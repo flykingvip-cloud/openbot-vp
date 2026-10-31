@@ -27,7 +27,16 @@
   "no_acknowledge_written": true,
   "no_releases_jsonl_change": true,
   "no_release_record_change": true,
-  "caveat": "proven_dag_break = DAG/SoT discontinuity only; NOT functional content rollback",
+  "caveat": "prior proven_dag_break claims for 52/100/121/140/145 are not fully adjudicated under shallow graphs; see closure note",
   "historical_audit_still_fail_closed": true,
-  "ledger_audit_exit": 30
+  "ledger_audit_exit": 30,
+  "superseded_adjudication": true,
+  "closure_note": "p1-dag-break-evidence-closure-2026-10-31.md",
+  "after_closure_of_five": {
+    "forward_only_among_five": [52, 100, 121, 140],
+    "incomplete_graph_unknown_among_five": [145],
+    "proven_dag_break_among_five": [],
+    "language_seq145": "当前联合对象图下非祖先（截断未排除）; NOT 历史无共同祖先"
+  },
+  "donor_also_shallow": true
 }

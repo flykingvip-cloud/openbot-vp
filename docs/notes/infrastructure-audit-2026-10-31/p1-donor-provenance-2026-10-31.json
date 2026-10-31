@@ -1,0 +1,39 @@
+{
+  "donor": {
+    "path": "/Users/daniel/AI项目/openbot",
+    "HEAD": "0c22e4837dc4179b02dd0b30f424c535d8cd9284",
+    "is_shallow": "true",
+    "shallow_boundaries": [
+      "333201a37397c942e40f7a5f58807f365fbd3054",
+      "595a0d9097a60e0ab460eab99cc8933824dcf63c",
+      "812d8e83059e41b4af4b547797952b37e65c0776",
+      "bf1a6ec9bbb3ab2a46292f6597086cdcfc13daaf",
+      "f225c8915f81820c6107a828830c3f8ceb1515da",
+      "ffb78e5d1bad56dbfd13c264503c69312d7ca87a"
+    ],
+    "remotes": [
+      "fork\thttps://github.com/gmood2008/openbot.git (fetch)",
+      "fork\thttps://github.com/gmood2008/openbot.git (push)",
+      "origin\thttps://github.com/upbeyond/openbot.git (fetch)",
+      "origin\thttps://github.com/upbeyond/openbot.git (push)",
+      "sshorigin\thttps://github.com/upbeyond/openbot.git (fetch)",
+      "sshorigin\thttps://github.com/upbeyond/openbot.git (push)",
+      "wt757\t/Users/daniel/AI项目/openbot-fix-nudge-claim-bridge (fetch)",
+      "wt757\t/Users/daniel/AI项目/openbot-fix-nudge-claim-bridge (push)"
+    ],
+    "branch": "cursor/skill-precipitation-actskill-integration-2026-10-19"
+  },
+  "audit_worktree": {
+    "path": "/Users/daniel/AI VP/openbot-infrastructure-audit",
+    "HEAD": "d189e74f85ff2838b0df0b469ca5eeae39bf9724",
+    "is_shallow": "true",
+    "shallow_boundaries": ["9a8e91d19e893fc5d963103538cdbd35f315ac30"],
+    "common_dir": "/Users/daniel/AI VP/openbot/.git",
+    "remotes": [
+      "origin\tgit@github.com-flykingvip:flykingvip-cloud/openbot-vp.git (fetch)",
+      "origin\tgit@github.com-flykingvip:flykingvip-cloud/openbot-vp.git (push)"
+    ]
+  },
+  "recovered_tips_into_audit_refs_count": 137,
+  "recovered_tips_sha_list_path": "recovered-shas.txt (also /tmp/infra-audit-p1-20261031/recovered-shas.txt)"
+}

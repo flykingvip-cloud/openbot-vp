@@ -1,0 +1,796 @@
+{
+  "generated_at_asia_shanghai": "2026-10-31T21:42:11+0800",
+  "ledger": "/Users/daniel/AI VP/openbot-infrastructure-audit/deploy/production/releases.jsonl",
+  "ledger_worktree_HEAD": "d189e74f85ff2838b0df0b469ca5eeae39bf9724",
+  "method": "rev-list ∩ shallow + immediate parent probe; positive is-ancestor wins; empty merge-base under shallow/missing => incomplete_graph_unknown",
+  "github_422_meaning": "fetch path unavailable now; NOT proof of forgery or permanent loss",
+  "provenance": {
+    "audit": {
+      "cwd": "/Users/daniel/AI VP/openbot-infrastructure-audit",
+      "HEAD": "d189e74f85ff2838b0df0b469ca5eeae39bf9724",
+      "is_shallow": true,
+      "shallow_path": "/Users/daniel/AI VP/openbot/.git/shallow",
+      "shallow_boundaries": ["9a8e91d19e893fc5d963103538cdbd35f315ac30"],
+      "remotes": [
+        "origin\tgit@github.com-flykingvip:flykingvip-cloud/openbot-vp.git (fetch)",
+        "origin\tgit@github.com-flykingvip:flykingvip-cloud/openbot-vp.git (push)"
+      ],
+      "alternates": [],
+      "audit_recovery_ref_count": 5,
+      "count_objects_head": [
+        "count: 69",
+        "size: 1192",
+        "in-pack: 130244",
+        "packs: 6",
+        "size-pack: 280334",
+        "prune-packable: 0",
+        "garbage: 1",
+        "size-garbage: 0"
+      ]
+    },
+    "donor": {
+      "cwd": "/Users/daniel/AI项目/openbot",
+      "HEAD": "0c22e4837dc4179b02dd0b30f424c535d8cd9284",
+      "is_shallow": true,
+      "shallow_path": "/Users/daniel/AI项目/openbot/.git/shallow",
+      "shallow_boundaries": [
+        "333201a37397c942e40f7a5f58807f365fbd3054",
+        "595a0d9097a60e0ab460eab99cc8933824dcf63c",
+        "812d8e83059e41b4af4b547797952b37e65c0776",
+        "bf1a6ec9bbb3ab2a46292f6597086cdcfc13daaf",
+        "f225c8915f81820c6107a828830c3f8ceb1515da",
+        "ffb78e5d1bad56dbfd13c264503c69312d7ca87a"
+      ],
+      "remotes": [
+        "fork\thttps://github.com/gmood2008/openbot.git (fetch)",
+        "fork\thttps://github.com/gmood2008/openbot.git (push)",
+        "origin\thttps://github.com/upbeyond/openbot.git (fetch)",
+        "origin\thttps://github.com/upbeyond/openbot.git (push)",
+        "sshorigin\thttps://github.com/upbeyond/openbot.git (fetch)",
+        "sshorigin\thttps://github.com/upbeyond/openbot.git (push)",
+        "wt757\t/Users/daniel/AI项目/openbot-fix-nudge-claim-bridge (fetch)",
+        "wt757\t/Users/daniel/AI项目/openbot-fix-nudge-claim-bridge (push)"
+      ],
+      "alternates": [],
+      "audit_recovery_ref_count": 0,
+      "count_objects_head": [
+        "count: 119",
+        "size: 1512",
+        "in-pack: 602476",
+        "packs: 6",
+        "size-pack: 1813174",
+        "prune-packable: 10",
+        "garbage: 106",
+        "size-garbage: 1440"
+      ]
+    }
+  },
+  "recovered_tips_inventory_count": 137,
+  "recovered_tips_sample": [
+    "0024d162c6182d5b9a6b0461d6fb49fde064d7d4",
+    "0411972cd38c0167421f5b2e289c6327479532ef",
+    "041dfd8826ee5d9854e5d3aefc46ec90dd94fc15",
+    "04690f8d2ed51f24a06825c153b7c1885d17182a",
+    "05fe958325f379ceef16e146d57cedc953d328d9",
+    "0751c73aed3dbe9d5724b9655d09c111af98889e",
+    "07ff8699ea01cf5779b1ef61269c1b7f3c285fd2",
+    "0b9c480fe2b54a5218a8658f21488a89fb4348d7",
+    "0f22222f1a1eb19303346c3c550786efb4354e4c",
+    "1326850607eb17c36141694ffd29fb1561dbee2f",
+    "13f4849b475a80921e37343595e0f2ef7a94c391",
+    "13ff093d281bea245f2bd04b8c43f44072e58831",
+    "1617926868e64b3d65e1b2f37e488ba6e8fb08f0",
+    "16cea426e711516629e52c0522c39a7a77628655",
+    "19aec9071ba71c531ba3780b4076c9c00d3ad362",
+    "1a6de1be5c443a0ad73eba04dba5ec6eb6c742a1",
+    "1b8bd8547f025b9694b23df2369732f6e3500e27",
+    "1e1143012db2276329ee0357ee78b51b7a89f41f",
+    "2022bcb0d192b5f99e291d0b50930aa7a6177664",
+    "21e1e8392f0ff5808563727eaa8f66e6ad9ed148"
+  ],
+  "pairs": [
+    {
+      "seq": 52,
+      "prior": "59be50660d8ebacf867211a206c92b4300bec418",
+      "current": "756a577ec77e9420ad5e927f7ddc963555ca1a97",
+      "per_repo": [
+        {
+          "repo": "audit",
+          "cwd": "/Users/daniel/AI VP/openbot-infrastructure-audit",
+          "elapsed_s": 0.374,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI VP/openbot/.git/shallow",
+          "shallow_boundaries": ["9a8e91d19e893fc5d963103538cdbd35f315ac30"],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": true,
+          "is_ancestor_prior_to_current_exit": 128,
+          "is_ancestor_prior_to_current_stderr": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nerror: could not parse commit cdd67eab5a1927a70e779a1172be45ecaca504b4",
+          "is_ancestor_current_to_prior_exit": 128,
+          "is_ancestor_current_to_prior_stderr": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nerror: could not parse commit cdd67eab5a1927a70e779a1172be45ecaca504b4",
+          "merge_base": null,
+          "merge_base_exit": 255,
+          "merge_base_stderr": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nerror: could not parse commit cdd67eab5a1927a70e779a1172be45ecaca504b4",
+          "merge_base_empty_with_truncation_risk": true,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 5632,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "59be50660d8ebacf867211a206c92b4300bec418 f28ce2d9b52ddf033f18814189b06b981075f0ee b159e32f05d46c50e8da5e0d1a11ba228532a3f4",
+                "b159e32f05d46c50e8da5e0d1a11ba228532a3f4 f28ce2d9b52ddf033f18814189b06b981075f0ee",
+                "f28ce2d9b52ddf033f18814189b06b981075f0ee fd9b2d43f07139da7e01492edddd06696deb52c1",
+                "fd9b2d43f07139da7e01492edddd06696deb52c1 40abfa43dff2df81382267aea48f898f933183ac",
+                "40abfa43dff2df81382267aea48f898f933183ac b105d2d1610bbdccfafdc2f4f4ad9b7ee908d3a3 4c87732d61b104eed3e997756a79287b21b25db1",
+                "4c87732d61b104eed3e997756a79287b21b25db1 53bc2484f26b6a7c46d5c4276f398dc6e0a93103 b105d2d1610bbdccfafdc2f4f4ad9b7ee908d3a3",
+                "b105d2d1610bbdccfafdc2f4f4ad9b7ee908d3a3 0de5f842a1b06500537b9208a1de193c74178e97",
+                "0de5f842a1b06500537b9208a1de193c74178e97 ea8999e47c72e45ffaf3b624843b39cc1b0eebb9"
+              ]
+            },
+            "current": {
+              "present": true,
+              "rev_list_ok": false,
+              "commit_count": null,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nfatal: Failed to traverse parents of commit 333201a37397c942e40f7a5f58807f365fbd3054",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "756a577ec77e9420ad5e927f7ddc963555ca1a97 2f10ffd8752feec8aed3ef1ebb4c89bafa7f9e59",
+                "2f10ffd8752feec8aed3ef1ebb4c89bafa7f9e59 b915cb93cf5b7056b636cd2e1bc89ea58d24bd98",
+                "b915cb93cf5b7056b636cd2e1bc89ea58d24bd98 af5970ad939ecce643c09ac369599c406a449156",
+                "af5970ad939ecce643c09ac369599c406a449156 d842810e4a2d4aa1d3f721ef8dee4f5338b85796",
+                "d842810e4a2d4aa1d3f721ef8dee4f5338b85796 a2b5f18b6ae37fdd39d9ae536fcf326079551506",
+                "a2b5f18b6ae37fdd39d9ae536fcf326079551506 5daffc984b33443a7f490cc481f1122b43770cb8",
+                "5daffc984b33443a7f490cc481f1122b43770cb8 60c34606053aa45930da0b342f9e8d6b08d4d2bb",
+                "60c34606053aa45930da0b342f9e8d6b08d4d2bb feb282af713021e5eaaac692e01c3cb3af0cc510"
+              ]
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": ["current_rev_list_failed"],
+          "label_this_repo": "incomplete_graph_command_failure"
+        },
+        {
+          "repo": "donor",
+          "cwd": "/Users/daniel/AI项目/openbot",
+          "elapsed_s": 0.615,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI项目/openbot/.git/shallow",
+          "shallow_boundaries": [
+            "333201a37397c942e40f7a5f58807f365fbd3054",
+            "595a0d9097a60e0ab460eab99cc8933824dcf63c",
+            "812d8e83059e41b4af4b547797952b37e65c0776",
+            "bf1a6ec9bbb3ab2a46292f6597086cdcfc13daaf",
+            "f225c8915f81820c6107a828830c3f8ceb1515da",
+            "ffb78e5d1bad56dbfd13c264503c69312d7ca87a"
+          ],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": true,
+          "is_ancestor_prior_to_current_exit": 1,
+          "is_ancestor_prior_to_current_stderr": "",
+          "is_ancestor_current_to_prior_exit": 1,
+          "is_ancestor_current_to_prior_stderr": "",
+          "merge_base": null,
+          "merge_base_exit": 1,
+          "merge_base_stderr": "",
+          "merge_base_empty_with_truncation_risk": true,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 5632,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "59be50660d8ebacf867211a206c92b4300bec418 f28ce2d9b52ddf033f18814189b06b981075f0ee b159e32f05d46c50e8da5e0d1a11ba228532a3f4",
+                "b159e32f05d46c50e8da5e0d1a11ba228532a3f4 f28ce2d9b52ddf033f18814189b06b981075f0ee",
+                "f28ce2d9b52ddf033f18814189b06b981075f0ee fd9b2d43f07139da7e01492edddd06696deb52c1",
+                "fd9b2d43f07139da7e01492edddd06696deb52c1 40abfa43dff2df81382267aea48f898f933183ac",
+                "40abfa43dff2df81382267aea48f898f933183ac b105d2d1610bbdccfafdc2f4f4ad9b7ee908d3a3 4c87732d61b104eed3e997756a79287b21b25db1",
+                "4c87732d61b104eed3e997756a79287b21b25db1 53bc2484f26b6a7c46d5c4276f398dc6e0a93103 b105d2d1610bbdccfafdc2f4f4ad9b7ee908d3a3",
+                "b105d2d1610bbdccfafdc2f4f4ad9b7ee908d3a3 0de5f842a1b06500537b9208a1de193c74178e97",
+                "0de5f842a1b06500537b9208a1de193c74178e97 ea8999e47c72e45ffaf3b624843b39cc1b0eebb9"
+              ]
+            },
+            "current": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 97,
+              "shallow_hits": [
+                "333201a37397c942e40f7a5f58807f365fbd3054",
+                "ffb78e5d1bad56dbfd13c264503c69312d7ca87a"
+              ],
+              "shallow_hit_count": 2,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "756a577ec77e9420ad5e927f7ddc963555ca1a97 2f10ffd8752feec8aed3ef1ebb4c89bafa7f9e59",
+                "2f10ffd8752feec8aed3ef1ebb4c89bafa7f9e59 b915cb93cf5b7056b636cd2e1bc89ea58d24bd98",
+                "b915cb93cf5b7056b636cd2e1bc89ea58d24bd98 af5970ad939ecce643c09ac369599c406a449156",
+                "af5970ad939ecce643c09ac369599c406a449156 d842810e4a2d4aa1d3f721ef8dee4f5338b85796",
+                "d842810e4a2d4aa1d3f721ef8dee4f5338b85796 a2b5f18b6ae37fdd39d9ae536fcf326079551506",
+                "a2b5f18b6ae37fdd39d9ae536fcf326079551506 5daffc984b33443a7f490cc481f1122b43770cb8",
+                "5daffc984b33443a7f490cc481f1122b43770cb8 60c34606053aa45930da0b342f9e8d6b08d4d2bb",
+                "60c34606053aa45930da0b342f9e8d6b08d4d2bb feb282af713021e5eaaac692e01c3cb3af0cc510"
+              ]
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": ["current_hit_shallow_boundary"],
+          "label_this_repo": "incomplete_graph_unknown"
+        }
+      ],
+      "final_label": "incomplete_graph_unknown",
+      "final_note": "当前联合对象图下非祖先；shallow/missing 未排除 — 不得写「历史无共同祖先」",
+      "reclassified_away_from_prior_proven_dag_break": true
+    },
+    {
+      "seq": 100,
+      "prior": "28ef650e0f97f56b650e6c5a1e216c690f379ffb",
+      "current": "6628f4bf364bd6d0560847b938b00e74035a8947",
+      "per_repo": [
+        {
+          "repo": "audit",
+          "cwd": "/Users/daniel/AI VP/openbot-infrastructure-audit",
+          "elapsed_s": 0.351,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI VP/openbot/.git/shallow",
+          "shallow_boundaries": ["9a8e91d19e893fc5d963103538cdbd35f315ac30"],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": true,
+          "is_ancestor_prior_to_current_exit": 0,
+          "is_ancestor_prior_to_current_stderr": "",
+          "is_ancestor_current_to_prior_exit": 1,
+          "is_ancestor_current_to_prior_stderr": "",
+          "merge_base": "28ef650e0f97f56b650e6c5a1e216c690f379ffb",
+          "merge_base_exit": 0,
+          "merge_base_stderr": "",
+          "merge_base_empty_with_truncation_risk": false,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": false,
+              "commit_count": null,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nfatal: Failed to traverse parents of commit 333201a37397c942e40f7a5f58807f365fbd3054",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "28ef650e0f97f56b650e6c5a1e216c690f379ffb 32672466c92a90fd99f72d7f26508a335f4f2b3d 7c6fb41b7a1f21d9d5acb731411920eb2df8e934",
+                "7c6fb41b7a1f21d9d5acb731411920eb2df8e934 32672466c92a90fd99f72d7f26508a335f4f2b3d",
+                "32672466c92a90fd99f72d7f26508a335f4f2b3d 00ebc781fe6d66b0725c65609af8095357c63ce1 807cf5c31a6ebb9184d7653e3cf18112bac31453",
+                "807cf5c31a6ebb9184d7653e3cf18112bac31453 4b8837039b24d87fedb75f27f15f06378daad0ec",
+                "00ebc781fe6d66b0725c65609af8095357c63ce1 4b8837039b24d87fedb75f27f15f06378daad0ec 98287e5a2d8ef4db41fffc397d630d975de0af70",
+                "98287e5a2d8ef4db41fffc397d630d975de0af70 4b8837039b24d87fedb75f27f15f06378daad0ec",
+                "4b8837039b24d87fedb75f27f15f06378daad0ec bab68df9a7165d2d1bff43d260aa4f0b23e2b8d3 69e093752bac7d6babfa32fc107c310d0e05c47c",
+                "69e093752bac7d6babfa32fc107c310d0e05c47c bab68df9a7165d2d1bff43d260aa4f0b23e2b8d3"
+              ]
+            },
+            "current": {
+              "present": true,
+              "rev_list_ok": false,
+              "commit_count": null,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nfatal: Failed to traverse parents of commit 333201a37397c942e40f7a5f58807f365fbd3054",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "6628f4bf364bd6d0560847b938b00e74035a8947 f0e9bed89dbefbd957c3f1900d902899164074c6",
+                "f0e9bed89dbefbd957c3f1900d902899164074c6 7d72684d3b33936858d510e9376fc1b92bc105d4",
+                "7d72684d3b33936858d510e9376fc1b92bc105d4 a722492c6793b36075cb9c0ca488ca17fc7c345b",
+                "a722492c6793b36075cb9c0ca488ca17fc7c345b 6e15d8586a827bc5b7d4ed6352507749c320f660",
+                "6e15d8586a827bc5b7d4ed6352507749c320f660 cdcf9a0a2ef4387ca7c6c57d5ebf43da1f0e030a",
+                "cdcf9a0a2ef4387ca7c6c57d5ebf43da1f0e030a 29a554a3ac23a8cfbaa3e15788bfd1fbb9831208 6131acfae7fc607a2d500b45c59ee85123105517",
+                "6131acfae7fc607a2d500b45c59ee85123105517 e09bd7961fa870397843c0780f309b5486c81ee9",
+                "e09bd7961fa870397843c0780f309b5486c81ee9 29a554a3ac23a8cfbaa3e15788bfd1fbb9831208"
+              ]
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": ["prior_rev_list_failed", "current_rev_list_failed"],
+          "label_this_repo": "forward-only"
+        },
+        {
+          "repo": "donor",
+          "cwd": "/Users/daniel/AI项目/openbot",
+          "elapsed_s": 0.394,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI项目/openbot/.git/shallow",
+          "shallow_boundaries": [
+            "333201a37397c942e40f7a5f58807f365fbd3054",
+            "595a0d9097a60e0ab460eab99cc8933824dcf63c",
+            "812d8e83059e41b4af4b547797952b37e65c0776",
+            "bf1a6ec9bbb3ab2a46292f6597086cdcfc13daaf",
+            "f225c8915f81820c6107a828830c3f8ceb1515da",
+            "ffb78e5d1bad56dbfd13c264503c69312d7ca87a"
+          ],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": true,
+          "is_ancestor_prior_to_current_exit": 1,
+          "is_ancestor_prior_to_current_stderr": "",
+          "is_ancestor_current_to_prior_exit": 1,
+          "is_ancestor_current_to_prior_stderr": "",
+          "merge_base": null,
+          "merge_base_exit": 1,
+          "merge_base_stderr": "",
+          "merge_base_empty_with_truncation_risk": true,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 1115,
+              "shallow_hits": [
+                "333201a37397c942e40f7a5f58807f365fbd3054",
+                "bf1a6ec9bbb3ab2a46292f6597086cdcfc13daaf",
+                "ffb78e5d1bad56dbfd13c264503c69312d7ca87a"
+              ],
+              "shallow_hit_count": 3,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "28ef650e0f97f56b650e6c5a1e216c690f379ffb 32672466c92a90fd99f72d7f26508a335f4f2b3d 7c6fb41b7a1f21d9d5acb731411920eb2df8e934",
+                "7c6fb41b7a1f21d9d5acb731411920eb2df8e934 32672466c92a90fd99f72d7f26508a335f4f2b3d",
+                "32672466c92a90fd99f72d7f26508a335f4f2b3d 00ebc781fe6d66b0725c65609af8095357c63ce1 807cf5c31a6ebb9184d7653e3cf18112bac31453",
+                "807cf5c31a6ebb9184d7653e3cf18112bac31453 4b8837039b24d87fedb75f27f15f06378daad0ec",
+                "00ebc781fe6d66b0725c65609af8095357c63ce1 4b8837039b24d87fedb75f27f15f06378daad0ec 98287e5a2d8ef4db41fffc397d630d975de0af70",
+                "98287e5a2d8ef4db41fffc397d630d975de0af70 4b8837039b24d87fedb75f27f15f06378daad0ec",
+                "4b8837039b24d87fedb75f27f15f06378daad0ec bab68df9a7165d2d1bff43d260aa4f0b23e2b8d3 69e093752bac7d6babfa32fc107c310d0e05c47c",
+                "69e093752bac7d6babfa32fc107c310d0e05c47c bab68df9a7165d2d1bff43d260aa4f0b23e2b8d3"
+              ]
+            },
+            "current": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 31,
+              "shallow_hits": ["812d8e83059e41b4af4b547797952b37e65c0776"],
+              "shallow_hit_count": 1,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "6628f4bf364bd6d0560847b938b00e74035a8947 f0e9bed89dbefbd957c3f1900d902899164074c6",
+                "f0e9bed89dbefbd957c3f1900d902899164074c6 7d72684d3b33936858d510e9376fc1b92bc105d4",
+                "7d72684d3b33936858d510e9376fc1b92bc105d4 a722492c6793b36075cb9c0ca488ca17fc7c345b",
+                "a722492c6793b36075cb9c0ca488ca17fc7c345b 6e15d8586a827bc5b7d4ed6352507749c320f660",
+                "6e15d8586a827bc5b7d4ed6352507749c320f660 cdcf9a0a2ef4387ca7c6c57d5ebf43da1f0e030a",
+                "cdcf9a0a2ef4387ca7c6c57d5ebf43da1f0e030a 29a554a3ac23a8cfbaa3e15788bfd1fbb9831208 6131acfae7fc607a2d500b45c59ee85123105517",
+                "6131acfae7fc607a2d500b45c59ee85123105517 e09bd7961fa870397843c0780f309b5486c81ee9",
+                "e09bd7961fa870397843c0780f309b5486c81ee9 29a554a3ac23a8cfbaa3e15788bfd1fbb9831208"
+              ]
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": ["prior_hit_shallow_boundary", "current_hit_shallow_boundary"],
+          "label_this_repo": "incomplete_graph_unknown"
+        }
+      ],
+      "final_label": "forward-only",
+      "final_note": "is-ancestor prior→current exit 0 in ≥1 repo (positive proof)",
+      "reclassified_away_from_prior_proven_dag_break": true
+    },
+    {
+      "seq": 121,
+      "prior": "0411972cd38c0167421f5b2e289c6327479532ef",
+      "current": "13ff093d281bea245f2bd04b8c43f44072e58831",
+      "per_repo": [
+        {
+          "repo": "audit",
+          "cwd": "/Users/daniel/AI VP/openbot-infrastructure-audit",
+          "elapsed_s": 0.341,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI VP/openbot/.git/shallow",
+          "shallow_boundaries": ["9a8e91d19e893fc5d963103538cdbd35f315ac30"],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": true,
+          "is_ancestor_prior_to_current_exit": 0,
+          "is_ancestor_prior_to_current_stderr": "",
+          "is_ancestor_current_to_prior_exit": 1,
+          "is_ancestor_current_to_prior_stderr": "",
+          "merge_base": "0411972cd38c0167421f5b2e289c6327479532ef",
+          "merge_base_exit": 0,
+          "merge_base_stderr": "",
+          "merge_base_empty_with_truncation_risk": false,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": false,
+              "commit_count": null,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nfatal: Failed to traverse parents of commit 333201a37397c942e40f7a5f58807f365fbd3054",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "0411972cd38c0167421f5b2e289c6327479532ef 318f58bf97cb908030d3229ca5d9308e1115bd53",
+                "318f58bf97cb908030d3229ca5d9308e1115bd53 d44d1d1b3381b2f20aa3c140b3d130bec6c5a740",
+                "d44d1d1b3381b2f20aa3c140b3d130bec6c5a740 a958c7ee9d7ba46fbd523ed241ed166ae7d966d7",
+                "a958c7ee9d7ba46fbd523ed241ed166ae7d966d7 3a1dddb10cf775c73d7af55a1fdab5c82d0bc625",
+                "3a1dddb10cf775c73d7af55a1fdab5c82d0bc625 0b9c480fe2b54a5218a8658f21488a89fb4348d7",
+                "0b9c480fe2b54a5218a8658f21488a89fb4348d7 7d5948030f8e4a50ea73343ca24c88c44bcdded8",
+                "7d5948030f8e4a50ea73343ca24c88c44bcdded8 23e2d2af2e86c9e5fffb909374132d359e814128",
+                "23e2d2af2e86c9e5fffb909374132d359e814128 1a3f8ebc71d282afe6bd41fa8091cb2419467244"
+              ]
+            },
+            "current": {
+              "present": true,
+              "rev_list_ok": false,
+              "commit_count": null,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nfatal: Failed to traverse parents of commit 333201a37397c942e40f7a5f58807f365fbd3054",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "13ff093d281bea245f2bd04b8c43f44072e58831 f225c8915f81820c6107a828830c3f8ceb1515da",
+                "f225c8915f81820c6107a828830c3f8ceb1515da 765a0bf95ec5a76265c93e0a54afaeda3d3562f8",
+                "765a0bf95ec5a76265c93e0a54afaeda3d3562f8 89430645968a3168a5991d2039125c1914321644",
+                "89430645968a3168a5991d2039125c1914321644 cec68f4a52bad93805cc9b1e429879e0f4e4f725",
+                "cec68f4a52bad93805cc9b1e429879e0f4e4f725 4d7aa62ec2e40f52c48f7fb5075dd1fb7227f1cb",
+                "4d7aa62ec2e40f52c48f7fb5075dd1fb7227f1cb 5fe414de83ced78a8225a387e46cc13e533a8d5e",
+                "5fe414de83ced78a8225a387e46cc13e533a8d5e 0411972cd38c0167421f5b2e289c6327479532ef",
+                "0411972cd38c0167421f5b2e289c6327479532ef 318f58bf97cb908030d3229ca5d9308e1115bd53"
+              ]
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": ["prior_rev_list_failed", "current_rev_list_failed"],
+          "label_this_repo": "forward-only"
+        },
+        {
+          "repo": "donor",
+          "cwd": "/Users/daniel/AI项目/openbot",
+          "elapsed_s": 0.34,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI项目/openbot/.git/shallow",
+          "shallow_boundaries": [
+            "333201a37397c942e40f7a5f58807f365fbd3054",
+            "595a0d9097a60e0ab460eab99cc8933824dcf63c",
+            "812d8e83059e41b4af4b547797952b37e65c0776",
+            "bf1a6ec9bbb3ab2a46292f6597086cdcfc13daaf",
+            "f225c8915f81820c6107a828830c3f8ceb1515da",
+            "ffb78e5d1bad56dbfd13c264503c69312d7ca87a"
+          ],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": true,
+          "is_ancestor_prior_to_current_exit": 1,
+          "is_ancestor_prior_to_current_stderr": "",
+          "is_ancestor_current_to_prior_exit": 1,
+          "is_ancestor_current_to_prior_stderr": "",
+          "merge_base": null,
+          "merge_base_exit": 1,
+          "merge_base_stderr": "",
+          "merge_base_empty_with_truncation_risk": true,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 705,
+              "shallow_hits": ["812d8e83059e41b4af4b547797952b37e65c0776"],
+              "shallow_hit_count": 1,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "0411972cd38c0167421f5b2e289c6327479532ef 318f58bf97cb908030d3229ca5d9308e1115bd53",
+                "318f58bf97cb908030d3229ca5d9308e1115bd53 d44d1d1b3381b2f20aa3c140b3d130bec6c5a740",
+                "d44d1d1b3381b2f20aa3c140b3d130bec6c5a740 a958c7ee9d7ba46fbd523ed241ed166ae7d966d7",
+                "a958c7ee9d7ba46fbd523ed241ed166ae7d966d7 3a1dddb10cf775c73d7af55a1fdab5c82d0bc625",
+                "3a1dddb10cf775c73d7af55a1fdab5c82d0bc625 0b9c480fe2b54a5218a8658f21488a89fb4348d7",
+                "0b9c480fe2b54a5218a8658f21488a89fb4348d7 7d5948030f8e4a50ea73343ca24c88c44bcdded8",
+                "7d5948030f8e4a50ea73343ca24c88c44bcdded8 23e2d2af2e86c9e5fffb909374132d359e814128",
+                "23e2d2af2e86c9e5fffb909374132d359e814128 1a3f8ebc71d282afe6bd41fa8091cb2419467244"
+              ]
+            },
+            "current": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 2,
+              "shallow_hits": ["f225c8915f81820c6107a828830c3f8ceb1515da"],
+              "shallow_hit_count": 1,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "13ff093d281bea245f2bd04b8c43f44072e58831 f225c8915f81820c6107a828830c3f8ceb1515da",
+                "f225c8915f81820c6107a828830c3f8ceb1515da"
+              ]
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": ["prior_hit_shallow_boundary", "current_hit_shallow_boundary"],
+          "label_this_repo": "incomplete_graph_unknown"
+        }
+      ],
+      "final_label": "forward-only",
+      "final_note": "is-ancestor prior→current exit 0 in ≥1 repo (positive proof)",
+      "reclassified_away_from_prior_proven_dag_break": true
+    },
+    {
+      "seq": 140,
+      "prior": "d95f332d39c8a3b300d1f56def26b80458e33d74",
+      "current": "c33c140167bfa251c5a0346b32a348ad2c85a9d0",
+      "per_repo": [
+        {
+          "repo": "audit",
+          "cwd": "/Users/daniel/AI VP/openbot-infrastructure-audit",
+          "elapsed_s": 0.353,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI VP/openbot/.git/shallow",
+          "shallow_boundaries": ["9a8e91d19e893fc5d963103538cdbd35f315ac30"],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": true,
+          "is_ancestor_prior_to_current_exit": 0,
+          "is_ancestor_prior_to_current_stderr": "",
+          "is_ancestor_current_to_prior_exit": 1,
+          "is_ancestor_current_to_prior_stderr": "",
+          "merge_base": "d95f332d39c8a3b300d1f56def26b80458e33d74",
+          "merge_base_exit": 0,
+          "merge_base_stderr": "",
+          "merge_base_empty_with_truncation_risk": false,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": false,
+              "commit_count": null,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nfatal: Failed to traverse parents of commit 333201a37397c942e40f7a5f58807f365fbd3054",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "d95f332d39c8a3b300d1f56def26b80458e33d74 5dd2a08c060421f63d6c3e480cda4e7dedf4bd5c",
+                "5dd2a08c060421f63d6c3e480cda4e7dedf4bd5c 8d0133180b53e16c40cdaabdc82929afdc97406e",
+                "8d0133180b53e16c40cdaabdc82929afdc97406e d292ce2b507d56781a459299a860a6b528d9999a",
+                "d292ce2b507d56781a459299a860a6b528d9999a 568719246e70cd36d1ae289e22745e6b8f0338e3",
+                "568719246e70cd36d1ae289e22745e6b8f0338e3 18d83285f0b8e253fe64698ad1e89d66e5610d9b",
+                "18d83285f0b8e253fe64698ad1e89d66e5610d9b 5203737d3ea69f3ab1e5656d2c2d825c9a0b972f",
+                "5203737d3ea69f3ab1e5656d2c2d825c9a0b972f a0efbc90c65570666a02af2dda9a72227aa95226",
+                "a0efbc90c65570666a02af2dda9a72227aa95226 01516d8aeae73ea130813b4be183067783cc1592"
+              ]
+            },
+            "current": {
+              "present": true,
+              "rev_list_ok": false,
+              "commit_count": null,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "error: Could not read cdd67eab5a1927a70e779a1172be45ecaca504b4\nfatal: Failed to traverse parents of commit 333201a37397c942e40f7a5f58807f365fbd3054",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "c33c140167bfa251c5a0346b32a348ad2c85a9d0 8aab43c023d8d475a2d307cbad318770c491dd08",
+                "8aab43c023d8d475a2d307cbad318770c491dd08 e4c2bba99e01faeda89b8ac2ba59c0cf76a68d6d",
+                "e4c2bba99e01faeda89b8ac2ba59c0cf76a68d6d a82f6c94e54e60ca0f1bc5e8352a1d04a2fba94a",
+                "a82f6c94e54e60ca0f1bc5e8352a1d04a2fba94a 94f2ea154cccebaab4fbb650df080ebdee36e53c",
+                "94f2ea154cccebaab4fbb650df080ebdee36e53c 1713f0c141c989b26e3aa0f317a885f5d54988e0",
+                "1713f0c141c989b26e3aa0f317a885f5d54988e0 3aaacebbb724f6e5bfeea6fdeb81f2560930c124",
+                "3aaacebbb724f6e5bfeea6fdeb81f2560930c124 e2de40140ba5dab09e41dcdb3018f849161def44",
+                "e2de40140ba5dab09e41dcdb3018f849161def44 43d0486bb13dd8681d142694f308cd078884b91b"
+              ]
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": ["prior_rev_list_failed", "current_rev_list_failed"],
+          "label_this_repo": "forward-only"
+        },
+        {
+          "repo": "donor",
+          "cwd": "/Users/daniel/AI项目/openbot",
+          "elapsed_s": 0.313,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI项目/openbot/.git/shallow",
+          "shallow_boundaries": [
+            "333201a37397c942e40f7a5f58807f365fbd3054",
+            "595a0d9097a60e0ab460eab99cc8933824dcf63c",
+            "812d8e83059e41b4af4b547797952b37e65c0776",
+            "bf1a6ec9bbb3ab2a46292f6597086cdcfc13daaf",
+            "f225c8915f81820c6107a828830c3f8ceb1515da",
+            "ffb78e5d1bad56dbfd13c264503c69312d7ca87a"
+          ],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": true,
+          "is_ancestor_prior_to_current_exit": 1,
+          "is_ancestor_prior_to_current_stderr": "",
+          "is_ancestor_current_to_prior_exit": 1,
+          "is_ancestor_current_to_prior_stderr": "",
+          "merge_base": null,
+          "merge_base_exit": 1,
+          "merge_base_stderr": "",
+          "merge_base_empty_with_truncation_risk": true,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 222,
+              "shallow_hits": ["f225c8915f81820c6107a828830c3f8ceb1515da"],
+              "shallow_hit_count": 1,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "d95f332d39c8a3b300d1f56def26b80458e33d74 5dd2a08c060421f63d6c3e480cda4e7dedf4bd5c",
+                "5dd2a08c060421f63d6c3e480cda4e7dedf4bd5c 8d0133180b53e16c40cdaabdc82929afdc97406e",
+                "8d0133180b53e16c40cdaabdc82929afdc97406e d292ce2b507d56781a459299a860a6b528d9999a",
+                "d292ce2b507d56781a459299a860a6b528d9999a 568719246e70cd36d1ae289e22745e6b8f0338e3",
+                "568719246e70cd36d1ae289e22745e6b8f0338e3 18d83285f0b8e253fe64698ad1e89d66e5610d9b",
+                "18d83285f0b8e253fe64698ad1e89d66e5610d9b 5203737d3ea69f3ab1e5656d2c2d825c9a0b972f",
+                "5203737d3ea69f3ab1e5656d2c2d825c9a0b972f a0efbc90c65570666a02af2dda9a72227aa95226",
+                "a0efbc90c65570666a02af2dda9a72227aa95226 01516d8aeae73ea130813b4be183067783cc1592"
+              ]
+            },
+            "current": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 15,
+              "shallow_hits": ["595a0d9097a60e0ab460eab99cc8933824dcf63c"],
+              "shallow_hit_count": 1,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "c33c140167bfa251c5a0346b32a348ad2c85a9d0 8aab43c023d8d475a2d307cbad318770c491dd08",
+                "8aab43c023d8d475a2d307cbad318770c491dd08 e4c2bba99e01faeda89b8ac2ba59c0cf76a68d6d",
+                "e4c2bba99e01faeda89b8ac2ba59c0cf76a68d6d a82f6c94e54e60ca0f1bc5e8352a1d04a2fba94a",
+                "a82f6c94e54e60ca0f1bc5e8352a1d04a2fba94a 94f2ea154cccebaab4fbb650df080ebdee36e53c",
+                "94f2ea154cccebaab4fbb650df080ebdee36e53c 1713f0c141c989b26e3aa0f317a885f5d54988e0",
+                "1713f0c141c989b26e3aa0f317a885f5d54988e0 3aaacebbb724f6e5bfeea6fdeb81f2560930c124",
+                "3aaacebbb724f6e5bfeea6fdeb81f2560930c124 e2de40140ba5dab09e41dcdb3018f849161def44",
+                "e2de40140ba5dab09e41dcdb3018f849161def44 43d0486bb13dd8681d142694f308cd078884b91b"
+              ]
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": ["prior_hit_shallow_boundary", "current_hit_shallow_boundary"],
+          "label_this_repo": "incomplete_graph_unknown"
+        }
+      ],
+      "final_label": "forward-only",
+      "final_note": "is-ancestor prior→current exit 0 in ≥1 repo (positive proof)",
+      "reclassified_away_from_prior_proven_dag_break": true
+    },
+    {
+      "seq": 145,
+      "prior": "9a8e91d19e893fc5d963103538cdbd35f315ac30",
+      "current": "065840dfba129475c9c9030c80af07970dcdd084",
+      "per_repo": [
+        {
+          "repo": "audit",
+          "cwd": "/Users/daniel/AI VP/openbot-infrastructure-audit",
+          "elapsed_s": 0.289,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI VP/openbot/.git/shallow",
+          "shallow_boundaries": ["9a8e91d19e893fc5d963103538cdbd35f315ac30"],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": true,
+          "is_ancestor_prior_to_current_exit": 1,
+          "is_ancestor_prior_to_current_stderr": "",
+          "is_ancestor_current_to_prior_exit": 1,
+          "is_ancestor_current_to_prior_stderr": "",
+          "merge_base": null,
+          "merge_base_exit": 1,
+          "merge_base_stderr": "",
+          "merge_base_empty_with_truncation_risk": true,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 1,
+              "shallow_hits": ["9a8e91d19e893fc5d963103538cdbd35f315ac30"],
+              "shallow_hit_count": 1,
+              "rev_list_err": "",
+              "immediate_parent_issues": [
+                {
+                  "tip": "9a8e91d19e893fc5d963103538cdbd35f315ac30",
+                  "reason": "tip_is_shallow_boundary",
+                  "declared_parents": ["b9be3ec588e9e709d95199238b92a6b83f46c1e8"]
+                },
+                {
+                  "child": "9a8e91d19e893fc5d963103538cdbd35f315ac30",
+                  "parent": "b9be3ec588e9e709d95199238b92a6b83f46c1e8",
+                  "reason": "parent_object_missing",
+                  "child_is_shallow": true,
+                  "err": "fatal: git cat-file: could not get object info"
+                }
+              ],
+              "log_sample": ["9a8e91d19e893fc5d963103538cdbd35f315ac30"]
+            },
+            "current": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 77,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "065840dfba129475c9c9030c80af07970dcdd084 b8864b26a2260629bd79ba969b419936839afc44",
+                "b8864b26a2260629bd79ba969b419936839afc44 dd129a28e34ea9636af8a9963380b828bb1da12b",
+                "dd129a28e34ea9636af8a9963380b828bb1da12b caa781b9934291a4ffe615e342fab6a029e425fc",
+                "caa781b9934291a4ffe615e342fab6a029e425fc 5b6176afb1bcb031d70fc8bb0d1631889c47244d",
+                "5b6176afb1bcb031d70fc8bb0d1631889c47244d 7c111408fd7dea24c6384b65db3e76658879647c",
+                "7c111408fd7dea24c6384b65db3e76658879647c f024b5c2e53db70963136930ab40ccce4d3f1c74 fc03711b5c89f8cecd04e6d00ffa9c1dcf3db154",
+                "f024b5c2e53db70963136930ab40ccce4d3f1c74 552236118df21c8d059e03a485b3a2e5ca203f43",
+                "fc03711b5c89f8cecd04e6d00ffa9c1dcf3db154 6be6d63a2e58184751720dd3be9ded4c93bf8297"
+              ]
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": [
+            "prior_hit_shallow_boundary",
+            "prior_immediate_parent_missing"
+          ],
+          "label_this_repo": "incomplete_graph_unknown"
+        },
+        {
+          "repo": "donor",
+          "cwd": "/Users/daniel/AI项目/openbot",
+          "elapsed_s": 0.215,
+          "is_shallow_repo": true,
+          "shallow_path": "/Users/daniel/AI项目/openbot/.git/shallow",
+          "shallow_boundaries": [
+            "333201a37397c942e40f7a5f58807f365fbd3054",
+            "595a0d9097a60e0ab460eab99cc8933824dcf63c",
+            "812d8e83059e41b4af4b547797952b37e65c0776",
+            "bf1a6ec9bbb3ab2a46292f6597086cdcfc13daaf",
+            "f225c8915f81820c6107a828830c3f8ceb1515da",
+            "ffb78e5d1bad56dbfd13c264503c69312d7ca87a"
+          ],
+          "alternates": [],
+          "prior_present": true,
+          "current_present": false,
+          "is_ancestor_prior_to_current_exit": 128,
+          "is_ancestor_prior_to_current_stderr": "fatal: Not a valid commit name 065840dfba129475c9c9030c80af07970dcdd084",
+          "is_ancestor_current_to_prior_exit": 128,
+          "is_ancestor_current_to_prior_stderr": "fatal: Not a valid commit name 065840dfba129475c9c9030c80af07970dcdd084",
+          "merge_base": null,
+          "merge_base_exit": 128,
+          "merge_base_stderr": "fatal: Not a valid commit name 065840dfba129475c9c9030c80af07970dcdd084",
+          "merge_base_empty_with_truncation_risk": true,
+          "walk": {
+            "prior": {
+              "present": true,
+              "rev_list_ok": true,
+              "commit_count": 86,
+              "shallow_hits": ["595a0d9097a60e0ab460eab99cc8933824dcf63c"],
+              "shallow_hit_count": 1,
+              "rev_list_err": "",
+              "immediate_parent_issues": [],
+              "log_sample": [
+                "9a8e91d19e893fc5d963103538cdbd35f315ac30 b9be3ec588e9e709d95199238b92a6b83f46c1e8",
+                "b9be3ec588e9e709d95199238b92a6b83f46c1e8 8be95942cae74ccd845b38bcce8a27480c2dee6a",
+                "8be95942cae74ccd845b38bcce8a27480c2dee6a cb4031d5fd979676f3adfc5ff9cccbcdb1aeb2d6",
+                "cb4031d5fd979676f3adfc5ff9cccbcdb1aeb2d6 65e8c2fbbb94ae28cfa6478bc225dc835eaeb4a0",
+                "65e8c2fbbb94ae28cfa6478bc225dc835eaeb4a0 18c6e60f113b688119c23fc9b5cb6beb3d18473d",
+                "18c6e60f113b688119c23fc9b5cb6beb3d18473d e5878b3b99be9847b00f2f8b87f94f1b50677fe1",
+                "e5878b3b99be9847b00f2f8b87f94f1b50677fe1 1201ff6429e3b70c2e8dba86347cb2b68f2724dd",
+                "1201ff6429e3b70c2e8dba86347cb2b68f2724dd a05142dd1054e08bdfbb28e459594886204a3b95"
+              ]
+            },
+            "current": {
+              "present": false,
+              "rev_list_ok": null,
+              "commit_count": null,
+              "shallow_hits": [],
+              "shallow_hit_count": 0,
+              "rev_list_err": null,
+              "immediate_parent_issues": []
+            }
+          },
+          "graph_complete_enough_to_adjudicate": false,
+          "incompleteness_reasons": ["current_tip_missing", "prior_hit_shallow_boundary"],
+          "label_this_repo": "missing_object"
+        }
+      ],
+      "final_label": "incomplete_graph_unknown",
+      "final_note": "当前联合对象图下非祖先；shallow/missing 未排除 — 不得写「历史无共同祖先」",
+      "reclassified_away_from_prior_proven_dag_break": true
+    }
+  ]
+}

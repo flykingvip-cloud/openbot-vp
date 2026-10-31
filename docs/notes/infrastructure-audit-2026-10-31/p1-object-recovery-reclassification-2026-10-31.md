@@ -1,5 +1,8 @@
 # Priority1 对象恢复与历史重新分类 — 2026-10-31 Asia/Shanghai
 
+> **SUPERSEDED ADJUDICATION (2026-10-31 later same day):** the 「5 proven DAG break」claim below is **withdrawn** as final adjudication. See `p1-dag-break-evidence-closure-2026-10-31.md`. After shallow/parent-chain closure: seqs **52/100/121/140 → forward-only**; seq **145 → incomplete_graph_unknown**（「当前联合对象图下非祖先」, **not** 「历史无共同祖先」）. Donor is also shallow; donor_primary must not be treated as complete-graph authority. Counts 141+5 remain the *prior published split*, not the closed result.
+
+
 > **性质**：证据包（evidence-only）。**不**修改 `deploy/production/releases.jsonl` / `RELEASE_RECORD.md`；**不**写 `regressionAcknowledged`；**不**合入、DIGEST、部署或触发 A3。
 > **与 #172 关系**：独立于 [#172](https://github.com/flykingvip-cloud/openbot-vp/pull/172)（限定账本修复）。本 PR 仅交付对象恢复与重新分类证据。Codex 独立验收；实施方不自宣布 PASS。
 
@@ -22,7 +25,7 @@
 2. 对每条 ERROR 做 `git cat-file -t` + `git merge-base --is-ancestor`；**缺对象不得称为已证明 regression**。
 3. `git fetch origin <sha>` → `not our tip` / `not our ref`；`gh api repos/.../commits/<sha>` 抽样 **24/24 HTTP 422**；remote `provenance/*` tags = **0**。
 4. 从 donor 只读 `git fetch <donor> <sha>:refs/audit-recovery/<sha>` 收回 **137** tip（不改写提交内容、不强推、不 GC、不删 refs）。
-5. **分类权威**：donor 为主；仅当 donor 缺对象时回退 audit worktree（避免 shallow 假 forward-only）。
+5. **分类权威（已修正）**：先前 donor_primary **不可**作为最终定案权威——**donor 亦为 shallow**。祖先正证（`is-ancestor` exit 0）可采纳；空 merge-base / 非祖先在未排除 shallow 截断前只能标 incomplete_graph_unknown。
 6. **未**写 `regressionAcknowledged`；未删账本行；本 PR **不**改账本/人类记录。
 
 ### 分类判定（forward-only）
@@ -66,7 +69,7 @@
 - seq144 `9a8e91d19e893fc5d963103538cdbd35f315ac30`：audit+donor 均有；`fix(build): formal-deliverable-root… (#882)`；parents `b9be3ec5…`
 - seq145 `065840dfba129475c9c9030c80af07970dcdd084`：仅 audit 有；donor 无；`fix(build): clear docker tsc… (#78)`；parents `b8864b26…`
 - audit：`is-ancestor 144→145` code **1**；`145→144` code **1**；`merge-base` 无共同祖先
-- 结论：**proven DAG break**；≠ 功能回退；不自动 acknowledge
+- 结论（**已由 closure 修正**）：不得再定为 proven DAG break；应记 **incomplete_graph_unknown /「当前联合对象图下非祖先」**（prior 即 audit shallow boundary，截断未排除）。≠ 功能回退；不自动 acknowledge。详见 `p1-dag-break-evidence-closure-2026-10-31.md`。
 
 ## 附件清单（本目录）
 
