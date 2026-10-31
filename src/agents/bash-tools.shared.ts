@@ -174,6 +174,73 @@ function mapGatewayAbsoluteHostWorkdir(params: {
   return undefined;
 }
 
+/**
+ * Best-effort rewrite of gateway-absolute `/root/.openbot/...` (and any path under
+ * the sandbox host workspaceDir — same vocabulary as mapGatewayAbsoluteHostWorkdir)
+ * inside an exec **command** string when host=sandbox. Workdir alone is not enough:
+ * `cat /root/.openbot/operators/.../workspace/foo` still misses the lease mount.
+ */
+export function rewriteGatewayAbsoluteHostPathsInCommand(params: {
+  command: string;
+  workspaceDir: string;
+  containerWorkdir: string;
+}): string {
+  const command = params.command;
+  const workspacePosix = path.resolve(params.workspaceDir).replace(/\\/g, "/");
+  const containerRoot = normalizeContainerPath(params.containerWorkdir);
+  if (!command || !workspacePosix || workspacePosix === "/" || containerRoot === ".") {
+    return command;
+  }
+
+  // Best-effort scan: replace gateway-absolute workspace prefixes with the container mount.
+  // Same vocabulary as mapGatewayAbsoluteHostWorkdir (paths under workspaceDir).
+  let out = "";
+  let i = 0;
+  while (i < command.length) {
+    const idx = command.indexOf(workspacePosix, i);
+    if (idx === -1) {
+      out += command.slice(i);
+      break;
+    }
+    out += command.slice(i, idx);
+    let end = idx + workspacePosix.length;
+    // Extend through a nested relative path segment while it looks like a path token.
+    while (end < command.length) {
+      const ch = command[end];
+      if (
+        ch === undefined ||
+        /\s/.test(ch) ||
+        ch === '"' ||
+        ch === "'" ||
+        ch === ";" ||
+        ch === "|" ||
+        ch === "&" ||
+        ch === "<" ||
+        ch === ">" ||
+        ch === "(" ||
+        ch === ")" ||
+        ch === "`" ||
+        ch === "\\"
+      ) {
+        break;
+      }
+      end += 1;
+    }
+    const matched = command.slice(idx, end);
+    if (matched === workspacePosix) {
+      out += containerRoot;
+    } else if (matched.startsWith(`${workspacePosix}/`)) {
+      const rel = matched.slice(workspacePosix.length + 1);
+      out += rel ? path.posix.join(containerRoot, rel) : containerRoot;
+    } else {
+      // Prefix matched a longer token that is not a path under workspace (e.g. sibling name).
+      out += matched;
+    }
+    i = end;
+  }
+  return out;
+}
+
 function normalizeContainerPath(input: string): string {
   const normalized = input.trim().replace(/\\/g, "/");
   if (!normalized) {

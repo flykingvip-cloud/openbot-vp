@@ -14,25 +14,37 @@ export function resolveConfiguredExecHost(params: {
 
 /**
  * When a session sandbox is bound to the exec tool, prefer host=sandbox over a
- * sticky agent/config `tools.exec.host=gateway` override. Otherwise file tools
- * use the account lease (`/account/workspace`, chromium) while shell runs in
- * the gateway process (uid `node`, no chromium) — LIVE bot-2 growth-report
- * regression 2026-10-31.
+ * sticky agent/config `tools.exec.host=gateway|node` override — including when
+ * the model explicitly echoes host=gateway|node. Otherwise file tools use the
+ * account lease (`/account/workspace`, chromium) while shell runs on gateway
+ * (uid `node`) or a paired Mac node — LIVE bot-2 growth-report regression
+ * class 2026-10-31 / audit P1-1 + P1-3.
  *
- * Elevated remains the operator break-glass onto the gateway. An explicit
- * model-requested host=gateway|node is left unchanged (existing allow/deny
- * gates still apply).
+ * Elevated remains the operator break-glass onto the gateway.
+ * Intentional Desktop local-computer allow (`decideLocalComputerHost` → allow)
+ * keeps host=node so the bounded Desktop path is not remapped.
  */
 export function preferBoundSandboxExecHost(params: {
   host: ExecHost;
   sandboxAvailable: boolean;
   requestedHost: ExecHost | null;
   elevatedRequested: boolean;
+  /** When true, keep intentional Desktop host=node from decideLocalComputerHost. */
+  localComputerAllow?: boolean;
 }): ExecHost {
+  void params.requestedHost;
   if (params.elevatedRequested) {
     return "gateway";
   }
-  if (params.sandboxAvailable && params.host === "gateway" && params.requestedHost == null) {
+  if (!params.sandboxAvailable) {
+    return params.host;
+  }
+  // Intentional Desktop local-computer allow path: do not remap host=node.
+  if (params.localComputerAllow && params.host === "node") {
+    return "node";
+  }
+  // Remap sticky/config or explicit model gateway|node onto the bound sandbox.
+  if (params.host === "gateway" || params.host === "node") {
     return "sandbox";
   }
   return params.host;

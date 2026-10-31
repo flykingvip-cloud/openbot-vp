@@ -64,7 +64,7 @@ describe("preferBoundSandboxExecHost", () => {
     ).toBe("gateway");
   });
 
-  it("keeps an explicit model-requested gateway host", () => {
+  it("remaps an explicit model-requested gateway host onto bound sandbox", () => {
     expect(
       preferBoundSandboxExecHost({
         host: "gateway",
@@ -72,7 +72,41 @@ describe("preferBoundSandboxExecHost", () => {
         requestedHost: "gateway",
         elevatedRequested: false,
       }),
-    ).toBe("gateway");
+    ).toBe("sandbox");
+  });
+
+  it("remaps sticky host=node onto bound sandbox", () => {
+    expect(
+      preferBoundSandboxExecHost({
+        host: "node",
+        sandboxAvailable: true,
+        requestedHost: null,
+        elevatedRequested: false,
+      }),
+    ).toBe("sandbox");
+  });
+
+  it("remaps explicit model-requested host=node onto bound sandbox", () => {
+    expect(
+      preferBoundSandboxExecHost({
+        host: "node",
+        sandboxAvailable: true,
+        requestedHost: "node",
+        elevatedRequested: false,
+      }),
+    ).toBe("sandbox");
+  });
+
+  it("keeps intentional Desktop local-computer host=node allow", () => {
+    expect(
+      preferBoundSandboxExecHost({
+        host: "node",
+        sandboxAvailable: true,
+        requestedHost: "node",
+        elevatedRequested: false,
+        localComputerAllow: true,
+      }),
+    ).toBe("node");
   });
 
   it("leaves sandbox host unchanged", () => {
