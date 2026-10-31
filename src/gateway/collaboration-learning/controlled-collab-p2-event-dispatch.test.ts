@@ -34,7 +34,13 @@ import {
   createRuntimeAuthority,
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
-import { markWakeOpUnknown, readWakeOpRecord } from "../collaboration-dispatch/wake-op-ledger.js";
+import {
+  claimWakeOpRunning,
+  markWakeOpCompleted,
+  markWakeOpFailed,
+  markWakeOpUnknown,
+  readWakeOpRecord,
+} from "../collaboration-dispatch/wake-op-ledger.js";
 import type {
   WakeRoundDispatchRequest,
   WakeRoundDispatcher,
@@ -2724,6 +2730,351 @@ describe("P2 R7 — invalidate order: board first, wake attempt-scoped", () => {
       roundDispatcher: async () => {
         dispatchCount += 1;
         return { ok: true, roundId: `r7-recover-${dispatchCount}` };
+      },
+      trusted: trustedLocatorFromAuthority(auth),
+      authority: auth,
+    });
+    expect(recovered.some((r) => r.dispatched)).toBe(true);
+    expect(dispatchCount).toBe(1);
+  });
+});
+
+describe("P2 R8 — wake conditional-commit: original binding + running CAS", () => {
+  async function pauseAtPermit(params: {
+    auth: RuntimeAuthority;
+    cfg: OpenBotConfig;
+    taskId: string;
+    itemId: string;
+    roundId: string;
+  }) {
+    let releasePause!: () => void;
+    const pause = new Promise<void>((resolve) => {
+      releasePause = resolve;
+    });
+    let reachedPause = false;
+    const liveRun = triggerPostSubmissionEventAdvance({
+      groupId: params.auth.groupId,
+      taskId: params.taskId,
+      itemId: params.itemId,
+      actorId: "bot-b",
+      cfg: params.cfg,
+      trusted: trustedLocatorFromAuthority(params.auth),
+      roundDispatcher: async () => ({ ok: true, roundId: params.roundId }),
+      _testAfterPermitCommitBeforeDispatcher: async () => {
+        reachedPause = true;
+        await pause;
+      },
+    });
+    for (let i = 0; i < 200 && !reachedPause; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(reachedPause).toBe(true);
+    const mid = await loadBoardClaimItem(params.auth, {
+      taskId: params.taskId,
+      itemId: params.itemId,
+    });
+    const attemptId = mid?.pendingEventRelay?.dispatchAttemptId;
+    const opKey = mid?.pendingEventRelay?.opKey;
+    const boundWake = mid?.pendingEventRelay?.boundWakeExecutionAttemptId;
+    expect(attemptId).toBeTruthy();
+    expect(opKey).toBeTruthy();
+    expect(boundWake).toBeTruthy();
+    const wake = await readWakeOpRecord({ authority: params.auth, opKey: opKey! });
+    expect(wake?.status).toBe("running");
+    expect(wake?.executionAttemptId).toBe(boundWake);
+    return {
+      releasePause,
+      liveRun,
+      mid,
+      attemptId: attemptId!,
+      opKey: opKey!,
+      boundWake: boundWake!,
+    };
+  }
+
+  test("mid-cleanup: new wake attempt must not be failed by old cleanup", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r8-mid-new-attempt";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    const paused = await pauseAtPermit({
+      auth,
+      cfg,
+      taskId,
+      itemId: item.itemId,
+      roundId: "r8-mid-new",
+    });
+    const boundA = paused.boundWake;
+
+    let injectedAttemptB: string | undefined;
+    const inv = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: paused.opKey,
+      expectedAttemptId: paused.attemptId,
+      cfg,
+      _testAfterBoardInvalidateBeforeWakeFail: async () => {
+        // Simulate concurrent reclaim creating a new wake attempt mid-cleanup.
+        await markWakeOpFailed({
+          authority: auth,
+          opKey: paused.opKey,
+          cfg,
+          detail: "r8_inject_fail_before_reclaim",
+        });
+        const claimed = await claimWakeOpRunning({
+          authority: auth,
+          keyInput: {
+            groupId: auth.groupId,
+            source: "nudge",
+            fromAgentId: "bot-a",
+            toAgentIds: ["bot-b"],
+            taskId,
+            itemId: item.itemId,
+            opKey: paused.opKey,
+          },
+          cfg,
+        });
+        expect(claimed.action).toBe("proceed");
+        injectedAttemptB = claimed.record?.executionAttemptId;
+        expect(injectedAttemptB).toBeTruthy();
+        expect(injectedAttemptB).not.toBe(boundA);
+      },
+    });
+    expect(inv.ok).toBe(true);
+
+    const wakeAfter = await readWakeOpRecord({ authority: auth, opKey: paused.opKey });
+    expect(wakeAfter?.executionAttemptId).toBe(injectedAttemptB);
+    // Old cleanup must NOT have failed the new attempt.
+    expect(wakeAfter?.status).toBe("running");
+    expect(wakeAfter?.executionAttemptId).not.toBe(boundA);
+
+    const boardAfter = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(boardAfter?.pendingEventRelay?.status).toBe("pending");
+    // Binding cleared after conditional wake CAS (safe reject on attempt mismatch).
+    expect(boardAfter?.pendingEventRelay?.boundWakeExecutionAttemptId).toBeFalsy();
+
+    paused.releasePause();
+    await paused.liveRun;
+  });
+
+  test("mid-cleanup: same attempt → unknown must not become failed", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r8-mid-unknown";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    const paused = await pauseAtPermit({
+      auth,
+      cfg,
+      taskId,
+      itemId: item.itemId,
+      roundId: "r8-mid-unknown",
+    });
+
+    const inv = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: paused.opKey,
+      expectedAttemptId: paused.attemptId,
+      cfg,
+      _testAfterBoardInvalidateBeforeWakeFail: async () => {
+        const unknowned = await markWakeOpUnknown({
+          authority: auth,
+          opKey: paused.opKey,
+          cfg,
+          detail: "r8_mid_cleanup_unknown",
+        });
+        expect(unknowned?.status).toBe("unknown");
+        expect(unknowned?.executionAttemptId).toBe(paused.boundWake);
+      },
+    });
+    expect(inv.ok).toBe(true);
+
+    const wakeAfter = await readWakeOpRecord({ authority: auth, opKey: paused.opKey });
+    expect(wakeAfter?.status).toBe("unknown");
+    expect(wakeAfter?.executionAttemptId).toBe(paused.boundWake);
+
+    const boardAfter = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(boardAfter?.pendingEventRelay?.status).toBe("pending");
+    expect(boardAfter?.pendingEventRelay?.boundWakeExecutionAttemptId).toBeFalsy();
+
+    paused.releasePause();
+    await paused.liveRun;
+  });
+
+  test("mid-cleanup: same attempt → completed must not become failed", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r8-mid-completed";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    const paused = await pauseAtPermit({
+      auth,
+      cfg,
+      taskId,
+      itemId: item.itemId,
+      roundId: "r8-mid-completed",
+    });
+
+    const inv = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: paused.opKey,
+      expectedAttemptId: paused.attemptId,
+      cfg,
+      _testAfterBoardInvalidateBeforeWakeFail: async () => {
+        const completed = await markWakeOpCompleted({
+          authority: auth,
+          opKey: paused.opKey,
+          roundId: "r8-mid-completed-receipt",
+          cfg,
+          detail: "r8_mid_cleanup_completed",
+        });
+        expect(completed?.status).toBe("completed");
+        expect(completed?.executionAttemptId).toBe(paused.boundWake);
+      },
+    });
+    expect(inv.ok).toBe(true);
+
+    const wakeAfter = await readWakeOpRecord({ authority: auth, opKey: paused.opKey });
+    expect(wakeAfter?.status).toBe("completed");
+    expect(wakeAfter?.executionAttemptId).toBe(paused.boundWake);
+    expect(wakeAfter?.roundId).toBe("r8-mid-completed-receipt");
+
+    const boardAfter = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(boardAfter?.pendingEventRelay?.status).toBe("pending");
+    expect(boardAfter?.pendingEventRelay?.boundWakeExecutionAttemptId).toBeFalsy();
+
+    paused.releasePause();
+    await paused.liveRun;
+  });
+
+  test("positive: permit binds wake attempt; invalidate → failed → recover once", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r8-positive-bind-recover";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    const paused = await pauseAtPermit({
+      auth,
+      cfg,
+      taskId,
+      itemId: item.itemId,
+      roundId: "r8-pos-old",
+    });
+
+    const inv = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: paused.opKey,
+      expectedAttemptId: paused.attemptId,
+      cfg,
+    });
+    expect(inv.ok).toBe(true);
+
+    const wakeAfterInv = await readWakeOpRecord({ authority: auth, opKey: paused.opKey });
+    expect(wakeAfterInv?.status).toBe("failed");
+    expect(wakeAfterInv?.executionAttemptId).toBe(paused.boundWake);
+
+    const pending = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(pending?.pendingEventRelay?.status).toBe("pending");
+    expect(pending?.pendingEventRelay?.boundWakeExecutionAttemptId).toBeFalsy();
+
+    paused.releasePause();
+    const oldResult = await paused.liveRun;
+    expect(oldResult.dispatched).toBe(false);
+
+    let dispatchCount = 0;
+    const recovered = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: "bot-b",
+      items: pending ? [pending] : [],
+      cfg,
+      roundDispatcher: async () => {
+        dispatchCount += 1;
+        return { ok: true, roundId: `r8-recover-${dispatchCount}` };
       },
       trusted: trustedLocatorFromAuthority(auth),
       authority: auth,

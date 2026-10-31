@@ -14,6 +14,7 @@ import type { OpenBotConfig } from "../../config/types.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   clearBoardPendingEventRelay,
+  clearBoundWakeExecutionAttemptId,
   commitBoardDispatchPermit,
   invalidateBoardDispatchPermitAttempt,
   loadBoardClaimItem,
@@ -865,6 +866,16 @@ export async function triggerPostSubmissionEventAdvance(params: {
     }
 
     // Linearization point: conditional pending → dispatched under board lock/version.
+    // P2 R8: bind wake executionAttemptId at permit so invalidate cleanup uses the
+    // original attempt — never re-select the wake ledger's current id.
+    const wakeAttemptAtPermit = compact(req.wakeExecutionAttemptId);
+    if (!wakeAttemptAtPermit) {
+      return {
+        ok: false,
+        reason: "wake_execution_attempt_required_at_permit",
+        sideEffectClass: "not_started",
+      };
+    }
     const permit = await commitBoardDispatchPermit(
       authority,
       {
@@ -875,6 +886,7 @@ export async function triggerPostSubmissionEventAdvance(params: {
         expectedReturnRevision,
         expectedBoardRevision,
         expectedClaimantId,
+        wakeExecutionAttemptId: wakeAttemptAtPermit,
       },
       { cfg },
     );
@@ -1399,11 +1411,18 @@ export async function reconcilePermitAcquiredBoardEventRelays(params: {
  */
 
 /**
- * P2 R7 — proven-dead take-over (order-safe):
+ * P2 R7/R8 — proven-dead take-over (order-safe + original wake binding):
  * 1) Board CAS invalidate first. If rejected → wake AND board unchanged.
- * 2) Only after board wins: attempt-scoped wake update (bind executionAttemptId).
- * 3) Never convert unknown/started → failed solely because executor process died
- *    (death ≠ proof of no external side effects; keep pending-verification).
+ * 2) Only after board wins: wake conditional fail using the **original**
+ *    `boundWakeExecutionAttemptId` persisted at permit — never re-read the
+ *    wake ledger's current executionAttemptId.
+ * 3) Wake lock requires exact attempt AND status still `running`; mismatch
+ *    refuses and keeps unknown/completed/new-attempt.
+ * 4) Two-write recovery: board invalidate keeps `boundWakeExecutionAttemptId`
+ *    until wake CAS finishes (or reconcile proves safe). Re-dispatch is allowed
+ *    only after wake conditional update completed, or claim/reconcile proves
+ *    the wake is already failed/unknown/completed (safe not to overwrite).
+ * 5) Never convert unknown/started → failed solely because executor process died.
  * Do NOT call from heartbeat alone.
  */
 export async function invalidatePermitAttemptForProvenDeadExecutor(params: {
@@ -1413,6 +1432,11 @@ export async function invalidatePermitAttemptForProvenDeadExecutor(params: {
   expectedOpKey: string;
   expectedAttemptId: string;
   cfg?: OpenBotConfig;
+  /**
+   * Test-only P2 R8: after board invalidate CAS succeeds, before wake conditional
+   * fail. Injects mid-cleanup races (new attempt / unknown / completed).
+   */
+  _testAfterBoardInvalidateBeforeWakeFail?: () => Promise<void>;
 }): Promise<ClaimResult<GroupBoardClaimItem>> {
   const opKey = compact(params.expectedOpKey);
 
@@ -1434,6 +1458,7 @@ export async function invalidatePermitAttemptForProvenDeadExecutor(params: {
   }
 
   // Board adjudication FIRST — rejection leaves wake untouched.
+  // On success, dispatchAttemptId is cleared but boundWakeExecutionAttemptId is kept.
   const boardResult = await invalidateBoardDispatchPermitAttempt(
     params.authority,
     {
@@ -1448,29 +1473,129 @@ export async function invalidatePermitAttemptForProvenDeadExecutor(params: {
     return boardResult;
   }
 
-  // Board won (proven not-started). Attempt-scoped wake fail for running only.
-  // Must bind durable executionAttemptId — never mutate by opKey alone.
-  if (opKey) {
+  // Original binding from permit — do NOT re-select current wake executionAttemptId.
+  const boundWakeAttemptId = compact(
+    boardResult.value.pendingEventRelay?.boundWakeExecutionAttemptId,
+  );
+
+  if (params._testAfterBoardInvalidateBeforeWakeFail) {
+    await params._testAfterBoardInvalidateBeforeWakeFail();
+  }
+
+  // Board won (proven not-started). Conditional wake fail: exact attempt + running.
+  if (opKey && boundWakeAttemptId) {
     try {
-      const wake = await readWakeOpRecord({ authority: params.authority, opKey });
-      if (wake?.status === "running") {
-        const wakeAttemptId = compact(wake.executionAttemptId);
-        if (wakeAttemptId) {
-          await markWakeOpFailed({
-            authority: params.authority,
-            opKey,
-            cfg: params.cfg,
-            detail: "permit_attempt_invalidated_executor_proven_dead",
-            expectedExecutionAttemptId: wakeAttemptId,
-          });
-        }
-      }
-      // unknown / other: leave unchanged (should have been refused above; belt-and-suspenders).
+      await markWakeOpFailed({
+        authority: params.authority,
+        opKey,
+        cfg: params.cfg,
+        detail: "permit_attempt_invalidated_executor_proven_dead",
+        expectedExecutionAttemptId: boundWakeAttemptId,
+      });
+      // Success or safe reject (attempt/status mismatch): clear binding so
+      // recover may re-dispatch only when wake claim/reconcile allows.
+      await clearBoundWakeExecutionAttemptAfterCleanup({
+        authority: params.authority,
+        taskId: params.taskId,
+        itemId: params.itemId,
+        expectedOpKey: opKey,
+        expectedBoundWakeAttemptId: boundWakeAttemptId,
+        cfg: params.cfg,
+      });
     } catch {
-      // best-effort wake fail after successful board invalidate
+      // Crash/throw between board write and wake CAS: binding retained on board.
+      // Recover must finish wake conditional fail (or prove safe) before re-dispatch.
     }
   }
   return boardResult;
+}
+
+/**
+ * P2 R8: drop permit→wake binding after wake conditional cleanup attempted.
+ * Only clears when the live bound id still matches the original (no newer bind).
+ */
+async function clearBoundWakeExecutionAttemptAfterCleanup(params: {
+  authority: RuntimeAuthority;
+  taskId: string;
+  itemId: string;
+  expectedOpKey: string;
+  expectedBoundWakeAttemptId: string;
+  cfg?: OpenBotConfig;
+}): Promise<void> {
+  const expectedBound = compact(params.expectedBoundWakeAttemptId);
+  const expectedOpKey = compact(params.expectedOpKey);
+  if (!expectedBound || !expectedOpKey) {
+    return;
+  }
+  try {
+    await clearBoundWakeExecutionAttemptId(
+      params.authority,
+      {
+        taskId: params.taskId,
+        itemId: params.itemId,
+        expectedOpKey,
+        expectedBoundWakeAttemptId: expectedBound,
+      },
+      { cfg: params.cfg },
+    );
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * P2 R8 two-write recovery: if a prior invalidate left boundWakeExecutionAttemptId
+ * on a pending relay, finish the wake conditional fail (exact attempt + running)
+ * before allowing re-dispatch. Safe reject (unknown/completed/new attempt) clears
+ * the binding so claim/reconcile may proceed without overwriting those statuses.
+ */
+export async function finishDeferredWakeFailBeforeRedispatch(params: {
+  authority: RuntimeAuthority;
+  item: GroupBoardClaimItem;
+  cfg?: OpenBotConfig;
+}): Promise<{ attempted: boolean; wakeStatus?: string; clearedBinding: boolean }> {
+  const pending = params.item.pendingEventRelay;
+  if (!pending || pending.status !== "pending") {
+    return { attempted: false, clearedBinding: false };
+  }
+  const opKey = compact(pending.opKey);
+  const bound = compact(pending.boundWakeExecutionAttemptId);
+  const taskId = compact(params.item.taskId);
+  const itemId = compact(params.item.itemId);
+  if (!opKey || !bound || !taskId || !itemId) {
+    return { attempted: false, clearedBinding: false };
+  }
+  let wakeStatus: string | undefined;
+  try {
+    const wake = await readWakeOpRecord({ authority: params.authority, opKey });
+    wakeStatus = wake?.status;
+    await markWakeOpFailed({
+      authority: params.authority,
+      opKey,
+      cfg: params.cfg,
+      detail: "deferred_permit_invalidate_wake_fail",
+      expectedExecutionAttemptId: bound,
+    });
+  } catch {
+    // best-effort; binding retained if clear fails below
+  }
+  let clearedBinding = false;
+  try {
+    const cleared = await clearBoundWakeExecutionAttemptId(
+      params.authority,
+      {
+        taskId,
+        itemId,
+        expectedOpKey: opKey,
+        expectedBoundWakeAttemptId: bound,
+      },
+      { cfg: params.cfg },
+    );
+    clearedBinding = cleared.ok;
+  } catch {
+    clearedBinding = false;
+  }
+  return { attempted: true, wakeStatus, clearedBinding };
 }
 
 export { invalidateBoardDispatchPermitAttempt };
@@ -1541,14 +1666,35 @@ export async function recoverPendingBoardEventRelays(params: {
 
   const pending = listPendingBoardEventRelays(workingItems);
   for (const row of pending) {
+    // P2 R8: complete deferred wake conditional fail before re-dispatch when a
+    // prior invalidate left boundWakeExecutionAttemptId (two-write crash window).
+    let itemForAdvance = row.item;
+    if (authority && compact(row.pending.boundWakeExecutionAttemptId)) {
+      await finishDeferredWakeFailBeforeRedispatch({
+        authority,
+        item: row.item,
+        cfg: params.cfg,
+      });
+      try {
+        const live = await loadBoardClaimItem(authority, {
+          taskId: compact(row.item.taskId) || params.taskId,
+          itemId: row.item.itemId,
+        });
+        if (live) {
+          itemForAdvance = live;
+        }
+      } catch {
+        // use snapshot
+      }
+    }
     results.push(
       await triggerPostSubmissionEventAdvance({
         groupId: params.groupId,
         taskId: params.taskId,
-        itemId: row.item.itemId,
+        itemId: itemForAdvance.itemId,
         actorId: params.actorId,
         // Pass opKey hint only; trigger re-reads live pending and refuses mismatch.
-        pending: row.pending,
+        pending: itemForAdvance.pendingEventRelay ?? row.pending,
         auth: params.auth,
         trusted: params.trusted,
         stores: params.stores,

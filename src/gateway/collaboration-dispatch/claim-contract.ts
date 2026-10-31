@@ -125,6 +125,13 @@ export type BoardPendingEventRelay = Readonly<{
    */
   dispatchAttemptId?: string;
   /**
+   * P2 R8: wake executionAttemptId bound at permit commit. Cleanup MUST use this
+   * original binding — never re-read the wake ledger's current attempt id.
+   * Kept across board invalidate until wake conditional fail completes (or
+   * reconcile proves safe), so the two-write crash window can finish cleanup.
+   */
+  boundWakeExecutionAttemptId?: string;
+  /**
    * P2 R5/R6: pending-verification signal when outcome/executor liveness cannot be proven.
    * Recovery must NOT timeout-then-blindly-retry / auto-release while this is set.
    */
@@ -1798,6 +1805,12 @@ export async function commitBoardDispatchPermit(
     expectedReturnRevision?: number;
     expectedBoardRevision?: number;
     expectedClaimantId?: string;
+    /**
+     * P2 R8: durable wake executionAttemptId at permit time. Persisted as
+     * boundWakeExecutionAttemptId so later invalidate cleanup binds the original
+     * attempt (not a re-read of the wake ledger).
+     */
+    wakeExecutionAttemptId: string;
   },
   options?: ClaimContractOptions,
 ): Promise<ClaimResult<GroupBoardClaimItem>> {
@@ -1808,10 +1821,11 @@ export async function commitBoardDispatchPermit(
   const taskId = compact(input.taskId);
   const itemId = compact(input.itemId);
   const expectedOpKey = compact(input.expectedOpKey);
-  if (!taskId || !itemId || !expectedOpKey) {
+  const wakeExecutionAttemptId = compact(input.wakeExecutionAttemptId);
+  if (!taskId || !itemId || !expectedOpKey || !wakeExecutionAttemptId) {
     return fail(
       "invalid_input",
-      "commitBoardDispatchPermit requires taskId, itemId, expectedOpKey",
+      "commitBoardDispatchPermit requires taskId, itemId, expectedOpKey, wakeExecutionAttemptId",
     );
   }
   return mutateBoardClaimItem(
@@ -1907,7 +1921,7 @@ export async function commitBoardDispatchPermit(
         );
       }
       // Status-only: do NOT bump board revision — permit must not look like accept/submit supersession.
-      // Mint dispatchAttemptId; dispatchInvokeStarted stays unset until mark succeeds.
+      // Mint dispatchAttemptId; bind wake executionAttemptId; dispatchInvokeStarted unset until mark.
       const next: GroupBoardClaimItem = {
         ...current,
         pendingEventRelay: {
@@ -1916,6 +1930,7 @@ export async function commitBoardDispatchPermit(
           dispatchInvokeStarted: false,
           pendingVerification: false,
           dispatchAttemptId: randomUUID(),
+          boundWakeExecutionAttemptId: wakeExecutionAttemptId,
         },
       };
       return { ok: true, value: next };
@@ -2056,6 +2071,10 @@ export async function invalidateBoardDispatchPermitAttempt(
           "dispatchInvokeStarted is true; cannot safely invalidate for retry",
         );
       }
+      // Clear board attempt so the old executor cannot mark/start. Keep
+      // boundWakeExecutionAttemptId until wake conditional fail completes (P2 R8
+      // two-write recovery): re-dispatch is gated by wake claim while that binding
+      // remains, or after wake CAS / reconcile proves safe.
       const next: GroupBoardClaimItem = {
         ...current,
         pendingEventRelay: {
@@ -2064,6 +2083,71 @@ export async function invalidateBoardDispatchPermitAttempt(
           dispatchInvokeStarted: false,
           pendingVerification: false,
           dispatchAttemptId: undefined,
+          // Retain boundWakeExecutionAttemptId for wake cleanup / crash recovery.
+        },
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
+}
+
+/**
+ * P2 R8: clear boundWakeExecutionAttemptId after wake conditional cleanup.
+ * Status-preserving; refuses if opKey or bound id no longer match.
+ */
+export async function clearBoundWakeExecutionAttemptId(
+  authority: RuntimeAuthority,
+  input: {
+    taskId: string;
+    itemId: string;
+    expectedOpKey: string;
+    expectedBoundWakeAttemptId: string;
+  },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  const expectedBound = compact(input.expectedBoundWakeAttemptId);
+  if (!taskId || !itemId || !expectedOpKey || !expectedBound) {
+    return fail(
+      "invalid_input",
+      "clearBoundWakeExecutionAttemptId requires taskId, itemId, expectedOpKey, expectedBoundWakeAttemptId",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "clear_bound_wake_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey at bound-wake clear",
+        );
+      }
+      if (compact(pending.boundWakeExecutionAttemptId) !== expectedBound) {
+        return fail(
+          "clear_bound_wake_attempt_mismatch",
+          "boundWakeExecutionAttemptId mismatch at clear — leave binding alone",
+        );
+      }
+      if (!pending.boundWakeExecutionAttemptId) {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: {
+          ...pending,
+          boundWakeExecutionAttemptId: undefined,
         },
       };
       return { ok: true, value: next };
@@ -2124,6 +2208,8 @@ export async function updateBoardPendingEventRelayStatus(
           dispatchInvokeStarted: false,
           pendingVerification: false,
           dispatchAttemptId: undefined,
+          // Ordinary pending release (not proven-dead invalidate) drops wake binding.
+          boundWakeExecutionAttemptId: undefined,
         };
       } else {
         if (typeof input.dispatchInvokeStarted === "boolean") {
@@ -2144,7 +2230,10 @@ export async function updateBoardPendingEventRelayStatus(
         Boolean(pending.dispatchInvokeStarted) === Boolean(nextPending.dispatchInvokeStarted);
       const sameVerify =
         Boolean(pending.pendingVerification) === Boolean(nextPending.pendingVerification);
-      if (sameStatus && sameInvoke && sameVerify) {
+      const sameBoundWake =
+        compact(pending.boundWakeExecutionAttemptId) ===
+        compact(nextPending.boundWakeExecutionAttemptId);
+      if (sameStatus && sameInvoke && sameVerify && sameBoundWake) {
         return { ok: true, value: current, skipAppend: true };
       }
       // Status-only lifecycle marker — keep board revision stable for permit linearization.

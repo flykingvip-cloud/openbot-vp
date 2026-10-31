@@ -458,8 +458,9 @@ export async function markWakeOpFailed(params: {
   nowMs?: number;
   detail?: string;
   /**
-   * P2 R7: when set, only mutate if durable executionAttemptId still matches.
-   * Prevents late cleanup from failing a newer attempt on the same opKey.
+   * P2 R7/R8: when set, only mutate if durable executionAttemptId still matches
+   * AND status is still `running`. Prevents late cleanup from failing a newer
+   * attempt, or overwriting unknown/completed on the same attempt.
    */
   expectedExecutionAttemptId?: string;
 }): Promise<WakeOpRecord | null> {
@@ -469,9 +470,15 @@ export async function markWakeOpFailed(params: {
     if (!current) {
       return null;
     }
-    if (expectedAttempt && compact(current.executionAttemptId) !== expectedAttempt) {
-      // Refuse: another attempt already owns this opKey.
-      return null;
+    if (expectedAttempt) {
+      if (compact(current.executionAttemptId) !== expectedAttempt) {
+        // Refuse: another attempt already owns this opKey.
+        return null;
+      }
+      if (current.status !== "running") {
+        // Refuse: same attempt left running — keep unknown/completed/failed.
+        return null;
+      }
     }
     return {
       ...current,
