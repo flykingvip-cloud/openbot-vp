@@ -68,6 +68,8 @@ import {
   readEnvInt,
   resolveSandboxWorkdir,
   resolveWorkdir,
+  rewriteContainerAbsolutePathsToHostInCommand,
+  rewriteGatewayAbsoluteHostPathsInCommand,
   truncateMiddle,
   clampExecWorkdirToWorkspaceRoot,
 } from "./bash-tools.shared.js";
@@ -374,13 +376,15 @@ export function createExecTool(
       if (elevatedRequested) {
         host = "gateway";
       } else {
-        // Bound session sandbox wins over agent tools.exec.host=gateway so
-        // shell/exec stay in aw-exec-lease (not gateway uid node).
+        // Bound session sandbox wins over agent tools.exec.host=gateway|node
+        // (sticky or model-echoed) so shell/exec stay in aw-exec-lease.
+        // Desktop local-computer allow keeps host=node.
         host = preferBoundSandboxExecHost({
           host,
           sandboxAvailable: Boolean(defaults?.sandbox),
           requestedHost,
           elevatedRequested: false,
+          localComputerAllow: localComputer.kind === "allow",
         });
       }
 
@@ -561,6 +565,11 @@ async function executeResolvedExecPolicy(params: {
   const rawWorkdir = toolParams.workdir?.trim() || defaults?.cwd || process.cwd();
   let workdir = rawWorkdir;
   let containerWorkdir = sandbox?.containerWorkdir;
+  // Authorization stays in the host-verifiable namespace (same direction as
+  // mapContainerPathToWorkspaceRoot for file tools). Container rewrite is only
+  // for docker/aw-exec-lease execution via runExecProcess.execCommand.
+  let command = toolParams.command;
+  let containerExecutionCommand: string | undefined;
   if (sandbox) {
     const resolved = await resolveSandboxWorkdir({
       workdir: rawWorkdir,
@@ -569,6 +578,19 @@ async function executeResolvedExecPolicy(params: {
     });
     workdir = resolved.hostWorkdir;
     containerWorkdir = resolved.containerWorkdir;
+    // Normalize any model-emitted container mount paths back to the host root
+    // before shared-fs INTERSECT, Desktop allow, and allowlist checks.
+    command = rewriteContainerAbsolutePathsToHostInCommand({
+      command,
+      workspaceDir: sandbox.workspaceDir,
+      containerWorkdir: sandbox.containerWorkdir,
+    });
+    // P1-2: host→container rewrite for the execution command only (not auth).
+    containerExecutionCommand = rewriteGatewayAbsoluteHostPathsInCommand({
+      command,
+      workspaceDir: sandbox.workspaceDir,
+      containerWorkdir: sandbox.containerWorkdir,
+    });
   } else {
     workdir = resolveWorkdir(rawWorkdir, warnings);
   }
@@ -576,7 +598,9 @@ async function executeResolvedExecPolicy(params: {
   // Shared-fs INTERSECT: when tools.fs.workspaceOnly is on, outside-workspace
   // mutation targets are denied here (policy owner shared-fs-resource) so
   // write-deny ⇒ exec-deny for the same path class. Not a workspace-root-guard wrap.
-  if (defaults?.workspaceOnly && !desktopSaveRunsOnNode(host, toolParams.command)) {
+  // Uses host-namespace `command` + host workdir/workspaceRoot — never the
+  // container-rewritten execution string.
+  if (defaults?.workspaceOnly && !desktopSaveRunsOnNode(host, command)) {
     // Trusted root only — never treat model workdir as the authorization root.
     const workspaceRoot = defaults.workspaceRoot?.trim() || defaults.cwd;
     if (!workspaceRoot) {
@@ -599,7 +623,7 @@ async function executeResolvedExecPolicy(params: {
       workdir = clamped.workdir;
     }
     assertSharedFsExecMutationAllowed({
-      command: toolParams.command,
+      command,
       workdir,
       workspaceRoot: path.resolve(workspaceRoot),
       workspaceOnly: true,
@@ -646,7 +670,7 @@ async function executeResolvedExecPolicy(params: {
 
   if (host === "node") {
     const nodeResult = await executeNodeHostCommand({
-      command: toolParams.command,
+      command,
       workdir,
       env,
       requestedEnv: toolParams.env,
@@ -677,7 +701,7 @@ async function executeResolvedExecPolicy(params: {
 
   if (host === "gateway" && !bypassApprovals) {
     const gatewayResult = await processGatewayAllowlist({
-      command: toolParams.command,
+      command,
       workdir,
       env,
       pty: toolParams.pty === true && !sandbox,
@@ -726,11 +750,13 @@ async function executeResolvedExecPolicy(params: {
 
   // Preflight: catch a common model failure mode (shell syntax leaking into Python/JS sources)
   // before we execute and burn tokens in cron loops.
-  await validateScriptFileForShellBleed({ command: toolParams.command, workdir });
+  await validateScriptFileForShellBleed({ command, workdir });
 
   const run = await runExecProcess({
-    command: toolParams.command,
-    execCommand: execCommandOverride,
+    // `command` remains host-verifiable for session/logging; sandbox execution
+    // uses containerExecutionCommand (gateway allowlist override still wins).
+    command,
+    execCommand: execCommandOverride ?? containerExecutionCommand,
     workdir,
     env,
     sandbox,

@@ -2,7 +2,11 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveSandboxWorkdir } from "./bash-tools.shared.js";
+import {
+  resolveSandboxWorkdir,
+  rewriteContainerAbsolutePathsToHostInCommand,
+  rewriteGatewayAbsoluteHostPathsInCommand,
+} from "./bash-tools.shared.js";
 
 async function withTempDir(run: (dir: string) => Promise<void>) {
   const dir = await mkdtemp(path.join(os.tmpdir(), "openbot-bash-workdir-"));
@@ -116,5 +120,85 @@ describe("resolveSandboxWorkdir", () => {
       expect(resolved.containerWorkdir).toBe("/account/workspace/deliverables/brief");
       expect(warnings).toEqual([]);
     });
+  });
+});
+
+describe("rewriteGatewayAbsoluteHostPathsInCommand", () => {
+  it("rewrites gateway-absolute workspace paths to the account container mount", () => {
+    const workspaceDir = "/root/.openbot/operators/u1/OpenBot/agents/bot-2/workspace";
+    const rewritten = rewriteGatewayAbsoluteHostPathsInCommand({
+      command: `cat ${workspaceDir}/deliverables/report.md && ls ${workspaceDir}`,
+      workspaceDir,
+      containerWorkdir: "/account/workspace",
+    });
+    expect(rewritten).toBe(
+      "cat /account/workspace/deliverables/report.md && ls /account/workspace",
+    );
+  });
+
+  it("leaves unrelated absolute paths untouched", () => {
+    const workspaceDir = "/root/.openbot/operators/u1/OpenBot/agents/bot-2/workspace";
+    const command = "cat /etc/hosts && ls /tmp";
+    expect(
+      rewriteGatewayAbsoluteHostPathsInCommand({
+        command,
+        workspaceDir,
+        containerWorkdir: "/account/workspace",
+      }),
+    ).toBe(command);
+  });
+
+  it("supports /workspace container mount vocabulary", () => {
+    const workspaceDir = "/root/.openbot/operators/u1/OpenBot/agents/bot-2/workspace";
+    expect(
+      rewriteGatewayAbsoluteHostPathsInCommand({
+        command: `python ${workspaceDir}/scripts/run.py`,
+        workspaceDir,
+        containerWorkdir: "/workspace",
+      }),
+    ).toBe("python /workspace/scripts/run.py");
+  });
+});
+
+describe("rewriteContainerAbsolutePathsToHostInCommand", () => {
+  it("maps /account/workspace mount paths back onto the host workspace root", () => {
+    const workspaceDir = "/root/.openbot/operators/u1/OpenBot/agents/bot-2/workspace";
+    expect(
+      rewriteContainerAbsolutePathsToHostInCommand({
+        command: "printf ok > /account/workspace/proof.txt",
+        workspaceDir,
+        containerWorkdir: "/account/workspace",
+      }),
+    ).toBe(`printf ok > ${workspaceDir}/proof.txt`);
+  });
+
+  it("round-trips with the host→container rewrite", () => {
+    const workspaceDir = "/root/.openbot/operators/u1/OpenBot/agents/bot-2/workspace";
+    const hostCmd = `mkdir -p ${workspaceDir}/out && cp a ${workspaceDir}/out/b`;
+    const containerCmd = rewriteGatewayAbsoluteHostPathsInCommand({
+      command: hostCmd,
+      workspaceDir,
+      containerWorkdir: "/account/workspace",
+    });
+    expect(containerCmd).toBe("mkdir -p /account/workspace/out && cp a /account/workspace/out/b");
+    expect(
+      rewriteContainerAbsolutePathsToHostInCommand({
+        command: containerCmd,
+        workspaceDir,
+        containerWorkdir: "/account/workspace",
+      }),
+    ).toBe(hostCmd);
+  });
+
+  it("leaves unrelated absolute paths untouched", () => {
+    const workspaceDir = "/root/.openbot/operators/u1/OpenBot/agents/bot-2/workspace";
+    const command = "cat /etc/hosts && ls /tmp";
+    expect(
+      rewriteContainerAbsolutePathsToHostInCommand({
+        command,
+        workspaceDir,
+        containerWorkdir: "/account/workspace",
+      }),
+    ).toBe(command);
   });
 });
