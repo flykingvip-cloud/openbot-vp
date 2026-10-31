@@ -17,6 +17,7 @@ import {
   bumpSessionSeenAt,
   resolveSessionSeenAliasOptionsFromTrustedSession,
 } from "../../session-seen-at.ts";
+import type { ChatCheckpoint } from "../../types/chat-types.ts";
 import { syncComputerPreviewAfterSessionSwitch } from "../../views/account-computer-preview.ts";
 import {
   maybeTriggerGrowthBirthTurn,
@@ -97,7 +98,7 @@ export type EmployeeWorkbenchSessionState = EmployeeWorkbenchGovernanceDetailSta
     chatHistoryHasMore?: boolean;
     chatHistoryQuietReload?: boolean;
     chatThinkingProgress?: unknown;
-    chatCheckpoints?: unknown[];
+    chatCheckpoints?: ChatCheckpoint[];
     chatCheckpointLoadState?: ChatCheckpointLoadState;
     chatCheckpointDiagnostics?: ChatCheckpointVisibilityDiagnostic[];
     pendingRestoreCheckpointId?: string | null;
