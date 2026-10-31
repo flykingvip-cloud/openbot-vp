@@ -52,6 +52,7 @@ import {
 } from "./execution-deliverable-binding.js";
 import {
   classifyConsumePendingLifecycle,
+  invalidatePermitAttemptForProvenDeadExecutor,
   listPendingBoardEventRelays,
   listPermitAcquiredBoardEventRelays,
   reconcilePermitAcquiredBoardEventRelays,
@@ -1763,12 +1764,12 @@ describe("P2 R5 — ok:false side-effect class (no double effect)", () => {
   });
 });
 
-describe("P2 R5 — permit vs dispatch completion + subprocess crash reconcile", () => {
-  test("subprocess: permit commit then exit → restart reconcile; no loss, no duplicate", async () => {
+describe("P2 R5/R6 — permit vs dispatch + subprocess (preinstalled runtime)", () => {
+  test("subprocess: permit commit then exit → invalidate then recover; no duplicate; no Corepack download", async () => {
     const { spawnSync } = await import("node:child_process");
     const { cfg, root } = await useConfig();
     const auth = authority(cfg);
-    const taskId = "task-p2-r5-crash-permit";
+    const taskId = "task-p2-r6-crash-permit";
     const { item } = await seedInProgress({
       auth,
       cfg,
@@ -1797,9 +1798,11 @@ describe("P2 R5 — permit vs dispatch completion + subprocess crash reconcile",
     await fs.writeFile(counterPath, "0\n", "utf8");
 
     const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-    const childScript = path.join(root, "r5-permit-crash-child.ts");
+    const childScript = path.join(root, "r6-permit-crash-child.ts");
     const trusted = trustedLocatorFromAuthority(auth);
     const configPath = process.env.OPENBOT_CONFIG_PATH!;
+    // Preinstalled runtime only — never `pnpm exec` / Corepack (network download forbidden mid-test).
+    const tsxCli = path.join(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
     await fs.writeFile(
       childScript,
@@ -1864,10 +1867,9 @@ main().catch(async (err) => {
     );
 
     const child = spawnSync(
-      "pnpm",
+      process.execPath,
       [
-        "exec",
-        "tsx",
+        tsxCli,
         childScript,
         root,
         auth.groupId,
@@ -1882,6 +1884,9 @@ main().catch(async (err) => {
         encoding: "utf8",
         env: {
           ...process.env,
+          // Forbid Corepack/pnpm network resolution in the child.
+          COREPACK_ENABLE_NETWORK: "0",
+          COREPACK_ENABLE_AUTO_PIN: "0",
           OPENBOT_STATE_DIR: path.join(root, "state"),
           OPENBOT_CONFIG_PATH: configPath,
           OPENCLAW_CONFIG_PATH: configPath,
@@ -1904,29 +1909,63 @@ main().catch(async (err) => {
     expect((await fs.readFile(markerPath, "utf8")).trim()).toBe("permit_committed");
     expect(Number((await fs.readFile(counterPath, "utf8")).trim())).toBe(0);
 
-    // Restart: reload board — permit acquired, invoke not started.
     clearConfigCache();
     setRuntimeConfigSnapshot(cfg, cfg);
     const live = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
     expect(live?.pendingEventRelay?.status).toBe("dispatched");
     expect(live?.pendingEventRelay?.dispatchInvokeStarted).not.toBe(true);
+    const attemptId = live?.pendingEventRelay?.dispatchAttemptId;
+    expect(attemptId).toBeTruthy();
     expect(listPermitAcquiredBoardEventRelays(live ? [live] : [])).toHaveLength(1);
-    // Without reconcile, pending-only scan would drop the event:
-    expect(listPendingBoardEventRelays(live ? [live] : [])).toHaveLength(0);
+
+    // Heartbeat alone must NOT auto-release / re-dispatch (executor liveness unproven to heartbeat).
+    let heartbeatDispatch = 0;
+    const heartbeatRecovered = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: "bot-b",
+      items: live ? [live] : [],
+      cfg,
+      roundDispatcher: async () => {
+        heartbeatDispatch += 1;
+        return { ok: true, roundId: "heartbeat-should-not-run" };
+      },
+      trusted: trustedLocatorFromAuthority(auth),
+      authority: auth,
+    });
+    expect(heartbeatDispatch).toBe(0);
+    expect(heartbeatRecovered.every((r) => !r.dispatched)).toBe(true);
+    const afterHb = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(afterHb?.pendingEventRelay?.status).toBe("dispatched");
+    expect(afterHb?.pendingEventRelay?.pendingVerification).toBe(true);
+
+    // Proven-dead path (parent observed exit 42): invalidate attempt, then recover.
+    const inv = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: afterHb!.pendingEventRelay!.opKey,
+      expectedAttemptId: attemptId!,
+      cfg,
+    });
+    expect(inv.ok).toBe(true);
 
     let dispatchCount = 0;
     const once: WakeRoundDispatcher = async () => {
       dispatchCount += 1;
       const n = Number((await fs.readFile(counterPath, "utf8")).trim() || "0") + 1;
       await fs.writeFile(counterPath, `${n}\n`, "utf8");
-      return { ok: true, roundId: `round-r5-${dispatchCount}` };
+      return { ok: true, roundId: `round-r6-${dispatchCount}` };
     };
+
+    const livePending = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(livePending?.pendingEventRelay?.status).toBe("pending");
 
     const recovered = await recoverPendingBoardEventRelays({
       groupId: auth.groupId,
       taskId,
       actorId: "bot-b",
-      items: live ? [live] : [],
+      items: livePending ? [livePending] : [],
       cfg,
       roundDispatcher: once,
       trusted: trustedLocatorFromAuthority(auth),
@@ -1940,7 +1979,6 @@ main().catch(async (err) => {
     const after = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
     expect(after?.pendingEventRelay).toBeNull();
 
-    // Second recovery: no duplicate side effect.
     const again = await recoverPendingBoardEventRelays({
       groupId: auth.groupId,
       taskId,
@@ -1956,6 +1994,300 @@ main().catch(async (err) => {
     expect(Number((await fs.readFile(counterPath, "utf8")).trim())).toBe(1);
     void readWakeOpRecord;
     void reconcilePermitAcquiredBoardEventRelays;
+  });
+});
+
+describe("P2 R6 — mark-success gate + attempt validity races", () => {
+  test("mark write reject → dispatcher not called (dispatcher=0)", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r6-mark-reject";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    let dispatchCount = 0;
+    const advance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: async () => {
+        dispatchCount += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      _testMarkInvokeStartedFault: "reject",
+    });
+    expect(dispatchCount).toBe(0);
+    expect(advance.dispatched).toBe(false);
+    expect(advance.pendingLifecycle).toBe("unknown");
+    const live = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(live?.pendingEventRelay?.pendingVerification).toBe(true);
+  });
+
+  test("mark throw → dispatcher not called (dispatcher=0)", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r6-mark-throw";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    let dispatchCount = 0;
+    const advance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: async () => {
+        dispatchCount += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      _testMarkInvokeStartedFault: "throw",
+    });
+    expect(dispatchCount).toBe(0);
+    expect(advance.dispatched).toBe(false);
+    const live = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(live?.pendingEventRelay?.pendingVerification).toBe(true);
+  });
+
+  test("live pause between permit and invoke → heartbeat does not release or re-dispatch", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r6-live-pause";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    let releasePause!: () => void;
+    const pause = new Promise<void>((resolve) => {
+      releasePause = resolve;
+    });
+    let reachedPause = false;
+    let dispatchCount = 0;
+
+    const liveRun = triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: async () => {
+        dispatchCount += 1;
+        return { ok: true, roundId: "live-run" };
+      },
+      _testAfterPermitCommitBeforeDispatcher: async () => {
+        reachedPause = true;
+        await pause;
+      },
+    });
+
+    // Wait until live executor holds permit and is paused before mark/invoke.
+    for (let i = 0; i < 200 && !reachedPause; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(reachedPause).toBe(true);
+    const mid = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(mid?.pendingEventRelay?.status).toBe("dispatched");
+    expect(mid?.pendingEventRelay?.dispatchInvokeStarted).not.toBe(true);
+    const attemptId = mid?.pendingEventRelay?.dispatchAttemptId;
+    expect(attemptId).toBeTruthy();
+
+    let hbDispatch = 0;
+    const hb = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: "bot-b",
+      items: mid ? [mid] : [],
+      cfg,
+      roundDispatcher: async () => {
+        hbDispatch += 1;
+        return { ok: true, roundId: "hb-must-not" };
+      },
+      trusted: trustedLocatorFromAuthority(auth),
+      authority: auth,
+    });
+    expect(hbDispatch).toBe(0);
+    expect(hb.every((r) => !r.dispatched)).toBe(true);
+
+    const afterHb = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    // Must NOT release to pending (would allow re-dispatch while live run continues).
+    expect(afterHb?.pendingEventRelay?.status).toBe("dispatched");
+    expect(afterHb?.pendingEventRelay?.dispatchAttemptId).toBe(attemptId);
+    expect(afterHb?.pendingEventRelay?.pendingVerification).toBe(true);
+
+    releasePause();
+    const finished = await liveRun;
+    expect(finished.dispatched).toBe(true);
+    expect(dispatchCount).toBe(1);
+  });
+
+  test("after invalidate: recovery vs old executor — at most one obtains execution", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r6-invalidate-race";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    let releasePause!: () => void;
+    const pause = new Promise<void>((resolve) => {
+      releasePause = resolve;
+    });
+    let reachedPause = false;
+    let totalDispatch = 0;
+
+    const countingDispatcher: WakeRoundDispatcher = async () => {
+      totalDispatch += 1;
+      return { ok: true, roundId: `race-${totalDispatch}` };
+    };
+
+    const oldExecutor = triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: countingDispatcher,
+      _testAfterPermitCommitBeforeDispatcher: async () => {
+        reachedPause = true;
+        await pause;
+      },
+    });
+
+    for (let i = 0; i < 200 && !reachedPause; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(reachedPause).toBe(true);
+    const mid = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    const attemptId = mid?.pendingEventRelay?.dispatchAttemptId;
+    const opKey = mid?.pendingEventRelay?.opKey;
+    expect(attemptId).toBeTruthy();
+    expect(opKey).toBeTruthy();
+
+    const inv = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: opKey!,
+      expectedAttemptId: attemptId!,
+      cfg,
+    });
+    expect(inv.ok).toBe(true);
+
+    const afterInv = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(afterInv?.pendingEventRelay?.status).toBe("pending");
+
+    // Resume old executor (should fail mark / not dispatch) while recovery competes.
+    // Recovery retries briefly: old consume may still hold the wake claim until it unwinds.
+    releasePause();
+    const recovery = (async () => {
+      let last: Awaited<ReturnType<typeof recoverPendingBoardEventRelays>> = [];
+      for (let i = 0; i < 40; i += 1) {
+        const live = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+        if (!live?.pendingEventRelay) {
+          return last;
+        }
+        if (live.pendingEventRelay.status === "pending") {
+          last = await recoverPendingBoardEventRelays({
+            groupId: auth.groupId,
+            taskId,
+            actorId: "bot-b",
+            items: [live],
+            cfg,
+            roundDispatcher: countingDispatcher,
+            trusted: trustedLocatorFromAuthority(auth),
+            authority: auth,
+          });
+          if (last.some((r) => r.dispatched) || totalDispatch > 0) {
+            return last;
+          }
+        }
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      return last;
+    })();
+
+    const [oldResult, recovered] = await Promise.all([oldExecutor, recovery]);
+    expect(oldResult.dispatched).toBe(false);
+    expect(totalDispatch).toBeLessThanOrEqual(1);
+    expect(totalDispatch).toBe(1);
+    const recoveryDispatched = recovered.some((r) => r.dispatched);
+    expect(recoveryDispatched).toBe(true);
   });
 });
 

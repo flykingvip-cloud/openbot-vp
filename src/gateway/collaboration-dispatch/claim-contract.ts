@@ -114,13 +114,19 @@ export type BoardPendingEventRelay = Readonly<{
    */
   status: BoardPendingEventRelayStatus;
   /**
-   * P2 R5: set true immediately before baseDispatcher invoke.
-   * Absent/false after status=dispatched ⇒ prove dispatch not started (safe recover).
+   * P2 R5/R6: set true only after durable mark succeeds, immediately before baseDispatcher.
+   * Absent/false after status=dispatched is a normal permit→mark gap — NOT proof the
+   * executor is dead. Heartbeat must not auto-release from this alone.
    */
   dispatchInvokeStarted?: boolean;
   /**
-   * P2 R5: clear pending-verification signal when reconcile cannot prove outcome.
-   * Recovery must NOT timeout-then-blindly-retry while this is set / status=unknown.
+   * P2 R6: minted at permit commit. Same-conditional invalidation + mark/dispatch gate
+   * bind to this id so an invalidated attempt cannot start after recovery takes over.
+   */
+  dispatchAttemptId?: string;
+  /**
+   * P2 R5/R6: pending-verification signal when outcome/executor liveness cannot be proven.
+   * Recovery must NOT timeout-then-blindly-retry / auto-release while this is set.
    */
   pendingVerification?: boolean;
   /** Exact execution binding at record time (especially for returned → member revise). */
@@ -1901,7 +1907,7 @@ export async function commitBoardDispatchPermit(
         );
       }
       // Status-only: do NOT bump board revision — permit must not look like accept/submit supersession.
-      // dispatchInvokeStarted stays unset until markBoardDispatchInvokeStarted (prove not-started).
+      // Mint dispatchAttemptId; dispatchInvokeStarted stays unset until mark succeeds.
       const next: GroupBoardClaimItem = {
         ...current,
         pendingEventRelay: {
@@ -1909,6 +1915,7 @@ export async function commitBoardDispatchPermit(
           status: "dispatched",
           dispatchInvokeStarted: false,
           pendingVerification: false,
+          dispatchAttemptId: randomUUID(),
         },
       };
       return { ok: true, value: next };
@@ -1918,8 +1925,9 @@ export async function commitBoardDispatchPermit(
 }
 
 /**
- * P2 R5 — durable marker immediately before baseDispatcher invoke.
- * Distinguishes permit-acquired from dispatch-invoke-started for crash reconcile.
+ * P2 R5/R6 — durable marker immediately before baseDispatcher invoke.
+ * Success is a necessary condition before calling the dispatcher.
+ * Binds expectedAttemptId so an invalidated permit attempt cannot mark/start.
  */
 export async function markBoardDispatchInvokeStarted(
   authority: RuntimeAuthority,
@@ -1927,6 +1935,8 @@ export async function markBoardDispatchInvokeStarted(
     taskId: string;
     itemId: string;
     expectedOpKey: string;
+    /** Required: must match live pendingEventRelay.dispatchAttemptId. */
+    expectedAttemptId: string;
   },
   options?: ClaimContractOptions,
 ): Promise<ClaimResult<GroupBoardClaimItem>> {
@@ -1937,10 +1947,11 @@ export async function markBoardDispatchInvokeStarted(
   const taskId = compact(input.taskId);
   const itemId = compact(input.itemId);
   const expectedOpKey = compact(input.expectedOpKey);
-  if (!taskId || !itemId || !expectedOpKey) {
+  const expectedAttemptId = compact(input.expectedAttemptId);
+  if (!taskId || !itemId || !expectedOpKey || !expectedAttemptId) {
     return fail(
       "invalid_input",
-      "markBoardDispatchInvokeStarted requires taskId, itemId, expectedOpKey",
+      "markBoardDispatchInvokeStarted requires taskId, itemId, expectedOpKey, expectedAttemptId",
     );
   }
   return mutateBoardClaimItem(
@@ -1963,12 +1974,97 @@ export async function markBoardDispatchInvokeStarted(
           `pendingEventRelay.status is ${pending.status}; expected dispatched (permit acquired)`,
         );
       }
+      if (compact(pending.dispatchAttemptId) !== expectedAttemptId) {
+        return fail(
+          "invoke_attempt_invalidated",
+          "pendingEventRelay.dispatchAttemptId does not match expectedAttemptId; refuse mark",
+        );
+      }
       if (pending.dispatchInvokeStarted === true) {
         return { ok: true, value: current, skipAppend: true };
       }
       const next: GroupBoardClaimItem = {
         ...current,
         pendingEventRelay: { ...pending, dispatchInvokeStarted: true },
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
+}
+
+/**
+ * P2 R6 — same-conditional invalidation of a permit-acquired attempt that has not
+ * yet marked invoke-started. Clears the attempt id and releases to pending so
+ * recovery may retry; the old executor bound to expectedAttemptId cannot mark/start.
+ * Refuses when invoke already started (cannot prove clean) — caller must leave
+ * pending-verification / manual verify.
+ */
+export async function invalidateBoardDispatchPermitAttempt(
+  authority: RuntimeAuthority,
+  input: {
+    taskId: string;
+    itemId: string;
+    expectedOpKey: string;
+    expectedAttemptId: string;
+  },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  const expectedAttemptId = compact(input.expectedAttemptId);
+  if (!taskId || !itemId || !expectedOpKey || !expectedAttemptId) {
+    return fail(
+      "invalid_input",
+      "invalidateBoardDispatchPermitAttempt requires taskId, itemId, expectedOpKey, expectedAttemptId",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return fail("invalidate_pending_missing", "pendingEventRelay missing at invalidate");
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "invalidate_pending_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey at invalidate",
+        );
+      }
+      if (pending.status !== "dispatched") {
+        return fail(
+          `invalidate_pending_status:${pending.status}`,
+          `pendingEventRelay.status is ${pending.status}; expected dispatched`,
+        );
+      }
+      if (compact(pending.dispatchAttemptId) !== expectedAttemptId) {
+        return fail(
+          "invalidate_attempt_mismatch",
+          "dispatchAttemptId mismatch at invalidate — another attempt already owns the permit",
+        );
+      }
+      if (pending.dispatchInvokeStarted === true) {
+        return fail(
+          "invalidate_invoke_already_started",
+          "dispatchInvokeStarted is true; cannot safely invalidate for retry",
+        );
+      }
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: {
+          ...pending,
+          status: "pending",
+          dispatchInvokeStarted: false,
+          pendingVerification: false,
+          dispatchAttemptId: undefined,
+        },
       };
       return { ok: true, value: next };
     },
@@ -2027,6 +2123,7 @@ export async function updateBoardPendingEventRelayStatus(
           ...nextPending,
           dispatchInvokeStarted: false,
           pendingVerification: false,
+          dispatchAttemptId: undefined,
         };
       } else {
         if (typeof input.dispatchInvokeStarted === "boolean") {

@@ -15,10 +15,12 @@ import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   clearBoardPendingEventRelay,
   commitBoardDispatchPermit,
+  invalidateBoardDispatchPermitAttempt,
   loadBoardClaimItem,
   markBoardDispatchInvokeStarted,
   updateBoardPendingEventRelayStatus,
   type BoardPendingEventRelay,
+  type ClaimResult,
   type GroupBoardClaimItem,
 } from "../collaboration-dispatch/claim-contract.js";
 import {
@@ -28,11 +30,7 @@ import {
 } from "../collaboration-dispatch/executor-private-todolist.js";
 import type { RuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { SELF_ADVANCE_ACTIVE_BOARD_STATUSES } from "../collaboration-dispatch/self-advance.js";
-import {
-  markWakeOpFailed,
-  markWakeOpUnknown,
-  readWakeOpRecord,
-} from "../collaboration-dispatch/wake-op-ledger.js";
+import { markWakeOpFailed, readWakeOpRecord } from "../collaboration-dispatch/wake-op-ledger.js";
 import {
   classifyDispatchSideEffect,
   consumeWakeForRoundDispatch,
@@ -138,7 +136,10 @@ export function classifyConsumePendingLifecycle(
     reason.startsWith("external_sent_") ||
     reason.includes("unknown") ||
     reason.includes("side_effect_started") ||
-    reason.includes("execute_collaboration_round_failed")
+    reason.includes("execute_collaboration_round_failed") ||
+    reason.includes("dispatch_invoke_mark_rejected") ||
+    reason.includes("dispatch_invoke_mark_threw") ||
+    reason.includes("dispatch_attempt_id_missing")
   ) {
     return "retain_unknown";
   }
@@ -530,9 +531,14 @@ export async function triggerPostSubmissionEventAdvance(params: {
   _testAfterAdjudicationReadBeforePermitCommit?: () => Promise<void>;
   /**
    * Test-only: after permit CAS commit, before dispatchInvokeStarted mark / baseDispatcher.
-   * Crash-window for P2 R5: permit acquired but dispatch not started.
+   * Crash-window for P2 R5/R6: permit acquired but dispatch not started.
    */
   _testAfterPermitCommitBeforeDispatcher?: () => Promise<void>;
+  /**
+   * Test-only P2 R6: force markBoardDispatchInvokeStarted to throw or reject so
+   * callers can assert dispatcher is never invoked (dispatcher=0).
+   */
+  _testMarkInvokeStartedFault?: "throw" | "reject";
   /** Forwarded to consumeWakeForRoundDispatch (post-readiness, pre-CAS take). */
   _testAfterReadinessBarrier?: () => Promise<void>;
   /** Forwarded to consumeWakeForRoundDispatch (post-eligibility, pre-CAS take). */
@@ -1003,15 +1009,118 @@ export async function triggerPostSubmissionEventAdvance(params: {
       ...(executionDeliverableBinding ? { executionDeliverableBinding } : {}),
       reason,
     };
-    // Durable: permit acquired → invoke about to start (crash after this ⇒ cannot prove clean).
+    // P2 R6: durable mark success is a necessary condition before baseDispatcher.
+    // Capture attempt id from permit commit; gate mark on it so invalidate wins races.
+    const permitAttemptId = compact(permit.value.pendingEventRelay?.dispatchAttemptId);
+    if (!permitAttemptId) {
+      try {
+        await updateBoardPendingEventRelayStatus(
+          authority,
+          {
+            taskId,
+            itemId,
+            expectedOpKey: opKey,
+            status: "unknown",
+            pendingVerification: true,
+          },
+          { cfg },
+        );
+      } catch {
+        // best-effort
+      }
+      return {
+        ok: false,
+        reason: "dispatch_attempt_id_missing_after_permit",
+        sideEffectClass: "started_or_unknown",
+      };
+    }
+
+    let markResult: ClaimResult<GroupBoardClaimItem>;
     try {
-      await markBoardDispatchInvokeStarted(
-        authority,
-        { taskId, itemId, expectedOpKey: opKey },
-        { cfg },
-      );
+      if (params._testMarkInvokeStartedFault === "throw") {
+        throw new Error("test_mark_invoke_threw");
+      }
+      if (params._testMarkInvokeStartedFault === "reject") {
+        markResult = {
+          ok: false,
+          reason: "test_mark_invoke_rejected",
+          message: "injected mark reject",
+        };
+      } else {
+        markResult = await markBoardDispatchInvokeStarted(
+          authority,
+          {
+            taskId,
+            itemId,
+            expectedOpKey: opKey,
+            expectedAttemptId: permitAttemptId,
+          },
+          { cfg },
+        );
+      }
     } catch {
-      // best-effort; missing mark keeps prove-not-started semantics on reconcile
+      // Write result unconfirmed → pending-verification; MUST NOT release; MUST NOT dispatch.
+      try {
+        await updateBoardPendingEventRelayStatus(
+          authority,
+          {
+            taskId,
+            itemId,
+            expectedOpKey: opKey,
+            status: "unknown",
+            pendingVerification: true,
+          },
+          { cfg },
+        );
+      } catch {
+        // best-effort
+      }
+      return {
+        ok: false,
+        reason: "dispatch_invoke_mark_threw",
+        sideEffectClass: "started_or_unknown",
+      };
+    }
+    if (!markResult.ok) {
+      // Rejected mark → MUST NOT call dispatcher.
+      const markReason = compact(markResult.reason) || "unknown";
+      // Invalidated / superseded attempt: invalidate already released to pending for recovery.
+      // Do not overwrite that pending into unknown (would disturb the winning recovery path).
+      if (
+        markReason === "invoke_attempt_invalidated" ||
+        markReason === "invoke_pending_missing" ||
+        markReason === "invoke_pending_opkey_mismatch" ||
+        markReason.startsWith("invoke_pending_status:")
+      ) {
+        // Attempt already invalidated/released to pending for recovery — do not
+        // surface as mark_rejected (that would classify retain_unknown and clobber pending).
+        return {
+          ok: false,
+          reason: `dispatch_invoke_mark_attempt_invalidated:${markReason}`,
+          sideEffectClass: "not_started",
+        };
+      }
+      // Still holding permit but mark refused — pending-verification; do NOT release for retry.
+      try {
+        await updateBoardPendingEventRelayStatus(
+          authority,
+          {
+            taskId,
+            itemId,
+            expectedOpKey: opKey,
+            status: "unknown",
+            pendingVerification: true,
+          },
+          { cfg },
+        );
+      } catch {
+        // best-effort
+      }
+      return {
+        ok: false,
+        reason: `dispatch_invoke_mark_rejected:${markReason}`,
+        sideEffectClass: "started_or_unknown",
+      };
     }
     const dispatched = await baseDispatcher(enriched);
     if (!dispatched.ok) {
@@ -1195,10 +1304,12 @@ export type PermitAcquiredReconcileResult = {
 };
 
 /**
- * Reconcile permit-acquired vs dispatch-completed via wake-op/attempt + invoke marker.
- * - Prove not started (no dispatchInvokeStarted) → release wake to failed + permit to pending.
- * - Cannot prove → unknown + pendingVerification (no blind retry).
+ * Reconcile permit-acquired vs dispatch-completed (P2 R6).
  * - Wake completed with receipt → clear pending (dispatch completed).
+ * - Otherwise: missing mark / timeout alone does NOT prove the original executor is dead.
+ *   Conservatively leave pending-verification; NEVER auto-release / re-dispatch.
+ * - To take over a not-started attempt, callers must invalidateBoardDispatchPermitAttempt
+ *   (same-conditional CAS that prevents the old attempt from marking/starting).
  */
 export async function reconcilePermitAcquiredBoardEventRelays(params: {
   authority: RuntimeAuthority;
@@ -1221,6 +1332,7 @@ export async function reconcilePermitAcquiredBoardEventRelays(params: {
       wake = null;
     }
     const invokeStarted = row.pending.dispatchInvokeStarted === true;
+    const attemptId = compact(row.pending.dispatchAttemptId);
 
     if (wake?.status === "completed") {
       try {
@@ -1241,44 +1353,10 @@ export async function reconcilePermitAcquiredBoardEventRelays(params: {
       continue;
     }
 
-    if (!invokeStarted) {
-      // Prove dispatch not started after permit — safe recover under same op.
-      if (wake?.status === "running") {
-        try {
-          await markWakeOpFailed({
-            authority: params.authority,
-            opKey,
-            cfg,
-            detail: "permit_acquired_dispatch_not_started",
-          });
-        } catch {
-          // best-effort
-        }
-      } else if (wake?.status === "unknown") {
-        try {
-          await updateBoardPendingEventRelayStatus(
-            params.authority,
-            {
-              taskId,
-              itemId,
-              expectedOpKey: opKey,
-              status: "unknown",
-              pendingVerification: true,
-            },
-            { cfg },
-          );
-        } catch {
-          // best-effort
-        }
-        results.push({
-          itemId,
-          opKey,
-          action: "marked_unknown_pending_verification",
-          reason: "wake_op_unknown_cannot_prove_not_started",
-          pendingVerification: true,
-        });
-        continue;
-      }
+    // P2 R6: cannot prove original executor dead from missing mark or wake timeout.
+    // Keep status=dispatched so a live executor still in the permit→mark gap can proceed;
+    // set pendingVerification only (no auto-release, no wake status mutation, no re-dispatch).
+    if (!row.pending.pendingVerification) {
       try {
         await updateBoardPendingEventRelayStatus(
           params.authority,
@@ -1286,57 +1364,25 @@ export async function reconcilePermitAcquiredBoardEventRelays(params: {
             taskId,
             itemId,
             expectedOpKey: opKey,
-            status: "pending",
-            clearDispatchMeta: true,
+            status: "dispatched",
+            pendingVerification: true,
+            ...(invokeStarted ? { dispatchInvokeStarted: true } : {}),
           },
           { cfg },
         );
       } catch {
         // best-effort
       }
-      results.push({
-        itemId,
-        opKey,
-        action: "released_for_retry",
-        reason: "permit_acquired_dispatch_not_started",
-      });
-      continue;
-    }
-
-    // Invoke started (or crash after mark) — cannot prove outcome; never blind-retry.
-    if (wake?.status === "running") {
-      try {
-        await markWakeOpUnknown({
-          authority: params.authority,
-          opKey,
-          cfg,
-          detail: "permit_dispatch_invoke_started_outcome_unknown",
-        });
-      } catch {
-        // best-effort
-      }
-    }
-    try {
-      await updateBoardPendingEventRelayStatus(
-        params.authority,
-        {
-          taskId,
-          itemId,
-          expectedOpKey: opKey,
-          status: "unknown",
-          pendingVerification: true,
-          dispatchInvokeStarted: true,
-        },
-        { cfg },
-      );
-    } catch {
-      // best-effort
     }
     results.push({
       itemId,
       opKey,
       action: "marked_unknown_pending_verification",
-      reason: "dispatch_invoke_started_outcome_unknown",
+      reason: invokeStarted
+        ? "dispatch_invoke_started_executor_liveness_unproven"
+        : attemptId
+          ? "permit_acquired_executor_liveness_unproven"
+          : "permit_acquired_missing_attempt_unproven",
       pendingVerification: true,
     });
   }
@@ -1349,7 +1395,52 @@ export async function reconcilePermitAcquiredBoardEventRelays(params: {
  * Does not invent a new queue — callers (heartbeat / recovery entry) supply items.
  * Always re-validates LIVE pending at the dispatch boundary (ignores stale snapshots).
  * Never silently treats permit-acquired as dispatched-complete; never timeout-blind-retries.
+ * Heartbeat reconcile alone does not invalidate/release a live permit attempt (P2 R6).
  */
+
+/**
+ * P2 R6 - proven-dead take-over: fail wake-op (if running) + same-conditional
+ * invalidate of the permit attempt so the old executor cannot mark/start and
+ * recovery may re-dispatch from pending. Do NOT call from heartbeat alone.
+ */
+export async function invalidatePermitAttemptForProvenDeadExecutor(params: {
+  authority: RuntimeAuthority;
+  taskId: string;
+  itemId: string;
+  expectedOpKey: string;
+  expectedAttemptId: string;
+  cfg?: OpenBotConfig;
+}): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const opKey = compact(params.expectedOpKey);
+  if (opKey) {
+    try {
+      const wake = await readWakeOpRecord({ authority: params.authority, opKey });
+      if (wake?.status === "running" || wake?.status === "unknown") {
+        await markWakeOpFailed({
+          authority: params.authority,
+          opKey,
+          cfg: params.cfg,
+          detail: "permit_attempt_invalidated_executor_proven_dead",
+        });
+      }
+    } catch {
+      // best-effort wake fail; board invalidate below is authoritative for attempt
+    }
+  }
+  return invalidateBoardDispatchPermitAttempt(
+    params.authority,
+    {
+      taskId: params.taskId,
+      itemId: params.itemId,
+      expectedOpKey: params.expectedOpKey,
+      expectedAttemptId: params.expectedAttemptId,
+    },
+    { cfg: params.cfg },
+  );
+}
+
+export { invalidateBoardDispatchPermitAttempt };
+
 export async function recoverPendingBoardEventRelays(params: {
   groupId: string;
   taskId: string;
