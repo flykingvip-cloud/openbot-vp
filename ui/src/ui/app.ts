@@ -118,10 +118,10 @@ import {
   applyChatCheckpointLoadSuccess,
   beginChatCheckpointLoad,
   createChatCheckpointLoadState,
-  isolateChatCheckpointLoad,
   type ChatCheckpointLoadState,
   checkpointsFromLoadState,
 } from "./chat/checkpoint-load-state.ts";
+import { applyChatCheckpointSessionIsolation } from "./chat/checkpoint-session-isolation.ts";
 import {
   diagnoseCheckpointListVisibility,
   type ChatCheckpointVisibilityDiagnostic,
@@ -4126,13 +4126,7 @@ export class OpenBotApp extends LitElement {
 
   /** P0: clear checkpoints + load state when the restore session surface changes. */
   isolateChatCheckpointLoadForSession(nextSessionKey: string | null) {
-    this.chatCheckpointLoadState = isolateChatCheckpointLoad(
-      this.chatCheckpointLoadState,
-      nextSessionKey,
-    );
-    this.chatCheckpoints = [];
-    this.chatCheckpointDiagnostics = [];
-    this.pendingRestoreCheckpointId = null;
+    applyChatCheckpointSessionIsolation(this, nextSessionKey);
   }
 
   requestRestoreCheckpoint(checkpointId: string) {

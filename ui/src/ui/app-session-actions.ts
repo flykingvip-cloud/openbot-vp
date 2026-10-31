@@ -6,12 +6,16 @@ import {
   resolveBuiltinStewardSessionKey,
   resolveStewardSessionDefaultsFromHello,
 } from "./builtin-steward-selection.ts";
+import type { ChatCheckpointLoadState } from "./chat/checkpoint-load-state.ts";
+import { applyChatCheckpointSessionIsolation } from "./chat/checkpoint-session-isolation.ts";
+import type { ChatCheckpointVisibilityDiagnostic } from "./chat/checkpoint-visibility-diagnostics.ts";
 import { DEFAULT_CHAT_CONTEXT_SCOPE } from "./chat/context-scope.ts";
 import type { Tab } from "./navigation.ts";
 import {
   bumpSessionSeenAt,
   resolveSessionSeenAliasOptionsFromTrustedSession,
 } from "./session-seen-at.ts";
+import type { ChatCheckpoint } from "./types/chat-types.ts";
 import { syncComputerPreviewAfterSessionSwitch } from "./views/account-computer-preview.ts";
 
 export type ShellSessionSwitchState = Pick<
@@ -38,7 +42,12 @@ export type ShellSessionSwitchState = Pick<
   | "resetToolStream"
   | "resetChatScroll"
   | "setTab"
->;
+> & {
+  chatCheckpoints?: ChatCheckpoint[];
+  chatCheckpointLoadState?: ChatCheckpointLoadState;
+  chatCheckpointDiagnostics?: ChatCheckpointVisibilityDiagnostic[];
+  pendingRestoreCheckpointId?: string | null;
+};
 
 export type ShellSessionSwitchOptions = {
   clearAttachments?: boolean;
@@ -57,7 +66,12 @@ export type ShellSessionDraftState = Pick<
   | "applySettings"
   | "loadAssistantIdentity"
   | "resetToolStream"
->;
+> & {
+  chatCheckpoints?: ChatCheckpoint[];
+  chatCheckpointLoadState?: ChatCheckpointLoadState;
+  chatCheckpointDiagnostics?: ChatCheckpointVisibilityDiagnostic[];
+  pendingRestoreCheckpointId?: string | null;
+};
 
 export type ShellChatSessionSwitchState = ShellSessionSwitchState &
   Pick<
@@ -76,6 +90,8 @@ export function switchShellSession(
   options: ShellSessionSwitchOptions = {},
 ) {
   const seenAt = Date.now();
+  // P0: same isolate boundary as employee workbench / loadChatCheckpoints.
+  applyChatCheckpointSessionIsolation(state, sessionKey);
   state.workbenchTeamSelectedKey = sessionKey;
   state.sessionKey = sessionKey;
   state.chatMessage = "";
@@ -141,6 +157,7 @@ export function switchShellSession(
  * scroll resets, URL sync, or session-seen timestamps.
  */
 export function setShellSessionDraftKey(state: ShellSessionDraftState, sessionKey: string) {
+  applyChatCheckpointSessionIsolation(state, sessionKey);
   state.sessionKey = sessionKey;
   state.chatMessage = "";
   state.resetToolStream();

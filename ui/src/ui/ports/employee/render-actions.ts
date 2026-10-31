@@ -9,11 +9,8 @@ import {
   resolveStewardSessionDefaultsFromHello,
 } from "../../builtin-steward-selection.ts";
 import { sessionKeysShareChatSurface } from "../../chat-session-key-match.ts";
-import {
-  createChatCheckpointLoadState,
-  isolateChatCheckpointLoad,
-  type ChatCheckpointLoadState,
-} from "../../chat/checkpoint-load-state.ts";
+import type { ChatCheckpointLoadState } from "../../chat/checkpoint-load-state.ts";
+import { applyChatCheckpointSessionIsolation } from "../../chat/checkpoint-session-isolation.ts";
 import type { ChatCheckpointVisibilityDiagnostic } from "../../chat/checkpoint-visibility-diagnostics.ts";
 import { applyPendingChatFocusMessage } from "../../chat/focus-message.ts";
 import {
@@ -378,14 +375,8 @@ export function switchEmployeeWorkbenchSession(
   // Stale checkpoint ids must not ride onto the next assistant. Leave an
   // already-open computer dock alone: #581 refreshes it on session switch
   // and only history force-open is suppressed.
-  // P0: isolate load state immediately — never show prior session checkpoints.
-  state.chatCheckpoints = [];
-  state.pendingRestoreCheckpointId = null;
-  state.chatCheckpointLoadState = isolateChatCheckpointLoad(
-    state.chatCheckpointLoadState ?? createChatCheckpointLoadState(),
-    sessionKey,
-  );
-  state.chatCheckpointDiagnostics = [];
+  // P0: unified isolate boundary — never show prior session checkpoints.
+  applyChatCheckpointSessionIsolation(state, sessionKey);
   const cached = readWorkbenchSessionTranscript(sessionKey);
   const generation = ++workbenchSessionSwitchGeneration;
   state.sessionKey = sessionKey;
