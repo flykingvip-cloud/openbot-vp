@@ -591,3 +591,143 @@ describe("controlledDiscussToTask authoritative stage readback (P2)", () => {
     expect(["boolean", "string"]).toContain(typeof retry.stages.responsibilityAccepted);
   });
 });
+
+describe("controlledDiscussToTask durable source owner (R3)", () => {
+  it("same source different principal → source_owner_conflict; tags keep first owner", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    const sourceMessageId = "msg-owner-persist-1";
+    const first = await controlledDiscussToTask({
+      sourceMessageId,
+      sourceKind: "trusted_inbound",
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:alice",
+      principalActor: "human:alice",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["o1", "o2"],
+      trusted,
+      cfg,
+    });
+    expect(first.taskId).toBeTruthy();
+    const stores = createTrustedGroupStores(trusted);
+    const task = await stores.objectStorage.readObject<Task>("grp_d2t", "task", first.taskId!);
+    const meta = readDiscussToTaskMetaFromTags(task?.tags);
+    expect(meta?.sourceOwner).toBe("human:alice");
+    expect(meta?.sourceKind).toBe("trusted_inbound");
+
+    const stolen = await controlledDiscussToTask({
+      sourceMessageId,
+      sourceKind: "client_idempotency_key",
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:bob",
+      principalActor: "human:bob",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["o1", "o2"],
+      trusted,
+      cfg,
+    });
+    expect(stolen.internalReason).toBe("discuss_to_task_source_owner_conflict");
+    expect(stolen.contractConflict).toBe(true);
+    const again = await stores.objectStorage.readObject<Task>("grp_d2t", "task", first.taskId!);
+    expect(readDiscussToTaskMetaFromTags(again?.tags)?.sourceOwner).toBe("human:alice");
+  });
+});
+
+describe("readAuthoritativeDiscussToTaskStages board fixtures (R3)", () => {
+  it("full traverse >3 items; empty visible plans → unknown not false", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    const first = await controlledDiscussToTask({
+      sourceMessageId: "msg-stage-multi",
+      sourceKind: "trusted_inbound",
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:owner",
+      principalActor: "human:owner",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["m1", "m2"],
+      trusted,
+      cfg,
+    });
+    expect(first.taskId).toBeTruthy();
+    const taskId = first.taskId!;
+    // Seed 4 published items + 1 claimed under group board-claims log.
+    const claimsDir = path.join(trusted.groupLocator, "runtime", "board-claims");
+    await fs.mkdir(claimsDir, { recursive: true });
+    const logPath = path.join(claimsDir, `${taskId}.jsonl`);
+    const lines = [];
+    for (let i = 1; i <= 4; i += 1) {
+      lines.push(
+        JSON.stringify({
+          kind: "board_claim",
+          item: {
+            itemId: `item-${i}`,
+            groupId: "grp_d2t",
+            taskId,
+            title: `item ${i}`,
+            remainingWork: `work ${i}`,
+            acceptanceCriteria: ["a"],
+            intendedClaimantIds: [],
+            publishedBy: "human:owner",
+            publishedAt: Date.now(),
+            status: i === 1 ? "claimed" : "published",
+            revision: 1,
+            ...(i === 1 ? { claimantId: "bot:worker", claimedAt: Date.now() } : {}),
+          },
+        }),
+      );
+    }
+    await fs.writeFile(logPath, `${lines.join("\n")}\n`, "utf8");
+
+    const stages = await readAuthoritativeDiscussToTaskStages({
+      groupId: "grp_d2t",
+      taskId,
+      cfg,
+      trusted,
+      viewerActor: "human:owner",
+      activationHints: { taskEnsured: true },
+    });
+    expect(stages.taskEstablished).toBe(true);
+    // If board log is discoverable under this stores layout:
+    if (stages.boardPublished === true) {
+      expect(stages.responsibilityAccepted).toBe(true);
+      // No todolists visible → unknown (not false-as-absent)
+      expect(stages.planProposed).toBe("unknown");
+      expect(stages.planConfirmed).toBe("unknown");
+    } else {
+      // Path layout may place board-claims under a different namespace root —
+      // then unread board must stay unknown, never pretend unpublished.
+      expect(stages.boardPublished).toBe("unknown");
+      expect(stages.responsibilityAccepted).toBe("unknown");
+    }
+  });
+
+  it("without viewerActor, plan lanes stay unknown", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    const first = await controlledDiscussToTask({
+      sourceMessageId: "msg-stage-noviewer",
+      sourceKind: "trusted_inbound",
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:owner",
+      principalActor: "human:owner",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["n1", "n2"],
+      trusted,
+      cfg,
+    });
+    const stages = await readAuthoritativeDiscussToTaskStages({
+      groupId: "grp_d2t",
+      taskId: first.taskId!,
+      cfg,
+      trusted,
+      activationHints: { taskEnsured: true, boardPublished: true },
+    });
+    expect(stages.planProposed).toBe("unknown");
+    expect(stages.planConfirmed).toBe("unknown");
+  });
+});

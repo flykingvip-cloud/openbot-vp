@@ -86,6 +86,7 @@ describe("collaboration.task.discussToTask auth boundary (handler surface)", () 
       sourceMessageId: "msg-bound-owner",
       tenantId: "tenant-x",
       groupId: "g",
+      principalActor: "human:owner",
       actor: "human:owner",
     });
     // Handler resolves actor from client; without auth it fails earlier.
@@ -96,6 +97,7 @@ describe("collaboration.task.discussToTask auth boundary (handler surface)", () 
       sourceMessageId: "msg-bound-owner",
       tenantId: "tenant-x",
       groupId: "g",
+      principalActor: "human:attacker",
       actor: "human:attacker",
     });
     expect(stolen.ok).toBe(false);

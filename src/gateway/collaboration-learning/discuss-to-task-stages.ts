@@ -15,11 +15,18 @@ import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 export const DISCUSS_TO_TASK_SOURCE_TAG = "d2tSourceMessageId:";
 export const DISCUSS_TO_TASK_CONTRACT_TAG = "d2tContractFp:";
 export const DISCUSS_TO_TASK_SLOT_TAG = "d2tOperationSlot:";
+export const DISCUSS_TO_TASK_OWNER_TAG = "d2tSourceOwner:";
+export const DISCUSS_TO_TASK_KIND_TAG = "d2tSourceKind:";
+
+export type DiscussToTaskSourceKindTag = "trusted_inbound" | "client_idempotency_key";
 
 export type DiscussToTaskPersistedMeta = {
   sourceMessageId: string;
   contractFingerprint: string;
   operationSlot: string;
+  /** Durable principal who owns this source — immutable once accepted. */
+  sourceOwner: string;
+  sourceKind: DiscussToTaskSourceKindTag;
 };
 
 export function buildDiscussToTaskTags(meta: DiscussToTaskPersistedMeta): string[] {
@@ -27,6 +34,8 @@ export function buildDiscussToTaskTags(meta: DiscussToTaskPersistedMeta): string
     `${DISCUSS_TO_TASK_SOURCE_TAG}${meta.sourceMessageId}`,
     `${DISCUSS_TO_TASK_CONTRACT_TAG}${meta.contractFingerprint}`,
     `${DISCUSS_TO_TASK_SLOT_TAG}${meta.operationSlot}`,
+    `${DISCUSS_TO_TASK_OWNER_TAG}${meta.sourceOwner}`,
+    `${DISCUSS_TO_TASK_KIND_TAG}${meta.sourceKind}`,
   ];
 }
 
@@ -37,13 +46,21 @@ export function readDiscussToTaskMetaFromTags(
   const source = list.find((t) => t.startsWith(DISCUSS_TO_TASK_SOURCE_TAG));
   const contract = list.find((t) => t.startsWith(DISCUSS_TO_TASK_CONTRACT_TAG));
   const slot = list.find((t) => t.startsWith(DISCUSS_TO_TASK_SLOT_TAG));
+  const owner = list.find((t) => t.startsWith(DISCUSS_TO_TASK_OWNER_TAG));
+  const kind = list.find((t) => t.startsWith(DISCUSS_TO_TASK_KIND_TAG));
+  // source/contract/slot required; owner/kind optional for R2 legacy rows.
   if (!source || !contract || !slot) {
     return null;
   }
+  const sourceKindRaw = kind ? kind.slice(DISCUSS_TO_TASK_KIND_TAG.length) : "trusted_inbound";
+  const sourceKind: DiscussToTaskSourceKindTag =
+    sourceKindRaw === "client_idempotency_key" ? "client_idempotency_key" : "trusted_inbound";
   return {
     sourceMessageId: source.slice(DISCUSS_TO_TASK_SOURCE_TAG.length),
     contractFingerprint: contract.slice(DISCUSS_TO_TASK_CONTRACT_TAG.length),
     operationSlot: slot.slice(DISCUSS_TO_TASK_SLOT_TAG.length),
+    sourceOwner: owner ? owner.slice(DISCUSS_TO_TASK_OWNER_TAG.length) : "",
+    sourceKind,
   };
 }
 
@@ -55,7 +72,9 @@ export function mergeDiscussToTaskTags(
     (t) =>
       !t.startsWith(DISCUSS_TO_TASK_SOURCE_TAG) &&
       !t.startsWith(DISCUSS_TO_TASK_CONTRACT_TAG) &&
-      !t.startsWith(DISCUSS_TO_TASK_SLOT_TAG),
+      !t.startsWith(DISCUSS_TO_TASK_SLOT_TAG) &&
+      !t.startsWith(DISCUSS_TO_TASK_OWNER_TAG) &&
+      !t.startsWith(DISCUSS_TO_TASK_KIND_TAG),
   );
   return [...filtered, ...buildDiscussToTaskTags(meta)];
 }
@@ -126,6 +145,11 @@ export async function readAuthoritativeDiscussToTaskStages(params: {
   tenant?: CollaborationTenantResolution | null;
   /** Optional already-resolved stores. */
   stores?: TrustedGroupStores | null;
+  /**
+   * Authorized principal for plan visibility. Never use a synthetic system
+   * viewer that would treat ACL-invisible plans as "not proposed".
+   */
+  viewerActor?: string | null;
   /** Seed from activation result when available. */
   activationHints?: {
     taskEnsured?: boolean;
@@ -189,27 +213,35 @@ export async function readAuthoritativeDiscussToTaskStages(params: {
     const publishedIds = items
       .filter((item) => boardPublishedFromItems([item]))
       .map((item) => item.itemId);
-    if (publishedIds.length === 0) {
+    const viewer = (params.viewerActor ?? "").trim();
+    if (!viewer) {
+      // Without an authorized viewer we cannot distinguish ACL-invisible plans from absent.
+      planProposed = "unknown";
+      planConfirmed = "unknown";
+    } else if (publishedIds.length === 0) {
       planProposed = false;
       planConfirmed = false;
     } else {
       let anyProposed = false;
       let anyConfirmed = false;
       let planReadFailed = false;
-      for (const boardItemId of publishedIds.slice(0, 3)) {
+      let visibleReads = 0;
+      // Full traversal — do not stop at three items.
+      for (const boardItemId of publishedIds) {
         try {
           const lists = await listCollaborationTodolists({
             groupId: params.groupId,
             taskId: params.taskId,
             boardItemId,
-            actor: "system:discuss-to-task-stage-read",
-            viewerId: "system:discuss-to-task-stage-read",
+            actor: viewer,
+            viewerId: viewer,
             auth: params.auth,
             trusted: params.trusted,
             stores: resolved,
             tenant: params.tenant,
             cfg: params.cfg,
           });
+          visibleReads += 1;
           if (lists.length > 0) {
             anyProposed = true;
           }
@@ -220,12 +252,18 @@ export async function readAuthoritativeDiscussToTaskStages(params: {
           planReadFailed = true;
         }
       }
-      if (planReadFailed && !anyProposed) {
+      if (planReadFailed || visibleReads < publishedIds.length) {
+        // Partial / failed reads → unknown (never false-as-not-yet).
+        planProposed = anyProposed ? true : "unknown";
+        planConfirmed = anyConfirmed ? true : "unknown";
+      } else if (anyProposed) {
+        planProposed = true;
+        planConfirmed = anyConfirmed;
+      } else {
+        // All items readable and empty for this viewer. Still may be private
+        // plans invisible to this principal → unknown rather than false.
         planProposed = "unknown";
         planConfirmed = "unknown";
-      } else {
-        planProposed = anyProposed;
-        planConfirmed = anyConfirmed;
       }
     }
   } catch {

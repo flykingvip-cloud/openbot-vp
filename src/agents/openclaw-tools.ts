@@ -432,9 +432,15 @@ export function createOpenClawTools(
               options?.gatewayClientSessionEnterpriseId ??
               options?.tenantId ??
               null,
+            // Trusted inbound message id — never agentRunId (execution run ≠ message).
             inboundSourceMessageId:
-              options?.agentRunId ??
-              (options?.currentMessageId != null ? String(options.currentMessageId) : null),
+              options?.currentMessageId != null ? String(options.currentMessageId) : null,
+            inboundPrincipalActor:
+              options?.requesterSenderId ??
+              options?.gatewayClientUser ??
+              options?.gatewayClientPlatformUserId ??
+              null,
+            executionRunId: options?.agentRunId ?? null,
             gatewayClientUser: identityFields.gatewayClientUser,
             gatewayClientPlatformUserId: identityFields.gatewayClientPlatformUserId,
             gatewayClientSessionDomain: identityFields.gatewayClientSessionDomain,

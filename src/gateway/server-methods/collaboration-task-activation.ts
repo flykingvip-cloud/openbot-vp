@@ -13,7 +13,7 @@ import { controlledDiscussToTask } from "../collaboration-learning/controlled-di
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
 import {
   assertDiscussToTaskSourceBinding,
-  registerDiscussToTaskSourceBinding,
+  peekDiscussToTaskSourceBinding,
 } from "../collaboration-learning/discuss-to-task-source-binding.js";
 import { stagesFromActivation } from "../collaboration-learning/discuss-to-task-stages.js";
 import {
@@ -384,42 +384,42 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         );
         return;
       }
-      // Source/idempotency key ownership: existing binding must match actor
-      // (no cross-user borrow). Unbound ids may be first-claimed by this
-      // authenticated RPC actor only — model/tool cannot invent outside context.
-      const existing = assertDiscussToTaskSourceBinding({
+      // Trusted inbound vs client idempotency key are distinct.
+      // If a trusted inbound binding exists, principal must match (no borrow).
+      // Unbound RPC keys are client_idempotency_key only — never registered as trusted inbound.
+      const peeked = peekDiscussToTaskSourceBinding({
         sourceMessageId,
         tenantId,
         groupId,
-        actor,
       });
-      if (!existing.ok) {
-        if (
-          existing.reason === "source_message_actor_mismatch" ||
-          existing.reason === "source_message_binding_expired"
-        ) {
+      let sourceKind: "trusted_inbound" | "client_idempotency_key" = "client_idempotency_key";
+      if (peeked) {
+        const asserted = assertDiscussToTaskSourceBinding({
+          sourceMessageId,
+          tenantId,
+          groupId,
+          principalActor: actor,
+        });
+        if (!asserted.ok) {
           respond(
             false,
             undefined,
             errorShape(
               ErrorCodes.INVALID_REQUEST,
-              `${existing.reason}: ${existing.detail ?? "cannot borrow or reuse foreign sourceMessageId"}`,
+              `${asserted.reason}: ${asserted.detail ?? "cannot borrow foreign trusted inbound"}`,
             ),
           );
           return;
         }
-        registerDiscussToTaskSourceBinding({
-          sourceMessageId,
-          tenantId,
-          groupId,
-          actor,
-        });
+        sourceKind = "trusted_inbound";
       }
       const result = await controlledDiscussToTask({
         groupId,
         sourceMessageId,
+        sourceKind,
         tenantId,
         actor,
+        principalActor: actor,
         message,
         title: readString(params?.title),
         goal: readString(params?.goal),
