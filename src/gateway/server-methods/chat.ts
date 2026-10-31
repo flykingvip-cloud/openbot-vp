@@ -2744,6 +2744,10 @@ async function appendAssistantTranscriptMessage(params: {
   peerOutbound?: {
     targets: Array<{ agentId?: string; label: string; sessionKey?: string }>;
   };
+  /** Declared deliverable chip(s) + publish view — persist with stripped bubble text. */
+  artifact?: Record<string, unknown>;
+  artifacts?: Record<string, unknown>[];
+  deliverablePublish?: Record<string, unknown>;
 }): Promise<TranscriptAppendResult> {
   const transcriptPath = resolveTranscriptPath({
     sessionId: params.sessionId,
@@ -2817,6 +2821,9 @@ async function appendAssistantTranscriptMessage(params: {
     cronResult: params.cronResult,
     ...(params.guideCard ? { guideCard: params.guideCard } : {}),
     ...(params.restoreTaskIsolation ? { restoreTaskIsolation: params.restoreTaskIsolation } : {}),
+    ...(params.artifact ? { artifact: params.artifact } : {}),
+    ...(params.artifacts ? { artifacts: params.artifacts } : {}),
+    ...(params.deliverablePublish ? { deliverablePublish: params.deliverablePublish } : {}),
   });
 }
 
@@ -4008,37 +4015,29 @@ async function runGroupBotDiscussionTurn(params: {
         storePath: groupSession.storePath,
         sessionFile: groupSession.entry.sessionFile,
       });
+      const publishView = prepared?.structured ? prepared.view : undefined;
+      const persistTimestamp = Date.now();
+      const finalMessage: Record<string, unknown> = {
+        role: "assistant",
+        content: [{ type: "text", text: replyText }],
+        timestamp: persistTimestamp,
+        senderLabel: params.bot.name,
+        agentId: params.bot.agentId,
+        collaborationRoundId: params.collaborationRoundId,
+        ...(params.isWrapTurn ? { collaborationWrap: true } : {}),
+        ...(publishView ? { deliverablePublish: publishView } : {}),
+        ...(deliverableArtifacts.artifact ? { artifact: deliverableArtifacts.artifact } : {}),
+        ...(deliverableArtifacts.artifacts ? { artifacts: deliverableArtifacts.artifacts } : {}),
+      };
       const appended =
         transcriptPath == null
           ? { ok: false, error: "transcript path not resolved" }
           : appendRawTranscriptMessage({
               transcriptPath,
-              message: {
-                role: "assistant",
-                content: [{ type: "text", text: replyText }],
-                timestamp: Date.now(),
-                senderLabel: params.bot.name,
-                agentId: params.bot.agentId,
-                collaborationRoundId: params.collaborationRoundId,
-                ...(params.isWrapTurn ? { collaborationWrap: true } : {}),
-              },
+              message: finalMessage,
             });
-      const publishView = prepared?.structured ? prepared.view : undefined;
       const message = {
-        ...(appended.ok && appended.message
-          ? appended.message
-          : {
-              role: "assistant",
-              content: [{ type: "text", text: replyText }],
-              timestamp: Date.now(),
-              senderLabel: params.bot.name,
-              agentId: params.bot.agentId,
-              collaborationRoundId: params.collaborationRoundId,
-              ...(params.isWrapTurn ? { collaborationWrap: true } : {}),
-            }),
-        ...(publishView ? { deliverablePublish: publishView } : {}),
-        ...(deliverableArtifacts.artifact ? { artifact: deliverableArtifacts.artifact } : {}),
-        ...(deliverableArtifacts.artifacts ? { artifacts: deliverableArtifacts.artifacts } : {}),
+        ...(appended.ok && appended.message ? appended.message : finalMessage),
       };
       broadcastChatFinal({
         context: params.context,
@@ -6418,6 +6417,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                 timestamp: Date.now(),
               });
               const replyText = stripControlChannelForDisplay(prepared.text);
+              const fallbackPublish = prepared.structured ? prepared.view : undefined;
               const appended = await appendAssistantTranscriptMessage({
                 message: replyText,
                 sessionId,
@@ -6429,12 +6429,15 @@ export const chatHandlers: GatewayRequestHandlers = {
                 ownerUserId: replyGovernance.ownerUserId,
                 groupId: replyGovernance.groupId,
                 failClosed: replyGovernance.failClosed,
+                ...(fallbackPublish ? { deliverablePublish: fallbackPublish } : {}),
+                ...(fallbackArtifacts.artifact ? { artifact: fallbackArtifacts.artifact } : {}),
+                ...(fallbackArtifacts.artifacts ? { artifacts: fallbackArtifacts.artifacts } : {}),
               });
               if (appended.ok) {
                 message = appended.message
                   ? {
                       ...appended.message,
-                      ...(prepared.structured ? { deliverablePublish: prepared.view } : {}),
+                      ...(fallbackPublish ? { deliverablePublish: fallbackPublish } : {}),
                       ...(fallbackArtifacts.artifact
                         ? { artifact: fallbackArtifacts.artifact }
                         : {}),
