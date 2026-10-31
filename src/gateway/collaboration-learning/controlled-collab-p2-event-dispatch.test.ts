@@ -7,6 +7,7 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Task } from "@openbot/collaboration-core";
 import { afterEach, describe, expect, test } from "vitest";
 import {
@@ -32,10 +33,12 @@ import {
   createRuntimeAuthority,
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
+import { readWakeOpRecord } from "../collaboration-dispatch/wake-op-ledger.js";
 import type {
   WakeRoundDispatchRequest,
   WakeRoundDispatcher,
 } from "../collaboration-dispatch/wake-round-dispatch.js";
+import { classifyDispatchSideEffect } from "../collaboration-dispatch/wake-round-dispatch.js";
 import { finalizeMemberRunTeamDeliverable } from "./chat-deliverable-team-submit.js";
 import {
   acceptCollaborationBoardItemSubmission,
@@ -50,6 +53,8 @@ import {
 import {
   classifyConsumePendingLifecycle,
   listPendingBoardEventRelays,
+  listPermitAcquiredBoardEventRelays,
+  reconcilePermitAcquiredBoardEventRelays,
   recoverPendingBoardEventRelays,
   triggerPostSubmissionEventAdvance,
 } from "./post-submission-event-advance.js";
@@ -442,6 +447,30 @@ describe("P2 R2 — pending lifecycle", () => {
         reason: "dispatch_threw:boom",
       }),
     ).toBe("retain_unknown");
+    expect(
+      classifyConsumePendingLifecycle({
+        outcome: "recorded",
+        dispatched: false,
+        reason: "dispatch_failed:execute_collaboration_round_failed:after write",
+      }),
+    ).toBe("retain_unknown");
+    expect(
+      classifyConsumePendingLifecycle({
+        outcome: "recorded",
+        dispatched: false,
+        reason: "side_effect_started_or_unknown:mock_post_write_fail",
+      }),
+    ).toBe("retain_unknown");
+    expect(classifyDispatchSideEffect({ ok: false, reason: "mode_b_dispatcher_unbound" })).toBe(
+      "not_started",
+    );
+    expect(
+      classifyDispatchSideEffect({
+        ok: false,
+        reason: "execute_collaboration_round_failed",
+        sideEffectClass: "started_or_unknown",
+      }),
+    ).toBe("started_or_unknown");
     expect(
       classifyConsumePendingLifecycle({
         outcome: "recorded",
@@ -1659,6 +1688,277 @@ describe("P2 R4 — post-adjudication / pre-permit-commit adversarial races", ()
   });
 });
 
+describe("P2 R5 — ok:false side-effect class (no double effect)", () => {
+  test("post-write ok:false keeps unknown; recovery does not produce second side effect", async () => {
+    const { cfg, root } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r5-post-write";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    const submissionId = randomUUID();
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId,
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    const counterPath = path.join(root, "side-effect-count.txt");
+    await fs.writeFile(counterPath, "0\n", "utf8");
+    const postWriteFail: WakeRoundDispatcher = async () => {
+      const n = Number((await fs.readFile(counterPath, "utf8")).trim() || "0") + 1;
+      await fs.writeFile(counterPath, `${n}\n`, "utf8");
+      return {
+        ok: false,
+        reason: "execute_collaboration_round_failed",
+        message: "simulated after countable write",
+        sideEffectClass: "started_or_unknown",
+      };
+    };
+
+    const first = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      roundDispatcher: postWriteFail,
+      trusted: trustedLocatorFromAuthority(auth),
+    });
+    expect(first.dispatched).toBe(false);
+    expect(first.pendingRelay).toBe(true);
+    expect(first.pendingLifecycle).toBe("unknown");
+    expect(Number((await fs.readFile(counterPath, "utf8")).trim())).toBe(1);
+
+    const liveAfter = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(liveAfter?.pendingEventRelay?.status).toBe("unknown");
+    expect(liveAfter?.pendingEventRelay?.pendingVerification).toBe(true);
+    expect(liveAfter?.pendingEventRelay?.dispatchInvokeStarted).toBe(true);
+
+    // Recovery scan must NOT auto-retry unknown / started-or-unknown.
+    const recovered = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: "bot-b",
+      items: liveAfter ? [liveAfter] : [],
+      cfg,
+      roundDispatcher: postWriteFail,
+      trusted: trustedLocatorFromAuthority(auth),
+      authority: auth,
+    });
+    expect(recovered).toHaveLength(0);
+    expect(Number((await fs.readFile(counterPath, "utf8")).trim())).toBe(1);
+  });
+});
+
+describe("P2 R5 — permit vs dispatch completion + subprocess crash reconcile", () => {
+  test("subprocess: permit commit then exit → restart reconcile; no loss, no duplicate", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const { cfg, root } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r5-crash-permit";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    const submissionId = randomUUID();
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId,
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    const counterPath = path.join(root, "crash-side-effect-count.txt");
+    const markerPath = path.join(root, "permit-committed.marker");
+    const errPath = path.join(root, "child-stderr.txt");
+    await fs.writeFile(counterPath, "0\n", "utf8");
+
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+    const childScript = path.join(root, "r5-permit-crash-child.ts");
+    const trusted = trustedLocatorFromAuthority(auth);
+    const configPath = process.env.OPENBOT_CONFIG_PATH!;
+
+    await fs.writeFile(
+      childScript,
+      `
+import fs from "node:fs/promises";
+import path from "node:path";
+import {
+  clearConfigCache,
+  setRuntimeConfigSnapshot,
+} from ${JSON.stringify(path.join(repoRoot, "src/config/config.ts"))};
+import { triggerPostSubmissionEventAdvance } from ${JSON.stringify(
+        path.join(repoRoot, "src/gateway/collaboration-learning/post-submission-event-advance.ts"),
+      )};
+
+const root = process.argv[2];
+const groupId = process.argv[3];
+const taskId = process.argv[4];
+const itemId = process.argv[5];
+const counterPath = process.argv[6];
+const markerPath = process.argv[7];
+const configPath = process.argv[8];
+const trustedJson = process.argv[9];
+
+process.env.OPENBOT_STATE_DIR = path.join(root, "state");
+process.env.OPENBOT_CONFIG_PATH = configPath;
+process.env.OPENCLAW_CONFIG_PATH = configPath;
+process.env.OPENBOT_TENANTS_ROOT = path.join(root, "tenants");
+
+async function main() {
+  const cfg = JSON.parse(await fs.readFile(configPath, "utf8"));
+  setRuntimeConfigSnapshot(cfg, cfg);
+  clearConfigCache();
+  const trusted = trustedJson && trustedJson !== "null" ? JSON.parse(trustedJson) : null;
+  await triggerPostSubmissionEventAdvance({
+    groupId,
+    taskId,
+    itemId,
+    actorId: "bot-b",
+    cfg,
+    trusted,
+    roundDispatcher: async () => {
+      const n = Number((await fs.readFile(counterPath, "utf8")).trim() || "0") + 1;
+      await fs.writeFile(counterPath, String(n) + "\\n", "utf8");
+      return { ok: true, roundId: "should-not-run-in-crash-child" };
+    },
+    _testAfterPermitCommitBeforeDispatcher: async () => {
+      await fs.writeFile(markerPath, "permit_committed\\n", "utf8");
+      process.exit(42);
+    },
+  });
+  process.exit(0);
+}
+
+main().catch(async (err) => {
+  const msg = err instanceof Error ? err.stack || err.message : String(err);
+  await fs.writeFile(path.join(root, "child-stderr.txt"), msg + "\\n", "utf8");
+  console.error(msg);
+  process.exit(1);
+});
+`,
+      "utf8",
+    );
+
+    const child = spawnSync(
+      "pnpm",
+      [
+        "exec",
+        "tsx",
+        childScript,
+        root,
+        auth.groupId,
+        taskId,
+        item.itemId,
+        counterPath,
+        markerPath,
+        configPath,
+        trusted ? JSON.stringify(trusted) : "null",
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          OPENBOT_STATE_DIR: path.join(root, "state"),
+          OPENBOT_CONFIG_PATH: configPath,
+          OPENCLAW_CONFIG_PATH: configPath,
+          OPENBOT_TENANTS_ROOT: path.join(root, "tenants"),
+        },
+        cwd: repoRoot,
+      },
+    );
+    if (child.status !== 42) {
+      let childErr = child.stderr || "";
+      try {
+        childErr += `\n${await fs.readFile(errPath, "utf8")}`;
+      } catch {
+        // ignore
+      }
+      throw new Error(
+        `child exit ${String(child.status)} stdout=${child.stdout?.slice(0, 500)} stderr=${childErr.slice(0, 2000)}`,
+      );
+    }
+    expect((await fs.readFile(markerPath, "utf8")).trim()).toBe("permit_committed");
+    expect(Number((await fs.readFile(counterPath, "utf8")).trim())).toBe(0);
+
+    // Restart: reload board — permit acquired, invoke not started.
+    clearConfigCache();
+    setRuntimeConfigSnapshot(cfg, cfg);
+    const live = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(live?.pendingEventRelay?.status).toBe("dispatched");
+    expect(live?.pendingEventRelay?.dispatchInvokeStarted).not.toBe(true);
+    expect(listPermitAcquiredBoardEventRelays(live ? [live] : [])).toHaveLength(1);
+    // Without reconcile, pending-only scan would drop the event:
+    expect(listPendingBoardEventRelays(live ? [live] : [])).toHaveLength(0);
+
+    let dispatchCount = 0;
+    const once: WakeRoundDispatcher = async () => {
+      dispatchCount += 1;
+      const n = Number((await fs.readFile(counterPath, "utf8")).trim() || "0") + 1;
+      await fs.writeFile(counterPath, `${n}\n`, "utf8");
+      return { ok: true, roundId: `round-r5-${dispatchCount}` };
+    };
+
+    const recovered = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: "bot-b",
+      items: live ? [live] : [],
+      cfg,
+      roundDispatcher: once,
+      trusted: trustedLocatorFromAuthority(auth),
+      authority: auth,
+    });
+    expect(recovered.length).toBeGreaterThanOrEqual(1);
+    expect(recovered.some((r) => r.dispatched)).toBe(true);
+    expect(dispatchCount).toBe(1);
+    expect(Number((await fs.readFile(counterPath, "utf8")).trim())).toBe(1);
+
+    const after = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(after?.pendingEventRelay).toBeNull();
+
+    // Second recovery: no duplicate side effect.
+    const again = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: "bot-b",
+      items: after ? [after] : [],
+      cfg,
+      roundDispatcher: once,
+      trusted: trustedLocatorFromAuthority(auth),
+      authority: auth,
+    });
+    expect(again).toHaveLength(0);
+    expect(dispatchCount).toBe(1);
+    expect(Number((await fs.readFile(counterPath, "utf8")).trim())).toBe(1);
+    void readWakeOpRecord;
+    void reconcilePermitAcquiredBoardEventRelays;
+  });
+});
+
 function viRespond() {
   const calls: unknown[][] = [];
   const fn = (...args: unknown[]) => {
@@ -1669,4 +1969,5 @@ function viRespond() {
 
 // silence unused in case tree-shaking
 void listPendingBoardEventRelays;
+void listPermitAcquiredBoardEventRelays;
 void sha256;

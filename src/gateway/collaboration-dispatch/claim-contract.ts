@@ -107,10 +107,22 @@ export type BoardPendingEventRelay = Readonly<{
   opKey: string;
   recordedAt: number;
   /**
-   * pending = recoverable relay; dispatched = consume completed (usually cleared);
-   * blocked = permanent refuse (stop/revoke/terminal); unknown = side-effect unproven.
+   * pending = recoverable (auto-retry OK);
+   * dispatched = permit acquired (NOT proof of dispatcher completion — R4/R5);
+   * blocked = permanent refuse (stop/revoke/terminal);
+   * unknown = side-effect unproven (do not auto-retry; may set pendingVerification).
    */
   status: BoardPendingEventRelayStatus;
+  /**
+   * P2 R5: set true immediately before baseDispatcher invoke.
+   * Absent/false after status=dispatched ⇒ prove dispatch not started (safe recover).
+   */
+  dispatchInvokeStarted?: boolean;
+  /**
+   * P2 R5: clear pending-verification signal when reconcile cannot prove outcome.
+   * Recovery must NOT timeout-then-blindly-retry while this is set / status=unknown.
+   */
+  pendingVerification?: boolean;
   /** Exact execution binding at record time (especially for returned → member revise). */
   claimantId?: string;
   todolistId?: string;
@@ -1765,7 +1777,8 @@ export async function clearBoardPendingEventRelay(
  * P2 R4 — atomic dispatch-permit linearization point.
  *
  * Under withRoundLock (mutateBoardClaimItem): re-check board pending/status/revision/
- * claimant, then CAS pendingEventRelay.status pending → dispatched.
+ * claimant, then CAS pendingEventRelay.status pending → dispatched (permit acquired).
+ * "dispatched" here means permit held — NOT dispatcher completion (R5).
  * This is the linearization vs accept / new submit / reassign. Model execution stays
  * outside the lock; post-permit board changes are in-flight (no instantaneous revoke).
  */
@@ -1888,9 +1901,74 @@ export async function commitBoardDispatchPermit(
         );
       }
       // Status-only: do NOT bump board revision — permit must not look like accept/submit supersession.
+      // dispatchInvokeStarted stays unset until markBoardDispatchInvokeStarted (prove not-started).
       const next: GroupBoardClaimItem = {
         ...current,
-        pendingEventRelay: { ...pending, status: "dispatched" },
+        pendingEventRelay: {
+          ...pending,
+          status: "dispatched",
+          dispatchInvokeStarted: false,
+          pendingVerification: false,
+        },
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
+}
+
+/**
+ * P2 R5 — durable marker immediately before baseDispatcher invoke.
+ * Distinguishes permit-acquired from dispatch-invoke-started for crash reconcile.
+ */
+export async function markBoardDispatchInvokeStarted(
+  authority: RuntimeAuthority,
+  input: {
+    taskId: string;
+    itemId: string;
+    expectedOpKey: string;
+  },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  if (!taskId || !itemId || !expectedOpKey) {
+    return fail(
+      "invalid_input",
+      "markBoardDispatchInvokeStarted requires taskId, itemId, expectedOpKey",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return fail("invoke_pending_missing", "pendingEventRelay missing at invoke-start mark");
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "invoke_pending_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey at invoke-start mark",
+        );
+      }
+      if (pending.status !== "dispatched") {
+        return fail(
+          `invoke_pending_status:${pending.status}`,
+          `pendingEventRelay.status is ${pending.status}; expected dispatched (permit acquired)`,
+        );
+      }
+      if (pending.dispatchInvokeStarted === true) {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: { ...pending, dispatchInvokeStarted: true },
       };
       return { ok: true, value: next };
     },
@@ -1906,6 +1984,10 @@ export async function updateBoardPendingEventRelayStatus(
     itemId: string;
     expectedOpKey: string;
     status: BoardPendingEventRelayStatus;
+    /** When releasing to pending, clear invoke/verification meta. */
+    clearDispatchMeta?: boolean;
+    pendingVerification?: boolean;
+    dispatchInvokeStarted?: boolean;
   },
   options?: ClaimContractOptions,
 ): Promise<ClaimResult<GroupBoardClaimItem>> {
@@ -1936,13 +2018,42 @@ export async function updateBoardPendingEventRelayStatus(
           "pendingEventRelay.opKey does not match expectedOpKey; refuse blind status update",
         );
       }
-      if (pending.status === input.status) {
+      let nextPending: BoardPendingEventRelay = {
+        ...pending,
+        status: input.status,
+      };
+      if (input.clearDispatchMeta || input.status === "pending") {
+        nextPending = {
+          ...nextPending,
+          dispatchInvokeStarted: false,
+          pendingVerification: false,
+        };
+      } else {
+        if (typeof input.dispatchInvokeStarted === "boolean") {
+          nextPending = {
+            ...nextPending,
+            dispatchInvokeStarted: input.dispatchInvokeStarted,
+          };
+        }
+        if (typeof input.pendingVerification === "boolean") {
+          nextPending = {
+            ...nextPending,
+            pendingVerification: input.pendingVerification,
+          };
+        }
+      }
+      const sameStatus = pending.status === nextPending.status;
+      const sameInvoke =
+        Boolean(pending.dispatchInvokeStarted) === Boolean(nextPending.dispatchInvokeStarted);
+      const sameVerify =
+        Boolean(pending.pendingVerification) === Boolean(nextPending.pendingVerification);
+      if (sameStatus && sameInvoke && sameVerify) {
         return { ok: true, value: current, skipAppend: true };
       }
       // Status-only lifecycle marker — keep board revision stable for permit linearization.
       const next: GroupBoardClaimItem = {
         ...current,
-        pendingEventRelay: { ...pending, status: input.status },
+        pendingEventRelay: nextPending,
       };
       return { ok: true, value: next };
     },

@@ -16,6 +16,7 @@ import {
   clearBoardPendingEventRelay,
   commitBoardDispatchPermit,
   loadBoardClaimItem,
+  markBoardDispatchInvokeStarted,
   updateBoardPendingEventRelayStatus,
   type BoardPendingEventRelay,
   type GroupBoardClaimItem,
@@ -28,9 +29,16 @@ import {
 import type { RuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { SELF_ADVANCE_ACTIVE_BOARD_STATUSES } from "../collaboration-dispatch/self-advance.js";
 import {
+  markWakeOpFailed,
+  markWakeOpUnknown,
+  readWakeOpRecord,
+} from "../collaboration-dispatch/wake-op-ledger.js";
+import {
+  classifyDispatchSideEffect,
   consumeWakeForRoundDispatch,
   getWakeRoundDispatcher,
   type ConsumeWakeRoundDispatchResult,
+  type DispatchSideEffectClass,
   type WakeRoundDispatcher,
   type WakeRoundDispatchRequest,
 } from "../collaboration-dispatch/wake-round-dispatch.js";
@@ -128,11 +136,14 @@ export function classifyConsumePendingLifecycle(
   if (
     reason.startsWith("dispatch_threw:") ||
     reason.startsWith("external_sent_") ||
-    reason.includes("unknown")
+    reason.includes("unknown") ||
+    reason.includes("side_effect_started") ||
+    reason.includes("execute_collaboration_round_failed")
   ) {
     return "retain_unknown";
   }
-  // Incomplete / recoverable: flag-off, dry-run, dispatcher unavailable, failed dispatch.
+  // Incomplete / recoverable: flag-off, dry-run, dispatcher unavailable, failed dispatch
+  // ONLY when side effects are proven not started (see classifyDispatchSideEffect).
   if (
     reason === "wake_contract_off" ||
     reason === "self_advance_not_execute" ||
@@ -517,6 +528,11 @@ export async function triggerPostSubmissionEventAdvance(params: {
    * Proves the post-adjudication / pre-permit-commit race window is closed.
    */
   _testAfterAdjudicationReadBeforePermitCommit?: () => Promise<void>;
+  /**
+   * Test-only: after permit CAS commit, before dispatchInvokeStarted mark / baseDispatcher.
+   * Crash-window for P2 R5: permit acquired but dispatch not started.
+   */
+  _testAfterPermitCommitBeforeDispatcher?: () => Promise<void>;
   /** Forwarded to consumeWakeForRoundDispatch (post-readiness, pre-CAS take). */
   _testAfterReadinessBarrier?: () => Promise<void>;
   /** Forwarded to consumeWakeForRoundDispatch (post-eligibility, pre-CAS take). */
@@ -900,7 +916,11 @@ export async function triggerPostSubmissionEventAdvance(params: {
       const attemptId = compact(req.wakeExecutionAttemptId);
       if (!wakeOpKey || !attemptId) {
         await releaseDispatchPermitBestEffort();
-        return { ok: false, reason: "wake_execution_attempt_required" };
+        return {
+          ok: false,
+          reason: "wake_execution_attempt_required",
+          sideEffectClass: "not_started",
+        };
       }
       const todolistId = compact(gate.todolistId) || compact(planConfirmBinding?.todolistId);
       const planVersion =
@@ -910,7 +930,11 @@ export async function triggerPostSubmissionEventAdvance(params: {
       const stepId = compact(gate.stepId) || compact(planConfirmBinding?.stepId);
       if (!todolistId || typeof planVersion !== "number" || !stepId) {
         await releaseDispatchPermitBestEffort();
-        return { ok: false, reason: "execution_deliverable_plan_required" };
+        return {
+          ok: false,
+          reason: "execution_deliverable_plan_required",
+          sideEffectClass: "not_started",
+        };
       }
       const runId = runIdFromWakeOpAttempt({ opKey: wakeOpKey, attemptId });
       executionDeliverableBinding = buildExecutionDeliverableBinding({
@@ -934,7 +958,11 @@ export async function triggerPostSubmissionEventAdvance(params: {
       });
       if (!executionDeliverableBinding) {
         await releaseDispatchPermitBestEffort();
-        return { ok: false, reason: "execution_deliverable_binding_incomplete" };
+        return {
+          ok: false,
+          reason: "execution_deliverable_binding_incomplete",
+          sideEffectClass: "not_started",
+        };
       }
       enrichedPlan = {
         todolistId,
@@ -955,10 +983,18 @@ export async function triggerPostSubmissionEventAdvance(params: {
       });
     }
 
+    if (params._testAfterPermitCommitBeforeDispatcher) {
+      await params._testAfterPermitCommitBeforeDispatcher();
+    }
+
     if (!baseDispatcher) {
       // Permit held but execution never started — release for recoverable retry.
       await releaseDispatchPermitBestEffort();
-      return { ok: false, reason: "mode_b_dispatcher_unbound" };
+      return {
+        ok: false,
+        reason: "mode_b_dispatcher_unbound",
+        sideEffectClass: "not_started",
+      };
     }
     const enriched: WakeRoundDispatchRequest = {
       ...req,
@@ -967,12 +1003,48 @@ export async function triggerPostSubmissionEventAdvance(params: {
       ...(executionDeliverableBinding ? { executionDeliverableBinding } : {}),
       reason,
     };
+    // Durable: permit acquired → invoke about to start (crash after this ⇒ cannot prove clean).
+    try {
+      await markBoardDispatchInvokeStarted(
+        authority,
+        { taskId, itemId, expectedOpKey: opKey },
+        { cfg },
+      );
+    } catch {
+      // best-effort; missing mark keeps prove-not-started semantics on reconcile
+    }
     const dispatched = await baseDispatcher(enriched);
     if (!dispatched.ok) {
-      // Pre-side-effect / soft fail: release permit so recovery can retry same opKey.
-      // Post-permit board accept/reassign is still in-flight semantics (no revoke here).
-      // If baseDispatcher throws, leave permit as dispatched (side-effect unproven / unknown).
-      await releaseDispatchPermitBestEffort();
+      const side: DispatchSideEffectClass = classifyDispatchSideEffect(dispatched);
+      if (side === "not_started") {
+        // Definitely not started: release permit so recovery can retry same opKey.
+        await releaseDispatchPermitBestEffort();
+        return dispatched;
+      }
+      // Started or outcome unknown: keep unknown — do NOT auto-retry / release.
+      // Completed-with-receipt on ok:false is anomalous; still do not blind-retry.
+      try {
+        await updateBoardPendingEventRelayStatus(
+          authority,
+          {
+            taskId,
+            itemId,
+            expectedOpKey: opKey,
+            status: "unknown",
+            pendingVerification: true,
+            dispatchInvokeStarted: true,
+          },
+          { cfg },
+        );
+      } catch {
+        // best-effort
+      }
+      return {
+        ok: false,
+        reason: `side_effect_started_or_unknown:${dispatched.reason}`,
+        message: dispatched.message,
+        sideEffectClass: side === "completed_with_receipt" ? "started_or_unknown" : side,
+      };
     }
     return dispatched;
   };
@@ -1089,9 +1161,194 @@ export function listPendingBoardEventRelays(
 }
 
 /**
- * Idempotent recovery: re-issue consume for each pending relay using the same opKey.
+ * P2 R5: permit-acquired (status=dispatched) relays needing reconcile — NOT auto-dispatch.
+ * Must not be silently treated as already completed; must not timeout-blind-retry.
+ */
+export function listPermitAcquiredBoardEventRelays(
+  items: readonly GroupBoardClaimItem[],
+): Array<{ item: GroupBoardClaimItem; pending: BoardPendingEventRelay }> {
+  const out: Array<{ item: GroupBoardClaimItem; pending: BoardPendingEventRelay }> = [];
+  for (const item of items) {
+    const pending = item.pendingEventRelay;
+    if (pending && pending.status === "dispatched" && compact(pending.opKey)) {
+      if (item.status === "accepted" || item.status === "cancelled") {
+        continue;
+      }
+      out.push({ item, pending });
+    }
+  }
+  return out;
+}
+
+export type PermitAcquiredReconcileAction =
+  | "released_for_retry"
+  | "marked_unknown_pending_verification"
+  | "cleared_completed"
+  | "left_unchanged";
+
+export type PermitAcquiredReconcileResult = {
+  itemId: string;
+  opKey: string;
+  action: PermitAcquiredReconcileAction;
+  reason: string;
+  pendingVerification?: boolean;
+};
+
+/**
+ * Reconcile permit-acquired vs dispatch-completed via wake-op/attempt + invoke marker.
+ * - Prove not started (no dispatchInvokeStarted) → release wake to failed + permit to pending.
+ * - Cannot prove → unknown + pendingVerification (no blind retry).
+ * - Wake completed with receipt → clear pending (dispatch completed).
+ */
+export async function reconcilePermitAcquiredBoardEventRelays(params: {
+  authority: RuntimeAuthority;
+  items: readonly GroupBoardClaimItem[];
+  cfg?: OpenBotConfig;
+}): Promise<PermitAcquiredReconcileResult[]> {
+  const cfg = params.cfg;
+  const results: PermitAcquiredReconcileResult[] = [];
+  for (const row of listPermitAcquiredBoardEventRelays(params.items)) {
+    const opKey = compact(row.pending.opKey);
+    const itemId = compact(row.item.itemId);
+    const taskId = compact(row.item.taskId);
+    if (!opKey || !itemId || !taskId) {
+      continue;
+    }
+    let wake = null as Awaited<ReturnType<typeof readWakeOpRecord>>;
+    try {
+      wake = await readWakeOpRecord({ authority: params.authority, opKey });
+    } catch {
+      wake = null;
+    }
+    const invokeStarted = row.pending.dispatchInvokeStarted === true;
+
+    if (wake?.status === "completed") {
+      try {
+        await clearBoardPendingEventRelay(
+          params.authority,
+          { taskId, itemId, expectedOpKey: opKey },
+          { cfg },
+        );
+      } catch {
+        // best-effort
+      }
+      results.push({
+        itemId,
+        opKey,
+        action: "cleared_completed",
+        reason: "wake_op_completed_receipt",
+      });
+      continue;
+    }
+
+    if (!invokeStarted) {
+      // Prove dispatch not started after permit — safe recover under same op.
+      if (wake?.status === "running") {
+        try {
+          await markWakeOpFailed({
+            authority: params.authority,
+            opKey,
+            cfg,
+            detail: "permit_acquired_dispatch_not_started",
+          });
+        } catch {
+          // best-effort
+        }
+      } else if (wake?.status === "unknown") {
+        try {
+          await updateBoardPendingEventRelayStatus(
+            params.authority,
+            {
+              taskId,
+              itemId,
+              expectedOpKey: opKey,
+              status: "unknown",
+              pendingVerification: true,
+            },
+            { cfg },
+          );
+        } catch {
+          // best-effort
+        }
+        results.push({
+          itemId,
+          opKey,
+          action: "marked_unknown_pending_verification",
+          reason: "wake_op_unknown_cannot_prove_not_started",
+          pendingVerification: true,
+        });
+        continue;
+      }
+      try {
+        await updateBoardPendingEventRelayStatus(
+          params.authority,
+          {
+            taskId,
+            itemId,
+            expectedOpKey: opKey,
+            status: "pending",
+            clearDispatchMeta: true,
+          },
+          { cfg },
+        );
+      } catch {
+        // best-effort
+      }
+      results.push({
+        itemId,
+        opKey,
+        action: "released_for_retry",
+        reason: "permit_acquired_dispatch_not_started",
+      });
+      continue;
+    }
+
+    // Invoke started (or crash after mark) — cannot prove outcome; never blind-retry.
+    if (wake?.status === "running") {
+      try {
+        await markWakeOpUnknown({
+          authority: params.authority,
+          opKey,
+          cfg,
+          detail: "permit_dispatch_invoke_started_outcome_unknown",
+        });
+      } catch {
+        // best-effort
+      }
+    }
+    try {
+      await updateBoardPendingEventRelayStatus(
+        params.authority,
+        {
+          taskId,
+          itemId,
+          expectedOpKey: opKey,
+          status: "unknown",
+          pendingVerification: true,
+          dispatchInvokeStarted: true,
+        },
+        { cfg },
+      );
+    } catch {
+      // best-effort
+    }
+    results.push({
+      itemId,
+      opKey,
+      action: "marked_unknown_pending_verification",
+      reason: "dispatch_invoke_started_outcome_unknown",
+      pendingVerification: true,
+    });
+  }
+  return results;
+}
+
+/**
+ * Idempotent recovery: reconcile permit-acquired first, then re-issue consume for
+ * each pending relay using the same opKey.
  * Does not invent a new queue — callers (heartbeat / recovery entry) supply items.
  * Always re-validates LIVE pending at the dispatch boundary (ignores stale snapshots).
+ * Never silently treats permit-acquired as dispatched-complete; never timeout-blind-retries.
  */
 export async function recoverPendingBoardEventRelays(params: {
   groupId: string;
@@ -1105,9 +1362,59 @@ export async function recoverPendingBoardEventRelays(params: {
   cfg?: OpenBotConfig;
   roundDispatcher?: WakeRoundDispatcher | null;
   requireTrustedScope?: boolean;
+  /** Optional authority override (tests / callers that already built claim authority). */
+  authority?: RuntimeAuthority | null;
 }): Promise<PostSubmissionEventAdvanceResult[]> {
-  const pending = listPendingBoardEventRelays(params.items);
   const results: PostSubmissionEventAdvanceResult[] = [];
+
+  // Build authority for reconcile when possible (same root as trigger).
+  let authority = params.authority ?? null;
+  if (!authority) {
+    try {
+      const cfg = params.cfg ?? loadConfig();
+      const built = await buildClaimAuthority({
+        groupId: params.groupId,
+        taskId: params.taskId,
+        cfg,
+        auth: params.auth,
+        trusted: params.trusted,
+        stores: params.stores,
+        tenant: params.tenant,
+      });
+      authority = built.authority;
+    } catch {
+      authority = null;
+    }
+  }
+
+  let workingItems = [...params.items];
+  if (authority) {
+    try {
+      await reconcilePermitAcquiredBoardEventRelays({
+        authority,
+        items: workingItems,
+        cfg: params.cfg,
+      });
+      // Reload live rows so released permits appear as pending for the scan below.
+      const reloaded: GroupBoardClaimItem[] = [];
+      for (const item of workingItems) {
+        const live = await loadBoardClaimItem(authority, {
+          taskId: compact(item.taskId) || params.taskId,
+          itemId: item.itemId,
+        });
+        if (live) {
+          reloaded.push(live);
+        }
+      }
+      if (reloaded.length > 0) {
+        workingItems = reloaded;
+      }
+    } catch {
+      // Reconcile is best-effort; pending markers remain durable.
+    }
+  }
+
+  const pending = listPendingBoardEventRelays(workingItems);
   for (const row of pending) {
     results.push(
       await triggerPostSubmissionEventAdvance({
