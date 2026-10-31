@@ -100,6 +100,10 @@ import {
 } from "../../sessions/session-key-utils.js";
 import { planDaibaiGuideAppend } from "../../shared/daibai-guide-card.js";
 import {
+  attachDeclaredDeliverableArtifacts,
+  declaredDeliverableArtifactFields,
+} from "../../shared/preview-artifact/materialize-declared-artifacts.js";
+import {
   isHiddenToolUseScratchpadMessage,
   type VisibleReplyLanguage,
 } from "../../shared/text/assistant-scratchpad.js";
@@ -1743,9 +1747,18 @@ function sanitizeChatHistoryMessage(
   if (!message || typeof message !== "object") {
     return { message, changed: false };
   }
-  const entry = { ...(message as Record<string, unknown>) };
+  let entry = { ...(message as Record<string, unknown>) };
   let changed = false;
   const keepBody = isPeerOutboundSurfaceMessage(message);
+  // Materialize 「打开成果」 artifacts from raw <<DELIVERABLE file=>> BEFORE display strip.
+  if (entry.role === "assistant" && !keepBody) {
+    const beforeArtifact = entry.artifact;
+    const beforeArtifacts = entry.artifacts;
+    entry = attachDeclaredDeliverableArtifacts(entry);
+    if (entry.artifact !== beforeArtifact || entry.artifacts !== beforeArtifacts) {
+      changed = true;
+    }
+  }
   const isToolResult = entry.role === "toolResult" || entry.role === "tool";
   const truncateOpts = isToolResult
     ? {
@@ -3854,6 +3867,7 @@ async function runGroupBotDiscussionTurn(params: {
       }
       let deliverableOwnerId: string | null = null;
       let prepared: PreparedChatDeliverable | null = null;
+      let deliverableArtifacts: ReturnType<typeof declaredDeliverableArtifactFields> = {};
       try {
         const tenantCtx = await resolveTenantContext(params.client);
         deliverableOwnerId = tenantCtx?.userId?.trim() || null;
@@ -3978,6 +3992,9 @@ async function runGroupBotDiscussionTurn(params: {
             });
           }
         }
+        deliverableArtifacts = declaredDeliverableArtifactFields(replyText, {
+          timestamp: Date.now(),
+        });
         replyText = stripControlChannelForDisplay(replyText);
       } catch (err) {
         params.context.logGateway.warn(
@@ -4020,6 +4037,8 @@ async function runGroupBotDiscussionTurn(params: {
               ...(params.isWrapTurn ? { collaborationWrap: true } : {}),
             }),
         ...(publishView ? { deliverablePublish: publishView } : {}),
+        ...(deliverableArtifacts.artifact ? { artifact: deliverableArtifacts.artifact } : {}),
+        ...(deliverableArtifacts.artifacts ? { artifacts: deliverableArtifacts.artifacts } : {}),
       };
       broadcastChatFinal({
         context: params.context,
@@ -6395,6 +6414,9 @@ export const chatHandlers: GatewayRequestHandlers = {
                 clientRunId,
                 taskId: null,
               });
+              const fallbackArtifacts = declaredDeliverableArtifactFields(prepared.text, {
+                timestamp: Date.now(),
+              });
               const replyText = stripControlChannelForDisplay(prepared.text);
               const appended = await appendAssistantTranscriptMessage({
                 message: replyText,
@@ -6413,6 +6435,12 @@ export const chatHandlers: GatewayRequestHandlers = {
                   ? {
                       ...appended.message,
                       ...(prepared.structured ? { deliverablePublish: prepared.view } : {}),
+                      ...(fallbackArtifacts.artifact
+                        ? { artifact: fallbackArtifacts.artifact }
+                        : {}),
+                      ...(fallbackArtifacts.artifacts
+                        ? { artifacts: fallbackArtifacts.artifacts }
+                        : {}),
                     }
                   : undefined;
                 emitChatInboundStage({
@@ -6466,6 +6494,10 @@ export const chatHandlers: GatewayRequestHandlers = {
                   content: [{ type: "text", text: replyText }],
                   timestamp: now,
                   ...(prepared.structured ? { deliverablePublish: prepared.view } : {}),
+                  ...(fallbackArtifacts.artifact ? { artifact: fallbackArtifacts.artifact } : {}),
+                  ...(fallbackArtifacts.artifacts
+                    ? { artifacts: fallbackArtifacts.artifacts }
+                    : {}),
                   // Keep this compatible with Pi stopReason enums even though this message isn't
                   // persisted to the transcript due to the append failure.
                   stopReason: "stop",
