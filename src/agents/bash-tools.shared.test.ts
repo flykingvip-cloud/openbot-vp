@@ -74,4 +74,47 @@ describe("resolveSandboxWorkdir", () => {
       expect(warnings).toEqual([]);
     });
   });
+
+  it("maps gateway-absolute host workspace workdir into the account container mount", async () => {
+    await withTempDir(async (workspaceDir) => {
+      const nested = path.join(workspaceDir, "deliverables");
+      await mkdir(nested, { recursive: true });
+      const warnings: string[] = [];
+      const gatewayAbsolute = workspaceDir; // same path the gateway mounts as /root/.openbot/...
+      const resolved = await resolveSandboxWorkdir({
+        workdir: gatewayAbsolute,
+        sandbox: {
+          containerName: "aw-exec-lease-1",
+          workspaceDir,
+          containerWorkdir: "/account/workspace",
+        },
+        warnings,
+      });
+
+      expect(resolved.hostWorkdir).toBe(workspaceDir);
+      expect(resolved.containerWorkdir).toBe("/account/workspace");
+      expect(warnings).toEqual([]);
+    });
+  });
+
+  it("maps nested gateway-absolute workdir under the account mount", async () => {
+    await withTempDir(async (workspaceDir) => {
+      const nested = path.join(workspaceDir, "deliverables", "brief");
+      await mkdir(nested, { recursive: true });
+      const warnings: string[] = [];
+      const resolved = await resolveSandboxWorkdir({
+        workdir: nested,
+        sandbox: {
+          containerName: "aw-exec-lease-2",
+          workspaceDir,
+          containerWorkdir: "/account/workspace",
+        },
+        warnings,
+      });
+
+      expect(resolved.hostWorkdir).toBe(nested);
+      expect(resolved.containerWorkdir).toBe("/account/workspace/deliverables/brief");
+      expect(warnings).toEqual([]);
+    });
+  });
 });

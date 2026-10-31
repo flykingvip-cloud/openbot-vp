@@ -12,6 +12,32 @@ export function resolveConfiguredExecHost(params: {
   return params.configuredHost ?? (params.sandboxAvailable ? "sandbox" : "gateway");
 }
 
+/**
+ * When a session sandbox is bound to the exec tool, prefer host=sandbox over a
+ * sticky agent/config `tools.exec.host=gateway` override. Otherwise file tools
+ * use the account lease (`/account/workspace`, chromium) while shell runs in
+ * the gateway process (uid `node`, no chromium) — LIVE bot-2 growth-report
+ * regression 2026-10-31.
+ *
+ * Elevated remains the operator break-glass onto the gateway. An explicit
+ * model-requested host=gateway|node is left unchanged (existing allow/deny
+ * gates still apply).
+ */
+export function preferBoundSandboxExecHost(params: {
+  host: ExecHost;
+  sandboxAvailable: boolean;
+  requestedHost: ExecHost | null;
+  elevatedRequested: boolean;
+}): ExecHost {
+  if (params.elevatedRequested) {
+    return "gateway";
+  }
+  if (params.sandboxAvailable && params.host === "gateway" && params.requestedHost == null) {
+    return "sandbox";
+  }
+  return params.host;
+}
+
 export function assertProtectedGatewayProcessCommandAllowed(params: {
   command: string;
   host: ExecHost;

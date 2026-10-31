@@ -36,6 +36,7 @@ import {
 } from "./bash-tools.exec-policy-provenance.js";
 import {
   assertProtectedGatewayProcessCommandAllowed,
+  preferBoundSandboxExecHost,
   resolveConfiguredExecHost,
 } from "./bash-tools.exec-protected-process.js";
 import {
@@ -372,6 +373,15 @@ export function createExecTool(
       }
       if (elevatedRequested) {
         host = "gateway";
+      } else {
+        // Bound session sandbox wins over agent tools.exec.host=gateway so
+        // shell/exec stay in aw-exec-lease (not gateway uid node).
+        host = preferBoundSandboxExecHost({
+          host,
+          sandboxAvailable: Boolean(defaults?.sandbox),
+          requestedHost,
+          elevatedRequested: false,
+        });
       }
 
       assertProtectedGatewayProcessCommandAllowed({
