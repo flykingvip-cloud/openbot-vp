@@ -175,35 +175,32 @@ function mapGatewayAbsoluteHostWorkdir(params: {
 }
 
 /**
- * Best-effort rewrite of gateway-absolute `/root/.openbot/...` (and any path under
- * the sandbox host workspaceDir — same vocabulary as mapGatewayAbsoluteHostWorkdir)
- * inside an exec **command** string when host=sandbox. Workdir alone is not enough:
- * `cat /root/.openbot/operators/.../workspace/foo` still misses the lease mount.
+ * Replace absolute path-prefix tokens under `fromRoot` with the matching path under
+ * `toRoot`, extending each match through a contiguous path token (same delimiter
+ * vocabulary for host↔container rewrites).
  */
-export function rewriteGatewayAbsoluteHostPathsInCommand(params: {
+function rewriteAbsoluteRootPrefixInCommand(params: {
   command: string;
-  workspaceDir: string;
-  containerWorkdir: string;
+  fromRoot: string;
+  toRoot: string;
 }): string {
   const command = params.command;
-  const workspacePosix = path.resolve(params.workspaceDir).replace(/\\/g, "/");
-  const containerRoot = normalizeContainerPath(params.containerWorkdir);
-  if (!command || !workspacePosix || workspacePosix === "/" || containerRoot === ".") {
+  const fromRoot = params.fromRoot;
+  const toRoot = params.toRoot;
+  if (!command || !fromRoot || fromRoot === "/" || !toRoot || toRoot === ".") {
     return command;
   }
 
-  // Best-effort scan: replace gateway-absolute workspace prefixes with the container mount.
-  // Same vocabulary as mapGatewayAbsoluteHostWorkdir (paths under workspaceDir).
   let out = "";
   let i = 0;
   while (i < command.length) {
-    const idx = command.indexOf(workspacePosix, i);
+    const idx = command.indexOf(fromRoot, i);
     if (idx === -1) {
       out += command.slice(i);
       break;
     }
     out += command.slice(i, idx);
-    let end = idx + workspacePosix.length;
+    let end = idx + fromRoot.length;
     // Extend through a nested relative path segment while it looks like a path token.
     while (end < command.length) {
       const ch = command[end];
@@ -227,18 +224,62 @@ export function rewriteGatewayAbsoluteHostPathsInCommand(params: {
       end += 1;
     }
     const matched = command.slice(idx, end);
-    if (matched === workspacePosix) {
-      out += containerRoot;
-    } else if (matched.startsWith(`${workspacePosix}/`)) {
-      const rel = matched.slice(workspacePosix.length + 1);
-      out += rel ? path.posix.join(containerRoot, rel) : containerRoot;
+    if (matched === fromRoot) {
+      out += toRoot;
+    } else if (matched.startsWith(`${fromRoot}/`)) {
+      const rel = matched.slice(fromRoot.length + 1);
+      out += rel ? path.posix.join(toRoot, rel) : toRoot;
     } else {
-      // Prefix matched a longer token that is not a path under workspace (e.g. sibling name).
+      // Prefix matched a longer token that is not a path under fromRoot (e.g. sibling name).
       out += matched;
     }
     i = end;
   }
   return out;
+}
+
+/**
+ * Best-effort rewrite of gateway-absolute `/root/.openbot/...` (and any path under
+ * the sandbox host workspaceDir — same vocabulary as mapGatewayAbsoluteHostWorkdir)
+ * inside an exec **command** string when host=sandbox. Workdir alone is not enough:
+ * `cat /root/.openbot/operators/.../workspace/foo` still misses the lease mount.
+ *
+ * Call-site rule: this produces the **container execution** command only. Shared-fs
+ * INTERSECT authorization must keep (or map back to) host-verifiable paths — see
+ * rewriteContainerAbsolutePathsToHostInCommand.
+ */
+export function rewriteGatewayAbsoluteHostPathsInCommand(params: {
+  command: string;
+  workspaceDir: string;
+  containerWorkdir: string;
+}): string {
+  const workspacePosix = path.resolve(params.workspaceDir).replace(/\\/g, "/");
+  const containerRoot = normalizeContainerPath(params.containerWorkdir);
+  return rewriteAbsoluteRootPrefixInCommand({
+    command: params.command,
+    fromRoot: workspacePosix,
+    toRoot: containerRoot,
+  });
+}
+
+/**
+ * Inverse of rewriteGatewayAbsoluteHostPathsInCommand: map container-mount absolute
+ * paths (`/account/workspace/...` or `/workspace/...`) back onto the host workspace
+ * root so shared-fs INTERSECT / workspaceOnly checks stay in the host namespace —
+ * same direction as mapContainerPathToWorkspaceRoot for file tools.
+ */
+export function rewriteContainerAbsolutePathsToHostInCommand(params: {
+  command: string;
+  workspaceDir: string;
+  containerWorkdir: string;
+}): string {
+  const workspacePosix = path.resolve(params.workspaceDir).replace(/\\/g, "/");
+  const containerRoot = normalizeContainerPath(params.containerWorkdir);
+  return rewriteAbsoluteRootPrefixInCommand({
+    command: params.command,
+    fromRoot: containerRoot,
+    toRoot: workspacePosix,
+  });
 }
 
 function normalizeContainerPath(input: string): string {

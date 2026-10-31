@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   resolveSandboxWorkdir,
+  rewriteContainerAbsolutePathsToHostInCommand,
   rewriteGatewayAbsoluteHostPathsInCommand,
 } from "./bash-tools.shared.js";
 
@@ -156,5 +157,48 @@ describe("rewriteGatewayAbsoluteHostPathsInCommand", () => {
         containerWorkdir: "/workspace",
       }),
     ).toBe("python /workspace/scripts/run.py");
+  });
+});
+
+describe("rewriteContainerAbsolutePathsToHostInCommand", () => {
+  it("maps /account/workspace mount paths back onto the host workspace root", () => {
+    const workspaceDir = "/root/.openbot/operators/u1/OpenBot/agents/bot-2/workspace";
+    expect(
+      rewriteContainerAbsolutePathsToHostInCommand({
+        command: "printf ok > /account/workspace/proof.txt",
+        workspaceDir,
+        containerWorkdir: "/account/workspace",
+      }),
+    ).toBe(`printf ok > ${workspaceDir}/proof.txt`);
+  });
+
+  it("round-trips with the host→container rewrite", () => {
+    const workspaceDir = "/root/.openbot/operators/u1/OpenBot/agents/bot-2/workspace";
+    const hostCmd = `mkdir -p ${workspaceDir}/out && cp a ${workspaceDir}/out/b`;
+    const containerCmd = rewriteGatewayAbsoluteHostPathsInCommand({
+      command: hostCmd,
+      workspaceDir,
+      containerWorkdir: "/account/workspace",
+    });
+    expect(containerCmd).toBe("mkdir -p /account/workspace/out && cp a /account/workspace/out/b");
+    expect(
+      rewriteContainerAbsolutePathsToHostInCommand({
+        command: containerCmd,
+        workspaceDir,
+        containerWorkdir: "/account/workspace",
+      }),
+    ).toBe(hostCmd);
+  });
+
+  it("leaves unrelated absolute paths untouched", () => {
+    const workspaceDir = "/root/.openbot/operators/u1/OpenBot/agents/bot-2/workspace";
+    const command = "cat /etc/hosts && ls /tmp";
+    expect(
+      rewriteContainerAbsolutePathsToHostInCommand({
+        command,
+        workspaceDir,
+        containerWorkdir: "/account/workspace",
+      }),
+    ).toBe(command);
   });
 });
