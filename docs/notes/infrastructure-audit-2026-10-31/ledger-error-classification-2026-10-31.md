@@ -27,7 +27,7 @@ Local classifier (`git cat-file` + `merge-base --is-ancestor`) on each ERROR reg
 
 | Subclass | n | Meaning | Treat as |
 |---|---:|---|---|
-| object-missing | 145 | Prior and/or current SHA **not in** this clone’s object store (and often not on `origin` API) | **Inconclusive** — cannot prove content rollback; cannot dismiss as “history noise” without restoring objects or recording `regressionAcknowledged` with proof |
+| object-missing (clone-relative) | 145 | Prior and/or current SHA **not in the audit clone** used for bulk classify (may exist in a deeper clone / elsewhere) | **Inconclusive in that clone** — cannot prove content rollback; **must not** auto-`regressionAcknowledged`; restore objects then re-audit |
 | true-non-ancestor | 1 | Both objects present locally; prior ∉ ancestors(current) | **Proven ancestry break** at seq **145** (`9a8e91d19e89` ↛ `065840dfba12`) |
 
 ### Seq 145 (only proven non-ancestor with local objects)
@@ -35,13 +35,14 @@ Local classifier (`git cat-file` + `merge-base --is-ancestor`) on each ERROR reg
 - Prior LIVE seq 144 tip `9a8e91d19e893fc5d963103538cdbd35f315ac30` (reintroduced by #76 ledger restore message).
 - Seq 145 tip `065840dfba129475c9c9030c80af07970dcdd084` (`fix(build): clear docker tsc… (#78)`).
 - Local: both `commit`; `merge-base --is-ancestor 144→145` **fails**; reverse also fails.
-- GitHub API: commit **144 SHA returns 422 Not Found**; 145 exists. Compare 144…145 → 404.
+- Independent acceptor re-check (same day): **both seq 144 and seq 145 objects present** in a full-enough local clone; `merge-base --is-ancestor` still returns non-zero → **true ancestry break**. Earlier notes that treated 144 as GitHub-missing were **environment/API-view limited**, not a permanent object absence.
+- Ancestry break ≠ proven **functional content** rollback; it is a commit-DAG / SoT discontinuity class.
 - **No** `regressionAcknowledged` on seq 145.
 - Class: **history / SoT discontinuity** after ledger restore — needs owner narrative + optional acknowledge; **not** auto-fixable by inventing ancestry.
 
-### Object-missing majority (145)
+### Object-missing / inconclusive majority (≈145 in the audit clone used for bulk classify)
 
-Includes seq 127/128 tips (`5ea7e2b7…`, `0024d162…`) and many earlier Path B tips: not present as commits on current GitHub `flykingvip-cloud/openbot-vp` graph in this environment. Provenance tags fetch was incomplete. Until objects or tags are restored, audit will keep ERROR-red.
+Many earlier Path B tips (including seq 127/128 tips `5ea7e2b7…`, `0024d162…` in that clone) were absent from the object store used for bulk classification → audit marks ERROR the same as true non-ancestor. **Do not auto-acknowledge** these rows. Restoring objects may reclassify some as forward-only or as additional proven breaks; until then historical audit stays fail (exit 30).
 
 **Do not** bulk-write `regressionAcknowledged` without per-row evidence.
 
@@ -60,7 +61,9 @@ Includes seq 127/128 tips (`5ea7e2b7…`, `0024d162…`) and many earlier Path B
 
 ## RELEASE_RECORD drift
 
-`deploy/production/RELEASE_RECORD.md` L3 still claims seq **107** / `bb72d034…` while machine tip is seq **151** / `d37bed5117d6`. Human view must be regenerated from machine ledger.
+Pre-fix: `deploy/production/RELEASE_RECORD.md` L3 still claimed seq **107** / `bb72d034…` while machine tip is seq **151** / `d37bed5117d6`.
+
+This PR applies a **one-shot static sync** of L3 / latest cutover pointer from the JSONL tip (seq 151 / `d37bed5117d6`). That is **not** continuous generation and **not** an anti-drift gate. Follow-up: generator and/or consistency check so human view cannot silently lag the next LIVE row again.
 
 ## Operational posture
 
