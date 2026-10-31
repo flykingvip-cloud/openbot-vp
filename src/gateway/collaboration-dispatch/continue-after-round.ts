@@ -206,6 +206,12 @@ export async function maybeContinueAfterRoundComplete(params: {
    * Cooldown still applies. Chat task_board_continue skips group sessions.
    */
   forceForDeliverableSettlement?: boolean;
+  /**
+   * P4/O5·O15: when force-continuing after a deliverable settlement, only suppress
+   * in_progress|returned for this triggering task/item. Sibling inventory stays eligible.
+   * When omitted under force (e.g. restart resume), whole-inventory filter still applies.
+   */
+  forceContinueScope?: { taskId?: string; itemId?: string };
 }): Promise<MaybeContinueAfterRoundResult> {
   const at = params.nowMs ?? Date.now();
   const authority = params.authority;
@@ -254,13 +260,27 @@ export async function maybeContinueAfterRoundComplete(params: {
       ((await loadBoardClaimItemsFromDir(boardClaimsDir(authority))) as GroupBoardClaimItem[]);
 
     let workingItems: GroupBoardClaimItem[] = [...loaded];
-    // P4/O5·O15: after deliverable settlement, do not force-continue execute items that
-    // still need formal board submit/review (in_progress|returned). Other milestones
-    // (e.g. published) may still continue. Same gate used by resume-incomplete force path.
+    // P4/O5·O15: after deliverable settlement, do not force-continue the triggering
+    // in_progress|returned item (still needs formal board submit/review). Scope to the
+    // settling task/item when provided so parallel sibling tasks are not wrongly stopped.
+    // Resume/restart force path omits scope → whole-inventory filter (safe default).
     if (params.forceForDeliverableSettlement === true) {
+      const scopeItemId = compact(params.forceContinueScope?.itemId);
+      const scopeTaskId = compact(params.forceContinueScope?.taskId);
+      const hasScope = Boolean(scopeItemId || scopeTaskId);
       workingItems = workingItems.filter((item) => {
         const status = (item.status ?? "").trim();
-        return status !== "in_progress" && status !== "returned";
+        if (status !== "in_progress" && status !== "returned") {
+          return true;
+        }
+        if (!hasScope) {
+          return false;
+        }
+        const matchesScope = scopeItemId
+          ? compact(item.itemId) === scopeItemId
+          : compact(item.taskId) === scopeTaskId;
+        // Drop only the triggering scoped item; keep other legitimate inventory.
+        return !matchesScope;
       });
     }
     let plan = planContinueAfterRound({

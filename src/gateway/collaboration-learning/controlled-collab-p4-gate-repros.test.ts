@@ -643,6 +643,417 @@ describe("P4 risk C (O14) — heartbeat must not double-execute same item alongs
   });
 });
 
+describe("P4 risk A (O4) — post-cap heartbeat must not revise-nudge original executor", () => {
+  test("after acceptance_loop_exceeded, consecutive heartbeat ticks: revise dispatch to claimant=0; escalate-only ok", async () => {
+    const { cfg } = await useConfig();
+    const cfg2 = {
+      ...cfg,
+      collaboration: {
+        ...cfg.collaboration,
+        task: {
+          ...cfg.collaboration?.task,
+          acceptanceLoopMaxReturns: 2,
+          groupTaskHeartbeat: {
+            mode: "emit",
+            emitGroupAllowlist: ["grp_p4"],
+            scanIntervalMs: 1,
+            escalateAfterConsecutiveNoResponse: 2,
+          },
+        },
+      },
+    } as OpenBotConfig;
+    setRuntimeConfigSnapshot(cfg2, cfg2);
+    const auth = authority(cfg2);
+    const taskId = "task-p4-o4-hb-cap";
+    const claimant = "bot-a";
+    const reviewer = "bot-b";
+    const { item } = await seedInProgress({
+      auth,
+      cfg: cfg2,
+      taskId,
+      claimant,
+      reviewer,
+    });
+
+    // Drive to cap: 2 returns → pendingEventRelay null, status returned, returnCount=2.
+    for (let i = 0; i < 2; i += 1) {
+      if (i > 0) {
+        const marked = await markBoardItemInProgress(
+          auth,
+          { taskId, itemId: item.itemId, actorId: claimant },
+          { cfg: cfg2 },
+        );
+        expect(marked.ok).toBe(true);
+      }
+      const link = await seedLink(auth, taskId, {
+        deliverableId: `del-o4hb-${i}`,
+        version: i + 1,
+        content: `# hb draft ${i + 1}\n`,
+      });
+      const sid = randomUUID();
+      const submitted = await submitBoardItemForReview(
+        auth,
+        {
+          taskId,
+          itemId: item.itemId,
+          actorId: claimant,
+          submissionId: sid,
+          artifactVersion: `art-hb-v${i + 1}`,
+          submissionSummary: `# hb draft ${i + 1} unique`,
+          ...link,
+        },
+        { cfg: cfg2, coordinatorBotId: reviewer },
+      );
+      expect(submitted.ok).toBe(true);
+      const returned = await returnBoardItemSubmission(
+        auth,
+        {
+          taskId,
+          itemId: item.itemId,
+          actorId: reviewer,
+          reason: `hb revise ${i + 1}`,
+          expectedSubmissionId: sid,
+        },
+        { cfg: cfg2, coordinatorBotId: reviewer },
+      );
+      expect(returned.ok).toBe(true);
+    }
+    const live = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(live?.status).toBe("returned");
+    expect(live?.returnCount).toBe(2);
+    expect(live?.pendingEventRelay).toBeNull();
+
+    let reviseExecuteToClaimant = 0;
+    let escalateExecuteCount = 0;
+    const dispatcher: WakeRoundDispatcher = async (req) => {
+      if (req.itemId !== item.itemId) {
+        return { ok: true, roundId: "o4hb-other" };
+      }
+      const targets = req.toAgentIds ?? [];
+      if (req.source === "escalate") {
+        escalateExecuteCount += 1;
+      } else if (targets.includes(claimant)) {
+        reviseExecuteToClaimant += 1;
+      }
+      return { ok: true, roundId: `o4hb-x-${reviseExecuteToClaimant}-${escalateExecuteCount}` };
+    };
+
+    let reviseNudgeToClaimant = 0;
+    let _escalatePlanCount = 0;
+    const decisionActions: string[] = [];
+    // Consecutive ordinary heartbeat ticks after cap.
+    for (let tick = 0; tick < 3; tick += 1) {
+      const hb = await runGroupTaskHeartbeat(
+        auth,
+        { groupId: auth.groupId },
+        {
+          cfg: cfg2,
+          force: true,
+          dryRun: false,
+          nowMs: Date.now() + tick * 60_000,
+          coordinatorBotId: reviewer,
+          roundDispatcher: dispatcher,
+        },
+      );
+      expect(hb.ok).toBe(true);
+      if (hb.ok && !hb.skipped) {
+        for (const d of hb.decisions) {
+          if (d.itemId !== item.itemId) {
+            continue;
+          }
+          decisionActions.push(`${d.action}:${d.reason}:to=${d.toAgentIds.join(",")}`);
+          // Planner-level: nudge targeting original claimant is a revise nudge — forbidden after cap.
+          if (d.action === "nudge" && d.toAgentIds.includes(claimant)) {
+            reviseNudgeToClaimant += 1;
+          }
+          if (d.action === "escalate") {
+            _escalatePlanCount += 1;
+          }
+        }
+      }
+    }
+
+    // Debug aid on failure: show planner decisions across ticks.
+    expect(
+      decisionActions.length,
+      `no heartbeat decisions for item; got ${JSON.stringify(decisionActions)}`,
+    ).toBeGreaterThan(0);
+    expect(
+      reviseNudgeToClaimant,
+      `revise nudges to claimant; decisions=${JSON.stringify(decisionActions)}`,
+    ).toBe(0);
+    expect(
+      reviseExecuteToClaimant,
+      `revise executes to claimant; decisions=${JSON.stringify(decisionActions)}`,
+    ).toBe(0);
+    // Upgrade path only: escalate and/or skip — never claimant revise nudge.
+    expect(
+      decisionActions.every((row) => row.startsWith("escalate:") || row.startsWith("skip:")),
+      `expected escalate|skip only; decisions=${JSON.stringify(decisionActions)}`,
+    ).toBe(true);
+  });
+});
+
+describe("P4 risk B (O5/O15) — force continue scoped to triggering item, not whole group", () => {
+  test("two parallel in_progress tasks: settling A must not stop legitimate B continue", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskA = "task-p4-o5-scope-a";
+    const taskB = "task-p4-o5-scope-b";
+    const seededA = await seedInProgress({
+      auth,
+      cfg,
+      taskId: taskA,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const seededB = await seedInProgress({
+      auth,
+      cfg,
+      taskId: taskB,
+      claimant: "bot-c",
+      reviewer: "bot-b",
+    });
+    await seedLink(auth, taskA, { deliverableId: "del-scope-a", version: 1 });
+    await seedLink(auth, taskB, { deliverableId: "del-scope-b", version: 1 });
+
+    const loadBoth = async () => {
+      const a = await loadBoardClaimItem(auth, { taskId: taskA, itemId: seededA.item.itemId });
+      const b = await loadBoardClaimItem(auth, { taskId: taskB, itemId: seededB.item.itemId });
+      return [a, b].filter(Boolean) as NonNullable<typeof a>[];
+    };
+
+    // Counterexample 1: force scoped to A — A blocked from continue; B remains eligible.
+    const scopedA = await maybeContinueAfterRoundComplete({
+      authority: auth,
+      roundId: "round-p4-o5-scope-a",
+      roundState: "ROUND_COMPLETE",
+      cfg,
+      forceForDeliverableSettlement: true,
+      forceContinueScope: { taskId: taskA, itemId: seededA.item.itemId },
+      loadBoardItems: loadBoth,
+    });
+    expect(scopedA.decision.primaryBoardItemId).toBe(seededB.item.itemId);
+    // B may wake/self-advance; A must not be the continue primary.
+    expect(scopedA.decision.primaryBoardItemId).not.toBe(seededA.item.itemId);
+    expect(
+      scopedA.decision.wakeRecorded ||
+        scopedA.decision.selfAdvanceTriggered ||
+        scopedA.decision.reason === "active_board_inventory" ||
+        Boolean(scopedA.decision.primaryBoardItemId),
+    ).toBe(true);
+
+    // Counterexample 2: force scoped to B — symmetric.
+    const scopedB = await maybeContinueAfterRoundComplete({
+      authority: auth,
+      roundId: "round-p4-o5-scope-b",
+      roundState: "ROUND_COMPLETE",
+      cfg,
+      nowMs: Date.now() + 120_000, // bypass continue cooldown from prior call
+      forceForDeliverableSettlement: true,
+      forceContinueScope: { taskId: taskB, itemId: seededB.item.itemId },
+      loadBoardItems: loadBoth,
+    });
+    expect(scopedB.decision.primaryBoardItemId).toBe(seededA.item.itemId);
+    expect(scopedB.decision.primaryBoardItemId).not.toBe(seededB.item.itemId);
+
+    // Triggering item alone still blocked (regression of local O5 gate).
+    const onlyA = await maybeContinueAfterRoundComplete({
+      authority: auth,
+      roundId: "round-p4-o5-scope-only-a",
+      roundState: "ROUND_COMPLETE",
+      cfg,
+      nowMs: Date.now() + 240_000,
+      forceForDeliverableSettlement: true,
+      forceContinueScope: { taskId: taskA, itemId: seededA.item.itemId },
+      loadBoardItems: async () => {
+        const a = await loadBoardClaimItem(auth, { taskId: taskA, itemId: seededA.item.itemId });
+        return a ? [a] : [];
+      },
+    });
+    expect(onlyA.decision.wakeRecorded).toBe(false);
+    expect(onlyA.decision.selfAdvanceTriggered).toBe(false);
+    expect(
+      onlyA.decision.reason.includes("await_board") ||
+        onlyA.decision.reason === "no_active_board_inventory" ||
+        onlyA.decision.reason.includes("force_continue_blocked"),
+    ).toBe(true);
+  });
+});
+
+describe("P4 risk C (O14) — cross-tick + interleaved relay/heartbeat must not double-execute event", () => {
+  test("(a) after relay clears pending, later heartbeat does not re-execute same business event", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p4-o14-cross";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId, { deliverableId: "del-o14-cross", version: 1 });
+    const submissionId = randomUUID();
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId,
+      artifactVersion: "art-cross-v1",
+      submissionSummary: "# Cross tick\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+    const live = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(live?.pendingEventRelay?.status).toBe("pending");
+    const businessOpKey = live?.pendingEventRelay?.opKey ?? "";
+    expect(businessOpKey.length).toBeGreaterThan(0);
+    const trusted = trustedLocatorFromAuthority(auth);
+
+    let businessEventExecuteCount = 0;
+    let reminderNudgeCount = 0;
+    const dispatcher: WakeRoundDispatcher = async (req) => {
+      if (req.itemId !== item.itemId) {
+        return { ok: true, roundId: "o14x-other" };
+      }
+      const reason = `${req.reason ?? ""} ${req.dispatchPrompt ?? ""}`;
+      const op = `${req.opKey ?? ""} ${req.wakeOpKey ?? ""}`;
+      // Business-event execute: relay/consume carrying the pending opKey / submitted event.
+      if (
+        op.includes(businessOpKey) ||
+        reason.includes(businessOpKey) ||
+        reason.includes("submitted")
+      ) {
+        businessEventExecuteCount += 1;
+      } else if ((req.reason ?? "").includes("heartbeat_nudge")) {
+        reminderNudgeCount += 1;
+      } else {
+        // Treat unlabeled same-item executes during relay window as business-event.
+        businessEventExecuteCount += 1;
+      }
+      return { ok: true, roundId: `o14x-${businessEventExecuteCount}-${reminderNudgeCount}` };
+    };
+
+    const recovered = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: "bot-b",
+      items: live ? [live] : [],
+      cfg,
+      roundDispatcher: dispatcher,
+      trusted,
+      authority: auth,
+    });
+    expect(recovered).toHaveLength(1);
+    expect(recovered[0]?.dispatched).toBe(true);
+    expect(businessEventExecuteCount).toBe(1);
+
+    const afterClear = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(afterClear?.pendingEventRelay ?? null).toBeNull();
+
+    // Later heartbeat ticks: must not re-execute the same business event.
+    for (let tick = 0; tick < 2; tick += 1) {
+      await runGroupTaskHeartbeat(
+        auth,
+        { groupId: auth.groupId },
+        {
+          cfg,
+          force: true,
+          dryRun: false,
+          nowMs: Date.now() + (tick + 1) * 60_000,
+          coordinatorBotId: "bot-b",
+          roundDispatcher: dispatcher,
+        },
+      );
+    }
+    expect(businessEventExecuteCount).toBe(1);
+    // Legitimate follow-up reminders (heartbeat_nudge) may occur; they are not the business event.
+    expect(reminderNudgeCount).toBeGreaterThanOrEqual(0);
+  });
+
+  test("(b) immediate relay interleaved with heartbeat: same business event execute count is 1", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p4-o14-interleave";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId, { deliverableId: "del-o14-il", version: 1 });
+    const submissionId = randomUUID();
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId,
+      artifactVersion: "art-il-v1",
+      submissionSummary: "# Interleave\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+    const live = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(live?.pendingEventRelay?.status).toBe("pending");
+    const businessOpKey = live?.pendingEventRelay?.opKey ?? "";
+    const trusted = trustedLocatorFromAuthority(auth);
+
+    let businessEventExecuteCount = 0;
+    const dispatcher: WakeRoundDispatcher = async (req) => {
+      if (req.itemId !== item.itemId) {
+        return { ok: true, roundId: "o14il-other" };
+      }
+      const reason = `${req.reason ?? ""} ${req.dispatchPrompt ?? ""}`;
+      const op = `${req.opKey ?? ""} ${req.wakeOpKey ?? ""}`;
+      if (
+        op.includes(businessOpKey) ||
+        reason.includes(businessOpKey) ||
+        reason.includes("submitted") ||
+        !(req.reason ?? "").includes("heartbeat_nudge")
+      ) {
+        businessEventExecuteCount += 1;
+      }
+      return { ok: true, roundId: `o14il-${businessEventExecuteCount}` };
+    };
+
+    // Interleave: kick immediate relay and heartbeat overlapping on the same pending.
+    const [advance, tick] = await Promise.all([
+      triggerPostSubmissionEventAdvance({
+        groupId: auth.groupId,
+        taskId,
+        itemId: item.itemId,
+        actorId: "bot-b",
+        cfg,
+        roundDispatcher: dispatcher,
+        trusted,
+      }),
+      runGroupTaskHeartbeat(
+        auth,
+        { groupId: auth.groupId },
+        {
+          cfg,
+          force: true,
+          dryRun: false,
+          nowMs: Date.now(),
+          coordinatorBotId: "bot-b",
+          roundDispatcher: dispatcher,
+        },
+      ),
+    ]);
+    expect(
+      advance.dispatched || advance.wakeConsumed || advance.reason.includes("idempotent"),
+    ).toBe(true);
+    expect(tick.ok).toBe(true);
+    expect(businessEventExecuteCount).toBe(1);
+  });
+});
+
 // silence unused import if hash helper unused in some runners
 void createHash;
 void path;

@@ -36,6 +36,7 @@ import {
 import { resolveSecurityProfile } from "../security-profile.js";
 import {
   boardClaimsDir,
+  resolveAcceptanceLoopMaxReturns,
   type BoardClaimStatus,
   type GroupBoardClaimItem,
 } from "./claim-contract.js";
@@ -385,6 +386,8 @@ export type HeartbeatBoardItemLike = {
   taskId: string;
   title?: string;
   status: string;
+  /** S3: return cycles; used to stop post-cap revise nudges (O4). */
+  returnCount?: number;
   claimantId?: string;
   publishedBy?: string;
   intendedClaimantIds?: readonly string[];
@@ -411,6 +414,8 @@ export function planHeartbeatActionForItem(params: {
   nowMs: number;
   escalateAfter: number;
   escalateTo: readonly string[];
+  /** When set, returned items at/over this cap never revise-nudge the claimant (O4). */
+  acceptanceLoopMaxReturns?: number;
 }): HeartbeatItemDecision {
   const item = params.item;
   const fingerprint = progressFingerprint(item);
@@ -443,6 +448,54 @@ export function planHeartbeatActionForItem(params: {
       toAgentIds: [],
       consecutiveNoResponse: consecutive,
     };
+  }
+
+  // P4/O4: after acceptance-loop cap, do not revise-nudge the original executor.
+  // Upgrade/escalation handling only (coordinator); skip if already escalated on same fingerprint.
+  if (item.status === "returned") {
+    const maxReturns =
+      typeof params.acceptanceLoopMaxReturns === "number" &&
+      Number.isFinite(params.acceptanceLoopMaxReturns) &&
+      params.acceptanceLoopMaxReturns > 0
+        ? Math.floor(params.acceptanceLoopMaxReturns)
+        : undefined;
+    const returnCount = typeof item.returnCount === "number" ? item.returnCount : 0;
+    if (maxReturns !== undefined && returnCount >= maxReturns) {
+      if (sameAsPrior && prior?.lastEscalateAt) {
+        return {
+          itemId: item.itemId,
+          taskId: item.taskId,
+          groupId: item.groupId,
+          status: item.status,
+          action: "skip",
+          toAgentIds: [],
+          reason: "acceptance_loop_exceeded_awaiting_upgrade",
+          consecutiveNoResponse: consecutive,
+        };
+      }
+      if (params.escalateTo.length > 0) {
+        return {
+          itemId: item.itemId,
+          taskId: item.taskId,
+          groupId: item.groupId,
+          status: item.status,
+          action: "escalate",
+          toAgentIds: uniqueIds(params.escalateTo),
+          reason: `acceptance_loop_exceeded_escalate_only:${returnCount}/${maxReturns}`,
+          consecutiveNoResponse: consecutive,
+        };
+      }
+      return {
+        itemId: item.itemId,
+        taskId: item.taskId,
+        groupId: item.groupId,
+        status: item.status,
+        action: "skip",
+        toAgentIds: [],
+        reason: `acceptance_loop_exceeded_no_revise:${returnCount}/${maxReturns}`,
+        consecutiveNoResponse: consecutive,
+      };
+    }
   }
 
   const overdue = isOverdue(item, params.nowMs);
@@ -552,6 +605,7 @@ function toHeartbeatItem(raw: {
   taskId: string;
   title?: string;
   status: string;
+  returnCount?: number;
   claimantId?: string;
   publishedBy?: string;
   intendedClaimantIds?: readonly string[];
@@ -571,6 +625,7 @@ function toHeartbeatItem(raw: {
     taskId: raw.taskId,
     title: raw.title,
     status: raw.status,
+    returnCount: raw.returnCount,
     claimantId: raw.claimantId,
     publishedBy: raw.publishedBy,
     intendedClaimantIds: raw.intendedClaimantIds,
@@ -609,6 +664,7 @@ export async function loadGroupBoardItemsForHeartbeat(
         taskId: row.taskId,
         title: row.title,
         status: row.status,
+        returnCount: (row as { returnCount?: number }).returnCount,
         claimantId: row.claimantId,
         publishedBy: row.publishedBy,
         // Exported type may omit intendedClaimantIds / dueAtMs — re-read not required for nudge
@@ -1032,6 +1088,7 @@ export async function runGroupTaskHeartbeat(
       nowMs,
       escalateAfter,
       escalateTo,
+      acceptanceLoopMaxReturns: resolveAcceptanceLoopMaxReturns(cfg),
     });
     decisions.push(decision);
 

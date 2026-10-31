@@ -338,6 +338,8 @@ export async function resolveModeBWakeRoundContext(
               agentId: bot.agentId,
               deliverableOk: false,
               reason: "wake_deliverable_binding_required",
+              taskId: request.taskId,
+              itemId: request.itemId,
             });
             return {
               text: `${text.trim()}\n\n团队成果未完成（execution_binding_required）。`,
@@ -427,6 +429,8 @@ export async function resolveModeBWakeRoundContext(
             reason: finalized.outcome.ok
               ? "wake_deliverable_ok"
               : `wake_deliverable_not_ok:${finalized.outcome.reason}`,
+            taskId: request.taskId ?? binding.taskId,
+            itemId: request.itemId ?? binding.boardItemId,
           });
         }
         return text ? { text } : undefined;
