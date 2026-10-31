@@ -10176,6 +10176,7 @@ landingStreams:
   - id: controlled-discuss-to-task-p1-20261031
     landingPolicy: serial
     paths:
+      - src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts
       - src/gateway/collaboration-learning/controlled-discuss-to-task.ts
       - src/gateway/collaboration-learning/controlled-discuss-to-task.test.ts
       - src/gateway/collaboration-learning/discuss-to-task-id.ts
@@ -22607,6 +22608,7 @@ landingStreams:
     intent:
       - P1 controlled discuss-to-formal-task entry, stable taskId mint, diagnosis, receipt semantics
     paths:
+      - src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts
       - src/gateway/collaboration-learning/controlled-discuss-to-task.ts
       - src/gateway/collaboration-learning/controlled-discuss-to-task.test.ts
       - src/gateway/collaboration-learning/discuss-to-task-id.ts
