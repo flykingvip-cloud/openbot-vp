@@ -423,6 +423,8 @@ function extractEnvelopeDeliverablePreview(text: string): {
   file?: string;
   url?: string;
   declaredType?: string;
+  unwritten?: boolean;
+  settle?: string;
 } | null {
   const envelope = extractDeliverableEnvelope(text);
   if (!envelope) {
@@ -448,6 +450,8 @@ function extractEnvelopeDeliverablePreview(text: string): {
     file: envelope.file,
     url: envelope.url,
     declaredType: envelope.type,
+    ...(envelope.unwritten ? { unwritten: true } : {}),
+    ...(envelope.settle ? { settle: envelope.settle } : {}),
   };
 }
 
@@ -835,6 +839,35 @@ function isDeclaredStructuredArtifact(artifact: Record<string, unknown>): boolea
   return false;
 }
 
+/** Map envelope unwritten/settle into providerMetadata failure/block flags. */
+function deliverableSettleProviderMetadata(envelope: {
+  unwritten?: boolean;
+  settle?: string;
+}): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (envelope.unwritten || envelope.settle === "declared") {
+    out.workspaceUnwritten = true;
+    out.previewUnavailable = true;
+  }
+  if (envelope.settle === "retryable") {
+    out.settleRetryable = true;
+    out.archiveClaimBlocked = true;
+    out.previewUnavailable = true;
+    out.deliveryUndelivered = true;
+  }
+  if (envelope.settle === "conflict") {
+    out.settleConflict = true;
+    out.archiveClaimBlocked = true;
+    out.previewStale = true;
+    out.previewUnavailable = true;
+    out.deliveryUndelivered = true;
+  }
+  if (envelope.settle === "confirmed") {
+    out.settleConfirmed = true;
+  }
+  return out;
+}
+
 function collectExplicitArtifacts(record: Record<string, unknown>): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
   if (Array.isArray(record.artifacts)) {
@@ -883,6 +916,7 @@ function buildEnvelopeArtifactFromPreview(
       ...(envelopePreview.declaredType ? { declaredType: envelopePreview.declaredType } : {}),
       ...(envelopePreview.file ? { workspaceFilename: envelopePreview.file } : {}),
       ...(envelopePreview.url ? { openUrl: envelopePreview.url } : {}),
+      ...deliverableSettleProviderMetadata(envelopePreview),
     },
   });
 }
@@ -969,6 +1003,7 @@ export function resolvePreviewArtifactRecords(message: unknown): Record<string, 
             ...(envelope.type ? { declaredType: envelope.type } : {}),
             ...(envelope.file ? { workspaceFilename: envelope.file } : {}),
             ...(envelope.url ? { openUrl: envelope.url } : {}),
+            ...deliverableSettleProviderMetadata(envelope),
           },
         }),
       );
