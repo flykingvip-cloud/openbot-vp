@@ -330,6 +330,13 @@ describe("emitDiscussToTaskClientFeedback (real chat egress — client receives)
     expect(client.broadcasts.length).toBe(1);
     expect(client.nodeSends.length).toBe(1);
     expect(client.nodeSends[0].event).toBe("chat");
+    expect(client.broadcasts[0].payload.state).toBe("status");
+    expect(client.nodeSends[0].payload.state).toBe("status");
+    expect(String(client.broadcasts[0].payload.runId)).toContain(":discuss-to-task-receipt");
+    expect(
+      (client.broadcasts[0].payload.message as { discussToTaskReceipt?: boolean })
+        ?.discussToTaskReceipt,
+    ).toBe(true);
     const texts = client.receivedTexts().join("\n");
     expect(texts).toContain(applied.clientFeedbackMessage!);
     expect(texts).not.toMatch(/disk_full|EACCES|ENOENT/);
@@ -370,7 +377,7 @@ describe("emitDiscussToTaskClientFeedback (real chat egress — client receives)
     const texts = client.receivedTexts().join("\n");
     expect(texts).toMatch(/归属冲突|冲突|受阻/);
     expect(texts).not.toMatch(/已派工/);
-    expect(client.broadcasts[0].payload.state).toBe("final");
+    expect(client.broadcasts[0].payload.state).toBe("status");
   });
 
   it("exception path: client receives fixed blocked copy", async () => {

@@ -93,7 +93,8 @@ export function reduceWorkProgress(
     if (input.state === "final" || input.state === "aborted" || input.state === "error") {
       return emptyWorkProgressState();
     }
-    if (input.state === "user_echo") {
+    if (input.state === "user_echo" || input.state === "status") {
+      // Status receipts (e.g. discuss→task) must not clear thinking/tool progress.
       return state;
     }
     if (input.state === "delta") {
