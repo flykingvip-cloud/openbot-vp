@@ -1,0 +1,47 @@
+{
+  "NOTICE": "HISTORICAL_donor_primary_snapshot — NOT the authoritative current classification. Consumers MUST read p1-current-classification-2026-10-31.json for current counts/classes.",
+  "authoritative_current_classification": "p1-current-classification-2026-10-31.json",
+  "timezone_label": "Asia/Shanghai (UTC+8)",
+  "origin_main": "0e4d269615e26909bbac606f1dfb755b3511400c",
+  "pr171_head": "e049e76bf41aed231828dc2c276a97cb31171580",
+  "pr172_head_ledger_under_audit": "d189e74f85ff2838b0df0b469ca5eeae39bf9724",
+  "audit_worktree": "/Users/daniel/AI VP/openbot-infrastructure-audit",
+  "audit_shallow": true,
+  "shallow_boundary": "9a8e91d19e893fc5d963103538cdbd35f315ac30",
+  "donor": "/Users/daniel/AI项目/openbot",
+  "donor_also_shallow": true,
+  "historical_donor_primary": {
+    "status": "HISTORICAL_SUPERSEDED_as_final_adjudication",
+    "method": "donor_primary; audit_fallback_only_when_donor_missing_object",
+    "prior_narrative_before_recovery": {
+      "missing_object": 145,
+      "proven_dag_break": 1,
+      "forward_only": 0
+    },
+    "counts_after_donor_primary": {
+      "forward-only": 141,
+      "proven_dag_break": 5,
+      "missing_object_dual_repo": 0,
+      "incomplete_graph": 0
+    },
+    "proven_break_seqs_HISTORICAL": [52, 100, 121, 140, 145],
+    "note": "These five were later closed under shallow/parent-chain evidence; do not treat proven_break_seqs_HISTORICAL as current."
+  },
+  "recovery_counts": {
+    "recovered_tip_objects_inventory": 137,
+    "recovered_shas_txt_line_count": 137,
+    "refs_audit_recovery_present_at_capture": 5,
+    "legacy_field_recovered_tips_into_audit_refs": 137,
+    "legacy_field_meaning": "inventory of tip objects recovered (same as recovered_tip_objects_inventory); NOT the live refs/audit-recovery/* count"
+  },
+  "github_commit_api_sample_all_422": true,
+  "origin_fetch_not_our_ref": true,
+  "provenance_tags_on_origin": 0,
+  "no_acknowledge_written": true,
+  "no_releases_jsonl_change": true,
+  "no_release_record_change": true,
+  "historical_audit_still_fail_closed": true,
+  "ledger_audit_exit": 30,
+  "closure_note": "p1-dag-break-evidence-closure-2026-10-31.md",
+  "after_closure_of_five_pointer": "see authoritative file p1-current-classification-2026-10-31.json"
+}

@@ -1,0 +1,64 @@
+# Sanitized snippet of pnpm delivery:ledger:audit on #172 tip (exit 30)
+# Full local raw retained on Mac /tmp/infra-audit-p1-20261031/ledger-audit-raw.txt
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 delivery:ledger:audit <audit-worktree>
+> node --import tsx scripts/delivery/ledger-audit.ts
+
+ledger: 149 releases, 146 errors, 35 warnings
+  ERROR seq 2 [regression] drops 1e1143012db2 which release 1 had live
+  ERROR seq 5 [regression] drops c487af0fec28 which release 4 had live
+  ERROR seq 6 [regression] drops 87d46f34ac17 which release 5 had live
+  ERROR seq 7 [regression] drops bbcf23634638 which release 6 had live
+  ERROR seq 8 [regression] drops f995e08494a1 which release 7 had live
+  ERROR seq 9 [regression] drops 13f4849b475a which release 8 had live
+  ERROR seq 10 [regression] drops 2a45057c6671 which release 9 had live
+  ERROR seq 12 [regression] drops a2e80b21134a which release 11 had live
+  ERROR seq 13 [regression] drops 9a7449b7b9d8 which release 12 had live
+  ERROR seq 14 [regression] drops 654b95cafeda which release 13 had live
+  ERROR seq 15 [regression] drops 48086e731e8e which release 14 had live
+  ERROR seq 16 [regression] drops 66f3f0585fe2 which release 15 had live
+  ERROR seq 19 [regression] drops 376ebb989c79 which release 18 had live
+  ERROR seq 20 [regression] drops f4668a2c735f which release 19 had live
+  ERROR seq 21 [regression] drops 6572d58cb925 which release 20 had live
+  ERROR seq 22 [regression] drops 2f89a812fbfd which release 21 had live
+  ERROR seq 23 [regression] drops 75666fc084d0 which release 22 had live
+  ERROR seq 24 [regression] drops dda34d9c6bd6 which release 23 had live
+  ERROR seq 25 [regression] drops 0751c73aed3d which release 24 had live
+  ERROR seq 26 [regression] drops 498831517cab which release 25 had live
+  ERROR seq 27 [regression] drops 1b8bd8547f02 which release 26 had live
+  ERROR seq 28 [regression] drops 4f249e67daf9 which release 27 had live
+  ERROR seq 29 [regression] drops 6ac338479a16 which release 28 had live
+  ERROR seq 29 [regression] drops 34595862f785 which release 28 had live
+  ERROR seq 30 [regression] drops aa348b38a14a which release 29 had live
+  ERROR seq 30 [regression] drops 34595862f785 which release 29 had live
+  ERROR seq 31 [regression] drops 2022bcb0d192 which release 30 had live
+  ERROR seq 32 [regression] drops 5480cefe122f which release 31 had live
+  ERROR seq 32 [regression] drops 2022bcb0d192 which release 31 had live
+  ERROR seq 33 [regression] drops c393dca8feed which release 32 had live
+  ERROR seq 33 [regression] drops 2022bcb0d192 which release 32 had live
+  ERROR seq 34 [regression] drops 5c221b9ec38c which release 33 had live
+  ERROR seq 35 [regression] drops affda8bce889 which release 34 had live
+  ERROR seq 35 [regression] drops 5c221b9ec38c which release 34 had live
+  ERROR seq 36 [regression] drops 7cd74d4c5c69 which release 35 had live
+  ERROR seq 36 [regression] drops 5c221b9ec38c which release 35 had live
+  ERROR seq 37 [regression] drops e6f26e13795a which release 36 had live
+  ERROR seq 37 [regression] drops 5c221b9ec38c which release 36 had live
+  ERROR seq 38 [regression] drops 5a3952679849 which release 37 had live
+  ERROR seq 38 [regression] drops 5c221b9ec38c which release 37 had live
+  ERROR seq 39 [regression] drops bad5f90a1d33 which release 38 had live
+  ERROR seq 39 [regression] drops 5c221b9ec38c which release 38 had live
+  ERROR seq 40 [regression] drops b576641a96eb which release 39 had live
+  ERROR seq 40 [regression] drops 5c221b9ec38c which release 39 had live
+  ERROR seq 41 [regression] drops 33993e52e554 which release 40 had live
+...
+# ... truncated; total lines in raw=187
+# --- tail ---
+  warn  seq 36 [overlay-debt] scoped-UI overlay: gateway e6f26e13795a + UI 5c221b9ec38c; owes a full-dist rebase
+  warn  seq 37 [overlay-debt] scoped-UI overlay: gateway 5a3952679849 + UI 5c221b9ec38c; owes a full-dist rebase
+  warn  seq 38 [overlay-debt] scoped-UI overlay: gateway bad5f90a1d33 + UI 5c221b9ec38c; owes a full-dist rebase
+  warn  seq 39 [overlay-debt] scoped-UI overlay: gateway b576641a96eb + UI 5c221b9ec38c; owes a full-dist rebase
+  warn  seq 40 [overlay-debt] scoped-UI overlay: gateway 33993e52e554 + UI 5c221b9ec38c; owes a full-dist rebase
+  warn  seq 47 [regression] drops 471b3a2c3099 which release 46 had live (acknowledged: approved rollback of unledgered seq 46 attempt; restore 21e1e839)
+  warn  seq 95 [regression] drops b9cccdefe8e7 which release 94 had live (acknowledged: return LIVE to origin/main from seq94 UI-hotfix SHA b9cccdefe8 (pre-squash #1195); trunk 5cd01d20d3 contains #1195 plus #1194 #1196-#1200)
+ ELIFECYCLE  Command failed with exit code 30.

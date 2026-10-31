@@ -1,0 +1,79 @@
+{
+  "schema": "openbot-vp.p1-current-classification/v1",
+  "status": "authoritative_current",
+  "timezone_label": "Asia/Shanghai (UTC+8)",
+  "generated_for_pr": 173,
+  "supersedes_machine_fields": [
+    "p1-reclassification-summary.json#proven_break_seqs",
+    "p1-reclassification-summary.json#counts_after_donor_primary",
+    "p1-reclassification-summary.json#method (as adjudication authority)",
+    "p1-object-recovery-reclassification-2026-10-31.md donor_primary table as final"
+  ],
+  "historical_originals_kept": [
+    "p1-reclassification-summary.json (labeled HISTORICAL_donor_primary)",
+    "reclassification-donor-primary.jsonl",
+    "p1-object-recovery-reclassification-2026-10-31.md (superseded banner)"
+  ],
+  "universe": {
+    "kind": "original_ERROR_regression_findings",
+    "count": 146,
+    "source": "pnpm delivery:ledger:audit ERROR regression lines on #172 tip d189e74f85ff2838b0df0b469ca5eeae39bf9724",
+    "not": "all ledger adjacent pairs",
+    "ledger_data_rows_approx": 149,
+    "adjacent_pairs_approx": 148,
+    "regressionAcknowledged_seqs": [3, 4, 11, 17, 18, 47, 95],
+    "ack_overlap_with_146": [],
+    "note": "acknowledged rows were already excluded from the 146 ERROR set; no overlap"
+  },
+  "graph_caveat": {
+    "audit_shallow": true,
+    "donor_shallow": true,
+    "phrase_required": "当前联合对象图下…",
+    "phrase_forbidden": ["联合完整图", "joint complete graph", "历史无共同祖先"],
+    "truncation_ruled_out": false,
+    "full_146_rewalked_this_round": false,
+    "closed_this_round": [52, 100, 121, 140, 145]
+  },
+  "current_counts_over_146": {
+    "forward_only": 145,
+    "incomplete_graph_unknown": 1,
+    "proven_dag_break": 0,
+    "missing_object": 0,
+    "derivation": "141 forward-only from prior donor_primary pass (unchanged this round) + 4 of the five closed as forward-only → 145 FO; seq145 → incomplete_graph_unknown; full 146 not re-walked end-to-end this round"
+  },
+  "seqs": {
+    "forward_only_closed_this_round": [52, 100, 121, 140],
+    "incomplete_graph_unknown": [145],
+    "proven_dag_break": [],
+    "forward_only_from_prior_pass_not_rewalked": "141 ERROR rows previously classified forward-only under donor_primary; not re-walked this round; retained as FO in adjusted view"
+  },
+  "seq145": {
+    "class": "incomplete_graph_unknown",
+    "label_zh": "当前联合对象图下非祖先",
+    "not_label_zh": "历史无共同祖先",
+    "truncation_not_ruled_out": true
+  },
+  "recovery_counts": {
+    "recovered_tip_objects_inventory": 137,
+    "recovered_shas_txt_line_count": 137,
+    "refs_audit_recovery_present_at_capture": 5,
+    "distinction": "inventory/list = tips recovered into audit object store and listed; refs = refs/audit-recovery/* present at capture (raw provenance.audit.audit_recovery_ref_count). Do NOT equate refs=5 or a mistaken 0 with inventory=137."
+  },
+  "posture": {
+    "historical_audit_still_fail_closed": true,
+    "ledger_audit_exit": 30,
+    "no_regressionAcknowledged_written": true,
+    "no_releases_jsonl_change": true,
+    "no_release_record_change": true,
+    "no_self_PASS": true,
+    "pr174_pr175_not_accepted_this_round": true
+  },
+  "pointers": {
+    "closure_md": "p1-dag-break-evidence-closure-2026-10-31.md",
+    "closure_json": "p1-dag-break-evidence-closure-2026-10-31.json",
+    "raw_graph": "p1-dag-break-graph-closure-raw-2026-10-31.json",
+    "historical_summary": "p1-reclassification-summary.json",
+    "provenance": "p1-donor-provenance-2026-10-31.json",
+    "recovered_shas": "recovered-shas.txt"
+  }
+}

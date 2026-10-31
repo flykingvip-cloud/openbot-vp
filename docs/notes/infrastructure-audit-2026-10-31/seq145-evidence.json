@@ -1,0 +1,33 @@
+{
+  "seq144_gatewaySha": "9a8e91d19e893fc5d963103538cdbd35f315ac30",
+  "seq145_gatewaySha": "065840dfba129475c9c9030c80af07970dcdd084",
+  "audit_types": {
+    "144": "commit",
+    "145": "commit"
+  },
+  "donor_types": {
+    "144": "commit",
+    "145": null
+  },
+  "audit_is_ancestor_144_of_145": false,
+  "audit_is_ancestor_145_of_144": false,
+  "audit_ancestor_codes": {
+    "144_to_145": 1,
+    "145_to_144": 1
+  },
+  "audit_merge_base": null,
+  "audit_merge_base_code": 1,
+  "log_144": "9a8e91d19e893fc5d963103538cdbd35f315ac30\nfix(build): formal-deliverable-root config null→undefined (#882)\nupbeyond\n2026-10-20 15:40:09 +0800",
+  "log_145": "065840dfba129475c9c9030c80af07970dcdd084\nfix(build): clear docker tsc TS2322/TS1355 for Path B (#78)\nflykingvip-cloud\n2026-10-25 18:27:46 +0800\nb8864b26a2260629bd79ba969b419936839afc44",
+  "seq144_notes": "HK SaaS Path B SUCCESS tip 9a8e91d19e89 (#882+#881 after #877 8be95942 tsc-red); private soak same tip/digest NO_PROMOTE; prior LIVE seq143 tip ffbd0bbc2882 digest sha256:81becb51468dc97b62bd54895054d88bceef8ee482bf8cec53107f16efa4a571; Wave A KEEP DISCIPLINE+SHADOW+EVAL; CONFIRM/REMEDIATION/ROUTER unset",
+  "seq145_notes": "HK SaaS Path B SUCCESS tip 065840dfba12 (#78+#77 after TS build unblock); private soak same tip/digest PASS NO_PROMOTE; prior ledger LIVE seq144 tip 9a8e91d19e89 digest sha256:8fd6d63213f53ce22d59f4ce6c9c7d11a52c4db708c74eb3aa7348f4a2dfd193; interim LIVE tip 3f8280305373 digest sha256:9f83ace0bdb04aded9f432337ffac766458d52c1808aed4fbacfb605c7a827aa StartedAt ~2026-10-25 17:15–18:45 CST / liveFrom 2026-10-25T09:15:22.386Z not separately ledgered (seq136 interim pattern); Wave A KEEP DISCIPLINE+SHADOW+EVAL; CONFIRM/REMEDIATION/ROUTER unset",
+  "seq144_evidence": "Path B SUCCESS tip 9a8e91d19e89 (PRODUCTION_GO DIGEST tip ≥ 9a8e91d19e893fc5d963103538cdbd35f315ac30; #882 formal-deliverable null→undefined + #881 sessionKey tsc after #870/#863): build-info commit=9a8e91d19e893fc5d963103538cdbd35f315ac30; ImageDigest sha256:8fd6d63213f53ce22d59f4ce6c9c7d11a52c4db708c74eb3aa7348f4a2dfd193; HK SaaS LIVE 8.217.93.71 StartedAt 2026-10-20 17:21:32 +0800 CST (liveFrom 2026-10-20T09:21:32Z); EVAL=1 SHADOW=1 DISCIPLINE=1 ROUTER unset DIAG unset REMEDIATION unset on HK; tools.exec.host=sandbox; aw-exec WIPE_OK_PROOF_DEFERRED=1; private soak PATH_B_SUCCESS same tip/digest EVAL/SHADOW/DIAG unset NO_PROMOTE seat-auth synced; private StartedAt 2026-10-20 17:35:39 CST; Mac evidence /tmp/hk-cutover-9a8e91d1-mac/ + ~/hk-cutover-9a8e91d1/; SOURCE_MODE=git; DIGEST did not set CONFIRM/REMEDIATION/ROUTER/PROMOTE",
+  "seq145_evidence": "Path B SUCCESS tip 065840dfba12 (Sandra PRODUCTION_GO DIGEST tip ≥ 065840dfba129475c9c9030c80af07970dcdd084; #78 TS fix atop #77 Residual B after build fail on b8864b26; includes #73+#72/#74/#75/#76/#77+#78): build-info commit=065840dfba129475c9c9030c80af07970dcdd084; ImageDigest sha256:ef333624c09bb2e5e43158871e768f74a046a472fcda63bdf68eb79a1a637918; HK SaaS LIVE 8.217.93.71 StartedAt 2026-10-25 18:45:47 +0800 CST (liveFrom 2026-10-25T10:45:47.391Z); EVAL=1 SHADOW=1 DISCIPLINE=1 ROUTER unset DIAG unset on HK; tools.exec.host=sandbox; aw-exec WIPE_OK_PROOF_DEFERRED=1; private soak PATH_B_SUCCESS same tip/digest EVAL/SHADOW/DIAG unset NO_PROMOTE seat-auth synced; private StartedAt 2026-10-25 18:55:55 CST / 2026-10-25T10:55:55.765Z; Mac evidence ~/hk-cutover-065840dfba12/ + /tmp/hk-cutover-065840dfba12-mac/; SOURCE_MODE=git; DIGEST did not set CONFIRM/REMEDIATION/ROUTER/PROMOTE",
+  "caveat": "Ancestry break is DAG/SoT discontinuity only; does NOT by itself prove functional content rollback.",
+  "combined_class": "proven_dag_break",
+  "adjudication_superseded": true,
+  "closed_label": "incomplete_graph_unknown",
+  "closed_zh": "当前联合对象图下非祖先（截断未排除）",
+  "forbidden_claim": "历史无共同祖先",
+  "reason": "prior tip is audit shallow boundary; parent missing in audit-only; joint alternate still truncated by shallow marker"
+}
