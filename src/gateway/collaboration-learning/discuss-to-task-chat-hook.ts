@@ -4,11 +4,13 @@
  * Registers authenticated inbound sourceMessageId so tool/RPC cannot borrow foreign ids.
  */
 import type { OpenBotConfig } from "../../config/types.js";
+import { isCollabTaskClaimContractEnabled } from "../collaboration-dispatch/claim-contract.js";
 import {
   controlledDiscussToTask,
   type ControlledDiscussToTaskResult,
 } from "./controlled-discuss-to-task.js";
 import { classifyDiscussToTaskIntent } from "./discuss-to-task-classify.js";
+import { FORMAL_TASK_FLAG_OFF_USER_MESSAGE } from "./discuss-to-task-receipt.js";
 import { registerDiscussToTaskSourceBinding } from "./discuss-to-task-source-binding.js";
 import { stagesFromActivation } from "./discuss-to-task-stages.js";
 import { resolveCompositionTrustedTeamContext } from "./team-resource-auth.js";
@@ -61,6 +63,26 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
       };
     }
     return null;
+  }
+
+  // Flag-off before auth/bind/activate: clearly blocked, no task/board writes.
+  const earlyTenantId =
+    params.tenant?.tenantId?.trim() ||
+    (typeof params.stampedEnterpriseId === "string" ? params.stampedEnterpriseId.trim() : "") ||
+    "_local";
+  if (!isCollabTaskClaimContractEnabled(params.cfg, groupId, earlyTenantId)) {
+    return {
+      classification: "explicit_delegation",
+      classificationReason: "explicit_team_task",
+      attempted: true,
+      taskId: null,
+      activationKey: null,
+      activation: null,
+      stages: emptyStages(),
+      statusCode: "formal_task_blocked_flag_off",
+      userMessage: FORMAL_TASK_FLAG_OFF_USER_MESSAGE,
+      internalReason: "claim_contract_flag_off",
+    };
   }
 
   const bound = await resolveCompositionTrustedTeamContext({

@@ -261,7 +261,7 @@ describe("controlledDiscussToTask real storage", () => {
     expect(a.taskId).not.toBe(b.taskId);
   });
 
-  it("flag off → blocked with unified user message, precise internal code", async () => {
+  it("flag off → blocked with unified user message; no task/board writes", async () => {
     const { cfg, trusted } = await useTrusted(false);
     const result = await controlledDiscussToTask({
       sourceMessageId: "msg-flag-off",
@@ -273,17 +273,29 @@ describe("controlledDiscussToTask real storage", () => {
       trusted,
       cfg,
     });
-    // Task may still be ensured as draft; board publish blocked by flag.
+    // Prior contract: flag-off = clearly blocked, no formal task established.
     expect(result.attempted).toBe(true);
-    if (
-      result.internalReason === "claim_contract_flag_off" ||
-      result.statusCode === "formal_task_blocked_flag_off"
-    ) {
-      expect(result.userMessage).toBe(FORMAL_TASK_FLAG_OFF_USER_MESSAGE);
-    }
-    // Never show 已派工
+    expect(result.internalReason).toBe("claim_contract_flag_off");
+    expect(result.statusCode).toBe("formal_task_blocked_flag_off");
+    expect(result.userMessage).toBe(FORMAL_TASK_FLAG_OFF_USER_MESSAGE);
     expect(result.userMessage).not.toMatch(/已派工/);
+    expect(result.taskId).toBeNull();
+    expect(result.activation).toBeNull();
+    expect(result.stages.taskEstablished).toBe(false);
+    expect(result.stages.boardPublished).toBe(false);
     expect(result.stages.responsibilityAccepted).not.toBe(true);
+
+    const wouldBeTaskId = mintDiscussToTaskId({
+      tenantId: "_local",
+      groupId: "grp_d2t",
+      sourceMessageId: "msg-flag-off",
+    });
+    const stores = createTrustedGroupStores({
+      groupsRoot: trusted.groupsRoot,
+      groupLocator: trusted.groupLocator,
+    });
+    const task = await stores.objectStorage.readObject<Task>("grp_d2t", "task", wouldBeTaskId);
+    expect(task).toBeNull();
   });
 });
 

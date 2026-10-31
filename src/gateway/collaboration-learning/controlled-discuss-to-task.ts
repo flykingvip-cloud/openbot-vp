@@ -3,13 +3,15 @@
  *
  * Authenticated inbound → classify → mint stable taskId → reuse
  * activateCollaborationTask / materialize / publish. No second task store.
- * humanConfirmed forced false (needs_confirm); meta tags commit inside activate lock. Flag-off keeps precise internal
- * codes and a unified user message. Recovery uses first-accepted contract +
+ * humanConfirmed forced false (needs_confirm); meta tags commit inside activate lock.
+ * Flag-off is checked before activate/ensure: blocked with unified user copy and
+ * precise internal code; no task/board writes. Recovery uses first-accepted contract +
  * activation fingerprint; same request with different goal/acceptance conflicts.
  */
 import { createHash } from "node:crypto";
 import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
+import { isCollabTaskClaimContractEnabled } from "../collaboration-dispatch/claim-contract.js";
 import {
   activateCollaborationTask,
   buildActivationKey,
@@ -304,6 +306,26 @@ export async function controlledDiscussToTask(
     });
   }
 
+  // Flag-off first: prior contract = clearly blocked, no formal task established
+  // (no ensure/activate/board writes). Precise internal code + unified user copy.
+  if (!isCollabTaskClaimContractEnabled(input.cfg, groupId, tenantId)) {
+    return finish({
+      classification,
+      attempted: true,
+      taskId: null,
+      activationKey: null,
+      activation: null,
+      stages: stagesFromActivation({
+        taskEnsured: false,
+        boardPublished: false,
+        responsibilityAccepted: false,
+        planProposed: false,
+        planConfirmed: false,
+      }),
+      internalReason: "claim_contract_flag_off",
+    });
+  }
+
   const taskId = mintDiscussToTaskId({
     tenantId,
     groupId,
@@ -516,7 +538,7 @@ export async function controlledDiscussToTask(
   const idempotentReplay =
     !metaPersistFailed && activation.status === "activated" ? activation.idempotentReplay : false;
 
-  // Flag-off: keep precise code; user message unified via deriveFormalTaskUserStatus.
+  // Blocked/needs_confirm reasons (incl. legacy materialize flag_off) unify via deriveFormalTaskUserStatus.
   return finish({
     classification,
     attempted: true,

@@ -128,8 +128,8 @@ function captureClientEgress() {
 }
 
 describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
-  it("flag-off / blocked: no 已派工 in visible receipt or coordinator bind", async () => {
-    const { cfg } = await useCfg(false);
+  it("flag-off / blocked: unified copy; no 已派工; no durable task write", async () => {
+    const { cfg, stores } = await useCfg(false);
     const persisted: string[] = [];
     const turn = await runControlledDiscussToTaskChatTurn({
       groupId: "grp_chat",
@@ -144,7 +144,10 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
         return { ok: true };
       },
     });
+    expect(turn.userVisibleMessage ?? "").toContain("当前组未启用正式任务能力");
     expect(turn.userVisibleMessage ?? "").not.toMatch(/已派工/);
+    expect(turn.d2tResult?.statusCode).toBe("formal_task_blocked_flag_off");
+    expect(turn.d2tResult?.taskId).toBeNull();
     if (turn.formalTaskEstablish) {
       expect(turn.formalTaskEstablish.userMessage ?? "").not.toMatch(/已派工/);
       expect(turn.coordinatorBindingText ?? "").toMatch(/禁止|回执/);
@@ -152,6 +155,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
     for (const row of persisted) {
       expect(row).not.toMatch(/已派工/);
     }
+    const { mintDiscussToTaskId } = await import("./discuss-to-task-id.js");
+    const taskId = mintDiscussToTaskId({
+      tenantId: "_local",
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-flag-off",
+    });
+    const task = await stores.objectStorage.readObject("grp_chat", "task", taskId);
+    expect(task).toBeNull();
   });
 
   it("duplicate request: same principal ok; different principal conflicts", async () => {
