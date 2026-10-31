@@ -770,6 +770,7 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         const idemBob = `d2t-bob-${Date.now()}`;
 
         collector = createCollector(ws);
+        const activeCollector = collector;
         resolveDeliveryAclActor.mockResolvedValue("human:alice");
         const statusAlice = onceMessage(ws, isDiscussToTaskStatusEvent, 45_000);
         const sendAlice = await rpcReq(ws, "chat.send", {
@@ -782,7 +783,7 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         await statusAlice;
         // Drain parent final before second principal send (avoids in-flight run starve).
         await vi.waitFor(() => {
-          expect(collector.finals().length).toBeGreaterThan(0);
+          expect(activeCollector.finals().length).toBeGreaterThan(0);
         }, FAST_WAIT);
 
         const bindingAlice = peekDiscussToTaskSourceBinding({

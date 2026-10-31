@@ -210,6 +210,9 @@ describe("activateCollaborationTask", () => {
     });
     if (first.status === "activated" || first.taskEnsured) {
       expect(second.status).toBe("blocked");
+      if (second.status !== "blocked") {
+        throw new Error(`expected blocked, got ${second.status}`);
+      }
       expect(second.reason).toBe("activation_contract_conflict");
       expect(second.boardPublished).toBe(false);
     }
@@ -248,6 +251,9 @@ describe("activateCollaborationTask", () => {
       cfg,
     });
     expect(drifted.status).toBe("blocked");
+    if (drifted.status !== "blocked") {
+      throw new Error(`expected blocked, got ${drifted.status}`);
+    }
     expect(drifted.reason).toBe("activation_contract_conflict");
     expect(drifted.boardPublished).toBe(false);
   });

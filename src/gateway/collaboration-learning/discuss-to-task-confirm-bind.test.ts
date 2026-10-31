@@ -152,7 +152,9 @@ describe("P1 #164 confirm binds first-persisted contract", () => {
       trusted,
       cfg,
     });
-    expect(confirmed.reason === "activation_contract_conflict").toBe(false);
+    if (confirmed.status === "blocked") {
+      expect(confirmed.reason).not.toBe("activation_contract_conflict");
+    }
     expect(confirmed.activationKey).toBe(firstKey);
     const after = await stores.objectStorage.readObject<Task>(
       "grp_confirm_bind",
@@ -160,12 +162,17 @@ describe("P1 #164 confirm binds first-persisted contract", () => {
       established.taskId!,
     );
     expect(activationKeyTag(after)).toBe(firstKey);
-    expect(
-      confirmed.status === "activated" ||
-        confirmed.boardPublished ||
-        confirmed.status === "needs_confirm" ||
-        confirmed.status === "partial_success",
-    ).toBe(true);
+    function isPublishableConfirmStatus(status: typeof confirmed.status): boolean {
+      switch (status) {
+        case "activated":
+        case "needs_confirm":
+        case "partial_success":
+          return true;
+        default:
+          return false;
+      }
+    }
+    expect(isPublishableConfirmStatus(confirmed.status) || confirmed.boardPublished).toBe(true);
   });
 
   it("B: confirm must not silently replace fields — different contract → activation_contract_conflict", async () => {
@@ -205,6 +212,9 @@ describe("P1 #164 confirm binds first-persisted contract", () => {
       cfg,
     });
     expect(mutated.status).toBe("blocked");
+    if (mutated.status !== "blocked") {
+      throw new Error(`expected blocked, got ${mutated.status}`);
+    }
     expect(mutated.reason).toBe("activation_contract_conflict");
     expect(mutated.boardPublished).toBe(false);
     expect(mutated.activationKey).not.toBe(firstKey);
@@ -266,6 +276,9 @@ describe("P1 #164 confirm binds first-persisted contract", () => {
         ...c.patch,
       });
       expect(mutated.status, c.label).toBe("blocked");
+      if (mutated.status !== "blocked") {
+        throw new Error(`${c.label}: expected blocked, got ${mutated.status}`);
+      }
       expect(mutated.reason, c.label).toBe("activation_contract_conflict");
     }
   });

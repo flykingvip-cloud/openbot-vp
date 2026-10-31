@@ -43,6 +43,7 @@ import {
   createRuntimeAuthority,
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
+import type { GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import type { WakeRoundDispatcher } from "../collaboration-dispatch/wake-round-dispatch.js";
 import {
   resolveModeBWakeRoundContext,
@@ -517,7 +518,9 @@ describe("P1 #164 combo closed-loop (delegate→establish→confirm→exec→sub
       cfg,
       tenant,
     });
-    expect(confirmed.reason === "activation_contract_conflict").toBe(false);
+    if (confirmed.status === "blocked") {
+      expect(confirmed.reason).not.toBe("activation_contract_conflict");
+    }
     expect(confirmed.activationKey).toBe(d2t.activationKey);
     expect(
       confirmed.status === "activated" || confirmed.boardPublished,
@@ -620,8 +623,11 @@ describe("P1 #164 combo closed-loop (delegate→establish→confirm→exec→sub
     // OS sync may use m-* ids). Not an autonomous loop action.
     const nowMs = Date.now();
     const prevTask = await seeded.stores.objectStorage.readObject<Task>(GROUP_ID, "task", taskId);
-    await seeded.stores.objectStorage.writeObject(GROUP_ID, "task", taskId, {
-      ...prevTask!,
+    if (!prevTask) {
+      throw new Error("expected task before responsibility normalize");
+    }
+    const normalized: GovernedTask = {
+      ...prevTask,
       ownerMemberId: REVIEWER,
       assignedMemberIds: [AUTHOR, REVIEWER],
       updatedBy: REVIEWER,
@@ -630,10 +636,12 @@ describe("P1 #164 combo closed-loop (delegate→establish→confirm→exec→sub
       responsibility: {
         owner: REVIEWER,
         executors: [AUTHOR],
-        reviewers: [REVIEWER],
-        approvers: [PEER],
+        reviewer: REVIEWER,
+        approver: PEER,
+        decisionAuthority: PEER,
       },
-    } satisfies Task);
+    };
+    await seeded.stores.objectStorage.writeObject(GROUP_ID, "task", taskId, normalized);
     await writeDispatchableAuthOs({ stores: seeded.stores, cfg });
     seedActiveOwnership();
     stages.execute = "pass";
