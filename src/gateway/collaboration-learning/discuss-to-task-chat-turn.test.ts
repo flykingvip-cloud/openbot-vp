@@ -12,6 +12,7 @@ import {
   setRuntimeConfigSnapshot,
 } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { validateChatEvent } from "../protocol/index.js";
 import {
   applyDiscussToTaskChatTurnToChatHandler,
   emitDiscussToTaskClientFeedback,
@@ -441,5 +442,89 @@ describe("emitDiscussToTaskClientFeedback (real chat egress — client receives)
     expect(blob).toMatch(/展示写入失败/);
     expect(blob).not.toMatch(/disk_full_raw_internal/);
     expect(extractEgressText(client.broadcasts[0].payload)).toMatch(/展示写入失败/);
+  });
+});
+
+describe("emitDiscussToTaskClientFeedback protocol schema (R7)", () => {
+  it("actual egress payload passes validateChatEvent", async () => {
+    const { cfg } = await useCfg(true);
+    const turn = await runControlledDiscussToTaskChatTurn({
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-protocol-ok",
+      message: EXPLICIT,
+      principalActor: "human:owner",
+      client: {},
+      tenant: null,
+      cfg,
+      persistReceipt: async ({ message }) => ({
+        ok: true,
+        messageId: "msg-protocol-ok",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: message }],
+          timestamp: Date.now(),
+        },
+      }),
+    });
+    const applied = applyDiscussToTaskChatTurnToChatHandler(turn);
+    expect(applied.clientFeedbackMessage ?? "").toBeTruthy();
+    const client = captureClientEgress();
+    const emitted = emitDiscussToTaskClientFeedback({
+      applied,
+      sessionKey: "agent:bot-a:main:space:grp_chat",
+      runId: "chat-run-protocol-ok",
+      broadcastChat: client.broadcastChat,
+      nodeSendToSession: client.nodeSendToSession,
+    });
+    expect(emitted.emitted).toBe(true);
+    const payload = client.broadcasts[0]?.payload as Record<string, unknown>;
+    expect(payload.state).toBe("status");
+    expect((payload.message as { receiptId?: string })?.receiptId).toMatch(
+      /discuss-to-task-receipt:/,
+    );
+    expect(validateChatEvent(payload)).toBe(true);
+  });
+
+  it("flag-off identical copy still validates for distinct run identities", async () => {
+    const { cfg } = await useCfg(false);
+    const client = captureClientEgress();
+    for (const runId of ["flag-off-a", "flag-off-b"]) {
+      const turn = await runControlledDiscussToTaskChatTurn({
+        groupId: "grp_chat",
+        sourceMessageId: runId,
+        message: EXPLICIT,
+        principalActor: "human:owner",
+        client: {},
+        tenant: null,
+        cfg,
+        persistReceipt: async ({ message }) => ({
+          ok: true,
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: message }],
+            timestamp: Date.now(),
+          },
+        }),
+      });
+      const applied = applyDiscussToTaskChatTurnToChatHandler(turn);
+      emitDiscussToTaskClientFeedback({
+        applied,
+        sessionKey: "agent:bot-a:main:space:grp_chat",
+        runId,
+        broadcastChat: client.broadcastChat,
+        nodeSendToSession: client.nodeSendToSession,
+      });
+    }
+    expect(client.broadcasts.length).toBeGreaterThanOrEqual(2);
+    const ids = client.broadcasts.map(
+      (b) =>
+        (b.payload.message as { receiptId?: string; id?: string })?.receiptId ??
+        (b.payload.message as { id?: string })?.id,
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const b of client.broadcasts) {
+      expect(b.payload.state).toBe("status");
+      expect(validateChatEvent(b.payload)).toBe(true);
+    }
   });
 });

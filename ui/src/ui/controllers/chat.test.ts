@@ -3882,3 +3882,93 @@ describe("discuss-to-task status receipt does not end parent chat run (R6)", () 
     expect(state.chatMessages).toHaveLength(1);
   });
 });
+
+describe("discuss-to-task receipt identity dedupe (R7)", () => {
+  const sessionKey = "space:grp-dedupe";
+  const flagOffCopy = "当前组未启用正式任务能力，尚未建立正式任务。";
+
+  function statusReceipt(params: {
+    runId: string;
+    text?: string;
+    receiptId?: string;
+  }): ChatEventPayload {
+    const receiptId = params.receiptId ?? `discuss-to-task-receipt:${params.runId}`;
+    return {
+      runId: `${params.runId}:discuss-to-task-receipt`,
+      sessionKey,
+      state: "status",
+      message: {
+        id: receiptId,
+        receiptId,
+        role: "assistant",
+        content: [{ type: "text", text: params.text ?? flagOffCopy }],
+        timestamp: Date.now(),
+        senderLabel: "协作调度",
+        discussToTaskReceipt: true,
+        collaborationRoundId: params.runId,
+      },
+    };
+  }
+
+  it("same receipt redelivery shows once", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: "run-open",
+      chatStream: "",
+      chatStreamStartedAt: 1,
+      chatMessages: [],
+    });
+    const once = statusReceipt({ runId: "req-1" });
+    expect(handleChatEvent(state, once)).toBe("status");
+    expect(handleChatEvent(state, once)).toBe("status");
+    expect(state.chatMessages).toHaveLength(1);
+    expect(state.chatRunId).toBe("run-open");
+  });
+
+  it("different requests with identical text both show", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: "run-open",
+      chatStream: "",
+      chatStreamStartedAt: 1,
+      chatMessages: [],
+    });
+    expect(handleChatEvent(state, statusReceipt({ runId: "flag-off-a" }))).toBe("status");
+    expect(handleChatEvent(state, statusReceipt({ runId: "flag-off-b" }))).toBe("status");
+    expect(state.chatMessages).toHaveLength(2);
+    const ids = state.chatMessages.map((m) => (m as { receiptId?: string; id?: string }).receiptId);
+    expect(ids).toEqual([
+      "discuss-to-task-receipt:flag-off-a",
+      "discuss-to-task-receipt:flag-off-b",
+    ]);
+    expect(JSON.stringify(state.chatMessages[0])).toContain(flagOffCopy);
+    expect(JSON.stringify(state.chatMessages[1])).toContain(flagOffCopy);
+    expect(state.chatRunId).toBe("run-open");
+  });
+
+  it("same-receipt status change updates in place (does not silently drop)", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: "run-open",
+      chatStream: "partial",
+      chatStreamStartedAt: 2,
+      chatMessages: [],
+    });
+    const runId = "req-change";
+    expect(handleChatEvent(state, statusReceipt({ runId, text: "正式任务建立中…" }))).toBe(
+      "status",
+    );
+    expect(state.chatMessages).toHaveLength(1);
+    expect(JSON.stringify(state.chatMessages[0])).toContain("正式任务建立中");
+
+    expect(
+      handleChatEvent(state, statusReceipt({ runId, text: "正式任务已建立，任务编号 T-9。" })),
+    ).toBe("status");
+    expect(state.chatMessages).toHaveLength(1);
+    expect(JSON.stringify(state.chatMessages[0])).toContain("任务编号 T-9");
+    expect(JSON.stringify(state.chatMessages[0])).not.toContain("正式任务建立中");
+    // Parent run must stay active across status update.
+    expect(state.chatRunId).toBe("run-open");
+    expect(state.chatStream).toBe("partial");
+  });
+});

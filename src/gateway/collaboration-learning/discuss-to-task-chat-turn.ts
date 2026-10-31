@@ -147,10 +147,13 @@ export function emitDiscussToTaskClientFeedback(params: {
     typeof persistedMessage?.id === "string" && persistedMessage.id.trim()
       ? persistedMessage.id.trim()
       : `discuss-to-task-receipt:${params.runId}`;
+  // Stable receipt identity = source request (parent runId). Clients MUST dedupe
+  // by receiptId/id, never by body text alone (two flag-off tasks can share copy).
   const message: Record<string, unknown> = persistedMessage
     ? {
         ...persistedMessage,
         id: receiptMessageId,
+        receiptId: receiptMessageId,
         discussToTaskReceipt: true,
         collaborationRoundId:
           typeof persistedMessage.collaborationRoundId === "string"
@@ -159,6 +162,7 @@ export function emitDiscussToTaskClientFeedback(params: {
       }
     : {
         id: receiptMessageId,
+        receiptId: receiptMessageId,
         role: "assistant",
         content: [{ type: "text", text }],
         timestamp: Date.now(),
