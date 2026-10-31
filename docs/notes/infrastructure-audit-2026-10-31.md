@@ -55,3 +55,16 @@ Shared checkout `#169` was left untouched.
 - Evidence notes under `docs/notes/infrastructure-audit-2026-10-31*`.
 
 Codex = independent acceptance; this agent does not declare PASS.
+
+## Batch C
+
+Read-only provenance/staging inventory (2026-10-31 ~20:05 Asia/Shanghai):
+
+- Notes: `docs/notes/infrastructure-audit-2026-10-31/batch-c-provenance-staging-2026-10-31.md`
+- LIVE / private / ledger tip aligned on `d37bed5117d6` (seq 151); R9 PASS on observation
+- `RELEASE_RECORD.md` L3 still seq 107 — document drift (C2)
+- Billing H1 still blocked: `billing-h1-blocked-2026-10-31.md`
+
+## Batch B tip (Codex independent)
+
+- Tip `fd4721f8` on `audit/infra-batch-b-local-gate` / PR #171 — Codex PASS on directed retest (agent does not self-PASS)
