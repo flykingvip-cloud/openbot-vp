@@ -17,10 +17,12 @@ name: CI Gate
 # runs cancel their predecessors. Widen the scope (for example to the full `pnpm test`)
 # only after a few runs have shown the real per-run cost.
 #
-# When included Actions minutes are exhausted, hosted jobs finish in ~3s with
-# `runner_id=0` and empty steps (historical: gmood2008/openbot#289; reconfirmed
-# 2026-10-31 audit on flykingvip-cloud/openbot-vp). Use the local substitute instead
-# of treating red checks as a PR regression:
+# When hosted jobs finish in ~3s with `runner_id=0`, empty steps, and missing logs,
+# they never ran checks — that pattern is not PR-local regression evidence by itself.
+# Minutes exhaustion / spending limits remain a leading hypothesis until Billing or
+# an explicit annotation/control experiment confirms them (historical similar outage:
+# gmood2008/openbot#289; 2026-10-31 audit on flykingvip-cloud/openbot-vp re-observed
+# the empty-steps pattern only). Use the local substitute while investigating:
 #   docs/reference/ci-local-merge-gate.md
 #   ./scripts/ci-local-merge-gate.sh --base origin/main --candidate HEAD
 

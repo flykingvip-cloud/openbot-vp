@@ -10215,6 +10215,7 @@ landingStreams:
     landingPolicy: serial
     paths:
       - scripts/ci-local-merge-gate.sh
+      - scripts/ci-local-merge-gate.test.ts
       - docs/reference/ci-local-merge-gate.md
       - .github/workflows/ci-gate.yml
       - docs/notes/infrastructure-audit-2026-10-31.md

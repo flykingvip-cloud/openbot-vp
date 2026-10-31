@@ -11,7 +11,7 @@
 | Item | Value |
 |---|---|
 | remote | `git@github.com-flykingvip:flykingvip-cloud/openbot-vp.git` |
-| shared checkout path | `/Users/daniel/AI VP/openbot` |
+| shared checkout path | `<shared-checkout>` |
 | current branch | `fix/deliverable-open-chip-survive-sanitize` (#169 WIP — **not** audit isolation) |
 | HEAD | `a9e7bd2b8096bdb57d501fd497863ace904764ee` |
 | freshly fetched `origin/main` | `53e11c997463abf68c4b889bc6f94c23f48b9c4e` |
@@ -43,7 +43,7 @@ Evidence package on bot box: `/workspace/infrastructure-audit/batch-a/` (REPORT 
 ## Isolation note
 
 Human-authorized 2026-10-31: agent created worktree
-`/Users/daniel/AI VP/openbot-infrastructure-audit` from freshly fetched `origin/main`
+`<audit-worktree>` from freshly fetched `origin/main`
 (`0e4d269615e26909bbac606f1dfb755b3511400c`) on branch `audit/infra-batch-b-local-gate`.
 Shared checkout `#169` was left untouched.
 
