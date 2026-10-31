@@ -286,6 +286,7 @@ import {
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
 import {
   applyDiscussToTaskChatTurnToChatHandler,
+  emitDiscussToTaskClientFeedback,
   runControlledDiscussToTaskChatTurn,
 } from "../collaboration-learning/discuss-to-task-chat-turn.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
@@ -5553,11 +5554,25 @@ export const chatHandlers: GatewayRequestHandlers = {
               if (d2tApplied.coordinatorBindingText) {
                 discussToTaskCoordinatorBinding = d2tApplied.coordinatorBindingText;
               }
-              // Deterministic client feedback rides formalTaskEstablish + coordinator
-              // binding (and transcript persist inside the turn). Logs are secondary.
+              // Deterministic client feedback via existing chat event egress (broadcastChat /
+              // nodeSendToSession). Covers normal / conflict / exception / persist-failure
+              // so the client receives content even when transcript persist fails.
+              const d2tEgress = emitDiscussToTaskClientFeedback({
+                applied: d2tApplied,
+                sessionKey: rawSessionKey,
+                runId: clientRunId,
+                broadcastChat: context.broadcastChat,
+                nodeSendToSession: context.nodeSendToSession,
+                tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
+              });
               if (d2tApplied.transcriptPersist && !d2tApplied.transcriptPersist.ok) {
                 context.logGateway.warn(
                   `discuss-to-task receipt transcript persist failed: ${d2tApplied.transcriptPersist.error ?? "unknown"}`,
+                );
+              }
+              if (!d2tEgress.emitted && d2tApplied.clientFeedbackMessage) {
+                context.logGateway.warn(
+                  "discuss-to-task client feedback egress did not emit despite clientFeedbackMessage",
                 );
               }
               if (d2tTurn.error) {
@@ -5578,6 +5593,19 @@ export const chatHandlers: GatewayRequestHandlers = {
               };
               discussToTaskCoordinatorBinding =
                 "[正式任务入口回执 — 必须绑定] status=blocked；禁止口头宣称已派工。";
+              // Exception path: still push safe status through chat event egress.
+              emitDiscussToTaskClientFeedback({
+                applied: {
+                  formalTaskEstablish,
+                  coordinatorBindingText: discussToTaskCoordinatorBinding,
+                  clientFeedbackMessage: formalTaskEstablish.userMessage,
+                },
+                sessionKey: rawSessionKey,
+                runId: clientRunId,
+                broadcastChat: context.broadcastChat,
+                nodeSendToSession: context.nodeSendToSession,
+                tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
+              });
             }
 
             const completedRound = await runSingleBeatEpisodeAroundRound({

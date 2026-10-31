@@ -1,7 +1,8 @@
 /**
  * Real createOpenClawTools → collaboration_board composition path.
- * Proves currentMessageId + principal are injected (not hand-filled on final tool options).
- * Model is unused; tool args must not supply trusted inbound identity.
+ * Executes the board tool *returned by* createOpenClawTools (no rebuilt substitute).
+ * Fixtures may inject auth deps via the composition mock; inbound columns must come
+ * from createOpenClawTools injection, not hand-filled on a reconstructed tool.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -26,6 +27,9 @@ const capturedInbound: Array<{
   inboundPrincipalActor?: string | null;
   executionRunId?: string | null;
 }> = [];
+
+/** Auth/storage fixture deps merged into the composition-created tool (not a rebuild). */
+let fixtureDeps: CollaborationBoardToolDeps | undefined;
 
 async function setupGroup() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-d2t-inject-"));
@@ -90,15 +94,14 @@ vi.mock("./collaboration-board-tool.js", async (importOriginal) => {
         inboundPrincipalActor: options?.inboundPrincipalActor,
         executionRunId: options?.executionRunId,
       });
-      // Keep composition-injected inbound columns; only stub team/actor/flag for storage fixture.
+      // Keep composition-injected inbound columns; only merge fixture auth/storage deps.
+      // Do NOT let tests reconstruct a substitute tool outside createOpenClawTools.
       return mod.createCollaborationBoardTool({
         ...options,
         deps: {
           isEnabled: () => true,
           resolveActor: async () => "bot:bot-a",
-          resolveTrustedTeam: async () => {
-            throw new Error("resolveTrustedTeam stub replaced in test body");
-          },
+          ...fixtureDeps,
           ...options?.deps,
         },
       });
@@ -111,6 +114,7 @@ afterEach(async () => {
   clearRuntimeConfigSnapshot();
   clearConfigCache();
   capturedInbound.length = 0;
+  fixtureDeps = undefined;
   delete process.env.OPENBOT_CONFIG_PATH;
   delete process.env.OPENCLAW_CONFIG_PATH;
   await Promise.all(tempDirs.splice(0).map((d) => fs.rm(d, { recursive: true, force: true })));
@@ -119,8 +123,8 @@ afterEach(async () => {
 
 const EXPLICIT = "请团队正式开展市场调研，验收标准：1) 竞品清单 2) 定价建议报告";
 
-describe("createOpenClawTools discuss_to_task injection chain (R4)", () => {
-  it("injects currentMessageId + requesterSenderId; feedback emitted without hand-filled tool options", async () => {
+describe("createOpenClawTools discuss_to_task injection chain (R5)", () => {
+  it("executes composition-returned collaboration_board: legal / forge / source↔principal", async () => {
     const { cfg, trusted, stores } = await setupGroup();
     const sourceMessageId = "client-run-injected-99";
     const principal = "human:owner";
@@ -132,11 +136,14 @@ describe("createOpenClawTools discuss_to_task injection chain (R4)", () => {
       kind: "trusted_inbound",
     });
 
-    const { createOpenClawTools } = await import("../openclaw-tools.js");
-    const { createCollaborationBoardTool } = await import("./collaboration-board-tool.js");
+    // Fixture may inject auth deps — but must not rebuild another tool.
+    fixtureDeps = {
+      isEnabled: () => true,
+      resolveActor: async () => "bot:bot-a",
+      resolveTrustedTeam: stubTeam(trusted, stores),
+    };
 
-    // Re-bind stub team onto the last captured create by rebuilding through composition mock path:
-    // createOpenClawTools must be the one that supplies inbound columns.
+    const { createOpenClawTools } = await import("../openclaw-tools.js");
     const tools = createOpenClawTools({
       agentSessionKey: "agent:bot-a:main:space:grp_inject",
       agentGroupId: "grp_inject",
@@ -156,29 +163,12 @@ describe("createOpenClawTools discuss_to_task injection chain (R4)", () => {
     expect(injected.executionRunId).toBe("agent-run-NOT-SOURCE");
     expect(injected.executionRunId).not.toBe(injected.inboundSourceMessageId);
 
-    // Execute via a tool constructed with the SAME injected columns from composition capture
-    // (deps only for fixture) — does not hand-fill inbound identity in the test.
-    const tool = createCollaborationBoardTool({
-      agentSessionKey: "agent:bot-a:main:space:grp_inject",
-      requesterAgentIdOverride: "bot-a",
-      agentGroupId: "grp_inject",
-      tenantId: "_local",
-      inboundSourceMessageId: injected.inboundSourceMessageId,
-      inboundPrincipalActor: injected.inboundPrincipalActor,
-      executionRunId: injected.executionRunId,
-      gatewayClientUser: principal,
-      config: cfg,
-      deps: {
-        isEnabled: () => true,
-        resolveActor: async () => "bot:bot-a",
-        resolveTrustedTeam: stubTeam(trusted, stores),
-      },
-    });
-
+    // CRITICAL (R5): execute the tool *returned by* createOpenClawTools — no reconstruct.
     const board = tools.find((row) => row.name === "collaboration_board");
     expect(board).toBeTruthy();
+    expect(typeof board?.execute).toBe("function");
 
-    const forged = (await tool.execute("tc-forge", {
+    const forged = (await board!.execute("tc-forge", {
       action: "discuss_to_task",
       groupId: "grp_inject",
       message: EXPLICIT,
@@ -189,7 +179,7 @@ describe("createOpenClawTools discuss_to_task injection chain (R4)", () => {
     const forgedReason = typeof forged.details?.reason === "string" ? forged.details.reason : "";
     expect(forgedReason).toMatch(/source_override/);
 
-    const okResult = (await tool.execute("tc-ok", {
+    const okResult = (await board!.execute("tc-ok", {
       action: "discuss_to_task",
       groupId: "grp_inject",
       message: EXPLICIT,
@@ -201,7 +191,9 @@ describe("createOpenClawTools discuss_to_task injection chain (R4)", () => {
     expect(identity.principalActor).toBe(principal);
     expect(identity.sourceMessageId).toBe(sourceMessageId);
     expect(identity.executionRunId).toBe("agent-run-NOT-SOURCE");
-    // User-visible formal feedback lives on discussToTask stages/status (tool details).
+    // Source ↔ principal consistency: inbound injection columns match execute identity.
+    expect(identity.sourceMessageId).toBe(injected.inboundSourceMessageId);
+    expect(identity.principalActor).toBe(injected.inboundPrincipalActor);
     const d2t = okResult.details?.discussToTask as {
       userMessage?: string;
       stages?: { taskEstablished?: boolean };
