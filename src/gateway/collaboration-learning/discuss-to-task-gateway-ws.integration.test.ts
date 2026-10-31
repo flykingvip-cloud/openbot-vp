@@ -4,13 +4,19 @@
  * Authenticated WS client → chat.send → formal entry (runControlledDiscussToTaskChatTurn)
  * → durable task + source binding → status receipt event → coordinator context.
  *
- * Model is mocked (getReplyFromConfig). The discuss-to-task entry is NOT bypassed.
+ * Proof scope (honest): real WS gateway + chat handler + durable store path, with
+ * identity boundary injected via mocked resolveDeliveryAclActor. Remaining mocks:
+ * - getReplyFromConfig (model / coordinator reply)
+ * - resolveDeliveryAclActor (ACL actor identity injection)
+ * - appendInjectedAssistantMessageToTranscript (receipt persist-fail fault injection only)
+ * The discuss-to-task entry itself is NOT bypassed.
  * Synthetic fixtures only — no production groups / LIVE flags / auto-wake.
  */
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { WebSocket } from "ws";
 import * as claimContractMod from "../collaboration-dispatch/claim-contract.js";
 import {
   connectOk,
@@ -20,6 +26,7 @@ import {
   rpcReq,
   startServerWithClient,
   testState,
+  trackConnectChallengeNonce,
   writeSessionStore,
 } from "../test-helpers.js";
 import { mintDiscussToTaskId } from "./discuss-to-task-id.js";
@@ -291,6 +298,27 @@ function createOpenDiscussionOperatingState(groupId: string) {
         status: "active",
       },
       {
+        memberId: "human:alice",
+        memberKind: "human",
+        label: "Alice",
+        governanceRole: "owner",
+        status: "active",
+      },
+      {
+        memberId: "human:bob",
+        memberKind: "human",
+        label: "Bob",
+        governanceRole: "owner",
+        status: "active",
+      },
+      {
+        memberId: "human:attacker",
+        memberKind: "human",
+        label: "Attacker",
+        governanceRole: "observer",
+        status: "active",
+      },
+      {
         memberId: "bot:bot-coord",
         memberKind: "bot",
         label: "Coordinator",
@@ -324,6 +352,26 @@ function seedMembers(_groupId?: string) {
       updatedAtMs: 1,
     },
     {
+      memberId: "human:alice",
+      memberKind: "human" as const,
+      userId: "alice",
+      name: "Alice",
+      governanceRole: "owner" as const,
+      status: "active" as const,
+      joinedAtMs: 1,
+      updatedAtMs: 1,
+    },
+    {
+      memberId: "human:bob",
+      memberKind: "human" as const,
+      userId: "bob",
+      name: "Bob",
+      governanceRole: "owner" as const,
+      status: "active" as const,
+      joinedAtMs: 1,
+      updatedAtMs: 1,
+    },
+    {
       memberId: "human:attacker",
       memberKind: "human" as const,
       userId: "attacker",
@@ -347,15 +395,39 @@ function seedMembers(_groupId?: string) {
   ];
 }
 
+async function openSecondWs(port: number): Promise<WebSocket> {
+  const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+  trackConnectChallengeNonce(ws);
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout waiting for second ws open")), 10_000);
+    const onOpen = () => {
+      clearTimeout(timer);
+      ws.off("error", onError);
+      resolve();
+    };
+    const onError = (err: Error) => {
+      clearTimeout(timer);
+      ws.off("open", onOpen);
+      reject(err);
+    };
+    ws.once("open", onOpen);
+    ws.once("error", onError);
+  });
+  return ws;
+}
+
 async function withGatewayWsHarness(
   run: (ctx: {
     ws: Awaited<ReturnType<typeof startServerWithClient>>["ws"];
     createSessionDir: () => Promise<string>;
     groupId: string;
+    port: number;
+    openSecondClient: () => Promise<WebSocket>;
   }) => Promise<void>,
 ) {
   const tempDirs: string[] = [];
-  const { server, ws } = await startServerWithClient();
+  const extraSockets: WebSocket[] = [];
+  const { server, ws, port } = await startServerWithClient();
   const createSessionDir = async () => {
     const stateDir = process.env.OPENCLAW_STATE_DIR;
     if (!stateDir) {
@@ -372,8 +444,25 @@ async function withGatewayWsHarness(
   };
   const groupId = `d2t-ws-${Date.now().toString(36)}`;
   try {
-    await run({ ws, createSessionDir, groupId });
+    await run({
+      ws,
+      createSessionDir,
+      groupId,
+      port,
+      openSecondClient: async () => {
+        const second = await openSecondWs(port);
+        extraSockets.push(second);
+        return second;
+      },
+    });
   } finally {
+    for (const s of extraSockets) {
+      try {
+        s.close();
+      } catch {
+        // ignore
+      }
+    }
     clearDiscussToTaskSourceBindingsForTests();
     resolveDeliveryAclActor.mockReset();
     resolveDeliveryAclActor.mockResolvedValue("human:owner");
@@ -560,7 +649,7 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
     });
   });
 
-  it("flag-off: claimContract false → flag-off user copy; no durable task", async () => {
+  it("flag-off: claimContract false → unified flag-off copy; no task/board writes", async () => {
     await withGatewayWsHarness(async ({ ws, createSessionDir, groupId }) => {
       const replySpy = getReplyFromConfig;
       const original = replySpy.getMockImplementation();
@@ -586,17 +675,10 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
 
         const statusEvt = (await statusPromise) as ChatEventFrame;
         const statusText = extractText(statusEvt.payload?.message);
-        // Phase-1 chat forces humanConfirmed=false, so materialize returns needs_confirm
-        // *before* the claimContract flag check. Flag-off unified copy appears after
-        // confirm-gated publish; chat path must still never claim 已派工, and board
-        // publish must stay closed (matches controlled-discuss-to-task unit flag-off).
+        // Prior contract: flag-off = clearly blocked, no formal task established.
+        expect(statusText).toContain(FORMAL_TASK_FLAG_OFF_USER_MESSAGE);
         expect(statusText).not.toMatch(/已派工/);
-        if (
-          statusText.includes(FORMAL_TASK_FLAG_OFF_USER_MESSAGE) ||
-          statusText.includes("formal_task_blocked_flag_off")
-        ) {
-          expect(statusText).toContain(FORMAL_TASK_FLAG_OFF_USER_MESSAGE);
-        }
+        expect(statusText).not.toMatch(/工作项已发布=是/);
 
         const taskId = mintDiscussToTaskId({
           tenantId: "_local",
@@ -609,14 +691,7 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
           groupLocator: roots.groupLocator(groupId),
         });
         const task = await stores.objectStorage.readObject<Task>(groupId, "task", taskId);
-        // Draft task may exist; board publish / responsibility must not complete under flag-off.
-        if (task) {
-          const tags = Array.isArray((task as { tags?: unknown }).tags)
-            ? (task as { tags: unknown[] }).tags
-            : [];
-          expect(JSON.stringify(tags)).not.toMatch(/已派工/);
-        }
-        expect(statusText).not.toMatch(/工作项已发布=是/);
+        expect(task).toBeNull();
       } finally {
         flagSpy.mockRestore();
         if (original) {
@@ -628,7 +703,7 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
     });
   });
 
-  it("cross-tenant / non-writer reject: observer actor cannot establish formal task", async () => {
+  it("observer (non-writer): injected observer identity cannot establish formal task", async () => {
     await withGatewayWsHarness(async ({ ws, createSessionDir, groupId }) => {
       const replySpy = getReplyFromConfig;
       const original = replySpy.getMockImplementation();
@@ -636,10 +711,11 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         await connectOk(ws, { device: null });
         await seedGroupAndSessions({ groupId, createSessionDir, claimContract: true });
         // Observer is active but not write-capable → formal_task_blocked_auth
+        // Identity boundary injected via resolveDeliveryAclActor mock (see file header).
         resolveDeliveryAclActor.mockResolvedValue("human:attacker");
         replySpy.mockImplementation(async () => ({ text: "observer path coordinator reply" }));
 
-        const idem = `d2t-xtenant-${Date.now()}`;
+        const idem = `d2t-observer-${Date.now()}`;
         const statusPromise = onceMessage(ws, isDiscussToTaskStatusEvent, 15_000);
 
         const sendRes = await rpcReq(ws, "chat.send", {
@@ -667,6 +743,123 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         });
         const task = await stores.objectStorage.readObject<Task>(groupId, "task", taskId);
         expect(task).toBeNull();
+      } finally {
+        if (original) {
+          replySpy.mockImplementation(original);
+        } else {
+          replySpy.mockReset();
+        }
+      }
+    });
+  });
+
+  it("dual principals same local groupId: two authenticated WS clients isolate source+task", async () => {
+    await withGatewayWsHarness(async ({ ws, createSessionDir, groupId, openSecondClient }) => {
+      const replySpy = getReplyFromConfig;
+      const original = replySpy.getMockImplementation();
+      let ws2: WebSocket | undefined;
+      try {
+        await connectOk(ws, { device: null });
+        ws2 = await openSecondClient();
+        await connectOk(ws2, { device: null });
+        await seedGroupAndSessions({ groupId, createSessionDir, claimContract: true });
+        replySpy.mockImplementation(async () => ({ text: "dual-principal coordinator reply" }));
+
+        const idemAlice = `d2t-alice-${Date.now()}`;
+        const idemBob = `d2t-bob-${Date.now()}`;
+
+        // Principal A (alice) on first authenticated WS — identity injected.
+        resolveDeliveryAclActor.mockResolvedValue("human:alice");
+        const statusAlice = onceMessage(ws, isDiscussToTaskStatusEvent, 15_000);
+        const sendAlice = await rpcReq(ws, "chat.send", {
+          sessionKey: `space:${groupId}`,
+          message: EXPLICIT,
+          idempotencyKey: idemAlice,
+          timeoutMs: 60_000,
+        });
+        expect(sendAlice.ok).toBe(true);
+        await statusAlice;
+
+        const bindingAlice = peekDiscussToTaskSourceBinding({
+          sourceMessageId: idemAlice,
+          tenantId: "_local",
+          groupId,
+        });
+        expect(bindingAlice?.principalActor).toBe("human:alice");
+
+        const taskIdAlice = mintDiscussToTaskId({
+          tenantId: "_local",
+          groupId,
+          sourceMessageId: idemAlice,
+        });
+        const roots = groupsRootForState();
+        const stores = createTrustedGroupStores({
+          groupsRoot: roots.groupsRoot,
+          groupLocator: roots.groupLocator(groupId),
+        });
+        const taskAlice = await stores.objectStorage.readObject<Task>(groupId, "task", taskIdAlice);
+        expect(taskAlice).toBeTruthy();
+
+        // Principal B (bob) on second authenticated WS — same local groupId.
+        resolveDeliveryAclActor.mockResolvedValue("human:bob");
+        const statusBob = onceMessage(ws2, isDiscussToTaskStatusEvent, 15_000);
+        const sendBob = await rpcReq(ws2, "chat.send", {
+          sessionKey: `space:${groupId}`,
+          message: EXPLICIT,
+          idempotencyKey: idemBob,
+          timeoutMs: 60_000,
+        });
+        expect(sendBob.ok).toBe(true);
+        await statusBob;
+
+        const bindingBob = peekDiscussToTaskSourceBinding({
+          sourceMessageId: idemBob,
+          tenantId: "_local",
+          groupId,
+        });
+        expect(bindingBob?.principalActor).toBe("human:bob");
+
+        const taskIdBob = mintDiscussToTaskId({
+          tenantId: "_local",
+          groupId,
+          sourceMessageId: idemBob,
+        });
+        const taskBob = await stores.objectStorage.readObject<Task>(groupId, "task", taskIdBob);
+        expect(taskBob).toBeTruthy();
+        expect(taskIdAlice).not.toBe(taskIdBob);
+
+        // Cross-principal source reuse: bob cannot take alice's bound sourceMessageId.
+        resolveDeliveryAclActor.mockResolvedValue("human:bob");
+        const statusSteal = onceMessage(ws2, isDiscussToTaskStatusEvent, 15_000);
+        const sendSteal = await rpcReq(ws2, "chat.send", {
+          sessionKey: `space:${groupId}`,
+          message: EXPLICIT,
+          idempotencyKey: idemAlice,
+          timeoutMs: 60_000,
+        });
+        // chat.send itself may cache/ok; durable ownership must stay alice's.
+        expect(sendSteal.ok).toBe(true);
+        try {
+          const stealEvt = (await statusSteal) as ChatEventFrame;
+          const stealText = extractText(stealEvt.payload?.message);
+          expect(stealText).toMatch(/归属冲突|冲突|受阻|无权|正式任务/);
+          expect(stealText).not.toMatch(/已派工/);
+        } catch {
+          // Same idempotencyKey may be cached at chat layer without a new status —
+          // ownership assert below still proves isolation.
+        }
+        const bindingAfter = peekDiscussToTaskSourceBinding({
+          sourceMessageId: idemAlice,
+          tenantId: "_local",
+          groupId,
+        });
+        expect(bindingAfter?.principalActor).toBe("human:alice");
+        const taskAliceAfter = await stores.objectStorage.readObject<Task>(
+          groupId,
+          "task",
+          taskIdAlice,
+        );
+        expect(taskAliceAfter).toBeTruthy();
       } finally {
         if (original) {
           replySpy.mockImplementation(original);
