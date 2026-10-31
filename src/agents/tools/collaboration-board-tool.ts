@@ -38,6 +38,7 @@ import {
   returnCollaborationBoardItemSubmission,
   submitCollaborationBoardItemForReview,
 } from "../../gateway/collaboration-learning/claim-contract-entry.js";
+import { controlledDiscussToTask } from "../../gateway/collaboration-learning/controlled-discuss-to-task.js";
 import {
   resolveDeliveryAclActor,
   type DeliveryActorClient,
@@ -70,6 +71,7 @@ import {
 export const COLLABORATION_BOARD_TOOL = "collaboration_board";
 
 const WRITE_ACTIONS = [
+  "discuss_to_task",
   "activate_task",
   "claim_item",
   "apply_claim",
@@ -167,7 +169,21 @@ const CollaborationBoardSchema = Type.Object({
       description: "Proxy basis / 身份依据 when proxyForActorId is set.",
     }),
   ),
-  title: Type.Optional(Type.String({ description: "activate_task board title." })),
+  sourceMessageId: Type.Optional(
+    Type.String({
+      description:
+        "discuss_to_task: authenticated inbound message id (required for discuss_to_task; stable across retries).",
+    }),
+  ),
+  forceExplicit: Type.Optional(
+    Type.Boolean({
+      description:
+        "discuss_to_task: skip classifier when server already validated explicit delegation.",
+    }),
+  ),
+  title: Type.Optional(
+    Type.String({ description: "activate_task / discuss_to_task board title." }),
+  ),
   message: Type.Optional(
     Type.String({ description: "activate_task intent message (not oral dispatch)." }),
   ),
@@ -488,7 +504,7 @@ export function createCollaborationBoardTool(options?: {
     name: COLLABORATION_BOARD_TOOL,
     label: "Collaboration board",
     description:
-      "Collaboration board tools (Mode B). Actions: list_items, get_member_progress, get_todolist, list_todolists, read_team_deliverable (read); activate_task, claim_item, apply_claim, propose_todolist, mark_in_progress, submit_for_review, accept_submission, return_submission, submit_team_deliverable (write). Requires claimContract / claimContractGroupAllowlist for this group. Managed paths need a trusted group locator from the session (stamped enterprise id); never fall back to host ~/.openbot/collaboration. Formal team delivery is submit_team_deliverable (gateway receipt with contentSha256) — sandbox cannot see host managed paths. Human-gate card is propose_todolist (agent↔agent peer plans may auto-confirm). Claimant writes enforce claimant + plan gate + S3 inside the entry.",
+      "Collaboration board tools (Mode B). Actions: list_items, get_member_progress, get_todolist, list_todolists, read_team_deliverable (read); discuss_to_task, activate_task, claim_item, apply_claim, propose_todolist, mark_in_progress, submit_for_review, accept_submission, return_submission, submit_team_deliverable (write). Requires claimContract / claimContractGroupAllowlist for this group. Managed paths need a trusted group locator from the session (stamped enterprise id); never fall back to host ~/.openbot/collaboration. Formal team delivery is submit_team_deliverable (gateway receipt with contentSha256) — sandbox cannot see host managed paths. Human-gate card is propose_todolist (agent↔agent peer plans may auto-confirm). Claimant writes enforce claimant + plan gate + S3 inside the entry.",
     parameters: CollaborationBoardSchema,
     execute: async (_toolCallId, args) => {
       const params = asToolParams(args);
@@ -604,14 +620,53 @@ export function createCollaborationBoardTool(options?: {
           });
         }
 
+        if (action === "discuss_to_task") {
+          const sourceMessageId = readStringParam(params, "sourceMessageId", { required: true });
+          const title = readStringParam(params, "title");
+          const message = readStringParam(params, "message", { required: true });
+          const suggested = readStringList(params.suggestedClaimantIds) ?? [
+            bareCollaborationAgentId(agentId),
+          ];
+          const tenantId = team.auth?.tenantId?.trim() || team.tenant?.tenantId?.trim() || "_local";
+          const result = await controlledDiscussToTask({
+            groupId,
+            sourceMessageId,
+            tenantId,
+            actor: actorId,
+            message,
+            title,
+            goal: readStringParam(params, "goal"),
+            acceptanceCriteria: readStringList(params.acceptanceCriteria),
+            constraints: readStringList(params.constraints),
+            suggestedClaimantIds: suggested,
+            dueAtMs: typeof params.dueAtMs === "number" ? params.dueAtMs : undefined,
+            humanConfirmed: params.humanConfirmed === true,
+            forceExplicit: params.forceExplicit === true,
+            auth: bound.auth,
+            trusted: bound.trusted,
+            tenant: bound.tenant,
+            cfg,
+          });
+          return jsonResult({
+            ok: result.attempted && result.stages.taskEstablished,
+            action,
+            groupId,
+            locatorBound: true,
+            discussToTask: result,
+            // suggestedClaimantIds are never actual claimants
+            responsibilityAccepted: false,
+          });
+        }
+
         if (action === "activate_task") {
           if (!taskId) {
             return failResult("invalid_input", "activate_task requires taskId");
           }
           const title = readStringParam(params, "title", { required: true });
           const message = readStringParam(params, "message", { required: true });
-          const suggested =
-            readStringList(params.suggestedClaimantIds) ?? [bareCollaborationAgentId(agentId)];
+          const suggested = readStringList(params.suggestedClaimantIds) ?? [
+            bareCollaborationAgentId(agentId),
+          ];
           const activated = await activateTask({
             groupId,
             taskId,
@@ -771,7 +826,7 @@ export function createCollaborationBoardTool(options?: {
           const steps = stepsRaw.map((row) => {
             const rec = row as Record<string, unknown>;
             return {
-              title: String(rec.title ?? ""),
+              title: typeof rec.title === "string" ? rec.title : "",
               ...(typeof rec.detail === "string" ? { detail: rec.detail } : {}),
               ...(typeof rec.stepId === "string" ? { stepId: rec.stepId } : {}),
             };
@@ -897,7 +952,10 @@ export function createCollaborationBoardTool(options?: {
             allowEmpty: true,
           });
           if (deliverableContent == null) {
-            return failResult("invalid_input", "submit_team_deliverable requires deliverableContent");
+            return failResult(
+              "invalid_input",
+              "submit_team_deliverable requires deliverableContent",
+            );
           }
           const relativePath = readStringParam(params, "deliverableRelativePath") || undefined;
           const previousDeliverableId =
@@ -959,7 +1017,7 @@ export function createCollaborationBoardTool(options?: {
           });
         }
 
-        return failResult("invalid_action", `unknown action: ${action}`);
+        return failResult("invalid_action", `unknown action: ${String(action)}`);
       } catch (error) {
         return mapEntryError(error);
       }

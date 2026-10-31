@@ -9,6 +9,7 @@ import { loadAgentRegistryStore } from "../agent-registry/store.js";
  */
 import { activateCollaborationTask } from "../collaboration-learning/activate-collaboration-task.js";
 import { tryConfirmPlanFromChat } from "../collaboration-learning/chat-plan-confirm.js";
+import { controlledDiscussToTask } from "../collaboration-learning/controlled-discuss-to-task.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
 import {
   checkMemberDispatchReadiness,
@@ -262,6 +263,121 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         requireHumanConfirm: readBoolean(params?.requireHumanConfirm),
         tenant,
         auth,
+      });
+      respond(true, result, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, error instanceof Error ? error.message : String(error)),
+      );
+    }
+  },
+
+  "collaboration.task.discussToTask": async ({ params, respond, client }) => {
+    const groupId = readString(params?.groupId);
+    const message = readString(params?.message);
+    const sourceMessageId = readString(params?.sourceMessageId);
+    if (!groupId || !message || !sourceMessageId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "groupId, message, sourceMessageId are required"),
+      );
+      return;
+    }
+    try {
+      const tenant = await resolveCollaborationTenantResolution(client);
+      const actor = await resolveDeliveryAclActor(client, groupId);
+      if (!actor) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "actor_not_authenticated"),
+        );
+        return;
+      }
+      const auth = await authorizeTeamGroupResourceAccess({
+        groupId,
+        actor,
+        client,
+        tenant,
+        action: "write",
+      });
+      if (!auth.ok) {
+        respond(
+          true,
+          {
+            classification: "explicit_delegation",
+            classificationReason: "explicit_team_task",
+            attempted: true,
+            taskId: null,
+            activationKey: null,
+            activation: null,
+            stages: {
+              taskEstablished: false,
+              boardPublished: false,
+              responsibilityAccepted: false,
+              planProposed: false,
+              planConfirmed: false,
+            },
+            statusCode: "formal_task_blocked_auth",
+            userMessage: "无权在该组建立正式任务。",
+            internalReason: auth.reason,
+          },
+          undefined,
+        );
+        return;
+      }
+      const tenantId =
+        auth.tenantId?.trim() ||
+        tenant?.tenantId?.trim() ||
+        (auth.profile === "personal_local" ? "_local" : "");
+      if (!tenantId) {
+        respond(
+          true,
+          {
+            classification: "explicit_delegation",
+            classificationReason: "explicit_team_task",
+            attempted: true,
+            taskId: null,
+            activationKey: null,
+            activation: null,
+            stages: {
+              taskEstablished: false,
+              boardPublished: false,
+              responsibilityAccepted: false,
+              planProposed: false,
+              planConfirmed: false,
+            },
+            statusCode: "formal_task_blocked_auth",
+            userMessage: "无权在该组建立正式任务。",
+            internalReason: "tenant_required",
+          },
+          undefined,
+        );
+        return;
+      }
+      const result = await controlledDiscussToTask({
+        groupId,
+        sourceMessageId,
+        tenantId,
+        actor,
+        message,
+        title: readString(params?.title),
+        goal: readString(params?.goal),
+        acceptanceCriteria: readStringArray(params?.acceptanceCriteria),
+        constraints: readStringArray(params?.constraints),
+        suggestedClaimantIds: readStringArray(params?.suggestedClaimantIds),
+        suggestedRole: readString(params?.suggestedRole),
+        dueAtMs: readNumber(params?.dueAtMs),
+        // Classification / RPC must not mint humanConfirmed by default.
+        humanConfirmed: readBoolean(params?.humanConfirmed) === true,
+        requireHumanConfirm: readBoolean(params?.requireHumanConfirm),
+        forceExplicit: readBoolean(params?.forceExplicit) === true,
+        tenant,
+        auth,
+        cfg: loadConfig(),
       });
       respond(true, result, undefined);
     } catch (error) {

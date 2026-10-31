@@ -10,6 +10,7 @@ describe("collaboration-task-activation pack", () => {
     expect(collaborationTaskActivationPack.methods).toEqual(
       expect.arrayContaining([
         "collaboration.task.activate",
+        "collaboration.task.discussToTask",
         "collaboration.task.confirmPlanFromChat",
         "collaboration.task.submitTeamDeliverable",
         "collaboration.task.readTeamDeliverable",

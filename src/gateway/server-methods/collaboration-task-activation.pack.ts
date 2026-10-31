@@ -10,6 +10,7 @@ const READ_METHODS = [
 ] as const;
 const WRITE_METHODS = [
   "collaboration.task.activate",
+  "collaboration.task.discussToTask",
   "collaboration.task.confirmPlanFromChat",
   "collaboration.task.submitTeamDeliverable",
   "collaboration.task.ensureMemberSession",

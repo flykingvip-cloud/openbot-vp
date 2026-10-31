@@ -284,6 +284,7 @@ import {
   resolveGroupPublicTranscriptPath,
 } from "../collaboration-learning/collaboration-paths.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
+import { maybeControlledDiscussToTaskBeforeDiscussion } from "../collaboration-learning/discuss-to-task-chat-hook.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   bindGroupPublicTranscript,
@@ -5492,6 +5493,52 @@ export const chatHandlers: GatewayRequestHandlers = {
               }
             };
 
+            // Phase-1 controlled discuss→task: classify authenticated inbound before primary discussion.
+            // Failures stay structured; never open production flags or invent claimants.
+            let formalTaskEstablish:
+              | {
+                  attempted: boolean;
+                  status?: string;
+                  taskId?: string | null;
+                  reason?: string;
+                }
+              | undefined;
+            try {
+              const d2tActor =
+                (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId || "";
+              const d2tResult = await maybeControlledDiscussToTaskBeforeDiscussion({
+                groupId: scope.groupId,
+                sourceMessageId: clientRunId,
+                message: transcriptMessage,
+                actor: d2tActor,
+                client,
+                tenant: collabTenant,
+                cfg: policySnapshotCfg,
+                stampedEnterpriseId: client?.sessionEnterpriseId,
+                identityAliases: [client?.user, client?.platformUserId, client?.sessionMembershipId]
+                  .map((value) => (typeof value === "string" ? value.trim() : ""))
+                  .filter(Boolean),
+              });
+              if (d2tResult) {
+                formalTaskEstablish = {
+                  attempted: d2tResult.attempted,
+                  status: d2tResult.statusCode,
+                  taskId: d2tResult.taskId,
+                  reason: d2tResult.internalReason,
+                };
+              }
+            } catch (d2tErr) {
+              context.logGateway.warn(
+                `controlled discuss-to-task before discussion failed: ${formatForLog(d2tErr)}`,
+              );
+              formalTaskEstablish = {
+                attempted: true,
+                status: "blocked",
+                taskId: null,
+                reason: "discuss_to_task_hook_failed",
+              };
+            }
+
             const completedRound = await runSingleBeatEpisodeAroundRound({
               cfg: policySnapshotCfg,
               groupId: authority.groupId,
@@ -5515,6 +5562,8 @@ export const chatHandlers: GatewayRequestHandlers = {
                   skipRoundIds: [clientRunId, ...context.chatAbortControllers.keys()],
                   signal: parentAbortController.signal,
                   isAborted: () => parentAbortController.signal.aborted,
+                  sourceMessageId: clientRunId,
+                  ...(formalTaskEstablish ? { formalTaskEstablish } : {}),
                   ...(p.contextScope ? { contextScope: p.contextScope } : {}),
                   ...(collaborationEventKey ? { eventKey: collaborationEventKey } : {}),
                   runBot: async ({

@@ -213,10 +213,10 @@ function buildCollabEdgeAuthoringLines(params: {
   ) {
     // Round-scoped delegation only: no persistent coordinator authority is granted.
     lines.push(
-      "本群未设协调者：若用户在本轮要求你组织、分派或调度其他成员，你就是本轮的临时编排者——在正文里写清分工，并在末尾用 handoff 或 peer_ask 边把子任务交给对应成员（最多 2 条），调度会在本轮内直接派发给他们。",
+      "本群未设协调者：若用户在本轮要求你组织、分派或调度其他成员，你可在正文里写清分工建议，并在末尾用 handoff 或 peer_ask 边表达同轮协作请求意图（最多 2 条）。边与正文分工是协作建议，不等于正式派工或责任已生效。",
     );
     lines.push(
-      "不要调用 organization_tasks 创建任务指派，也不要用 sessions_send 私发其他成员（本群这两条通路不可用）；也不要请用户为此设置协调者或开启 Agent 间消息。",
+      "正式任务与责任仅以服务端正式回执为准（例如 collaboration_board.discuss_to_task / activate_task 成功回执）；未收到正式回执时，不要宣称已派工或认领即生效。不要调用 organization_tasks 创建任务指派，也不要用 sessions_send 私发其他成员（本群这两条通路不可用）。",
     );
   }
   return lines;
