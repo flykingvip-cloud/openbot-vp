@@ -9,7 +9,13 @@ import { loadAgentRegistryStore } from "../agent-registry/store.js";
  */
 import { activateCollaborationTask } from "../collaboration-learning/activate-collaboration-task.js";
 import { tryConfirmPlanFromChat } from "../collaboration-learning/chat-plan-confirm.js";
+import { controlledDiscussToTask } from "../collaboration-learning/controlled-discuss-to-task.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
+import {
+  assertDiscussToTaskSourceBinding,
+  peekDiscussToTaskSourceBinding,
+} from "../collaboration-learning/discuss-to-task-source-binding.js";
+import { stagesFromActivation } from "../collaboration-learning/discuss-to-task-stages.js";
 import {
   checkMemberDispatchReadiness,
   ensureRegisteredMemberMainSession,
@@ -262,6 +268,172 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         requireHumanConfirm: readBoolean(params?.requireHumanConfirm),
         tenant,
         auth,
+      });
+      respond(true, result, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, error instanceof Error ? error.message : String(error)),
+      );
+    }
+  },
+
+  "collaboration.task.discussToTask": async ({ params, respond, client }) => {
+    const groupId = readString(params?.groupId);
+    const message = readString(params?.message);
+    const sourceMessageId = readString(params?.sourceMessageId);
+    if (!groupId || !message || !sourceMessageId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "groupId, message, sourceMessageId are required"),
+      );
+      return;
+    }
+    // Phase-1: forbid client confirm / confirm-bypass.
+    if (readBoolean(params?.humanConfirmed) === true) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          "humanConfirmed must not be set by client for discussToTask (phase-1)",
+        ),
+      );
+      return;
+    }
+    if (
+      params?.requireHumanConfirm === false ||
+      readBoolean(params?.requireHumanConfirm) === false
+    ) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          "requireHumanConfirm=false is forbidden for discussToTask (phase-1)",
+        ),
+      );
+      return;
+    }
+    try {
+      const tenant = await resolveCollaborationTenantResolution(client);
+      const actor = await resolveDeliveryAclActor(client, groupId);
+      if (!actor) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "actor_not_authenticated"),
+        );
+        return;
+      }
+      const auth = await authorizeTeamGroupResourceAccess({
+        groupId,
+        actor,
+        client,
+        tenant,
+        action: "write",
+      });
+      const emptyStages = stagesFromActivation({
+        taskEnsured: false,
+        boardPublished: false,
+        responsibilityAccepted: false,
+        planProposed: false,
+        planConfirmed: false,
+      });
+      if (!auth.ok) {
+        respond(
+          true,
+          {
+            classification: "explicit_delegation",
+            classificationReason: "explicit_team_task",
+            attempted: true,
+            taskId: null,
+            activationKey: null,
+            activation: null,
+            stages: emptyStages,
+            statusCode: "formal_task_blocked_auth",
+            userMessage: "无权在该组建立正式任务。",
+            internalReason: auth.reason,
+          },
+          undefined,
+        );
+        return;
+      }
+      const tenantId =
+        auth.tenantId?.trim() ||
+        tenant?.tenantId?.trim() ||
+        (auth.profile === "personal_local" ? "_local" : "");
+      if (!tenantId) {
+        respond(
+          true,
+          {
+            classification: "explicit_delegation",
+            classificationReason: "explicit_team_task",
+            attempted: true,
+            taskId: null,
+            activationKey: null,
+            activation: null,
+            stages: emptyStages,
+            statusCode: "formal_task_blocked_auth",
+            userMessage: "无权在该组建立正式任务。",
+            internalReason: "tenant_required",
+          },
+          undefined,
+        );
+        return;
+      }
+      // Trusted inbound vs client idempotency key are distinct.
+      // If a trusted inbound binding exists, principal must match (no borrow).
+      // Unbound RPC keys are client_idempotency_key only — never registered as trusted inbound.
+      const peeked = peekDiscussToTaskSourceBinding({
+        sourceMessageId,
+        tenantId,
+        groupId,
+      });
+      let sourceKind: "trusted_inbound" | "client_idempotency_key" = "client_idempotency_key";
+      if (peeked) {
+        const asserted = assertDiscussToTaskSourceBinding({
+          sourceMessageId,
+          tenantId,
+          groupId,
+          principalActor: actor,
+        });
+        if (!asserted.ok) {
+          respond(
+            false,
+            undefined,
+            errorShape(
+              ErrorCodes.INVALID_REQUEST,
+              `${asserted.reason}: ${asserted.detail ?? "cannot borrow foreign trusted inbound"}`,
+            ),
+          );
+          return;
+        }
+        sourceKind = "trusted_inbound";
+      }
+      const result = await controlledDiscussToTask({
+        groupId,
+        sourceMessageId,
+        sourceKind,
+        tenantId,
+        actor,
+        principalActor: actor,
+        message,
+        title: readString(params?.title),
+        goal: readString(params?.goal),
+        acceptanceCriteria: readStringArray(params?.acceptanceCriteria),
+        constraints: readStringArray(params?.constraints),
+        suggestedClaimantIds: readStringArray(params?.suggestedClaimantIds),
+        suggestedRole: readString(params?.suggestedRole),
+        dueAtMs: readNumber(params?.dueAtMs),
+        humanConfirmed: false,
+        requireHumanConfirm: true,
+        forceExplicit: readBoolean(params?.forceExplicit) === true,
+        tenant,
+        auth,
+        cfg: loadConfig(),
       });
       respond(true, result, undefined);
     } catch (error) {

@@ -284,6 +284,11 @@ import {
   resolveGroupPublicTranscriptPath,
 } from "../collaboration-learning/collaboration-paths.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
+import {
+  applyDiscussToTaskChatTurnToChatHandler,
+  emitDiscussToTaskClientFeedback,
+  runControlledDiscussToTaskChatTurn,
+} from "../collaboration-learning/discuss-to-task-chat-turn.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   bindGroupPublicTranscript,
@@ -5494,6 +5499,115 @@ export const chatHandlers: GatewayRequestHandlers = {
               }
             };
 
+            // Phase-1 controlled discuss→task: trusted inbound → receipt → coordinator bind.
+            let formalTaskEstablish:
+              | {
+                  attempted: boolean;
+                  status?: string;
+                  taskId?: string | null;
+                  reason?: string;
+                  userMessage?: string;
+                  stagesSummary?: string;
+                }
+              | undefined;
+            let discussToTaskCoordinatorBinding: string | undefined;
+            try {
+              const d2tActor =
+                (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId || "";
+              const d2tTurn = await runControlledDiscussToTaskChatTurn({
+                groupId: scope.groupId,
+                sourceMessageId: clientRunId,
+                message: transcriptMessage,
+                principalActor: d2tActor,
+                client,
+                tenant: collabTenant,
+                cfg: policySnapshotCfg,
+                stampedEnterpriseId: client?.sessionEnterpriseId,
+                identityAliases: [client?.user, client?.platformUserId, client?.sessionMembershipId]
+                  .map((value) => (typeof value === "string" ? value.trim() : ""))
+                  .filter(Boolean),
+                persistReceipt: async ({ message, idempotencyKey }) => {
+                  if (!groupSession.entry.sessionId || !groupSession.storePath) {
+                    return { ok: false, error: "session_context_missing" };
+                  }
+                  try {
+                    return await appendAssistantTranscriptMessage({
+                      message,
+                      sessionId: groupSession.entry.sessionId,
+                      storePath: groupSession.storePath,
+                      sessionFile: groupSession.entry.sessionFile,
+                      createIfMissing: true,
+                      idempotencyKey,
+                    });
+                  } catch (persistErr) {
+                    return {
+                      ok: false,
+                      error: persistErr instanceof Error ? persistErr.message : String(persistErr),
+                    };
+                  }
+                },
+              });
+              const d2tApplied = applyDiscussToTaskChatTurnToChatHandler(d2tTurn);
+              if (d2tApplied.formalTaskEstablish) {
+                formalTaskEstablish = d2tApplied.formalTaskEstablish;
+              }
+              if (d2tApplied.coordinatorBindingText) {
+                discussToTaskCoordinatorBinding = d2tApplied.coordinatorBindingText;
+              }
+              // Deterministic client feedback via existing chat event egress (broadcastChat /
+              // nodeSendToSession). Covers normal / conflict / exception / persist-failure
+              // so the client receives content even when transcript persist fails.
+              const d2tEgress = emitDiscussToTaskClientFeedback({
+                applied: d2tApplied,
+                sessionKey: rawSessionKey,
+                runId: clientRunId,
+                broadcastChat: context.broadcastChat,
+                nodeSendToSession: context.nodeSendToSession,
+                tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
+              });
+              if (d2tApplied.transcriptPersist && !d2tApplied.transcriptPersist.ok) {
+                context.logGateway.warn(
+                  `discuss-to-task receipt transcript persist failed: ${d2tApplied.transcriptPersist.error ?? "unknown"}`,
+                );
+              }
+              if (!d2tEgress.emitted && d2tApplied.clientFeedbackMessage) {
+                context.logGateway.warn(
+                  "discuss-to-task client feedback egress did not emit despite clientFeedbackMessage",
+                );
+              }
+              if (d2tTurn.error) {
+                context.logGateway.warn(
+                  `controlled discuss-to-task before discussion failed: ${d2tTurn.error}`,
+                );
+              }
+            } catch (d2tErr) {
+              context.logGateway.warn(
+                `controlled discuss-to-task before discussion failed: ${formatForLog(d2tErr)}`,
+              );
+              formalTaskEstablish = {
+                attempted: true,
+                status: "blocked",
+                taskId: null,
+                reason: "discuss_to_task_hook_failed",
+                userMessage: "正式任务建立受阻，尚未建立正式任务。",
+              };
+              discussToTaskCoordinatorBinding =
+                "[正式任务入口回执 — 必须绑定] status=blocked；禁止口头宣称已派工。";
+              // Exception path: still push safe status through chat event egress.
+              emitDiscussToTaskClientFeedback({
+                applied: {
+                  formalTaskEstablish,
+                  coordinatorBindingText: discussToTaskCoordinatorBinding,
+                  clientFeedbackMessage: formalTaskEstablish.userMessage,
+                },
+                sessionKey: rawSessionKey,
+                runId: clientRunId,
+                broadcastChat: context.broadcastChat,
+                nodeSendToSession: context.nodeSendToSession,
+                tenantId: collabTenant?.tenantId ?? client?.sessionEnterpriseId ?? null,
+              });
+            }
+
             const completedRound = await runSingleBeatEpisodeAroundRound({
               cfg: policySnapshotCfg,
               groupId: authority.groupId,
@@ -5511,12 +5625,16 @@ export const chatHandlers: GatewayRequestHandlers = {
               executeRound: () =>
                 executeCollaborationRound(authority, facts, {
                   decision,
-                  message: transcriptMessage,
+                  message: discussToTaskCoordinatorBinding
+                    ? `${discussToTaskCoordinatorBinding}\n\n${transcriptMessage}`
+                    : transcriptMessage,
                   productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg),
                   sessionKey: rawSessionKey,
                   skipRoundIds: [clientRunId, ...context.chatAbortControllers.keys()],
                   signal: parentAbortController.signal,
                   isAborted: () => parentAbortController.signal.aborted,
+                  sourceMessageId: clientRunId,
+                  ...(formalTaskEstablish ? { formalTaskEstablish } : {}),
                   ...(p.contextScope ? { contextScope: p.contextScope } : {}),
                   ...(collaborationEventKey ? { eventKey: collaborationEventKey } : {}),
                   runBot: async ({

@@ -79,7 +79,11 @@ describe("resumeIncompleteBoardsAfterGatewayRestart", () => {
     expect(result.resumed).toBe(1);
     expect(result.skipped).toBe(1);
     expect(continueRound).toHaveBeenCalledTimes(1);
-    expect(continueRound.mock.calls[0]?.[0].roundId).toBe("restart-resume:grp-night:1700000000000");
+    expect(continueRound).toHaveBeenCalledWith(
+      expect.objectContaining({
+        roundId: "restart-resume:grp-night:1700000000000",
+      }),
+    );
     const night = result.groups.find((g) => g.groupId === "grp-night");
     expect(night?.wakeRecorded).toBe(true);
     expect(night?.primaryBoardItemId).toBe("item-m2");

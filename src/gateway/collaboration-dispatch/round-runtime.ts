@@ -68,6 +68,7 @@ import {
 import type { BeatExecutionInput, RuntimeAuthority, RuntimeFacts } from "./runtime-authority.js";
 import { resolveSecondaryTakeoverBot } from "./secondary-takeover.js";
 import { isCollabFloorShadowStageB } from "./shadow-stage-flag.js";
+import { buildSupplementDenialDiagnosis } from "./supplement-denial-diagnosis.js";
 import {
   COLLABORATION_ABSOLUTE_VISIBLE_TURN_LIMIT,
   type CollaborationBotTarget,
@@ -536,6 +537,9 @@ export async function executeCollaborationRound(
     contextScopeRequest: input.contextScopeRequest,
     contextScope: input.contextScope,
     eventKey: input.eventKey,
+    sourceMessageId: input.sourceMessageId,
+    discussToTaskActor: input.discussToTaskActor,
+    formalTaskEstablish: input.formalTaskEstablish,
   };
   const effectiveEarly = authority.policy
     .effective as import("./effective-policy.js").EffectiveCollaborationPolicy;
@@ -1027,12 +1031,54 @@ export async function executeCollaborationRound(
     if (!round.policyDecision) {
       return;
     }
+    const structuralGate = {
+      primaryCompleted,
+      primaryBudgetClosed,
+      primaryMode: String(params.decision.primaryMode ?? ""),
+      supplementEnabled: Boolean(frozen.supplement.enabled),
+      responseMode: String(params.decision.responseMode ?? ""),
+      edgeTargetCount: edgeTargetIds.size,
+      supplementStructurallyAllowed,
+    };
+    const edgeDiag = (round.edges ?? []).map((edge) => {
+      const to = normalizeAgentIdentifier(edge.toAgentId) ?? edge.toAgentId;
+      const dispatched = Boolean(
+        gate?.some(
+          (g) => g.decision === "KEEP" && (normalizeAgentIdentifier(g.agentId) ?? g.agentId) === to,
+        ),
+      );
+      return {
+        toAgentId: edge.toAgentId,
+        kind: edge.kind,
+        dispatched,
+        ...(dispatched ? {} : { rejectReason: "not_dispatched_this_round" as const }),
+      };
+    });
+    const diagnosis = buildSupplementDenialDiagnosis({
+      roundId: round.roundId,
+      effectivePolicyHash: round.policyDecision.effectivePolicyHash,
+      policyVersion: round.policyDecision.protocolVersion,
+      structuralGate,
+      windowOpened: window.opened,
+      windowReason: window.reason,
+      edges: edgeDiag,
+      ...(params.formalTaskEstablish
+        ? { formalTask: params.formalTaskEstablish }
+        : {
+            formalTask: {
+              attempted: false,
+              status: "not_attempted",
+              taskId: null,
+            },
+          }),
+    });
     round = {
       ...round,
       policyDecision: {
         ...round.policyDecision,
         supplementWindow: window,
         ...(gate && gate.length > 0 ? { supplementGate: gate } : {}),
+        supplementDenialDiagnosis: diagnosis,
       },
     };
   };

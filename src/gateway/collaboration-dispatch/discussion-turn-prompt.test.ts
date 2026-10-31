@@ -378,8 +378,10 @@ describe("collaboration discussion turn prompt", () => {
       expect(prompt).toContain("高密度分析=bot--agent");
       expect(prompt).not.toContain("熊猫学习=panda");
       expect(prompt).toContain("本群未设协调者");
-      expect(prompt).toContain("临时编排者");
+      expect(prompt).toContain("协作建议");
+      expect(prompt).toContain("不要宣称已派工或认领即生效");
       expect(prompt).toContain("不要调用 organization_tasks");
+      expect(prompt).not.toContain("调度会在本轮内直接派发给他们");
       expect(prompt).toContain("[[collab_edge:handoff|to=agentId");
     });
 

@@ -31,6 +31,10 @@ import { buildRuntimeNamespace } from "../collaboration-dispatch/runtime-namespa
 import { withTaskControlLock } from "../collaboration-dispatch/task-control-cas.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { ClaimContractEntryError } from "./claim-contract-entry.js";
+import {
+  adjudicateDiscussToTaskTagsUnderLock,
+  isDiscussToTaskMetaTag,
+} from "./discuss-to-task-stages.js";
 import { readGroupOperatingState, syncGroupOperatingState } from "./shared.js";
 import {
   resolveTeamDeliverableStores,
@@ -66,6 +70,8 @@ export type ActivateCollaborationTaskInput = {
   trusted?: { groupsRoot: string; groupLocator: string } | null;
   cfg?: OpenBotConfig;
   nowMs?: number;
+  /** Extra tags merged under withTaskControlLock (e.g. discuss-to-task source/contract). */
+  extraTags?: readonly string[];
 };
 
 export type ActivateCollaborationTaskResult =
@@ -263,12 +269,54 @@ function taskActivationKey(task: Task | null | undefined): string {
   return tag ? tag.slice(ACTIVATION_TAG_PREFIX.length) : "";
 }
 
+function mergeExtraTags(
+  existing: readonly string[] | undefined,
+  extraTags: readonly string[] | undefined,
+): string[] | undefined {
+  if (!extraTags || extraTags.length === 0) {
+    return existing ? [...existing] : undefined;
+  }
+  const out = [...(existing ?? [])];
+  for (const tag of extraTags) {
+    const compactTag = compact(tag);
+    if (!compactTag) {
+      continue;
+    }
+    // Replace prior tags with the same prefix (text before first ':' or whole).
+    const prefix = compactTag.includes(":")
+      ? compactTag.slice(0, compactTag.indexOf(":") + 1)
+      : compactTag;
+    // Discuss-to-task ownership / claim tags are not generically replaceable.
+    // Lock-held adjudication decides create/replay/conflict before this merge.
+    if (isDiscussToTaskMetaTag(compactTag)) {
+      const prior = out.find((row) => row.startsWith(prefix));
+      if (prior && prior !== compactTag) {
+        // Keep first-accepted value; caller should have conflicted already.
+        continue;
+      }
+      if (prior && prior === compactTag) {
+        continue;
+      }
+      out.push(compactTag);
+      continue;
+    }
+    for (let i = out.length - 1; i >= 0; i -= 1) {
+      if (prefix && out[i].startsWith(prefix)) {
+        out.splice(i, 1);
+      }
+    }
+    out.push(compactTag);
+  }
+  return out;
+}
+
 async function mutateCollaborationTaskObject(params: {
   groupId: string;
   taskId: string;
   title: string;
   actor: string;
   activationKey?: string;
+  extraTags?: readonly string[];
   /** When true, new or draft tasks become ready; terminal still refused. */
   readyRequested: boolean;
   cfg: OpenBotConfig;
@@ -282,6 +330,26 @@ async function mutateCollaborationTaskObject(params: {
     "task",
     params.taskId,
   );
+  // Lock-held discuss-to-task source owner / kind / claim adjudication.
+  const adjudication = adjudicateDiscussToTaskTagsUnderLock({
+    existingTags: existing?.tags,
+    proposedExtraTags: params.extraTags,
+  });
+  if (adjudication.action === "conflict") {
+    return {
+      ok: false,
+      reason: adjudication.reason,
+      detail: adjudication.detail,
+    };
+  }
+  const effectiveExtraTags = ((): readonly string[] | undefined => {
+    if (adjudication.action === "passthrough") {
+      return params.extraTags;
+    }
+    const nonD2t = [...(params.extraTags ?? [])].filter((tag) => !isDiscussToTaskMetaTag(tag));
+    return [...nonD2t, ...adjudication.tags];
+  })();
+
   if (existing) {
     if (TERMINAL_TASK_STATUSES.has(existing.status)) {
       return {
@@ -290,9 +358,28 @@ async function mutateCollaborationTaskObject(params: {
         detail: `task status=${existing.status}`,
       };
     }
+    // Defense in depth: never silently replace a first-persisted activationKey.
+    // Field changes (message/goal/constraints/candidates) require explicit revise,
+    // not confirm-time overwrite (P1 #164 final hardening).
+    const priorActivationKey = taskActivationKey(existing);
+    const requestedActivationKey = compact(params.activationKey);
+    if (
+      priorActivationKey &&
+      requestedActivationKey &&
+      priorActivationKey !== requestedActivationKey
+    ) {
+      return {
+        ok: false,
+        reason: "activation_contract_conflict",
+        detail: `existing activationKey=${priorActivationKey} requested=${requestedActivationKey}`,
+      };
+    }
     const nextStatus =
       params.readyRequested && existing.status === "draft" ? "ready" : existing.status;
-    const tags = mergeActivationTag(existing.tags, params.activationKey);
+    const tags = mergeExtraTags(
+      mergeActivationTag(existing.tags, params.activationKey),
+      effectiveExtraTags,
+    );
     const touched: Task = {
       ...existing,
       title: compact(params.title) || existing.title,
@@ -311,7 +398,7 @@ async function mutateCollaborationTaskObject(params: {
     status: params.readyRequested ? "ready" : "draft",
     ownerMemberId: compact(params.actor) || undefined,
     assignedMemberIds: compact(params.actor) ? [compact(params.actor)] : [],
-    tags: mergeActivationTag(undefined, params.activationKey),
+    tags: mergeExtraTags(mergeActivationTag(undefined, params.activationKey), effectiveExtraTags),
     createdBy: compact(params.actor) || undefined,
     updatedBy: compact(params.actor) || undefined,
     createdAtMs: now,
@@ -327,6 +414,7 @@ async function ensureCollaborationTaskObject(params: {
   title: string;
   actor: string;
   activationKey?: string;
+  extraTags?: readonly string[];
   readyRequested: boolean;
   cfg?: OpenBotConfig;
   nowMs?: number;
@@ -343,6 +431,7 @@ async function ensureCollaborationTaskObject(params: {
       title: params.title,
       actor: params.actor,
       activationKey: params.activationKey,
+      extraTags: params.extraTags,
       readyRequested: params.readyRequested,
       cfg,
       nowMs: params.nowMs,
@@ -407,14 +496,9 @@ async function findExistingPublishedItem(params: {
       item.status === "in_progress" ||
       item.status === "submitted_for_review",
   );
-  if (active.length === 0) {
-    return { ok: true, item: null };
-  }
-  const byKey = active.find((item) => boardItemActivationKey(item) === params.activationKey);
-  if (byKey) {
-    return { ok: true, item: byKey };
-  }
-  // Consult task tag fingerprint — same title with different contract is a conflict.
+  // Confirm must bind the first-persisted activationKey even when no board item is
+  // published yet (needs_confirm -> humanConfirmed). Skipping this check allowed
+  // silent contract replace on confirm (P1 #164 final hardening).
   try {
     const stores = params.stores;
     const task = await stores.objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
@@ -432,6 +516,14 @@ async function findExistingPublishedItem(params: {
       reason: "task_fingerprint_read_failed",
       detail: error instanceof Error ? error.message : String(error),
     };
+  }
+
+  if (active.length === 0) {
+    return { ok: true, item: null };
+  }
+  const byKey = active.find((item) => boardItemActivationKey(item) === params.activationKey);
+  if (byKey) {
+    return { ok: true, item: byKey };
   }
 
   // Same taskId + title without key: treat as conflict when contract fingerprint differs.
@@ -718,6 +810,7 @@ ${message}`
       title,
       actor,
       activationKey,
+      extraTags: params.extraTags,
       readyRequested: false,
       cfg,
       stores: teamStores,
@@ -834,6 +927,7 @@ ${message}`
           title,
           actor,
           activationKey,
+          extraTags: params.extraTags,
           readyRequested: false,
           cfg,
           stores: teamStores,
@@ -908,6 +1002,7 @@ ${message}`
           title,
           actor,
           activationKey,
+          extraTags: params.extraTags,
           readyRequested: true,
           cfg,
           stores: teamStores,

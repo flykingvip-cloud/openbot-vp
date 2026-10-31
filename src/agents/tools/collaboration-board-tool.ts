@@ -38,10 +38,12 @@ import {
   returnCollaborationBoardItemSubmission,
   submitCollaborationBoardItemForReview,
 } from "../../gateway/collaboration-learning/claim-contract-entry.js";
+import { controlledDiscussToTask } from "../../gateway/collaboration-learning/controlled-discuss-to-task.js";
 import {
   resolveDeliveryAclActor,
   type DeliveryActorClient,
 } from "../../gateway/collaboration-learning/delivery-actor-binding.js";
+import { assertDiscussToTaskSourceBinding } from "../../gateway/collaboration-learning/discuss-to-task-source-binding.js";
 import {
   assertPersistedTaskNotStopped,
   TaskStoppedError,
@@ -70,6 +72,7 @@ import {
 export const COLLABORATION_BOARD_TOOL = "collaboration_board";
 
 const WRITE_ACTIONS = [
+  "discuss_to_task",
   "activate_task",
   "claim_item",
   "apply_claim",
@@ -167,7 +170,20 @@ const CollaborationBoardSchema = Type.Object({
       description: "Proxy basis / 身份依据 when proxyForActorId is set.",
     }),
   ),
-  title: Type.Optional(Type.String({ description: "activate_task board title." })),
+  sourceMessageId: Type.Optional(
+    Type.String({
+      description:
+        "IGNORED for discuss_to_task — sourceMessageId is injected from trusted execution context; model must not fill or override.",
+    }),
+  ),
+  forceExplicit: Type.Optional(
+    Type.Boolean({
+      description: "IGNORED for discuss_to_task — model cannot force explicit classification.",
+    }),
+  ),
+  title: Type.Optional(
+    Type.String({ description: "activate_task / discuss_to_task board title." }),
+  ),
   message: Type.Optional(
     Type.String({ description: "activate_task intent message (not oral dispatch)." }),
   ),
@@ -187,7 +203,7 @@ const CollaborationBoardSchema = Type.Object({
   humanConfirmed: Type.Optional(
     Type.Boolean({
       description:
-        "activate_task: true publishes the board item. The human gate is the later todolist card, not this flag.",
+        "activate_task only: true publishes the board item. FORBIDDEN for discuss_to_task (phase-1 rejects model-set confirm).",
     }),
   ),
   dueAtMs: Type.Optional(Type.Number({ description: "activate_task due time in epoch ms." })),
@@ -458,6 +474,18 @@ export function createCollaborationBoardTool(options?: {
    * Distinct from allowlist tenant normalization, which drops UUIDs.
    */
   stampedEnterpriseId?: string | null;
+  /**
+   * Trusted inbound message id for this turn (clientRunId / MessageSid).
+   * Injected by composition root — NEVER an agentRunId. Model must not fill.
+   */
+  inboundSourceMessageId?: string | null;
+  /**
+   * Original inbound principal (human). Source ownership is checked against this,
+   * not the executing bot actorId.
+   */
+  inboundPrincipalActor?: string | null;
+  /** Executing agent run id (diagnostics only — never used as sourceMessageId). */
+  executionRunId?: string | null;
   gatewayClientUser?: string;
   gatewayClientPlatformUserId?: string;
   gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
@@ -483,12 +511,15 @@ export function createCollaborationBoardTool(options?: {
   const listTodolists = deps.listTodolists ?? listCollaborationTodolists;
   const resolveTrustedTeam = deps.resolveTrustedTeam ?? resolveCompositionTrustedTeamContext;
   const stampedEnterpriseId = compact(options?.stampedEnterpriseId);
+  const inboundSourceMessageId = compact(options?.inboundSourceMessageId);
+  const inboundPrincipalActor = compact(options?.inboundPrincipalActor);
+  const executionRunId = compact(options?.executionRunId);
 
   return {
     name: COLLABORATION_BOARD_TOOL,
     label: "Collaboration board",
     description:
-      "Collaboration board tools (Mode B). Actions: list_items, get_member_progress, get_todolist, list_todolists, read_team_deliverable (read); activate_task, claim_item, apply_claim, propose_todolist, mark_in_progress, submit_for_review, accept_submission, return_submission, submit_team_deliverable (write). Requires claimContract / claimContractGroupAllowlist for this group. Managed paths need a trusted group locator from the session (stamped enterprise id); never fall back to host ~/.openbot/collaboration. Formal team delivery is submit_team_deliverable (gateway receipt with contentSha256) — sandbox cannot see host managed paths. Human-gate card is propose_todolist (agent↔agent peer plans may auto-confirm). Claimant writes enforce claimant + plan gate + S3 inside the entry.",
+      "Collaboration board tools (Mode B). Actions: list_items, get_member_progress, get_todolist, list_todolists, read_team_deliverable (read); discuss_to_task, activate_task, claim_item, apply_claim, propose_todolist, mark_in_progress, submit_for_review, accept_submission, return_submission, submit_team_deliverable (write). Requires claimContract / claimContractGroupAllowlist for this group. Managed paths need a trusted group locator from the session (stamped enterprise id); never fall back to host ~/.openbot/collaboration. Formal team delivery is submit_team_deliverable (gateway receipt with contentSha256) — sandbox cannot see host managed paths. Human-gate card is propose_todolist (agent↔agent peer plans may auto-confirm). Claimant writes enforce claimant + plan gate + S3 inside the entry.",
     parameters: CollaborationBoardSchema,
     execute: async (_toolCallId, args) => {
       const params = asToolParams(args);
@@ -601,6 +632,104 @@ export function createCollaborationBoardTool(options?: {
             taskId,
             cfg,
             objectStorage: team.stores.objectStorage,
+          });
+        }
+
+        if (action === "discuss_to_task") {
+          // Model must not fill/override sourceMessageId, humanConfirmed, or forceExplicit.
+          if (params.humanConfirmed === true) {
+            return failResult(
+              "discuss_to_task_confirm_forbidden",
+              "discuss_to_task rejects model-set humanConfirmed; phase-1 requires server confirm path",
+            );
+          }
+          if (params.requireHumanConfirm === false) {
+            return failResult(
+              "discuss_to_task_confirm_bypass_forbidden",
+              "discuss_to_task rejects requireHumanConfirm=false",
+            );
+          }
+          const modelSource = readStringParam(params, "sourceMessageId");
+          const sourceMessageId = inboundSourceMessageId;
+          if (!sourceMessageId) {
+            return failResult(
+              "discuss_to_task_source_unbound",
+              "discuss_to_task requires trusted inbound sourceMessageId from execution context",
+            );
+          }
+          if (modelSource && modelSource !== sourceMessageId) {
+            return failResult(
+              "discuss_to_task_source_override_forbidden",
+              "model must not override trusted sourceMessageId",
+            );
+          }
+          const title = readStringParam(params, "title");
+          const message = readStringParam(params, "message", { required: true });
+          const suggested = readStringList(params.suggestedClaimantIds) ?? [
+            bareCollaborationAgentId(agentId),
+          ];
+          const tenantId = team.auth?.tenantId?.trim() || team.tenant?.tenantId?.trim() || "_local";
+          // Columns: principal (owner) ≠ executing agent ≠ execution run.
+          const principalActor =
+            inboundPrincipalActor ||
+            compact(options?.gatewayClientUser) ||
+            compact(options?.gatewayClientPlatformUserId) ||
+            "";
+          if (!principalActor) {
+            return failResult(
+              "discuss_to_task_principal_required",
+              "discuss_to_task requires inbound principal actor from trusted turn context",
+            );
+          }
+          const binding = assertDiscussToTaskSourceBinding({
+            sourceMessageId,
+            tenantId,
+            groupId,
+            principalActor,
+          });
+          if (!binding.ok) {
+            return failResult(
+              binding.reason,
+              binding.detail ??
+                "sourceMessageId is not bound to this authenticated inbound principal",
+            );
+          }
+          const result = await controlledDiscussToTask({
+            groupId,
+            sourceMessageId,
+            sourceKind: "trusted_inbound",
+            tenantId,
+            actor: actorId,
+            principalActor,
+            message,
+            title,
+            goal: readStringParam(params, "goal"),
+            acceptanceCriteria: readStringList(params.acceptanceCriteria),
+            constraints: readStringList(params.constraints),
+            suggestedClaimantIds: suggested,
+            dueAtMs: typeof params.dueAtMs === "number" ? params.dueAtMs : undefined,
+            humanConfirmed: false,
+            forceExplicit: false,
+            auth: bound.auth,
+            trusted: bound.trusted,
+            tenant: bound.tenant,
+            cfg,
+          });
+          void executionRunId; // diagnostics only — never used as sourceMessageId
+          return jsonResult({
+            ok: result.attempted && result.stages.taskEstablished === true,
+            action,
+            groupId,
+            locatorBound: true,
+            discussToTask: result,
+            identity: {
+              principalActor,
+              executingAgent: actorId,
+              sourceMessageId,
+              executionRunId: executionRunId || null,
+            },
+            // suggestedClaimantIds are never actual claimants
+            responsibilityAccepted: result.stages.responsibilityAccepted === true,
           });
         }
 

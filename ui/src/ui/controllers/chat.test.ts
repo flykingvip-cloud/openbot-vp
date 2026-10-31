@@ -3686,3 +3686,289 @@ describe("handleChatEvent thinking progress (process channel)", () => {
     expect(state.chatThinkingProgress).toBeNull();
   });
 });
+
+describe("discuss-to-task status receipt does not end parent chat run (R6)", () => {
+  const sessionKey = "space:grp-demo";
+  const parentRunId = "run-parent-1";
+  const receiptRunId = `${parentRunId}:discuss-to-task-receipt`;
+  const persistFailCopy = "正式任务已建立（展示写入失败，请刷新后重试。）";
+
+  function receiptPayload(overrides: Partial<ChatEventPayload> = {}): ChatEventPayload {
+    return {
+      runId: receiptRunId,
+      sessionKey,
+      state: "status",
+      message: {
+        id: `discuss-to-task-receipt:${parentRunId}`,
+        role: "assistant",
+        content: [{ type: "text", text: "正式任务已建立，任务编号 T-1。" }],
+        timestamp: 1000,
+        senderLabel: "协作调度",
+        discussToTaskReceipt: true,
+        collaborationRoundId: parentRunId,
+      },
+      ...overrides,
+    };
+  }
+
+  it("main run stays active after receipt; thinking/delta still apply; only main final clears", () => {
+    const initialThinking = {
+      steps: [
+        { id: "step-0", label: "理解问题", status: "done" as const },
+        { id: "step-1", label: "组织回答", status: "active" as const },
+      ],
+      activeIndex: 1,
+      percent: 40,
+      placeholder: "正在梳理思路…",
+    };
+    const state = createState({
+      sessionKey,
+      chatRunId: parentRunId,
+      chatStream: "",
+      chatStreamStartedAt: 10,
+      chatThinkingProgress: initialThinking,
+      chatMessages: [],
+    });
+
+    expect(handleChatEvent(state, receiptPayload())).toBe("status");
+    expect(state.chatRunId).toBe(parentRunId);
+    expect(state.chatStream).toBe("");
+    expect(state.chatStreamStartedAt).toBe(10);
+    expect(state.chatThinkingProgress).toEqual(initialThinking);
+    expect(state.chatMessages).toHaveLength(1);
+    expect(JSON.stringify(state.chatMessages[0])).toContain("正式任务已建立");
+
+    const nextThinking = {
+      steps: [
+        { id: "step-0", label: "理解问题", status: "done" as const },
+        { id: "step-1", label: "组织回答", status: "done" as const },
+        { id: "step-2", label: "继续执行", status: "active" as const },
+      ],
+      activeIndex: 2,
+      percent: 66,
+      placeholder: "正在梳理思路…",
+    };
+    const thinking: ChatEventPayload = {
+      runId: parentRunId,
+      sessionKey,
+      state: "thinking",
+      thinking: nextThinking,
+    };
+    expect(handleChatEvent(state, thinking)).toBe("thinking");
+    expect(state.chatRunId).toBe(parentRunId);
+    expect(state.chatThinkingProgress).toEqual(nextThinking);
+
+    const delta: ChatEventPayload = {
+      runId: parentRunId,
+      sessionKey,
+      state: "delta",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "主答进行中…" }],
+      },
+    };
+    expect(handleChatEvent(state, delta)).toBe("delta");
+    expect(state.chatRunId).toBe(parentRunId);
+    expect(state.chatStream).toBe("主答进行中…");
+    // Visible delivery clears thinking placeholder, but run stays open.
+    expect(state.chatThinkingProgress).toBeNull();
+
+    const mainFinal: ChatEventPayload = {
+      runId: parentRunId,
+      sessionKey,
+      state: "final",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "主答完成。" }],
+      },
+    };
+    expect(handleChatEvent(state, mainFinal)).toBe("final");
+    expect(state.chatRunId).toBeNull();
+    expect(state.chatStream).toBeNull();
+    expect(state.chatStreamStartedAt).toBeNull();
+    expect(JSON.stringify(state.chatMessages)).toContain("主答完成");
+  });
+
+  it("legacy final receipt semantics would have cleared — status must not", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: parentRunId,
+      chatStream: "partial",
+      chatStreamStartedAt: 5,
+      chatMessages: [],
+    });
+    // Guard: same runId shape with state final still clears (protocol terminal).
+    const badLegacy: ChatEventPayload = {
+      ...receiptPayload(),
+      state: "final",
+    };
+    expect(handleChatEvent(state, badLegacy)).toBe("final");
+    expect(state.chatRunId).toBeNull();
+
+    const state2 = createState({
+      sessionKey,
+      chatRunId: parentRunId,
+      chatStream: "partial",
+      chatStreamStartedAt: 5,
+      chatMessages: [],
+    });
+    expect(handleChatEvent(state2, receiptPayload())).toBe("status");
+    expect(state2.chatRunId).toBe(parentRunId);
+    expect(state2.chatStream).toBe("partial");
+    expect(state2.chatStreamStartedAt).toBe(5);
+  });
+
+  it("persist-fail fixed copy is visible without ending the parent run", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: parentRunId,
+      chatStream: null,
+      chatStreamStartedAt: 1,
+      chatMessages: [],
+    });
+    const payload = receiptPayload({
+      message: {
+        id: `discuss-to-task-receipt:${parentRunId}`,
+        role: "assistant",
+        content: [{ type: "text", text: persistFailCopy }],
+        timestamp: 1000,
+        discussToTaskReceipt: true,
+      },
+    });
+    expect(handleChatEvent(state, payload)).toBe("status");
+    expect(state.chatRunId).toBe(parentRunId);
+    expect(JSON.stringify(state.chatMessages)).toContain("展示写入失败");
+    expect(JSON.stringify(state.chatMessages)).not.toMatch(/disk_full|EACCES/);
+  });
+
+  it("duplicate receipt is deduped while parent run stays active", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: parentRunId,
+      chatStream: "",
+      chatStreamStartedAt: 2,
+      chatMessages: [],
+    });
+    const once = receiptPayload();
+    expect(handleChatEvent(state, once)).toBe("status");
+    expect(handleChatEvent(state, once)).toBe("status");
+    expect(state.chatMessages).toHaveLength(1);
+    expect(state.chatRunId).toBe(parentRunId);
+  });
+
+  it("other sessions do not receive the receipt", () => {
+    const state = createState({
+      sessionKey: "space:other-group",
+      chatRunId: "run-other",
+      chatStream: "keep",
+      chatMessages: [],
+    });
+    expect(handleChatEvent(state, receiptPayload())).toBeNull();
+    expect(state.chatMessages).toEqual([]);
+    expect(state.chatRunId).toBe("run-other");
+    expect(state.chatStream).toBe("keep");
+  });
+
+  it("idle session still appends status without opening a run", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: null,
+      chatStream: null,
+      chatMessages: [],
+    });
+    expect(handleChatEvent(state, receiptPayload())).toBe("status");
+    expect(state.chatRunId).toBeNull();
+    expect(state.chatStream).toBeNull();
+    expect(state.chatMessages).toHaveLength(1);
+  });
+});
+
+describe("discuss-to-task receipt identity dedupe (R7)", () => {
+  const sessionKey = "space:grp-dedupe";
+  const flagOffCopy = "当前组未启用正式任务能力，尚未建立正式任务。";
+
+  function statusReceipt(params: {
+    runId: string;
+    text?: string;
+    receiptId?: string;
+  }): ChatEventPayload {
+    const receiptId = params.receiptId ?? `discuss-to-task-receipt:${params.runId}`;
+    return {
+      runId: `${params.runId}:discuss-to-task-receipt`,
+      sessionKey,
+      state: "status",
+      message: {
+        id: receiptId,
+        receiptId,
+        role: "assistant",
+        content: [{ type: "text", text: params.text ?? flagOffCopy }],
+        timestamp: Date.now(),
+        senderLabel: "协作调度",
+        discussToTaskReceipt: true,
+        collaborationRoundId: params.runId,
+      },
+    };
+  }
+
+  it("same receipt redelivery shows once", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: "run-open",
+      chatStream: "",
+      chatStreamStartedAt: 1,
+      chatMessages: [],
+    });
+    const once = statusReceipt({ runId: "req-1" });
+    expect(handleChatEvent(state, once)).toBe("status");
+    expect(handleChatEvent(state, once)).toBe("status");
+    expect(state.chatMessages).toHaveLength(1);
+    expect(state.chatRunId).toBe("run-open");
+  });
+
+  it("different requests with identical text both show", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: "run-open",
+      chatStream: "",
+      chatStreamStartedAt: 1,
+      chatMessages: [],
+    });
+    expect(handleChatEvent(state, statusReceipt({ runId: "flag-off-a" }))).toBe("status");
+    expect(handleChatEvent(state, statusReceipt({ runId: "flag-off-b" }))).toBe("status");
+    expect(state.chatMessages).toHaveLength(2);
+    const ids = state.chatMessages.map((m) => (m as { receiptId?: string; id?: string }).receiptId);
+    expect(ids).toEqual([
+      "discuss-to-task-receipt:flag-off-a",
+      "discuss-to-task-receipt:flag-off-b",
+    ]);
+    expect(JSON.stringify(state.chatMessages[0])).toContain(flagOffCopy);
+    expect(JSON.stringify(state.chatMessages[1])).toContain(flagOffCopy);
+    expect(state.chatRunId).toBe("run-open");
+  });
+
+  it("same-receipt status change updates in place (does not silently drop)", () => {
+    const state = createState({
+      sessionKey,
+      chatRunId: "run-open",
+      chatStream: "partial",
+      chatStreamStartedAt: 2,
+      chatMessages: [],
+    });
+    const runId = "req-change";
+    expect(handleChatEvent(state, statusReceipt({ runId, text: "正式任务建立中…" }))).toBe(
+      "status",
+    );
+    expect(state.chatMessages).toHaveLength(1);
+    expect(JSON.stringify(state.chatMessages[0])).toContain("正式任务建立中");
+
+    expect(
+      handleChatEvent(state, statusReceipt({ runId, text: "正式任务已建立，任务编号 T-9。" })),
+    ).toBe("status");
+    expect(state.chatMessages).toHaveLength(1);
+    expect(JSON.stringify(state.chatMessages[0])).toContain("任务编号 T-9");
+    expect(JSON.stringify(state.chatMessages[0])).not.toContain("正式任务建立中");
+    // Parent run must stay active across status update.
+    expect(state.chatRunId).toBe("run-open");
+    expect(state.chatStream).toBe("partial");
+  });
+});

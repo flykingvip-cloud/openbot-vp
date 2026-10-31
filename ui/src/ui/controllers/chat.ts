@@ -357,7 +357,7 @@ export type ChatEventState = Pick<
 export type ChatEventPayload = {
   runId: string;
   sessionKey: string;
-  state: "delta" | "final" | "aborted" | "error" | "thinking" | "user_echo";
+  state: "delta" | "final" | "aborted" | "error" | "thinking" | "user_echo" | "status";
   /** Server dropped a scratchpad snapshot; clear the in-progress bubble. */
   retract?: boolean;
   mode?: "stop" | "undo";
@@ -1536,6 +1536,84 @@ function handleForeignRunFinalEvent(state: ChatEventState, payload: ChatEventPay
   return "final";
 }
 
+function isDiscussToTaskReceiptMessage(message: unknown): boolean {
+  if (!message || typeof message !== "object" || Array.isArray(message)) {
+    return false;
+  }
+  return (message as { discussToTaskReceipt?: unknown }).discussToTaskReceipt === true;
+}
+
+/**
+ * Stable receipt identity for discuss→task status bubbles.
+ * Prefer explicit receiptId, then message.id (both stamped from source run).
+ * Never use body text — identical copy across distinct requests must both show.
+ */
+function resolveDiscussToTaskReceiptIdentity(message: Record<string, unknown>): string {
+  const receiptId = typeof message.receiptId === "string" ? message.receiptId.trim() : "";
+  if (receiptId) {
+    return receiptId;
+  }
+  const messageId = typeof message.id === "string" ? message.id.trim() : "";
+  return messageId;
+}
+
+/**
+ * True only for exact redelivery of the same receipt identity with the same body.
+ * - Same receiptId/id + same text → skip (show once).
+ * - Same receiptId/id + different text → false so appendChatMessage updates in place
+ *   (status change must not silently drop).
+ * - Different identity even with identical text → false (both show).
+ */
+function discussToTaskReceiptAlreadyVisible(
+  state: Pick<ChatEventState, "chatMessages">,
+  message: Record<string, unknown>,
+): boolean {
+  const identity = resolveDiscussToTaskReceiptIdentity(message);
+  if (!identity) {
+    return false;
+  }
+  const incomingText = extractText(message)?.trim() ?? "";
+  const messages = Array.isArray(state.chatMessages) ? state.chatMessages : [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const row = messages[index];
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      continue;
+    }
+    const existing = row as Record<string, unknown>;
+    const existingIdentity = resolveDiscussToTaskReceiptIdentity(existing);
+    if (!existingIdentity || existingIdentity !== identity) {
+      continue;
+    }
+    // Require receipt marker on at least one side so plain id collisions do not
+    // suppress unrelated bubbles; egress always stamps discussToTaskReceipt.
+    if (!isDiscussToTaskReceiptMessage(existing) && !isDiscussToTaskReceiptMessage(message)) {
+      continue;
+    }
+    const existingText = extractText(existing)?.trim() ?? "";
+    return existingText === incomingText;
+  }
+  return false;
+}
+
+/**
+ * Non-terminal status/progress bubble (e.g. discuss→task establish receipt).
+ * Appends safe user-visible status but never clears the parent run / stream /
+ * thinking progress / stop capability. Conflict / persist-fail / exception for
+ * the establish-task sub-op are status only — not whole-chat end.
+ */
+function handleStatusChatEvent(state: ChatEventState, payload: ChatEventPayload) {
+  const statusMessage = normalizeFinalVisibleMessage(payload.message);
+  if (!statusMessage) {
+    return;
+  }
+  const speaker = resolveEventSpeaker(state, payload);
+  const stamped = mergeAssistantSpeakerIdentity(statusMessage, speaker);
+  if (discussToTaskReceiptAlreadyVisible(state, stamped)) {
+    return;
+  }
+  appendVisibleAssistantMessage(state, stamped);
+}
+
 function handleFinalChatEvent(state: ChatEventState, payload: ChatEventPayload) {
   const finalMessage = normalizeFinalVisibleMessage(payload.message);
   const speaker = resolveEventSpeaker(state, payload);
@@ -2035,6 +2113,12 @@ export function handleChatEvent(state: ChatEventState, payload?: ChatEventPayloa
       scheduleOguiDecisionStatusRefresh(state);
       return foreign;
     }
+    // Idle / other-run status receipts: append visible status for this session
+    // surface, but never open or clear a chat turn.
+    if (payload.state === "status") {
+      handleStatusChatEvent(state, payload);
+      return "status";
+    }
     return null;
   }
 
@@ -2106,6 +2190,10 @@ export function handleChatEvent(state: ChatEventState, payload?: ChatEventPayloa
   } else if (payload.state === "user_echo") {
     // Persist-ack only. Closing the turn here ate thinking/delta after :user.
     return "user_echo";
+  } else if (payload.state === "status") {
+    // Establish-task / progress receipt: visible status, parent run stays active.
+    handleStatusChatEvent(state, payload);
+    return "status";
   } else if (payload.state === "final") {
     handleFinalChatEvent(state, payload);
   } else if (payload.state === "aborted") {

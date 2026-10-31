@@ -149,6 +149,15 @@ export type BeatExecutionInput = {
    * Omitted keeps that legacy executor; any other id is refused.
    */
   productionExecutor?: string;
+  /**
+   * Authenticated inbound message id (stable across retries). When present with
+   * discussToTaskActor, composition roots may pre-run controlledDiscussToTask
+   * and pass formalTaskEstablish for diagnosis — round-runtime does not invent ids.
+   */
+  sourceMessageId?: string;
+  discussToTaskActor?: string;
+  /** Precomputed formal-task establish diagnosis from composition root. */
+  formalTaskEstablish?: import("./supplement-denial-diagnosis.js").FormalTaskEstablishDiagnosis;
 };
 
 function brandAuthority(value: Omit<RuntimeAuthority, typeof AUTHORITY_BRAND>): RuntimeAuthority {

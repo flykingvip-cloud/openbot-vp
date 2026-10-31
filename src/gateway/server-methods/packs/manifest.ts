@@ -63,6 +63,7 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
       "collaboration.task.readTeamDeliverable",
       "collaboration.task.checkDispatchReadiness",
       "collaboration.task.activate",
+      "collaboration.task.discussToTask",
       "collaboration.task.confirmPlanFromChat",
       "collaboration.task.submitTeamDeliverable",
       "collaboration.task.ensureMemberSession",
@@ -74,6 +75,7 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
       ],
       "operator.write": [
         "collaboration.task.activate",
+        "collaboration.task.discussToTask",
         "collaboration.task.confirmPlanFromChat",
         "collaboration.task.submitTeamDeliverable",
         "collaboration.task.ensureMemberSession",

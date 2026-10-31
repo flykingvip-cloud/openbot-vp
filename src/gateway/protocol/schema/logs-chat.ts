@@ -400,6 +400,11 @@ export const ChatEventSchema = Type.Object(
       Type.Literal("error"),
       /** Process-channel only: structure + progress while delivery text is empty. */
       Type.Literal("thinking"),
+      /**
+       * Non-terminal status/progress receipt (e.g. discuss→task establish).
+       * Must not end the parent chat run — clients treat like progress, not final.
+       */
+      Type.Literal("status"),
     ]),
     message: Type.Optional(Type.Unknown()),
     /** Safe thinking outline/progress; never raw CoT. Process ≠ delivery. */

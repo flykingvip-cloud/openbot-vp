@@ -102,6 +102,8 @@ describe("isTerminalChatEventState", () => {
     expect(isTerminalChatEventState("error")).toBe(true);
     expect(isTerminalChatEventState("aborted")).toBe(true);
     expect(isTerminalChatEventState("delta")).toBe(false);
+    expect(isTerminalChatEventState("status")).toBe(false);
+    expect(isTerminalChatEventState("thinking")).toBe(false);
     expect(isTerminalChatEventState(null)).toBe(false);
   });
 });
