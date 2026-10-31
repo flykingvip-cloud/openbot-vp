@@ -10208,15 +10208,22 @@ landingStreams:
       - .loom/registry.yaml
       - deploy/production/releases.jsonl
       - deploy/production/RELEASE_RECORD.md
+      - scripts/delivery/ledger.ts
+      - scripts/delivery/ledger.test.ts
+      - scripts/delivery/forward-guard.ts
+      - scripts/delivery/forward-guard.test.ts
       - docs/notes/infrastructure-audit-2026-10-31/**
     canLandWith:
+      - GOV_SEQ104_CUTOVER
+      - PHW1
+      - infrastructure-audit-p1-object-recovery-20261031
       - strip-ohbe-from-openbot-vp
       - infrastructure-audit-batch-b-20261031
       - infrastructure-audit-release-record-anti-drift-20261031
     metadata:
       task: infrastructure-audit:ledger-integrity
       owner: infra-audit
-      purpose: Close seq127 dual-open liveTo with successor-StartedAt attestation; sync RELEASE_RECORD L3 from machine tip; classify ledger ERROR without bulk acknowledge.
+      purpose: Close seq127 dual-open; sync RELEASE_RECORD; classify ledger-audit exit-30 (missing-object/incomplete-graph/regression) fail-closed; no row deletes or mass acknowledge.
   - id: infrastructure-audit-batch-b-20261031
     landingPolicy: serial
     paths:
@@ -11131,6 +11138,7 @@ landingStreams:
       - src/diagnosis/production-unified-deps.cli.ts
       - src/diagnosis/production-unified-lock.cli.ts
     canLandWith:
+      - infrastructure-audit-ledger-integrity-20261031
       - batch9-formal-root
       - single-chain-tool-protocol-p0
     metadata:
@@ -19176,7 +19184,8 @@ landingStreams:
       - .loom/registry.yaml
       - deploy/production/RELEASE_RECORD.md
       - scripts/delivery/ledger.test.ts
-    canLandWith: []
+    canLandWith:
+      - infrastructure-audit-ledger-integrity-20261031
     metadata:
       legacyTitle: Delivery record seq104/105 cutover and seq99-103 backfill
       task: gov-p3-seq104-cutover
@@ -19252,6 +19261,7 @@ landingStreams:
       - test/gateway.local-files-handshake.e2e.test.ts
       - test/gateway.local-files-read-chain.e2e.test.ts
     canLandWith:
+      - infrastructure-audit-ledger-integrity-20261031
       - MRR
     metadata:
       legacyTitle: Local Disk Read Grant (non-production prototype)
@@ -22573,6 +22583,7 @@ landingStreams:
       - scripts/delivery/ledger.test.ts
       - scripts/delivery/cutover-record.ts
     canLandWith:
+      - infrastructure-audit-ledger-integrity-20261031
       - D
     metadata:
       legacyTitle: Prod Hygiene Wave1 Ledger Timeline Audit

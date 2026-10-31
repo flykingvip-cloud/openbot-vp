@@ -7,6 +7,8 @@ import {
   decideDelivery,
   detectRegressedPaths,
   isForwardOnly,
+  classifyAncestry,
+  objectExists,
   type GitRunner,
 } from "./forward-guard.js";
 
@@ -187,5 +189,21 @@ describe("delivery forward guard", () => {
     expect(decision.regressions.deleted).toContain(
       "src/gateway/user-modeling/tenant-membership.ts",
     );
+  });
+});
+
+describe("classifyAncestry", () => {
+  it("returns missing-object when a tip is absent", () => {
+    const git = ((args: string[]) => {
+      if (args[0] === "cat-file" && args[1] === "-t") {
+        return {
+          code: args[2] === "missing" ? 128 : 0,
+          stdout: args[2] === "missing" ? "" : "commit\n",
+        };
+      }
+      return { code: 1, stdout: "" };
+    }) as import("./forward-guard.js").GitRunner;
+    expect(objectExists("present", git)).toBe(true);
+    expect(classifyAncestry("missing", "present", git).kind).toBe("missing-object");
   });
 });
