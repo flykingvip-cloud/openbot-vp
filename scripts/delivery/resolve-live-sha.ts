@@ -62,6 +62,26 @@ export function parseLatestCutoverSha(markdown: string | null): string | null {
   if (!markdown) {
     return null;
   }
+  // Prefer the managed generated current-identity block (ledger↔doc anti-drift).
+  const begin = "<!-- BEGIN GENERATED: current-identity -->";
+  const end = "<!-- END GENERATED: current-identity -->";
+  const beginAt = markdown.indexOf(begin);
+  const endAt = markdown.indexOf(end);
+  if (beginAt >= 0 && endAt > beginAt) {
+    const block = markdown.slice(beginAt + begin.length, endAt);
+    const machine = block.match(/gatewaySha=([0-9a-f]{40})/i);
+    if (machine) {
+      return machine[1].toLowerCase();
+    }
+    const table = block
+      .split("\n")
+      .find((line) => /^\|\s*gatewaySha\s*\|/i.test(line))
+      ?.match(SHA_IN_TEXT_PATTERN)?.[0];
+    if (table) {
+      return table.toLowerCase();
+    }
+  }
+  // Fallback: legacy "## Latest cutover" table (may lag until regenerate).
   const latest = markdown.match(/## Latest cutover[^]*?(?=\n---|\n## |$)/i)?.[0] ?? "";
   const sourceRow = latest.split("\n").find((line) => /^\|\s*Source revision\s*\|/i.test(line));
   return sourceRow?.match(SHA_IN_TEXT_PATTERN)?.[0]?.toLowerCase() ?? null;
