@@ -43,6 +43,10 @@ function buildInjectedTranscriptMessage(params: {
   guideCard?: Record<string, unknown>;
   /** Legacy checkpoint restore receipt. Not part of the current task main line. */
   restoreTaskIsolation?: RestoreTaskIsolationStamp;
+  /** Declared deliverable chip(s) — must survive history reload after tag strip. */
+  artifact?: Record<string, unknown>;
+  artifacts?: Record<string, unknown>[];
+  deliverablePublish?: Record<string, unknown>;
   /** Keep the caller’s text. Outbound 1:1 lines are already the sent body. */
   preserveBody?: boolean;
   now: number;
@@ -109,6 +113,15 @@ function buildInjectedTranscriptMessage(params: {
     if (params.restoreTaskIsolation) {
       messageBody[RESTORE_TASK_ISOLATION_FIELD] = params.restoreTaskIsolation;
     }
+    if (params.artifact) {
+      messageBody.artifact = params.artifact;
+    }
+    if (params.artifacts && params.artifacts.length > 0) {
+      messageBody.artifacts = params.artifacts;
+    }
+    if (params.deliverablePublish) {
+      messageBody.deliverablePublish = params.deliverablePublish;
+    }
   }
 
   return messageBody;
@@ -125,6 +138,9 @@ export function appendInjectedMessageToTranscript(params: {
   cronResult?: GatewayInjectedCronResultMeta;
   guideCard?: Record<string, unknown>;
   restoreTaskIsolation?: RestoreTaskIsolationStamp;
+  artifact?: Record<string, unknown>;
+  artifacts?: Record<string, unknown>[];
+  deliverablePublish?: Record<string, unknown>;
   now?: number;
 }): GatewayInjectedTranscriptAppendResult {
   const now = params.now ?? Date.now();
@@ -138,6 +154,9 @@ export function appendInjectedMessageToTranscript(params: {
     ...(params.cronResult ? { cronResult: params.cronResult } : {}),
     ...(params.guideCard ? { guideCard: params.guideCard } : {}),
     ...(params.restoreTaskIsolation ? { restoreTaskIsolation: params.restoreTaskIsolation } : {}),
+    ...(params.artifact ? { artifact: params.artifact } : {}),
+    ...(params.artifacts ? { artifacts: params.artifacts } : {}),
+    ...(params.deliverablePublish ? { deliverablePublish: params.deliverablePublish } : {}),
     now,
   });
 
@@ -260,6 +279,10 @@ export function appendInjectedAssistantMessageToTranscript(params: {
   /** Sanitized 大白引导卡片。只随会话转写保留，不触发模型回合。 */
   guideCard?: Record<string, unknown>;
   restoreTaskIsolation?: RestoreTaskIsolationStamp;
+  /** Declared deliverable chip(s) persisted with the stripped bubble text. */
+  artifact?: Record<string, unknown>;
+  artifacts?: Record<string, unknown>[];
+  deliverablePublish?: Record<string, unknown>;
   now?: number;
 }): GatewayInjectedTranscriptAppendResult {
   return appendInjectedMessageToTranscript({
@@ -272,6 +295,9 @@ export function appendInjectedAssistantMessageToTranscript(params: {
     ...(params.cronResult ? { cronResult: params.cronResult } : {}),
     ...(params.guideCard ? { guideCard: params.guideCard } : {}),
     ...(params.restoreTaskIsolation ? { restoreTaskIsolation: params.restoreTaskIsolation } : {}),
+    ...(params.artifact ? { artifact: params.artifact } : {}),
+    ...(params.artifacts ? { artifacts: params.artifacts } : {}),
+    ...(params.deliverablePublish ? { deliverablePublish: params.deliverablePublish } : {}),
     ...(params.now ? { now: params.now } : {}),
   });
 }
