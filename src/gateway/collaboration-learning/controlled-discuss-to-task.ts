@@ -542,6 +542,7 @@ export async function controlledDiscussToTask(
       activation.status === "blocked" &&
       (activation.reason === "activation_contract_conflict" ||
         activation.reason === "discuss_to_task_contract_conflict" ||
-        activation.reason === "discuss_to_task_source_owner_conflict"),
+        activation.reason === "discuss_to_task_source_owner_conflict" ||
+        activation.reason === "discuss_to_task_source_kind_conflict"),
   });
 }

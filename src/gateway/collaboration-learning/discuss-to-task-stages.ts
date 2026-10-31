@@ -79,6 +79,70 @@ export function mergeDiscussToTaskTags(
   return [...filtered, ...buildDiscussToTaskTags(meta)];
 }
 
+export function isDiscussToTaskMetaTag(tag: string): boolean {
+  return (
+    tag.startsWith(DISCUSS_TO_TASK_SOURCE_TAG) ||
+    tag.startsWith(DISCUSS_TO_TASK_CONTRACT_TAG) ||
+    tag.startsWith(DISCUSS_TO_TASK_SLOT_TAG) ||
+    tag.startsWith(DISCUSS_TO_TASK_OWNER_TAG) ||
+    tag.startsWith(DISCUSS_TO_TASK_KIND_TAG)
+  );
+}
+
+export type DiscussToTaskLockAdjudication =
+  | { action: "passthrough" }
+  | { action: "create"; tags: string[] }
+  | { action: "replay"; tags: string[] }
+  | {
+      action: "conflict";
+      reason:
+        | "discuss_to_task_source_owner_conflict"
+        | "discuss_to_task_contract_conflict"
+        | "discuss_to_task_source_kind_conflict";
+      detail: string;
+    };
+
+/**
+ * Lock-held source/claim adjudication. Existing ownership tags are never generically
+ * replaced: create / replay / conflict only.
+ */
+export function adjudicateDiscussToTaskTagsUnderLock(params: {
+  existingTags: readonly string[] | undefined;
+  proposedExtraTags: readonly string[] | undefined;
+}): DiscussToTaskLockAdjudication {
+  const proposed = readDiscussToTaskMetaFromTags(params.proposedExtraTags);
+  if (!proposed?.sourceMessageId || !proposed.contractFingerprint || !proposed.sourceOwner) {
+    return { action: "passthrough" };
+  }
+  const existing = readDiscussToTaskMetaFromTags(params.existingTags);
+  if (!existing?.sourceOwner) {
+    return { action: "create", tags: buildDiscussToTaskTags(proposed) };
+  }
+  if (existing.sourceOwner !== proposed.sourceOwner) {
+    return {
+      action: "conflict",
+      reason: "discuss_to_task_source_owner_conflict",
+      detail: `firstOwner=${existing.sourceOwner} requested=${proposed.sourceOwner}`,
+    };
+  }
+  if (existing.sourceKind && proposed.sourceKind && existing.sourceKind !== proposed.sourceKind) {
+    return {
+      action: "conflict",
+      reason: "discuss_to_task_source_kind_conflict",
+      detail: `firstKind=${existing.sourceKind} requested=${proposed.sourceKind}`,
+    };
+  }
+  if (existing.contractFingerprint !== proposed.contractFingerprint) {
+    return {
+      action: "conflict",
+      reason: "discuss_to_task_contract_conflict",
+      detail: `firstAccepted=${existing.contractFingerprint} requested=${proposed.contractFingerprint}`,
+    };
+  }
+  // Same owner + kind + claim fingerprint → replay; keep first-accepted tags.
+  return { action: "replay", tags: buildDiscussToTaskTags(existing) };
+}
+
 export function stagesFromActivation(params: {
   taskEnsured: boolean | "unknown";
   boardPublished: boolean | "unknown";

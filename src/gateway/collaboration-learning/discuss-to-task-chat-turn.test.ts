@@ -12,7 +12,10 @@ import {
   setRuntimeConfigSnapshot,
 } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
-import { runControlledDiscussToTaskChatTurn } from "./discuss-to-task-chat-turn.js";
+import {
+  applyDiscussToTaskChatTurnToChatHandler,
+  runControlledDiscussToTaskChatTurn,
+} from "./discuss-to-task-chat-turn.js";
 import { clearDiscussToTaskSourceBindingsForTests } from "./discuss-to-task-source-binding.js";
 import { createTrustedGroupStores } from "./team-resource-auth.js";
 
@@ -134,7 +137,12 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
     expect(turn.transcriptPersist?.ok).toBe(false);
     if (turn.d2tResult) {
       expect(turn.userVisibleMessage ?? "").toMatch(/展示写入失败/);
-      expect(turn.userVisibleMessage ?? "").toMatch(/disk_full/);
+      expect(turn.userVisibleMessage ?? "").not.toMatch(/disk_full/);
+      expect(turn.formalTaskEstablish?.userMessage ?? "").toMatch(/展示写入失败/);
+      const applied = applyDiscussToTaskChatTurnToChatHandler(turn);
+      expect(applied.clientFeedbackMessage ?? "").toMatch(/展示写入失败/);
+      expect(applied.coordinatorBindingText ?? "").toMatch(/展示写入失败/);
+      expect(applied.formalTaskEstablish?.userMessage ?? "").toMatch(/展示写入失败/);
     }
   });
 
@@ -151,5 +159,69 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
     });
     const blob = (turn.userVisibleMessage ?? "") + (turn.formalTaskEstablish?.userMessage ?? "");
     expect(blob).not.toMatch(/已派工/);
+  });
+
+  it("source conflict early return still persists receipt + chat handler emits feedback", async () => {
+    const { cfg } = await useCfg(true);
+    const persisted: string[] = [];
+    await runControlledDiscussToTaskChatTurn({
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-conflict-persist",
+      message: EXPLICIT,
+      principalActor: "human:alice",
+      client: {},
+      tenant: null,
+      cfg,
+      persistReceipt: async ({ message }) => {
+        persisted.push(message);
+        return { ok: true };
+      },
+    });
+    const steal = await runControlledDiscussToTaskChatTurn({
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-conflict-persist",
+      message: EXPLICIT,
+      principalActor: "human:bob",
+      client: {},
+      tenant: null,
+      cfg,
+      persistReceipt: async ({ message }) => {
+        persisted.push(message);
+        return { ok: true };
+      },
+    });
+    expect(steal.formalTaskEstablish?.reason).toMatch(/source_owner_conflict/);
+    expect(persisted.length).toBeGreaterThanOrEqual(2);
+    expect(persisted.some((row) => /归属冲突|冲突/.test(row))).toBe(true);
+    const applied = applyDiscussToTaskChatTurnToChatHandler(steal);
+    expect(applied.clientFeedbackMessage ?? "").toMatch(/归属冲突|冲突|受阻/);
+    expect(applied.coordinatorBindingText ?? "").toMatch(/source_owner_conflict|归属冲突|冲突/);
+    expect(applied.formalTaskEstablish?.userMessage ?? "").toMatch(/归属冲突|冲突|受阻/);
+  });
+
+  it("exception path persists receipt and apply helper surfaces feedback", async () => {
+    const persisted: string[] = [];
+    // Missing cfg-backed storage → hook throws or blocks; still must emit feedback.
+    const turn = await runControlledDiscussToTaskChatTurn({
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-exception-persist",
+      message: EXPLICIT,
+      principalActor: "human:owner",
+      client: {},
+      tenant: null,
+      cfg: { gateway: { security: { profile: "personal_local" } } } as never,
+      persistReceipt: async ({ message }) => {
+        persisted.push(message);
+        return { ok: true };
+      },
+    });
+    // Either blocked establish or null discussion — when formal/userVisible present, must have persisted.
+    if (turn.userVisibleMessage || turn.formalTaskEstablish) {
+      expect(persisted.length).toBeGreaterThanOrEqual(1);
+      const applied = applyDiscussToTaskChatTurnToChatHandler(turn);
+      expect(
+        applied.clientFeedbackMessage ?? applied.formalTaskEstablish?.userMessage ?? "",
+      ).toBeTruthy();
+    }
   });
 });

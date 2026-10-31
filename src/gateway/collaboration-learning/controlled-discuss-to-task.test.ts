@@ -19,6 +19,7 @@ import { buildAcceptedTaskStopControl } from "../collaboration-dispatch/task-sto
 import { controlledDiscussToTask } from "./controlled-discuss-to-task.js";
 import { mintDiscussToTaskId } from "./discuss-to-task-id.js";
 import { FORMAL_TASK_FLAG_OFF_USER_MESSAGE } from "./discuss-to-task-receipt.js";
+import { clearDiscussToTaskSourceBindingsForTests } from "./discuss-to-task-source-binding.js";
 import {
   readAuthoritativeDiscussToTaskStages,
   readDiscussToTaskMetaFromTags,
@@ -36,6 +37,7 @@ const saved = {
 };
 
 afterEach(async () => {
+  clearDiscussToTaskSourceBindingsForTests();
   clearRuntimeConfigSnapshot();
   clearConfigCache();
   const restore = (key: keyof typeof saved, env: string) => {
@@ -729,5 +731,120 @@ describe("readAuthoritativeDiscussToTaskStages board fixtures (R3)", () => {
     });
     expect(stages.planProposed).toBe("unknown");
     expect(stages.planConfirmed).toBe("unknown");
+  });
+});
+
+describe("controlledDiscussToTask lock-held concurrent ownership (R4)", () => {
+  it("barrier: same source different principals → one conflict; durable first owner survives cache clear", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    const sourceMessageId = "msg-barrier-owner-r4";
+    const base = {
+      sourceMessageId,
+      sourceKind: "trusted_inbound" as const,
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["b1", "b2"],
+      trusted,
+      cfg,
+    };
+    const [a, b] = await Promise.all([
+      controlledDiscussToTask({ ...base, actor: "human:alice", principalActor: "human:alice" }),
+      controlledDiscussToTask({ ...base, actor: "human:bob", principalActor: "human:bob" }),
+    ]);
+    const rows = [a, b];
+    const conflicts = rows.filter(
+      (row) => row.internalReason === "discuss_to_task_source_owner_conflict",
+    );
+    const accepted = rows.filter(
+      (row) =>
+        row.internalReason !== "discuss_to_task_source_owner_conflict" &&
+        row.taskId &&
+        row.stages.taskEstablished === true,
+    );
+    expect(accepted.length).toBe(1);
+    expect(conflicts.length).toBe(1);
+    expect(accepted[0].stages.taskEstablished).toBe(true);
+
+    const stores = createTrustedGroupStores(trusted);
+    const taskId = accepted[0].taskId!;
+    const task = await stores.objectStorage.readObject<Task>("grp_d2t", "task", taskId);
+    const firstOwner = readDiscussToTaskMetaFromTags(task?.tags)?.sourceOwner;
+    expect(firstOwner === "human:alice" || firstOwner === "human:bob").toBe(true);
+
+    clearDiscussToTaskSourceBindingsForTests();
+    const other = firstOwner === "human:alice" ? "human:bob" : "human:alice";
+    const retry = await controlledDiscussToTask({
+      ...base,
+      actor: other,
+      principalActor: other,
+    });
+    expect(retry.internalReason).toBe("discuss_to_task_source_owner_conflict");
+    const again = await stores.objectStorage.readObject<Task>("grp_d2t", "task", taskId);
+    expect(readDiscussToTaskMetaFromTags(again?.tags)?.sourceOwner).toBe(firstOwner);
+  });
+
+  it("barrier: same source different claim fingerprints → one contract conflict; first claim remains", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    const sourceMessageId = "msg-barrier-claim-r4";
+    const shared = {
+      sourceMessageId,
+      sourceKind: "trusted_inbound" as const,
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:alice",
+      principalActor: "human:alice",
+      forceExplicit: true,
+      trusted,
+      cfg,
+    };
+    const [a, b] = await Promise.all([
+      controlledDiscussToTask({
+        ...shared,
+        message: EXPLICIT_MSG,
+        acceptanceCriteria: ["c1", "c2"],
+        title: "claim-A",
+      }),
+      controlledDiscussToTask({
+        ...shared,
+        message: EXPLICIT_MSG + "\n补充约束：仅内部使用",
+        acceptanceCriteria: ["c1", "c2", "c3-extra"],
+        title: "claim-B",
+      }),
+    ]);
+    const rows = [a, b];
+    const conflicts = rows.filter(
+      (row) =>
+        row.internalReason === "discuss_to_task_contract_conflict" || row.contractConflict === true,
+    );
+    const accepted = rows.filter(
+      (row) =>
+        row.internalReason !== "discuss_to_task_contract_conflict" &&
+        !row.contractConflict &&
+        row.taskId &&
+        row.stages.taskEstablished === true,
+    );
+    // Concurrent different claims: exactly one durable accept under lock.
+    expect(accepted.length).toBe(1);
+    expect(conflicts.length).toBe(1);
+
+    const stores = createTrustedGroupStores(trusted);
+    const taskId = accepted[0].taskId!;
+    const task = await stores.objectStorage.readObject<Task>("grp_d2t", "task", taskId);
+    const firstFp = readDiscussToTaskMetaFromTags(task?.tags)?.contractFingerprint;
+    expect(firstFp).toBeTruthy();
+
+    clearDiscussToTaskSourceBindingsForTests();
+    const retryOther = await controlledDiscussToTask({
+      ...shared,
+      message: EXPLICIT_MSG + "\n另一契约",
+      acceptanceCriteria: ["other-1", "other-2"],
+      title: "claim-C",
+    });
+    expect(retryOther.internalReason).toBe("discuss_to_task_contract_conflict");
+    const again = await stores.objectStorage.readObject<Task>("grp_d2t", "task", taskId);
+    expect(readDiscussToTaskMetaFromTags(again?.tags)?.contractFingerprint).toBe(firstFp);
+    expect(readDiscussToTaskMetaFromTags(again?.tags)?.sourceOwner).toBe("human:alice");
   });
 });
