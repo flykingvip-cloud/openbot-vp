@@ -13,6 +13,7 @@ import {
 } from "../infra/agent-events.js";
 import { resolveHeartbeatVisibility } from "../infra/heartbeat-visibility.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
+import { declaredDeliverableArtifactFields } from "../shared/preview-artifact/materialize-declared-artifacts.js";
 import { stripAssistantScratchpadFromText } from "../shared/text/assistant-scratchpad.js";
 import { stripControlChannelForDisplay } from "../shared/text/control-channel-visibility.js";
 import { getRunReplyLanguage } from "../shared/text/run-reply-language.js";
@@ -804,6 +805,7 @@ export function createAgentEventHandler({
           visibleText = settled.visibleText;
         }
       }
+      let finalArtifacts: ReturnType<typeof declaredDeliverableArtifactFields> = {};
       if (visibleText && !shouldSuppressSilent && !isCollaborationGroupSessionKey(sessionKey)) {
         const identity = resolveDirectDeliverableIdentity(sessionKey, clientRunId, sourceRunId);
         prepared = prepareChatDeliverablePublish({
@@ -817,10 +819,17 @@ export function createAgentEventHandler({
           clientRunId,
           taskId: null,
         });
+        // Materialize chip artifacts from tagged text, then strip tags for the bubble.
+        finalArtifacts = declaredDeliverableArtifactFields(prepared.text, {
+          timestamp: Date.now(),
+        });
         // prepareChatDeliverablePublish already strips <<DELIVERABLE>> tags from
         // outgoing text; still strip turn_completion / tool-digest leftovers.
         visibleText = stripControlChannelForDisplay(prepared.text);
       } else if (visibleText) {
+        finalArtifacts = declaredDeliverableArtifactFields(visibleText, {
+          timestamp: Date.now(),
+        });
         visibleText = stripControlChannelForDisplay(visibleText);
       }
       const payload = {
@@ -837,6 +846,8 @@ export function createAgentEventHandler({
                 timestamp: Date.now(),
                 ...(replyLanguage ? { replyLanguage } : {}),
                 ...(prepared?.structured ? { deliverablePublish: prepared.view } : {}),
+                ...(finalArtifacts.artifact ? { artifact: finalArtifacts.artifact } : {}),
+                ...(finalArtifacts.artifacts ? { artifacts: finalArtifacts.artifacts } : {}),
               }
             : undefined,
       };
