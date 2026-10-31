@@ -1,0 +1,21 @@
+# PENDING AUTH — do NOT merge to default branch without explicit owner authorization.
+# PENDING AUTH — do NOT workflow_dispatch / gh workflow run without explicit owner authorization.
+# Feature-branch presence alone does NOT register workflow_dispatch (must exist on default branch).
+# A3 alone cannot close H1 (Actions minutes exhaustion). See:
+#   docs/notes/infrastructure-audit-2026-10-31/a3-implementation-pack-PENDING-AUTH.md
+name: Audit A3 runner probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exp1-echo:
+    name: Exp-1 trivial echo (runner obtainability)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Exp-1 echo
+        run: echo ok && uname -a && date -u
