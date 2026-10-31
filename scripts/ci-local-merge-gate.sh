@@ -45,11 +45,22 @@ done
 export OPENBOT_TEST_PROFILE="${OPENBOT_TEST_PROFILE:-low}"
 
 echo "== resolve refs =="
-git fetch origin main --quiet 2>/dev/null || true
+# Fail closed: a stale or unreachable origin/main must never look like a green gate.
+if ! git fetch origin main --quiet; then
+  echo "BLOCKED: git fetch origin main failed; cannot certify a fresh main baseline" >&2
+  echo "result=blocked" >&2
+  exit 3
+fi
 BASE_SHA="$(git rev-parse --verify "${BASE_REF}^{commit}")"
 CANDIDATE_SHA="$(git rev-parse --verify "${CANDIDATE_REF}^{commit}")"
 echo "base=$BASE_SHA ($BASE_REF)"
 echo "candidate=$CANDIDATE_SHA ($CANDIDATE_REF)"
+if ! git merge-base --is-ancestor "$BASE_SHA" "$CANDIDATE_SHA"; then
+  echo "BLOCKED: $BASE_REF ($BASE_SHA) is not an ancestor of $CANDIDATE_REF ($CANDIDATE_SHA)" >&2
+  echo "Rebase/replay onto freshly fetched origin/main before treating this gate as usable." >&2
+  echo "result=blocked" >&2
+  exit 3
+fi
 
 echo "== ci-diagnostic-delta unit tests =="
 pnpm vitest run \
