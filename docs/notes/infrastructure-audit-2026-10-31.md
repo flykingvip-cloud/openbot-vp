@@ -68,3 +68,5 @@ Read-only provenance/staging inventory (2026-10-31 ~20:05 Asia/Shanghai):
 ## Batch B tip (Codex independent)
 
 - Tip `fd4721f8` on `audit/infra-batch-b-local-gate` / PR #171 — Codex PASS on directed retest (agent does not self-PASS)
+
+- Also: `ledger-audit-2026-10-31.md` (exit 30 debt), `a3-control-experiment-plan-PENDING-AUTH.md` (not executed).

@@ -114,3 +114,8 @@ No clean rebuild executed in this pass (out of Batch C read-only; needs explicit
 - Refresh `RELEASE_RECORD.md` L3 from ledger tip (requires owner-authorized docs PR; out of Batch C mutate unless asked)
 - Optional: run `pnpm delivery:ledger:audit` on Mac worktree for timeline-gap findings (read-only)
 - Optional A3: minimal control experiment for empty-steps only after billing UI evidence or explicit auth
+
+## Ledger machine audit (read-only)
+
+Ran `pnpm delivery:ledger:audit` on the audit worktree → exit **30**.
+Detail: `ledger-audit-2026-10-31.md`. Treat as delivery-debt inventory; tip LIVE identity remains aligned per SSH probe (C1).
