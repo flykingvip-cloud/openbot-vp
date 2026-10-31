@@ -10215,6 +10215,7 @@ landingStreams:
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.test.ts
       - src/gateway/collaboration-learning/discuss-to-task-contracts.lock.test.ts
       - src/gateway/collaboration-learning/controlled-collab-p1-combo-closed-loop.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-confirm-bind.test.ts
       - ui/src/ui/controllers/chat.ts
       - ui/src/ui/controllers/chat.test.ts
       - ui/src/ui/chat/work-progress-phase.ts
@@ -22650,6 +22651,7 @@ landingStreams:
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.test.ts
       - src/gateway/collaboration-learning/discuss-to-task-contracts.lock.test.ts
       - src/gateway/collaboration-learning/controlled-collab-p1-combo-closed-loop.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-confirm-bind.test.ts
       - ui/src/ui/controllers/chat.ts
       - ui/src/ui/controllers/chat.test.ts
       - ui/src/ui/chat/work-progress-phase.ts

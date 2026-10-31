@@ -4,12 +4,17 @@
  * Loop: 用户委托 → 任务建立 → 所需确认 → 执行 → 提交 → 退回一次 → 修订 → 接受
  *
  * P1 entry via controlledDiscussToTask (flag-on). Confirmation via
- * activateCollaborationTask(humanConfirmed:true) — NOT discussToTask bypass.
+ * activateCollaborationTask(humanConfirmed:true) with the **same** first-persisted
+ * contract fields (message/goal/constraints/candidates) — NOT discussToTask bypass
+ * and NOT a silent field replace on confirm (see discuss-to-task-confirm-bind.test.ts).
  * Execute/submit/return/revise/accept reuses P2/P3 Mode B + board fixtures.
  * No second dispatcher / wake budget / prod flags / real groups / LIVE model.
  *
  * Mode B mock boundary (honest, same as P3): getReplyFromConfig + space list +
  * ownership SoT. Real: consume → Mode B boot → enforceAcl:true finalize.
+ *
+ * Harness-only (NOT autonomous loop evidence): writeDispatchableAuthOs / roster
+ * re-seed after activate OS sync, and task responsibility normalize writes.
  */
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -110,6 +115,10 @@ const GROUP_ID = "grp_p1_combo_loop";
 const TENANT_ID = "tenant-p1-combo";
 const EXPLICIT =
   "请两名成员协作完成短 Markdown 提纲\n验收标准：\n- 有标题\n- 有正文\n请团队正式开展";
+/** First-persisted contract fields — confirm must reuse these (no silent replace). */
+const COMBO_TITLE = "P1 combo short markdown";
+const COMBO_GOAL = "产出有标题与正文的短 Markdown 提纲";
+const COMBO_CONSTRAINTS = ["不得编造来源"] as const;
 const MD_V1_BODY = "# P1 Combo Draft v1\n\nShort markdown deliverable body.\n";
 const MD_V2_BODY = "# P1 Combo Draft v2\n\nRevised after one return — accepted candidate.\n";
 
@@ -462,8 +471,10 @@ describe("P1 #164 combo closed-loop (delegate→establish→confirm→exec→sub
       tenantId: TENANT_ID,
       actor: PEER,
       message: EXPLICIT,
-      title: "P1 combo short markdown",
+      title: COMBO_TITLE,
+      goal: COMBO_GOAL,
       acceptanceCriteria: ["有标题", "有正文"],
+      constraints: [...COMBO_CONSTRAINTS],
       suggestedClaimantIds: [AUTHOR, REVIEWER],
       forceExplicit: true,
       trusted: seeded.trusted,
@@ -486,23 +497,28 @@ describe("P1 #164 combo closed-loop (delegate→establish→confirm→exec→sub
     expect(durable).not.toBeNull();
     stages.delegate_establish = "pass";
 
-    // —— 2) 所需确认（activate humanConfirmed=true — not discussToTask bypass）——
+    // —— 2) 所需确认：同一首次持久化契约（message/goal/constraints/candidates）——
+    // activate(humanConfirmed:true) composition only; field drift must conflict
+    // (covered by discuss-to-task-confirm-bind.test.ts), not silently replace here.
+    expect(d2t.activationKey).toBeTruthy();
     const confirmed = await activateCollaborationTask({
       groupId: GROUP_ID,
       taskId,
-      title: "P1 combo short markdown",
-      message: "请为短 Markdown 提纲报告发布看板并分工，验收两段有来源底稿",
+      title: COMBO_TITLE,
+      message: EXPLICIT,
       actor: PEER,
-      goal: "产出有来源的短 Markdown 提纲报告",
+      goal: COMBO_GOAL,
       acceptanceCriteria: ["有标题", "有正文"],
-      constraints: ["不得编造来源", "正文不少于三句"],
-      suggestedClaimantIds: [AUTHOR],
+      constraints: [...COMBO_CONSTRAINTS],
+      suggestedClaimantIds: [AUTHOR, REVIEWER],
       humanConfirmed: true,
       requireHumanConfirm: true,
       trusted: seeded.trusted,
       cfg,
       tenant,
     });
+    expect(confirmed.reason === "activation_contract_conflict").toBe(false);
+    expect(confirmed.activationKey).toBe(d2t.activationKey);
     expect(
       confirmed.status === "activated" || confirmed.boardPublished,
       JSON.stringify(confirmed),
@@ -510,7 +526,8 @@ describe("P1 #164 combo closed-loop (delegate→establish→confirm→exec→sub
     expect(confirmed.taskEnsured).toBe(true);
     stages.confirm = "pass";
 
-    // Re-assert roster after activate OS sync (avoid auth_revoked on later advance).
+    // TEST HARNESS ONLY (not autonomous closed-loop evidence): re-assert roster
+    // after activate OS sync so later claim/advance avoid auth_revoked fixtures.
     await writeDispatchableAuthOs({ stores: seeded.stores, cfg });
     seedActiveOwnership();
 
@@ -541,7 +558,7 @@ describe("P1 #164 combo closed-loop (delegate→establish→confirm→exec→sub
     const seedTask: Task = {
       taskId,
       groupId: GROUP_ID,
-      title: "P1 combo short markdown",
+      title: COMBO_TITLE,
       status: "in_progress",
       ownerMemberId: REVIEWER,
       assignedMemberIds: [AUTHOR, REVIEWER],
@@ -598,8 +615,9 @@ describe("P1 #164 combo closed-loop (delegate→establish→confirm→exec→sub
       throw new Error(started.message);
     }
 
-    // Normalize duty/membership ids to P3 fixture shape so dispatch auth recheck
-    // maps claimants (d2t stamps owner as human-peer; OS sync may use m-* ids).
+    // TEST HARNESS ONLY: normalize duty/membership ids to P3 fixture shape so
+    // dispatch auth recheck maps claimants (d2t stamps owner as human-peer;
+    // OS sync may use m-* ids). Not an autonomous loop action.
     const nowMs = Date.now();
     const prevTask = await seeded.stores.objectStorage.readObject<Task>(GROUP_ID, "task", taskId);
     await seeded.stores.objectStorage.writeObject(GROUP_ID, "task", taskId, {
@@ -654,7 +672,8 @@ describe("P1 #164 combo closed-loop (delegate→establish→confirm→exec→sub
     });
     expect(submitted1.item.status).toBe("submitted_for_review");
 
-    // Submit/entry may re-sync OS from m-* membership rows — restore dispatchable map.
+    // TEST HARNESS ONLY: submit/entry may re-sync OS from m-* membership rows —
+    // restore dispatchable map (not autonomous loop evidence).
     await writeDispatchableAuthOs({ stores: seeded.stores, cfg });
     seedActiveOwnership();
 

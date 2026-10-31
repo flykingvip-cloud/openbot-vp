@@ -209,17 +209,47 @@ describe("activateCollaborationTask", () => {
       acceptanceCriteria: ["b", "c"],
     });
     if (first.status === "activated" || first.taskEnsured) {
-      expect(["blocked", "activated", "needs_confirm", "partial_success"]).toContain(second.status);
-      if (second.status === "blocked") {
-        expect(
-          [
-            "activation_contract_conflict",
-            "activation_task_busy",
-            "terminal_task_not_reopened",
-          ].some((r) => second.reason === r) || second.reason.length > 0,
-        ).toBe(true);
-      }
+      expect(second.status).toBe("blocked");
+      expect(second.reason).toBe("activation_contract_conflict");
+      expect(second.boardPublished).toBe(false);
     }
+  });
+
+  it("draft needs_confirm then confirm with drifted fields is activation_contract_conflict", async () => {
+    const { cfg } = await useConfig(true);
+    const draft = await activateCollaborationTask({
+      groupId: "grp_act",
+      taskId: "TEAM-REAL-ACT-CONFIRM-BIND",
+      title: "确认绑定提纲",
+      message: "请发布看板并分工，验收标准：有来源",
+      actor: "human:owner",
+      goal: "目标草稿",
+      acceptanceCriteria: ["有来源"],
+      constraints: ["不得编造"],
+      suggestedClaimantIds: ["bot-a", "bot-b"],
+      humanConfirmed: false,
+      requireHumanConfirm: true,
+      cfg,
+    });
+    expect(draft.taskEnsured).toBe(true);
+    expect(draft.boardPublished).toBe(false);
+    const drifted = await activateCollaborationTask({
+      groupId: "grp_act",
+      taskId: "TEAM-REAL-ACT-CONFIRM-BIND",
+      title: "确认绑定提纲",
+      message: "请发布看板并分工，验收标准：有来源（已改文案）",
+      actor: "human:owner",
+      goal: "目标草稿-已改",
+      acceptanceCriteria: ["有来源"],
+      constraints: ["不得编造", "额外"],
+      suggestedClaimantIds: ["bot-a"],
+      humanConfirmed: true,
+      requireHumanConfirm: true,
+      cfg,
+    });
+    expect(drifted.status).toBe("blocked");
+    expect(drifted.reason).toBe("activation_contract_conflict");
+    expect(drifted.boardPublished).toBe(false);
   });
 
   it("buildActivationKey changes when acceptance criteria change", () => {

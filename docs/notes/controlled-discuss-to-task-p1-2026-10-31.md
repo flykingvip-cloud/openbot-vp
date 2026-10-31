@@ -12,6 +12,12 @@
 
 ## Step 3 contracts (2026-10-31 Asia/Shanghai)
 Closed and locked via `discuss-to-task-contracts.lock.test.ts` + prior suites:
+
+## Confirm bind (2026-10-31 Asia/Shanghai final hardening)
+- Confirm must reuse first-persisted activationKey (message/goal/constraints/candidates).
+- Drift on confirm → `activation_contract_conflict` (no silent replace).
+- Lock: `discuss-to-task-confirm-bind.test.ts`; combo confirm uses same contract fields.
+
 1. Explicit delegation → formal task
 2. Flag-off real blocked (fixed copy; no task/board establish)
 3. Source idempotency (same sourceMessageId)

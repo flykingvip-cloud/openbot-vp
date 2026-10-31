@@ -358,6 +358,22 @@ async function mutateCollaborationTaskObject(params: {
         detail: `task status=${existing.status}`,
       };
     }
+    // Defense in depth: never silently replace a first-persisted activationKey.
+    // Field changes (message/goal/constraints/candidates) require explicit revise,
+    // not confirm-time overwrite (P1 #164 final hardening).
+    const priorActivationKey = taskActivationKey(existing);
+    const requestedActivationKey = compact(params.activationKey);
+    if (
+      priorActivationKey &&
+      requestedActivationKey &&
+      priorActivationKey !== requestedActivationKey
+    ) {
+      return {
+        ok: false,
+        reason: "activation_contract_conflict",
+        detail: `existing activationKey=${priorActivationKey} requested=${requestedActivationKey}`,
+      };
+    }
     const nextStatus =
       params.readyRequested && existing.status === "draft" ? "ready" : existing.status;
     const tags = mergeExtraTags(
@@ -480,14 +496,9 @@ async function findExistingPublishedItem(params: {
       item.status === "in_progress" ||
       item.status === "submitted_for_review",
   );
-  if (active.length === 0) {
-    return { ok: true, item: null };
-  }
-  const byKey = active.find((item) => boardItemActivationKey(item) === params.activationKey);
-  if (byKey) {
-    return { ok: true, item: byKey };
-  }
-  // Consult task tag fingerprint — same title with different contract is a conflict.
+  // Confirm must bind the first-persisted activationKey even when no board item is
+  // published yet (needs_confirm -> humanConfirmed). Skipping this check allowed
+  // silent contract replace on confirm (P1 #164 final hardening).
   try {
     const stores = params.stores;
     const task = await stores.objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
@@ -505,6 +516,14 @@ async function findExistingPublishedItem(params: {
       reason: "task_fingerprint_read_failed",
       detail: error instanceof Error ? error.message : String(error),
     };
+  }
+
+  if (active.length === 0) {
+    return { ok: true, item: null };
+  }
+  const byKey = active.find((item) => boardItemActivationKey(item) === params.activationKey);
+  if (byKey) {
+    return { ok: true, item: byKey };
   }
 
   // Same taskId + title without key: treat as conflict when contract fingerprint differs.
