@@ -61,7 +61,7 @@ export type DiscussToTaskChatEgressPayload = {
   message: Record<string, unknown>;
 };
 
-const RECEIPT_PERSIST_FAIL_SUFFIX = "（展示写入失败，请刷新后重试。）";
+export const RECEIPT_PERSIST_FAIL_SUFFIX = "（展示写入失败，请刷新后重试。）";
 
 type PersistReceiptFn = (args: {
   message: string;

@@ -10171,7 +10171,8 @@ landingStreams:
       - src/gateway/protocol/schema/collaboration.ts
       - src/gateway/server-methods/collaboration-learning.ts
       - .loom/registry.yaml
-    canLandWith: []
+    canLandWith:
+      - controlled-discuss-to-task-p1-20261031
     metadata: {}
   - id: controlled-discuss-to-task-p1-20261031
     landingPolicy: serial
@@ -10212,6 +10213,7 @@ landingStreams:
       - src/agents/openclaw-tools.ts
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.ts
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-contracts.lock.test.ts
       - ui/src/ui/controllers/chat.ts
       - ui/src/ui/controllers/chat.test.ts
       - ui/src/ui/chat/work-progress-phase.ts
@@ -10223,7 +10225,8 @@ landingStreams:
       - src/agents/tools/collaboration-board-discuss-to-task.injection.test.ts
       - docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
       - .loom/registry.yaml
-    canLandWith: []
+    canLandWith:
+      - controlled-collab-p2-event-dispatch-20261031
     metadata:
       task: controlled-discuss-to-task-p1-20261031
       owner: cursor-grok
@@ -22644,6 +22647,7 @@ landingStreams:
       - src/agents/openclaw-tools.ts
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.ts
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-contracts.lock.test.ts
       - ui/src/ui/controllers/chat.ts
       - ui/src/ui/controllers/chat.test.ts
       - ui/src/ui/chat/work-progress-phase.ts
