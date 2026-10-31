@@ -68,6 +68,7 @@ import {
   readEnvInt,
   resolveSandboxWorkdir,
   resolveWorkdir,
+  rewriteContainerAbsolutePathsToHostInCommand,
   rewriteGatewayAbsoluteHostPathsInCommand,
   truncateMiddle,
   clampExecWorkdirToWorkspaceRoot,
@@ -564,7 +565,11 @@ async function executeResolvedExecPolicy(params: {
   const rawWorkdir = toolParams.workdir?.trim() || defaults?.cwd || process.cwd();
   let workdir = rawWorkdir;
   let containerWorkdir = sandbox?.containerWorkdir;
+  // Authorization stays in the host-verifiable namespace (same direction as
+  // mapContainerPathToWorkspaceRoot for file tools). Container rewrite is only
+  // for docker/aw-exec-lease execution via runExecProcess.execCommand.
   let command = toolParams.command;
+  let containerExecutionCommand: string | undefined;
   if (sandbox) {
     const resolved = await resolveSandboxWorkdir({
       workdir: rawWorkdir,
@@ -573,8 +578,15 @@ async function executeResolvedExecPolicy(params: {
     });
     workdir = resolved.hostWorkdir;
     containerWorkdir = resolved.containerWorkdir;
-    // P1-2: rewrite gateway-absolute paths inside the command body (not only workdir).
-    command = rewriteGatewayAbsoluteHostPathsInCommand({
+    // Normalize any model-emitted container mount paths back to the host root
+    // before shared-fs INTERSECT, Desktop allow, and allowlist checks.
+    command = rewriteContainerAbsolutePathsToHostInCommand({
+      command,
+      workspaceDir: sandbox.workspaceDir,
+      containerWorkdir: sandbox.containerWorkdir,
+    });
+    // P1-2: host→container rewrite for the execution command only (not auth).
+    containerExecutionCommand = rewriteGatewayAbsoluteHostPathsInCommand({
       command,
       workspaceDir: sandbox.workspaceDir,
       containerWorkdir: sandbox.containerWorkdir,
@@ -586,6 +598,8 @@ async function executeResolvedExecPolicy(params: {
   // Shared-fs INTERSECT: when tools.fs.workspaceOnly is on, outside-workspace
   // mutation targets are denied here (policy owner shared-fs-resource) so
   // write-deny ⇒ exec-deny for the same path class. Not a workspace-root-guard wrap.
+  // Uses host-namespace `command` + host workdir/workspaceRoot — never the
+  // container-rewritten execution string.
   if (defaults?.workspaceOnly && !desktopSaveRunsOnNode(host, command)) {
     // Trusted root only — never treat model workdir as the authorization root.
     const workspaceRoot = defaults.workspaceRoot?.trim() || defaults.cwd;
@@ -739,8 +753,10 @@ async function executeResolvedExecPolicy(params: {
   await validateScriptFileForShellBleed({ command, workdir });
 
   const run = await runExecProcess({
+    // `command` remains host-verifiable for session/logging; sandbox execution
+    // uses containerExecutionCommand (gateway allowlist override still wins).
     command,
-    execCommand: execCommandOverride,
+    execCommand: execCommandOverride ?? containerExecutionCommand,
     workdir,
     env,
     sandbox,
