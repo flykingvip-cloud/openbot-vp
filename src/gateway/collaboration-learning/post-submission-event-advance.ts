@@ -31,7 +31,11 @@ import {
 } from "../collaboration-dispatch/executor-private-todolist.js";
 import type { RuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { SELF_ADVANCE_ACTIVE_BOARD_STATUSES } from "../collaboration-dispatch/self-advance.js";
-import { markWakeOpFailed, readWakeOpRecord } from "../collaboration-dispatch/wake-op-ledger.js";
+import {
+  markWakeOpFailed,
+  readWakeOpRecord,
+  readWakeOpRecordDetailed,
+} from "../collaboration-dispatch/wake-op-ledger.js";
 import {
   classifyDispatchSideEffect,
   consumeWakeForRoundDispatch,
@@ -1422,6 +1426,8 @@ export async function reconcilePermitAcquiredBoardEventRelays(params: {
  *    until wake CAS finishes (or reconcile proves safe). Re-dispatch is allowed
  *    only after wake conditional update completed, or claim/reconcile proves
  *    the wake is already failed/unknown/completed (safe not to overwrite).
+ *    P2 R9: unverifiable cleanup (read/CAS/clear throw) retains binding and
+ *    stops automatic recovery — exception ≠ safe reject.
  * 5) Never convert unknown/started → failed solely because executor process died.
  * Do NOT call from heartbeat alone.
  */
@@ -1544,43 +1550,142 @@ async function clearBoundWakeExecutionAttemptAfterCleanup(params: {
 }
 
 /**
- * P2 R8 two-write recovery: if a prior invalidate left boundWakeExecutionAttemptId
+ * P2 R9 — deferred wake cleanup outcome for two-write recovery.
+ * Only `completed` and `determined_no_change_needed` may clear the board binding
+ * and allow redispatch. `unverifiable` retains binding and stops auto-recovery.
+ */
+export type DeferredWakeFailCleanupOutcome =
+  | "completed"
+  | "determined_no_change_needed"
+  | "unverifiable"
+  | "not_applicable";
+
+export type DeferredWakeFailCleanupResult = {
+  outcome: DeferredWakeFailCleanupOutcome;
+  attempted: boolean;
+  wakeStatus?: string;
+  clearedBinding: boolean;
+  reason?: string;
+};
+
+export type DeferredWakeFailCleanupFault =
+  | "wake_read_throw"
+  | "wake_cas_throw"
+  | "clear_binding_throw";
+
+/**
+ * P2 R8/R9 two-write recovery: if a prior invalidate left boundWakeExecutionAttemptId
  * on a pending relay, finish the wake conditional fail (exact attempt + running)
- * before allowing re-dispatch. Safe reject (unknown/completed/new attempt) clears
- * the binding so claim/reconcile may proceed without overwriting those statuses.
+ * before allowing re-dispatch.
+ *
+ * Classification (P2 R9):
+ * - completed: wake fail CAS applied successfully
+ * - determined_no_change_needed: safe reject (unknown/completed/new attempt /
+ *   already failed for that attempt) — proven we must not / need not modify
+ * - unverifiable: read/write/CAS throw, corrupt/unexplained missing, clear failure
+ *
+ * Only completed | determined_no_change_needed may clear the binding. Exception
+ * is never treated as safe reject.
  */
 export async function finishDeferredWakeFailBeforeRedispatch(params: {
   authority: RuntimeAuthority;
   item: GroupBoardClaimItem;
   cfg?: OpenBotConfig;
-}): Promise<{ attempted: boolean; wakeStatus?: string; clearedBinding: boolean }> {
+  /** Test-only: inject I/O faults for deferred cleanup contract. */
+  _testDeferredCleanupFault?: DeferredWakeFailCleanupFault;
+}): Promise<DeferredWakeFailCleanupResult> {
   const pending = params.item.pendingEventRelay;
   if (!pending || pending.status !== "pending") {
-    return { attempted: false, clearedBinding: false };
+    return { outcome: "not_applicable", attempted: false, clearedBinding: false };
   }
   const opKey = compact(pending.opKey);
   const bound = compact(pending.boundWakeExecutionAttemptId);
   const taskId = compact(params.item.taskId);
   const itemId = compact(params.item.itemId);
   if (!opKey || !bound || !taskId || !itemId) {
-    return { attempted: false, clearedBinding: false };
+    return { outcome: "not_applicable", attempted: false, clearedBinding: false };
   }
+
+  const fault = params._testDeferredCleanupFault;
   let wakeStatus: string | undefined;
+  let outcome: DeferredWakeFailCleanupOutcome;
+
   try {
-    const wake = await readWakeOpRecord({ authority: params.authority, opKey });
-    wakeStatus = wake?.status;
-    await markWakeOpFailed({
+    if (fault === "wake_read_throw") {
+      throw new Error("test_deferred_wake_read_throw");
+    }
+    const detailed = await readWakeOpRecordDetailed({
       authority: params.authority,
       opKey,
-      cfg: params.cfg,
-      detail: "deferred_permit_invalidate_wake_fail",
-      expectedExecutionAttemptId: bound,
     });
-  } catch {
-    // best-effort; binding retained if clear fails below
+    if (detailed.state === "corrupt") {
+      return {
+        outcome: "unverifiable",
+        attempted: true,
+        clearedBinding: false,
+        reason: "wake_record_corrupt",
+      };
+    }
+    if (detailed.state === "missing") {
+      // Binding present but wake absent cannot be explained as a safe reject.
+      return {
+        outcome: "unverifiable",
+        attempted: true,
+        clearedBinding: false,
+        reason: "wake_record_missing",
+      };
+    }
+    const wake = detailed.record;
+    wakeStatus = wake.status;
+    const wakeAttempt = compact(wake.executionAttemptId);
+    if (wakeAttempt !== bound || wake.status !== "running") {
+      // Safe reject: new attempt / unknown / completed / already failed / mismatch.
+      outcome = "determined_no_change_needed";
+    } else {
+      try {
+        if (fault === "wake_cas_throw") {
+          throw new Error("test_deferred_wake_cas_throw");
+        }
+        const after = await markWakeOpFailed({
+          authority: params.authority,
+          opKey,
+          cfg: params.cfg,
+          detail: "deferred_permit_invalidate_wake_fail",
+          expectedExecutionAttemptId: bound,
+        });
+        if (after && after.status === "failed" && compact(after.executionAttemptId) === bound) {
+          wakeStatus = after.status;
+          outcome = "completed";
+        } else {
+          // Race under lock: status/attempt changed — proven safe not to overwrite.
+          wakeStatus = after?.status ?? wakeStatus;
+          outcome = "determined_no_change_needed";
+        }
+      } catch (error) {
+        return {
+          outcome: "unverifiable",
+          attempted: true,
+          wakeStatus,
+          clearedBinding: false,
+          reason: `wake_cas_throw:${(error as Error).message ?? "unknown"}`,
+        };
+      }
+    }
+  } catch (error) {
+    return {
+      outcome: "unverifiable",
+      attempted: true,
+      wakeStatus,
+      clearedBinding: false,
+      reason: `wake_read_throw:${(error as Error).message ?? "unknown"}`,
+    };
   }
-  let clearedBinding = false;
+
+  // Only completed | determined_no_change_needed may clear the board binding.
   try {
+    if (fault === "clear_binding_throw") {
+      throw new Error("test_deferred_clear_binding_throw");
+    }
     const cleared = await clearBoundWakeExecutionAttemptId(
       params.authority,
       {
@@ -1591,11 +1696,32 @@ export async function finishDeferredWakeFailBeforeRedispatch(params: {
       },
       { cfg: params.cfg },
     );
-    clearedBinding = cleared.ok;
-  } catch {
-    clearedBinding = false;
+    if (!cleared.ok) {
+      return {
+        outcome: "unverifiable",
+        attempted: true,
+        wakeStatus,
+        clearedBinding: false,
+        reason: `clear_binding_failed:${cleared.reason}`,
+      };
+    }
+    return {
+      outcome,
+      attempted: true,
+      wakeStatus,
+      clearedBinding: true,
+    };
+  } catch (error) {
+    // Clear failure after a successful wake CAS is still unverifiable for
+    // "binding cleared" — retain binding / 待核验; do not invent auto-retry.
+    return {
+      outcome: "unverifiable",
+      attempted: true,
+      wakeStatus,
+      clearedBinding: false,
+      reason: `clear_binding_throw:${(error as Error).message ?? "unknown"}`,
+    };
   }
-  return { attempted: true, wakeStatus, clearedBinding };
 }
 
 export { invalidateBoardDispatchPermitAttempt };
@@ -1614,6 +1740,8 @@ export async function recoverPendingBoardEventRelays(params: {
   requireTrustedScope?: boolean;
   /** Optional authority override (tests / callers that already built claim authority). */
   authority?: RuntimeAuthority | null;
+  /** Test-only: inject deferred wake cleanup I/O faults. */
+  _testDeferredCleanupFault?: DeferredWakeFailCleanupFault;
 }): Promise<PostSubmissionEventAdvanceResult[]> {
   const results: PostSubmissionEventAdvanceResult[] = [];
 
@@ -1666,15 +1794,32 @@ export async function recoverPendingBoardEventRelays(params: {
 
   const pending = listPendingBoardEventRelays(workingItems);
   for (const row of pending) {
-    // P2 R8: complete deferred wake conditional fail before re-dispatch when a
+    // P2 R8/R9: complete deferred wake conditional fail before re-dispatch when a
     // prior invalidate left boundWakeExecutionAttemptId (two-write crash window).
+    // Unverifiable cleanup must NOT clear binding or continue advance/redispatch.
     let itemForAdvance = row.item;
     if (authority && compact(row.pending.boundWakeExecutionAttemptId)) {
-      await finishDeferredWakeFailBeforeRedispatch({
+      const cleanup = await finishDeferredWakeFailBeforeRedispatch({
         authority,
         item: row.item,
         cfg: params.cfg,
+        _testDeferredCleanupFault: params._testDeferredCleanupFault,
       });
+      if (cleanup.outcome === "unverifiable") {
+        results.push(
+          emptyResult(
+            row.pending.businessEvent,
+            `deferred_wake_cleanup_unverifiable:${cleanup.reason ?? "unknown"}`,
+            {
+              pendingRelay: true,
+              opKey: compact(row.pending.opKey) || null,
+              targetAgentIds: [...row.pending.targetAgentIds],
+              pendingLifecycle: "unknown",
+            },
+          ),
+        );
+        continue;
+      }
       try {
         const live = await loadBoardClaimItem(authority, {
           taskId: compact(row.item.taskId) || params.taskId,

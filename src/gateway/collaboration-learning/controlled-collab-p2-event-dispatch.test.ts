@@ -22,6 +22,7 @@ import {
   boardClaimLogPath,
   boardClaimsDir,
   claimBoardItem,
+  invalidateBoardDispatchPermitAttempt,
   loadBoardClaimItem,
   markBoardDispatchInvokeStarted,
   markBoardItemInProgress,
@@ -59,6 +60,7 @@ import {
 } from "./execution-deliverable-binding.js";
 import {
   classifyConsumePendingLifecycle,
+  finishDeferredWakeFailBeforeRedispatch,
   invalidatePermitAttemptForProvenDeadExecutor,
   listPendingBoardEventRelays,
   listPermitAcquiredBoardEventRelays,
@@ -3081,6 +3083,190 @@ describe("P2 R8 — wake conditional-commit: original binding + running CAS", ()
     });
     expect(recovered.some((r) => r.dispatched)).toBe(true);
     expect(dispatchCount).toBe(1);
+  });
+});
+
+describe("P2 R9 — deferred cleanup unverifiable must retain binding + stop advance", () => {
+  async function seedPausedWithBinding(params: { taskId: string; roundId: string }) {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId: params.taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, params.taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId: params.taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    let releasePause!: () => void;
+    const pause = new Promise<void>((resolve) => {
+      releasePause = resolve;
+    });
+    let reachedPause = false;
+    const liveRun = triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId: params.taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: async () => ({ ok: true, roundId: params.roundId }),
+      _testAfterPermitCommitBeforeDispatcher: async () => {
+        reachedPause = true;
+        await pause;
+      },
+    });
+    for (let i = 0; i < 200 && !reachedPause; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(reachedPause).toBe(true);
+
+    const mid = await loadBoardClaimItem(auth, {
+      taskId: params.taskId,
+      itemId: item.itemId,
+    });
+    const attemptId = mid?.pendingEventRelay?.dispatchAttemptId;
+    const opKey = mid?.pendingEventRelay?.opKey;
+    const boundWake = mid?.pendingEventRelay?.boundWakeExecutionAttemptId;
+    expect(attemptId).toBeTruthy();
+    expect(opKey).toBeTruthy();
+    expect(boundWake).toBeTruthy();
+
+    // Board invalidate only — leave two-write crash window (binding retained, wake running).
+    const inv = await invalidateBoardDispatchPermitAttempt(
+      auth,
+      {
+        taskId: params.taskId,
+        itemId: item.itemId,
+        expectedOpKey: opKey!,
+        expectedAttemptId: attemptId!,
+      },
+      { cfg },
+    );
+    expect(inv.ok).toBe(true);
+
+    const pending = await loadBoardClaimItem(auth, {
+      taskId: params.taskId,
+      itemId: item.itemId,
+    });
+    expect(pending?.pendingEventRelay?.status).toBe("pending");
+    expect(pending?.pendingEventRelay?.boundWakeExecutionAttemptId).toBe(boundWake);
+    expect(pending?.pendingEventRelay?.dispatchAttemptId).toBeFalsy();
+
+    const wake = await readWakeOpRecord({ authority: auth, opKey: opKey! });
+    expect(wake?.status).toBe("running");
+    expect(wake?.executionAttemptId).toBe(boundWake);
+
+    return {
+      cfg,
+      auth,
+      taskId: params.taskId,
+      itemId: item.itemId,
+      opKey: opKey!,
+      boundWake: boundWake!,
+      pending: pending!,
+      releasePause,
+      liveRun,
+    };
+  }
+
+  async function assertFaultStopsRedispatch(
+    fault: "wake_read_throw" | "wake_cas_throw" | "clear_binding_throw",
+  ) {
+    const seeded = await seedPausedWithBinding({
+      taskId: `task-p2-r9-${fault}`,
+      roundId: `r9-${fault}-old`,
+    });
+
+    let dispatchCount = 0;
+    const blocked = await recoverPendingBoardEventRelays({
+      groupId: seeded.auth.groupId,
+      taskId: seeded.taskId,
+      actorId: "bot-b",
+      items: [seeded.pending],
+      cfg: seeded.cfg,
+      roundDispatcher: async () => {
+        dispatchCount += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      trusted: trustedLocatorFromAuthority(seeded.auth),
+      authority: seeded.auth,
+      _testDeferredCleanupFault: fault,
+    });
+    expect(dispatchCount).toBe(0);
+    expect(blocked.every((r) => !r.dispatched)).toBe(true);
+    expect(blocked.some((r) => r.reason.startsWith("deferred_wake_cleanup_unverifiable:"))).toBe(
+      true,
+    );
+    expect(blocked.some((r) => r.pendingLifecycle === "unknown")).toBe(true);
+
+    const midBoard = await loadBoardClaimItem(seeded.auth, {
+      taskId: seeded.taskId,
+      itemId: seeded.itemId,
+    });
+    expect(midBoard?.pendingEventRelay?.boundWakeExecutionAttemptId).toBe(seeded.boundWake);
+
+    // Direct cleanup under same fault must also refuse to clear.
+    const direct = await finishDeferredWakeFailBeforeRedispatch({
+      authority: seeded.auth,
+      item: midBoard!,
+      cfg: seeded.cfg,
+      _testDeferredCleanupFault: fault,
+    });
+    expect(direct.outcome).toBe("unverifiable");
+    expect(direct.clearedBinding).toBe(false);
+
+    // After fault cleared, recovery may proceed safely.
+    let recoverCount = 0;
+    const recovered = await recoverPendingBoardEventRelays({
+      groupId: seeded.auth.groupId,
+      taskId: seeded.taskId,
+      actorId: "bot-b",
+      items: midBoard ? [midBoard] : [],
+      cfg: seeded.cfg,
+      roundDispatcher: async () => {
+        recoverCount += 1;
+        return { ok: true, roundId: `r9-recover-${fault}-${recoverCount}` };
+      },
+      trusted: trustedLocatorFromAuthority(seeded.auth),
+      authority: seeded.auth,
+    });
+    expect(recovered.some((r) => r.dispatched)).toBe(true);
+    expect(recoverCount).toBe(1);
+
+    const after = await loadBoardClaimItem(seeded.auth, {
+      taskId: seeded.taskId,
+      itemId: seeded.itemId,
+    });
+    expect(after?.pendingEventRelay?.boundWakeExecutionAttemptId).toBeFalsy();
+
+    seeded.releasePause();
+    await seeded.liveRun;
+  }
+
+  test("wake read throws → binding retained, dispatcher=0; then recover", async () => {
+    await assertFaultStopsRedispatch("wake_read_throw");
+  });
+
+  test("CAS write throws → binding retained, dispatcher=0; then recover", async () => {
+    await assertFaultStopsRedispatch("wake_cas_throw");
+  });
+
+  test("binding clear fails → binding retained, dispatcher=0; then recover", async () => {
+    await assertFaultStopsRedispatch("clear_binding_throw");
   });
 });
 
