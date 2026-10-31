@@ -37,24 +37,39 @@ Machine-readable: `p1-dag-break-evidence-closure-2026-10-31.json`, `p1-dag-break
 - Audit shallow boundary **is** the prior tip; declared parent `b9be3ec588e9…` absent in audit-only, present in donor; with alternate, parent object readable but **shallow marker still truncates** `rev-list` of prior to count=1.
 - Therefore truncation is **not** ruled out. Do **not** claim historical absence of a merge-base.
 
-## Count口径 (141＋5＝146)
+## Authoritative current classification
+
+**唯一当前有效分类表**：`p1-current-classification-2026-10-31.json`  
+（`p1-reclassification-summary.json` 仅保留 HISTORICAL donor_primary 快照；勿把其顶层旧字段当现行口径。）
+
+## Count口径 (141＋5＝146 → 调整视图 145＋1)
 
 - **146** = `delivery:ledger:audit` **ERROR regression** adjacency findings on the audited ledger tip (`#172` `d189e74f`), **not** all adjacent ledger pairs.
 - Ledger data rows ≈ **149**; adjacent pairs ≈ **148**; ERROR regressions = **146**.
 - `regressionAcknowledged` seqs on ledger: **3, 4, 11, 17, 18, 47, 95** (7). **Zero overlap** with the 146 ERROR set — acknowledged rows were already excluded from ERROR output.
-- Published `#173` split **141 forward-only + 5 proven_dag_break** was the donor_primary pass over those same 146 ERROR rows.
+- Published `#173` split **141 forward-only + 5 proven_dag_break** was the **HISTORICAL** donor_primary pass over those same 146 ERROR rows (not current adjudication).
 - After this closure of the five: **52/100/121/140 → forward-only**; **145 → incomplete_graph_unknown**; **proven_dag_break among those five = 0**.
-- Implied adjusted view over the 146 (only these five corrected): **145 forward-only + 1 incomplete_graph_unknown + 0 proven_dag_break**. Full 146 not re-walked end-to-end this turn beyond the five.
+- **当前口径（原 146）**：**145** 条正向祖先证据 + **1** 条图不完整未知（seq145）。推导：原 141 FO（本轮未重遍历）+ 本轮闭合 4 条 FO = 145 FO；seq145 = incomplete_graph_unknown。**完整 146 条本轮未重新遍历。**
+- 用语：用「**当前联合对象图下…**」；**禁止**「联合完整图」/ joint complete graph。audit 与 donor 均为 shallow；截断未排除。
 - Historical audit remains **fail-closed**. No acknowledge written to greenwash.
+
+## Recovery counts（三项必须区分，禁止混写）
+
+| 项 | 数量 | 来源 |
+|---|---:|---|
+| 恢复 tip **对象/清单**（inventory） | **137** | `p1-donor-provenance-2026-10-31.json` · `recovered_tips_into_audit_refs_count`；对象现均 `cat-file` 可读 |
+| `recovered-shas.txt` **行数** | **137** | 同目录清单文件 |
+| 捕获时仍存在的 `refs/audit-recovery/*` **refs 数** | **5** | `p1-dag-break-graph-closure-raw-2026-10-31.json` → `provenance.audit.audit_recovery_ref_count` |
+
+**不得**把 refs=5（或误写 0）写成「恢复 tip = 0」，也不得把 inventory=137 说成「当前仍有 137 条 recovery refs」。
 
 ## Donor provenance (preserved)
 
-See `p1-donor-provenance-2026-10-31.json`.
+See `p1-donor-provenance-2026-10-31.json`（已补 `recovery_counts` 三分项）。
 
 - Donor remotes include `origin=https://github.com/upbeyond/openbot.git`, `fork=https://github.com/gmood2008/openbot.git` (plus local wt remote).
 - Donor HEAD at capture: `0c22e4837dc4179b02dd0b30f424c535d8cd9284`.
 - Donor **is_shallow=true** with 6 shallow boundaries.
-- Recovered tip inventory count into audit `refs/audit-recovery/*`: **0** (list in `recovered-shas.txt`).
 - GitHub `422` / `not our ref` on tip fetch = **current fetch path unavailable**, **not** proof of forgery or permanent loss.
 
 ## Boundaries

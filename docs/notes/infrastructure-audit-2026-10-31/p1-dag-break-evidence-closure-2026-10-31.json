@@ -5,7 +5,9 @@
     "forward_only": 141,
     "proven_dag_break": 5,
     "proven_break_seqs": [52, 100, 121, 140, 145],
-    "method": "donor_primary (INCORRECT as adjudication authority because donor is also shallow)"
+    "method": "donor_primary (INCORRECT as adjudication authority because donor is also shallow)",
+    "status": "HISTORICAL_SUPERSEDED",
+    "authoritative_current": "p1-current-classification-2026-10-31.json"
   },
   "count_口径": {
     "original_ERROR_regressions": 146,
@@ -52,7 +54,14 @@
       "prune-packable: 10",
       "garbage: 106",
       "size-garbage: 1440"
-    ]
+    ],
+    "recovery_counts": {
+      "recovered_tip_objects_inventory": 137,
+      "recovered_shas_txt_line_count": 137,
+      "refs_audit_recovery_present_at_capture": 5,
+      "note": "Do not conflate inventory 137 with refs 5; never claim recovered tips = 0 while inventory is 137."
+    },
+    "audit_recovery_ref_count_meaning": "refs/audit-recovery/* on the DONOR repo at capture (=0). Not the inventory (137) and not the audit-repo refs count (5)."
   },
   "audit_provenance": {
     "cwd": "/Users/daniel/AI VP/openbot-infrastructure-audit",
@@ -1017,5 +1026,21 @@
     "reclassified_to_forward_only": [52, 100, 121, 140],
     "reclassified_to_incomplete_graph_unknown": [145]
   },
-  "no_regressionAcknowledged_written": true
+  "no_regressionAcknowledged_written": true,
+  "authoritative_current_classification": "p1-current-classification-2026-10-31.json",
+  "recovery_counts": {
+    "recovered_tip_objects_inventory": 137,
+    "recovered_shas_txt_line_count": 137,
+    "refs_audit_recovery_present_at_capture": 5,
+    "note": "Do not conflate inventory 137 with refs 5; never claim recovered tips = 0 while inventory is 137."
+  },
+  "current_view_over_146": {
+    "forward_only": 145,
+    "incomplete_graph_unknown": 1,
+    "proven_dag_break": 0,
+    "full_146_rewalked_this_round": false,
+    "phrase": "当前联合对象图下…",
+    "forbidden_phrase": "联合完整图"
+  },
+  "NOTICE": "For current classification use p1-current-classification-2026-10-31.json only; do not merge historical proven_break_seqs from this file or p1-reclassification-summary.json."
 }

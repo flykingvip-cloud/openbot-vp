@@ -35,5 +35,13 @@
     ]
   },
   "recovered_tips_into_audit_refs_count": 137,
-  "recovered_tips_sha_list_path": "recovered-shas.txt (also /tmp/infra-audit-p1-20261031/recovered-shas.txt)"
+  "recovered_tips_sha_list_path": "recovered-shas.txt (also /tmp/infra-audit-p1-20261031/recovered-shas.txt)",
+  "recovery_counts": {
+    "recovered_tip_objects_inventory": 137,
+    "recovered_shas_txt_line_count": 137,
+    "refs_audit_recovery_present_at_capture": 5,
+    "source_raw_field": "p1-dag-break-graph-closure-raw-2026-10-31.json#provenance.audit.audit_recovery_ref_count",
+    "note": "recovered_tips_into_audit_refs_count below is the inventory (137), not the refs-present count (5)."
+  },
+  "recovered_tips_into_audit_refs_count_meaning": "inventory of tip objects recovered into audit object store / listed in recovered-shas.txt; NOT refs/audit-recovery/* cardinality"
 }

@@ -1,6 +1,6 @@
 # Priority1 对象恢复与历史重新分类 — 2026-10-31 Asia/Shanghai
 
-> **SUPERSEDED ADJUDICATION (2026-10-31 later same day):** the 「5 proven DAG break」claim below is **withdrawn** as final adjudication. See `p1-dag-break-evidence-closure-2026-10-31.md`. After shallow/parent-chain closure: seqs **52/100/121/140 → forward-only**; seq **145 → incomplete_graph_unknown**（「当前联合对象图下非祖先」, **not** 「历史无共同祖先」）. Donor is also shallow; donor_primary must not be treated as complete-graph authority. Counts 141+5 remain the *prior published split*, not the closed result.
+> **SUPERSEDED ADJUDICATION (2026-10-31 later same day):** the 「5 proven DAG break」claim below is **withdrawn** as final adjudication. **权威当前分类**见 `p1-current-classification-2026-10-31.json`（145 forward-only + 1 incomplete_graph_unknown；完整 146 本轮未重遍历）。详见 `p1-dag-break-evidence-closure-2026-10-31.md`。seqs **52/100/121/140 → forward-only**；seq **145 → incomplete_graph_unknown**（「当前联合对象图下非祖先」, **not** 「历史无共同祖先」）。Donor 亦 shallow；**禁止**称「联合完整图」。Counts 141+5 仅为 *HISTORICAL donor_primary* 已发表拆分，非现行定案。恢复计数三分项：inventory/清单 **137**，捕获时 `refs/audit-recovery/*` **5**。
 
 
 > **性质**：证据包（evidence-only）。**不**修改 `deploy/production/releases.jsonl` / `RELEASE_RECORD.md`；**不**写 `regressionAcknowledged`；**不**合入、DIGEST、部署或触发 A3。
@@ -46,11 +46,11 @@
 | missing object | 145 | **0**（双库联合视角） |
 | incomplete graph / unknown | （被误并进 missing） | **0**（权威分类后） |
 
-历史仍 **fail-closed**（exit 30）；不得称交付门禁通过。失败原因现可准确解释：多数原 ERROR 为 forward-only（可追溯祖先），少数为 proven DAG break（SoT 断裂），**不再**把缺对象统称为已证明 regression。
+历史仍 **fail-closed**（exit 30）；不得称交付门禁通过。现行口径见 `p1-current-classification-2026-10-31.json`（145 FO + 1 incomplete_graph_unknown；proven_dag_break=0）。HISTORICAL donor_primary 曾报少数 proven DAG break，已撤回为定案。**不再**把缺对象统称为已证明 regression。
 
-机器可读：同目录 `p1-reclassification-summary.json`、`reclassification-donor-primary.jsonl`。
+机器可读：**权威当前** `p1-current-classification-2026-10-31.json`；HISTORICAL `p1-reclassification-summary.json`、`reclassification-donor-primary.jsonl`。
 
-## Proven DAG break（≠ 功能内容回退）
+## Proven DAG break（HISTORICAL donor_primary 表；≠ 功能内容回退；现行已撤回）
 
 | seq | prior | current | 分类源 |
 |---:|---|---|---|
@@ -75,7 +75,8 @@
 
 | 文件 | 说明 |
 |---|---|
-| `p1-reclassification-summary.json` | 计数与基线摘要 |
+| `p1-current-classification-2026-10-31.json` | **权威当前分类**（145 FO + 1 incomplete；勿合并旧补丁字段） |
+| `p1-reclassification-summary.json` | HISTORICAL donor_primary 快照（非现行） |
 | `missing-object-inventory.jsonl` | 恢复前缺失 tip 清单（137） |
 | `recovered-shas.txt` | 从 donor 收回的 tip 列表 |
 | `reclassification-donor-primary.jsonl` | 146 条权威重分类全表 |
@@ -85,7 +86,7 @@
 
 ## 已证明 / 待验证 / 环境限制
 
-- **已证明**：donor 可补齐 137 tip；donor-primary 下 141 forward-only + 5 proven DAG break；GitHub/origin 抽样不可达这些 tip；seq145 在 audit 对象齐全下为双向非祖先。
+- **已证明（现行）**：donor 可补齐 tip 对象 inventory **137**（清单 137 行；捕获时 recovery refs **5**）；当前分类见 `p1-current-classification-2026-10-31.json`（145 FO + 1 incomplete_graph_unknown）；GitHub/origin 抽样不可达这些 tip。HISTORICAL donor_primary 曾报 141+5，已由 closure 撤回为定案。
 - **待验证**：H1「Actions 分钟耗尽」；A3 未授权未执行。
 - **环境限制**：audit worktree 仍 shallow；完整祖先行走依赖本地 donor；`refs/audit-recovery/*` 仅本机取回锚点，未推远程。
 
