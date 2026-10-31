@@ -25,14 +25,36 @@ export type DiscussToTaskChatTurnFormalEstablish = {
   stagesSummary?: string;
 };
 
+export type DiscussToTaskTranscriptPersist = {
+  ok: boolean;
+  error?: string;
+  messageId?: string;
+  message?: Record<string, unknown>;
+};
+
 export type DiscussToTaskChatTurnResult = {
   d2tResult: ControlledDiscussToTaskResult | null;
   formalTaskEstablish?: DiscussToTaskChatTurnFormalEstablish;
   coordinatorBindingText?: string;
   userVisibleMessage?: string;
-  transcriptPersist?: { ok: boolean; error?: string };
+  transcriptPersist?: DiscussToTaskTranscriptPersist;
   bindingRegister?: SourceBindingRegisterResult;
   error?: string;
+};
+
+export type DiscussToTaskClientFeedbackEgress = {
+  formalTaskEstablish?: DiscussToTaskChatTurnFormalEstablish;
+  coordinatorBindingText?: string;
+  clientFeedbackMessage?: string;
+  transcriptPersist?: DiscussToTaskTranscriptPersist;
+};
+
+export type DiscussToTaskChatEgressPayload = {
+  runId: string;
+  sessionKey: string;
+  seq: number;
+  state: "final";
+  message: Record<string, unknown>;
 };
 
 const RECEIPT_PERSIST_FAIL_SUFFIX = "（展示写入失败，请刷新后重试。）";
@@ -40,19 +62,16 @@ const RECEIPT_PERSIST_FAIL_SUFFIX = "（展示写入失败，请刷新后重试�
 type PersistReceiptFn = (args: {
   message: string;
   idempotencyKey: string;
-}) => Promise<{ ok: boolean; error?: string }>;
+}) => Promise<DiscussToTaskTranscriptPersist>;
 
 /**
  * Map chat-turn result onto the chat.send handler fields the client already consumes
  * (formalTaskEstablish + coordinator binding). Always prefers deterministic
  * userVisibleMessage over model paraphrase / logs alone.
  */
-export function applyDiscussToTaskChatTurnToChatHandler(turn: DiscussToTaskChatTurnResult): {
-  formalTaskEstablish?: DiscussToTaskChatTurnFormalEstablish;
-  coordinatorBindingText?: string;
-  clientFeedbackMessage?: string;
-  transcriptPersist?: { ok: boolean; error?: string };
-} {
+export function applyDiscussToTaskChatTurnToChatHandler(
+  turn: DiscussToTaskChatTurnResult,
+): DiscussToTaskClientFeedbackEgress {
   const clientFeedbackMessage =
     (turn.userVisibleMessage && turn.userVisibleMessage.trim()) ||
     turn.formalTaskEstablish?.userMessage ||
@@ -92,19 +111,73 @@ export function applyDiscussToTaskChatTurnToChatHandler(turn: DiscussToTaskChatT
   };
 }
 
+/**
+ * Send deterministic discuss→task status through the existing chat event egress
+ * (broadcastChat + nodeSendToSession). Used by the real chat.send handler so the
+ * client receives content even when transcript persist fails (no model paraphrase).
+ * Never includes raw internal persist errors — only the safe clientFeedbackMessage.
+ */
+export function emitDiscussToTaskClientFeedback(params: {
+  applied: DiscussToTaskClientFeedbackEgress;
+  sessionKey: string;
+  runId: string;
+  broadcastChat: (
+    sessionKey: string,
+    payload: unknown,
+    opts?: { dropIfSlow?: boolean; tenantId?: string | null; runId?: string | null },
+  ) => void;
+  nodeSendToSession: (sessionKey: string, event: string, payload: unknown) => void;
+  tenantId?: string | null;
+}): { emitted: boolean; payload?: DiscussToTaskChatEgressPayload } {
+  const text = params.applied.clientFeedbackMessage?.trim() ?? "";
+  if (!text) {
+    return { emitted: false };
+  }
+  const persistedMessage =
+    params.applied.transcriptPersist?.ok && params.applied.transcriptPersist.message
+      ? params.applied.transcriptPersist.message
+      : undefined;
+  const message: Record<string, unknown> = persistedMessage
+    ? { ...persistedMessage }
+    : {
+        role: "assistant",
+        content: [{ type: "text", text }],
+        timestamp: Date.now(),
+        senderLabel: "协作调度",
+        collaborationRoundId: params.runId,
+        discussToTaskReceipt: true,
+        ...(params.applied.formalTaskEstablish
+          ? { formalTaskEstablish: params.applied.formalTaskEstablish }
+          : {}),
+      };
+  const payload: DiscussToTaskChatEgressPayload = {
+    runId: `${params.runId}:discuss-to-task-receipt`,
+    sessionKey: params.sessionKey,
+    seq: 0,
+    state: "final",
+    message,
+  };
+  params.broadcastChat(params.sessionKey, payload, {
+    runId: payload.runId,
+    ...(params.tenantId != null ? { tenantId: params.tenantId } : {}),
+  });
+  params.nodeSendToSession(params.sessionKey, "chat", payload);
+  return { emitted: true, payload };
+}
+
 async function persistUserVisibleReceipt(params: {
   message: string;
   sourceMessageId: string;
   persistReceipt?: PersistReceiptFn;
 }): Promise<{
   userVisibleMessage: string;
-  transcriptPersist?: { ok: boolean; error?: string };
+  transcriptPersist?: DiscussToTaskTranscriptPersist;
 }> {
   const safeMessage = params.message.trim();
   if (!params.persistReceipt || !safeMessage) {
     return { userVisibleMessage: safeMessage };
   }
-  let transcriptPersist: { ok: boolean; error?: string };
+  let transcriptPersist: DiscussToTaskTranscriptPersist;
   try {
     transcriptPersist = await params.persistReceipt({
       message: safeMessage,

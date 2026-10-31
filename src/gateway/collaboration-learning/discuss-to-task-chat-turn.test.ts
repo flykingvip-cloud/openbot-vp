@@ -14,6 +14,7 @@ import {
 import type { OpenBotConfig } from "../../config/types.js";
 import {
   applyDiscussToTaskChatTurnToChatHandler,
+  emitDiscussToTaskClientFeedback,
   runControlledDiscussToTaskChatTurn,
 } from "./discuss-to-task-chat-turn.js";
 import { clearDiscussToTaskSourceBindingsForTests } from "./discuss-to-task-source-binding.js";
@@ -54,6 +55,74 @@ async function useCfg(claimContract: boolean) {
     cfg,
     trusted: { groupsRoot, groupLocator },
     stores: createTrustedGroupStores({ groupsRoot, groupLocator }),
+  };
+}
+
+function extractEgressText(payload: { message?: Record<string, unknown> } | undefined): string {
+  const message = payload?.message;
+  if (!message) {
+    return "";
+  }
+  const content = message.content;
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map((block) => {
+        if (!block || typeof block !== "object") {
+          return "";
+        }
+        const text = (block as { text?: unknown }).text;
+        return typeof text === "string" ? text : "";
+      })
+      .join("");
+  }
+  if (typeof message.text === "string") {
+    return message.text;
+  }
+  return JSON.stringify(message);
+}
+
+function captureClientEgress() {
+  const broadcasts: Array<{
+    sessionKey: string;
+    payload: { message?: Record<string, unknown>; state?: string; runId?: string };
+    opts?: unknown;
+  }> = [];
+  const nodeSends: Array<{
+    sessionKey: string;
+    event: string;
+    payload: { message?: Record<string, unknown>; state?: string; runId?: string };
+  }> = [];
+  return {
+    broadcasts,
+    nodeSends,
+    broadcastChat: (sessionKey: string, payload: unknown, opts?: unknown) => {
+      broadcasts.push({
+        sessionKey,
+        payload: payload as {
+          message?: Record<string, unknown>;
+          state?: string;
+          runId?: string;
+        },
+        opts,
+      });
+    },
+    nodeSendToSession: (sessionKey: string, event: string, payload: unknown) => {
+      nodeSends.push({
+        sessionKey,
+        event,
+        payload: payload as {
+          message?: Record<string, unknown>;
+          state?: string;
+          runId?: string;
+        },
+      });
+    },
+    receivedTexts(): string[] {
+      return broadcasts.map((row) => extractEgressText(row.payload));
+    },
   };
 }
 
@@ -223,5 +292,147 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
         applied.clientFeedbackMessage ?? applied.formalTaskEstablish?.userMessage ?? "",
       ).toBeTruthy();
     }
+  });
+});
+
+describe("emitDiscussToTaskClientFeedback (real chat egress — client receives)", () => {
+  it("normal path: client broadcast+node receive safe status text", async () => {
+    const { cfg } = await useCfg(true);
+    const turn = await runControlledDiscussToTaskChatTurn({
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-egress-ok",
+      message: EXPLICIT,
+      principalActor: "human:owner",
+      client: {},
+      tenant: null,
+      cfg,
+      persistReceipt: async ({ message }) => ({
+        ok: true,
+        messageId: "msg-ok-1",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: message }],
+          timestamp: Date.now(),
+        },
+      }),
+    });
+    const applied = applyDiscussToTaskChatTurnToChatHandler(turn);
+    expect(applied.clientFeedbackMessage ?? "").toBeTruthy();
+    const client = captureClientEgress();
+    const emitted = emitDiscussToTaskClientFeedback({
+      applied,
+      sessionKey: "agent:bot-a:main:space:grp_chat",
+      runId: "chat-run-egress-ok",
+      broadcastChat: client.broadcastChat,
+      nodeSendToSession: client.nodeSendToSession,
+    });
+    expect(emitted.emitted).toBe(true);
+    expect(client.broadcasts.length).toBe(1);
+    expect(client.nodeSends.length).toBe(1);
+    expect(client.nodeSends[0].event).toBe("chat");
+    const texts = client.receivedTexts().join("\n");
+    expect(texts).toContain(applied.clientFeedbackMessage!);
+    expect(texts).not.toMatch(/disk_full|EACCES|ENOENT/);
+  });
+
+  it("conflict path: client receives conflict copy (not helper-only)", async () => {
+    const { cfg } = await useCfg(true);
+    await runControlledDiscussToTaskChatTurn({
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-egress-conflict",
+      message: EXPLICIT,
+      principalActor: "human:alice",
+      client: {},
+      tenant: null,
+      cfg,
+      persistReceipt: async () => ({ ok: true }),
+    });
+    const steal = await runControlledDiscussToTaskChatTurn({
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-egress-conflict",
+      message: EXPLICIT,
+      principalActor: "human:bob",
+      client: {},
+      tenant: null,
+      cfg,
+      persistReceipt: async () => ({ ok: true }),
+    });
+    const applied = applyDiscussToTaskChatTurnToChatHandler(steal);
+    const client = captureClientEgress();
+    const emitted = emitDiscussToTaskClientFeedback({
+      applied,
+      sessionKey: "agent:bot-a:main:space:grp_chat",
+      runId: "chat-run-egress-conflict",
+      broadcastChat: client.broadcastChat,
+      nodeSendToSession: client.nodeSendToSession,
+    });
+    expect(emitted.emitted).toBe(true);
+    const texts = client.receivedTexts().join("\n");
+    expect(texts).toMatch(/归属冲突|冲突|受阻/);
+    expect(texts).not.toMatch(/已派工/);
+    expect(client.broadcasts[0].payload.state).toBe("final");
+  });
+
+  it("exception path: client receives fixed blocked copy", async () => {
+    const turn = await runControlledDiscussToTaskChatTurn({
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-egress-exception",
+      message: EXPLICIT,
+      principalActor: "human:owner",
+      client: {},
+      tenant: null,
+      cfg: { gateway: { security: { profile: "personal_local" } } } as never,
+      persistReceipt: async () => ({ ok: true }),
+    });
+    const applied = applyDiscussToTaskChatTurnToChatHandler(turn);
+    // When feedback exists, egress must deliver it to the client sinks.
+    if (!applied.clientFeedbackMessage) {
+      return;
+    }
+    const client = captureClientEgress();
+    const emitted = emitDiscussToTaskClientFeedback({
+      applied,
+      sessionKey: "agent:bot-a:main:space:grp_chat",
+      runId: "chat-run-egress-exception",
+      broadcastChat: client.broadcastChat,
+      nodeSendToSession: client.nodeSendToSession,
+    });
+    expect(emitted.emitted).toBe(true);
+    const texts = client.receivedTexts().join("\n");
+    expect(texts).toMatch(/受阻|尚未建立正式任务|正式任务/);
+    expect(texts).not.toMatch(/已派工/);
+  });
+
+  it("persist-failure: client still receives fixed fail copy without raw error", async () => {
+    const { cfg } = await useCfg(true);
+    const turn = await runControlledDiscussToTaskChatTurn({
+      groupId: "grp_chat",
+      sourceMessageId: "chat-run-egress-persist-fail",
+      message: EXPLICIT,
+      principalActor: "human:owner",
+      client: {},
+      tenant: null,
+      cfg,
+      persistReceipt: async () => ({ ok: false, error: "disk_full_raw_internal" }),
+    });
+    const applied = applyDiscussToTaskChatTurnToChatHandler(turn);
+    expect(applied.clientFeedbackMessage ?? "").toMatch(/展示写入失败/);
+    expect(applied.clientFeedbackMessage ?? "").not.toMatch(/disk_full/);
+    const client = captureClientEgress();
+    const emitted = emitDiscussToTaskClientFeedback({
+      applied,
+      sessionKey: "agent:bot-a:main:space:grp_chat",
+      runId: "chat-run-egress-persist-fail",
+      broadcastChat: client.broadcastChat,
+      nodeSendToSession: client.nodeSendToSession,
+    });
+    expect(emitted.emitted).toBe(true);
+    expect(client.broadcasts.length).toBe(1);
+    expect(client.nodeSends.length).toBe(1);
+    const blob =
+      JSON.stringify(client.broadcasts[0].payload) + JSON.stringify(client.nodeSends[0].payload);
+    expect(blob).toMatch(/展示写入失败/);
+    expect(blob).not.toMatch(/disk_full_raw_internal/);
+    expect(extractEgressText(client.broadcasts[0].payload)).toMatch(/展示写入失败/);
   });
 });
