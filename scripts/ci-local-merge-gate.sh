@@ -123,6 +123,9 @@ pnpm vitest run scripts/delivery
 echo "== release ledger audit =="
 pnpm delivery:ledger:audit
 
+echo "== RELEASE_RECORD current-identity anti-drift =="
+pnpm delivery:release-record:check
+
 echo ""
 if [[ "$RESULT" == "partial" ]]; then
   echo "result=partial"

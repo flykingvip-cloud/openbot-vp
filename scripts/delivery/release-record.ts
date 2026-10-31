@@ -272,46 +272,128 @@ function machineValue(block: string, key: string): string | null {
   return m ? m[1] : null;
 }
 
-export function parseGeneratedIdentity(block: string): ParsedGeneratedIdentity {
-  const seqRaw = machineValue(block, "seq") ?? tableValue(block, "seq");
-  const seq = seqRaw && /^\d+$/.test(seqRaw) ? Number(seqRaw) : null;
-  const gatewaySha =
-    (machineValue(block, "gatewaySha") ?? tableValue(block, "gatewaySha") ?? "").toLowerCase() ||
-    null;
-  const uiSha =
-    (machineValue(block, "uiSha") ?? tableValue(block, "uiSha") ?? "").toLowerCase() || null;
-  const digest =
-    (machineValue(block, "digest") || tableValue(block, "artifactDigest") || "").toLowerCase() ||
-    null;
-  const imageTag =
-    machineValue(block, "imageTag") || tableValue(block, "imageTag / artifactId") || null;
-  const tag = machineValue(block, "tag") || tableValue(block, "tag") || null;
-  const liveFrom = machineValue(block, "liveFrom") || tableValue(block, "liveFrom") || null;
-  const liveToMachine = machineValue(block, "liveTo");
-  const liveToTable = tableValue(block, "liveTo");
-  const liveTo =
-    liveToMachine !== null && liveToMachine !== ""
-      ? liveToMachine
-      : liveToTable === "_(open)_"
-        ? ""
+export type IdentitySurface = "machine" | "table" | "prefer-machine";
+
+function emptyToNull(value: string | null | undefined): string | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  return value;
+}
+
+function parseLiveVerified(raw: string | null): boolean | null {
+  if (raw === "true" || raw === "`true`") {
+    return true;
+  }
+  if (raw === "false" || raw === "`false`") {
+    return false;
+  }
+  return null;
+}
+
+/**
+ * Parse identity from one surface, or prefer-machine (legacy fallback for callers
+ * that only need a single view). Check must use machine + table separately.
+ */
+export function parseGeneratedIdentity(
+  block: string,
+  surface: IdentitySurface = "prefer-machine",
+): ParsedGeneratedIdentity {
+  const fromMachine = (): ParsedGeneratedIdentity => {
+    const seqRaw = machineValue(block, "seq");
+    const seq = seqRaw && /^\d+$/.test(seqRaw) ? Number(seqRaw) : null;
+    const gatewaySha = emptyToNull((machineValue(block, "gatewaySha") ?? "").toLowerCase());
+    const uiSha = emptyToNull((machineValue(block, "uiSha") ?? "").toLowerCase());
+    const digest = emptyToNull((machineValue(block, "digest") ?? "").toLowerCase());
+    const imageTag = emptyToNull(machineValue(block, "imageTag"));
+    const tag = emptyToNull(machineValue(block, "tag"));
+    const liveFrom = emptyToNull(machineValue(block, "liveFrom"));
+    const liveToRaw = machineValue(block, "liveTo");
+    const liveTo = liveToRaw === null ? null : liveToRaw;
+    const liveVerified = parseLiveVerified(machineValue(block, "liveVerified"));
+    return {
+      seq,
+      gatewaySha,
+      uiSha,
+      artifactDigest: digest,
+      imageTag,
+      artifactId: imageTag,
+      tag,
+      liveFrom,
+      liveTo,
+      liveVerified,
+    };
+  };
+
+  const fromTable = (): ParsedGeneratedIdentity => {
+    const seqRaw = tableValue(block, "seq");
+    const seq = seqRaw && /^\d+$/.test(seqRaw) ? Number(seqRaw) : null;
+    const gatewaySha = emptyToNull((tableValue(block, "gatewaySha") ?? "").toLowerCase());
+    const uiSha = emptyToNull((tableValue(block, "uiSha") ?? "").toLowerCase());
+    const digest = emptyToNull((tableValue(block, "artifactDigest") ?? "").toLowerCase());
+    const imageTag = emptyToNull(tableValue(block, "imageTag / artifactId"));
+    const tag = emptyToNull(tableValue(block, "tag"));
+    const liveFrom = emptyToNull(tableValue(block, "liveFrom"));
+    const liveToTable = tableValue(block, "liveTo");
+    const liveTo =
+      liveToTable === "_(open)_" || liveToTable === null || liveToTable === ""
+        ? liveToTable === "_(open)_"
+          ? ""
+          : liveToTable
         : liveToTable;
-  const lvRaw = machineValue(block, "liveVerified") ?? tableValue(block, "liveVerified");
-  let liveVerified: boolean | null = null;
-  if (lvRaw === "true") {
-    liveVerified = true;
-  } else if (lvRaw === "false") {
-    liveVerified = false;
+    let lvRaw = tableValue(block, "liveVerified");
+    if (lvRaw === "_(unset)_") {
+      lvRaw = null;
+    }
+    const liveVerified = parseLiveVerified(lvRaw);
+    return {
+      seq,
+      gatewaySha,
+      uiSha,
+      artifactDigest: digest,
+      imageTag,
+      artifactId: imageTag,
+      tag,
+      liveFrom,
+      liveTo: liveTo === "" ? "" : liveTo,
+      liveVerified,
+    };
+  };
+
+  if (surface === "machine") {
+    return fromMachine();
+  }
+  if (surface === "table") {
+    return fromTable();
   }
 
+  // prefer-machine: machine wins when present (legacy single-view helpers only).
+  const machine = fromMachine();
+  const table = fromTable();
+  const pick = <T>(m: T, t: T): T => (m !== null && m !== undefined && m !== ("" as T) ? m : t);
+  const seq = machine.seq ?? table.seq;
+  const gatewaySha = pick(machine.gatewaySha, table.gatewaySha);
+  const uiSha = pick(machine.uiSha, table.uiSha);
+  const digest = pick(machine.artifactDigest, table.artifactDigest);
+  const imageTag = pick(machine.imageTag, table.imageTag);
+  const tag = pick(machine.tag, table.tag);
+  const liveFrom = pick(machine.liveFrom, table.liveFrom);
+  const liveTo =
+    machine.liveTo !== null && machine.liveTo !== ""
+      ? machine.liveTo
+      : table.liveTo === "_(open)_"
+        ? ""
+        : table.liveTo;
+  const liveVerified = machine.liveVerified ?? table.liveVerified;
   return {
     seq,
-    gatewaySha: gatewaySha && FULL_SHA.test(gatewaySha) ? gatewaySha : gatewaySha,
-    uiSha: uiSha && FULL_SHA.test(uiSha) ? uiSha : uiSha,
-    artifactDigest: digest || null,
-    imageTag: imageTag || null,
-    artifactId: imageTag || null,
-    tag: tag || null,
-    liveFrom: liveFrom || null,
+    gatewaySha,
+    uiSha,
+    artifactDigest: digest,
+    imageTag,
+    artifactId: imageTag,
+    tag,
+    liveFrom,
     liveTo: liveTo === "" ? "" : liveTo,
     liveVerified,
   };
@@ -341,37 +423,72 @@ export function checkReleaseRecordConsistency(
       ],
     };
   }
-  const parsed = parseGeneratedIdentity(block);
+  // Dual-surface: human-visible markdown table AND hidden machine comment must
+  // each match the ledger tip. Preferring only the machine comment previously
+  // allowed a corrupted table SHA to still pass check (false green).
+  const machine = parseGeneratedIdentity(block, "machine");
+  const table = parseGeneratedIdentity(block, "table");
   const reasons: string[] = [];
-  if (parsed.seq !== tip.seq) {
-    reasons.push(`seq drift: record=${parsed.seq ?? "∅"} ledger=${tip.seq}`);
+
+  const compareSurface = (label: string, parsed: ParsedGeneratedIdentity): void => {
+    if (parsed.seq !== tip.seq) {
+      reasons.push(`${label} seq drift: record=${parsed.seq ?? "∅"} ledger=${tip.seq}`);
+    }
+    if (norm(parsed.gatewaySha) !== tip.gatewaySha) {
+      reasons.push(
+        `${label} gatewaySha drift: record=${parsed.gatewaySha ?? "∅"} ledger=${tip.gatewaySha}`,
+      );
+    }
+    if (norm(parsed.uiSha) !== tip.uiSha) {
+      reasons.push(`${label} uiSha drift: record=${parsed.uiSha ?? "∅"} ledger=${tip.uiSha}`);
+    }
+    const tipDigest = norm(tip.artifactDigest);
+    if (tipDigest && norm(parsed.artifactDigest) !== tipDigest) {
+      reasons.push(
+        `${label} artifactDigest drift: record=${parsed.artifactDigest ?? "∅"} ledger=${tip.artifactDigest}`,
+      );
+    }
+    const tipImage = tip.imageTag ?? tip.artifactId;
+    if (tipImage && norm(parsed.imageTag) !== norm(tipImage)) {
+      reasons.push(`${label} imageTag drift: record=${parsed.imageTag ?? "∅"} ledger=${tipImage}`);
+    }
+    if (tip.tag && norm(parsed.tag) !== norm(tip.tag)) {
+      reasons.push(`${label} tag drift: record=${parsed.tag ?? "∅"} ledger=${tip.tag}`);
+    }
+    if (norm(parsed.liveFrom) !== norm(tip.liveFrom)) {
+      reasons.push(
+        `${label} liveFrom drift: record=${parsed.liveFrom ?? "∅"} ledger=${tip.liveFrom}`,
+      );
+    }
+    if (parsed.liveTo !== null && parsed.liveTo !== "" && parsed.liveTo !== "_(open)_") {
+      reasons.push(`${label} liveTo must be open for the unique open tip; got ${parsed.liveTo}`);
+    }
+  };
+
+  compareSurface("machine", machine);
+  compareSurface("table", table);
+
+  // Surfaces must also agree with each other on identity fields (catches
+  // table-only or comment-only edits that still match ledger by coincidence).
+  const surfacePairs: Array<[string, string | null | undefined, string | null | undefined]> = [
+    [
+      "seq",
+      machine.seq === null ? null : String(machine.seq),
+      table.seq === null ? null : String(table.seq),
+    ],
+    ["gatewaySha", machine.gatewaySha, table.gatewaySha],
+    ["uiSha", machine.uiSha, table.uiSha],
+    ["artifactDigest", machine.artifactDigest, table.artifactDigest],
+    ["imageTag", machine.imageTag, table.imageTag],
+    ["tag", machine.tag, table.tag],
+    ["liveFrom", machine.liveFrom, table.liveFrom],
+  ];
+  for (const [field, mVal, tVal] of surfacePairs) {
+    if (norm(mVal) !== norm(tVal)) {
+      reasons.push(`surface mismatch ${field}: machine=${mVal ?? "∅"} table=${tVal ?? "∅"}`);
+    }
   }
-  if (norm(parsed.gatewaySha) !== tip.gatewaySha) {
-    reasons.push(`gatewaySha drift: record=${parsed.gatewaySha ?? "∅"} ledger=${tip.gatewaySha}`);
-  }
-  if (norm(parsed.uiSha) !== tip.uiSha) {
-    reasons.push(`uiSha drift: record=${parsed.uiSha ?? "∅"} ledger=${tip.uiSha}`);
-  }
-  const tipDigest = norm(tip.artifactDigest);
-  if (tipDigest && norm(parsed.artifactDigest) !== tipDigest) {
-    reasons.push(
-      `artifactDigest drift: record=${parsed.artifactDigest ?? "∅"} ledger=${tip.artifactDigest}`,
-    );
-  }
-  const tipImage = tip.imageTag ?? tip.artifactId;
-  if (tipImage && norm(parsed.imageTag) !== norm(tipImage)) {
-    reasons.push(`imageTag drift: record=${parsed.imageTag ?? "∅"} ledger=${tipImage}`);
-  }
-  if (tip.tag && norm(parsed.tag) !== norm(tip.tag)) {
-    reasons.push(`tag drift: record=${parsed.tag ?? "∅"} ledger=${tip.tag}`);
-  }
-  if (norm(parsed.liveFrom) !== norm(tip.liveFrom)) {
-    reasons.push(`liveFrom drift: record=${parsed.liveFrom ?? "∅"} ledger=${tip.liveFrom}`);
-  }
-  // Open tip must be recorded as open in the managed block.
-  if (parsed.liveTo !== null && parsed.liveTo !== "" && parsed.liveTo !== "_(open)_") {
-    reasons.push(`managed block liveTo must be open for the unique open tip; got ${parsed.liveTo}`);
-  }
+
   if (reasons.length > 0) {
     return { ok: false, tip, reasons };
   }
@@ -379,7 +496,7 @@ export function checkReleaseRecordConsistency(
     ok: true,
     tip,
     reasons: [
-      `ledger↔doc consistent for open seq ${tip.seq} (not a LIVE container reconciliation)`,
+      `ledger↔doc consistent for open seq ${tip.seq} (table+machine; not a LIVE container reconciliation)`,
     ],
   };
 }

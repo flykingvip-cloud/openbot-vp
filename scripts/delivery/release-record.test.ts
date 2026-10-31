@@ -204,6 +204,30 @@ describe("generate + check", () => {
     expect(next).toContain("do not rewrite me");
     expect(next.indexOf(BEGIN_MARKER)).toBeLessThan(next.indexOf("## Latest cutover"));
   });
+
+  it("PoC: human-visible table SHA corrupted while machine comment unchanged must fail", () => {
+    const ledger = [row(TIP_B, TIP_A.liveFrom), row(TIP_A)].join("\n");
+    const md = upsertGeneratedBlock("# Release record\n", TIP_A);
+    expect(checkReleaseRecordConsistency(ledger, md).ok).toBe(true);
+
+    const wrongSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const corrupted = md.replace(
+      /\|\s*gatewaySha\s*\|\s*`[0-9a-f]{40}`\s*\|/i,
+      `| gatewaySha | \`${wrongSha}\` |`,
+    );
+    expect(corrupted).not.toBe(md);
+    // Hidden machine comment still has the tip SHA.
+    expect(corrupted).toContain(`gatewaySha=${TIP_A.gatewaySha}`);
+    expect(corrupted).toContain(wrongSha);
+    const identityLine = corrupted.split("\n").find((l) => l.includes("<!-- identity:"));
+    expect(identityLine).toBeTruthy();
+    expect(identityLine!).toContain(TIP_A.gatewaySha);
+    expect(identityLine!).not.toContain(wrongSha);
+
+    const bad = checkReleaseRecordConsistency(ledger, corrupted);
+    expect(bad.ok).toBe(false);
+    expect(bad.reasons.join("\n")).toMatch(/table gatewaySha drift|surface mismatch gatewaySha/);
+  });
 });
 
 describe("parseCliArgs", () => {
