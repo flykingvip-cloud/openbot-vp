@@ -267,8 +267,46 @@ function isDominantQuotedEnvelope(body: string, text: string): boolean {
   return normalizeEnvelopeBody(body).length / totalLength >= MIN_QUOTED_ENVELOPE_COVERAGE;
 }
 
+function envelopeLocationKey(entry: DeliverableEnvelope): string | null {
+  if (entry.file) {
+    return `file:${entry.file}`;
+  }
+  if (entry.url) {
+    return `url:${entry.url}`;
+  }
+  return null;
+}
+
+/**
+ * All tagged envelopes that declare a concrete file or URL, in document order.
+ * Used so one assistant reply can expose multiple 「打开成果」 targets.
+ */
+export function extractLocatedDeliverableEnvelopes(text: string): DeliverableEnvelope[] {
+  const seen = new Set<string>();
+  const located: DeliverableEnvelope[] = [];
+  for (const envelope of extractTaggedDeliverableEnvelopes(text)) {
+    if (!envelopeDeclaresLocation(envelope)) {
+      continue;
+    }
+    const key = envelopeLocationKey(envelope);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    located.push(envelope);
+  }
+  return located;
+}
+
 /** Return the best deliverable envelope in `text`, or null when none qualify. */
 export function extractDeliverableEnvelope(text: string): DeliverableEnvelope | null {
+  const located = extractLocatedDeliverableEnvelopes(text);
+  if (located.length === 1) {
+    return located[0] ?? null;
+  }
+  if (located.length > 1) {
+    return pickBestEnvelope(located);
+  }
   const taggedBest = pickBestEnvelope(extractTaggedDeliverableEnvelopes(text));
   if (taggedBest) {
     return taggedBest;
