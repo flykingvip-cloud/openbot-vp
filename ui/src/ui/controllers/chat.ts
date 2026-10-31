@@ -1543,11 +1543,35 @@ function isDiscussToTaskReceiptMessage(message: unknown): boolean {
   return (message as { discussToTaskReceipt?: unknown }).discussToTaskReceipt === true;
 }
 
+/**
+ * Stable receipt identity for discuss→task status bubbles.
+ * Prefer explicit receiptId, then message.id (both stamped from source run).
+ * Never use body text — identical copy across distinct requests must both show.
+ */
+function resolveDiscussToTaskReceiptIdentity(message: Record<string, unknown>): string {
+  const receiptId = typeof message.receiptId === "string" ? message.receiptId.trim() : "";
+  if (receiptId) {
+    return receiptId;
+  }
+  const messageId = typeof message.id === "string" ? message.id.trim() : "";
+  return messageId;
+}
+
+/**
+ * True only for exact redelivery of the same receipt identity with the same body.
+ * - Same receiptId/id + same text → skip (show once).
+ * - Same receiptId/id + different text → false so appendChatMessage updates in place
+ *   (status change must not silently drop).
+ * - Different identity even with identical text → false (both show).
+ */
 function discussToTaskReceiptAlreadyVisible(
   state: Pick<ChatEventState, "chatMessages">,
   message: Record<string, unknown>,
 ): boolean {
-  const messageId = typeof message.id === "string" ? message.id.trim() : "";
+  const identity = resolveDiscussToTaskReceiptIdentity(message);
+  if (!identity) {
+    return false;
+  }
   const incomingText = extractText(message)?.trim() ?? "";
   const messages = Array.isArray(state.chatMessages) ? state.chatMessages : [];
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -1556,15 +1580,17 @@ function discussToTaskReceiptAlreadyVisible(
       continue;
     }
     const existing = row as Record<string, unknown>;
-    if (messageId && typeof existing.id === "string" && existing.id === messageId) {
-      return true;
-    }
-    if (!isDiscussToTaskReceiptMessage(existing)) {
+    const existingIdentity = resolveDiscussToTaskReceiptIdentity(existing);
+    if (!existingIdentity || existingIdentity !== identity) {
       continue;
     }
-    if (incomingText && (extractText(existing)?.trim() ?? "") === incomingText) {
-      return true;
+    // Require receipt marker on at least one side so plain id collisions do not
+    // suppress unrelated bubbles; egress always stamps discussToTaskReceipt.
+    if (!isDiscussToTaskReceiptMessage(existing) && !isDiscussToTaskReceiptMessage(message)) {
+      continue;
     }
+    const existingText = extractText(existing)?.trim() ?? "";
+    return existingText === incomingText;
   }
   return false;
 }
