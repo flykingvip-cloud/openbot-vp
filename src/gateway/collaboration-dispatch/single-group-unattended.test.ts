@@ -56,6 +56,31 @@ import {
 import { assertTaskMayComplete, asGovernedTask } from "./task-runtime.js";
 import type { WakeRoundDispatcher } from "./wake-round-dispatch.js";
 
+async function submitBoardItemForReviewSeeded(
+  auth: RuntimeAuthority,
+  input: Parameters<typeof submitBoardItemForReview>[1],
+  options?: Parameters<typeof submitBoardItemForReview>[2],
+) {
+  let next = input;
+  if (input.linkedDeliverableId) {
+    const { seedLinkedTeamDeliverableFixture, P2_LINKED_DELIVERABLE_FIXTURE_BODY } =
+      await import("../collaboration-learning/verify-linked-team-deliverable.js");
+    const seeded = await seedLinkedTeamDeliverableFixture({
+      authority: auth,
+      taskId: input.taskId,
+      deliverableId: input.linkedDeliverableId,
+      version:
+        typeof input.linkedDeliverableVersion === "number" ? input.linkedDeliverableVersion : 1,
+      content: P2_LINKED_DELIVERABLE_FIXTURE_BODY,
+    });
+    if (!seeded.ok) {
+      throw new Error(`seed linked deliverable failed: ${seeded.reason}`);
+    }
+    next = { ...input, linkedContentSha256: seeded.contentSha256 };
+  }
+  return submitBoardItemForReview(auth, next, options);
+}
+
 const tempDirs: string[] = [];
 const savedStateDir = process.env.OPENBOT_STATE_DIR;
 const savedOpenbotConfigPath = process.env.OPENBOT_CONFIG_PATH;
@@ -645,7 +670,7 @@ describe("batch 5 single-group unattended", () => {
       ).ok,
     ).toBe(true);
     const submissionId = randomUUID();
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: "task-ok",
@@ -655,7 +680,7 @@ describe("batch 5 single-group unattended", () => {
         artifactVersion: "v1",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
         submissionSummary: "提纲草案",
       },
@@ -726,7 +751,7 @@ describe("batch 5 single-group unattended", () => {
     const controlSubmission = randomUUID();
     expect(
       (
-        await submitBoardItemForReview(
+        await submitBoardItemForReviewSeeded(
           control,
           {
             taskId: "task-ctl",
@@ -736,7 +761,7 @@ describe("batch 5 single-group unattended", () => {
             artifactVersion: "v1",
             linkedDeliverableId: "del-p2-test",
             linkedDeliverableVersion: 1,
-            linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
             submissionSummary: "control",
           },

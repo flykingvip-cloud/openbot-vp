@@ -44,6 +44,31 @@ import { createRuntimeAuthority, type RuntimeAuthority } from "./runtime-authori
 import type { CollaborationBotTarget, CollaborationDispatchScope } from "./types.js";
 import { listWakeEvents } from "./wake-contract.js";
 
+async function submitBoardItemForReviewSeeded(
+  auth: RuntimeAuthority,
+  input: Parameters<typeof submitBoardItemForReview>[1],
+  options?: Parameters<typeof submitBoardItemForReview>[2],
+) {
+  let next = input;
+  if (input.linkedDeliverableId) {
+    const { seedLinkedTeamDeliverableFixture, P2_LINKED_DELIVERABLE_FIXTURE_BODY } =
+      await import("../collaboration-learning/verify-linked-team-deliverable.js");
+    const seeded = await seedLinkedTeamDeliverableFixture({
+      authority: auth,
+      taskId: input.taskId,
+      deliverableId: input.linkedDeliverableId,
+      version:
+        typeof input.linkedDeliverableVersion === "number" ? input.linkedDeliverableVersion : 1,
+      content: P2_LINKED_DELIVERABLE_FIXTURE_BODY,
+    });
+    if (!seeded.ok) {
+      throw new Error(`seed linked deliverable failed: ${seeded.reason}`);
+    }
+    next = { ...input, linkedContentSha256: seeded.contentSha256 };
+  }
+  return submitBoardItemForReview(auth, next, options);
+}
+
 const tempDirs: string[] = [];
 const savedStateDir = process.env.OPENBOT_STATE_DIR;
 const savedOpenbotConfigPath = process.env.OPENBOT_CONFIG_PATH;
@@ -560,7 +585,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
       return;
     }
     const submissionId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -571,7 +596,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
@@ -685,7 +710,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
         },
         { cfg },
       ),
-      submitBoardItemForReview(
+      submitBoardItemForReviewSeeded(
         auth,
         {
           taskId: seedTask.taskId,
@@ -696,7 +721,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
           artifactVersion: "v1.0.0",
           linkedDeliverableId: "del-p2-test",
           linkedDeliverableVersion: 1,
-          linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
         },
         { cfg },
       ),
@@ -723,7 +748,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
     }
 
     // Post-cancel submit cannot advance.
-    const after = await submitBoardItemForReview(
+    const after = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -734,7 +759,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
         artifactVersion: "v1.0.1",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
@@ -791,7 +816,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
     const revInProgress = inProg.value.revision ?? 0;
 
     const submissionId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -802,7 +827,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
         artifactVersion: "v2.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
@@ -853,7 +878,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
       expect(acceptAfter.reason).toBe("invalid_status");
     }
 
-    const resubmit = await submitBoardItemForReview(
+    const resubmit = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -864,7 +889,7 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
         artifactVersion: "v2.0.1",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
@@ -924,7 +949,7 @@ describe("C1 claim progress states", () => {
     const itemId = published.value.itemId;
 
     // cannot submit from published
-    const earlySubmit = await submitBoardItemForReview(
+    const earlySubmit = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -934,7 +959,7 @@ describe("C1 claim progress states", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
@@ -982,7 +1007,7 @@ describe("C1 claim progress states", () => {
     }
     expect(inProg.value.status).toBe("in_progress");
 
-    const badId = await submitBoardItemForReview(
+    const badId = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -992,7 +1017,7 @@ describe("C1 claim progress states", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
@@ -1003,7 +1028,7 @@ describe("C1 claim progress states", () => {
     expect(isBoardClaimSubmissionId("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")).toBe(true);
 
     const submissionId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1014,7 +1039,7 @@ describe("C1 claim progress states", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
@@ -1026,7 +1051,7 @@ describe("C1 claim progress states", () => {
     expect(submitted.value.submissionId).toBe(submissionId);
 
     // idempotent same submissionId
-    const again = await submitBoardItemForReview(
+    const again = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1036,14 +1061,14 @@ describe("C1 claim progress states", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
     expect(again.ok).toBe(true);
 
     // different submissionId while open → refuse
-    const clash = await submitBoardItemForReview(
+    const clash = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1053,7 +1078,7 @@ describe("C1 claim progress states", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
@@ -1087,7 +1112,7 @@ describe("C1 claim progress states", () => {
     expect(resumed.ok).toBe(true);
 
     const submissionId2 = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
-    const resubmitted = await submitBoardItemForReview(
+    const resubmitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1097,7 +1122,7 @@ describe("C1 claim progress states", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
         submissionSummary: "chapter v2 with sources",
       },
@@ -1236,7 +1261,7 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
       { cfg },
     );
 
-    const empty = await submitBoardItemForReview(
+    const empty = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1246,7 +1271,7 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
         submissionSummary: "  ",
       },
@@ -1258,7 +1283,7 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
     }
 
     const submissionId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1269,7 +1294,7 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
       },
       { cfg },
     );
@@ -1297,7 +1322,7 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
       { taskId: seedTask.taskId, itemId, actorId: "bot-analyst" },
       { cfg },
     );
-    const dup = await submitBoardItemForReview(
+    const dup = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1307,7 +1332,7 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
         submissionSummary: "draft v1",
       },
@@ -1369,7 +1394,7 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
         { cfg: cfg2 },
       );
       const sid = `cccccccc-cccc-4ccc-8ccc-${String(i).padStart(12, "0")}`;
-      const submitted = await submitBoardItemForReview(
+      const submitted = await submitBoardItemForReviewSeeded(
         auth,
         {
           taskId: seedTask.taskId,
@@ -1379,7 +1404,7 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
           artifactVersion: "v1.0.0",
           linkedDeliverableId: "del-p2-test",
           linkedDeliverableVersion: 1,
-          linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
           submissionSummary: `draft v${i + 1}`,
         },
@@ -1782,7 +1807,7 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
       { cfg },
     );
     const submissionId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1792,7 +1817,7 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
         submissionSummary: "chapter for review",
       },
@@ -1854,7 +1879,7 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
       { cfg },
     );
     const submissionId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1864,7 +1889,7 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
         submissionSummary: "chapter for review",
       },
@@ -1923,7 +1948,7 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
       { cfg },
     );
     const submissionId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -1933,7 +1958,7 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
         submissionSummary: "chapter for review",
       },

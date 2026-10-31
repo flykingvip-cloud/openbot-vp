@@ -923,25 +923,49 @@ export async function runGroupTaskHeartbeat(
   const nextItems: Record<string, GroupTaskHeartbeatItemState> = { ...priorState.items };
 
   // P2: durable pendingEventRelay recovery via existing heartbeat path (same opKey; no new queue).
+  // Reload FULL board claim rows (not HeartbeatBoardItemLike) so pendingEventRelay is visible.
   if (!dryRun && !unattendedTarget) {
     try {
       const { recoverPendingBoardEventRelays } =
         await import("../collaboration-learning/post-submission-event-advance.js");
-      const byTask = new Map<string, typeof items>();
+      const { loadBoardClaimItem } = await import("./claim-contract.js");
+      const groupLocator = compact(authority.namespace?.groupLocator);
+      const trusted =
+        groupLocator.length > 0
+          ? {
+              groupLocator,
+              groupsRoot: path.dirname(groupLocator),
+            }
+          : null;
+      const tenantId = compact(options?.tenantId) || compact(authority.tenantId) || null;
+      const byTask = new Map<string, string[]>();
       for (const item of items) {
         const list = byTask.get(item.taskId) ?? [];
-        list.push(item);
+        list.push(item.itemId);
         byTask.set(item.taskId, list);
       }
-      for (const [taskId, taskItems] of byTask) {
+      for (const [taskId, itemIds] of byTask) {
+        const fullItems = [];
+        for (const itemId of itemIds) {
+          const full = await loadBoardClaimItem(authority, { taskId, itemId });
+          if (full) {
+            fullItems.push(full);
+          }
+        }
+        if (fullItems.length === 0) {
+          continue;
+        }
+        // Same tenant + store root as this heartbeat's verified authority — never null/legacy.
         await recoverPendingBoardEventRelays({
           groupId,
           taskId,
           actorId,
-          items: taskItems,
-          tenant: null,
+          items: fullItems,
+          tenant: tenantId ? { tenantId, trust: "none" } : null,
+          trusted,
           cfg,
           roundDispatcher: options?.roundDispatcher,
+          requireTrustedScope: true,
         });
       }
     } catch {

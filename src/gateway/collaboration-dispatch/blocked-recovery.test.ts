@@ -37,6 +37,31 @@ import { isSelfAdvanceActiveBoardItem, trySelfAdvance } from "./self-advance.js"
 const GROUP_ID = "grp_unblock";
 const TASK_ID = "task_unblock";
 
+async function submitBoardItemForReviewSeeded(
+  auth: RuntimeAuthority,
+  input: Parameters<typeof submitBoardItemForReview>[1],
+  options?: Parameters<typeof submitBoardItemForReview>[2],
+) {
+  let next = input;
+  if (input.linkedDeliverableId) {
+    const { seedLinkedTeamDeliverableFixture, P2_LINKED_DELIVERABLE_FIXTURE_BODY } =
+      await import("../collaboration-learning/verify-linked-team-deliverable.js");
+    const seeded = await seedLinkedTeamDeliverableFixture({
+      authority: auth,
+      taskId: input.taskId,
+      deliverableId: input.linkedDeliverableId,
+      version:
+        typeof input.linkedDeliverableVersion === "number" ? input.linkedDeliverableVersion : 1,
+      content: P2_LINKED_DELIVERABLE_FIXTURE_BODY,
+    });
+    if (!seeded.ok) {
+      throw new Error(`seed linked deliverable failed: ${seeded.reason}`);
+    }
+    next = { ...input, linkedContentSha256: seeded.contentSha256 };
+  }
+  return submitBoardItemForReview(auth, next, options);
+}
+
 const tempDirs: string[] = [];
 const savedStateDir = process.env.OPENBOT_STATE_DIR;
 const savedOpenbotConfigPath = process.env.OPENBOT_CONFIG_PATH;
@@ -374,7 +399,7 @@ describe("blocked recovery", () => {
       { cfg },
     );
     const submissionId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: TASK_ID,
@@ -384,7 +409,7 @@ describe("blocked recovery", () => {
         artifactVersion: "v1.0.0",
         linkedDeliverableId: "del-p2-test",
         linkedDeliverableVersion: 1,
-        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
 
         submissionSummary: "final chapter",
       },
