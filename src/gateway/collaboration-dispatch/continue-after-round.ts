@@ -254,6 +254,15 @@ export async function maybeContinueAfterRoundComplete(params: {
       ((await loadBoardClaimItemsFromDir(boardClaimsDir(authority))) as GroupBoardClaimItem[]);
 
     let workingItems: GroupBoardClaimItem[] = [...loaded];
+    // P4/O5·O15: after deliverable settlement, do not force-continue execute items that
+    // still need formal board submit/review (in_progress|returned). Other milestones
+    // (e.g. published) may still continue. Same gate used by resume-incomplete force path.
+    if (params.forceForDeliverableSettlement === true) {
+      workingItems = workingItems.filter((item) => {
+        const status = (item.status ?? "").trim();
+        return status !== "in_progress" && status !== "returned";
+      });
+    }
     let plan = planContinueAfterRound({
       enabled: true,
       boardItems: workingItems,
@@ -262,7 +271,10 @@ export async function maybeContinueAfterRoundComplete(params: {
     if (plan.reason === "no_active_board_inventory") {
       const decision = baseDecision({
         enabled: true,
-        reason: "no_active_board_inventory",
+        reason:
+          params.forceForDeliverableSettlement === true
+            ? "force_continue_blocked_await_board_submit"
+            : "no_active_board_inventory",
       });
       await appendContinueDecision(authority, decision);
       await writeCooldownAt(authority, at);

@@ -772,6 +772,9 @@ describe("FINAL v3 S3 submit/review versioning", () => {
           submissionId: sid,
           artifactVersion: `v1.${i}.0`,
           submissionSummary: `draft increment ${i}`,
+          linkedDeliverableId: "del-p2-test",
+          linkedDeliverableVersion: 1,
+          linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
         },
         { cfg },
       );
@@ -796,6 +799,8 @@ describe("FINAL v3 S3 submit/review versioning", () => {
     const loaded = await loadBoardClaimItem(auth, { taskId: seedTask.taskId, itemId });
     expect(loaded?.returnCount).toBe(2);
     expect(loaded?.status).toBe("returned");
+    // P4/O4: cap hit clears return-revise relay (escalate-only).
+    expect(loaded?.pendingEventRelay).toBeNull();
     expect(boardSubmissionStateContract("returned").acceptsLatePriorVersion).toBe(false);
   });
 });

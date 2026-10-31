@@ -924,6 +924,9 @@ export async function runGroupTaskHeartbeat(
 
   // P2: durable pendingEventRelay recovery via existing heartbeat path (same opKey; no new queue).
   // Reload FULL board claim rows (not HeartbeatBoardItemLike) so pendingEventRelay is visible.
+  // P4/O14: items with pendingEventRelay (or recovered/dispatched this tick) must not also
+  // get heartbeat nudge/escalate execute — same work-item side-effect count, not opKey-only.
+  const relayGuardedItemIds = new Set<string>();
   if (!dryRun && !unattendedTarget) {
     try {
       const { recoverPendingBoardEventRelays } =
@@ -950,13 +953,16 @@ export async function runGroupTaskHeartbeat(
           const full = await loadBoardClaimItem(authority, { taskId, itemId });
           if (full) {
             fullItems.push(full);
+            if (full.pendingEventRelay) {
+              relayGuardedItemIds.add(full.itemId);
+            }
           }
         }
         if (fullItems.length === 0) {
           continue;
         }
         // Same tenant + store root as this heartbeat's verified authority — never null/legacy.
-        await recoverPendingBoardEventRelays({
+        const recovered = await recoverPendingBoardEventRelays({
           groupId,
           taskId,
           actorId,
@@ -966,7 +972,32 @@ export async function runGroupTaskHeartbeat(
           cfg,
           roundDispatcher: options?.roundDispatcher,
           requireTrustedScope: true,
+          authority,
         });
+        for (const row of recovered) {
+          if (row.dispatched || row.wakeConsumed || row.wakeRecorded) {
+            for (const full of fullItems) {
+              if (full.pendingEventRelay?.opKey && row.opKey === full.pendingEventRelay.opKey) {
+                relayGuardedItemIds.add(full.itemId);
+              }
+            }
+            // Also guard by matching any recovered item that still maps to this task's set.
+            for (const itemId of itemIds) {
+              // Prefer explicit: if this recover batch ran for these items, keep prior guards.
+              void itemId;
+            }
+          }
+        }
+        // After recover, re-check live pending and keep guard for any still-pending or just-cleared.
+        for (const itemId of itemIds) {
+          if (relayGuardedItemIds.has(itemId)) {
+            continue;
+          }
+          const live = await loadBoardClaimItem(authority, { taskId, itemId });
+          if (live?.pendingEventRelay) {
+            relayGuardedItemIds.add(itemId);
+          }
+        }
       }
     } catch {
       // Recovery is best-effort; pending markers remain durable for the next scan.
@@ -974,6 +1005,26 @@ export async function runGroupTaskHeartbeat(
   }
 
   for (const item of items) {
+    if (relayGuardedItemIds.has(item.itemId)) {
+      decisions.push({
+        itemId: item.itemId,
+        taskId: item.taskId,
+        groupId: item.groupId,
+        status: item.status,
+        action: "skip",
+        toAgentIds: [],
+        reason: "pending_event_relay_guard",
+        consecutiveNoResponse: priorState.items[item.itemId]?.consecutiveNoResponse ?? 0,
+      });
+      nextItems[item.itemId] = {
+        consecutiveNoResponse: priorState.items[item.itemId]?.consecutiveNoResponse ?? 0,
+        lastFingerprint: progressFingerprint(item),
+        lastStatus: item.status,
+        lastNudgeAt: priorState.items[item.itemId]?.lastNudgeAt,
+        lastEscalateAt: priorState.items[item.itemId]?.lastEscalateAt,
+      };
+      continue;
+    }
     const prior = priorState.items[item.itemId];
     const decision = planHeartbeatActionForItem({
       item,

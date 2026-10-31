@@ -10129,6 +10129,7 @@ tasks:
       - src/gateway/collaboration-dispatch/claim-contract.test.ts
       - src/gateway/collaboration-dispatch/claim-contract.ts
       - src/gateway/collaboration-dispatch/collab-s3-submit-review-versioning.test.ts
+      - src/gateway/collaboration-dispatch/continue-after-round.ts
       - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
       - src/gateway/collaboration-dispatch/peer-review-gate.test.ts
       - src/gateway/collaboration-dispatch/single-group-unattended.test.ts
@@ -10136,6 +10137,8 @@ tasks:
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts
       - src/gateway/collaboration-learning/controlled-collab-p2-mode-b-boot-acl.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p3-two-member-md-loop.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p4-gate-repros.test.ts
       - src/gateway/collaboration-learning/post-submission-event-advance.ts
       - src/gateway/protocol/schema/collaboration.ts
       - src/gateway/server-methods/collaboration-learning.ts
@@ -10154,6 +10157,7 @@ landingStreams:
       - src/gateway/collaboration-dispatch/claim-contract.test.ts
       - src/gateway/collaboration-dispatch/claim-contract.ts
       - src/gateway/collaboration-dispatch/collab-s3-submit-review-versioning.test.ts
+      - src/gateway/collaboration-dispatch/continue-after-round.ts
       - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
       - src/gateway/collaboration-dispatch/peer-review-gate.test.ts
       - src/gateway/collaboration-dispatch/single-group-unattended.test.ts
@@ -10161,6 +10165,8 @@ landingStreams:
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts
       - src/gateway/collaboration-learning/controlled-collab-p2-mode-b-boot-acl.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p3-two-member-md-loop.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p4-gate-repros.test.ts
       - src/gateway/collaboration-learning/post-submission-event-advance.ts
       - src/gateway/protocol/schema/collaboration.ts
       - src/gateway/server-methods/collaboration-learning.ts

@@ -1084,7 +1084,8 @@ describe("P2 matrix — direct-internal (claim-contract)", () => {
       reviewer: reviewerB,
     });
     const subNoLink = randomUUID();
-    await submitBoardItemForReview(
+    // P4/S2: submit without verifiable link is explicitly blocked (no review entry).
+    const refuseNoLinkSubmit = await submitBoardItemForReview(
       auth,
       {
         taskId: noLinkTask,
@@ -1096,22 +1097,16 @@ describe("P2 matrix — direct-internal (claim-contract)", () => {
       },
       { cfg, coordinatorBotId: reviewerB },
     );
-    const refuseNoLink = await acceptBoardItemSubmission(
-      auth,
-      {
-        taskId: noLinkTask,
-        itemId: noLink.item.itemId,
-        actorId: reviewerB,
-        expectedSubmissionId: subNoLink,
-        reason: "ok",
-        checkedAcceptanceCriteria: ["has title", "has body"],
-      },
-      { cfg },
-    );
-    expect(refuseNoLink.ok).toBe(false);
-    if (!refuseNoLink.ok) {
-      expect(refuseNoLink.reason).toBe("deliverable_link_required");
+    expect(refuseNoLinkSubmit.ok).toBe(false);
+    if (!refuseNoLinkSubmit.ok) {
+      expect(refuseNoLinkSubmit.reason).toBe("deliverable_link_required");
     }
+    const noLinkLive = await loadBoardClaimItem(auth, {
+      taskId: noLinkTask,
+      itemId: noLink.item.itemId,
+    });
+    expect(noLinkLive?.status).toBe("in_progress");
+    expect(noLinkLive?.pendingEventRelay ?? null).toBeNull();
 
     const accepted = await acceptBoardItemSubmission(
       auth,

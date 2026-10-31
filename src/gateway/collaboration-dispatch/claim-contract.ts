@@ -1085,7 +1085,7 @@ export type SubmitForReviewInput = {
    */
   artifactVersion: string;
   submissionSummary?: string;
-  /** P2 optional dual-track link (required later for accept). */
+  /** P4/S2: required dual-track link at submit (also required for accept). */
   linkedDeliverableId?: string;
   linkedDeliverableVersion?: number;
   linkedContentSha256?: string;
@@ -1343,17 +1343,17 @@ export async function submitBoardItemForReview(
         Number.isFinite(input.linkedDeliverableVersion)
           ? input.linkedDeliverableVersion
           : undefined;
-      // Partial link refused: all-or-nothing when any binding field is set.
+      // P4/S2: verifiable deliverable link required at submit — no review without it.
+      // Partial link still refused as incomplete; missing all three = explicit block.
       const linkAny = Boolean(
         linkedDeliverableId || linkedContentSha256 || linkedDeliverableVersion != null,
       );
-      if (
-        linkAny &&
-        (!linkedDeliverableId || !linkedContentSha256 || linkedDeliverableVersion == null)
-      ) {
+      if (!linkedDeliverableId || !linkedContentSha256 || linkedDeliverableVersion == null) {
         return fail(
-          "deliverable_link_incomplete",
-          "linkedDeliverableId + linkedDeliverableVersion + linkedContentSha256 must be provided together",
+          linkAny ? "deliverable_link_incomplete" : "deliverable_link_required",
+          linkAny
+            ? "linkedDeliverableId + linkedDeliverableVersion + linkedContentSha256 must be provided together"
+            : "submit requires linkedDeliverableId + linkedDeliverableVersion + linkedContentSha256; without a verifiable deliverable link the item must not enter review dispatch",
         );
       }
       if (linkedDeliverableId && linkedContentSha256 && linkedDeliverableVersion != null) {
@@ -1624,6 +1624,13 @@ export async function returnBoardItemSubmission(
         return fail(versionGate.reason, versionGate.message);
       }
       const priorCount = typeof current.returnCount === "number" ? current.returnCount : 0;
+      // P4/O4: already at/over acceptance-loop cap → refuse further return-revise.
+      if (priorCount >= maxReturns) {
+        return fail(
+          "acceptance_loop_exceeded",
+          `returnCount ${priorCount} already reached acceptanceLoopMaxReturns ${maxReturns}; escalate only — no further return-revise`,
+        );
+      }
       const nextCount = priorCount + 1;
       const pendingSubmissionId = compact(current.submissionId);
       const pendingArtifactVersion = normalizeArtifactVersion(current.artifactVersion);
@@ -1640,27 +1647,30 @@ export async function returnBoardItemSubmission(
       ].join("|");
       // Claimant + deliverable bound here; exact todolist/version/step resolved +
       // re-validated at dispatch (post-submission-event-advance) against live plan.
-      const pendingEventRelay = claimantIdForRelay
-        ? ({
-            businessEvent: "returned",
-            sourceId: pendingSubmissionId || `return-${nextCount}`,
-            artifactVersion: pendingArtifactVersion || "none",
-            returnRevision: nextCount,
-            targetAgentIds: [claimantIdForRelay],
-            opKey,
-            recordedAt: nowOf(options),
-            status: "pending",
-            claimantId: claimantIdForRelay,
-            boardRevision: nextBoardClaimRevision(current),
-            linkedDeliverableId: compact(current.linkedDeliverableId) || undefined,
-            linkedDeliverableVersion:
-              typeof current.linkedDeliverableVersion === "number" &&
-              Number.isFinite(current.linkedDeliverableVersion)
-                ? current.linkedDeliverableVersion
-                : undefined,
-            linkedContentSha256: compact(current.linkedContentSha256) || undefined,
-          } satisfies BoardPendingEventRelay)
-        : null;
+      // P4/O4: when this return hits the cap, escalate only — do not arm return-revise relay.
+      const hitsCap = nextCount >= maxReturns;
+      const pendingEventRelay =
+        claimantIdForRelay && !hitsCap
+          ? ({
+              businessEvent: "returned",
+              sourceId: pendingSubmissionId || `return-${nextCount}`,
+              artifactVersion: pendingArtifactVersion || "none",
+              returnRevision: nextCount,
+              targetAgentIds: [claimantIdForRelay],
+              opKey,
+              recordedAt: nowOf(options),
+              status: "pending",
+              claimantId: claimantIdForRelay,
+              boardRevision: nextBoardClaimRevision(current),
+              linkedDeliverableId: compact(current.linkedDeliverableId) || undefined,
+              linkedDeliverableVersion:
+                typeof current.linkedDeliverableVersion === "number" &&
+                Number.isFinite(current.linkedDeliverableVersion)
+                  ? current.linkedDeliverableVersion
+                  : undefined,
+              linkedContentSha256: compact(current.linkedContentSha256) || undefined,
+            } satisfies BoardPendingEventRelay)
+          : null;
       const next: GroupBoardClaimItem = {
         ...current,
         status: "returned",
