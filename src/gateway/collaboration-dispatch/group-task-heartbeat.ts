@@ -922,6 +922,33 @@ export async function runGroupTaskHeartbeat(
   const wakeEvents: WakeEvent[] = [];
   const nextItems: Record<string, GroupTaskHeartbeatItemState> = { ...priorState.items };
 
+  // P2: durable pendingEventRelay recovery via existing heartbeat path (same opKey; no new queue).
+  if (!dryRun && !unattendedTarget) {
+    try {
+      const { recoverPendingBoardEventRelays } =
+        await import("../collaboration-learning/post-submission-event-advance.js");
+      const byTask = new Map<string, typeof items>();
+      for (const item of items) {
+        const list = byTask.get(item.taskId) ?? [];
+        list.push(item);
+        byTask.set(item.taskId, list);
+      }
+      for (const [taskId, taskItems] of byTask) {
+        await recoverPendingBoardEventRelays({
+          groupId,
+          taskId,
+          actorId,
+          items: taskItems,
+          tenant: null,
+          cfg,
+          roundDispatcher: options?.roundDispatcher,
+        });
+      }
+    } catch {
+      // Recovery is best-effort; pending markers remain durable for the next scan.
+    }
+  }
+
   for (const item of items) {
     const prior = priorState.items[item.itemId];
     const decision = planHeartbeatActionForItem({

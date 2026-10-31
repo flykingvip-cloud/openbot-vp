@@ -382,6 +382,10 @@ describe("blocked recovery", () => {
         actorId: "bot-analyst",
         submissionId,
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         submissionSummary: "final chapter",
       },
       { cfg },

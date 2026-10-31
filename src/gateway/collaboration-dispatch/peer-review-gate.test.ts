@@ -203,6 +203,10 @@ async function reachSubmitted(
       actorId: "bot-analyst",
       submissionId: SUBMISSION_ID,
       artifactVersion: "v1.0.0",
+      linkedDeliverableId: "del-p2-test",
+      linkedDeliverableVersion: 1,
+      linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
       submissionSummary: "chapter v1",
     },
     { cfg },

@@ -91,6 +91,21 @@ export const BOARD_CLAIM_PROGRESS_STATUSES = [
   "blocked",
 ] as const satisfies readonly BoardClaimStatus[];
 
+/** P2 business event identity retained when consume uses source=nudge. */
+export type BoardPendingEventRelay = Readonly<{
+  businessEvent: "submitted_for_review" | "returned" | "accepted";
+  /** Original source id (submissionId / acceptedSubmissionId). */
+  sourceId: string;
+  artifactVersion: string;
+  /** Return round (returnCount) — new round may legally re-dispatch. */
+  returnRevision?: number;
+  targetAgentIds: readonly string[];
+  /** Idempotency key bound to business event + version (+ returnRevision). */
+  opKey: string;
+  recordedAt: number;
+  status: "pending";
+}>;
+
 export type GroupBoardClaimItem = Readonly<{
   itemId: string;
   groupId: string;
@@ -189,6 +204,18 @@ export type GroupBoardClaimItem = Readonly<{
   cancelledAt?: number;
   cancelledBy?: string;
   cancelledReason?: string;
+  /**
+   * P2: minimal dual-track link — board submission ↔ team deliverable receipt.
+   * Review/return/accept target this exact binding (no third deliverable format).
+   */
+  linkedDeliverableId?: string;
+  linkedDeliverableVersion?: number;
+  linkedContentSha256?: string;
+  /**
+   * P2: durable pending relay after state commit when wake/consume has not yet
+   * succeeded. Identifiable by existing recovery/heartbeat; same opKey is idempotent.
+   */
+  pendingEventRelay?: BoardPendingEventRelay | null;
 }>;
 
 export type ClaimResult<T> =
@@ -1015,6 +1042,10 @@ export type SubmitForReviewInput = {
    */
   artifactVersion: string;
   submissionSummary?: string;
+  /** P2 optional dual-track link (required later for accept). */
+  linkedDeliverableId?: string;
+  linkedDeliverableVersion?: number;
+  linkedContentSha256?: string;
 };
 
 export type AcceptSubmissionInput = {
@@ -1262,6 +1293,49 @@ export async function submitBoardItemForReview(
       if (!actor.ok) {
         return actor;
       }
+      const linkedDeliverableId = compact(input.linkedDeliverableId) || undefined;
+      const linkedContentSha256 = compact(input.linkedContentSha256) || undefined;
+      const linkedDeliverableVersion =
+        typeof input.linkedDeliverableVersion === "number" &&
+        Number.isFinite(input.linkedDeliverableVersion)
+          ? input.linkedDeliverableVersion
+          : undefined;
+      // Partial link refused: all-or-nothing when any binding field is set.
+      const linkAny = Boolean(
+        linkedDeliverableId || linkedContentSha256 || linkedDeliverableVersion != null,
+      );
+      if (
+        linkAny &&
+        (!linkedDeliverableId || !linkedContentSha256 || linkedDeliverableVersion == null)
+      ) {
+        return fail(
+          "deliverable_link_incomplete",
+          "linkedDeliverableId + linkedDeliverableVersion + linkedContentSha256 must be provided together",
+        );
+      }
+      const reviewer = compact(options?.coordinatorBotId) || compact(current.publishedBy);
+      const fromAgentId = compact(input.actorId) || compact(current.claimantId);
+      const opKey = [
+        "board_event_relay",
+        "submitted_for_review",
+        authority.groupId || current.groupId,
+        taskId,
+        itemId,
+        submissionId,
+        artifactVersion,
+      ].join("|");
+      const pendingEventRelay =
+        reviewer && fromAgentId
+          ? ({
+              businessEvent: "submitted_for_review",
+              sourceId: submissionId,
+              artifactVersion,
+              targetAgentIds: [reviewer],
+              opKey,
+              recordedAt: nowOf(options),
+              status: "pending",
+            } satisfies BoardPendingEventRelay)
+          : undefined;
       wrote = true;
       const next: GroupBoardClaimItem = {
         ...current,
@@ -1270,6 +1344,10 @@ export async function submitBoardItemForReview(
         artifactVersion,
         submittedAt: nowOf(options),
         submissionSummary: summaryBody,
+        linkedDeliverableId,
+        linkedDeliverableVersion,
+        linkedContentSha256,
+        pendingEventRelay: pendingEventRelay ?? current.pendingEventRelay ?? null,
         revision: nextBoardClaimRevision(current),
       };
       return { ok: true, value: next };
@@ -1279,9 +1357,8 @@ export async function submitBoardItemForReview(
   if (!submitted.ok) {
     return submitted;
   }
-  // P1: best-effort wake 主答/coordinator after a real submit transition (outside lock).
-  // Prefer options.coordinatorBotId (entry loads operating-state); fallback publishedBy.
-  // Never intendedClaimant. Source "insight" = wake 主答 (no WAKE_SOURCES "submit").
+  // Ledger-only insight wake retained for audit (insight ∉ WAKE_ROUND_DISPATCH_SOURCES).
+  // P2 product relay is pendingEventRelay + consume(source=nudge) outside this mutate.
   // Fail-open: wake miss must not flip the submit Result. Skip on idempotent no-write.
   if (wrote) {
     const reviewer = compact(options?.coordinatorBotId) || compact(submitted.value.publishedBy);
@@ -1297,7 +1374,7 @@ export async function submitBoardItemForReview(
           outcome: "recorded",
           taskId,
           itemId,
-          reason: "submit_for_review",
+          reason: `submitted_for_review:submission=${submissionId}:artifact=${artifactVersion}`,
           relatedId: submissionId,
         },
         options,
@@ -1370,6 +1447,18 @@ export async function acceptBoardItemSubmission(
           "pending submission has no artifactVersion; cannot accept unbound version",
         );
       }
+      // P2: accept targets the exact submission↔deliverable link; no legal artifact → refuse.
+      if (
+        !compact(current.linkedDeliverableId) ||
+        !compact(current.linkedContentSha256) ||
+        typeof current.linkedDeliverableVersion !== "number" ||
+        !Number.isFinite(current.linkedDeliverableVersion)
+      ) {
+        return fail(
+          "deliverable_link_required",
+          "accept requires linkedDeliverableId + linkedDeliverableVersion + linkedContentSha256 bound to this submission",
+        );
+      }
       const criteriaGate = acceptanceCriteriaFullyChecked({
         boardCriteria: current.acceptanceCriteria,
         checkedCriteria: input.checkedAcceptanceCriteria,
@@ -1408,6 +1497,8 @@ export async function acceptBoardItemSubmission(
         acceptanceVerdict: "pass",
         acceptanceProxyForActorId: compact(input.proxyForActorId) || undefined,
         acceptanceProxyBasis: compact(input.proxyBasis) || undefined,
+        // Accepted items must not keep pending exec/review relays.
+        pendingEventRelay: null,
         revision: nextBoardClaimRevision(current),
       };
       return { ok: true, value: next };
@@ -1458,6 +1549,29 @@ export async function returnBoardItemSubmission(
       const nextCount = priorCount + 1;
       const pendingSubmissionId = compact(current.submissionId);
       const pendingArtifactVersion = normalizeArtifactVersion(current.artifactVersion);
+      const claimantIdForRelay = compact(current.claimantId);
+      const opKey = [
+        "board_event_relay",
+        "returned",
+        authority.groupId || current.groupId,
+        taskId,
+        itemId,
+        pendingSubmissionId || "none",
+        pendingArtifactVersion || "none",
+        `r${nextCount}`,
+      ].join("|");
+      const pendingEventRelay = claimantIdForRelay
+        ? ({
+            businessEvent: "returned",
+            sourceId: pendingSubmissionId || `return-${nextCount}`,
+            artifactVersion: pendingArtifactVersion || "none",
+            returnRevision: nextCount,
+            targetAgentIds: [claimantIdForRelay],
+            opKey,
+            recordedAt: nowOf(options),
+            status: "pending",
+          } satisfies BoardPendingEventRelay)
+        : null;
       const next: GroupBoardClaimItem = {
         ...current,
         status: "returned",
@@ -1474,6 +1588,7 @@ export async function returnBoardItemSubmission(
         submissionId: undefined,
         artifactVersion: undefined,
         submittedAt: undefined,
+        pendingEventRelay,
         revision: nextBoardClaimRevision(current),
       };
       return { ok: true, value: next };
@@ -1488,6 +1603,8 @@ export async function returnBoardItemSubmission(
   // Wake / escalate outside lock, only after durable success.
   const claimantId = compact(next.claimantId);
   if (claimantId) {
+    const returnedSubmissionId = compact(next.lastReturnedSubmissionId);
+    const returnedArtifact = normalizeArtifactVersion(next.lastReturnedArtifactVersion);
     await recordWakeEventBestEffort(
       authority,
       {
@@ -1498,7 +1615,8 @@ export async function returnBoardItemSubmission(
         outcome: "recorded",
         taskId,
         itemId,
-        reason,
+        reason: `returned:submission=${returnedSubmissionId}:artifact=${returnedArtifact}:r${nextCount}:${reason}`,
+        relatedId: returnedSubmissionId || undefined,
       },
       options,
     );
@@ -1531,6 +1649,50 @@ export async function returnBoardItemSubmission(
     );
   }
   return returned;
+}
+
+/** P2: clear durable pendingEventRelay after successful consume/idempotent reuse. */
+export async function clearBoardPendingEventRelay(
+  authority: RuntimeAuthority,
+  input: { taskId: string; itemId: string; expectedOpKey: string },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  if (!taskId || !itemId || !expectedOpKey) {
+    return fail(
+      "invalid_input",
+      "clearBoardPendingEventRelay requires taskId, itemId, expectedOpKey",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending || pending.status !== "pending") {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "pending_relay_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey; refuse blind clear",
+        );
+      }
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: null,
+        revision: nextBoardClaimRevision(current),
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
 }
 
 /** in_progress|submitted_for_review → blocked. */

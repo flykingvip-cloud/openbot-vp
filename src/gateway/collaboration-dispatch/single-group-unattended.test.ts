@@ -653,6 +653,10 @@ describe("batch 5 single-group unattended", () => {
         actorId: CLAIMANT,
         submissionId,
         artifactVersion: "v1",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         submissionSummary: "提纲草案",
       },
       { cfg, nowMs: NOW },
@@ -730,6 +734,10 @@ describe("batch 5 single-group unattended", () => {
             actorId: CLAIMANT,
             submissionId: controlSubmission,
             artifactVersion: "v1",
+            linkedDeliverableId: "del-p2-test",
+            linkedDeliverableVersion: 1,
+            linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
             submissionSummary: "control",
           },
           { cfg, nowMs: NOW },

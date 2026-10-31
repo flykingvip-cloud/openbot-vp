@@ -569,6 +569,9 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
         submissionId,
         submissionSummary: "race chapter v1",
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -691,6 +694,9 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
           submissionId,
           submissionSummary: "should not stick past cancel",
           artifactVersion: "v1.0.0",
+          linkedDeliverableId: "del-p2-test",
+          linkedDeliverableVersion: 1,
+          linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         },
         { cfg },
       ),
@@ -726,6 +732,9 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
         submissionId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         submissionSummary: "after cancel",
         artifactVersion: "v1.0.1",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -791,6 +800,9 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
         submissionId,
         submissionSummary: "submit before ordered cancel",
         artifactVersion: "v2.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -850,6 +862,9 @@ describe("Contract C1 concurrent claim (atomic RMW)", () => {
         submissionId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
         submissionSummary: "re-submit after cancel",
         artifactVersion: "v2.0.1",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -917,6 +932,9 @@ describe("C1 claim progress states", () => {
         actorId: "bot-analyst",
         submissionId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -972,6 +990,9 @@ describe("C1 claim progress states", () => {
         actorId: "bot-analyst",
         submissionId: "not-a-uuid",
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -991,6 +1012,9 @@ describe("C1 claim progress states", () => {
         submissionId,
         submissionSummary: "chapter v1",
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -1010,6 +1034,9 @@ describe("C1 claim progress states", () => {
         actorId: "bot-analyst",
         submissionId,
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -1024,6 +1051,9 @@ describe("C1 claim progress states", () => {
         actorId: "bot-analyst",
         submissionId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -1065,6 +1095,10 @@ describe("C1 claim progress states", () => {
         actorId: "bot-analyst",
         submissionId: submissionId2,
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         submissionSummary: "chapter v2 with sources",
       },
       { cfg },
@@ -1210,6 +1244,10 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
         actorId: "bot-analyst",
         submissionId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         submissionSummary: "  ",
       },
       { cfg },
@@ -1229,6 +1267,9 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
         submissionId,
         submissionSummary: "draft v1",
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       },
       { cfg },
     );
@@ -1264,6 +1305,10 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
         actorId: "bot-analyst",
         submissionId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         submissionSummary: "draft v1",
       },
       { cfg },
@@ -1332,6 +1377,10 @@ describe("P4 submit empty/duplicate + acceptance loop", () => {
           actorId: "bot-analyst",
           submissionId: sid,
           artifactVersion: "v1.0.0",
+          linkedDeliverableId: "del-p2-test",
+          linkedDeliverableVersion: 1,
+          linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
           submissionSummary: `draft v${i + 1}`,
         },
         { cfg: cfg2 },
@@ -1741,6 +1790,10 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
         actorId: "bot-analyst",
         submissionId,
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         submissionSummary: "chapter for review",
       },
       { cfg, coordinatorBotId: "bot-coordinator" },
@@ -1748,7 +1801,10 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
     expect(submitted.ok).toBe(true);
     const events = await listWakeEvents(auth, { groupId: "grp_claim", taskId: seedTask.taskId });
     const insightWakes = events.filter(
-      (e) => e.source === "insight" && e.reason === "submit_for_review",
+      (e) =>
+        e.source === "insight" &&
+        typeof e.reason === "string" &&
+        e.reason.startsWith("submitted_for_review:"),
     );
     expect(insightWakes).toHaveLength(1);
     expect(insightWakes[0]?.fromAgentId).toBe("bot-analyst");
@@ -1806,6 +1862,10 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
         actorId: "bot-analyst",
         submissionId,
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         submissionSummary: "chapter for review",
       },
       { cfg },
@@ -1813,7 +1873,10 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
     expect(submitted.ok).toBe(true);
     const events = await listWakeEvents(auth, { groupId: "grp_claim", taskId: seedTask.taskId });
     const insightWakes = events.filter(
-      (e) => e.source === "insight" && e.reason === "submit_for_review",
+      (e) =>
+        e.source === "insight" &&
+        typeof e.reason === "string" &&
+        e.reason.startsWith("submitted_for_review:"),
     );
     expect(insightWakes).toHaveLength(1);
     expect(insightWakes[0]?.toAgentIds).toEqual(["bot-secretary"]);
@@ -1868,6 +1931,10 @@ describe("P1 submit-for-review wakes reviewer (best-effort)", () => {
         actorId: "bot-analyst",
         submissionId,
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
         submissionSummary: "chapter for review",
       },
       { cfg, coordinatorBotId: "bot-coordinator" },
