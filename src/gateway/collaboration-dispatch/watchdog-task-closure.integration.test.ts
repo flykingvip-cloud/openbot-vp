@@ -272,6 +272,57 @@ describe("watchdog closure — consume/Mode B/ledger side effects", () => {
     expect(result.wakeOp?.status).toBe("completed");
     expect(result.roundId).toBeTruthy();
   });
+
+  it("dispatcher throw persists unknown AND returns started_or_unknown (no omit)", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    let calls = 0;
+    setWakeRoundDispatcher(async () => {
+      calls += 1;
+      throw new Error("simulated_dispatcher_throw");
+    });
+
+    const first = await consumeWakeForRoundDispatch({
+      authority: auth,
+      cfg,
+      writeMode: "execute",
+      nowMs: 1_700_000_000_500,
+      request: {
+        groupId: SAMPLE_GRAY,
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: ["bot:analyst"],
+        source: "nudge",
+        taskId: "task_throw",
+        itemId: "item_throw",
+        reason: "test:dispatcher_throw",
+      },
+    });
+    expect(calls).toBe(1);
+    expect(first.dispatched).toBe(false);
+    expect(first.sideEffectClass).toBe("started_or_unknown");
+    expect(first.wakeOp?.status).toBe("unknown");
+    expect(first.reason).toContain("dispatch_threw");
+
+    // Same opKey: unknown ledger must suppress blind re-dispatch.
+    const second = await consumeWakeForRoundDispatch({
+      authority: auth,
+      cfg,
+      writeMode: "execute",
+      nowMs: 1_700_000_000_600,
+      request: {
+        groupId: SAMPLE_GRAY,
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: ["bot:analyst"],
+        source: "nudge",
+        taskId: "task_throw",
+        itemId: "item_throw",
+        reason: "test:dispatcher_throw_retry",
+      },
+    });
+    expect(calls).toBe(1);
+    expect(second.dispatched).toBe(false);
+    expect(second.wakeOp?.status).toBe("unknown");
+  });
 });
 
 describe("watchdog closure — heartbeat persistence + human exit", () => {
@@ -470,6 +521,89 @@ describe("watchdog closure — heartbeat persistence + human exit", () => {
     const jsonl = await fs.readFile(path.join(dir, `${SAMPLE_GRAY}.human-attention.jsonl`), "utf8");
     expect(jsonl).toContain("group_task_heartbeat_human_attention");
     expect(jsonl).toContain(published.value.itemId);
+  });
+
+  it("dispatcher throw → immediate humanAttention; next scan does not blind re-nudge", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    let calls = 0;
+    setWakeRoundDispatcher(async () => {
+      calls += 1;
+      throw new Error("hb_dispatcher_throw");
+    });
+
+    const published = await publishBoardItem(
+      auth,
+      {
+        groupId: SAMPLE_GRAY,
+        taskId: "task_throw_hb",
+        remainingWork: "推进",
+        acceptanceCriteria: ["有结果"],
+        intendedClaimantIds: ["bot:analyst"],
+        publishedBy: "human-ceo",
+      },
+      { cfg, nowMs: 100 },
+    );
+    expect(published.ok).toBe(true);
+    if (!published.ok) {
+      return;
+    }
+
+    const t1 = okScan(
+      await runGroupTaskHeartbeat(
+        auth,
+        { groupId: SAMPLE_GRAY },
+        {
+          cfg,
+          force: true,
+          nowMs: 1_000,
+          coordinatorBotId: "bot:coord",
+          skipClaimBridge: true,
+          actorId: "system:hb",
+        },
+      ),
+    );
+    expect(calls).toBe(1);
+    const st1 = t1.state.items[published.value.itemId];
+    const human1 = t1.decisions.find(
+      (d) => d.itemId === published.value.itemId && d.action === "human_todo",
+    );
+    expect(human1).toBeTruthy();
+    expect(human1?.reason).toContain("side_effect_unknown");
+    expect(st1?.humanAttention?.status).toBe("needs_human");
+    expect(st1?.humanAttention?.source).toBe("side_effect_unknown");
+    // Must NOT be the not_started fail-count path (would leave action as nudge).
+    expect(
+      t1.decisions.some((d) => d.itemId === published.value.itemId && d.action === "nudge"),
+    ).toBe(false);
+
+    // Next scan: open humanAttention stays human_todo; no second dispatcher invoke.
+    const t2 = okScan(
+      await runGroupTaskHeartbeat(
+        auth,
+        { groupId: SAMPLE_GRAY },
+        {
+          cfg,
+          force: true,
+          nowMs: 60_000,
+          coordinatorBotId: "bot:coord",
+          skipClaimBridge: true,
+          actorId: "system:hb",
+        },
+      ),
+    );
+    expect(calls).toBe(1);
+    const human2 = t2.decisions.find(
+      (d) => d.itemId === published.value.itemId && d.action === "human_todo",
+    );
+    expect(human2).toBeTruthy();
+    expect(t2.state.items[published.value.itemId]?.humanAttention?.status).toBe("needs_human");
+    expect(
+      t2.decisions.some(
+        (d) =>
+          d.itemId === published.value.itemId && (d.action === "nudge" || d.action === "escalate"),
+      ),
+    ).toBe(false);
   });
 });
 

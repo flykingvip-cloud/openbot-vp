@@ -1837,12 +1837,15 @@ export async function consumeWakeForRoundDispatch(
         const safe = sanitizeDispatchError(error, 160);
         reason = `dispatch_threw:${safe.message}`;
         // Cannot prove whether the dispatcher side effect landed — unknown, no blind re-run.
+        // Heartbeat must see started_or_unknown immediately (humanAttention), not omit the
+        // class and fall into nudge fail-count / backoff as if the throw were not_started.
+        dispatchSideEffectClass = "started_or_unknown";
         const unknown = await markWakeOpUnknown({
           authority: params.authority,
           opKey: claimed.opKey,
           cfg: params.cfg,
           nowMs: params.nowMs,
-          detail: reason,
+          detail: `${reason}|side:started_or_unknown`,
         });
         if (unknown) {
           wakeOp = unknown;
