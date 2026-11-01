@@ -102,7 +102,11 @@ function renderOneCard(
   authority: "structured" | "fence",
   opts: RenderHumanAttentionCardsOpts,
 ): TemplateResult {
-  const resolved = Boolean(card.resolution);
+  const resolved =
+    card.status === "resolved" ||
+    card.status === "recovered" ||
+    // Legacy cards without status: empty options imply terminal.
+    (card.status == null && Boolean(card.resolution) && card.options.length === 0);
   return html`
     <div
       class="employee-workbench__assistant-prelude chat-bubble employee-workbench__assistant-prelude-bubble employee-workbench__steward-confirm-card employee-workbench__human-attention-card"

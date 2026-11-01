@@ -4,6 +4,7 @@
  */
 import { loadConfig } from "../../config/config.js";
 import { actHumanAttentionCard } from "../collaboration-dispatch/human-attention-actions.js";
+import { buildHumanAttentionAuthority } from "../collaboration-dispatch/human-attention-business.js";
 import {
   buildHumanAttentionCard,
   type HumanAttentionOptionId,
@@ -74,6 +75,7 @@ export const humanAttentionHandlers: GatewayRequestHandlers = {
             recoveryHint: todo.recoveryHint,
             taskTitle: todo.taskTitle,
             boardStatus: todo.boardStatus,
+            status: todo.status,
             resolution: todo.resolution,
           }),
         )
@@ -121,6 +123,12 @@ export const humanAttentionHandlers: GatewayRequestHandlers = {
         );
         return;
       }
+      const cfg = loadConfig();
+      const { authority } = buildHumanAttentionAuthority({
+        groupId: todo.groupId,
+        taskId: todo.taskId,
+        cfg,
+      });
       const result = await actHumanAttentionCard({
         todoId: params.todoId,
         action: params.action as HumanAttentionOptionId,
@@ -129,7 +137,8 @@ export const humanAttentionHandlers: GatewayRequestHandlers = {
         expectedFingerprint: params.expectedFingerprint,
         transferOwnerId: params.transferOwnerId,
         note: params.note,
-        cfg: loadConfig(),
+        cfg,
+        authority,
       });
       if (!result.ok) {
         respond(
@@ -152,6 +161,7 @@ export const humanAttentionHandlers: GatewayRequestHandlers = {
         recoveryHint: result.todo.recoveryHint,
         taskTitle: result.todo.taskTitle,
         boardStatus: result.todo.boardStatus,
+        status: result.todo.status,
         resolution: result.todo.resolution,
       });
       respond(

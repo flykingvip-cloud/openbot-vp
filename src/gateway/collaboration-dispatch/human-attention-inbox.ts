@@ -56,6 +56,19 @@ export type HumanAttentionTodo = {
   claimedAt?: number;
   acknowledgedAt?: number;
   acknowledgedBy?: string;
+  /**
+   * When true, heartbeat upsert must not overwrite ownerIds with task.responsibility
+   * projections — transfer established an explicit override contract.
+   */
+  ownerOverride?: boolean;
+  /** Non-terminal transfer audit (status stays open; UI uses status not this). */
+  lastTransfer?: {
+    fromOwnerIds: string[];
+    toOwnerId: string;
+    actorId: string;
+    at: number;
+    result: string;
+  };
   resolution?: HumanAttentionTodoResolution;
   recoveredAt?: number;
   recoveredBy?: string;
@@ -207,15 +220,25 @@ export function upsertHumanAttentionTodo(
   if (index >= 0) {
     const current = all[index];
     if (ACTIVE.has(current.status)) {
+      const preserveOwners = current.ownerOverride === true;
+      const nextOwners = preserveOwners
+        ? current.ownerIds
+        : ownerIds.length > 0
+          ? ownerIds
+          : current.ownerIds;
+      const ownersChanged =
+        nextOwners.length !== current.ownerIds.length ||
+        nextOwners.some((id, i) => normalizeId(id) !== normalizeId(current.ownerIds[i]));
       const materialChange =
         current.reason !== reason ||
         current.source !== input.source ||
-        current.failureKind !== failureKind;
+        current.failureKind !== failureKind ||
+        ownersChanged;
       const refreshed: HumanAttentionTodo = {
         ...current,
         reason,
         recoveryHint,
-        ownerIds: ownerIds.length > 0 ? ownerIds : current.ownerIds,
+        ownerIds: nextOwners,
         source: input.source,
         failureKind,
         updatedAt: nowMs,
@@ -482,8 +505,13 @@ export async function resolveHumanAttentionTodo(params: {
   cfg?: OpenBotConfig;
   /** When true, clear heartbeat humanAttention so auto-advance may resume. */
   clearHeartbeat?: boolean;
+  /**
+   * When true with clearHeartbeat, failure to clear (or missing authority) refuses
+   * the resolve — todo stays open. Prevents "recovered" UX when gate remains.
+   */
+  requireHeartbeatClear?: boolean;
   transferOwnerId?: string;
-}): Promise<HumanAttentionActionResult & { heartbeatCleared?: boolean }> {
+}): Promise<HumanAttentionActionResult & { heartbeatCleared?: boolean; message?: string }> {
   const actorId = compact(params.actorId);
   if (!actorId) {
     return { ok: false, reason: "actor_required" };
@@ -503,52 +531,122 @@ export async function resolveHumanAttentionTodo(params: {
     return { ok: false, reason: "not_owner" };
   }
   const nowMs = params.nowMs ?? Date.now();
-  let nextOwners = todo.ownerIds;
-  if (params.action === "transfer") {
-    const target = compact(params.transferOwnerId);
-    if (!target) {
-      return { ok: false, reason: "transfer_owner_required" };
-    }
-    nextOwners = [target];
-  }
+
   let heartbeatCleared = false;
-  if (params.clearHeartbeat && params.authority) {
-    try {
-      heartbeatCleared = await clearHeartbeatHumanAttention({
-        authority: params.authority,
-        groupId: todo.groupId,
-        itemId: todo.itemId,
-        fingerprint: todo.fingerprint,
-        nowMs,
-      });
-    } catch {
-      heartbeatCleared = false;
+  if (params.clearHeartbeat) {
+    if (!params.authority) {
+      if (params.requireHeartbeatClear) {
+        return {
+          ok: false,
+          reason: "authority_required_for_clear",
+          message: "清除心跳保护需要可信 authority",
+        };
+      }
+    } else {
+      try {
+        heartbeatCleared = await clearHeartbeatHumanAttention({
+          authority: params.authority,
+          groupId: todo.groupId,
+          itemId: todo.itemId,
+          fingerprint: todo.fingerprint,
+          nowMs,
+        });
+      } catch {
+        heartbeatCleared = false;
+      }
+      if (params.requireHeartbeatClear && !heartbeatCleared) {
+        return {
+          ok: false,
+          reason: "heartbeat_clear_failed",
+          message: "未能清除心跳人工闸，待办保持打开",
+        };
+      }
     }
   }
+
   const resolution: HumanAttentionTodoResolution = {
     action: params.action,
     actorId,
     at: nowMs,
     result: sanitizeDispatchErrorMessage(params.result, 240),
   };
-  const terminal = params.action === "transfer" && !params.clearHeartbeat ? "open" : "resolved";
   const next: HumanAttentionTodo = {
     ...todo,
-    status: terminal === "open" ? "open" : params.clearHeartbeat ? "recovered" : "resolved",
-    ownerIds: nextOwners,
+    status: params.clearHeartbeat ? "recovered" : "resolved",
     resolution,
-    recoveredBy: terminal === "open" ? undefined : actorId,
-    recoveredAt: terminal === "open" ? undefined : nowMs,
+    recoveredBy: actorId,
+    recoveredAt: nowMs,
     updatedAt: nowMs,
-    version: todo.version + (params.action === "transfer" ? 1 : 0),
   };
   all[index] = next;
   writeAll(all);
   broadcastWorkbenchSignalsInvalidate({
     reason: "task",
-    userIds: [...nextOwners.filter((oid) => !oid.startsWith("bot:")), actorId],
+    userIds: [...todo.ownerIds.filter((oid) => !oid.startsWith("bot:")), actorId],
   });
   return { ok: true, todo: next, heartbeatCleared };
+}
+
+/**
+ * Transfer keeps status open + ownerOverride. Does NOT set resolution (UI terminal
+ * state is driven by status, not resolution presence).
+ */
+export async function transferHumanAttentionTodo(params: {
+  id: string;
+  actorId: string;
+  transferOwnerId: string;
+  result: string;
+  nowMs?: number;
+}): Promise<HumanAttentionActionResult & { message?: string }> {
+  const actorId = compact(params.actorId);
+  const target = compact(params.transferOwnerId);
+  if (!actorId) {
+    return { ok: false, reason: "actor_required" };
+  }
+  if (!target) {
+    return { ok: false, reason: "transfer_owner_required" };
+  }
+  let loaded: ReturnType<typeof requireTodo>;
+  try {
+    loaded = requireTodo(compact(params.id));
+  } catch {
+    return { ok: false, reason: "not_found" };
+  }
+  const { all, index, todo } = loaded;
+  if (todo.status === "recovered" || todo.status === "resolved") {
+    return { ok: false, reason: "already_resolved" };
+  }
+  const isClaimant = normalizeId(todo.claimedBy) === normalizeId(actorId);
+  if (!isClaimant && !actorMatchesHumanAttentionOwners(todo.ownerIds, actorId)) {
+    return { ok: false, reason: "not_owner" };
+  }
+  const nowMs = params.nowMs ?? Date.now();
+  const next: HumanAttentionTodo = {
+    ...todo,
+    status: "open",
+    ownerIds: [target],
+    ownerOverride: true,
+    lastTransfer: {
+      fromOwnerIds: [...todo.ownerIds],
+      toOwnerId: target,
+      actorId,
+      at: nowMs,
+      result: sanitizeDispatchErrorMessage(params.result, 240),
+    },
+    // Explicitly drop any prior resolution so UI does not treat as terminal.
+    resolution: undefined,
+    recoveredAt: undefined,
+    recoveredBy: undefined,
+    updatedAt: nowMs,
+    version: todo.version + 1,
+  };
+  all[index] = next;
+  writeAll(all);
+  broadcastWorkbenchSignalsInvalidate({
+    reason: "task",
+    userIds: [target, actorId].filter((oid) => !oid.startsWith("bot:")),
+  });
+  return { ok: true, todo: next };
 }
 
 /** @deprecated prefer resolveHumanAttentionTodo */

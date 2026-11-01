@@ -143,6 +143,7 @@ function cardFromTodo(todo: HumanAttentionTodo): HumanAttentionCard | null {
     recoveryHint: todo.recoveryHint,
     taskTitle: todo.taskTitle,
     boardStatus: todo.boardStatus,
+    status: todo.status,
     resolution: todo.resolution,
   });
 }

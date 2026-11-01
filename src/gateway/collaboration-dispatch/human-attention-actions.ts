@@ -1,10 +1,15 @@
 /**
  * Human-attention card actions.
  *
- * On click: re-check actor permission, todo status, fingerprint, and version.
- * Action set is gated by failureKind — side_effect_unknown never allows blind retry.
+ * On click: re-check actor permission, todo status/version, live board fingerprint,
+ * then execute the real business contract. Inbox is closed only after success.
+ * side_effect_unknown never allows blind retry.
  */
 import type { OpenBotConfig } from "../../config/types.js";
+import {
+  executeHumanAttentionBusinessAction,
+  buildHumanAttentionAuthority,
+} from "./human-attention-business.js";
 import {
   assertsNoBlindRetryOption,
   buildHumanAttentionCard,
@@ -16,6 +21,7 @@ import {
   actorMatchesHumanAttentionOwners,
   getHumanAttentionTodo,
   resolveHumanAttentionTodo,
+  transferHumanAttentionTodo,
   type HumanAttentionTodo,
 } from "./human-attention-inbox.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
@@ -30,6 +36,7 @@ export type ActHumanAttentionParams = {
   /** Client-seen fingerprint; mismatch → stale_fingerprint. */
   expectedFingerprint: string;
   nowMs?: number;
+  /** Required for mutating actions that clear heartbeat or call wake-op / board APIs. */
   authority?: RuntimeAuthority | null;
   cfg?: OpenBotConfig;
   transferOwnerId?: string;
@@ -63,18 +70,6 @@ function isMutatingAction(action: HumanAttentionOptionId): boolean {
     action === "accept_submission" ||
     action === "return_submission" ||
     action === "take_over"
-  );
-}
-
-function clearsHeartbeat(action: HumanAttentionOptionId): boolean {
-  return (
-    action === "retry_after_fix" ||
-    action === "confirm_completed" ||
-    action === "release_after_verify" ||
-    action === "cancel_task" ||
-    action === "take_over" ||
-    action === "accept_submission" ||
-    action === "return_submission"
   );
 }
 
@@ -150,6 +145,7 @@ export async function actHumanAttentionCard(
     recoveryHint: todo.recoveryHint,
     taskTitle: todo.taskTitle,
     boardStatus: todo.boardStatus,
+    status: todo.status,
   });
   if (!card || !assertsNoBlindRetryOption(card)) {
     return { ok: false, reason: "invalid_card", todo };
@@ -175,83 +171,95 @@ export async function actHumanAttentionCard(
     };
   }
 
-  // Read-only evidence actions.
-  if (
-    action === "view_evidence" ||
-    action === "view_failure_reason" ||
-    action === "view_artifact"
-  ) {
-    return {
-      ok: true,
-      todo,
-      evidence: {
-        todoId: todo.id,
+  let authority = params.authority ?? null;
+  if (!authority && (isMutatingAction(action) || action.startsWith("view_"))) {
+    try {
+      authority = buildHumanAttentionAuthority({
+        groupId: todo.groupId,
         taskId: todo.taskId,
-        itemId: todo.itemId,
-        fingerprint: todo.fingerprint,
-        version: todo.version,
-        failureKind: todo.failureKind,
-        reason: todo.reason,
-        recoveryHint: todo.recoveryHint,
-        boardStatus: todo.boardStatus,
-        wakeOpKey: todo.wakeOpKey,
-        sideEffectClass: todo.sideEffectClass,
-        sideEffectMayHaveOccurred: todo.failureKind === "side_effect_unknown",
-      },
-    };
-  }
-
-  if (!isMutatingAction(action)) {
-    return { ok: false, reason: "action_not_allowed", todo };
-  }
-
-  if (action === "release_after_verify" && todo.failureKind === "side_effect_unknown") {
-    const note = compact(params.note);
-    if (!note) {
-      return {
-        ok: false,
-        reason: "verification_note_required",
-        message: "核实后允许重试前须填写副作用核实说明",
-        todo,
-      };
+        cfg: params.cfg,
+      }).authority;
+    } catch {
+      authority = null;
     }
   }
 
-  const resultText =
-    action === "retry_after_fix"
-      ? "已确认未开始；清除人工闸后允许自动重试"
-      : action === "release_after_verify"
-        ? `已核实副作用：${compact(params.note)}；解除保护允许重试`
-        : action === "confirm_completed"
-          ? "人工确认结果已完成"
-          : action === "cancel_task"
-            ? "人工取消任务并关闭待办"
-            : action === "take_over"
-              ? "人工接管并恢复自动推进条件"
-              : action === "transfer"
-                ? `已转交给 ${compact(params.transferOwnerId)}`
-                : action === "accept_submission"
-                  ? "审核通过（待办关闭；板状态由审核链继续）"
-                  : action === "return_submission"
-                    ? "退回修改（待办关闭；板状态由审核链继续）"
-                    : sanitizeDispatchErrorMessage(String(action), 120);
+  if (!authority) {
+    return {
+      ok: false,
+      reason: "authority_required",
+      message: "缺少可信 RuntimeAuthority，无法执行业务操作",
+      todo,
+    };
+  }
 
+  const business = await executeHumanAttentionBusinessAction({
+    action,
+    todo,
+    actorId,
+    authority,
+    cfg: params.cfg,
+    nowMs: params.nowMs,
+    note: params.note,
+    transferOwnerId: params.transferOwnerId,
+    expectedFingerprint: compact(params.expectedFingerprint) || todo.fingerprint,
+  });
+
+  if (!business.ok) {
+    return { ok: false, reason: business.reason, message: business.message, todo };
+  }
+
+  // Read-only evidence / view actions: do not close todo.
+  if (!business.closeTodo && action !== "transfer") {
+    return {
+      ok: true,
+      todo,
+      evidence: business.evidence,
+      heartbeatCleared: false,
+    };
+  }
+
+  if (action === "transfer") {
+    const transferred = await transferHumanAttentionTodo({
+      id: todo.id,
+      actorId,
+      transferOwnerId: business.transferOwnerId || params.transferOwnerId || "",
+      result: business.resultText,
+      nowMs: params.nowMs,
+    });
+    if (!transferred.ok) {
+      return { ok: false, reason: transferred.reason, message: "转交待办失败", todo };
+    }
+    return {
+      ok: true,
+      todo: transferred.todo,
+      heartbeatCleared: false,
+      evidence: { transferOwnerId: business.transferOwnerId },
+    };
+  }
+
+  // Mutating close path: only resolve after business succeeded; clear heartbeat under authority.
   const resolved = await resolveHumanAttentionTodo({
     id: todo.id,
     actorId,
     action,
-    result: resultText,
+    result: business.resultText,
     nowMs: params.nowMs,
-    authority: params.authority,
+    authority,
     cfg: params.cfg,
-    clearHeartbeat: clearsHeartbeat(action),
-    transferOwnerId: params.transferOwnerId,
+    clearHeartbeat: business.heartbeatShouldClear,
+    requireHeartbeatClear: business.heartbeatShouldClear,
   });
   if (!resolved.ok) {
-    return { ok: false, reason: resolved.reason, todo };
+    return {
+      ok: false,
+      reason: resolved.reason,
+      message: resolved.message ?? "关闭待办失败（业务已执行时请人工核对）",
+      todo: getHumanAttentionTodo(todo.id) ?? todo,
+    };
   }
 
-  if (resolved.todo.resolution) {
+  if (resolved.todo.status === "recovered" || resolved.todo.status === "resolved") {
     await emitHumanAttentionResolutionReceipt({
       todo: resolved.todo,
       cfg: params.cfg,
@@ -262,6 +270,12 @@ export async function actHumanAttentionCard(
   return {
     ok: true,
     todo: resolved.todo,
+    evidence: business.evidence,
     heartbeatCleared: resolved.heartbeatCleared,
   };
+}
+
+/** @internal test helper */
+export function describeHumanAttentionAction(action: HumanAttentionOptionId): string {
+  return sanitizeDispatchErrorMessage(String(action), 80);
 }

@@ -57,7 +57,12 @@ export type HumanAttentionCard = {
   sideEffectMayHaveOccurred: boolean;
   summary: string[];
   options: HumanAttentionOption[];
-  /** Set when resolved — card becomes a receipt. */
+  /**
+   * Todo status. Terminal UX is driven by status (resolved|recovered), NOT by
+   * mere presence of resolution/lastTransfer — open transfers stay actionable.
+   */
+  status?: "open" | "claimed" | "acknowledged" | "resolved" | "recovered";
+  /** Set when resolved — card becomes a receipt (only when status is terminal). */
   resolution?: {
     action: HumanAttentionOptionId;
     actorId: string;
@@ -80,6 +85,7 @@ export type HumanAttentionCardBuildInput = {
   recoveryHint: string;
   taskTitle?: string;
   boardStatus?: string;
+  status?: HumanAttentionCard["status"];
   resolution?: HumanAttentionCard["resolution"];
 };
 
@@ -189,6 +195,8 @@ export function buildHumanAttentionCard(
       ? "外部操作：可能已发生（禁止直接重试，须先核实）"
       : "外部操作：未见已开始证据（修复后可重试）",
   ];
+  const status = input.status;
+  const terminal = status === "resolved" || status === "recovered";
   const card: HumanAttentionCard = {
     kind: HUMAN_ATTENTION_KIND,
     todoId,
@@ -198,7 +206,7 @@ export function buildHumanAttentionCard(
     boardItemId,
     fingerprint,
     version,
-    title: input.resolution ? "任务人工处理结果" : "任务需要你处理",
+    title: terminal ? "任务人工处理结果" : "任务需要你处理",
     taskTitle,
     boardStatus,
     failureKind,
@@ -207,12 +215,13 @@ export function buildHumanAttentionCard(
     recoveryHint,
     sideEffectMayHaveOccurred,
     summary,
-    options: input.resolution ? [] : optionsForHumanAttentionFailureKind(failureKind),
+    options: terminal ? [] : optionsForHumanAttentionFailureKind(failureKind),
+    status,
   };
   if (input.ownerLabels && input.ownerLabels.length === ownerIds.length) {
     card.ownerLabels = input.ownerLabels.map((label) => compact(label) || "责任人");
   }
-  if (input.resolution) {
+  if (terminal && input.resolution) {
     card.resolution = {
       action: input.resolution.action,
       actorId: compact(input.resolution.actorId),
@@ -264,6 +273,14 @@ export function parseHumanAttentionCard(raw: unknown): HumanAttentionCard | null
     recoveryHint: typeof raw.recoveryHint === "string" ? raw.recoveryHint : "",
     taskTitle: typeof raw.taskTitle === "string" ? raw.taskTitle : undefined,
     boardStatus: typeof raw.boardStatus === "string" ? raw.boardStatus : undefined,
+    status:
+      raw.status === "open" ||
+      raw.status === "claimed" ||
+      raw.status === "acknowledged" ||
+      raw.status === "resolved" ||
+      raw.status === "recovered"
+        ? raw.status
+        : undefined,
     resolution:
       raw.resolution && isPlainObject(raw.resolution)
         ? {
@@ -318,7 +335,7 @@ export function formatHumanAttentionMessageText(
     "",
     `恢复建议：${card.recoveryHint}`,
   ];
-  if (card.resolution) {
+  if ((card.status === "resolved" || card.status === "recovered") && card.resolution) {
     lines.push(
       "",
       `处理人：${card.resolution.actorId}`,

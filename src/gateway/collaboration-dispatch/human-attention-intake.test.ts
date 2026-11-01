@@ -154,18 +154,66 @@ describe("human-attention inbox + card loop", () => {
       expect(missingNote.reason).toBe("verification_note_required");
     }
 
-    const ok = await actHumanAttentionCard({
+    // confirm_completed requires a bound wake-op with prior receipt — without it,
+    // the todo must stay open (no false "recovered").
+    const confirm = await actHumanAttentionCard({
       todoId: todo.id,
       action: "confirm_completed",
       actorId: "amy",
       expectedVersion: todo.version,
       expectedFingerprint: todo.fingerprint,
     });
-    expect(ok.ok).toBe(true);
-    if (ok.ok) {
-      expect(ok.todo.resolution?.actorId).toBe("amy");
-      expect(ok.todo.resolution?.result).toContain("确认结果已完成");
+    expect(confirm.ok).toBe(false);
+    if (!confirm.ok) {
+      expect(confirm.reason).toMatch(/missing_wake_op|authority_required/);
     }
+  });
+
+  it("transfer keeps status open and card options (terminal uses status not resolution)", async () => {
+    const { todo } = upsertHumanAttentionTodo({
+      groupId: "g",
+      itemId: "i2",
+      taskId: "t2",
+      fingerprint: "fp2",
+      reason: "exhausted",
+      ownerIds: ["human:amy"],
+      recoveryHint: "transfer",
+      source: "nudge_failures_exhausted",
+      boardStatus: "in_progress",
+      nowMs: 20,
+    });
+    const transferred = await actHumanAttentionCard({
+      todoId: todo.id,
+      action: "transfer",
+      actorId: "amy",
+      expectedVersion: todo.version,
+      expectedFingerprint: todo.fingerprint,
+      transferOwnerId: "human:bob",
+    });
+    expect(transferred.ok).toBe(true);
+    if (!transferred.ok) {
+      return;
+    }
+    expect(transferred.todo.status).toBe("open");
+    expect(transferred.todo.ownerIds).toEqual(["human:bob"]);
+    expect(transferred.todo.ownerOverride).toBe(true);
+    expect(transferred.todo.resolution).toBeUndefined();
+    const card = buildHumanAttentionCard({
+      todoId: transferred.todo.id,
+      groupId: transferred.todo.groupId,
+      taskId: transferred.todo.taskId,
+      boardItemId: transferred.todo.itemId,
+      fingerprint: transferred.todo.fingerprint,
+      version: transferred.todo.version,
+      failureKind: transferred.todo.failureKind,
+      reason: transferred.todo.reason,
+      ownerIds: transferred.todo.ownerIds,
+      recoveryHint: transferred.todo.recoveryHint,
+      status: transferred.todo.status,
+      resolution: transferred.todo.resolution,
+    });
+    expect(card?.options.length).toBeGreaterThan(0);
+    expect(card?.title).toBe("任务需要你处理");
   });
 
   it("formats fence that parses back with bound todoId/version/fingerprint", () => {
