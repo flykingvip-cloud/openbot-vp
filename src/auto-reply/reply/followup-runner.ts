@@ -42,8 +42,11 @@ import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
 import {
+  assertRunnerTurnBudgetAllowsModelCall,
+  chargeModelCallAgainstTip,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  TaskBudgetExceededError,
 } from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
@@ -182,8 +185,11 @@ export function createFollowupRunner(params: {
       | undefined;
     let followupFailureDetail: string | undefined;
     let followupOutcomeCloseoutDone = false;
-    /** Real usage-derived USD for tip budget closeout (followup has no mid-run charge). */
+    /** Real usage-derived USD when the pre-call gate did not already charge this item. */
     let tipBudgetCostUsd: number | undefined;
+    let followupBudgetCharged = false;
+    let followupBudgetCallSeq = 0;
+    let parentTaskId: string | undefined;
     const submitFollowupOutcomeCloseout = async (overrides?: {
       success?: boolean;
       failureReason?: import("../../task-outcome/runtime-from-runner.js").RunnerTurnFailureReason;
@@ -218,7 +224,10 @@ export function createFollowupRunner(params: {
           taskId: followupOutcomeTaskId,
           scope: followupOutcomeScope,
           entrypoint: "chat",
-          ...(tipBudgetCostUsd != null ? { costUsd: tipBudgetCostUsd } : {}),
+          ...(followupBudgetCharged ? { skipBudgetCharge: true } : {}),
+          ...(!followupBudgetCharged && tipBudgetCostUsd != null
+            ? { costUsd: tipBudgetCostUsd }
+            : {}),
           ...(failureReason && !success
             ? { failureReason, ...(failureDetail ? { failureDetail } : {}) }
             : {}),
@@ -246,7 +255,7 @@ export function createFollowupRunner(params: {
         queued.run.executionIdentity?.enterpriseId?.trim() ||
         queued.run.executionIdentity?.collaborationOwnerEntitlement?.tenantId?.trim() ||
         undefined;
-      const parentTaskId =
+      parentTaskId =
         queued.parentTaskId?.trim() || queued.run.collaborationTaskId?.trim() || undefined;
       const opened = ensureFollowupTurnTaskOutcome(queued.run.config, {
         agentId: queued.run.agentId,
@@ -468,6 +477,13 @@ export function createFollowupRunner(params: {
                   protocol: invocation.protocol,
                 };
               }
+              if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
+                assertRunnerTurnBudgetAllowsModelCall(queued.run.config, queued.run.agentId, {
+                  taskId: followupOutcomeTaskId,
+                  scope: followupOutcomeScope,
+                  ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
+                });
+              }
               const result = await runEmbeddedPiAgent({
                 sessionId: queued.run.sessionId,
                 sessionKey: queued.run.sessionKey,
@@ -557,6 +573,23 @@ export function createFollowupRunner(params: {
               bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                 result.meta?.systemPromptReport,
               );
+              if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
+                followupBudgetCallSeq += 1;
+                const charged = chargeModelCallAgainstTip(queued.run.config, queued.run.agentId, {
+                  taskId: followupOutcomeTaskId,
+                  scope: followupOutcomeScope,
+                  runId,
+                  callSeq: followupBudgetCallSeq,
+                  usage: result.meta?.agentMeta?.usage,
+                  provider,
+                  model,
+                  ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
+                });
+                followupBudgetCharged = true;
+                if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
+                  tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
+                }
+              }
               return result;
             },
           });
@@ -606,7 +639,12 @@ export function createFollowupRunner(params: {
         const message = err instanceof Error ? err.message : String(err);
         defaultRuntime.error?.(`Followup agent failed before reply: ${message}`);
         followupRunSucceeded = false;
-        followupFailureReason = "run_failed";
+        if (err instanceof TaskBudgetExceededError) {
+          followupFailureReason = "budget_exceeded";
+          followupBudgetCharged = true;
+        } else {
+          followupFailureReason = "run_failed";
+        }
         followupFailureDetail = message;
         return;
       }
@@ -614,12 +652,14 @@ export function createFollowupRunner(params: {
       const usage = runResult.meta?.agentMeta?.usage;
       const promptTokens = runResult.meta?.agentMeta?.promptTokens;
       const modelUsed = runResult.meta?.agentMeta?.model ?? fallbackModel ?? defaultModel;
-      tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
-        usage,
-        provider: fallbackProvider,
-        model: modelUsed,
-        config: queued.run.config,
-      });
+      if (!followupBudgetCharged) {
+        tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
+          usage,
+          provider: fallbackProvider,
+          model: modelUsed,
+          config: queued.run.config,
+        });
+      }
       const contextTokensUsed =
         agentCfgContextTokens ??
         lookupContextTokens(modelUsed) ??

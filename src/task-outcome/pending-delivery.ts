@@ -22,6 +22,23 @@ const byTaskId = new Map<string, AwaitingDeliveryRegistration>();
 
 const PENDING_DIRNAME = "pending-deliveries";
 
+/** Unknown deliveries stay until a real receipt. This age is observability only. */
+export const AWAITING_DELIVERY_STALE_AFTER_MS = 30 * 60 * 1000;
+
+/** Pending rows older than maxAgeMs. Does not delete or mark them delivered. */
+export function listStaleAwaitingDeliveries(
+  nowMs: number = Date.now(),
+  maxAgeMs: number = AWAITING_DELIVERY_STALE_AFTER_MS,
+): AwaitingDeliveryRegistration[] {
+  const stale: AwaitingDeliveryRegistration[] = [];
+  for (const reg of byRunId.values()) {
+    if (nowMs - reg.registeredAtMs >= maxAgeMs) {
+      stale.push(reg);
+    }
+  }
+  return stale;
+}
+
 function pendingDir(persistRoot: string): string {
   return path.join(persistRoot, PENDING_DIRNAME);
 }

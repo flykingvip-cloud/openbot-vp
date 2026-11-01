@@ -8,7 +8,8 @@
 > W5（结构与运行收尾）**日志有界**已合入 [#112](https://github.com/flykingvip-cloud/openbot-vp/pull/112) → main `23314d48`；**不**宣布 W0–W5 全部收尾。
 > **Wrap-up（#117）**：修 W4 P1；W3 tip 预算最小生产接线；矩阵四态。已合入 main `0513edd2`。
 > **Residual（#120）**：W1 入口摸底；非 chat tip.budget iterations；adopted 显式 API；evolution inventory。
-> **Paths cleanup（本轮）**：cron/followup/cli/gateway_agent 收尾接入真实 usage→`estimateTipBudgetCostUsdFromUsage`→tip `costUsd`；evolution 旁路在 tip 已桥接同 runId 时跳过重复 append（**不退役** RPC/canary）。**未 merge / 未部署**。**不**宣布 askOutcome / W0–W5 整体关闭。
+> **Paths cleanup**：cron/followup/cli/gateway_agent 收尾接入真实 usage→`estimateTipBudgetCostUsdFromUsage`→tip `costUsd`；evolution 旁路在 tip 已桥接同 runId 时跳过重复 append（**不退役** RPC/canary 观测写入）。
+> **Executor closeout（本轮，源码）**：子 agent 写入 `entrypoint: "subagent"`；cli/gateway_agent/cron/followup/chat 在下一次模型调用前走 `assertRunnerTurnBudgetAllowsModelCall`，调用后 `chargeModelCallAgainstTip`。未知费用记 `unknownCostCharges`，已知 0 记 `knownZeroCostCharges`，都不写成 `spentCostUsd`。父 tip 只累加 `childAttributed*`，不把同一笔再加进父任务的 `spentCostUsd`。协作 claim 不是模型调用，`costEvidence: "not_applicable"`。evolution RPC 观察不再增加任务成功计数。长时间 pending 只打日志，不提前清掉 unknown。**未部署**。**不**宣布 askOutcome / W0–W5 整体关闭。supervisor 仍用自己的 `nextStop` 计数，不与 tip 共用一笔 spend。嵌入式 runner 内部的多轮 provider 调用仍按一次 attempt 计，下一次 fallback/入口调用才会被门闩拦住。
 
 ## 已核实合入（gh，勿口述）
 
@@ -81,7 +82,7 @@ entrypoint adapter 实例方法
 - cron 冷启动：仍靠 tip store / gateway hydrate（跨进程无第二套身份）。
 - **子 agent lane**：`commands/agent` 对 `AGENT_LANE_SUBAGENT` **故意跳过** TaskOutcome（文档诚实登记，不算完成）。
 
-**登记**：W1–W5 + wrap-up #117 + residual #120 已合入。Paths cleanup：cron/followup/cli/gateway_agent 收尾显式 `costUsd`（`estimateTipBudgetCostUsdFromUsage`）；collab claim 无用量源；`attachAdoptedLearningAssetsToTask` 仍无生产上游调用（inventory）；evolution `recordRunOutcome` **仍不退役**，仅 tip 已桥接同 runId 时去重 append。pending 仍进程内；子 agent 故意跳过。**本 paths PR 未 merge / 未部署**。**不**宣布整体关闭。
+**登记**：W1–W5 + wrap-up #117 + residual #120 已合入。Executor closeout：子 agent 不再跳过，持久 `subagent`，仅在父 tip 已存在时写 `parentTaskId`。cli/gateway/cron/followup/chat 在模型调用前检查 tip（及已存在的父 tip）预算。collab claim 无模型用量，记 `not_applicable` 而不是未知美元。`attachAdoptedLearningAssetsToTask` 仍无生产上游（显式采用，禁止把注入当采用）。evolution `recordRunOutcome` **仍不退役**；RPC 传入 `countsAsTaskJudgement: false`，不再把观察写成任务成功计数。学习曝光 pending 仍是进程内 Map。长时间 pending 只观测。**未部署**。**不**宣布整体关闭。
 
 **既有超时/重试/回退/用量（W3 inventory，不另起）**：`CloseReasonCode.timeout` + eligibility；supervisor `retry.nextStop`（iterations/cost/duration）；agents `model-fallback`；gateway billing / enterprise-model budget-gate。任务总预算 tip 只做投影与关闭归因，不替代上述机制。
 
@@ -138,14 +139,14 @@ entrypoint adapter 实例方法
 
 **禁止**把下列各项统一标成「收尾完成」或「原计划已完成」。日志有界（W5）可标行为已验证；其余按实态。
 
-| 阶段 | 主题            | main tip                             | 接口可用        | 生产接通                                                                                  | 行为已验证                                              | 未完成（诚实）                                                                          |
-| ---- | --------------- | ------------------------------------ | --------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| W0   | 基线与证据      | `1f698e37` #95                       | 是              | n/a（文档）                                                                               | 文档分类                                                | 「已完成」仅限有调用证据入口                                                            |
-| W1   | 跨入口身份/收尾 | `b6c60550` #98 + residual            | 是              | chat/cron/cli/gateway_agent/collab claim                                                  | 已接线入口测 + residual inventory                       | 子 agent **故意跳过**；collab 非 claim RPC 复用 tip；cron 冷启动 hydrate                |
-| W2   | 技能/模式消费   | `f3a19e08` #99                       | 是              | tip 消费链                                                                                | handlers 测                                             | evolution 旁路仍 inventory                                                              |
-| W3   | 验收与总预算    | `f53e027b` + #117 + residual + paths | 是（投影/门闩） | **共用** tip budget；chat 中途 charge；cron/followup/cli/gateway_agent 收尾真实 `costUsd` | residual + paths：iterations 超限；usage→USD 有证据才计 | collab claim 无用量源；ParentChild 预算；supervisor 旁路；无 cost 配置时只计 iterations |
-| W4   | 经验有效性      | `b8ff8ea4` + #117 + residual         | 是（四段字段）  | tip exposure + **显式 adopted API**                                                       | residual：attach→adopted；无 adopted 不策展             | 生产采用方须显式传 id；pending 仍进程内；无自动推断                                     |
-| W5   | 结构/矩阵       | `23314d48` #112 + residual           | 是              | loop-log 观测                                                                             | **有界 ring 行为已验证**                                | 旁路不退役（RPC/canary 无 tip）；**不**宣布原计划完成                                   |
+| 阶段 | 主题            | main tip                           | 接口可用        | 生产接通                                                                                   | 行为已验证                                  | 未完成（诚实）                                                                         |
+| ---- | --------------- | ---------------------------------- | --------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| W0   | 基线与证据      | `1f698e37` #95                     | 是              | n/a（文档）                                                                                | 文档分类                                    | 「已完成」仅限有调用证据入口                                                           |
+| W1   | 跨入口身份/收尾 | `b6c60550` #98 + executor closeout | 是              | chat/cron/cli/gateway_agent/collab claim/subagent                                          | 入口测试含 subagent tip 与模型门闩          | collab 非 claim RPC 复用 tip；cron 冷启动仍靠 hydrate；嵌入式内部多轮按一次 attempt 计 |
+| W2   | 技能/模式消费   | `f3a19e08` #99                     | 是              | tip 消费链                                                                                 | handlers 测                                 | evolution 旁路仍 inventory                                                             |
+| W3   | 验收与总预算    | `f53e027b` + executor closeout     | 是（投影/门闩） | tip budget 在下一次模型调用前生效；未知费用与已知 0 分开；父 tip 用 childAttributed 不双计 | 门闩测试：超限后模型替身不再被调用          | supervisor `nextStop` 仍是另一本账；嵌入式内部多轮不逐次拦截；collab claim 无模型用量  |
+| W4   | 经验有效性      | `b8ff8ea4` + #117 + residual       | 是（四段字段）  | tip exposure + **显式 adopted API**                                                        | residual：attach→adopted；无 adopted 不策展 | 生产采用方须显式传 id；pending 仍进程内；无自动推断                                    |
+| W5   | 结构/矩阵       | `23314d48` #112 + residual         | 是              | loop-log 观测                                                                              | **有界 ring 行为已验证**                    | 旁路不退役（RPC/canary 无 tip）；**不**宣布原计划完成                                  |
 
 **复用 / 断点 / 减少（wrap-up）**
 

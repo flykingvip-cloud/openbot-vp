@@ -94,6 +94,9 @@ export const AgentParamsSchema = Type.Object(
     timeout: Type.Optional(Type.Integer({ minimum: 0 })),
     bestEffortDeliver: Type.Optional(Type.Boolean()),
     lane: Type.Optional(Type.String()),
+    /** Existing parent TaskOutcome id. Ignored unless the parent tip already exists. */
+    parentTaskId: Type.Optional(Type.String()),
+    parentAgentId: Type.Optional(Type.String()),
     extraSystemPrompt: Type.Optional(Type.String()),
     internalEvents: Type.Optional(Type.Array(AgentInternalEventSchema)),
     inputProvenance: Type.Optional(

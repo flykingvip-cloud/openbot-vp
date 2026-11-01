@@ -16,13 +16,34 @@ import {
 /** Tip limits ≡ supervisor budget shape. */
 export type TaskBudgetLimits = SupervisorBudget;
 
+/**
+ * How a model-call charge learned its USD.
+ * - known: cost config produced a finite estimate (including explicit 0).
+ * - unknown: a model call happened but usage or cost config could not price it.
+ * - not_applicable: the charge is not a model call (collab claim iteration).
+ * Unknown must not be stored as spentCostUsd 0.
+ */
+export type TipCostEvidence = "known" | "unknown" | "not_applicable";
+
 /** Durable tip snapshot: limits + spend + clock (+ iteration count; tip has no iterations[]). */
 export type TaskBudgetState = TaskBudgetLimits & {
+  /** Own known positive USD. Does not include child-attributed or unknown calls. */
   spentCostUsd: number;
   /** Wall-clock start for duration check; set on first spend / ensureStarted. */
   startedAtMs?: number;
-  /** Count of recorded iterations charged against maxIterations (mirrors SupervisedTask.iterations.length). */
+  /** Own recorded iterations (mirrors SupervisedTask.iterations.length). */
   iterationCount: number;
+  /** Model calls whose USD could not be priced. Not added to spentCostUsd. */
+  unknownCostCharges?: number;
+  /** Model calls priced at exactly 0. Distinct from unknown. */
+  knownZeroCostCharges?: number;
+  /**
+   * USD attributed from child tasks. Kept off spentCostUsd so a family rollup
+   * uses parent.spentCostUsd + parent.childAttributedCostUsd and does not also
+   * add the child's own spentCostUsd.
+   */
+  childAttributedCostUsd?: number;
+  childAttributedIterations?: number;
 };
 
 export const DEFAULT_TASK_BUDGET_LIMITS: TaskBudgetLimits = { ...DEFAULT_SUPERVISOR_BUDGET };
@@ -45,6 +66,10 @@ export function buildTaskBudgetState(params: {
     ...limits,
     spentCostUsd: 0,
     iterationCount: 0,
+    unknownCostCharges: 0,
+    knownZeroCostCharges: 0,
+    childAttributedCostUsd: 0,
+    childAttributedIterations: 0,
   };
 }
 
@@ -60,20 +85,61 @@ export function ensureTaskBudgetStarted(
 
 export function accumulateTaskBudgetSpend(
   state: TaskBudgetState,
-  delta: { costUsd?: number; iterations?: number },
+  delta: {
+    costUsd?: number;
+    iterations?: number;
+    costEvidence?: TipCostEvidence;
+    /** child = roll into the parent tip without adding to the parent's own spend. */
+    attribution?: "own" | "child";
+  },
   nowMs: number = Date.now(),
 ): TaskBudgetState {
   const next = ensureTaskBudgetStarted(state, nowMs);
-  const cost = typeof delta.costUsd === "number" && delta.costUsd > 0 ? delta.costUsd : 0;
   const iters =
     typeof delta.iterations === "number" && delta.iterations > 0 ? Math.floor(delta.iterations) : 0;
-  if (cost === 0 && iters === 0) {
+  const evidence = delta.costEvidence;
+  const knownCost =
+    evidence === "known" &&
+    typeof delta.costUsd === "number" &&
+    Number.isFinite(delta.costUsd) &&
+    delta.costUsd >= 0
+      ? delta.costUsd
+      : undefined;
+  // Legacy callers omit evidence and only pass a positive estimate.
+  const legacyPositive =
+    evidence == null &&
+    typeof delta.costUsd === "number" &&
+    Number.isFinite(delta.costUsd) &&
+    delta.costUsd > 0
+      ? delta.costUsd
+      : 0;
+  const child = delta.attribution === "child";
+  if (child) {
+    return {
+      ...next,
+      childAttributedIterations: (next.childAttributedIterations ?? 0) + iters,
+      childAttributedCostUsd:
+        (next.childAttributedCostUsd ?? 0) +
+        (knownCost != null && knownCost > 0 ? knownCost : legacyPositive),
+      unknownCostCharges:
+        (next.unknownCostCharges ?? 0) + (evidence === "unknown" && iters > 0 ? 1 : 0),
+      knownZeroCostCharges:
+        (next.knownZeroCostCharges ?? 0) +
+        (evidence === "known" && knownCost === 0 && iters > 0 ? 1 : 0),
+    };
+  }
+  const ownCost = knownCost != null && knownCost > 0 ? knownCost : legacyPositive;
+  const unknownInc = evidence === "unknown" && iters > 0 ? 1 : 0;
+  const zeroInc = evidence === "known" && knownCost === 0 && iters > 0 ? 1 : 0;
+  if (ownCost === 0 && iters === 0 && unknownInc === 0 && zeroInc === 0) {
     return next;
   }
   return {
     ...next,
-    spentCostUsd: next.spentCostUsd + cost,
+    spentCostUsd: next.spentCostUsd + ownCost,
     iterationCount: next.iterationCount + iters,
+    unknownCostCharges: (next.unknownCostCharges ?? 0) + unknownInc,
+    knownZeroCostCharges: (next.knownZeroCostCharges ?? 0) + zeroInc,
   };
 }
 
@@ -90,16 +156,18 @@ export function assessTaskBudgetExhaustion(
   state: TaskBudgetState,
   nowMs: number = Date.now(),
 ): TaskBudgetExhaustion | null {
-  if (state.iterationCount >= state.maxIterations) {
+  const iterations = state.iterationCount + (state.childAttributedIterations ?? 0);
+  const spent = state.spentCostUsd + (state.childAttributedCostUsd ?? 0);
+  if (iterations >= state.maxIterations) {
     return {
       dimension: "iterations",
-      detail: `iterations ${state.iterationCount} >= maxIterations ${state.maxIterations}`,
+      detail: `iterations ${iterations} >= maxIterations ${state.maxIterations}`,
     };
   }
-  if (state.spentCostUsd >= state.maxCostUsd) {
+  if (spent >= state.maxCostUsd) {
     return {
       dimension: "cost",
-      detail: `spentCostUsd ${state.spentCostUsd} >= maxCostUsd ${state.maxCostUsd}`,
+      detail: `spentCostUsd ${spent} >= maxCostUsd ${state.maxCostUsd}`,
     };
   }
   if (state.startedAtMs != null) {

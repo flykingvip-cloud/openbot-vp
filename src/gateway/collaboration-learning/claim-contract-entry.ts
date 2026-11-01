@@ -734,6 +734,8 @@ async function recordCollabClaimTurnOutcome(params: {
       taskId: opened.taskId,
       scope: opened.scope,
       entrypoint: "collab",
+      // Claim/apply is not a model call. Iteration still counts; USD is not unknown and not zero.
+      costEvidence: "not_applicable",
       ...(params.success
         ? {}
         : {

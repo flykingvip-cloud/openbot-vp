@@ -279,6 +279,11 @@ async function runFallbackCandidate<T>(params: {
       result,
     };
   } catch (err) {
+    // Budget exhaustion is a task stop, not a provider failover. Trying the next
+    // model would be another call the tip gate already refused.
+    if (err instanceof Error && err.name === "TaskBudgetExceededError") {
+      throw err;
+    }
     if (shouldRethrowAbort(err)) {
       throw err;
     }

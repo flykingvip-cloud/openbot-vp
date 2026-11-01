@@ -110,7 +110,7 @@ export type ParentChildContract = {
   aggregation: ChildAggregationPolicy;
 };
 
-export type Entrypoint = "chat" | "gateway_agent" | "cron" | "cli" | "collab";
+export type Entrypoint = "chat" | "gateway_agent" | "cron" | "cli" | "collab" | "subagent";
 
 export type CloseReasonCode =
   | "accepted_and_delivered"
@@ -325,6 +325,10 @@ export type SubmitTransition =
       type: "accumulate_budget_spend";
       costUsd?: number;
       iterations?: number;
+      /** known zero stays off spentCostUsd; unknown is counted, not forged as 0. */
+      costEvidence?: "known" | "unknown" | "not_applicable";
+      /** child spend rolls into the parent tip's childAttributed* fields only. */
+      attribution?: "own" | "child";
       expectedVersion: number;
       fencingToken: string;
       nowMs?: number;

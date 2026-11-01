@@ -894,6 +894,8 @@ export function createEvolutionControlHandlers(resolve = resolvePlane): GatewayR
           success: succeeded,
           runId,
           tenantId: access.tenantId,
+          // RPC/canary observation. Task success stays on TaskOutcome.
+          countsAsTaskJudgement: false,
           occurredAt: typeof params.occurredAt === "number" ? params.occurredAt : Date.now(),
           ...(typeof params.latencyMs === "number" ? { latencyMs: params.latencyMs } : {}),
           ...(typeof params.securityViolation === "boolean"

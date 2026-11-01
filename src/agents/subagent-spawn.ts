@@ -27,6 +27,7 @@ import {
   normalizeAgentId,
   parseAgentSessionKey,
 } from "../routing/session-key.js";
+import { resolveLinkedParentTaskId } from "../task-outcome/entrypoint-ensure.js";
 import { normalizeDeliveryContext } from "../utils/delivery-context.js";
 import { resolveAgentConfig } from "./agent-scope.js";
 import { AGENT_LANE_SUBAGENT } from "./lanes.js";
@@ -713,6 +714,13 @@ export async function spawnSubagentDirect(
     stageSpawnGovernanceSnapshot(childIdem, childGovernanceSnapshot);
   }
   try {
+    const linkedParentTaskId = ctx.parentRunId?.trim()
+      ? resolveLinkedParentTaskId(cfg, {
+          parentAgentId: requesterAgentId,
+          parentRunId: ctx.parentRunId,
+          parentSessionKey: requesterInternalKey,
+        })
+      : undefined;
     const response = await callGateway<{ runId: string }>({
       method: "agent",
       params: {
@@ -725,6 +733,9 @@ export async function spawnSubagentDirect(
         idempotencyKey: childIdem,
         deliver: false,
         lane: AGENT_LANE_SUBAGENT,
+        ...(linkedParentTaskId
+          ? { parentTaskId: linkedParentTaskId, parentAgentId: requesterAgentId }
+          : {}),
         extraSystemPrompt: childSystemPrompt,
         thinking: thinkingOverride,
         timeout: runTimeoutSeconds,

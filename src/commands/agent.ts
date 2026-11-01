@@ -121,13 +121,17 @@ import { deliverAgentCommandResult } from "./agent/delivery.js";
 import {
   ensureCliTurnTaskOutcome,
   ensureGatewayAgentTurnTaskOutcome,
+  ensureSubagentTurnTaskOutcome,
 } from "../task-outcome/entrypoint-ensure.js";
 import {
+  assertRunnerTurnBudgetAllowsModelCall,
+  chargeModelCallAgainstTip,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  TaskBudgetExceededError,
   type RunnerTurnFailureReason,
 } from "../task-outcome/runtime-from-runner.js";
-import type { TrustedScope } from "../task-outcome/types.js";
+import type { Entrypoint, TrustedScope } from "../task-outcome/types.js";
 import { resolveAgentCommandModelGovernance } from "./agent/model-governance.js";
 import { resolveAgentRunContext } from "./agent/run-context.js";
 import { updateSessionStoreAfterAgentRun } from "./agent/session-store.js";
@@ -895,14 +899,20 @@ async function agentCommandInternal(
   // Model allowlists for the child still come from the parent snapshot.
   let commercialGate: AgentCommandCommercialGateResult | undefined;
 
-  // askOutcome W1: CLI / gateway_agent production tip (skip nested subagent lane).
-  const agentOutcomeEntrypoint =
-    isSubagentLane ? undefined : opts.governanceEntry === "E2" ? "gateway_agent" : "cli";
+  // askOutcome: CLI / gateway_agent / subagent share one tip closeout.
+  // Subagent persists entrypoint "subagent" (not cli/gateway) and links parentTaskId when known.
+  const agentOutcomeEntrypoint: Entrypoint = isSubagentLane
+    ? "subagent"
+    : opts.governanceEntry === "E2"
+      ? "gateway_agent"
+      : "cli";
   let agentOutcomeTaskId: string | undefined;
   let agentOutcomeScope: TrustedScope | undefined;
   let agentOutcomeCloseoutDone = false;
-  /** Real usage-derived USD for tip budget closeout (cli/gateway_agent have no mid-run charge). */
+  /** Real usage-derived USD for tip budget closeout when mid-run charge did not run. */
   let tipBudgetCostUsd: number | undefined;
+  let tipBudgetChargedThisTurn = false;
+  let tipBudgetCallSeq = 0;
   let agentOutcomeSuccess: boolean | undefined;
   let agentOutcomeFailureReason: RunnerTurnFailureReason | undefined;
   let agentOutcomeFailureDetail: string | undefined;
@@ -924,19 +934,27 @@ async function agentCommandInternal(
       opts.executionIdentity?.enterpriseId?.trim() ||
       undefined;
     const opened =
-      agentOutcomeEntrypoint === "cli"
-        ? ensureCliTurnTaskOutcome(cfg, {
+      agentOutcomeEntrypoint === "subagent"
+        ? ensureSubagentTurnTaskOutcome(cfg, {
             agentId: sessionAgentId,
             runId,
             subjectRef,
             ...(tenantId ? { tenantId } : {}),
+            ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
           })
-        : ensureGatewayAgentTurnTaskOutcome(cfg, {
-            agentId: sessionAgentId,
-            runId,
-            subjectRef,
-            ...(tenantId ? { tenantId } : {}),
-          });
+        : agentOutcomeEntrypoint === "cli"
+          ? ensureCliTurnTaskOutcome(cfg, {
+              agentId: sessionAgentId,
+              runId,
+              subjectRef,
+              ...(tenantId ? { tenantId } : {}),
+            })
+          : ensureGatewayAgentTurnTaskOutcome(cfg, {
+              agentId: sessionAgentId,
+              runId,
+              subjectRef,
+              ...(tenantId ? { tenantId } : {}),
+            });
     if (opened.ok) {
       agentOutcomeTaskId = opened.taskId;
       agentOutcomeScope = opened.scope;
@@ -963,7 +981,10 @@ async function agentCommandInternal(
         scope: agentOutcomeScope,
         entrypoint: agentOutcomeEntrypoint,
         latencyMs: Math.max(0, Date.now() - agentOutcomeStartedAt),
-        ...(tipBudgetCostUsd != null ? { costUsd: tipBudgetCostUsd } : {}),
+        ...(tipBudgetChargedThisTurn ? { skipBudgetCharge: true } : {}),
+        ...(!tipBudgetChargedThisTurn && tipBudgetCostUsd != null
+          ? { costUsd: tipBudgetCostUsd }
+          : {}),
         ...(success
           ? {}
           : {
@@ -1470,7 +1491,18 @@ async function agentCommandInternal(
         run: (providerOverride, modelOverride, runOptions) => {
           const isFallbackRetry = fallbackAttemptIndex > 0;
           fallbackAttemptIndex += 1;
-          return runAgentAttempt({
+          if (agentOutcomeTaskId && agentOutcomeScope) {
+            assertRunnerTurnBudgetAllowsModelCall(cfg, sessionAgentId, {
+              taskId: agentOutcomeTaskId,
+              scope: agentOutcomeScope,
+              startedAtMs: agentOutcomeStartedAt,
+              ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
+              ...(opts.parentAgentId?.trim() ? { parentAgentId: opts.parentAgentId.trim() } : {}),
+            });
+          }
+          return (async () => {
+            try {
+              const result = await runAgentAttempt({
             providerOverride,
             modelOverride,
             cfg,
@@ -1507,17 +1539,72 @@ async function agentCommandInternal(
               }
             },
           });
+              if (agentOutcomeTaskId && agentOutcomeScope) {
+                tipBudgetCallSeq += 1;
+                const charged = chargeModelCallAgainstTip(cfg, sessionAgentId, {
+                  taskId: agentOutcomeTaskId,
+                  scope: agentOutcomeScope,
+                  runId,
+                  callSeq: tipBudgetCallSeq,
+                  usage: result.meta?.agentMeta?.usage,
+                  provider: providerOverride,
+                  model: modelOverride,
+                  ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
+                  ...(opts.parentAgentId?.trim()
+                    ? { parentAgentId: opts.parentAgentId.trim() }
+                    : {}),
+                });
+                tipBudgetChargedThisTurn = true;
+                if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
+                  tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
+                }
+              }
+              return result;
+            } catch (err) {
+              if (
+                agentOutcomeTaskId &&
+                agentOutcomeScope &&
+                !(err instanceof TaskBudgetExceededError)
+              ) {
+                try {
+                  tipBudgetCallSeq += 1;
+                  chargeModelCallAgainstTip(cfg, sessionAgentId, {
+                    taskId: agentOutcomeTaskId,
+                    scope: agentOutcomeScope,
+                    runId,
+                    callSeq: tipBudgetCallSeq,
+                    provider: providerOverride,
+                    model: modelOverride,
+                    ...(opts.parentTaskId?.trim()
+                      ? { parentTaskId: opts.parentTaskId.trim() }
+                      : {}),
+                    ...(opts.parentAgentId?.trim()
+                      ? { parentAgentId: opts.parentAgentId.trim() }
+                      : {}),
+                  });
+                  tipBudgetChargedThisTurn = true;
+                } catch (chargeErr) {
+                  if (chargeErr instanceof TaskBudgetExceededError) {
+                    throw chargeErr;
+                  }
+                }
+              }
+              throw err;
+            }
+          })();
         },
       });
       result = fallbackResult.result;
       fallbackProvider = fallbackResult.provider;
       fallbackModel = fallbackResult.model;
-      tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
-        usage: result.meta?.agentMeta?.usage,
-        provider: fallbackProvider,
-        model: result.meta?.agentMeta?.model ?? fallbackModel,
-        config: cfg,
-      });
+      if (!tipBudgetChargedThisTurn) {
+        tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
+          usage: result.meta?.agentMeta?.usage,
+          provider: fallbackProvider,
+          model: result.meta?.agentMeta?.model ?? fallbackModel,
+          config: cfg,
+        });
+      }
       // Enterprise credit usage. Subagent runs record against the slot they acquired.
       await recordAgentCommandCreditUsage({
         gate: commercialGate,
@@ -1617,7 +1704,10 @@ async function agentCommandInternal(
     if (agentOutcomeSuccess === undefined) {
       agentOutcomeSuccess = false;
       const msg = String(err);
-      if (opts.abortSignal?.aborted) {
+      if (err instanceof TaskBudgetExceededError) {
+        agentOutcomeFailureReason = "budget_exceeded";
+        tipBudgetChargedThisTurn = true;
+      } else if (opts.abortSignal?.aborted) {
         agentOutcomeFailureReason = "user_cancelled";
       } else if (agentOutcomeFailureReason === undefined) {
         agentOutcomeFailureReason = /denied|blocked|authz|policy/i.test(msg)

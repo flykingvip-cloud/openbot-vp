@@ -101,6 +101,12 @@ export type RunnerTurnOutcomeInput = {
    * When omitted, only iterationCount += 1 is charged on the chat runner path.
    */
   costUsd?: number;
+  /**
+   * known = priced (including 0); unknown = model call without a price;
+   * not_applicable = non-model closeout (collab claim). Omitted + positive costUsd
+   * stays the legacy "known positive" path.
+   */
+  costEvidence?: "known" | "unknown" | "not_applicable";
   /** Optional tighten-only tip budget limits (applied on first ensure). */
   budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
   /**
@@ -228,21 +234,27 @@ function openRunnerBudgetContext(
   return { store, service, chat, record, fencingToken };
 }
 
+export type TipBudgetCostClassification = {
+  evidence: "known" | "unknown";
+  /** Present only when evidence is known. 0 is a real price, not a missing config. */
+  costUsd?: number;
+};
+
 /**
- * Best-effort USD estimate from real agent usage + model cost config.
- * Returns undefined when usage/cost evidence is missing — never invents spend.
- * Reused by chat mid-run charge and non-chat closeout paths.
+ * Price a model call from usage + cost config.
+ * Missing usage or missing cost config is unknown — never a fabricated 0.
+ * A cost config that prices to 0 is known.
  */
-export function estimateTipBudgetCostUsdFromUsage(params: {
+export function classifyTipBudgetCostFromUsage(params: {
   usage?: unknown;
   provider?: string;
   model?: string;
   config?: OpenBotConfig;
-}): number | undefined {
+}): TipBudgetCostClassification {
   try {
     const usage = normalizeUsage(params.usage as never);
     if (!usage) {
-      return undefined;
+      return { evidence: "unknown" };
     }
     const costConfig = resolveModelCostConfig({
       provider: params.provider,
@@ -250,11 +262,33 @@ export function estimateTipBudgetCostUsdFromUsage(params: {
       config: params.config,
     });
     const estimated = estimateUsageCost({ usage, cost: costConfig });
-    if (typeof estimated === "number" && Number.isFinite(estimated) && estimated > 0) {
-      return estimated;
+    if (typeof estimated === "number" && Number.isFinite(estimated) && estimated >= 0) {
+      return { evidence: "known", costUsd: estimated };
     }
   } catch {
-    // cost estimate is best-effort; callers still charge iterations
+    // cost estimate is best-effort; callers still charge iterations and mark unknown
+  }
+  return { evidence: "unknown" };
+}
+
+/**
+ * Best-effort positive USD estimate from real agent usage + model cost config.
+ * Returns undefined for unknown and for known zero — callers that need the
+ * distinction must use classifyTipBudgetCostFromUsage.
+ */
+export function estimateTipBudgetCostUsdFromUsage(params: {
+  usage?: unknown;
+  provider?: string;
+  model?: string;
+  config?: OpenBotConfig;
+}): number | undefined {
+  const classified = classifyTipBudgetCostFromUsage(params);
+  if (
+    classified.evidence === "known" &&
+    typeof classified.costUsd === "number" &&
+    classified.costUsd > 0
+  ) {
+    return classified.costUsd;
   }
   return undefined;
 }
@@ -263,6 +297,15 @@ export function estimateTipBudgetCostUsdFromUsage(params: {
  * Pre-model-call gate: assess tip budget WITHOUT charging.
  * Exhausted ⇒ allowed=false (caller must not invoke the model).
  */
+function loadExistingTask(
+  cfg: OpenBotConfig,
+  agentId: string,
+  taskId: string,
+): TaskOutcomeRecord | null {
+  const store = new DurableTaskOutcomeStore(resolveStoreRoot(cfg, agentId));
+  return store.loadTask(taskId);
+}
+
 export function assessRunnerTurnBudgetGate(
   cfg: OpenBotConfig,
   agentId: string,
@@ -272,6 +315,9 @@ export function assessRunnerTurnBudgetGate(
     budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
     startedAtMs?: number;
     nowMs?: number;
+    /** When the parent tip exists, its limits apply too. Missing parent is not invented. */
+    parentTaskId?: string;
+    parentAgentId?: string;
   },
 ): RunnerBudgetGateResult {
   const ctx = openRunnerBudgetContext(cfg, agentId, params);
@@ -286,13 +332,111 @@ export function assessRunnerTurnBudgetGate(
       exhaustion,
     };
   }
+  const parentTaskId = params.parentTaskId?.trim();
+  if (parentTaskId) {
+    const parent = loadExistingTask(cfg, params.parentAgentId?.trim() || agentId, parentTaskId);
+    if (parent?.budget) {
+      const parentExhausted = assessTaskBudgetExhaustion(parent.budget, nowMs);
+      if (parentExhausted || parent.reasonCode === "budget_exceeded") {
+        return {
+          allowed: false,
+          record: parent,
+          fencingToken: parent.fencingToken || ctx.fencingToken,
+          exhaustion: parentExhausted ?? {
+            dimension: "iterations",
+            detail: "parent task already closed budget_exceeded",
+          },
+        };
+      }
+    }
+  }
   return { allowed: true, record: ctx.record, fencingToken: ctx.fencingToken };
+}
+
+/** Pre-model-call gate used by production entrypoints. Throws instead of invoking the model. */
+export function assertRunnerTurnBudgetAllowsModelCall(
+  cfg: OpenBotConfig,
+  agentId: string,
+  params: {
+    taskId: string;
+    scope: TrustedScope;
+    budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
+    startedAtMs?: number;
+    nowMs?: number;
+    parentTaskId?: string;
+    parentAgentId?: string;
+  },
+): void {
+  const gate = assessRunnerTurnBudgetGate(cfg, agentId, params);
+  if (!gate.allowed) {
+    throw new TaskBudgetExceededError(
+      params.parentTaskId?.trim() || params.taskId,
+      gate.exhaustion,
+    );
+  }
 }
 
 /**
  * Post-model-call charge: accumulate real iterations/cost, then assess.
  * If exhausted, fail_closed(budget_exceeded) so the next gate blocks.
  */
+function attributeChildSpendToParent(
+  cfg: OpenBotConfig,
+  childAgentId: string,
+  params: {
+    childTaskId: string;
+    parentTaskId: string;
+    parentAgentId?: string;
+    runId: string;
+    callSeq: number;
+    iterations: number;
+    costUsd?: number;
+    costEvidence?: "known" | "unknown" | "not_applicable";
+    nowMs: number;
+  },
+): void {
+  const parentAgentId = params.parentAgentId?.trim() || childAgentId;
+  const store = new DurableTaskOutcomeStore(resolveStoreRoot(cfg, parentAgentId));
+  const service = new TaskOutcomeResultService({ store, submittedBy: "runner-budget-gate" });
+  let current = store.loadTask(params.parentTaskId);
+  if (!current?.budget || current.lifecycle === "closed") {
+    return;
+  }
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const fencingToken = current.fencingToken || newFencingToken();
+    const spent = service.submit(
+      current.taskId,
+      {
+        type: "accumulate_budget_spend",
+        iterations: params.iterations,
+        ...(params.costUsd != null ? { costUsd: params.costUsd } : {}),
+        ...(params.costEvidence ? { costEvidence: params.costEvidence } : {}),
+        attribution: "child",
+        expectedVersion: current.outcomeVersion,
+        fencingToken,
+        nowMs: params.nowMs,
+      },
+      {
+        requiredScope: current.scope,
+        commandId: `budget-spend:child:${current.taskId}:${params.childTaskId}:${params.runId}:call:${params.callSeq}`,
+      },
+    );
+    if (spent.ok || spent.code === "command_conflict") {
+      // Same child-call id already attributed. First payload wins; do not add again.
+      return;
+    }
+    if (spent.code !== "version_conflict" && spent.code !== "stale_fencing") {
+      throw new Error(`task-outcome parent budget attribution failed: ${spent.code}`);
+    }
+    const reloaded = store.loadTask(params.parentTaskId);
+    if (!reloaded?.budget || reloaded.lifecycle === "closed") {
+      return;
+    }
+    current = reloaded;
+  }
+  throw new Error("task-outcome parent budget attribution failed: version_conflict");
+}
+
 export function chargeRunnerTurnBudgetSpend(
   cfg: OpenBotConfig,
   agentId: string,
@@ -302,8 +446,11 @@ export function chargeRunnerTurnBudgetSpend(
     runId: string;
     callSeq: number;
     costUsd?: number;
+    costEvidence?: "known" | "unknown" | "not_applicable";
     iterations?: number;
     nowMs?: number;
+    parentTaskId?: string;
+    parentAgentId?: string;
   },
 ): {
   record: TaskOutcomeRecord;
@@ -322,16 +469,23 @@ export function chargeRunnerTurnBudgetSpend(
     typeof params.iterations === "number" && params.iterations > 0
       ? Math.floor(params.iterations)
       : 1;
-  const costUsd =
+  const knownPositive =
     typeof params.costUsd === "number" && Number.isFinite(params.costUsd) && params.costUsd > 0
       ? params.costUsd
       : undefined;
+  const knownZero =
+    params.costEvidence === "known" &&
+    typeof params.costUsd === "number" &&
+    Number.isFinite(params.costUsd) &&
+    params.costUsd === 0;
+  const costUsd = knownPositive ?? (knownZero ? 0 : undefined);
   const spent = ctx.service.submit(
     params.taskId,
     {
       type: "accumulate_budget_spend",
       iterations,
       ...(costUsd != null ? { costUsd } : {}),
+      ...(params.costEvidence ? { costEvidence: params.costEvidence } : {}),
       expectedVersion: ctx.record.outcomeVersion,
       fencingToken: ctx.fencingToken,
       nowMs,
@@ -341,10 +495,25 @@ export function chargeRunnerTurnBudgetSpend(
       commandId: `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`,
     },
   );
-  if (!spent.ok) {
+  if (!spent.ok && spent.code !== "command_conflict") {
     throw new Error(`task-outcome mid-run budget charge failed: ${spent.code}`);
   }
-  let record = spent.record;
+  // Same callSeq already charged. Keep the first payload and do not add spend again.
+  let record = spent.ok ? spent.record : (ctx.store.loadTask(params.taskId) ?? ctx.record);
+  const parentTaskId = params.parentTaskId?.trim();
+  if (parentTaskId && parentTaskId !== params.taskId) {
+    attributeChildSpendToParent(cfg, agentId, {
+      childTaskId: params.taskId,
+      parentTaskId,
+      parentAgentId: params.parentAgentId,
+      runId: params.runId,
+      callSeq: params.callSeq,
+      iterations,
+      ...(costUsd != null ? { costUsd } : {}),
+      ...(params.costEvidence ? { costEvidence: params.costEvidence } : {}),
+      nowMs,
+    });
+  }
   const exhaustion =
     record.budget != null ? assessTaskBudgetExhaustion(record.budget, nowMs) : null;
   if (exhaustion && record.lifecycle !== "closed") {
@@ -360,6 +529,59 @@ export function chargeRunnerTurnBudgetSpend(
     return { record: closed.record, exhaustion, closedForBudget: true };
   }
   return { record, exhaustion, closedForBudget: false };
+}
+
+/**
+ * Production post-call charge: classify usage, record known/unknown/zero,
+ * and attribute the same call to the parent tip when one exists.
+ */
+export function chargeModelCallAgainstTip(
+  cfg: OpenBotConfig,
+  agentId: string,
+  params: {
+    taskId: string;
+    scope: TrustedScope;
+    runId: string;
+    callSeq: number;
+    usage?: unknown;
+    provider?: string;
+    model?: string;
+    parentTaskId?: string;
+    parentAgentId?: string;
+    nowMs?: number;
+  },
+): {
+  record: TaskOutcomeRecord;
+  evidence: "known" | "unknown";
+  costUsd?: number;
+  closedForBudget: boolean;
+} {
+  const classified = classifyTipBudgetCostFromUsage({
+    usage: params.usage,
+    provider: params.provider,
+    model: params.model,
+    config: cfg,
+  });
+  const charged = chargeRunnerTurnBudgetSpend(cfg, agentId, {
+    taskId: params.taskId,
+    scope: params.scope,
+    runId: params.runId,
+    callSeq: params.callSeq,
+    iterations: 1,
+    costEvidence: classified.evidence,
+    ...(classified.evidence === "known" && classified.costUsd != null
+      ? { costUsd: classified.costUsd }
+      : {}),
+    ...(params.parentTaskId ? { parentTaskId: params.parentTaskId } : {}),
+    ...(params.parentAgentId ? { parentAgentId: params.parentAgentId } : {}),
+    ...(params.nowMs != null ? { nowMs: params.nowMs } : {}),
+  });
+  return {
+    record: charged.record,
+    evidence: classified.evidence,
+    ...(classified.costUsd != null ? { costUsd: classified.costUsd } : {}),
+    closedForBudget: charged.closedForBudget,
+  };
 }
 
 function defaultScope(tenantId?: string): TrustedScope {
@@ -526,6 +748,18 @@ export async function recordRunnerTurnOutcome(
           ...tightened,
           spentCostUsd: tipRecord.budget.spentCostUsd,
           iterationCount: tipRecord.budget.iterationCount,
+          ...(tipRecord.budget.unknownCostCharges != null
+            ? { unknownCostCharges: tipRecord.budget.unknownCostCharges }
+            : {}),
+          ...(tipRecord.budget.knownZeroCostCharges != null
+            ? { knownZeroCostCharges: tipRecord.budget.knownZeroCostCharges }
+            : {}),
+          ...(tipRecord.budget.childAttributedCostUsd != null
+            ? { childAttributedCostUsd: tipRecord.budget.childAttributedCostUsd }
+            : {}),
+          ...(tipRecord.budget.childAttributedIterations != null
+            ? { childAttributedIterations: tipRecord.budget.childAttributedIterations }
+            : {}),
           ...(tipRecord.budget.startedAtMs != null
             ? { startedAtMs: tipRecord.budget.startedAtMs }
             : {}),
@@ -606,7 +840,11 @@ export async function recordRunnerTurnOutcome(
     const costUsd =
       typeof input.costUsd === "number" && Number.isFinite(input.costUsd) && input.costUsd > 0
         ? input.costUsd
-        : undefined;
+        : input.costEvidence === "known" && typeof input.costUsd === "number" && input.costUsd === 0
+          ? 0
+          : undefined;
+    const costEvidence =
+      input.costEvidence ?? (costUsd != null && costUsd > 0 ? ("known" as const) : undefined);
     if (!input.skipBudgetCharge) {
       const spent = service.submit(
         taskId,
@@ -614,6 +852,7 @@ export async function recordRunnerTurnOutcome(
           type: "accumulate_budget_spend",
           iterations: 1,
           ...(costUsd != null ? { costUsd } : {}),
+          ...(costEvidence ? { costEvidence } : {}),
           expectedVersion: res.record.outcomeVersion,
           fencingToken,
           nowMs: Date.now(),

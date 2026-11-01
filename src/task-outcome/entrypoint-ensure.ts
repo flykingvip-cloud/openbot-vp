@@ -1,12 +1,13 @@
 import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
-import { scopeFromChatEntry } from "./chat-entry.js";
+import { chatTurnTaskId, scopeFromChatEntry } from "./chat-entry.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { CliTaskOutcomeAdapter } from "./entrypoints/cli.js";
 import { CollabTaskOutcomeAdapter } from "./entrypoints/collab.js";
 import { CronTaskOutcomeAdapter } from "./entrypoints/cron.js";
 import { GatewayAgentTaskOutcomeAdapter } from "./entrypoints/gateway-agent.js";
+import { SubagentTaskOutcomeAdapter } from "./entrypoints/subagent.js";
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { TASK_OUTCOME_STORE_DIRNAME } from "./runtime-from-runner.js";
 import { DurableTaskOutcomeStore } from "./store.js";
@@ -175,6 +176,81 @@ export function ensureCollabTurnTaskOutcome(
         authzScopeRef: identity.authzScopeRef ?? "collab-entry",
       }),
       taskContractVersion: identity.taskContractVersion ?? "1.0.0",
+    }),
+  );
+}
+
+export function subagentTurnTaskId(params: { agentId: string; runId: string }): string {
+  return `subagent:${params.agentId.trim()}:${params.runId.trim()}`;
+}
+
+/**
+ * Link a child run to a parent tip only when that tip already exists.
+ * Candidates are the real entrypoint task ids for the parent run — no agentId guess.
+ */
+export function resolveLinkedParentTaskId(
+  cfg: OpenBotConfig,
+  params: { parentAgentId: string; parentRunId: string; parentSessionKey?: string },
+): string | undefined {
+  const parentAgentId = params.parentAgentId.trim();
+  const parentRunId = params.parentRunId.trim();
+  if (!parentAgentId || !parentRunId) {
+    return undefined;
+  }
+  const sessionKey = params.parentSessionKey?.trim();
+  const candidates = [
+    chatTurnTaskId({
+      agentId: parentAgentId,
+      runId: parentRunId,
+      ...(sessionKey ? { sessionKey } : {}),
+    }),
+    chatTurnTaskId({ agentId: parentAgentId, runId: parentRunId }),
+    cliTurnTaskId({ agentId: parentAgentId, runId: parentRunId }),
+    gatewayAgentTurnTaskId({ agentId: parentAgentId, runId: parentRunId }),
+    subagentTurnTaskId({ agentId: parentAgentId, runId: parentRunId }),
+  ];
+  const store = new DurableTaskOutcomeStore(
+    path.join(resolveAgentDir(cfg, parentAgentId), TASK_OUTCOME_STORE_DIRNAME),
+  );
+  const seen = new Set<string>();
+  for (const taskId of candidates) {
+    if (seen.has(taskId)) {
+      continue;
+    }
+    seen.add(taskId);
+    if (store.loadTask(taskId)) {
+      return taskId;
+    }
+  }
+  return undefined;
+}
+
+export function ensureSubagentTurnTaskOutcome(
+  cfg: OpenBotConfig,
+  identity: {
+    agentId: string;
+    runId: string;
+    subjectRef: string;
+    tenantId?: string;
+    authzScopeRef?: string;
+    taskContractVersion?: string;
+    parentTaskId?: string;
+  },
+): EntrypointEnsureOk | EntrypointEnsureErr {
+  const taskId = subagentTurnTaskId({ agentId: identity.agentId, runId: identity.runId });
+  const scope = scopeFromChatEntry({
+    agentId: identity.agentId,
+    runId: taskId,
+    subjectRef: identity.subjectRef,
+    tenantId: identity.tenantId,
+    authzScopeRef: identity.authzScopeRef ?? "subagent-entry",
+  });
+  return openWithAdapter(cfg, { ...identity, taskId }, "subagent", (service) =>
+    new SubagentTaskOutcomeAdapter(service).openTask({
+      taskId,
+      scope,
+      taskContractVersion: identity.taskContractVersion ?? "1.0.0",
+      ...(identity.parentTaskId?.trim() ? { parentTaskId: identity.parentTaskId.trim() } : {}),
     }),
   );
 }

@@ -214,6 +214,8 @@ export const agentHandlers: GatewayRequestHandlers = {
       groupChannel?: string;
       groupSpace?: string;
       lane?: string;
+      parentTaskId?: string;
+      parentAgentId?: string;
       extraSystemPrompt?: string;
       internalEvents?: AgentInternalEvent[];
       idempotencyKey: string;
@@ -753,6 +755,8 @@ export const agentHandlers: GatewayRequestHandlers = {
             messageChannel: originMessageChannel,
             runId,
             lane: request.lane,
+            parentTaskId: request.parentTaskId,
+            parentAgentId: request.parentAgentId,
             extraSystemPrompt: request.extraSystemPrompt,
             internalEvents: request.internalEvents,
             inputProvenance,

@@ -9737,7 +9737,7 @@ tasks:
     since: 2026-10-26
     metadata: {}
   - id: askOutcome-p0-task-outcome-contract
-    owner: executor-acceptance
+    owner: 执行器收尾
     intent:
       - TaskOutcome unified durable replayable judgement
     paths:
@@ -9745,6 +9745,7 @@ tasks:
       - docs/design/task-outcome/**
       - docs/notes/askOutcome-p0-baseline.md
       - .loom/registry.yaml
+      - docs/notes/executor-closeout-acceptance.md
     state: active
     sessions:
       - id: askoutcome-p0-local-20261026
@@ -9752,9 +9753,20 @@ tasks:
         ide: cursor-local
         agent: executor-acceptance
         status: active
-        lastSignalAt: 2026-10-26T04:17:05.253Z
+        lastSignalAt: 2026-11-01T11:57:56.191Z
         metadata: {}
-    ownerHistory: []
+      - id: executor-closeout-6a40
+        taskId: askOutcome-p0-task-outcome-contract
+        ide: cursor
+        agent: 执行器收尾
+        status: active
+        lastSignalAt: 2026-11-01T11:57:56.191Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: executor-acceptance
+        toOwner: 执行器收尾
+        at: 2026-11-01T11:51:33.998Z
+        via: verified
     since: 2026-10-26
     metadata: {}
   - id: p1-task-driven-aor-scoring
@@ -10039,7 +10051,8 @@ tasks:
   - id: collab-restore-line-phase-a:grok-bot
     owner: grok-bot
     intent:
-      - P0 checkpoint restore-line load observability (empty≠error; request isolation; diagnostics)
+      - P0 checkpoint restore-line load observability (empty≠error; request
+        isolation; diagnostics)
       - Unify session-switch isolate boundary across shell/employee/send realign
       - Shared read-only placement projection so diagnostics match DOM divider
     paths:
@@ -10171,10 +10184,15 @@ tasks:
   - id: infrastructure-audit:p1-object-recovery
     owner: infra-audit
     intent:
-      - P1 object recovery + historical reclassification evidence (no ledger edits)
+      - P1 object recovery + historical reclassification evidence (no ledger
+        edits)
     paths:
       - .loom/registry.yaml
       - docs/notes/infrastructure-audit-2026-10-31/**
+    state: active
+    sessions: []
+    ownerHistory: []
+    metadata: {}
   - id: infrastructure-audit:release-record-anti-drift
     owner: infra-audit
     intent: []
@@ -10232,7 +10250,8 @@ tasks:
   - id: closed-loop-negation-diagnosis:cursor-closed-loop-490b
     owner: cursor-closed-loop-490b
     intent:
-      - Structured TaskOutcome rejection and diagnosis read of one outcome version
+      - Structured TaskOutcome rejection and diagnosis read of one outcome
+        version
     paths:
       - src/task-outcome/subject-ref.ts
       - src/task-outcome/feedback-disposition.ts
@@ -10255,9 +10274,12 @@ tasks:
   - id: watchdog-task-closure:grok-sentinel-link
     owner: grok-sentinel-link
     intent:
-      - "Fail-closed watchdog task closure: Mode B abort≠success, review routing, escalate stage binding"
-      - "P1/P2 acceptance: sideEffectClass consume, nudge fail bounds, humanAttention, sanitize, closed-loop tests"
-      - "Human takeover: conversation human-attention cards + unified pending-tasks + act RPCs; end-to-end redaction"
+      - "Fail-closed watchdog task closure: Mode B abort≠success, review
+        routing, escalate stage binding"
+      - "P1/P2 acceptance: sideEffectClass consume, nudge fail bounds,
+        humanAttention, sanitize, closed-loop tests"
+      - "Human takeover: conversation human-attention cards + unified
+        pending-tasks + act RPCs; end-to-end redaction"
     paths:
       - src/gateway/collaboration-dispatch/**
       - src/gateway/wake-round-dispatcher-boot.ts
@@ -10393,6 +10415,43 @@ tasks:
     since: 2026-11-01
     metadata: {}
 landingStreams:
+  - id: askOutcome-executor-closeout
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/design/task-outcome/call-chain-and-replacements.md
+      - docs/notes/executor-closeout-acceptance.md
+      - src/agents/model-fallback.ts
+      - src/agents/subagent-spawn.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/commands/agent.ts
+      - src/commands/agent/types.ts
+      - src/cron/isolated-agent/run.ts
+      - src/gateway/agent-growth/operational-metrics-store.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/protocol/schema/agent.ts
+      - src/gateway/server-methods/agent.ts
+      - src/gateway/server-methods/evolution-control.ts
+      - src/task-outcome/budget.ts
+      - src/task-outcome/consumer-boot.ts
+      - src/task-outcome/entrypoint-ensure.ts
+      - src/task-outcome/entrypoints/subagent.ts
+      - src/task-outcome/executor-closeout-residuals.test.ts
+      - src/task-outcome/index.ts
+      - src/task-outcome/paths-bypass-cleanup.test.ts
+      - src/task-outcome/pending-delivery.ts
+      - src/task-outcome/residual-four-items.test.ts
+      - src/task-outcome/result-service.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/transitions.ts
+      - src/task-outcome/types.ts
+    canLandWith: []
+    metadata:
+      task: askOutcome-p0-task-outcome-contract
+      owner: 执行器收尾
+      purpose: Executor closeout wiring into shared entrypoints; first-match so this
+        commit lands as one stream
   - id: closed-loop-ui-wiring-20261101
     landingPolicy: serial
     paths:
@@ -10438,7 +10497,8 @@ landingStreams:
     metadata:
       task: closed-loop-negation-diagnosis:cursor-closed-loop-490b
       owner: cursor-closed-loop-490b
-      purpose: Scope only for the next frontend and backend wiring PR. No UI implementation.
+      purpose: Scope only for the next frontend and backend wiring PR. No UI
+        implementation.
   - id: closed-loop-isolation-contract-20261101
     landingPolicy: serial
     paths:
@@ -10450,7 +10510,8 @@ landingStreams:
     metadata:
       task: closed-loop-isolation-contract:cursor-closed-loop-490b
       owner: cursor-closed-loop-490b
-      purpose: Isolation contract freeze. Docs, spec, and synthetic tests only. No production behavior change.
+      purpose: Isolation contract freeze. Docs, spec, and synthetic tests only. No
+        production behavior change.
   - id: watchdog-task-closure:grok-sentinel-link
     landingPolicy: serial
     paths:
@@ -10533,7 +10594,8 @@ landingStreams:
     metadata:
       task: watchdog-task-closure:grok-sentinel-link
       owner: grok-sentinel-link
-      purpose: Fail-closed heartbeat/Mode B side-effect class, human-attention card+todo intake, sanitize, closed-loop integration.
+      purpose: Fail-closed heartbeat/Mode B side-effect class, human-attention
+        card+todo intake, sanitize, closed-loop integration.
   - id: infrastructure-audit-p1-object-recovery-20261031
     landingPolicy: serial
     paths:
@@ -10546,7 +10608,8 @@ landingStreams:
     metadata:
       task: infrastructure-audit:p1-object-recovery
       owner: infra-audit
-      purpose: Evidence-only P1 object recovery and historical ERROR reclassification; no releases.jsonl or RELEASE_RECORD edits; no acknowledge.
+      purpose: Evidence-only P1 object recovery and historical ERROR reclassification;
+        no releases.jsonl or RELEASE_RECORD edits; no acknowledge.
   - id: infrastructure-audit-ledger-integrity-20261031
     landingPolicy: serial
     paths:
@@ -10568,7 +10631,9 @@ landingStreams:
     metadata:
       task: infrastructure-audit:ledger-integrity
       owner: infra-audit
-      purpose: Close seq127 dual-open; sync RELEASE_RECORD; classify ledger-audit exit-30 (missing-object/incomplete-graph/regression) fail-closed; no row deletes or mass acknowledge.
+      purpose: Close seq127 dual-open; sync RELEASE_RECORD; classify ledger-audit
+        exit-30 (missing-object/incomplete-graph/regression) fail-closed; no row
+        deletes or mass acknowledge.
   - id: infrastructure-audit-batch-b-20261031
     landingPolicy: serial
     paths:
@@ -10827,10 +10892,11 @@ landingStreams:
     metadata:
       task: collab-restore-line-phase-a:grok-bot
       owner: grok-bot
-      purpose: Phase A 恢复线 + P0 load observability (idle/loading/ready/error/stale/empty;
-        sessionKey+generation isolation; diagnostic reason codes; unified session-switch
-        isolate boundary; shared read-only placement projection for diagnostics). Does NOT
-        change restore RPC/placement/fallback/restorable. P1+ deferred. NO_PROMOTE
+      purpose: Phase A 恢复线 + P0 load observability
+        (idle/loading/ready/error/stale/empty; sessionKey+generation isolation;
+        diagnostic reason codes; unified session-switch isolate boundary; shared
+        read-only placement projection for diagnostics). Does NOT change restore
+        RPC/placement/fallback/restorable. P1+ deferred. NO_PROMOTE
   - id: memory-safe-continuity-live-gateway-20261030
     landingPolicy: serial
     paths:
@@ -11141,7 +11207,7 @@ landingStreams:
     canLandWith: []
     metadata:
       task: askOutcome-p0-task-outcome-contract
-      owner: executor-acceptance
+      owner: 执行器收尾
       purpose: TaskOutcome unified durable replayable judgement (askOutcome P0)
   - id: p0a-p0-task-capability-plan
     landingPolicy: serial
@@ -23089,9 +23155,7 @@ landingStreams:
       task: pr143-market-assistant-merge-notes
       owner: grok-bot
   - id: controlled-discuss-to-task-p1-20261031
-    owner: cursor-grok
-    intent:
-      - P1 controlled discuss-to-formal-task entry, stable taskId mint, diagnosis, receipt semantics
+    landingPolicy: serial
     paths:
       - src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts
       - src/gateway/collaboration-learning/controlled-discuss-to-task.ts
@@ -23143,14 +23207,10 @@ landingStreams:
       - src/agents/tools/collaboration-board-discuss-to-task.injection.test.ts
       - docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
       - .loom/registry.yaml
-    state: active
-    sessions: []
-    ownerHistory: []
-    since: "2026-10-31"
+    canLandWith: []
     metadata:
       provisionId: a8d23812-36a4-498e-a962-712f0734cd16
       branch: cursor-grok/controlled-discuss-to-task-p1-20261031
-
 sharedPaths:
   - glob: src/context-engine/registry.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

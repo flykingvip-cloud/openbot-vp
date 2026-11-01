@@ -74,8 +74,7 @@ import { ensureChatTurnTaskOutcome } from "../../task-outcome/chat-entry.js";
 import type { ModalityExecutionArtifact } from "../../task-outcome/modality-artifact-evidence.js";
 import {
   assessRunnerTurnBudgetGate,
-  chargeRunnerTurnBudgetSpend,
-  estimateTipBudgetCostUsdFromUsage,
+  chargeModelCallAgainstTip,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
   type GrowthOutcomeCommitOpts,
@@ -242,19 +241,14 @@ export async function runAgentTurnWithFallback(params: {
       return;
     }
     tipBudgetModelCallSeq += 1;
-    const costUsd = estimateTipBudgetCostUsdFromUsage({
-      usage: opts.usage,
-      provider: opts.provider,
-      model: opts.model,
-      config: params.followupRun.run.config,
-    });
-    chargeRunnerTurnBudgetSpend(params.followupRun.run.config, growthAgentIdForEntry, {
+    chargeModelCallAgainstTip(params.followupRun.run.config, growthAgentIdForEntry, {
       taskId: chatOutcomeTaskId,
       scope: chatOutcomeScope,
       runId,
       callSeq: tipBudgetModelCallSeq,
-      iterations: 1,
-      ...(costUsd != null ? { costUsd } : {}),
+      usage: opts.usage,
+      provider: opts.provider,
+      model: opts.model,
     });
     tipBudgetChargedThisTurn = true;
   };

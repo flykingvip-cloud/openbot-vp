@@ -29,6 +29,11 @@ export type TaskOutcomeObservation = {
   securityViolation?: boolean;
   crossTenantContamination?: boolean;
   occurredAt?: number;
+  /**
+   * False for external/canary observations. Those must not increment task
+   * success counters or pose as a TaskOutcome judgement.
+   */
+  countsAsTaskJudgement?: boolean;
   /** Test-only evolution-control persist root. Production omits this. */
   evolutionPersistDir?: string;
 };
@@ -144,6 +149,9 @@ function evolutionRecordFromObservation(
       ? { crossTenantContamination: outcome.crossTenantContamination }
       : {}),
     ...(typeof outcome.humanTakeover === "boolean" ? { humanTakeover: outcome.humanTakeover } : {}),
+    ...(outcome.countsAsTaskJudgement === false
+      ? { surfaceId: "evolution.observation", outcome: "unavailable" as const }
+      : {}),
   };
 }
 
@@ -225,10 +233,13 @@ export async function recordRunOutcome(
 ): Promise<void> {
   const toolsTotal = Math.max(0, Math.floor(outcome.toolsTotal ?? 0));
   const toolsSucceeded = Math.min(toolsTotal, Math.max(0, Math.floor(outcome.toolsSucceeded ?? 0)));
+  const countsAsTaskJudgement = outcome.countsAsTaskJudgement !== false;
   await update(cfg, agentId, (m) => {
-    m.tasksTotal += 1;
-    if (outcome.success) {
-      m.tasksSucceeded += 1;
+    if (countsAsTaskJudgement) {
+      m.tasksTotal += 1;
+      if (outcome.success) {
+        m.tasksSucceeded += 1;
+      }
     }
     m.toolsTotal += toolsTotal;
     m.toolsSucceeded += toolsSucceeded;

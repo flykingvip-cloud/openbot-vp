@@ -40,12 +40,13 @@ describe("residual 1: W1 entry inventory (real call sites)", () => {
     expect(src).toMatch(/dispatchAgentRunFromGateway/);
   });
 
-  it("commands/agent skips nested subagent lane for TaskOutcome (intentional)", () => {
+  it("commands/agent opens a subagent tip and gates the model call", () => {
     const src = fs.readFileSync(path.join(root, "src/commands/agent.ts"), "utf8");
-    expect(src).toMatch(/isSubagentLane \? undefined/);
-    expect(src).toMatch(/skip nested subagent lane/);
-    expect(src).toMatch(/ensureCliTurnTaskOutcome/);
-    expect(src).toMatch(/ensureGatewayAgentTurnTaskOutcome/);
+    expect(src).toMatch(/ensureSubagentTurnTaskOutcome/);
+    expect(src).toMatch(/assertRunnerTurnBudgetAllowsModelCall/);
+    expect(src).toMatch(/chargeModelCallAgainstTip/);
+    expect(src).toMatch(/entrypoint: "subagent"|"subagent"/);
+    expect(src).not.toMatch(/skip nested subagent lane/);
   });
 
   it("collab claim-contract-entry is the production ensureCollab site", () => {
