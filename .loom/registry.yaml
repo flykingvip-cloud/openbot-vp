@@ -10160,6 +10160,29 @@ tasks:
     ownerHistory: []
     since: 2026-10-31
     metadata: {}
+  - id: infrastructure-audit:infra-audit
+    owner: infra-audit
+    intent:
+      - "OpenBot infrastructure full audit: CI root-cause (batch A)"
+      - gate/local substitute (B)
+      - build provenance (C)
+      - prod topology/recovery (D)
+      - stability ops (E)
+    paths:
+      - docs/notes/infrastructure-audit-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/**
+    state: active
+    sessions:
+      - id: 844CDD06-136B-4F1A-BF56-7B671063A923
+        taskId: infrastructure-audit:infra-audit
+        ide: cursor
+        agent: 基础设施审计
+        status: active
+        lastSignalAt: 2026-10-31T10:39:22.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-31
+    metadata: {}
 landingStreams:
   - id: infrastructure-audit-p1-object-recovery-20261031
     landingPolicy: serial
@@ -10169,6 +10192,7 @@ landingStreams:
     canLandWith:
       - strip-ohbe-from-openbot-vp
       - infrastructure-audit-ledger-integrity-20261031
+      - infrastructure-audit-batch-b-20261031
     metadata:
       task: infrastructure-audit:p1-object-recovery
       owner: infra-audit
@@ -10182,10 +10206,27 @@ landingStreams:
       - docs/notes/infrastructure-audit-2026-10-31/**
     canLandWith:
       - strip-ohbe-from-openbot-vp
+      - infrastructure-audit-batch-b-20261031
     metadata:
       task: infrastructure-audit:ledger-integrity
       owner: infra-audit
       purpose: Close seq127 dual-open liveTo with successor-StartedAt attestation; sync RELEASE_RECORD L3 from machine tip; classify ledger ERROR without bulk acknowledge.
+  - id: infrastructure-audit-batch-b-20261031
+    landingPolicy: serial
+    paths:
+      - scripts/ci-local-merge-gate.sh
+      - scripts/ci-local-merge-gate.test.ts
+      - docs/reference/ci-local-merge-gate.md
+      - .github/workflows/ci-gate.yml
+      - docs/notes/infrastructure-audit-2026-10-31.md
+      - docs/notes/infrastructure-audit-2026-10-31/**
+      - .loom/registry.yaml
+    canLandWith:
+      - strip-ohbe-from-openbot-vp
+      - infrastructure-audit-p1-object-recovery-20261031
+      - infrastructure-audit-ledger-integrity-20261031
+    metadata:
+      note: Batch B fail-closed local CI merge gate + audit notes (infra-audit)
   - id: controlled-collab-p2-event-dispatch-20261031
     landingPolicy: serial
     paths:

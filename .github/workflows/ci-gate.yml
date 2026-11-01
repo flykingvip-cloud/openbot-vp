@@ -2,28 +2,27 @@ name: CI Gate
 
 # Minimal merge gate that actually runs.
 #
-# Background: `ci.yml` declares 30 of its 34 jobs on `blacksmith-*` runners, but this
-# repository never subscribed to Blacksmith — the labels were inherited from upstream
-# openclaw in the very first commit (5e1c095933, 2026-03-13). Those jobs sit `queued`
-# with `runner=none` forever, and because pushes arrive faster than the queue drains,
-# `concurrency` cancels each run before a runner is ever assigned. Result: over 200 CI
-# runs, 100% `cancelled`, zero completions, going back to at least early June. The
-# failure is silent by construction — never red, never timed out, just cancelled.
+# Background (historical): early `ci.yml` inherited unused `blacksmith-*` labels from
+# upstream openclaw (5e1c095933, 2026-03-13). Those jobs sat `queued` with
+# `runner=none` and were cancelled by concurrency — silent, never red. That story is
+# retained so old cancelled runs stay interpretable.
 #
-# This workflow puts the cheap, high-signal gates on GitHub-hosted runners so there is
-# at least one check that can be made required. It deliberately does NOT try to replace
-# `ci.yml`: the heavy matrix (Windows, macOS, Android, Docker, benchmarks) stays on
-# blacksmith labels and stays queued until Blacksmith is connected. Those are not merge
-# gates.
+# Current `ci.yml` on main (as of 2026-10-31) already uses GitHub-hosted
+# `ubuntu-24.04` / `windows-2025` / `macos-latest` for its jobs. This workflow still
+# keeps the cheap, high-signal gates on GitHub-hosted runners so there is at least one
+# check that can be made required. It does NOT replace the full `ci.yml` matrix.
 #
 # Minute budget matters here. GitHub-hosted minutes are metered on private repos, so
 # every job carries `timeout-minutes`, docs-only pushes are skipped, and pull-request
 # runs cancel their predecessors. Widen the scope (for example to the full `pnpm test`)
 # only after a few runs have shown the real per-run cost.
 #
-# When included Actions minutes are exhausted, hosted jobs finish in ~3s with
-# `runner_id=0` and empty steps (see #289). Use the local substitute instead of
-# treating red checks as a PR regression:
+# When hosted jobs finish in ~3s with `runner_id=0`, empty steps, and missing logs,
+# they never ran checks — that pattern is not PR-local regression evidence by itself.
+# Minutes exhaustion / spending limits remain a leading hypothesis until Billing or
+# an explicit annotation/control experiment confirms them (historical similar outage:
+# gmood2008/openbot#289; 2026-10-31 audit on flykingvip-cloud/openbot-vp re-observed
+# the empty-steps pattern only). Use the local substitute while investigating:
 #   docs/reference/ci-local-merge-gate.md
 #   ./scripts/ci-local-merge-gate.sh --base origin/main --candidate HEAD
 
