@@ -10436,6 +10436,29 @@ tasks:
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
+  - id: closed-loop-recheck-exec:cursor-closed-loop-490b
+    owner: cursor-closed-loop-490b
+    intent:
+      - Original-scenario recheck executor, off by default
+    paths:
+      - src/task-outcome/recheck-executor.ts
+      - src/task-outcome/recheck-executor.test.ts
+      - src/task-outcome/recheck-observation.ts
+      - src/diagnosis/task-outcome-evidence.ts
+      - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+    state: active
+    sessions:
+      - id: 4b7d9e21-1c44-4e90-8a55-2d6f0b77cc31
+        taskId: closed-loop-recheck-exec:cursor-closed-loop-490b
+        ide: cursor
+        agent: cursor-closed-loop-490b
+        status: active
+        lastSignalAt: 2026-11-01T13:10:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-01
+    metadata: {}
 landingStreams:
   - id: usage-cost-layers-20261101
     landingPolicy: serial
@@ -10475,6 +10498,20 @@ landingStreams:
       task: usage-cost-layers
       owner: cursor-cloud
       purpose: One usage and cost projection for user, enterprise, and platform.
+  - id: closed-loop-recheck-exec-20261101
+    landingPolicy: serial
+    paths:
+      - src/task-outcome/recheck-executor.ts
+      - src/task-outcome/recheck-executor.test.ts
+      - src/task-outcome/recheck-observation.ts
+      - src/diagnosis/task-outcome-evidence.ts
+      - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+    canLandWith: []
+    metadata:
+      task: closed-loop-recheck-exec:cursor-closed-loop-490b
+      owner: cursor-closed-loop-490b
+      purpose: Recheck executor default off. No notify.
   - id: closed-loop-recheck-read-20261101
     landingPolicy: serial
     paths:

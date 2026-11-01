@@ -615,7 +615,9 @@ function readTaskOutcomeEvidenceView(value: unknown): DiagnosisRunNote["taskOutc
       ...(typeof record.judgement === "string" ? { judgement: record.judgement } : {}),
       ...(typeof record.reasonCode === "string" ? { reasonCode: record.reasonCode } : {}),
       ...(typeof record.revisionKind === "string" ? { revisionKind: record.revisionKind } : {}),
-      ...(record.recheckStatus === "incomplete" || record.recheckStatus === "not_checked"
+      ...(record.recheckStatus === "incomplete" ||
+      record.recheckStatus === "not_checked" ||
+      record.recheckStatus === "completed"
         ? { recheckStatus: record.recheckStatus }
         : {}),
     };

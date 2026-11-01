@@ -37,7 +37,7 @@ export type TaskOutcomeEvidence =
       judgement: TaskJudgement;
       reasonCode?: string;
       revisionKind?: "new_execution" | "correction";
-      recheckStatus: "not_checked" | "incomplete";
+      recheckStatus: "not_checked" | "incomplete" | "completed";
       lifecycle: string;
       toolObservations: TaskOutcomeToolObservation[];
     }
@@ -47,6 +47,16 @@ export type TaskOutcomeEvidence =
       taskId?: string;
       tipVersion?: number;
     };
+
+function recheckLabel(status: "not_checked" | "incomplete" | "completed"): string {
+  if (status === "incomplete") {
+    return "复验未完成";
+  }
+  if (status === "completed") {
+    return "复验已记录";
+  }
+  return "未复验";
+}
 
 export function formatTaskOutcomeEvidenceText(evidence: TaskOutcomeEvidence): string {
   if (evidence.ok) {
@@ -58,7 +68,7 @@ export function formatTaskOutcomeEvidenceText(evidence: TaskOutcomeEvidence): st
       `判定=${evidence.judgement}`,
       `reasonCode=${evidence.reasonCode ?? ""}`,
       `工具失败观察=${failed}。工具失败不改变任务判定。`,
-      `复验=${evidence.recheckStatus === "incomplete" ? "复验未完成" : "未复验"}。`,
+      `复验=${recheckLabel(evidence.recheckStatus)}。`,
     ].join("\n");
   }
   return [

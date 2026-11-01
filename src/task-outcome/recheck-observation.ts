@@ -6,13 +6,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { DurableTaskOutcomeStore, boundedOutcomePathSegment } from "./store.js";
 
-export type RecheckObservationStatus = "not_checked" | "incomplete";
+export type RecheckObservationStatus = "not_checked" | "incomplete" | "completed";
 
 type StoredRecheckObservation = {
   taskId: string;
   outcomeVersion: number;
-  status: "incomplete";
-  reason: "not_completed";
+  status: "incomplete" | "completed";
+  reason: "not_completed" | "recorded";
 };
 
 type RecheckObservationFile = {
@@ -41,11 +41,13 @@ export function readRecheckStatus(
   taskId: string,
   outcomeVersion: number,
 ): RecheckObservationStatus {
-  const found = readFile(rootDir, taskId).some(
-    (row) =>
-      row.taskId === taskId && row.outcomeVersion === outcomeVersion && row.status === "incomplete",
+  const row = readFile(rootDir, taskId).find(
+    (item) => item.taskId === taskId && item.outcomeVersion === outcomeVersion,
   );
-  return found ? "incomplete" : "not_checked";
+  if (row?.status === "incomplete" || row?.status === "completed") {
+    return row.status;
+  }
+  return "not_checked";
 }
 
 /** Test and later executor seam. Does not run a scenario and does not edit the version snapshot. */
@@ -53,6 +55,15 @@ export function recordIncompleteRecheckObservation(params: {
   rootDir: string;
   taskId: string;
   outcomeVersion: number;
+}): { ok: true } | { ok: false; code: "version_missing" } {
+  return recordRecheckObservation({ ...params, status: "incomplete" });
+}
+
+export function recordRecheckObservation(params: {
+  rootDir: string;
+  taskId: string;
+  outcomeVersion: number;
+  status: "incomplete" | "completed";
 }): { ok: true } | { ok: false; code: "version_missing" } {
   const taskId = params.taskId.trim();
   if (!taskId || !Number.isInteger(params.outcomeVersion) || params.outcomeVersion < 1) {
@@ -74,8 +85,8 @@ export function recordIncompleteRecheckObservation(params: {
           {
             taskId,
             outcomeVersion: params.outcomeVersion,
-            status: "incomplete",
-            reason: "not_completed",
+            status: params.status,
+            reason: params.status === "incomplete" ? "not_completed" : "recorded",
           },
         ],
       };
