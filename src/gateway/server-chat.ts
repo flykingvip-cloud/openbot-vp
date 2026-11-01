@@ -40,6 +40,7 @@ import {
   prepareChatDeliverablePublish,
   type PreparedChatDeliverable,
 } from "./knowledge/deliverables/chat-deliverable-publish.js";
+import { appendPersistedAgentMessageToTranscript } from "./server-methods/chat-transcript-inject.js";
 import { loadSessionEntrySyncFallback } from "./tenant-context.js";
 import { formatForLog } from "./ws-log.js";
 
@@ -849,6 +850,20 @@ export function createAgentEventHandler({
         visibleText = stripControlChannelForDisplay(visibleText);
       }
       const taskUpdate = resolveVisibleChatTaskUpdate(sessionKey, clientRunId);
+      if (taskUpdate) {
+        try {
+          const transcriptPath =
+            loadSessionEntrySyncFallback(sessionKey).entry?.sessionFile?.trim();
+          if (transcriptPath) {
+            appendPersistedAgentMessageToTranscript({
+              transcriptPath,
+              message: taskUpdate,
+            });
+          }
+        } catch {
+          // The live chat event still carries the card when transcript append fails.
+        }
+      }
       const payload = {
         runId: clientRunId,
         sessionKey,

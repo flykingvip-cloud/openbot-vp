@@ -4049,6 +4049,12 @@ async function runGroupBotDiscussionTurn(params: {
           runId,
           agentId: params.bot.agentId,
         }) ?? undefined;
+      if (taskUpdate && transcriptPath) {
+        appendRawTranscriptMessage({
+          transcriptPath,
+          message: taskUpdate,
+        });
+      }
       broadcastChatFinal({
         context: params.context,
         runId,
