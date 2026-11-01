@@ -26,7 +26,9 @@ async function defaultResolveCaller(
     tenantId = null;
   }
   return {
-    subjectRaw: client?.platformUserId?.trim() || client?.user?.trim() || "",
+    // Same field chat entry prefers: authenticated platform user id.
+    // client.user (often an email) and request body strings are not this identity.
+    subjectRaw: client?.platformUserId?.trim() || "",
     tenantId,
   };
 }
