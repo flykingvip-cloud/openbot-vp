@@ -720,7 +720,11 @@ describe("closed-loop isolation contract", () => {
     expect(corrected.ok).toBe(true);
     const stale = readBoundTaskEvidence(service, taskId, out.record.outcomeVersion);
     expect(stale).toMatchObject({ ok: false, code: "outcome_version_changed" });
-    expect(readBoundTaskEvidence(service, taskId, undefined).code).toBe("version_required");
+    const unbound = readBoundTaskEvidence(service, taskId, undefined);
+    expect(unbound.ok).toBe(false);
+    if (!unbound.ok) {
+      expect(unbound.code).toBe("version_required");
+    }
 
     const now = Date.now();
     const failedPreview = deriveStructuralPreviewSources({
