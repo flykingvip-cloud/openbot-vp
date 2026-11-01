@@ -1,8 +1,9 @@
 # 10 — Tracked coverage inventory (denominator hardened)
 
 **Pin:** `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`  
-**When:** 2026-11-02 Asia/Shanghai  
-**Supersedes soft claim:** “约 N=118” without stable IDs.
+**When:** 2026-11-02 Asia/Shanghai（含独立复核口径收紧）  
+**Supersedes soft claim:** “约 N=118” without stable IDs.  
+**重要：** 行数（含本轮拆分后的 N）**尚不能证明覆盖完整**。见 [`../runs/2026-11-02-independent-reviewer-corrections/00-exhaustiveness-note.md`](../runs/2026-11-02-independent-reviewer-corrections/00-exhaustiveness-note.md)。
 
 ## Claim narrowing (mandatory)
 
@@ -14,15 +15,18 @@
 | SBOM / license file exists in tree | ≠ regen / audit PASS |
 | CLI `--help` lists a command | ≠ that command’s runtime acceptance |
 | P1 DEF-001/002/004 cleared | ≠ fullstack PASS |
+| 团队诊断脚本 FAIL | ≠ 验收方已独立复现 |
+| Tracked N（任意固定行数） | ≠ 公开入口已穷尽 |
 
 ## Column legend
 
 - **Cap** — 功能能力 claimed by product/docs  
 - **Static** — 静态结构 (files/ids present, docs match)  
 - **Compile** — 编译 / package build / typecheck of that surface  
-- **Runtime** — 运行 (local smoke or live). Live prod credentials stay **NOT RUN**.
+- **Runtime** — 运行 (local smoke or live). Live prod credentials stay **NOT_RUN**.
 
-Status vocabulary: `PASS` | `FAIL` | `NOT_RUN` | `BLOCKED` | `N/A`
+Status vocabulary（**仅允许**）: `PASS` | `FAIL` | `NOT_RUN` | `BLOCKED` | `N/A`  
+**禁止 `PARTIAL`。** 原含糊项已拆成原子行。
 
 ## Inventory (stable IDs)
 
@@ -30,16 +34,19 @@ Status vocabulary: `PASS` | `FAIL` | `NOT_RUN` | `BLOCKED` | `N/A`
 
 | ID | Item | Cap | Static | Compile | Runtime | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| C-CLI-HELP | openbot CLI help surface | Y | PASS | PASS | PASS | 49 commands, 2026-11-02 smoke |
-| C-BACKUP-OMIT | Backup default omit credentials | Y | PASS | PASS | **FAIL** | DEF-008; unit+diag this pin |
-| C-BACKUP-CREATE | Backup create (happy path) | Y | PASS | PASS | PARTIAL | create works; omit broken |
+| C-CLI-HELP | openbot CLI help surface | Y | PASS | PASS | PASS | 49 top-level commands listed; ≠ per-command runtime |
+| C-BACKUP-CREATE-STATIC | Backup create 静态入口 / 单测期望存在 | Y | PASS | PASS | N/A | 命令与单测入口在树中；不作 runtime 宣称 |
+| C-BACKUP-OMIT-TEAM-DIAG | 默认 omit（团队诊断证据） | Y | PASS | PASS | **FAIL** | 团队脚本：includeCredentials=false 且归档含 credentials；DEF-008 |
+| C-BACKUP-OMIT-INDEP-REPRO | 默认 omit（验收方独立复现） | Y | PASS | **BLOCKED** | **BLOCKED** | 独立重跑诊断被缺失 `@openbot/collaboration-core` 阻断；**未完成** |
+| C-BACKUP-INCLUDE-CREDS | 显式 includeCredentials 预期行为 | Y | PASS | PASS | **NOT_RUN** | 须保留 opt-in；本轮未独立跑通；unit 中相关用例曾 skip |
+| C-BACKUP-OMIT | Backup default omit（登记别名） | Y | PASS | PASS | **FAIL** | = DEF-008 缺陷登记口径（对齐团队诊断 FAIL；非独立复现成功） |
 | C-BACKUP-VERIFY | Backup verify | Y | PASS | PASS | NOT_RUN | Stage4 suite import flap this WT |
-| C-STORE-STAGE4 | Stage4 store evidence suite | Y | PASS | BLOCKED* | NOT_RUN | *adapter resolve via linked nm in isolated WT |
-| C-GATEWAY-LOCAL | Local gateway bring-up | Y | PASS | NOT_RUN | NOT_RUN | no live/local full start this run |
+| C-STORE-STAGE4 | Stage4 store evidence suite | Y | PASS | BLOCKED | NOT_RUN | collaboration workspace resolve 阻断完整套件 |
+| C-GATEWAY-LOCAL | Local gateway bring-up | Y | PASS | NOT_RUN | NOT_RUN | |
 | C-DOCTOR | Doctor / health | Y | PASS | NOT_RUN | NOT_RUN | |
 | C-CONFIG | Config load/migrate | Y | PASS | NOT_RUN | NOT_RUN | |
-| C-MEMORY | Memory / RAG path | Y | PASS | NOT_RUN | NOT_RUN | docs closeout only on tip |
-| C-AUTH-PROFILES | Auth profiles plumbing | Y | PASS | NOT_RUN | NOT_RUN | live creds NOT RUN |
+| C-MEMORY | Memory / RAG path | Y | PASS | NOT_RUN | NOT_RUN | |
+| C-AUTH-PROFILES | Auth profiles plumbing | Y | PASS | NOT_RUN | NOT_RUN | live creds NOT_RUN |
 | C-SESSION | Session / transcript store | Y | PASS | NOT_RUN | NOT_RUN | |
 | C-HOOKS | Hooks pipeline | Y | PASS | NOT_RUN | NOT_RUN | |
 | C-PLUGINS-LOAD | Plugin loader | Y | PASS | NOT_RUN | NOT_RUN | |
@@ -55,93 +62,110 @@ Status vocabulary: `PASS` | `FAIL` | `NOT_RUN` | `BLOCKED` | `N/A`
 
 | ID | Item | Cap | Static | Compile | Runtime | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| UI-BUILD | `pnpm ui:build` (vite) | Y | PASS | **PASS** | N/A | 5.78s; dist gitignored |
-| UI-STATIC | Serve built index.html HTTP 200 | Y | PASS | N/A | **PASS** | `127.0.0.1:18765` static only |
-| UI-INTERACTIVE | Control UI ↔ local gateway | Y | PASS | N/A | **NOT_RUN** | needs gateway; no prod creds |
+| UI-BUILD | `pnpm ui:build` (vite) | Y | PASS | **PASS** | N/A | dist gitignored |
+| UI-STATIC | Serve built index.html HTTP 200 | Y | PASS | N/A | **PASS** | static only |
+| UI-INTERACTIVE | Control UI ↔ local gateway | Y | PASS | N/A | **NOT_RUN** | |
 | UI-I18N | UI i18n bundles | Y | PASS | NOT_RUN | NOT_RUN | |
 
-### C. Channel plugins (24) — static match ≠ live
+> Control UI 导航还有 enterprise / platform / console / frontstage 等多路由；**未**按路由逐条列入本表 → 穷尽性缺口（见独立复核笔记）。
 
-Each channel has Cap=Y. Static = plugin package + docs id match. Compile/Runtime default NOT_RUN this run unless noted. **Live = NOT_RUN for all.**
+### C. Channel plugins — static match ≠ live
 
-| ID | Channel | Static | Compile | Runtime |
-| --- | --- | --- | --- | --- |
-| CH-telegram | telegram | PASS | NOT_RUN | NOT_RUN |
-| CH-whatsapp | whatsapp | PASS | NOT_RUN | NOT_RUN |
-| CH-discord | discord | PASS | NOT_RUN | NOT_RUN |
-| CH-irc | irc | PASS | NOT_RUN | NOT_RUN |
-| CH-googlechat | googlechat | PASS | NOT_RUN | NOT_RUN |
-| CH-slack | slack | PASS | NOT_RUN | NOT_RUN |
-| CH-signal | signal | PASS | NOT_RUN | NOT_RUN |
-| CH-imessage | imessage | PASS | NOT_RUN | NOT_RUN |
-| CH-msteams | msteams | PASS | NOT_RUN | NOT_RUN |
-| CH-mattermost | mattermost | PASS | NOT_RUN | NOT_RUN |
-| CH-matrix | matrix | PASS | NOT_RUN | NOT_RUN |
-| CH-feishu | feishu | PASS | NOT_RUN | NOT_RUN |
-| CH-wecom | wecom | PASS | NOT_RUN | NOT_RUN |
-| CH-wecom-app | wecom-app | PASS | NOT_RUN | NOT_RUN |
-| CH-dingtalk | dingtalk | PASS | NOT_RUN | NOT_RUN |
-| CH-qqbot | qqbot | PASS | NOT_RUN | NOT_RUN |
-| CH-openclaw-weixin | openclaw-weixin | PASS | NOT_RUN | NOT_RUN |
-| CH-bluebubbles | bluebubbles | PASS | NOT_RUN | NOT_RUN |
-| CH-line | line | PASS | NOT_RUN | NOT_RUN |
-| CH-zalo | zalo | PASS | NOT_RUN | NOT_RUN |
-| CH-zalouser | zalouser | PASS | NOT_RUN | NOT_RUN |
-| CH-synology-chat | synology-chat | PASS | NOT_RUN | NOT_RUN |
-| CH-tlon | tlon | PASS | NOT_RUN | NOT_RUN |
-| CH-nextcloud-talk | nextcloud-talk | PASS | NOT_RUN | NOT_RUN |
+Each channel Cap=Y. Static = plugin package + docs id match where applicable. Compile/Runtime default NOT_RUN. **Live = NOT_RUN for all.**
 
-Static 24↔24 docs/plugin inventory reconfirmed earlier coverage work; not re-audited line-by-line this run.
+| ID | Channel | Static | Compile | Runtime | Notes |
+| --- | --- | --- | --- | --- | --- |
+| CH-telegram | telegram | PASS | NOT_RUN | NOT_RUN | |
+| CH-whatsapp | whatsapp | PASS | NOT_RUN | NOT_RUN | |
+| CH-discord | discord | PASS | NOT_RUN | NOT_RUN | |
+| CH-irc | irc | PASS | NOT_RUN | NOT_RUN | |
+| CH-googlechat | googlechat | PASS | NOT_RUN | NOT_RUN | |
+| CH-slack | slack | PASS | NOT_RUN | NOT_RUN | |
+| CH-signal | signal | PASS | NOT_RUN | NOT_RUN | |
+| CH-imessage | imessage | PASS | NOT_RUN | NOT_RUN | |
+| CH-msteams | msteams | PASS | NOT_RUN | NOT_RUN | |
+| CH-mattermost | mattermost | PASS | NOT_RUN | NOT_RUN | |
+| CH-matrix | matrix | PASS | NOT_RUN | NOT_RUN | |
+| CH-feishu | feishu | PASS | NOT_RUN | NOT_RUN | |
+| CH-wecom | wecom | PASS | NOT_RUN | NOT_RUN | |
+| CH-dingtalk | dingtalk | PASS | NOT_RUN | NOT_RUN | |
+| CH-bluebubbles | bluebubbles | PASS | NOT_RUN | NOT_RUN | |
+| CH-line | line | PASS | NOT_RUN | NOT_RUN | |
+| CH-zalo | zalo | PASS | NOT_RUN | NOT_RUN | |
+| CH-zalouser | zalouser | PASS | NOT_RUN | NOT_RUN | |
+| CH-synology-chat | synology-chat | PASS | NOT_RUN | NOT_RUN | |
+| CH-tlon | tlon | PASS | NOT_RUN | NOT_RUN | |
+| CH-nextcloud-talk | nextcloud-talk | PASS | NOT_RUN | NOT_RUN | |
+| CH-nostr | nostr | PASS | NOT_RUN | NOT_RUN | 本轮核对补入（plugin+docs 存在；旧表曾漏） |
+| CH-twitch | twitch | PASS | NOT_RUN | NOT_RUN | 本轮核对补入 |
+| CH-wechat | wechat | PASS | NOT_RUN | NOT_RUN | 本轮核对补入 |
 
-### D. Multi-end clients (core surfaces; toolchain often peripheral BLOCKED)
+**清单不一致 / 未穷尽（明确记缺口，不宣称 PASS）：**
+
+| 线索 | 状态 |
+| --- | --- |
+| 旧表曾列 `CH-wecom-app` / `CH-qqbot` / `CH-openclaw-weixin` | **未列入本表** — tip 上未见对应 `extensions/*/openclaw.plugin.json` channels 入口；属**疑似过时 ID 或未核对入口**，不得虚构成 PASS |
+| 非 channel 的 extensions（memory-core、voice-call、acpx、…） | **未列入**稳定 ID → 缺口 |
+| 49 个 CLI 子命令各自 runtime | 仅 C-CLI-HELP → **未穷尽** |
+
+### D. Multi-end clients
 
 | ID | Surface | Cap | Static | Compile | Runtime | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| ME-MAC-APP | macOS app | Y | PASS | **BLOCKED** | NOT_RUN | SwiftPM policy / prior hang; disk 98% — no install |
+| ME-MAC-APP | macOS app | Y | PASS | **BLOCKED** | NOT_RUN | SwiftPM policy |
 | ME-IOS | iOS | Y | PASS | **BLOCKED** | NOT_RUN | xcodegen / signing |
 | ME-ANDROID | Android | Y | PASS | **BLOCKED** | NOT_RUN | SDK/gradle env |
-| ME-WINDOWS | Windows | Y | PASS | **BLOCKED** | NOT_RUN | no Windows SDK on this Mac |
+| ME-WINDOWS | Windows | Y | PASS | **BLOCKED** | NOT_RUN | no Windows SDK |
 | ME-HARMONY | HarmonyOS | Y | PASS | **BLOCKED** | NOT_RUN | hvigor missing |
 | ME-NODE-MINI | Node mini/companion | Y | PASS | NOT_RUN | NOT_RUN | |
 
-### E. Supply chain / docs / acceptance meta (mostly peripheral)
+### E. Supply chain / docs / acceptance meta
 
 | ID | Item | Cap | Static | Compile | Runtime | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | SC-SBOM-FILE | SBOM file present | Y | PASS | N/A | N/A | ≠ regen |
-| SC-SBOM-REGEN | SBOM regenerate | Y | PASS | **BLOCKED** | NOT_RUN | prior timeout / network |
+| SC-SBOM-REGEN | SBOM regenerate | Y | PASS | **BLOCKED** | NOT_RUN | |
 | SC-LICENSE | License inventory | Y | PASS | NOT_RUN | NOT_RUN | |
 | SC-DEP-AUDIT | Dependency audit | Y | PASS | **BLOCKED** | NOT_RUN | |
-| DOC-ACCEPT | Acceptance docs tree | Y | PASS | N/A | N/A | this PR |
-| DOC-LOOM | Loom register/claim | Y | PASS | N/A | N/A | follow process on edit |
-| TEST-UNIT-CORE | Core unit tests subset | Y | PASS | PASS | PARTIAL | backup omit FAIL |
-| TEST-STAGE4 | Stage4 acceptance file | Y | PASS | BLOCKED* | FAIL† | †historical+same codepath; *import |
+| DOC-ACCEPT | Acceptance docs tree | Y | PASS | N/A | N/A | this PR docs-only |
+| DOC-LOOM | Loom register/claim | Y | PASS | N/A | N/A | |
+| TEST-UNIT-BACKUP-OMIT | Unit: default omit credentials | Y | PASS | PASS | **FAIL** | `backup.test.ts` omit assert；旁证，≠独立诊断复现完成 |
+| TEST-UNIT-CORE-OTHER | Other core unit subset | Y | PASS | NOT_RUN | NOT_RUN | 本轮未跑全量；禁止用 PARTIAL 概括 |
+| TEST-STAGE4 | Stage4 acceptance file | Y | PASS | **BLOCKED** | **FAIL** | FAIL=缺陷登记/历史同 codepath；本轮套件加载 BLOCKED |
 
-### F. P1 defect clearances (product already on main) — not fullstack
+### F. P1 defect clearances — not fullstack
 
-| ID | Defect | Cap | Static | Compile | Runtime |
-| --- | --- | --- | --- | --- | --- |
-| P1-DEF001 | (merged PR192) | Y | PASS | PASS | PASS |
-| P1-DEF002 | (merged PR192) | Y | PASS | PASS | PASS |
-| P1-DEF004 | (merged PR192) | Y | PASS | PASS | PASS |
-| P1-DEF008 | credentials-omit | Y | PASS | PASS | **FAIL** | new this run |
+| ID | Defect | Cap | Static | Compile | Runtime | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| P1-DEF001 | (merged PR192) | Y | PASS | PASS | PASS | |
+| P1-DEF002 | (merged PR192) | Y | PASS | PASS | PASS | |
+| P1-DEF004 | (merged PR192) | Y | PASS | PASS | PASS | |
+| P1-DEF008 | credentials-omit | Y | PASS | PASS | **FAIL** | 缺陷登记；独立复现 BLOCKED |
 
 ## Counts (row-tracked)
 
 | Bucket | Rows | Notes |
 | --- | --- | --- |
-| **Total tracked IDs** | **66** | A20 + B4 + C24 + D6 + E8 + F4 = 66 (stable; replaces soft “≈118”) |
-| Prior soft “≈118” | — | Inflated by per-command/per-file micro-rows without IDs; **do not use** |
-| Runtime **FAIL** (core) | **1** | C-BACKUP-OMIT / DEF-008 (P1-DEF008) |
-| Runtime **PASS** (this run, credential-free) | **2** | C-CLI-HELP, UI-STATIC (+ UI-BUILD compile PASS) |
-| Compile **PASS** this run | **2+** | UI-BUILD; backup unit compiles (assertion FAIL) |
-| **Core NOT_RUN / BLOCKED** (runtime or compile blocking core claim) | **~28** | Most of A except help/omit; UI-INTERACTIVE; ME-* compiles; Stage4 full |
-| **Peripheral NOT_RUN / BLOCKED** | **~30** | All 24 CH-* live/compile; SC-* regen/audit; DOC meta N/A |
+| **Total tracked IDs（本轮拆分后）** | **70** | A23 + B4 + C24 + D6 + E9 + F4；recount below |
+| Prior soft “≈118” | — | **do not use** as authoritative |
+| Prior “N=66” | — | 改进但仍**不能证明完整**；本轮拆 PARTIAL 后行数变化，完整性质疑仍在 |
+| Runtime **FAIL**（缺陷登记口径） | **DEF-008 / omit** | 团队诊断 + unit 旁证；**非**独立复现完成 |
+| Runtime **PASS**（本轮 credential-free） | **C-CLI-HELP, UI-STATIC** | |
+| **禁止 PARTIAL** | 已拆 | C-BACKUP-* 原子行；TEST-UNIT-* 原子行 |
 
-### Core vs peripheral unverified (explicit)
+**Recount check:**  
+A: C-CLI-HELP, C-BACKUP-CREATE-STATIC, C-BACKUP-OMIT-TEAM-DIAG, C-BACKUP-OMIT-INDEP-REPRO, C-BACKUP-INCLUDE-CREDS, C-BACKUP-OMIT, C-BACKUP-VERIFY, C-STORE-STAGE4, C-GATEWAY-LOCAL, C-DOCTOR, C-CONFIG, C-MEMORY, C-AUTH-PROFILES, C-SESSION, C-HOOKS, C-PLUGINS-LOAD, C-CRON, C-BROWSER-TOOL, C-TTS, C-MEDIA, C-AGENT-LOOP, C-SECURITY-AUDIT, C-UPDATE = **23**  
+B: **4**  
+C: **24**  
+D: **6**  
+E: SC×4 + DOC×2 + TEST×3 = **9**  
+F: **4**  
+**Total = 23+4+24+6+9+4 = 70**
 
-**Core unverified (NOT_RUN or BLOCKED, excluding already FAIL omit):** ≈ **27–30** items spanning gateway, doctor, sessions, plugins-load, agent loop, Control UI interactive, multi-end compiles, Stage4 suite execution.
+### Core vs peripheral unverified
 
-**Peripheral unverified:** ≈ **24+** channel lives + supply-chain regen/audit + optional media/TTS deep paths already listed NOT_RUN.
+**Core unverified / blocked / fail：** omit FAIL + 独立复现 BLOCKED + gateway/UI interactive/multi-end/Stage4 等大量 NOT_RUN/BLOCKED。
 
-**Conclusion:** Denominator is **66 trackable rows**. Fullstack PASS requires core runtime clears including DEF-008 fix + gateway/UI interactive + policy decision on multi-end BLOCKED. **P1 clear ≠ PASS.**
+**Peripheral：** 全部 CH-* live、非 channel extensions、packages runtime、CLI 逐命令、Control UI 各路由、跨仓 install — **未穷尽**。
+
+**Conclusion:** Tracked rows（现 **70**）是改进后的可追踪分母，**不能**证明公开入口覆盖完整。Fullstack 继续 **FAIL / NOT READY**。**P1 clear ≠ PASS。不据此批准 #193 合并。**

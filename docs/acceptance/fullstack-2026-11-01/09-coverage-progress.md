@@ -72,3 +72,10 @@
 - Control UI: `ui:build` PASS + static smoke PASS; interactive NOT_RUN. Live creds NOT_RUN.
 - Fullstack still **NOT PASS**. See [`10-acceptance-conclusion.md`](./10-acceptance-conclusion.md).
 
+## 2026-11-02 independent reviewer corrections
+
+- 总评继续 **FAIL / NOT READY**；接受 DEF-008 登记与 Stage4 FAIL；**不核准**全栈；**不据此批准 #193 合并**。
+- 独立复现：**未完成**（collaboration-core 阻断）；安全措辞收紧为凭证排除失效。
+- 覆盖表：**禁止 PARTIAL**，已拆原子行；**N 不能证明完整**（见穷尽性笔记）。
+- 修复建议收窄：canonicalize 实际凭证目录；保留 includeCredentials；拒绝无条件 `/credentials/` 排除。
+- 详见 [`../runs/2026-11-02-independent-reviewer-corrections/`](../runs/2026-11-02-independent-reviewer-corrections/)。

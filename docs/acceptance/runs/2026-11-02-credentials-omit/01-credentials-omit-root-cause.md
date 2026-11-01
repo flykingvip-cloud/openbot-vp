@@ -2,17 +2,18 @@
 
 **Pin:** `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`  
 **When:** 2026-11-02 Asia/Shanghai  
-**Classification:** **product defect** (not test defect; environment triggers via macOS `/var`→`/private/var` symlink, but product path compare is non-canonical)  
-**Security boundary:** **YES** — default backup archive can contain `credentials/oauth.json` while advertising omit / `skipped.reason=excluded`.
+**Classification:** **product defect**（可接受为缺陷登记；环境经 macOS `/var`→`/private/var` 触发，但产品路径比较未 canonicalize）  
+**Security boundary:** **YES（收紧表述）** — 这是**凭证排除失效**：默认备份在宣称 omit / `skipped.reason=excluded` 时，归档内仍可能含 `credentials/oauth.json`。  
+**现有证据没有证明**：远程攻击、权限提升、或已经发生真实凭证泄露。风险是：备份被分享 / 上传 / 存储时可能暴露凭证。
 
-## Reproduction (this pin)
+## 证据分层（禁止把团队诊断写成「验收方已独立复现」）
 
-| Evidence | Result | Path |
+| 层级 | 内容 | 结论 |
 | --- | --- | --- |
-| Unit: `src/commands/backup.test.ts` → “default archive payload omits credentials under state” | **FAIL** assert archive still contains `credentials/` | `logs/02-backup-unit-omit-repro.log` |
-| Diagnostic: createBackupArchive default `includeCredentials:false` under `os.tmpdir()` | **credentialLeakInArchive=true**; plan still lists skipped excluded | `logs/03-realpath-diagnostic.out.txt` (+ script `03-realpath-diagnostic.mjs`, fictional payload only) |
-| Historical Stage4 evidence (prior pin `1ce8f5ee…`) | **FAIL** same assert at `stage4-store-evidence.test.ts:279` | prior `runs/2026-11-01-pr192-review/logs/10-stage4-evidence.log` |
-| Stage4 vitest file load on isolated WT | blocked by missing workspace package resolve when using ephemeral config / symlink `node_modules` | `logs/01-stage4-credentials-omit-repro.log` — **not** used as primary omit proof; unit+diag sufficient |
+| A. 代码根因核对 | `src/infra/backup-create.ts:194`（`path.resolve` only）与 `:371`（tar filter 直接使用该判断） | 与归档证据**相互吻合** → **可接受为产品缺陷登记** |
+| B. 团队诊断脚本 | 调用产品 `createBackupArchive`，虚构载荷；输出同时显示 `includeCredentials=false`、`skipped.reason=excluded` 与归档内存在 `credentials/oauth.json` | 支持「排除承诺与实际归档不一致」；**属团队诊断证据** |
+| C. 验收方独立运行复现 | 独立重跑该诊断脚本时，被缺失的 `@openbot/collaboration-core` 工作区模块阻断（Stage4 导入同因见 `logs/01-stage4-credentials-omit-repro.log`） | **未完成** → 状态 **BLOCKED**；**不得**写成「验收方已独立复现」 |
+| D. tip WT 上既有 unit 日志 | `logs/02-backup-unit-omit-repro.log` 显示 omit 断言 FAIL（历史/同 pin 树证据） | 可作旁证；**仍不替代**独立复核者对本轮诊断脚本的独立复现 |
 
 No live secrets were used. Diagnostic wrote only `FICTIONAL_PLACEHOLDER_NOT_A_SECRET`. Logs must not be extended with real OAuth material.
 
@@ -25,12 +26,13 @@ No live secrets were used. Diagnostic wrote only `FICTIONAL_PLACEHOLDER_NOT_A_SE
 5. `isOauthPathExcluded` (`backup-create.ts:194-198`) does `path.resolve` only — **does not realpath** — so `isPathWithin(/private/var/.../credentials/oauth.json, /var/folders/.../credentials)` is **false**.
 6. Filter therefore **keeps** credential files. Manifest still records `options.includeCredentials=false` and `skipped: [{kind:credentials, reason:excluded}]` — **plan/metadata lie relative to payload**.
 
-Diagnostic numbers (Asia/Shanghai run):
+Diagnostic numbers (团队归档 / Asia/Shanghai；非验收方本轮独立复现成功):
 
 - `symlinkMismatch: true`
 - `isPathWithin_logical_vs_real_entry: false`
 - `isPathWithin_real_vs_real: true`
-- `credentialLeakInArchive: true` with relpath `.../credentials/oauth.json` inside archive payload
+- `credentialLeakInArchive: true` with relpath `.../credentials/oauth.json` inside archive payload  
+  （标识名沿用脚本字段；含义是「归档内出现凭证路径」，**不是**「已确认真实泄露事件」）
 
 ## Exact loci
 
@@ -42,24 +44,31 @@ Diagnostic numbers (Asia/Shanghai run):
 | Failing product unit assert | `src/commands/backup.test.ts:451-452` |
 | Failing Stage4 acceptance assert | `docs/acceptance/stage4-store-evidence.test.ts:279-280` |
 
-## Impact
+## Impact（措辞收紧）
 
-- **Security boundary:** default backup is documented / flagged as credentials-excluded, but archives created when state lives on a symlinked path (common on macOS temp + often `/var`) may **embed OAuth credential files**.
-- Sharing, uploading, or storing “safe” backups can leak secrets.
-- Acceptance Stage4 cannot be PASS while this remains.
-- Not a redaction-of-logs issue only — it is a **payload inclusion** bug. Tests detecting it are correct.
+- **安全影响准确表述：** **凭证排除失效**。当备份被分享、上传或存储时，**可能**暴露凭证。
+- **现有证据没有证明**远程攻击、权限提升、或已经发生真实凭证泄露。
+- 触及安全边界可保留（default omit 承诺与 payload 不一致），但不得夸大为 RCE / 远程利用链 / 已泄露事件。
+- Acceptance Stage4 在此缺陷未修复前不能为 PASS。
+- Tests detecting the inconsistency are correct; this is a **payload inclusion** bug relative to the omit promise.
 
-## Fix suggestion (NO product patch in this PR)
+## Fix suggestion（NO product patch in this PR；已收窄）
+
+**不得采纳**「无条件排除任意 `/credentials/` 目录」：可能误删普通工作区内容，且无法覆盖自定义凭证目录。
 
 Authorized product follow-up should:
 
-1. Canonicalize `oauthDir` (and preferably state/config) with the same `canonicalizeExistingPath` / `realpath` used for asset `sourcePath` before filter compare; **or** pass canonical oauth into the tar filter.
-2. Defense in depth: also exclude any archive entry whose path contains `/credentials/` (or equals oauth basename tree) when `includeCredentials===false`, independent of symlink identity.
-3. Add a regression that forces logical vs realpath mismatch (tmpdir on macOS is enough) and asserts archive bytes omit credentials **and** that filter uses canonical oauth.
-4. Consider backup verify warning if `includeCredentials===false` but archive lists `credentials/` paths.
+1. 围绕**实际配置的凭证目录**及其 **canonicalize / realpath 规范路径**，在 filter 比较前与 asset `sourcePath` 使用同一套规范化；**或**把已规范化的 oauth 路径传入 tar filter。
+2. **保留**显式 `includeCredentials===true` 的预期行为（opt-in 打包凭证应继续可用）。
+3. 增加回归：强制 logical vs realpath mismatch（macOS tmpdir 足够），断言默认 omit 时归档字节不含凭证路径，且 filter 使用规范化 oauth。
+4. 可选：当 `includeCredentials===false` 但归档列出凭证路径时，backup verify 发出警告。
 
 ## Defect ID
 
-**DEF-008** — Backup default credentials-omit fails across symlink/realpath (security boundary).
+**DEF-008** — Backup default credentials-omit fails across symlink/realpath（凭证排除失效；安全边界 YES，表述见上）。
 
-See `docs/acceptance/p1-fix-2026-11-01/defect-status.md` update (documentation only; not authorized as product fix here).
+See `docs/acceptance/p1-fix-2026-11-01/defect-status.md`（documentation only; not authorized as product fix here）.
+
+## 本轮范围声明
+
+本轮**未修改产品代码**、**未安装工具链**；仅文档 / 口径更新。

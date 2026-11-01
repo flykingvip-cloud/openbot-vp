@@ -47,3 +47,11 @@
 - Live credentials / Enterprise IM live I/O / live gateway doctor against prod.
 - SwiftPM full `swift build` (policy + prior hang).
 - No product patch for credentials-omit without separate authorization.
+
+## 2026-11-02 independent reviewer corrections（口径收紧）
+
+- DEF-008：**代码根因与团队归档证据相互吻合** → 可接受为产品缺陷登记。
+- **验收方独立运行复现尚未完成**（诊断脚本重跑被缺失 `@openbot/collaboration-core` 阻断）。不得把团队复现写成「验收方已独立复现」。
+- 安全：凭证排除失效；可能在备份分享/上传/存储时暴露凭证；**无**远程攻击 / 提权 / 真实泄露已发生之证明。
+- 总评继续 **FAIL / NOT READY**。接受 DEF-008 登记及 Stage4 FAIL；**不核准**全栈通过；**不据此批准 #193 合并**。
+- 本轮仅文档 / 口径；未改产品代码、未装工具链。详见 `../2026-11-02-independent-reviewer-corrections/`。

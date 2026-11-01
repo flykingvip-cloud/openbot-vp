@@ -26,15 +26,17 @@ Clearing these P1s removes current type/protocol/materializer blockers for hones
 | Field | Value |
 | --- | --- |
 | ID | **DEF-008** |
-| Status | **OPEN** (product defect; docs-only this PR) |
-| Security boundary | **YES** |
+| Status | **OPEN**（产品缺陷登记已接受；docs-only this PR） |
+| Security boundary | **YES** — **凭证排除失效**；备份分享/上传/存储时**可能**暴露凭证。**现有证据没有证明**远程攻击、权限提升、或已经发生真实凭证泄露 |
 | Pin found | `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c` |
 | When | 2026-11-02 Asia/Shanghai |
-| Classification | Product defect (env triggers via `/var`→`/private/var`; compare non-canonical) |
-| Evidence | `docs/acceptance/runs/2026-11-02-credentials-omit/` (`00-pin.md`, `01-credentials-omit-root-cause.md`, `logs/02-*`, `logs/03-*`) |
-| Primary loci | `src/infra/backup-create.ts:194-198`, `:371-379`; `src/commands/backup-shared.ts:271` |
-| Failing asserts | `src/commands/backup.test.ts:451-452`; `docs/acceptance/stage4-store-evidence.test.ts:279-280` |
+| Classification | Product defect（env 经 `/var`→`/private/var` 触发；比较非 canonical） |
+| Team diagnostic evidence | 虚构载荷下 `includeCredentials=false` + `skipped.reason=excluded` 同时归档含 `credentials/oauth.json` |
+| Independent runtime repro | **未完成 / BLOCKED**（缺失 `@openbot/collaboration-core`）；**不得**写成验收方已独立复现 |
+| Evidence | `docs/acceptance/runs/2026-11-02-credentials-omit/`；独立复核 `docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/` |
+| Primary loci | `src/infra/backup-create.ts:194-198`, `:371-379`；`src/commands/backup-shared.ts:271` |
+| Failing asserts | `src/commands/backup.test.ts:451-452`；`docs/acceptance/stage4-store-evidence.test.ts:279-280` |
 | Authorized fix? | **No** in this acceptance docs PR — analyze + recommend only |
-| Suggested fix | Canonicalize `oauthDir` (same realpath as asset `sourcePath`) before `isOauthPathExcluded`; optional basename `/credentials/` strip when `includeCredentials===false` |
-| Blocks fullstack PASS? | **Yes** |
-
+| Suggested fix（收窄） | 围绕**实际配置的凭证目录**及其 canonicalize/realpath 验证过滤；**保留**显式 `includeCredentials`。**不采纳**无条件排除任意 `/credentials/`（可能误伤工作区且无法覆盖自定义凭证目录） |
+| Blocks fullstack PASS? | **Yes** — 总评 **FAIL / NOT READY**；不据此批准 #193 合并 |
+| This round | **未修改产品代码、未安装工具链** — 仅文档/口径 |

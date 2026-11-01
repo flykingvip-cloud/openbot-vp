@@ -1,36 +1,40 @@
-# 10 — PR #193 review (do not merge from acceptance bot)
+# 10 — PR #193 review（本轮独立复核：不据此批准合并）
 
 **URL:** https://github.com/flykingvip-cloud/openbot-vp/pull/193  
 **Base:** `main` @ `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`  
-**Head (pre this update):** `5b87e6a2599d52fc34e66d1a5d647ab730b7dbf4` on `docs/acceptance-coverage-20261101`  
+**Branch:** `docs/acceptance-coverage-20261101`  
 **When reviewed:** 2026-11-02 Asia/Shanghai
 
 ## Scope check
 
 | Check | Result |
 | --- | --- |
-| Files are docs / sanitized acceptance logs only | **PASS** (16 files under `docs/acceptance/` on prior tip; this update adds more docs+logs only) |
-| Product `src/**` changed? | **No** (must remain so after push) |
-| Real secrets in logs? | **No** — fictional placeholders / help-text only (scanned) |
-| Three-section structure / SHAs / results present? | Prior tip had coverage narrative; **denominator soft “约 N=118”** was weak |
-| Denominator consistency | **Fixed in this update** via `10-coverage-inventory-tracked.md` (66 stable IDs) |
-| Claims P1 clear ⇒ fullstack PASS? | Prior docs correctly said no; reinforced |
+| Files are docs / sanitized acceptance logs only | **期望保持** docs-only（push 前须再 diff 确认无 `src/`） |
+| Product `src/**` changed? | **本轮禁止改产品代码** |
+| Real secrets in logs? | **No** — fictional placeholders |
+| PARTIAL 状态 | **本轮清除**（拆原子行） |
+| 独立复现宣称 | **纠正为未完成** |
+| 安全措辞 | **收紧为凭证排除失效**（无远程攻击/已泄露证明） |
+| 66/70 行 = 完整覆盖？ | **否** — 明确未穷尽 |
 
-## Verdict
+## 验收总评 vs PR 合并
 
-**可合并（条件）→ 随本更新转为建议可合并（docs-only），但仍需人工确认 diff 无 `src/` 后由维护者合并。**
+| 问题 | 本轮结论 |
+| --- | --- |
+| 全栈验收 | **FAIL / NOT READY** |
+| 接受 DEF-008 登记 + Stage4 FAIL | **是** |
+| 可否因本轮材料批准 #193 合并 | **否** |
+| Bot 是否可 `gh pr merge` | **禁止** |
 
-More precisely for the acceptance gate vocabulary:
+说明：即便 PR 内容保持 docs-only，**验收口径下本轮不批准合并**。是否合入由维护者另行决定；不得把「文档已更新」写成「验收已放行合入」。
 
-- **可合并** as a **docs-only** PR **after** this credentials-omit + tracked-denominator update lands on the branch — provided CI/diff still shows zero product code.
-- **需修改** if anyone still cites “约 N=118” as the authoritative denominator without pointing at the tracked inventory, or if unsanitized secrets appear (none found).
-- **证据不足** was the right call **before** DEF-008 root-cause + pin re-run; that gap is closed for omit classification.
-
-**Do not merge from this agent.** No `gh pr merge`.
+此前文稿中「建议可合并（docs-only）」表述**收回为**：本轮独立复核 **不据此批准 #193 合并**；若维护者仅合文档，须自行确认 diff，且不得解读为全栈 PASS。
 
 ## Consistency notes for maintainers
 
-1. Pin everywhere: `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`.
-2. DEF-008 OPEN / security YES — fullstack not PASS.
-3. Tracked N=66 replaces soft ≈118.
-4. Live credentials remain NOT RUN.
+1. Pin：`d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`。
+2. DEF-008 OPEN / 安全边界 YES（措辞收紧）— fullstack **NOT READY**。
+3. 独立复现 = **未完成 / BLOCKED**。
+4. 无 PARTIAL；修复建议已收窄（禁止无条件 `/credentials/` 排除）。
+5. Live credentials remain NOT_RUN。
+6. **Do not merge from this agent.**
