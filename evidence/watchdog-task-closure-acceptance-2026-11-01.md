@@ -7,8 +7,9 @@
 - Tip (evidence refresh): `3f1d0b3a7bb3ccead2e8ab011321eb0a16276c5f`
 - Tip (pre enterprise/lock fix evidence): `8207c98c5dca609e0968275eb7553f9ca6f3354e`
 - Tip (enterprise authority + locked inbox clear): `2174fc45e71c2129513afd193225ba24eaa5e3bf`
+- Tip (heartbeat stale-snapshot merge): `b612bc6b369d5c43b06b53212dc9e2dae4304221`
 - Zone: Asia/Shanghai (UTC+8)
-- Written: 2026-11-01 ~11:15 Asia/Shanghai
+- Written: 2026-11-01 ~11:25 Asia/Shanghai
 
 ## Acceptance blockers addressed (button fulfillment)
 
@@ -151,6 +152,8 @@ Review blockers addressed:
 
 
 ## Round: heartbeat stale-snapshot merge (P1) — 2026-11-01 ~11:25 Asia/Shanghai
+
+- Tip: `b612bc6b369d5c43b06b53212dc9e2dae4304221`
 
 Review blocker: heartbeat could overwrite human recovery with a lock-free prior snapshot.
 
