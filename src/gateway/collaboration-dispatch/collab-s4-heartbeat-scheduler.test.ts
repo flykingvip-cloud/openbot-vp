@@ -321,6 +321,7 @@ describe("S4 task behavior", () => {
         lastFingerprint: fp,
         lastStatus: "in_progress",
         lastEscalateAt: 50,
+        lastEscalateFingerprint: fp,
       },
       nowMs: 100,
       escalateAfter: 2,
