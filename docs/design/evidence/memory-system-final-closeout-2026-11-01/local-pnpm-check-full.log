@@ -1,0 +1,102 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 check /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> pnpm check:host-env-policy:swift && pnpm format:check && pnpm build:collaboration:packages && pnpm build:evolution:packages && pnpm tsgo && pnpm lint && pnpm lint:tmp:no-random-messaging && pnpm lint:tmp:channel-agnostic-boundaries && pnpm lint:tmp:no-raw-channel-fetch && pnpm lint:agent:ingress-owner && pnpm lint:plugins:no-register-http-handler && pnpm lint:plugins:no-monolithic-plugin-sdk-entry-imports && pnpm lint:webhook:no-low-level-body-read && pnpm lint:auth:no-pairing-store-group && pnpm lint:auth:pairing-account-scope && pnpm lint:ui:capability-boundaries && pnpm lint:ui:employee-capability-terminology && pnpm lint:core:composition-root-loc && pnpm lint:gateway:method-packs && pnpm lint:gateway:isolation-fail-closed && pnpm lint:core:architecture-manifest && pnpm lint:aor:boundaries && pnpm lint:convergence:registry && pnpm lint:collab:runtime-capabilities && pnpm lint:collab:runtime-authority && pnpm lint:collab:policy-consumption && pnpm test:collab:runtime-lifecycle
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 check:host-env-policy:swift /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/generate-host-env-security-policy-swift.mjs --check
+
+OK apps/macos/Sources/OpenBot/HostEnvSecurityPolicy.generated.swift
+
+> @upbeyond/openbot@2026.7.12-rc.2 format:check /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> oxfmt --check
+
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 9694ms on 17239 files using 14 threads.
+
+> @upbeyond/openbot@2026.7.12-rc.2 build:collaboration:packages /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> pnpm --dir packages/collaboration-core build && pnpm --dir packages/collaboration-runtime build && pnpm --dir packages/collaboration-openbot-adapter build
+
+
+> @openbot/collaboration-core@0.1.0 build /Users/daniel/AI VP/openbot-memory-final-closeout-182/packages/collaboration-core
+> tsc -p tsconfig.build.json
+
+
+> @openbot/collaboration-runtime@0.1.0 build /Users/daniel/AI VP/openbot-memory-final-closeout-182/packages/collaboration-runtime
+> tsc -p tsconfig.build.json
+
+
+> @openbot/collaboration-openbot-adapter@0.1.0 build /Users/daniel/AI VP/openbot-memory-final-closeout-182/packages/collaboration-openbot-adapter
+> tsc -p tsconfig.build.json
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 build:evolution:packages /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> pnpm --dir packages/evolution-core build
+
+
+> @openbot/evolution-core@0.1.0 build /Users/daniel/AI VP/openbot-memory-final-closeout-182/packages/evolution-core
+> tsc -p tsconfig.build.json
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> oxlint --type-aware
+
+Found 0 warnings and 0 errors.
+Finished in 13.0s on 12545 files with 136 rules using 14 threads.
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:tmp:no-random-messaging /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/check-no-random-messaging-tmp.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:tmp:channel-agnostic-boundaries /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/check-channel-agnostic-boundaries.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:tmp:no-raw-channel-fetch /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/check-no-raw-channel-fetch.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:agent:ingress-owner /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/check-ingress-agent-owner-context.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:plugins:no-register-http-handler /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/check-no-register-http-handler.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:plugins:no-monolithic-plugin-sdk-entry-imports /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node --import tsx scripts/check-no-monolithic-plugin-sdk-entry-imports.ts
+
+OK: bundled plugin source files use scoped plugin-sdk subpaths (844 checked).
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:webhook:no-low-level-body-read /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/check-webhook-auth-body-order.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:auth:no-pairing-store-group /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/check-no-pairing-store-group-auth.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:auth:pairing-account-scope /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/check-pairing-account-scope.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:ui:capability-boundaries /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node scripts/check-openbot-ui-boundaries.mjs
+
+OpenBot UI boundary check passed.
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:ui:employee-capability-terminology /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node --import tsx scripts/employee-capability-terminology-lint.ts
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:core:composition-root-loc /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node --import tsx scripts/check-core-composition-root-loc.ts
+
+Core composition-root LOC guard failed:
+- src/gateway/collaboration-learning.ts: 166 lines (budget 150) — collaboration-learning facade: re-exports only; logic in src/gateway/collaboration-learning/* (locked to origin/main size after #103 wake-op re-exports unmasked check).
+- ui/src/ui/app.ts: 4890 lines (budget 4845) — control-ui shell: wiring only; feature logic belongs in controllers/ + wiring/ (locked to origin/main size after baseline check unmask).
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

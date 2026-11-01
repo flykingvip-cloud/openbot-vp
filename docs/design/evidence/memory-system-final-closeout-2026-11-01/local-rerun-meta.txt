@@ -1,0 +1,39 @@
+install_start_Berlin=2026-11-01 13:44:54 CET
+SHA=c35164c188651329b28f541d7376db0a804966f0
+node=v22.18.0 pnpm=10.23.0
+origin_main=ea7f9218889ac9ca3d280d15cc14736149af369f
+install_exit=0
+install_end_Berlin=2026-11-01 13:45:07 CET
+tsgo_exit=2
+check_exit=1
+format_check_exit=0
+tsgo_exit=0
+SHA_NOW=c35164c188651329b28f541d7376db0a804966f0
+check_exit=1
+
+===== LOCAL RERUN APPEND 2026-11-01 13:56:35 UTC+01:00 / 2026-11-01 20:56:35 UTC+08:00 =====
+worktree=/Users/daniel/AI VP/openbot-memory-final-closeout-182
+branch=cursor/memory-final-closeout-afe1
+HEAD_at_rerun_start=c35164c188651329b28f541d7376db0a804966f0
+origin_main=ea7f9218889ac9ca3d280d15cc14736149af369f
+relationship=ea7f921 is ancestor of HEAD; HEAD is NOT ancestor of ea7f921 (HEAD is ea7f921 + closeout commit c35164c)
+node=v22.18.0
+pnpm=10.23.0
+install=CI=true pnpm install --frozen-lockfile → exit 0 (prior this session; treat as exit 0)
+tsgo=pnpm tsgo → exit 0 after local type/mock/contract fixes
+format_check=pnpm format:check → exit 0 after oxfmt
+check=pnpm check → exit 1 at lint:core:composition-root-loc
+composition_root_loc_trunk_blocker=
+  - src/gateway/collaboration-learning.ts: 166 lines (budget 150); UNTOUCHED vs origin/main; origin/main tip ea7f921 also 165 lines (same stale budget exceed)
+  - ui/src/ui/app.ts: 4890 lines (budget 4845); UNTOUCHED vs origin/main; origin/main tip also 4889 lines
+  - Recorded as trunk pre-existing blocker; budgets NOT raised; files NOT refactored
+six_model_effect_scenarios=not-run (no explicit model auth/cost authorization this turn)
+O6_O7_O9=deferred unchanged
+no_deploy_no_merge_no_push=true
+gateway_identity_evidence=local-gateway-identity.json
+isolation_unit_exit=0
+isolation_gateway_exit=0
+isolation_ui_exit=0
+isolation_e2e_exit=0
+isolation_commands=see local-isolation-*.log and LOCAL RERUN section in closeout md
+six_scenarios=not-run

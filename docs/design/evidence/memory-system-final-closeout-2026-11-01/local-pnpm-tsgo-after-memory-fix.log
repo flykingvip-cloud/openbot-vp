@@ -1,0 +1,24 @@
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(61,43): error TS2493: Tuple type '[]' of length '0' has no element at index '0'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(79,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(80,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(93,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(94,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(109,23): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(110,23): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(128,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(191,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/cron/service.delivery-adapter-evidence.p2h.test.ts(119,65): error TS2353: Object literal may only specify known properties, and 'ok' does not exist in type 'OutboundDeliveryResult'.
+src/cron/service.delivery-adapter-evidence.p2h.test.ts(137,65): error TS2353: Object literal may only specify known properties, and 'ok' does not exist in type 'OutboundDeliveryResult'.
+src/gateway/enterprise-data/event-driven-projection-materializer.ts(23,36): error TS2305: Module '"./types.js"' has no exported member 'SarGovernanceProvider'.
+src/gateway/evolution-control/authorize-shadow-intent.test.ts(62,15): error TS7006: Parameter 'success' implicitly has an 'any' type.
+src/gateway/evolution-control/authorize-shadow-intent.test.ts(62,24): error TS7006: Parameter 'data' implicitly has an 'any' type.
+src/gateway/evolution-control/authorize-shadow-intent.test.ts(62,30): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/gateway/server-methods/chat.restore.test.ts(40,76): error TS2556: A spread argument must either have a tuple type or be passed to a rest parameter.
+src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts(143,42): error TS2493: Tuple type '[]' of length '0' has no element at index '1'.
+src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts(258,35): error TS2345: Argument of type '(store: any, storePath?: string | undefined) => Promise<void>' is not assignable to parameter of type '() => Promise<void>'.
+  Target signature provides too few arguments. Expected 1 or more, but got 0.
+src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts(258,42): error TS7006: Parameter 'store' implicitly has an 'any' type.
+src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts(320,54): error TS2493: Tuple type '[]' of length '0' has no element at index '1'.
+src/gateway/server-methods/enterprise-data-events.ts(209,17): error TS7006: Parameter 'ctx' implicitly has an 'any' type.
+src/gateway/server-methods/enterprise-data-events.ts(209,22): error TS7006: Parameter 'run' implicitly has an 'any' type.
+ui/src/ui/collaboration/collaboration-rules-summary.test.ts(88,30): error TS2322: Type '"governance.botMaySelfAdvanceWithoutHuman"' is not assignable to type '"participation.proactiveBots"'.

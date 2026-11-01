@@ -1,0 +1,13 @@
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-memory-final-closeout-182/ui
+
+stderr | src/ui/ports/employee/views/memory-center-page.node.test.ts
+Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+
+ ✓ src/ui/ports/employee/views/memory-center-page.node.test.ts (12 tests) 51ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  20:56:33
+   Duration  612ms (transform 40ms, setup 0ms, import 60ms, tests 51ms, environment 406ms)
+

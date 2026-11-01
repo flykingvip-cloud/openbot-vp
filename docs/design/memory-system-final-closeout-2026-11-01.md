@@ -213,3 +213,75 @@
 ## 11. 未触碰
 
 未合并，未推 main，未部署，未切流，未写/删/遗忘/重建真实用户记忆，未改 QMD、cloudSync、privateMemoryPromote 的默认值，未放宽 ACL 或类型门闩，未关外部 issue。既有设计文档与历史证据目录保持原样。
+
+## LOCAL RERUN (Mac worktree)
+
+| 字段        | 值                                                                                                                            |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 工作树      | `/Users/daniel/AI VP/openbot-memory-final-closeout-182`                                                                       |
+| 分支        | `cursor/memory-final-closeout-afe1`                                                                                           |
+| 开跑时 HEAD | `c35164c188651329b28f541d7376db0a804966f0`（相对 `origin/main` `ea7f9218889ac9ca3d280d15cc14736149af369f`：`ea7f921` 是祖先） |
+| 时区        | 证据时间戳 **Europe/Berlin**；用户对照 Asia/Shanghai                                                                          |
+| 本轮不做    | 合并、push、部署、切流、真实用户记忆写入/search 可能 sync-write、放宽 composition-root LOC、六场景付费模型效果                |
+
+### 门禁 exits（本机）
+
+| 命令                                     | exit  | 说明                                  | 证据                                               |
+| ---------------------------------------- | ----- | ------------------------------------- | -------------------------------------------------- |
+| `CI=true pnpm install --frozen-lockfile` | **0** | 本会话已跑；按成功计                  | `local-pnpm-install.log`                           |
+| `pnpm tsgo`                              | **0** | 经本地 type/mock/contract 修复后      | `local-pnpm-tsgo-after-trunk-fix.log` / 修复后复跑 |
+| `pnpm format:check`                      | **0** | oxfmt 后                              | `local-format-check.log`                           |
+| `pnpm check`                             | **1** | 停在 `lint:core:composition-root-loc` | `local-pnpm-check-full.log`                        |
+
+**主干既有 composition-root-loc 阻塞（未修、未抬预算）：**
+
+- `src/gateway/collaboration-learning.ts`: 166（budget 150）；相对 `origin/main` **未触碰**；`ea7f921` tip 同为超预算
+- `ui/src/ui/app.ts`: 4890（budget 4845）；相对 `origin/main` **未触碰**；`ea7f921` tip 同为超预算
+
+研发门禁结论：**BLOCKED** 于 trunk composition-root-loc（tsgo/format 已绿）。
+
+### 隔离 vitest 复跑（与云端 mem-closeout 同矩阵）
+
+| 命令                                                                                                    | exit  | 摘要                             | 证据                          |
+| ------------------------------------------------------------------------------------------------------- | ----- | -------------------------------- | ----------------------------- |
+| unit：`pnpm exec vitest run --config vitest.unit.config.ts --maxWorkers=2`（19 memory 文件）            | **0** | 19 files / 79 tests              | `local-isolation-unit.log`    |
+| gateway：`pnpm exec vitest run --config vitest.gateway.config.ts --pool=forks --maxWorkers=2`（6 文件） | **0** | 6 files / 31 tests               | `local-isolation-gateway.log` |
+| UI：`ui/` 下 `vitest.node.config.ts` → `memory-center-page.node.test.ts`                                | **0** | 12 tests                         | `local-isolation-ui.log`      |
+| e2e：`vitest.e2e.config.ts` → `test/memory-continuity-gateway.e2e.test.ts`                              | **0** | 1 test ~14s（子进程真 token DM） | `local-isolation-e2e.log`     |
+
+未发明通过项；上表均为本机复跑实测 exit。
+
+### 本机网关身份（只读）
+
+证据：`docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-identity.json`。
+
+| port  | PID   | cwd HEAD / note                | health | UI commit / build-info                               | STATE（只读推断）                                       |
+| ----- | ----- | ------------------------------ | ------ | ---------------------------------------------------- | ------------------------------------------------------- |
+| 18789 | 77060 | `beb0ee226ab6…`（#180 工作树） | live   | UI=`beb0ee226ab6…`；`dist/build-info.json` 同 commit | `~/.openbot`                                            |
+| 18790 | 71854 | `02c26fab…` detached           | live   | UI=`02c26fa`；无 dist/build-info                     | `/private/tmp/openbot-pr143-live-20261029-174622/state` |
+| 19001 | 11204 | 无 `.git`                      | live   | UI 404；无 build-info.json                           | `/private/tmp/openbot-joint-accept-state-883a5159`      |
+
+**结论：** runtime identity = **VERIFIED**（只读）。三者都不是 tip-of-main memory closeout SHA。未调用 memory search API，未改 state。
+
+### 六场景模型效果
+
+全部 **not-run**。本轮用户授权工作树 + 门禁/验收工具，**没有**明确模型鉴权/费用授权；不得记通过。
+
+| 场景                 | 结果        |
+| -------------------- | ----------- |
+| 保存后新会话采用     | **not-run** |
+| 无关内容不乱入       | **not-run** |
+| 更新后不沿用旧事实   | **not-run** |
+| 无权限不进上下文     | **not-run** |
+| 遗忘后不用被禁用来源 | **not-run** |
+| 未批准学习不采用     | **not-run** |
+
+O6 / O7 / O9 仍 **明确延期**。撤回的「forget failed」双来源假阳性结论保持。
+
+### 三层关闭（本机复跑后，仍不宣称整体关闭）
+
+1. **研发交付：BLOCKED** — 卡在 trunk `composition-root-loc`（tsgo/format 绿；隔离矩阵复跑绿）。
+2. **运行身份：VERIFIED**（只读三网关）— 但无一为 memory closeout tip SHA；**不**等于运行生效关闭。
+3. **模型效果：not-run** — 待费用/鉴权授权。
+
+**不宣称 overall close。** Draft PR #182 仍是唯一收尾记录。

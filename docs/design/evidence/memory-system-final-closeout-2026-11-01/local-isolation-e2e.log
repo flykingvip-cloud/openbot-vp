@@ -1,0 +1,11 @@
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-memory-final-closeout-182
+
+ ✓ test/memory-continuity-gateway.e2e.test.ts (1 test) 14175ms
+     ✓ child gateway: authorized DM marker via HTTP memory_search / memory_get  14174ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  20:56:34
+   Duration  17.92s (transform 2.51s, setup 183ms, import 3.49s, tests 14.17s, environment 0ms)
+

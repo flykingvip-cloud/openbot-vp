@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 
 const captured = vi.hoisted(() => ({
-  run: vi.fn(async () => {
+  run: vi.fn(async (_opts?: { command?: string; execCommand?: string }) => {
     throw new Error("REACHED_SANDBOX_RUN");
   }),
 }));
@@ -82,8 +82,8 @@ describe("exec sandbox workspace write namespace (createExecTool call-site)", ()
       );
       expect(err).toContain("REACHED_SANDBOX_RUN");
       expect(runCalls).toBe(1);
-      expect(lastRun.command).toContain(`${root}/proof.txt`);
-      expect(lastRun.execCommand).toBe("printf ok > /account/workspace/proof.txt");
+      expect(lastRun!.command).toContain(`${root}/proof.txt`);
+      expect(lastRun!.execCommand).toBe("printf ok > /account/workspace/proof.txt");
     });
   });
 
@@ -96,8 +96,8 @@ describe("exec sandbox workspace write namespace (createExecTool call-site)", ()
       );
       expect(err).toContain("REACHED_SANDBOX_RUN");
       expect(runCalls).toBe(1);
-      expect(lastRun.command).toContain(`${root}/from-container.txt`);
-      expect(lastRun.execCommand).toBe("printf ok > /account/workspace/from-container.txt");
+      expect(lastRun!.command).toContain(`${root}/from-container.txt`);
+      expect(lastRun!.execCommand).toBe("printf ok > /account/workspace/from-container.txt");
     });
   });
 
@@ -112,8 +112,8 @@ describe("exec sandbox workspace write namespace (createExecTool call-site)", ()
         const { err, runCalls, lastRun } = await executeCatching(tool, command);
         expect(err, command).toContain("REACHED_SANDBOX_RUN");
         expect(runCalls, command).toBe(1);
-        expect(String(lastRun.execCommand), command).toContain("/account/workspace/");
-        expect(String(lastRun.execCommand), command).not.toContain(root);
+        expect(String(lastRun!.execCommand), command).toContain("/account/workspace/");
+        expect(String(lastRun!.execCommand), command).not.toContain(root);
       }
     });
   });
@@ -131,7 +131,7 @@ describe("exec sandbox workspace write namespace (createExecTool call-site)", ()
       );
       expect(err).toContain("REACHED_SANDBOX_RUN");
       expect(runCalls).toBe(1);
-      expect(lastRun.execCommand).toBe('printf ok > "/account/workspace/proof.txt"');
+      expect(lastRun!.execCommand).toBe('printf ok > "/account/workspace/proof.txt"');
     });
   });
 
@@ -194,7 +194,7 @@ describe("exec sandbox workspace write namespace (createExecTool call-site)", ()
       const { err, runCalls, lastRun } = await executeCatching(tool, `cat ${root}/readme.md`);
       expect(err).toContain("REACHED_SANDBOX_RUN");
       expect(runCalls).toBe(1);
-      expect(lastRun.execCommand).toBe("cat /account/workspace/readme.md");
+      expect(lastRun!.execCommand).toBe("cat /account/workspace/readme.md");
     });
   });
 });
