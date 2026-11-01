@@ -265,6 +265,8 @@
     "delivery:cutover:record": "node --import tsx scripts/delivery/cutover-record.ts",
     "delivery:ledger:audit": "node --import tsx scripts/delivery/ledger-audit.ts",
     "delivery:merge-back-plan": "node --import tsx scripts/delivery/merge-back.ts",
+    "delivery:release-record:check": "node --import tsx scripts/delivery/release-record.ts check",
+    "delivery:release-record:generate": "node --import tsx scripts/delivery/release-record.ts generate --write",
     "delivery:retire:plan": "node --import tsx scripts/delivery/retire-plan.ts",
     "dev": "node scripts/run-node.mjs",
     "docs:bin": "node scripts/build-docs-list.mjs",

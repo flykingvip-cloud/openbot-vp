@@ -10155,6 +10155,11 @@ tasks:
     paths:
       - .loom/registry.yaml
       - docs/notes/infrastructure-audit-2026-10-31/**
+  - id: infrastructure-audit:release-record-anti-drift
+    owner: infra-audit
+    intent: []
+    paths:
+      - docs/notes/infrastructure-audit-2026-10-31/release-record-anti-drift-2026-10-31.md
     state: active
     sessions: []
     ownerHistory: []
@@ -10207,6 +10212,7 @@ landingStreams:
     canLandWith:
       - strip-ohbe-from-openbot-vp
       - infrastructure-audit-batch-b-20261031
+      - infrastructure-audit-release-record-anti-drift-20261031
     metadata:
       task: infrastructure-audit:ledger-integrity
       owner: infra-audit
@@ -10225,8 +10231,31 @@ landingStreams:
       - strip-ohbe-from-openbot-vp
       - infrastructure-audit-p1-object-recovery-20261031
       - infrastructure-audit-ledger-integrity-20261031
+      - infrastructure-audit-release-record-anti-drift-20261031
     metadata:
       note: Batch B fail-closed local CI merge gate + audit notes (infra-audit)
+  - id: infrastructure-audit-release-record-anti-drift-20261031
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - deploy/production/RELEASE_RECORD.md
+      - docs/notes/infrastructure-audit-2026-10-31/release-record-anti-drift-2026-10-31.md
+      - package.json
+      - scripts/delivery/release-record.ts
+      - scripts/delivery/release-record.test.ts
+      - scripts/delivery/resolve-live-sha.ts
+      - scripts/ci-local-merge-gate.sh
+      - .github/workflows/ci-gate.yml
+    canLandWith:
+      - infrastructure-audit-ledger-integrity-20261031
+      - strip-ohbe-from-openbot-vp
+      - infrastructure-audit-p1-object-recovery-20261031
+      - infrastructure-audit-batch-b-20261031
+    metadata:
+      task: infrastructure-audit:release-record-anti-drift
+      owner: infra-audit
+      purpose: Generate/check managed RELEASE_RECORD current-identity block from
+        releases.jsonl (ledger↔doc anti-drift; not LIVE container reconcile).
   - id: controlled-collab-p2-event-dispatch-20261031
     landingPolicy: serial
     paths:
