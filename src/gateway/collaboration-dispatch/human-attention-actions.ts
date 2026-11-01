@@ -178,6 +178,7 @@ export async function actHumanAttentionCard(
         groupId: todo.groupId,
         taskId: todo.taskId,
         cfg: params.cfg,
+        todoTenantId: todo.tenantId,
       }).authority;
     } catch {
       authority = null;

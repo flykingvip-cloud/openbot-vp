@@ -7,12 +7,20 @@
 import type { Task } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
-import { createWorkspaceCollaborationStores } from "../collaboration-learning/shared.js";
+import {
+  createWorkspaceCollaborationStores,
+  resolveCollaborationGroupTenantId,
+} from "../collaboration-learning/shared.js";
+import {
+  resolveAuthorityTenantForEntry,
+  type CollaborationTenantResolution,
+} from "../collaboration-learning/trusted-tenant.js";
 import {
   createInternalLibraryRecoveryExecContext,
   confirmWakeOpCompletedAuthorized,
   releaseWakeOpForRetryAuthorized,
 } from "../collaboration-learning/wake-op-recovery-entry.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 import {
   acceptBoardItemSubmission,
   cancelBoardItem,
@@ -43,11 +51,19 @@ function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
-/** Build RuntimeAuthority for a human-attention todo's group (composition helper). */
+/**
+ * Build RuntimeAuthority for a human-attention todo's group (composition helper).
+ * Resolves tenant/profile from preferred client identity + trusted group ownership —
+ * never hard-codes empty tenant / personal_local when enterprise namespace is active.
+ */
 export function buildHumanAttentionAuthority(params: {
   groupId: string;
   taskId: string;
   cfg?: OpenBotConfig;
+  /** Preferred tenant from RPC identity (`resolveCollaborationTenantResolution`). */
+  tenant?: CollaborationTenantResolution | null;
+  /** Optional stamped todo scope (heartbeat open under enterprise authority). */
+  todoTenantId?: string | null;
 }): HumanAttentionAuthorityBundle {
   const cfg = params.cfg ?? loadConfig();
   const groupId = compact(params.groupId);
@@ -57,12 +73,23 @@ export function buildHumanAttentionAuthority(params: {
     { collaborationMode: "task_driven", finalDecisionMode: "human_required" },
     { now, idGen: () => generatePolicySnapshotId(now) },
   );
+  const preferred: CollaborationTenantResolution | null =
+    params.tenant ??
+    (compact(params.todoTenantId)
+      ? { tenantId: compact(params.todoTenantId), trust: "actor_fallback" }
+      : null);
+  const groupTenantId = resolveCollaborationGroupTenantId(groupId, preferred?.tenantId ?? null);
+  const tenant = resolveAuthorityTenantForEntry({
+    preferred,
+    groupTenantId,
+  });
+  const profile = resolveSecurityProfile(cfg).profile;
   const authority = createRuntimeAuthority({
     snapshot,
     episodeId: episodeIdForClientRun(`human-attention:${groupId}:${taskId}`),
-    tenant: { tenantId: null, trust: "none" },
+    tenant,
     groupId,
-    profile: "personal_local",
+    profile,
     cfg,
   });
   return { authority, cfg };
@@ -144,6 +171,14 @@ export async function assertHumanAttentionNotStale(params: {
   const expected = compact(params.expectedFingerprint) || compact(params.todo.fingerprint);
   if (!expected) {
     return { ok: false, reason: "missing_fingerprint", message: "缺少进展指纹" };
+  }
+  // Missing authoritative board record must refuse mutations — not treat as "unchanged".
+  if (!live.boardItem) {
+    return {
+      ok: false,
+      reason: "missing_board_item",
+      message: "权威看板项不存在，拒绝修改；请刷新后重试",
+    };
   }
   if (live.fingerprint && live.fingerprint !== expected) {
     return {
@@ -380,22 +415,57 @@ export async function executeHumanAttentionBusinessAction(params: {
   const actorId = compact(params.actorId);
   const action = params.action;
 
-  const stale = await assertHumanAttentionNotStale({
-    authority: params.authority,
-    cfg,
-    todo: params.todo,
-    expectedFingerprint: params.expectedFingerprint,
-  });
-  if (!stale.ok) {
-    return stale;
-  }
-  const live = stale.live;
+  const isViewAction =
+    action === "view_evidence" || action === "view_failure_reason" || action === "view_artifact";
 
-  if (
-    action === "view_evidence" ||
-    action === "view_failure_reason" ||
-    action === "view_artifact"
-  ) {
+  // Cheap action pre-checks before board I/O (clearer reasons for intake/unit paths).
+  if (action === "release_after_verify" && !compact(params.note)) {
+    return {
+      ok: false,
+      reason: "verification_note_required",
+      message: "核实后允许重试前须填写副作用核实说明",
+    };
+  }
+  if (action === "transfer" && !compact(params.transferOwnerId)) {
+    return { ok: false, reason: "transfer_owner_required", message: "转交需要目标责任人" };
+  }
+  if (action === "confirm_completed" && !compact(params.todo.wakeOpKey)) {
+    return { ok: false, reason: "missing_wake_op", message: "待办未绑定 wake-op，无法确认完成" };
+  }
+
+  // view_* may return evidence even when the board row is gone (non-blocking alert UX).
+  // Mutating actions require an authoritative board record via assertHumanAttentionNotStale.
+  let live: LiveTaskFacts;
+  if (isViewAction) {
+    live = await loadLiveHumanAttentionFacts({
+      authority: params.authority,
+      cfg,
+      groupId: params.todo.groupId,
+      taskId: params.todo.taskId,
+      itemId: params.todo.itemId,
+    });
+    const expected = compact(params.expectedFingerprint) || compact(params.todo.fingerprint);
+    if (expected && live.fingerprint && live.fingerprint !== expected) {
+      return {
+        ok: false,
+        reason: "stale_progress",
+        message: "看板已有新进展，旧卡片已失效，请刷新",
+      };
+    }
+  } else {
+    const stale = await assertHumanAttentionNotStale({
+      authority: params.authority,
+      cfg,
+      todo: params.todo,
+      expectedFingerprint: params.expectedFingerprint,
+    });
+    if (!stale.ok) {
+      return stale;
+    }
+    live = stale.live;
+  }
+
+  if (isViewAction) {
     let wakeOp: WakeOpRecord | null = null;
     const opKey = compact(params.todo.wakeOpKey);
     if (opKey) {
@@ -441,13 +511,6 @@ export async function executeHumanAttentionBusinessAction(params: {
 
   if (action === "release_after_verify") {
     const note = compact(params.note);
-    if (!note) {
-      return {
-        ok: false,
-        reason: "verification_note_required",
-        message: "核实后允许重试前须填写副作用核实说明",
-      };
-    }
     const released = await releaseWakeOpForHumanVerify({
       authority: params.authority,
       cfg,

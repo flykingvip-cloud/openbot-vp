@@ -163,7 +163,14 @@ export async function openHumanAttentionWithCard(
   const nowMs = params.nowMs ?? Date.now();
   let upserted: ReturnType<typeof upsertHumanAttentionTodo>;
   try {
-    upserted = upsertHumanAttentionTodo({ ...params, nowMs });
+    const stampedTenantId =
+      compact(params.tenantId) ||
+      (params.authority?.tenantId ? compact(params.authority.tenantId) : "");
+    upserted = upsertHumanAttentionTodo({
+      ...params,
+      nowMs,
+      ...(stampedTenantId ? { tenantId: stampedTenantId } : {}),
+    });
   } catch (error) {
     return {
       ok: false,

@@ -16,6 +16,7 @@ import {
   type HumanAttentionFailureKind,
   type HumanAttentionOptionId,
 } from "./human-attention-card.js";
+import { withRoundLock, writeJsonDurable } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { sanitizeDispatchErrorMessage } from "./sanitize-dispatch-error.js";
 
@@ -50,6 +51,11 @@ export type HumanAttentionTodo = {
   boardStatus?: string;
   wakeOpKey?: string;
   sideEffectClass?: string;
+  /**
+   * Runtime namespace scope stamped when the todo was opened under a trusted
+   * authority (enterprise tenant). Used to rebuild authority without guessing.
+   */
+  tenantId?: string | null;
   openedAt: number;
   updatedAt: number;
   claimedBy?: string;
@@ -89,6 +95,8 @@ export type UpsertHumanAttentionTodoInput = {
   boardStatus?: string;
   wakeOpKey?: string;
   sideEffectClass?: string;
+  /** Bind todo to enterprise/personal runtime scope when known. */
+  tenantId?: string | null;
 };
 
 export type UpsertHumanAttentionTodoResult = {
@@ -250,6 +258,11 @@ export function upsertHumanAttentionTodo(
         ...(compact(input.sideEffectClass)
           ? { sideEffectClass: compact(input.sideEffectClass) }
           : {}),
+        ...(compact(input.tenantId)
+          ? { tenantId: compact(input.tenantId) }
+          : current.tenantId
+            ? { tenantId: current.tenantId }
+            : {}),
       };
       all[index] = refreshed;
       writeAll(all);
@@ -275,6 +288,7 @@ export function upsertHumanAttentionTodo(
     ...(compact(input.boardStatus) ? { boardStatus: compact(input.boardStatus) } : {}),
     ...(compact(input.wakeOpKey) ? { wakeOpKey: compact(input.wakeOpKey) } : {}),
     ...(compact(input.sideEffectClass) ? { sideEffectClass: compact(input.sideEffectClass) } : {}),
+    ...(compact(input.tenantId) ? { tenantId: compact(input.tenantId) } : {}),
   };
   if (index >= 0) {
     all[index] = todo;
@@ -434,7 +448,11 @@ function safeStem(id: string): string | null {
   return encodeURIComponent(trimmed);
 }
 
-async function clearHeartbeatHumanAttention(params: {
+/**
+ * Clear heartbeat humanAttention under the same lock stem as heartbeat writeState,
+ * with atomic durable write and fingerprint re-check inside the lock.
+ */
+export async function clearHeartbeatHumanAttention(params: {
   authority: RuntimeAuthority;
   groupId: string;
   itemId: string;
@@ -445,54 +463,58 @@ async function clearHeartbeatHumanAttention(params: {
   if (!stem) {
     return false;
   }
-  const statePath = path.join(
-    params.authority.namespace.root,
-    "group-task-heartbeat",
-    `${stem}.json`,
-  );
-  let raw: string;
-  try {
-    raw = await fs.promises.readFile(statePath, "utf8");
-  } catch {
-    return false;
-  }
-  let state: {
-    groupId: string;
-    lastScanAt: number;
-    items: Record<string, Record<string, unknown>>;
-  };
-  try {
-    state = JSON.parse(raw) as typeof state;
-  } catch {
-    return false;
-  }
-  const item = state.items?.[params.itemId];
-  if (!item || typeof item !== "object") {
-    return false;
-  }
-  const attention = item.humanAttention as { fingerprint?: string } | undefined;
-  if (!attention) {
-    return false;
-  }
-  if (compact(attention.fingerprint) !== compact(params.fingerprint)) {
-    return false;
-  }
-  const nextItem = {
-    ...item,
-    humanAttention: undefined,
-    nudgeFailCount: 0,
-    escalateFailCount: 0,
-  };
-  const next = {
-    ...state,
-    lastScanAt: params.nowMs,
-    items: {
-      ...state.items,
-      [params.itemId]: nextItem,
-    },
-  };
-  await fs.promises.writeFile(statePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
-  return true;
+  const dir = path.join(params.authority.namespace.root, "group-task-heartbeat");
+  const statePath = path.join(dir, `${stem}.json`);
+  return withRoundLock(dir, stem, async () => {
+    let raw: string;
+    try {
+      raw = await fs.promises.readFile(statePath, "utf8");
+    } catch {
+      return false;
+    }
+    let state: {
+      groupId: string;
+      lastScanAt: number;
+      items: Record<string, Record<string, unknown>>;
+    };
+    try {
+      state = JSON.parse(raw) as typeof state;
+    } catch {
+      return false;
+    }
+    if (!state || typeof state !== "object" || typeof state.groupId !== "string") {
+      return false;
+    }
+    const items = state.items && typeof state.items === "object" ? { ...state.items } : {};
+    const item = items[params.itemId];
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+    const attention = item.humanAttention as { fingerprint?: string } | undefined;
+    if (!attention) {
+      return false;
+    }
+    // Re-validate fingerprint under the lock so concurrent heartbeat progress wins.
+    if (compact(attention.fingerprint) !== compact(params.fingerprint)) {
+      return false;
+    }
+    const nextItem: Record<string, unknown> = {
+      ...item,
+      nudgeFailCount: 0,
+      escalateFailCount: 0,
+    };
+    delete nextItem.humanAttention;
+    const next = {
+      ...state,
+      lastScanAt: params.nowMs,
+      items: {
+        ...items,
+        [params.itemId]: nextItem,
+      },
+    };
+    await writeJsonDurable(statePath, next);
+    return true;
+  });
 }
 
 export async function resolveHumanAttentionTodo(params: {

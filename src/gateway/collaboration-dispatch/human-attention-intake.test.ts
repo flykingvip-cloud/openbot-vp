@@ -1,4 +1,11 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { clearConfigCache, setRuntimeConfigSnapshot } from "../../config/config.js";
+import type { OpenBotConfig } from "../../config/types.js";
+import { publishBoardItem } from "./claim-contract.js";
+import { progressFingerprint } from "./group-task-heartbeat.js";
 import { actHumanAttentionCard } from "./human-attention-actions.js";
 import {
   assertsNoBlindRetryOption,
@@ -13,11 +20,98 @@ import {
   resetHumanAttentionInboxForTests,
   upsertHumanAttentionTodo,
 } from "./human-attention-inbox.js";
+import { createRoundPolicySnapshot } from "./round-policy-snapshot.js";
+import { createRuntimeAuthority } from "./runtime-authority.js";
 import { sanitizeDispatchError, sanitizeDispatchErrorMessage } from "./sanitize-dispatch-error.js";
 
-afterEach(() => {
+const tempDirs: string[] = [];
+
+afterEach(async () => {
   resetHumanAttentionInboxForTests();
+  clearConfigCache();
+  delete process.env.OPENBOT_STATE_DIR;
+  delete process.env.OPENBOT_CONFIG_PATH;
+  delete process.env.OPENCLAW_CONFIG_PATH;
+  delete process.env.OPENBOT_SECURITY_PROFILE;
+  for (const dir of tempDirs.splice(0)) {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  }
 });
+
+async function seedAuthorityWithBoard(params: {
+  groupId: string;
+  taskId: string;
+  itemHint?: string;
+}): Promise<{
+  cfg: OpenBotConfig;
+  authority: ReturnType<typeof createRuntimeAuthority>;
+  itemId: string;
+  fingerprint: string;
+}> {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-ha-intake-"));
+  tempDirs.push(root);
+  process.env.OPENBOT_STATE_DIR = path.join(root, "state");
+  delete process.env.OPENBOT_SECURITY_PROFILE;
+  const cfg = {
+    agents: { defaults: { workspace: path.join(root, "agent-ws") } },
+    gateway: { security: { profile: "personal_local" } },
+    collaboration: {
+      defaults: { workspace: path.join(root, "collaboration") },
+      runtimeNamespace: true,
+      task: {
+        wakeContract: true,
+        wakeContractGroupAllowlist: [params.groupId],
+        claimContract: true,
+        selfAdvance: { mode: "execute", executeGroupAllowlist: [params.groupId] },
+        groupTaskHeartbeat: {
+          mode: "observe",
+          emitGroupAllowlist: [params.groupId],
+          scanIntervalMs: 1_000,
+          escalateAfterConsecutiveNoResponse: 2,
+        },
+      },
+    },
+  } as OpenBotConfig;
+  const configPath = path.join(root, "openbot.json");
+  await fs.writeFile(configPath, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+  process.env.OPENBOT_CONFIG_PATH = configPath;
+  process.env.OPENCLAW_CONFIG_PATH = configPath;
+  setRuntimeConfigSnapshot(cfg, cfg);
+  clearConfigCache();
+  const snapshot = createRoundPolicySnapshot(
+    { collaborationMode: "task_driven", finalDecisionMode: "human_required" },
+    { now: 1, idGen: () => "pss_ha_intake" },
+  );
+  const authority = createRuntimeAuthority({
+    snapshot,
+    episodeId: "ep_ha_intake",
+    tenant: { tenantId: null, trust: "none" },
+    groupId: params.groupId,
+    profile: "personal_local",
+    cfg,
+  });
+  const published = await publishBoardItem(
+    authority,
+    {
+      groupId: params.groupId,
+      taskId: params.taskId,
+      remainingWork: params.itemHint ?? "work",
+      acceptanceCriteria: ["ok"],
+      intendedClaimantIds: ["bot:analyst"],
+      publishedBy: "human:amy",
+    },
+    { cfg, nowMs: 100 },
+  );
+  if (!published.ok) {
+    throw new Error(`publishBoardItem failed: ${published.reason}`);
+  }
+  return {
+    cfg,
+    authority,
+    itemId: published.value.itemId,
+    fingerprint: progressFingerprint(published.value),
+  };
+}
 
 describe("human-attention card options by failure kind", () => {
   it("not_started offers fix-retry / transfer / cancel — never blind immediate retry id", () => {
@@ -170,11 +264,12 @@ describe("human-attention inbox + card loop", () => {
   });
 
   it("transfer keeps status open and card options (terminal uses status not resolution)", async () => {
+    const seeded = await seedAuthorityWithBoard({ groupId: "g", taskId: "t2" });
     const { todo } = upsertHumanAttentionTodo({
       groupId: "g",
-      itemId: "i2",
+      itemId: seeded.itemId,
       taskId: "t2",
-      fingerprint: "fp2",
+      fingerprint: seeded.fingerprint,
       reason: "exhausted",
       ownerIds: ["human:amy"],
       recoveryHint: "transfer",
@@ -189,6 +284,8 @@ describe("human-attention inbox + card loop", () => {
       expectedVersion: todo.version,
       expectedFingerprint: todo.fingerprint,
       transferOwnerId: "human:bob",
+      authority: seeded.authority,
+      cfg: seeded.cfg,
     });
     expect(transferred.ok).toBe(true);
     if (!transferred.ok) {

@@ -14,6 +14,7 @@ import {
   listHumanAttentionTodos,
 } from "../collaboration-dispatch/human-attention-inbox.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
+import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { resolveEmployeeWorkbenchActor } from "../employee-workbench-scope.js";
 import {
   ErrorCodes,
@@ -124,10 +125,13 @@ export const humanAttentionHandlers: GatewayRequestHandlers = {
         return;
       }
       const cfg = loadConfig();
+      const tenant = await resolveCollaborationTenantResolution(client);
       const { authority } = buildHumanAttentionAuthority({
         groupId: todo.groupId,
         taskId: todo.taskId,
         cfg,
+        tenant,
+        todoTenantId: todo.tenantId,
       });
       const result = await actHumanAttentionCard({
         todoId: params.todoId,

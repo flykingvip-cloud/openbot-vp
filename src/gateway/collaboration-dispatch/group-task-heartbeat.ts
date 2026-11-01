@@ -43,7 +43,7 @@ import {
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import { openHumanAttentionWithCard } from "./human-attention-emit.js";
 import { loadBoardClaimItemsFromDir } from "./member-progress-export.js";
-import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
+import { appendJsonlDurable, writeJsonDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 import { sanitizeDispatchErrorMessage } from "./sanitize-dispatch-error.js";
@@ -870,7 +870,7 @@ async function writeState(
   const statePath = groupTaskHeartbeatStatePath(dir, state.groupId);
   await withRoundLock(dir, stem, async () => {
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    await writeJsonDurable(statePath, state);
   });
 }
 
