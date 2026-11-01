@@ -175,13 +175,14 @@ export async function executeModeBWakeRound(params: {
         completion.responseStatus === "aborted";
       const abortDetail =
         compact(round.abortReason) || (noVisible ? "no_visible_reply" : "aborted");
+      // Once executeCollaborationRound returned an aborted round, we lack proof that
+      // tools/files/messages never ran — empty final text ≠ not_started. Only
+      // pre-invoke Mode B failures (context/lead) may claim not_started.
       return {
         ok: false,
         reason: `round_aborted:${abortDetail}`,
         message: `Mode B round aborted (${abortDetail})`,
-        // Round rows were persisted; treat as uncertain external side effects unless
-        // the completion clearly never produced a visible/tool body.
-        sideEffectClass: noVisible ? "not_started" : "started_or_unknown",
+        sideEffectClass: "started_or_unknown",
       };
     }
     if (round.state !== "ROUND_COMPLETE") {

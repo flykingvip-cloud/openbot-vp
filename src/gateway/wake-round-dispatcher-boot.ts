@@ -21,6 +21,7 @@ import { getReplyFromConfig } from "../auto-reply/reply.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
 import { loadConfig } from "../config/config.js";
 import type { OpenBotConfig } from "../config/types.js";
+import { redactSensitiveText } from "../logging/redact.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { toCollaborationSpaceSessionKey } from "../sessions/session-key-utils.js";
 import { episodeIdForClientRun } from "./collaboration-dispatch/collaboration-event-key.js";
@@ -60,6 +61,11 @@ import {
 import { resolveSecurityProfile } from "./security-profile.js";
 
 const wakeRoundDispatchLog = createSubsystemLogger("gateway/wake-round-dispatch");
+
+/** Redact + truncate runBot error text before logs / wakeRunBotError payloads. */
+export function sanitizeWakeRunBotErrorMessage(message: string): string {
+  return redactSensitiveText(message.replace(/\s+/g, " ").slice(0, 240), { mode: "all" });
+}
 
 function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
@@ -443,7 +449,7 @@ export async function resolveModeBWakeRoundContext(
         // placeholder → ROUND_ABORTED while Mode B still receipted ok:true).
         const err = error instanceof Error ? error : new Error(String(error));
         const category = compact(err.name) || "Error";
-        const safeMessage = err.message.replace(/\s+/g, " ").slice(0, 240);
+        const safeMessage = sanitizeWakeRunBotErrorMessage(err.message);
         wakeRoundDispatchLog.error("wake runBot execution failed", {
           category,
           message: safeMessage,

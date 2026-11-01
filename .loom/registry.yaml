@@ -10260,11 +10260,13 @@ tasks:
     owner: grok-sentinel-link
     intent:
       - "Fail-closed watchdog task closure: Mode B abort≠success, review routing, escalate stage binding"
+      - "P1/P2 acceptance: sideEffectClass consume, nudge fail bounds, humanAttention, sanitize, closed-loop tests"
     paths:
       - src/gateway/collaboration-dispatch/**
       - src/gateway/wake-round-dispatcher-boot.ts
       - src/gateway/group-task-heartbeat-scheduler-boot.ts
       - .kiro/specs/watchdog-task-closure/**
+      - evidence/watchdog-task-closure-acceptance-*.md
       - .loom/registry.yaml
     state: active
     sessions:
@@ -10300,6 +10302,22 @@ landingStreams:
       task: closed-loop-isolation-contract:cursor-closed-loop-490b
       owner: cursor-closed-loop-490b
       purpose: Isolation contract freeze. Docs, spec, and synthetic tests only. No production behavior change.
+  - id: watchdog-task-closure:grok-sentinel-link
+    landingPolicy: serial
+    paths:
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/mode-b-wake-round-dispatcher.ts
+      - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
+      - src/gateway/collaboration-dispatch/watchdog-task-closure.test.ts
+      - src/gateway/collaboration-dispatch/watchdog-task-closure.integration.test.ts
+      - src/gateway/wake-round-dispatcher-boot.ts
+      - evidence/watchdog-task-closure-acceptance-*.md
+      - .loom/registry.yaml
+    canLandWith: []
+    metadata:
+      task: watchdog-task-closure:grok-sentinel-link
+      owner: grok-sentinel-link
+      purpose: Fail-closed heartbeat/Mode B side-effect class, humanAttention exit, sanitize, closed-loop integration.
   - id: infrastructure-audit-p1-object-recovery-20261031
     landingPolicy: serial
     paths:

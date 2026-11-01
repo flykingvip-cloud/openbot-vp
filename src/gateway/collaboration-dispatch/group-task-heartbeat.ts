@@ -114,7 +114,7 @@ export type GroupTaskHeartbeatOptions = {
   roundDispatcher?: WakeRoundDispatcher | null;
 };
 
-export type HeartbeatActionKind = "nudge" | "escalate" | "skip";
+export type HeartbeatActionKind = "nudge" | "escalate" | "skip" | "human_todo";
 
 export type HeartbeatItemDecision = Readonly<{
   itemId: string;
@@ -127,6 +127,17 @@ export type HeartbeatItemDecision = Readonly<{
   consecutiveNoResponse: number;
 }>;
 
+export type HeartbeatHumanAttention = {
+  status: "needs_human";
+  reason: string;
+  ownerIds: string[];
+  openedAt: number;
+  /** How an operator unblocks this item (no blind replay when side effects unknown). */
+  recoveryHint: string;
+  fingerprint: string;
+  source: "nudge_failures_exhausted" | "escalate_failures_exhausted" | "side_effect_unknown";
+};
+
 export type GroupTaskHeartbeatItemState = {
   consecutiveNoResponse: number;
   lastNudgeAt?: number;
@@ -137,8 +148,13 @@ export type GroupTaskHeartbeatItemState = {
   /** Bounded escalate dispatch failures on the current fingerprint. */
   escalateFailCount?: number;
   lastEscalateAttemptAt?: number;
+  /** Bounded nudge dispatch failures (not delivery receipts). */
+  nudgeFailCount?: number;
+  lastNudgeAttemptAt?: number;
   lastFingerprint?: string;
   lastStatus?: string;
+  /** Durable operator attention when automated recovery is exhausted or unsafe. */
+  humanAttention?: HeartbeatHumanAttention;
 };
 
 export type GroupTaskHeartbeatState = {
@@ -373,28 +389,121 @@ function isOverdue(item: { dueAtMs?: number }, nowMs: number): boolean {
   return typeof item.dueAtMs === "number" && Number.isFinite(item.dueAtMs) && item.dueAtMs < nowMs;
 }
 
+const NUDGE_FAIL_LIMIT = 3;
+const ESCALATE_FAIL_LIMIT = 3;
+/** Minimum gap between failed nudge attempts on the same fingerprint (backoff). */
+const NUDGE_FAIL_BACKOFF_MS = 30_000;
+
 function clearEscalateFieldsWhenFingerprintChanges(
   prior: GroupTaskHeartbeatItemState | null | undefined,
   fingerprint: string,
 ): Pick<
   GroupTaskHeartbeatItemState,
-  "lastEscalateAt" | "lastEscalateFingerprint" | "escalateFailCount" | "lastEscalateAttemptAt"
+  | "lastEscalateAt"
+  | "lastEscalateFingerprint"
+  | "escalateFailCount"
+  | "lastEscalateAttemptAt"
+  | "nudgeFailCount"
+  | "lastNudgeAttemptAt"
+  | "humanAttention"
 > {
   const priorFp = compact(prior?.lastFingerprint);
   if (priorFp && priorFp !== fingerprint) {
-    // New progress stage: old escalate must not suppress supervision.
+    // New progress stage: old escalate / fail / humanAttention must not suppress supervision.
     return {};
   }
   const escalateFp = compact(prior?.lastEscalateFingerprint);
   if (escalateFp && escalateFp !== fingerprint) {
-    return {};
+    return {
+      nudgeFailCount: prior?.nudgeFailCount,
+      lastNudgeAttemptAt: prior?.lastNudgeAttemptAt,
+      humanAttention:
+        prior?.humanAttention && prior.humanAttention.fingerprint === fingerprint
+          ? prior.humanAttention
+          : undefined,
+    };
   }
   return {
     lastEscalateAt: prior?.lastEscalateAt,
     lastEscalateFingerprint: prior?.lastEscalateFingerprint,
     escalateFailCount: prior?.escalateFailCount,
     lastEscalateAttemptAt: prior?.lastEscalateAttemptAt,
+    nudgeFailCount: prior?.nudgeFailCount,
+    lastNudgeAttemptAt: prior?.lastNudgeAttemptAt,
+    humanAttention:
+      prior?.humanAttention && prior.humanAttention.fingerprint === fingerprint
+        ? prior.humanAttention
+        : undefined,
   };
+}
+
+function resolveHumanAttentionOwners(
+  item: HeartbeatBoardItemLike,
+  escalateTo: readonly string[],
+): string[] {
+  return uniqueIds([
+    item.ownerId,
+    item.coordinatorId,
+    item.decisionAuthorityId,
+    item.publishedBy,
+    ...escalateTo,
+  ]);
+}
+
+function buildHumanAttention(params: {
+  item: HeartbeatBoardItemLike;
+  fingerprint: string;
+  nowMs: number;
+  reason: string;
+  source: HeartbeatHumanAttention["source"];
+  escalateTo: readonly string[];
+}): HeartbeatHumanAttention {
+  const owners = resolveHumanAttentionOwners(params.item, params.escalateTo);
+  const recovery =
+    params.source === "side_effect_unknown"
+      ? "Inspect wake-op ledger (status=unknown); verify external effects; confirm or release_for_retry before re-dispatch."
+      : "Inspect board item + wake-op ledger; fix routing/auth/dispatcher; clear humanAttention after verified recovery or progress.";
+  return {
+    status: "needs_human",
+    reason: params.reason,
+    ownerIds: owners,
+    openedAt: params.nowMs,
+    recoveryHint: recovery,
+    fingerprint: params.fingerprint,
+    source: params.source,
+  };
+}
+
+async function appendHumanAttentionRecord(params: {
+  authority: RuntimeAuthority;
+  cfg?: OpenBotConfig;
+  groupId: string;
+  item: HeartbeatBoardItemLike;
+  attention: HeartbeatHumanAttention;
+  nowMs: number;
+}): Promise<void> {
+  try {
+    const dir = groupTaskHeartbeatDir(params.authority);
+    assertCollaborationRuntimeWritable(dir, params.cfg);
+    const stem = safeStem(params.groupId);
+    if (!stem) {
+      return;
+    }
+    await withRoundLock(dir, `${stem}.human-attention`, async () => {
+      await fs.mkdir(dir, { recursive: true });
+      await appendJsonlDurable(path.join(dir, `${stem}.human-attention.jsonl`), {
+        kind: "group_task_heartbeat_human_attention",
+        at: params.nowMs,
+        groupId: params.groupId,
+        itemId: params.item.itemId,
+        taskId: params.item.taskId,
+        status: params.item.status,
+        attention: params.attention,
+      });
+    });
+  } catch {
+    // best-effort durable operator queue
+  }
 }
 
 function nudgeTargets(item: GroupBoardClaimItem | HeartbeatBoardItemLike): string[] {
@@ -591,9 +700,74 @@ export function planHeartbeatActionForItem(params: {
       consecutiveNoResponse: consecutive,
     };
   }
+  // Open human attention for this fingerprint: visible operator exit, not silent skip.
+  const priorAttention = prior?.humanAttention;
+  if (
+    sameAsPrior &&
+    priorAttention &&
+    priorAttention.status === "needs_human" &&
+    priorAttention.fingerprint === fingerprint
+  ) {
+    return {
+      itemId: item.itemId,
+      taskId: item.taskId,
+      groupId: item.groupId,
+      status: item.status,
+      action: "human_todo",
+      toAgentIds: priorAttention.ownerIds,
+      reason: `needs_human:${priorAttention.source}:${priorAttention.reason}`,
+      consecutiveNoResponse: consecutive,
+    };
+  }
+
   // Bounded recovery after escalate dispatch failures on this fingerprint.
   const failCount = sameAsPrior ? (prior?.escalateFailCount ?? 0) : 0;
-  if (sameAsPrior && failCount >= 3) {
+  if (sameAsPrior && failCount >= ESCALATE_FAIL_LIMIT) {
+    return {
+      itemId: item.itemId,
+      taskId: item.taskId,
+      groupId: item.groupId,
+      status: item.status,
+      action: "human_todo",
+      toAgentIds: resolveHumanAttentionOwners(item, params.escalateTo),
+      reason: `escalate_failures_exhausted:${reasonBase}`,
+      consecutiveNoResponse: consecutive,
+    };
+  }
+
+  // Bounded nudge dispatch failures (distinct from "delivered" lastNudgeAt).
+  const nudgeFails = sameAsPrior ? (prior?.nudgeFailCount ?? 0) : 0;
+  if (sameAsPrior && nudgeFails >= NUDGE_FAIL_LIMIT) {
+    // Prefer escalate when targets exist; otherwise open human attention.
+    if (params.escalateTo.length > 0) {
+      return {
+        itemId: item.itemId,
+        taskId: item.taskId,
+        groupId: item.groupId,
+        status: item.status,
+        action: "escalate",
+        toAgentIds: uniqueIds(params.escalateTo),
+        reason: `escalate_after_nudge_dispatch_failures:${reasonBase}`,
+        consecutiveNoResponse: consecutive,
+      };
+    }
+    return {
+      itemId: item.itemId,
+      taskId: item.taskId,
+      groupId: item.groupId,
+      status: item.status,
+      action: "human_todo",
+      toAgentIds: resolveHumanAttentionOwners(item, params.escalateTo),
+      reason: `nudge_failures_exhausted:${reasonBase}`,
+      consecutiveNoResponse: consecutive,
+    };
+  }
+  if (
+    sameAsPrior &&
+    nudgeFails > 0 &&
+    typeof prior?.lastNudgeAttemptAt === "number" &&
+    params.nowMs - prior.lastNudgeAttemptAt < NUDGE_FAIL_BACKOFF_MS
+  ) {
     return {
       itemId: item.itemId,
       taskId: item.taskId,
@@ -601,7 +775,7 @@ export function planHeartbeatActionForItem(params: {
       status: item.status,
       action: "skip",
       toAgentIds: [],
-      reason: `escalate_failures_exhausted:${reasonBase}`,
+      reason: `nudge_fail_backoff:${reasonBase}`,
       consecutiveNoResponse: consecutive,
     };
   }
@@ -1313,15 +1487,100 @@ export async function runGroupTaskHeartbeat(
         // Emit path: only credit a nudge when dispatch was accepted with receipt.
         // Failed/recorded must not advance anti-spam counters as if delivered.
         if (!consume.dispatched) {
+          const side = consume.sideEffectClass;
+          const priorFails =
+            compact(prior?.lastFingerprint) === fingerprint ? (prior?.nudgeFailCount ?? 0) : 0;
+          if (side === "started_or_unknown") {
+            const attention = buildHumanAttention({
+              item,
+              fingerprint,
+              nowMs,
+              reason: `nudge_side_effect_unknown:${consume.reason}`,
+              source: "side_effect_unknown",
+              escalateTo,
+            });
+            nextItems[item.itemId] = {
+              ...escalateCarry,
+              consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+              lastNudgeAt: prior?.lastNudgeAt,
+              lastFingerprint: fingerprint,
+              lastStatus: item.status,
+              nudgeFailCount: priorFails + 1,
+              lastNudgeAttemptAt: nowMs,
+              humanAttention: attention,
+            };
+            decisions[decisions.length - 1] = {
+              ...decision,
+              action: "human_todo",
+              toAgentIds: attention.ownerIds,
+              reason: `needs_human:side_effect_unknown:${consume.reason}`,
+            };
+            await appendHumanAttentionRecord({
+              authority,
+              cfg,
+              groupId,
+              item,
+              attention,
+              nowMs,
+            });
+            continue;
+          }
+          // not_started / unclassified: bounded retry with backoff; advance stall toward escalate.
+          const nextFails = priorFails + 1;
+          const attention =
+            nextFails >= NUDGE_FAIL_LIMIT && escalateTo.length === 0
+              ? buildHumanAttention({
+                  item,
+                  fingerprint,
+                  nowMs,
+                  reason: `nudge_failures_exhausted:${decision.reason}`,
+                  source: "nudge_failures_exhausted",
+                  escalateTo,
+                })
+              : escalateCarry.humanAttention;
           nextItems[item.itemId] = {
-            consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+            ...escalateCarry,
+            consecutiveNoResponse: (prior?.consecutiveNoResponse ?? 0) + 1,
             lastNudgeAt: prior?.lastNudgeAt,
             lastFingerprint: fingerprint,
             lastStatus: item.status,
-            ...escalateCarry,
+            nudgeFailCount: nextFails,
+            lastNudgeAttemptAt: nowMs,
+            ...(attention ? { humanAttention: attention } : { humanAttention: undefined }),
           };
+          if (attention && nextFails >= NUDGE_FAIL_LIMIT && escalateTo.length === 0) {
+            decisions[decisions.length - 1] = {
+              ...decision,
+              action: "human_todo",
+              toAgentIds: attention.ownerIds,
+              reason: attention.reason,
+            };
+            await appendHumanAttentionRecord({
+              authority,
+              cfg,
+              groupId,
+              item,
+              attention,
+              nowMs,
+            });
+          }
           continue;
         }
+        // Success: clear nudge fail counters; credit delivery anti-spam.
+        {
+          const sameFp = compact(prior?.lastFingerprint) === fingerprint;
+          nextItems[item.itemId] = {
+            ...escalateCarry,
+            consecutiveNoResponse: sameFp ? (prior?.consecutiveNoResponse ?? 0) + 1 : 1,
+            lastNudgeAt: nowMs,
+            lastFingerprint: fingerprint,
+            lastStatus: item.status,
+            nudgeFailCount: 0,
+            lastNudgeAttemptAt: nowMs,
+            humanAttention: undefined,
+          };
+        }
+        continue;
       } else {
         // Observe / dry-run: record planned fingerprint without emitting escalate stamps.
         const same = prior?.lastFingerprint === fingerprint;
@@ -1334,14 +1593,44 @@ export async function runGroupTaskHeartbeat(
         };
         continue;
       }
-      const same = prior?.lastFingerprint === fingerprint;
+    }
+
+    if (decision.action === "human_todo") {
+      const fingerprint = progressFingerprint(item);
+      const escalateCarry = clearEscalateFieldsWhenFingerprintChanges(prior, fingerprint);
+      const attention =
+        escalateCarry.humanAttention && escalateCarry.humanAttention.fingerprint === fingerprint
+          ? escalateCarry.humanAttention
+          : buildHumanAttention({
+              item,
+              fingerprint,
+              nowMs,
+              reason: decision.reason,
+              source: decision.reason.includes("escalate_failures_exhausted")
+                ? "escalate_failures_exhausted"
+                : decision.reason.includes("nudge_failures_exhausted")
+                  ? "nudge_failures_exhausted"
+                  : "side_effect_unknown",
+              escalateTo,
+            });
       nextItems[item.itemId] = {
-        consecutiveNoResponse: same ? (prior?.consecutiveNoResponse ?? 0) + 1 : 1,
-        lastNudgeAt: nowMs,
+        ...escalateCarry,
+        consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+        lastNudgeAt: prior?.lastNudgeAt,
         lastFingerprint: fingerprint,
         lastStatus: item.status,
-        ...escalateCarry,
+        humanAttention: attention,
       };
+      if (!dryRun) {
+        await appendHumanAttentionRecord({
+          authority,
+          cfg,
+          groupId,
+          item,
+          attention,
+          nowMs,
+        });
+      }
       continue;
     }
 
@@ -1406,27 +1695,69 @@ export async function runGroupTaskHeartbeat(
             lastEscalateFingerprint: fingerprint,
             escalateFailCount: 0,
             lastEscalateAttemptAt: nowMs,
+            nudgeFailCount: 0,
             lastFingerprint: fingerprint,
             lastStatus: item.status,
+            humanAttention: undefined,
           };
         } else {
           const priorFails =
             compact(prior?.lastFingerprint) === fingerprint ? (prior?.escalateFailCount ?? 0) : 0;
+          const nextFails = priorFails + 1;
+          const side = consume.sideEffectClass;
+          let attention = escalateCarry.humanAttention;
+          if (side === "started_or_unknown") {
+            attention = buildHumanAttention({
+              item,
+              fingerprint,
+              nowMs,
+              reason: `escalate_side_effect_unknown:${consume.reason}`,
+              source: "side_effect_unknown",
+              escalateTo,
+            });
+          } else if (nextFails >= ESCALATE_FAIL_LIMIT) {
+            attention = buildHumanAttention({
+              item,
+              fingerprint,
+              nowMs,
+              reason: `escalate_failures_exhausted:${decision.reason}`,
+              source: "escalate_failures_exhausted",
+              escalateTo,
+            });
+          }
           nextItems[item.itemId] = {
             consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
             lastNudgeAt: prior?.lastNudgeAt,
             lastFingerprint: fingerprint,
             lastStatus: item.status,
-            escalateFailCount: priorFails + 1,
+            escalateFailCount: nextFails,
             lastEscalateAttemptAt: nowMs,
-            // Keep a prior successful escalate on this fingerprint if any; else none.
             ...(escalateCarry.lastEscalateAt
               ? {
                   lastEscalateAt: escalateCarry.lastEscalateAt,
                   lastEscalateFingerprint: escalateCarry.lastEscalateFingerprint,
                 }
               : {}),
+            nudgeFailCount: escalateCarry.nudgeFailCount,
+            lastNudgeAttemptAt: escalateCarry.lastNudgeAttemptAt,
+            ...(attention ? { humanAttention: attention } : {}),
           };
+          if (attention) {
+            decisions[decisions.length - 1] = {
+              ...decision,
+              action: "human_todo",
+              toAgentIds: attention.ownerIds,
+              reason: attention.reason,
+            };
+            await appendHumanAttentionRecord({
+              authority,
+              cfg,
+              groupId,
+              item,
+              attention,
+              nowMs,
+            });
+          }
         }
         continue;
       }

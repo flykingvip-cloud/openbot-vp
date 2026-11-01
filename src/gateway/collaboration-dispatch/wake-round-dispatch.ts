@@ -444,6 +444,11 @@ export type ConsumeWakeRoundDispatchResult = Readonly<{
   wakeOp?: WakeOpRecord;
   /** True when a prior completed result was reused (no new side effect). */
   reused?: boolean;
+  /**
+   * Side-effect class from the Mode B dispatcher (or classified on fail).
+   * Heartbeat / recovery must honor this: not_started may retry; started_or_unknown must not replay.
+   */
+  sideEffectClass?: DispatchSideEffectClass;
 }>;
 
 /**
@@ -1668,6 +1673,7 @@ export async function consumeWakeForRoundDispatch(
     let dispatched = false;
     let reason = gate.reason;
     let roundId: string | undefined;
+    let dispatchSideEffectClass: DispatchSideEffectClass | undefined;
 
     if (gate.allowed && dispatcherPresent && dispatcher) {
       try {
@@ -1778,6 +1784,7 @@ export async function consumeWakeForRoundDispatch(
             dispatched = true;
             roundId = compact(result.roundId);
             reason = result.detail ? `dispatched:${result.detail}` : `dispatched:${request.source}`;
+            dispatchSideEffectClass = classifyDispatchSideEffect(result);
             const completed = await markWakeOpCompleted({
               authority: params.authority,
               opKey: claimed.opKey,
@@ -1796,15 +1803,33 @@ export async function consumeWakeForRoundDispatch(
             : `dispatch_failed:${result.reason}${
                 result.message ? `:${result.message.replace(/\s+/g, " ").slice(0, 160)}` : ""
               }`;
-          const failed = await markWakeOpFailed({
-            authority: params.authority,
-            opKey: claimed.opKey,
-            cfg: params.cfg,
-            nowMs: params.nowMs,
-            detail: reason,
-          });
-          if (failed) {
-            wakeOp = failed;
+          const classified: DispatchSideEffectClass = result.ok
+            ? "started_or_unknown"
+            : classifyDispatchSideEffect(result);
+          dispatchSideEffectClass = classified;
+          if (classified === "not_started") {
+            const failed = await markWakeOpFailed({
+              authority: params.authority,
+              opKey: claimed.opKey,
+              cfg: params.cfg,
+              nowMs: params.nowMs,
+              detail: reason,
+            });
+            if (failed) {
+              wakeOp = failed;
+            }
+          } else {
+            // Tools/files/messages may have already run — protect; do not blind replay.
+            const unknown = await markWakeOpUnknown({
+              authority: params.authority,
+              opKey: claimed.opKey,
+              cfg: params.cfg,
+              nowMs: params.nowMs,
+              detail: `${reason}|side:${classified}`,
+            });
+            if (unknown) {
+              wakeOp = unknown;
+            }
           }
         }
       } catch (error) {
@@ -1893,6 +1918,7 @@ export async function consumeWakeForRoundDispatch(
       opKey: claimed.opKey,
       wakeOp,
       reused: false,
+      ...(dispatchSideEffectClass ? { sideEffectClass: dispatchSideEffectClass } : {}),
     };
   } finally {
     // Single-claim: release this op's taken lease so a later op can commit.

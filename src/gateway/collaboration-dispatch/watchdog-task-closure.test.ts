@@ -197,8 +197,9 @@ describe("watchdog task-closure — escalate stage binding", () => {
       escalateAfter: 2,
       escalateTo: ["coord"],
     });
-    expect(exhausted.action).toBe("skip");
+    expect(exhausted.action).toBe("human_todo");
     expect(exhausted.reason).toContain("escalate_failures_exhausted");
+    expect(exhausted.toAgentIds.length).toBeGreaterThan(0);
 
     const afterProgress = planHeartbeatActionForItem({
       item: item({
@@ -223,6 +224,105 @@ describe("watchdog task-closure — escalate stage binding", () => {
   });
 });
 
+describe("watchdog task-closure — nudge fail / human attention", () => {
+  it("nudge dispatch failures exhaust to human_todo when no escalate targets", () => {
+    const fp = progressFingerprint({
+      status: "in_progress",
+      claimantId: "bot-executor",
+      inProgressAt: 1,
+    });
+    const decision = planHeartbeatActionForItem({
+      item: item({
+        itemId: "i1",
+        groupId: "g1",
+        taskId: "t1",
+        status: "in_progress",
+        claimantId: "bot-executor",
+        publishedBy: "bot-publisher",
+        inProgressAt: 1,
+      }),
+      prior: {
+        consecutiveNoResponse: 1,
+        lastFingerprint: fp,
+        nudgeFailCount: 3,
+        lastNudgeAttemptAt: 1,
+      },
+      nowMs: 100_000,
+      escalateAfter: 2,
+      escalateTo: [],
+    });
+    expect(decision.action).toBe("human_todo");
+    expect(decision.reason).toContain("nudge_failures_exhausted");
+    expect(decision.toAgentIds).toContain("bot-publisher");
+  });
+
+  it("nudge fail backoff skips until window elapses", () => {
+    const fp = progressFingerprint({
+      status: "in_progress",
+      claimantId: "bot-executor",
+      inProgressAt: 1,
+    });
+    const decision = planHeartbeatActionForItem({
+      item: item({
+        itemId: "i1",
+        groupId: "g1",
+        taskId: "t1",
+        status: "in_progress",
+        claimantId: "bot-executor",
+        inProgressAt: 1,
+      }),
+      prior: {
+        consecutiveNoResponse: 1,
+        lastFingerprint: fp,
+        nudgeFailCount: 1,
+        lastNudgeAttemptAt: 90_000,
+      },
+      nowMs: 100_000,
+      escalateAfter: 2,
+      escalateTo: ["coord"],
+    });
+    expect(decision.action).toBe("skip");
+    expect(decision.reason).toContain("nudge_fail_backoff");
+  });
+
+  it("open humanAttention on fingerprint stays human_todo across scans", () => {
+    const fp = progressFingerprint({
+      status: "applied",
+      claimantId: "bot-executor",
+      appliedAt: 1,
+    });
+    const decision = planHeartbeatActionForItem({
+      item: item({
+        itemId: "i1",
+        groupId: "g1",
+        taskId: "t1",
+        status: "applied",
+        claimantId: "bot-executor",
+        publishedBy: "bot-publisher",
+        appliedAt: 1,
+      }),
+      prior: {
+        consecutiveNoResponse: 2,
+        lastFingerprint: fp,
+        humanAttention: {
+          status: "needs_human",
+          reason: "escalate_failures_exhausted:x",
+          ownerIds: ["bot-publisher", "coord"],
+          openedAt: 50,
+          recoveryHint: "inspect",
+          fingerprint: fp,
+          source: "escalate_failures_exhausted",
+        },
+      },
+      nowMs: 100,
+      escalateAfter: 2,
+      escalateTo: ["coord"],
+    });
+    expect(decision.action).toBe("human_todo");
+    expect(decision.toAgentIds).toEqual(["bot-publisher", "coord"]);
+  });
+});
+
 describe("watchdog task-closure — Mode B abort ≠ success receipt", () => {
   const leadBot = {
     agentId: "bot-2",
@@ -235,7 +335,7 @@ describe("watchdog task-closure — Mode B abort ≠ success receipt", () => {
     vi.mocked(executeCollaborationRound).mockReset();
   });
 
-  it("ROUND_ABORTED placeholder returns ok:false not_started (retryable failed path)", async () => {
+  it("ROUND_ABORTED empty/placeholder is started_or_unknown (no auto-replay)", async () => {
     vi.mocked(executeCollaborationRound).mockResolvedValue({
       roundId: "wake_abort_1",
       state: "ROUND_ABORTED",
@@ -246,6 +346,17 @@ describe("watchdog task-closure — Mode B abort ≠ success receipt", () => {
         visibleReply: false,
         source: "heuristic",
       },
+      dispatches: [
+        {
+          dispatchId: "d1",
+          agentId: "bot-2",
+          role: "primary",
+          attempt: 1,
+          status: "completed",
+          createdAt: 1,
+        },
+      ],
+      completedDispatchIds: ["d1"],
     } as never);
 
     const result = await executeModeBWakeRound({
@@ -268,7 +379,45 @@ describe("watchdog task-closure — Mode B abort ≠ success receipt", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toMatch(/^round_aborted:/);
-      expect(result.sideEffectClass).toBe("not_started");
+      // Tools may have run even with empty final text — must not claim not_started.
+      expect(result.sideEffectClass).toBe("started_or_unknown");
+    }
+  });
+
+  it("ROUND_ABORTED with no visible reply still started_or_unknown without proof of idle", async () => {
+    vi.mocked(executeCollaborationRound).mockResolvedValue({
+      roundId: "wake_abort_empty",
+      state: "ROUND_ABORTED",
+      abortReason: "fatal",
+      completion: {
+        responseStatus: "placeholder",
+        hasConclusion: false,
+        visibleReply: false,
+        source: "heuristic",
+      },
+      dispatches: [],
+      completedDispatchIds: [],
+    } as never);
+
+    const result = await executeModeBWakeRound({
+      request: {
+        groupId: "g1",
+        fromAgentId: "system",
+        toAgentIds: ["bot-2"],
+        source: "nudge",
+        reason: "test-abort-empty",
+      },
+      context: {
+        authority: { groupId: "g1" } as never,
+        facts: { bots: [leadBot] } as never,
+        sessionKey: "space:g1",
+        leadBot,
+        runBot: async () => ({ text: "" }),
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.sideEffectClass).toBe("started_or_unknown");
     }
   });
 
