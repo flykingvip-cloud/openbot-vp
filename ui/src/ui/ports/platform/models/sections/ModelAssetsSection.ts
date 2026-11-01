@@ -1656,7 +1656,7 @@ function renderDrawerActionSection(params: {
               type="button"
               data-testid="model-drawer-tenant-selectable"
               ?disabled=${!canManage || !controlsAvailable}
-              title=${controlsAvailable ? "写入准入租户可选（存档；干跑预览可见；不驱动线上会话选型）" : "租户可选准入尚未接入后端，当前不可操作"}
+              title=${controlsAvailable ? "写入准入租户可选（平台模型；影响真实执行；个人 BYOK 不在此范围）" : "租户可选准入尚未接入后端，当前不可操作"}
               @click=${() => {
                 if (!controlsAvailable) {
                   return;
@@ -1682,7 +1682,7 @@ function renderDrawerActionSection(params: {
               type="button"
               data-testid="model-drawer-auto-routing"
               ?disabled=${!canManage || !controlsAvailable}
-              title=${controlsAvailable ? "写入准入自动路由资格（存档；干跑预览可见；不驱动线上会话选型）" : "自动路由准入尚未接入后端，当前不可操作"}
+              title=${controlsAvailable ? "写入准入自动路由资格（平台模型；暂停或未验证会从真实执行中排除；个人 BYOK 不在此范围）" : "自动路由准入尚未接入后端，当前不可操作"}
               @click=${() => {
                 if (!controlsAvailable) {
                   return;

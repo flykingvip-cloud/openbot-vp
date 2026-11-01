@@ -3,6 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { loadConfig } from "../../config/config.js";
+import { assertExecutorModelAdmitted } from "../../gateway/models/capability-admission/apply-runtime-admission.js";
 import { resolveUserPath } from "../../utils.js";
 import { loadWebMedia } from "../../web/media.js";
 import { resolveApiKeyForProvider } from "../model-auth.js";
@@ -89,6 +90,12 @@ export function createStepfunImageTool(options?: {
           : imageInput?.trim()
             ? "edit"
             : "generate";
+
+      await assertExecutorModelAdmitted({
+        modelRef: `${endpoint.provider}/${endpoint.model}`,
+        outputType: "image",
+        taskText: prompt,
+      });
 
       const auth = await resolveApiKeyForProvider({
         provider: endpoint.provider,

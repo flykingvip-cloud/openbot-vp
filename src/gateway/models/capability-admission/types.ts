@@ -119,18 +119,28 @@ export type RoutingPreviewRequest = {
   minContextWindow?: number;
 };
 
+export type RoutingExclusionCode =
+  | "no_admission_record"
+  | "auto_routing_disabled"
+  | "auto_routing_restricted"
+  | "category_not_admitted"
+  | "capability_unverified"
+  | "capability_failed"
+  | "checker_unavailable"
+  | "verification_expired"
+  | "evidence_fingerprint_mismatch"
+  | "admission_store_unreadable"
+  | "no_permission"
+  | "context_insufficient"
+  | "health"
+  | "budget"
+  | "transient_rate_limit"
+  | "other";
+
 export type RoutingPreviewExclusion = {
   modelId: string;
   reason: string;
-  code:
-    | "capability_unverified"
-    | "auto_routing_disabled"
-    | "no_permission"
-    | "context_insufficient"
-    | "verification_expired"
-    | "health"
-    | "budget"
-    | "other";
+  code: RoutingExclusionCode;
 };
 
 export type RoutingDecisionPreview = {
@@ -151,4 +161,10 @@ export type RoutingDecisionPreview = {
   requiredCapabilities: CanonicalCapabilityId[];
   budget?: "low" | "medium" | "high";
   outputType?: "text" | "image" | "music" | "audio";
+  /** Where the task category came from. Shared with the live decision. */
+  taskCategorySource?: "output_type" | "task_text" | "profile_fallback" | "default";
+  /** Live and preview both leave this false: this module does not turn on AOR. */
+  aorInvoked?: false;
+  nativeMidjourneyClaimed?: false;
+  officialSunoCertified?: false;
 };

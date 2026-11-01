@@ -426,6 +426,9 @@ export function createFollowupRunner(params: {
             ...(executionRouting.preferredModelOrder
               ? { preferredModelOrder: executionRouting.preferredModelOrder }
               : {}),
+            runtimeAdmission: {
+              taskText: queued.prompt,
+            },
             runId,
             agentDir: queued.run.agentDir,
             fallbacksOverride: resolveRunModelFallbacksOverride({

@@ -1,6 +1,13 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import type { OpenBotConfig } from "../../config/config.js";
+import {
+  __setCapabilityAdmissionStorePathForTest,
+  upsertModelAdmission,
+} from "../../gateway/models/capability-admission/store.js";
 import {
   STEPFUN_IMAGE_MODEL_ID,
   normalizeStepfunImageSize,
@@ -185,6 +192,7 @@ describe("createStepfunImageTool", () => {
   });
 
   afterEach(() => {
+    __setCapabilityAdmissionStorePathForTest(undefined);
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -355,5 +363,35 @@ describe("createStepfunImageTool", () => {
       expect(textBlock.text).toMatch(/^MEDIA:/);
       expect(textBlock.text).toContain("relativePath: .openbot/generated-images/");
     }
+  });
+
+  it("does not call Stepfun when the platform image model is paused", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-stepfun-admit-"));
+    const storePath = path.join(dir, "admission.json");
+    __setCapabilityAdmissionStorePathForTest(storePath);
+    await upsertModelAdmission(
+      `阶跃星辰/${STEPFUN_IMAGE_MODEL_ID}`,
+      { autoRouting: "paused", autoRoutingReason: "管理员暂停" },
+      storePath,
+    );
+    const fetchMock = vi.fn(async () => {
+      throw new Error("generation must not be called");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const generate = vi.spyOn(
+      await import("./stepfun-image-tool.helpers.js"),
+      "callStepfunImageGeneration",
+    );
+    const edit = vi.spyOn(await import("./stepfun-image-tool.helpers.js"), "callStepfunImageEdit");
+    const { createStepfunImageTool } = await import("./stepfun-image-tool.js");
+    const tool = createStepfunImageTool({ config: baseCfg, workspaceDir: dir });
+    await expect(tool!.execute("call-paused", { prompt: "海报" })).rejects.toMatchObject({
+      code: "PLATFORM_ADMISSION_EMPTY",
+    });
+    expect(generate).not.toHaveBeenCalled();
+    expect(edit).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    generate.mockRestore();
+    edit.mockRestore();
   });
 });

@@ -96,6 +96,17 @@ export async function listModelAdmissions(storePath?: string): Promise<ModelAdmi
   return Object.values(store.admissions).toSorted((a, b) => a.modelRef.localeCompare(b.modelRef));
 }
 
+/**
+ * Stored admission rows only. Missing keys are omitted — callers must not
+ * treat a synthesized default as a verified record.
+ */
+export async function readStoredModelAdmissions(
+  storePath?: string,
+): Promise<Record<string, ModelAdmissionRecord>> {
+  const store = await loadStore(storePath);
+  return { ...store.admissions };
+}
+
 export async function upsertModelAdmission(
   modelRef: string,
   patch: Partial<Omit<ModelAdmissionRecord, "modelRef">>,

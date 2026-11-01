@@ -1141,6 +1141,9 @@ export async function runCronIsolatedAgentTurn(params: {
           ...(executionRouting.preferredModelOrder
             ? { preferredModelOrder: executionRouting.preferredModelOrder }
             : {}),
+          runtimeAdmission: {
+            taskText: promptText,
+          },
           runId: cronSession.sessionEntry.sessionId,
           agentDir,
           fallbacksOverride:

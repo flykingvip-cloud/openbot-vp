@@ -1,9 +1,8 @@
 /**
- * Task routing decision preview.
- * Local path is UI demo dry-run. Gateway RPC path (via routing-decision-service)
- * produces the same shape with uiDemo=false / backendStatus=wired.
- * Neither path is live agent/chat model selection.
- * Default does NOT call generation models.
+ * Local UI demo for routing preview.
+ * The live decision and the wired preview both come from the gateway.
+ * This module does not call generation models. Demo results must stay labeled
+ * as 界面演示，非后端决策.
  */
 
 import { verifiedCapabilityIds } from "./capability-evidence.ts";
@@ -150,8 +149,11 @@ function detectTaskCategory(req: RoutingPreviewRequest): string {
   }
 
   // Priority 3: strategy profile only when task text cannot be recognized.
-  // Still constrained by outputType (text vs modality profiles).
-  return constrainProfileFallback(req.taskProfileId, req.outputType);
+  // Non-empty plain text must not be rewritten into image/music by a profile.
+  const profileConstraint = (req.taskText ?? "").trim()
+    ? (req.outputType ?? "text")
+    : req.outputType;
+  return constrainProfileFallback(req.taskProfileId, profileConstraint);
 }
 
 /** Exported for unit tests of Chinese / mixed classification. */

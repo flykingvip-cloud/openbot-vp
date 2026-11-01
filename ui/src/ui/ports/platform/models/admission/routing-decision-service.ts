@@ -1,8 +1,8 @@
 /**
  * Routing decision preview service.
- * When gateway admission RPC is bound, previews go through models.admission.previewRoutingDecision.
- * Otherwise falls back to UI dry-run demo (honestly labeled not_wired).
- * Never calls generation models. Neither path drives live agent/chat model selection.
+ * When gateway admission RPC is bound, previews use the same decision core as live execution.
+ * Otherwise falls back to a UI dry-run demo, labeled as a demo.
+ * Preview never calls generation models and never records execution success.
  */
 
 import {
@@ -30,8 +30,8 @@ export type RoutingDecisionServiceResult = Omit<
 };
 
 const DEMO_BANNER =
-  "界面演示，非后端决策 · 尚未接入后端决策接口 · 干跑不调用生成模型 · 不驱动线上会话选型";
-const WIRED_BANNER = "后端准入干跑预览 · 不调用生成模型 · 不驱动线上会话选型";
+  "界面演示，非后端决策 · 尚未接入后端决策接口 · 干跑不调用生成模型 · 不是运行时准入结果";
+const WIRED_BANNER = "后端准入干跑预览 · 与运行时同一决策核心 · 不调用生成模型 · 不记执行成功";
 
 export function getRoutingDecisionBackendStatus(): RoutingDecisionBackendStatus {
   return isCapabilityAdmissionRpcActive() ? "wired" : "not_wired";
@@ -65,7 +65,7 @@ export async function previewRoutingDecisionViaService(params: {
           banner: WIRED_BANNER,
           decisionReason: preview.decisionReason.includes("后端")
             ? preview.decisionReason
-            : `${preview.decisionReason}（后端准入干跑预览；不驱动线上会话选型）`,
+            : `${preview.decisionReason}（后端准入干跑预览；与运行时同一决策核心；不调用生成、不记执行成功）`,
         };
       } catch (err) {
         const preview = previewRoutingDecision(params);

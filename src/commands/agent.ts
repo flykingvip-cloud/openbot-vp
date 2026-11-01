@@ -1479,6 +1479,9 @@ async function agentCommandInternal(
         runId,
         agentDir,
         fallbacksOverride: effectiveFallbacksOverride,
+        runtimeAdmission: {
+          taskText: opts.message ?? "",
+        },
         // legacy when the gate skipped (no enterprise scope); otherwise
         // OPENBOT_GOVERNANCE_AGENT_COMMAND_MODEL_MODE (default shadow: record only).
         ...commandModelGovernance,

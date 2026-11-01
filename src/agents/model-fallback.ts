@@ -5,6 +5,11 @@ import {
 } from "../config/model-input.js";
 import { isEnterpriseRuntimeModelId } from "../gateway/enterprise-model/ids.js";
 import type { GovernanceMode } from "../gateway/governance/decision.js";
+import {
+  filterModelCandidatesByPlatformAdmission,
+  PlatformAdmissionEmptyError,
+  type RuntimeAdmissionInput,
+} from "../gateway/models/capability-admission/apply-runtime-admission.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { sanitizeForLog } from "../terminal/ansi.js";
 import {
@@ -806,6 +811,12 @@ export async function runWithModelFallback<T>(params: {
   absentAllowlistReason?: string;
   /** Correlation fields for the model-entitlement envelope (ids only, no credentials). */
   governanceContext?: ModelGovernanceContext;
+  /**
+   * Platform capability admission. Omitted fields still consult the catalog and
+   * admission store. Personal / enterprise BYOK ids are not platform-scoped.
+   * Excluded platform models are removed before any run, including pin and fallback.
+   */
+  runtimeAdmission?: RuntimeAdmissionInput;
   run: ModelFallbackRunFn<T>;
   onError?: ModelFallbackErrorHandler;
 }): Promise<ModelFallbackRunResult<T>> {
@@ -876,6 +887,16 @@ export async function runWithModelFallback<T>(params: {
     if (requestedIdx > 0) {
       const [requested] = candidates.splice(requestedIdx, 1);
       candidates.unshift(requested);
+    }
+  }
+  const admission = await filterModelCandidatesByPlatformAdmission({
+    candidates,
+    runtime: params.runtimeAdmission,
+  });
+  if (admission.engaged && admission.decision) {
+    candidates = admission.candidates;
+    if (candidates.length === 0) {
+      throw new PlatformAdmissionEmptyError(admission.decision);
     }
   }
   const authStore = params.cfg
@@ -1146,6 +1167,8 @@ export async function runWithImageModelFallback<T>(params: {
   governanceMode?: GovernanceMode;
   governanceContext?: ModelGovernanceContext;
   runId?: string;
+  /** Same platform admission input as text fallback. Role stays orchestrator. */
+  runtimeAdmission?: RuntimeAdmissionInput;
   run: (provider: string, model: string) => Promise<T>;
   onError?: ModelFallbackErrorHandler;
 }): Promise<ModelFallbackRunResult<T>> {
@@ -1179,6 +1202,16 @@ export async function runWithImageModelFallback<T>(params: {
       if (candidates.length === 0) {
         throw new ModelEntitlementEmptyError();
       }
+    }
+  }
+  const imageAdmission = await filterModelCandidatesByPlatformAdmission({
+    candidates,
+    runtime: params.runtimeAdmission,
+  });
+  if (imageAdmission.engaged && imageAdmission.decision) {
+    candidates = imageAdmission.candidates;
+    if (candidates.length === 0) {
+      throw new PlatformAdmissionEmptyError(imageAdmission.decision);
     }
   }
 
