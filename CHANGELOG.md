@@ -293,6 +293,7 @@ Docs: https://docs.openbot.love
 - Integrations/device digital-human: a media pull that finishes after cancel, revoke, rebind, or tool timeout no longer completes the run; an accepted tool result retries with the same Idempotency-Key instead of `LATE_RESULT`; oversized pulls are cancelled at the byte cap; truncated PNG containers are rejected.
 - Integrations/device digital-human: a grant runs the gateway agent named on that digital human (`gatewayAgentId`) and a session key of `device-dh:<digitalHumanId>:<conversationId>`. A missing mapping fails the run. `OPENBOT_DEVICE_DH_AGENT_ID` and `OPENBOT_DEVICE_DH_AGENT_SESSION_KEY` apply only with their debug/force flags. Cancel aborts the in-flight completions request. Turn accept stores the run and idempotency key, then returns `202` before the gateway call finishes.
 - Integrations/device platform: add, rebind, and revoke register the user grant on the loopback integrations stub when consent and service Basic env names are set. Device-control can `GET /grants/{authorizationRef}` on that origin with the exchange credential. Rebind and revoke show up on that GET. A stub rejection does not leave a management-only grant.
+- Collaboration: the group operating summary no longer treats another task's deliverable as the current formal result. When the active task has no matching deliverable, the summary says 当前任务无正式成果. A chat message that only says 完成 does not accept a board submission. Activate still reports dispatched false until the dispatcher accepts a wake.
 
 ## 2026.3.8
 

@@ -608,6 +608,9 @@ export function buildProfileMemberSnapshot(members: CollaborationMember[]) {
   return { humans, bots };
 }
 
+/** Shown when the active task has no deliverable whose taskId matches it. */
+export const CURRENT_TASK_NO_FORMAL_DELIVERABLE = "当前任务无正式成果";
+
 export function summarizeActiveContext(params: {
   phase: GatewayCollaborationOperatingPhase;
   currentMission?: string | null;
@@ -615,30 +618,110 @@ export function summarizeActiveContext(params: {
   reviewId?: string | null;
   decisionId?: string | null;
   deliverableId?: string | null;
+  /** Current task exists, but no formal deliverable is bound to it. */
+  noFormalDeliverableForCurrentTask?: boolean;
 }) {
   const parts = normalizeStringList([
     params.currentMission ? `使命：${params.currentMission}` : "",
     params.taskId ? `任务：${params.taskId}` : "",
     params.reviewId ? `评审：${params.reviewId}` : "",
     params.decisionId ? `决策：${params.decisionId}` : "",
-    params.deliverableId ? `产出：${params.deliverableId}` : "",
+    params.noFormalDeliverableForCurrentTask
+      ? CURRENT_TASK_NO_FORMAL_DELIVERABLE
+      : params.deliverableId
+        ? `产出：${params.deliverableId}`
+        : "",
     `阶段：${params.phase}`,
   ]);
   return parts.join("；");
 }
 
-export function selectActiveTask(tasks: Task[]) {
-  return [...tasks]
-    .filter((task) => ["ready", "in_progress", "blocked", "review"].includes(task.status))
-    .toSorted((left, right) => (right.updatedAtMs ?? 0) - (left.updatedAtMs ?? 0))[0];
+const ACTIVE_TASK_STATUSES = new Set(["ready", "in_progress", "blocked", "review"]);
+
+/**
+ * Prefer system task authority (existing OS currentTaskId / activated task) when
+ * that task is still active. Update-time alone must not let an old task steal
+ * the current binding.
+ */
+export function selectActiveTask(tasks: Task[], preferredTaskId?: string | null): Task | undefined {
+  const active = [...tasks].filter((task) => ACTIVE_TASK_STATUSES.has(task.status));
+  const preferred = preferredTaskId?.trim() ?? "";
+  if (preferred) {
+    const bound = active.find((task) => task.taskId === preferred);
+    if (bound) {
+      return bound;
+    }
+  }
+  return active.toSorted((left, right) => (right.updatedAtMs ?? 0) - (left.updatedAtMs ?? 0))[0];
 }
+
+const ACTIVE_DELIVERABLE_STATUSES = new Set(["draft", "submitted", "in_review", "approved"]);
 
 export function selectActiveDeliverable(deliverables: Deliverable[]) {
   return [...deliverables]
-    .filter((deliverable) =>
-      ["draft", "submitted", "in_review", "approved"].includes(deliverable.status),
-    )
+    .filter((deliverable) => ACTIVE_DELIVERABLE_STATUSES.has(deliverable.status))
     .toSorted((left, right) => (right.updatedAtMs ?? 0) - (left.updatedAtMs ?? 0))[0];
+}
+
+/**
+ * Formal deliverable for the current task only.
+ * A newer deliverable bound to another task (or with no taskId) is not reused.
+ * No current task → undefined (caller may keep the unscoped picker).
+ */
+export function selectDeliverableForCurrentTask(
+  deliverables: readonly Deliverable[],
+  currentTaskId: string | null | undefined,
+): Deliverable | undefined {
+  const taskId = currentTaskId?.trim() ?? "";
+  if (!taskId) {
+    return undefined;
+  }
+  return [...deliverables]
+    .filter((deliverable) => ACTIVE_DELIVERABLE_STATUSES.has(deliverable.status))
+    .filter((deliverable) => (deliverable.taskId ?? "").trim() === taskId)
+    .toSorted((left, right) => (right.updatedAtMs ?? 0) - (left.updatedAtMs ?? 0))[0];
+}
+
+/**
+ * OS deliverable binding used by syncGroupOperatingState.
+ * When an active task exists, currentDeliverableId must share that taskId.
+ * Mismatch → no id, and the phase is not driven by the foreign deliverable.
+ */
+export function projectOperatingDeliverableBinding(params: {
+  tasks: readonly Task[];
+  deliverables: readonly Deliverable[];
+  decision?: Decision;
+  review?: Review;
+  /** Existing OS / activated task authority when still active. */
+  preferredTaskId?: string | null;
+}): {
+  task: Task | undefined;
+  deliverable: Deliverable | undefined;
+  currentDeliverableId: string | null;
+  phase: GatewayCollaborationOperatingPhase;
+  noFormalDeliverable: boolean;
+  /** True when there is no active task; historical rows must not pose as current. */
+  historicalOnly: boolean;
+} {
+  const task = selectActiveTask([...params.tasks], params.preferredTaskId);
+  const taskId = task?.taskId?.trim() ?? "";
+  // No active task → do not promote a historical deliverable into currentDeliverableId.
+  const deliverable = taskId
+    ? selectDeliverableForCurrentTask(params.deliverables, taskId)
+    : undefined;
+  const phase = deriveOperatingPhase({
+    decision: params.decision,
+    review: params.review,
+    deliverable,
+  });
+  return {
+    task,
+    deliverable,
+    currentDeliverableId: deliverable?.deliverableId ?? null,
+    phase,
+    noFormalDeliverable: Boolean(taskId) && !deliverable,
+    historicalOnly: !taskId,
+  };
 }
 
 export function selectActiveReview(reviews: Review[]) {
@@ -1215,11 +1298,21 @@ export async function syncGroupOperatingState(params: {
     normalizeValue(profile?.groupCode) ??
     normalizeValue(params.titleFallback) ??
     params.groupId;
-  const task = selectActiveTask(tasks);
-  const deliverable = selectActiveDeliverable(deliverables);
   const review = selectActiveReview(reviews);
   const decision = selectActiveDecision(decisions);
-  const phase = deriveOperatingPhase({ decision, review, deliverable });
+  // Bind the formal deliverable to system task authority (existing OS
+  // currentTaskId when still active). A newer row / old-task update must not
+  // steal the current binding or pose as the active deliverable.
+  const deliverableBinding = projectOperatingDeliverableBinding({
+    tasks,
+    deliverables,
+    decision,
+    review,
+    preferredTaskId: existingState?.activeContext?.currentTaskId ?? null,
+  });
+  const task = deliverableBinding.task;
+  const deliverable = deliverableBinding.deliverable;
+  const phase = deliverableBinding.phase;
   const bootstrapMemory = memories.find(
     (entry) =>
       entry &&
@@ -1287,7 +1380,7 @@ export async function syncGroupOperatingState(params: {
       currentTaskId: task?.taskId ?? null,
       currentReviewId: review?.reviewId ?? null,
       currentDecisionId: decision?.decisionId ?? null,
-      currentDeliverableId: deliverable?.deliverableId ?? null,
+      currentDeliverableId: deliverableBinding.currentDeliverableId,
       waitingForHuman: phase !== "explore",
       summary: summarizeActiveContext({
         phase,
@@ -1295,7 +1388,8 @@ export async function syncGroupOperatingState(params: {
         taskId: task?.taskId ?? null,
         reviewId: review?.reviewId ?? null,
         decisionId: decision?.decisionId ?? null,
-        deliverableId: deliverable?.deliverableId ?? null,
+        deliverableId: deliverableBinding.currentDeliverableId,
+        noFormalDeliverableForCurrentTask: deliverableBinding.noFormalDeliverable,
       }),
       updatedAtMs: activeContextUpdatedAt || Date.now(),
     },
