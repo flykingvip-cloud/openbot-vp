@@ -10415,6 +10415,38 @@ tasks:
     since: 2026-11-01
     metadata: {}
 landingStreams:
+  - id: usage-cost-layers-20261101
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/shared/usage-cost-layer.ts
+      - src/gateway/billing/usage-cost-layer.ts
+      - src/gateway/billing/usage-cost-layer.test.ts
+      - src/gateway/billing/usage-cost-facts.ts
+      - src/gateway/billing/credit-usage-stage-store.ts
+      - src/gateway/server-methods/usage-cost-layer.ts
+      - src/gateway/server-methods/usage-cost-layer.test.ts
+      - src/gateway/server-methods/billing.ts
+      - src/gateway/server-methods/billing.test.ts
+      - src/gateway/server-methods.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - ui/src/ui/views/usage-cost/usage-cost-client.ts
+      - ui/src/ui/views/usage-cost/usage-cost-panel.ts
+      - ui/src/ui/views/usage-cost/usage-cost-panel.node.test.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/ports/employee/views/group-profile-governance.ts
+      - ui/src/ui/ports/employee/views/workbench-stage.ts
+      - ui/src/ui/ports/employee/views/workbench-types.ts
+      - ui/src/ui/ports/employee/views/workbench.ts
+      - ui/src/ui/ports/platform/pricing/economics-section.ts
+      - ui/src/ui/views/cost-budget-v2/pages/overview-page.ts
+    canLandWith: []
+    metadata:
+      task: usage-cost-layers
+      owner: cursor-cloud
+      purpose: One usage and cost projection for user, enterprise, and platform.
   - id: askOutcome-executor-closeout
     landingPolicy: serial
     paths:

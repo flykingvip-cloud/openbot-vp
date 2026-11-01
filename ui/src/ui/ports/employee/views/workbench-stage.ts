@@ -5,6 +5,7 @@ import { sessionKeysShareChatSurface } from "../../../chat-session-key-match.ts"
 import { icons } from "../../../icons.ts";
 import { renderRobotCapabilityTab } from "../../../views/robot-capability-tab.ts";
 import { renderSaveSkillModal } from "../../../views/save-skill-modal.ts";
+import type { UsageCostClient } from "../../../views/usage-cost/usage-cost-client.ts";
 import { renderGroupProfileStageView } from "./group-profile-governance.ts";
 import type { EmployeeWorkbenchSurfaceRuntime } from "./home-page-contracts.ts";
 import { renderGrowthBadge } from "./workbench-growth-badge.ts";
@@ -286,6 +287,8 @@ export function renderWorkbenchStage(
                 onDecisionRationaleDraftChange: props.onDecisionRationaleDraftChange ?? null,
                 onSaveDecisionDraft: props.onSaveDecisionDraft ?? null,
                 onTransitionGovernanceObject: props.onTransitionGovernanceObject ?? null,
+                usageClient: props.client as UsageCostClient | null,
+                onUsageRerender: props.requestUpdate ?? null,
               })
             : renderCollaborationStagePage(
                 conversationContract,

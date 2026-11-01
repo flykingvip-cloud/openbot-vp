@@ -236,6 +236,7 @@ export function renderWorkbench(
     activeGrowthStatus: props.activeGrowthStatus ?? null,
     connected: props.connected,
     client: props.client ?? null,
+    requestUpdate: props.requestUpdate,
     settingsView: props.settingsView ?? "system",
     personalSettingsTab: props.personalSettingsTab ?? "account",
     systemSettingsTab: props.systemSettingsTab ?? DEFAULT_WORKBENCH_SYSTEM_SETTINGS_TAB,

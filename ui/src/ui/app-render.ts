@@ -1078,6 +1078,8 @@ export function renderApp(state: AppViewState) {
     );
     return {
       sessionKey: chatSessionKey,
+      usageClient: state.client,
+      usageRerender: () => state.requestUpdate(),
       onSessionKeyChange: (next: string) => {
         switchShellChatSession(state, next, {
           clearAttachments: true,
@@ -2694,6 +2696,7 @@ export function renderApp(state: AppViewState) {
             chatComposer: null,
             authPanel: workbenchAuthPanel,
           }),
+          requestUpdate: () => state.requestUpdate(),
           bundledBrandLogoSrc: bundledBrandWordmarkSrc,
           computerFullscreen:
             state.sidebarOpen &&

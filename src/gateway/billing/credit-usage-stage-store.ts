@@ -96,6 +96,19 @@ export function stageAtLeast(current: CreditUsageStage, target: CreditUsageStage
   return stageIndex(current) >= stageIndex(target);
 }
 
+export async function listCreditUsageStages(
+  enterpriseId: string | null,
+  storePath?: string,
+): Promise<CreditUsageStageRecord[]> {
+  const store = await loadStore(storePath);
+  const rows = Object.values(store.byKey);
+  if (!enterpriseId) {
+    return rows;
+  }
+  const ent = tenant(enterpriseId);
+  return rows.filter((row) => tenant(row.enterpriseId) === ent);
+}
+
 export async function getCreditUsageStage(
   enterpriseId: string,
   taskId: string,

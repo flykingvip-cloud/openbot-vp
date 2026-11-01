@@ -144,6 +144,8 @@ import {
 } from "./chat-context-scope.ts";
 import { renderMarkdownSidebar } from "./markdown-sidebar.ts";
 import { renderSecureFormThreadCards } from "./secure-form-card.ts";
+import type { UsageCostClient } from "./usage-cost/usage-cost-client.ts";
+import { renderUsageCostDisclosure } from "./usage-cost/usage-cost-panel.ts";
 import "../components/resizable-divider.ts";
 
 export type CompactionIndicatorStatus = {
@@ -212,6 +214,9 @@ export type ChatProps = {
   onQuoteDraftChange?: (next: ChatQuoteDraft | null) => void;
   queue: ChatQueueItem[];
   connected: boolean;
+  /** 任务卡片上的用量查询。缺省时不发请求。 */
+  usageClient?: UsageCostClient | null;
+  usageRerender?: (() => void) | null;
   canSend: boolean;
   disabledReason: string | null;
   /** Transport phase. Auth/pairing stays off this and keeps disabledReason as today. */
@@ -3124,6 +3129,12 @@ function renderTaskCard(task: TaskCard, props: ChatProps) {
             `
           : nothing
       }
+      ${renderUsageCostDisclosure({
+        surface: "user",
+        taskId: task.id,
+        client: props.usageClient,
+        rerender: props.usageRerender,
+      })}
     </section>
   `;
 }

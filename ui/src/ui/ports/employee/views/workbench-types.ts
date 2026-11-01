@@ -772,6 +772,7 @@ export type WorkbenchStageProps = {
   activeGrowthStatus?: GrowthStatusView | null;
   connected?: boolean;
   client?: GatewayBrowserClient | null;
+  requestUpdate?: () => void;
   currentLocale?: Locale;
   currentTheme?: ThemeMode;
   userProfileName?: string;
@@ -1199,6 +1200,7 @@ export type WorkbenchProps = Partial<WorkbenchDaibaiStageCapabilityContract> & {
   growthStatusBySelectionKey?: Record<string, GrowthStatusView>;
   connected: boolean;
   client?: GatewayBrowserClient | null;
+  requestUpdate?: () => void;
   currentLocale: Locale;
   currentTheme: ThemeMode;
   userProfileName: string;

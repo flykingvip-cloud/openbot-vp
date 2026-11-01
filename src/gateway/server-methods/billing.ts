@@ -13,6 +13,7 @@
  */
 
 import { loadConfig } from "../../config/config.js";
+import { omitCommercialCostKeys } from "../../shared/usage-cost-layer.js";
 import {
   ContractEndedError,
   CycleNotEndedError,
@@ -332,12 +333,47 @@ export const billingHandlers: GatewayRequestHandlers = {
         const stale = replay.truncated || replay.timedOutEvents > 0;
         if (!cost) {
           // 无生效订阅：空态（R15.3 / R7.5）。
-          safeRespond(true, {
-            subscribed: false,
-            accruedCents: 0,
-            seatCostCents: 0,
-            usageCostCents: 0,
-            extraCostCents: 0,
+          safeRespond(
+            true,
+            omitCommercialCostKeys({
+              subscribed: false,
+              accruedCents: 0,
+              seatCostCents: 0,
+              usageCostCents: 0,
+              extraCostCents: 0,
+              predictedCents: status.predictedCents,
+              budgetStatus: status,
+              billingMode,
+              creditsStatus,
+              economics,
+              commercialGovernanceStatus,
+              aiGovernance,
+              overAllocation,
+              consumptionForecast,
+              creditsReconciliation,
+              knowledgeGovernanceCredits,
+              commercialRuntimeDrift,
+              snapshotType: "estimated",
+              computedAt,
+              stale,
+              tenantCapabilities,
+            }),
+          );
+          return;
+        }
+        safeRespond(
+          true,
+          omitCommercialCostKeys({
+            subscribed: true,
+            planView: cost.plan,
+            cycleStart: cost.cycleStart,
+            cycleEnd: cost.cycleEnd,
+            accruedCents:
+              billingMode === "enterprise_budget" ? status.accruedCents : cost.bill.totalCostCents,
+            seatCostCents: cost.bill.seatCostCents,
+            usageCostCents: cost.bill.usageCostCents,
+            extraCostCents: cost.bill.extraCostCents,
+            missingPriceKeys: cost.snapshot.missingPriceKeys,
             predictedCents: status.predictedCents,
             budgetStatus: status,
             billingMode,
@@ -354,37 +390,8 @@ export const billingHandlers: GatewayRequestHandlers = {
             computedAt,
             stale,
             tenantCapabilities,
-          });
-          return;
-        }
-        safeRespond(true, {
-          subscribed: true,
-          planView: cost.plan,
-          cycleStart: cost.cycleStart,
-          cycleEnd: cost.cycleEnd,
-          accruedCents:
-            billingMode === "enterprise_budget" ? status.accruedCents : cost.bill.totalCostCents,
-          seatCostCents: cost.bill.seatCostCents,
-          usageCostCents: cost.bill.usageCostCents,
-          extraCostCents: cost.bill.extraCostCents,
-          missingPriceKeys: cost.snapshot.missingPriceKeys,
-          predictedCents: status.predictedCents,
-          budgetStatus: status,
-          billingMode,
-          creditsStatus,
-          economics,
-          commercialGovernanceStatus,
-          aiGovernance,
-          overAllocation,
-          consumptionForecast,
-          creditsReconciliation,
-          knowledgeGovernanceCredits,
-          commercialRuntimeDrift,
-          snapshotType: "estimated",
-          computedAt,
-          stale,
-          tenantCapabilities,
-        });
+          }),
+        );
       } catch (err) {
         respondUnavailable(safeRespond, err);
       }

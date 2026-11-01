@@ -839,6 +839,8 @@ describe("dashboard + settle + 闸口", () => {
     expect(res.payload.consumptionForecast).toBeDefined();
     expect(res.payload.creditsReconciliation).toBeDefined();
     expect(res.payload.stale).toBe(false);
+    expect(JSON.stringify(res.payload)).not.toContain("providerCostCents");
+    expect(JSON.stringify(res.payload)).not.toContain("marginCents");
   });
 
   it("returns a payload marked stale when replay is truncated instead of waiting forever", async () => {
