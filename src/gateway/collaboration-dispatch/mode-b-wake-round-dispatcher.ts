@@ -13,6 +13,7 @@ import { resolveProductionCollaborationExecutor } from "./legacy-production-exec
 import { normalizeAgentIdentifier } from "./mention-utils.js";
 import { executeCollaborationRound } from "./round-runtime.js";
 import type { BeatExecutionInput, RuntimeAuthority, RuntimeFacts } from "./runtime-authority.js";
+import { sanitizeDispatchError } from "./sanitize-dispatch-error.js";
 import type { CollaborationBotTarget, ParticipationDecision } from "./types.js";
 import type {
   WakeRoundDispatcher,
@@ -164,6 +165,35 @@ export async function executeModeBWakeRound(params: {
       isAborted: () => false,
     });
     const settledId = compact(round.roundId) || roundId;
+    // Dispatch-accepted ≠ round-succeeded ≠ task-done. ROUND_ABORTED / empty
+    // completion must not be receipted as completed_with_receipt.
+    if (round.state === "ROUND_ABORTED") {
+      const completion = round.completion;
+      const noVisible =
+        !completion?.visibleReply ||
+        completion.responseStatus === "placeholder" ||
+        completion.responseStatus === "failed" ||
+        completion.responseStatus === "aborted";
+      const abortDetail =
+        compact(round.abortReason) || (noVisible ? "no_visible_reply" : "aborted");
+      // Once executeCollaborationRound returned an aborted round, we lack proof that
+      // tools/files/messages never ran — empty final text ≠ not_started. Only
+      // pre-invoke Mode B failures (context/lead) may claim not_started.
+      return {
+        ok: false,
+        reason: `round_aborted:${abortDetail}`,
+        message: `Mode B round aborted (${abortDetail})`,
+        sideEffectClass: "started_or_unknown",
+      };
+    }
+    if (round.state !== "ROUND_COMPLETE") {
+      return {
+        ok: false,
+        reason: `round_not_complete:${compact(round.state) || "unknown"}`,
+        message: `Mode B round ended in ${compact(round.state) || "unknown"}`,
+        sideEffectClass: "started_or_unknown",
+      };
+    }
     return {
       ok: true,
       roundId: settledId,
@@ -171,12 +201,12 @@ export async function executeModeBWakeRound(params: {
       sideEffectClass: "completed_with_receipt",
     };
   } catch (error) {
-    const messageText = error instanceof Error ? error.message : String(error);
+    const safe = sanitizeDispatchError(error, 240);
     // Exception may occur AFTER model/tools/formal write started — not "no side effects".
     return {
       ok: false,
       reason: "execute_collaboration_round_failed",
-      message: messageText.slice(0, 240),
+      message: safe.message,
       sideEffectClass: "started_or_unknown",
     };
   }

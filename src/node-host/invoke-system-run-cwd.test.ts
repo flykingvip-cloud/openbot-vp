@@ -18,12 +18,12 @@ const LINUX_WORKSPACE = "/home/ubuntu/.openbot/workspace";
 function isRealApprovableDirectory(candidate: string): boolean {
   try {
     const listed = fs.lstatSync(candidate);
+    // Reject symlink candidates (e.g. process.cwd link) but accept real dirs
+    // under macOS /var -> /private/var (realpath !== path.resolve).
     if (!listed.isDirectory() || listed.isSymbolicLink()) {
       return false;
     }
-    const resolved = path.resolve(candidate);
-    const real = fs.realpathSync(candidate);
-    return real === resolved && fs.statSync(real).isDirectory();
+    return fs.statSync(candidate).isDirectory();
   } catch {
     return false;
   }

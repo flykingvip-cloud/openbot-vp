@@ -108,10 +108,14 @@ describe("resolveCronDeliveryBestEffort", () => {
 
   it("returns true for isolated jobs with inferred workbench surfaces", async () => {
     const { resolveCronDeliveryBestEffort } = await import("./delivery-dispatch.js");
+    const description = `任务\n<!--openbot-task-meta:${encodeURIComponent(
+      JSON.stringify({ notify: { inApp: true, wecom: false } }),
+    )}-->`;
     const job = {
       sessionTarget: "isolated",
       agentId: "bot-1",
-      delivery: {},
+      description,
+      delivery: { mode: "announce", channel: "last" },
       payload: { kind: "agentTurn" },
     } as never;
     expect(resolveCronDeliveryBestEffort(job)).toBe(true);

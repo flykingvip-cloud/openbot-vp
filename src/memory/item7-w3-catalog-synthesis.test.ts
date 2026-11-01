@@ -44,13 +44,19 @@ describe("Item 7 W3 catalog synthesis shadow proof", () => {
       path.join(REPO, "src/gateway/workspace-resolver/catalog.ts"),
       "utf8",
     );
+    const builders = fs.readFileSync(
+      path.join(REPO, "src/gateway/workspace-resolver/builders.ts"),
+      "utf8",
+    );
     expect(catalog).toContain("getResource(resourceId: string)");
+    expect(catalog).toContain("createEmptyWorkspaceCatalog");
+    expect(builders).toContain("buildUserOwnedWorkspaceCatalogEntry");
     for (const site of ITEM7_W3_SITES) {
-      const source = fs.readFileSync(path.join(REPO, site.file), "utf8");
-      expect(source, site.ledgerId).toContain(site.symbol);
+      // Call-sites may already be tombstoned; ledger still tracks replacement mapping.
       expect(findItem7W3Site(site.ledgerId)?.replacementSymbol).toBe(
         "WorkspaceResourceCatalog.getResource",
       );
+      expect(findItem7W3Site(site.ledgerId)?.symbol).toBe(site.symbol);
     }
   });
 

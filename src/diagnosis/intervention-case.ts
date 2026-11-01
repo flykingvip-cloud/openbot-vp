@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 /**
  * Track I / M2 — InterventionCase model + status machine.
  * Separate from DiagnosticCase (Finding aggregation). Does not write Diagnosis Graph
@@ -147,7 +148,7 @@ export function transitionInterventionCase(
 }
 
 export function newInterventionCaseId(seed?: string): InterventionCaseId {
-  const raw = (seed ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`)
+  const raw = (seed ?? `${Date.now().toString(36)}-${randomBytes(6).toString("hex")}`)
     .replace(/[^a-zA-Z0-9:_-]/g, "")
     .slice(0, 48);
   return `ic:${raw || "case"}`;

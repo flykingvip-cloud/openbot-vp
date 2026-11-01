@@ -20,7 +20,19 @@ describe("production gateway device-platform mount", () => {
     expect(serverSource).toContain("handleDevicePlatformHttpRequest");
     expect(serverSource).not.toContain("device-digital-human/stub-server");
     expect(serverSource).not.toContain("device-digital-human/http");
-    expect(serverSource).not.toMatch(/from\s+["'][^"']*device-digital-human/);
+    // Production still mounts claw4 firmware + integrations-grant helpers from
+    // device-digital-human; only the stub/control-plane http entry must stay off.
+    expect(serverSource).toMatch(
+      /from\s+["'][^"']*device-digital-human\/(claw4-firmware-http|integrations-grant-http)/,
+    );
+    const forbiddenDigitalHumanImports = [
+      ...serverSource.matchAll(/from\s+["']([^"']*device-digital-human[^"']*)["']/g),
+    ].map((m) => m[1]);
+    expect(
+      forbiddenDigitalHumanImports.every(
+        (spec) => spec.includes("claw4-firmware-http") || spec.includes("integrations-grant-http"),
+      ),
+    ).toBe(true);
   });
 
   it("serves management routes from createGatewayHttpServer and does not own integrations", async () => {

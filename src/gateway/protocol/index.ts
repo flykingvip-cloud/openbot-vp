@@ -122,6 +122,8 @@ import {
   type CollaborationTaskRetryOwnerDecisionDeliveryParams,
   type CollaborationTaskListOwnerDecisionDeliveriesParams,
   type CollaborationTaskConfirmTodolistParams,
+  type CollaborationTaskListHumanAttentionParams,
+  type CollaborationTaskActHumanAttentionParams,
   type CollaborationTaskReviseTodolistParams,
   type CollaborationTaskGetTodolistParams,
   type CollaborationTaskListTodolistsParams,
@@ -159,6 +161,8 @@ import {
   CollaborationTaskRetryOwnerDecisionDeliveryParamsSchema,
   CollaborationTaskListOwnerDecisionDeliveriesParamsSchema,
   CollaborationTaskConfirmTodolistParamsSchema,
+  CollaborationTaskListHumanAttentionParamsSchema,
+  CollaborationTaskActHumanAttentionParamsSchema,
   CollaborationTaskReviseTodolistParamsSchema,
   CollaborationTaskGetTodolistParamsSchema,
   CollaborationTaskListTodolistsParamsSchema,
@@ -737,6 +741,14 @@ export const validateCollaborationTaskListOwnerDecisionDeliveriesParams =
   );
 export const validateCollaborationTaskConfirmTodolistParams =
   ajv.compile<CollaborationTaskConfirmTodolistParams>(CollaborationTaskConfirmTodolistParamsSchema);
+export const validateCollaborationTaskListHumanAttentionParams =
+  ajv.compile<CollaborationTaskListHumanAttentionParams>(
+    CollaborationTaskListHumanAttentionParamsSchema,
+  );
+export const validateCollaborationTaskActHumanAttentionParams =
+  ajv.compile<CollaborationTaskActHumanAttentionParams>(
+    CollaborationTaskActHumanAttentionParamsSchema,
+  );
 export const validateCollaborationTaskReviseTodolistParams =
   ajv.compile<CollaborationTaskReviseTodolistParams>(CollaborationTaskReviseTodolistParamsSchema);
 export const validateCollaborationTaskGetTodolistParams =

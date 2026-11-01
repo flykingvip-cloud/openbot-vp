@@ -56,6 +56,8 @@ const BASE_METHODS = [
   "collaboration.task.retryOwnerDecisionDelivery",
   "collaboration.task.listOwnerDecisionDeliveries",
   "collaboration.task.confirmTodolist",
+  "collaboration.task.listHumanAttention",
+  "collaboration.task.actHumanAttention",
   "collaboration.task.reviseTodolist",
   "collaboration.task.getTodolist",
   "collaboration.task.listTodolists",

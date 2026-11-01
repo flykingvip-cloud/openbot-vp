@@ -914,6 +914,8 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "collaboration.task.retryOwnerDecisionDelivery",
     "collaboration.task.listOwnerDecisionDeliveries",
     "collaboration.task.confirmTodolist",
+    "collaboration.task.listHumanAttention",
+    "collaboration.task.actHumanAttention",
     "collaboration.task.reviseTodolist",
     "collaboration.task.getTodolist",
     "collaboration.task.listTodolists",

@@ -144,7 +144,7 @@ describe("registerOnboardCommand", () => {
 
     await runCli(["onboard"]);
 
-    expect(runtime.error).toHaveBeenCalledWith("Error: onboard failed");
-    expect(runtime.exit).toHaveBeenCalledWith(1);
+    expect(runtime.error).toHaveBeenCalledWith("usage: onboard failed");
+    expect(runtime.exit).toHaveBeenCalledWith(2);
   });
 });

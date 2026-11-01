@@ -38,6 +38,7 @@ import { resolveSecurityProfile } from "../security-profile.js";
 import { listAgentsForGateway } from "../session-utils.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
+import { sanitizeDispatchError, sanitizeDispatchErrorMessage } from "./sanitize-dispatch-error.js";
 import {
   casClearTaskDispatchClaimForOp,
   casCommitTaskDispatchEligibility,
@@ -444,6 +445,11 @@ export type ConsumeWakeRoundDispatchResult = Readonly<{
   wakeOp?: WakeOpRecord;
   /** True when a prior completed result was reused (no new side effect). */
   reused?: boolean;
+  /**
+   * Side-effect class from the Mode B dispatcher (or classified on fail).
+   * Heartbeat / recovery must honor this: not_started may retry; started_or_unknown must not replay.
+   */
+  sideEffectClass?: DispatchSideEffectClass;
 }>;
 
 /**
@@ -1668,6 +1674,7 @@ export async function consumeWakeForRoundDispatch(
     let dispatched = false;
     let reason = gate.reason;
     let roundId: string | undefined;
+    let dispatchSideEffectClass: DispatchSideEffectClass | undefined;
 
     if (gate.allowed && dispatcherPresent && dispatcher) {
       try {
@@ -1778,6 +1785,7 @@ export async function consumeWakeForRoundDispatch(
             dispatched = true;
             roundId = compact(result.roundId);
             reason = result.detail ? `dispatched:${result.detail}` : `dispatched:${request.source}`;
+            dispatchSideEffectClass = classifyDispatchSideEffect(result);
             const completed = await markWakeOpCompleted({
               authority: params.authority,
               opKey: claimed.opKey,
@@ -1796,27 +1804,48 @@ export async function consumeWakeForRoundDispatch(
             : `dispatch_failed:${result.reason}${
                 result.message ? `:${result.message.replace(/\s+/g, " ").slice(0, 160)}` : ""
               }`;
-          const failed = await markWakeOpFailed({
-            authority: params.authority,
-            opKey: claimed.opKey,
-            cfg: params.cfg,
-            nowMs: params.nowMs,
-            detail: reason,
-          });
-          if (failed) {
-            wakeOp = failed;
+          const classified: DispatchSideEffectClass = result.ok
+            ? "started_or_unknown"
+            : classifyDispatchSideEffect(result);
+          dispatchSideEffectClass = classified;
+          if (classified === "not_started") {
+            const failed = await markWakeOpFailed({
+              authority: params.authority,
+              opKey: claimed.opKey,
+              cfg: params.cfg,
+              nowMs: params.nowMs,
+              detail: reason,
+            });
+            if (failed) {
+              wakeOp = failed;
+            }
+          } else {
+            // Tools/files/messages may have already run — protect; do not blind replay.
+            const unknown = await markWakeOpUnknown({
+              authority: params.authority,
+              opKey: claimed.opKey,
+              cfg: params.cfg,
+              nowMs: params.nowMs,
+              detail: `${reason}|side:${classified}`,
+            });
+            if (unknown) {
+              wakeOp = unknown;
+            }
           }
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        reason = `dispatch_threw:${message.slice(0, 160)}`;
+        const safe = sanitizeDispatchError(error, 160);
+        reason = `dispatch_threw:${safe.message}`;
         // Cannot prove whether the dispatcher side effect landed — unknown, no blind re-run.
+        // Heartbeat must see started_or_unknown immediately (humanAttention), not omit the
+        // class and fall into nudge fail-count / backoff as if the throw were not_started.
+        dispatchSideEffectClass = "started_or_unknown";
         const unknown = await markWakeOpUnknown({
           authority: params.authority,
           opKey: claimed.opKey,
           cfg: params.cfg,
           nowMs: params.nowMs,
-          detail: reason,
+          detail: `${reason}|side:started_or_unknown`,
         });
         if (unknown) {
           wakeOp = unknown;
@@ -1865,7 +1894,10 @@ export async function consumeWakeForRoundDispatch(
             outcome,
             taskId: request.taskId,
             itemId: request.itemId,
-            reason: request.reason ? `${request.reason}|${reason}` : reason,
+            reason: sanitizeDispatchErrorMessage(
+              request.reason ? `${request.reason}|${reason}` : reason,
+              320,
+            ),
             relatedId: request.relatedId ?? roundId,
           },
           { cfg: params.cfg, nowMs: params.nowMs },
@@ -1893,6 +1925,7 @@ export async function consumeWakeForRoundDispatch(
       opKey: claimed.opKey,
       wakeOp,
       reused: false,
+      ...(dispatchSideEffectClass ? { sideEffectClass: dispatchSideEffectClass } : {}),
     };
   } finally {
     // Single-claim: release this op's taken lease so a later op can commit.

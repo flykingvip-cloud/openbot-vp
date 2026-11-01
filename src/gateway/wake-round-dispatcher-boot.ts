@@ -21,6 +21,7 @@ import { getReplyFromConfig } from "../auto-reply/reply.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
 import { loadConfig } from "../config/config.js";
 import type { OpenBotConfig } from "../config/types.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 import { toCollaborationSpaceSessionKey } from "../sessions/session-key-utils.js";
 import { episodeIdForClientRun } from "./collaboration-dispatch/collaboration-event-key.js";
 import {
@@ -29,6 +30,7 @@ import {
   type ModeBWakeRoundContext,
 } from "./collaboration-dispatch/mode-b-wake-round-dispatcher.js";
 import { buildGroupRuntimeAuthority } from "./collaboration-dispatch/runtime-authority.js";
+import { sanitizeDispatchErrorMessage } from "./collaboration-dispatch/sanitize-dispatch-error.js";
 import type {
   CollaborationBotTarget,
   CollaborationDispatchScope,
@@ -57,6 +59,13 @@ import {
   type CollaborationTenantResolution,
 } from "./collaboration-learning/trusted-tenant.js";
 import { resolveSecurityProfile } from "./security-profile.js";
+
+const wakeRoundDispatchLog = createSubsystemLogger("gateway/wake-round-dispatch");
+
+/** Redact + truncate runBot error text before logs / wakeRunBotError payloads. */
+export function sanitizeWakeRunBotErrorMessage(message: string): string {
+  return sanitizeDispatchErrorMessage(message, 240);
+}
 
 function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
@@ -434,10 +443,32 @@ export async function resolveModeBWakeRoundContext(
           });
         }
         return text ? { text } : undefined;
-      } catch {
-        // Mirror chat runStageBot: bot failure must not throw out of
-        // executeCollaborationRound (would force wake outcome recorded).
-        return undefined;
+      } catch (error) {
+        // Distinguish execution exceptions from normal empty replies.
+        // Do not forge success text or return bare undefined (that becomes
+        // placeholder → ROUND_ABORTED while Mode B still receipted ok:true).
+        const err = error instanceof Error ? error : new Error(String(error));
+        const category = compact(err.name) || "Error";
+        const safeMessage = sanitizeWakeRunBotErrorMessage(err.message);
+        wakeRoundDispatchLog.error("wake runBot execution failed", {
+          category,
+          message: safeMessage,
+          groupId,
+          agentId: bot.agentId,
+          taskId: compact(request.taskId) || undefined,
+          itemId: compact(request.itemId) || undefined,
+          wakeOpKey: compact(request.wakeOpKey) || compact(request.opKey) || undefined,
+          source: request.source,
+        });
+        throw Object.assign(err, {
+          wakeRunBotError: {
+            category,
+            message: safeMessage,
+            groupId,
+            agentId: bot.agentId,
+            source: request.source,
+          },
+        });
       }
     },
   };

@@ -22,15 +22,30 @@ type MockChild = EventEmitter & {
 function createMockChild(params?: { autoClose?: boolean; closeDelayMs?: number }): MockChild {
   const stdout = new EventEmitter();
   const stderr = new EventEmitter();
+  const stdin = new EventEmitter() as EventEmitter & {
+    end: (data?: unknown, encodingOrCb?: unknown, cb?: unknown) => void;
+  };
+  stdin.end = (_data?: unknown, encodingOrCb?: unknown, cb?: unknown) => {
+    const done = typeof encodingOrCb === "function" ? encodingOrCb : cb;
+    if (typeof done === "function") {
+      queueMicrotask(() => (done as () => void)());
+    }
+  };
   const child = new EventEmitter() as MockChild;
   child.stdout = stdout;
   child.stderr = stderr;
+  (child as MockChild & { stdin: typeof stdin }).stdin = stdin;
   child.closeWith = (code = 0) => {
     child.emit("close", code);
   };
   child.kill = () => {
     // Let timeout rejection win in tests that simulate hung QMD commands.
   };
+  // Emit spawn so callers that await the spawn event (e.g. fs pinned-write helper)
+  // do not hang when this suite mocks node:child_process.spawn.
+  queueMicrotask(() => {
+    child.emit("spawn");
+  });
   if (params?.autoClose !== false) {
     const delayMs = params?.closeDelayMs ?? 0;
     if (delayMs <= 0) {
@@ -140,6 +155,9 @@ describe("QmdMemoryManager", () => {
     // created lazily by manager code when needed.
     await fs.mkdir(workspaceDir);
     process.env.OPENCLAW_STATE_DIR = stateDir;
+    // Spawn is mocked in this suite; force native root-scoped writes so session
+    // export does not hang waiting for the python3 pinned-write helper.
+    process.env.OPENBOT_FS_SAFE_NATIVE_WRITES = "1";
     cfg = {
       agents: {
         list: [{ id: agentId, default: true, workspace: workspaceDir }],
@@ -158,6 +176,7 @@ describe("QmdMemoryManager", () => {
   afterEach(() => {
     vi.useRealTimers();
     delete process.env.OPENCLAW_STATE_DIR;
+    delete process.env.OPENBOT_FS_SAFE_NATIVE_WRITES;
     delete (globalThis as Record<string, unknown>).__openbotMcporterDaemonStart;
     delete (globalThis as Record<string, unknown>).__openbotMcporterColdStartWarned;
     delete (globalThis as Record<string, unknown>).__openclawMcporterDaemonStart;

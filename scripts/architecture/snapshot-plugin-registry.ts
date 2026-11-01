@@ -65,10 +65,24 @@ function main(): void {
     "loader-registry-snapshot.json",
   );
 
-  const registry = loadOpenBotPlugins({
-    cache: false,
-    config: { plugins: { enabled: true } },
-  });
+  // Keep baseline hermetic: do not discover ~/.openbot/extensions.
+  const prevStateDir = process.env.OPENBOT_STATE_DIR;
+  const isolatedStateDir = path.join(repoRoot, ".tmp", "loader-registry-baseline-state");
+  fs.mkdirSync(isolatedStateDir, { recursive: true });
+  process.env.OPENBOT_STATE_DIR = isolatedStateDir;
+  let registry;
+  try {
+    registry = loadOpenBotPlugins({
+      cache: false,
+      config: { plugins: { enabled: true } },
+    });
+  } finally {
+    if (prevStateDir === undefined) {
+      delete process.env.OPENBOT_STATE_DIR;
+    } else {
+      process.env.OPENBOT_STATE_DIR = prevStateDir;
+    }
+  }
   const serialized = serializeSnapshot(buildSnapshot(registry));
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, serialized, "utf8");

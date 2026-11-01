@@ -404,8 +404,10 @@ export function releaseStaleHumanTakeoverForAgent(scopeKey: string): boolean {
     });
   }
   if (!matched) {
-    // Coordinator may still hold after a UI-only takeover without a live slot grant.
-    applyProductHandBack({ tenantId: "", userId: "", scopeKey: key });
+    // Keep coordinator-only human locks (direct authority.humanTakeover / product
+    // takeover without a live account-computer slot). Agents must wait for an
+    // explicit hand-back; clearing here broke P0 serial denial after takeover.
+    return false;
   }
   return true;
 }

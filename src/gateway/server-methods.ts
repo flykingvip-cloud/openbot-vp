@@ -77,6 +77,7 @@ import { execApprovalsHandlers } from "./server-methods/exec-approvals.js";
 import { governanceHandlers } from "./server-methods/governance.js";
 import { guidanceProgressHandlers } from "./server-methods/guidance.js";
 import { healthHandlers } from "./server-methods/health.js";
+import { humanAttentionHandlers } from "./server-methods/human-attention.js";
 import { incubationHandlers } from "./server-methods/incubation.js";
 import { knowledgeHandlers } from "./server-methods/knowledge.js";
 import { lifecycleProducerHandlers } from "./server-methods/lifecycle-producer.js";
@@ -225,6 +226,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...assetIncubationSessionHandlers,
   ...guidanceProgressHandlers,
   ...collaborationLearningHandlers,
+  ...humanAttentionHandlers,
   ...chatHandlers,
   ...conversationHandlers,
   ...mentionHandlers,

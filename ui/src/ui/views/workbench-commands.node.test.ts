@@ -158,13 +158,13 @@ describe("workbench command registry", () => {
     });
 
     expect(findWorkbenchCommand(sections, "quick-agents")).toMatchObject({
-      title: "Assistant settings",
-      subtitle: "Use the console to manage assistants, identities, and tool access.",
+      title: "frontstage.workbench.remote.actions.agents",
+      subtitle: "frontstage.workbench.remote.actions.agentsBody",
       actionId: "openAssistantSettings",
     });
     expect(findWorkbenchCommand(sections, "quick-channels")).toMatchObject({
-      title: "Channel settings",
-      subtitle: "Use the console to inspect linked messaging surfaces and routing health.",
+      title: "frontstage.workbench.remote.actions.channels",
+      subtitle: "frontstage.workbench.remote.actions.channelsBody",
       actionId: "openChannelSettings",
     });
   });

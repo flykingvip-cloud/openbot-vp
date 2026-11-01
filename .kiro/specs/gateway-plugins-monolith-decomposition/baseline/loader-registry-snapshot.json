@@ -6,15 +6,15 @@
   "plugins": [
     {
       "id": "acpx",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "bluebubbles",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "copilot-proxy",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "device-pair",
@@ -22,87 +22,91 @@
     },
     {
       "id": "diagnostics-otel",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "diffs",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "dingtalk",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "discord",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "feishu",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "google-gemini-cli-auth",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "googlechat",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "imessage",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "irc",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "line",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "llm-task",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "lobster",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "matrix",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "mattermost",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
+    },
+    {
+      "id": "media-monitor",
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "memory-core",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "memory-lancedb",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "minimax-portal-auth",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "msteams",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "nextcloud-talk",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "nostr",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "open-prose",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "phone-control",
@@ -114,15 +118,15 @@
     },
     {
       "id": "signal",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "slack",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "synology-chat",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "talk-voice",
@@ -130,7 +134,7 @@
     },
     {
       "id": "telegram",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "thread-ownership",
@@ -138,45 +142,45 @@
     },
     {
       "id": "tlon",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "twitch",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "voice-call",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "wechat",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "wecom",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "whatsapp",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "zalo",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     },
     {
       "id": "zalouser",
-      "version": "2026.3.9"
+      "version": "2026.7.12-rc.2"
     }
   ],
   "resourceCounts": {
-    "tools": 0,
+    "tools": 1,
     "hooks": 0,
     "typedHooks": 0,
     "channels": 0,
     "providers": 0,
     "httpRoutes": 0,
-    "cliRegistrars": 0,
+    "cliRegistrars": 1,
     "services": 2,
     "commands": 3,
     "gatewayHandlers": 0

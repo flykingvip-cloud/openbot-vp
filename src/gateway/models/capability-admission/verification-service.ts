@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 /**
  * Gateway capability verification service (formal authority).
  * Async tasks persist in the admission store; default runner never calls paid APIs.
@@ -11,7 +12,6 @@
  * - late success after cancel or a superseded generation must not pollute
  *   current formal evidence
  */
-
 import {
   capabilityLabel,
   normalizeCapabilityIds,
@@ -58,7 +58,7 @@ export type DiscoveredCapability = {
 };
 
 function newTaskId(): string {
-  return `gcvt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  return `gcvt_${Date.now().toString(36)}_${randomBytes(4).toString("hex")}`;
 }
 
 function summarizeTaskStatus(

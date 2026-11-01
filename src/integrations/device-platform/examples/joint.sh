@@ -125,11 +125,8 @@ case "$MODE" in
   harness)
     assert_separate_origins
     cd "$ROOT"
-    if command -v pnpm >/dev/null 2>&1 && [[ -d "$ROOT/node_modules/tsx" ]]; then
-      pnpm exec tsx src/integrations/device-platform/examples/joint-cli.ts
-    else
-      node --import tsx src/integrations/device-platform/examples/joint-cli.ts
-    fi
+    # Prefer hermetic node --import tsx (Vitest HOME isolation breaks Corepack pnpm).
+    node --import tsx src/integrations/device-platform/examples/joint-cli.ts
     ;;
   live)
     probe_live

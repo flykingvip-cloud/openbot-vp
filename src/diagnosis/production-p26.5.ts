@@ -9,12 +9,14 @@ import { fileURLToPath } from "node:url";
 import { coreGatewayHandlers } from "../gateway/server-methods.js";
 import { GATEWAY_METHOD_PACKS } from "../gateway/server-methods/packs/registry.js";
 import { isProductionRemediationLiveExecutorUndeployed } from "./production-cutover.js";
-import { isReadonlyEnablementPrefixOpen } from "./production-gate-contract.js";
+import { DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED } from "./production-cutover.js";
+import { isUnapprovedProductionGateOpen } from "./production-gate-contract.js";
 import { DIAGNOSIS_REPORT_API_DEPLOYED } from "./report-query-deploy.js";
 import {
   createDefaultDiagnosisReportApiDeps,
   createLiveDiagnosisReportApiDeps,
 } from "./report-query-gateway.js";
+import { DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED } from "./report-query-production-adapters.js";
 import { createFileProjectionAuthoritySource } from "./report-query-projection-snapshot.js";
 import { DiagnosisContractError } from "./types.js";
 
@@ -94,7 +96,13 @@ export function evaluateDiagnosisProductionP26_5(
     typeof createFileProjectionAuthoritySource === "function";
   const liveExecutorUndeployed = isProductionRemediationLiveExecutorUndeployed();
   const { doctorFixBound, channelRestartBound } = scanRepoForForbiddenBindings();
-  const gatesOpen = isReadonlyEnablementPrefixOpen();
+  // Readonly diagnosis admission: adapters + report API on, remediation closed.
+  // Da Bai is an orthogonal product-first knife and may already be open (P24.5/P26).
+  const gatesOpen =
+    DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED &&
+    DIAGNOSIS_REPORT_API_DEPLOYED &&
+    !DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED &&
+    !isUnapprovedProductionGateOpen();
   const blockers = [
     ...(packRegistered ? [] : ["live_pack_unregistered"]),
     ...(queryHandlerPresent ? [] : ["query_handler_missing"]),

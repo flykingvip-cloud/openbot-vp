@@ -285,7 +285,19 @@ function attribute(): Attribution[] {
     const owners = matchers
       .filter((matcher) => matcher.regexps.some((re) => re.test(entry.path)))
       .map((matcher) => ({ agentId: matcher.claim.agentId, spec: matcher.claim.spec }));
-    return { path: entry.path, status: statusKind(entry.xy), owners };
+    // Deduplicate identical Agents lines within one spec (same agentId+spec).
+    // Multiple ## Agents bullets in a single tasks.md otherwise inflate owner
+    // lists and break loom check parity against the Registry (one task per id).
+    const seen = new Set<string>();
+    const deduped = owners.filter((owner) => {
+      const key = `${owner.agentId}\0${owner.spec}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+    return { path: entry.path, status: statusKind(entry.xy), owners: deduped };
   });
 }
 

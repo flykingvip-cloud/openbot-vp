@@ -342,12 +342,26 @@ export function resolveSessionFilePath(
       // When callers pin an explicit sessionsDir (tenant managed store), structural
       // fallback must not jump to a different state root (global ~/.openbot/agents).
       // Compare via realpath so macOS /var vs /private/var aliases stay in-bounds.
+      // Same-root sibling agent sessions remain allowed when opts.agentId is set.
       if (explicitSessionsDir) {
         const resolvedBase = path.resolve(sessionsDir);
         const realBase = safeRealpathSync(resolvedBase) ?? resolvedBase;
         const realResolved = safeRealpathSync(resolved) ?? resolved;
         const relative = path.relative(realBase, realResolved);
         if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+          const explicitAgentId = opts?.agentId?.trim();
+          if (explicitAgentId) {
+            const siblingSessionsDir = resolveSiblingAgentSessionsDir(
+              realBase,
+              normalizeAgentId(explicitAgentId),
+            );
+            if (
+              siblingSessionsDir &&
+              resolvePathFromAgentSessionsDir(siblingSessionsDir, realResolved)
+            ) {
+              return resolved;
+            }
+          }
           return resolveSessionTranscriptPathInDir(sessionId, sessionsDir);
         }
       }

@@ -99,7 +99,7 @@ export function resolveExecutorClaimantId(params: {
       reason: `ambiguous_intended_for_plan_owner:owner=${planOwner}:matches=${matches.join(",")}`,
     };
   }
-  return { ok: true, claimantId: matches[0]! };
+  return { ok: true, claimantId: matches[0] };
 }
 
 export async function ensureBoardActiveAfterConfirm(params: {
@@ -166,7 +166,12 @@ export async function ensureBoardActiveAfterConfirm(params: {
     cfg: params.cfg,
   };
   if (!shared.itemId) {
-    return { item: params.item, activated: false, reason: "board_item_id_missing", authorizingActorId };
+    return {
+      item: params.item,
+      activated: false,
+      reason: "board_item_id_missing",
+      authorizingActorId,
+    };
   }
 
   try {

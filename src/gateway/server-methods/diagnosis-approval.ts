@@ -5,7 +5,7 @@
  * Session kind must be platform-admin or platform-super-admin.
  * The enterprise sibling is registered separately and is not called here.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -117,7 +117,10 @@ export function createLiveDiagnosisApprovalPorts(
   return {
     now: () => new Date().toISOString(),
     newId: () =>
-      `appr_${createHash("sha256").update(`${Date.now()}:${Math.random()}`).digest("hex").slice(0, 24)}`,
+      `appr_${createHash("sha256")
+        .update(`${Date.now()}:${randomBytes(16).toString("hex")}`)
+        .digest("hex")
+        .slice(0, 24)}`,
     ledger,
     grants: {
       async get(grantId) {

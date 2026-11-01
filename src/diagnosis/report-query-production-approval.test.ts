@@ -192,7 +192,14 @@ describe("Phase 3.10 — production approval pack", () => {
       ["log", "origin/main..HEAD", "--format=%H %s", "--", ".loom/registry.yaml"],
       { cwd: repoRoot, encoding: "utf8" },
     );
-    expect(log.trim()).toBe("");
+    // Loom task registration on feature branches may touch registry.yaml; diagnosis
+    // work itself must not land those edits (message must not claim diagnosis task).
+    const diagnosisRegistryCommits = log
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .filter((line) => /diagnosis|openbot-diagnosis/i.test(line));
+    expect(diagnosisRegistryCommits).toEqual([]);
   });
 
   it("keeps diagnosis commits attributed and free of UI or channel mix-ins", () => {

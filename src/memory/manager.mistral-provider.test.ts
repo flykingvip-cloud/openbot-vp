@@ -58,6 +58,13 @@ function buildConfig(params: {
   } as OpenBotConfig;
 }
 
+function unwrapManager(manager: unknown): unknown {
+  if (manager && typeof manager === "object" && "inner" in manager) {
+    return (manager as { inner: unknown }).inner;
+  }
+  return manager;
+}
+
 describe("memory manager mistral provider wiring", () => {
   let workspaceDir = "";
   let indexPath = "";
@@ -103,7 +110,7 @@ describe("memory manager mistral provider wiring", () => {
     }
     manager = result.manager as unknown as MemoryIndexManager;
 
-    const internal = manager as unknown as { mistral?: MistralEmbeddingClient };
+    const internal = unwrapManager(manager) as { mistral?: MistralEmbeddingClient };
     expect(internal.mistral).toBe(mistralClient);
   });
 
@@ -135,7 +142,7 @@ describe("memory manager mistral provider wiring", () => {
       throw new Error(`manager missing: ${result.error ?? "no error provided"}`);
     }
     manager = result.manager as unknown as MemoryIndexManager;
-    const internal = manager as unknown as {
+    const internal = unwrapManager(manager) as {
       activateFallbackProvider: (reason: string) => Promise<boolean>;
       openAi?: OpenAiEmbeddingClient;
       mistral?: MistralEmbeddingClient;
@@ -176,7 +183,7 @@ describe("memory manager mistral provider wiring", () => {
       throw new Error(`manager missing: ${result.error ?? "no error provided"}`);
     }
     manager = result.manager as unknown as MemoryIndexManager;
-    const internal = manager as unknown as {
+    const internal = unwrapManager(manager) as {
       activateFallbackProvider: (reason: string) => Promise<boolean>;
       openAi?: OpenAiEmbeddingClient;
       ollama?: OllamaEmbeddingClient;
