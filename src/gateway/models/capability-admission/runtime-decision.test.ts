@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { runWithModelFallback } from "../../../agents/model-fallback.js";
+import { deriveLifecycle, projectTaskJudgement } from "../../../task-outcome/judge.js";
 import { resolveTrustedRunModalityCompletionEvidence } from "../../../task-outcome/modality-artifact-evidence.js";
 import {
   assertExecutorModelAdmitted,
@@ -571,5 +572,41 @@ describe("image and music completion evidence", () => {
         artifacts: [{ toolName: "image_gen", relativePath: ".openbot/generated-images/a.png" }],
       })?.kind,
     ).toBe("execution_artifact");
+  });
+
+  it("keeps a real image artifact when delivery failed and does not call that success", () => {
+    const evidence = resolveTrustedRunModalityCompletionEvidence({
+      targetModality: "image_generation",
+      success: true,
+      runId: "run-gen",
+      artifacts: [{ toolName: "image_gen", relativePath: ".openbot/generated-images/poster.png" }],
+    });
+    expect(evidence).toEqual({
+      kind: "execution_artifact",
+      digestOrRef: ".openbot/generated-images/poster.png",
+      detail: "tool=image_gen",
+    });
+    const acceptance = { status: "passed" as const };
+    const delivery = { status: "failed" as const };
+    const lifecycle = deriveLifecycle({ acceptance, delivery, hasDecisiveRun: true });
+    expect(lifecycle).toBe("closed");
+    expect(projectTaskJudgement({ lifecycle, acceptance, delivery })).toBe("failure");
+    expect(delivery.status).toBe("failed");
+    expect(acceptance.status).toBe("passed");
+  });
+
+  it("does not close a pending acceptance just because delivery failed", () => {
+    const evidence = resolveTrustedRunModalityCompletionEvidence({
+      targetModality: "audio_music_generation",
+      success: true,
+      runId: "run-music",
+      artifacts: [{ toolName: "music_gen", relativePath: ".openbot/generated-audio/clip.mp3" }],
+    });
+    expect(evidence?.kind).toBe("execution_artifact");
+    const acceptance = { status: "pending" as const };
+    const delivery = { status: "failed" as const };
+    const lifecycle = deriveLifecycle({ acceptance, delivery, hasDecisiveRun: true });
+    expect(lifecycle).toBe("awaiting_acceptance");
+    expect(projectTaskJudgement({ lifecycle, acceptance, delivery })).toBe("incomplete");
   });
 });
