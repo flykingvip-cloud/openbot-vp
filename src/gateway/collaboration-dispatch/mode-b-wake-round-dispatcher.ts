@@ -164,6 +164,34 @@ export async function executeModeBWakeRound(params: {
       isAborted: () => false,
     });
     const settledId = compact(round.roundId) || roundId;
+    // Dispatch-accepted ≠ round-succeeded ≠ task-done. ROUND_ABORTED / empty
+    // completion must not be receipted as completed_with_receipt.
+    if (round.state === "ROUND_ABORTED") {
+      const completion = round.completion;
+      const noVisible =
+        !completion?.visibleReply ||
+        completion.responseStatus === "placeholder" ||
+        completion.responseStatus === "failed" ||
+        completion.responseStatus === "aborted";
+      const abortDetail =
+        compact(round.abortReason) || (noVisible ? "no_visible_reply" : "aborted");
+      return {
+        ok: false,
+        reason: `round_aborted:${abortDetail}`,
+        message: `Mode B round aborted (${abortDetail})`,
+        // Round rows were persisted; treat as uncertain external side effects unless
+        // the completion clearly never produced a visible/tool body.
+        sideEffectClass: noVisible ? "not_started" : "started_or_unknown",
+      };
+    }
+    if (round.state !== "ROUND_COMPLETE") {
+      return {
+        ok: false,
+        reason: `round_not_complete:${compact(round.state) || "unknown"}`,
+        message: `Mode B round ended in ${compact(round.state) || "unknown"}`,
+        sideEffectClass: "started_or_unknown",
+      };
+    }
     return {
       ok: true,
       roundId: settledId,
