@@ -82,6 +82,7 @@ describe("enterprise-data-capability section-routing", () => {
       mcpServer: "linear",
       mcpTool: "list_issues",
       capabilityId: null,
+      requestId: null,
     });
   });
 

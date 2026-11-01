@@ -23,11 +23,9 @@ export OPENBOT_DEVICE_DH_STUB=1
 export OPENBOT_DEVICE_DH_STUB_CONFIG="$CONFIG"
 export OPENBOT_DEVICE_DH_STUB_PORT="$PORT"
 
-if command -v pnpm >/dev/null 2>&1 && [[ -x "$ROOT/node_modules/.bin/tsx" || -d "$ROOT/node_modules/tsx" ]]; then
-  pnpm exec tsx src/integrations/device-digital-human/stub-server.ts >"$LOG" 2>"$ERR" &
-else
-  node --import tsx src/integrations/device-digital-human/stub-server.ts >"$LOG" 2>"$ERR" &
-fi
+# Prefer hermetic node --import tsx: Vitest isolates HOME where Corepack
+# cannot resolve pnpm.cjs, so `pnpm exec tsx` flakes under the test runner.
+node --import tsx src/integrations/device-digital-human/stub-server.ts >"$LOG" 2>"$ERR" &
 PID=$!
 
 URL=""
@@ -50,8 +48,4 @@ if [[ -z "$URL" ]]; then
   exit 1
 fi
 
-if command -v pnpm >/dev/null 2>&1 && [[ -d "$ROOT/node_modules/tsx" ]]; then
-  pnpm exec tsx src/integrations/device-digital-human/examples/rehearse-cli.ts "$URL"
-else
-  node --import tsx src/integrations/device-digital-human/examples/rehearse-cli.ts "$URL"
-fi
+node --import tsx src/integrations/device-digital-human/examples/rehearse-cli.ts "$URL"

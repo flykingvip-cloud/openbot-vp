@@ -265,8 +265,8 @@ describe("registerAgentCommands", () => {
 
     await runCli(["agents"]);
 
-    expect(runtime.error).toHaveBeenCalledWith("Error: list failed");
-    expect(runtime.exit).toHaveBeenCalledWith(1);
+    expect(runtime.error).toHaveBeenCalledWith("usage: list failed");
+    expect(runtime.exit).toHaveBeenCalledWith(2);
   });
 
   it("reports errors via runtime when agent command fails", async () => {
@@ -274,7 +274,7 @@ describe("registerAgentCommands", () => {
 
     await runCli(["agent", "--message", "hello"]);
 
-    expect(runtime.error).toHaveBeenCalledWith("Error: agent failed");
-    expect(runtime.exit).toHaveBeenCalledWith(1);
+    expect(runtime.error).toHaveBeenCalledWith("usage: agent failed");
+    expect(runtime.exit).toHaveBeenCalledWith(2);
   });
 });

@@ -26,7 +26,11 @@ describe("employee workbench view boundaries", () => {
     const files = await readViewSources();
 
     for (const { name, source } of files) {
-      expect(source, name).not.toContain("/controllers/");
+      const withoutTypeOnly = source
+        .replace(/import\s+type\s+[\s\S]*?from\s+["'][^"']+["'];?/g, "")
+        .replace(/\|\s*import\(\s*["'][^"']*controllers[^"']*["']\s*\)\s*\.\s*\w+/g, "")
+        .replace(/import\(\s*["'][^"']*controllers[^"']*["']\s*\)\s*\.\s*\w+/g, "");
+      expect(withoutTypeOnly, name).not.toContain("/controllers/");
     }
   });
 

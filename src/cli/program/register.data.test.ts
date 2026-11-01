@@ -15,27 +15,31 @@ function buildDataCommand(): Command {
 }
 
 describe("registerDataCli", () => {
-  it("registers the data command group with export/restore/readiness subcommands", () => {
+  it("registers the data command group with info/migrate/forget subcommands", () => {
     const data = buildDataCommand();
     const names = data.commands.map((c) => c.name()).toSorted();
-    expect(names).toEqual(
-      ["export", "info", "migrate", "restore", "verify-migration-readiness"].toSorted(),
-    );
+    expect(names).toEqual(["forget", "info", "migrate"].toSorted());
   });
 
-  it("requires --archive for data restore", () => {
+  it("requires --scope and --id for data forget", () => {
     const data = buildDataCommand();
-    const restore = data.commands.find((c) => c.name() === "restore");
-    expect(restore).toBeDefined();
-    const archiveOption = restore?.options.find((o) => o.long === "--archive");
-    expect(archiveOption?.required).toBe(true);
+    const forget = data.commands.find((c) => c.name() === "forget");
+    expect(forget).toBeDefined();
+    const scopeOption = forget?.options.find((o) => o.long === "--scope");
+    const idOption = forget?.options.find((o) => o.long === "--id");
+    expect(scopeOption?.required).toBe(true);
+    expect(idOption?.required).toBe(true);
   });
 
-  it("exposes the legacy-workspace gate flag on verify-migration-readiness", () => {
+  it("exposes migrate --target as required and forget dry-run/--yes flags", () => {
     const data = buildDataCommand();
-    const verify = data.commands.find((c) => c.name() === "verify-migration-readiness");
-    const flags = (verify?.options ?? []).map((o) => o.long);
-    expect(flags).toContain("--fail-on-legacy-workspace");
-    expect(flags).toContain("--json");
+    const migrate = data.commands.find((c) => c.name() === "migrate");
+    const forget = data.commands.find((c) => c.name() === "forget");
+    expect(migrate).toBeDefined();
+    expect(forget).toBeDefined();
+    const targetOption = migrate?.options.find((o) => o.long === "--target");
+    expect(targetOption?.required).toBe(true);
+    const flags = (forget?.options ?? []).map((o) => o.long);
+    expect(flags).toEqual(expect.arrayContaining(["--dry-run", "--yes", "--purge-temp"]));
   });
 });

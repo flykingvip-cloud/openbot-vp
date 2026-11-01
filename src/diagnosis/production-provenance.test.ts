@@ -33,8 +33,30 @@ function gitOk(args: readonly string[]): boolean {
 
 describe("provenance peeled-target resolution", () => {
   it("peels the annotated LIVE tag to the commit, not the tag object", () => {
-    const resolved = resolvePeeledProvenanceTag(LIVE, { git, gitOk });
-    expect(resolved.tagName).toBe("provenance/sha-04690f8d2ed5");
+    const tagName = "provenance/sha-04690f8d2ed5";
+    const mockGit = (args: readonly string[]): string => {
+      const joined = args.join(" ");
+      if (
+        joined.includes(`${tagName}^{commit}`) ||
+        joined.includes(`refs/tags/${tagName}^{commit}`)
+      ) {
+        return LIVE;
+      }
+      if (joined.includes(tagName) || joined.includes(`refs/tags/${tagName}`)) {
+        return TAG_OBJECT;
+      }
+      throw new Error(`unexpected git args: ${joined}`);
+    };
+    const mockGitOk = (args: readonly string[]): boolean => {
+      try {
+        mockGit(args);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const resolved = resolvePeeledProvenanceTag(LIVE, { git: mockGit, gitOk: mockGitOk });
+    expect(resolved.tagName).toBe(tagName);
     expect(resolved.tagObjectSha).toBe(TAG_OBJECT);
     expect(resolved.peeledCommitSha).toBe(LIVE);
     expect(resolved.tagObjectSha).not.toBe(resolved.peeledCommitSha);

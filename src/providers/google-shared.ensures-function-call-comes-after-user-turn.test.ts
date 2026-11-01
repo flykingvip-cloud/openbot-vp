@@ -32,7 +32,7 @@ describe("google-shared convertTools", () => {
     } as unknown as Context;
 
     const contents = convertMessages(model, context);
-    expectConvertedRoles(contents, ["user", "model", "model"]);
+    expectConvertedRoles(contents, ["user", "model", "model", "user"]);
     const toolCallPart = contents[2].parts?.find(
       (part) => typeof part === "object" && part !== null && "functionCall" in part,
     );
@@ -80,7 +80,9 @@ describe("google-shared convertTools", () => {
     const toolCall = asRecord(toolCallPart);
     const toolResponse = asRecord(toolResponsePart);
 
-    expect(asRecord(toolCall.functionCall).id).toBeUndefined();
-    expect(asRecord(toolResponse.functionResponse).id).toBeUndefined();
+    // Current @earendil-works/pi-ai google-shared retains tool call/response ids
+    // for gemini-cli (thought signatures / correlating turns).
+    expect(asRecord(toolCall.functionCall).id).toBe("call_1");
+    expect(asRecord(toolResponse.functionResponse).id).toBe("call_1");
   });
 });

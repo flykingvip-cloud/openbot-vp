@@ -3,7 +3,7 @@
  * This record — not transcript fence markers or token overlap — decides
  * whether a turn stays on the current task or starts different work.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import { isTaskSurfaceUtterance } from "../agents/task-surface/surface.js";
 import { formatDroppedParkedTaskSentence, type FocusSnapshot } from "./focus-policy.js";
@@ -122,7 +122,7 @@ export function allocateTaskInstanceId(params?: {
     const digest = createHash("sha256").update(`inbound-req:${inbound}`).digest("hex").slice(0, 12);
     return `task-${digest}`;
   }
-  const entropy = `${Date.now()}:${Math.random()}:${params?.entropy ?? ""}:${process.hrtime.bigint()}`;
+  const entropy = `${Date.now()}:${randomBytes(16).toString("hex")}:${params?.entropy ?? ""}:${process.hrtime.bigint()}`;
   const digest = createHash("sha256").update(entropy).digest("hex").slice(0, 12);
   return `task-${digest}`;
 }
@@ -285,7 +285,7 @@ export function sanitizeTaskBoardPathForPrompt(raw: string): string {
     const rest = (tenant[1] ?? "").replace(/^\/+/, "");
     return rest || "workspace";
   }
-  if (/^\/(?:root|var|tmp)\//.test(value) || /^\/Users\//.test(value)) {
+  if (/^\/(?:root|var|tmp)\//.test(value) || value.startsWith("/Users/")) {
     const base = value.replace(/\/+$/, "").split("/").pop();
     return base || "workspace";
   }

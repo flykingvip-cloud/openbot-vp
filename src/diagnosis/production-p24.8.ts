@@ -142,9 +142,9 @@ export function evaluateDiagnosisProductionP24_8(
     !input.coreHandlerHasDiagnosis &&
     DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED &&
     DIAGNOSIS_REPORT_API_DEPLOYED &&
-    !DIAGNOSIS_DAIBAI_DELIVERY_ENABLED &&
+    DIAGNOSIS_DAIBAI_DELIVERY_ENABLED &&
     !DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED &&
-    nextStep === "daibaiDelivery" &&
+    nextStep === "remediationExecution" &&
     DIAGNOSIS_CANARY_POLICY.firstStage === "internal_single_tenant" &&
     DIAGNOSIS_CANARY_POLICY.started;
   let humanEnablementRecorded = false;

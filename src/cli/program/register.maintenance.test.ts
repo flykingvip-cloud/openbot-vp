@@ -69,8 +69,8 @@ describe("registerMaintenanceCommands doctor action", () => {
 
     await runMaintenanceCli(["doctor"]);
 
-    expect(runtime.error).toHaveBeenCalledWith("Error: doctor failed");
-    expect(runtime.exit).toHaveBeenCalledWith(1);
+    expect(runtime.error).toHaveBeenCalledWith("usage: doctor failed");
+    expect(runtime.exit).toHaveBeenCalledWith(2);
     expect(runtime.exit).not.toHaveBeenCalledWith(0);
   });
 
@@ -158,7 +158,7 @@ describe("registerMaintenanceCommands doctor action", () => {
 
     await runMaintenanceCli(["dashboard"]);
 
-    expect(runtime.error).toHaveBeenCalledWith("Error: dashboard failed");
-    expect(runtime.exit).toHaveBeenCalledWith(1);
+    expect(runtime.error).toHaveBeenCalledWith("usage: dashboard failed");
+    expect(runtime.exit).toHaveBeenCalledWith(2);
   });
 });

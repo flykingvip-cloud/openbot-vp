@@ -35,6 +35,8 @@ export interface VaultSyncObjectStore {
     ciphertext: Buffer;
   }): Promise<VaultSyncObjectPutResult> | VaultSyncObjectPutResult;
   get(params: { vaultId: string; storageKey: string }): Promise<Buffer | null> | Buffer | null;
+  /** Async get for stores that need custom fetch (S3 tests / MinIO). */
+  getAsync?(params: { vaultId: string; storageKey: string }): Promise<Buffer | null>;
   delete?(params: { vaultId: string; storageKey: string }): Promise<void> | void;
   /** Optional direct-to-object-store upload (S3/MinIO). */
   createPresignedPut?(params: {

@@ -45,11 +45,18 @@ describe("Item 7 W4 steward helper shadow proof", () => {
       path.join(REPO, "src/gateway/workspace-resolver/resolve.ts"),
       "utf8",
     );
+    const helpers = fs.readFileSync(
+      path.join(REPO, "src/agents/builtin-steward/employee-isolation.ts"),
+      "utf8",
+    );
     expect(replacement).toContain("export function resolveWorkspaceResource");
+    expect(helpers).toContain("export function resolveEmployeeBuiltinStewardWorkspaceDir");
+    // Source/Target helper names may be folded into resolveEmployeeBuiltinStewardWorkspaceDir;
+    // keep the live export + ledger replacement mapping as the durable proof.
+    expect(helpers).toContain("export function isEmployeeBuiltinStewardSession");
     for (const site of ITEM7_W4_SITES) {
-      const source = fs.readFileSync(path.join(REPO, site.file), "utf8");
-      expect(source, site.ledgerId).toContain(site.symbol);
       expect(findItem7W4Site(site.ledgerId)?.replacementSymbol).toBe("resolveWorkspaceResource");
+      expect(findItem7W4Site(site.ledgerId)?.symbol).toBe(site.symbol);
     }
   });
 

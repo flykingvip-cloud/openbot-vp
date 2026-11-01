@@ -10,16 +10,34 @@ describe("appcast.xml", () => {
     const items = [...appcast.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((match) => match[1] ?? "");
     expect(items.length).toBeGreaterThan(0);
 
-    const stableItem = items.find((item) => /<sparkle:version>\d+90<\/sparkle:version>/.test(item));
-    expect(stableItem).toBeDefined();
+    const parsed = items
+      .map((item) => {
+        const shortVersion = item.match(
+          /<sparkle:shortVersionString>([^<]+)<\/sparkle:shortVersionString>/,
+        )?.[1];
+        const sparkleVersion = item.match(/<sparkle:version>([^<]+)<\/sparkle:version>/)?.[1];
+        return { shortVersion, sparkleVersion };
+      })
+      .filter((row) => row.shortVersion && row.sparkleVersion);
 
-    const shortVersion = stableItem?.match(
-      /<sparkle:shortVersionString>([^<]+)<\/sparkle:shortVersionString>/,
-    )?.[1];
-    const sparkleVersion = stableItem?.match(/<sparkle:version>([^<]+)<\/sparkle:version>/)?.[1];
+    expect(parsed.length).toBeGreaterThan(0);
 
-    expect(shortVersion).toBeDefined();
-    expect(sparkleVersion).toBeDefined();
-    expect(sparkleVersion).toBe(String(canonicalSparkleBuildFromVersion(shortVersion!)));
+    // CalVer short versions must use the canonical Sparkle build floor.
+    const calver = parsed.find(
+      (row) => canonicalSparkleBuildFromVersion(row.shortVersion!) != null,
+    );
+    if (calver) {
+      expect(calver.sparkleVersion).toBe(
+        String(canonicalSparkleBuildFromVersion(calver.shortVersion!)),
+      );
+      return;
+    }
+
+    // Legacy semver appcast entries (e.g. 1.0.4) keep a numeric sparkle:version
+    // outside the CalVer floor mapping.
+    for (const row of parsed) {
+      expect(row.sparkleVersion).toMatch(/^\d+$/);
+      expect(canonicalSparkleBuildFromVersion(row.shortVersion!)).toBeNull();
+    }
   });
 });

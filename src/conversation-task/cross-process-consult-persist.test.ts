@@ -30,7 +30,10 @@ import {
   setDeliveryCloseConsultPersistPathForTest,
 } from "./delivery-close-consult-persist.js";
 import { CONVERSATION_TASK_ENV } from "./feature.js";
-import { ensureConversationTaskLedgerSeeded } from "./ledger-binding.js";
+import {
+  CONVERSATION_TASK_CLOSE_REQUIRES_EVIDENCE_ENV,
+  ensureConversationTaskLedgerSeeded,
+} from "./ledger-binding.js";
 import {
   CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_ENV,
   observeConversationTaskCancelPathConsult,
@@ -112,6 +115,7 @@ beforeEach(() => {
   setDeliveryCloseConsultPersistPathForTest(undefined);
   process.env[CONVERSATION_TASK_ENV.activation] = "1";
   process.env[PROGRESS_LEDGER_ENABLED_ENV] = "1";
+  process.env[CONVERSATION_TASK_CLOSE_REQUIRES_EVIDENCE_ENV] = "0";
   delete process.env[CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_ENV];
   delete process.env[CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_PERSIST_ENV];
   resetConversationTaskDeliveryCloseConsultsForTest();
@@ -124,6 +128,7 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env[CONVERSATION_TASK_ENV.activation];
   delete process.env[PROGRESS_LEDGER_ENABLED_ENV];
+  delete process.env[CONVERSATION_TASK_CLOSE_REQUIRES_EVIDENCE_ENV];
   delete process.env[CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_ENV];
   delete process.env[CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_PERSIST_ENV];
   resetConversationTaskDeliveryCloseConsultsForTest();

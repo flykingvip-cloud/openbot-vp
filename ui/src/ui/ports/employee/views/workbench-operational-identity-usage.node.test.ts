@@ -76,7 +76,7 @@ function usageSettings(partial: Partial<SettingsContract>): SettingsContract {
           provider: "personal-email",
           action: "send_email",
           result: "allowed",
-          createdAt: "2026-09-17T12:00:00.000Z",
+          createdAt: "2026-10-28T12:00:00.000Z",
           summary: {
             headline: "hedon@example.com · 周报",
             recipients: ["hedon@example.com"],
@@ -92,7 +92,7 @@ function usageSettings(partial: Partial<SettingsContract>): SettingsContract {
           provider: "wechat-official",
           action: "publish_article",
           result: "allowed",
-          createdAt: "2026-09-16T12:00:00.000Z",
+          createdAt: "2026-10-27T12:00:00.000Z",
           summary: {
             headline: "秋季发布",
             excerpt: "核心观点是把使用记录按身份对齐。",

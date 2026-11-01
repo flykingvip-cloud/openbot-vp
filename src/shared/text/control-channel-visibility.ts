@@ -177,13 +177,13 @@ function isIncompleteAngleControl(suffix: string): boolean {
     return false;
   }
   let i = 2;
-  while (i < suffix.length && /[ \t]/.test(suffix[i]!)) {
+  while (i < suffix.length && /[ \t]/.test(suffix[i])) {
     i += 1;
   }
   if (i < suffix.length && suffix[i] === "/") {
     i += 1;
   }
-  while (i < suffix.length && /[ \t]/.test(suffix[i]!)) {
+  while (i < suffix.length && /[ \t]/.test(suffix[i])) {
     i += 1;
   }
   const rest = suffix.slice(i);

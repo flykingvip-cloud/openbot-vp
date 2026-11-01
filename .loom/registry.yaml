@@ -10281,6 +10281,63 @@ tasks:
       - .kiro/specs/watchdog-task-closure/**
       - evidence/watchdog-task-closure-acceptance-*.md
       - .loom/registry.yaml
+      - .kiro/specs/gateway-plugins-monolith-decomposition/baseline/loader-registry-snapshot.json
+      - .kiro/specs/openbot-diagnosis-platform/tasks.md
+      - CHANGELOG.md
+      - docs/reference/secretref-user-supplied-credentials-matrix.json
+      - scripts/architecture/snapshot-plugin-registry.ts
+      - src/agents/sandbox/account-computer-stream.ts
+      - src/agents/tools/collaboration-board-trusted-locator.test.ts
+      - src/cli/nodes-camera.test.ts
+      - src/cli/program/register.agent.test.ts
+      - src/cli/program/register.configure.test.ts
+      - src/cli/program/register.data.test.ts
+      - src/cli/program/register.maintenance.test.ts
+      - src/cli/program/register.onboard.test.ts
+      - src/cli/program/register.setup.test.ts
+      - src/config/schema.labels.ts
+      - src/config/sessions/paths.ts
+      - src/config/talk-defaults.test.ts
+      - src/conversation-task/cross-process-consult-persist.test.ts
+      - src/conversation-task/session-task-board.ts
+      - src/cron/isolated-agent/delivery-dispatch.named-agent.test.ts
+      - src/diagnosis/intervention-case.ts
+      - src/diagnosis/production-p24.8.ts
+      - src/diagnosis/production-p26.5.ts
+      - src/diagnosis/production-provenance.test.ts
+      - src/diagnosis/report-query-production-approval.test.ts
+      - src/gateway/collaboration-learning/ensure-board-active-after-confirm.ts
+      - src/gateway/models/capability-admission/verification-service.ts
+      - src/gateway/server-methods/diagnosis-approval.ts
+      - src/infra/exec-approvals.test.ts
+      - src/infra/state-migrations.state-dir.test.ts
+      - src/infra/system-presence.version.test.ts
+      - src/integrations/device-digital-human/examples/rehearse.sh
+      - src/integrations/device-platform/examples/joint.sh
+      - src/integrations/device-platform/gateway-mount.test.ts
+      - src/memory/item7-w3-catalog-synthesis.test.ts
+      - src/memory/item7-w4-steward-helpers.test.ts
+      - src/memory/manager.mistral-provider.test.ts
+      - src/memory/qmd-manager.test.ts
+      - src/memory/search-manager.ts
+      - src/memory/u0-boundary-freeze.ts
+      - src/node-host/invoke-system-run-cwd.test.ts
+      - src/pairing/pairing-messages.test.ts
+      - src/plugins/__tests__/loader-registry-roundtrip.test.ts
+      - src/providers/google-shared.ensures-function-call-comes-after-user-turn.test.ts
+      - src/shared/text/control-channel-visibility.ts
+      - src/vault-sync/store/control-plane.ts
+      - src/vault-sync/store/object-store.ts
+      - src/version.test.ts
+      - test/appcast.test.ts
+      - test/constitutional-governance-state-convergence.test.ts
+      - ui/src/ui/collaboration/collaboration-rules-summary.test.ts
+      - ui/src/ui/ports/employee/views/workbench-operational-identity-usage.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-views.boundary.node.test.ts
+      - ui/src/ui/ports/enterprise/evolution-decision/evolution-decision.node.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/section-routing.node.test.ts
+      - ui/src/ui/session-seen-at.ts
+      - ui/src/ui/views/workbench-commands.node.test.ts
     state: active
     sessions:
       - id: 0d1b7efb-a31b-4844-bdab-61e809afd198
@@ -10320,6 +10377,7 @@ landingStreams:
     paths:
       - src/gateway/collaboration-dispatch/**
       - src/gateway/wake-round-dispatcher-boot.ts
+      - src/gateway/group-task-heartbeat-scheduler-boot.ts
       - src/gateway/workbench/pending-tasks-read-model.ts
       - src/gateway/server-methods/human-attention.ts
       - src/gateway/server-methods.ts
@@ -10332,8 +10390,66 @@ landingStreams:
       - ui/src/ui/chat/human-attention-card.node.test.ts
       - ui/src/ui/views/chat.ts
       - ui/src/ui/app-render.ts
+      - .kiro/specs/watchdog-task-closure/**
       - evidence/watchdog-task-closure-acceptance-*.md
       - .loom/registry.yaml
+      - .kiro/specs/gateway-plugins-monolith-decomposition/baseline/loader-registry-snapshot.json
+      - .kiro/specs/openbot-diagnosis-platform/tasks.md
+      - CHANGELOG.md
+      - docs/reference/secretref-user-supplied-credentials-matrix.json
+      - scripts/architecture/snapshot-plugin-registry.ts
+      - src/agents/sandbox/account-computer-stream.ts
+      - src/agents/tools/collaboration-board-trusted-locator.test.ts
+      - src/cli/nodes-camera.test.ts
+      - src/cli/program/register.agent.test.ts
+      - src/cli/program/register.configure.test.ts
+      - src/cli/program/register.data.test.ts
+      - src/cli/program/register.maintenance.test.ts
+      - src/cli/program/register.onboard.test.ts
+      - src/cli/program/register.setup.test.ts
+      - src/config/schema.labels.ts
+      - src/config/sessions/paths.ts
+      - src/config/talk-defaults.test.ts
+      - src/conversation-task/cross-process-consult-persist.test.ts
+      - src/conversation-task/session-task-board.ts
+      - src/cron/isolated-agent/delivery-dispatch.named-agent.test.ts
+      - src/diagnosis/intervention-case.ts
+      - src/diagnosis/production-p24.8.ts
+      - src/diagnosis/production-p26.5.ts
+      - src/diagnosis/production-provenance.test.ts
+      - src/diagnosis/report-query-production-approval.test.ts
+      - src/gateway/collaboration-learning/ensure-board-active-after-confirm.ts
+      - src/gateway/models/capability-admission/verification-service.ts
+      - src/gateway/server-methods/diagnosis-approval.ts
+      - src/infra/exec-approvals.test.ts
+      - src/infra/state-migrations.state-dir.test.ts
+      - src/infra/system-presence.version.test.ts
+      - src/integrations/device-digital-human/examples/rehearse.sh
+      - src/integrations/device-platform/examples/joint.sh
+      - src/integrations/device-platform/gateway-mount.test.ts
+      - src/memory/item7-w3-catalog-synthesis.test.ts
+      - src/memory/item7-w4-steward-helpers.test.ts
+      - src/memory/manager.mistral-provider.test.ts
+      - src/memory/qmd-manager.test.ts
+      - src/memory/search-manager.ts
+      - src/memory/u0-boundary-freeze.ts
+      - src/node-host/invoke-system-run-cwd.test.ts
+      - src/pairing/pairing-messages.test.ts
+      - src/plugins/__tests__/loader-registry-roundtrip.test.ts
+      - src/providers/google-shared.ensures-function-call-comes-after-user-turn.test.ts
+      - src/shared/text/control-channel-visibility.ts
+      - src/vault-sync/store/control-plane.ts
+      - src/vault-sync/store/object-store.ts
+      - src/version.test.ts
+      - test/appcast.test.ts
+      - test/constitutional-governance-state-convergence.test.ts
+      - ui/src/ui/collaboration/collaboration-rules-summary.test.ts
+      - ui/src/ui/ports/employee/views/workbench-operational-identity-usage.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-views.boundary.node.test.ts
+      - ui/src/ui/ports/enterprise/evolution-decision/evolution-decision.node.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/section-routing.node.test.ts
+      - ui/src/ui/session-seen-at.ts
+      - ui/src/ui/views/workbench-commands.node.test.ts
     canLandWith: []
     metadata:
       task: watchdog-task-closure:grok-sentinel-link

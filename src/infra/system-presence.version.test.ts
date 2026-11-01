@@ -20,9 +20,9 @@ describe("system-presence version fallback", () => {
         npm_package_version: "1.0.0-package",
       },
       async ({ listSystemPresence }) => {
-        const { VERSION } = await import("../version.js");
+        const { VERSION, resolveUsableRuntimeVersion } = await import("../version.js");
         const selfEntry = listSystemPresence().find((entry) => entry.reason === "self");
-        expect(selfEntry?.version).toBe(VERSION);
+        expect(selfEntry?.version).toBe(resolveUsableRuntimeVersion(VERSION) ?? "2.4.6-service");
       },
     );
   });
@@ -49,9 +49,9 @@ describe("system-presence version fallback", () => {
         npm_package_version: "1.0.0-package",
       },
       async ({ listSystemPresence }) => {
-        const { VERSION } = await import("../version.js");
+        const { VERSION, resolveUsableRuntimeVersion } = await import("../version.js");
         const selfEntry = listSystemPresence().find((entry) => entry.reason === "self");
-        expect(selfEntry?.version).toBe(VERSION);
+        expect(selfEntry?.version).toBe(resolveUsableRuntimeVersion(VERSION) ?? "1.0.0-package");
       },
     );
   });

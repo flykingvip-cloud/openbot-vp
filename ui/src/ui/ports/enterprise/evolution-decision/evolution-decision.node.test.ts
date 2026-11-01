@@ -243,6 +243,7 @@ describe("enterprise decision client", () => {
       "reject",
       "rollback",
       "start_experiment",
+      "approve_application",
       "apply_canary",
       "verify",
       "promote",
@@ -253,7 +254,6 @@ describe("enterprise decision client", () => {
     for (const action of [
       "employee_final_authorization",
       "authorize",
-      "approve_application",
       "working-dna",
       "capsule",
       "managed-memory",

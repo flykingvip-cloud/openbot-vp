@@ -31,16 +31,31 @@ const saved = {
 afterEach(async () => {
   clearRuntimeConfigSnapshot();
   clearConfigCache();
-  if (saved.state === undefined) delete process.env.OPENBOT_STATE_DIR;
-  else process.env.OPENBOT_STATE_DIR = saved.state;
-  if (saved.tenants === undefined) delete process.env.OPENBOT_TENANTS_ROOT;
-  else process.env.OPENBOT_TENANTS_ROOT = saved.tenants;
-  if (saved.config === undefined) delete process.env.OPENBOT_CONFIG_PATH;
-  else process.env.OPENBOT_CONFIG_PATH = saved.config;
-  if (saved.legacyConfig === undefined) delete process.env.OPENCLAW_CONFIG_PATH;
-  else process.env.OPENCLAW_CONFIG_PATH = saved.legacyConfig;
-  if (saved.profile === undefined) delete process.env.OPENBOT_SECURITY_PROFILE;
-  else process.env.OPENBOT_SECURITY_PROFILE = saved.profile;
+  if (saved.state === undefined) {
+    delete process.env.OPENBOT_STATE_DIR;
+  } else {
+    process.env.OPENBOT_STATE_DIR = saved.state;
+  }
+  if (saved.tenants === undefined) {
+    delete process.env.OPENBOT_TENANTS_ROOT;
+  } else {
+    process.env.OPENBOT_TENANTS_ROOT = saved.tenants;
+  }
+  if (saved.config === undefined) {
+    delete process.env.OPENBOT_CONFIG_PATH;
+  } else {
+    process.env.OPENBOT_CONFIG_PATH = saved.config;
+  }
+  if (saved.legacyConfig === undefined) {
+    delete process.env.OPENCLAW_CONFIG_PATH;
+  } else {
+    process.env.OPENCLAW_CONFIG_PATH = saved.legacyConfig;
+  }
+  if (saved.profile === undefined) {
+    delete process.env.OPENBOT_SECURITY_PROFILE;
+  } else {
+    process.env.OPENBOT_SECURITY_PROFILE = saved.profile;
+  }
   await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
@@ -193,12 +208,7 @@ describe("collaboration_board trusted locator", () => {
     const taskFile = path.join(groupLocator, "tasks.json");
     const taskRaw = await fs.readFile(taskFile, "utf8");
     expect(taskRaw).toContain(taskId);
-    const hostGroup = path.join(
-      stateDir,
-      "collaboration",
-      "groups",
-      encodeURIComponent(groupId),
-    );
+    const hostGroup = path.join(stateDir, "collaboration", "groups", encodeURIComponent(groupId));
     await expect(fs.stat(hostGroup)).rejects.toThrow();
   });
 
@@ -238,12 +248,7 @@ describe("collaboration_board trusted locator", () => {
       code: TRUSTED_GROUP_LOCATOR_REQUIRED,
     });
 
-    const hostGroup = path.join(
-      stateDir,
-      "collaboration",
-      "groups",
-      encodeURIComponent(groupId),
-    );
+    const hostGroup = path.join(stateDir, "collaboration", "groups", encodeURIComponent(groupId));
     await expect(fs.stat(hostGroup)).rejects.toThrow();
   });
 

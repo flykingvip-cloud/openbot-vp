@@ -46,7 +46,7 @@ describe("registerConfigureCommand", () => {
 
     await runCli(["configure"]);
 
-    expect(runtime.error).toHaveBeenCalledWith("Error: configure failed");
-    expect(runtime.exit).toHaveBeenCalledWith(1);
+    expect(runtime.error).toHaveBeenCalledWith("usage: configure failed");
+    expect(runtime.exit).toHaveBeenCalledWith(2);
   });
 });

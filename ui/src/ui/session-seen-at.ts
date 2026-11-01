@@ -351,20 +351,21 @@ function isOwnOwnerPartitionedSessionSeenKey(key: string, ownOwner: string): boo
  * steward identity becomes known / changes.
  */
 export function scrubSessionSeenAtForOwnSteward(
-  sessionSeenAt: Record<string, number>,
+  sessionSeenAt: Record<string, number> | null | undefined,
   ownStewardSessionKey: string | null | undefined,
   options?: { tenantId?: string | null; spaceMode?: SessionSeenSpaceMode },
 ): Record<string, number> {
+  const source = sessionSeenAt ?? {};
   const own = ownStewardSessionKey?.trim() || "";
   const ownOwner = extractEmployeeStewardOwnerFromSessionKey(own);
   if (!ownOwner) {
-    return sessionSeenAt;
+    return source;
   }
   const spaceMode = options?.spaceMode ?? "personal";
 
   let mutated = false;
   const next: Record<string, number> = {};
-  for (const [key, value] of Object.entries(sessionSeenAt)) {
+  for (const [key, value] of Object.entries(source)) {
     if (typeof value !== "number" || !Number.isFinite(value)) {
       continue;
     }
@@ -403,5 +404,5 @@ export function scrubSessionSeenAtForOwnSteward(
     }
     next[key] = value;
   }
-  return mutated ? next : sessionSeenAt;
+  return mutated ? next : source;
 }

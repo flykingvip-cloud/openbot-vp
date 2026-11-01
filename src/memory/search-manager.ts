@@ -32,6 +32,7 @@ import type {
 const log = createSubsystemLogger("memory");
 const COGNIWEAVE_MANAGER_CACHE = new Map<string, MemorySearchManager>();
 const QMD_MANAGER_CACHE = new Map<string, MemorySearchManager>();
+const BUILTIN_WRAP_CACHE = new WeakMap<object, MemorySearchManager>();
 let managerRuntimePromise: Promise<typeof import("./manager-runtime.js")> | null = null;
 
 export {
@@ -352,7 +353,18 @@ export async function getMemorySearchManager(
         tenantId: authz.tenantId,
       },
     });
-    return { manager: withRecallDeny(manager, dataRoot) };
+    if (!manager) {
+      return { manager: null };
+    }
+    const cachedWrap = BUILTIN_WRAP_CACHE.get(manager);
+    if (cachedWrap) {
+      return { manager: cachedWrap };
+    }
+    const wrapped = withRecallDeny(manager, dataRoot);
+    if (wrapped) {
+      BUILTIN_WRAP_CACHE.set(manager, wrapped);
+    }
+    return { manager: wrapped };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { manager: null, error: message };

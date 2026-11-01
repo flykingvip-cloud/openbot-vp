@@ -562,6 +562,15 @@ export class VaultSyncControlPlane {
     encryptionVersion: number;
     members: VaultMemberRecord[];
   } {
+    // Validate CAS before any mutation so a version conflict cannot leave a
+    // half-applied revoke behind.
+    const current = this.getVault(params.vaultId);
+    if (!current) {
+      throw new Error("vault not found");
+    }
+    if (params.expectedCurrentEncryptionVersion !== current.encryptionVersion) {
+      throw new Error("encryption version conflict");
+    }
     this.revokeMember({
       vaultId: params.vaultId,
       memberAccountId: params.memberAccountId,
@@ -581,6 +590,12 @@ export class VaultSyncControlPlane {
     if (!revoked) {
       throw new Error("member not found after revoke");
     }
+    this.appendAuditEvent(params.vaultId, {
+      eventType: "member_revoked_and_rotated",
+      memberAccountId: params.memberAccountId,
+      encryptionVersion: vault.encryptionVersion,
+      at: new Date().toISOString(),
+    });
     return {
       revoked,
       encryptionVersion: vault.encryptionVersion,
@@ -811,6 +826,8 @@ export class VaultSyncControlPlane {
       updatedAt: now,
       completedBlobId: null,
       httpUploadToken: randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, ""),
+      objectUploadBlobId:
+        typeof this.objectStore.createPresignedPut === "function" ? uploadId : null,
     };
     fs.mkdirSync(this.uploadDir(params.vaultId, uploadId), { recursive: true, mode: 0o700 });
     this.writeUploadMeta(session);
@@ -938,6 +955,66 @@ export class VaultSyncControlPlane {
     vaultId: string;
     uploadId: string;
   }): Promise<BlobRecord> {
+    const session = this.readUploadMeta(params.vaultId, params.uploadId);
+    if (!session) {
+      throw new Error("upload session not found");
+    }
+    if (session.status === "completed" && session.completedBlobId) {
+      const existing = this.getBlobRecord(session.vaultId, session.completedBlobId);
+      if (existing) {
+        return existing;
+      }
+    }
+    const objectBlobId = session.objectUploadBlobId?.trim();
+    if (objectBlobId && typeof this.objectStore.getAsync === "function") {
+      if (session.status !== "open") {
+        throw new Error("upload session not open");
+      }
+      const storageKey =
+        typeof this.objectStore.buildStorageKey === "function"
+          ? this.objectStore.buildStorageKey(session.vaultId, objectBlobId)
+          : `${session.vaultId}/${objectBlobId}`;
+      const ciphertext = await this.objectStore.getAsync({
+        vaultId: session.vaultId,
+        storageKey,
+      });
+      if (!ciphertext || ciphertext.length !== session.totalSizeBytes) {
+        throw new Error("upload incomplete");
+      }
+      const actual = createHash("sha256").update(ciphertext).digest("hex");
+      if (actual !== session.ciphertextHash) {
+        throw new Error("ciphertext hash mismatch");
+      }
+      // Object already resides at the presigned key; register blob metadata without re-put.
+      const vault = this.getVault(session.vaultId);
+      if (!vault) {
+        throw new Error("vault not found");
+      }
+      if (vault.usageBytes + ciphertext.length > vault.quotaBytes) {
+        throw new Error("quota exceeded");
+      }
+      const record: BlobRecord = {
+        blobId: objectBlobId,
+        vaultId: session.vaultId,
+        sizeBytes: ciphertext.length,
+        ciphertextHash: session.ciphertextHash,
+        storageKey,
+        createdAt: new Date().toISOString(),
+      };
+      const blobsFile = path.join(this.vaultDir(session.vaultId), "blobs.json");
+      const blobs = this.readJson<BlobRecord[]>(blobsFile, []);
+      blobs.push(record);
+      this.writeJson(blobsFile, blobs);
+      vault.usageBytes += ciphertext.length;
+      this.writeJson(path.join(this.vaultDir(session.vaultId), "vault.json"), vault);
+      this.mirrorVault(vault);
+      this.mirrorBlob(record);
+      session.status = "completed";
+      session.completedBlobId = record.blobId;
+      session.updatedAt = new Date().toISOString();
+      this.writeUploadMeta(session);
+      return record;
+    }
     return this.completeUploadSession(params);
   }
 

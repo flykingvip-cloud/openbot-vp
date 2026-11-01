@@ -64,7 +64,7 @@ describe("buildCollaborationRulesDrawerSections (server-rendered effective, BP-2
     ).toBe(true);
   });
 
-  it("never shows runtime-unexecuted 可自推进 even when the group stores it as true", () => {
+  it("shows 可自推进 when the group stores it as true (now runtime-enforced)", () => {
     const view = serverView({
       collaborationPolicy: {
         mentionBotMustRespond: true,
@@ -72,19 +72,23 @@ describe("buildCollaborationRulesDrawerSections (server-rendered effective, BP-2
       },
     });
     expect(view.effective.governance.botMaySelfAdvanceWithoutHuman).toBe(true);
-    expect(view.runtimeNotEnforced).toContain("governance.botMaySelfAdvanceWithoutHuman");
+    expect(view.runtimeNotEnforced).not.toContain("governance.botMaySelfAdvanceWithoutHuman");
+    expect(view.runtimeNotEnforced).toContain("participation.proactiveBots");
     const lines = buildCollaborationRulesSummary({ effectivePolicy: view });
-    expect(lines.filter((line) => line.includes("自推进"))).toEqual([]);
+    expect(lines.some((line) => line.includes("自推进"))).toBe(true);
   });
 
-  it("would show 可自推进 only once the server stops listing it as not enforced", () => {
+  it("hides 可自推进 when the server still lists it as not enforced", () => {
     const view = serverView({
       collaborationPolicy: { mentionBotMustRespond: true, botMaySelfAdvanceWithoutHuman: true },
     });
     const lines = buildCollaborationRulesSummary({
-      effectivePolicy: { ...view, runtimeNotEnforced: [] },
+      effectivePolicy: {
+        ...view,
+        runtimeNotEnforced: ["governance.botMaySelfAdvanceWithoutHuman"],
+      },
     });
-    expect(lines.some((line) => line.includes("自推进"))).toBe(true);
+    expect(lines.filter((line) => line.includes("自推进"))).toEqual([]);
   });
 
   it("treats final-decision and proposal lines as live governance, not pending storage", () => {

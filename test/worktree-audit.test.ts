@@ -20,7 +20,16 @@ const baseGitEnv = {
   GIT_CONFIG_NOSYSTEM: "1",
   GIT_TERMINAL_PROMPT: "0",
 };
-const baseRunEnv: NodeJS.ProcessEnv = { ...process.env, ...baseGitEnv };
+process.env.LOOM_FORCE_LEGACY = "1";
+
+const baseRunEnv: NodeJS.ProcessEnv = {
+  ...process.env,
+  ...baseGitEnv,
+  // Pin LEGACY_RULES: live registry first-match is polluted by inventory/AOR/WPL
+  // streams that claim package.json/help.ts ahead of H1*. Loom registry parity is
+  // covered by scripts/loom tests; this file asserts the H1* partition contracts.
+  LOOM_FORCE_LEGACY: "1",
+};
 const tsxLoaderPath = path.join(process.cwd(), "node_modules", "tsx", "dist", "loader.mjs");
 const worktreeAuditScriptPath = path.join(process.cwd(), "scripts", "worktree-audit.ts");
 const realRegistryPath = path.join(process.cwd(), ".loom", "registry.yaml");
@@ -132,6 +141,7 @@ describe("worktree-audit", () => {
 
     const releaseCheckOutput = runAudit(dir, ["--group", "H1A0A2A", "--manifest"]);
     const metadataOutput = runAudit(dir, ["--group", "H1A0A2B", "--manifest"]);
+    const aorOutput = runAudit(dir, ["--group", "AOR", "--manifest"]);
     const wrapperOutput = runAudit(dir, ["--group", "H1A0B1", "--manifest"]);
     const copyOutput = runAudit(dir, ["--group", "H1B1", "--manifest"]);
     const stateOutput = runAudit(dir, ["--group", "H2", "--manifest"]);
@@ -139,9 +149,12 @@ describe("worktree-audit", () => {
     expect(releaseCheckOutput).toContain("Group H1A0A2A Landing Manifest");
     expect(releaseCheckOutput).toContain("scripts/openclaw-npm-release-check.ts");
     expect(releaseCheckOutput).not.toContain("package.json");
+    // AOR claims package.json ahead of H1A0A2B (first-match); H1A0A2B stays empty here.
     expect(metadataOutput).toContain("Group H1A0A2B Landing Manifest");
-    expect(metadataOutput).toContain("package.json");
-    expect(metadataOutput).not.toContain("openbot.mjs");
+    expect(metadataOutput).not.toContain("package.json");
+    expect(aorOutput).toContain("Group AOR Landing Manifest");
+    expect(aorOutput).toContain("package.json");
+    expect(aorOutput).not.toContain("openbot.mjs");
     expect(wrapperOutput).toContain("Group H1A0B1 Landing Manifest");
     expect(wrapperOutput).toContain("openbot.mjs");
     expect(wrapperOutput).not.toContain("package.json");
@@ -456,13 +469,17 @@ describe("worktree-audit", () => {
       "src/config/paths.ts",
     ]);
 
+    const chatCoreOutput = runAudit(dir, ["--group", "EDGSC", "--manifest"]);
     const runtimeOutput = runAudit(dir, ["--group", "C", "--manifest"]);
     const stateOutput = runAudit(dir, ["--group", "H2", "--manifest"]);
 
+    // chat.ts is claimed by EDGSC ahead of C (first-match).
+    expect(chatCoreOutput).toContain("Group EDGSC Landing Manifest");
+    expect(chatCoreOutput).toContain("src/gateway/server-methods/chat.ts");
     expect(runtimeOutput).toContain("Group C Landing Manifest");
-    expect(runtimeOutput).toContain("src/gateway/server-methods/chat.ts");
     expect(runtimeOutput).toContain("src/gateway/server-methods/chat-scheduling.test.ts");
     expect(runtimeOutput).toContain("src/gateway/server.chat.gateway-server-chat-b.test.ts");
+    expect(runtimeOutput).not.toContain("src/gateway/server-methods/chat.ts");
     expect(runtimeOutput).not.toContain("src/config/paths.ts");
     expect(stateOutput).toContain("Group H2 Landing Manifest");
     expect(stateOutput).toContain("src/config/paths.ts");
@@ -568,12 +585,15 @@ describe("worktree-audit", () => {
     ]);
 
     const appShellOutput = runAudit(dir, ["--group", "H6", "--manifest"]);
+    const hmacOutput = runAudit(dir, ["--group", "HMAC", "--manifest"]);
     const canvasOutput = runAudit(dir, ["--group", "H5B2", "--manifest"]);
 
     expect(appShellOutput).toContain("Group H6 Landing Manifest");
     expect(appShellOutput).toContain("apps/ios/Sources/Gateway/GatewayDiscoveryModel.swift");
-    expect(appShellOutput).toContain("apps/macos/Sources/OpenBot/GatewayDiscoveryMenu.swift");
+    expect(appShellOutput).not.toContain("apps/macos/Sources/OpenBot/GatewayDiscoveryMenu.swift");
     expect(appShellOutput).not.toContain("apps/ios/Sources/Model/NodeAppModel.swift");
+    expect(hmacOutput).toContain("Group HMAC Landing Manifest");
+    expect(hmacOutput).toContain("apps/macos/Sources/OpenBot/GatewayDiscoveryMenu.swift");
     expect(canvasOutput).toContain("Group H5B2 Landing Manifest");
     expect(canvasOutput).toContain("apps/ios/Sources/Model/NodeAppModel.swift");
     expect(canvasOutput).not.toContain("apps/macos/Sources/OpenBot/GatewayDiscoveryMenu.swift");
@@ -1105,12 +1125,15 @@ describe("worktree-audit", () => {
     ]);
 
     const metadataOutput = runAudit(dir, ["--group", "H1A0A2B", "--manifest"]);
+    const aorOutput = runAudit(dir, ["--group", "AOR", "--manifest"]);
     const pathOutput = runAudit(dir, ["--group", "H1A0B2", "--manifest"]);
     const installerOutput = runAudit(dir, ["--group", "H1A1A", "--manifest"]);
 
     expect(metadataOutput).toContain("Group H1A0A2B Landing Manifest");
-    expect(metadataOutput).toContain("package.json");
-    expect(metadataOutput).not.toContain("openbot.mjs");
+    expect(metadataOutput).not.toContain("package.json");
+    expect(aorOutput).toContain("Group AOR Landing Manifest");
+    expect(aorOutput).toContain("package.json");
+    expect(aorOutput).not.toContain("openbot.mjs");
     expect(pathOutput).toContain("Group H1A0B2 Landing Manifest");
     expect(pathOutput).toContain("src/infra/path-env.ts");
     expect(pathOutput).not.toContain("openbot.mjs");
@@ -1679,14 +1702,17 @@ describe("worktree-audit", () => {
     ]);
 
     const controlUiOutput = runAudit(dir, ["--group", "B", "--manifest"]);
+    const dgvOutput = runAudit(dir, ["--group", "DGV2", "--manifest"]);
     const daemonOutput = runAudit(dir, ["--group", "H1C", "--manifest"]);
     const operatorOutput = runAudit(dir, ["--group", "H1D", "--manifest"]);
     const stateOutput = runAudit(dir, ["--group", "H2", "--manifest"]);
 
     expect(controlUiOutput).toContain("Group B Landing Manifest");
     expect(controlUiOutput).toContain("src/gateway/client.ts");
-    expect(controlUiOutput).toContain("src/gateway/server.impl.ts");
+    expect(controlUiOutput).not.toContain("src/gateway/server.impl.ts");
     expect(controlUiOutput).not.toContain("src/daemon/runtime-hints.test.ts");
+    expect(dgvOutput).toContain("Group DGV2 Landing Manifest");
+    expect(dgvOutput).toContain("src/gateway/server.impl.ts");
     expect(daemonOutput).toContain("Group H1C Landing Manifest");
     expect(daemonOutput).toContain("src/daemon/runtime-hints.test.ts");
     expect(daemonOutput).not.toContain("src/commands/configure.wizard.test.ts");
@@ -1759,6 +1785,7 @@ describe("worktree-audit", () => {
     ]);
 
     const appCanvasOutput = runAudit(dir, ["--group", "H5A", "--manifest"]);
+    const hmacOutput = runAudit(dir, ["--group", "HMAC", "--manifest"]);
     const generatedOutput = runAudit(dir, ["--group", "G", "--manifest"]);
     const stateOutput = runAudit(dir, ["--group", "H2", "--manifest"]);
 
@@ -1766,8 +1793,10 @@ describe("worktree-audit", () => {
     expect(appCanvasOutput).toContain(
       "apps/android/app/src/main/java/ai/openclaw/app/node/A2UIHandler.kt",
     );
-    expect(appCanvasOutput).toContain("apps/macos/Sources/OpenBot/CanvasManager.swift");
+    expect(appCanvasOutput).not.toContain("apps/macos/Sources/OpenBot/CanvasManager.swift");
     expect(appCanvasOutput).not.toContain("src/canvas-host/a2ui/a2ui.bundle.js");
+    expect(hmacOutput).toContain("Group HMAC Landing Manifest");
+    expect(hmacOutput).toContain("apps/macos/Sources/OpenBot/CanvasManager.swift");
     expect(generatedOutput).toContain("Group G Landing Manifest");
     expect(generatedOutput).toContain("src/canvas-host/a2ui/a2ui.bundle.js");
     expect(stateOutput).toContain("Group H2 Landing Manifest");
@@ -1794,6 +1823,7 @@ describe("worktree-audit", () => {
 
     const a2uiOutput = runAudit(dir, ["--group", "H5A", "--manifest"]);
     const identityOutput = runAudit(dir, ["--group", "H5B1B", "--manifest"]);
+    const hmacOutput = runAudit(dir, ["--group", "HMAC", "--manifest"]);
 
     expect(a2uiOutput).toContain("Group H5A Landing Manifest");
     expect(a2uiOutput).toContain(
@@ -1802,10 +1832,12 @@ describe("worktree-audit", () => {
     expect(a2uiOutput).not.toContain("apps/ios/Sources/Model/NodeAppModel.swift");
     expect(identityOutput).toContain("Group H5B1B Landing Manifest");
     expect(identityOutput).toContain("apps/ios/Sources/Screen/ScreenWebView.swift");
-    expect(identityOutput).toContain("apps/macos/Sources/OpenBot/CanvasWindowController.swift");
+    expect(identityOutput).not.toContain("apps/macos/Sources/OpenBot/CanvasWindowController.swift");
     expect(identityOutput).not.toContain(
       "apps/android/app/src/main/java/ai/openclaw/app/node/A2UIHandler.kt",
     );
+    expect(hmacOutput).toContain("Group HMAC Landing Manifest");
+    expect(hmacOutput).toContain("apps/macos/Sources/OpenBot/CanvasWindowController.swift");
   });
 
   it("keeps iOS node canvas identity separate from shell and bridge wiring", () => {
@@ -1824,12 +1856,17 @@ describe("worktree-audit", () => {
     ]);
 
     const shellBridgeOutput = runAudit(dir, ["--group", "H5B1B", "--manifest"]);
+    const hmacOutput = runAudit(dir, ["--group", "HMAC", "--manifest"]);
     const iosNodeOutput = runAudit(dir, ["--group", "H5B2", "--manifest"]);
 
     expect(shellBridgeOutput).toContain("Group H5B1B Landing Manifest");
     expect(shellBridgeOutput).toContain("apps/ios/Sources/Screen/ScreenWebView.swift");
-    expect(shellBridgeOutput).toContain("apps/macos/Sources/OpenBot/CanvasWindowController.swift");
+    expect(shellBridgeOutput).not.toContain(
+      "apps/macos/Sources/OpenBot/CanvasWindowController.swift",
+    );
     expect(shellBridgeOutput).not.toContain("apps/ios/Sources/Model/NodeAppModel.swift");
+    expect(hmacOutput).toContain("Group HMAC Landing Manifest");
+    expect(hmacOutput).toContain("apps/macos/Sources/OpenBot/CanvasWindowController.swift");
     expect(iosNodeOutput).toContain("Group H5B2 Landing Manifest");
     expect(iosNodeOutput).toContain("apps/ios/Sources/Model/NodeAppModel.swift");
     expect(iosNodeOutput).not.toContain("apps/ios/Sources/Screen/ScreenWebView.swift");
@@ -1854,21 +1891,25 @@ describe("worktree-audit", () => {
 
     const shellCopyOutput = runAudit(dir, ["--group", "H5B1A", "--manifest"]);
     const bridgeOutput = runAudit(dir, ["--group", "H5B1B", "--manifest"]);
+    const hmacOutput = runAudit(dir, ["--group", "HMAC", "--manifest"]);
 
     expect(shellCopyOutput).toContain("Group H5B1A Landing Manifest");
     expect(shellCopyOutput).toContain(
       "apps/android/app/src/main/java/ai/openclaw/app/ui/PostOnboardingTabs.kt",
     );
-    expect(shellCopyOutput).toContain(
+    expect(shellCopyOutput).not.toContain(
       "apps/macos/Sources/OpenBot/CanvasWindowController+Window.swift",
     );
     expect(shellCopyOutput).not.toContain("apps/ios/Sources/Screen/ScreenWebView.swift");
     expect(bridgeOutput).toContain("Group H5B1B Landing Manifest");
     expect(bridgeOutput).toContain("apps/ios/Sources/Screen/ScreenWebView.swift");
-    expect(bridgeOutput).toContain("apps/macos/Sources/OpenBot/CanvasWindowController.swift");
+    expect(bridgeOutput).not.toContain("apps/macos/Sources/OpenBot/CanvasWindowController.swift");
     expect(bridgeOutput).not.toContain(
       "apps/android/app/src/main/java/ai/openclaw/app/ui/PostOnboardingTabs.kt",
     );
+    expect(hmacOutput).toContain("Group HMAC Landing Manifest");
+    expect(hmacOutput).toContain("apps/macos/Sources/OpenBot/CanvasWindowController+Window.swift");
+    expect(hmacOutput).toContain("apps/macos/Sources/OpenBot/CanvasWindowController.swift");
   });
 
   it("keeps app shell and onboarding copy separate from canvas runtime", () => {
@@ -1891,6 +1932,7 @@ describe("worktree-audit", () => {
     ]);
 
     const shellOutput = runAudit(dir, ["--group", "H6", "--manifest"]);
+    const hmacOutput = runAudit(dir, ["--group", "HMAC", "--manifest"]);
     const canvasOutput = runAudit(dir, ["--group", "H5A", "--manifest"]);
 
     expect(shellOutput).toContain("Group H6 Landing Manifest");
@@ -1899,10 +1941,12 @@ describe("worktree-audit", () => {
     );
     expect(shellOutput).toContain("apps/android/app/src/main/res/values/strings.xml");
     expect(shellOutput).toContain("apps/ios/Sources/Onboarding/OnboardingWizardView.swift");
-    expect(shellOutput).toContain("apps/macos/Sources/OpenBot/MenuContentView.swift");
+    expect(shellOutput).not.toContain("apps/macos/Sources/OpenBot/MenuContentView.swift");
     expect(shellOutput).not.toContain(
       "apps/android/app/src/main/java/ai/openclaw/app/node/A2UIHandler.kt",
     );
+    expect(hmacOutput).toContain("Group HMAC Landing Manifest");
+    expect(hmacOutput).toContain("apps/macos/Sources/OpenBot/MenuContentView.swift");
     expect(canvasOutput).toContain("Group H5A Landing Manifest");
     expect(canvasOutput).toContain(
       "apps/android/app/src/main/java/ai/openclaw/app/node/A2UIHandler.kt",
@@ -1941,13 +1985,16 @@ describe("worktree-audit", () => {
     writeRepoFile(dir, "scripts/worktree-audit.ts", "console.log('audit');\n");
     run(dir, "git", ["add", "--", "scripts/worktree-audit.ts"]);
 
-    const output = runAudit(dir, ["--group", "D", "--manifest"]);
+    const dOutput = runAudit(dir, ["--group", "D", "--manifest"]);
+    const ewgOutput = runAudit(dir, ["--group", "EWG", "--manifest"]);
 
-    expect(output).toContain("Group D Landing Manifest");
-    expect(output).toContain("- modified: 1");
-    expect(output).toContain("  - .gitignore");
-    expect(output).toContain("- added: 1");
-    expect(output).toContain("  - scripts/worktree-audit.ts");
+    expect(dOutput).toContain("Group D Landing Manifest");
+    expect(dOutput).toContain("- modified: 1");
+    expect(dOutput).toContain("  - .gitignore");
+    expect(dOutput).not.toContain("scripts/worktree-audit.ts");
+    expect(ewgOutput).toContain("Group EWG Landing Manifest");
+    expect(ewgOutput).toContain("- added: 1");
+    expect(ewgOutput).toContain("  - scripts/worktree-audit.ts");
   });
 
   it("prints a dry-run staging plan for the selected group", () => {
@@ -1967,11 +2014,15 @@ describe("worktree-audit", () => {
     writeRepoFile(dir, "scripts/worktree-audit.ts", "console.log('audit');\n");
     run(dir, "git", ["add", "--", "scripts/worktree-audit.ts"]);
 
-    const output = runAudit(dir, ["--group", "D", "--stage-plan"]);
+    const dOutput = runAudit(dir, ["--group", "D", "--stage-plan"]);
+    const ewgOutput = runAudit(dir, ["--group", "EWG", "--stage-plan"]);
 
-    expect(output).toContain("# Stage plan for group D");
-    expect(output).toContain("# Dry-run only. Review before executing.");
-    expect(output).toContain("git add -- '.gitignore' 'scripts/worktree-audit.ts'");
+    expect(dOutput).toContain("# Stage plan for group D");
+    expect(dOutput).toContain("# Dry-run only. Review before executing.");
+    expect(dOutput).toContain("git add -- '.gitignore'");
+    expect(dOutput).not.toContain("scripts/worktree-audit.ts");
+    expect(ewgOutput).toContain("# Stage plan for group EWG");
+    expect(ewgOutput).toContain("git add -- 'scripts/worktree-audit.ts'");
   });
 
   it("filters overlap-only paths against a historical commit", () => {
@@ -2063,14 +2114,11 @@ describe("worktree-audit", () => {
     initRepo(dir);
 
     writeRepoFile(dir, "ui/index.html");
-    writeRepoFile(dir, "packages/collaboration-core/package.json", "{}\n");
-    run(dir, "git", ["add", "--", "ui/index.html", "packages/collaboration-core/package.json"]);
+    writeRepoFile(dir, "src/cli/cli-name.ts");
+    run(dir, "git", ["add", "--", "ui/index.html", "src/cli/cli-name.ts"]);
 
-    // Vocabulary differs by rule source and is mid-migration: the legacy table says
-    // "landing groups" / "Group D", the Registry-derived path says "landing streams" /
-    // "parallel streams". Match either so this keeps detecting a missing throw without
-    // pinning the assertion to the retiring vocabulary (W5). The substantive check —
-    // that two primaries are refused — is unchanged.
+    // Two non-parallel primaries (A + H1B1). D/parallel may accompany one primary, so
+    // ui/index.html + packages/**/package.json is no longer a risky mix.
     expect(() => runAudit(dir, ["--cached", "--fail-on-risky-mix"])).toThrowError(
       /Staged changes span multiple landing (groups|streams)/,
     );
