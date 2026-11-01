@@ -101,16 +101,15 @@ export function classifyAncestry(prior: string, current: string, git: GitRunner)
     };
   }
 
-  const shallow = isShallowRepository(git);
-  if (shallow) {
-    const mergeBase = git(["merge-base", prior, current]);
-    if (mergeBase.code !== 0) {
-      return {
-        kind: "incomplete-graph",
-        reason:
-          "shallow repository and empty/failed merge-base; truncation not ruled out under the current object graph",
-      };
-    }
+  // Shallow stores can yield false non-ancestor even when merge-base succeeds:
+  // parent-chain truncation along either tip has not been ruled out, so never
+  // adjudicate a proven regression until the graph is deepened.
+  if (isShallowRepository(git)) {
+    return {
+      kind: "incomplete-graph",
+      reason:
+        "shallow repository; related parent-chain truncation not ruled out under the current object graph",
+    };
   }
 
   return { kind: "regression" };

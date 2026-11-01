@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -298,7 +298,7 @@ describe("auditLedger", () => {
     expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
   });
 
-  it("flags shallow truncation with empty merge-base as incomplete-graph, not regression", () => {
+  it("flags shallow graphs as incomplete-graph even when merge-base would succeed", () => {
     const rows = [
       row({
         seq: 1,
@@ -309,11 +309,16 @@ describe("auditLedger", () => {
       }),
       row({ seq: 2, gatewaySha: "c9", uiSha: "c9", imageTag: "rc-amd64-provenance-c9" }),
     ];
-    const audit = auditLedger(rows, ancestryRunner({ c9: [] }, { shallow: true }));
+    // ancestors empty → not forward; stub merge-base still returns a base when not shallow,
+    // but shallow must stay incomplete regardless.
+    const audit = auditLedger(
+      rows,
+      ancestryRunner({ c9: [] }, { shallow: true, parents: { c9: ["c0"], c1: ["c0"] } }),
+    );
     expect(audit.ok).toBe(false);
     const finding = audit.findings.find((f) => f.code === "incomplete-graph");
     expect(finding).toBeDefined();
-    expect(finding?.message).toContain("current object graph");
+    expect(finding?.message).toMatch(/shallow|truncation|current object graph/i);
     expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
   });
 
@@ -338,6 +343,125 @@ describe("auditLedger", () => {
     expect(audit.ok).toBe(false);
     expect(audit.findings.some((f) => f.code === "incomplete-graph")).toBe(true);
     expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+  });
+
+  it("aggregates gateway/UI candidates so missing-object outranks an earlier regression", () => {
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: "prior1",
+        uiSha: "prior1",
+        imageTag: "rc-amd64-provenance-prior1",
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({
+        seq: 2,
+        gatewaySha: "gw",
+        uiSha: "ui",
+        imageTag: "rc-amd64-provenance-ui",
+      }),
+    ];
+    // gw: complete non-ancestor → would be regression; ui: missing tip → missing-object.
+    // First candidate is gw; aggregation must still surface the unknown.
+    const audit = auditLedger(
+      rows,
+      ancestryRunner({ gw: [], ui: ["prior1"] }, { missing: ["ui"] }),
+    );
+    expect(audit.ok).toBe(false);
+    expect(audit.findings.some((f) => f.code === "missing-object")).toBe(true);
+    expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+  });
+
+  it("aggregates incomplete-graph over regression across overlay candidates", () => {
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: "prior1",
+        uiSha: "prior1",
+        imageTag: "rc-amd64-provenance-prior1",
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({
+        seq: 2,
+        gatewaySha: "gw",
+        uiSha: "ui",
+        imageTag: "rc-amd64-provenance-ui",
+      }),
+    ];
+    const audit = auditLedger(rows, ancestryRunner({ gw: [], ui: [] }, { shallow: true }));
+    expect(audit.ok).toBe(false);
+    expect(audit.findings.some((f) => f.code === "incomplete-graph")).toBe(true);
+    expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+  });
+
+  it("real git fixture keeps unknown as ERROR (exit-30 posture)", () => {
+    const root = mkdtempSync(join(tmpdir(), "openbot-ledger-classify-real-"));
+    const run = (cwd: string, args: string[]) => {
+      const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+      if ((result.status ?? 1) !== 0) {
+        throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
+      }
+    };
+    run(root, ["init", "-b", "main"]);
+    run(root, ["config", "user.email", "test@example.com"]);
+    run(root, ["config", "user.name", "test"]);
+    writeFileSync(join(root, "a.txt"), "a\n");
+    run(root, ["add", "a.txt"]);
+    run(root, ["commit", "-m", "root"]);
+    run(root, ["checkout", "-b", "side"]);
+    writeFileSync(join(root, "b.txt"), "b\n");
+    run(root, ["add", "b.txt"]);
+    run(root, ["commit", "-m", "side"]);
+    const side = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).stdout.trim();
+    run(root, ["checkout", "main"]);
+    writeFileSync(join(root, "c.txt"), "c\n");
+    run(root, ["add", "c.txt"]);
+    run(root, ["commit", "-m", "mainline"]);
+    const main = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).stdout.trim();
+
+    const shallow = mkdtempSync(join(tmpdir(), "openbot-ledger-classify-shallow-"));
+    const clone = spawnSync("git", ["clone", "--depth=1", root, shallow], { encoding: "utf8" });
+    expect(clone.status).toBe(0);
+    const fetch = spawnSync("git", ["fetch", "--depth=1", "origin", side], {
+      cwd: shallow,
+      encoding: "utf8",
+    });
+    expect(fetch.status).toBe(0);
+
+    const git: GitRunner = (args) => {
+      const result = spawnSync("git", args, { cwd: shallow, encoding: "utf8" });
+      return { code: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+    };
+
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: side,
+        uiSha: side,
+        imageTag: "rc-amd64-provenance-" + side.slice(0, 12),
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({
+        seq: 2,
+        gatewaySha: main,
+        uiSha: main,
+        imageTag: "rc-amd64-provenance-" + main.slice(0, 12),
+      }),
+    ];
+    const audit = auditLedger(rows, git);
+    expect(audit.ok).toBe(false);
+    expect(
+      audit.findings.some((f) => f.code === "incomplete-graph" && f.severity === "error"),
+    ).toBe(true);
+    expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+    rmSync(shallow, { recursive: true, force: true });
   });
 
   it("does not let regressionAcknowledged clear missing-object or incomplete-graph", () => {

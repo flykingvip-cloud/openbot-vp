@@ -14,7 +14,7 @@
 |---|---|---|---|
 | （无 finding） | `forward_only` | `classifyAncestry` → forward | — |
 | `missing-object` | `missing_object` | tip `cat-file -t` 失败 | error（不可用 `regressionAcknowledged` 降级） |
-| `incomplete-graph` | `incomplete_graph_unknown` | tip 存在但父对象缺失，或 shallow 且 merge-base 失败/空，或 is-ancestor 非 0/1 | error（同上） |
+| `incomplete-graph` | `incomplete_graph_unknown` | tip 存在但父对象缺失，或 **shallow（不论 merge-base 是否成功）**，或 is-ancestor 非 0/1 | error（同上） |
 | `regression` | `proven_dag_break`（仅当图足够完整） | tip 与父对象齐全、非 shallow 截断未决，且非祖先 | error；仅此项可被 `regressionAcknowledged` → warning |
 
 用语：消息使用 **「under the current object graph」** / 等价中文「当前对象图下」；**禁止**写「联合完整图」。
@@ -24,8 +24,9 @@
 1. `cat-file -t` 两侧 tip → 缺则 `missing-object`
 2. `merge-base --is-ancestor` → 0 则 forward；非 0/1 则 `incomplete-graph`
 3. `rev-list --parents -n 1` + 父对象存在性 → 父缺失则 `incomplete-graph`
-4. 若 shallow 且 `merge-base A B` 失败 → `incomplete-graph`
-5. 否则 `regression`
+4. 若 shallow → **一律** `incomplete-graph`（即使 `merge-base` 成功；父链截断未排除）
+5. 多候选（gateway/UI）：任一 `forward` 即通过；否则按 `missing-object` > `incomplete-graph` > `regression` 聚合（禁止首个 regression 定案）
+6. 否则（非 shallow 且图足够完整）→ `regression`
 
 ## 明确禁令
 

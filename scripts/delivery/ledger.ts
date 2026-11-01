@@ -374,6 +374,29 @@ function auditIdentity(row: ReleaseRow, findings: LedgerFinding[]): void {
   }
 }
 
+/** Rank non-forward ancestry classes: unknowns before proven regression. */
+function preferNonForwardAncestry(
+  current: ReturnType<typeof classifyAncestry> | null,
+  next: ReturnType<typeof classifyAncestry>,
+): ReturnType<typeof classifyAncestry> {
+  if (current === null || current.kind === "forward") {
+    return next;
+  }
+  const rank = (kind: string): number => {
+    switch (kind) {
+      case "missing-object":
+        return 0;
+      case "incomplete-graph":
+        return 1;
+      case "regression":
+        return 2;
+      default:
+        return 3;
+    }
+  };
+  return rank(next.kind) < rank(current.kind) ? next : current;
+}
+
 /**
  * Audits the ledger. `git` is injected so this is testable without a real repo, and so the
  * ancestry rule reuses `classifyAncestry` (object-complete then forward-only) rather than reimplementing it.
@@ -443,8 +466,9 @@ export function auditLedger(rows: ReleaseRow[], git: GitRunner): LedgerAudit {
       continue;
     }
     for (const priorSha of shippedShas(previous)) {
-      // Prefer any current tip that still contains prior (forward). Otherwise classify the
-      // first non-forward pair so missing/incomplete are not labeled as proven regression.
+      // Prefer any current tip that still contains prior (forward). Otherwise aggregate
+      // gateway/UI candidates: unknown (missing-object / incomplete-graph) outranks
+      // regression so a later unknown cannot be discarded after an early regression.
       const currentShas = shippedShas(row);
       let classified: ReturnType<typeof classifyAncestry> | null = null;
       for (const sha of currentShas) {
@@ -453,7 +477,7 @@ export function auditLedger(rows: ReleaseRow[], git: GitRunner): LedgerAudit {
           classified = result;
           break;
         }
-        classified ??= result;
+        classified = preferNonForwardAncestry(classified, result);
       }
       if (classified === null || classified.kind === "forward") {
         continue;
