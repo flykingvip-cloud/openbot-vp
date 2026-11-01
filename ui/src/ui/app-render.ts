@@ -50,7 +50,11 @@ import {
   formatPostPlanConfirmAdvanceUserMessage,
 } from "./chat/owner-decision-card.ts";
 import type { ChatQuoteDraft } from "./chat/quote-draft.ts";
-import { formatRejectNotice, rejectNoticeFromPayload } from "./chat/task-outcome-reject.ts";
+import {
+  formatRejectNotice,
+  rejectNoticeFromPayload,
+  type TaskOutcomeRejectRef,
+} from "./chat/task-outcome-reject.ts";
 import { labelForWorkProgressPhase } from "./chat/work-progress-phase.ts";
 import {
   resolveWorkbenchChatSessionKey,
@@ -1551,7 +1555,7 @@ export function renderApp(state: AppViewState) {
       onConfirmRestoreCheckpoint: (checkpointId: string) =>
         void state.confirmRestoreCheckpoint(checkpointId),
       onQueueRemove: (id: string) => state.removeQueuedMessage(id),
-      onRejectTaskOutcome: async (ref) => {
+      onRejectTaskOutcome: async (ref: TaskOutcomeRejectRef) => {
         const client = state.client;
         if (!client) {
           const result = { ok: false as const, code: "unauthorized" };

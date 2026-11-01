@@ -17,6 +17,7 @@ export function readTaskOutcomeRejectRef(value: {
   taskId?: unknown;
   agentId?: unknown;
   outcomeVersion?: unknown;
+  id?: unknown;
 }): TaskOutcomeRejectRef | null {
   const taskId = typeof value.taskId === "string" ? value.taskId.trim() : "";
   const agentId = typeof value.agentId === "string" ? value.agentId.trim() : "";
