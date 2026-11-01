@@ -8,7 +8,9 @@
 | -------------------- | ------------------------------------------------------------------------------------------ |
 | 核查时间             | 2026-11-01T11:36:38Z 起，测试约 2026-11-01T11:56Z                                          |
 | 实施前 `origin/main` | `72a042332a5b0f3e630a7f916390f730be5e92e0`                                                 |
-| 工作区               | 干净，`git merge-base --is-ancestor origin/main HEAD` 通过                                 |
+| rebase 后 `origin/main` | `ea7f9218889ac9ca3d280d15cc14736149af369f`（#181）。祖先检查通过 |
+| 本分支提交 | `b991d50e4294bcc79a76603f575204c31cc95792` |
+| 工作区               | rebase 后干净，`git merge-base --is-ancestor origin/main HEAD` 通过                                 |
 | 运行时               | Node v22.23.4，pnpm 10.23.0（本环境执行 `pnpm install --frozen-lockfile`，退出码 0）       |
 | 任务                 | `askOutcome-p0-task-outcome-contract`                                                      |
 | 当前 owner           | `执行器收尾`（`via: verified`）                                                            |
@@ -49,6 +51,7 @@
 | `OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/task-outcome/executor-closeout-residuals.test.ts src/task-outcome/w3-task-budget.test.ts src/task-outcome/reverify-p1-crash-budget.test.ts src/gateway/agent-growth/operational-metrics-store.test.ts` | 0      | 修复指纹后                                      |
 | `OPENBOT_TEST_PROFILE=low pnpm exec vitest run` 上列 closeout + `paths-bypass-cleanup` + `residual-four-items` + `entrypoint-identity` + `cli-gateway-collab-entry-wiring` + `consumer-boot` + `run.task-outcome-closeout` + `followup-runner.test.ts`    | 0      | followup 的 `parentTaskId` 提升到函数作用域之后 |
 | `pnpm exec oxlint` 本轮改过的源文件                                                                                                                                                                                                                       | 0      | 去掉未使用测试辅助函数之后                      |
+| rebase 到 `ea7f9218` 后 `vitest run src/task-outcome/executor-closeout-residuals.test.ts src/task-outcome/closed-loop-negation-diagnosis.test.ts` | 0 | 12 tests |
 
 `src/task-outcome/executor-closeout-residuals.test.ts` 用真实 `assertRunnerTurnBudgetAllowsModelCall` / `chargeModelCallAgainstTip`，并用真实 `agentCommand` + 嵌入式 runner 替身：第一次调用计数为 1，把 tip 的 `maxIterations` 收到已用次数后，第二次 `agentCommand` 抛出 `TaskBudgetExceededError`，替身次数仍为 1。
 
