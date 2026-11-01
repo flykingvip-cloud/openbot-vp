@@ -2,12 +2,10 @@
  * Read-only view of one TaskOutcome version for diagnosis.diagnose.
  * Tool failures stay observations. They do not change taskJudgement.
  */
-import path from "node:path";
-import { resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
 import {
   callerOwnsTaskOutcome,
-  TASK_OUTCOME_STORE_DIRNAME,
+  resolveConfiguredTaskOutcomeRoot,
 } from "../task-outcome/reject-result.js";
 import { DurableTaskOutcomeStore } from "../task-outcome/store.js";
 import { normalizeTaskOutcomeSubjectRef } from "../task-outcome/subject-ref.js";
@@ -20,7 +18,8 @@ export type TaskOutcomeEvidenceCode =
   | "version_missing"
   | "outcome_version_changed"
   | "read_failed"
-  | "task_ref_incomplete";
+  | "task_ref_incomplete"
+  | "agent_unresolved";
 
 export type TaskOutcomeToolObservation = {
   toolName: string;
@@ -83,8 +82,11 @@ export function readTaskOutcomeEvidence(input: {
     return { ok: false, code: "read_failed", taskId: taskId || undefined };
   }
   try {
-    const root = path.join(resolveAgentDir(input.cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
-    const store = new DurableTaskOutcomeStore(root);
+    const located = resolveConfiguredTaskOutcomeRoot(input.cfg, agentId);
+    if (!located.ok) {
+      return { ok: false, code: located.code, taskId };
+    }
+    const store = new DurableTaskOutcomeStore(located.root);
     try {
       const tip = store.loadTask(taskId);
       if (!tip) {
