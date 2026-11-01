@@ -10256,6 +10256,28 @@ tasks:
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
+  - id: watchdog-task-closure:grok-sentinel-link
+    owner: grok-sentinel-link
+    intent:
+      - "Fail-closed watchdog task closure: Mode B abort≠success, review routing, escalate stage binding"
+    paths:
+      - src/gateway/collaboration-dispatch/**
+      - src/gateway/wake-round-dispatcher-boot.ts
+      - src/gateway/group-task-heartbeat-scheduler-boot.ts
+      - .kiro/specs/watchdog-task-closure/**
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: 0d1b7efb-a31b-4844-bdab-61e809afd198
+        taskId: watchdog-task-closure:grok-sentinel-link
+        ide: cursor
+        agent: grok-sentinel-link
+        status: active
+        lastSignalAt: 2026-11-01T01:36:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-01
+    metadata: {}
 landingStreams:
   - id: closed-loop-ui-wiring-scope-20261101
     landingPolicy: serial
