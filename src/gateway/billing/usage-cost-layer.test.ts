@@ -200,14 +200,16 @@ describe("usage cost layer", () => {
       return;
     }
     expect(presented.view.cacheRead.known).toBe(9);
-    expect(presented.view.cacheRead.unknownCount).toBe(1);
+    // historical + free 均无测到的缓存字段 → unknown；cached 贡献 known=9
+    expect(presented.view.cacheRead.unknownCount).toBe(2);
     expect(presented.view.cacheNote).toContain("不会显示成 0");
     expect(presented.view.ranking?.map((row) => row.model)).toEqual(["openai/free"]);
     expect(presented.view.ranking?.[0]?.priceKind).toBe("free");
     expect(presented.view.ranking?.[0]?.procurementCents).toBe(0);
-    expect(
-      presented.view.excludedFromRanking?.map((row) => row.model).toSorted(),
-    ).toEqual(["openai/cached", "openai/unpriced"]);
+    expect(presented.view.excludedFromRanking?.map((row) => row.model).toSorted()).toEqual([
+      "openai/cached",
+      "openai/unpriced",
+    ]);
     expect(presented.view.procurementCents).toBeNull();
     await fs.rm(dir, { recursive: true, force: true });
   });
@@ -322,7 +324,7 @@ describe("usage cost layer", () => {
     expect(presented.view.ranking?.map((row) => row.model)).toEqual(["solid-paid", "cheap-flaky"]);
   });
 
-    it("does not show unknown usage or missing price as zero and keeps them out of the cheap ranking", () => {
+  it("does not show unknown usage or missing price as zero and keeps them out of the cheap ranking", () => {
     const presented = presentUsageCostLayer(platform, [
       fact({
         requestId: "unknown-usage",

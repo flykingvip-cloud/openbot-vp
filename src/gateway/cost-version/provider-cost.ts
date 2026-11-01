@@ -33,8 +33,7 @@ export function computeProviderCostCentsFloat(input: ProviderCostRateInput): num
   const cacheWriteTokens = nonNegTokens(input.usage.cacheWriteTokens);
   const inputRate = nonNegRate(input.inputCostPer1MCents);
   const outputRate = nonNegRate(input.outputCostPer1MCents);
-  let total =
-    (inputTokens * inputRate) / 1_000_000 + (outputTokens * outputRate) / 1_000_000;
+  let total = (inputTokens * inputRate) / 1_000_000 + (outputTokens * outputRate) / 1_000_000;
   if (input.cacheReadCostPer1MCents !== undefined) {
     total += (cacheReadTokens * nonNegRate(input.cacheReadCostPer1MCents)) / 1_000_000;
   }
