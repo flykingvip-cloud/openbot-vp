@@ -10,9 +10,11 @@ import {
   formatEnterpriseRuntimeLabel,
   formatEnterpriseStatusLabel,
   localizeEnterpriseGatewayError,
+  localizeEnterpriseGatewayThrown,
   resolveEnterpriseConnectionView,
   resolveIdleSeatCount,
 } from "./enterprise-connection-copy.ts";
+import { formatSourceActionMismatchMessage } from "./views/enterprise-data-capability/product-wizard.ts";
 
 describe("resolveEnterpriseConnectionView", () => {
   it("stays quiet while the gateway is still connecting", () => {
@@ -62,6 +64,30 @@ describe("enterprise copy", () => {
         "gateway rebinding for Control UI surface change; please retry",
       ),
     ).toContain("重新绑定");
+  });
+
+  it("maps source/action connector mismatch to Chinese", () => {
+    const english =
+      "Action crm.customer.export@v1 must align with a linked DataSource connectorId.";
+    expect(localizeEnterpriseGatewayError(english)).toBe(
+      formatSourceActionMismatchMessage(["crm.customer.export@v1"]),
+    );
+    expect(
+      localizeEnterpriseGatewayThrown(
+        Object.assign(new Error(english), {
+          details: { code: "DATA_CAPABILITY_SOURCE_ACTION_MISMATCH" },
+        }),
+        "请求失败",
+      ),
+    ).toBe(formatSourceActionMismatchMessage(["crm.customer.export@v1"]));
+    expect(
+      localizeEnterpriseGatewayThrown(
+        Object.assign(new Error("rejected"), {
+          details: { code: "DATA_CAPABILITY_SOURCE_ACTION_MISMATCH" },
+        }),
+        "请求失败",
+      ),
+    ).toBe(formatSourceActionMismatchMessage([]));
   });
 
   it("maps raw roles and statuses", () => {

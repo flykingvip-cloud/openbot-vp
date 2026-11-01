@@ -11,9 +11,16 @@ import { renderIcon } from "../../../../icons.ts";
 import { renderOrgTargetPicker } from "../../../../views/enterprise-data-capability/org-target-picker.ts";
 import type { EnterprisePortReadModel } from "../../semantic/enterprise-read-model.ts";
 import {
+  actionRefToken,
+  applySourceToggle,
   clampProductWizardStep,
+  connectorIdsForSelectedSources,
+  PRODUCT_WIZARD_SOURCE_ACTION_PRUNED_MESSAGE,
   PRODUCT_WIZARD_STEPS,
+  productWizardSourceActionMismatch,
+  productWizardValidationContext,
   validateProductWizardStep,
+  wizardActionsForSelection,
   type ProductWizardStep,
 } from "./product-wizard.ts";
 
@@ -87,13 +94,34 @@ export function renderCapabilityEditorModal(
     projectionTemplateKey: state.projectionTemplateKey,
     openScopeReady: ctx.seatIds.size + ctx.departmentPaths.size > 0,
   };
+  const validationContext = productWizardValidationContext({
+    sources: sourceOptions,
+    actions: actionsCatalog,
+    seatCount: ctx.seatCount,
+  });
   const stepValidation = isCreate
-    ? validateProductWizardStep(step, draft, {
-        sourceCount: sourceOptions.length,
-        actionCount: actionsCatalog.length,
-        seatCount: ctx.seatCount,
-      })
+    ? validateProductWizardStep(step, draft, validationContext)
     : { ok: true, message: null, missing: [] as Array<"sources" | "actions" | "seats"> };
+  const mismatchMessage =
+    !isCreate || step >= 2
+      ? productWizardSourceActionMismatch({
+          sourceIds: draft.sourceIds,
+          actionRefTokens: draft.actionRefTokens,
+          sources: sourceOptions,
+          actions: actionsCatalog,
+        })
+      : null;
+  const inputValidation = validateProductWizardStep(2, draft, validationContext);
+  const bannerMessage =
+    state.error ??
+    mismatchMessage ??
+    (!isCreate && !inputValidation.ok ? inputValidation.message : null) ??
+    (isCreate ? stepValidation.message : null);
+  const linkedConnectorIds = connectorIdsForSelectedSources(sourceOptions, state.sourceIds);
+  const visibleActions =
+    state.sourceIds.size === 0
+      ? []
+      : wizardActionsForSelection(actionsCatalog, linkedConnectorIds, state.actionRefTokens);
 
   const showStep = (n: ProductWizardStep) => !isCreate || step === n;
 
@@ -101,11 +129,7 @@ export function renderCapabilityEditorModal(
     if (!isCreate) {
       return;
     }
-    const current = validateProductWizardStep(state.wizardStep, draft, {
-      sourceCount: sourceOptions.length,
-      actionCount: actionsCatalog.length,
-      seatCount: ctx.seatCount,
-    });
+    const current = validateProductWizardStep(state.wizardStep, draft, validationContext);
     if (!current.ok) {
       onUpdate({ error: current.message });
       return;
@@ -207,7 +231,9 @@ export function renderCapabilityEditorModal(
               ? html`
           <div class="edc-form-section">
             <div class="edc-form-section__title">数据输入</div>
-            <div class="edc-form-section__sub">勾选已连接的数据源与可调用动作。</div>
+            <div class="edc-form-section__sub">
+              先勾选数据源，再选择同一连接器下的动作。更换数据源会自动取消不匹配的动作。
+            </div>
             ${
               sourceOptions.length === 0
                 ? html`
@@ -227,13 +253,19 @@ export function renderCapabilityEditorModal(
                             .checked=${checked}
                             ?disabled=${state.busy}
                             @change=${() => {
-                              const next = new Set(state.sourceIds);
-                              if (next.has(source.sourceId)) {
-                                next.delete(source.sourceId);
-                              } else {
-                                next.add(source.sourceId);
-                              }
-                              onUpdate({ sourceIds: next });
+                              const next = applySourceToggle({
+                                sourceIds: state.sourceIds,
+                                actionRefTokens: state.actionRefTokens,
+                                toggledSourceId: source.sourceId,
+                                sources: sourceOptions,
+                              });
+                              onUpdate({
+                                sourceIds: next.sourceIds,
+                                actionRefTokens: next.actionRefTokens,
+                                error: next.pruned
+                                  ? PRODUCT_WIZARD_SOURCE_ACTION_PRUNED_MESSAGE
+                                  : null,
+                              });
                             }}
                           />
                           ${renderIcon("link", "edc-pick-row__icon")}
@@ -256,10 +288,24 @@ export function renderCapabilityEditorModal(
                       <button class="btn btn--sm" type="button" @click=${onJumpAssets}>前往数据资产</button>
                     </div>
                   `
-                : html`<div class="edc-pick-list" role="group" aria-label="动作能力绑定" style="margin-top:0.75rem;">
-                    ${actionsCatalog.map((action) => {
-                      const token = `${action.connectorId}:${action.actionKey}:${action.version}`;
+                : state.sourceIds.size === 0
+                  ? html`
+                      <div class="edc-pick-empty" style="margin-top: 0.75rem">
+                        请先勾选数据源，再选择同一连接器下的动作。
+                      </div>
+                    `
+                  : visibleActions.length === 0
+                    ? html`
+                        <div class="edc-pick-empty" style="margin-top:0.75rem;">
+                          所选数据源下暂无可用动作。请更换数据源，或先接入该连接器的动作。
+                          <button class="btn btn--sm" type="button" @click=${onJumpAssets}>前往数据资产</button>
+                        </div>
+                      `
+                    : html`<div class="edc-pick-list" role="group" aria-label="动作能力绑定" style="margin-top:0.75rem;">
+                    ${visibleActions.map((action) => {
+                      const token = actionRefToken(action);
                       const checked = state.actionRefTokens.has(token);
+                      const aligned = linkedConnectorIds.has(action.connectorId);
                       return html`
                         <label class="edc-pick-row ${checked ? "is-checked" : ""}">
                           <input
@@ -271,17 +317,23 @@ export function renderCapabilityEditorModal(
                               const next = new Set(state.actionRefTokens);
                               if (next.has(token)) {
                                 next.delete(token);
-                              } else {
+                              } else if (linkedConnectorIds.has(action.connectorId)) {
                                 next.add(token);
+                              } else {
+                                return;
                               }
-                              onUpdate({ actionRefTokens: next });
+                              onUpdate({ actionRefTokens: next, error: null });
                             }}
                           />
                           ${renderIcon("zap", "edc-pick-row__icon")}
                           <span class="edc-pick-row__body">
                             <span class="edc-pick-row__label">${action.displayName}</span>
                             <span class="edc-pick-row__meta">
-                              ${action.actionKey}:${action.version}
+                              ${
+                                aligned
+                                  ? `${action.connectorId} · ${action.actionKey}:${action.version}`
+                                  : `${action.connectorId} · 与所选数据源连接器不一致`
+                              }
                             </span>
                           </span>
                         </label>
@@ -407,11 +459,9 @@ export function renderCapabilityEditorModal(
           }
 
           ${
-            state.error
-              ? html`<div class="enterprise-org-modal__notice enterprise-org-modal__notice--danger">${state.error}</div>`
-              : stepValidation.message && isCreate
-                ? html`<div class="enterprise-org-modal__notice enterprise-org-modal__notice--danger">${stepValidation.message}</div>`
-                : html``
+            bannerMessage
+              ? html`<div class="enterprise-org-modal__notice enterprise-org-modal__notice--danger">${bannerMessage}</div>`
+              : html``
           }
         </div>
         <div class="enterprise-org-modal__footer">

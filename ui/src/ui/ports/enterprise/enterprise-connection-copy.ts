@@ -6,6 +6,8 @@
  * the severe empty-state banner.
  */
 
+import { formatSourceActionMismatchMessage } from "./views/enterprise-data-capability/product-wizard.ts";
+
 const TRANSIENT_GATEWAY_ERROR =
   /gateway rebinding|gateway not connected|gateway closed|please retry|enterprise capability request timed out/i;
 
@@ -35,11 +37,43 @@ export function localizeEnterpriseGatewayError(message: string | null | undefine
   if (/enterprise capability request timed out/i.test(text)) {
     return "企业能力数据加载超时，请稍后重试。";
   }
+  const sourceActionMismatch = text.match(
+    /^Action\s+(\S+@\S+)\s+must align with a linked DataSource connectorId\.?$/i,
+  );
+  if (sourceActionMismatch?.[1]) {
+    return formatSourceActionMismatchMessage([sourceActionMismatch[1]]);
+  }
+  if (
+    /must align with a linked DataSource connectorId|DATA_CAPABILITY_SOURCE_ACTION_MISMATCH/i.test(
+      text,
+    )
+  ) {
+    return formatSourceActionMismatchMessage([]);
+  }
   return text;
+}
+
+function readGatewayDetailCode(error: unknown): string | null {
+  if (!error || typeof error !== "object" || !("details" in error)) {
+    return null;
+  }
+  const details = (error as { details?: unknown }).details;
+  if (!details || typeof details !== "object" || !("code" in details)) {
+    return null;
+  }
+  const code = (details as { code?: unknown }).code;
+  return typeof code === "string" && code.trim() ? code.trim() : null;
 }
 
 export function localizeEnterpriseGatewayThrown(error: unknown, fallback: string): string {
   const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  if (readGatewayDetailCode(error) === "DATA_CAPABILITY_SOURCE_ACTION_MISMATCH") {
+    const localized = localizeEnterpriseGatewayError(raw);
+    if (localized && localized !== raw.trim()) {
+      return localized;
+    }
+    return formatSourceActionMismatchMessage([]);
+  }
   return localizeEnterpriseGatewayError(raw) ?? fallback;
 }
 
