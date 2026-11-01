@@ -1,6 +1,6 @@
 # Fullstack coverage denominator — expanded beyond 14 wiring rows
 
-**Pin for inventory:** PR HEAD `433906f5b` / main tip at review-end `5815006dc` (inventory shapes match tip `f68a3c56b` trees for apps/extensions/packages).  
+**Pin for coverage evidence (batch2):** PR branch HEAD `1ce8f5ee4e8c852d45a9c6a30a623e0bed082587` (`fix/p1-def001-002-004-20261101`). **origin/main tip at write:** `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`. Inventory shapes still match apps/extensions/packages trees used for N=118.
 **Sources:** `AGENTS.md`, `docs/acceptance/openbot-inventory-acceptance-plan.md`, acceptance worktree `01-module-inventory.md` / `02-wiring-matrix.md` (old pin draft), `docs/channels/`, `extensions/*/openclaw.plugin.json`, `apps/`, `packages/`, CLI `openbot --help`.  
 **Rule:** old **14** wiring-matrix rows are a _critical-path slice_, **not** the public-capability denominator.
 
@@ -58,24 +58,24 @@ matrix, mattermost, msteams, nextcloud-talk, nostr, signal, slack,
 synology-chat, telegram, tlon, twitch, wechat, wecom, whatsapp, zalo, zalouser
 ```
 
-| Status class     | Channels                | Meaning                                                                                           |
-| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------- |
-| BLOCKED (live)   | wecom, feishu, dingtalk | Enterprise IM — credentials not authorized                                                        |
-| NOT RUN (live)   | all other 24 plugins    | Adapter entry present; inbound/outbound live **NOT RUN**                                          |
-| Covered (static) | all 24                  | Listed via `openclaw.plugin.json` + docs/channels this run (`logs/08-static-inventory-smoke.log`) |
+| Status class     | Channels                | Meaning                                                                                                                        |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| BLOCKED (live)   | wecom, feishu, dingtalk | Enterprise IM — credentials not authorized                                                                                     |
+| NOT RUN (live)   | all other 24 plugins    | Adapter entry present; inbound/outbound live **NOT RUN**                                                                       |
+| Covered (static) | all 24                  | Listed via `openclaw.plugin.json` + docs/channels; batch2 reconfirm **24↔24 COMPLETE** (`logs/10-install-channels-static.log`) |
 
 ---
 
 ## Apps (6)
 
-| App                 | Presence | Coverage                                                                        |
-| ------------------- | -------- | ------------------------------------------------------------------------------- |
-| macos               | PRESENT  | Protocol models regen checked; full app build **NOT RUN** / SwiftPM **BLOCKED** |
-| ios                 | PRESENT  | **NOT RUN**                                                                     |
-| android             | PRESENT  | **NOT RUN**                                                                     |
-| harmony             | PRESENT  | **NOT RUN**                                                                     |
-| windows             | PRESENT  | **NOT RUN**                                                                     |
-| shared (OpenBotKit) | PRESENT  | GatewayModels regen checked                                                     |
+| App                 | Presence | Coverage                                                                                                                                   |
+| ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| macos               | PRESENT  | `swift package dump-package` **PASS** (metadata); full `swift build` / SwiftPM compile remains **BLOCKED** (policy + prior dep-fetch hang) |
+| ios                 | PRESENT  | project.yml only (`xcodeproj_count=0`); **BLOCKED** until xcodegen — no `xcodebuild -list`                                                 |
+| android             | PRESENT  | `./gradlew tasks` **PASS** with JAVA_HOME 17 (`assemble`/`installDebug`/`lint`/`test` listed); **assemble not executed** (credential-free) |
+| harmony             | PRESENT  | `oh-package.json5` PRESENT; `hvigorw` **BLOCKED** (tool missing)                                                                           |
+| windows             | PRESENT  | `.sln` PRESENT; `dotnet` **BLOCKED** (SDK missing)                                                                                         |
+| shared (OpenBotKit) | PRESENT  | GatewayModels regen checked on PR HEAD                                                                                                     |
 
 ---
 
@@ -91,20 +91,22 @@ Status: **NOT RUN** as product capability (tree presence only this pass).
 
 Help enumeration PASS (`logs/07-cli-help-doctor-smoke.log`). Examples: gateway, agent, channels, doctor, models, nodes, plugins, sandbox, skills, status, tui, update, …
 
-Per-command behavioral coverage: **NOT RUN** (except help text). Risk queue prioritizes `doctor`, `channels status`, `gateway`, `agents`, `onboard`, `plugins`.
+Per-command behavioral coverage: **NOT RUN** (except help/version). Batch2: `openbot --version` + 11 command `--help` **PASS** (`logs/10-cli-extra-help-version.log`). Risk queue still prioritizes live `doctor`, `channels status`, `gateway`, `agents`, `onboard`, `plugins`.
 
 ---
 
 ## Stages 1–8 (acceptance plan)
 
-| Stage | Theme                                                                   | This pass                                                           |
-| ----: | ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
-|     1 | Trust / security profiles                                               | Prior narrow PASS evidence exists in plan; **not re-executed** here |
-|     2 | Architecture / transcript                                               | Prior narrow PASS; **not re-executed**                              |
-|     3 | API / CLI authz evidence tests present under `docs/acceptance/stage3-*` | **NOT RUN** this review                                             |
-|   4–6 | Broader product / CI / install matrices                                 | **NOT RUN** / historically CONDITIONAL—top risk queue below         |
-|     7 | Product-surface authority                                               | Inventory anchors only                                              |
-|     8 | Eligibility rollup                                                      | `stage8_eligible` remains false until fuller CURRENT evidence       |
+| Stage | Theme                                                                   | This pass                                                                                                                          |
+| ----: | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+|     1 | Trust / security profiles                                               | Prior narrow PASS evidence exists in plan; **not re-executed** here                                                                |
+|     2 | Architecture / transcript                                               | Prior narrow PASS; **not re-executed**                                                                                             |
+|     3 | API / CLI authz evidence tests present under `docs/acceptance/stage3-*` | **NOT RUN** this review                                                                                                            |
+|     4 | Store/backup/CI evidence (`docs/acceptance/stage4-*`)                   | **CONDITIONAL** — 25/26 vitest PASS; 1 FAIL credentials-omit archive (`logs/10-stage4-evidence.log`)                               |
+|     5 | HA production wiring evidence                                           | **PASS** 6/6 wiring asserts; docker compose HA profile **skipped** → prod HA still **CONDITIONAL** (`logs/10-stage5-evidence.log`) |
+|     6 | SBOM / audit / install evidence                                         | SBOM committed CycloneDX **PASS** static (1600 comps); regen ETIMEDOUT; live `pnpm audit` **BLOCKED** (corepack timeout)           |
+|     7 | Product-surface authority                                               | Inventory anchors only                                                                                                             |
+|     8 | Eligibility rollup                                                      | `stage8_eligible` remains false until fuller CURRENT evidence                                                                      |
 
 ---
 
@@ -115,7 +117,7 @@ Cited by `AGENTS.md:51` only (do **not** invent other repos):
 - Sibling repo path: `../openbot.love`
 - Artifacts: `public/install.sh`, `public/install-cli.sh`, `public/install.ps1`
 - Served from: `https://openbot.love/*`
-- Local sibling on this Mac at review time: **ABSENT**
+- Local sibling on this Mac at review time: **ABSENT** (batch2 reconfirm)
 - Status: **跨仓依赖 / NOT RUN** inside `openbot-vp`
 
 Remotes verified for this work: **only** `flykingvip-cloud/openbot-vp`.
@@ -155,9 +157,61 @@ Remotes verified for this work: **only** `flykingvip-cloud/openbot-vp`.
 
 1. Live IM + agent + credentials (**BLOCKED/NOT RUN**)
 2. SwiftPM / native app compiles (**BLOCKED/NOT RUN**)
-3. Installer 跨仓 + Stage 4–6 CURRENT CI/install evidence (**NOT RUN**)
+3. Installer 跨仓 still **NOT RUN**; Stages 4–6 now have CURRENT credential-free evidence (see batch2) but Stage4 FAIL + audit BLOCKED remain
 4. CLI/doctor beyond help; Control UI interactive ports (**NOT RUN**)
 5. Packages (collab/AOR/evolution) runtime (**NOT RUN**)
+
+---
+
+## Credential-free expansion — batch2 (2026-11-01 23:40 Asia/Shanghai)
+
+**Evidence pin:** `1ce8f5ee4e8c852d45a9c6a30a623e0bed082587`  
+**Do not claim live PASS. Do not claim SwiftPM PASS.**
+
+| Check                                            | Status                                                                          | Log                                      |
+| ------------------------------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------- |
+| Stage4 evidence (5 files / 26 tests)             | **CONDITIONAL** (25 PASS / 1 FAIL: default archive omits credentials assertion) | `logs/10-stage4-evidence.log`            |
+| Stage5 HA wiring evidence                        | **PASS** (6/6); docker HA compose skipped → HA deploy **CONDITIONAL**           | `logs/10-stage5-evidence.log`            |
+| Stage6 SBOM committed CycloneDX 1.6              | **PASS** static (1600 components, cdxgen 12.8.5)                                | `logs/10-stage6-sbom-static-summary.log` |
+| Stage6 SBOM regen purl-set test                  | **FAIL**/timeout (spawnSync ETIMEDOUT 180s) — committed artifact still PASS     | `logs/10-stage6-sbom-evidence-only.log`  |
+| Stage6 live `pnpm audit` moderate                | **BLOCKED** (corepack ConnectTimeout fetching pnpm)                             | aborted `logs/10-stage6-*.log`           |
+| CLI `--version` + 11× `--help`                   | **PASS**                                                                        | `logs/10-cli-extra-help-version.log`     |
+| package.json install/release/sbom/doctor scripts | **PASS** (presence)                                                             | `logs/10-install-channels-static.log`    |
+| Channel plugins ↔ docs/channels                  | **PASS** COMPLETE 24↔24                                                         | `logs/10-install-channels-static.log`    |
+| `plugins list` offline discovery                 | **PASS**                                                                        | `logs/10-install-channels-static.log`    |
+| openbot.love sibling installers                  | **跨仓依赖 / NOT RUN** (ABSENT)                                                 | `logs/10-install-channels-static.log`    |
+| Apps roots (6)                                   | **PASS** PRESENT                                                                | `logs/10-multiend-apps-inventory.log`    |
+| macos `swift package dump-package`               | **PASS** (metadata only)                                                        | `logs/10-multiend-tools-probe.log`       |
+| android `./gradlew tasks` (JAVA_HOME 17)         | **PASS** (list only; no assemble)                                               | `logs/10-android-gradle-tasks.log`       |
+| ios xcodebuild -list                             | **BLOCKED** (no xcodeproj; needs xcodegen)                                      | `logs/10-multiend-tools-probe.log`       |
+| windows `dotnet`                                 | **BLOCKED** (SDK missing)                                                       | `logs/10-multiend-tools-probe.log`       |
+| harmony hvigor                                   | **BLOCKED** (tool missing)                                                      | `logs/10-multiend-tools-probe.log`       |
+| SwiftPM `swift build`                            | **BLOCKED** (policy)                                                            | —                                        |
+
+### Covered-count delta (primary N=118)
+
+| Slice                     |           Before batch2 |                                                       After batch2 (credential-free) |
+| ------------------------- | ----------------------: | -----------------------------------------------------------------------------------: |
+| Stages 4–6 of 8           |     0 CURRENT evidenced |      3 evidenced (4 CONDITIONAL, 5 PASS/CONDITIONAL HA, 6 SBOM PASS + audit BLOCKED) |
+| CLI of 49                 |    help smoke (~3 cmds) |      help/version + 11 command helps (**~12** help-level) — behavioral still NOT RUN |
+| Channel plugins of 24     |        static inventory |                      static **COMPLETE** 24↔24 (unchanged depth; live still NOT RUN) |
+| Apps of 6                 |           presence only | presence + macos dump-package + android tasks list; ios/win/harmony tool **BLOCKED** |
+| Packages of 18            |                presence |                                                          unchanged (NOT RUN runtime) |
+| Cross-repo installer of 1 |                 NOT RUN |                                                             still **NOT RUN** / 跨仓 |
+| Critical surfaces of 12   | CONDITIONAL/BLOCKED mix |                                                                  unchanged (no live) |
+
+**Rough covered (credential-free, non-live):** Stages 4–6 slice + static channels + app tool probes + CLI help expansion ≈ **prior static + ~15 newly executed checks**. Live/SwiftPM gaps unchanged.
+
+### Risk queue refresh (post-batch2)
+
+1. Live IM + agent + credentials (**BLOCKED/NOT RUN**) — unchanged top risk
+2. SwiftPM / ios xcodegen / windows dotnet / harmony hvigor (**BLOCKED**)
+3. Stage4 credentials-omit FAIL → fix or narrow CONDITIONAL before claiming Stage4 PASS
+4. Stage6 live audit + SBOM regen reliability (network/corepack)
+5. Installer 跨仓 `openbot.love` dry-run
+6. CLI doctor against local loopback gateway (credential-light)
+7. Control UI interactive ports; packages collab/AOR runtime
+8. Android `assembleDebug` smoke (signing-free) when time allows — tasks list only so far
 
 ## Remediation follow-up (credential-free, light)
 

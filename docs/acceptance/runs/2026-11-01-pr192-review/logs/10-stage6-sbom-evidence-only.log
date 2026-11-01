@@ -1,0 +1,30 @@
+=== stage6 SBOM evidence ONLY retry @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+
+ ❯ docs/acceptance/stage6-sbom-evidence.test.ts (3 tests | 1 failed) 181239ms
+     ✓ commits CycloneDX 1.6 JSON produced with cdxgen tool metadata 20ms
+     × regenerates with the same component purl set (cdxgen timestamps may differ) 180008ms
+     ✓ package.json exposes pnpm sbom:cyclonedx wrapping the cdxgen generator 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  docs/acceptance/stage6-sbom-evidence.test.ts > Stage 6 formal SBOM (@cyclonedx/cdxgen) > regenerates with the same component purl set (cdxgen timestamps may differ)
+Error: spawnSync /usr/local/bin/node ETIMEDOUT
+ ❯ docs/acceptance/stage6-sbom-evidence.test.ts:58:7
+     56|     const out = path.join(dir, "regen.cdx.json");
+     57|     try {
+     58|       execFileSync(process.execPath, ["--import", "tsx", GENERATOR, "-…
+       |       ^
+     59|         cwd: ROOT,
+     60|         stdio: "pipe",
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  23:35:41
+   Duration  181.56s (transform 206ms, setup 238ms, import 4ms, tests 181.24s, environment 0ms)
+
+EXIT:1
