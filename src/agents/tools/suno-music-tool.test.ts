@@ -131,6 +131,10 @@ describe("createSunoMusicTool", () => {
     const fetchMock = vi.fn(async () => {
       throw new Error("generation must not be called");
     });
+    const generate = vi.spyOn(
+      await import("./suno-music-tool.helpers.js"),
+      "callSunoMusicGeneration",
+    );
     const { createSunoMusicTool } = await import("./suno-music-tool.js");
     const tool = createSunoMusicTool({
       config: musicCfg(),
@@ -141,6 +145,8 @@ describe("createSunoMusicTool", () => {
     await expect(tool!.execute("call-paused", { prompt: "配乐" })).rejects.toMatchObject({
       code: "PLATFORM_ADMISSION_EMPTY",
     });
+    expect(generate).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+    generate.mockRestore();
   });
 });

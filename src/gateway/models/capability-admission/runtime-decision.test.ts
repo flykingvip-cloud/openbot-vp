@@ -6,6 +6,7 @@ import { runWithModelFallback } from "../../../agents/model-fallback.js";
 import { resolveTrustedRunModalityCompletionEvidence } from "../../../task-outcome/modality-artifact-evidence.js";
 import {
   assertExecutorModelAdmitted,
+  formatPlatformAdmissionEmptyMessage,
   isPlatformAdmissionEmptyError,
   PlatformAdmissionEmptyError,
 } from "./apply-runtime-admission.js";
@@ -459,6 +460,72 @@ describe("runWithModelFallback platform admission", () => {
     ).rejects.toSatisfy((err: unknown) => isPlatformAdmissionEmptyError(err));
     expect(first).toHaveBeenCalledTimes(1);
     expect(second).not.toHaveBeenCalled();
+  });
+});
+
+describe("entry fixtures through real runWithModelFallback", () => {
+  async function rejectBeforeRun(params: { taskText: string; preferredModelOrder?: string[] }) {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-entry-admit-"));
+    const storePath = path.join(dir, "admission.json");
+    await upsertModelAdmission(
+      "openai/paused",
+      { autoRouting: "paused", autoRoutingReason: "管理员暂停" },
+      storePath,
+    );
+    const run = vi.fn(async (_provider: string, _model: string) => "should-not-run");
+    let thrown: unknown;
+    try {
+      await runWithModelFallback({
+        cfg: {},
+        provider: "openai",
+        model: "paused",
+        fallbacksOverride: ["openai/missing"],
+        ...(params.preferredModelOrder ? { preferredModelOrder: params.preferredModelOrder } : {}),
+        runtimeAdmission: {
+          storePath,
+          platformModelIds: ["openai/paused", "openai/missing"],
+          discoverPlatformScope: false,
+          taskText: params.taskText,
+        },
+        run,
+      });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(isPlatformAdmissionEmptyError(thrown)).toBe(true);
+    if (!isPlatformAdmissionEmptyError(thrown)) {
+      return;
+    }
+    expect(thrown.code).toBe("PLATFORM_ADMISSION_EMPTY");
+    expect(run).not.toHaveBeenCalled();
+    expect(formatPlatformAdmissionEmptyMessage(thrown.decision)).toContain("openai/paused");
+    expect(formatPlatformAdmissionEmptyMessage(thrown.decision)).toContain("openai/missing");
+  }
+
+  it("chat orchestrator task text rejects paused and unrecorded platform models before run", async () => {
+    await rejectBeforeRun({
+      taskText: "画一张海报",
+      preferredModelOrder: ["openai/paused", "openai/missing"],
+    });
+  });
+
+  it("followup prompt rejects paused and unrecorded platform models before run", async () => {
+    await rejectBeforeRun({ taskText: "继续处理上一问" });
+  });
+
+  it("CLI message rejects paused and unrecorded platform models before run", async () => {
+    await rejectBeforeRun({ taskText: "重构这段代码" });
+  });
+
+  it("Routine prompt rejects paused and unrecorded platform models before run", async () => {
+    await rejectBeforeRun({ taskText: "每日摘要" });
+  });
+
+  it("subagent child order cannot reinsert a paused platform model before run", async () => {
+    await rejectBeforeRun({
+      taskText: "子任务：写测试",
+      preferredModelOrder: ["openai/paused", "openai/missing"],
+    });
   });
 });
 

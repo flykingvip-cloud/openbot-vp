@@ -378,11 +378,20 @@ describe("createStepfunImageTool", () => {
       throw new Error("generation must not be called");
     });
     vi.stubGlobal("fetch", fetchMock);
+    const generate = vi.spyOn(
+      await import("./stepfun-image-tool.helpers.js"),
+      "callStepfunImageGeneration",
+    );
+    const edit = vi.spyOn(await import("./stepfun-image-tool.helpers.js"), "callStepfunImageEdit");
     const { createStepfunImageTool } = await import("./stepfun-image-tool.js");
     const tool = createStepfunImageTool({ config: baseCfg, workspaceDir: dir });
     await expect(tool!.execute("call-paused", { prompt: "海报" })).rejects.toMatchObject({
       code: "PLATFORM_ADMISSION_EMPTY",
     });
+    expect(generate).not.toHaveBeenCalled();
+    expect(edit).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+    generate.mockRestore();
+    edit.mockRestore();
   });
 });
