@@ -119,4 +119,25 @@ describe("resolveKnowledgeGatewayClientForAgentRun", () => {
     });
     expect(client?.user).toBe("owner@acme.test");
   });
+  it("maps email-shaped cron ownerId to platform uuid and stamps enterpriseId", async () => {
+    const resolved = await resolveKnowledgeGatewayClientForAgentRun({
+      ownerUserId: "owner@acme.test",
+      tenantId: "ent-42",
+      agentId: "bot-skill",
+    });
+    expect(resolved?.user).toBe("owner@acme.test");
+    expect(resolved?.platformUserId).toBe("user-90");
+    expect(resolved?.sessionEnterpriseId).toBe("ent-42");
+    expect(resolved?.client.sessionEnterpriseId).toBe("ent-42");
+    expect(entitlementMock.resolveAgentRunEntitlementScope).not.toHaveBeenCalled();
+  });
+
+  it("stamps enterpriseId when owner resolves by platform id", async () => {
+    const resolved = await resolveKnowledgeGatewayClientForAgentRun({
+      ownerUserId: "user-90",
+      tenantId: "ent-7",
+    });
+    expect(resolved?.platformUserId).toBe("user-90");
+    expect(resolved?.sessionEnterpriseId).toBe("ent-7");
+  });
 });
