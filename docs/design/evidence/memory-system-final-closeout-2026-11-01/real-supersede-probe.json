@@ -1,0 +1,40 @@
+{
+  "evidenceLayer": "sdk-unit",
+  "searchCalled": false,
+  "purgeCalled": false,
+  "preseedDeprecated": false,
+  "factIds": {
+    "old": "FACT-OLD-CLOSEOUT-20261101",
+    "new": "FACT-NEW-CLOSEOUT-20261101",
+    "atomOld": "atom_closeout_old",
+    "atomNew": "atom_closeout_new"
+  },
+  "isolationRoot": "/tmp/openbot-mem-closeout-supersede-0kSKxP",
+  "beforeIds": ["atom_closeout_new", "atom_closeout_old"],
+  "afterIds": ["atom_closeout_new"],
+  "oldStatusAfterSupersede": "deprecated",
+  "newParentVersion": "atom_closeout_old",
+  "wrongOwnerHitCount": 0,
+  "detectConflictsReturn": {
+    "conflicts": [
+      {
+        "atomId": "atom_closeout_old",
+        "conflictsWith": []
+      },
+      {
+        "atomId": "atom_closeout_new",
+        "conflictsWith": []
+      }
+    ]
+  },
+  "detectConflictsDoesNotFlipStatus": true,
+  "softForget": {
+    "firstStatus": "forgotten",
+    "replayOperationId": "closeout-soft-forget-1",
+    "secondAffectedObjectCount": 0,
+    "bindingStatus": "forgotten",
+    "purgeCalled": false,
+    "physicalDeleteClaimed": false
+  },
+  "note": "Conflict rows are not produced by detectConflicts; this probe does not claim a product conflict workflow. Soft forget is source lifecycle forgotten, not purge."
+}

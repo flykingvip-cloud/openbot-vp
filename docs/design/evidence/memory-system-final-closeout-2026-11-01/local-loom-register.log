@@ -1,0 +1,10 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 loom /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node --import tsx scripts/loom.ts register --task memory-system-final-closeout --owner grok-bot-local-mac-closeout --session-id 8305f9c4-1c83-4ae9-a585-59bf4e92ab1d --ide cursor --agent grok-bot-local-mac-closeout --paths 'docs/design/memory-system-final-closeout-2026-11-01.md,docs/design/evidence/memory-system-final-closeout-2026-11-01/**,src/plugins/runtime/types-core.ts,src/memory/memory-continuity-gateway.http.integration.test.ts'
+
+Registered "memory-system-final-closeout" (owner=grok-bot-local-mac-closeout, state=active, paths=4, sessions=1). Wrote /Users/daniel/AI VP/openbot-memory-final-closeout-182/.loom/registry.yaml
+
+> @upbeyond/openbot@2026.7.12-rc.2 loom /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> node --import tsx scripts/loom.ts register --task memory-system-final-closeout --owner grok-bot-local-mac-closeout --session-id 8305f9c4-1c83-4ae9-a585-59bf4e92ab1d --ide cursor --agent grok-bot-local-mac-closeout --paths 'docs/design/memory-system-final-closeout-2026-11-01.md,docs/design/evidence/memory-system-final-closeout-2026-11-01/**,src/plugins/runtime/types-core.ts,src/memory/memory-continuity-gateway.http.integration.test.ts,src/agents/bash-tools.exec-runtime.ts,src/agents/bash-tools.exec.sandbox-workspace-write.test.ts,src/cron/service.delivery-adapter-evidence.p2h.test.ts,src/gateway/enterprise-data/event-driven-projection-materializer.ts,src/gateway/evolution-control/authorize-shadow-intent.test.ts,src/gateway/server-methods/chat.restore.test.ts,src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts,src/gateway/server-methods/enterprise-data-events.ts,ui/src/ui/collaboration/collaboration-rules-summary.test.ts'
+
+Registered "memory-system-final-closeout" (owner=grok-bot-local-mac-closeout, state=active, paths=13, sessions=1). Wrote /Users/daniel/AI VP/openbot-memory-final-closeout-182/.loom/registry.yaml

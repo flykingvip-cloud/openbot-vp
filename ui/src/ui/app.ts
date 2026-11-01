@@ -114,18 +114,14 @@ import {
 } from "./capability/view-state.ts";
 import { sessionKeysShareChatSurface } from "./chat-session-key-match.ts";
 import {
-  applyChatCheckpointLoadFailure,
-  applyChatCheckpointLoadSuccess,
-  beginChatCheckpointLoad,
   createChatCheckpointLoadState,
   type ChatCheckpointLoadState,
-  checkpointsFromLoadState,
 } from "./chat/checkpoint-load-state.ts";
-import { applyChatCheckpointSessionIsolation } from "./chat/checkpoint-session-isolation.ts";
 import {
-  diagnoseCheckpointListVisibility,
-  type ChatCheckpointVisibilityDiagnostic,
-} from "./chat/checkpoint-visibility-diagnostics.ts";
+  applyChatCheckpointSessionIsolation,
+  loadChatCheckpointsForHost,
+} from "./chat/checkpoint-session-isolation.ts";
+import { type ChatCheckpointVisibilityDiagnostic } from "./chat/checkpoint-visibility-diagnostics.ts";
 import type { ChatContextExpansionSuggestion } from "./chat/context-expansion.ts";
 import {
   DEFAULT_CHAT_CONTEXT_SCOPE,
@@ -4079,49 +4075,7 @@ export class OpenBotApp extends LitElement {
 
   /** Fetch the active session's restorable checkpoints for the inline dividers. */
   async loadChatCheckpoints() {
-    if (!this.client || !this.connected) {
-      // P0: do not wipe last-good on disconnect; leave load state as-is.
-      return;
-    }
-    const sessionKey = resolveChatRestoreSessionKey(this);
-    const began = beginChatCheckpointLoad(this.chatCheckpointLoadState, sessionKey);
-    this.chatCheckpointLoadState = began.state;
-    this.chatCheckpoints = checkpointsFromLoadState(began.state);
-    // Phase A: load checkpoints for collab/space sessions (恢复线).
-    // P0: bind request to sessionKey + generation; ignore late / cross-session replies.
-    try {
-      const result = await this.client.request<{ checkpoints?: ChatCheckpoint[] }>(
-        "chat.checkpoints.list",
-        { sessionKey: began.sessionKey },
-      );
-      const applied = applyChatCheckpointLoadSuccess(this.chatCheckpointLoadState, {
-        sessionKey: began.sessionKey,
-        generation: began.generation,
-        checkpoints: result.checkpoints,
-      });
-      this.chatCheckpointLoadState = applied.state;
-      if (!applied.ignored) {
-        this.chatCheckpoints = checkpointsFromLoadState(applied.state);
-        this.chatCheckpointDiagnostics = diagnoseCheckpointListVisibility(
-          applied.state.checkpoints,
-          this.chatMessages,
-        );
-      }
-    } catch {
-      const applied = applyChatCheckpointLoadFailure(this.chatCheckpointLoadState, {
-        sessionKey: began.sessionKey,
-        generation: began.generation,
-        errorToken: "list_failed",
-      });
-      this.chatCheckpointLoadState = applied.state;
-      if (!applied.ignored) {
-        this.chatCheckpoints = checkpointsFromLoadState(applied.state);
-        // Keep prior diagnostics when stale; clear when hard error with no data.
-        if (applied.state.status === "error") {
-          this.chatCheckpointDiagnostics = [];
-        }
-      }
-    }
+    await loadChatCheckpointsForHost(this);
   }
 
   /** P0: clear checkpoints + load state when the restore session surface changes. */

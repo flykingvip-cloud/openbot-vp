@@ -1,0 +1,119 @@
+{
+  "title": "local-gateway-19001-buildinfo-fix",
+  "recordedAtAsiaShanghai": "2026-11-01T22:13:26.529036+08:00",
+  "goal": "Fix gateway :19001 missing build-info identity gap by restarting from git worktree with official write-build-info",
+  "authorizedApproach": "proper restart of acceptance gateway only (not production / not :18789/:18790)",
+  "before": {
+    "parentPid": 11176,
+    "openclawPid": 11203,
+    "gatewayPid": 11204,
+    "cwd": "/private/tmp/openbot-joint-accept-883a5159",
+    "hadGit": false,
+    "hadDistBuildInfo": false,
+    "treeNameEncodedSha": "883a5159dcaa4a22cc12368894632597fd356d2c",
+    "portsListening": [19001, 19003, 19004],
+    "envFlagsObserved": [
+      "OPENCLAW_SKIP_CHANNELS=1",
+      "CLAWDBOT_SKIP_CHANNELS=1",
+      "OPENBOT_STATE_DIR=/private/tmp/openbot-joint-accept-state-883a5159",
+      "OPENCLAW_STATE_DIR=/private/tmp/openbot-joint-accept-state-883a5159"
+    ]
+  },
+  "worktree": {
+    "path": "/Users/daniel/AI VP/openbot-wt-postmerge-883a5159",
+    "head": "883a5159dcaa4a22cc12368894632597fd356d2c",
+    "headConfirmed": true,
+    "nodeModulesPresent": true,
+    "pnpmInstallSkipped": true,
+    "writeBuildInfoCommand": "node --import tsx scripts/write-build-info.ts",
+    "preferGitHeadOverEnv": true
+  },
+  "buildInfo": {
+    "path": "/Users/daniel/AI VP/openbot-wt-postmerge-883a5159/dist/build-info.json",
+    "contents": {
+      "version": "2026.7.12-rc.2",
+      "commit": "883a5159dcaa4a22cc12368894632597fd356d2c",
+      "builtAt": "2026-11-01T14:12:26.264Z",
+      "probeModuleSha": "b9b9d3350ef20546"
+    },
+    "commitMatchesExpected": true
+  },
+  "stop": {
+    "targets": [11176, 11203, 11204],
+    "signal": "TERM then verify; KILL not needed",
+    "portsFreed": [19001, 19003, 19004],
+    "untouchedPids": [71854, 77060],
+    "untouchedPorts": [18789, 18790]
+  },
+  "restart": {
+    "command": "OPENCLAW_SKIP_CHANNELS=1 CLAWDBOT_SKIP_CHANNELS=1 OPENBOT_STATE_DIR=/private/tmp/openbot-joint-accept-state-883a5159 OPENCLAW_STATE_DIR=/private/tmp/openbot-joint-accept-state-883a5159 OPENBOT_GATEWAY_PORT=19001 nohup node scripts/run-node.mjs --dev gateway --port 19001 > /private/tmp/openbot-joint-accept-19001-restart.log 2>&1 &",
+    "logPath": "/private/tmp/openbot-joint-accept-19001-restart.log",
+    "stateDirKept": "/private/tmp/openbot-joint-accept-state-883a5159",
+    "parentPid": 14883,
+    "openclawPid": 14974,
+    "gatewayPid": 14977,
+    "cwd": "/Users/daniel/AI VP/openbot-wt-postmerge-883a5159",
+    "portsListening": [19001, 19003, 19004],
+    "runNodeNote": "run-node.mjs rebuilt stale TypeScript dist and auto-built Control UI assets on first start; write-build-info alone was run first and commit identity survived"
+  },
+  "after": {
+    "healthUrl": "http://127.0.0.1:19001/health",
+    "health": {
+      "ok": true,
+      "status": "live"
+    },
+    "uiRootHttp": 200,
+    "uiDataOpenbotBuildCommit": "883a5159dcaa4a22cc12368894632597fd356d2c",
+    "cwdMatchesWorktree": true,
+    "gitHeadMatchesBuildInfo": true,
+    "ports18789_18790Untouched": true,
+    "pid18789": 77060,
+    "pid18790": 71854
+  },
+  "notes": [
+    "No full pnpm build invoked manually; run-node --dev performed stale dist rebuild + ui:build automatically.",
+    "Gateway log noted auth token was missing and generated a new token saved to state config (gateway.auth.token); openbot.json rewritten with backup .bak — token value intentionally omitted from this evidence.",
+    "No git commit/push of evidence; file written for user to push later.",
+    "Did not touch production ports :18789 or :18790."
+  ],
+  "success": true,
+  "blockers": [],
+  "provenanceAuthFollowup": {
+    "recordedAtAsiaShanghai": "2026-11-01T22:22:22.188+08:00",
+    "evidenceFile": "local-gateway-19001-provenance-auth.json",
+    "taskA_verdictLabelZh": "声明身份，构建来源未完全验证",
+    "taskA_fullOfficialBuildProven": false,
+    "taskA_officialCommand": "node --import tsx scripts/write-build-info.ts",
+    "taskA_actualBuildPath": "write-build-info + run-node stale tsdown rebuild + auto ui:build (not full pnpm build)",
+    "taskA_worktreeClean": true,
+    "taskA_uiShaAloneInsufficient": true,
+    "taskB_statePathOnly": "/private/tmp/openbot-joint-accept-state-883a5159",
+    "taskB_homeOpenbotJsonTouched": false,
+    "taskB_bakExistsNotRestored": true,
+    "taskB_authOverallPass": true,
+    "overallConclusionsUnchanged": true
+  },
+  "updatedAtAsiaShanghai": "2026-11-01T22:22:22.188+08:00",
+  "desensitization": {
+    "checkedAtAsiaShanghai": "2026-11-01T23:09:54+08:00",
+    "stripped": [
+      "gateway.auth.token values",
+      "Authorization/Bearer header values",
+      "cookies",
+      "API keys"
+    ],
+    "policy": "No secret values retained; auth outcomes kept as status codes / booleans only.",
+    "redactionMarker": "[REDACTED]"
+  },
+  "closeoutArchiveNote": {
+    "pinnedAcceptanceShaAtPersist": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
+    "roleOfThisEvidence": "historical_19001_joint_accept_identity_gap_fix_only",
+    "mayProveCloseoutTipRuntimeEffect": false,
+    "verdictLabelZhRetained": "声明身份，构建来源未完全验证",
+    "noteZh": ":19001 产物仅记录为声明身份、构建来源未完全验证；不能用于证明 closeout tip 已生效。本文件随收尾持久保存并脱敏。",
+    "locGateAtPinnedTip": "unblocked_at_3460ef9fa_without_budget_raise",
+    "runtimeEffectClosed": false,
+    "modelScenariosClosed": false
+  },
+  "persistedAtAsiaShanghai": "2026-11-01T23:09:54+08:00"
+}

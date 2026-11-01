@@ -1,0 +1,8 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 format:check /Users/daniel/AI VP/openbot-memory-final-closeout-182
+> oxfmt --check
+
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 9548ms on 17239 files using 14 threads.

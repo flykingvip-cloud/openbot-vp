@@ -1,0 +1,72 @@
+{
+  "capturedAt": {
+    "Europe/Berlin": "2026-11-01 13:56:35 UTC+01:00",
+    "Asia/Shanghai": "2026-11-01 20:56:35 UTC+08:00"
+  },
+  "method": "read-only: ps/lsof/http health/UI HTML/dist build-info; no memory search APIs; no state mutation",
+  "gateways": [
+    {
+      "pid": 77060,
+      "port": 18789,
+      "cwd": "/Users/daniel/AI VP/openbot-gateway-rebuild-beb0ee226ab6",
+      "gitHead": "beb0ee226ab6eb7bdd10338b43da42c38478f225",
+      "gitNote": "#180 tip in that worktree",
+      "health": {
+        "ok": true,
+        "status": "live",
+        "httpStatus": 200
+      },
+      "distBuildInfo": {
+        "path": "dist/build-info.json",
+        "version": "2026.7.12-rc.2",
+        "commit": "beb0ee226ab6eb7bdd10338b43da42c38478f225",
+        "builtAt": "2026-11-01T11:02:31.676Z",
+        "probeModuleSha": "b9b9d3350ef20546"
+      },
+      "uiDataOpenbotBuildCommit": "beb0ee226ab6eb7bdd10338b43da42c38478f225",
+      "uiSource": "GET http://127.0.0.1:18789/",
+      "OPENBOT_STATE_DIR_observed": "/Users/daniel/.openbot",
+      "OPENBOT_STATE_DIR_note": "inferred from open files (config-store/control-plane under ~/.openbot); process environ OPENBOT_STATE_DIR not visible via ps eww; NOT mutated",
+      "isTipOfMainMemoryCloseoutSha": false
+    },
+    {
+      "pid": 71854,
+      "port": 18790,
+      "cwd": "/private/tmp/openbot-pr143-live-20261029-174622/src",
+      "gitHead": "02c26fabf5262c91182635a4e200aada4eb9fa1c",
+      "gitNote": "detached HEAD",
+      "health": {
+        "ok": true,
+        "status": "live",
+        "httpStatus": 200
+      },
+      "distBuildInfo": null,
+      "distBuildInfoNote": "no dist/build-info.json under cwd tree",
+      "uiDataOpenbotBuildCommit": "02c26fa",
+      "uiSource": "GET http://127.0.0.1:18790/",
+      "OPENBOT_STATE_DIR_observed": "/private/tmp/openbot-pr143-live-20261029-174622/state",
+      "OPENBOT_STATE_DIR_note": "inferred from open files (state/conversation-task/*, state/openbot.json); parent PID 71853 openclaw; environ var not visible via ps eww; NOT mutated",
+      "isTipOfMainMemoryCloseoutSha": false
+    },
+    {
+      "pid": 11204,
+      "port": 19001,
+      "cwd": "/private/tmp/openbot-joint-accept-883a5159",
+      "gitHead": null,
+      "gitNote": "no .git in tree",
+      "health": {
+        "ok": true,
+        "status": "live",
+        "httpStatus": 200
+      },
+      "distBuildInfo": null,
+      "distBuildInfoNote": "dist/ present (control-ui, bundled, ...) but no build-info.json found under tree",
+      "uiDataOpenbotBuildCommit": null,
+      "uiSource": "GET / /index.html /control-ui/ returned 404; no commit attr readable",
+      "OPENBOT_STATE_DIR_observed": "/private/tmp/openbot-joint-accept-state-883a5159",
+      "OPENBOT_STATE_DIR_note": "inferred from open files (conversation-task dbs under openbot-joint-accept-state-883a5159); parent PID 11203 openclaw; environ var not visible via ps eww; NOT mutated",
+      "isTipOfMainMemoryCloseoutSha": false
+    }
+  ],
+  "conclusion": "runtime identity VERIFIED read-only for three local gateways; none is tip-of-main memory closeout SHA (c35164c / closeout branch tip)"
+}

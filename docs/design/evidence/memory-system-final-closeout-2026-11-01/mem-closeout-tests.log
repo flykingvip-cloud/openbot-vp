@@ -1,0 +1,85 @@
+START 2026-11-01T12:45:24+0100
+SHA 72a042332a5b0f3e630a7f916390f730be5e92e0
+NODE v22.23.4
+PNPM 10.23.0
+TZ_BERLIN 2026-11-01T12:45:24+0100
+TZ_SHANGHAI 2026-11-01T19:45:24+0800
+===== unit START 12:45:24 =====
+
+ RUN  v4.0.18 /workspace
+
+ ✓ src/memory/memory-effect-acceptance-matrix.test.ts (2 tests) 85ms
+ ✓ src/memory/memory-batch1-o8-baseline-v3.test.ts (3 tests) 2488ms
+     ✓ records separated-layer matrix without claiming full E2E  2486ms
+ ✓ src/memory/memory-continuity-rpc.integration.test.ts (2 tests) 101ms
+ ✓ src/memory/memory-center-o4-readonly.test.ts (9 tests) 99ms
+ ✓ src/memory/memory-continuity-acceptance.test.ts (3 tests) 162ms
+ ✓ src/memory/health-probe.test.ts (13 tests) 37ms
+ ✓ src/memory/memory-fact-forget.test.ts (5 tests) 53ms
+ ✓ src/memory/memory-continuity-authz.test.ts (6 tests) 24ms
+ ✓ src/memory/memory-platform-audit.o2.test.ts (10 tests) 70ms
+ ✓ src/memory/personal-learning-ownership.test.ts (4 tests) 39ms
+ ✓ src/memory/health-probe-run.test.ts (3 tests) 14ms
+ ✓ src/memory/query-atoms-acl.test.ts (4 tests) 12ms
+ ✓ src/memory/health-probe-snapshot.test.ts (4 tests) 9ms
+ ✓ src/memory/memory-center-atoms.test.ts (2 tests) 4ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ✓ src/memory/memory-continuity-gateway.http.integration.test.ts (2 tests) 1351ms
+     ✓ authorized DM: write marker → HTTP search/get returns marker  1274ms
+ ✓ src/memory/health-probe-build-info.test.ts (3 tests) 5ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-12.16.1.tgz
+Downloading the pnpm 12.16.1 binary for linux-x64...
+ ✓ src/memory/health-probe.oxlint.test.ts (2 tests) 2364ms
+     ✓ passes eslint/no-restricted-imports on health-probe.ts  1083ms
+     ✓ fails when health-probe would import manager.js  1236ms
+ ✓ src/memory/health-probe.di-guard.test.ts (1 test) 16ms
+ ✓ src/memory/health-probe.factory.test.ts (1 test) 3ms
+
+ Test Files  19 passed (19)
+      Tests  79 passed (79)
+   Start at  11:45:25
+   Duration  21.30s (transform 16.01s, setup 1.57s, import 32.32s, tests 6.93s, environment 2ms)
+
+===== unit EXIT:0 =====
+===== gateway START 12:45:46 =====
+
+ RUN  v4.0.18 /workspace
+
+ ✓ src/gateway/server-methods/doctor-memory-health.test.ts (10 tests) 19ms
+ ✓ src/gateway/collaboration-learning/memory-index-paths.test.ts (4 tests) 15ms
+ ✓ src/gateway/server-methods/memory-list-o4-status-view.test.ts (4 tests) 6ms
+ ✓ src/gateway/server-methods/memory-forget-gateway-isolation.test.ts (5 tests) 10ms
+ ✓ src/gateway/server-methods/memory-forget-fact-gateway-isolation.test.ts (4 tests) 5ms
+ ✓ src/gateway/server-methods/memory-center-access.test.ts (4 tests) 5ms
+
+ Test Files  6 passed (6)
+      Tests  31 passed (31)
+   Start at  11:45:47
+   Duration  8.38s (transform 5.79s, setup 734ms, import 14.14s, tests 59ms, environment 0ms)
+
+===== gateway EXIT:0 =====
+===== ui START 12:45:55 =====
+
+ RUN  v4.0.18 /workspace
+
+No test files found, exiting with code 1
+
+filter: ui/src/ui/ports/employee/views/memory-center-page.node.test.ts
+include: src/**/*.node.test.ts
+exclude:  **/node_modules/**, **/.git/**
+
+===== ui EXIT:1 =====
+===== e2e START 12:45:56 =====
+
+ RUN  v4.0.18 /workspace
+
+ ✓ test/memory-continuity-gateway.e2e.test.ts (1 test) 12650ms
+     ✓ child gateway: authorized DM marker via HTTP memory_search / memory_get  12649ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  11:45:56
+   Duration  17.67s (transform 3.41s, setup 255ms, import 4.67s, tests 12.65s, environment 0ms)
+
+===== e2e EXIT:0 =====
+END 2026-11-01T12:46:14+0100

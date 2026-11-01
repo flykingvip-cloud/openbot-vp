@@ -1,0 +1,124 @@
+{
+  "schema": "local-gateway-closeout-tip-build-identity/v1",
+  "recordedAtAsiaShanghai": "2026-11-01T23:14:50+08:00",
+  "purpose": "Dedicated-env official full build of pinned closeout tip + isolated gateway runtime identity probe",
+  "pinnedAcceptanceSha": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
+  "worktree": {
+    "path": "/Users/daniel/AI VP/openbot-closeout-accept-build-3460ef9fa",
+    "gitHead": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
+    "detachedAtPinnedTip": true,
+    "note": "Sibling worktree of openbot-memory-final-closeout-182 at pinned tip; not the #113 joint-accept tree"
+  },
+  "dedicatedStateDir": "/private/tmp/openbot-closeout-accept-3460ef9fa",
+  "notUsing": {
+    "portsAvoided": [18789, 18790, 19001],
+    "jointAcceptState": "/private/tmp/openbot-joint-accept-state-883a5159",
+    "noteZh": "未重启、未把 :19001/#113 当作 closeout tip 生效证明"
+  },
+  "officialFullBuild": {
+    "command": "pnpm build",
+    "includes": "pnpm build:collaboration:packages && build:evolution:packages && canvas:a2ui:bundle && tsdown-build && copy-plugin-sdk + dts + write-build-info.ts + write-cli-* + pnpm ui:build",
+    "writeBuildInfoStep": "node --import tsx scripts/write-build-info.ts (via pnpm build)",
+    "logPath": "/private/tmp/openbot-closeout-accept-3460ef9fa/full-pnpm-build.log",
+    "exitCode": 0,
+    "distBuildInfoAfterBuild": {
+      "version": "2026.7.12-rc.2",
+      "commit": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
+      "builtAt": "2026-11-01T15:13:15.356Z",
+      "probeModuleSha": "b9b9d3350ef20546"
+    },
+    "distMatchesPinnedTip": true
+  },
+  "gatewayStart": {
+    "port": 19111,
+    "bind": "loopback",
+    "authMode": "token",
+    "tokenValueStored": false,
+    "tokenLabel": "[REDACTED] probe-only token passed on CLI; not a user secret",
+    "commandShape": "OPENBOT_STATE_DIR=<dedicated> OPENCLAW_STATE_DIR=<dedicated> OPENCLAW_SKIP_CHANNELS=1 node scripts/run-node.mjs gateway --port 19111 --bind loopback --auth token --allow-unconfigured --token [REDACTED]",
+    "pidListener": 54560,
+    "cwd": "/Users/daniel/AI VP/openbot-closeout-accept-build-3460ef9fa",
+    "runNodeNote": "run-node.mjs performed an additional tsdown rebuild on start (log: Build complete ~9.6s) even without --dev; dist/build-info.json commit remained the pinned tip afterward."
+  },
+  "identityProbe": {
+    "http": {
+      "/": {
+        "status": 200,
+        "dataOpenbotBuildCommit": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
+        "matchesPinnedTip": true
+      },
+      "/health": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "status": "live"
+        }
+      },
+      "/readyz": {
+        "status": "ERR",
+        "bodyPreview": "{\"ready\":false,\"failing\":[\"wecom\"],\"uptimeMs\":35327}",
+        "note": "ready=false due to wecom failing; not used as closeout product acceptance"
+      }
+    },
+    "filesystemDistBuildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
+      "builtAt": "2026-11-01T15:13:15.356Z",
+      "probeModuleSha": "b9b9d3350ef20546"
+    },
+    "declaredCommitEqualsPinnedTip": true
+  },
+  "stateIsolation": {
+    "OPENBOT_STATE_DIR": "/private/tmp/openbot-closeout-accept-3460ef9fa",
+    "openFilesMentioningDedicatedStateSample": [
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/config-store.db-shm",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/control-plane.db-shm",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/gateway-19111.log",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/gateway-19111.log",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/canvas/index.html",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/config-store.db",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/config-store.db-wal",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/config-store.db-shm",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/config-store.db",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/config-store.db-wal",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/control-plane.db",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/control-plane.db-wal",
+      "/private/tmp/openbot-closeout-accept-3460ef9fa/conversation-task/control-plane.db-shm",
+      "/Users/daniel/.openbot/openbot.json"
+    ],
+    "mainUserOpenbotMutated": false,
+    "noteZh": "专用 state；未改 ~/.openbot 作为写入目标"
+  },
+  "bannedPortsUnchangedDuringProbe": {
+    "18789": {
+      "listening": true,
+      "pids": ["77060"]
+    },
+    "18790": {
+      "listening": true,
+      "pids": ["71854"]
+    },
+    "19001": {
+      "listening": true,
+      "pids": ["14977"]
+    }
+  },
+  "provenanceLabel": {
+    "en": "official_full_pnpm_build_of_pinned_tip_plus_run_node_start_tsdown",
+    "zh": "本 tip 官方完整 pnpm build（含 write-build-info + ui:build）后，在专用 state 上启动隔离网关；启动时 run-node 额外做了一次 tsdown。运行声明 commit 与 tip 一致。",
+    "isPartialOnly": false,
+    "isOfficialFullBuildOfTip": true,
+    "mayClaimCloseoutProductEffect": false,
+    "mayClaimModelScenarios": false
+  },
+  "desensitization": {
+    "stripped": ["gateway token values", "Authorization headers", "cookies", "API keys"],
+    "redactionMarker": "[REDACTED]"
+  },
+  "conclusions": {
+    "runtimeIdentityVerifiedForPinnedTip": true,
+    "runtimeEffectClosed": false,
+    "modelScenariosStillNotRun": true,
+    "overallCloseoutStillOpen": true
+  }
+}

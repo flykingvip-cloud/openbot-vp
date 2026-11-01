@@ -1,0 +1,265 @@
+{
+  "title": "local-gateway-19001-provenance-auth",
+  "recordedAtAsiaShanghai": "2026-11-01T22:22:22.188+08:00",
+  "relatedEvidence": "local-gateway-19001-buildinfo-fix.json",
+  "scope": {
+    "gatewayPort": 19001,
+    "worktree": "/Users/daniel/AI VP/openbot-wt-postmerge-883a5159",
+    "expectedSha": "883a5159dcaa4a22cc12368894632597fd356d2c",
+    "untouchedGateways": [18789, 18790],
+    "noTokenValuesLogged": true,
+    "bakNotRestored": true
+  },
+  "taskA_artifactProvenance": {
+    "officialGenerationCommand": "node --import tsx scripts/write-build-info.ts",
+    "fullPnpmBuildOrTsdownOfficialForThisTreeAtThisSha": false,
+    "whatActuallyRan": [
+      "node --import tsx scripts/write-build-info.ts (manual; wrote dist/build-info.json)",
+      "node scripts/run-node.mjs --dev gateway --port 19001 auto-detected stale dist → ran tsdown rebuild",
+      "gateway auto ui:build for missing Control UI assets"
+    ],
+    "worktreeAtVerification": {
+      "gitStatusPorcelain": "",
+      "gitStatusClean": true,
+      "head": "883a5159dcaa4a22cc12368894632597fd356d2c",
+      "commitTimeAsiaShanghai": "2026-10-27T13:07:22+08:00"
+    },
+    "buildInfoJson": {
+      "path": "/Users/daniel/AI VP/openbot-wt-postmerge-883a5159/dist/build-info.json",
+      "commit": "883a5159dcaa4a22cc12368894632597fd356d2c",
+      "builtAtUtc": "2026-11-01T14:12:26.264Z",
+      "mtimeAsiaShanghai": "2026-11-01T22:12:26+08:00",
+      "matchesHead": true
+    },
+    "distProvenance": {
+      "distFileCount": 2723,
+      "mtimeBucketsAsiaShanghai": {
+        "2026-10-27": 2,
+        "2026-11-01": 2721
+      },
+      "oct27Leftovers": ["protocol.schema.json", "tsconfig.tsbuildinfo"],
+      "nov1RebuildWindow": "2026-11-01T22:12:45+08:00 .. 2026-11-01T22:13:01+08:00",
+      "restartLogEvidence": [
+        "[openclaw] Building TypeScript (dist is stale).",
+        "tsdown v0.21.0 ... config file: .../openbot-wt-postmerge-883a5159/tsdown.config.ts",
+        "[gateway] Control UI assets missing; building (ui:build, auto-installs UI deps)…"
+      ],
+      "logPaths": [
+        "/private/tmp/openbot-joint-accept-19001-restart.log",
+        "/private/tmp/openbot-joint-accept-gw-19001.log"
+      ],
+      "packagesStarDistStillOct27": true,
+      "packagesDistNote": "packages/*/dist/index.js mtimes remain 2026-10-27 ~13:18 Asia/Shanghai; no full monorepo pnpm build evidenced for this SHA restart",
+      "writeBuildInfoBeforeTsdown": true,
+      "uiSameShaAloneInsufficient": true,
+      "uiSameShaAloneInsufficientStatement": "UI showing the same SHA alone is NOT enough to prove dist/ was produced by a full official build of 883a5159; it only proves build-info/identity embedding.",
+      "verdictLabelZh": "声明身份，构建来源未完全验证",
+      "verdictLabelEn": "declared identity; build provenance not fully verified",
+      "verdictRationale": [
+        "Declared commit identity is consistent (HEAD == build-info.commit == UI data-openbot-build-commit).",
+        "Main package dist was rebuilt tonight via run-node stale-tsdown + ui:build from this worktree, not via an official full pnpm build.",
+        "Cannot claim full official build provenance of 883a5159 for the entire artifact set (packages/*/dist untouched; no pnpm build invocation recorded).",
+        "Therefore label: 声明身份，构建来源未完全验证."
+      ]
+    }
+  },
+  "taskB_tokenRewriteBlastRadiusAndAuth": {
+    "statePathUsedBy19001": "/private/tmp/openbot-joint-accept-state-883a5159",
+    "statePathConfirmation": {
+      "restartCommandEnvFromPriorEvidence": [
+        "OPENBOT_STATE_DIR=/private/tmp/openbot-joint-accept-state-883a5159",
+        "OPENCLAW_STATE_DIR=/private/tmp/openbot-joint-accept-state-883a5159"
+      ],
+      "restartLogDevConfigReady": "/private/tmp/openbot-joint-accept-state-883a5159/openbot.json",
+      "restartLogConfigOverwriteTargetsStateOnly": true,
+      "restartLogTokenGenerationMessagePresent": true,
+      "gatewayPid": 14977,
+      "cwd": "/Users/daniel/AI VP/openbot-wt-postmerge-883a5159",
+      "lsofStateDirOpenFiles": true,
+      "lsofHomeOpenbotJson": {
+        "open": true,
+        "mode": "read-only (fd 31r)",
+        "mtimeAsiaShanghai": "2026-10-27T16:00:01+08:00",
+        "size": 27923,
+        "touchedByThisRestart": false,
+        "note": "Process has RO open on ~/.openbot/openbot.json, but this was NOT the write/cwd state for token rewrite; config overwrite + .bak occurred only under OPENBOT_STATE_DIR."
+      },
+      "homeWasNotCwdStateForThisProcess": true
+    },
+    "bak": {
+      "path": "/private/tmp/openbot-joint-accept-state-883a5159/openbot.json.bak",
+      "exists": true,
+      "alsoPresent": ["/private/tmp/openbot-joint-accept-state-883a5159/openbot.json.bak.1"],
+      "restored": false
+    },
+    "authChecks": {
+      "method": "HTTP Bearer from state gateway.auth.token (in-process only; never logged)",
+      "tokenSource": "in-process read of state openbot.json gateway.auth.token; never echoed/logged/printed",
+      "recordedAtAsiaShanghai": "2026-11-01T22:21:45.881+08:00",
+      "overallAuthPass": true,
+      "homeVsStateTokenEqual": false,
+      "checks": [
+        {
+          "case": "browser19003_missing_token",
+          "url": "http://127.0.0.1:19003/",
+          "method": "GET",
+          "status": 401,
+          "pass": true,
+          "body_prefix_len": 12,
+          "expect": "reject_401_or_403"
+        },
+        {
+          "case": "browser19003_wrong_token",
+          "url": "http://127.0.0.1:19003/",
+          "method": "GET",
+          "status": 401,
+          "pass": true,
+          "body_prefix_len": 12,
+          "expect": "reject_401_or_403"
+        },
+        {
+          "case": "browser19003_authorized",
+          "url": "http://127.0.0.1:19003/",
+          "method": "GET",
+          "status": 200,
+          "pass": true,
+          "body_prefix_len": 200,
+          "expect": "2xx_or_3xx"
+        },
+        {
+          "case": "browser19003_authorized_x_openbot_token",
+          "url": "http://127.0.0.1:19003/",
+          "method": "GET",
+          "status": 401,
+          "pass": false,
+          "body_prefix_len": 12,
+          "expect": "2xx_or_3xx"
+        },
+        {
+          "case": "tools_invoke_missing_token",
+          "url": "http://127.0.0.1:19001/tools/invoke",
+          "method": "POST",
+          "status": 401,
+          "pass": true,
+          "body_prefix_len": 58,
+          "expect": "reject_401_or_403"
+        },
+        {
+          "case": "tools_invoke_wrong_token",
+          "url": "http://127.0.0.1:19001/tools/invoke",
+          "method": "POST",
+          "status": 401,
+          "pass": true,
+          "body_prefix_len": 58,
+          "expect": "reject_401_or_403"
+        },
+        {
+          "case": "tools_invoke_authorized",
+          "url": "http://127.0.0.1:19001/tools/invoke",
+          "method": "POST",
+          "status": 500,
+          "pass": true,
+          "body_prefix_len": 76,
+          "expect": "auth_accepted_not_401_403"
+        },
+        {
+          "case": "canvas_missing_token",
+          "url": "http://127.0.0.1:19001/__openbot__/canvas/",
+          "method": "GET",
+          "status": 401,
+          "pass": null,
+          "body_prefix_len": 58,
+          "expect": "informational"
+        },
+        {
+          "case": "canvas_wrong_token",
+          "url": "http://127.0.0.1:19001/__openbot__/canvas/",
+          "method": "GET",
+          "status": 401,
+          "pass": true,
+          "body_prefix_len": 58,
+          "expect": "reject_401_or_403"
+        },
+        {
+          "case": "canvas_authorized",
+          "url": "http://127.0.0.1:19001/__openbot__/canvas/",
+          "method": "GET",
+          "status": 200,
+          "pass": true,
+          "body_prefix_len": 200,
+          "expect": "2xx_or_3xx"
+        }
+      ],
+      "interpretation": [
+        "Authorized Bearer against browser :19003 → 200",
+        "Unauthorized missing/wrong token against browser :19003 → 401",
+        "Authorized Bearer POST /tools/invoke → not 401/403 (got 500 tool_error after auth accepted)",
+        "Unauthorized missing/wrong token POST /tools/invoke → 401",
+        "Authorized Bearer canvas → 200; wrong token → 401",
+        "X-OpenBot-Token alone not accepted on :19003 (401) — Bearer is the verified method for that surface"
+      ]
+    }
+  },
+  "overallConclusionsUnchanged": {
+    "tipGatesStillLocBlocked": true,
+    "closeoutRuntimeEffectStillUnverified": true,
+    "sixModelScenariosStillNotRun": true,
+    "thisIdentityFixDoesNotChangeThoseThree": true,
+    "notesZh": [
+      "最新研发门禁仍受 LOC 阻塞",
+      "closeout 运行生效仍未验证",
+      "六条模型场景仍未执行",
+      "本次身份/provenance/auth 补核不改变上述三项结论"
+    ]
+  },
+  "success": {
+    "provenanceDocumented": true,
+    "provenanceFullyVerifiedAsOfficialFullBuild": false,
+    "authBehaviorVerified": true,
+    "tokenBlastRadiusLimitedTo19001State": true,
+    "otherGatewaysUntouched": true
+  },
+  "desensitization": {
+    "checkedAtAsiaShanghai": "2026-11-01T23:09:54+08:00",
+    "stripped": [
+      "gateway.auth.token values",
+      "Authorization/Bearer header values",
+      "cookies",
+      "API keys"
+    ],
+    "tokenSourceNote": "Checks used in-process token read only; values never stored in this file.",
+    "policy": "Keep ports/SHAs/mtimes/pass-fail/status codes; never token strings.",
+    "redactionMarker": "[REDACTED]"
+  },
+  "overallConclusionsAtRecording": {
+    "tipGatesStillLocBlocked": true,
+    "closeoutRuntimeEffectStillUnverified": true,
+    "sixModelScenariosStillNotRun": true,
+    "thisIdentityFixDoesNotChangeThoseThree": true,
+    "notesZh": [
+      "最新研发门禁仍受 LOC 阻塞",
+      "closeout 运行生效仍未验证",
+      "六条模型场景仍未执行",
+      "本次身份/provenance/auth 补核不改变上述三项结论"
+    ]
+  },
+  "overallConclusionsAtPersist": {
+    "tipGatesStillLocBlocked": false,
+    "locUnblockedAtSha": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
+    "closeoutRuntimeEffectStillUnverified": true,
+    "sixModelScenariosStillNotRun": true,
+    "this19001EvidenceDoesNotProveCloseoutTipEffect": true,
+    "notesZh": [
+      "研发 tip LOC 门禁已在 3460ef9fa 解除（未抬预算）",
+      ":19001 仍不能证明 closeout tip 运行生效",
+      "六条模型场景仍未执行（待费用/鉴权授权）"
+    ]
+  },
+  "closeoutArchiveNote": {
+    "pinnedAcceptanceShaAtPersist": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
+    "roleOfThisEvidence": "historical_19001_provenance_and_auth_boundary_only",
+    "mayProveCloseoutTipRuntimeEffect": false,
+    "authInterpretationBoundaryZh": "正确凭据非 401 只证明通过鉴权关口，不等于业务功能验收通过。"
+  },
+  "persistedAtAsiaShanghai": "2026-11-01T23:09:54+08:00"
+}

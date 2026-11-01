@@ -10110,10 +10110,6 @@ tasks:
   paths:
   - .loom/registry.yaml
   - docs/notes/infrastructure-audit-2026-10-31/**
-  state: active
-  sessions: []
-  ownerHistory: []
-  metadata: {}
 - id: infrastructure-audit:a3-implementation-pack
   owner: infra-audit
   intent:
@@ -10926,6 +10922,8 @@ landingStreams:
   - strip-ohbe-from-openbot-vp
   - infrastructure-audit-ledger-integrity-20261031
   - infrastructure-audit-batch-b-20261031
+  - infrastructure-audit-a3-implementation-pack-20261031
+  - infrastructure-audit-release-record-anti-drift-20261031
   metadata:
     task: infrastructure-audit:p1-object-recovery
     owner: infra-audit
@@ -23456,6 +23454,17 @@ landingStreams:
     owner: cursor-cloud
     purpose: Wire post-publish claim entry; withdraw parallel formal acceptance SM; OS sync prefers currentTaskId
       authority with real storage tests.
+- id: memory-system-final-closeout-20261101
+  landingPolicy: serial
+  paths:
+  - docs/design/memory-system-final-closeout-2026-11-01.md
+  - docs/design/evidence/memory-system-final-closeout-2026-11-01/**
+  - .loom/registry.yaml
+  canLandWith: []
+  metadata:
+    task: memory-system-final-closeout
+    owner: grok-bot-cloud-closeout
+    purpose: Closeout doc, evidence logs, and isolated SDK probe. No product behavior change.
 sharedPaths:
 - glob: src/context-engine/registry.ts
   landerTask: openbot-default-capability-p0:cursor-grok-default-capability

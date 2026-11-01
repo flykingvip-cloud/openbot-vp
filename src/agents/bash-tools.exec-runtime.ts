@@ -37,8 +37,8 @@ import {
   clampWithDefault,
   readEnvInt,
 } from "./bash-tools.shared.js";
-import { resolveDockerSpawnInvocation } from "./sandbox/docker.js";
 import { buildCursorPositionResponse, stripDsrRequests } from "./pty-dsr.js";
+import { resolveDockerSpawnInvocation } from "./sandbox/docker.js";
 import { getShellConfig, sanitizeBinaryOutput } from "./shell-utils.js";
 
 // Sanitize inherited host env before merge so dangerous variables from process.env
