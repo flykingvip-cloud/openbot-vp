@@ -547,7 +547,6 @@ describe("structured task rejection and diagnosis read", () => {
         id: "scope",
         method: "task.outcome.rejectResult",
       },
-      params: { taskId: "task-gw" },
       respond,
       client: {
         connect: { role: "operator", scopes: ["operator.read"], minProtocol: 1, maxProtocol: 1 },
