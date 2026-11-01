@@ -304,18 +304,32 @@ O6 / O7 / O9 仍 **明确延期**。撤回的「forget failed」双来源假阳�
 
 ### 本 tip 已持久化的本机证据（脱敏）
 
-| 文件                                                                                                    | 角色                                          |
-| ------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-19001-buildinfo-fix.json`   | :19001 身份补核历史；非 closeout tip 生效证明 |
-| `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-19001-provenance-auth.json` | :19001 provenance + auth 边界历史；非业务验收 |
-| `docs/design/evidence/memory-system-final-closeout-2026-11-01/composition-root-loc-fix-2026-11-01.md`   | LOC 解除记录                                  |
+| 文件                                                                                                          | 角色                                          |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-19001-buildinfo-fix.json`         | :19001 身份补核历史；非 closeout tip 生效证明 |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-19001-provenance-auth.json`       | :19001 provenance + auth 边界历史；非业务验收 |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/composition-root-loc-fix-2026-11-01.md`         | LOC 解除记录                                  |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-closeout-tip-build-identity.json` | 专用环境完整构建 + :19111 身份探针（已停）    |
 
 ### LOC 状态（相对 LOCAL RERUN 上文）
 
 上文 LOCAL RERUN 记录的「166/150、4890/4845、BLOCKED」是 **LOC 修复前** 快照。修复后 tip `3460ef9faa8d7844367f4e2e4d28f656aeb27072`：`collaboration-learning.ts`=150/150，`ui/src/ui/app.ts`=4844/4845；`pnpm lint:core:composition-root-loc` exit 0。
 
+### 专用环境完整构建 + 运行身份（本 tip）
+
+| 字段         | 值                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| 证据         | `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-closeout-tip-build-identity.json`                  |
+| 构建命令     | `pnpm build`（官方完整路径，含 `write-build-info.ts` + `ui:build`）exit **0**                                                  |
+| 构建工作树   | `/Users/daniel/AI VP/openbot-closeout-accept-build-3460ef9fa` @ `3460ef9faa8d7844367f4e2e4d28f656aeb27072`（detached sibling） |
+| 专用 state   | `/private/tmp/openbot-closeout-accept-3460ef9fa`（**不是** #113 joint-accept state）                                           |
+| 临时网关端口 | **19111**（已停止；未碰 :18789/:18790/:19001）                                                                                 |
+| 声明 commit  | UI `data-openbot-build-commit` 与 `dist/build-info.json` 均为 `3460ef9fa…`（= 钉 tip）                                         |
+| provenance   | **official full pnpm build of pinned tip**；启动时 run-node 额外 tsdown 一次；**不**宣称产品运行生效或模型场景关闭             |
+| 记录时区     | 2026-11-01T23:15:06+0800 Asia/Shanghai                                                                                         |
+
 ### 仍开放
 
-1. 专用环境对本 tip 做**官方完整构建**并验证运行身份（不得用 :19001/:18789/:18790 冒充）。
-2. 获费用/鉴权授权后执行六条模型场景。
-3. 整体收尾仍不关闭。
+1. ~~专用环境对本 tip 做官方完整构建并验证运行身份~~ **已完成**（见上表；:19111 已停）。
+2. 获费用/鉴权授权后执行六条模型场景（仍 **not-run**）。
+3. 整体收尾仍不关闭（运行产品生效 ≠ 身份探针；模型效果未跑）。
