@@ -285,3 +285,37 @@ O6 / O7 / O9 仍 **明确延期**。撤回的「forget failed」双来源假阳�
 3. **模型效果：not-run** — 待费用/鉴权授权。
 
 **不宣称 overall close。** Draft PR #182 仍是唯一收尾记录。
+
+## FINAL ACCEPTANCE SHA PIN (post-LOC tip)
+
+| 字段                                                | 值                                                                                                                                                      |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **最终验收 / 门禁 tip SHA（研发 tip，LOC 解除后）** | `3460ef9faa8d7844367f4e2e4d28f656aeb27072`                                                                                                              |
+| 分支                                                | `cursor/memory-final-closeout-afe1`                                                                                                                     |
+| Draft PR                                            | https://github.com/flykingvip-cloud/openbot-vp/pull/182                                                                                                 |
+| 相对 `origin/main`（钉定时）                        | behind 13 / ahead 6（钉定时 `git fetch` 后 `git rev-list --left-right --count origin/main...HEAD`；origin/main=`5815006dc…`）；**不**假装已与 main 同步 |
+| 钉定时区                                            | 2026-11-01T23:10:10+0800 Asia/Shanghai                                                                                                                  |
+
+### 钉 SHA 含义（边界）
+
+- 本 SHA 固定为 **R&D / closeout tip**：`composition-root-loc` 已在此 tip 通过且**未抬预算**。
+- **不**宣称：运行生效已关闭、模型六场景已关闭、已部署、或与 `origin/main` 字节一致。
+- `:19001` / #113 joint-accept 历史证据（见下）仅证明当时声明身份与鉴权隔离边界；标签保留「声明身份，构建来源未完全验证」；**不得**用作本 tip 运行生效证明。
+
+### 本 tip 已持久化的本机证据（脱敏）
+
+| 文件                                                                                                    | 角色                                          |
+| ------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-19001-buildinfo-fix.json`   | :19001 身份补核历史；非 closeout tip 生效证明 |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-19001-provenance-auth.json` | :19001 provenance + auth 边界历史；非业务验收 |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/composition-root-loc-fix-2026-11-01.md`   | LOC 解除记录                                  |
+
+### LOC 状态（相对 LOCAL RERUN 上文）
+
+上文 LOCAL RERUN 记录的「166/150、4890/4845、BLOCKED」是 **LOC 修复前** 快照。修复后 tip `3460ef9faa8d7844367f4e2e4d28f656aeb27072`：`collaboration-learning.ts`=150/150，`ui/src/ui/app.ts`=4844/4845；`pnpm lint:core:composition-root-loc` exit 0。
+
+### 仍开放
+
+1. 专用环境对本 tip 做**官方完整构建**并验证运行身份（不得用 :19001/:18789/:18790 冒充）。
+2. 获费用/鉴权授权后执行六条模型场景。
+3. 整体收尾仍不关闭。
