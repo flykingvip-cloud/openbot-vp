@@ -2,8 +2,8 @@
 
 ## 目标
 
-改进 `auditLedger` 对祖先关系失败的**分类**，使缺对象 / 图不完整 / 已裁定回归不再共用 `regression`。  
-**不改变 fail-closed**：上述三类在未人工裁决前仍为 `severity: error` → CLI exit 30。  
+改进 `auditLedger` 对祖先关系失败的**分类**，使缺对象 / 图不完整 / 已裁定回归不再共用 `regression`。
+**不改变 fail-closed**：上述三类在未人工裁决前仍为 `severity: error` → CLI exit 30。
 **禁止**靠删除 `releases.jsonl` 行或批量写入 `regressionAcknowledged` 刷绿。
 
 ## 运行时 finding codes ↔ 离线 P1 类
