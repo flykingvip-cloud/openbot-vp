@@ -1149,7 +1149,8 @@ describe("repaired ledger warning profile", () => {
     expect(rows.find((r) => r.seq === 151)?.artifactDigest).toBe(
       "sha256:09c9b4c0db843c8b977f21cc0e5fb78c43ab408dbd633cda9e41573756442c48",
     );
-    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(true);
+    // Sole open tip (seq 151) is allowed; dual-open was cleared by #172.
+    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
     expect(rows.filter((r) => r.seq >= 99 && r.seq <= 103).map((r) => r.executor)).toEqual(
       Array(5).fill("cursor"),
     );
