@@ -4,19 +4,19 @@
 
 ## 1. 接管与基线
 
-| 项                   | 值                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------ |
-| 核查时间             | 2026-11-01T11:36:38Z 起，测试约 2026-11-01T11:56Z                                          |
-| 实施前 `origin/main` | `72a042332a5b0f3e630a7f916390f730be5e92e0`                                                 |
-| rebase 后 `origin/main` | `ea7f9218889ac9ca3d280d15cc14736149af369f`（#181）。祖先检查通过 |
-| 本分支提交 | `b991d50e4294bcc79a76603f575204c31cc95792` |
-| 工作区               | rebase 后干净，`git merge-base --is-ancestor origin/main HEAD` 通过                                 |
-| 运行时               | Node v22.23.4，pnpm 10.23.0（本环境执行 `pnpm install --frozen-lockfile`，退出码 0）       |
-| 任务                 | `askOutcome-p0-task-outcome-contract`                                                      |
-| 当前 owner           | `执行器收尾`（`via: verified`）                                                            |
-| 前任 owner           | `executor-acceptance`（保留在 `ownerHistory` 与 session `askoutcome-p0-local-20261026`）   |
-| 本会话               | `executor-closeout-6a40`，ide `cursor`                                                     |
-| 历史预发布报告       | 仓库内无 `openbot-prelease-accept-20261027.md` / `-r2.md` / `-r3.md`。缺失，不补写伪造说明 |
+| 项                      | 值                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| 核查时间                | 2026-11-01T11:36:38Z 起，测试约 2026-11-01T11:56Z                                          |
+| 实施前 `origin/main`    | `72a042332a5b0f3e630a7f916390f730be5e92e0`                                                 |
+| rebase 后 `origin/main` | `ea7f9218889ac9ca3d280d15cc14736149af369f`（#181）。祖先检查通过                           |
+| 本分支提交              | `b991d50e4294bcc79a76603f575204c31cc95792`                                                 |
+| 工作区                  | rebase 后干净，`git merge-base --is-ancestor origin/main HEAD` 通过                        |
+| 运行时                  | Node v22.23.4，pnpm 10.23.0（本环境执行 `pnpm install --frozen-lockfile`，退出码 0）       |
+| 任务                    | `askOutcome-p0-task-outcome-contract`                                                      |
+| 当前 owner              | `执行器收尾`（`via: verified`）                                                            |
+| 前任 owner              | `executor-acceptance`（保留在 `ownerHistory` 与 session `askoutcome-p0-local-20261026`）   |
+| 本会话                  | `executor-closeout-6a40`，ide `cursor`                                                     |
+| 历史预发布报告          | 仓库内无 `openbot-prelease-accept-20261027.md` / `-r2.md` / `-r3.md`。缺失，不补写伪造说明 |
 
 ## 2. 本轮修了什么
 
@@ -32,11 +32,11 @@
 | 协作 claim 无用量                                  | 不是模型调用。`costEvidence: "not_applicable"`，不计未知美元                                                                                        | `claim-contract-entry.ts`                                                                                                         |
 | evolution RPC 把观察写成任务成功                   | `countsAsTaskJudgement: false` 时不增加 `tasksTotal` / `tasksSucceeded`。jsonl 仍可写观察，`readEffectiveEvolutionTaskOutcomes` 本来就要求 `taskId` | `evolution-control.ts`                                                                                                            |
 | 长时间 pending 无观测                              | `listStaleAwaitingDeliveries`，启动和 drain 只打日志。不删除、不改成已送达                                                                          | `pending-delivery.ts`、`consumer-boot.ts`                                                                                         |
+| supervisor spend 与 tip 各记一本                   | 复用 `chargeModelCallAgainstTip` / `assessRunnerTurnBudgetGate`。每轮监督只记一笔 tip，`nextStop` 读投影，不把本地估计再加一次                      | `superviseTick` 在 `worker.dispatch` 前检查；`src/task-outcome/supervisor-tip-budget.ts`                                          |
 
 ## 3. 仍未闭合（不是改名结项）
 
-- supervisor 的 `nextStop` 仍是另一本账。它已经能挡住下一轮监督循环，但 spend 不与 tip 共用。没有把两本账合成新系统。
-- 一次 embedded attempt 内部的多轮 provider 调用（工具循环、压缩）仍算一次入口计费。下一次 fallback 或下一次入口调用才会被门闩拦住。
+- 一次 embedded attempt 内部的多轮 provider 调用（工具循环、压缩）仍算一次入口计费。下一次 fallback、下一次入口调用，以及下一次 supervisor `worker.dispatch` 才会被同一本 tip 拦住。
 - `attachAdoptedLearningAssetsToTask` 仍没有生产调用方。按契约不从提示词注入推断采用；没有执行证据就不计有效、不策展。
 - 学习曝光 pending 仍是进程内 Map。重启会丢掉尚未挂到 tip 的注入记录。
 - 协作里非 claim 的 board RPC 继续复用 claim tip，不另造任务身份。
@@ -51,7 +51,8 @@
 | `OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/task-outcome/executor-closeout-residuals.test.ts src/task-outcome/w3-task-budget.test.ts src/task-outcome/reverify-p1-crash-budget.test.ts src/gateway/agent-growth/operational-metrics-store.test.ts` | 0      | 修复指纹后                                      |
 | `OPENBOT_TEST_PROFILE=low pnpm exec vitest run` 上列 closeout + `paths-bypass-cleanup` + `residual-four-items` + `entrypoint-identity` + `cli-gateway-collab-entry-wiring` + `consumer-boot` + `run.task-outcome-closeout` + `followup-runner.test.ts`    | 0      | followup 的 `parentTaskId` 提升到函数作用域之后 |
 | `pnpm exec oxlint` 本轮改过的源文件                                                                                                                                                                                                                       | 0      | 去掉未使用测试辅助函数之后                      |
-| rebase 到 `ea7f9218` 后 `vitest run src/task-outcome/executor-closeout-residuals.test.ts src/task-outcome/closed-loop-negation-diagnosis.test.ts` | 0 | 12 tests |
+| `OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/task-outcome/supervisor-tip-budget.test.ts src/gateway/supervisor/engine.test.ts src/gateway/supervisor/retry.test.ts` | 0 | 41 tests。超限后 worker dispatch 次数不变 |
+| rebase 到 `ea7f9218` 后 `vitest run src/task-outcome/executor-closeout-residuals.test.ts src/task-outcome/closed-loop-negation-diagnosis.test.ts`                                                                                                         | 0      | 12 tests                                        |
 
 `src/task-outcome/executor-closeout-residuals.test.ts` 用真实 `assertRunnerTurnBudgetAllowsModelCall` / `chargeModelCallAgainstTip`，并用真实 `agentCommand` + 嵌入式 runner 替身：第一次调用计数为 1，把 tip 的 `maxIterations` 收到已用次数后，第二次 `agentCommand` 抛出 `TaskBudgetExceededError`，替身次数仍为 1。
 
@@ -69,7 +70,5 @@
 
 ## 6. 发布前还要用户决定的事
 
-1. 是否授权从合入后的 `origin/main` 做新一轮隔离构建和验收。本 PR 合入前不要用本分支发布。
-2. 生产切换、重启、配置变更都不在本轮授权内。
-3. supervisor 与 tip 是否要合成同一本 spend，需要单独决定；本轮故意没有做。
-4. 嵌入式 runner 内部每一轮 provider 请求是否都要单独计费，会碰到 `attempt.ts` 热文件，本轮没有改。
+1. 是否授权从合入后的 `origin/main` 做新一轮隔离构建和验收。本 PR 不合入，也不做生产切换。
+2. 嵌入式 runner 内部每一轮 provider 请求是否都要单独计费。会碰到 `attempt.ts`，本轮不做。

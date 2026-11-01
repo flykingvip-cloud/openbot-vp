@@ -110,7 +110,14 @@ export type ParentChildContract = {
   aggregation: ChildAggregationPolicy;
 };
 
-export type Entrypoint = "chat" | "gateway_agent" | "cron" | "cli" | "collab" | "subagent";
+export type Entrypoint =
+  | "chat"
+  | "gateway_agent"
+  | "cron"
+  | "cli"
+  | "collab"
+  | "subagent"
+  | "supervisor";
 
 export type CloseReasonCode =
   | "accepted_and_delivered"

@@ -10446,6 +10446,11 @@ landingStreams:
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/transitions.ts
       - src/task-outcome/types.ts
+      - src/task-outcome/supervisor-tip-budget.ts
+      - src/task-outcome/supervisor-tip-budget.test.ts
+      - src/gateway/supervisor/engine.ts
+      - src/gateway/supervisor/retry.ts
+      - src/gateway/supervisor/types.ts
     canLandWith: []
     metadata:
       task: askOutcome-p0-task-outcome-contract
