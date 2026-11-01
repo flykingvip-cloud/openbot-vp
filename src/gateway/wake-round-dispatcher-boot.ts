@@ -21,7 +21,6 @@ import { getReplyFromConfig } from "../auto-reply/reply.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
 import { loadConfig } from "../config/config.js";
 import type { OpenBotConfig } from "../config/types.js";
-import { redactSensitiveText } from "../logging/redact.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { toCollaborationSpaceSessionKey } from "../sessions/session-key-utils.js";
 import { episodeIdForClientRun } from "./collaboration-dispatch/collaboration-event-key.js";
@@ -31,6 +30,7 @@ import {
   type ModeBWakeRoundContext,
 } from "./collaboration-dispatch/mode-b-wake-round-dispatcher.js";
 import { buildGroupRuntimeAuthority } from "./collaboration-dispatch/runtime-authority.js";
+import { sanitizeDispatchErrorMessage } from "./collaboration-dispatch/sanitize-dispatch-error.js";
 import type {
   CollaborationBotTarget,
   CollaborationDispatchScope,
@@ -64,7 +64,7 @@ const wakeRoundDispatchLog = createSubsystemLogger("gateway/wake-round-dispatch"
 
 /** Redact + truncate runBot error text before logs / wakeRunBotError payloads. */
 export function sanitizeWakeRunBotErrorMessage(message: string): string {
-  return redactSensitiveText(message.replace(/\s+/g, " ").slice(0, 240), { mode: "all" });
+  return sanitizeDispatchErrorMessage(message, 240);
 }
 
 function compact(value: string | null | undefined): string {

@@ -483,4 +483,35 @@ describe("watchdog task-closure — Mode B abort ≠ success receipt", () => {
       expect(result.sideEffectClass).toBe("started_or_unknown");
     }
   });
+
+  it("Mode B catch redacts credential-like Error.message in returned message", async () => {
+    const secret = "sk-abcdefghijklmnopqrstuvwxyz012345";
+    vi.mocked(executeCollaborationRound).mockRejectedValue(
+      new Error(`Authorization: Bearer ${secret} boom`),
+    );
+    const result = await executeModeBWakeRound({
+      request: {
+        groupId: "g1",
+        fromAgentId: "system",
+        toAgentIds: ["bot-2"],
+        source: "nudge",
+        reason: "test-redact",
+      },
+      context: {
+        authority: { groupId: "g1" } as never,
+        facts: { bots: [leadBot] } as never,
+        sessionKey: "space:g1",
+        leadBot,
+        runBot: async () => {
+          throw new Error("should not run");
+        },
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.sideEffectClass).toBe("started_or_unknown");
+      expect(result.message ?? "").not.toContain(secret);
+      expect(result.message ?? "").not.toMatch(/Bearer\s+sk-abcdefghijklmnopqrstuvwxyz012345/i);
+    }
+  });
 });

@@ -100,6 +100,8 @@ import {
   CollaborationTaskRetryOwnerDecisionDeliveryParamsSchema,
   CollaborationTaskListOwnerDecisionDeliveriesParamsSchema,
   CollaborationTaskConfirmTodolistParamsSchema,
+  CollaborationTaskListHumanAttentionParamsSchema,
+  CollaborationTaskActHumanAttentionParamsSchema,
   CollaborationTaskReviseTodolistParamsSchema,
   CollaborationTaskGetTodolistParamsSchema,
   CollaborationTaskListTodolistsParamsSchema,
@@ -415,6 +417,8 @@ export const ProtocolSchemas = {
   CollaborationTaskListOwnerDecisionDeliveriesParams:
     CollaborationTaskListOwnerDecisionDeliveriesParamsSchema,
   CollaborationTaskConfirmTodolistParams: CollaborationTaskConfirmTodolistParamsSchema,
+  CollaborationTaskListHumanAttentionParams: CollaborationTaskListHumanAttentionParamsSchema,
+  CollaborationTaskActHumanAttentionParams: CollaborationTaskActHumanAttentionParamsSchema,
   CollaborationTaskReviseTodolistParams: CollaborationTaskReviseTodolistParamsSchema,
   CollaborationTaskGetTodolistParams: CollaborationTaskGetTodolistParamsSchema,
   CollaborationTaskListTodolistsParams: CollaborationTaskListTodolistsParamsSchema,

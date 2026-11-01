@@ -908,6 +908,42 @@ export const CollaborationTaskConfirmTodolistParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export type CollaborationTaskListHumanAttentionParams = {
+  groupId?: string;
+  includeResolved?: boolean;
+  limit?: number;
+};
+
+export const CollaborationTaskListHumanAttentionParamsSchema = Type.Object(
+  {
+    groupId: Type.Optional(NonEmptyString),
+    includeResolved: Type.Optional(Type.Boolean()),
+    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })),
+  },
+  { additionalProperties: false },
+);
+
+export type CollaborationTaskActHumanAttentionParams = {
+  todoId: string;
+  action: string;
+  expectedVersion: number;
+  expectedFingerprint: string;
+  transferOwnerId?: string;
+  note?: string;
+};
+
+export const CollaborationTaskActHumanAttentionParamsSchema = Type.Object(
+  {
+    todoId: NonEmptyString,
+    action: NonEmptyString,
+    expectedVersion: Type.Integer({ minimum: 1 }),
+    expectedFingerprint: NonEmptyString,
+    transferOwnerId: Type.Optional(NonEmptyString),
+    note: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
 export type CollaborationTaskReviseTodolistParams = {
   groupId: string;
   taskId: string;

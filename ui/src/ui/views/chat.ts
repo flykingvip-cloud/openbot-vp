@@ -50,6 +50,12 @@ import {
   buildChatSenderIdentityLookup,
   type ChatParticipantAgent,
 } from "../chat/grouped-render.ts";
+import {
+  renderHumanAttentionCards,
+  type HumanAttentionAction,
+  type HumanAttentionActDetail,
+  type HumanAttentionCardView,
+} from "../chat/human-attention-card.ts";
 import { extractText } from "../chat/message-extract.ts";
 import { normalizeMessage, normalizeRoleForGrouping } from "../chat/message-normalizer.ts";
 import {
@@ -289,6 +295,11 @@ export type ChatProps = {
   /** Re-send the card for the same proposal version. Does not confirm or re-propose. */
   onOwnerDecisionRetry?: (card: OwnerDecisionCardView) => void;
   onOwnerDecisionLoadRecoveries?: () => void;
+  onHumanAttentionAct?: (
+    action: HumanAttentionAction,
+    card: HumanAttentionCardView,
+    detail?: HumanAttentionActDetail,
+  ) => void;
   /** First-visit password vs QR choice for the Account Computer login page. */
   loginMethodChoice?: LoginMethodChoiceUi | null;
   /** Opt-in “是否保存该网站登录信息” after a typed password fill. */
@@ -1914,6 +1925,10 @@ export function renderChatContent(
         onHydrateStatuses: props.onOwnerDecisionHydrateStatuses,
         onRetryDelivery: props.onOwnerDecisionRetry,
         onLoadRecoveries: props.onOwnerDecisionLoadRecoveries,
+      })}
+      ${renderHumanAttentionCards(history, {
+        busy: props.sending,
+        onAct: props.onHumanAttentionAct,
       })}
       ${renderAccountComputerLoginThreadCards({
         sessionKey: props.sessionKey,

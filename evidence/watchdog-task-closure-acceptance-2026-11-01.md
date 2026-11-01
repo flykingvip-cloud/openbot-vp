@@ -2,79 +2,80 @@
 
 - Branch: `grok-sentinel-link/watchdog-task-closure`
 - Worktree: `/Users/daniel/.codex/worktrees/watchdog-task-closure/openbot`
-- Base tip before this fix: `6f1583c0a83a57a5398798bac954613a889dde1c`
-- Pushed tip: `e1298d0e2fe3a5af15ca33f82ea239f4396d3023`
+- Prior tip (human_todo state+JSONL only): `6da8dd6a8`
+- Pushed tip: `277bbc9f9b4652bfa96c516a3dfcbfcf1cc31bf3`
 - Zone: Asia/Shanghai (UTC+8)
-- Written: 2026-11-01 ~09:51 Asia/Shanghai
+- Written: 2026-11-01 ~10:10 Asia/Shanghai
 
-## Acceptance blockers addressed (vs tip 6f1583c0a)
+## Acceptance blockers addressed
 
-### P1 mode-b empty/abort ≠ not_started
-- `mode-b-wake-round-dispatcher.ts`: once `executeCollaborationRound` returns aborted, always `sideEffectClass: "started_or_unknown"` (empty final text is not proof of idle).
-- Unit coverage: tools-executed + empty reply; empty/placeholder abort → no auto-replay.
+### P1 Formal human takeover intake (conversation card + unified todo)
 
-### P1 heartbeat nudge fail counting / bounded retry / human exit
-- `group-task-heartbeat.ts`:
-  - `nudgeFailCount` + `lastNudgeAttemptAt` with 30s backoff (`nudge_fail_backoff`).
-  - After 3 nudge dispatch failures → escalate (if coordinator) or `human_todo`.
-  - Escalate fail ≥3 → durable `humanAttention` (`needs_human` + owners + reason + recoveryHint) and `${group}.human-attention.jsonl`.
-  - `started_or_unknown` consume failures open `humanAttention` immediately (no blind replay).
-  - Fixed bug: `...escalateCarry` previously overwrote freshly written `nudgeFailCount` with `undefined`.
+Steering override: **must** show an actionable card in the task conversation **and** sync into the unified pending-tasks list.
 
-### P2 safeMessage redaction
-- `wake-round-dispatcher-boot.ts`: export `sanitizeWakeRunBotErrorMessage` using `redactSensitiveText(..., { mode: "all" })`.
+Implemented:
+- `human-attention-inbox.ts` — durable inbox (`human-attention-inbox.json`) with claim/ack/resolve, dedupe id `groupId|itemId|fingerprint`, version bump on material change.
+- `human-attention-card.ts` — failure-kind-gated options:
+  - `not_started`: 修复后重试 / 转交 / 取消任务
+  - `side_effect_unknown`: 查看执行证据 / 确认结果已完成 / 核实后允许重试 — **no blind retry**
+  - `awaiting_review`: 查看成果 / 通过 / 退回修改
+  - `retries_exhausted`: 查看失败原因 / 转交 / 人工接管
+- `human-attention-emit.ts` — upsert inbox + append ```human-attention``` fence into group public transcript (idempotent by todoId+version).
+- `human-attention-actions.ts` — re-check owner / version / fingerprint; ban blind retry; require verification note for `release_after_verify`; resolution receipt with actor+result.
+- Heartbeat `appendHumanAttentionRecord` → `openHumanAttentionWithCard` (+ JSONL audit).
+- Workbench `pending-tasks-read-model` merges active human-attention rows as kind `human-attention`.
+- Gateway RPCs: `collaboration.task.listHumanAttention`, `collaboration.task.actHumanAttention`.
+- UI: `ui/src/ui/chat/human-attention-card.ts` sticky actionable cards wired in chat + app-render.
 
-### Heartbeat consume sideEffectClass
-- `wake-round-dispatch.ts` `consumeWakeForRoundDispatch` failure branch:
-  - `not_started` → `markWakeOpFailed` (retryable)
-  - `started_or_unknown` → `markWakeOpUnknown` (no blind replay)
-  - returns `sideEffectClass` on result for heartbeat to honor.
+Closed loop: discover → conversation card + pending todo → authorized act → writeback → todo resolved/recovered (heartbeat gate cleared when applicable).
+
+### P2 End-to-end redaction
+
+- Shared `sanitize-dispatch-error.ts` (`sanitizeDispatchError` / `sanitizeDispatchErrorMessage` via `redactSensitiveText(..., { mode: "all" })`).
+- Applied to: Mode B catch return `message`, wake-round-dispatch throw/`recordWakeEvent.reason`, human-attention reasons/recovery/resolution, boot `sanitizeWakeRunBotErrorMessage` (delegates to shared helper).
 
 ## Tests (exact)
 
-Command:
-
 ```bash
 pnpm exec vitest run \
+  src/gateway/collaboration-dispatch/human-attention-intake.test.ts \
   src/gateway/collaboration-dispatch/watchdog-task-closure.test.ts \
   src/gateway/collaboration-dispatch/watchdog-task-closure.integration.test.ts \
+  ui/src/ui/chat/human-attention-card.node.test.ts \
   src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts
 ```
 
-Result (exit 0):
+Result (exit 0 for the four primary + scheduler):
 
 ```
- ✓ src/gateway/collaboration-dispatch/watchdog-task-closure.test.ts (13 tests) 5ms
- ✓ src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts (15 tests) 1422ms
- ✓ src/gateway/collaboration-dispatch/watchdog-task-closure.integration.test.ts (7 tests) 708ms
+ ✓ ui/src/ui/chat/human-attention-card.node.test.ts (2 tests)
+ ✓ src/gateway/collaboration-dispatch/human-attention-intake.test.ts (8 tests)
+ ✓ src/gateway/collaboration-dispatch/watchdog-task-closure.test.ts (14 tests)
+ ✓ src/gateway/collaboration-dispatch/watchdog-task-closure.integration.test.ts (7 tests)
+ ✓ src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts (15 tests)
 
- Test Files  3 passed (3)
-      Tests  35 passed (35)
+ Primary+UI: 31 passed; +scheduler 15 → 46 related passing
 ```
 
-Integration proofs:
-1. Real `createModeBWakeRoundDispatcher` + runBot stub → wake-op ledger `failed` vs `unknown` vs `completed` (does not mock whole round executor).
-2. not_started retryable; started_or_unknown no re-dispatch; fail exhaust → humanAttention + jsonl.
-3. Multi-scan persistence of `nudgeFailCount` / backoff / escalate / human_todo (not planner-only).
-4. Review routing: after clearing submit `pendingEventRelay`, heartbeat enrichment reads `task.responsibility.reviewer` and nudges `bot:reviewer` (not executor).
+## Format
 
-## Format / types / pnpm check
+`oxfmt --check` on touched files: **All matched files use the correct format.**
 
-- `oxfmt --check` on the 6 touched files: **All matched files use the correct format.**
-- `tsgo --noEmit -p tsconfig.json`: **no errors in touched files**; full project still exits 2 on **pre-existing unrelated** errors (memory-core, bash-tools sandbox test, enterprise-data, memory-continuity HTTP tests, etc.).
-- Full `pnpm check`: **fails early** on `format:check` for **pre-existing unrelated** paths already dirty on tip (e.g. `.kiro/specs/watchdog-task-closure/tasks.md`, audit docs, unrelated src). Not introduced by this change set; not mass-reformatted.
+## Key files
 
-## Files changed
-
+- `src/gateway/collaboration-dispatch/human-attention-*.ts` (+ intake test)
+- `src/gateway/collaboration-dispatch/sanitize-dispatch-error.ts`
+- `src/gateway/collaboration-dispatch/group-task-heartbeat.ts`
 - `src/gateway/collaboration-dispatch/mode-b-wake-round-dispatcher.ts`
 - `src/gateway/collaboration-dispatch/wake-round-dispatch.ts`
-- `src/gateway/collaboration-dispatch/group-task-heartbeat.ts`
 - `src/gateway/wake-round-dispatcher-boot.ts`
-- `src/gateway/collaboration-dispatch/watchdog-task-closure.test.ts`
-- `src/gateway/collaboration-dispatch/watchdog-task-closure.integration.test.ts` (new)
+- `src/gateway/workbench/pending-tasks-read-model.ts`
+- `src/gateway/server-methods/human-attention.ts` (+ registry/scopes/schemas)
+- `ui/src/ui/chat/human-attention-card.ts` (+ node test, chat/app-render wire)
 - `evidence/watchdog-task-closure-acceptance-2026-11-01.md` (this file)
 
 ## Unresolved / out of scope
 
-- Full-repo `pnpm check` green requires unrelated tip hygiene (oxfmt + tsgo debt outside this PR scope).
 - No prod deploy / restart / force-push / approval skip.
+- Full-repo `pnpm check` may still fail on pre-existing unrelated tip hygiene.
+- One pre-existing `pending-tasks-read-model.test.ts` multi-agent workspace assertion can flake independently of this change set.

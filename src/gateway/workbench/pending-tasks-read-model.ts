@@ -7,6 +7,7 @@ import {
   type TaskAssignment,
 } from "../../organization/task-assignment.js";
 import { listPendingTenantHumanNotices } from "../../organization/tenant-human-notice.js";
+import { listHumanAttentionTodos } from "../collaboration-dispatch/human-attention-inbox.js";
 import type { GatewayCollaborationSpacesListResult } from "../collaboration-learning/snapshot-types.js";
 import { listGatewayCollaborationSpaces } from "../collaboration-learning/space-store.js";
 import { humanRosterMemberMatchesActorIdentities } from "../employee-workbench-scope.js";
@@ -17,7 +18,13 @@ import type {
 } from "../knowledge/deliverables/types.js";
 import { listAgentsForGateway } from "../session-utils.js";
 
-export type WorkbenchPendingTaskKind = "task" | "governance" | "invite" | "mention" | "human-gate";
+export type WorkbenchPendingTaskKind =
+  | "task"
+  | "governance"
+  | "invite"
+  | "mention"
+  | "human-gate"
+  | "human-attention";
 
 /**
  * Distinguishes actor-private follow-ups from space-shared queue items.
@@ -57,7 +64,7 @@ export type WorkbenchPendingTasksResult = {
   inviteCount: number;
   mentionCount?: number;
   items: WorkbenchPendingTaskItem[];
-} & { humanGateCount?: number };
+} & { humanGateCount?: number; humanAttentionCount?: number };
 
 /**
  * Read pending task-assignments for an organization across EVERY configured
@@ -141,6 +148,15 @@ export type WorkbenchPendingTasksDeps = {
       ackRequired: true;
     }>
   >;
+  listHumanAttentionTodos?: (params: { actorId: string; limit?: number }) => Array<{
+    id: string;
+    groupId: string;
+    taskId: string;
+    title: string;
+    updatedAtMs: number;
+    fingerprint: string;
+    version: number;
+  }>;
 };
 
 export type WorkbenchPendingTasksParams = {
@@ -190,6 +206,16 @@ function defaultDeps(): WorkbenchPendingTasksDeps {
         return [];
       }
     },
+    listHumanAttentionTodos: ({ actorId, limit }) =>
+      listHumanAttentionTodos({ actorId, limit: limit ?? 50 }).map((todo) => ({
+        id: todo.id,
+        groupId: todo.groupId,
+        taskId: todo.taskId,
+        title: todo.taskTitle?.trim() || todo.reason || "任务需要你处理",
+        updatedAtMs: todo.updatedAt,
+        fingerprint: todo.fingerprint,
+        version: todo.version,
+      })),
   };
 }
 
@@ -496,6 +522,30 @@ export async function buildWorkbenchPendingTasks(
     }
   }
 
+  // (6) Watchdog / heartbeat human-attention intake (conversation card + unified todo).
+  if (deps.listHumanAttentionTodos) {
+    try {
+      const todos = deps.listHumanAttentionTodos({
+        actorId: params.userId,
+        limit: 50,
+      });
+      for (const todo of todos) {
+        add({
+          id: `human-attention:${todo.id}`,
+          kind: "human-attention",
+          title: todo.title.startsWith("任务需要") ? todo.title : `任务需要你处理：${todo.title}`,
+          source: todo.groupId,
+          updatedAtMs: todo.updatedAtMs,
+          ackRequired: true,
+          visibility: "personal",
+          groupId: todo.groupId,
+        });
+      }
+    } catch {
+      // Best-effort: human-attention inbox unavailable this cycle.
+    }
+  }
+
   const all = [...byId.values()];
   const taskItems = all.filter((item) => item.kind === "task");
   const taskCount = taskItems.length;
@@ -503,13 +553,17 @@ export async function buildWorkbenchPendingTasks(
   const spaceTaskCount = taskItems.filter((item) => item.visibility === "space").length;
   const ackRequiredCount = all.filter(
     (item) =>
-      (item.kind === "task" || item.kind === "mention" || item.kind === "human-gate") &&
+      (item.kind === "task" ||
+        item.kind === "mention" ||
+        item.kind === "human-gate" ||
+        item.kind === "human-attention") &&
       item.ackRequired === true,
   ).length;
   const governanceCount = all.filter((item) => item.kind === "governance").length;
   const inviteCount = all.filter((item) => item.kind === "invite").length;
   const mentionCount = all.filter((item) => item.kind === "mention").length;
   const humanGateCount = all.filter((item) => item.kind === "human-gate").length;
+  const humanAttentionCount = all.filter((item) => item.kind === "human-attention").length;
   // Layer: ack-required first, then personal over space-shared, then recency.
   const items = all
     .toSorted((left, right) => {
@@ -528,7 +582,13 @@ export async function buildWorkbenchPendingTasks(
     .slice(0, limit);
 
   return {
-    totalCount: taskCount + governanceCount + inviteCount + mentionCount + humanGateCount,
+    totalCount:
+      taskCount +
+      governanceCount +
+      inviteCount +
+      mentionCount +
+      humanGateCount +
+      humanAttentionCount,
     taskCount,
     ackRequiredCount,
     personalTaskCount,
@@ -537,6 +597,7 @@ export async function buildWorkbenchPendingTasks(
     inviteCount,
     mentionCount,
     humanGateCount,
+    humanAttentionCount,
     items,
   };
 }

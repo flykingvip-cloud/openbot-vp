@@ -28,6 +28,11 @@ import { loadChatContextSourceCatalog } from "./chat/context-scope-catalog.ts";
 import type { ChatContextScopeState } from "./chat/context-scope.ts";
 import { getConversationTaskProgressEntries } from "./chat/conversation-task-progress.ts";
 import { resolveCronResultArtifactRecord } from "./chat/cron-result-message.ts";
+import type {
+  HumanAttentionAction,
+  HumanAttentionActDetail,
+  HumanAttentionCardView,
+} from "./chat/human-attention-card.ts";
 import {
   clearOwnerDecisionActionError,
   collapseOwnerDecisionCardsForBoardItem,
@@ -1477,6 +1482,57 @@ export function renderApp(state: AppViewState) {
             await refreshShellChat(state as unknown as Parameters<typeof refreshShellChat>[0]);
           } catch {
             // ignore refresh failures
+          }
+          state.requestUpdate();
+        })();
+      },
+      onHumanAttentionAct: (
+        action: HumanAttentionAction,
+        card: HumanAttentionCardView,
+        detail?: HumanAttentionActDetail,
+      ) => {
+        void (async () => {
+          const client = state.client;
+          if (!client || !state.connected) {
+            state.lastError = "未连接网关，无法处理人工接管卡片。请登录后重试。";
+            state.requestUpdate();
+            return;
+          }
+          try {
+            const result = await client.request<{
+              todo?: { status?: string };
+              evidence?: Record<string, unknown>;
+              heartbeatCleared?: boolean;
+            }>("collaboration.task.actHumanAttention", {
+              todoId: card.todoId,
+              action,
+              expectedVersion: card.version,
+              expectedFingerprint: card.fingerprint,
+              ...(detail?.transferOwnerId ? { transferOwnerId: detail.transferOwnerId } : {}),
+              ...(detail?.note ? { note: detail.note } : {}),
+            });
+            if (
+              result?.evidence &&
+              (action === "view_evidence" ||
+                action === "view_failure_reason" ||
+                action === "view_artifact")
+            ) {
+              state.lastError = null;
+              // Surface evidence in a simple dialog for operators.
+              const body = JSON.stringify(result.evidence, null, 2);
+              if (typeof window !== "undefined") {
+                window.alert(body.slice(0, 4000));
+              }
+            } else {
+              state.lastError = null;
+            }
+            try {
+              await refreshShellChat(state as unknown as Parameters<typeof refreshShellChat>[0]);
+            } catch {
+              // ignore
+            }
+          } catch (err) {
+            state.lastError = err instanceof Error ? err.message : String(err);
           }
           state.requestUpdate();
         })();

@@ -41,10 +41,12 @@ import {
   type GroupBoardClaimItem,
 } from "./claim-contract.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
+import { openHumanAttentionWithCard } from "./human-attention-emit.js";
 import { loadBoardClaimItemsFromDir } from "./member-progress-export.js";
 import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
+import { sanitizeDispatchErrorMessage } from "./sanitize-dispatch-error.js";
 import {
   resolveSelfAdvanceWriteMode,
   trySelfAdvance,
@@ -465,7 +467,7 @@ function buildHumanAttention(params: {
       : "Inspect board item + wake-op ledger; fix routing/auth/dispatcher; clear humanAttention after verified recovery or progress.";
   return {
     status: "needs_human",
-    reason: params.reason,
+    reason: sanitizeDispatchErrorMessage(params.reason, 320),
     ownerIds: owners,
     openedAt: params.nowMs,
     recoveryHint: recovery,
@@ -481,7 +483,34 @@ async function appendHumanAttentionRecord(params: {
   item: HeartbeatBoardItemLike;
   attention: HeartbeatHumanAttention;
   nowMs: number;
+  wakeOpKey?: string;
+  sideEffectClass?: string;
 }): Promise<void> {
+  try {
+    // Formal intake: unified inbox + conversation card (deduped by fingerprint).
+    await openHumanAttentionWithCard({
+      groupId: params.groupId,
+      itemId: params.item.itemId,
+      taskId: params.item.taskId,
+      fingerprint: params.attention.fingerprint,
+      reason: params.attention.reason,
+      ownerIds: params.attention.ownerIds,
+      recoveryHint: params.attention.recoveryHint,
+      source: params.attention.source,
+      openedAt: params.attention.openedAt,
+      nowMs: params.nowMs,
+      taskTitle: params.item.title,
+      boardStatus: params.item.status,
+      wakeOpKey: params.wakeOpKey,
+      sideEffectClass: params.sideEffectClass,
+      cfg: params.cfg,
+      authority: params.authority,
+      emitCard: true,
+    });
+  } catch {
+    // best-effort durable operator queue + card
+  }
+  // Keep audit JSONL (best-effort).
   try {
     const dir = groupTaskHeartbeatDir(params.authority);
     assertCollaborationRuntimeWritable(dir, params.cfg);
@@ -499,10 +528,11 @@ async function appendHumanAttentionRecord(params: {
         taskId: params.item.taskId,
         status: params.item.status,
         attention: params.attention,
+        todoId: `${params.groupId}|${params.item.itemId}|${params.attention.fingerprint}`,
       });
     });
   } catch {
-    // best-effort durable operator queue
+    // best-effort audit trail
   }
 }
 
@@ -1522,6 +1552,8 @@ export async function runGroupTaskHeartbeat(
               item,
               attention,
               nowMs,
+              wakeOpKey: consume.opKey,
+              sideEffectClass: consume.sideEffectClass,
             });
             continue;
           }
@@ -1562,6 +1594,8 @@ export async function runGroupTaskHeartbeat(
               item,
               attention,
               nowMs,
+              wakeOpKey: consume.opKey,
+              sideEffectClass: consume.sideEffectClass ?? "not_started",
             });
           }
           continue;
@@ -1629,6 +1663,8 @@ export async function runGroupTaskHeartbeat(
           item,
           attention,
           nowMs,
+          sideEffectClass:
+            attention.source === "side_effect_unknown" ? "started_or_unknown" : undefined,
         });
       }
       continue;
@@ -1756,6 +1792,8 @@ export async function runGroupTaskHeartbeat(
               item,
               attention,
               nowMs,
+              wakeOpKey: consume.opKey,
+              sideEffectClass: consume.sideEffectClass,
             });
           }
         }

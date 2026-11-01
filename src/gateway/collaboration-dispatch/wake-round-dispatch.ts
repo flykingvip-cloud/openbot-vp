@@ -38,6 +38,7 @@ import { resolveSecurityProfile } from "../security-profile.js";
 import { listAgentsForGateway } from "../session-utils.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
+import { sanitizeDispatchError, sanitizeDispatchErrorMessage } from "./sanitize-dispatch-error.js";
 import {
   casClearTaskDispatchClaimForOp,
   casCommitTaskDispatchEligibility,
@@ -1833,8 +1834,8 @@ export async function consumeWakeForRoundDispatch(
           }
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        reason = `dispatch_threw:${message.slice(0, 160)}`;
+        const safe = sanitizeDispatchError(error, 160);
+        reason = `dispatch_threw:${safe.message}`;
         // Cannot prove whether the dispatcher side effect landed — unknown, no blind re-run.
         const unknown = await markWakeOpUnknown({
           authority: params.authority,
@@ -1890,7 +1891,10 @@ export async function consumeWakeForRoundDispatch(
             outcome,
             taskId: request.taskId,
             itemId: request.itemId,
-            reason: request.reason ? `${request.reason}|${reason}` : reason,
+            reason: sanitizeDispatchErrorMessage(
+              request.reason ? `${request.reason}|${reason}` : reason,
+              320,
+            ),
             relatedId: request.relatedId ?? roundId,
           },
           { cfg: params.cfg, nowMs: params.nowMs },

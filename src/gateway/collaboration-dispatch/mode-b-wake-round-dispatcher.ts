@@ -13,6 +13,7 @@ import { resolveProductionCollaborationExecutor } from "./legacy-production-exec
 import { normalizeAgentIdentifier } from "./mention-utils.js";
 import { executeCollaborationRound } from "./round-runtime.js";
 import type { BeatExecutionInput, RuntimeAuthority, RuntimeFacts } from "./runtime-authority.js";
+import { sanitizeDispatchError } from "./sanitize-dispatch-error.js";
 import type { CollaborationBotTarget, ParticipationDecision } from "./types.js";
 import type {
   WakeRoundDispatcher,
@@ -200,12 +201,12 @@ export async function executeModeBWakeRound(params: {
       sideEffectClass: "completed_with_receipt",
     };
   } catch (error) {
-    const messageText = error instanceof Error ? error.message : String(error);
+    const safe = sanitizeDispatchError(error, 240);
     // Exception may occur AFTER model/tools/formal write started — not "no side effects".
     return {
       ok: false,
       reason: "execute_collaboration_round_failed",
-      message: messageText.slice(0, 240),
+      message: safe.message,
       sideEffectClass: "started_or_unknown",
     };
   }
