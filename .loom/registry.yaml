@@ -10372,6 +10372,13 @@ tasks:
       - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.node.test.ts
       - ui/src/styles/chat/grouped.css
       - .kiro/specs/closed-loop-ui-wiring/tasks.md
+      - src/task-outcome/chat-task-update.ts
+      - src/task-outcome/chat-task-update.test.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/protocol/schema/logs-chat.ts
+      - src/gateway/server-methods/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.task-update.test.ts
     state: active
     sessions:
       - id: 3a91c0e4-6b17-4f2a-9c55-0e8d4a11b6c2
@@ -10409,6 +10416,13 @@ landingStreams:
       - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.node.test.ts
       - ui/src/styles/chat/grouped.css
       - .kiro/specs/closed-loop-ui-wiring/tasks.md
+      - src/task-outcome/chat-task-update.ts
+      - src/task-outcome/chat-task-update.test.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/protocol/schema/logs-chat.ts
+      - src/gateway/server-methods/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.task-update.test.ts
     canLandWith: []
     metadata:
       task: closed-loop-ui-wiring:cursor-closed-loop-490b
