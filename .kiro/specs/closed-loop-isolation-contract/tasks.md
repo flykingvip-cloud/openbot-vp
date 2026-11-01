@@ -2,7 +2,7 @@
 
 ## Agents
 
-- cursor-closed-loop-490b · role: owner · scope: isolation tests, contract audit, and loom registration for the closed-loop freeze; no production behavior change · paths: docs/audits/2026-11-01-closed-loop-isolation-contract.md, .kiro/specs/closed-loop-isolation-contract/**, src/task-outcome/closed-loop-isolation-contract.test.ts, src/task-outcome/closed-loop-isolation-restart-child.ts · since: 2026-11-01
+- cursor-closed-loop-490b · role: owner · scope: isolation tests, contract audit, and loom registration for the closed-loop freeze; no production behavior change · paths: docs/audits/2026-11-01-closed-loop-isolation-contract.md, .kiro/specs/closed-loop-isolation-contract/, src/task-outcome/closed-loop-isolation-contract.test.ts, src/task-outcome/closed-loop-isolation-restart-child.ts · since: 2026-11-01
 
 ## Tasks
 

@@ -4,14 +4,14 @@
 
 ## 保留的权威
 
-| 事实 | 唯一写入点 |
-| --- | --- |
-| 任务成败 | `src/task-outcome/judge.ts` 经由 `TaskOutcomeResultService` |
-| 已关闭任务的合法改写 | 已有 `correction` 转移。生产路径今天未授权 |
-| 通道是否送达 | `src/task-outcome/delivery-confirm.ts` 与 `set_delivery` |
-| 大白转写是否被网关接受 | `deliverDiagnoseReportToConversation` 的返回值。不是任务 delivery |
-| 诊断 confirm | `confirmDiagnoseEvolutionPrescription` 写 cron。不是运行时变更，也不是原任务复验 |
-| 运行时变更授权 | evolution apply-authorization。本期保持关闭 |
+| 事实                   | 唯一写入点                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| 任务成败               | `src/task-outcome/judge.ts` 经由 `TaskOutcomeResultService`                      |
+| 已关闭任务的合法改写   | 已有 `correction` 转移。生产路径今天未授权                                       |
+| 通道是否送达           | `src/task-outcome/delivery-confirm.ts` 与 `set_delivery`                         |
+| 大白转写是否被网关接受 | `deliverDiagnoseReportToConversation` 的返回值。不是任务 delivery                |
+| 诊断 confirm           | `confirmDiagnoseEvolutionPrescription` 写 cron。不是运行时变更，也不是原任务复验 |
+| 运行时变更授权         | evolution apply-authorization。本期保持关闭                                      |
 
 ## 明确不能复用的机制
 

@@ -9,35 +9,35 @@
 
 在本工作区执行 `pnpm install --frozen-lockfile` 之后：
 
-| 命令 | 结果 |
-| --- | --- |
+| 命令                                                                                                                                                                                                                                                                                                                                                                                                                            | 结果               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | `pnpm exec vitest run src/task-outcome/judge.test.ts src/task-outcome/result-service.test.ts src/task-outcome/consumer-boot.test.ts src/gateway/agent-growth/feedback-signal.test.ts src/auto-reply/reply/goal-correction-mutation.test.ts src/diagnosis/diagnose-daibai-inbox.test.ts src/diagnosis/diagnose-policy.test.ts src/cron/isolated-agent/result-surfacing.test.ts src/task-outcome/w4-experience-evolution.test.ts` | 9 files, 58 passed |
-| `pnpm exec vitest run src/diagnosis/diagnosis-issue-queue.test.ts src/task-outcome/judge.test.ts` | 2 files, 13 passed |
-| `pnpm exec vitest run src/task-outcome/closed-loop-isolation-contract.test.ts` | 1 file, 9 passed |
+| `pnpm exec vitest run src/diagnosis/diagnosis-issue-queue.test.ts src/task-outcome/judge.test.ts`                                                                                                                                                                                                                                                                                                                               | 2 files, 13 passed |
+| `pnpm exec vitest run src/task-outcome/closed-loop-isolation-contract.test.ts`                                                                                                                                                                                                                                                                                                                                                  | 1 file, 9 passed   |
 
 隔离用例在 `src/task-outcome/closed-loop-isolation-contract.test.ts`。进程重启由 `src/task-outcome/closed-loop-isolation-restart-child.ts` 另起进程完成，不是在同一进程里 new 一个对象。
 
 ## A. 先前结论在本基线上是否仍成立
 
-| 先前结论 | 本基线 | 证据 | 对实施建议的修正 |
-| --- | --- | --- | --- |
-| 反馈正则能识别「不对」，但 `src/auto-reply` 不调用它 | 仍成立 | `feedback-signal.ts:40-47`、`record-feedback.ts:27-39`。非测试引用只有这两个文件 | 不要把这条正则直接接到 correction。它分不清引用、别的话题和新需求 |
-| 没有生产 correction 调用；allowlist 只在测试出现 | 仍成立 | `result-service.ts:102-104` 默认空集合；`rg correctionAllowlist` 的非测试命中只有 `result-service.ts`。`chat-entry.ts:92-95` 与 `runtime-from-runner.ts:467-470` 都没传 allowlist | 第一笔业务 PR 要给「已验证的任务主体」配置已有参数，不是新写一套修正器 |
-| correction 会重开任务 | **不成立，用词错误** | `transitions.ts:78-79` 关闭后只放行 `correction`。`transitions.ts:313-401`：失败验收强制 `stopRecovery`，结果是 `closed` + `failure` + `reasonCode=correction`；`pending` 变成 `awaiting_acceptance`。attempts 保留，不新增 run | 禁止把 correction 写成 reopen。它是追加版本并重算门闩 |
-| 旧贡献会被撤销 | API 能力成立；当前用户回复路径不会走到 | `consumers.ts:213-215` 旧版本计数先扣再记。隔离测试把 success 贡献收成 failure。`growth-bridge.ts:233-243` 对不再合格的关闭样本写 revoked 行 | 撤销发生在消费者处理 `task.corrected` 时，不是用户一句话自动发生 |
-| 诊断不读 TaskOutcome tip | 仍成立 | `src/diagnosis` 没有 `task-outcome` import。`structural-preview-reader.ts:100-107` 读 evolution jsonl；`140-166` 还要求 `eligible`、`completed`、`succeeded` | 读者必须带 `taskId + outcomeVersion`。版本变了返回 `outcome_version_changed`，读失败不能写成正常 |
-| 工具失败仍可任务成功 | 仍成立 | `runtime-from-runner.ts:579-586` 把工具比率记成观察；`661-701` 只在调用方给出门闩时关闭。隔离运行：`toolsSucceeded 1 / toolsTotal 2` 且 acceptance `not_required`、delivery `delivered` → `taskJudgement=success`，`reasonCode=accepted_and_delivered` | 不要从工具失败自动升级成用户任务失败，也不要从任务成功推断工具都成功 |
-| inject 接受被写成 delivered | 仍成立 | `diagnose-policy.ts:225-248` 一有路由就 `daibai_delivery_gate_closed`。`diagnose-daibai-inbox.ts:159-166` 全部 send 接受后改成 `delivered: true, reason: conversation_accepted` | `delivered` 只表示转写写入被接受。UI 已把它说成「已投送」，见下方消费者。不得拿它判断任务成功或用户已读 |
-| 通知失败应让原任务回到 `awaiting_delivery`，并用现有 drain 重试 | **建议作废** | 隔离测试：inject 返回 `unavailable` 后，已关闭任务仍是 `closed/success/delivered`。`pending-delivery.ts` 登记的仍是原 run 的通道投递。outbox 消费者按事件重试，一次关闭路径有多条事件 | 不复用 pending-delivery，也不复用 outbox。缺的是「通知失败」自己的事实；本期不新开队列 |
-| 收件人用 platformUserId 拼大白会话 | 半对 | `employee-isolation.ts:46-51` 确实这样拼。TaskOutcome `scope.subjectRef` 没有映射函数（全库无 `subjectRef` 与 `platformUserId` 的互指） | 两者不相等。映射不存在时失败关闭。禁止退回 `agent:main:main` 或 `diagnosis:canary:daibai` |
-| cron 只有管家且有 owner 才进该用户大白 | 仍成立，且另有退回 | `result-surfacing.ts:85-94`：owner 且 agent 是内置管家 → 员工会话；否则 `resolveAgentMainSessionKey`。隔离：无 owner 的 `main` 得到 `agent:main:main`；有 owner 但 agent 是 `bot-2` 得到 `agent:bot-2:main` | 这是现有 cron 浮出。用户任务跟进不得调用这个退回 |
-| Issue 复查回写在网关被拒绝，响应里 `enabled: true` | 仍成立 | `diagnosis-issue-gateway.ts:34`、`76-85`。常量 `DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED` 在 `diagnose-professional-protocol.ts:12` 为 true | 不打开网关门。库函数在测试传入 `enabled: true` 时能写 cron，那是 API 能力，不是网关行为 |
-| 支持单关闭不回写任务 | 仍成立 | `support-cases/store.ts:221-237`。隔离：case `closed`，TaskOutcome 仍是 success | 保持 |
-| 无采纳则经验不验证 | 仍成立 | `experience-verified-handler.ts:94-100`。`attachAdoptedLearningAssetsToTask` 的非测试引用只有定义和 `index.ts` 再导出 | 不要自动采纳。有效性验证磁盘副作用本期未跑，见未验证 |
-| claimContract 默认关 | 仍成立 | `claim-contract.ts:359-385`。空配置对象返回 false | 第一笔 PR 不打开 |
-| 治理默认 assist，skill auto 默认关，remediation 常量 false，soft-observe 默认开 | 仍成立（代码默认） | `mode.ts:16-32`、`skill-auto-evolution.ts:78-86`、`production-cutover.ts:41`、`soft-observe-dh-loop.ts:79-88` | 部署环境变量未验证。本期不改这些默认值 |
-| 父子任务只有字段 | 仍成立 | `types.ts:107-111`、`157-158`。`transitions.ts` 没有 parent rollup | 不进第一笔 PR |
-| 能力缺口去重在内存 | 仍成立 | `capability-gap-ingest.ts:79`、`252-276`。子进程计数从 1 开始，父进程计数不变，且 `proposalId` 为空 | 不把这块迁进第一笔 PR |
+| 先前结论                                                                        | 本基线                                 | 证据                                                                                                                                                                                                                                                   | 对实施建议的修正                                                                                        |
+| ------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| 反馈正则能识别「不对」，但 `src/auto-reply` 不调用它                            | 仍成立                                 | `feedback-signal.ts:40-47`、`record-feedback.ts:27-39`。非测试引用只有这两个文件                                                                                                                                                                       | 不要把这条正则直接接到 correction。它分不清引用、别的话题和新需求                                       |
+| 没有生产 correction 调用；allowlist 只在测试出现                                | 仍成立                                 | `result-service.ts:102-104` 默认空集合；`rg correctionAllowlist` 的非测试命中只有 `result-service.ts`。`chat-entry.ts:92-95` 与 `runtime-from-runner.ts:467-470` 都没传 allowlist                                                                      | 第一笔业务 PR 要给「已验证的任务主体」配置已有参数，不是新写一套修正器                                  |
+| correction 会重开任务                                                           | **不成立，用词错误**                   | `transitions.ts:78-79` 关闭后只放行 `correction`。`transitions.ts:313-401`：失败验收强制 `stopRecovery`，结果是 `closed` + `failure` + `reasonCode=correction`；`pending` 变成 `awaiting_acceptance`。attempts 保留，不新增 run                        | 禁止把 correction 写成 reopen。它是追加版本并重算门闩                                                   |
+| 旧贡献会被撤销                                                                  | API 能力成立；当前用户回复路径不会走到 | `consumers.ts:213-215` 旧版本计数先扣再记。隔离测试把 success 贡献收成 failure。`growth-bridge.ts:233-243` 对不再合格的关闭样本写 revoked 行                                                                                                           | 撤销发生在消费者处理 `task.corrected` 时，不是用户一句话自动发生                                        |
+| 诊断不读 TaskOutcome tip                                                        | 仍成立                                 | `src/diagnosis` 没有 `task-outcome` import。`structural-preview-reader.ts:100-107` 读 evolution jsonl；`140-166` 还要求 `eligible`、`completed`、`succeeded`                                                                                           | 读者必须带 `taskId + outcomeVersion`。版本变了返回 `outcome_version_changed`，读失败不能写成正常        |
+| 工具失败仍可任务成功                                                            | 仍成立                                 | `runtime-from-runner.ts:579-586` 把工具比率记成观察；`661-701` 只在调用方给出门闩时关闭。隔离运行：`toolsSucceeded 1 / toolsTotal 2` 且 acceptance `not_required`、delivery `delivered` → `taskJudgement=success`，`reasonCode=accepted_and_delivered` | 不要从工具失败自动升级成用户任务失败，也不要从任务成功推断工具都成功                                    |
+| inject 接受被写成 delivered                                                     | 仍成立                                 | `diagnose-policy.ts:225-248` 一有路由就 `daibai_delivery_gate_closed`。`diagnose-daibai-inbox.ts:159-166` 全部 send 接受后改成 `delivered: true, reason: conversation_accepted`                                                                        | `delivered` 只表示转写写入被接受。UI 已把它说成「已投送」，见下方消费者。不得拿它判断任务成功或用户已读 |
+| 通知失败应让原任务回到 `awaiting_delivery`，并用现有 drain 重试                 | **建议作废**                           | 隔离测试：inject 返回 `unavailable` 后，已关闭任务仍是 `closed/success/delivered`。`pending-delivery.ts` 登记的仍是原 run 的通道投递。outbox 消费者按事件重试，一次关闭路径有多条事件                                                                  | 不复用 pending-delivery，也不复用 outbox。缺的是「通知失败」自己的事实；本期不新开队列                  |
+| 收件人用 platformUserId 拼大白会话                                              | 半对                                   | `employee-isolation.ts:46-51` 确实这样拼。TaskOutcome `scope.subjectRef` 没有映射函数（全库无 `subjectRef` 与 `platformUserId` 的互指）                                                                                                                | 两者不相等。映射不存在时失败关闭。禁止退回 `agent:main:main` 或 `diagnosis:canary:daibai`               |
+| cron 只有管家且有 owner 才进该用户大白                                          | 仍成立，且另有退回                     | `result-surfacing.ts:85-94`：owner 且 agent 是内置管家 → 员工会话；否则 `resolveAgentMainSessionKey`。隔离：无 owner 的 `main` 得到 `agent:main:main`；有 owner 但 agent 是 `bot-2` 得到 `agent:bot-2:main`                                            | 这是现有 cron 浮出。用户任务跟进不得调用这个退回                                                        |
+| Issue 复查回写在网关被拒绝，响应里 `enabled: true`                              | 仍成立                                 | `diagnosis-issue-gateway.ts:34`、`76-85`。常量 `DIAGNOSIS_SELF_EVOLUTION_CONFIRM_ENABLED` 在 `diagnose-professional-protocol.ts:12` 为 true                                                                                                            | 不打开网关门。库函数在测试传入 `enabled: true` 时能写 cron，那是 API 能力，不是网关行为                 |
+| 支持单关闭不回写任务                                                            | 仍成立                                 | `support-cases/store.ts:221-237`。隔离：case `closed`，TaskOutcome 仍是 success                                                                                                                                                                        | 保持                                                                                                    |
+| 无采纳则经验不验证                                                              | 仍成立                                 | `experience-verified-handler.ts:94-100`。`attachAdoptedLearningAssetsToTask` 的非测试引用只有定义和 `index.ts` 再导出                                                                                                                                  | 不要自动采纳。有效性验证磁盘副作用本期未跑，见未验证                                                    |
+| claimContract 默认关                                                            | 仍成立                                 | `claim-contract.ts:359-385`。空配置对象返回 false                                                                                                                                                                                                      | 第一笔 PR 不打开                                                                                        |
+| 治理默认 assist，skill auto 默认关，remediation 常量 false，soft-observe 默认开 | 仍成立（代码默认）                     | `mode.ts:16-32`、`skill-auto-evolution.ts:78-86`、`production-cutover.ts:41`、`soft-observe-dh-loop.ts:79-88`                                                                                                                                          | 部署环境变量未验证。本期不改这些默认值                                                                  |
+| 父子任务只有字段                                                                | 仍成立                                 | `types.ts:107-111`、`157-158`。`transitions.ts` 没有 parent rollup                                                                                                                                                                                     | 不进第一笔 PR                                                                                           |
+| 能力缺口去重在内存                                                              | 仍成立                                 | `capability-gap-ingest.ts:79`、`252-276`。子进程计数从 1 开始，父进程计数不变，且 `proposalId` 为空                                                                                                                                                    | 不把这块迁进第一笔 PR                                                                                   |
 
 先前报告漏掉的现网行为：`get-reply-run.ts:694-717` 会调用 `applyGoalCorrectionMutation`。`goal-correction-mutation.ts:109-112` 没有 `taskContextId` 就返回 null，不会新建账本行。有绑定则改写该 workspace 任务的 title / description，并把 status 写成 `active`（`123-135`）。隔离测试证明：引用句「他说『不对，重做一遍这个结果』」会改 workspace 任务，同时 TaskOutcome tip 版本和 judgement 不变。这不是 TaskOutcome correction，也不是 reopen。
 
@@ -67,11 +67,11 @@ API 能力（测试直接调用，生产构造器做不到）：
 
 ### 2. 权威结果与根因证据
 
-| 层 | 权威 | 今天的行为 |
-| --- | --- | --- |
-| 结果 | tip.`taskJudgement`，由 `judge.ts:22-53` 从 lifecycle、acceptance、delivery 投影 | 非 closed 一律 `incomplete`。`delivery_unknown` 不能是 success |
-| 观察 | `attempts[].toolObservations`、acceptanceEvidence、delivery 状态 | 工具失败可以和任务 success 同时存在。reasonCode 不会变成工具名 |
-| 根因 | 没有单一字段 | `reasonCode=correction` 只表示这次是修正。eligibility 对未知 code 落到 `attribution=other`。诊断协议域、Issue 的客户端 `failureAttribution`、结构候选的 mechanism 映射仍然各写各的 |
+| 层   | 权威                                                                             | 今天的行为                                                                                                                                                                         |
+| ---- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 结果 | tip.`taskJudgement`，由 `judge.ts:22-53` 从 lifecycle、acceptance、delivery 投影 | 非 closed 一律 `incomplete`。`delivery_unknown` 不能是 success                                                                                                                     |
+| 观察 | `attempts[].toolObservations`、acceptanceEvidence、delivery 状态                 | 工具失败可以和任务 success 同时存在。reasonCode 不会变成工具名                                                                                                                     |
+| 根因 | 没有单一字段                                                                     | `reasonCode=correction` 只表示这次是修正。eligibility 对未知 code 落到 `attribution=other`。诊断协议域、Issue 的客户端 `failureAttribution`、结构候选的 mechanism 映射仍然各写各的 |
 
 诊断读取预言：必须同时给出 taskId 和 outcomeVersion。缺版本 → `version_required`。快照不存在 → `version_missing`。tip 已经更新 → `outcome_version_changed`，不得把新 judgement 当作所请求的版本。`readSessionIndex`（`structural-preview-reader.ts:110-119`）解析失败返回 `[]`，调用方若把它说成「没有会话、系统正常」是错的。零发现文案 `DIAGNOSIS_ZERO_FINDINGS_TEXT` 已经写明证据不足不等于系统正常，但坏文件今天变不成这条文案。
 
@@ -90,12 +90,12 @@ API 能力（测试直接调用，生产构造器做不到）：
 
 四件不同的事：
 
-| 事实 | 今天写在哪里 | 跟进通知失败时 |
-| --- | --- | --- |
-| 原任务产物交给通道 | TaskOutcome delivery。`enqueue_only` 即使 ok 也是 `delivery_unknown`（`delivery-confirm.ts:40-42`） | 不得改 |
-| 大白转写被网关接受 | 诊断响应 `delivered/reason`；cron `chat.inject` | 失败是 `conversation_unavailable`。原任务保持原 judgement |
-| 离线提醒 | `employee-push` 只服务 mention。本链路没有调用 | 不接入 |
-| 用户已读 | 没有原任务回执。支持单 `proposalSeenByUserVersion` 只属于支持单 | 不得伪造 |
+| 事实               | 今天写在哪里                                                                                        | 跟进通知失败时                                            |
+| ------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 原任务产物交给通道 | TaskOutcome delivery。`enqueue_only` 即使 ok 也是 `delivery_unknown`（`delivery-confirm.ts:40-42`） | 不得改                                                    |
+| 大白转写被网关接受 | 诊断响应 `delivered/reason`；cron `chat.inject`                                                     | 失败是 `conversation_unavailable`。原任务保持原 judgement |
+| 离线提醒           | `employee-push` 只服务 mention。本链路没有调用                                                      | 不接入                                                    |
+| 用户已读           | 没有原任务回执。支持单 `proposalSeenByUserVersion` 只属于支持单                                     | 不得伪造                                                  |
 
 `pending-deliveries` 能在子进程里按 taskId 找回原通道登记。它没有 send 函数，drain 也不会发 inject。outbox 第二次 drain 不会把已 ack 的副作用再加一次；ack 丢失后同一版本贡献不会记第二次。这证明任务消费者的幂等，不证明通知能重试。
 
@@ -112,14 +112,14 @@ API 能力（测试直接调用，生产构造器做不到）：
 
 ### 6. 修复责任与关闭权
 
-| 动作 | 谁可以做 | 对原任务 |
-| --- | --- | --- |
-| 诊断 confirm | `confirmDiagnoseEvolutionPrescription`。caller 必须是 targetOwner，或持有匹配 grant。写 cron，`delivery.mode=none`（`diagnose-evolution-prescription.ts:289-308`） | 不改。job 描述里没有原 taskId。缺 content hash 的第二次 confirm 返回 `prescription_hash_required`，不追加 job |
-| 处方执行 / Issue apply、recheck、writeback | 网关无条件 `confirm_not_enabled`。库函数只有测试传入 `enabled: true` 才在自己的 issue 目录里走完 | 隔离测试中的 TaskOutcome 不变。这不是生产网关 |
-| 运行时变更 | 治理默认 assist，不改运行时。skill auto 默认关。remediation 常量 false | 不关用户任务 |
-| 人工接手 | confirm 的 cron 带 `ownership.ownerId` 和 wakeText，没有「下一步结果写回哪个 taskId」 | 不能称为闭环 |
-| 支持单关闭 | `applySupportCaseResolution` | 不改 TaskOutcome |
-| 任务关闭 | 只有 judge | 支持单、报告、注入、曝光都不能关 |
+| 动作                                       | 谁可以做                                                                                                                                                           | 对原任务                                                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| 诊断 confirm                               | `confirmDiagnoseEvolutionPrescription`。caller 必须是 targetOwner，或持有匹配 grant。写 cron，`delivery.mode=none`（`diagnose-evolution-prescription.ts:289-308`） | 不改。job 描述里没有原 taskId。缺 content hash 的第二次 confirm 返回 `prescription_hash_required`，不追加 job |
+| 处方执行 / Issue apply、recheck、writeback | 网关无条件 `confirm_not_enabled`。库函数只有测试传入 `enabled: true` 才在自己的 issue 目录里走完                                                                   | 隔离测试中的 TaskOutcome 不变。这不是生产网关                                                                 |
+| 运行时变更                                 | 治理默认 assist，不改运行时。skill auto 默认关。remediation 常量 false                                                                                             | 不关用户任务                                                                                                  |
+| 人工接手                                   | confirm 的 cron 带 `ownership.ownerId` 和 wakeText，没有「下一步结果写回哪个 taskId」                                                                              | 不能称为闭环                                                                                                  |
+| 支持单关闭                                 | `applySupportCaseResolution`                                                                                                                                       | 不改 TaskOutcome                                                                                              |
+| 任务关闭                                   | 只有 judge                                                                                                                                                         | 支持单、报告、注入、曝光都不能关                                                                              |
 
 ## C. 第一笔业务 PR 的范围
 
@@ -191,16 +191,16 @@ API 能力（测试直接调用，生产构造器做不到）：
 
 ## 未验证
 
-| 项 | 原因 |
-| --- | --- |
-| 生产网关是否在跑，以及 `OPENBOT_DIAGNOSIS_TICK`、`OPENBOT_EVOLUTION_GOVERNANCE_MODE`、`OPENBOT_SKILL_AUTO_EVOLUTION`、`OPENBOT_EVOLUTION_SOFT_OBSERVE_DH`、`collaboration.task.claimContract` 的实际值 | 未读 LIVE，未打开容器 `build-info.json` |
-| 运行镜像里的 `DIAGNOSIS_*` 常量是否与本 SHA 一致 | 同上 |
-| 用户客户端是否在线、能否从历史拉到 inject、是否阅读 | 没有已读回执，且禁止连接真实流量 |
-| Employee APNs 生产送达 | 未调用，闭环本来也没接它 |
-| canary tenant `001` 与 `diagnosis:canary:daibai` 是否仍有流量 | 未读生产 |
-| 多 Gateway 实例下内存缺口去重的实际重复率 | 只证明了两个进程计数互不可见 |
-| `createExperienceVerifiedHandler` 在修正后撤销 `outcome_verified` 计数的磁盘效果 | 该路径会 `loadConfig()` 并写默认协作工作区。本期拒绝碰默认目录。纯函数计划已覆盖「无采纳则不验证」 |
-| 父任务 rollup、学习采纳接线、缺口持久去重 | 明确不在本期。代码检索仍是「没有执行」 |
+| 项                                                                                                                                                                                                     | 原因                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| 生产网关是否在跑，以及 `OPENBOT_DIAGNOSIS_TICK`、`OPENBOT_EVOLUTION_GOVERNANCE_MODE`、`OPENBOT_SKILL_AUTO_EVOLUTION`、`OPENBOT_EVOLUTION_SOFT_OBSERVE_DH`、`collaboration.task.claimContract` 的实际值 | 未读 LIVE，未打开容器 `build-info.json`                                                            |
+| 运行镜像里的 `DIAGNOSIS_*` 常量是否与本 SHA 一致                                                                                                                                                       | 同上                                                                                               |
+| 用户客户端是否在线、能否从历史拉到 inject、是否阅读                                                                                                                                                    | 没有已读回执，且禁止连接真实流量                                                                   |
+| Employee APNs 生产送达                                                                                                                                                                                 | 未调用，闭环本来也没接它                                                                           |
+| canary tenant `001` 与 `diagnosis:canary:daibai` 是否仍有流量                                                                                                                                          | 未读生产                                                                                           |
+| 多 Gateway 实例下内存缺口去重的实际重复率                                                                                                                                                              | 只证明了两个进程计数互不可见                                                                       |
+| `createExperienceVerifiedHandler` 在修正后撤销 `outcome_verified` 计数的磁盘效果                                                                                                                       | 该路径会 `loadConfig()` 并写默认协作工作区。本期拒绝碰默认目录。纯函数计划已覆盖「无采纳则不验证」 |
+| 父任务 rollup、学习采纳接线、缺口持久去重                                                                                                                                                              | 明确不在本期。代码检索仍是「没有执行」                                                             |
 
 ## Loom
 
