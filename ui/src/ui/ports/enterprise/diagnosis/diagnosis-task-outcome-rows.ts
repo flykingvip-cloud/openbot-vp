@@ -141,7 +141,13 @@ export function diagnoseTaskOutcomeAttachNote(draft: DiagnoseTaskOutcomeDraft): 
 }
 
 function recheckCopy(status: string | undefined): string {
-  return status === "incomplete" ? "复验未完成" : "未复验";
+  if (status === "incomplete") {
+    return "复验未完成";
+  }
+  if (status === "completed") {
+    return "复验已记录";
+  }
+  return "未复验";
 }
 
 function emptyRows(source: string): DiagnosisTaskOutcomeRow[] {
