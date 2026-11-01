@@ -10414,6 +10414,28 @@ tasks:
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
+  - id: closed-loop-recheck-read:cursor-closed-loop-490b
+    owner: cursor-closed-loop-490b
+    intent:
+      - Read-only recheck observations on one TaskOutcome version
+    paths:
+      - src/task-outcome/recheck-observation.ts
+      - src/task-outcome/recheck-observation.test.ts
+      - src/diagnosis/task-outcome-evidence.ts
+      - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+    state: active
+    sessions:
+      - id: 8c2e1a44-5d10-4a77-9b31-6f0c2d88aa10
+        taskId: closed-loop-recheck-read:cursor-closed-loop-490b
+        ide: cursor
+        agent: cursor-closed-loop-490b
+        status: active
+        lastSignalAt: 2026-11-01T13:05:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-01
+    metadata: {}
 landingStreams:
   - id: usage-cost-layers-20261101
     landingPolicy: serial
@@ -10453,6 +10475,19 @@ landingStreams:
       task: usage-cost-layers
       owner: cursor-cloud
       purpose: One usage and cost projection for user, enterprise, and platform.
+  - id: closed-loop-recheck-read-20261101
+    landingPolicy: serial
+    paths:
+      - src/task-outcome/recheck-observation.ts
+      - src/task-outcome/recheck-observation.test.ts
+      - src/diagnosis/task-outcome-evidence.ts
+      - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+    canLandWith: []
+    metadata:
+      task: closed-loop-recheck-read:cursor-closed-loop-490b
+      owner: cursor-closed-loop-490b
+      purpose: Read-only recheck observations. No executor and no notify.
   - id: askOutcome-executor-closeout
     landingPolicy: serial
     paths:

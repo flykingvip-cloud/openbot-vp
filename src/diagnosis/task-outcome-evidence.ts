@@ -3,6 +3,7 @@
  * Tool failures stay observations. They do not change taskJudgement.
  */
 import type { OpenBotConfig } from "../config/config.js";
+import { readRecheckStatus } from "../task-outcome/recheck-observation.js";
 import {
   callerOwnsTaskOutcome,
   resolveConfiguredTaskOutcomeRoot,
@@ -36,6 +37,7 @@ export type TaskOutcomeEvidence =
       judgement: TaskJudgement;
       reasonCode?: string;
       revisionKind?: "new_execution" | "correction";
+      recheckStatus: "not_checked" | "incomplete";
       lifecycle: string;
       toolObservations: TaskOutcomeToolObservation[];
     }
@@ -56,6 +58,7 @@ export function formatTaskOutcomeEvidenceText(evidence: TaskOutcomeEvidence): st
       `判定=${evidence.judgement}`,
       `reasonCode=${evidence.reasonCode ?? ""}`,
       `工具失败观察=${failed}。工具失败不改变任务判定。`,
+      `复验=${evidence.recheckStatus === "incomplete" ? "复验未完成" : "未复验"}。`,
     ].join("\n");
   }
   return [
@@ -129,6 +132,7 @@ export function readTaskOutcomeEvidence(input: {
         judgement: snap.taskJudgement,
         ...(snap.reasonCode ? { reasonCode: snap.reasonCode } : {}),
         ...(snap.revisionKind ? { revisionKind: snap.revisionKind } : {}),
+        recheckStatus: readRecheckStatus(located.root, taskId, snap.outcomeVersion),
         lifecycle: snap.lifecycle,
         toolObservations,
       };

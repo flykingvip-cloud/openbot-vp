@@ -11,6 +11,7 @@ export type DiagnosisTaskOutcomeEvidenceView =
       judgement?: string;
       reasonCode?: string;
       revisionKind?: string;
+      recheckStatus?: string;
     }
   | {
       ok: false;
@@ -65,7 +66,7 @@ export function diagnosisTaskOutcomeRows(input: {
       { label: "关联原任务", value: taskId, mono: taskId !== "未声明" },
       { label: "结果版本", value: version, mono: version !== "未声明" },
       { label: "当前处理", value: handlingCopy(evidence) },
-      { label: "复验结果", value: "未复验" },
+      { label: "复验结果", value: recheckCopy(evidence.recheckStatus) },
     ];
   }
   const taskId = evidence.taskId?.trim() || "未声明";
@@ -137,6 +138,10 @@ export function diagnoseTaskOutcomeAttachNote(draft: DiagnoseTaskOutcomeDraft): 
     return null;
   }
   return "任务对照未附上：需要同时填写任务、数字人和结果版本。不会自动选择最近任务。";
+}
+
+function recheckCopy(status: string | undefined): string {
+  return status === "incomplete" ? "复验未完成" : "未复验";
 }
 
 function emptyRows(source: string): DiagnosisTaskOutcomeRow[] {
