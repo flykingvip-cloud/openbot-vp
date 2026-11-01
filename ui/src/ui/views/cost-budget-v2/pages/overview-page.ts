@@ -8,6 +8,7 @@ import { buildSeatsGovernanceDrilldownHref } from "../../cost-budget/cost-budget
 import { renderCostBudgetOverviewSubscribeHero } from "../../cost-budget/cost-budget-overview-subscribe-hero.ts";
 import { buildCostBudgetTodos, type CostBudgetTodo } from "../../cost-budget/cost-budget-todos.ts";
 import { renderEnterpriseKpiGrid, type EnterpriseKpiItem } from "../../enterprise-kpi-card.ts";
+import { renderUsageCostDisclosure } from "../../usage-cost/usage-cost-panel.ts";
 import { renderOverviewBudgetForecastPanel } from "../panels/overview-budget-forecast-panel.ts";
 import { renderDashboardGovernancePanel } from "../panels/overview-governance-panel.ts";
 import { renderKnowledgeGovernanceCreditsPanel } from "../panels/overview-knowledge-governance-credits-panel.ts";
@@ -244,6 +245,13 @@ function renderSubscribedOverview(
     })}
 
     ${renderKnowledgeGovernanceCreditsPanel(d)}
+    ${renderUsageCostDisclosure({
+      surface: "enterprise",
+      tenantId: options.tenantId,
+      client: options.client,
+      rerender: options.onRefresh,
+      budgetLevel: level === "ok" ? null : level,
+    })}
 
     ${renderOverviewTodosCard(options.onNavigate)}
 

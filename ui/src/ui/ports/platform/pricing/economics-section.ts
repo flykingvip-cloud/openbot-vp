@@ -18,6 +18,7 @@ import type { RoutingPolicy } from "../../../capability/policy-engine/index.ts";
 import type { GatewayBrowserClient } from "../../../gateway.ts";
 import { renderIcon, type IconName } from "../../../icons.ts";
 import { renderEnterpriseKpiGrid } from "../../../views/enterprise-kpi-card.ts";
+import { renderUsageCostDisclosure } from "../../../views/usage-cost/usage-cost-panel.ts";
 import { clearEconomicsFocus, getEconomicsFocus, setEconomicsFocus } from "./economics-focus.ts";
 import {
   createGatewayLoadRetry,
@@ -915,6 +916,11 @@ export function renderPlatformEconomicsSection(
               `
             : nothing
         }
+        ${renderUsageCostDisclosure({
+          surface: "platform",
+          client,
+          rerender,
+        })}
         ${renderRiskSection(options)} ${renderDetailSection(client, options)}
       </section>
 

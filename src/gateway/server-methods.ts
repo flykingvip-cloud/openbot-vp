@@ -150,6 +150,7 @@ import { toolsCatalogHandlers } from "./server-methods/tools-catalog.js";
 import { ttsHandlers } from "./server-methods/tts.js";
 import type { GatewayRequestHandlers, GatewayRequestOptions } from "./server-methods/types.js";
 import { updateHandlers } from "./server-methods/update.js";
+import { usageCostLayerHandlers } from "./server-methods/usage-cost-layer.js";
 import { usageIngestHandlers } from "./server-methods/usage-ingest.js";
 import { usageHandlers } from "./server-methods/usage.js";
 import { userModelingHandlers } from "./server-methods/user-modeling.js";
@@ -330,6 +331,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...pushHandlers,
   ...sendHandlers,
   ...usageHandlers,
+  ...usageCostLayerHandlers,
   ...agentHandlers,
   ...agentsHandlers,
   ...agentGrowthHandlers,

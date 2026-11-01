@@ -43,6 +43,7 @@ import { getSubscription } from "./subscriptions-store.js";
 import { getActiveSubscription } from "./subscriptions-store.js";
 import { consumeTenantCredits, ensureTenantCreditsAllocation } from "./tenant-credits-store.js";
 import { resolveUsageAttributionTags } from "./usage-attribution-context.js";
+import { describeProviderPrice } from "./usage-cost-facts.js";
 import {
   appendUsageLedgerEntry,
   getUsageLedgerEntryByTaskId,
@@ -67,7 +68,10 @@ export type RecordCreditUsageInput = {
   planVersionId?: string;
   authorizationDecisionId?: string;
   occurredAt?: string;
-  tokenUsage?: TokenUsageInput;
+  tokenUsage?: TokenUsageInput & {
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+  };
   toolCallCount?: number;
   toolClasses?: readonly string[];
   durationMs?: number;
@@ -334,6 +338,7 @@ export async function recordCreditUsage(
     inputCostPer1MCents: costRates.inputCostPer1MCents,
     outputCostPer1MCents: costRates.outputCostPer1MCents,
   });
+  const providerPrice = describeProviderPrice(costRates);
   const tenantRevenueCents = enterpriseByok
     ? 0
     : computeTenantRevenueCents({
@@ -557,6 +562,14 @@ export async function recordCreditUsage(
         ...(input.tokenUsage?.outputTokens !== undefined
           ? { outputTokens: input.tokenUsage.outputTokens }
           : {}),
+        ...(input.tokenUsage?.cacheReadTokens !== undefined
+          ? { cacheReadTokens: input.tokenUsage.cacheReadTokens }
+          : {}),
+        ...(input.tokenUsage?.cacheWriteTokens !== undefined
+          ? { cacheWriteTokens: input.tokenUsage.cacheWriteTokens }
+          : {}),
+        providerPriceState: providerPrice.providerPriceState,
+        ...(providerPrice.providerPriceFree ? { providerPriceFree: true } : {}),
         ...(input.toolCallCount !== undefined
           ? { toolCallCount: Math.max(0, Math.floor(input.toolCallCount)) }
           : {}),

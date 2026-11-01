@@ -2,6 +2,8 @@ import { html } from "lit";
 import { t } from "../../../../i18n/index.ts";
 import { renderCollaborationObservabilityPanel } from "../../../collaboration/collaboration-observability-panel.ts";
 import { icons } from "../../../icons.ts";
+import type { UsageCostClient } from "../../../views/usage-cost/usage-cost-client.ts";
+import { renderUsageCostDisclosure } from "../../../views/usage-cost/usage-cost-panel.ts";
 import type {
   GroupProfileView,
   WorkbenchCollaborationGovernanceSnapshot,
@@ -702,6 +704,8 @@ function renderTaskDetailPage(params: {
   onGroupProfileViewChange?: ((view: GroupProfileView) => void) | null;
   onOpenGovernanceObjectDetail?: ((kind: WorkbenchGovernanceObjectKind, id: string) => void) | null;
   onTransitionGovernanceObject?: GovernanceTransitionHandler | null;
+  usageClient?: UsageCostClient | null;
+  onUsageRerender?: (() => void) | null;
 }) {
   const task = selectTask(params.snapshot);
   if (!task) {
@@ -760,6 +764,12 @@ function renderTaskDetailPage(params: {
         `,
         task.taskId,
       )}
+      ${renderUsageCostDisclosure({
+        surface: "user",
+        taskId: task.taskId,
+        client: params.usageClient,
+        rerender: params.onUsageRerender,
+      })}
       ${renderObservabilitySection(params.snapshot)}
       ${renderGovernanceSection(
         "Related deliverables",
@@ -1407,6 +1417,8 @@ export function renderGroupProfileStageView(params: {
   onDecisionRationaleDraftChange?: ((value: string) => void) | null;
   onSaveDecisionDraft?: ((decisionId: string) => void) | null;
   onTransitionGovernanceObject?: GovernanceTransitionHandler | null;
+  usageClient?: UsageCostClient | null;
+  onUsageRerender?: (() => void) | null;
 }) {
   if (!params.snapshot) {
     return renderEmpty(

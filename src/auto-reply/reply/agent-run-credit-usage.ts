@@ -69,7 +69,7 @@ export type BuildCommercialRunCreditUsageInput = {
   toolCallCount: number;
   toolClasses: readonly string[];
   fallbackAttemptsRaw: unknown;
-  tokenUsage?: { input?: number; output?: number };
+  tokenUsage?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
 };
 
 export function buildCommercialRunCreditUsageInput(
@@ -94,13 +94,22 @@ export function buildCommercialRunCreditUsageInput(
     toolCallCount: input.toolCallCount,
     toolClasses: [...input.toolClasses],
     tokenUsage:
-      input.tokenUsage?.input !== undefined || input.tokenUsage?.output !== undefined
+      input.tokenUsage?.input !== undefined ||
+      input.tokenUsage?.output !== undefined ||
+      input.tokenUsage?.cacheRead !== undefined ||
+      input.tokenUsage?.cacheWrite !== undefined
         ? {
             ...(input.tokenUsage.input !== undefined
               ? { inputTokens: input.tokenUsage.input }
               : {}),
             ...(input.tokenUsage.output !== undefined
               ? { outputTokens: input.tokenUsage.output }
+              : {}),
+            ...(input.tokenUsage.cacheRead !== undefined
+              ? { cacheReadTokens: input.tokenUsage.cacheRead }
+              : {}),
+            ...(input.tokenUsage.cacheWrite !== undefined
+              ? { cacheWriteTokens: input.tokenUsage.cacheWrite }
               : {}),
           }
         : undefined,
