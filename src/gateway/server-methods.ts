@@ -141,6 +141,10 @@ import { spacesHandlers } from "./server-methods/spaces.js";
 import { subscriptionsHandlers } from "./server-methods/subscriptions.js";
 import { systemHandlers } from "./server-methods/system.js";
 import { talkHandlers } from "./server-methods/talk.js";
+import {
+  TASK_OUTCOME_REJECT_RESULT_METHOD,
+  authorizeTaskOutcomeRejectTransport,
+} from "./server-methods/task-outcome-reject.js";
 import { taskHandlers } from "./server-methods/task.js";
 import { toolsCatalogHandlers } from "./server-methods/tools-catalog.js";
 import { ttsHandlers } from "./server-methods/tts.js";
@@ -203,6 +207,9 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
   }
   if (role === "node") {
     return null;
+  }
+  if (method === TASK_OUTCOME_REJECT_RESULT_METHOD) {
+    return authorizeTaskOutcomeRejectTransport(client);
   }
   if (scopes.includes(ADMIN_SCOPE)) {
     return null;

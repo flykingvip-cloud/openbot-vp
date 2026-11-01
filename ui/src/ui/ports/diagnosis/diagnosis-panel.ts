@@ -48,6 +48,12 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @property({ attribute: false }) sessionKind: string | null = null;
   @property({ attribute: false }) gatewayMethods: readonly string[] | null = null;
   @property({ type: Boolean }) connected = false;
+  /** Set only when the host already has taskId, agentId, and outcomeVersion. */
+  @property({ attribute: false }) taskOutcomeRef: {
+    taskId: string;
+    agentId: string;
+    outcomeVersion: number;
+  } | null = null;
 
   @state() private model: DiagnosisViewModel | null = null;
   @state() private loading = false;
@@ -110,6 +116,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
       return;
     }
     this.diagnosing = true;
+    const taskOutcome = completeTaskOutcomeRef(this.taskOutcomeRef);
     try {
       if (!isDiagnosisGatewayReady()) {
         this.lastDiagnose = { kind: "disconnected" };
@@ -133,6 +140,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
               })),
             }
           : {}),
+        ...(taskOutcome ? { taskOutcome } : {}),
       });
       if (!result) {
         this.lastDiagnose = { kind: "failed" };
@@ -167,6 +175,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
         deliveryReason,
         deliveryDelivered: result.delivery?.delivered === true,
         reportText: result.reportText,
+        taskOutcomeEvidence: readTaskOutcomeEvidenceView(result.taskOutcomeEvidence),
       };
       this.evolutionProjections = result.evolutionProjections ?? [];
       await this.reload();
@@ -545,6 +554,59 @@ export class OpenBotDiagnosisPanel extends LitElement {
       )}
     `;
   }
+}
+
+function completeTaskOutcomeRef(
+  value: { taskId: string; agentId: string; outcomeVersion: number } | null,
+): { taskId: string; agentId: string; outcomeVersion: number } | null {
+  const taskId = value?.taskId.trim() ?? "";
+  const agentId = value?.agentId.trim() ?? "";
+  const outcomeVersion = value?.outcomeVersion;
+  if (
+    !taskId ||
+    !agentId ||
+    typeof outcomeVersion !== "number" ||
+    !Number.isInteger(outcomeVersion) ||
+    outcomeVersion < 1
+  ) {
+    return null;
+  }
+  return { taskId, agentId, outcomeVersion };
+}
+
+function readTaskOutcomeEvidenceView(value: unknown): DiagnosisRunNote["taskOutcomeEvidence"] {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as {
+    ok?: unknown;
+    code?: unknown;
+    taskId?: unknown;
+    outcomeVersion?: unknown;
+    judgement?: unknown;
+    reasonCode?: unknown;
+    revisionKind?: unknown;
+  };
+  if (record.ok === true) {
+    return {
+      ok: true,
+      ...(typeof record.taskId === "string" ? { taskId: record.taskId } : {}),
+      ...(typeof record.outcomeVersion === "number"
+        ? { outcomeVersion: record.outcomeVersion }
+        : {}),
+      ...(typeof record.judgement === "string" ? { judgement: record.judgement } : {}),
+      ...(typeof record.reasonCode === "string" ? { reasonCode: record.reasonCode } : {}),
+      ...(typeof record.revisionKind === "string" ? { revisionKind: record.revisionKind } : {}),
+    };
+  }
+  if (record.ok === false) {
+    return {
+      ok: false,
+      ...(typeof record.code === "string" ? { code: record.code } : {}),
+      ...(typeof record.taskId === "string" ? { taskId: record.taskId } : {}),
+    };
+  }
+  return null;
 }
 
 function transportFailureText(err: unknown): string {

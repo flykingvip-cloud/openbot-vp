@@ -279,7 +279,7 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
     id: "task-outcome-reject",
     methods: ["task.outcome.rejectResult"],
     scopes: {
-      "operator.write": ["task.outcome.rejectResult"],
+      "operator.approvals": ["task.outcome.rejectResult"],
     },
   },
   {

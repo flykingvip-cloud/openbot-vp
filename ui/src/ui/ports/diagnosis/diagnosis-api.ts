@@ -138,6 +138,15 @@ export type DiagnosisDiagnoseResponse = {
   };
   reportText?: string;
   evolutionProjections?: DiagnosisEvolutionProjection[];
+  taskOutcomeEvidence?: {
+    ok?: boolean;
+    code?: string;
+    taskId?: string;
+    outcomeVersion?: number;
+    judgement?: string;
+    reasonCode?: string;
+    revisionKind?: string;
+  };
 };
 
 export type DiagnosisEvolutionProjection = {
@@ -211,6 +220,7 @@ export async function runDiagnosisDiagnose(params?: {
   cadence?: "off" | "daily" | "tick";
   deliverTo?: { enterpriseAdmin?: boolean; owners?: boolean };
   targets?: Array<{ agentId: string; sessionKey: string; runId?: string | null }>;
+  taskOutcome?: { taskId: string; agentId: string; outcomeVersion: number };
 }): Promise<DiagnosisDiagnoseResponse | null> {
   if (!diagnosisClient?.connected) {
     return null;

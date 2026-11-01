@@ -765,6 +765,25 @@ img.chat-avatar {
   margin-top: 8px;
 }
 
+.chat-task-card__reject {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.chat-task-card__reject-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .chat-artifact-entry {
   padding: 12px;
 }

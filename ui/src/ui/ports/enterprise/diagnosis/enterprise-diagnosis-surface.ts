@@ -7,6 +7,11 @@ import {
   isAllDiagnosisTarget,
   type DiagnosisTargetOption,
 } from "../../diagnosis/diagnosis-targets.ts";
+import {
+  diagnosisSourceLabel,
+  diagnosisTaskOutcomeRows,
+  type DiagnosisTaskOutcomeEvidenceView,
+} from "./diagnosis-task-outcome-rows.ts";
 import { renderEnterpriseDiagnosisReport } from "./enterprise-diagnosis-report.ts";
 
 export type DiagnosisViewConversationEntry = {
@@ -119,6 +124,7 @@ export type DiagnosisRunNote = {
   deliveryReason?: string;
   deliveryDelivered?: boolean;
   reportText?: string;
+  taskOutcomeEvidence?: DiagnosisTaskOutcomeEvidenceView | null;
 };
 
 export type EnterpriseDiagnosisHandlers = {
@@ -1176,6 +1182,17 @@ export function renderEnterpriseDiagnosisSurface(
               )
             : nothing
         }
+        <div data-testid="diagnosis-task-outcome" class="enterprise-diagnosis__block">
+          ${kvRows(
+            diagnosisTaskOutcomeRows({
+              evidence: handlers.lastDiagnose?.taskOutcomeEvidence,
+              sourceLabel: diagnosisSourceLabel({
+                targets: handlers.targets,
+                selectedTargetId: handlers.selectedTargetId,
+              }),
+            }),
+          )}
+        </div>
         ${targetHint(handlers)}
         ${diagnoseControls(handlers)}
         <div class="enterprise-org-ws enterprise-org-ws--flat enterprise-diagnosis__body">

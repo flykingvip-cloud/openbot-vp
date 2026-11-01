@@ -69,6 +69,12 @@ export type TaskCard = {
   elapsed_time?: number;
   estimated_time?: string;
   message?: string;
+  /** Present only when the server event included all three fields. */
+  outcomeReject?: {
+    taskId: string;
+    agentId: string;
+    outcomeVersion: number;
+  };
 };
 
 export type ArtifactContext = {
