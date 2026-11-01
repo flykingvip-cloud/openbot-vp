@@ -84,7 +84,7 @@
 | 群协作记忆与成员撤销 | members.json；非成员/撤销/跨租户不泄露正文                                                         | #156 工具层；#157 HTTP 注入                                                                       | 工具层真 members.json；HTTP **注入身份**；不是子进程真认证                                          | acceptance 群组用例通过；HTTP 集成 2 通过                                                                                   | **子进程群组真认证**（platform-auth / trusted-proxy）仍是缺口。注入测试不得把它关闭 | 是                | 注入身份通过；子进程群组 not-run | 否              | not-run  | **已关闭**（工具层 + HTTP 注入）。子进程群组真认证 **明确延期** |
 | 学习批准/注入/撤销   | candidate 不注入；批准后才进入 recall；撤销后停止。`privateMemoryPromote` 默认关                   | #156；`memory-continuity-acceptance.test.ts` 学习环；`personal-learning-ownership.test.ts`        | 隔离 state；个人 scope `agent:<botId>`；群胶囊存储                                                  | acceptance 学习环通过；ownership 4 通过                                                                                     | 未批准学习是否被模型采用（见效果行）                                                | 是                | 通过                             | 否              | not-run  | **已关闭**（召回门）。不等于模型采用                            |
 | 更新与冲突           | 优化方案 S2：真更新后不沿用旧事实；冲突可解释                                                      | SDK `supersedeAtom` 会把旧原子标 deprecated。`detectConflicts` 只读列出 `conflictsWith`，不改状态 | 本轮探针：in-memory SDK。两个原子先以 **active** 写入，再调用 `supersedeAtom`                       | 探针 exit 0。默认 `queryAtoms` 之后只剩新事实 `FACT-NEW-CLOSEOUT-20261101`；旧事实不再命中。错主命中 0 且状态未被拒绝读改写 | 没有产品级「冲突生成」入口。不把预置 conflicted 行当本轮更新。模型是否改口：not-run | 引擎 API 已在主干 | SDK 通过                         | 否              | not-run  | **已关闭**（SDK 真 supersede）。产品冲突流 **明确延期**         |
-| 完整模型正确采用     | 优化方案 §4：回答正确采用 ≠ 召回命中 ≠ reuseCount                                                  | 无本轮产品改动                                                                                    | 需要已授权的合成模型配置                                                                            | **not-run**（六场景全是 not-run）                                                                                           | 全部效果场景                                                                        | 不适用            | not-run                          | 否              | not-run  | **阻塞**（缺模型授权，不得记通过）                              |
+| 完整模型正确采用     | 优化方案 §4：回答正确采用 ≠ 召回命中 ≠ reuseCount                                                  | 无本轮产品改动                                                                                    | DeepSeek 合成隔离；pinned `3460ef9fa…`；state `/private/tmp/openbot-closeout-model-effect-3460ef9fa/` | **pass×6**（`model-effect-six-scenarios-deepseek.json`）                                                                    | 全部效果场景                                                                        | 是                | 六场景 pass                      | 否              | pass     | **合成模型层可关**（≠ production online）                       |
 | 当前部署与运行版本   | 以运行容器 `build-info` 为准，不以 git 日期为准                                                    | 验收 SHA 是源码 tip，不是已证明的运行 tip                                                         | 本云端无 podman/docker、无监听网关、无 `~/.openbot`                                                 | **not-run**                                                                                                                 | 线上 SHA、后端与开关摘要、健康报告实读                                              | 源码已在 main     | 不适用                           | **否 / 不可达** | not-run  | **阻塞**（运行未生效）                                          |
 | O6 reuseCount        | 不接通自增、不废弃、不改权重；不可用于效果评估                                                     | 方案 D1；本轮无实现 PR                                                                            | 无                                                                                                  | 未改代码                                                                                                                    | 仪表盘文案若仍未落地，保持暂缓                                                      | 否                | not-run                          | 否              | not-run  | **明确延期**                                                    |
 | O7 相关性过滤        | 先离线评估；默认行为不变                                                                           | 方案 D2                                                                                           | 无                                                                                                  | 未改默认                                                                                                                    | 离线对照                                                                            | 否                | not-run                          | 否              | not-run  | **明确延期**                                                    |
@@ -140,25 +140,20 @@
 
 ## 6. 真实模型效果
 
-全部 **not-run**。not-run 不计通过。禁止用 mock 或固定答案冒充。
+本机补跑（Asia/Shanghai **2026-11-01T23:23+08:00**）：provider=`api-proxy-deepseek`，model=`deepseek-chat`，**六场景全部 pass**（6 model HTTP calls；hard-stop 40/~$5 未触发）。禁止用 mock 或固定答案冒充——本轮为真实 DeepSeek 回答。
 
-本机没有 `~/.openbot`，环境变量里没有模型供应商密钥，没有可调用的合成模型配置。按要求不读出凭据，也不使用真实用户会话。
+证据：`docs/design/evidence/memory-system-final-closeout-2026-11-01/model-effect-six-scenarios-deepseek.json` 与同目录 `.md` / `.driver.ts`。状态根：`/private/tmp/openbot-closeout-model-effect-3460ef9fa/`（合成隔离；**未**写真实 `~/.openbot` 用户记忆；**未**启网关、未碰 :18789/:18790/:19001）。密钥仅进程内读取，证据中为 `[REDACTED]`。
 
-要补跑，一次需要同时具备：
+每个场景记录了：合成事实 ID、model id、提示词版本、attempt≤2、召回/片段是否进入请求、回答摘录、评分规则；正例要求 fragmentInRequest 且回答含唯一 token，负例要求请求与回答均无 token。
 
-1. 隔离根内的模型配置（provider、base URL、model id），密钥不进日志、不进本证据目录。
-2. 合成 workspace / state，确认不是生产记忆目录。
-3. 每个场景记录：合成事实 ID、模型参数、提示词版本、重复次数、检索来源、片段是否进入请求、回答原文、评分规则。
-4. 能区分「碰巧答对」和「请求里确实有该记忆」。
-
-| 场景                 | 结果    |
-| -------------------- | ------- |
-| 保存后新会话采用     | not-run |
-| 无关内容不乱入       | not-run |
-| 更新后不沿用旧事实   | not-run |
-| 无权限不进上下文     | not-run |
-| 遗忘后不用被禁用来源 | not-run |
-| 未批准学习不采用     | not-run |
+| 场景                 | 结果                                                                 |
+| -------------------- | -------------------------------------------------------------------- |
+| 保存后新会话采用     | **pass**（DeepSeek `deepseek-chat`；fragmentInRequest + 采用 token） |
+| 无关内容不乱入       | **pass**（相关采用；无关 hobby token 未出现在回答）                  |
+| 更新后不沿用旧事实   | **pass**（supersede 后仅 NEW 进上下文；模型采用 NEW 非 OLD）         |
+| 无权限不进上下文     | **pass**（错主 ACL 空上下文；模型未采用 secret）                     |
+| 遗忘后不用被禁用来源 | **pass**（path1 forget 后无片段；模型未用 token）                    |
+| 未批准学习不采用     | **pass**（candidate 不进 recall；模型未采用；批准对照可注入）        |
 
 检索层已经覆盖的部分（召回、ACL、批准前不注入）不能填这张表。
 
@@ -189,15 +184,15 @@
 | failed（产品） | 无。本轮记忆/O4/path1/soft forget/连续记忆/权限套件没有失败断言                                                                 |
 | failed（门禁） | `pnpm tsgo` exit 2；`pnpm check` exit 1。分类为主干既有，不是本收尾改坏的产品回归                                               |
 | 本轮工具错误   | UI vitest 第一次在错误 cwd 下 exit 1；纠正后 exit 0                                                                             |
-| not-run        | 六条模型场景；生产/运行 build-info；soft forget 进程重启；子进程群组真认证；O6/O7/O9；产品冲突生成；loom register；本机网关身份 |
+| not-run        | ~~六条模型场景~~（已 DeepSeek pass×6）；生产/运行 build-info（历史）；soft forget 进程重启；子进程群组真认证；O6/O7/O9；产品冲突生成；loom register |
 | 明确延期       | O6、O7、O9；子进程群组真认证；产品级冲突流；DS 历史文件迁入 workspace                                                           |
-| 阻塞关闭上线   | 运行实例不可达 + 模型效果 not-run + 全仓门禁在该 SHA 非绿                                                                       |
+| 阻塞关闭上线   | 运行生效未证明（历史）+ ~~模型效果 not-run~~（已 DeepSeek 补跑）+ 门禁以 tip `3460ef9fa…` 为准                                 |
 
 ## 9. 三层关闭建议
 
 1. **研发交付：不能按「全绿可关」关闭。** 清单内功能 PR 已在验收 SHA 中。本轮隔离套件通过，首批不重开。但 `pnpm tsgo` 与 `pnpm check` 在该 SHA 上不是 exit 0，所以不能宣布研发门禁关闭。
 2. **运行生效：不能关闭。** build-info 不可达。状态是「主干有代码，运行未证明生效」。
-3. **记忆效果：不能关闭。** 模型六场景全部 not-run。脚手架、召回和召回门通过，都不等于用户答案采用了记忆。
+3. **记忆效果：合成模型层可关。** DeepSeek 六场景全部 pass（见 §6）。脚手架/召回通过仍不等于 production online effect；本关闭仅覆盖隔离合成模型采用证据。
 
 ## 10. 剩余最小动作
 
@@ -206,7 +201,7 @@
 | 让 `origin/main` 的 `pnpm format:check` 与 `pnpm tsgo` 在不放宽规则的前提下 exit 0 | 主干维护           | 最小类型对齐：`PluginMemoryToolFactory` 补上实现已读取的 `authenticatedUserId` 与 `securityProfile`；修正 HTTP harness 的 authorize mock 类型。本收尾 PR 不改这些产品类型 |
 | 子进程群组真认证夹具                                                               | 记忆连续性         | 需要 platform-auth 或 trusted-proxy。禁止用 HTTP 注入测试把缺口标成已关闭                                                                                                 |
 | soft forget 重启复验                                                               | 记忆连续性         | 隔离进程重启后，forgotten 来源仍不可检索，且文件未被物理删除                                                                                                              |
-| 合成模型六场景                                                                     | 效果验收           | 条件见 §6。未授权则继续 not-run                                                                                                                                           |
+| 合成模型六场景                                                                     | 效果验收           | **已补跑 pass×6**（DeepSeek `deepseek-chat`；见 `model-effect-six-scenarios-deepseek.json`）                                                                               |
 | 只读核对运行容器 build-info                                                        | 发布               | 见 §7。本轮不部署                                                                                                                                                         |
 | 本机 loom / 网关身份                                                               | 有本机身份的执行者 | 云端 not-run                                                                                                                                                              |
 
@@ -222,7 +217,7 @@
 | 分支        | `cursor/memory-final-closeout-afe1`                                                                                           |
 | 开跑时 HEAD | `c35164c188651329b28f541d7376db0a804966f0`（相对 `origin/main` `ea7f9218889ac9ca3d280d15cc14736149af369f`：`ea7f921` 是祖先） |
 | 时区        | 证据时间戳 **Europe/Berlin**；用户对照 Asia/Shanghai                                                                          |
-| 本轮不做    | 合并、push、部署、切流、真实用户记忆写入/search 可能 sync-write、放宽 composition-root LOC、六场景付费模型效果                |
+| 本轮不做    | 合并、部署、切流、真实用户记忆写入/search 可能 sync-write、放宽 composition-root LOC（模型六场景已另轮 DeepSeek 补跑并 push 证据） |
 
 ### 门禁 exits（本机）
 
@@ -265,16 +260,16 @@
 
 ### 六场景模型效果
 
-全部 **not-run**。本轮用户授权工作树 + 门禁/验收工具，**没有**明确模型鉴权/费用授权；不得记通过。
+用户后续授权 DeepSeek-only 合成模型效果补跑（见 §6 与 `model-effect-six-scenarios-deepseek.*`）。**六场景全部 pass**（真实 `deepseek-chat`；非 mock）。
 
-| 场景                 | 结果        |
-| -------------------- | ----------- |
-| 保存后新会话采用     | **not-run** |
-| 无关内容不乱入       | **not-run** |
-| 更新后不沿用旧事实   | **not-run** |
-| 无权限不进上下文     | **not-run** |
-| 遗忘后不用被禁用来源 | **not-run** |
-| 未批准学习不采用     | **not-run** |
+| 场景                 | 结果     |
+| -------------------- | -------- |
+| 保存后新会话采用     | **pass** |
+| 无关内容不乱入       | **pass** |
+| 更新后不沿用旧事实   | **pass** |
+| 无权限不进上下文     | **pass** |
+| 遗忘后不用被禁用来源 | **pass** |
+| 未批准学习不采用     | **pass** |
 
 O6 / O7 / O9 仍 **明确延期**。撤回的「forget failed」双来源假阳性结论保持。
 
@@ -282,9 +277,9 @@ O6 / O7 / O9 仍 **明确延期**。撤回的「forget failed」双来源假阳�
 
 1. **研发交付：BLOCKED** — 卡在 trunk `composition-root-loc`（tsgo/format 绿；隔离矩阵复跑绿）。
 2. **运行身份：VERIFIED**（只读三网关）— 但无一为 memory closeout tip SHA；**不**等于运行生效关闭。
-3. **模型效果：not-run** — 待费用/鉴权授权。
+3. **模型效果：可关（合成 DeepSeek 六场景）** — 六场景全部 pass，有真实模型采用/拒用证据；仍 **不** 宣称 production online effect 或完整 gateway agent tool-loop E2E。
 
-**不宣称 overall close。** Draft PR #182 仍是唯一收尾记录。
+**不宣称 overall close（运行生效仍未关）。** Draft PR #182 仍是唯一收尾记录。
 
 ## FINAL ACCEPTANCE SHA PIN (post-LOC tip)
 
@@ -299,7 +294,7 @@ O6 / O7 / O9 仍 **明确延期**。撤回的「forget failed」双来源假阳�
 ### 钉 SHA 含义（边界）
 
 - 本 SHA 固定为 **R&D / closeout tip**：`composition-root-loc` 已在此 tip 通过且**未抬预算**。
-- **不**宣称：运行生效已关闭、模型六场景已关闭、已部署、或与 `origin/main` 字节一致。
+- **不**宣称：运行生效已关闭、已部署、或与 `origin/main` 字节一致。合成 DeepSeek 六场景见 §6（pass×6）；仍不宣称 production online effect。
 - `:19001` / #113 joint-accept 历史证据（见下）仅证明当时声明身份与鉴权隔离边界；标签保留「声明身份，构建来源未完全验证」；**不得**用作本 tip 运行生效证明。
 
 ### 本 tip 已持久化的本机证据（脱敏）
@@ -310,6 +305,9 @@ O6 / O7 / O9 仍 **明确延期**。撤回的「forget failed」双来源假阳�
 | `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-19001-provenance-auth.json`       | :19001 provenance + auth 边界历史；非业务验收 |
 | `docs/design/evidence/memory-system-final-closeout-2026-11-01/composition-root-loc-fix-2026-11-01.md`         | LOC 解除记录                                  |
 | `docs/design/evidence/memory-system-final-closeout-2026-11-01/local-gateway-closeout-tip-build-identity.json` | 专用环境完整构建 + :19111 身份探针（已停）    |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/model-effect-six-scenarios-deepseek.json`         | DeepSeek 六场景模型效果（pass×6；密钥已脱敏） |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/model-effect-six-scenarios-deepseek.md`           | 六场景短记录                                  |
+| `docs/design/evidence/memory-system-final-closeout-2026-11-01/model-effect-six-scenarios-deepseek.driver.ts`    | 隔离驱动（只读密钥；合成 state）              |
 
 ### LOC 状态（相对 LOCAL RERUN 上文）
 

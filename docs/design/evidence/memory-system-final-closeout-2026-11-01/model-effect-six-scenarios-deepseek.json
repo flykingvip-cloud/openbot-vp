@@ -1,0 +1,154 @@
+{
+  "schema": "model-effect-six-scenarios-deepseek/v1",
+  "generatedAtUtc": "2026-11-01T15:23:03.490Z",
+  "startedAtUtc": "2026-11-01T15:22:59.463Z",
+  "startedAtAsiaShanghai": "2026-11-01, 23:22:59",
+  "timezoneNote": "user Asia/Shanghai; ISO timestamps UTC unless labeled",
+  "pinnedAcceptanceSha": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
+  "productTree": "/Users/daniel/AI VP/openbot-closeout-accept-build-3460ef9fa",
+  "closeoutWorktree": "/Users/daniel/AI VP/openbot-memory-final-closeout-182",
+  "branch": "cursor/memory-final-closeout-afe1",
+  "stateRoot": "/private/tmp/openbot-closeout-model-effect-3460ef9fa",
+  "provider": "api-proxy-deepseek",
+  "modelId": "deepseek-chat",
+  "baseUrl": "https://api.deepseek.com",
+  "apiKey": "[REDACTED]",
+  "promptVersion": "model-effect-six-v1-2026-11-01",
+  "hardStop": {
+    "maxModelCalls": 40,
+    "maxAttemptsPerScenario": 2,
+    "hit": false,
+    "modelCallCount": 6,
+    "spendCapNote": "~$5 equivalent; DeepSeek chat cheap — call-count gate primary"
+  },
+  "isolation": {
+    "wroteRealUserMemory": false,
+    "usedJointAccept883a5159": false,
+    "portsTouched": [],
+    "note": "SDK/manager path; no gateway started on 18789/18790/19001"
+  },
+  "summary": {
+    "pass": 6,
+    "fail": 0,
+    "error": 0,
+    "notRun": 0
+  },
+  "overallModelEffectCloseable": true,
+  "scenarios": [
+    {
+      "status": "pass",
+      "reason": "new-session recall injected fact; model quoted token",
+      "modelCalls": 1,
+      "syntheticFactIds": ["SYN-FACT-S1-ADOPT-3460EF9FA-7F3A"],
+      "fragmentInRequest": true,
+      "recallHitCount": 1,
+      "answerQuotes": ["SYN-FACT-S1-ADOPT-3460EF9FA-7F3A"],
+      "scoringRule": "pass iff recallHit>=1 AND fragmentInRequest AND answer contains FACT token",
+      "detail": {
+        "paths": ["MEMORY.md"],
+        "systemHadFact": true
+      },
+      "id": "ME-S1",
+      "nameZh": "保存后新会话采用",
+      "attempts": 1,
+      "modelId": "deepseek-chat"
+    },
+    {
+      "status": "pass",
+      "reason": "relevant adopted; unrelated token absent from answer",
+      "modelCalls": 1,
+      "syntheticFactIds": ["SYN-FACT-S2-REL-3460EF9FA-A91C", "SYN-FACT-S2-IRREL-3460EF9FA-B02D"],
+      "fragmentInRequest": true,
+      "recallHitCount": 2,
+      "answerQuotes": [
+        "The warehouse Alpha shipping address code is SYN-FACT-S2-REL-3460EF9FA-A91C."
+      ],
+      "scoringRule": "pass iff relevant fragment in request+answer AND unrelated token NOT in answer",
+      "detail": {
+        "irrelInRequest": true,
+        "paths": ["MEMORY.md", "memory/unrelated-hobby.md"]
+      },
+      "id": "ME-S2",
+      "nameZh": "无关内容不乱入",
+      "attempts": 1,
+      "modelId": "deepseek-chat"
+    },
+    {
+      "status": "pass",
+      "reason": "supersede left only NEW in context; model adopted NEW not OLD",
+      "modelCalls": 1,
+      "syntheticFactIds": ["SYN-FACT-S3-OLD-3460EF9FA-C13E", "SYN-FACT-S3-NEW-3460EF9FA-D24F"],
+      "fragmentInRequest": true,
+      "recallHitCount": 1,
+      "answerQuotes": ["SYN-FACT-S3-NEW-3460EF9FA-D24F"],
+      "scoringRule": "pass iff queryAtoms returns only NEW, OLD not retrievable, answer has NEW and not OLD",
+      "detail": {
+        "atomIds": ["atom_new"]
+      },
+      "id": "ME-S3",
+      "nameZh": "更新后不沿用旧事实",
+      "attempts": 1,
+      "modelId": "deepseek-chat"
+    },
+    {
+      "status": "pass",
+      "reason": "wrong-owner ACL empty context; model did not adopt secret",
+      "modelCalls": 1,
+      "syntheticFactIds": ["SYN-FACT-S4-ACL-3460EF9FA-E35A"],
+      "fragmentInRequest": false,
+      "recallHitCount": 0,
+      "answerQuotes": ["DO_NOT_KNOW"],
+      "scoringRule": "pass iff ACL deny hits=0 AND fragment not in request AND answer lacks SECRET",
+      "detail": {},
+      "id": "ME-S4",
+      "nameZh": "无权限不进上下文",
+      "attempts": 1,
+      "modelId": "deepseek-chat"
+    },
+    {
+      "status": "pass",
+      "reason": "path1 forget removed source from recall; model did not use token",
+      "modelCalls": 1,
+      "syntheticFactIds": ["SYN-FACT-S5-FORGET-3460EF9FA-F46B"],
+      "fragmentInRequest": false,
+      "recallHitCount": 0,
+      "answerQuotes": ["DO_NOT_KNOW"],
+      "scoringRule": "pass iff pre-forget hit, forgetMemoryEntry deleted, post-forget no FACT in snippets/request/answer",
+      "detail": {
+        "beforeHitCount": 1,
+        "deletedPath": {
+          "deletedPath": "/private/tmp/openbot-closeout-model-effect-3460ef9fa/s5-forget/workspace-main/MEMORY.md"
+        }
+      },
+      "id": "ME-S5",
+      "nameZh": "遗忘后不用被禁用来源",
+      "attempts": 1,
+      "modelId": "deepseek-chat"
+    },
+    {
+      "status": "pass",
+      "reason": "candidate excluded from recall/context; model did not adopt; approve control injects",
+      "modelCalls": 1,
+      "syntheticFactIds": ["SYN-LESSON-S6-CAND-3460EF9FA-G57C"],
+      "fragmentInRequest": false,
+      "recallHitCount": 0,
+      "answerQuotes": ["DO_NOT_KNOW"],
+      "scoringRule": "pass iff candidate not in recall/request/answer AND approve control makes lesson injectable",
+      "detail": {
+        "capsuleId": "experience:human_takeover:1793546582862:SYN-LESSON-S6-CAND-3460EF9FA-G57C",
+        "approvedPromoted": true,
+        "afterApproveCount": 1
+      },
+      "id": "ME-S6",
+      "nameZh": "未批准学习不采用",
+      "attempts": 1,
+      "modelId": "deepseek-chat"
+    }
+  ],
+  "doesNotClaim": [
+    "production online effect",
+    "full gateway agent tool-loop E2E",
+    "merge or deploy",
+    "real ~/.openbot user memory writes"
+  ]
+}
