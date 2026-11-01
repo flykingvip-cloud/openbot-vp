@@ -603,6 +603,7 @@ function readTaskOutcomeEvidenceView(value: unknown): DiagnosisRunNote["taskOutc
     judgement?: unknown;
     reasonCode?: unknown;
     revisionKind?: unknown;
+    recheckStatus?: unknown;
   };
   if (record.ok === true) {
     return {
@@ -614,6 +615,9 @@ function readTaskOutcomeEvidenceView(value: unknown): DiagnosisRunNote["taskOutc
       ...(typeof record.judgement === "string" ? { judgement: record.judgement } : {}),
       ...(typeof record.reasonCode === "string" ? { reasonCode: record.reasonCode } : {}),
       ...(typeof record.revisionKind === "string" ? { revisionKind: record.revisionKind } : {}),
+      ...(record.recheckStatus === "incomplete" || record.recheckStatus === "not_checked"
+        ? { recheckStatus: record.recheckStatus }
+        : {}),
     };
   }
   if (record.ok === false) {
