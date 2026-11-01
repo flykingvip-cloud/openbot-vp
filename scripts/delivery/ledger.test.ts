@@ -986,10 +986,9 @@ describe("repaired ledger warning profile", () => {
     // in this GitHub repo, so ancestry regression ERRORs are expected delivery debt).
     expect(rows.length).toBeGreaterThanOrEqual(142);
     expect(Math.max(...rows.map((r) => r.seq))).toBe(151);
-    // Historical debt: seq 127 never received liveTo. Tip seq 151 is the Path B LIVE open row.
-    // Dual-open remains an audit error until seq 127 is closed with an authentic stop time.
-    expect(rows.filter((r) => r.liveTo === undefined).map((r) => r.seq)).toEqual([127, 151]);
-    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(true);
+    // #172 closed seq 127 liveTo with successor-StartedAt attestation; sole open tip is seq 151.
+    expect(rows.filter((r) => r.liveTo === undefined).map((r) => r.seq)).toEqual([151]);
+    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
     expect(audit.findings.some((f) => f.seq === 1 && f.code === "missing-tag")).toBe(true);
     expect(audit.findings.some((f) => f.code === "overlay-debt")).toBe(true);
     // seq 99-102 were backfilled from host metadata; their real stop times keep the
