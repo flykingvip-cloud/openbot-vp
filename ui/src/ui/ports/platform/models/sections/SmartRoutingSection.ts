@@ -1351,7 +1351,7 @@ function renderTrialMatchForm(
     <div class="card-follow--sm" data-testid="routing-trial-match-form">
       <div class="card-title">试配任务</div>
       <div class="callout warn card-follow--xs" data-testid="routing-trial-match-banner">
-        干跑试配预览 · 不调用生成模型 · 不驱动线上会话／Agent 选型（资格写入准入存档后仅影响本预览）
+        干跑试配预览 · 不调用生成模型 · 不记执行成功。后端已接入时与运行时同一决策核心；界面演示会单独标注。
       </div>
       <div class="row row--tight row--wrap card-follow--xs">
         <label class="field">
@@ -1423,12 +1423,12 @@ function renderTrialMatchForm(
           class="btn btn--primary"
           type="button"
           ?disabled=${!onSimulateRouting || !selectedPolicy}
+          data-testid="routing-trial-run"
           title=${
             onSimulateRouting && selectedPolicy
-              ? "干跑决策预览，不调用生成模型，不驱动线上会话选型"
+              ? "干跑决策预览，不调用生成模型，不记执行成功"
               : "试配能力待接入或未选择策略"
           }
-          data-testid="routing-trial-run"
           @click=${() =>
             selectedPolicy
               ? onSimulateRouting?.({
@@ -1453,19 +1453,18 @@ function renderRoutingDecisionPreviewPanel(preview: RoutingDecisionPreview | nul
   if (!preview) {
     return html`
       <div class="callout info card-follow--sm" data-testid="routing-decision-preview-empty">
-        填写上方试配任务后点击「试配预览」。结果为干跑预览（可走 gateway
-        准入决策预览），不代表线上会话／Agent 真实选型。
+        填写上方试配任务后点击「试配预览」。后端已接入时结果与运行时决策核心相同；本预览不调用生成、不记执行成功。界面演示会单独标注。
       </div>
     `;
   }
   return html`
     <div class="card-follow--sm" data-testid="routing-decision-preview">
-      <div class="card-title">试配结果（干跑预览 · 不驱动线上选型）</div>
+      <div class="card-title">试配结果（干跑预览）</div>
       <div class="muted card-follow--xs">
         ${
           preview.backendStatus === "wired" && !preview.uiDemo
-            ? "后端准入干跑预览 · 不调用生成模型 · 不驱动线上会话／Agent 选型"
-            : "界面演示／本地干跑 · 不代表线上真实路由"
+            ? "后端准入干跑预览 · 与运行时同一决策核心 · 不调用生成模型 · 不记执行成功"
+            : "界面演示／本地干跑 · 不是后端决策，不代表运行时准入"
         }
         · requestId ${preview.requestId}
       </div>
@@ -1643,7 +1642,7 @@ export function renderSmartRoutingSection(props: SmartRoutingSectionProps) {
             ?disabled=${!onSimulateRouting || !selectedPolicy}
             title=${
               onSimulateRouting && selectedPolicy
-                ? "干跑决策预览，不调用生成模型，不驱动线上会话选型"
+                ? "干跑决策预览，不调用生成模型，不记执行成功"
                 : "试配能力待接入"
             }
             @click=${() =>

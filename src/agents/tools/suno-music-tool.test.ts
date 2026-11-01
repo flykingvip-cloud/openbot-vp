@@ -4,6 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../../config/config.js";
+import {
+  __setCapabilityAdmissionStorePathForTest,
+  upsertModelAdmission,
+} from "../../gateway/models/capability-admission/store.js";
 import { SUNO_MUSIC_MODEL_ID } from "../music-generation-models.js";
 import {
   resolveSunoMusicApiUrl,
@@ -14,6 +18,7 @@ import {
 const tmpDirs: string[] = [];
 
 afterEach(async () => {
+  __setCapabilityAdmissionStorePathForTest(undefined);
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   await Promise.all(
@@ -111,5 +116,31 @@ describe("createSunoMusicTool", () => {
       model: `suno/${SUNO_MUSIC_MODEL_ID}`,
     });
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("does not call the Suno-compatible API when that platform model is paused", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-suno-admit-"));
+    tmpDirs.push(dir);
+    const storePath = path.join(dir, "admission.json");
+    __setCapabilityAdmissionStorePathForTest(storePath);
+    await upsertModelAdmission(
+      `suno/${SUNO_MUSIC_MODEL_ID}`,
+      { autoRouting: "paused", autoRoutingReason: "管理员暂停" },
+      storePath,
+    );
+    const fetchMock = vi.fn(async () => {
+      throw new Error("generation must not be called");
+    });
+    const { createSunoMusicTool } = await import("./suno-music-tool.js");
+    const tool = createSunoMusicTool({
+      config: musicCfg(),
+      agentDir: dir,
+      workspaceDir: dir,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+    await expect(tool!.execute("call-paused", { prompt: "配乐" })).rejects.toMatchObject({
+      code: "PLATFORM_ADMISSION_EMPTY",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

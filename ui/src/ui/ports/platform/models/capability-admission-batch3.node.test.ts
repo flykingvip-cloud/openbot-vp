@@ -249,6 +249,15 @@ describe("batch3 Chinese / mixed task classification", () => {
     ).toBe("high_quality_reasoning");
   });
 
+  it("does not turn plain text plus an image profile into image generation", () => {
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "请帮我处理一下",
+        taskProfileId: "image_generation",
+      }),
+    ).toBe("general_text");
+  });
+
   it("does not let image_generation profile override clear coding task text", () => {
     expect(
       detectTaskCategoryForPreview({

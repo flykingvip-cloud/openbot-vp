@@ -65,6 +65,10 @@ import { type EmployeeModelGateResult } from "../../gateway/model-entitlement/em
 import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
+import {
+  formatPlatformAdmissionEmptyMessage,
+  isPlatformAdmissionEmptyError,
+} from "../../gateway/models/capability-admission/apply-runtime-admission.js";
 import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
@@ -638,6 +642,9 @@ export async function runAgentTurnWithFallback(params: {
           ...(executionRouting.preferredModelOrder
             ? { preferredModelOrder: executionRouting.preferredModelOrder }
             : {}),
+          runtimeAdmission: {
+            taskText: params.followupRun.prompt || params.commandBody,
+          },
           runId,
           run: (provider, model, runOptions) => {
             // Notify that model selection is complete (including after fallback).
@@ -1204,6 +1211,14 @@ export async function runAgentTurnWithFallback(params: {
             kind: "final",
             payload: {
               text: `⚠️ ${buildModelEntitlementEmptyUserMessage(modelGate?.entitlementHint)}`,
+            },
+          };
+        }
+        if (isPlatformAdmissionEmptyError(err)) {
+          return {
+            kind: "final",
+            payload: {
+              text: `⚠️ ${formatPlatformAdmissionEmptyMessage(err.decision)}`,
             },
           };
         }
