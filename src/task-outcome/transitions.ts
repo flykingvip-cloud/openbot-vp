@@ -254,7 +254,12 @@ export function applyTransition(
         ...next,
         budget: accumulateTaskBudgetSpend(
           current.budget,
-          { costUsd: transition.costUsd, iterations: transition.iterations },
+          {
+            costUsd: transition.costUsd,
+            iterations: transition.iterations,
+            costEvidence: transition.costEvidence,
+            attribution: transition.attribution,
+          },
           Number.isFinite(nowMs) ? nowMs : Date.now(),
         ),
       };

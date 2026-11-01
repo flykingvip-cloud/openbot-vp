@@ -52,7 +52,13 @@ export function nextStop(
   nowMs: number = Date.now(),
 ): SupervisedTaskState | null {
   const { budget: b } = task;
-  if (task.iterations.length >= b.maxIterations) {
+  // Tip iterationCount is the shared ledger. The local log is only a floor so a
+  // missed tip charge cannot restart the loop. The two counts are not added.
+  const iterations =
+    typeof b.iterationCount === "number"
+      ? Math.max(b.iterationCount, task.iterations.length)
+      : task.iterations.length;
+  if (iterations >= b.maxIterations) {
     return "max_iterations";
   }
   if (b.spentCostUsd >= b.maxCostUsd) {

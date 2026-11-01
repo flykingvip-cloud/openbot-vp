@@ -192,10 +192,11 @@ describe("paths cleanup: evolution bypass skips when tip already bridged", () =>
 });
 
 describe("paths cleanup: honest inventory still holds", () => {
-  it("subagent lane remains intentional skip", () => {
+  it("subagent lane opens TaskOutcome and gates the next model call", () => {
     const src = fs.readFileSync(path.join(root, "src/commands/agent.ts"), "utf8");
-    expect(src).toMatch(/isSubagentLane \? undefined/);
-    expect(src).toMatch(/skip nested subagent lane/);
+    expect(src).toMatch(/ensureSubagentTurnTaskOutcome/);
+    expect(src).toMatch(/assertRunnerTurnBudgetAllowsModelCall/);
+    expect(src).not.toMatch(/skip nested subagent lane/);
   });
 
   it("attachAdoptedLearningAssetsToTask remains the only explicit adopted API", () => {

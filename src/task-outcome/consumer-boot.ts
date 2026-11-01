@@ -5,7 +5,10 @@
 import path from "node:path";
 import { listAgentIds, resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
-import { hydrateAwaitingDeliveriesFromDisk } from "./pending-delivery.js";
+import {
+  hydrateAwaitingDeliveriesFromDisk,
+  listStaleAwaitingDeliveries,
+} from "./pending-delivery.js";
 import { drainPendingGrowthEvolution, TASK_OUTCOME_STORE_DIRNAME } from "./runtime-from-runner.js";
 
 export type TaskOutcomeConsumerBootLog = {
@@ -85,6 +88,12 @@ export async function recoverTaskOutcomeConsumersAtGatewayBoot(params: {
   params.log?.info?.(
     `task-outcome awaiting-delivery hydrate: agents=${hydrate.agentsScanned} hydrated=${hydrate.hydrated}`,
   );
+  const stale = listStaleAwaitingDeliveries();
+  if (stale.length > 0) {
+    params.log?.warn?.(
+      `task-outcome awaiting-delivery still pending: count=${stale.length} oldestTaskId=${stale[0]?.taskId ?? ""}`,
+    );
+  }
 
   const drain = await drainAllAgentsPendingGrowth(params.cfg);
   params.log?.info?.(
@@ -125,6 +134,10 @@ export function startTaskOutcomeRuntimeDrain(
           opts?.log?.info?.(
             `task-outcome runtime drain: processed=${out.processed} deferred=${out.deferred}`,
           );
+        }
+        const stale = listStaleAwaitingDeliveries();
+        if (stale.length > 0) {
+          opts?.log?.warn?.(`task-outcome awaiting-delivery still pending: count=${stale.length}`);
         }
       })
       .catch((err) => {

@@ -90,8 +90,11 @@ import {
 import { isReadonlyInvokeEnabled } from "../../task-orchestration/feature.js";
 import { ensureCronTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
 import {
+  assertRunnerTurnBudgetAllowsModelCall,
+  chargeModelCallAgainstTip,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  TaskBudgetExceededError,
 } from "../../task-outcome/runtime-from-runner.js";
 import { classifyCronCompletion } from "../completion-contract.js";
 import { isCronDeliveryOnlyFailure, isCronDeliveryToolError } from "../delivery-only-failure.js";
@@ -882,8 +885,30 @@ export async function runCronIsolatedAgentTurn(params: {
     | import("../../task-outcome/runtime-from-runner.js").RunnerTurnOutcomeInput["capabilityOutcome"]
     | undefined;
   let cronOutcomeCloseoutDone = false;
-  /** Real usage-derived USD for tip budget closeout (set when agentMeta.usage exists). */
+  /** Real usage-derived USD when the pre-call gate did not already charge this fire. */
   let tipBudgetCostUsd: number | undefined;
+  let cronBudgetCharged = false;
+  let cronBudgetCallSeq = 0;
+  let cronForcedFailureReason: "budget_exceeded" | undefined;
+  const chargeCronModelCall = (params: { usage?: unknown; provider?: string; model?: string }) => {
+    if (!cronOutcomeTaskId || !cronOutcomeScope) {
+      return;
+    }
+    cronBudgetCallSeq += 1;
+    const charged = chargeModelCallAgainstTip(cfgWithAgentDefaults, agentId, {
+      taskId: cronOutcomeTaskId,
+      scope: cronOutcomeScope,
+      runId: `${cronSession.sessionEntry.sessionId}:${runStartedAt}`,
+      callSeq: cronBudgetCallSeq,
+      usage: params.usage,
+      provider: params.provider,
+      model: params.model,
+    });
+    cronBudgetCharged = true;
+    if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
+      tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
+    }
+  };
   if (!cronOutcomeOpened.ok) {
     logWarn(
       `[cron:${params.job.id}] task-outcome entry failed: ${cronOutcomeOpened.code} ${cronOutcomeOpened.message}`,
@@ -963,11 +988,13 @@ export async function runCronIsolatedAgentTurn(params: {
       const ok = settled.status === "ok" && !aborted;
       const failureReason = aborted
         ? ("user_cancelled" as const)
-        : settled.status === "error"
-          ? ("run_failed" as const)
-          : settled.status === "skipped"
-            ? ("other" as const)
-            : undefined;
+        : cronForcedFailureReason
+          ? cronForcedFailureReason
+          : settled.status === "error"
+            ? ("run_failed" as const)
+            : settled.status === "skipped"
+              ? ("other" as const)
+              : undefined;
       const tipRunId = `${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
       try {
         await recordRunnerTurnOutcome(cfgWithAgentDefaults, agentId, {
@@ -977,7 +1004,8 @@ export async function runCronIsolatedAgentTurn(params: {
           scope: cronOutcomeScope,
           entrypoint: "cron",
           latencyMs: Math.max(0, runEndedAt - runStartedAt),
-          ...(tipBudgetCostUsd != null ? { costUsd: tipBudgetCostUsd } : {}),
+          ...(cronBudgetCharged ? { skipBudgetCharge: true } : {}),
+          ...(!cronBudgetCharged && tipBudgetCostUsd != null ? { costUsd: tipBudgetCostUsd } : {}),
           ...(failureReason
             ? {
                 failureReason,
@@ -1121,6 +1149,13 @@ export async function runCronIsolatedAgentTurn(params: {
             if (abortSignal?.aborted) {
               throw new Error(abortReason());
             }
+            if (cronOutcomeTaskId && cronOutcomeScope) {
+              assertRunnerTurnBudgetAllowsModelCall(cfgWithAgentDefaults, agentId, {
+                taskId: cronOutcomeTaskId,
+                scope: cronOutcomeScope,
+                startedAtMs: runStartedAt,
+              });
+            }
             const bootstrapPromptWarningSignature =
               bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1];
             // Ledger ticks need the embedded tool loop. runCliAgent disables tools.
@@ -1197,6 +1232,11 @@ export async function runCronIsolatedAgentTurn(params: {
               bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                 result.meta?.systemPromptReport,
               );
+              chargeCronModelCall({
+                usage: result.meta?.agentMeta?.usage,
+                provider: providerOverride,
+                model: modelOverride,
+              });
               return result;
             }
             let embeddedProvider = providerOverride;
@@ -1293,6 +1333,11 @@ export async function runCronIsolatedAgentTurn(params: {
             bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
               result.meta?.systemPromptReport,
             );
+            chargeCronModelCall({
+              usage: result.meta?.agentMeta?.usage,
+              provider: embeddedProvider,
+              model: embeddedModel,
+            });
             return result;
           },
         });
@@ -1374,6 +1419,10 @@ export async function runCronIsolatedAgentTurn(params: {
       }
     }
   } catch (err) {
+    if (err instanceof TaskBudgetExceededError) {
+      cronBudgetCharged = true;
+      cronForcedFailureReason = "budget_exceeded";
+    }
     const raw = String(err);
     // Surface raw sandbox account failures as cron_account:missing so P4 soft-disable applies.
     const error =
@@ -1423,12 +1472,14 @@ export async function runCronIsolatedAgentTurn(params: {
         setCliSessionId(cronSession.sessionEntry, providerUsed, cliSessionId);
       }
     }
-    tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
-      usage,
-      provider: providerUsed,
-      model: modelUsed,
-      config: cfgWithAgentDefaults,
-    });
+    if (!cronBudgetCharged) {
+      tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
+        usage,
+        provider: providerUsed,
+        model: modelUsed,
+        config: cfgWithAgentDefaults,
+      });
+    }
     if (hasNonzeroUsage(usage)) {
       const input = usage.input ?? 0;
       const output = usage.output ?? 0;

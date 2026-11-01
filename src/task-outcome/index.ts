@@ -10,6 +10,7 @@ export { GatewayAgentTaskOutcomeAdapter } from "./entrypoints/gateway-agent.js";
 export { CronTaskOutcomeAdapter } from "./entrypoints/cron.js";
 export { CliTaskOutcomeAdapter } from "./entrypoints/cli.js";
 export { CollabTaskOutcomeAdapter } from "./entrypoints/collab.js";
+export { SubagentTaskOutcomeAdapter } from "./entrypoints/subagent.js";
 export {
   recordRunnerTurnOutcome,
   confirmRunnerTurnDelivery,
@@ -25,6 +26,8 @@ export {
   takeAwaitingDelivery,
   resolveAndTakeAwaitingDelivery,
   hydrateAwaitingDeliveriesFromDisk,
+  listStaleAwaitingDeliveries,
+  AWAITING_DELIVERY_STALE_AFTER_MS,
   clearAwaitingDeliveriesForTests,
 } from "./pending-delivery.js";
 export {
@@ -58,12 +61,15 @@ export {
   cliTurnTaskId,
   collabTurnTaskId,
   gatewayAgentTurnTaskId,
+  subagentTurnTaskId,
   followupTurnTaskId,
   ensureCronTurnTaskOutcome,
   ensureCliTurnTaskOutcome,
   ensureCollabTurnTaskOutcome,
   ensureGatewayAgentTurnTaskOutcome,
+  ensureSubagentTurnTaskOutcome,
   ensureFollowupTurnTaskOutcome,
+  resolveLinkedParentTaskId,
 } from "./entrypoint-ensure.js";
 
 export {
@@ -123,6 +129,9 @@ export {
 export {
   assessRunnerTurnBudgetGate,
   chargeRunnerTurnBudgetSpend,
+  assertRunnerTurnBudgetAllowsModelCall,
+  chargeModelCallAgainstTip,
+  classifyTipBudgetCostFromUsage,
   estimateTipBudgetCostUsdFromUsage,
   TaskBudgetExceededError,
   type RunnerBudgetGateResult,

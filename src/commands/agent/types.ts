@@ -73,6 +73,13 @@ export type AgentCommandOpts = {
   bestEffortDeliver?: boolean;
   abortSignal?: AbortSignal;
   lane?: string;
+  /**
+   * Existing parent TaskOutcome id for a subagent child. Set only when the
+   * parent tip was resolved; never invented from agentId.
+   */
+  parentTaskId?: string;
+  /** Agent that owns parentTaskId when the child runs under a different agent. */
+  parentAgentId?: string;
   /** Parent governance snapshot staged for a subagent child run (PR-1b). */
   spawnGovernanceSnapshot?: RunGovernanceSnapshot;
   /**

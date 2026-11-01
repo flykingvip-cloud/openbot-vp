@@ -153,7 +153,16 @@ export interface SupervisedTask {
   acceptance: AcceptanceCriteria;
   state: SupervisedTaskState;
   iterations: SupervisionIteration[];
-  budget: SupervisorBudget & { spentCostUsd: number; startedAtMs?: number };
+  budget: SupervisorBudget & {
+    spentCostUsd: number;
+    startedAtMs?: number;
+    /**
+     * Tip ledger iteration count (own + child). When set, `nextStop` uses
+     * max(this, iterations.length) so a charge outside this loop still stops
+     * the next round. Absent ⇒ legacy iterations.length only.
+     */
+    iterationCount?: number;
+  };
   /** Opaque continuity key handed to the Worker (the adapter maps it to a CLI session). */
   continuityKey?: string;
   /**

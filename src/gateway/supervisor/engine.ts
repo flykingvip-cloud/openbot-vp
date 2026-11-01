@@ -5,13 +5,18 @@
  * M2: fixing → retry with redacted evidence; `nextStop` gates; escalator on stop.
  */
 
+import { loadConfig, type OpenBotConfig } from "../../config/config.js";
 import type {
   CredentialPolicy,
   ExecutionContext,
   PlacementFallback,
   WorkerLogEvent,
 } from "../../fabric/worker/types.js";
-import { accumulateSpentCost, ensureBudgetStarted, estimateWorkerCostUsd } from "./budget.js";
+import {
+  prepareSupervisorRoundBudget,
+  recordSupervisorRoundOnTip,
+} from "../../task-outcome/supervisor-tip-budget.js";
+import { ensureBudgetStarted } from "./budget.js";
 import type { EscalatorPort } from "./escalator.js";
 import { isSupervisorEnabled } from "./feature.js";
 import type { NodeAgentRegistry } from "./node-agent-registry.js";
@@ -89,7 +94,15 @@ export interface SupervisorPorts {
 
 /** Allowed state transitions (Property 6). Terminal states have no outgoing edges. */
 export const TASK_TRANSITIONS: Record<SupervisedTaskState, SupervisedTaskState[]> = {
-  planned: ["dispatched", "aborted", "failed", "escalated"],
+  planned: [
+    "dispatched",
+    "aborted",
+    "failed",
+    "escalated",
+    "max_iterations",
+    "budget_exhausted",
+    "timed_out",
+  ],
   dispatched: ["executing", "aborted", "failed", "escalated"],
   executing: ["validating", "aborted", "failed", "escalated"],
   validating: ["accepted", "fixing", "aborted", "failed", "escalated"],
@@ -150,6 +163,10 @@ function withState(task: SupervisedTask, state: SupervisedTaskState): Supervised
   return { ...task, state };
 }
 
+function supervisorBudgetConfig(opts?: SuperviseTickOptions): OpenBotConfig {
+  return opts?.config ?? loadConfig();
+}
+
 function buildInitialPrompt(task: SupervisedTask): string {
   return task.goal.trim();
 }
@@ -172,6 +189,11 @@ export interface SuperviseTickOptions {
   persist?: (task: SupervisedTask) => Promise<void>;
   /** Cooperative abort: polled during worker dispatch. */
   isAborted?: () => boolean | Promise<boolean>;
+  /**
+   * Config used to open the shared TaskOutcome tip. Production omits this and
+   * loads the runtime config. Tests pass an isolated agent dir.
+   */
+  config?: OpenBotConfig;
 }
 
 const DEFAULT_RETRYABLE_EXIT_CODES: readonly number[] = [1, 2];
@@ -442,7 +464,12 @@ async function runOneRound(
     );
   }
 
-  next = accumulateSpentCost(next, estimateWorkerCostUsd(workerResult.usage));
+  next = recordSupervisorRoundOnTip(
+    supervisorBudgetConfig(opts),
+    next,
+    iterIndex,
+    workerResult.usage,
+  );
   next = withState({ ...next, activeRun: undefined }, "validating");
   next = {
     ...next,
@@ -478,6 +505,13 @@ export async function superviseTick(
   }
 
   const nowMs = opts?.nowMs ?? Date.now();
+  if (task.state === "planned" || task.state === "fixing") {
+    const prepared = prepareSupervisorRoundBudget(supervisorBudgetConfig(opts), task, nowMs);
+    if (prepared.stop) {
+      return finalizeStop(prepared.task, prepared.stop, ports, prepared.detail);
+    }
+    task = prepared.task;
+  }
   if (isInFlightTaskState(task.state)) {
     if (task.state === "validating") {
       return resumeValidatingRound(task, ports, opts);
