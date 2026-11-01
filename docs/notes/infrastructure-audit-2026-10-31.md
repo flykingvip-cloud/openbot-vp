@@ -1,5 +1,7 @@
 # Infrastructure audit task view (2026-10-31)
 
+> **现行结论入口（2026-11-01）：** [closeout-2026-11-01.md](infrastructure-audit-2026-10-31/closeout-2026-11-01.md)。证据索引与残留移交在同一目录。下文是 2026-10-31 的任务视图。其中「this PR」、tip、OPEN 只描述当天快照，不表示这些 PR 今天仍未合入。
+
 - Task: `infrastructure-audit:infra-audit`
 - Owner: `infra-audit` (agent 基础设施审计)
 - Session: `844CDD06-136B-4F1A-BF56-7B671063A923` (ide=cursor)

@@ -1,0 +1,5 @@
+vitest-ci-local-merge-gate exit=0 start=2026-11-01T12:59:16Z end=2026-11-01T12:59:18Z
+vitest-release-record exit=0 start=2026-11-01T12:59:18Z end=2026-11-01T12:59:19Z
+vitest-ledger-forward exit=0 start=2026-11-01T12:59:19Z end=2026-11-01T12:59:21Z
+release-record-check exit=0 start=2026-11-01T12:59:21Z end=2026-11-01T12:59:21Z
+ledger-audit exit=30 start=2026-11-01T12:59:28Z end=2026-11-01T12:59:29Z

@@ -1,5 +1,7 @@
 # RELEASE_RECORD anti-drift (Priority 2) — 2026-10-31 Asia/Shanghai
 
+> **历史标识：** 本页 Baseline note 写于 #172/#174 尚未同时出现在主干之时（当时 `origin/main` `0e4d269615e26909bbac606f1dfb755b3511400c`，文中「#172 not merged」是当天事实）。2026-11-01 现行结论：两者均已在主干，`pnpm delivery:release-record:check` 在候选 `c3b00f492411dc96d2befd67921fe4951cfede97` 上退出码 0。见 [closeout-2026-11-01.md](closeout-2026-11-01.md)。下面正文不改写成新事实。
+
 ## Scope
 
 - Machine SoT remains `deploy/production/releases.jsonl`.
