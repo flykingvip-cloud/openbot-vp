@@ -4,7 +4,7 @@
 - Worktree: `/Users/daniel/.codex/worktrees/watchdog-task-closure/openbot`
 - Prior tip (card/todo visible, buttons incomplete): `b3e8ec1c8`
 - Tip (button fulfillment): `194634dde2b2e4cded46f274a807068dd1e513fd`
-- Tip (evidence refresh): `a2b8a4d4572689ccda2f41ab91e98521e7c1576c`
+- Tip (evidence refresh): `3f1d0b3a7bb3ccead2e8ab011321eb0a16276c5f`
 - Zone: Asia/Shanghai (UTC+8)
 - Written: 2026-11-01 ~10:35 Asia/Shanghai
 
