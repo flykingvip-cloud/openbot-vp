@@ -503,11 +503,26 @@ function buildRanking(facts: readonly UsageRequestFact[]): {
       callCount: rows.length,
     });
   }
-  ranking.sort(
-    (left, right) =>
-      left.procurementCents - right.procurementCents || right.callCount - left.callCount,
-  );
+  ranking.sort((left, right) => {
+    const scoreDelta = rankCompositeScore(right) - rankCompositeScore(left);
+    if (scoreDelta !== 0) {
+      return scoreDelta;
+    }
+    return left.procurementCents - right.procurementCents || right.callCount - left.callCount;
+  });
   return { ranking, excludedFromRanking };
+}
+
+/**
+ * 用量排名：质量与成功率优先，再扣时延与采购成本。
+ * 缺价／未知已在入榜前排除，不会因「看起来像 ¥0」挤进零成本位。
+ */
+function rankCompositeScore(row: UsageCostRankRow): number {
+  const success = row.successRate ?? 0;
+  const quality = row.acceptanceRate ?? 0;
+  const latencySec = (row.latencyMsMedian ?? 0) / 1_000;
+  const costYuan = row.procurementCents / 100;
+  return success + quality - latencySec - costYuan;
 }
 
 function taskStatus(facts: readonly UsageRequestFact[]): UsageCostTaskNode["status"] {

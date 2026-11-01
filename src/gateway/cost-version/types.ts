@@ -10,6 +10,9 @@ export type ModelCostSnapshot = {
   tier: string;
   inputCostPer1MCents: number;
   outputCostPer1MCents: number;
+  /** 未配置时不要当成已知 0；有缓存用量时由 OrMissing 判缺失。 */
+  cacheReadCostPer1MCents?: number;
+  cacheWriteCostPer1MCents?: number;
 };
 
 export type CostVersionStatus = "active" | "draft" | "deprecated";
