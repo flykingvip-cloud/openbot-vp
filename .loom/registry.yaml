@@ -10379,6 +10379,7 @@ tasks:
       - src/gateway/server-methods/chat.ts
       - ui/src/ui/controllers/chat.ts
       - ui/src/ui/controllers/chat.task-update.test.ts
+      - docs/audits/2026-11-01-closed-loop-auto-recheck-notify.md
     state: active
     sessions:
       - id: 3a91c0e4-6b17-4f2a-9c55-0e8d4a11b6c2
@@ -10423,6 +10424,7 @@ landingStreams:
       - src/gateway/server-methods/chat.ts
       - ui/src/ui/controllers/chat.ts
       - ui/src/ui/controllers/chat.task-update.test.ts
+      - docs/audits/2026-11-01-closed-loop-auto-recheck-notify.md
     canLandWith: []
     metadata:
       task: closed-loop-ui-wiring:cursor-closed-loop-490b
