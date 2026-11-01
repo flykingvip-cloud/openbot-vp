@@ -85,7 +85,11 @@ describe("buildCollaborationRulesDrawerSections (server-rendered effective, BP-2
     const lines = buildCollaborationRulesSummary({
       effectivePolicy: {
         ...view,
-        runtimeNotEnforced: ["governance.botMaySelfAdvanceWithoutHuman"],
+        // Retired from RuntimeNotEnforcedEffectiveField after self-advance enforcement;
+        // keep UI filter regression: if server listed it, hide 可自推进.
+        runtimeNotEnforced: [
+          "governance.botMaySelfAdvanceWithoutHuman",
+        ] as unknown as typeof view.runtimeNotEnforced,
       },
     });
     expect(lines.filter((line) => line.includes("自推进"))).toEqual([]);

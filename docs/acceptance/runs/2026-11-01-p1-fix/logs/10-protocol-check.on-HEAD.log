@@ -1,0 +1,15 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 protocol:check /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+> pnpm protocol:gen && pnpm protocol:gen:swift && git diff --exit-code -- dist/protocol.schema.json apps/macos/Sources/OpenBotProtocol/GatewayModels.swift apps/shared/OpenBotKit/Sources/OpenBotProtocol/GatewayModels.swift
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 protocol:gen /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+> node --import tsx scripts/protocol-gen.ts
+
+wrote /Users/daniel/AI VP/openbot-p1fix-f68a3c56b/dist/protocol.schema.json
+
+> @upbeyond/openbot@2026.7.12-rc.2 protocol:gen:swift /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+> node --import tsx scripts/protocol-gen-swift.ts
+
+wrote /Users/daniel/AI VP/openbot-p1fix-f68a3c56b/apps/macos/Sources/OpenBotProtocol/GatewayModels.swift
+wrote /Users/daniel/AI VP/openbot-p1fix-f68a3c56b/apps/shared/OpenBotKit/Sources/OpenBotProtocol/GatewayModels.swift

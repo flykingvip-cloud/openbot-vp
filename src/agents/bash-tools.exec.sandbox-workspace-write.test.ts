@@ -47,6 +47,11 @@ function createSandboxExecTool(root: string) {
   });
 }
 
+type CapturedRunArgs = {
+  command?: string;
+  execCommand?: string;
+};
+
 async function executeCatching(tool: ReturnType<typeof createExecTool>, command: string) {
   captured.run.mockClear();
   let err = "";
@@ -55,10 +60,11 @@ async function executeCatching(tool: ReturnType<typeof createExecTool>, command:
   } catch (e) {
     err = String(e);
   }
+  const calls = captured.run.mock.calls as unknown as Array<[CapturedRunArgs]>;
   return {
     err,
-    runCalls: captured.run.mock.calls.length,
-    lastRun: captured.run.mock.calls[0]?.[0],
+    runCalls: calls.length,
+    lastRun: calls[0]?.[0],
   };
 }
 

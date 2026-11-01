@@ -4,6 +4,11 @@ type PluginMemoryToolFactory = (options: {
   config?: import("../../config/types.openbot.js").OpenBotConfig;
   agentSessionKey?: string;
   governance?: import("../../memory/memory-search-governance.js").MemorySearchGovernance;
+  /** Authenticated human for members.json continuity authz (produced by memory-core). */
+  authenticatedUserId?: string | null;
+  /** Trusted security mode when full accessContext is not built (builtin/plugin path). */
+  securityProfile?: "personal_local" | "managed_enterprise";
+  accessContext?: import("../../memory/memory-index-access-context.js").MemoryIndexAccessContext;
   gatewayClientUser?: string;
   gatewayClientSessionDomain?: import("../../gateway/server-methods/types.js").GatewayClient["sessionDomain"];
 }) => import("../../agents/tools/common.js").AnyAgentTool | null;

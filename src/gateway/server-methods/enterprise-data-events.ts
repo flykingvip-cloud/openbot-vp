@@ -206,7 +206,7 @@ export function createEnterpriseDataEventHandlers(deps?: {
       withMaterializationFailureLedgerWriteLock(run));
   const withDataStore: WithDataStoreRunner =
     deps?.withDataStore ??
-    (async <_T>(ctx, run) => {
+    (async <T>(ctx: WithDataStoreContext, run: (store: EnterpriseDataStore) => Promise<T> | T) => {
       // Same trusted locator as enterprise-data.ts withEnterpriseDataStore.
       const storePath = await resolveControlPlaneStorePathForClient(
         ctx.client ?? null,
@@ -231,7 +231,7 @@ export function createEnterpriseDataEventHandlers(deps?: {
             "attempted" in result &&
             "failed" in result &&
             "attempts" in result
-              ? (result as EventDrivenMaterializationResult)
+              ? (result as unknown as EventDrivenMaterializationResult)
               : undefined;
           throw new EventDrivenStoreAccessError("save", error, partial);
         }

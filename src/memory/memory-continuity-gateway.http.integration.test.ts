@@ -183,7 +183,7 @@ async function syncMemoryIndex(params: {
       agentId: "main",
       authenticatedUserId: params.authenticatedUserId,
     });
-    if (!result.manager || !("sync" in result.manager)) {
+    if (!result.manager || typeof result.manager.sync !== "function") {
       throw new Error("syncMemoryIndex: manager missing");
     }
     registerIsolatedTestV1Root(result.manager);
@@ -305,7 +305,12 @@ describe("memory continuity live HTTP /tools/invoke", () => {
       indexPath,
     });
     await syncMemoryIndex({ workspaceDir, indexPath });
-    gatewayAuthResult.current = { ok: true, user: "user-alice" };
+    gatewayAuthResult.current = {
+      ok: true,
+      user: "user-alice",
+      method: "token",
+      trustedProxy: undefined,
+    };
 
     const search = await invokeMemoryTool({
       tool: "memory_search",
@@ -384,7 +389,12 @@ describe("memory continuity live HTTP /tools/invoke", () => {
     const collabRel = `collaboration/${groupId}/memory/group-note.md`;
 
     // Authorized member
-    gatewayAuthResult.current = { ok: true, user: "member-alice" };
+    gatewayAuthResult.current = {
+      ok: true,
+      user: "member-alice",
+      method: "token",
+      trustedProxy: undefined,
+    };
     const memberSearch = await invokeMemoryTool({
       tool: "memory_search",
       args: { query: marker, maxResults: 10, minScore: 0 },
@@ -415,7 +425,12 @@ describe("memory continuity live HTTP /tools/invoke", () => {
     const leakSecrets = [marker, "CROSS_TENANT_SECRET"];
 
     // Non-member (injected identity: user present, not in members.json)
-    gatewayAuthResult.current = { ok: true, user: "non-member-carol" };
+    gatewayAuthResult.current = {
+      ok: true,
+      user: "non-member-carol",
+      method: "token",
+      trustedProxy: undefined,
+    };
     const carolSearch = await invokeMemoryTool({
       tool: "memory_search",
       args: { query: marker, maxResults: 10, minScore: 0 },
@@ -437,7 +452,12 @@ describe("memory continuity live HTTP /tools/invoke", () => {
 
     // Revoked (same user id, status revoked) — search + get, no leak
     await writeMembers(groupDir, [{ userId: "member-alice", status: "revoked" }]);
-    gatewayAuthResult.current = { ok: true, user: "member-alice" };
+    gatewayAuthResult.current = {
+      ok: true,
+      user: "member-alice",
+      method: "token",
+      trustedProxy: undefined,
+    };
     const revokedSearch = await invokeMemoryTool({
       tool: "memory_search",
       args: { query: marker, maxResults: 10, minScore: 0 },

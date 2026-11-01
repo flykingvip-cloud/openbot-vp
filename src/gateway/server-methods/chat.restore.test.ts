@@ -37,7 +37,7 @@ vi.mock("../collaboration-learning.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../collaboration-learning.js")>();
   return {
     ...original,
-    listGatewayCollaborationSpaces: (...args: unknown[]) => listSpacesMock(...args),
+    listGatewayCollaborationSpaces: (...args: unknown[]) => listSpacesMock(...(args as [])),
   };
 });
 

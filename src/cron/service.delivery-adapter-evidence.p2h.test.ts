@@ -116,7 +116,9 @@ describe("P2-H delivery adapter evidence (no live HTTP)", () => {
   });
 
   it("dispatchCronDelivery marks delivered only after deliverOutboundPayloads returns results", async () => {
-    vi.mocked(deliverOutboundPayloads).mockResolvedValueOnce([{ ok: true, messageId: "m1" }]);
+    vi.mocked(deliverOutboundPayloads).mockResolvedValueOnce([
+      { channel: "slack", messageId: "m1" },
+    ]);
     const state = await dispatchCronDelivery(makeDispatchParams());
     expect(deliverOutboundPayloads).toHaveBeenCalledTimes(1);
     const call = vi.mocked(deliverOutboundPayloads).mock.calls[0]?.[0];
@@ -134,7 +136,9 @@ describe("P2-H delivery adapter evidence (no live HTTP)", () => {
   });
 
   it("CronService persists lastDeliveryStatus from adapter-derived delivered flag", async () => {
-    vi.mocked(deliverOutboundPayloads).mockResolvedValueOnce([{ ok: true }]);
+    vi.mocked(deliverOutboundPayloads).mockResolvedValueOnce([
+      { channel: "slack", messageId: "m2" },
+    ]);
     const dispatchState = await dispatchCronDelivery(makeDispatchParams());
     expect(dispatchState.delivered).toBe(true);
 

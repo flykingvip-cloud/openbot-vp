@@ -20,7 +20,8 @@ import {
   type ProjectionMaterializationResult,
 } from "./projection-materializer.js";
 import { findEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
-import type { EnterpriseDataStore, SarGovernanceProvider } from "./types.js";
+import type { SarGovernanceProvider } from "./sar-governance-bridge.js";
+import type { EnterpriseDataStore } from "./types.js";
 
 const MAX_EVENT_DRIVEN_PER_EVENT = 5;
 

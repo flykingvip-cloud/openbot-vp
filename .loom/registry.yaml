@@ -10530,7 +10530,127 @@ tasks:
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
+  - id: p1-fix-20261101:全栈验收
+    owner: grok-bot
+    intent: []
+    paths:
+      - docs/acceptance/runs/2026-11-01-p1-fix/**
+      - docs/acceptance/p1-fix-2026-11-01/**
+      - docs/acceptance/fullstack-2026-11-01/**
+      - .loom/registry.yaml
+      - src/gateway/enterprise-data/event-driven-projection-materializer.ts
+      - src/plugins/runtime/types-core.ts
+      - extensions/memory-core/index.ts
+      - src/agents/tools/memory-tool.ts
+      - apps/macos/Sources/OpenBotProtocol/GatewayModels.swift
+      - apps/shared/OpenBotKit/Sources/OpenBotKit/GatewayModels.swift
+      - apps/shared/OpenBotKit/Sources/OpenBotProtocol/GatewayModels.swift
+      - dist/protocol.schema.json
+      - src/agents/bash-tools.exec.sandbox-workspace-write.test.ts
+      - src/cron/service.delivery-adapter-evidence.p2h.test.ts
+      - src/gateway/evolution-control/authorize-shadow-intent.test.ts
+      - src/gateway/server-methods/chat.restore.test.ts
+      - src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
+      - src/gateway/server-methods/enterprise-data-events.ts
+      - src/memory/memory-continuity-gateway.http.integration.test.ts
+      - ui/src/ui/collaboration/collaboration-rules-summary.test.ts
+      - src/plugins/runtime/types.contract.test.ts
+      - docs/acceptance/fullstack-2026-11-01/07-p1-fix-status-2026-11-01.md
+      - docs/acceptance/p1-fix-2026-11-01/README.md
+      - docs/acceptance/p1-fix-2026-11-01/defect-status.md
+      - docs/acceptance/runs/2026-11-01-p1-fix/00-pin.md
+      - docs/acceptance/runs/2026-11-01-p1-fix/gates-summary.md
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/00-loom-claim-docs.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/00-loom-register.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/01-pnpm-install.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/02-typecheck-tsgo.after.exit.txt
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/02-typecheck-tsgo.after.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/02-typecheck-tsgo.before.exit.txt
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/02-typecheck-tsgo.before.full.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/02-typecheck-tsgo.before.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03-protocol-check.after-gen-dirty.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03-protocol-check.before.exit.txt
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03-protocol-check.before.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03a-protocol-gen.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03b-protocol-gen-swift.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03c-swift-build-OpenBotProtocol.BLOCKED.txt
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03c-swift-build-OpenBotProtocol.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03c-swiftc-typecheck-macos-module.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03c-swiftc-typecheck-macos-with-anycodable.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03c-swiftc-typecheck-macos.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03c-swiftc-typecheck-shared-full.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03c-swiftc-typecheck-shared-module.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/03c-swiftc-typecheck-shared.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/04-format-check.before.exit.txt
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/04-format-check.before.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/04-format-check.changed-after.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/04-oxfmt-changed.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/05-focused-materializer-sar.after-def004.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/05-tsgo.after.exit.txt
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/05-tsgo.after.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/05b-materializer-module-resolve.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/06-focused-regressions.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/07-test-auth-compat.exit.txt
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/07-test-auth-compat.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/08-build-low.exit.txt
+      - docs/acceptance/runs/2026-11-01-p1-fix/logs/08-build-low.log
+      - docs/acceptance/runs/2026-11-01-p1-fix/scope-coverage.md
+    state: active
+    sessions:
+      - id: b329ae09-75ed-4b60-a7a1-5832fd2c0a2a
+        taskId: p1-fix-20261101:全栈验收
+        ide: cursor
+        agent: grok-bot
+        status: active
+        lastSignalAt: 2026-11-01T14:56:40.890Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-01
+    metadata: {}
+  - id: pr192-review-20261101:独立复核
+    owner: grok-bot
+    intent: []
+    paths:
+      - docs/acceptance/runs/2026-11-01-pr192-review/**
+      - docs/acceptance/fullstack-2026-11-01/08-pr192-independent-review.md
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: pr192-review-20261101230443
+        taskId: pr192-review-20261101:独立复核
+        ide: cursor
+        agent: grok-bot
+        status: active
+        lastSignalAt: 2026-11-01T15:04:44.543Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-01
+    metadata: {}
 landingStreams:
+  - id: p1-fix-20261101
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/acceptance/runs/2026-11-01-p1-fix/**
+      - docs/acceptance/runs/2026-11-01-pr192-review/**
+      - docs/acceptance/p1-fix-2026-11-01/**
+      - docs/acceptance/fullstack-2026-11-01/**
+      - apps/macos/Sources/OpenBotProtocol/GatewayModels.swift
+      - apps/shared/OpenBotKit/Sources/OpenBotProtocol/GatewayModels.swift
+      - src/gateway/enterprise-data/event-driven-projection-materializer.ts
+      - src/plugins/runtime/types-core.ts
+      - src/plugins/runtime/types.contract.test.ts
+      - src/agents/bash-tools.exec.sandbox-workspace-write.test.ts
+      - src/cron/service.delivery-adapter-evidence.p2h.test.ts
+      - src/gateway/evolution-control/authorize-shadow-intent.test.ts
+      - src/gateway/server-methods/chat.restore.test.ts
+      - src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
+      - src/gateway/server-methods/enterprise-data-events.ts
+      - src/memory/memory-continuity-gateway.http.integration.test.ts
+      - ui/src/ui/collaboration/collaboration-rules-summary.test.ts
+    canLandWith: []
+    metadata:
+      legacyTitle: P1 fix DEF-001/002/004 acceptance 2026-11-01
   - id: smart-model-routing-runtime-admission
     landingPolicy: serial
     paths:

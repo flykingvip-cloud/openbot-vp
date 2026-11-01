@@ -1,0 +1,150 @@
+=== Static channel inventory (docs/channels) ===
+bluebubbles
+broadcast-groups
+channel-routing
+dingtalk
+discord
+enterprise-im
+feishu
+googlechat
+group-messages
+groups
+imessage
+index
+irc
+line
+location
+matrix
+mattermost
+msteams
+nextcloud-talk
+nostr
+pairing
+signal
+slack
+synology-chat
+telegram
+tlon
+troubleshooting
+twitch
+wechat
+wecom
+whatsapp
+zalo
+zalouser
+COUNT_DOCS:33
+=== Extensions dirs ===
+acpx
+bluebubbles
+copilot-proxy
+device-pair
+diagnostics-otel
+diffs
+dingtalk
+discord
+feishu
+google-gemini-cli-auth
+googlechat
+imessage
+irc
+line
+llm-task
+lobster
+matrix
+mattermost
+media-monitor
+memory-core
+memory-lancedb
+minimax-portal-auth
+msteams
+nextcloud-talk
+nostr
+open-prose
+phone-control
+qwen-portal-auth
+shared
+signal
+slack
+synology-chat
+talk-voice
+telegram
+test-utils
+thread-ownership
+tlon
+twitch
+voice-call
+wechat
+wecom
+whatsapp
+zalo
+zalouser
+COUNT_EXT:44
+=== Channel-like extensions (openclaw.plugin.json channels) ===
+bluebubbles/: bluebubbles
+dingtalk/: dingtalk
+discord/: discord
+feishu/: feishu
+googlechat/: googlechat
+imessage/: imessage
+irc/: irc
+line/: line
+matrix/: matrix
+mattermost/: mattermost
+msteams/: msteams
+nextcloud-talk/: nextcloud-talk
+nostr/: nostr
+signal/: signal
+slack/: slack
+synology-chat/: synology-chat
+telegram/: telegram
+tlon/: tlon
+twitch/: twitch
+wechat/: wechat
+wecom/: wecom
+whatsapp/: whatsapp
+zalo/: zalo
+zalouser/: zalouser
+=== Apps presence ===
+PRESENT apps/android
+PRESENT apps/harmony
+PRESENT apps/ios
+PRESENT apps/macos
+PRESENT apps/shared
+PRESENT apps/windows
+=== Packages ===
+README.md
+aor-backend-graph
+aor-backend-openbot
+aor-backend-stub
+aor-core
+aor-sdk-node
+aor-sdk-python
+clawdbot
+cogniweave-sdk
+collaboration-core
+collaboration-openbot-adapter
+collaboration-runtime
+constitutional-conformance
+constitutional-contracts
+constitutional-registry
+constitutional-runtime
+evolution-core
+moltbot
+toolkit
+COUNT_PKG:19
+=== Installer sibling (docs/AGENTS cite) ===
+=== SBOM script presence ===
+350:    "sbom:cyclonedx": "node --import tsx scripts/generate-cyclonedx-sbom.ts",
+scripts/generate-cyclonedx-sbom.ts
+SBOM_SCRIPT_PRESENT
+=== Stage docs presence ===
+docs/acceptance/stage1-auth-plugin-evidence.test.ts
+docs/acceptance/stage2-transcript-evidence.test.ts
+docs/acceptance/stage3-api-evidence.test.ts
+docs/acceptance/stage3-api03-policy-evidence.test.ts
+docs/acceptance/stage3-cli-authz-evidence.test.ts
+docs/acceptance/stage3-cli-backward-evidence.test.ts
+docs/acceptance/stage3-cli-errors-evidence.test.ts
+docs/acceptance/stage3-cli-idempotency-evidence.test.ts
+docs/acceptance/stage3-cli-versioning-evidence.test.ts
+docs/acceptance/stage3-plugin-authz-evidence.test.ts

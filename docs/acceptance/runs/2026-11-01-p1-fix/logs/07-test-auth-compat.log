@@ -1,0 +1,47 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 test:auth:compat /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+> vitest run --config vitest.gateway.config.ts src/gateway/server.auth.compat-baseline.test.ts src/gateway/client.test.ts src/gateway/reconnect-gating.test.ts src/gateway/protocol/connect-error-details.test.ts
+
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+
+ ✓ src/gateway/protocol/connect-error-details.test.ts (5 tests) 3ms
+ ✓ src/gateway/reconnect-gating.test.ts (13 tests) 3ms
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > uses explicit shared token and does not inject stored device token
+gateway connect failed: Error: gateway closed (1000): 
+
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > uses explicit shared password and does not inject stored device token
+gateway connect failed: Error: gateway closed (1000): 
+
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > uses stored device token when shared token is not provided
+gateway connect failed: Error: gateway closed (1000): 
+
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > prefers explicit deviceToken over stored device token
+gateway connect failed: Error: gateway closed (1000): 
+
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > retries with stored device token after shared-token mismatch on trusted endpoints
+gateway connect failed: GatewayClientRequestError: unauthorized
+
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > retries with stored device token after shared-token mismatch on trusted endpoints
+gateway connect failed: Error: gateway closed (1000): 
+
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > retries with stored device token when server recommends retry_with_device_token
+gateway connect failed: GatewayClientRequestError: unauthorized
+
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > retries with stored device token when server recommends retry_with_device_token
+gateway connect failed: Error: gateway closed (1000): 
+
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > does not auto-reconnect on AUTH_TOKEN_MISSING connect failures
+gateway connect failed: GatewayClientRequestError: unauthorized
+
+stderr | src/gateway/client.test.ts > GatewayClient connect auth payload > does not auto-reconnect on token mismatch when retry is not trusted
+gateway connect failed: GatewayClientRequestError: unauthorized
+
+ ✓ src/gateway/client.test.ts (18 tests) 534ms
+ ✓ src/gateway/server.auth.compat-baseline.test.ts (7 tests) 13565ms
+
+ Test Files  4 passed (4)
+      Tests  43 passed (43)
+   Start at  22:54:01
+   Duration  17.47s (transform 12.63s, setup 729ms, import 4.10s, tests 14.10s, environment 0ms)
+
