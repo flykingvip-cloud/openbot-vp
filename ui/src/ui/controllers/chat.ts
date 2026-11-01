@@ -369,6 +369,11 @@ export type ChatEventPayload = {
   mode?: "stop" | "undo";
   userMessageId?: string;
   message?: unknown;
+  /** Task card for a real TaskOutcome tip. Absent when that tip does not exist. */
+  taskUpdate?: {
+    type: "task_update";
+    task: Record<string, unknown>;
+  };
   /** Process-channel only; never Layer C delivery text. */
   thinking?: ThinkingProgressSnapshot;
   errorMessage?: string;
@@ -1628,7 +1633,25 @@ function handleFinalChatEvent(state: ChatEventState, payload: ChatEventPayload) 
   if (!appendVisibleAssistantMessage(state, stamped)) {
     appendVisibleStreamedAssistantReply(state, speaker);
   }
+  appendTaskUpdateMessage(state, payload.taskUpdate);
   clearActiveChatRunState(state, payload.runId);
+}
+
+function appendTaskUpdateMessage(
+  state: Pick<ChatEventState, "chatMessages">,
+  taskUpdate: ChatEventPayload["taskUpdate"],
+) {
+  if (!taskUpdate || taskUpdate.type !== "task_update" || !taskUpdate.task) {
+    return;
+  }
+  const task = taskUpdate.task;
+  const taskId = typeof task.taskId === "string" ? task.taskId.trim() : "";
+  const agentId = typeof task.agentId === "string" ? task.agentId.trim() : "";
+  const outcomeVersion = task.outcomeVersion;
+  if (!taskId || !agentId || typeof outcomeVersion !== "number" || outcomeVersion < 1) {
+    return;
+  }
+  appendChatMessage(state, taskUpdate as unknown as Record<string, unknown>);
 }
 
 function handleAbortedChatEvent(state: ChatEventState, payload: ChatEventPayload) {

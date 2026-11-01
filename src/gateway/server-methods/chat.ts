@@ -116,6 +116,7 @@ import {
   readTextBlock,
 } from "../../shared/text/visible-message-text.js";
 import { enforceVisibleReplyLanguageFromCache } from "../../shared/text/visible-reply-language.js";
+import { resolveChatFinalTaskUpdate } from "../../task-outcome/chat-task-update.js";
 import {
   stripInlineDirectiveTagsForDisplay,
   stripInlineDirectiveTagsFromMessageForDisplay,
@@ -3230,6 +3231,7 @@ function broadcastChatFinal(params: {
   runId: string;
   sessionKey: string;
   message?: Record<string, unknown>;
+  taskUpdate?: ReturnType<typeof resolveChatFinalTaskUpdate>;
   /** Declaring bot. Collaboration space keys must not steal this from the group session. */
   deliverableAgentId?: string | null;
   deliverableOwnerId?: string | null;
@@ -3246,6 +3248,7 @@ function broadcastChatFinal(params: {
     seq,
     state: "final" as const,
     message: stripInlineDirectiveTagsFromMessageForDisplay(strippedEnvelopeMessage),
+    ...(params.taskUpdate ? { taskUpdate: params.taskUpdate } : {}),
   };
   const send = () => {
     params.context.broadcastChat(params.sessionKey, payload, {
@@ -4039,6 +4042,13 @@ async function runGroupBotDiscussionTurn(params: {
       const message = {
         ...(appended.ok && appended.message ? appended.message : finalMessage),
       };
+      const taskUpdate =
+        resolveChatFinalTaskUpdate({
+          cfg,
+          sessionKey,
+          runId,
+          agentId: params.bot.agentId,
+        }) ?? undefined;
       broadcastChatFinal({
         context: params.context,
         runId,
@@ -4047,6 +4057,7 @@ async function runGroupBotDiscussionTurn(params: {
         deliverableAgentId: params.bot.agentId,
         deliverableOwnerId,
         prepared,
+        taskUpdate,
       });
       void appendCollaborationExecutionRecord({
         groupId: params.scope.groupId,
@@ -6508,12 +6519,20 @@ export const chatHandlers: GatewayRequestHandlers = {
                 };
               }
             }
+            const taskUpdate =
+              resolveChatFinalTaskUpdate({
+                cfg,
+                sessionKey: resolvedSessionKey,
+                runId: clientRunId,
+                agentId,
+              }) ?? undefined;
             broadcastChatFinal({
               context,
               runId: clientRunId,
               sessionKey: resolvedSessionKey,
               message,
               prepared,
+              taskUpdate,
             });
           } else {
             // Agent run completed (tools may have edited workspace files): create
