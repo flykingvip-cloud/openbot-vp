@@ -4,6 +4,7 @@
 - Worktree: `/Users/daniel/.codex/worktrees/watchdog-task-closure/openbot`
 - Prior tip (card/todo visible, buttons incomplete): `b3e8ec1c8`
 - Tip (button fulfillment): `194634dde2b2e4cded46f274a807068dd1e513fd`
+- Tip (evidence refresh): `a2b8a4d4572689ccda2f41ab91e98521e7c1576c`
 - Zone: Asia/Shanghai (UTC+8)
 - Written: 2026-11-01 ~10:35 Asia/Shanghai
 
@@ -66,9 +67,9 @@ Result:
  ✓ human-attention-actions.integration.test.ts (6)
  ✓ watchdog-task-closure.test.ts (14)
  ✓ collab-s4-heartbeat-scheduler.test.ts (15)
- ✓ watchdog-task-closure.integration.test.ts (7)
+ ✓ watchdog-task-closure.integration.test.ts (9)
  Test Files  6 passed (6)
-      Tests  53 passed (53)
+      Tests  55 passed (55)
 ```
 
 Integration coverage includes:
