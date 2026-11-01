@@ -17,6 +17,10 @@ import type { OpenBotConfig } from "../config/config.js";
 import { createDiagnosisReportGatewayHandlers } from "../diagnosis/report-query-gateway.js";
 import type { TaskOutcomeEvidence } from "../diagnosis/task-outcome-evidence.js";
 import { resolveEvolutionTaskOutcomesPath } from "../gateway/agent-growth/evolution-task-outcomes.js";
+import { authorizeOperatorScopesForMethod } from "../gateway/method-scopes.js";
+import { listGatewayMethods } from "../gateway/server-methods-list.js";
+import { handleGatewayRequest } from "../gateway/server-methods.js";
+import { diagnosisReportsPack } from "../gateway/server-methods/diagnosis-reports.pack.js";
 import { createTaskOutcomeRejectHandlers } from "../gateway/server-methods/task-outcome-reject.js";
 import { taskOutcomeRejectPack } from "../gateway/server-methods/task-outcome-reject.pack.js";
 import { OutcomeConsumerRuntime } from "./consumers.js";
@@ -426,5 +430,133 @@ describe("structured task rejection and diagnosis read", () => {
       ok: false,
       code: "version_conflict",
     });
+  });
+
+  it("keeps explicit goal rewrites and refuses agentId as a writable path", async () => {
+    expect(
+      planInboundFeedbackDisposition("你是不是搞错了，应该是要让数字人调用这个 MCP").kind,
+    ).toBe("workspace_goal");
+    expect(planInboundFeedbackDisposition("请改为导出 csv").kind).toBe("workspace_goal");
+    expect(planInboundFeedbackDisposition("目标是把结果写成表格").kind).toBe("workspace_goal");
+    const workspace = tempDir("neg-goal-");
+    fs.mkdirSync(path.join(workspace, "memory"), { recursive: true });
+    const cfg = {} as OpenBotConfig;
+    const contextScope = resolveTaskContextScope({
+      cfg,
+      workspaceDir: workspace,
+      agentId: "bot",
+      sessionKey: "agent:bot:main",
+    });
+    const bound = await createTaskContext({
+      scope: contextScope,
+      title: "原目标",
+      description: "开源智能体平台对比",
+    });
+    const updated = await applyInboundTaskFeedback({
+      cfg,
+      workspaceDir: workspace,
+      agentId: "bot",
+      sessionKey: "agent:bot:main",
+      sessionEntry: { sessionId: "s1", updatedAt: 1, taskContextId: bound.id },
+      text: "你是不是搞错了，应该是要让数字人调用 github.com/gmood2008/tool 这个 MCP",
+      sourceMessageId: "m-goal-keep",
+    });
+    expect(updated.workspace).toBe("updated");
+    expect((await getTaskContext(contextScope, bound.id))?.description).toContain(
+      "github.com/gmood2008/tool",
+    );
+
+    const agentDir = tempDir("neg-agent-bound-");
+    const owned = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, "task-outcomes"));
+    closeSuccess(store, "task-owned");
+    store.close();
+    const outside = path.join(tempDir("neg-outside-"), "escaped");
+    const escaped = rejectTaskOutcomeResult({
+      cfg: owned,
+      agentId: "../../etc",
+      taskId: "task-owned",
+      outcomeVersion: 1,
+      callerSubjectRaw: "alice",
+    });
+    expect(escaped).toMatchObject({ ok: false, code: "agent_unresolved" });
+    expect(fs.existsSync(outside)).toBe(false);
+    const unknown = rejectTaskOutcomeResult({
+      cfg: owned,
+      agentId: "not-configured",
+      taskId: "task-owned",
+      outcomeVersion: 1,
+      callerSubjectRaw: "alice",
+    });
+    expect(unknown).toMatchObject({ ok: false, code: "agent_unresolved" });
+    expect(fs.existsSync(path.join(agentDir, "..", "not-configured"))).toBe(false);
+  });
+
+  it("registers the reject and diagnose methods and does not treat a body subject as authority", async () => {
+    expect(listGatewayMethods()).toContain("task.outcome.rejectResult");
+    expect(listGatewayMethods()).toContain("diagnosis.diagnose");
+    expect(diagnosisReportsPack.methods).toContain("diagnosis.diagnose");
+    expect(
+      authorizeOperatorScopesForMethod("task.outcome.rejectResult", ["operator.write"]),
+    ).toEqual({
+      allowed: true,
+    });
+    expect(
+      authorizeOperatorScopesForMethod("task.outcome.rejectResult", ["operator.read"]),
+    ).toEqual({
+      allowed: false,
+      missingScope: "operator.write",
+    });
+    const agentDir = tempDir("neg-gw-");
+    const cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, "task-outcomes"));
+    const closed = closeSuccess(store, "task-gw");
+    store.close();
+    const handlers = createTaskOutcomeRejectHandlers({
+      cfg,
+      resolveCaller: async (client) => ({
+        subjectRaw: client?.platformUserId?.trim() || "",
+        tenantId: "tenant-a",
+      }),
+    });
+    let spoofed: { ok?: boolean; code?: string } | undefined;
+    await handlers["task.outcome.rejectResult"]({
+      req: { type: "req", id: "spoof", method: "task.outcome.rejectResult" } as never,
+      params: {
+        taskId: "task-gw",
+        agentId: "bot",
+        outcomeVersion: closed.outcomeVersion,
+        subjectRef: "subject:alice",
+      },
+      client: { platformUserId: "mallory", user: "alice@example.com" } as never,
+      isWebchatConnect: () => false,
+      respond: (_ok, payload) => {
+        spoofed = payload as typeof spoofed;
+      },
+      context: {} as never,
+    });
+    expect(spoofed).toMatchObject({ ok: false, code: "unauthorized" });
+
+    const respond = (ok: boolean, payload?: unknown) => {
+      captured = { ok, payload };
+    };
+    let captured: { ok: boolean; payload?: unknown } | undefined;
+    await handleGatewayRequest({
+      req: {
+        type: "req",
+        id: "scope",
+        method: "task.outcome.rejectResult",
+      },
+      params: { taskId: "task-gw" },
+      respond,
+      client: {
+        connect: { role: "operator", scopes: ["operator.read"], minProtocol: 1, maxProtocol: 1 },
+        platformUserId: "alice",
+        sessionDomain: "enterprise",
+      } as never,
+      isWebchatConnect: () => false,
+      context: { logGateway: { warn: () => undefined, info: () => undefined } } as never,
+    });
+    expect(captured?.ok).toBe(false);
   });
 });

@@ -21,6 +21,7 @@ import { computeEvaluationEligibility } from "./eligibility.js";
 import {
   applyOutcomeVerifiedContributionKey,
   revokeOutcomeVerifiedContributionKey,
+  type OutcomeVerifiedCollaborationStores,
 } from "./experience-verified-counts.js";
 import type { DurableTaskOutcomeStore } from "./store.js";
 import { scopeIdOf } from "./transitions.js";
@@ -218,7 +219,11 @@ export async function applyExperienceVerification(
  * experience-verified consumer: adopted ∩ tip exposure → outcome_verified + curation.
  * Contribution metadata stays in contributions/experience-verified — never store.saveTask.
  */
-export function createExperienceVerifiedHandler(store: DurableTaskOutcomeStore): ConsumerHandler {
+export function createExperienceVerifiedHandler(
+  store: DurableTaskOutcomeStore,
+  opts?: { stores?: OutcomeVerifiedCollaborationStores },
+): ConsumerHandler {
+  const stores = opts?.stores;
   return {
     consumerId: EXPERIENCE_VERIFIED_CONSUMER_ID,
     onEvent: async (event: OutcomeOutboxEvent, record: TaskOutcomeRecord) => {
@@ -240,6 +245,7 @@ export function createExperienceVerifiedHandler(store: DurableTaskOutcomeStore):
             contributionKey: `${prev.contributionKey}:${scope.scopeId}`,
             scopeId: scope.scopeId,
             assetIds: scope.assetIds,
+            stores,
           });
         }
         return;
@@ -252,6 +258,7 @@ export function createExperienceVerifiedHandler(store: DurableTaskOutcomeStore):
             contributionKey: `${prev.contributionKey}:${scope.scopeId}`,
             scopeId: scope.scopeId,
             assetIds: scope.assetIds,
+            stores,
           });
         }
         saveExperienceVerifiedContribution(store, sid, {
@@ -273,6 +280,7 @@ export function createExperienceVerifiedHandler(store: DurableTaskOutcomeStore):
             contributionKey: `${prev.contributionKey}:${scope.scopeId}`,
             scopeId: scope.scopeId,
             assetIds: scope.assetIds,
+            stores,
           });
         }
       }
@@ -283,10 +291,12 @@ export function createExperienceVerifiedHandler(store: DurableTaskOutcomeStore):
           contributionKey: `${contributionKey}:${scope.scopeId}`,
           scopeId: scope.scopeId,
           assetIds: scope.assetIds,
+          stores,
         });
         curateLearningSkillDraftsSafely({
           scopeId: scope.scopeId,
           botId: scope.botId,
+          ...(stores ? { stores } : {}),
         });
         verifiedAssetIds.push(...applied.verifiedAssetIds);
       }

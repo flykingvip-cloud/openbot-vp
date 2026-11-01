@@ -3,9 +3,11 @@
  * Appends a correction version for one closed task the caller already owns.
  * Does not reopen execution, does not change judge, and does not write the workspace task.
  */
+import fs from "node:fs";
 import path from "node:path";
-import { resolveAgentDir } from "../agents/agent-scope.js";
+import { resolveAgentConfig, resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
+import { isValidAgentId } from "../routing/session-key.js";
 import { TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { normalizeTaskOutcomeSubjectRef } from "./subject-ref.js";
@@ -16,6 +18,7 @@ export const REJECT_RESULT_REASON = "结果不符合要求";
 
 export type RejectTaskOutcomeCode =
   | "unauthorized"
+  | "agent_unresolved"
   | "not_found"
   | "not_a_closed_result"
   | "version_conflict"
@@ -48,6 +51,28 @@ export function callerOwnsTaskOutcome(params: {
   return true;
 }
 
+/**
+ * Client agentId selects a directory only when it is a configured agent id.
+ * Unknown ids, path fragments, and missing stores do not create directories.
+ */
+export function resolveConfiguredTaskOutcomeRoot(
+  cfg: OpenBotConfig,
+  agentId: string,
+): { ok: true; root: string } | { ok: false; code: "agent_unresolved" | "not_found" } {
+  const raw = agentId.trim();
+  if (!isValidAgentId(raw) || raw.includes("/") || raw.includes("\\") || raw.includes("..")) {
+    return { ok: false, code: "agent_unresolved" };
+  }
+  if (!resolveAgentConfig(cfg, raw)) {
+    return { ok: false, code: "agent_unresolved" };
+  }
+  const root = path.join(resolveAgentDir(cfg, raw), TASK_OUTCOME_STORE_DIRNAME);
+  if (!fs.existsSync(root)) {
+    return { ok: false, code: "not_found" };
+  }
+  return { ok: true, root };
+}
+
 export function rejectTaskOutcomeResult(input: {
   cfg: OpenBotConfig;
   agentId: string;
@@ -63,8 +88,11 @@ export function rejectTaskOutcomeResult(input: {
   if (!agentId || !taskId || !callerSubjectRef || !Number.isInteger(input.outcomeVersion)) {
     return { ok: false, code: "unauthorized" };
   }
-  const root = path.join(resolveAgentDir(input.cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
-  const store = new DurableTaskOutcomeStore(root);
+  const located = resolveConfiguredTaskOutcomeRoot(input.cfg, agentId);
+  if (!located.ok) {
+    return { ok: false, code: located.code };
+  }
+  const store = new DurableTaskOutcomeStore(located.root);
   try {
     const current = store.loadTask(taskId);
     if (!current) {
