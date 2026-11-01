@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -23,15 +23,92 @@ import {
 const DIGEST_A = `sha256:${"a".repeat(64)}`;
 const DIGEST_B = `sha256:${"b".repeat(64)}`;
 
+type AncestryStubOptions = {
+  /** SHAs that `cat-file -t` should treat as missing. */
+  missing?: string[];
+  /** When true, `rev-parse --is-shallow-repository` → true. */
+  shallow?: boolean;
+  /** tip → declared parents that are missing as objects (incomplete graph). */
+  missingParents?: Record<string, string[]>;
+  /** tip → declared parents that exist (defaults to root / no parents). */
+  parents?: Record<string, string[]>;
+};
+
 /** Ancestry stub: `contains[child]` lists every commit reachable from `child`. */
-function ancestryRunner(contains: Record<string, string[]>): GitRunner {
+function ancestryRunner(
+  contains: Record<string, string[]>,
+  options: AncestryStubOptions = {},
+): GitRunner {
+  const known = new Set<string>();
+  for (const [child, ancestors] of Object.entries(contains)) {
+    known.add(child);
+    for (const a of ancestors) {
+      known.add(a);
+    }
+  }
+  for (const parents of Object.values(options.parents ?? {})) {
+    for (const p of parents) {
+      known.add(p);
+    }
+  }
+  const missing = new Set(options.missing ?? []);
+
   return (args) => {
+    if (args[0] === "cat-file" && args[1] === "-t") {
+      const sha = args[2] ?? "";
+      if (missing.has(sha)) {
+        return { code: 128, stdout: "", stderr: "fatal: Not a valid object name" };
+      }
+      if (known.has(sha)) {
+        return { code: 0, stdout: "commit\n" };
+      }
+      // Unknown short SHAs used only as "dropped" priors in regression fixtures still need
+      // to exist so classification reaches the regression branch (complete graph).
+      if (sha.length > 0 && !missing.has(sha)) {
+        known.add(sha);
+        return { code: 0, stdout: "commit\n" };
+      }
+      return { code: 128, stdout: "", stderr: "fatal: Not a valid object name" };
+    }
+
+    if (args[0] === "rev-parse" && args[1] === "--is-shallow-repository") {
+      return { code: 0, stdout: options.shallow ? "true\n" : "false\n" };
+    }
+
+    if (args[0] === "rev-list" && args[1] === "--parents" && args[2] === "-n" && args[3] === "1") {
+      const sha = args[4] ?? "";
+      if (missing.has(sha) || !sha) {
+        return { code: 128, stdout: "", stderr: "fatal" };
+      }
+      const declaredMissing = options.missingParents?.[sha] ?? [];
+      const presentParents = options.parents?.[sha] ?? [];
+      const line = [sha, ...presentParents, ...declaredMissing].join(" ");
+      return { code: 0, stdout: `${line}\n` };
+    }
+
     if (args[0] === "merge-base" && args[1] === "--is-ancestor") {
       const [, , parent, child] = args;
+      if (missing.has(parent ?? "") || missing.has(child ?? "")) {
+        return { code: 128, stdout: "", stderr: "fatal: Not a valid object name" };
+      }
       const reachable = contains[child ?? ""] ?? [];
       const ok = parent === child || reachable.includes(parent ?? "");
       return { code: ok ? 0 : 1, stdout: "" };
     }
+
+    if (args[0] === "merge-base") {
+      const a = args[1] ?? "";
+      const b = args[2] ?? "";
+      if (options.shallow) {
+        return { code: 1, stdout: "" };
+      }
+      const reachableB = contains[b] ?? [];
+      if (a === b || reachableB.includes(a) || (contains[a] ?? []).includes(b)) {
+        return { code: 0, stdout: `${a}\n` };
+      }
+      return { code: 1, stdout: "" };
+    }
+
     return { code: 1, stdout: "" };
   };
 }
@@ -202,6 +279,212 @@ describe("auditLedger", () => {
     const regression = audit.findings.find((f) => f.code === "regression");
     expect(regression?.severity).toBe("warning");
     expect(regression?.message).toContain("acknowledged");
+  });
+
+  it("flags missing tip objects as missing-object, not regression", () => {
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: "c1",
+        uiSha: "c1",
+        imageTag: "rc-amd64-provenance-c1",
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({ seq: 2, gatewaySha: "c2", uiSha: "c2", imageTag: "rc-amd64-provenance-c2" }),
+    ];
+    const audit = auditLedger(rows, ancestryRunner({ c2: ["c1"] }, { missing: ["c1"] }));
+    expect(audit.ok).toBe(false);
+    expect(audit.findings.some((f) => f.code === "missing-object")).toBe(true);
+    expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+  });
+
+  it("flags shallow graphs as incomplete-graph even when merge-base would succeed", () => {
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: "c1",
+        uiSha: "c1",
+        imageTag: "rc-amd64-provenance-c1",
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({ seq: 2, gatewaySha: "c9", uiSha: "c9", imageTag: "rc-amd64-provenance-c9" }),
+    ];
+    // ancestors empty → not forward; stub merge-base still returns a base when not shallow,
+    // but shallow must stay incomplete regardless.
+    const audit = auditLedger(
+      rows,
+      ancestryRunner({ c9: [] }, { shallow: true, parents: { c9: ["c0"], c1: ["c0"] } }),
+    );
+    expect(audit.ok).toBe(false);
+    const finding = audit.findings.find((f) => f.code === "incomplete-graph");
+    expect(finding).toBeDefined();
+    expect(finding?.message).toMatch(/shallow|truncation|current object graph/i);
+    expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+  });
+
+  it("flags missing immediate parents as incomplete-graph", () => {
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: "c1",
+        uiSha: "c1",
+        imageTag: "rc-amd64-provenance-c1",
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({ seq: 2, gatewaySha: "c9", uiSha: "c9", imageTag: "rc-amd64-provenance-c9" }),
+    ];
+    const audit = auditLedger(
+      rows,
+      ancestryRunner(
+        { c9: [] },
+        { missingParents: { c1: ["deadparent01"] }, missing: ["deadparent01"] },
+      ),
+    );
+    expect(audit.ok).toBe(false);
+    expect(audit.findings.some((f) => f.code === "incomplete-graph")).toBe(true);
+    expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+  });
+
+  it("aggregates gateway/UI candidates so missing-object outranks an earlier regression", () => {
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: "prior1",
+        uiSha: "prior1",
+        imageTag: "rc-amd64-provenance-prior1",
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({
+        seq: 2,
+        gatewaySha: "gw",
+        uiSha: "ui",
+        imageTag: "rc-amd64-provenance-ui",
+      }),
+    ];
+    // gw: complete non-ancestor → would be regression; ui: missing tip → missing-object.
+    // First candidate is gw; aggregation must still surface the unknown.
+    const audit = auditLedger(
+      rows,
+      ancestryRunner({ gw: [], ui: ["prior1"] }, { missing: ["ui"] }),
+    );
+    expect(audit.ok).toBe(false);
+    expect(audit.findings.some((f) => f.code === "missing-object")).toBe(true);
+    expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+  });
+
+  it("aggregates incomplete-graph over regression across overlay candidates", () => {
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: "prior1",
+        uiSha: "prior1",
+        imageTag: "rc-amd64-provenance-prior1",
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({
+        seq: 2,
+        gatewaySha: "gw",
+        uiSha: "ui",
+        imageTag: "rc-amd64-provenance-ui",
+      }),
+    ];
+    const audit = auditLedger(rows, ancestryRunner({ gw: [], ui: [] }, { shallow: true }));
+    expect(audit.ok).toBe(false);
+    expect(audit.findings.some((f) => f.code === "incomplete-graph")).toBe(true);
+    expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+  });
+
+  it("real git fixture keeps unknown as ERROR (exit-30 posture)", () => {
+    const root = mkdtempSync(join(tmpdir(), "openbot-ledger-classify-real-"));
+    const run = (cwd: string, args: string[]) => {
+      const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+      if ((result.status ?? 1) !== 0) {
+        throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
+      }
+    };
+    run(root, ["init", "-b", "main"]);
+    run(root, ["config", "user.email", "test@example.com"]);
+    run(root, ["config", "user.name", "test"]);
+    writeFileSync(join(root, "a.txt"), "a\n");
+    run(root, ["add", "a.txt"]);
+    run(root, ["commit", "-m", "root"]);
+    run(root, ["checkout", "-b", "side"]);
+    writeFileSync(join(root, "b.txt"), "b\n");
+    run(root, ["add", "b.txt"]);
+    run(root, ["commit", "-m", "side"]);
+    const side = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).stdout.trim();
+    run(root, ["checkout", "main"]);
+    writeFileSync(join(root, "c.txt"), "c\n");
+    run(root, ["add", "c.txt"]);
+    run(root, ["commit", "-m", "mainline"]);
+    const main = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).stdout.trim();
+
+    const shallow = mkdtempSync(join(tmpdir(), "openbot-ledger-classify-shallow-"));
+    const clone = spawnSync("git", ["clone", "--depth=1", root, shallow], { encoding: "utf8" });
+    expect(clone.status).toBe(0);
+    const fetch = spawnSync("git", ["fetch", "--depth=1", "origin", side], {
+      cwd: shallow,
+      encoding: "utf8",
+    });
+    expect(fetch.status).toBe(0);
+
+    const git: GitRunner = (args) => {
+      const result = spawnSync("git", args, { cwd: shallow, encoding: "utf8" });
+      return { code: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+    };
+
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: side,
+        uiSha: side,
+        imageTag: "rc-amd64-provenance-" + side.slice(0, 12),
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({
+        seq: 2,
+        gatewaySha: main,
+        uiSha: main,
+        imageTag: "rc-amd64-provenance-" + main.slice(0, 12),
+      }),
+    ];
+    const audit = auditLedger(rows, git);
+    expect(audit.ok).toBe(false);
+    expect(
+      audit.findings.some((f) => f.code === "incomplete-graph" && f.severity === "error"),
+    ).toBe(true);
+    expect(audit.findings.some((f) => f.code === "regression")).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+    rmSync(shallow, { recursive: true, force: true });
+  });
+
+  it("does not let regressionAcknowledged clear missing-object or incomplete-graph", () => {
+    const rows = [
+      row({
+        seq: 1,
+        gatewaySha: "c1",
+        uiSha: "c1",
+        imageTag: "rc-amd64-provenance-c1",
+        liveTo: "2026-07-27T01:00:00Z",
+      }),
+      row({
+        seq: 2,
+        gatewaySha: "c2",
+        uiSha: "c2",
+        imageTag: "rc-amd64-provenance-c2",
+        regressionAcknowledged: "should not clear missing-object",
+      }),
+    ];
+    const audit = auditLedger(rows, ancestryRunner({ c2: ["c1"] }, { missing: ["c1"] }));
+    expect(audit.ok).toBe(false);
+    const finding = audit.findings.find((f) => f.code === "missing-object");
+    expect(finding?.severity).toBe("error");
   });
 
   it("flags an image tag that does not name either shipped commit", () => {
@@ -690,7 +973,7 @@ describe("repaired ledger warning profile", () => {
     expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
   });
 
-  it("production releases.jsonl Path B SoT reaches seq145 tip 065840dfba12", () => {
+  it("production releases.jsonl Path B SoT reaches seq151 tip d37bed5117d6", () => {
     const text = readFileSync("deploy/production/releases.jsonl", "utf8");
     const { rows, errors } = parseLedger(text);
     expect(errors).toEqual([]);
@@ -702,11 +985,10 @@ describe("repaired ledger warning profile", () => {
     // Path B SoT structure (history rewrite means many gatewaySha values are no longer
     // in this GitHub repo, so ancestry regression ERRORs are expected delivery debt).
     expect(rows.length).toBeGreaterThanOrEqual(142);
-    expect(Math.max(...rows.map((r) => r.seq))).toBe(145);
-    // Historical debt: seq 127 never received liveTo. Tip seq 145 is the Path B LIVE open row.
-    // Dual-open remains an audit error until seq 127 is closed with an authentic stop time.
-    expect(rows.filter((r) => r.liveTo === undefined).map((r) => r.seq)).toEqual([127, 145]);
-    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(true);
+    expect(Math.max(...rows.map((r) => r.seq))).toBe(151);
+    // #172 closed seq 127 liveTo with successor-StartedAt attestation; sole open tip is seq 151.
+    expect(rows.filter((r) => r.liveTo === undefined).map((r) => r.seq)).toEqual([151]);
+    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
     expect(audit.findings.some((f) => f.seq === 1 && f.code === "missing-tag")).toBe(true);
     expect(audit.findings.some((f) => f.code === "overlay-debt")).toBe(true);
     // seq 99-102 were backfilled from host metadata; their real stop times keep the
@@ -812,14 +1094,63 @@ describe("repaired ledger warning profile", () => {
       "sha256:8fd6d63213f53ce22d59f4ce6c9c7d11a52c4db708c74eb3aa7348f4a2dfd193",
     );
     expect(rows.find((r) => r.seq === 145)?.liveFrom).toBe("2026-10-25T10:45:47.391Z");
-    expect(rows.find((r) => r.seq === 145)?.liveTo).toBeUndefined();
+    expect(rows.find((r) => r.seq === 145)?.liveTo).toBe("2026-10-29T14:14:38.692Z");
     expect(rows.find((r) => r.seq === 145)?.gatewaySha).toBe(
       "065840dfba129475c9c9030c80af07970dcdd084",
     );
     expect(rows.find((r) => r.seq === 145)?.artifactDigest).toBe(
       "sha256:ef333624c09bb2e5e43158871e768f74a046a472fcda63bdf68eb79a1a637918",
     );
-    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(true);
+    expect(rows.find((r) => r.seq === 146)?.liveFrom).toBe("2026-10-29T14:14:38.692Z");
+    expect(rows.find((r) => r.seq === 146)?.liveTo).toBe("2026-10-30T03:41:25.843Z");
+    expect(rows.find((r) => r.seq === 146)?.gatewaySha).toBe(
+      "0a6daead74ab08f85edfe5e61b18eb49289c43cc",
+    );
+    expect(rows.find((r) => r.seq === 146)?.artifactDigest).toBe(
+      "sha256:5a5f92aab93a7b61118f53667b9b9c3f0bd442786fa674fd64807f6fc7002869",
+    );
+    expect(rows.find((r) => r.seq === 147)?.liveFrom).toBe("2026-10-30T03:41:25.843Z");
+    expect(rows.find((r) => r.seq === 147)?.liveTo).toBe("2026-10-30T06:59:55.083Z");
+    expect(rows.find((r) => r.seq === 147)?.gatewaySha).toBe(
+      "d632f4627a158e079dc21810fdb15e17ac440119",
+    );
+    expect(rows.find((r) => r.seq === 147)?.artifactDigest).toBe(
+      "sha256:951a99b1209c22cf30598e3f0ed9b34b698d1b969157110c717beaf09c9cc981",
+    );
+    expect(rows.find((r) => r.seq === 148)?.liveFrom).toBe("2026-10-30T06:59:55.083Z");
+    expect(rows.find((r) => r.seq === 148)?.liveTo).toBe("2026-10-30T13:57:38.488Z");
+    expect(rows.find((r) => r.seq === 148)?.gatewaySha).toBe(
+      "3a391742f2603bc80d42ad3d4258e047224da352",
+    );
+    expect(rows.find((r) => r.seq === 148)?.artifactDigest).toBe(
+      "sha256:63028750c24890e6393b3a2f1a2fad02ea2c71236742b2ac6210ae084104bde8",
+    );
+    expect(rows.find((r) => r.seq === 149)?.liveFrom).toBe("2026-10-30T13:57:38.488Z");
+    expect(rows.find((r) => r.seq === 149)?.liveTo).toBe("2026-10-30T22:56:48.458Z");
+    expect(rows.find((r) => r.seq === 149)?.gatewaySha).toBe(
+      "b31c1e12ea341d4d42211ec072f8b24b29b6727a",
+    );
+    expect(rows.find((r) => r.seq === 149)?.artifactDigest).toBe(
+      "sha256:12cf98adb47379477a8f2edff65962975a087f5d47fd4a38a41ace9da1365c91",
+    );
+    expect(rows.find((r) => r.seq === 150)?.liveFrom).toBe("2026-10-30T22:56:48.458Z");
+    expect(rows.find((r) => r.seq === 150)?.liveTo).toBe("2026-10-31T03:21:00.871Z");
+    expect(rows.find((r) => r.seq === 150)?.gatewaySha).toBe(
+      "66bad421c9bb74ccfd6234fc3e003aaa67ce798a",
+    );
+    expect(rows.find((r) => r.seq === 150)?.artifactDigest).toBe(
+      "sha256:baff3fa97596e284681a62f2d27523d0dded5b7ebcfba7ea8875bfec97ce684d",
+    );
+    expect(rows.find((r) => r.seq === 151)?.liveFrom).toBe("2026-10-31T03:21:00.871Z");
+    expect(rows.find((r) => r.seq === 151)?.liveTo).toBeUndefined();
+    expect(rows.find((r) => r.seq === 151)?.gatewaySha).toBe(
+      "d37bed5117d6969e5ad0ee47b32e4efa8b6d715a",
+    );
+    expect(rows.find((r) => r.seq === 151)?.artifactDigest).toBe(
+      "sha256:09c9b4c0db843c8b977f21cc0e5fb78c43ab408dbd633cda9e41573756442c48",
+    );
+    // Sole open tip (seq 151) is allowed; dual-open was cleared by #172.
+    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
     expect(rows.filter((r) => r.seq >= 99 && r.seq <= 103).map((r) => r.executor)).toEqual(
       Array(5).fill("cursor"),
     );

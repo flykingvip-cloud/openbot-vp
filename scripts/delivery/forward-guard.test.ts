@@ -7,6 +7,8 @@ import {
   decideDelivery,
   detectRegressedPaths,
   isForwardOnly,
+  classifyAncestry,
+  objectExists,
   type GitRunner,
 } from "./forward-guard.js";
 
@@ -187,5 +189,140 @@ describe("delivery forward guard", () => {
     expect(decision.regressions.deleted).toContain(
       "src/gateway/user-modeling/tenant-membership.ts",
     );
+  });
+});
+
+describe("classifyAncestry", () => {
+  it("returns missing-object when a tip is absent", () => {
+    const git = ((args: string[]) => {
+      if (args[0] === "cat-file" && args[1] === "-t") {
+        return {
+          code: args[2] === "missing" ? 128 : 0,
+          stdout: args[2] === "missing" ? "" : "commit\n",
+        };
+      }
+      return { code: 1, stdout: "" };
+    }) as import("./forward-guard.js").GitRunner;
+    expect(objectExists("present", git)).toBe(true);
+    expect(classifyAncestry("missing", "present", git).kind).toBe("missing-object");
+  });
+});
+
+describe("classifyAncestry real git fixtures", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  function runGit(cwd: string, args: string[]): void {
+    execFileSync("git", args, { cwd, stdio: "ignore" });
+  }
+
+  function gitRunner(cwd: string): GitRunner {
+    return (args) => {
+      const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+      return {
+        code: result.status ?? 1,
+        stdout: result.stdout ?? "",
+        stderr: result.stderr ?? "",
+      };
+    };
+  }
+
+  it("real git: shallow non-ancestor stays incomplete-graph (even with merge-base)", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-classify-shallow-"));
+    dirs.push(root);
+    runGit(root, ["init", "-b", "main"]);
+    runGit(root, ["config", "user.email", "test@example.com"]);
+    runGit(root, ["config", "user.name", "test"]);
+    // Local clones need an identified HEAD branch for fetch.
+    runGit(root, ["config", "receive.denyCurrentBranch", "ignore"]);
+    fs.writeFileSync(path.join(root, "a.txt"), "a\n");
+    runGit(root, ["add", "a.txt"]);
+    runGit(root, ["commit", "-m", "root"]);
+
+    runGit(root, ["checkout", "-b", "side"]);
+    fs.writeFileSync(path.join(root, "b.txt"), "b\n");
+    runGit(root, ["add", "b.txt"]);
+    runGit(root, ["commit", "-m", "side"]);
+    const sideSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+
+    runGit(root, ["checkout", "main"]);
+    fs.writeFileSync(path.join(root, "c.txt"), "c\n");
+    runGit(root, ["add", "c.txt"]);
+    runGit(root, ["commit", "-m", "mainline"]);
+    const mainSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+
+    const shallow = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-classify-shallow-clone-"));
+    dirs.push(shallow);
+    execFileSync("git", ["clone", "--depth=1", root, shallow], { stdio: "ignore" });
+    execFileSync("git", ["fetch", "--depth=1", "origin", sideSha], {
+      cwd: shallow,
+      stdio: "ignore",
+    });
+
+    const git = gitRunner(shallow);
+    const shallowFlag = git(["rev-parse", "--is-shallow-repository"]);
+    expect(shallowFlag.stdout.trim()).toBe("true");
+    // Even if merge-base resolves, shallow must not adjudicate regression.
+    const mb = git(["merge-base", sideSha, mainSha]);
+    void mb;
+    const verdict = classifyAncestry(sideSha, mainSha, git);
+    expect(verdict.kind).toBe("incomplete-graph");
+  });
+
+  it("real git: full non-ancestor is regression", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-classify-full-"));
+    dirs.push(root);
+    runGit(root, ["init", "-b", "main"]);
+    runGit(root, ["config", "user.email", "test@example.com"]);
+    runGit(root, ["config", "user.name", "test"]);
+    fs.writeFileSync(path.join(root, "a.txt"), "a\n");
+    runGit(root, ["add", "a.txt"]);
+    runGit(root, ["commit", "-m", "root"]);
+
+    runGit(root, ["checkout", "-b", "side"]);
+    fs.writeFileSync(path.join(root, "b.txt"), "b\n");
+    runGit(root, ["add", "b.txt"]);
+    runGit(root, ["commit", "-m", "side"]);
+    const sideSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+
+    runGit(root, ["checkout", "main"]);
+    fs.writeFileSync(path.join(root, "c.txt"), "c\n");
+    runGit(root, ["add", "c.txt"]);
+    runGit(root, ["commit", "-m", "mainline"]);
+    const mainSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+
+    const git = gitRunner(root);
+    expect(classifyAncestry(sideSha, mainSha, git).kind).toBe("regression");
+  });
+
+  it("real git: missing tip is missing-object", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-classify-missing-"));
+    dirs.push(root);
+    runGit(root, ["init", "-b", "main"]);
+    runGit(root, ["config", "user.email", "test@example.com"]);
+    runGit(root, ["config", "user.name", "test"]);
+    fs.writeFileSync(path.join(root, "a.txt"), "a\n");
+    runGit(root, ["add", "a.txt"]);
+    runGit(root, ["commit", "-m", "root"]);
+    const tip = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const git = gitRunner(root);
+    const missing = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+    expect(classifyAncestry(missing, tip, git).kind).toBe("missing-object");
   });
 });

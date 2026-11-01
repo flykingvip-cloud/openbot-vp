@@ -18,7 +18,7 @@
 // their original fields. `schemaVersion: 2` rows identify the running artifact by
 // `artifactDigest` + recorded build-info SHAs, not by parsing `imageTag`.
 
-import { isForwardOnly, type GitRunner } from "./forward-guard.ts";
+import { classifyAncestry, type GitRunner } from "./forward-guard.ts";
 
 export const ARTIFACT_KINDS = ["image", "dist-overlay"] as const;
 export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
@@ -213,6 +213,8 @@ export type LedgerFinding = {
     | "duplicate-seq"
     | "out-of-order"
     | "regression"
+    | "missing-object"
+    | "incomplete-graph"
     | "overlay-debt"
     | "identity-mismatch"
     | "missing-tag"
@@ -372,9 +374,32 @@ function auditIdentity(row: ReleaseRow, findings: LedgerFinding[]): void {
   }
 }
 
+/** Rank non-forward ancestry classes: unknowns before proven regression. */
+function preferNonForwardAncestry(
+  current: ReturnType<typeof classifyAncestry> | null,
+  next: ReturnType<typeof classifyAncestry>,
+): ReturnType<typeof classifyAncestry> {
+  if (current === null || current.kind === "forward") {
+    return next;
+  }
+  const rank = (kind: string): number => {
+    switch (kind) {
+      case "missing-object":
+        return 0;
+      case "incomplete-graph":
+        return 1;
+      case "regression":
+        return 2;
+      default:
+        return 3;
+    }
+  };
+  return rank(next.kind) < rank(current.kind) ? next : current;
+}
+
 /**
  * Audits the ledger. `git` is injected so this is testable without a real repo, and so the
- * ancestry rule reuses `isForwardOnly` rather than reimplementing it.
+ * ancestry rule reuses `classifyAncestry` (object-complete then forward-only) rather than reimplementing it.
  */
 export function auditLedger(rows: ReleaseRow[], git: GitRunner): LedgerAudit {
   const findings: LedgerFinding[] = [];
@@ -441,18 +466,53 @@ export function auditLedger(rows: ReleaseRow[], git: GitRunner): LedgerAudit {
       continue;
     }
     for (const priorSha of shippedShas(previous)) {
-      const stillPresent = shippedShas(row).some((sha) => isForwardOnly(priorSha, sha, git));
-      if (!stillPresent) {
-        const acknowledged = row.regressionAcknowledged?.trim();
-        findings.push({
-          severity: acknowledged ? "warning" : "error",
-          seq: row.seq,
-          code: "regression",
-          message: acknowledged
-            ? `drops ${priorSha.slice(0, 12)} which release ${previous.seq} had live (acknowledged: ${acknowledged})`
-            : `drops ${priorSha.slice(0, 12)} which release ${previous.seq} had live`,
-        });
+      // Prefer any current tip that still contains prior (forward). Otherwise aggregate
+      // gateway/UI candidates: unknown (missing-object / incomplete-graph) outranks
+      // regression so a later unknown cannot be discarded after an early regression.
+      const currentShas = shippedShas(row);
+      let classified: ReturnType<typeof classifyAncestry> | null = null;
+      for (const sha of currentShas) {
+        const result = classifyAncestry(priorSha, sha, git);
+        if (result.kind === "forward") {
+          classified = result;
+          break;
+        }
+        classified = preferNonForwardAncestry(classified, result);
       }
+      if (classified === null || classified.kind === "forward") {
+        continue;
+      }
+
+      if (classified.kind === "missing-object") {
+        const tips = classified.missing.map((s) => s.slice(0, 12)).join(", ");
+        findings.push({
+          severity: "error",
+          seq: row.seq,
+          code: "missing-object",
+          message: `cannot adjudicate whether ${priorSha.slice(0, 12)} (release ${previous.seq}) is still live: missing object(s) ${tips} under the current object graph`,
+        });
+        continue;
+      }
+
+      if (classified.kind === "incomplete-graph") {
+        findings.push({
+          severity: "error",
+          seq: row.seq,
+          code: "incomplete-graph",
+          message: `cannot prove ancestry for ${priorSha.slice(0, 12)} from release ${previous.seq}: ${classified.reason}`,
+        });
+        continue;
+      }
+
+      const acknowledged = row.regressionAcknowledged?.trim();
+      findings.push({
+        severity: acknowledged ? "warning" : "error",
+        seq: row.seq,
+        code: "regression",
+        message: acknowledged
+          ? `drops ${priorSha.slice(0, 12)} which release ${previous.seq} had live (acknowledged: ${acknowledged})`
+          : `drops ${priorSha.slice(0, 12)} which release ${previous.seq} had live`,
+      });
     }
   }
 

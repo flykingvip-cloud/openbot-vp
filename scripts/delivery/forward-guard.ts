@@ -24,6 +24,97 @@ export function isForwardOnly(live: string, candidate: string, git: GitRunner): 
   return git(["merge-base", "--is-ancestor", live, candidate]).code === 0;
 }
 
+/** True when `git cat-file -t <sha>` succeeds (object present in the current object store). */
+export function objectExists(sha: string, git: GitRunner): boolean {
+  return git(["cat-file", "-t", sha]).code === 0;
+}
+
+/** True when `git rev-parse --is-shallow-repository` reports true. */
+export function isShallowRepository(git: GitRunner): boolean {
+  const result = git(["rev-parse", "--is-shallow-repository"]);
+  return result.code === 0 && result.stdout.trim() === "true";
+}
+
+/**
+ * Immediate parents of `sha` that are declared by the commit but missing as objects.
+ * Empty array means parents are present (or the commit is a root). Null means the tip
+ * itself could not be listed (treat as incomplete).
+ */
+export function missingImmediateParents(sha: string, git: GitRunner): string[] | null {
+  const listed = git(["rev-list", "--parents", "-n", "1", sha]);
+  if (listed.code !== 0) {
+    return null;
+  }
+  const parts = listed.stdout.trim().split(/\s+/).filter(Boolean);
+  // parts[0] is the tip; the rest are parents
+  const parents = parts.slice(1);
+  return parents.filter((parent) => !objectExists(parent, git));
+}
+
+export type AncestryClass =
+  | { kind: "forward" }
+  | { kind: "missing-object"; missing: string[] }
+  | { kind: "incomplete-graph"; reason: string }
+  | { kind: "regression" };
+
+/**
+ * Classify whether `prior` is still contained in `current` under the *current* object graph.
+ * Missing tips and shallow/parent truncation must not be labeled as proven regression.
+ */
+export function classifyAncestry(prior: string, current: string, git: GitRunner): AncestryClass {
+  const missing: string[] = [];
+  if (!objectExists(prior, git)) {
+    missing.push(prior);
+  }
+  if (!objectExists(current, git)) {
+    missing.push(current);
+  }
+  if (missing.length > 0) {
+    return { kind: "missing-object", missing };
+  }
+
+  const ancestorProbe = git(["merge-base", "--is-ancestor", prior, current]);
+  if (ancestorProbe.code === 0) {
+    return { kind: "forward" };
+  }
+  // Git uses 128 for fatal (e.g. mid-object issues); never call that a proven regression.
+  if (ancestorProbe.code !== 0 && ancestorProbe.code !== 1) {
+    return {
+      kind: "incomplete-graph",
+      reason: `merge-base --is-ancestor exited ${ancestorProbe.code} under the current object graph`,
+    };
+  }
+
+  const priorParents = missingImmediateParents(prior, git);
+  const currentParents = missingImmediateParents(current, git);
+  if (priorParents === null || currentParents === null) {
+    return {
+      kind: "incomplete-graph",
+      reason: "could not list immediate parents under the current object graph",
+    };
+  }
+  if (priorParents.length > 0 || currentParents.length > 0) {
+    const samples = [...priorParents, ...currentParents].slice(0, 3).map((s) => s.slice(0, 12));
+    return {
+      kind: "incomplete-graph",
+      reason: `immediate parent object(s) missing (${samples.join(", ")}) under the current object graph`,
+    };
+  }
+
+  // Shallow stores can yield false non-ancestor even when merge-base succeeds:
+  // parent-chain truncation along either tip has not been ruled out, so never
+  // adjudicate a proven regression until the graph is deepened.
+  if (isShallowRepository(git)) {
+    return {
+      kind: "incomplete-graph",
+      reason:
+        "shallow repository; related parent-chain truncation not ruled out under the current object graph",
+    };
+  }
+
+  return { kind: "regression" };
+}
+
 function uniqueSortedPaths(output: string): string[] {
   return [
     ...new Set(
