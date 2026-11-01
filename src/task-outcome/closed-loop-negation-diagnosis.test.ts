@@ -23,7 +23,7 @@ import { OutcomeConsumerRuntime } from "./consumers.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { planInboundFeedbackDisposition } from "./feedback-disposition.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
-import { rejectTaskOutcomeResult } from "./reject-result.js";
+import { callerOwnsTaskOutcome, rejectTaskOutcomeResult } from "./reject-result.js";
 import { TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import type { TrustedScope } from "./types.js";
@@ -173,6 +173,33 @@ describe("structured task rejection and diagnosis read", () => {
     });
     expect(goal.workspace).toBe("updated");
     expect(goal.disposition.kind).toBe("workspace_goal");
+
+    expect(
+      callerOwnsTaskOutcome({
+        scope: {
+          kind: "enterprise",
+          enterpriseDomainId: "enterprise:t1",
+          tenantId: "t1",
+          subjectRef: "subject:alice",
+          authzScopeRef: "scope:isolation",
+        },
+        callerSubjectRef: "subject:alice",
+        callerTenantId: "t2",
+      }),
+    ).toBe(false);
+    expect(
+      callerOwnsTaskOutcome({
+        scope: {
+          kind: "enterprise",
+          enterpriseDomainId: "enterprise:t1",
+          tenantId: "t1",
+          subjectRef: "subject:alice",
+          authzScopeRef: "scope:isolation",
+        },
+        callerSubjectRef: "subject:alice",
+        callerTenantId: "t1",
+      }),
+    ).toBe(true);
 
     const stranger = rejectTaskOutcomeResult({
       cfg,
