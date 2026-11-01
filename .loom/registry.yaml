@@ -10208,7 +10208,40 @@ tasks:
     ownerHistory: []
     since: 2026-10-31
     metadata: {}
+  - id: closed-loop-isolation-contract:cursor-closed-loop-490b
+    owner: cursor-closed-loop-490b
+    intent:
+      - Isolation verification and contract freeze; no production behavior change
+    paths:
+      - docs/audits/2026-11-01-closed-loop-isolation-contract.md
+      - .kiro/specs/closed-loop-isolation-contract/**
+      - src/task-outcome/closed-loop-isolation-contract.test.ts
+      - src/task-outcome/closed-loop-isolation-restart-child.ts
+    state: active
+    sessions:
+      - id: 02dd5c3c-9e50-4cb8-ac0d-75e5ba88cab9
+        taskId: closed-loop-isolation-contract:cursor-closed-loop-490b
+        ide: cursor
+        agent: cursor-closed-loop-490b
+        status: active
+        lastSignalAt: 2026-11-01T04:03:24.215Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-01
+    metadata: {}
 landingStreams:
+  - id: closed-loop-isolation-contract-20261101
+    landingPolicy: serial
+    paths:
+      - docs/audits/2026-11-01-closed-loop-isolation-contract.md
+      - .kiro/specs/closed-loop-isolation-contract/**
+      - src/task-outcome/closed-loop-isolation-contract.test.ts
+      - src/task-outcome/closed-loop-isolation-restart-child.ts
+    canLandWith: []
+    metadata:
+      task: closed-loop-isolation-contract:cursor-closed-loop-490b
+      owner: cursor-closed-loop-490b
+      purpose: Isolation contract freeze. Docs, spec, and synthetic tests only. No production behavior change.
   - id: infrastructure-audit-p1-object-recovery-20261031
     landingPolicy: serial
     paths:
