@@ -40,6 +40,7 @@ export type RunnerTurnFailureReason =
   | "timeout"
   | "authz_denied"
   | "prepare_failed"
+  | "budget_exceeded"
   | "other";
 
 export type RunnerTurnOutcomeInput = {
@@ -303,7 +304,7 @@ function loadExistingTask(
   taskId: string,
 ): TaskOutcomeRecord | null {
   const store = new DurableTaskOutcomeStore(resolveStoreRoot(cfg, agentId));
-  return store.loadTask(taskId);
+  return store.loadTask(taskId) ?? null;
 }
 
 export function assessRunnerTurnBudgetGate(

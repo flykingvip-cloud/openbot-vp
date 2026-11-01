@@ -150,7 +150,7 @@ describe("executor closeout budget gate", () => {
         },
       },
     };
-    chargeModelCallAgainstTip({ ...cfg, ...priced } as OpenBotConfig, "bot", {
+    chargeModelCallAgainstTip({ ...cfg, ...priced } as unknown as OpenBotConfig, "bot", {
       taskId: opened.taskId,
       scope: opened.scope,
       runId: "run-zero",
