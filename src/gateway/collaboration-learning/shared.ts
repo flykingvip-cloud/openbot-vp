@@ -636,10 +636,23 @@ export function summarizeActiveContext(params: {
   return parts.join("；");
 }
 
-export function selectActiveTask(tasks: Task[]) {
-  return [...tasks]
-    .filter((task) => ["ready", "in_progress", "blocked", "review"].includes(task.status))
-    .toSorted((left, right) => (right.updatedAtMs ?? 0) - (left.updatedAtMs ?? 0))[0];
+const ACTIVE_TASK_STATUSES = new Set(["ready", "in_progress", "blocked", "review"]);
+
+/**
+ * Prefer system task authority (existing OS currentTaskId / activated task) when
+ * that task is still active. Update-time alone must not let an old task steal
+ * the current binding.
+ */
+export function selectActiveTask(tasks: Task[], preferredTaskId?: string | null): Task | undefined {
+  const active = [...tasks].filter((task) => ACTIVE_TASK_STATUSES.has(task.status));
+  const preferred = preferredTaskId?.trim() ?? "";
+  if (preferred) {
+    const bound = active.find((task) => task.taskId === preferred);
+    if (bound) {
+      return bound;
+    }
+  }
+  return active.toSorted((left, right) => (right.updatedAtMs ?? 0) - (left.updatedAtMs ?? 0))[0];
 }
 
 const ACTIVE_DELIVERABLE_STATUSES = new Set(["draft", "submitted", "in_review", "approved"]);
@@ -679,18 +692,23 @@ export function projectOperatingDeliverableBinding(params: {
   deliverables: readonly Deliverable[];
   decision?: Decision;
   review?: Review;
+  /** Existing OS / activated task authority when still active. */
+  preferredTaskId?: string | null;
 }): {
   task: Task | undefined;
   deliverable: Deliverable | undefined;
   currentDeliverableId: string | null;
   phase: GatewayCollaborationOperatingPhase;
   noFormalDeliverable: boolean;
+  /** True when there is no active task; historical rows must not pose as current. */
+  historicalOnly: boolean;
 } {
-  const task = selectActiveTask([...params.tasks]);
+  const task = selectActiveTask([...params.tasks], params.preferredTaskId);
   const taskId = task?.taskId?.trim() ?? "";
+  // No active task → do not promote a historical deliverable into currentDeliverableId.
   const deliverable = taskId
     ? selectDeliverableForCurrentTask(params.deliverables, taskId)
-    : selectActiveDeliverable([...params.deliverables]);
+    : undefined;
   const phase = deriveOperatingPhase({
     decision: params.decision,
     review: params.review,
@@ -702,6 +720,7 @@ export function projectOperatingDeliverableBinding(params: {
     currentDeliverableId: deliverable?.deliverableId ?? null,
     phase,
     noFormalDeliverable: Boolean(taskId) && !deliverable,
+    historicalOnly: !taskId,
   };
 }
 
@@ -1281,13 +1300,15 @@ export async function syncGroupOperatingState(params: {
     params.groupId;
   const review = selectActiveReview(reviews);
   const decision = selectActiveDecision(decisions);
-  // Bind the formal deliverable to the active task. A newer row from another
-  // task must not become currentDeliverableId or drive the operating phase.
+  // Bind the formal deliverable to system task authority (existing OS
+  // currentTaskId when still active). A newer row / old-task update must not
+  // steal the current binding or pose as the active deliverable.
   const deliverableBinding = projectOperatingDeliverableBinding({
     tasks,
     deliverables,
     decision,
     review,
+    preferredTaskId: existingState?.activeContext?.currentTaskId ?? null,
   });
   const task = deliverableBinding.task;
   const deliverable = deliverableBinding.deliverable;

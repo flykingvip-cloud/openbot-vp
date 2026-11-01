@@ -35,7 +35,6 @@ import {
   adjudicateDiscussToTaskTagsUnderLock,
   isDiscussToTaskMetaTag,
 } from "./discuss-to-task-stages.js";
-import { ACTIVATE_SUCCESS_DISPATCHED } from "./formal-responsibility-chain.js";
 import { readGroupOperatingState, syncGroupOperatingState } from "./shared.js";
 import {
   resolveTeamDeliverableStores,
@@ -46,6 +45,15 @@ import {
   resolveAuthorityTenantForEntry,
   type CollaborationTenantResolution,
 } from "./trusted-tenant.js";
+import {
+  tryClaimAfterBoardPublish,
+  type TryClaimAfterBoardPublishResult,
+} from "./try-claim-after-board-publish.js";
+
+/** Board publish is not dispatcher acceptance. Never flip to true here. */
+export const ACTIVATE_SUCCESS_DISPATCHED = false as const;
+
+export type ActivateFormalClaimAdvance = TryClaimAfterBoardPublishResult;
 
 export type ActivateCollaborationTaskInput = {
   groupId: string;
@@ -110,6 +118,8 @@ export type ActivateCollaborationTaskResult =
       boardPublished: true;
       operatingStateSynced: false;
       dispatched: false;
+      /** Real claim entry outcome after publish; absent when claim was not attempted. */
+      formalClaim?: ActivateFormalClaimAdvance;
     }
   | {
       status: "activated";
@@ -124,6 +134,8 @@ export type ActivateCollaborationTaskResult =
       boardPublished: true;
       operatingStateSynced: true;
       dispatched: false;
+      /** Real claimCollaborationBoardItem outcome when a rightful actor was present or blocked. */
+      formalClaim: ActivateFormalClaimAdvance;
     };
 
 const TERMINAL_TASK_STATUSES = new Set(["completed", "cancelled"]);
@@ -646,6 +658,20 @@ export async function activateCollaborationTask(
     idempotentReplay: boolean,
   ) => {
     const stores = teamStores;
+    // After a legal publish, invoke the real claim entry when the present actor
+    // is rightful. Never auto-mint for an absent intended claimant.
+    const formalClaim = await tryClaimAfterBoardPublish({
+      groupId,
+      taskId,
+      item,
+      actorId: actor,
+      auth: params.auth,
+      trusted: params.trusted,
+      stores,
+      tenant: params.tenant,
+      cfg,
+    });
+    const boardItem = formalClaim.item;
     try {
       await syncGroupOperatingState({
         fileStore: stores.fileStore,
@@ -661,8 +687,8 @@ export async function activateCollaborationTask(
         status: "partial_success" as const,
         taskId,
         activationKey,
-        boardItemId: item.itemId,
-        item,
+        boardItemId: boardItem.itemId,
+        item: boardItem,
         taskCreated,
         reason: "operating_state_sync_failed",
         detail: error instanceof Error ? error.message : String(error),
@@ -671,6 +697,7 @@ export async function activateCollaborationTask(
         operatingStateSynced: false as const,
         // Board publish is not dispatcher acceptance. Keep false.
         dispatched: ACTIVATE_SUCCESS_DISPATCHED,
+        formalClaim,
       };
     }
     const os = await readGroupOperatingState({ fileStore: stores.fileStore, groupId });
@@ -678,8 +705,8 @@ export async function activateCollaborationTask(
       status: "activated" as const,
       taskId,
       activationKey,
-      boardItemId: item.itemId,
-      item,
+      boardItemId: boardItem.itemId,
+      item: boardItem,
       taskCreated,
       idempotentReplay,
       currentTaskId: os?.activeContext?.currentTaskId ?? null,
@@ -688,6 +715,7 @@ export async function activateCollaborationTask(
       operatingStateSynced: true as const,
       // 建板 ≠ 派工. dispatched stays false until consumeWake's dispatcher accepts.
       dispatched: ACTIVATE_SUCCESS_DISPATCHED,
+      formalClaim,
     };
   };
 
