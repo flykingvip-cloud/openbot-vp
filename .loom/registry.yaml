@@ -10243,6 +10243,7 @@ tasks:
       - src/gateway/server-methods/task-outcome-reject.ts
       - src/gateway/server-methods/task-outcome-reject.pack.ts
       - .kiro/specs/closed-loop-negation-diagnosis/**
+      - docs/audits/2026-11-01-closed-loop-ui-wiring-scope.md
     state: active
     sessions:
       - id: 7c1a9e2b-4d55-4e18-9a6f-0b8e5d3c1a77
@@ -10250,12 +10251,21 @@ tasks:
         ide: cursor
         agent: cursor-closed-loop-490b
         status: active
-        lastSignalAt: 2026-11-01T04:28:00.000Z
+        lastSignalAt: 2026-11-01T05:15:00.000Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
 landingStreams:
+  - id: closed-loop-ui-wiring-scope-20261101
+    landingPolicy: serial
+    paths:
+      - docs/audits/2026-11-01-closed-loop-ui-wiring-scope.md
+    canLandWith: []
+    metadata:
+      task: closed-loop-negation-diagnosis:cursor-closed-loop-490b
+      owner: cursor-closed-loop-490b
+      purpose: Scope only for the next frontend and backend wiring PR. No UI implementation.
   - id: closed-loop-isolation-contract-20261101
     landingPolicy: serial
     paths:
