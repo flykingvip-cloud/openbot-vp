@@ -1,10 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { ref } from "lit/directives/ref.js";
 import { repeat } from "lit/directives/repeat.js";
-import {
-  isTranscriptStartBoundary,
-  resolveEffectiveRestoreBoundaryMessageId,
-} from "../../../../src/auto-reply/reply/chat-checkpoint-boundary.ts";
 import type { MentionCandidate } from "../../../../src/organization/mention-types.js";
 import { isDaibaiGuideTranscriptMessage } from "../../../../src/shared/daibai-guide-card.ts";
 import {
@@ -18,6 +14,13 @@ import { t } from "../../i18n/index.ts";
 import { exitComputerFullscreenSize } from "../account-computer/desktop-input-capability.ts";
 import { sanitizeUserFacingChatError } from "../chat-error-sanitize.ts";
 import { CHAT_ATTACHMENT_ACCEPT, isSupportedAttachmentFile } from "../chat/attachment-kinds.ts";
+import {
+  checkpointBoundaryCanTruncate,
+  collapseConsecutiveDuplicateUserTurns,
+  getMessageIdForCheckpoint,
+  projectCheckpointPlacements,
+  resolveCheckpointPlaceBeforeUserIndex,
+} from "../chat/checkpoint-placement.ts";
 import { shouldHideCollaborationAssistantMessage } from "../chat/collaboration-message-filter.ts";
 import { CHAT_HISTORY_RENDER_LIMIT } from "../chat/constants.ts";
 import type { ChatContextExpansionSuggestion } from "../chat/context-expansion.ts";
@@ -2457,9 +2460,6 @@ export function renderChatCompose(props: ChatProps) {
   `;
 }
 
-/** Only the latest N user instructions get an inline Restore divider. */
-const CHAT_CHECKPOINT_VISIBLE_USER_TURNS = 2;
-
 function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
   const result: Array<ChatItem | MessageGroup> = [];
   let currentGroup: MessageGroup | null = null;
@@ -2526,81 +2526,12 @@ function groupMessages(items: ChatItem[]): Array<ChatItem | MessageGroup> {
   return result;
 }
 
-/** Extract a transcript message id usable to match a checkpoint boundary. */
-export function getMessageIdForCheckpoint(message: unknown): string | undefined {
-  if (!message || typeof message !== "object") {
-    return undefined;
-  }
-  const m = message as Record<string, unknown>;
-  if (typeof m.transcriptEntryId === "string" && m.transcriptEntryId) {
-    return m.transcriptEntryId;
-  }
-  if (typeof m.id === "string" && m.id) {
-    return m.id;
-  }
-  if (typeof m.messageId === "string" && m.messageId) {
-    return m.messageId;
-  }
-  return undefined;
-}
-
-/**
- * History index of the user instruction a checkpoint undoes (divider renders
- * immediately before this row).
- *
- * Capture anchors `boundaryMessageId` on the last message *kept* when restoring
- * (the message before the undone user turn). The divider therefore sits before
- * the first user message after that boundary.
- */
-export function resolveCheckpointPlaceBeforeUserIndex(
-  history: unknown[],
-  boundaryMessageId: string,
-): number | undefined {
-  if (isTranscriptStartBoundary(boundaryMessageId)) {
-    for (let hi = 0; hi < history.length; hi++) {
-      if (normalizeMessage(history[hi]).role.toLowerCase() === "user") {
-        return hi;
-      }
-    }
-    return undefined;
-  }
-  const boundaryIndex = history.findIndex(
-    (msg) => getMessageIdForCheckpoint(msg) === boundaryMessageId,
-  );
-  if (boundaryIndex < 0) {
-    return undefined;
-  }
-  // Preferred: first user after boundary (boundary = last message kept on restore).
-  for (let hi = boundaryIndex + 1; hi < history.length; hi++) {
-    if (normalizeMessage(history[hi]).role.toLowerCase() === "user") {
-      return hi;
-    }
-  }
-  // Legacy capture: boundary was the undone user turn itself.
-  // Do NOT walk back onto a prior user — that steals another turn's divider
-  // (e.g. after restoring a later checkpoint, its boundary has no next user).
-  if (normalizeMessage(history[boundaryIndex]).role.toLowerCase() === "user") {
-    return boundaryIndex;
-  }
-  return undefined;
-}
-
-/** True when restoring this boundary would remove at least one transcript row. */
-export function checkpointBoundaryCanTruncate(
-  history: unknown[],
-  boundaryMessageId: string | undefined,
-): boolean {
-  if (!boundaryMessageId) {
-    return false;
-  }
-  if (isTranscriptStartBoundary(boundaryMessageId)) {
-    return history.length > 0;
-  }
-  const boundaryIndex = history.findIndex(
-    (msg) => getMessageIdForCheckpoint(msg) === boundaryMessageId,
-  );
-  return boundaryIndex >= 0 && boundaryIndex < history.length - 1;
-}
+/** Re-export placement helpers (shared with diagnostics). */
+export {
+  getMessageIdForCheckpoint,
+  resolveCheckpointPlaceBeforeUserIndex,
+  checkpointBoundaryCanTruncate,
+} from "../chat/checkpoint-placement.ts";
 
 /**
  * If the requested checkpoint is already at the transcript tip (restore would
@@ -2684,193 +2615,18 @@ function appendConversationTaskProgressAfterUser(
   }
 }
 
-function visibleUserTurnText(message: unknown): string | null {
-  if (normalizeMessage(message).role.toLowerCase() !== "user") {
-    return null;
-  }
-  const text = extractText(message)?.trim() ?? "";
-  return text || null;
-}
-
-/** One send must not paint twice when the optimistic row and the persisted row both land. */
-function collapseConsecutiveDuplicateUserTurns(history: unknown[]): unknown[] {
-  const collapsed: unknown[] = [];
-  for (const message of history) {
-    const text = visibleUserTurnText(message);
-    const previous = collapsed[collapsed.length - 1];
-    if (text && previous && visibleUserTurnText(previous) === text) {
-      collapsed[collapsed.length - 1] = message;
-      continue;
-    }
-    collapsed.push(message);
-  }
-  return collapsed;
-}
-
 function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
   const items: ChatItem[] = [];
   const taskItems = new Map<string, ChatItem & { kind: "task-card" }>();
   const usedConversationTaskProgressIds = new Set<string>();
   const checkpoints = props.checkpoints ?? [];
   const placedCheckpointIds = new Set<string>();
-  const history = collapseConsecutiveDuplicateUserTurns(
-    Array.isArray(props.messages) ? props.messages : [],
-  );
+  const placement = projectCheckpointPlacements(checkpoints, props.messages ?? []);
+  const history = placement.history;
   const showToolMessages = props.showToolMessages === true;
   const tools = showToolMessages && Array.isArray(props.toolMessages) ? props.toolMessages : [];
   const historyStart = 0;
-  // Place each Restore divider immediately BEFORE the user instruction being
-  // undone. Restoring removes that instruction and everything below the line.
-  //
-  // Visibility: only the latest CHAT_CHECKPOINT_VISIBLE_USER_TURNS user
-  // instructions (counting backwards from the current thread) get a divider.
-  // Older turns keep their checkpoints for restore RPC, but do not render a line.
-  const recentUserIndexes: number[] = [];
-  for (let hi = history.length - 1; hi >= 0; hi--) {
-    if (normalizeMessage(history[hi]).role.toLowerCase() !== "user") {
-      continue;
-    }
-    recentUserIndexes.push(hi);
-    if (recentUserIndexes.length >= CHAT_CHECKPOINT_VISIBLE_USER_TURNS) {
-      break;
-    }
-  }
-  const visibleUserIndexSet = new Set(recentUserIndexes);
-  const checkpointBeforeRawIndex = new Map<number, ChatCheckpoint>();
-  const checkpointBoundaryIndex = new Map<string, number>();
-  const historyRoles = history.map((msg) => ({
-    id: getMessageIdForCheckpoint(msg),
-    role: normalizeMessage(msg).role.toLowerCase(),
-  }));
-  for (const cp of checkpoints) {
-    if (!cp.boundaryMessageId) {
-      continue;
-    }
-    // Skip tip checkpoints — restore would truncate nothing and steal the slot.
-    if (!checkpointBoundaryCanTruncate(history, cp.boundaryMessageId)) {
-      continue;
-    }
-    const boundaryIndex = isTranscriptStartBoundary(cp.boundaryMessageId)
-      ? -1
-      : history.findIndex((msg) => getMessageIdForCheckpoint(msg) === cp.boundaryMessageId);
-    if (boundaryIndex >= 0) {
-      checkpointBoundaryIndex.set(cp.checkpointId, boundaryIndex);
-    }
-    const placeBefore = resolveCheckpointPlaceBeforeUserIndex(history, cp.boundaryMessageId);
-    if (placeBefore === undefined || !visibleUserIndexSet.has(placeBefore)) {
-      continue;
-    }
-    const existing = checkpointBeforeRawIndex.get(placeBefore);
-    if (!existing) {
-      checkpointBeforeRawIndex.set(placeBefore, cp);
-      continue;
-    }
-    // Prefer the checkpoint whose boundary sits closest before this user turn.
-    // Latest-created alone is wrong after a later turn was already restored:
-    // that later checkpoint no longer has a next user and must not steal this slot.
-    const existingBoundary = checkpointBoundaryIndex.get(existing.checkpointId) ?? -1;
-    const nextBoundary = checkpointBoundaryIndex.get(cp.checkpointId) ?? -1;
-    const existingDistance =
-      existingBoundary >= 0 && existingBoundary < placeBefore
-        ? placeBefore - existingBoundary
-        : Number.POSITIVE_INFINITY;
-    const nextDistance =
-      nextBoundary >= 0 && nextBoundary < placeBefore
-        ? placeBefore - nextBoundary
-        : Number.POSITIVE_INFINITY;
-    if (
-      nextDistance < existingDistance ||
-      (nextDistance === existingDistance && cp.createdAt.localeCompare(existing.createdAt) >= 0)
-    ) {
-      checkpointBeforeRawIndex.set(placeBefore, cp);
-    }
-  }
-  // Id match is authoritative. Recent user turns whose boundary row is hidden
-  // (tool-only lines omitted from history) still get the newest unused
-  // checkpoint that is older than any checkpoint already bound further down.
-  const placedCheckpointIdSet = new Set(
-    [...checkpointBeforeRawIndex.values()].map((cp) => cp.checkpointId),
-  );
-  const unusedCheckpoints = checkpoints
-    .filter((cp) => cp.boundaryMessageId && !placedCheckpointIdSet.has(cp.checkpointId))
-    .filter((cp) => {
-      const boundaryIndex = history.findIndex(
-        (msg) => getMessageIdForCheckpoint(msg) === cp.boundaryMessageId,
-      );
-      // A visible tip boundary restores nothing; leave it unused.
-      return boundaryIndex < 0 || boundaryIndex < history.length - 1;
-    })
-    .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
-  for (const userIndex of recentUserIndexes) {
-    if (checkpointBeforeRawIndex.has(userIndex)) {
-      continue;
-    }
-    let laterCreatedAt: string | undefined;
-    for (const [placedIndex, placed] of checkpointBeforeRawIndex) {
-      if (placedIndex > userIndex) {
-        if (!laterCreatedAt || placed.createdAt < laterCreatedAt) {
-          laterCreatedAt = placed.createdAt;
-        }
-      }
-    }
-    const candidateIndex = unusedCheckpoints.findIndex((cp) => {
-      if (placedCheckpointIdSet.has(cp.checkpointId)) {
-        return false;
-      }
-      if (laterCreatedAt && cp.createdAt >= laterCreatedAt) {
-        return false;
-      }
-      if (!cp.boundaryMessageId) {
-        return false;
-      }
-      const placeBefore = resolveCheckpointPlaceBeforeUserIndex(history, cp.boundaryMessageId);
-      // A checkpoint that already resolves to a different user turn stays there.
-      return placeBefore === undefined || placeBefore === userIndex;
-    });
-    if (candidateIndex < 0) {
-      continue;
-    }
-    const [candidate] = unusedCheckpoints.splice(candidateIndex, 1);
-    if (!candidate) {
-      continue;
-    }
-    placedCheckpointIdSet.add(candidate.checkpointId);
-    checkpointBeforeRawIndex.set(userIndex, candidate);
-  }
-  // If id matching failed (e.g. history rows missing ids) but the session has
-  // checkpoints, still show a Restore line above the latest visible user turn.
-  // Prefer a checkpoint that still has transcript after its boundary (can truncate).
-  if (checkpointBeforeRawIndex.size === 0 && recentUserIndexes.length > 0) {
-    const latestUserIndex = recentUserIndexes[0];
-    let fallback: ChatCheckpoint | undefined;
-    let fallbackRank = -1;
-    for (const cp of checkpoints) {
-      const boundaryMessageId = resolveEffectiveRestoreBoundaryMessageId(
-        cp.boundaryMessageId,
-        historyRoles,
-      );
-      const canTruncate = checkpointBoundaryCanTruncate(history, boundaryMessageId);
-      if (!canTruncate) {
-        continue;
-      }
-      const boundaryIndex = isTranscriptStartBoundary(boundaryMessageId)
-        ? -1
-        : history.findIndex((msg) => getMessageIdForCheckpoint(msg) === boundaryMessageId);
-      const beforeLatestUser = boundaryIndex >= 0 && boundaryIndex < latestUserIndex;
-      const rank = (canTruncate ? 4 : 0) + (beforeLatestUser ? 2 : 0);
-      if (
-        !fallback ||
-        rank > fallbackRank ||
-        (rank === fallbackRank && cp.createdAt.localeCompare(fallback.createdAt) >= 0)
-      ) {
-        fallback = cp;
-        fallbackRank = rank;
-      }
-    }
-    if (fallback) {
-      checkpointBeforeRawIndex.set(latestUserIndex, fallback);
-    }
-  }
+  const checkpointBeforeRawIndex = placement.beforeUserIndex;
   let pendingCheckpoints: ChatCheckpoint[] = [];
   for (const [rawIndex, cp] of checkpointBeforeRawIndex) {
     if (rawIndex < historyStart) {

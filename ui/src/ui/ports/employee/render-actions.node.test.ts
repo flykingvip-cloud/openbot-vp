@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { setChatActionsTestHooks } from "../../app-chat-actions.ts";
 import type { UiSettings } from "../../storage.ts";
+import type { ChatCheckpoint } from "../../types/chat-types.ts";
 import type { ChatAttachment, ChatQueueItem } from "../../ui-types.ts";
 import {
   type EmployeeWorkbenchSessionState,
@@ -655,7 +656,7 @@ describe("employee render actions", () => {
       navCollapsed: false,
       navGroupsCollapsed: {},
     };
-    const state = {
+    const state: EmployeeWorkbenchSessionState = {
       basePath: "",
       hello: null,
       connected: true,
@@ -695,9 +696,23 @@ describe("employee render actions", () => {
       workbenchGrowthBirthAwakening: false,
       workbenchGrowthBirthTurnSentKey: null,
       sidebarOpen: true,
-      chatCheckpoints: [{ checkpointId: "cp-a" }],
+      chatCheckpoints: [{ checkpointId: "cp-a" }] as ChatCheckpoint[],
+      chatCheckpointLoadState: {
+        status: "ready",
+        sessionKey: "agent:bot-a:main",
+        generation: 1,
+        checkpoints: [{ checkpointId: "cp-a" }] as ChatCheckpoint[],
+      },
+      chatCheckpointDiagnostics: [
+        {
+          checkpointId: "cp-a",
+          inlineVisible: true,
+          sourceBoundaryState: "ok",
+          reasonCodes: [],
+        },
+      ],
       pendingRestoreCheckpointId: "cp-a",
-    } satisfies EmployeeWorkbenchSessionState;
+    };
 
     switchEmployeeWorkbenchSession(state, "agent:bot-a:main", "assistant");
     expect(state.sidebarOpen).toBe(true);
@@ -707,5 +722,7 @@ describe("employee render actions", () => {
     expect(state.sidebarOpen).toBe(true);
     expect(state.chatCheckpoints).toEqual([]);
     expect(state.pendingRestoreCheckpointId).toBeNull();
+    expect(state.chatCheckpointLoadState?.checkpoints ?? []).toEqual([]);
+    expect(state.chatCheckpointDiagnostics ?? []).toEqual([]);
   });
 });

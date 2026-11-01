@@ -26,6 +26,7 @@ import {
   chatEventMatchesOpenSession,
   sessionKeysShareChatSurface,
 } from "../chat-session-key-match.ts";
+import { applyChatCheckpointSessionIsolation } from "../chat/checkpoint-session-isolation.ts";
 import { shouldHideCollaborationAssistantMessage } from "../chat/collaboration-message-filter.ts";
 import { DEFAULT_CHAT_CONTEXT_SCOPE, toChatSendContextScope } from "../chat/context-scope.ts";
 import {
@@ -268,6 +269,11 @@ export type ChatSendState = Pick<
     | import("../chat/context-expansion.ts").ChatContextExpansionSuggestion
     | null;
   chatOguiDecisions?: import("../chat/ogui-form-view.ts").OguiDecisionStatusLookup | null;
+} & {
+  chatCheckpoints?: import("../types/chat-types.ts").ChatCheckpoint[];
+  chatCheckpointLoadState?: import("../chat/checkpoint-load-state.ts").ChatCheckpointLoadState;
+  chatCheckpointDiagnostics?: import("../chat/checkpoint-visibility-diagnostics.ts").ChatCheckpointVisibilityDiagnostic[];
+  pendingRestoreCheckpointId?: string | null;
 };
 
 export type ChatMentionAuthorityContext = {
@@ -424,6 +430,7 @@ function realignSessionKeyForSend(state: ChatSendState, sessionKey: string) {
     return;
   }
   // Drop the previous bot's transcript so a desync cannot look like crosstalk.
+  applyChatCheckpointSessionIsolation(state, sessionKey);
   state.sessionKey = sessionKey;
   state.chatMessages = [];
   state.chatStream = null;

@@ -10038,10 +10038,30 @@ tasks:
     metadata: {}
   - id: collab-restore-line-phase-a:grok-bot
     owner: grok-bot
-    intent: []
+    intent:
+      - P0 checkpoint restore-line load observability (empty≠error; request isolation; diagnostics)
+      - Unify session-switch isolate boundary across shell/employee/send realign
+      - Shared read-only placement projection so diagnostics match DOM divider
     paths:
       - ui/src/ui/app.chat-restore.node.test.ts
       - src/gateway/server-methods/chat-checkpoints.d3.test.ts
+      - ui/src/ui/app.ts
+      - ui/src/ui/app-session-actions.ts
+      - ui/src/ui/app-session-actions.test.ts
+      - ui/src/ui/app-session-checkpoint-isolation.node.test.ts
+      - ui/src/ui/capability/app-view-state-slices.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/ports/employee/render-actions.ts
+      - ui/src/ui/ports/employee/render-actions.node.test.ts
+      - ui/src/ui/chat/checkpoint-load-state.ts
+      - ui/src/ui/chat/checkpoint-load-state.node.test.ts
+      - ui/src/ui/chat/checkpoint-placement.ts
+      - ui/src/ui/chat/checkpoint-session-isolation.ts
+      - ui/src/ui/chat/checkpoint-visibility-diagnostics.ts
+      - ui/src/ui/chat/checkpoint-visibility-diagnostics.node.test.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/views/chat.checkpoint-diagnostics-agreement.node.test.ts
+      - .loom/registry.yaml
     state: active
     sessions: []
     ownerHistory: []
@@ -10461,14 +10481,31 @@ landingStreams:
       - src/auto-reply/reply/session-continuity.checkpoint-rollback.test.ts
       - ui/src/ui/app.ts
       - ui/src/ui/app.chat-restore.node.test.ts
+      - ui/src/ui/app-session-actions.ts
+      - ui/src/ui/app-session-actions.test.ts
+      - ui/src/ui/app-session-checkpoint-isolation.node.test.ts
+      - ui/src/ui/capability/app-view-state-slices.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/ports/employee/render-actions.ts
+      - ui/src/ui/ports/employee/render-actions.node.test.ts
+      - ui/src/ui/chat/checkpoint-load-state.ts
+      - ui/src/ui/chat/checkpoint-load-state.node.test.ts
+      - ui/src/ui/chat/checkpoint-placement.ts
+      - ui/src/ui/chat/checkpoint-session-isolation.ts
+      - ui/src/ui/chat/checkpoint-visibility-diagnostics.ts
+      - ui/src/ui/chat/checkpoint-visibility-diagnostics.node.test.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/views/chat.checkpoint-diagnostics-agreement.node.test.ts
     canLandWith:
       - memory-safe-continuity-live-gateway-20261030
+      - openbot-default-capability-p0-20261030
     metadata:
       task: collab-restore-line-phase-a:grok-bot
       owner: grok-bot
-      purpose: Phase A re-enable chat checkpoint timeline (恢复线) for space/collab
-        sessions — human-user nodes only; transcript restore; no group workspace
-        snapshot (Phase B out); NO_PROMOTE
+      purpose: Phase A 恢复线 + P0 load observability (idle/loading/ready/error/stale/empty;
+        sessionKey+generation isolation; diagnostic reason codes; unified session-switch
+        isolate boundary; shared read-only placement projection for diagnostics). Does NOT
+        change restore RPC/placement/fallback/restorable. P1+ deferred. NO_PROMOTE
   - id: memory-safe-continuity-live-gateway-20261030
     landingPolicy: serial
     paths:

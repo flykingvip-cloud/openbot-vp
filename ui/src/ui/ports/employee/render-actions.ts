@@ -9,11 +9,15 @@ import {
   resolveStewardSessionDefaultsFromHello,
 } from "../../builtin-steward-selection.ts";
 import { sessionKeysShareChatSurface } from "../../chat-session-key-match.ts";
+import type { ChatCheckpointLoadState } from "../../chat/checkpoint-load-state.ts";
+import { applyChatCheckpointSessionIsolation } from "../../chat/checkpoint-session-isolation.ts";
+import type { ChatCheckpointVisibilityDiagnostic } from "../../chat/checkpoint-visibility-diagnostics.ts";
 import { applyPendingChatFocusMessage } from "../../chat/focus-message.ts";
 import {
   bumpSessionSeenAt,
   resolveSessionSeenAliasOptionsFromTrustedSession,
 } from "../../session-seen-at.ts";
+import type { ChatCheckpoint } from "../../types/chat-types.ts";
 import { syncComputerPreviewAfterSessionSwitch } from "../../views/account-computer-preview.ts";
 import {
   maybeTriggerGrowthBirthTurn,
@@ -94,7 +98,9 @@ export type EmployeeWorkbenchSessionState = EmployeeWorkbenchGovernanceDetailSta
     chatHistoryHasMore?: boolean;
     chatHistoryQuietReload?: boolean;
     chatThinkingProgress?: unknown;
-    chatCheckpoints?: unknown[];
+    chatCheckpoints?: ChatCheckpoint[];
+    chatCheckpointLoadState?: ChatCheckpointLoadState;
+    chatCheckpointDiagnostics?: ChatCheckpointVisibilityDiagnostic[];
     pendingRestoreCheckpointId?: string | null;
     sidebarOpen?: boolean;
     chatOguiDecisions?: import("../../chat/ogui-form-view.ts").OguiDecisionStatusLookup | null;
@@ -370,8 +376,8 @@ export function switchEmployeeWorkbenchSession(
   // Stale checkpoint ids must not ride onto the next assistant. Leave an
   // already-open computer dock alone: #581 refreshes it on session switch
   // and only history force-open is suppressed.
-  state.chatCheckpoints = [];
-  state.pendingRestoreCheckpointId = null;
+  // P0: unified isolate boundary — never show prior session checkpoints.
+  applyChatCheckpointSessionIsolation(state, sessionKey);
   const cached = readWorkbenchSessionTranscript(sessionKey);
   const generation = ++workbenchSessionSwitchGeneration;
   state.sessionKey = sessionKey;
