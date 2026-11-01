@@ -86,6 +86,11 @@ import {
   renderStewardCallAuthorizationCards,
 } from "../chat/steward-call-authorization-card.ts";
 import {
+  readTaskOutcomeRejectRef,
+  type TaskOutcomeRejectRef,
+  type TaskOutcomeRejectUiResult,
+} from "../chat/task-outcome-reject.ts";
+import {
   buildMentionInsertion,
   resolveComposerMentionInsertToken,
 } from "../components/mention/mention-insert.ts";
@@ -394,6 +399,8 @@ export type ChatProps = {
     opts: { mode: "draft" | "send"; targetSessionKey?: string; targetLabel?: string },
   ) => Promise<string>;
   onTaskCardStateChange?: () => void;
+  onRejectTaskOutcome?: (ref: TaskOutcomeRejectRef) => Promise<TaskOutcomeRejectUiResult>;
+  taskOutcomeRejectNotice?: { key: string; text: string } | null;
   onSplitRatioChange?: (ratio: number) => void;
   onChatScroll?: (event: Event) => void;
   onRequestArtifactEditAccess?: (
@@ -1722,7 +1729,7 @@ function renderChatThreadItem(
   }
 
   if (item.kind === "task-card") {
-    return renderTaskCard(item.task);
+    return renderTaskCard(item.task, props);
   }
 
   if (item.kind === "conversation-task-progress") {
@@ -2953,6 +2960,10 @@ function parseTaskCard(value: unknown): TaskCard | null {
       ? { estimated_time: stringField(task.estimated_time)! }
       : {}),
     ...(stringField(task.message) ? { message: stringField(task.message)! } : {}),
+    ...(() => {
+      const outcomeReject = readTaskOutcomeRejectRef(task);
+      return outcomeReject ? { outcomeReject } : {};
+    })(),
   };
 }
 
@@ -3053,7 +3064,7 @@ function hasToolOnlyContent(message: Record<string, unknown>) {
   });
 }
 
-function renderTaskCard(task: TaskCard) {
+function renderTaskCard(task: TaskCard, props: ChatProps) {
   const progress =
     typeof task.progress === "number"
       ? task.progress
@@ -3084,6 +3095,35 @@ function renderTaskCard(task: TaskCard) {
         ${task.estimated_time ? html`<span>预计 ${task.estimated_time}</span>` : nothing}
       </div>
       ${task.message ? html`<div class="chat-task-card__message">${task.message}</div>` : nothing}
+      ${
+        task.outcomeReject && props.onRejectTaskOutcome
+          ? html`
+              <button
+                type="button"
+                class="chat-task-card__reject"
+                data-testid="reject-task-outcome"
+                @click=${() => {
+                  const ref = task.outcomeReject;
+                  const reject = props.onRejectTaskOutcome;
+                  if (!ref || !reject) {
+                    return;
+                  }
+                  void reject(ref);
+                }}
+              >
+                结果不符合要求
+              </button>
+              ${
+                props.taskOutcomeRejectNotice?.key ===
+                `${task.outcomeReject.taskId}:${task.outcomeReject.outcomeVersion}`
+                  ? html`<p class="chat-task-card__reject-note" data-testid="reject-task-outcome-note">
+                      ${props.taskOutcomeRejectNotice.text}
+                    </p>`
+                  : nothing
+              }
+            `
+          : nothing
+      }
     </section>
   `;
 }

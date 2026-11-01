@@ -11,6 +11,16 @@ import type { GatewayClient, GatewayRequestHandlers } from "./types.js";
 
 export const TASK_OUTCOME_REJECT_RESULT_METHOD = "task.outcome.rejectResult" as const;
 
+/** Operator scopes do not grant this method. A platform user id only opens the handler. */
+export function authorizeTaskOutcomeRejectTransport(
+  client: GatewayClient | null,
+): ReturnType<typeof errorShape> | null {
+  if (!client?.platformUserId?.trim()) {
+    return errorShape(ErrorCodes.INVALID_REQUEST, "unauthorized");
+  }
+  return null;
+}
+
 export type TaskOutcomeRejectCaller = {
   subjectRaw: string;
   tenantId: string | null;

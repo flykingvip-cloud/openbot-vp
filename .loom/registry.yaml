@@ -10237,11 +10237,7 @@ tasks:
       - src/task-outcome/subject-ref.ts
       - src/task-outcome/feedback-disposition.ts
       - src/task-outcome/reject-result.ts
-      - src/task-outcome/closed-loop-negation-diagnosis.test.ts
       - src/auto-reply/reply/inbound-task-feedback.ts
-      - src/diagnosis/task-outcome-evidence.ts
-      - src/gateway/server-methods/task-outcome-reject.ts
-      - src/gateway/server-methods/task-outcome-reject.pack.ts
       - .kiro/specs/closed-loop-negation-diagnosis/**
       - docs/audits/2026-11-01-closed-loop-ui-wiring-scope.md
     state: active
@@ -10350,7 +10346,90 @@ tasks:
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
+  - id: closed-loop-ui-wiring:cursor-closed-loop-490b
+    owner: cursor-closed-loop-490b
+    intent:
+      - Subject-scoped result rejection button and enterprise diagnosis rows
+    paths:
+      - src/gateway/method-scopes.ts
+      - src/gateway/server-methods.ts
+      - src/gateway/server-methods/task-outcome-reject.ts
+      - src/gateway/server-methods/task-outcome-reject.pack.ts
+      - src/gateway/server-methods/packs/manifest.ts
+      - src/diagnosis/task-outcome-evidence.ts
+      - src/task-outcome/closed-loop-negation-diagnosis.test.ts
+      - src/task-outcome/closed-loop-ui-wiring.test.ts
+      - ui/src/ui/types/chat-types.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/chat/task-outcome-reject.ts
+      - ui/src/ui/chat/task-outcome-reject.node.test.ts
+      - ui/src/ui/capability/app-view-state-slices.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-api.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+      - ui/src/ui/ports/enterprise/diagnosis/enterprise-diagnosis-surface.ts
+      - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.ts
+      - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.node.test.ts
+      - ui/src/styles/chat/grouped.css
+      - .kiro/specs/closed-loop-ui-wiring/tasks.md
+      - src/task-outcome/chat-task-update.ts
+      - src/task-outcome/chat-task-update.test.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/protocol/schema/logs-chat.ts
+      - src/gateway/server-methods/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.task-update.test.ts
+      - docs/audits/2026-11-01-closed-loop-auto-recheck-notify.md
+    state: active
+    sessions:
+      - id: 3a91c0e4-6b17-4f2a-9c55-0e8d4a11b6c2
+        taskId: closed-loop-ui-wiring:cursor-closed-loop-490b
+        ide: cursor
+        agent: cursor-closed-loop-490b
+        status: active
+        lastSignalAt: 2026-11-01T10:55:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-01
+    metadata: {}
 landingStreams:
+  - id: closed-loop-ui-wiring-20261101
+    landingPolicy: serial
+    paths:
+      - src/gateway/method-scopes.ts
+      - src/gateway/server-methods.ts
+      - src/gateway/server-methods/task-outcome-reject.ts
+      - src/gateway/server-methods/task-outcome-reject.pack.ts
+      - src/gateway/server-methods/packs/manifest.ts
+      - src/diagnosis/task-outcome-evidence.ts
+      - src/task-outcome/closed-loop-negation-diagnosis.test.ts
+      - src/task-outcome/closed-loop-ui-wiring.test.ts
+      - ui/src/ui/types/chat-types.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/chat/task-outcome-reject.ts
+      - ui/src/ui/chat/task-outcome-reject.node.test.ts
+      - ui/src/ui/capability/app-view-state-slices.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-api.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+      - ui/src/ui/ports/enterprise/diagnosis/enterprise-diagnosis-surface.ts
+      - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.ts
+      - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.node.test.ts
+      - ui/src/styles/chat/grouped.css
+      - .kiro/specs/closed-loop-ui-wiring/tasks.md
+      - src/task-outcome/chat-task-update.ts
+      - src/task-outcome/chat-task-update.test.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/protocol/schema/logs-chat.ts
+      - src/gateway/server-methods/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.task-update.test.ts
+      - docs/audits/2026-11-01-closed-loop-auto-recheck-notify.md
+    canLandWith: []
+    metadata:
+      task: closed-loop-ui-wiring:cursor-closed-loop-490b
+      owner: cursor-closed-loop-490b
+      purpose: Wire the reject button and diagnosis rows without widening operator.write.
   - id: closed-loop-ui-wiring-scope-20261101
     landingPolicy: serial
     paths:

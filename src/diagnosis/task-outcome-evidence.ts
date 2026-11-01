@@ -35,6 +35,7 @@ export type TaskOutcomeEvidence =
       outcomeVersion: number;
       judgement: TaskJudgement;
       reasonCode?: string;
+      revisionKind?: "new_execution" | "correction";
       lifecycle: string;
       toolObservations: TaskOutcomeToolObservation[];
     }
@@ -127,6 +128,7 @@ export function readTaskOutcomeEvidence(input: {
         outcomeVersion: snap.outcomeVersion,
         judgement: snap.taskJudgement,
         ...(snap.reasonCode ? { reasonCode: snap.reasonCode } : {}),
+        ...(snap.revisionKind ? { revisionKind: snap.revisionKind } : {}),
         lifecycle: snap.lifecycle,
         toolObservations,
       };

@@ -7,6 +7,11 @@ import {
   isAllDiagnosisTarget,
   type DiagnosisTargetOption,
 } from "../../diagnosis/diagnosis-targets.ts";
+import {
+  diagnosisSourceLabel,
+  diagnosisTaskOutcomeRows,
+  type DiagnosisTaskOutcomeEvidenceView,
+} from "./diagnosis-task-outcome-rows.ts";
 import { renderEnterpriseDiagnosisReport } from "./enterprise-diagnosis-report.ts";
 
 export type DiagnosisViewConversationEntry = {
@@ -119,6 +124,7 @@ export type DiagnosisRunNote = {
   deliveryReason?: string;
   deliveryDelivered?: boolean;
   reportText?: string;
+  taskOutcomeEvidence?: DiagnosisTaskOutcomeEvidenceView | null;
 };
 
 export type EnterpriseDiagnosisHandlers = {
@@ -146,6 +152,14 @@ export type EnterpriseDiagnosisHandlers = {
   onCadence?: (value: "off" | "daily" | "tick") => void;
   onDeliverToAdmin?: (value: boolean) => void;
   onDeliverToOwners?: (value: boolean) => void;
+  taskOutcomeDraft?: { taskId: string; agentId: string; outcomeVersion: string };
+  onTaskOutcomeDraftChange?: (draft: {
+    taskId: string;
+    agentId: string;
+    outcomeVersion: string;
+  }) => void;
+  onUseSelectedAgentId?: () => void;
+  taskOutcomeAttachNote?: string | null;
   onRunConversationAction?: (action: DiagnoseReportActionChip) => void;
   daibaiDeliveryEnabled?: boolean;
   decisionNote?: string | null;
@@ -618,7 +632,73 @@ function diagnoseControls(handlers: EnterpriseDiagnosisHandlers): TemplateResult
         />
         投送到相关数字人负责人大白对话
       </label>
+      ${taskOutcomeFields(handlers)}
     </div>
+  `;
+}
+
+function taskOutcomeFields(handlers: EnterpriseDiagnosisHandlers): TemplateResult {
+  const draft = handlers.taskOutcomeDraft ?? { taskId: "", agentId: "", outcomeVersion: "" };
+  const disabled = Boolean(handlers.diagnosing);
+  const selected = handlers.targets?.find((row) => row.id === handlers.selectedTargetId);
+  const canCopyAgent =
+    Boolean(selected?.agentId.trim()) && !isAllDiagnosisTarget(handlers.selectedTargetId);
+  const emit = (next: { taskId: string; agentId: string; outcomeVersion: string }) => {
+    handlers.onTaskOutcomeDraftChange?.(next);
+  };
+  return html`
+    <label class="enterprise-diagnosis__control">
+      <span class="enterprise-diagnosis__target-label">任务</span>
+      <input
+        class="enterprise-diagnosis__target-select"
+        data-testid="diagnosis-task-id"
+        ?disabled=${disabled}
+        .value=${draft.taskId}
+        @input=${(event: Event) => {
+          emit({ ...draft, taskId: (event.target as HTMLInputElement).value });
+        }}
+      />
+    </label>
+    <label class="enterprise-diagnosis__control">
+      <span class="enterprise-diagnosis__target-label">数字人</span>
+      <input
+        class="enterprise-diagnosis__target-select"
+        data-testid="diagnosis-task-agent"
+        ?disabled=${disabled}
+        .value=${draft.agentId}
+        @input=${(event: Event) => {
+          emit({ ...draft, agentId: (event.target as HTMLInputElement).value });
+        }}
+      />
+    </label>
+    <label class="enterprise-diagnosis__control">
+      <span class="enterprise-diagnosis__target-label">结果版本</span>
+      <input
+        class="enterprise-diagnosis__target-select"
+        data-testid="diagnosis-task-version"
+        inputmode="numeric"
+        ?disabled=${disabled}
+        .value=${draft.outcomeVersion}
+        @input=${(event: Event) => {
+          emit({ ...draft, outcomeVersion: (event.target as HTMLInputElement).value });
+        }}
+      />
+    </label>
+    <button
+      type="button"
+      class="btn btn--sm"
+      data-testid="diagnosis-use-selected-agent"
+      ?disabled=${disabled || !canCopyAgent || !handlers.onUseSelectedAgentId}
+      @click=${() => handlers.onUseSelectedAgentId?.()}
+    >
+      填入当前诊断对象
+    </button>
+    <p class="enterprise-diagnosis__target-hint" data-testid="diagnosis-task-hint">
+      ${
+        handlers.taskOutcomeAttachNote ??
+        "留空则不对照任务结果，不会自动选择最近任务。卡片编号不能当作任务。"
+      }
+    </p>
   `;
 }
 
@@ -1176,6 +1256,17 @@ export function renderEnterpriseDiagnosisSurface(
               )
             : nothing
         }
+        <div data-testid="diagnosis-task-outcome" class="enterprise-diagnosis__block">
+          ${kvRows(
+            diagnosisTaskOutcomeRows({
+              evidence: handlers.lastDiagnose?.taskOutcomeEvidence,
+              sourceLabel: diagnosisSourceLabel({
+                targets: handlers.targets,
+                selectedTargetId: handlers.selectedTargetId,
+              }),
+            }),
+          )}
+        </div>
         ${targetHint(handlers)}
         ${diagnoseControls(handlers)}
         <div class="enterprise-org-ws enterprise-org-ws--flat enterprise-diagnosis__body">

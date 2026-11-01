@@ -325,6 +325,9 @@ export const UserVisibleTaskCardSchema = Type.Object(
     elapsed_time: Type.Optional(Type.Integer({ minimum: 0 })),
     estimated_time: Type.Optional(NonEmptyString),
     message: Type.Optional(NonEmptyString),
+    taskId: Type.Optional(NonEmptyString),
+    agentId: Type.Optional(NonEmptyString),
+    outcomeVersion: Type.Optional(Type.Integer({ minimum: 1 })),
   },
   { additionalProperties: false },
 );
@@ -407,6 +410,8 @@ export const ChatEventSchema = Type.Object(
       Type.Literal("status"),
     ]),
     message: Type.Optional(Type.Unknown()),
+    /** Present only when a TaskOutcome tip already exists for this run. */
+    taskUpdate: Type.Optional(UserVisibleTaskEventSchema),
     /** Safe thinking outline/progress; never raw CoT. Process ≠ delivery. */
     thinking: Type.Optional(ChatThinkingProgressSchema),
     errorMessage: Type.Optional(Type.String()),

@@ -499,13 +499,20 @@ describe("structured task rejection and diagnosis read", () => {
     expect(
       authorizeOperatorScopesForMethod("task.outcome.rejectResult", ["operator.write"]),
     ).toEqual({
-      allowed: true,
+      allowed: false,
+      missingScope: "operator.approvals",
+    });
+    expect(
+      authorizeOperatorScopesForMethod("task.outcome.rejectResult", ["operator.admin"]),
+    ).toEqual({
+      allowed: false,
+      missingScope: "operator.approvals",
     });
     expect(
       authorizeOperatorScopesForMethod("task.outcome.rejectResult", ["operator.read"]),
     ).toEqual({
       allowed: false,
-      missingScope: "operator.write",
+      missingScope: "operator.approvals",
     });
     const agentDir = tempDir("neg-gw-");
     const cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
@@ -549,8 +556,12 @@ describe("structured task rejection and diagnosis read", () => {
       },
       respond,
       client: {
-        connect: { role: "operator", scopes: ["operator.read"], minProtocol: 1, maxProtocol: 1 },
-        platformUserId: "alice",
+        connect: {
+          role: "operator",
+          scopes: ["operator.admin", "operator.write"],
+          minProtocol: 1,
+          maxProtocol: 1,
+        },
         sessionDomain: "enterprise",
       } as never,
       isWebchatConnect: () => false,

@@ -105,6 +105,7 @@ export type AppViewChatCapabilityState = Omit<ChatState, "workbenchSystemSetting
   chatCheckpointDiagnostics: ChatCheckpointVisibilityDiagnostic[];
   pendingRestoreCheckpointId: string | null;
   restoreInFlightCheckpointId: string | null;
+  taskOutcomeRejectNotice?: { key: string; text: string } | null;
 };
 
 export type AppViewDaibaiCapabilityState = Pick<

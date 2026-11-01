@@ -1128,6 +1128,8 @@ export function resolveLeastPrivilegeOperatorScopesForMethod(method: string): Op
 const ADMIN_SCOPE_DOES_NOT_SUBSTITUTE = new Set<string>([
   "platform.diagnosis.approval.decide",
   "enterprise.mesh.asset.pause",
+  // Subject match is the grant. Admin must not open this method.
+  "task.outcome.rejectResult",
 ]);
 
 export function adminScopeSubstitutesForMethod(method: string): boolean {
@@ -1138,6 +1140,11 @@ export function authorizeOperatorScopesForMethod(
   method: string,
   scopes: readonly string[],
 ): { allowed: true } | { allowed: false; missingScope: OperatorScope } {
+  // No operator scope grants this call. The gateway asks for platformUserId,
+  // then the handler checks subjectRef and enterprise tenant.
+  if (method === "task.outcome.rejectResult") {
+    return { allowed: false, missingScope: APPROVALS_SCOPE };
+  }
   if (scopes.includes(ADMIN_SCOPE) && adminScopeSubstitutesForMethod(method)) {
     return { allowed: true };
   }

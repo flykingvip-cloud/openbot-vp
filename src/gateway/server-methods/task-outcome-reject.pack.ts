@@ -7,8 +7,10 @@ import {
 export const taskOutcomeRejectPack = defineGatewayMethodPack({
   id: "task-outcome-reject",
   methods: [TASK_OUTCOME_REJECT_RESULT_METHOD],
+  // Bucket only, so the method stays classified. operator.write and
+  // operator.admin do not authorize it; see authorizeTaskOutcomeRejectTransport.
   scopes: {
-    "operator.write": [TASK_OUTCOME_REJECT_RESULT_METHOD],
+    "operator.approvals": [TASK_OUTCOME_REJECT_RESULT_METHOD],
   },
   handlers: taskOutcomeRejectHandlers,
 });

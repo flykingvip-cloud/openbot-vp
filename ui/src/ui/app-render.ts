@@ -50,6 +50,11 @@ import {
   formatPostPlanConfirmAdvanceUserMessage,
 } from "./chat/owner-decision-card.ts";
 import type { ChatQuoteDraft } from "./chat/quote-draft.ts";
+import {
+  formatRejectNotice,
+  rejectNoticeFromPayload,
+  type TaskOutcomeRejectRef,
+} from "./chat/task-outcome-reject.ts";
 import { labelForWorkProgressPhase } from "./chat/work-progress-phase.ts";
 import {
   resolveWorkbenchChatSessionKey,
@@ -1550,6 +1555,45 @@ export function renderApp(state: AppViewState) {
       onConfirmRestoreCheckpoint: (checkpointId: string) =>
         void state.confirmRestoreCheckpoint(checkpointId),
       onQueueRemove: (id: string) => state.removeQueuedMessage(id),
+      onRejectTaskOutcome: async (ref: TaskOutcomeRejectRef) => {
+        const client = state.client;
+        if (!client) {
+          const result = { ok: false as const, code: "unauthorized" };
+          state.taskOutcomeRejectNotice = {
+            key: `${ref.taskId}:${ref.outcomeVersion}`,
+            text: formatRejectNotice(result),
+          };
+          state.requestUpdate();
+          return result;
+        }
+        try {
+          const payload = await client.request("task.outcome.rejectResult", {
+            taskId: ref.taskId,
+            agentId: ref.agentId,
+            outcomeVersion: ref.outcomeVersion,
+          });
+          const result = rejectNoticeFromPayload(payload);
+          state.taskOutcomeRejectNotice = {
+            key: `${ref.taskId}:${ref.outcomeVersion}`,
+            text: formatRejectNotice(result),
+          };
+          state.requestUpdate();
+          return result;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          const result = {
+            ok: false as const,
+            code: message.includes("missing scope") ? "forbidden" : "unauthorized",
+          };
+          state.taskOutcomeRejectNotice = {
+            key: `${ref.taskId}:${ref.outcomeVersion}`,
+            text: formatRejectNotice(result),
+          };
+          state.requestUpdate();
+          return result;
+        }
+      },
+      taskOutcomeRejectNotice: state.taskOutcomeRejectNotice,
       onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
       showNewMessages: state.chatNewMessagesBelow && !state.chatManualRefreshInFlight,
       onScrollToBottom: () => state.scrollToBottom(),

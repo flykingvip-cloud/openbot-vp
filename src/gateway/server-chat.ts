@@ -26,6 +26,7 @@ import {
   isUnsupportedImageSoftFailure,
   UNSUPPORTED_IMAGE_DIALOGUE,
 } from "../shared/unsupported-image-failure.js";
+import { resolveChatFinalTaskUpdate } from "../task-outcome/chat-task-update.js";
 import { stripInlineDirectiveTagsForDisplay } from "../utils/directive-tags.js";
 import { markChatRunNotUndoable, type ChatAbortControllerEntry } from "./chat-abort.js";
 import { isCollaborationSpaceChildSessionKey } from "./chat-event-isolation.js";
@@ -39,6 +40,7 @@ import {
   prepareChatDeliverablePublish,
   type PreparedChatDeliverable,
 } from "./knowledge/deliverables/chat-deliverable-publish.js";
+import { appendPersistedAgentMessageToTranscript } from "./server-methods/chat-transcript-inject.js";
 import { loadSessionEntrySyncFallback } from "./tenant-context.js";
 import { formatForLog } from "./ws-log.js";
 
@@ -689,6 +691,21 @@ export function createAgentEventHandler({
     chatRunState.deltaSentAt.set(clientRunId, now);
   };
 
+  const resolveVisibleChatTaskUpdate = (sessionKey: string, runId: string) => {
+    try {
+      const { cfg } = loadSessionEntrySyncFallback(sessionKey);
+      return (
+        resolveChatFinalTaskUpdate({
+          cfg,
+          sessionKey,
+          runId,
+        }) ?? undefined
+      );
+    } catch {
+      return undefined;
+    }
+  };
+
   const emitChatFinal = (
     sessionKey: string,
     clientRunId: string,
@@ -832,12 +849,28 @@ export function createAgentEventHandler({
         });
         visibleText = stripControlChannelForDisplay(visibleText);
       }
+      const taskUpdate = resolveVisibleChatTaskUpdate(sessionKey, clientRunId);
+      if (taskUpdate) {
+        try {
+          const transcriptPath =
+            loadSessionEntrySyncFallback(sessionKey).entry?.sessionFile?.trim();
+          if (transcriptPath) {
+            appendPersistedAgentMessageToTranscript({
+              transcriptPath,
+              message: taskUpdate,
+            });
+          }
+        } catch {
+          // The live chat event still carries the card when transcript append fails.
+        }
+      }
       const payload = {
         runId: clientRunId,
         sessionKey,
         seq,
         state: "final" as const,
         ...(stopReason && { stopReason }),
+        ...(taskUpdate ? { taskUpdate } : {}),
         message:
           visibleText && !shouldSuppressSilent
             ? {
