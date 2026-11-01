@@ -10459,6 +10459,25 @@ tasks:
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
+  - id: closed-loop-correction-notify:cursor-closed-loop-490b
+    owner: cursor-closed-loop-490b
+    intent:
+      - One factual correction notice, automatic path off
+    paths:
+      - src/task-outcome/correction-notify.ts
+      - src/task-outcome/correction-notify.test.ts
+    state: active
+    sessions:
+      - id: 91aa0c33-7e12-4b6d-9f40-5c1d8e22bb44
+        taskId: closed-loop-correction-notify:cursor-closed-loop-490b
+        ide: cursor
+        agent: cursor-closed-loop-490b
+        status: active
+        lastSignalAt: 2026-11-01T13:20:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-01
+    metadata: {}
 landingStreams:
   - id: usage-cost-layers-20261101
     landingPolicy: serial
@@ -10498,6 +10517,16 @@ landingStreams:
       task: usage-cost-layers
       owner: cursor-cloud
       purpose: One usage and cost projection for user, enterprise, and platform.
+  - id: closed-loop-correction-notify-20261101
+    landingPolicy: serial
+    paths:
+      - src/task-outcome/correction-notify.ts
+      - src/task-outcome/correction-notify.test.ts
+    canLandWith: []
+    metadata:
+      task: closed-loop-correction-notify:cursor-closed-loop-490b
+      owner: cursor-closed-loop-490b
+      purpose: Correction notice only. No new queue and no automatic send.
   - id: closed-loop-recheck-exec-20261101
     landingPolicy: serial
     paths:
