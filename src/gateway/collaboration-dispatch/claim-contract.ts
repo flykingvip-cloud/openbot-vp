@@ -46,6 +46,7 @@ import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { isBareChatCompletionPhrase } from "../collaboration-learning/formal-delivery-acceptance.js";
 import { verifyLinkedTeamDeliverableForAuthority } from "../collaboration-learning/verify-linked-team-deliverable.js";
 import { assertChallengeWindowForPublish } from "./challenge-window.js";
 import type { EffectiveCollaborationPolicy, TaskResponsibility } from "./effective-policy.js";
@@ -1454,6 +1455,13 @@ export async function acceptBoardItemSubmission(
   input: AcceptSubmissionInput,
   options?: ClaimContractOptions,
 ): Promise<ClaimResult<GroupBoardClaimItem>> {
+  // Chat "完成" / "闭环完成" is not an acceptance form. Refuse before any write.
+  if (isBareChatCompletionPhrase(input.reason)) {
+    return fail(
+      "chat_completion_is_not_acceptance",
+      "聊天「完成」不改变验收状态；须走正式提交的 expectedSubmissionId 与验收条款",
+    );
+  }
   const cfg = options?.cfg;
   if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
     return flagOff();

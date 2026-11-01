@@ -35,6 +35,7 @@ import {
   adjudicateDiscussToTaskTagsUnderLock,
   isDiscussToTaskMetaTag,
 } from "./discuss-to-task-stages.js";
+import { ACTIVATE_SUCCESS_DISPATCHED } from "./formal-responsibility-chain.js";
 import { readGroupOperatingState, syncGroupOperatingState } from "./shared.js";
 import {
   resolveTeamDeliverableStores,
@@ -668,7 +669,8 @@ export async function activateCollaborationTask(
         taskEnsured: true as const,
         boardPublished: true as const,
         operatingStateSynced: false as const,
-        dispatched: false as const,
+        // Board publish is not dispatcher acceptance. Keep false.
+        dispatched: ACTIVATE_SUCCESS_DISPATCHED,
       };
     }
     const os = await readGroupOperatingState({ fileStore: stores.fileStore, groupId });
@@ -684,7 +686,8 @@ export async function activateCollaborationTask(
       taskEnsured: true as const,
       boardPublished: true as const,
       operatingStateSynced: true as const,
-      dispatched: false as const,
+      // 建板 ≠ 派工. dispatched stays false until consumeWake's dispatcher accepts.
+      dispatched: ACTIVATE_SUCCESS_DISPATCHED,
     };
   };
 

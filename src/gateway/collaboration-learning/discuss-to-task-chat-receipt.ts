@@ -4,6 +4,10 @@
  */
 import type { ControlledDiscussToTaskResult } from "./controlled-discuss-to-task.js";
 import { formatStagesForUser } from "./discuss-to-task-stages.js";
+import {
+  factsFromFormalStages,
+  projectFormalResponsibilityChain,
+} from "./formal-responsibility-chain.js";
 
 export type DiscussToTaskChatReceiptView = {
   statusCode: string;
@@ -20,6 +24,7 @@ export function buildDiscussToTaskChatReceipt(
   result: ControlledDiscussToTaskResult,
 ): DiscussToTaskChatReceiptView {
   const stagesSummary = formatStagesForUser(result.stages);
+  const chain = projectFormalResponsibilityChain(factsFromFormalStages(result.stages));
   const taskPart = result.taskId ? `taskId=${result.taskId}` : "taskId=（无）";
   const coordinatorBindingText = [
     "[正式任务入口回执 — 必须绑定，禁止另编任务或口头宣称已派工]",
@@ -29,6 +34,8 @@ export function buildDiscussToTaskChatReceipt(
     `stages: ${stagesSummary}`,
     `userMessage: ${result.userMessage}`,
     result.internalReason ? `internalReason=${result.internalReason}` : null,
+    `formalNext=${chain.nextEntryPoint ?? "none"}; formalDispatched=${chain.dispatched}; activateDispatched=${chain.activateDispatched}`,
+    "claim→plan→policy confirm→wake 各段须有回执；@mention/催办与聊天「完成」不代替该链，也不改变验收。",
     "后续工具与回复必须引用上述 taskId（若有）；不得虚构新的正式任务身份。",
   ]
     .filter(Boolean)
