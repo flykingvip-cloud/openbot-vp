@@ -1,0 +1,12 @@
+
+ RUN  v4.0.18 /workspace
+
+ ✓ scripts/delivery/forward-guard.test.ts (12 tests) 436ms
+ ✓ scripts/delivery/ledger.test.ts (49 tests) 771ms
+     ✓ production releases.jsonl Path B SoT reaches seq151 tip d37bed5117d6  669ms
+
+ Test Files  2 passed (2)
+      Tests  61 passed (61)
+   Start at  12:59:19
+   Duration  1.28s (transform 669ms, setup 623ms, import 137ms, tests 1.21s, environment 0ms)
+

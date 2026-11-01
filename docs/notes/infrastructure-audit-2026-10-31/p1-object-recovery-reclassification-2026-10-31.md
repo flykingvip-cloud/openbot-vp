@@ -1,5 +1,7 @@
 # Priority1 对象恢复与历史重新分类 — 2026-10-31 Asia/Shanghai
 
+> **历史合入状态（不要按今天阅读表内 OPEN）：** 基线表里的「#171 OPEN」「#172 未合入」以及文末「未合入 #171/#172」记录的是 2026-10-31 写本文时的状态。2026-11-01 现行合入与验收边界见 [closeout-2026-11-01.md](closeout-2026-11-01.md)。表内单元格保持原句。
+
 > **SUPERSEDED ADJUDICATION (2026-10-31 later same day):** the 「5 proven DAG break」claim below is **withdrawn** as final adjudication. **权威当前分类**见 `p1-current-classification-2026-10-31.json`（145 forward-only + 1 incomplete_graph_unknown；完整 146 本轮未重遍历）。详见 `p1-dag-break-evidence-closure-2026-10-31.md`。seqs **52/100/121/140 → forward-only**；seq **145 → incomplete_graph_unknown**（「当前联合对象图下非祖先」, **not** 「历史无共同祖先」）。Donor 亦 shallow；**禁止**称「联合完整图」。Counts 141+5 仅为 *HISTORICAL donor_primary* 已发表拆分，非现行定案。恢复计数三分项：inventory/清单 **137**，捕获时 `refs/audit-recovery/*` **5**。
 
 

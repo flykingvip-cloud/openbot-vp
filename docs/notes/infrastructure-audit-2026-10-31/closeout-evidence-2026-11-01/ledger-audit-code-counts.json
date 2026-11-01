@@ -1,0 +1,10 @@
+{
+  "source": "parsed from ledger-audit.err and ledger-audit.out of this run",
+  "counts": {
+    "ERROR missing-object": 157,
+    "warn timeline-gap": 8,
+    "warn missing-tag": 1,
+    "warn overlay-debt": 15
+  },
+  "note": "this-run clone classification; not a rewrite of p1-current-classification-2026-10-31.json"
+}

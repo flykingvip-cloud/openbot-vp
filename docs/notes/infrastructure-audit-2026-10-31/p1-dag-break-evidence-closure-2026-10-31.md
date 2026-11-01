@@ -1,5 +1,7 @@
 # P1 DAG-break evidence closure — 2026-10-31 Asia/Shanghai
 
+> **历史标识：** 文末「未继续 #174/#175」指写本文的那一轮。#174 已于之后合入；#175 仍未执行。现行入口 [closeout-2026-11-01.md](closeout-2026-11-01.md)。分类口径正文保持原样。
+
 > Supersedes the adjudication language in `p1-object-recovery-reclassification-2026-10-31.md`
 > that called seqs **52 / 100 / 121 / 140 / 145** 「proven DAG break」.
 > **No** `regressionAcknowledged` changes. **No** self-PASS.
