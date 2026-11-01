@@ -64,3 +64,11 @@
 - `docs/acceptance/runs/2026-11-01-pr192-review/coverage-denominator.md`
 - `docs/acceptance/runs/2026-11-01-pr192-review/logs/10-*.log`
 - This file: `docs/acceptance/fullstack-2026-11-01/09-coverage-progress.md`
+
+## 2026-11-02 update (credentials-omit + denominator harden)
+
+- Soft “约 N=118” **superseded** by row-tracked inventory: [`10-coverage-inventory-tracked.md`](./10-coverage-inventory-tracked.md) (**N=66** stable IDs).
+- DEF-008 OPEN — backup credentials-omit FAIL on main `d42fbc3ca2…` (security boundary YES). Evidence: `../runs/2026-11-02-credentials-omit/`.
+- Control UI: `ui:build` PASS + static smoke PASS; interactive NOT_RUN. Live creds NOT_RUN.
+- Fullstack still **NOT PASS**. See [`10-acceptance-conclusion.md`](./10-acceptance-conclusion.md).
+

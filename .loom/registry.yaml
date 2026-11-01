@@ -10466,6 +10466,7 @@ tasks:
   - docs/acceptance/runs/2026-11-01-p1-fix/**
   - docs/acceptance/p1-fix-2026-11-01/**
   - docs/acceptance/fullstack-2026-11-01/**
+  - docs/acceptance/runs/2026-11-02-credentials-omit/**
   - .loom/registry.yaml
   - src/gateway/enterprise-data/event-driven-projection-materializer.ts
   - src/plugins/runtime/types-core.ts
@@ -10531,7 +10532,7 @@ tasks:
     ide: cursor
     agent: grok-bot
     status: active
-    lastSignalAt: 2026-11-01 14:56:40.890000+00:00
+    lastSignalAt: 2026-11-01 22:59:33.925245+00:00
     metadata: {}
   ownerHistory: []
   since: 2026-11-01
@@ -10607,6 +10608,7 @@ landingStreams:
   - docs/acceptance/runs/2026-11-01-pr192-review/**
   - docs/acceptance/p1-fix-2026-11-01/**
   - docs/acceptance/fullstack-2026-11-01/**
+  - docs/acceptance/runs/2026-11-02-credentials-omit/**
   - apps/macos/Sources/OpenBotProtocol/GatewayModels.swift
   - apps/shared/OpenBotKit/Sources/OpenBotProtocol/GatewayModels.swift
   - src/gateway/enterprise-data/event-driven-projection-materializer.ts

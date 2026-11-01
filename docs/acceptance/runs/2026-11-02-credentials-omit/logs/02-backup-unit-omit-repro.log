@@ -1,0 +1,50 @@
+=== backup.test.ts default archive payload omits credentials @ d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c ===
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-acceptance-main-d42fbc3ca2
+
+ ❯ src/commands/backup.test.ts (16 tests | 1 failed | 15 skipped) 32ms
+     ↓ collapses default config and workspace into the state backup root and excludes credentials
+     ↓ opt-in includeCredentials covers credentials via state when oauth lives under state
+     ↓ orders coverage checks by canonical path so symlinked workspaces do not duplicate state
+     ↓ creates an archive with a manifest and external workspace payload
+     ↓ optionally verifies the archive after writing it
+     ↓ rejects output paths that would be created inside a backed-up directory
+     ↓ rejects symlinked output paths even when intermediate directories do not exist yet
+     ↓ falls back to the home directory when cwd is inside a backed-up source tree
+     ↓ falls back to the home directory when cwd is a symlink into a backed-up source tree
+     ↓ allows dry-run preview even when the target archive already exists
+     ↓ fails fast when config is invalid and workspace backup is enabled
+     ↓ allows explicit partial backups when config is invalid
+     × default archive payload omits credentials under state 31ms
+     ↓ includeCredentials packs credentials under state into the archive
+     ↓ backs up only the active config file when --only-config is requested
+     ↓ allows config-only backups even when the config file is invalid
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/commands/backup.test.ts > backup commands > default archive payload omits credentials under state
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/commands/backup.test.ts:451:85
+    449|         };
+    450|         await walk(extractDir);
+    451|         expect(listed.some((p) => p.includes(`${path.sep}credentials${…
+       |                                                                                     ^
+    452|         expect(listed.some((p) => p.endsWith(`${path.sep}oauth.json`))…
+    453|         expect(listed.some((p) => p.endsWith(`${path.sep}state.txt`)))…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 15 skipped (16)
+   Start at  06:54:11
+   Duration  4.83s (transform 2.87s, setup 210ms, import 4.49s, tests 32ms, environment 0ms)
+
+EXIT:1

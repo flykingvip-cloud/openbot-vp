@@ -1,0 +1,39 @@
+{
+  "stateLogical": "/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l",
+  "stateReal": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l",
+  "oauthLogical": "/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l/credentials",
+  "oauthReal": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l/credentials",
+  "symlinkMismatch": true,
+  "isPathWithin_logical_vs_real_entry": false,
+  "isPathWithin_real_vs_real": true
+}
+{
+  "includeCredentials": false,
+  "skipped": [
+    {
+      "kind": "credentials",
+      "sourcePath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l/credentials",
+      "displayPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l/credentials",
+      "reason": "excluded"
+    }
+  ],
+  "assets": [
+    {
+      "kind": "state",
+      "sourcePath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l"
+    }
+  ],
+  "archivePath": "/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-out-jise1f/2026-11-02T00-00-00.000Z-openbot-backup.tar.gz"
+}
+{
+  "listedCount": 4,
+  "credentialLeakInArchive": true,
+  "credentialRelPaths": [
+    "2026-11-02T00-00-00.000Z-openbot-backup/payload/posix/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l/credentials/oauth.json"
+  ],
+  "nonCredSample": [
+    "2026-11-02T00-00-00.000Z-openbot-backup/manifest.json",
+    "2026-11-02T00-00-00.000Z-openbot-backup/payload/posix/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l/openbot.json",
+    "2026-11-02T00-00-00.000Z-openbot-backup/payload/posix/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/cred-omit-diag-qmLr6l/state.txt"
+  ]
+}
