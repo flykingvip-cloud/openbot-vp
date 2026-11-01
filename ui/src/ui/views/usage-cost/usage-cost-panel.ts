@@ -150,6 +150,11 @@ function renderUsageCostBody(
                 输入 ${formatTokenTally(view.input)} · 输出 ${formatTokenTally(view.output)} · 缓存读
                 ${formatTokenTally(view.cacheRead)} · 缓存写 ${formatTokenTally(view.cacheWrite)}
               </p>
+              ${
+                view.cacheNote
+                  ? html`<p data-testid="usage-cost-cache-note">${view.cacheNote}</p>`
+                  : nothing
+              }
               <ul data-testid="usage-cost-charges">
                 ${view.charges.map((line) => html`<li>${line.label}</li>`)}
               </ul>
@@ -252,9 +257,15 @@ function renderPlatformCost(view: UsageCostLayerView): TemplateResult | typeof n
     return nothing;
   }
   const procurement =
-    view.procurementCents === null || view.procurementCents === undefined
-      ? "采购成本待确认"
-      : `采购成本 ${formatMoney("CNY", view.procurementCents)}`;
+    view.procurementStatus === "free" &&
+    view.procurementCents !== null &&
+    view.procurementCents !== undefined
+      ? `免费模型 ${formatMoney("CNY", view.procurementCents)}`
+      : view.procurementStatus === "mixed" ||
+          view.procurementCents === null ||
+          view.procurementCents === undefined
+        ? "采购成本待确认"
+        : `采购成本 ${formatMoney("CNY", view.procurementCents)}`;
   const margin =
     view.commercialMarginCents === null || view.commercialMarginCents === undefined
       ? "商业差额待确认"
@@ -268,7 +279,8 @@ function renderPlatformCost(view: UsageCostLayerView): TemplateResult | typeof n
         ${(view.ranking ?? []).map(
           (row) => html`
             <li>
-              ${row.provider ?? "未知供应商"} / ${row.model ?? "未知模型"} · 采购
+              ${row.provider ?? "未知供应商"} / ${row.model ?? "未知模型"} ·
+              ${row.priceKind === "free" ? "免费模型" : "采购"}
               ${formatMoney("CNY", row.procurementCents)} · 成功率
               ${row.successRate === null ? "未知" : `${Math.round(row.successRate * 100)}%`}
             </li>

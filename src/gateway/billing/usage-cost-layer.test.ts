@@ -1,4 +1,12 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  describeProviderPrice,
+  ledgerEntryToUsageFact,
+  ledgerPriceKind,
+} from "./usage-cost-facts.js";
 import {
   presentUsageCostLayer,
   responseHasCommercialCost,
@@ -6,6 +14,7 @@ import {
   type UsageCostActor,
   type UsageRequestFact,
 } from "./usage-cost-layer.js";
+import { appendUsageLedgerEntry } from "./usage-ledger-store.js";
 
 function fact(overrides: Partial<UsageRequestFact> = {}): UsageRequestFact {
   return {
@@ -68,6 +77,96 @@ const platform: UsageCostActor = {
 };
 
 describe("usage cost layer", () => {
+  it("keeps measured cache and treats an unpriced zero as missing, not free", async () => {
+    expect(
+      describeProviderPrice({ source: "none", inputCostPer1MCents: 0, outputCostPer1MCents: 0 }),
+    ).toEqual({ providerPriceState: "missing", providerPriceFree: false });
+    expect(
+      describeProviderPrice({ source: "catalog", inputCostPer1MCents: 0, outputCostPer1MCents: 0 }),
+    ).toEqual({ providerPriceState: "missing", providerPriceFree: false });
+    expect(
+      describeProviderPrice({
+        source: "cost_version",
+        inputCostPer1MCents: 0,
+        outputCostPer1MCents: 0,
+      }),
+    ).toEqual({ providerPriceState: "known", providerPriceFree: true });
+    expect(
+      describeProviderPrice({
+        source: "catalog",
+        inputCostPer1MCents: 12,
+        outputCostPer1MCents: 0,
+      }),
+    ).toEqual({ providerPriceState: "known", providerPriceFree: false });
+
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "usage-cost-cache-"));
+    const ledgerPath = path.join(dir, "ledger.json");
+    const historical = await appendUsageLedgerEntry(
+      {
+        enterpriseId: "ent-a",
+        taskId: "old-zero",
+        modelId: "openai/unpriced",
+        tier: "standard",
+        policyId: "included",
+        creditsCharged: 1,
+        providerCostCents: 0,
+        tenantRevenueCents: 0,
+        inputTokens: 4,
+        outputTokens: 1,
+      },
+      ledgerPath,
+    );
+    const cached = await appendUsageLedgerEntry(
+      {
+        enterpriseId: "ent-a",
+        taskId: "cached",
+        modelId: "openai/free",
+        tier: "standard",
+        policyId: "included",
+        creditsCharged: 0,
+        providerCostCents: 0,
+        tenantRevenueCents: 0,
+        inputTokens: 3,
+        outputTokens: 1,
+        cacheReadTokens: 9,
+        cacheWriteTokens: 0,
+        providerPriceState: "known",
+        providerPriceFree: true,
+      },
+      ledgerPath,
+    );
+    const historicalFact = ledgerEntryToUsageFact(historical.entry, undefined);
+    const cachedFact = ledgerEntryToUsageFact(cached.entry, {
+      enterpriseId: "ent-a",
+      taskId: "cached",
+      stage: "done",
+      creditsCharged: 0,
+      updatedAt: "2026-11-01T00:00:00.000Z",
+    });
+    expect(ledgerPriceKind(historical.entry)).toBe("missing");
+    expect(historicalFact.cacheReadTokens).toBeNull();
+    expect(historicalFact.procurementCents).toBeNull();
+    expect(cachedFact.cacheReadTokens).toBe(9);
+    expect(cachedFact.cacheWriteTokens).toBe(0);
+    expect(cachedFact.procurementPrice).toBe("free");
+    const presented = presentUsageCostLayer(platform, [historicalFact, cachedFact]);
+    expect(presented.ok).toBe(true);
+    if (!presented.ok) {
+      return;
+    }
+    expect(presented.view.cacheRead.known).toBe(9);
+    expect(presented.view.cacheRead.unknownCount).toBe(1);
+    expect(presented.view.cacheNote).toContain("不会显示成 0");
+    expect(presented.view.ranking?.map((row) => row.model)).toEqual(["openai/free"]);
+    expect(presented.view.ranking?.[0]?.priceKind).toBe("free");
+    expect(presented.view.ranking?.[0]?.procurementCents).toBe(0);
+    expect(presented.view.excludedFromRanking?.map((row) => row.model)).toEqual([
+      "openai/unpriced",
+    ]);
+    expect(presented.view.procurementCents).toBeNull();
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
   it("keeps one total across user, enterprise, and platform without parent double counting", () => {
     const rows = [
       fact({

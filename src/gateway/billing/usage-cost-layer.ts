@@ -64,6 +64,8 @@ export type UsageRequestFact = {
   recordedCredits?: number | null;
   /** null 表示价格缺失，不是 0 成本。 */
   procurementCents: number | null;
+  /** 缺省时：金额为 null 视为缺失，0 视为已确认的零成本，不视为免费模型。 */
+  procurementPrice?: "known" | "free" | "missing";
   procurementCurrency: string | null;
   /** 客户侧结算收入（分）。未知为 null。只在平台侧参与差额。 */
   revenueCents: number | null;
@@ -446,6 +448,13 @@ function median(values: number[]): number | null {
   return sorted[mid] ?? null;
 }
 
+function priceKindOf(fact: UsageRequestFact): "known" | "free" | "missing" {
+  if (fact.procurementPrice) {
+    return fact.procurementPrice;
+  }
+  return fact.procurementCents === null ? "missing" : "known";
+}
+
 function buildRanking(facts: readonly UsageRequestFact[]): {
   ranking: UsageCostRankRow[];
   excludedFromRanking: UsageCostExcludedRank[];
@@ -464,7 +473,9 @@ function buildRanking(facts: readonly UsageRequestFact[]): {
     const unknownUsage = rows.some(
       (row) => row.inputTokens === null || row.outputTokens === null || row.status === "unknown",
     );
-    const missingPrice = rows.some((row) => row.procurementCents === null);
+    const missingPrice = rows.some(
+      (row) => priceKindOf(row) === "missing" || row.procurementCents === null,
+    );
     if (unknownUsage || missingPrice) {
       excludedFromRanking.push({
         provider,
@@ -483,6 +494,7 @@ function buildRanking(facts: readonly UsageRequestFact[]): {
       provider,
       model,
       procurementCents: rows.reduce((sum, row) => sum + (row.procurementCents ?? 0), 0),
+      priceKind: rows.every((row) => priceKindOf(row) === "free") ? "free" : "known",
       successRate: terminal.length > 0 ? succeeded / terminal.length : null,
       acceptanceRate: accepted.length > 0 ? passed / accepted.length : null,
       latencyMsMedian: median(
@@ -664,6 +676,26 @@ function projectSurface(
         ? null
         : undefined;
   const currencies = currenciesOf(tallies.charges);
+  const cacheUnknown = counted.some(
+    (fact) => fact.cacheReadTokens === null || fact.cacheWriteTokens === null,
+  );
+  const cacheNote =
+    counted.length === 0
+      ? null
+      : cacheUnknown
+        ? "缓存按任务记一行。账本里有的缓存读/写会显示；没有写入的记为未知，不会显示成 0。一次任务里的多次调用不会逐条分列。"
+        : "缓存按任务合计，不是逐次调用。";
+  const priceKinds = new Set(counted.map((fact) => priceKindOf(fact)));
+  const procurementStatus =
+    surface !== "platform" || counted.length === 0
+      ? undefined
+      : priceKinds.size > 1
+        ? "mixed"
+        : priceKinds.has("free")
+          ? "free"
+          : priceKinds.has("missing")
+            ? "missing"
+            : "known";
   const view: UsageCostLayerView = {
     schemaVersion: 1,
     surface,
@@ -674,6 +706,7 @@ function projectSurface(
     coverage: options.truncated ? "truncated" : "complete",
     freshness: lifecycle === "running" ? "delayed" : "current",
     recoveredFromStore: true,
+    cacheNote,
     mixedCurrency: currencies.size > 1,
     callCount: counted.length,
     input: tallies.input,
@@ -699,6 +732,7 @@ function projectSurface(
     view.ranking = ranking.ranking;
     view.excludedFromRanking = ranking.excludedFromRanking;
     view.procurementCents = procurementCents ?? null;
+    view.procurementStatus = procurementStatus;
     view.commercialMarginCents = commercialMarginCents ?? null;
     const taskTypes = [...new Set(counted.map((fact) => fact.taskType).filter(Boolean))];
     view.taskType =

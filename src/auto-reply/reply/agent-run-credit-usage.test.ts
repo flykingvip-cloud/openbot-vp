@@ -52,6 +52,26 @@ describe("agent-run-credit-usage", () => {
     expect(payload.tokenUsage).toEqual({ inputTokens: 100, outputTokens: 50 });
   });
 
+  it("keeps cache read and write on the credit usage input", () => {
+    const payload = buildCommercialRunCreditUsageInput({
+      enterpriseId: "ent-1",
+      policyId: "balanced",
+      runId: "run-cache",
+      provider: "openai",
+      model: "gpt-4o",
+      toolCallCount: 0,
+      toolClasses: [],
+      fallbackAttemptsRaw: [],
+      tokenUsage: { input: 10, output: 2, cacheRead: 8, cacheWrite: 0 },
+    });
+    expect(payload.tokenUsage).toEqual({
+      inputTokens: 10,
+      outputTokens: 2,
+      cacheReadTokens: 8,
+      cacheWriteTokens: 0,
+    });
+  });
+
   it("normalizeRuntimeFallbackAttempts tolerates missing attempts", () => {
     expect(normalizeRuntimeFallbackAttempts(undefined)).toEqual([]);
     expect(normalizeRuntimeFallbackAttempts(null)).toEqual([]);

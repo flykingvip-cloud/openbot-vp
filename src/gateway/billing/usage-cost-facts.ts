@@ -9,6 +9,39 @@ import { listCreditUsageStages } from "./credit-usage-stage-store.js";
 import type { UsageRequestFact, UsageSettlementFact } from "./usage-cost-layer.js";
 import { listAllUsageLedgerEntries, listUsageLedgerEntries } from "./usage-ledger-store.js";
 
+export function describeProviderPrice(input: {
+  source: "cost_version" | "catalog" | "none";
+  inputCostPer1MCents: number;
+  outputCostPer1MCents: number;
+}): { providerPriceState: "known" | "missing"; providerPriceFree: boolean } {
+  const inputRate = Math.max(0, Math.floor(input.inputCostPer1MCents));
+  const outputRate = Math.max(0, Math.floor(input.outputCostPer1MCents));
+  // 目录种子把未定价写成 0/0。只有成本版本里的 0/0 才是确认过的免费模型。
+  const unpriced =
+    input.source === "none" || (input.source === "catalog" && inputRate === 0 && outputRate === 0);
+  if (unpriced) {
+    return { providerPriceState: "missing", providerPriceFree: false };
+  }
+  return {
+    providerPriceState: "known",
+    providerPriceFree: inputRate === 0 && outputRate === 0,
+  };
+}
+
+export type LedgerPriceKind = "known" | "free" | "missing";
+
+export function ledgerPriceKind(
+  entry: Pick<UsageLedgerEntry, "providerCostCents" | "providerPriceState" | "providerPriceFree">,
+): LedgerPriceKind {
+  if (entry.providerPriceState === "known") {
+    return entry.providerPriceFree ? "free" : "known";
+  }
+  if (entry.providerPriceState === "missing") {
+    return "missing";
+  }
+  return entry.providerCostCents > 0 ? "known" : "missing";
+}
+
 export const USAGE_COST_FACT_LIMIT = 200;
 
 export type LoadUsageCostFactsInput = {
@@ -20,21 +53,30 @@ export type LoadUsageCostFactsInput = {
   stageStorePath?: string;
 };
 
+function measuredToken(value: number | undefined): number | null {
+  if (value === undefined || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  return Math.floor(value);
+}
+
 function settlementFor(
   entry: UsageLedgerEntry,
   stage: CreditUsageStageRecord | undefined,
 ): UsageSettlementFact {
   const byok = entry.billingOwner === "enterprise" || entry.source === "enterprise";
+  const price = ledgerPriceKind(entry);
   if (byok) {
-    if (entry.providerCostCents > 0) {
-      return {
-        kind: "byok_estimate",
-        currency: "CNY",
-        amountCents: entry.providerCostCents,
-        basis: "已配置价格口径，不是结算扣费",
-      };
+    if (price === "missing") {
+      return { kind: "unknown" };
     }
-    return { kind: "unknown" };
+    return {
+      kind: "byok_estimate",
+      currency: "CNY",
+      amountCents: entry.providerCostCents,
+      basis:
+        price === "free" ? "价格已确认的免费模型，不是结算扣费" : "已配置价格口径，不是结算扣费",
+    };
   }
   if (stage?.stage !== "done") {
     return { kind: "pending", credits: entry.creditsCharged };
@@ -75,7 +117,7 @@ export function ledgerEntryToUsageFact(
   entry: UsageLedgerEntry,
   stage: CreditUsageStageRecord | undefined,
 ): UsageRequestFact {
-  const procurementKnown = entry.providerCostCents > 0;
+  const price = ledgerPriceKind(entry);
   return {
     requestId: entry.id,
     taskId: entry.taskId,
@@ -92,10 +134,10 @@ export function ledgerEntryToUsageFact(
     taskType: null,
     status: statusFor(stage),
     attempt: (entry.retryCount ?? 0) > 0 ? "retry" : "primary",
-    inputTokens: entry.inputTokens ?? null,
-    outputTokens: entry.outputTokens ?? null,
-    cacheReadTokens: null,
-    cacheWriteTokens: null,
+    inputTokens: measuredToken(entry.inputTokens),
+    outputTokens: measuredToken(entry.outputTokens),
+    cacheReadTokens: measuredToken(entry.cacheReadTokens),
+    cacheWriteTokens: measuredToken(entry.cacheWriteTokens),
     latencyMs: entry.durationMs ?? null,
     acceptance: null,
     anomaly: false,
@@ -104,8 +146,9 @@ export function ledgerEntryToUsageFact(
       entry.billingOwner === "enterprise" || entry.source === "enterprise"
         ? null
         : entry.creditsCharged,
-    procurementCents: procurementKnown ? entry.providerCostCents : null,
-    procurementCurrency: procurementKnown ? "CNY" : null,
+    procurementCents: price === "missing" ? null : entry.providerCostCents,
+    procurementCurrency: price === "missing" ? null : "CNY",
+    procurementPrice: price,
     revenueCents: entry.tenantRevenueCents,
   };
 }

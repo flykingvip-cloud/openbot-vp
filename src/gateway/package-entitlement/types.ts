@@ -92,6 +92,21 @@ export type UsageLedgerEntry = {
   planVersionId?: string;
   inputTokens?: number;
   outputTokens?: number;
+  /**
+   * 任务合计的缓存 token。缺省表示这次写入没有缓存分类，读取时必须显示未知，不能当成 0。
+   * 账本一行一个任务，这里不是逐次调用的缓存明细。
+   */
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  /**
+   * 写入时供应商单价是否已经确认。
+   * known：CostVersion，或目录里至少一侧单价大于 0。
+   * missing：没有单价，或目录仍是未定价的 0/0。
+   * 缺省且 providerCostCents 为 0 的历史行按 missing 读，避免把未定价显示成免费。
+   */
+  providerPriceState?: "known" | "missing";
+  /** 单价已确认，且输入/输出单价都是 0。 */
+  providerPriceFree?: boolean;
   /** P4：Credits v2 审计维度（可选）。 */
   toolCallCount?: number;
   durationMs?: number;

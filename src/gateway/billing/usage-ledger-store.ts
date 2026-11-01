@@ -113,6 +113,14 @@ export async function appendUsageLedgerEntry(
       ...(input.outputTokens !== undefined
         ? { outputTokens: Math.max(0, Math.floor(input.outputTokens)) }
         : {}),
+      ...(input.cacheReadTokens !== undefined
+        ? { cacheReadTokens: Math.max(0, Math.floor(input.cacheReadTokens)) }
+        : {}),
+      ...(input.cacheWriteTokens !== undefined
+        ? { cacheWriteTokens: Math.max(0, Math.floor(input.cacheWriteTokens)) }
+        : {}),
+      ...(input.providerPriceState ? { providerPriceState: input.providerPriceState } : {}),
+      ...(input.providerPriceFree ? { providerPriceFree: true } : {}),
       ...(input.toolCallCount !== undefined
         ? { toolCallCount: Math.max(0, Math.floor(input.toolCallCount)) }
         : {}),

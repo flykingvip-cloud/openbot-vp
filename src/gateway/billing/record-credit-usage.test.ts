@@ -98,9 +98,16 @@ describe("recordCreditUsage", () => {
 
     const { readFile } = await import("node:fs/promises");
     const ledgerRaw = JSON.parse(await readFile(ledgerPath, "utf8")) as {
-      entries: Array<{ planId?: string; inputTokens?: number }>;
+      entries: Array<{
+        planId?: string;
+        inputTokens?: number;
+        providerPriceState?: string;
+        providerPriceFree?: boolean;
+      }>;
     };
     expect(ledgerRaw.entries[0]?.planId).toBe(plan.id);
+    expect(ledgerRaw.entries[0]?.providerPriceState).toBe("missing");
+    expect(ledgerRaw.entries[0]?.providerPriceFree).toBeUndefined();
 
     const second = await recordCreditUsage({
       enterpriseId: "ent-credits",

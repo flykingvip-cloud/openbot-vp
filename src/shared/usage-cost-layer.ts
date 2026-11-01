@@ -74,6 +74,7 @@ export type UsageCostRankRow = {
   provider: string | null;
   model: string | null;
   procurementCents: number;
+  priceKind: "known" | "free";
   successRate: number | null;
   acceptanceRate: number | null;
   latencyMsMedian: number | null;
@@ -95,6 +96,8 @@ export type UsageCostLayerView = {
   coverage: "complete" | "truncated";
   freshness: "current" | "delayed";
   recoveredFromStore: true;
+  /** 缓存分类说明。账本没有逐次缓存时明确写未知，不用 0 代替。 */
+  cacheNote: string | null;
   mixedCurrency: boolean;
   callCount: number;
   input: UsageTokenTally;
@@ -121,6 +124,8 @@ export type UsageCostLayerView = {
   ranking?: UsageCostRankRow[];
   excludedFromRanking?: UsageCostExcludedRank[];
   procurementCents?: number | null;
+  /** 仅平台。mixed 表示已确认成本和待确认价格同时存在，合计不能当成完整成本。 */
+  procurementStatus?: "known" | "free" | "missing" | "mixed";
   commercialMarginCents?: number | null;
   taskType?: string | null;
   acceptance?: "passed" | "failed" | "pending" | null;

@@ -10424,6 +10424,12 @@ landingStreams:
       - src/gateway/billing/usage-cost-layer.test.ts
       - src/gateway/billing/usage-cost-facts.ts
       - src/gateway/billing/credit-usage-stage-store.ts
+      - src/gateway/billing/usage-ledger-store.ts
+      - src/gateway/billing/record-credit-usage.ts
+      - src/gateway/billing/record-credit-usage.test.ts
+      - src/gateway/package-entitlement/types.ts
+      - src/auto-reply/reply/agent-run-credit-usage.ts
+      - src/auto-reply/reply/agent-run-credit-usage.test.ts
       - src/gateway/server-methods/usage-cost-layer.ts
       - src/gateway/server-methods/usage-cost-layer.test.ts
       - src/gateway/server-methods/billing.ts
