@@ -1,4 +1,8 @@
-import { formatDockerCliMissingUserMessage } from "../../agents/sandbox/docker-engine-client.js";
+import {
+  extractSandboxInfraUserFacingDetail,
+  formatDockerCliMissingUserMessage,
+  isSandboxInfraPreReplyError,
+} from "../../agents/sandbox/docker-engine-client.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import {
   asMessageList,
@@ -106,12 +110,23 @@ export function collaborationSkipReasonForMissingReply(params: {
   return "empty";
 }
 
-const INFRA_PRE_REPLY_RE =
-  /AccountWorkerFailedError|DOCKER_CLI_MISSING|OPENCLAW_INSTALL_DOCKER_CLI|docker command was not found|Sandbox mode requires Docker|云电脑没有启动|Embedded agent failed before reply|Agent failed before reply/i;
+/**
+ * Explicit sandbox / docker / 云电脑 markers only.
+ * Aggregate shells ("All models failed", "Embedded agent failed before reply",
+ * "Agent failed before reply") are NOT infra evidence by themselves.
+ */
+const INFRA_EVIDENCE_RE =
+  /AccountWorkerFailedError|DOCKER_CLI_MISSING|OPENCLAW_INSTALL_DOCKER_CLI|docker command was not found|Sandbox mode requires Docker|云电脑没有启动|docker create failed|docker start failed|pull access denied|Unable to find image|Sandbox browser image not found|cannot connect to the docker daemon/i;
 
 /**
  * A pre-reply sandbox failure is not an empty draft. Surface the operator
- * reason so the round abort is not skipReason=empty.
+ * reason so the round abort is not skipReason=empty — including when the
+ * error is wrapped as "All models failed (N): …云电脑…".
+ *
+ * "All models failed" is only an aggregate shell: walk/parse individual
+ * reasons and short-circuit to infra copy only when an explicit sandbox /
+ * docker / 云电脑 cause is proven. Pure auth / rate-limit / model capability
+ * aggregates return null so the real error path + abort UX stay intact.
  */
 export function collaborationInfraFailureDetail(params: {
   combinedReplyRaw: string;
@@ -131,22 +146,32 @@ export function collaborationInfraFailureDetail(params: {
     }
   }
   const joined = chunks.join("\n");
-  if (!INFRA_PRE_REPLY_RE.test(joined)) {
+
+  // Prefer extracted user-facing sandbox detail (works through aggregate wraps).
+  for (const chunk of chunks) {
+    const extracted = extractSandboxInfraUserFacingDetail(chunk);
+    if (extracted) {
+      return extracted;
+    }
+  }
+  const extractedJoined = extractSandboxInfraUserFacingDetail(joined);
+  if (extractedJoined) {
+    return extractedJoined;
+  }
+
+  // Proven infra evidence only — never treat aggregate shells alone as sandbox.
+  if (!INFRA_EVIDENCE_RE.test(joined) && !isSandboxInfraPreReplyError(joined)) {
     return null;
   }
+
   if (
-    /AccountWorkerFailedError|DOCKER_CLI_MISSING|docker command was not found|Sandbox mode requires Docker|OPENCLAW_INSTALL_DOCKER_CLI/i.test(
+    /DOCKER_CLI_MISSING|docker command was not found|Sandbox mode requires Docker|OPENCLAW_INSTALL_DOCKER_CLI|AccountWorkerFailedError/i.test(
       joined,
     )
   ) {
     return formatDockerCliMissingUserMessage();
   }
-  const direct = chunks
-    .map((chunk) => chunk.trim())
-    .find((chunk) => chunk.includes("云电脑没有启动"));
-  if (direct) {
-    return direct.slice(0, 400);
-  }
+
   return "云电脑没有启动：账号沙箱未能创建容器。请确认网关镜像包含 docker 命令（OPENCLAW_INSTALL_DOCKER_CLI=1），或已挂载 docker.sock / podman.sock。";
 }
 
@@ -313,6 +338,17 @@ export function formatCollaborationRoundAbortNotice(params: {
   userText?: string;
 }): string {
   const who = params.agentName?.trim() || "数字人";
+  const detail = params.errorMessage?.trim();
+  // Infra (proven 云电脑 / docker) already carries the operator reason —
+  // prefer that line over main's generic understanding shell. Aggregate-only
+  // "All models failed" must not take this short path.
+  if (
+    detail &&
+    (/云电脑没有启动|DOCKER_CLI_MISSING|docker create failed/i.test(detail) ||
+      isSandboxInfraPreReplyError(detail))
+  ) {
+    return `${detail}。可稍后重试，或 @其他成员接手。`;
+  }
   const named = Boolean(params.agentName?.trim());
   const intent = classifyCollaborationAbortIntent(params.userText);
   const understanding = collaborationAbortUnderstanding({ who, intent, named });

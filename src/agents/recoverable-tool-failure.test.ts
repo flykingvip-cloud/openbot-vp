@@ -19,6 +19,14 @@ describe("classifyRecoverableToolFailure", () => {
         "Cannot connect to the Docker daemon at unix:///var/run/docker.sock",
       ),
     ).toBe("sandbox_runtime");
+    expect(
+      classifyRecoverableToolFailure(
+        "云电脑没有启动：docker create failed: Unable to find image 'openbot-sandbox-browser:trixie' locally",
+      ),
+    ).toBe("sandbox_runtime");
+    expect(classifyRecoverableToolFailure("AccountWorkerFailedError: DOCKER_CLI_MISSING")).toBe(
+      "sandbox_runtime",
+    );
   });
 
   it("classifies path_missing", () => {

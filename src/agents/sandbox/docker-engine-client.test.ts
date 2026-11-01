@@ -17,6 +17,8 @@ import {
   readDockerContainerLivenessViaEngine,
   readDockerPortViaEngine,
   resolveAccountWorkerDockerTransport,
+  extractSandboxInfraUserFacingDetail,
+  isSandboxInfraPreReplyError,
   userFacingPreReplyFailure,
   type DockerEngineRequest,
 } from "./docker-engine-client.js";
@@ -661,5 +663,30 @@ describe("container liveness probes", () => {
       }),
     ).resolves.toBe("running");
     expect(inspectCli).not.toHaveBeenCalled();
+  });
+});
+
+describe("isSandboxInfraPreReplyError / extractSandboxInfraUserFacingDetail", () => {
+  it("classifies 云电脑 create / denied pull as infra", () => {
+    const msg =
+      "云电脑没有启动：docker create failed: Unable to find image 'openbot-sandbox-browser:trixie' locally\nError response from daemon: denied: requested access to the resource is denied";
+    expect(isSandboxInfraPreReplyError(msg)).toBe(true);
+    expect(extractSandboxInfraUserFacingDetail(msg)).toContain("云电脑没有启动");
+  });
+
+  it("extracts 云电脑 from an All models failed wrap", () => {
+    const wrapped =
+      "All models failed (2): api-proxy-deepseek/deepseek-v4-flash: 云电脑没有启动：docker create failed: Unable to find image 'openbot-sandbox-browser:trixie' locally | ent/x: Unknown model";
+    expect(isSandboxInfraPreReplyError(wrapped)).toBe(true);
+    const detail = extractSandboxInfraUserFacingDetail(wrapped);
+    expect(detail).toContain("云电脑没有启动");
+    expect(detail).not.toMatch(/Unknown model/i);
+  });
+
+  it("does not treat ordinary LLM overload as sandbox infra", () => {
+    expect(isSandboxInfraPreReplyError("LLM error overloaded_error: overloaded")).toBe(false);
+    expect(
+      extractSandboxInfraUserFacingDetail("LLM error overloaded_error: overloaded"),
+    ).toBeNull();
   });
 });

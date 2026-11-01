@@ -166,6 +166,25 @@ describe("classifyCollaborationAbortIntent", () => {
     expect(classifyCollaborationAbortIntent("随便问一句")).toBe("none");
     expect(classifyCollaborationAbortIntent(undefined)).toBe("none");
   });
+
+  it("prefers 云电脑 detail from an All models failed wrap over generic empty", () => {
+    const detail = collaborationInfraFailureDetail({
+      sinceMs: 1_780_000_000_000,
+      combinedReplyRaw:
+        "Embedded agent failed before reply: All models failed (2): api-proxy/deepseek: 云电脑没有启动：docker create failed: Unable to find image 'openbot-sandbox-browser:trixie' locally | ent/x: Unknown model",
+      messages: [],
+    });
+    expect(detail).toContain("云电脑没有启动");
+    const notice = formatCollaborationRoundAbortNotice({
+      agentName: "熊猫学习",
+      skipReason: "crash",
+      errorMessage: detail ?? undefined,
+    });
+    expect(notice).toContain("云电脑没有启动");
+    expect(notice).not.toContain("未产出正文");
+    // Infra abort should lead with the 云电脑 reason, not only the generic empty shell.
+    expect(notice.startsWith("云电脑")).toBe(true);
+  });
 });
 
 describe("formatCollaborationRoundAbortNotice", () => {
@@ -239,6 +258,154 @@ describe("formatCollaborationRoundAbortNotice", () => {
     expect(deliverNotice).toMatch(/交付|成果/);
     expect(deliverNotice).toContain("binding");
     expect(deliverNotice).not.toContain("本轮没有形成可见回复");
+  });
+});
+
+describe("collaborationInfraFailureDetail aggregate classification", () => {
+  const sinceMs = 1_780_000_000_000;
+
+  it("negative: All models failed + 401/rate-limit is NOT infra 云电脑 lead", () => {
+    const raw =
+      "Embedded agent failed before reply: All models failed (2): openai/gpt-4: HTTP 401 Unauthorized: invalid api key; anthropic/claude-sonnet: rate_limit_error: Rate limit exceeded";
+    const detail = collaborationInfraFailureDetail({
+      sinceMs,
+      combinedReplyRaw: raw,
+      messages: [],
+    });
+    expect(detail).toBeNull();
+
+    // Real error path + main abort UX (understanding / fact / actions), not 云电脑 short-circuit.
+    const notice = formatCollaborationRoundAbortNotice({
+      agentName: "熊猫学习",
+      skipReason: "crash",
+      errorMessage: raw,
+      userText: "请继续写下一章",
+    });
+    expect(notice).toMatch(/^我理解/);
+    expect(notice).toContain("续写");
+    expect(notice).toContain("执行中断");
+    expect(notice).toContain(raw.slice(0, 40));
+    expect(notice).not.toMatch(/^云电脑/);
+    expect(notice).not.toContain("未能创建容器");
+    expect(notice).not.toContain("docker.sock");
+  });
+
+  it("negative: bare All models failed aggregate shell is not sandbox evidence", () => {
+    expect(
+      collaborationInfraFailureDetail({
+        sinceMs,
+        combinedReplyRaw: "All models failed (1): ent/x: Unknown model",
+        messages: [],
+      }),
+    ).toBeNull();
+    expect(
+      collaborationInfraFailureDetail({
+        sinceMs,
+        combinedReplyRaw: "Agent failed before reply: context length exceeded",
+        messages: [],
+      }),
+    ).toBeNull();
+  });
+
+  it("positive: explicit docker/sandbox evidence still infra short-circuits", () => {
+    const raw =
+      "Embedded agent failed before reply: All models failed (2): api-proxy/deepseek: 云电脑没有启动：docker create failed: Unable to find image 'openbot-sandbox-browser:trixie' locally | ent/x: Unknown model";
+    const detail = collaborationInfraFailureDetail({
+      sinceMs,
+      combinedReplyRaw: raw,
+      messages: [],
+    });
+    expect(detail).toContain("云电脑没有启动");
+    expect(detail).toContain("docker create failed");
+    const notice = formatCollaborationRoundAbortNotice({
+      agentName: "熊猫学习",
+      skipReason: "crash",
+      errorMessage: detail ?? undefined,
+      userText: "请继续写下一章",
+    });
+    expect(notice.startsWith("云电脑")).toBe(true);
+    expect(notice).toContain("可稍后重试");
+    expect(notice).not.toMatch(/^我理解/);
+  });
+
+  it("positive: AccountWorkerFailedError / docker CLI missing stays infra", () => {
+    const detail = collaborationInfraFailureDetail({
+      sinceMs,
+      combinedReplyRaw: "",
+      messages: [
+        {
+          role: "assistant",
+          timestamp: sinceMs + 500,
+          content: [
+            {
+              type: "text",
+              text: "⚠️ Agent failed before reply: AccountWorkerFailedError: Sandbox mode requires Docker, but the docker command was not found in PATH.",
+            },
+          ],
+        },
+      ],
+    });
+    expect(detail).toContain("DOCKER_CLI_MISSING");
+    const notice = formatCollaborationRoundAbortNotice({
+      agentName: "高密度分析",
+      skipReason: "crash",
+      errorMessage: detail ?? undefined,
+    });
+    expect(notice).toContain("DOCKER_CLI_MISSING");
+    expect(notice).not.toMatch(/^我理解/);
+  });
+
+  it("mixed: only proven infra root cause kept; auth-only sibling does not force cloud-PC", () => {
+    const mixed =
+      "All models failed (2): openai/gpt-4: HTTP 401 Unauthorized | api-proxy/deepseek: 云电脑没有启动：docker create failed: Unable to find image 'openbot-sandbox-browser:trixie' locally";
+    const detail = collaborationInfraFailureDetail({
+      sinceMs,
+      combinedReplyRaw: mixed,
+      messages: [],
+    });
+    expect(detail).toContain("云电脑没有启动");
+    expect(detail).toContain("docker create failed");
+    // Proven infra kept; do not invent a different cloud-PC boilerplate, and do not drop infra because of 401 sibling.
+    expect(detail).not.toBe(
+      "云电脑没有启动：账号沙箱未能创建容器。请确认网关镜像包含 docker 命令（OPENCLAW_INSTALL_DOCKER_CLI=1），或已挂载 docker.sock / podman.sock。",
+    );
+    const notice = formatCollaborationRoundAbortNotice({
+      agentName: "熊猫学习",
+      skipReason: "crash",
+      errorMessage: detail ?? undefined,
+      userText: "催办立刻续跑",
+    });
+    expect(notice.startsWith("云电脑")).toBe(true);
+    expect(notice).not.toContain("401");
+    expect(notice).not.toMatch(/^我理解/);
+  });
+
+  it("mixed auth-only aggregate never becomes fixed 云电脑 boilerplate", () => {
+    const authOnly =
+      "All models failed (3): a/x: 401; b/y: rate_limit_exceeded; c/z: model_not_found";
+    expect(
+      collaborationInfraFailureDetail({
+        sinceMs,
+        combinedReplyRaw: authOnly,
+        messages: [
+          {
+            role: "assistant",
+            timestamp: sinceMs + 10,
+            content: [{ type: "text", text: authOnly }],
+          },
+        ],
+      }),
+    ).toBeNull();
+    const notice = formatCollaborationRoundAbortNotice({
+      agentName: "CEO助理",
+      skipReason: "crash",
+      errorMessage: authOnly,
+      userText: "请交付 binding 成果",
+    });
+    expect(notice).toMatch(/^我理解/);
+    expect(notice).toMatch(/交付|成果/);
+    expect(notice).toContain("执行中断");
+    expect(notice).not.toContain("未能创建容器");
   });
 });
 

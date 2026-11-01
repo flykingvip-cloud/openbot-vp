@@ -93,19 +93,65 @@ export function isDockerAccountWorkerUnavailableError(error: unknown): boolean {
   );
 }
 
+/**
+ * Sandbox / account-worker infra that is not a per-model failure.
+ * Model fallback must rethrow these instead of burning the next candidate.
+ */
+export function isSandboxInfraPreReplyError(message: string): boolean {
+  const text = message.trim();
+  if (!text) {
+    return false;
+  }
+  return /云电脑没有启动|docker create failed|docker start failed|AccountWorkerFailedError|DOCKER_CLI_MISSING|cannot connect to the docker daemon|Sandbox mode requires Docker|docker command was not found|pull access denied|Unable to find image ['"]?openbot-sandbox|Unable to find image ['"]?openclaw-sandbox|Sandbox browser image not found/i.test(
+    text,
+  );
+}
+
+/** Prefer the 云电脑 line inside an "All models failed …" wrap. */
+export function extractSandboxInfraUserFacingDetail(message: string): string | null {
+  const text = message.trim();
+  if (!text) {
+    return null;
+  }
+  const cloudIdx = text.indexOf("云电脑没有启动");
+  if (cloudIdx >= 0) {
+    // Drop trailing "| other-provider/model: …" segments from fallback summaries.
+    return text
+      .slice(cloudIdx, cloudIdx + 400)
+      .replace(/\s*\|\s*[^\n|]*$/u, "")
+      .trim();
+  }
+  const createOrImageMiss =
+    /docker create failed|docker start failed|Unable to find image|pull access denied|Sandbox browser image not found/i.test(
+      text,
+    );
+  if (createOrImageMiss) {
+    const compact = text.replace(/\s+/g, " ").trim().slice(0, 180);
+    return `云电脑没有启动：${compact}`;
+  }
+  if (
+    isDockerAccountWorkerUnavailableError(new Error(text)) ||
+    /DOCKER_CLI_MISSING|docker command was not found|Sandbox mode requires Docker/i.test(text)
+  ) {
+    return formatDockerCliMissingUserMessage();
+  }
+  return null;
+}
+
 export function userFacingPreReplyFailure(message: string): string | null {
   const text = message.trim();
   if (!text) {
     return null;
+  }
+  const infra = extractSandboxInfraUserFacingDetail(text);
+  if (infra) {
+    return infra;
   }
   if (
     isDockerAccountWorkerUnavailableError(new Error(text)) ||
     text.includes("DOCKER_CLI_MISSING")
   ) {
     return formatDockerCliMissingUserMessage();
-  }
-  if (text.includes("云电脑没有启动")) {
-    return text.slice(0, 400);
   }
   const entitlement = userFacingEntitlementPreReplyFailure(text);
   if (entitlement) {
@@ -347,6 +393,14 @@ export function parseAccountWorkerDockerCreateArgs(args: string[]): CreateSpec {
     if (token === "--name" && next) {
       name = next;
       index += 1;
+      continue;
+    }
+    // Local-only create: never registry-pull operator sandbox images.
+    if (token === "--pull" && next) {
+      index += 1;
+      continue;
+    }
+    if (token.startsWith("--pull=")) {
       continue;
     }
     if (token === "-e" && next) {

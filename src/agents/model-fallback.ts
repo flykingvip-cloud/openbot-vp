@@ -39,6 +39,7 @@ import {
 } from "./model-selection.js";
 import type { FailoverReason } from "./pi-embedded-helpers.js";
 import { isLikelyContextOverflowError } from "./pi-embedded-helpers.js";
+import { isSandboxInfraPreReplyError } from "./sandbox/docker-engine-client.js";
 
 const log = createSubsystemLogger("model-fallback");
 
@@ -1053,6 +1054,12 @@ export async function runWithModelFallback<T>(params: {
       // that may have a smaller context window and fail worse.
       const errMessage = err instanceof Error ? err.message : String(err);
       if (isLikelyContextOverflowError(errMessage)) {
+        throw err;
+      }
+      // Sandbox / 云电脑 create failures are infra, not per-model. Fail overing
+      // only burns another candidate (and another create) and wraps the honest
+      // 云电脑 notice as "All models failed".
+      if (isSandboxInfraPreReplyError(errMessage)) {
         throw err;
       }
       const normalized =

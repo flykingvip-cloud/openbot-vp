@@ -143,7 +143,9 @@ export function buildAccountWorkerContainerArgs(params: {
 }): string[] {
   const mounts = params.kind === "exec" ? params.spec.execMounts : params.spec.browserMounts;
   const image = params.kind === "exec" ? params.spec.image : params.spec.browserImage;
-  const args = ["create", "--name", params.name];
+  // Never registry-pull operator sandbox images on create miss (LIVE: denied
+  // pull of openbot-sandbox-browser:*). Local short-name / localhost only.
+  const args = ["create", "--pull=never", "--name", params.name];
   for (const mount of mounts) {
     args.push("-v", formatHostEngineDockerBind(mount, params.bindTranslation));
   }
@@ -530,22 +532,51 @@ export function createDockerAccountSandboxDriver(options?: {
   }
 
   async function resolveAliasedImage(image: string): Promise<string> {
-    const peer = sandboxImageCompatPeer(image);
-    if (!peer) {
+    const trimmed = image.trim();
+    if (!trimmed) {
       return image;
     }
-    const requestedPresent = (await imagePresent(image)) === "yes";
-    const peerPresent = (await imagePresent(peer)) === "yes";
-    const plan = planSandboxImageAlias({
-      requested: image,
-      requestedPresent,
-      peerPresent,
-    });
-    if (plan.kind === "retag") {
-      const tagged = await runDocker(["tag", plan.from, plan.to], { allowFailure: true });
-      return tagged.code === 0 ? plan.to : plan.from;
+    // Prefer an already-local name. Podman often stores builds as localhost/<name>.
+    const localhostVariant = trimmed.startsWith("localhost/")
+      ? trimmed
+      : trimmed.includes("/")
+        ? null
+        : `localhost/${trimmed}`;
+    const shortVariant =
+      trimmed.startsWith("localhost/") && trimmed.split("/").length === 2
+        ? trimmed.slice("localhost/".length)
+        : null;
+    for (const candidate of [trimmed, localhostVariant, shortVariant]) {
+      if (!candidate) {
+        continue;
+      }
+      if ((await imagePresent(candidate)) === "yes") {
+        return candidate;
+      }
     }
-    return image;
+    const peer = sandboxImageCompatPeer(trimmed);
+    if (!peer) {
+      return trimmed;
+    }
+    const peerLocalhost = peer.includes("/") ? null : `localhost/${peer}`;
+    for (const candidate of [peer, peerLocalhost]) {
+      if (!candidate) {
+        continue;
+      }
+      if ((await imagePresent(candidate)) === "yes") {
+        const plan = planSandboxImageAlias({
+          requested: trimmed,
+          requestedPresent: false,
+          peerPresent: true,
+        });
+        if (plan.kind === "retag") {
+          const tagged = await runDocker(["tag", candidate, plan.to], { allowFailure: true });
+          return tagged.code === 0 ? plan.to : candidate;
+        }
+        return candidate;
+      }
+    }
+    return trimmed;
   }
 
   async function ensureCreatedAndStarted(params: {
