@@ -10195,6 +10195,14 @@ tasks:
     paths:
       - .loom/registry.yaml
       - docs/notes/infrastructure-audit-2026-10-31/**
+  - id: infrastructure-audit:a3-implementation-pack
+    owner: infra-audit
+    intent:
+      - A3 runner-probe implementation pack (workflow_dispatch-only YAML; merge registration ≠ run; no auto dispatch)
+    paths:
+      - .loom/registry.yaml
+      - .github/workflows/audit-a3-runner-probe.yml
+      - docs/notes/infrastructure-audit-2026-10-31/a3-implementation-pack-PENDING-AUTH.md
     state: active
     sessions: []
     ownerHistory: []
@@ -10953,6 +10961,8 @@ landingStreams:
       - strip-ohbe-from-openbot-vp
       - infrastructure-audit-ledger-integrity-20261031
       - infrastructure-audit-batch-b-20261031
+      - infrastructure-audit-a3-implementation-pack-20261031
+      - infrastructure-audit-release-record-anti-drift-20261031
     metadata:
       task: infrastructure-audit:p1-object-recovery
       owner: infra-audit
@@ -11021,6 +11031,21 @@ landingStreams:
       owner: infra-audit
       purpose: Generate/check managed RELEASE_RECORD current-identity block from
         releases.jsonl (ledger↔doc anti-drift; not LIVE container reconcile).
+  - id: infrastructure-audit-a3-implementation-pack-20261031
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .github/workflows/audit-a3-runner-probe.yml
+      - docs/notes/infrastructure-audit-2026-10-31/a3-implementation-pack-PENDING-AUTH.md
+    canLandWith:
+      - strip-ohbe-from-openbot-vp
+      - infrastructure-audit-ledger-integrity-20261031
+      - infrastructure-audit-p1-object-recovery-20261031
+      - infrastructure-audit-release-record-anti-drift-20261031
+    metadata:
+      task: infrastructure-audit:a3-implementation-pack
+      owner: infra-audit
+      purpose: A3 runner-probe pack — workflow_dispatch only; merge registers YAML on default without auto-run; run requires separate owner auth; never claim Contents API .sha is SHA256.
   - id: controlled-collab-p2-event-dispatch-20261031
     landingPolicy: serial
     paths:
