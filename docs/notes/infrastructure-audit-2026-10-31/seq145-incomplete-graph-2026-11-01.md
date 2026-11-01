@@ -45,3 +45,7 @@
 - 独立验收记录指向上述证据。
 
 未满足时保持未决。本任务保持 blocked，直到有人接手并补齐对象图。
+
+## Loom 路径归属（2026-11-01 复验整理）
+
+本说明文件路径仍由 `infrastructure-audit:infra-audit` 认领（目录通配）。任务 `infrastructure-audit:seq145-incomplete-graph` 保持 `blocked` / `owner: unassigned`（等待责任分配），**不再单独认领本路径**，以消除 ownership-overlap。接管本残留时须按 AGENTS.md 做 takeover（`loom register`）后再认领路径。

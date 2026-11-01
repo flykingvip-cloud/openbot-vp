@@ -2,6 +2,8 @@
 
 原始输出目录：`docs/notes/infrastructure-audit-2026-10-31/closeout-evidence-2026-11-01/`。
 
+原始命令输出（`*.out` / `*.err`）以压缩归档保留原始字节，避免 `git diff --check` 因尾随空白失败而被静默改写：`closeout-evidence-2026-11-01/raw-command-outputs.tar.gz`（成员摘要见同目录 `raw-command-outputs.MANIFEST.txt` / `raw-command-outputs.sha256`）。解压后应与归档前逐字节一致。目录内不再保留松散 `.out`/`.err`。
+
 候选（验证当时）：
 
 - head `c3b00f492411dc96d2befd67921fe4951cfede97`
@@ -14,11 +16,11 @@
 | 记录 | 命令 | 退出码 | UTC | 原始输出 |
 |---|---|---:|---|---|
 | 汇总 | 见各行 | 见 `summary.txt` | 12:59:16 起 | `summary.txt` |
-| 本地门禁单测 | `pnpm exec vitest run scripts/ci-local-merge-gate.test.ts` | 0 | 12:59:16–12:59:18 | `vitest-ci-local-merge-gate.out` / `.err` |
-| 防漂移单测 | `pnpm exec vitest run scripts/delivery/release-record.test.ts` | 0 | 12:59:18–12:59:19 | `vitest-release-record.out` / `.err` |
-| 账本与 forward-guard 单测 | `pnpm exec vitest run scripts/delivery/ledger.test.ts scripts/delivery/forward-guard.test.ts` | 0 | 12:59:19–12:59:21 | `vitest-ledger-forward.out` / `.err` |
-| 人类记录检查 | `pnpm delivery:release-record:check` | 0 | 12:59:21 | `release-record-check.out` |
-| 账本审计 | `pnpm delivery:ledger:audit` | 30 | 12:59:28–12:59:29 | `ledger-audit.out`（warn）、`ledger-audit.err`（ERROR）、`ledger-audit-code-counts.json` |
+| 本地门禁单测 | `pnpm exec vitest run scripts/ci-local-merge-gate.test.ts` | 0 | 12:59:16–12:59:18 | `raw-command-outputs.tar.gz` → `vitest-ci-local-merge-gate.out` / `.err` |
+| 防漂移单测 | `pnpm exec vitest run scripts/delivery/release-record.test.ts` | 0 | 12:59:18–12:59:19 | `raw-command-outputs.tar.gz` → `vitest-release-record.out` / `.err` |
+| 账本与 forward-guard 单测 | `pnpm exec vitest run scripts/delivery/ledger.test.ts scripts/delivery/forward-guard.test.ts` | 0 | 12:59:19–12:59:21 | `raw-command-outputs.tar.gz` → `vitest-ledger-forward.out` / `.err` |
+| 人类记录检查 | `pnpm delivery:release-record:check` | 0 | 12:59:21 | `raw-command-outputs.tar.gz` → `release-record-check.out` / `.err` |
+| 账本审计 | `pnpm delivery:ledger:audit` | 30 | 12:59:28–12:59:29 | `raw-command-outputs.tar.gz` → `ledger-audit.out`（warn）/ `ledger-audit.err`（ERROR）；计数旁路：`ledger-audit-code-counts.json` |
 
 本轮 audit 计数（从上述原始文件解析，不是历史 146 表）：ERROR missing-object 157；warn timeline-gap 8；warn overlay-debt 15；warn missing-tag 1。无 regression、incomplete-graph、open-interval 行。
 

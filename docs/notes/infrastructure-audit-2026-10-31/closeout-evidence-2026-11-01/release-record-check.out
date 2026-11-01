@@ -1,5 +1,0 @@
-
-> @upbeyond/openbot@2026.7.12-rc.2 delivery:release-record:check /workspace
-> node --import tsx scripts/delivery/release-record.ts check
-
-ledger↔doc consistent for open seq 151 (table+machine; not a LIVE container reconciliation)

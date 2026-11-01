@@ -10586,9 +10586,10 @@ tasks:
   owner: unassigned
   intent:
   - seq145 remains incomplete_graph_unknown until parent chain evidence exists; no acknowledge; owner
-    待指派
-  paths:
-  - docs/notes/infrastructure-audit-2026-10-31/seq145-incomplete-graph-2026-11-01.md
+    等待责任分配
+  - note file stays under infrastructure-audit:infra-audit path claim; this blocked task claims no path
+    until takeover (no ownership-overlap)
+  paths: []
   state: blocked
   sessions:
   - id: 2161bb74-d574-4b2e-b228-d42f0d530c36
