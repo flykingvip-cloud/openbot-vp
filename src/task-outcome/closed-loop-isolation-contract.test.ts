@@ -13,10 +13,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildEmployeeBuiltinStewardSessionKey } from "../agents/builtin-steward/employee-isolation.js";
-import {
-  applyGoalCorrectionMutation,
-  extractGoalCorrectionMutation,
-} from "../auto-reply/reply/goal-correction-mutation.js";
+import { extractGoalCorrectionMutation } from "../auto-reply/reply/goal-correction-mutation.js";
+import { applyInboundTaskFeedback } from "../auto-reply/reply/inbound-task-feedback.js";
 import {
   createTaskContext,
   getTaskContext,
@@ -536,7 +534,10 @@ describe("closed-loop isolation contract", () => {
   });
 
   it("production source has no correction allowlist and no feedback writeback", () => {
-    expect(rgFiles("correctionAllowlist")).toEqual(["src/task-outcome/result-service.ts"]);
+    expect(rgFiles("correctionAllowlist")).toEqual([
+      "src/task-outcome/reject-result.ts",
+      "src/task-outcome/result-service.ts",
+    ]);
     expect(rgFiles("recordInboundFeedback")).toEqual([
       "src/gateway/agent-growth/record-feedback.ts",
     ]);
@@ -545,31 +546,41 @@ describe("closed-loop isolation contract", () => {
       "src/gateway/agent-growth/record-feedback.ts",
     ]);
     expect(rgFiles("applyGoalCorrectionMutation")).toEqual([
-      "src/auto-reply/reply/get-reply-run.ts",
       "src/auto-reply/reply/goal-correction-mutation.ts",
+      "src/auto-reply/reply/inbound-task-feedback.ts",
     ]);
+    expect(rgFiles("applyInboundTaskFeedback")).toContain("src/auto-reply/reply/get-reply-run.ts");
     expect(rgFiles("attachAdoptedLearningAssetsToTask")).toEqual([
       "src/task-outcome/index.ts",
       "src/task-outcome/learning-adoption.ts",
     ]);
     const taskOutcomeImporters = [
-      ...rgFiles('from "../task-outcome'),
-      ...rgFiles('from "../../task-outcome'),
+      ...rgFiles('from "../task-outcome/'),
+      ...rgFiles('from "../../task-outcome/'),
     ].toSorted((left, right) => left.localeCompare(right));
-    expect(taskOutcomeImporters.filter((file) => file.startsWith("src/diagnosis/"))).toEqual([]);
-    expect(taskOutcomeImporters).toEqual([
-      "src/agents/pi-embedded-subscribe.handlers.tools.ts",
-      "src/auto-reply/reply/agent-runner-execution.ts",
-      "src/auto-reply/reply/agent-runner.ts",
-      "src/auto-reply/reply/dispatch-from-config.ts",
-      "src/auto-reply/reply/followup-runner.ts",
-      "src/commands/agent.ts",
-      "src/cron/isolated-agent/run.ts",
-      "src/cron/service/timer.ts",
-      "src/gateway/agent-growth/operational-metrics-store.ts",
-      "src/gateway/collaboration-learning/claim-contract-entry.ts",
-      "src/gateway/server.impl.ts",
+    expect(taskOutcomeImporters.filter((file) => file.startsWith("src/diagnosis/"))).toEqual([
+      "src/diagnosis/report-query-gateway.ts",
+      "src/diagnosis/task-outcome-evidence.ts",
     ]);
+    expect(taskOutcomeImporters).toEqual(
+      [
+        "src/agents/pi-embedded-subscribe.handlers.tools.ts",
+        "src/auto-reply/reply/agent-runner-execution.ts",
+        "src/auto-reply/reply/agent-runner.ts",
+        "src/auto-reply/reply/dispatch-from-config.ts",
+        "src/auto-reply/reply/followup-runner.ts",
+        "src/auto-reply/reply/inbound-task-feedback.ts",
+        "src/commands/agent.ts",
+        "src/cron/isolated-agent/run.ts",
+        "src/cron/service/timer.ts",
+        "src/diagnosis/report-query-gateway.ts",
+        "src/diagnosis/task-outcome-evidence.ts",
+        "src/gateway/agent-growth/operational-metrics-store.ts",
+        "src/gateway/collaboration-learning/claim-contract-entry.ts",
+        "src/gateway/server-methods/task-outcome-reject.ts",
+        "src/gateway/server.impl.ts",
+      ].toSorted((left, right) => left.localeCompare(right)),
+    );
   });
 
   it("feedback regex and goal mutation do not correct the named TaskOutcome", async () => {
@@ -640,7 +651,7 @@ describe("closed-loop isolation contract", () => {
       title: "另一项",
       description: "不该被改",
     });
-    const quoted = await applyGoalCorrectionMutation({
+    const quoted = await applyInboundTaskFeedback({
       cfg,
       workspaceDir: workspace,
       agentId: "bot-isolation",
@@ -649,14 +660,14 @@ describe("closed-loop isolation contract", () => {
       text: "他说「不对，重做一遍这个结果」",
       sourceMessageId: "m-quote",
     });
-    expect(quoted).toBe("updated");
+    expect(quoted.workspace).toBe("skipped");
+    expect(quoted.disposition).toEqual({ kind: "ignore", reason: "quoted" });
     expect(service.get("task-a")?.outcomeVersion).toBe(before);
     expect(service.get("task-a")?.taskJudgement).toBe("success");
-    const rewritten = await getTaskContext(contextScope, bound.id);
-    expect(rewritten?.description).toContain("不对");
+    expect((await getTaskContext(contextScope, bound.id))?.description).toBe("原来的交付说明");
     expect((await getTaskContext(contextScope, other.id))?.description).toBe("不该被改");
 
-    const unbound = await applyGoalCorrectionMutation({
+    const unbound = await applyInboundTaskFeedback({
       cfg,
       workspaceDir: workspace,
       agentId: "bot-isolation",
@@ -664,7 +675,8 @@ describe("closed-loop isolation contract", () => {
       text: "上次的交付不对，应该是要让结果通过验收",
       sourceMessageId: "m-unbound",
     });
-    expect(unbound).toBeNull();
+    expect(unbound.workspace).toBe("skipped");
+    expect(unbound.clarify).toContain("结果不符合要求");
     expect(service.get("task-a")?.taskJudgement).toBe("success");
     store.close();
   });
