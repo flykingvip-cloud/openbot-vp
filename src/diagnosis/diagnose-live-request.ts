@@ -68,6 +68,11 @@ import {
   loadStructuralPreviewSources,
   type StructuralPreviewSources,
 } from "./structural-preview-reader.js";
+import {
+  formatTaskOutcomeEvidenceText,
+  readTaskOutcomeEvidence,
+  type TaskOutcomeEvidence,
+} from "./task-outcome-evidence.js";
 import type { DiagnosticPrincipal, TrustedTenantContext } from "./types.js";
 
 export type DiagnoseExecutionPayload = Omit<LiveDiagnoseSummary, "reportId"> & {
@@ -86,6 +91,7 @@ export type DiagnoseExecutionPayload = Omit<LiveDiagnoseSummary, "reportId"> & {
   prescriptions?: DiagnoseEvolutionPrescription[];
   professionalReport?: ProfessionalDiagnosisReport;
   reportText?: string;
+  taskOutcomeEvidence?: TaskOutcomeEvidence;
 };
 
 export type LocatorStatus = "located" | "locator_failed" | "not_applicable";
@@ -189,7 +195,23 @@ export async function executeParsedDiagnoseRequest(input: {
   sessionKeyExists?: (agentId: string, sessionKey: string) => boolean;
   conversationSend?: DiagnoseConversationSend;
   resolveOwners?: DiagnoseConversationOwnerResolver;
+  /** Same cfg the gateway uses for agent dirs. Missing cfg cannot be read as success. */
+  taskOutcomeCfg?: OpenBotConfig;
+  callerSubjectRaw?: string;
+  callerTenantId?: string | null;
 }): Promise<DiagnoseExecutionPayload> {
+  const taskOutcomeEvidence = diagnoseTaskOutcomeEvidence(input);
+  const withEvidence = (payload: DiagnoseExecutionPayload): DiagnoseExecutionPayload => {
+    if (!taskOutcomeEvidence) {
+      return payload;
+    }
+    const text = formatTaskOutcomeEvidenceText(taskOutcomeEvidence);
+    return {
+      ...payload,
+      taskOutcomeEvidence,
+      reportText: payload.reportText?.trim() ? `${payload.reportText}\n\n${text}` : text,
+    };
+  };
   const now = input.now ?? Date.now();
   const skillConfigDir = input.skillConfigDir ?? CONFIG_DIR;
   const observedSinceMs = now - input.request.windowMs;
@@ -205,14 +227,14 @@ export async function executeParsedDiagnoseRequest(input: {
   if (locators.length === 0) {
     const base = emptyPayload(input.request, planDiagnosisDaibaiDelivery(input.request.deliverTo));
     const sealed = sealReport(base, input.trusted.tenantId);
-    return {
+    return withEvidence({
       ...sealed,
       delivery: await resolveExecutionDelivery({
         ...input,
         locators,
         payload: sealed,
       }),
-    };
+    });
   }
   const summaries: LiveDiagnoseSummary[] = [];
   for (const locator of locators) {
@@ -243,14 +265,14 @@ export async function executeParsedDiagnoseRequest(input: {
         : empty,
       input.trusted.tenantId,
     );
-    return {
+    return withEvidence({
       ...failedPayload,
       delivery: await resolveExecutionDelivery({
         ...input,
         locators,
         payload: failedPayload,
       }),
-    };
+    });
   }
   const last = summaries[summaries.length - 1];
   const findings = summaries.flatMap((row) => row.findings).slice(0, 12);
@@ -283,14 +305,37 @@ export async function executeParsedDiagnoseRequest(input: {
     loadGroupMembers: input.loadGroupMembers,
     sessionKeyExists: input.sessionKeyExists,
   });
-  return {
+  return withEvidence({
     ...sealed,
     delivery: await resolveExecutionDelivery({
       ...input,
       locators,
       payload: sealed,
     }),
-  };
+  });
+}
+
+function diagnoseTaskOutcomeEvidence(input: {
+  request: ParsedDiagnoseRequest;
+  taskOutcomeCfg?: OpenBotConfig;
+  callerSubjectRaw?: string;
+  callerTenantId?: string | null;
+}): TaskOutcomeEvidence | undefined {
+  const ref = input.request.taskOutcomeRef;
+  if (!ref) {
+    return undefined;
+  }
+  if (ref.kind === "incomplete") {
+    return { ok: false, code: "task_ref_incomplete" };
+  }
+  return readTaskOutcomeEvidence({
+    cfg: input.taskOutcomeCfg,
+    agentId: ref.agentId,
+    taskId: ref.taskId,
+    outcomeVersion: ref.outcomeVersion,
+    callerSubjectRaw: input.callerSubjectRaw ?? "",
+    callerTenantId: input.callerTenantId,
+  });
 }
 
 async function resolveExecutionDelivery(input: {

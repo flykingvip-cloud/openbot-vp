@@ -59,6 +59,13 @@ export type ParsedDiagnoseRequest = {
   locators: DiagnosisLocator[];
   requestedCount: number;
   skipped: number;
+  /**
+   * Absent when the caller did not ask for one task result.
+   * incomplete when taskId / outcomeVersion / agentId is only partly present.
+   */
+  taskOutcomeRef?:
+    | { kind: "incomplete" }
+    | { kind: "bound"; taskId: string; outcomeVersion: number; agentId: string };
 };
 
 export function observationWindowMs(id: DiagnosisObservationWindowId): number {
@@ -208,6 +215,7 @@ export function parseDiagnoseRequest(params: unknown): ParsedDiagnoseRequest {
   const cadence = parseCadence(optionalString(record, "cadence"));
   const allLocators = parseLocators(record);
   const locators = allLocators.slice(0, DIAGNOSIS_ALL_TARGET_CAP);
+  const taskOutcomeRef = parseTaskOutcomeRef(record);
   return {
     scope,
     windowId,
@@ -219,7 +227,34 @@ export function parseDiagnoseRequest(params: unknown): ParsedDiagnoseRequest {
     locators,
     requestedCount: allLocators.length,
     skipped: Math.max(0, allLocators.length - locators.length),
+    ...(taskOutcomeRef ? { taskOutcomeRef } : {}),
   };
+}
+
+function parseTaskOutcomeRef(
+  record: Record<string, unknown>,
+): ParsedDiagnoseRequest["taskOutcomeRef"] {
+  const nested =
+    record.taskOutcome && typeof record.taskOutcome === "object"
+      ? (record.taskOutcome as Record<string, unknown>)
+      : record;
+  const taskId = optionalString(nested, "taskId") ?? "";
+  const agentId = optionalString(nested, "taskAgentId") ?? optionalString(nested, "agentId") ?? "";
+  const versionRaw = nested.outcomeVersion;
+  const hasVersion = versionRaw !== undefined && versionRaw !== null && versionRaw !== "";
+  if (!taskId && !hasVersion) {
+    return undefined;
+  }
+  const outcomeVersion =
+    typeof versionRaw === "number"
+      ? versionRaw
+      : typeof versionRaw === "string" && /^[1-9]\d*$/.test(versionRaw.trim())
+        ? Number(versionRaw.trim())
+        : Number.NaN;
+  if (!taskId || !agentId.trim() || !Number.isInteger(outcomeVersion) || outcomeVersion < 1) {
+    return { kind: "incomplete" };
+  }
+  return { kind: "bound", taskId, outcomeVersion, agentId: agentId.trim() };
 }
 
 export function planDiagnosisDaibaiDelivery(deliverTo: DiagnosisDeliverTo): DiagnosisDeliveryPlan {
