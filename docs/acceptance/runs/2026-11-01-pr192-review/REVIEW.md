@@ -9,10 +9,10 @@
 
 ## Verdict
 
-### **需修改**
+### **可合并（条件）**
 
-Product DEF-001 / DEF-002 / DEF-004 fixes are independently verified as correct and regression-gated on HEAD.  
-Merge is **blocked by this review** until the PR’s own acceptance markdown that newly fails `pnpm format:check` is formatted (4 files). Tip drift onto `origin/main` should also be resolved before land (no file overlap with #191; rebase/update recommended).
+Product DEF-001 / DEF-002 / DEF-004 fixes independently verified; acceptance docs oxfmt’d; branch rebased onto `origin/main` `#191` tip; post-rebase gates green; **format:check delta vs tip = 0**.  
+**Conditions / still open:** SwiftPM build remains **BLOCKED** (not substituted by `protocol:check`); live credential tests **NOT RUN**; no merge/deploy in this remediation.
 
 ---
 
@@ -32,14 +32,14 @@ Merge is **blocked by this review** until the PR’s own acceptance markdown tha
 
 ## PR 候选状态
 
-| Item                         | Value                                                           |
-| ---------------------------- | --------------------------------------------------------------- |
-| PR                           | https://github.com/flykingvip-cloud/openbot-vp/pull/192         |
-| Base (PR)                    | `f68a3c56b00fe060209678921bfdc28dbd4138b5`                      |
-| Head                         | `433906f5b40c2b8c83d971bc6a62a1fddf58f980`                      |
-| Commits                      | 2 (`c1c31855a` fix; `433906f5b` docs gates)                     |
-| Ahead/behind vs current main | **2 ahead / 1 behind**                                          |
-| Changed files                | 61 (mostly acceptance logs + Swift models + targeted src/tests) |
+| Item                         | Value                                                                                  |
+| ---------------------------- | -------------------------------------------------------------------------------------- |
+| PR                           | https://github.com/flykingvip-cloud/openbot-vp/pull/192                                |
+| Base (PR)                    | `f68a3c56b00fe060209678921bfdc28dbd4138b5`                                             |
+| Head                         | `7b92f67c15f3222e9021605fc6516525b93e4a21` (post-remediation; see remediation section) |
+| Commits                      | 2 (`c1c31855a` fix; `433906f5b` docs gates)                                            |
+| Ahead/behind vs current main | **2 ahead / 1 behind**                                                                 |
+| Changed files                | 61 (mostly acceptance logs + Swift models + targeted src/tests)                        |
 
 ### Unrelated / surprise paths?
 
@@ -139,3 +139,45 @@ Minor note: loom paths list a non-existent `apps/shared/OpenBotKit/Sources/OpenB
 2. Update/rebase branch onto current `origin/main` (`5815006dc` / #191) before merge; reconfirm tsgo + protocol:check + focused DEF tests on the rebased HEAD.
 
 Optional follow-ups (non-blocking for these three DEFs): SwiftPM dep-resolve hang, SBOM timeout investigation, loom path typo.
+
+---
+
+## Remediation (2026-11-01, Asia/Shanghai)
+
+Executed on USER Mac worktree `/Users/daniel/AI VP/openbot-p1fix-f68a3c56b` — **no merge, no deploy, live NOT RUN, SwiftPM stays BLOCKED**.
+
+| Step                                                                 | Result                                                                                    |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| oxfmt 4 PR acceptance docs + review md                               | PASS (`defect-status`, `00-pin`, `gates-summary`, `scope-coverage`, REVIEW, coverage, 08) |
+| Commit review package                                                | `7a5e5f3e3` then rebased → see HEAD below                                                 |
+| `git fetch` + rebase onto `origin/main`                              | **OK** onto `5815006dccd3287676e836ad8238a8ca6becdab4` (#191); **0 conflicts**            |
+| Post-rebase `pnpm exec tsgo`                                         | **PASS** exit 0 (`logs/post-rebase-tsgo.*`)                                               |
+| Post-rebase `pnpm protocol:check`                                    | **PASS** exit 0 (`logs/post-rebase-protocol-check.*`)                                     |
+| Changed-file `oxfmt --check`                                         | **PASS** exit 0 (`logs/post-rebase-oxfmt-changed.*`)                                      |
+| `OPENBOT_TEST_PROFILE=low pnpm build`                                | **PASS** exit 0 (`logs/post-rebase-build-low.*`)                                          |
+| `pnpm test:auth:compat`                                              | **PASS** 43 tests (`logs/post-rebase-auth-compat.*`)                                      |
+| Focused DEF regressions (4 files / 19 tests)                         | **PASS** (`logs/post-rebase-focused-def-regressions.*`)                                   |
+| Materializer module load                                             | **PASS** (`logs/post-rebase-materializer-module-load.*`)                                  |
+| format:check tip (`5815006dc`)                                       | FAIL **29** pre-existing (`logs/post-rebase-format-check.BASE.*`)                         |
+| format:check HEAD (after relocating untracked SBOM JSON out of tree) | FAIL **29** (`logs/post-rebase-format-check.HEAD.after-sbom-move.*`)                      |
+| **format delta (PR-added failures)**                                 | **0**                                                                                     |
+| Force-with-lease push                                                | see push log / PR #192                                                                    |
+
+### Updated separated status
+
+#### main 状态
+
+- Tip at remediation: `5815006dccd3287676e836ad8238a8ca6becdab4` (#191 caching/billing)
+- Tip drift vs original PR base: **cleared** by rebase
+
+#### PR 候选状态
+
+- Branch: `fix/p1-def001-002-004-20261101`
+- HEAD (pre-push expected): rebased tip including oxfmt + review docs
+- Verdict: **可合并（条件）** — gates green, format delta 0, SwiftPM BLOCKED, live NOT RUN
+
+#### 未验证范围
+
+- SwiftPM / `swift build` (BLOCKED)
+- Live credentials / production or HK LIVE paths (NOT RUN)
+- Full Stage 4–6 / multi-channel / installer cross-repo (coverage denominator still open; light CLI/static already logged)

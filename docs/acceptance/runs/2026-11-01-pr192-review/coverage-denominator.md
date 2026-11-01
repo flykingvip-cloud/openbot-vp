@@ -158,3 +158,9 @@ Remotes verified for this work: **only** `flykingvip-cloud/openbot-vp`.
 3. Installer 跨仓 + Stage 4–6 CURRENT CI/install evidence (**NOT RUN**)
 4. CLI/doctor beyond help; Control UI interactive ports (**NOT RUN**)
 5. Packages (collab/AOR/evolution) runtime (**NOT RUN**)
+
+## Remediation follow-up (credential-free, light)
+
+- Post-rebase gates reconfirmed 2026-11-01 Asia/Shanghai — see `REVIEW.md` Remediation; does not expand Stage 4–6 live coverage.
+- Extra static: `package.json` scripts containing doctor/cli/channel/install/sbom/protocol/gateway — count **22** names (inventory only; not executed beyond prior CLI help/doctor smoke + protocol:check). Sample: android:install, gateway:dev, gateway:dev:reset, gateway:watch, lint:gateway:isolation-fail-closed, lint:gateway:method-packs, lint:tmp:channel-agnostic-boundaries, lint:tmp:no-raw-channel-fetch, protocol:check, protocol:gen, protocol:gen:swift, sbom:cyclonedx
+- SBOM JSON relocated out of worktree (`/tmp/pr192-review-artifacts/`) so format delta stays 0; summary remains in `logs/09-sbom-smoke.SUMMARY.md`.
