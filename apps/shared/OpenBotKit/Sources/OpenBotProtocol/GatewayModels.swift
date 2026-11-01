@@ -620,6 +620,8 @@ public struct AgentParams: Codable, Sendable {
     public let timeout: Int?
     public let besteffortdeliver: Bool?
     public let lane: String?
+    public let parenttaskid: String?
+    public let parentagentid: String?
     public let extrasystemprompt: String?
     public let internalevents: [[String: AnyCodable]]?
     public let inputprovenance: [String: AnyCodable]?
@@ -650,6 +652,8 @@ public struct AgentParams: Codable, Sendable {
         timeout: Int?,
         besteffortdeliver: Bool?,
         lane: String?,
+        parenttaskid: String?,
+        parentagentid: String?,
         extrasystemprompt: String?,
         internalevents: [[String: AnyCodable]]?,
         inputprovenance: [String: AnyCodable]?,
@@ -679,6 +683,8 @@ public struct AgentParams: Codable, Sendable {
         self.timeout = timeout
         self.besteffortdeliver = besteffortdeliver
         self.lane = lane
+        self.parenttaskid = parenttaskid
+        self.parentagentid = parentagentid
         self.extrasystemprompt = extrasystemprompt
         self.internalevents = internalevents
         self.inputprovenance = inputprovenance
@@ -710,6 +716,8 @@ public struct AgentParams: Codable, Sendable {
         case timeout
         case besteffortdeliver = "bestEffortDeliver"
         case lane
+        case parenttaskid = "parentTaskId"
+        case parentagentid = "parentAgentId"
         case extrasystemprompt = "extraSystemPrompt"
         case internalevents = "internalEvents"
         case inputprovenance = "inputProvenance"
@@ -2900,6 +2908,9 @@ public struct CollaborationTaskSubmitForReviewParams: Codable, Sendable {
     public let submissionid: String
     public let artifactversion: String
     public let submissionsummary: String?
+    public let linkeddeliverableid: String?
+    public let linkeddeliverableversion: Int?
+    public let linkedcontentsha256: String?
 
     public init(
         groupid: String,
@@ -2907,7 +2918,10 @@ public struct CollaborationTaskSubmitForReviewParams: Codable, Sendable {
         itemid: String,
         submissionid: String,
         artifactversion: String,
-        submissionsummary: String?)
+        submissionsummary: String?,
+        linkeddeliverableid: String?,
+        linkeddeliverableversion: Int?,
+        linkedcontentsha256: String?)
     {
         self.groupid = groupid
         self.taskid = taskid
@@ -2915,6 +2929,9 @@ public struct CollaborationTaskSubmitForReviewParams: Codable, Sendable {
         self.submissionid = submissionid
         self.artifactversion = artifactversion
         self.submissionsummary = submissionsummary
+        self.linkeddeliverableid = linkeddeliverableid
+        self.linkeddeliverableversion = linkeddeliverableversion
+        self.linkedcontentsha256 = linkedcontentsha256
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -2924,6 +2941,9 @@ public struct CollaborationTaskSubmitForReviewParams: Codable, Sendable {
         case submissionid = "submissionId"
         case artifactversion = "artifactVersion"
         case submissionsummary = "submissionSummary"
+        case linkeddeliverableid = "linkedDeliverableId"
+        case linkeddeliverableversion = "linkedDeliverableVersion"
+        case linkedcontentsha256 = "linkedContentSha256"
     }
 }
 
@@ -3564,6 +3584,62 @@ public struct CollaborationTaskConfirmTodolistParams: Codable, Sendable {
         case taskid = "taskId"
         case todolistid = "todolistId"
         case expectedversion = "expectedVersion"
+    }
+}
+
+public struct CollaborationTaskListHumanAttentionParams: Codable, Sendable {
+    public let groupid: String?
+    public let includeresolved: Bool?
+    public let limit: Int?
+
+    public init(
+        groupid: String?,
+        includeresolved: Bool?,
+        limit: Int?)
+    {
+        self.groupid = groupid
+        self.includeresolved = includeresolved
+        self.limit = limit
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case includeresolved = "includeResolved"
+        case limit
+    }
+}
+
+public struct CollaborationTaskActHumanAttentionParams: Codable, Sendable {
+    public let todoid: String
+    public let action: String
+    public let expectedversion: Int
+    public let expectedfingerprint: String
+    public let transferownerid: String?
+    public let note: String?
+
+    public init(
+        todoid: String,
+        action: String,
+        expectedversion: Int,
+        expectedfingerprint: String,
+        transferownerid: String?,
+        note: String?)
+    {
+        self.todoid = todoid
+        self.action = action
+        self.expectedversion = expectedversion
+        self.expectedfingerprint = expectedfingerprint
+        self.transferownerid = transferownerid
+        self.note = note
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case todoid = "todoId"
+        case action
+        case expectedversion = "expectedVersion"
+        case expectedfingerprint = "expectedFingerprint"
+        case transferownerid = "transferOwnerId"
+        case note
     }
 }
 
@@ -6778,6 +6854,11 @@ public struct ChatSendParams: Codable, Sendable {
     public let stewardcallauthorizationid: String?
     public let humantakeoverobserved: Bool?
     public let composerquote: [String: AnyCodable]?
+    public let planconfirmtaskid: String?
+    public let planconfirmboarditemid: String?
+    public let planconfirmtodolistid: String?
+    public let planconfirmdecisionid: String?
+    public let planconfirmexpectedversion: Int?
     public let idempotencykey: String
     public let contextscope: [String: AnyCodable]?
 
@@ -6799,6 +6880,11 @@ public struct ChatSendParams: Codable, Sendable {
         stewardcallauthorizationid: String?,
         humantakeoverobserved: Bool?,
         composerquote: [String: AnyCodable]?,
+        planconfirmtaskid: String?,
+        planconfirmboarditemid: String?,
+        planconfirmtodolistid: String?,
+        planconfirmdecisionid: String?,
+        planconfirmexpectedversion: Int?,
         idempotencykey: String,
         contextscope: [String: AnyCodable]?)
     {
@@ -6819,6 +6905,11 @@ public struct ChatSendParams: Codable, Sendable {
         self.stewardcallauthorizationid = stewardcallauthorizationid
         self.humantakeoverobserved = humantakeoverobserved
         self.composerquote = composerquote
+        self.planconfirmtaskid = planconfirmtaskid
+        self.planconfirmboarditemid = planconfirmboarditemid
+        self.planconfirmtodolistid = planconfirmtodolistid
+        self.planconfirmdecisionid = planconfirmdecisionid
+        self.planconfirmexpectedversion = planconfirmexpectedversion
         self.idempotencykey = idempotencykey
         self.contextscope = contextscope
     }
@@ -6841,6 +6932,11 @@ public struct ChatSendParams: Codable, Sendable {
         case stewardcallauthorizationid = "stewardCallAuthorizationId"
         case humantakeoverobserved = "humanTakeoverObserved"
         case composerquote = "composerQuote"
+        case planconfirmtaskid = "planConfirmTaskId"
+        case planconfirmboarditemid = "planConfirmBoardItemId"
+        case planconfirmtodolistid = "planConfirmTodolistId"
+        case planconfirmdecisionid = "planConfirmDecisionId"
+        case planconfirmexpectedversion = "planConfirmExpectedVersion"
         case idempotencykey = "idempotencyKey"
         case contextscope = "contextScope"
     }
@@ -6972,6 +7068,7 @@ public struct ChatEvent: Codable, Sendable {
     public let seq: Int
     public let state: AnyCodable
     public let message: AnyCodable?
+    public let taskupdate: [String: AnyCodable]?
     public let thinking: [String: AnyCodable]?
     public let errormessage: String?
     public let usage: AnyCodable?
@@ -6983,6 +7080,7 @@ public struct ChatEvent: Codable, Sendable {
         seq: Int,
         state: AnyCodable,
         message: AnyCodable?,
+        taskupdate: [String: AnyCodable]?,
         thinking: [String: AnyCodable]?,
         errormessage: String?,
         usage: AnyCodable?,
@@ -6993,6 +7091,7 @@ public struct ChatEvent: Codable, Sendable {
         self.seq = seq
         self.state = state
         self.message = message
+        self.taskupdate = taskupdate
         self.thinking = thinking
         self.errormessage = errormessage
         self.usage = usage
@@ -7005,6 +7104,7 @@ public struct ChatEvent: Codable, Sendable {
         case seq
         case state
         case message
+        case taskupdate = "taskUpdate"
         case thinking
         case errormessage = "errorMessage"
         case usage
@@ -7045,6 +7145,9 @@ public struct UserVisibleTaskCard: Codable, Sendable {
     public let elapsedTime: Int?
     public let estimatedTime: String?
     public let message: String?
+    public let taskid: String?
+    public let agentid: String?
+    public let outcomeversion: Int?
 
     public init(
         id: String,
@@ -7056,7 +7159,10 @@ public struct UserVisibleTaskCard: Codable, Sendable {
         progress: Int?,
         elapsedTime: Int?,
         estimatedTime: String?,
-        message: String?)
+        message: String?,
+        taskid: String?,
+        agentid: String?,
+        outcomeversion: Int?)
     {
         self.id = id
         self.title = title
@@ -7068,6 +7174,9 @@ public struct UserVisibleTaskCard: Codable, Sendable {
         self.elapsedTime = elapsedTime
         self.estimatedTime = estimatedTime
         self.message = message
+        self.taskid = taskid
+        self.agentid = agentid
+        self.outcomeversion = outcomeversion
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -7081,6 +7190,9 @@ public struct UserVisibleTaskCard: Codable, Sendable {
         case elapsedTime = "elapsed_time"
         case estimatedTime = "estimated_time"
         case message
+        case taskid = "taskId"
+        case agentid = "agentId"
+        case outcomeversion = "outcomeVersion"
     }
 }
 

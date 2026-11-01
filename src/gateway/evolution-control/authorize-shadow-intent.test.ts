@@ -59,7 +59,7 @@ async function invoke(
   await handler({
     params,
     client,
-    respond: (success, data, err) => {
+    respond: (success: boolean, data: unknown, err?: unknown) => {
       ok = success;
       payload = data;
       error = err as { message?: string } | undefined;

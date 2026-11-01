@@ -1,0 +1,1 @@
+swift package build was hung on dependency fetch; light swiftc -typecheck with AnyCodable PASSED for both GatewayModels paths

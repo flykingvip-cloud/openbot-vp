@@ -1,0 +1,6 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 protocol:gen:swift /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+> node --import tsx scripts/protocol-gen-swift.ts
+
+wrote /Users/daniel/AI VP/openbot-p1fix-f68a3c56b/apps/macos/Sources/OpenBotProtocol/GatewayModels.swift
+wrote /Users/daniel/AI VP/openbot-p1fix-f68a3c56b/apps/shared/OpenBotKit/Sources/OpenBotProtocol/GatewayModels.swift

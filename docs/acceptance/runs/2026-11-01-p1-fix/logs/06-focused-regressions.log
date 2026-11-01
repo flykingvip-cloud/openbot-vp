@@ -1,0 +1,13 @@
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+
+ ✓ src/agents/tools/memory-tool.test.ts (6 tests) 7ms
+ ✓ src/gateway/enterprise-data/controlled-sar-provider.test.ts (5 tests) 24ms
+ ✓ src/gateway/enterprise-data/event-driven-projection-materializer.test.ts (2 tests) 9ms
+ ✓ src/plugins/runtime/types.contract.test.ts (2 tests) 3ms
+
+ Test Files  4 passed (4)
+      Tests  15 passed (15)
+   Start at  22:53:41
+   Duration  12.17s (transform 14.37s, setup 806ms, import 22.60s, tests 44ms, environment 0ms)
+

@@ -1,0 +1,40 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 format:check /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+> oxfmt --check
+
+Checking formatting...
+
+.kiro/specs/watchdog-task-closure/tasks.md (3ms)
+deploy/production/RELEASE_RECORD.md (4474ms)
+docs/PR143-MERGE-NOTES.md (98ms)
+docs/acceptance/runs/2026-11-01-p1-fix/00-pin.md (4ms)
+docs/design/collab-context-p3-private-memory-promote-2026-10-14.md (31ms)
+docs/design/memory-continuity-acceptance.md (64ms)
+docs/notes/controlled-discuss-to-task-p1-2026-10-31.md (26ms)
+docs/notes/fix-ab-ghost-confirm-chat-history-20261029.md (5ms)
+docs/notes/fix-member-governance-owner-identity-20261029.md (4ms)
+docs/notes/infrastructure-audit-2026-10-31.md (58ms)
+docs/notes/infrastructure-audit-2026-10-31/a3-control-experiment-plan-PENDING-AUTH.md (12ms)
+docs/notes/infrastructure-audit-2026-10-31/batch-b-local-gate-2026-10-31.md (15ms)
+docs/notes/infrastructure-audit-2026-10-31/batch-c-provenance-staging-2026-10-31.md (43ms)
+docs/notes/infrastructure-audit-2026-10-31/billing-h1-blocked-2026-10-31.md (35ms)
+docs/notes/infrastructure-audit-2026-10-31/disk-inventory-2026-10-31.md (10ms)
+docs/notes/infrastructure-audit-2026-10-31/ledger-audit-2026-10-31.md (42ms)
+docs/notes/infrastructure-audit-2026-10-31/ledger-audit-finding-codes-exit30-2026-10-31.md (36ms)
+docs/notes/infrastructure-audit-2026-10-31/ledger-error-classification-2026-10-31.md (60ms)
+docs/notes/infrastructure-audit-2026-10-31/p1-dag-break-evidence-closure-2026-10-31.md (23ms)
+docs/notes/infrastructure-audit-2026-10-31/p1-object-recovery-reclassification-2026-10-31.md (37ms)
+docs/notes/infrastructure-audit-2026-10-31/plan.md (123ms)
+docs/notes/infrastructure-audit-2026-10-31/release-record-anti-drift-2026-10-31.md (10ms)
+docs/notes/team-real-f4-board-confirmer-chain-2026-10-28.md (10ms)
+docs/reference/ci-local-merge-gate.md (7ms)
+evidence/watchdog-task-closure-acceptance-2026-11-01.md (186ms)
+src/agents/bash-tools.exec-runtime.ts (1ms)
+src/agents/sandbox/ACCOUNT_WORKER_SANDBOX_IMAGES.md (21ms)
+src/agents/tools/collaboration-board-tool.test.ts (1ms)
+src/gateway/collaboration-dispatch/executor-private-todolist.test.ts (1ms)
+src/gateway/collaboration-learning/product-wiring-autoadvance-readiness-deliverable.test.ts (2ms)
+
+Format issues found in above 30 files. Run without `--check` to fix.
+Finished in 15029ms on 17259 files using 14 threads.
+ ELIFECYCLE  Command failed with exit code 1.

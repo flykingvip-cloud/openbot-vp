@@ -140,7 +140,9 @@ describe("P1-F events.ingest tenant store locator", () => {
     expect(response.ok).toBe(true);
     expect(response.payload?.deduped).toBe(false);
     expect(mocks.resolve).toHaveBeenCalled();
-    expect(mocks.resolve.mock.calls[0]?.[1]).toBe("enterprise-data.json");
+    expect((mocks.resolve.mock.calls as unknown as Array<[unknown, string]>)[0]?.[1]).toBe(
+      "enterprise-data.json",
+    );
     expect(mocks.load).toHaveBeenCalledWith("/tenant-acme/enterprise-data.json");
     expect(mocks.save).toHaveBeenCalledWith(expect.anything(), "/tenant-acme/enterprise-data.json");
   });
@@ -255,9 +257,10 @@ describe("P1-F events.ingest real tenant file path (binding → ingest → feed)
     mocks.load.mockImplementation(async (storePath?: string) =>
       real.loadEnterpriseDataStore(storePath),
     );
-    mocks.save.mockImplementation(async (store, storePath?: string) =>
-      real.saveEnterpriseDataStore(store, storePath),
-    );
+    mocks.save.mockImplementation(async (...args: unknown[]) => {
+      const [store, storePath] = args as Parameters<typeof real.saveEnterpriseDataStore>;
+      return real.saveEnterpriseDataStore(store, storePath);
+    });
   });
 
   afterEach(() => {
@@ -317,7 +320,11 @@ describe("P1-F events.ingest real tenant file path (binding → ingest → feed)
     expect(response.ok).toBe(true);
     expect(mocks.resolve).toHaveBeenCalled();
     expect(mocks.load.mock.calls.some((call) => call[0] === acmePath)).toBe(true);
-    expect(mocks.save.mock.calls.some((call) => call[1] === acmePath)).toBe(true);
+    expect(
+      (mocks.save.mock.calls as unknown as Array<[unknown, string]>).some(
+        (call) => call[1] === acmePath,
+      ),
+    ).toBe(true);
     expect(fs.readFileSync(globexPath, "utf8")).toBe(beforeGlobex);
 
     const reloaded = await real.loadEnterpriseDataStore(acmePath);
