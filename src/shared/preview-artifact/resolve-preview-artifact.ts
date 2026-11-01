@@ -1,7 +1,10 @@
 import { persistDeclaredWorkspaceLocator } from "../workspace-deliverable-path.ts";
 import { buildArtifactIds, legacyHashPreviewText } from "./artifact-hash.ts";
 import { canonicalizePreviewText } from "./canonicalize.ts";
-import { extractDeliverableEnvelope } from "./deliverable-envelope.ts";
+import {
+  extractDeliverableEnvelope,
+  extractLocatedDeliverableEnvelopes,
+} from "./deliverable-envelope.ts";
 import { classifyArtifactDepositTier } from "./deposit-tier.ts";
 import { extractGeneratedWorkspaceFilename } from "./generated-workspace-filename.ts";
 
@@ -420,6 +423,8 @@ function extractEnvelopeDeliverablePreview(text: string): {
   file?: string;
   url?: string;
   declaredType?: string;
+  unwritten?: boolean;
+  settle?: string;
 } | null {
   const envelope = extractDeliverableEnvelope(text);
   if (!envelope) {
@@ -445,6 +450,8 @@ function extractEnvelopeDeliverablePreview(text: string): {
     file: envelope.file,
     url: envelope.url,
     declaredType: envelope.type,
+    ...(envelope.unwritten ? { unwritten: true } : {}),
+    ...(envelope.settle ? { settle: envelope.settle } : {}),
   };
 }
 
@@ -821,81 +828,198 @@ function extractPreviewSourceText(message: Record<string, unknown>) {
   return extractPreviewMessageText(message);
 }
 
-export function resolvePreviewArtifactRecord(message: unknown): Record<string, unknown> | null {
+function isDeclaredStructuredArtifact(artifact: Record<string, unknown>): boolean {
+  const meta = artifact.providerMetadata;
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    const record = meta as Record<string, unknown>;
+    if (record.declared === true || record.deliverableEnvelope === true) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Map envelope unwritten/settle into providerMetadata failure/block flags. */
+function deliverableSettleProviderMetadata(envelope: {
+  unwritten?: boolean;
+  settle?: string;
+}): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (envelope.unwritten || envelope.settle === "declared") {
+    out.workspaceUnwritten = true;
+    out.previewUnavailable = true;
+  }
+  if (envelope.settle === "retryable") {
+    out.settleRetryable = true;
+    out.archiveClaimBlocked = true;
+    out.previewUnavailable = true;
+    out.deliveryUndelivered = true;
+  }
+  if (envelope.settle === "conflict") {
+    out.settleConflict = true;
+    out.archiveClaimBlocked = true;
+    out.previewStale = true;
+    out.previewUnavailable = true;
+    out.deliveryUndelivered = true;
+  }
+  if (envelope.settle === "confirmed") {
+    out.settleConfirmed = true;
+  }
+  return out;
+}
+
+function collectExplicitArtifacts(record: Record<string, unknown>): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  if (Array.isArray(record.artifacts)) {
+    for (const entry of record.artifacts) {
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        out.push(entry as Record<string, unknown>);
+      }
+    }
+  }
+  if (
+    out.length === 0 &&
+    record.artifact &&
+    typeof record.artifact === "object" &&
+    !Array.isArray(record.artifact)
+  ) {
+    out.push(record.artifact as Record<string, unknown>);
+  }
+  return out;
+}
+
+function buildEnvelopeArtifactFromPreview(
+  record: Record<string, unknown>,
+  envelopePreview: NonNullable<ReturnType<typeof extractEnvelopeDeliverablePreview>>,
+): Record<string, unknown> {
+  const createdAt = timestampToIso(record.timestamp);
+  const previewKind = envelopePreview.file ? "file" : envelopePreview.url ? "published" : "text";
+  return buildAssistantArtifactRecord({
+    title: envelopePreview.title,
+    sourceMessage: envelopePreview.sourceMessage,
+    mimeType: envelopePreview.mimeType,
+    createdAt,
+    openUrl: envelopePreview.url,
+    identitySeed: envelopePreview.logicalId
+      ? `logical:${envelopePreview.logicalId}`
+      : envelopePreview.file
+        ? `file:${envelopePreview.file}`
+        : envelopePreview.url
+          ? `url:${envelopePreview.url}`
+          : undefined,
+    providerMetadata: {
+      deliverableEnvelope: true,
+      declared: true,
+      envelopeKind: envelopePreview.envelopeKind,
+      previewKind,
+      ...(envelopePreview.logicalId ? { logicalId: envelopePreview.logicalId } : {}),
+      ...(envelopePreview.declaredType ? { declaredType: envelopePreview.declaredType } : {}),
+      ...(envelopePreview.file ? { workspaceFilename: envelopePreview.file } : {}),
+      ...(envelopePreview.url ? { openUrl: envelopePreview.url } : {}),
+      ...deliverableSettleProviderMetadata(envelopePreview),
+    },
+  });
+}
+
+/** All first-class deliverable targets in a message (one chip per located envelope). */
+export function resolvePreviewArtifactRecords(message: unknown): Record<string, unknown>[] {
   if (!message || typeof message !== "object" || Array.isArray(message)) {
-    return null;
+    return [];
   }
   const record = message as Record<string, unknown>;
   // Cron task results should stay in the chat lane, not open as generated doc previews.
   if (record.openclawCronResult && typeof record.openclawCronResult === "object") {
-    return null;
+    return [];
   }
   const explicitEventArtifact = normalizeExplicitArtifactEvent(record);
   if (explicitEventArtifact) {
-    return explicitEventArtifact;
+    return [explicitEventArtifact];
   }
   const writeToolArtifact = normalizeWriteToolArtifact(record);
   if (writeToolArtifact) {
-    return writeToolArtifact;
+    return [writeToolArtifact];
   }
-  const explicitArtifact =
-    record.artifact && typeof record.artifact === "object" && !Array.isArray(record.artifact)
-      ? (record.artifact as Record<string, unknown>)
-      : null;
+
+  // Prefer structured declared artifacts already materialized before display strip.
+  const explicitArtifacts = collectExplicitArtifacts(record);
+  const declaredExplicit = explicitArtifacts.filter(isDeclaredStructuredArtifact);
+  if (declaredExplicit.length > 0) {
+    return declaredExplicit;
+  }
+  const explicitArtifact = explicitArtifacts[0] ?? null;
   const explicitProvider =
     explicitArtifact && typeof explicitArtifact.provider === "string"
       ? explicitArtifact.provider.trim()
       : "";
   const shouldRevalidateExplicitArtifact = explicitProvider === "assistant-message";
   if (explicitArtifact && !shouldRevalidateExplicitArtifact) {
-    return explicitArtifact;
+    return [explicitArtifact];
   }
+
   const role = typeof record.role === "string" ? record.role.toLowerCase() : "";
   if (role !== "assistant") {
-    return explicitArtifact && !shouldRevalidateExplicitArtifact ? explicitArtifact : null;
+    return explicitArtifact && !shouldRevalidateExplicitArtifact ? [explicitArtifact] : [];
   }
   const extractedText = extractPreviewSourceText(record);
   if (typeof extractedText !== "string") {
-    return null;
+    return [];
   }
   const text = extractedText.trim();
+  const located = extractLocatedDeliverableEnvelopes(text);
+  if (located.length > 0) {
+    const built: Record<string, unknown>[] = [];
+    for (const envelope of located) {
+      const sourceMessage = envelope.body;
+      const fileTitle = envelope.file ? basenameFromPath(envelope.file) : undefined;
+      const title =
+        envelope.title?.trim() ||
+        fileTitle ||
+        (sourceMessage ? extractPreviewTitle(sourceMessage) : "") ||
+        "对话生成文档";
+      const mimeType = envelope.file
+        ? inferPreviewMimeTypeFromFilename(envelope.file)
+        : inferPreviewMimeType(sourceMessage);
+      const previewKind = envelope.file ? "file" : envelope.url ? "published" : "text";
+      built.push(
+        buildAssistantArtifactRecord({
+          title,
+          sourceMessage,
+          mimeType,
+          createdAt: timestampToIso(record.timestamp),
+          openUrl: envelope.url,
+          identitySeed: envelope.logicalId
+            ? `logical:${envelope.logicalId}`
+            : envelope.file
+              ? `file:${envelope.file}`
+              : envelope.url
+                ? `url:${envelope.url}`
+                : undefined,
+          providerMetadata: {
+            deliverableEnvelope: true,
+            declared: true,
+            envelopeKind: envelope.kind,
+            previewKind,
+            ...(envelope.logicalId ? { logicalId: envelope.logicalId } : {}),
+            ...(envelope.type ? { declaredType: envelope.type } : {}),
+            ...(envelope.file ? { workspaceFilename: envelope.file } : {}),
+            ...(envelope.url ? { openUrl: envelope.url } : {}),
+            ...deliverableSettleProviderMetadata(envelope),
+          },
+        }),
+      );
+    }
+    return built;
+  }
   const envelopePreview = extractEnvelopeDeliverablePreview(text);
   if (envelopePreview) {
-    const createdAt = timestampToIso(record.timestamp);
-    // A declared file/url is a first-class deliverable: carry its real location + preview kind so
-    // the sidebar opens the actual file/link and 成果中心 can store a reference (not just text).
-    const previewKind = envelopePreview.file ? "file" : envelopePreview.url ? "published" : "text";
-    return buildAssistantArtifactRecord({
-      title: envelopePreview.title,
-      sourceMessage: envelopePreview.sourceMessage,
-      mimeType: envelopePreview.mimeType,
-      createdAt,
-      openUrl: envelopePreview.url,
-      identitySeed: envelopePreview.logicalId
-        ? `logical:${envelopePreview.logicalId}`
-        : envelopePreview.file
-          ? `file:${envelopePreview.file}`
-          : envelopePreview.url
-            ? `url:${envelopePreview.url}`
-            : undefined,
-      providerMetadata: {
-        deliverableEnvelope: true,
-        declared: true,
-        envelopeKind: envelopePreview.envelopeKind,
-        previewKind,
-        ...(envelopePreview.logicalId ? { logicalId: envelopePreview.logicalId } : {}),
-        ...(envelopePreview.declaredType ? { declaredType: envelopePreview.declaredType } : {}),
-        ...(envelopePreview.file ? { workspaceFilename: envelopePreview.file } : {}),
-        ...(envelopePreview.url ? { openUrl: envelopePreview.url } : {}),
-      },
-    });
+    return [buildEnvelopeArtifactFromPreview(record, envelopePreview)];
   }
   const completeFilePreview = extractCompleteFilePreview(text);
   const workspaceFilename = extractGeneratedWorkspaceFilename(text);
   // A concise, explicit generated-file announcement is itself a preview signal. Requiring a
   // 120-character document body here hid real file deliverables such as `output/report.html`.
   if (!completeFilePreview && !workspaceFilename && !looksLikePreviewableText(text)) {
-    return null;
+    return [];
   }
   const createdAt = timestampToIso(record.timestamp);
   const deliverablePreview = completeFilePreview ?? extractDeliverablePreview(text);
@@ -912,31 +1036,48 @@ export function resolvePreviewArtifactRecord(message: unknown): Record<string, u
     (workspaceFilename
       ? inferPreviewMimeTypeFromFilename(workspaceFilename)
       : inferPreviewMimeType(sourceMessage));
-  return buildAssistantArtifactRecord({
-    title,
-    sourceMessage,
-    mimeType,
-    createdAt,
-    providerMetadata: {
-      ...(deliverablePreview ? { inferredDeliverable: true } : {}),
-      ...(inferredDocumentBody?.inferredDocumentBody ? { inferredDocumentBody: true } : {}),
-      // Prose-announced file (no declaration envelope): carry the filename so preview can still
-      // open the real workspace file, but keep it flagged as an inferred (low-tier) signal.
-      ...(workspaceFilename ? { workspaceFilename, previewKind: "file", inferredFile: true } : {}),
-    },
-  });
+  return [
+    buildAssistantArtifactRecord({
+      title,
+      sourceMessage,
+      mimeType,
+      createdAt,
+      providerMetadata: {
+        ...(deliverablePreview ? { inferredDeliverable: true } : {}),
+        ...(inferredDocumentBody?.inferredDocumentBody ? { inferredDocumentBody: true } : {}),
+        // Prose-announced file (no declaration envelope): carry the filename so preview can still
+        // open the real workspace file, but keep it flagged as an inferred (low-tier) signal.
+        ...(workspaceFilename
+          ? { workspaceFilename, previewKind: "file", inferredFile: true }
+          : {}),
+      },
+    }),
+  ];
+}
+
+export function resolvePreviewArtifactRecord(message: unknown): Record<string, unknown> | null {
+  return resolvePreviewArtifactRecords(message)[0] ?? null;
 }
 
 export function withGeneratedPreviewArtifact(message: Record<string, unknown>) {
-  const artifact = resolvePreviewArtifactRecord(message);
+  const artifacts = resolvePreviewArtifactRecords(message);
+  const artifact = artifacts[0];
   if (!artifact || message.artifact === artifact) {
     return message;
   }
-  if (message.artifact && typeof message.artifact === "object") {
+  if (
+    message.artifact &&
+    typeof message.artifact === "object" &&
+    isDeclaredStructuredArtifact(message.artifact as Record<string, unknown>)
+  ) {
+    return message;
+  }
+  if (message.artifact && typeof message.artifact === "object" && artifacts.length === 0) {
     return message;
   }
   return {
     ...message,
     artifact,
+    ...(artifacts.length > 1 ? { artifacts } : {}),
   };
 }

@@ -223,15 +223,17 @@ describe("buildAgentSystemPrompt", () => {
       workspaceDir: "/tmp/openclaw",
     });
     expect(prompt).toContain("## Deliverable Output Envelope");
-    expect(prompt).toContain('<<DELIVERABLE title="Short title">>');
+    expect(prompt).toContain("Chat bubble = short structured overview only");
+    expect(prompt).toContain(
+      '<<DELIVERABLE title="Short title" type="doc" file="campaigns/october/报告.docx">>',
+    );
+    expect(prompt).toContain("write-then-declare");
     expect(prompt).toContain("<</DELIVERABLE>>");
-    expect(prompt).toContain("「");
-    expect(prompt).toContain("」");
-    expect(prompt).toContain("Body conventions (inside the envelope only):");
-    expect(prompt).toContain("Report/article/brief: start with a markdown title line");
+    expect(prompt).toContain("short overview only — NOT the full document");
     expect(prompt).toContain("Do not copy the file onto output/<kind>/<basename>");
     expect(prompt).toContain("Declare `file=` only after a workspace write tool has succeeded");
     expect(prompt).toContain("未写入工作区");
+    expect(prompt).toContain("「打开成果」");
     expect(prompt).not.toContain("bare filename only (no path)");
   });
 

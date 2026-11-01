@@ -100,6 +100,10 @@ import {
 } from "../../sessions/session-key-utils.js";
 import { planDaibaiGuideAppend } from "../../shared/daibai-guide-card.js";
 import {
+  attachDeclaredDeliverableArtifacts,
+  declaredDeliverableArtifactFields,
+} from "../../shared/preview-artifact/materialize-declared-artifacts.js";
+import {
   isHiddenToolUseScratchpadMessage,
   type VisibleReplyLanguage,
 } from "../../shared/text/assistant-scratchpad.js";
@@ -1743,9 +1747,18 @@ function sanitizeChatHistoryMessage(
   if (!message || typeof message !== "object") {
     return { message, changed: false };
   }
-  const entry = { ...(message as Record<string, unknown>) };
+  let entry = { ...(message as Record<string, unknown>) };
   let changed = false;
   const keepBody = isPeerOutboundSurfaceMessage(message);
+  // Materialize 「打开成果」 artifacts from raw <<DELIVERABLE file=>> BEFORE display strip.
+  if (entry.role === "assistant" && !keepBody) {
+    const beforeArtifact = entry.artifact;
+    const beforeArtifacts = entry.artifacts;
+    entry = attachDeclaredDeliverableArtifacts(entry);
+    if (entry.artifact !== beforeArtifact || entry.artifacts !== beforeArtifacts) {
+      changed = true;
+    }
+  }
   const isToolResult = entry.role === "toolResult" || entry.role === "tool";
   const truncateOpts = isToolResult
     ? {
@@ -2731,6 +2744,10 @@ async function appendAssistantTranscriptMessage(params: {
   peerOutbound?: {
     targets: Array<{ agentId?: string; label: string; sessionKey?: string }>;
   };
+  /** Declared deliverable chip(s) + publish view — persist with stripped bubble text. */
+  artifact?: Record<string, unknown>;
+  artifacts?: Record<string, unknown>[];
+  deliverablePublish?: Record<string, unknown>;
 }): Promise<TranscriptAppendResult> {
   const transcriptPath = resolveTranscriptPath({
     sessionId: params.sessionId,
@@ -2804,6 +2821,9 @@ async function appendAssistantTranscriptMessage(params: {
     cronResult: params.cronResult,
     ...(params.guideCard ? { guideCard: params.guideCard } : {}),
     ...(params.restoreTaskIsolation ? { restoreTaskIsolation: params.restoreTaskIsolation } : {}),
+    ...(params.artifact ? { artifact: params.artifact } : {}),
+    ...(params.artifacts ? { artifacts: params.artifacts } : {}),
+    ...(params.deliverablePublish ? { deliverablePublish: params.deliverablePublish } : {}),
   });
 }
 
@@ -3854,6 +3874,7 @@ async function runGroupBotDiscussionTurn(params: {
       }
       let deliverableOwnerId: string | null = null;
       let prepared: PreparedChatDeliverable | null = null;
+      let deliverableArtifacts: ReturnType<typeof declaredDeliverableArtifactFields> = {};
       try {
         const tenantCtx = await resolveTenantContext(params.client);
         deliverableOwnerId = tenantCtx?.userId?.trim() || null;
@@ -3978,6 +3999,9 @@ async function runGroupBotDiscussionTurn(params: {
             });
           }
         }
+        deliverableArtifacts = declaredDeliverableArtifactFields(replyText, {
+          timestamp: Date.now(),
+        });
         replyText = stripControlChannelForDisplay(replyText);
       } catch (err) {
         params.context.logGateway.warn(
@@ -3991,35 +4015,29 @@ async function runGroupBotDiscussionTurn(params: {
         storePath: groupSession.storePath,
         sessionFile: groupSession.entry.sessionFile,
       });
+      const publishView = prepared?.structured ? prepared.view : undefined;
+      const persistTimestamp = Date.now();
+      const finalMessage: Record<string, unknown> = {
+        role: "assistant",
+        content: [{ type: "text", text: replyText }],
+        timestamp: persistTimestamp,
+        senderLabel: params.bot.name,
+        agentId: params.bot.agentId,
+        collaborationRoundId: params.collaborationRoundId,
+        ...(params.isWrapTurn ? { collaborationWrap: true } : {}),
+        ...(publishView ? { deliverablePublish: publishView } : {}),
+        ...(deliverableArtifacts.artifact ? { artifact: deliverableArtifacts.artifact } : {}),
+        ...(deliverableArtifacts.artifacts ? { artifacts: deliverableArtifacts.artifacts } : {}),
+      };
       const appended =
         transcriptPath == null
           ? { ok: false, error: "transcript path not resolved" }
           : appendRawTranscriptMessage({
               transcriptPath,
-              message: {
-                role: "assistant",
-                content: [{ type: "text", text: replyText }],
-                timestamp: Date.now(),
-                senderLabel: params.bot.name,
-                agentId: params.bot.agentId,
-                collaborationRoundId: params.collaborationRoundId,
-                ...(params.isWrapTurn ? { collaborationWrap: true } : {}),
-              },
+              message: finalMessage,
             });
-      const publishView = prepared?.structured ? prepared.view : undefined;
       const message = {
-        ...(appended.ok && appended.message
-          ? appended.message
-          : {
-              role: "assistant",
-              content: [{ type: "text", text: replyText }],
-              timestamp: Date.now(),
-              senderLabel: params.bot.name,
-              agentId: params.bot.agentId,
-              collaborationRoundId: params.collaborationRoundId,
-              ...(params.isWrapTurn ? { collaborationWrap: true } : {}),
-            }),
-        ...(publishView ? { deliverablePublish: publishView } : {}),
+        ...(appended.ok && appended.message ? appended.message : finalMessage),
       };
       broadcastChatFinal({
         context: params.context,
@@ -6395,7 +6413,11 @@ export const chatHandlers: GatewayRequestHandlers = {
                 clientRunId,
                 taskId: null,
               });
+              const fallbackArtifacts = declaredDeliverableArtifactFields(prepared.text, {
+                timestamp: Date.now(),
+              });
               const replyText = stripControlChannelForDisplay(prepared.text);
+              const fallbackPublish = prepared.structured ? prepared.view : undefined;
               const appended = await appendAssistantTranscriptMessage({
                 message: replyText,
                 sessionId,
@@ -6407,12 +6429,21 @@ export const chatHandlers: GatewayRequestHandlers = {
                 ownerUserId: replyGovernance.ownerUserId,
                 groupId: replyGovernance.groupId,
                 failClosed: replyGovernance.failClosed,
+                ...(fallbackPublish ? { deliverablePublish: fallbackPublish } : {}),
+                ...(fallbackArtifacts.artifact ? { artifact: fallbackArtifacts.artifact } : {}),
+                ...(fallbackArtifacts.artifacts ? { artifacts: fallbackArtifacts.artifacts } : {}),
               });
               if (appended.ok) {
                 message = appended.message
                   ? {
                       ...appended.message,
-                      ...(prepared.structured ? { deliverablePublish: prepared.view } : {}),
+                      ...(fallbackPublish ? { deliverablePublish: fallbackPublish } : {}),
+                      ...(fallbackArtifacts.artifact
+                        ? { artifact: fallbackArtifacts.artifact }
+                        : {}),
+                      ...(fallbackArtifacts.artifacts
+                        ? { artifacts: fallbackArtifacts.artifacts }
+                        : {}),
                     }
                   : undefined;
                 emitChatInboundStage({
@@ -6466,6 +6497,10 @@ export const chatHandlers: GatewayRequestHandlers = {
                   content: [{ type: "text", text: replyText }],
                   timestamp: now,
                   ...(prepared.structured ? { deliverablePublish: prepared.view } : {}),
+                  ...(fallbackArtifacts.artifact ? { artifact: fallbackArtifacts.artifact } : {}),
+                  ...(fallbackArtifacts.artifacts
+                    ? { artifacts: fallbackArtifacts.artifacts }
+                    : {}),
                   // Keep this compatible with Pi stopReason enums even though this message isn't
                   // persisted to the transcript due to the append failure.
                   stopReason: "stop",

@@ -5,7 +5,6 @@ import {
   extractLocatedDeliverableEnvelopes,
   type DeliverableEnvelope,
 } from "./deliverable-envelope.ts";
-import { extractText } from "./message-extract.ts";
 
 export { isDeliverableResultArtifact } from "../../../../src/shared/preview-artifact/deposit-tier.ts";
 
@@ -863,7 +862,16 @@ function looksLikePreviewableText(text: string) {
 }
 
 function extractPreviewSourceText(message: Record<string, unknown>) {
+  // Use RAW content for envelope parsing. extractText() strips <<DELIVERABLE>> tags
+  // for display; chip resolution must see file=/url= before that strip (or trust
+  // structured artifact fields materialized on the message).
+  if (typeof message.text === "string" && message.text.trim()) {
+    return message.text.trim();
+  }
   const content = message.content;
+  if (typeof content === "string" && content.trim()) {
+    return content.trim();
+  }
   if (Array.isArray(content)) {
     const textBlocks = content
       .map((part) => {
@@ -874,11 +882,11 @@ function extractPreviewSourceText(message: Record<string, unknown>) {
         return item.type === "text" && typeof item.text === "string" ? item.text.trim() : null;
       })
       .filter((value): value is string => typeof value === "string" && value.length > 0);
-    if (textBlocks.length > 1) {
+    if (textBlocks.length > 0) {
       return textBlocks.join("\n\n");
     }
   }
-  return extractText(message);
+  return null;
 }
 
 function resolveInferredPreviewArtifact(
@@ -972,21 +980,46 @@ export function resolvePreviewArtifactRecords(message: unknown): Record<string, 
   if (writeToolArtifact) {
     return [writeToolArtifact];
   }
+  const explicitArtifacts: Record<string, unknown>[] = [];
+  if (Array.isArray(record.artifacts)) {
+    for (const entry of record.artifacts) {
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        explicitArtifacts.push(entry as Record<string, unknown>);
+      }
+    }
+  }
   const explicitArtifact =
     record.artifact && typeof record.artifact === "object" && !Array.isArray(record.artifact)
       ? (record.artifact as Record<string, unknown>)
       : null;
+  if (explicitArtifact && explicitArtifacts.length === 0) {
+    explicitArtifacts.push(explicitArtifact);
+  }
+  const declaredExplicit = explicitArtifacts.filter((artifact) => {
+    const meta = artifact.providerMetadata;
+    if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+      const m = meta as Record<string, unknown>;
+      if (m.declared === true || m.deliverableEnvelope === true) {
+        return true;
+      }
+    }
+    return false;
+  });
+  if (declaredExplicit.length > 0) {
+    return declaredExplicit;
+  }
+  const primaryExplicit = explicitArtifacts[0] ?? null;
   const explicitProvider =
-    explicitArtifact && typeof explicitArtifact.provider === "string"
-      ? explicitArtifact.provider.trim()
+    primaryExplicit && typeof primaryExplicit.provider === "string"
+      ? primaryExplicit.provider.trim()
       : "";
   const shouldRevalidateExplicitArtifact = explicitProvider === "assistant-message";
-  if (explicitArtifact && !shouldRevalidateExplicitArtifact) {
-    return [explicitArtifact];
+  if (primaryExplicit && !shouldRevalidateExplicitArtifact) {
+    return [primaryExplicit];
   }
   const role = typeof record.role === "string" ? record.role.toLowerCase() : "";
   if (role !== "assistant") {
-    return explicitArtifact && !shouldRevalidateExplicitArtifact ? [explicitArtifact] : [];
+    return primaryExplicit && !shouldRevalidateExplicitArtifact ? [primaryExplicit] : [];
   }
   const extractedText = extractPreviewSourceText(record);
   if (typeof extractedText !== "string") {
@@ -1020,7 +1053,19 @@ export function withGeneratedPreviewArtifact(message: Record<string, unknown>) {
     return message;
   }
   if (message.artifact && typeof message.artifact === "object") {
-    return message;
+    const meta = (message.artifact as Record<string, unknown>).providerMetadata;
+    if (
+      meta &&
+      typeof meta === "object" &&
+      !Array.isArray(meta) &&
+      ((meta as Record<string, unknown>).declared === true ||
+        (meta as Record<string, unknown>).deliverableEnvelope === true)
+    ) {
+      return message;
+    }
+    if (artifacts.length === 0) {
+      return message;
+    }
   }
   return {
     ...message,

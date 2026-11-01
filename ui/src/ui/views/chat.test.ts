@@ -1978,6 +1978,52 @@ describe("chat view", () => {
     expect(onOpenArtifact).not.toHaveBeenCalled();
   });
 
+  it("keeps 「打开成果」 when tags were stripped but declared artifact was materialized", () => {
+    const container = document.createElement("div");
+    const onOpenArtifact = vi.fn();
+    render(
+      renderChat(
+        createProps({
+          onOpenArtifact,
+          messages: [
+            {
+              role: "assistant",
+              content: [
+                {
+                  type: "text",
+                  text: "旁白：SOP 已落盘。\n- 个人邮箱流程",
+                },
+              ],
+              timestamp: 1,
+              artifact: {
+                artifactId: "assistant-doc:email-sop",
+                title: "邮件发送 SOP",
+                provider: "assistant-message",
+                providerMetadata: {
+                  declared: true,
+                  deliverableEnvelope: true,
+                  previewKind: "file",
+                  workspaceFilename: "email-sending-sop.md",
+                },
+              },
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    expect(container.textContent).toContain(t("chat.openArtifact"));
+    expect(container.textContent).toContain("email-sending-sop.md");
+    expect(container.textContent).not.toContain("<<DELIVERABLE");
+    const artifactButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+      (button) => button.textContent?.includes(t("chat.openArtifact")),
+    );
+    expect(artifactButton).toBeDefined();
+    artifactButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onOpenArtifact).toHaveBeenCalledWith("assistant-doc:email-sop");
+  });
+
   it("renders one 打开成果 button per located deliverable file", () => {
     const container = document.createElement("div");
     const onOpenArtifact = vi.fn();
