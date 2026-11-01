@@ -1,0 +1,10 @@
+START 2026-11-01T12:41:38+0100
+Scope: all 56 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+. prepare$ command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath git-hooks || exit 0
+. prepare: Done
+Done in 2.1s using pnpm v10.23.0
+EXIT:0
+END 2026-11-01T12:41:40+0100

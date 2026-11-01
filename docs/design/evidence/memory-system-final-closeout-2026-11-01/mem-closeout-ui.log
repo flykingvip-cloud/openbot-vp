@@ -1,0 +1,14 @@
+
+ RUN  v4.0.18 /workspace/ui
+
+stderr | src/ui/ports/employee/views/memory-center-page.node.test.ts
+Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+
+ ✓ src/ui/ports/employee/views/memory-center-page.node.test.ts (12 tests) 73ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  11:47:01
+   Duration  663ms (transform 57ms, setup 0ms, import 80ms, tests 73ms, environment 385ms)
+
+UI_EXIT:0
