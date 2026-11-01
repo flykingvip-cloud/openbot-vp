@@ -68,7 +68,38 @@
 
 本环境没有 `kubectl`、`podman`、生产 SSH。没有读取运行容器的 `build-info.json`。因此不能声称已核对实际 LIVE 身份。要核对需要：能进运行 gateway 容器的只读入口，执行 `cat /app/dist/build-info.json`，并对照镜像 digest。
 
-## 6. 发布前还要用户决定的事
+## 6. 仍待发布的决定
 
-1. 是否授权从合入后的 `origin/main` 做新一轮隔离构建和验收。本 PR 不合入，也不做生产切换。
+1. 合入后是否授权从新的 `origin/main` 做隔离构建和发布。本轮不做生产切换、重启或配置变更。
 2. 嵌入式 runner 内部每一轮 provider 请求是否都要单独计费。会碰到 `attempt.ts`，本轮不做。
+
+## 7. 本地 CI 等价验收（不依赖 Actions runner）
+
+代码提交 `5a9261cc05de02a607ac22985657c538457f09a7`。本节本身的后续提交只改这份笔记。GitHub Actions 因账单未启动任何 job，下列命令在云端 VM 上执行。日志在 `/tmp/accept/`。
+
+| 等价检查                  | 命令                                                                                                                   | 退出码 | 结果                                                                                                                                                                                            |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| no-tabs                   | workflow 同款 Python 扫描 `.github/workflows`                                                                          | 0      | 18 个 workflow 无 tab                                                                                                                                                                           |
+| actionlint 1.7.11         | `actionlint`                                                                                                           | 0      | 日志 `/tmp/accept/actionlint.log`                                                                                                                                                               |
+| composite input 插值      | `python3 scripts/check-composite-action-input-interpolation.py`                                                        | 0      | 无直接插值                                                                                                                                                                                      |
+| format（本 PR 文件）      | `oxfmt --check` 本 PR 改过的源文件与结项笔记                                                                           | 0      | 本 PR 文件无格式问题                                                                                                                                                                            |
+| format（全库，CI 绝对门） | `pnpm exec oxfmt --check`                                                                                              | 1      | 29 个文件与 `origin/main` 内容相同，不是本 PR 引入。日志 `/tmp/accept/format.log`                                                                                                               |
+| host env policy           | `pnpm check:host-env-policy:swift`                                                                                     | 0      |                                                                                                                                                                                                 |
+| Knowledge Universe tabs   | `node scripts/check-knowledge-universe-page-tabs.mjs`                                                                  | 0      |                                                                                                                                                                                                 |
+| S01 R6                    | `node scripts/verify-single-sot.mjs` 与 `node --test docs/design/evidence/memory-workspace-s01-r6-single-sot.test.mjs` | 0      |                                                                                                                                                                                                 |
+| phase0 单测               | `node --test` 三个 `memory-workspace-phase0-*.test.mjs`                                                                | 0      | 23 通过                                                                                                                                                                                         |
+| types/lint 增量           | `node scripts/ci-diagnostic-delta.mjs --base origin/main --candidate 5a9261cc`                                         | 0      | tsgo 基线 30、候选 30、新增 0；oxlint 新增 0。日志 `/tmp/accept/diagnostic-delta-3.log`                                                                                                         |
+| 协作能力门                | `pnpm lint:collab:runtime-capabilities` 与 `pnpm test:collab:runtime-lifecycle`                                        | 0      | 生命周期 28 通过                                                                                                                                                                                |
+| 本 PR 与 delivery 单测    | `OPENBOT_TEST_PROFILE=low pnpm exec vitest run` 任务结果、监督预算、delivery、`scripts/ci-diagnostic-delta.test.ts`    | 0      | 23 文件、291 通过。日志 `/tmp/accept/vitest.log`                                                                                                                                                |
+| 类型修复后相关测试        | 同上配置再跑 closeout、supervisor tip、followup、cron closeout                                                         | 0      | 34 通过。日志 `/tmp/accept/vitest-after-types.log`                                                                                                                                              |
+| release record            | `pnpm delivery:release-record:check`                                                                                   | 0      | seq 151 文档与账本一致，不是容器 LIVE 核对                                                                                                                                                      |
+| ledger audit              | `pnpm delivery:ledger:audit`                                                                                           | 30     | 见下节。日志未完整保留；退出码 30，157 个 `missing-object`                                                                                                                                      |
+| freeze 扫描               | workflow 同款 trusted blob + `--mode freeze`                                                                           | 1      | 相对 2026-08-14 基线 blob 报新增调用点。除 `src/commands/agent.ts` 行号因本 PR 移动外，列出的文件与 `origin/main` 相同，且 diff 没有新增 `resolveAgentWorkspaceDir`。不是本 PR 新写的工作区入口 |
+
+## 8. 无法等价复现
+
+- **历史 git 对象。** 本克隆从恢复快照 `dd6c85ca` 起只有约 229 个提交，不是浅克隆，但没有 seq 2 起的发布对象。`git fetch origin 1e1143012db2` 失败：`couldn't find remote ref`。因此 `delivery:ledger:audit` 不能像 `fetch-depth: 0` 的 CI 那样裁定旧发布是否仍活着。影响：不能用这次退出码 30 证明账本逻辑回归；本 PR 没有改 `releases.jsonl`。`delivery:release-record:check` 只核对当前 seq 151，已通过。
+- **生产环境。** 无 kubectl、podman、生产 SSH，没有读运行容器 `build-info.json`。影响：不能把合入 main 说成 LIVE。seq 151 仍是账本里的最后一条生产身份。
+- **GitHub Actions。** 账单未付或支出上限导致 job 的 `steps` 为 0。label / label-issues 是同一原因，不是标签权限逻辑失败。`docs-scope` 同样没启动；它只区分文档与代码，本 PR 含源码，不是 docs-only。
+- **全库 `pnpm build`。** CI Gate 的失败项不包含完整构建；`build-artifacts` 因 `docs-scope` 没启动而 skipping。本次没有把完整 `pnpm build` 当作合入门。
+- **全库 `oxfmt --check` 与 freeze。** 失败点在 `origin/main` 上已经存在。本 PR 不重新格式化那 29 个无关文件，也不改记忆冻结基线。
