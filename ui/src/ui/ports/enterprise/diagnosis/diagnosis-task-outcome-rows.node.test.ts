@@ -1,7 +1,11 @@
 /** @vitest-environment jsdom */
 import { render } from "lit";
-import { describe, expect, it } from "vitest";
-import { diagnosisSourceLabel, diagnosisTaskOutcomeRows } from "./diagnosis-task-outcome-rows.ts";
+import { describe, expect, it, vi } from "vitest";
+import {
+  diagnosisSourceLabel,
+  diagnosisTaskOutcomeRows,
+  resolveDiagnoseTaskOutcome,
+} from "./diagnosis-task-outcome-rows.ts";
 import {
   renderEnterpriseDiagnosisSurface,
   type DiagnosisViewModel,
@@ -102,5 +106,66 @@ describe("diagnosis task outcome rows", () => {
     expect(block).toContain("失败（correction）");
     expect(block).toContain("未复验");
     expect(block).not.toContain("已重新执行");
+  });
+
+  it("keeps diagnose unbound until the user fills task, agent, and version", () => {
+    expect(resolveDiagnoseTaskOutcome({ taskId: "", agentId: "", outcomeVersion: "" })).toBeNull();
+    expect(
+      resolveDiagnoseTaskOutcome({ taskId: "task-1", agentId: "bot", outcomeVersion: "" }),
+    ).toBeNull();
+    expect(
+      resolveDiagnoseTaskOutcome(
+        { taskId: "task-1", agentId: "", outcomeVersion: "" },
+        { taskId: "other", agentId: "bot", outcomeVersion: 9 },
+      ),
+    ).toBeNull();
+    expect(
+      resolveDiagnoseTaskOutcome({ taskId: "task-1", agentId: "bot", outcomeVersion: "4" }),
+    ).toEqual({ taskId: "task-1", agentId: "bot", outcomeVersion: 4 });
+
+    const missing = diagnosisTaskOutcomeRows({
+      sourceLabel: "数字人 客服",
+      evidence: { ok: false, code: "not_found", taskId: "task-missing" },
+    });
+    expect(missing.find((row) => row.label === "当前处理")?.value).toBe("没有这条任务结果");
+    const stale = diagnosisTaskOutcomeRows({
+      sourceLabel: "数字人 客服",
+      evidence: { ok: false, code: "outcome_version_changed", taskId: "task-1" },
+    });
+    expect(stale.find((row) => row.label === "结果版本")?.value).toBe("证据已过期");
+
+    const container = document.createElement("div");
+    const onTaskOutcomeDraftChange = vi.fn();
+    render(
+      renderEnterpriseDiagnosisSurface(model(), {
+        onDiagnoseNow: () => undefined,
+        targets: [
+          {
+            id: "agent:bot",
+            kind: "agent",
+            label: "客服",
+            agentId: "bot",
+            sessionKey: "agent:bot:main",
+            steward: false,
+          },
+        ],
+        selectedTargetId: "agent:bot",
+        onUseSelectedAgentId: () =>
+          onTaskOutcomeDraftChange({ taskId: "", agentId: "bot", outcomeVersion: "" }),
+      }),
+      container,
+    );
+    expect(
+      (container.querySelector("[data-testid=diagnosis-task-id]") as HTMLInputElement).value,
+    ).toBe("");
+    expect(container.textContent).toContain("不会自动选择最近任务");
+    container
+      .querySelector<HTMLButtonElement>("[data-testid=diagnosis-use-selected-agent]")
+      ?.click();
+    expect(onTaskOutcomeDraftChange).toHaveBeenCalledWith({
+      taskId: "",
+      agentId: "bot",
+      outcomeVersion: "",
+    });
   });
 });

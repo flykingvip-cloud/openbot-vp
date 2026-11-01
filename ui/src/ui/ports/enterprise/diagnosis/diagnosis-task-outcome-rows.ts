@@ -75,7 +75,9 @@ export function diagnosisTaskOutcomeRows(input: {
       ? "无法关联身份"
       : evidence.code === "forbidden"
         ? "权限不足"
-        : "尚未处理";
+        : evidence.code === "not_found"
+          ? "没有这条任务结果"
+          : "尚未处理";
   return [
     { label: "来源", value: source },
     { label: "关联原任务", value: taskId, mono: taskId !== "未声明" },
@@ -83,6 +85,58 @@ export function diagnosisTaskOutcomeRows(input: {
     { label: "当前处理", value: handling },
     { label: "复验结果", value: "未复验" },
   ];
+}
+
+export type DiagnoseTaskOutcomeDraft = {
+  taskId: string;
+  agentId: string;
+  outcomeVersion: string;
+};
+
+export type DiagnoseTaskOutcomeRef = {
+  taskId: string;
+  agentId: string;
+  outcomeVersion: number;
+};
+
+/** Attach a task only when the user supplied all three fields. Partial input does not fall back to another task. */
+export function resolveDiagnoseTaskOutcome(
+  draft: DiagnoseTaskOutcomeDraft,
+  hostRef: DiagnoseTaskOutcomeRef | null = null,
+): DiagnoseTaskOutcomeRef | null {
+  const taskId = draft.taskId.trim();
+  const agentId = draft.agentId.trim();
+  const versionText = draft.outcomeVersion.trim();
+  const started = Boolean(taskId || agentId || versionText);
+  if (started) {
+    if (!taskId || !agentId || !/^[1-9]\d*$/.test(versionText)) {
+      return null;
+    }
+    return { taskId, agentId, outcomeVersion: Number(versionText) };
+  }
+  const hostTaskId = hostRef?.taskId.trim() ?? "";
+  const hostAgentId = hostRef?.agentId.trim() ?? "";
+  const hostVersion = hostRef?.outcomeVersion;
+  if (
+    !hostTaskId ||
+    !hostAgentId ||
+    typeof hostVersion !== "number" ||
+    !Number.isInteger(hostVersion) ||
+    hostVersion < 1
+  ) {
+    return null;
+  }
+  return { taskId: hostTaskId, agentId: hostAgentId, outcomeVersion: hostVersion };
+}
+
+export function diagnoseTaskOutcomeAttachNote(draft: DiagnoseTaskOutcomeDraft): string | null {
+  const started = Boolean(
+    draft.taskId.trim() || draft.agentId.trim() || draft.outcomeVersion.trim(),
+  );
+  if (!started || resolveDiagnoseTaskOutcome(draft)) {
+    return null;
+  }
+  return "任务对照未附上：需要同时填写任务、数字人和结果版本。不会自动选择最近任务。";
 }
 
 function emptyRows(source: string): DiagnosisTaskOutcomeRow[] {

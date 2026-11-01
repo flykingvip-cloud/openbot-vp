@@ -2,6 +2,10 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createAuthorizationDecisionRefresh } from "../../../../../src/diagnosis/visualization.ts";
 import type { GatewayBrowserClient } from "../../gateway.ts";
+import {
+  diagnoseTaskOutcomeAttachNote,
+  resolveDiagnoseTaskOutcome,
+} from "../enterprise/diagnosis/diagnosis-task-outcome-rows.ts";
 import { renderEnterpriseDiagnosisSurface } from "../enterprise/diagnosis/enterprise-diagnosis-surface.ts";
 import type {
   DiagnosisRunNote,
@@ -67,6 +71,10 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @state() private deliverToAdmin = false;
   @state() private deliverToOwners = false;
   @state() private decisionNote: string | null = null;
+  @state() private taskIdDraft = "";
+  @state() private agentIdDraft = "";
+  @state() private outcomeVersionDraft = "";
+  @state() private taskOutcomeAttachNote: string | null = null;
   @state() private approvalNotice: { tone: "ok" | "err"; text: string } | null = null;
   private decidedGrants = new Map<string, "APPROVED" | "DENIED">();
 
@@ -116,7 +124,13 @@ export class OpenBotDiagnosisPanel extends LitElement {
       return;
     }
     this.diagnosing = true;
-    const taskOutcome = completeTaskOutcomeRef(this.taskOutcomeRef);
+    const draft = {
+      taskId: this.taskIdDraft,
+      agentId: this.agentIdDraft,
+      outcomeVersion: this.outcomeVersionDraft,
+    };
+    const taskOutcome = resolveDiagnoseTaskOutcome(draft, this.taskOutcomeRef);
+    this.taskOutcomeAttachNote = diagnoseTaskOutcomeAttachNote(draft);
     try {
       if (!isDiagnosisGatewayReady()) {
         this.lastDiagnose = { kind: "disconnected" };
@@ -496,6 +510,27 @@ export class OpenBotDiagnosisPanel extends LitElement {
           onDeliverToOwners: (value) => {
             this.deliverToOwners = value;
           },
+          taskOutcomeDraft: {
+            taskId: this.taskIdDraft,
+            agentId: this.agentIdDraft,
+            outcomeVersion: this.outcomeVersionDraft,
+          },
+          onTaskOutcomeDraftChange: (draft) => {
+            this.taskIdDraft = draft.taskId;
+            this.agentIdDraft = draft.agentId;
+            this.outcomeVersionDraft = draft.outcomeVersion;
+            this.taskOutcomeAttachNote = null;
+          },
+          onUseSelectedAgentId: () => {
+            const target = findDiagnosisTarget(this.targets, this.selectedTargetId);
+            const agentId = target?.agentId.trim() ?? "";
+            if (!agentId || isAllDiagnosisTarget(this.selectedTargetId)) {
+              return;
+            }
+            this.agentIdDraft = agentId;
+            this.taskOutcomeAttachNote = null;
+          },
+          taskOutcomeAttachNote: this.taskOutcomeAttachNote,
           onRunConversationAction: (action) => {
             dispatchDiagnosisConversationAction(this, action, "panel");
           },
@@ -554,24 +589,6 @@ export class OpenBotDiagnosisPanel extends LitElement {
       )}
     `;
   }
-}
-
-function completeTaskOutcomeRef(
-  value: { taskId: string; agentId: string; outcomeVersion: number } | null,
-): { taskId: string; agentId: string; outcomeVersion: number } | null {
-  const taskId = value?.taskId.trim() ?? "";
-  const agentId = value?.agentId.trim() ?? "";
-  const outcomeVersion = value?.outcomeVersion;
-  if (
-    !taskId ||
-    !agentId ||
-    typeof outcomeVersion !== "number" ||
-    !Number.isInteger(outcomeVersion) ||
-    outcomeVersion < 1
-  ) {
-    return null;
-  }
-  return { taskId, agentId, outcomeVersion };
 }
 
 function readTaskOutcomeEvidenceView(value: unknown): DiagnosisRunNote["taskOutcomeEvidence"] {
