@@ -1,0 +1,163 @@
+=== CLI help ===
+
+🐲 OpenBot 2026.7.12-rc.2 (0c22e48) — If it works, it's automation; if it breaks, it's a "learning opportunity."
+
+Usage: openbot [options] [command]
+
+Options:
+  --dev                Dev profile: isolate state under ~/.openbot-dev, default
+                       gateway port 19001, and shift derived ports
+                       (browser/canvas)
+  -h, --help           Display help for command
+  --log-level <level>  Global log level override for file + console
+                       (silent|fatal|error|warn|info|debug|trace)
+  --no-color           Disable ANSI colors
+  --profile <name>     Use a named profile (isolates
+                       OPENBOT_STATE_DIR/OPENBOT_CONFIG_PATH under
+                       ~/.openbot-<name>)
+  -V, --version        output the version number
+
+Commands:
+  Hint: commands suffixed with * have subcommands. Run <command> --help for details.
+  acp *                Agent Control Protocol tools
+  agent                Run one agent turn via the Gateway
+  agents *             Manage isolated agents (workspaces, auth, routing)
+  approvals *          Manage exec approvals (gateway or node host)
+  backup *             Create and verify local backup archives for OpenBot state
+  browser *            Manage OpenBot's dedicated browser (Chrome/Chromium)
+  channels *           Manage connected chat channels (Telegram, Discord, etc.)
+  clawbot *            Legacy clawbot command aliases
+  completion           Generate shell completion script
+  config *             Non-interactive config helpers
+                       (get/set/unset/file/validate). Default: starts setup
+                       wizard.
+  configure            Interactive setup wizard for credentials, channels,
+                       gateway, and agent defaults
+  conversation-task *  Shadow-only ConversationTask enablement (ops)
+  cron *               Manage cron jobs via the Gateway scheduler
+  daemon *             Gateway service (legacy alias)
+  dashboard            Open the Control UI with your current token
+  data *               OpenBot Data Space (info, migrate, export)
+  devices *            Device pairing + token management
+  directory *          Lookup contact and group IDs (self, peers, groups) for
+                       supported chat channels
+  dns *                DNS helpers for wide-area discovery (Tailscale + CoreDNS)
+  docs                 Search the live OpenBot docs
+  doctor               Health checks + quick fixes for the gateway and channels
+  gateway *            Run, inspect, and query the WebSocket Gateway
+  health               Fetch health from the running gateway
+  help                 Display help for command
+  hooks *              Manage internal agent hooks
+  local-files *        Grant and answer reads of a user's own computer
+  logs                 Tail gateway file logs via RPC
+  memory *             Search and reindex memory files
+  message *            Send, read, and manage messages
+  models *             Discover, scan, and configure models
+  node *               Run and manage the headless node host service
+  nodes *              Manage gateway-owned node pairing and node commands
+  onboard              Interactive onboarding wizard for gateway, workspace, and
+                       skills
+  pairing *            Secure DM pairing (approve inbound requests)
+  plugins *            Manage OpenBot plugins and extensions
+  qr                   Generate iOS pairing QR/setup code
+  reset                Reset local config/state (keeps the CLI installed)
+  sandbox *            Manage sandbox containers for agent isolation
+  secrets *            Secrets runtime reload controls
+  security *           Security tools and local config audits
+  sessions *           List stored conversation sessions
+  setup                Initialize local config and agent workspace
+  skills *             List and inspect available skills
+  status               Show channel health and recent session recipients
+  system *             System events, heartbeat, and presence
+  tui                  Open a terminal UI connected to the Gateway
+  uninstall            Uninstall the gateway service + local data (CLI remains)
+  update *             Update OpenBot and inspect update channel status
+  webhooks *           Webhook helpers and integrations
+
+Examples:
+  openbot models --help
+    Show detailed help for the models command.
+  openbot channels login --verbose
+    Link personal WhatsApp Web and show QR + connection logs.
+  openbot message send --target +15555550123 --message "Hi" --json
+    Send via your web session and print JSON result.
+  openbot gateway --port 18789
+    Run the WebSocket Gateway locally.
+  openbot --dev gateway
+    Run a dev Gateway (isolated state/config) on ws://127.0.0.1:19001.
+  openbot gateway --force
+    Kill anything bound to the default gateway port, then start it.
+  openbot gateway ...
+    Gateway control via WebSocket.
+  openbot agent --to +15555550123 --message "Run summary" --deliver
+    Talk directly to the agent using the Gateway; optionally send the WhatsApp reply.
+  openbot message send --channel telegram --target @mychat --message "Hi"
+    Send via your Telegram bot.
+
+Docs: https://docs.openbot.love/cli
+
+EXIT_HELP:0
+=== CLI doctor (no creds) ===
+
+🐲 OpenBot 2026.7.12-rc.2 (0c22e48) — Hot reload for config, cold sweat for deploys.
+
+Usage: openbot doctor [options]
+
+Health checks + quick fixes for the gateway and channels
+
+Options:
+  --deep                      Scan system services for extra gateway installs
+                              (default: false)
+  --fix                       Apply recommended repairs (alias for --repair)
+                              (default: false)
+  --force                     Apply aggressive repairs (overwrites custom
+                              service config) (default: false)
+  --generate-gateway-token    Generate and configure a gateway token (default:
+                              false)
+  -h, --help                  Display help for command
+  --no-workspace-suggestions  Disable workspace memory system suggestions
+  --non-interactive           Run without prompts (safe migrations only)
+                              (default: false)
+  --repair                    Apply recommended repairs without prompting
+                              (default: false)
+  --yes                       Accept defaults without prompting (default: false)
+
+Docs: https://docs.openbot.love/cli/doctor
+
+EXIT_DOCTOR_HELP:0
+=== channels list/help ===
+
+🐲 OpenBot 2026.7.12-rc.2 (0c22e48) — Somewhere between 'hello world' and 'oh god what have I built.'
+
+Usage: openbot channels [options] [command]
+
+Manage connected chat channels and accounts
+
+Options:
+  -h, --help    Display help for command
+
+Commands:
+  add           Add or update a channel account
+  capabilities  Show provider capabilities (intents/scopes + supported features)
+  help          Display help for command
+  list          List configured channels + auth profiles
+  login         Link a channel account (if supported)
+  logout        Log out of a channel session (if supported)
+  logs          Show recent channel logs from the gateway log file
+  remove        Disable or delete a channel account
+  resolve       Resolve channel/user names to IDs
+  status        Show gateway channel status (use status --deep for local)
+
+Examples:
+  openbot channels list
+    List configured channels and auth profiles.
+  openbot channels status --probe
+    Run channel status checks and probes.
+  openbot channels add --channel telegram --token <token>
+    Add or update a channel account non-interactively.
+  openbot channels login --channel whatsapp
+    Link a WhatsApp Web account.
+
+Docs: https://docs.openbot.love/cli/channels
+
+EXIT_CHANNELS_HELP:0

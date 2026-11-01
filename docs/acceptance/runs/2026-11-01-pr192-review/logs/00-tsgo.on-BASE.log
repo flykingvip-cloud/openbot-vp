@@ -1,0 +1,197 @@
+extensions/diagnostics-otel/src/service.ts(1,48): error TS2307: Cannot find module '@opentelemetry/api' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(2,37): error TS2307: Cannot find module '@opentelemetry/api-logs' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(3,33): error TS2307: Cannot find module '@opentelemetry/exporter-logs-otlp-proto' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(4,36): error TS2307: Cannot find module '@opentelemetry/exporter-metrics-otlp-proto' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(5,35): error TS2307: Cannot find module '@opentelemetry/exporter-trace-otlp-proto' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(6,40): error TS2307: Cannot find module '@opentelemetry/resources' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(7,57): error TS2307: Cannot find module '@opentelemetry/sdk-logs' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(8,47): error TS2307: Cannot find module '@opentelemetry/sdk-metrics' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(9,25): error TS2307: Cannot find module '@opentelemetry/sdk-node' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(10,62): error TS2307: Cannot find module '@opentelemetry/sdk-trace-base' or its corresponding type declarations.
+extensions/diagnostics-otel/src/service.ts(11,35): error TS2307: Cannot find module '@opentelemetry/semantic-conventions' or its corresponding type declarations.
+extensions/diffs/src/render.ts(1,73): error TS2307: Cannot find module '@pierre/diffs' or its corresponding type declarations.
+extensions/diffs/src/render.ts(2,33): error TS2307: Cannot find module '@pierre/diffs' or its corresponding type declarations.
+extensions/diffs/src/render.ts(3,55): error TS2307: Cannot find module '@pierre/diffs/ssr' or its corresponding type declarations.
+extensions/diffs/src/render.ts(393,55): error TS7006: Parameter 'entry' implicitly has an 'any' type.
+extensions/diffs/src/render.ts(400,36): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+extensions/diffs/src/render.ts(400,41): error TS7006: Parameter 'fileDiff' implicitly has an 'any' type.
+extensions/diffs/src/render.ts(411,22): error TS7006: Parameter 'fileDiff' implicitly has an 'any' type.
+extensions/diffs/src/types.ts(1,73): error TS2307: Cannot find module '@pierre/diffs' or its corresponding type declarations.
+extensions/diffs/src/viewer-client.ts(1,46): error TS2307: Cannot find module '@pierre/diffs' or its corresponding type declarations.
+extensions/diffs/src/viewer-client.ts(7,8): error TS2307: Cannot find module '@pierre/diffs' or its corresponding type declarations.
+extensions/googlechat/src/auth.ts(1,42): error TS2307: Cannot find module 'google-auth-library' or its corresponding type declarations.
+extensions/matrix/src/matrix/actions/pins.test.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/actions/reactions.test.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/actions/summary.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/actions/types.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/active-client.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/client/create-client.ts(6,8): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/client/create-client.ts(70,42): error TS2307: Cannot find module '@matrix-org/matrix-sdk-crypto-nodejs' or its corresponding type declarations.
+extensions/matrix/src/matrix/client/create-client.ts(93,7): error TS7006: Parameter 'toDeviceMessages' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/create-client.ts(94,7): error TS7006: Parameter 'otkCounts' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/create-client.ts(95,7): error TS7006: Parameter 'unusedFallbackKeyAlgs' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/create-client.ts(96,7): error TS7006: Parameter 'changedDeviceLists' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/create-client.ts(97,7): error TS7006: Parameter 'leftDeviceLists' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/logging.ts(35,13): error TS7006: Parameter 'module' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/logging.ts(35,21): error TS7019: Rest parameter 'messageOrObject' implicitly has an 'any[]' type.
+extensions/matrix/src/matrix/client/logging.ts(36,13): error TS7006: Parameter 'module' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/logging.ts(36,21): error TS7019: Rest parameter 'messageOrObject' implicitly has an 'any[]' type.
+extensions/matrix/src/matrix/client/logging.ts(37,12): error TS7006: Parameter 'module' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/logging.ts(37,20): error TS7019: Rest parameter 'messageOrObject' implicitly has an 'any[]' type.
+extensions/matrix/src/matrix/client/logging.ts(38,12): error TS7006: Parameter 'module' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/logging.ts(38,20): error TS7019: Rest parameter 'messageOrObject' implicitly has an 'any[]' type.
+extensions/matrix/src/matrix/client/logging.ts(39,13): error TS7006: Parameter 'module' implicitly has an 'any' type.
+extensions/matrix/src/matrix/client/logging.ts(39,21): error TS7019: Rest parameter 'messageOrObject' implicitly has an 'any[]' type.
+extensions/matrix/src/matrix/client/shared.test.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/client/shared.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/client/startup.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/auto-join.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/direct.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/events.test.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/events.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/events.ts(34,16): error TS7006: Parameter 'userId' implicitly has an 'any' type.
+extensions/matrix/src/matrix/monitor/handler.body-for-agent.test.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/handler.ts(1,64): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/location.ts(1,50): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/media.test.ts(30,28): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/media.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/replies.test.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/replies.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/room-info.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/monitor/types.ts(1,57): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/sdk-runtime.ts(3,39): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/send.test.ts(78,26): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/send.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/send/client.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/send/media.ts(8,8): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/send/media.ts(20,25): error TS2307: Cannot find module 'music-metadata' or its corresponding type declarations.
+extensions/matrix/src/matrix/send/media.ts(167,42): error TS2307: Cannot find module 'music-metadata' or its corresponding type declarations.
+extensions/matrix/src/matrix/send/targets.test.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/send/targets.ts(1,35): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/send/types.ts(9,8): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/matrix/src/matrix/send/types.ts(89,19): error TS2307: Cannot find module '@vector-im/matrix-bot-sdk' or its corresponding type declarations.
+extensions/memory-core/index.ts(28,11): error TS2353: Object literal may only specify known properties, and 'authenticatedUserId' does not exist in type '{ config?: OpenBotConfig | undefined; agentSessionKey?: string | undefined; governance?: MemorySearchGovernance | undefined; gatewayClientUser?: string | undefined; gatewayClientSessionDomain?: "employee" | ... 2 more ... | undefined; }'.
+extensions/memory-core/index.ts(36,11): error TS2353: Object literal may only specify known properties, and 'authenticatedUserId' does not exist in type '{ config?: OpenBotConfig | undefined; agentSessionKey?: string | undefined; governance?: MemorySearchGovernance | undefined; gatewayClientUser?: string | undefined; gatewayClientSessionDomain?: "employee" | ... 2 more ... | undefined; }'.
+extensions/memory-lancedb/index.ts(10,31): error TS2307: Cannot find module '@lancedb/lancedb' or its corresponding type declarations.
+extensions/memory-lancedb/index.ts(12,20): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+extensions/memory-lancedb/index.ts(26,49): error TS2307: Cannot find module '@lancedb/lancedb' or its corresponding type declarations.
+extensions/memory-lancedb/index.ts(27,53): error TS2307: Cannot find module '@lancedb/lancedb' or its corresponding type declarations.
+extensions/memory-lancedb/index.ts(29,35): error TS2307: Cannot find module '@lancedb/lancedb' or its corresponding type declarations.
+extensions/memory-lancedb/index.ts(122,33): error TS7006: Parameter 'row' implicitly has an 'any' type.
+extensions/memory-lancedb/index.ts(139,27): error TS7006: Parameter 'r' implicitly has an 'any' type.
+extensions/msteams/src/sdk-types.ts(1,34): error TS2307: Cannot find module '@microsoft/agents-hosting' or its corresponding type declarations.
+extensions/msteams/src/sdk.ts(4,40): error TS2307: Cannot find module '@microsoft/agents-hosting' or its corresponding type declarations.
+extensions/msteams/src/sdk.ts(8,23): error TS2307: Cannot find module '@microsoft/agents-hosting' or its corresponding type declarations.
+extensions/nostr/src/nostr-bus.ts(8,8): error TS2307: Cannot find module 'nostr-tools' or its corresponding type declarations.
+extensions/nostr/src/nostr-bus.ts(9,34): error TS2307: Cannot find module 'nostr-tools/nip04' or its corresponding type declarations.
+extensions/nostr/src/nostr-bus.ts(503,17): error TS7006: Parameter 'reason' implicitly has an 'any' type.
+extensions/nostr/src/nostr-profile-import.ts(8,53): error TS2307: Cannot find module 'nostr-tools' or its corresponding type declarations.
+extensions/nostr/src/nostr-profile-import.ts(135,21): error TS7006: Parameter 'event' implicitly has an 'any' type.
+extensions/nostr/src/nostr-profile.test.ts(1,43): error TS2307: Cannot find module 'nostr-tools' or its corresponding type declarations.
+extensions/nostr/src/nostr-profile.ts(8,55): error TS2307: Cannot find module 'nostr-tools' or its corresponding type declarations.
+extensions/tlon/src/channel.ts(2,33): error TS2307: Cannot find module '@tloncorp/api' or its corresponding type declarations.
+extensions/tlon/src/urbit/send.test.ts(17,31): error TS2307: Cannot find module '@urbit/aura' or its corresponding type declarations.
+extensions/tlon/src/urbit/send.ts(1,26): error TS2307: Cannot find module '@urbit/aura' or its corresponding type declarations.
+extensions/tlon/src/urbit/upload.test.ts(30,41): error TS2307: Cannot find module '@tloncorp/api' or its corresponding type declarations.
+extensions/tlon/src/urbit/upload.test.ts(85,41): error TS2307: Cannot find module '@tloncorp/api' or its corresponding type declarations.
+extensions/tlon/src/urbit/upload.test.ts(133,41): error TS2307: Cannot find module '@tloncorp/api' or its corresponding type declarations.
+extensions/tlon/src/urbit/upload.test.ts(163,41): error TS2307: Cannot find module '@tloncorp/api' or its corresponding type declarations.
+extensions/tlon/src/urbit/upload.ts(4,28): error TS2307: Cannot find module '@tloncorp/api' or its corresponding type declarations.
+extensions/twitch/src/probe.ts(1,36): error TS2307: Cannot find module '@twurple/auth' or its corresponding type declarations.
+extensions/twitch/src/probe.ts(2,28): error TS2307: Cannot find module '@twurple/chat' or its corresponding type declarations.
+extensions/twitch/src/probe.ts(73,50): error TS7006: Parameter '_manually' implicitly has an 'any' type.
+extensions/twitch/src/probe.ts(73,61): error TS7006: Parameter 'reason' implicitly has an 'any' type.
+extensions/twitch/src/resolver.ts(8,27): error TS2307: Cannot find module '@twurple/api' or its corresponding type declarations.
+extensions/twitch/src/resolver.ts(9,36): error TS2307: Cannot find module '@twurple/auth' or its corresponding type declarations.
+extensions/twitch/src/twitch-client.ts(1,60): error TS2307: Cannot find module '@twurple/auth' or its corresponding type declarations.
+extensions/twitch/src/twitch-client.ts(2,38): error TS2307: Cannot find module '@twurple/chat' or its corresponding type declarations.
+extensions/twitch/src/twitch-client.ts(41,16): error TS7006: Parameter 'userId' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(46,17): error TS7006: Parameter 'err' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(52,31): error TS7006: Parameter 'userId' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(52,39): error TS7006: Parameter 'token' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(58,38): error TS7006: Parameter 'userId' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(58,46): error TS7006: Parameter 'error' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(119,17): error TS7006: Parameter 'level' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(119,24): error TS7006: Parameter 'message' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(162,23): error TS7006: Parameter 'channelName' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(162,36): error TS7006: Parameter '_user' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(162,43): error TS7006: Parameter 'messageText' implicitly has an 'any' type.
+extensions/twitch/src/twitch-client.ts(162,56): error TS7006: Parameter 'msg' implicitly has an 'any' type.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(61,43): error TS2493: Tuple type '[]' of length '0' has no element at index '0'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(79,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(80,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(93,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(94,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(109,23): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(110,23): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(128,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/agents/bash-tools.exec.sandbox-workspace-write.test.ts(191,14): error TS18048: 'lastRun' is possibly 'undefined'.
+src/cron/service.delivery-adapter-evidence.p2h.test.ts(119,65): error TS2353: Object literal may only specify known properties, and 'ok' does not exist in type 'OutboundDeliveryResult'.
+src/cron/service.delivery-adapter-evidence.p2h.test.ts(137,65): error TS2353: Object literal may only specify known properties, and 'ok' does not exist in type 'OutboundDeliveryResult'.
+src/gateway/enterprise-data/event-driven-projection-materializer.ts(23,36): error TS2305: Module '"./types.js"' has no exported member 'SarGovernanceProvider'.
+src/gateway/evolution-control/authorize-shadow-intent.test.ts(62,15): error TS7006: Parameter 'success' implicitly has an 'any' type.
+src/gateway/evolution-control/authorize-shadow-intent.test.ts(62,24): error TS7006: Parameter 'data' implicitly has an 'any' type.
+src/gateway/evolution-control/authorize-shadow-intent.test.ts(62,30): error TS7006: Parameter 'err' implicitly has an 'any' type.
+src/gateway/server-methods/chat.restore.test.ts(40,76): error TS2556: A spread argument must either have a tuple type or be passed to a rest parameter.
+src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts(143,42): error TS2493: Tuple type '[]' of length '0' has no element at index '1'.
+src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts(258,35): error TS2345: Argument of type '(store: any, storePath?: string | undefined) => Promise<void>' is not assignable to parameter of type '() => Promise<void>'.
+  Target signature provides too few arguments. Expected 1 or more, but got 0.
+src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts(258,42): error TS7006: Parameter 'store' implicitly has an 'any' type.
+src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts(320,54): error TS2493: Tuple type '[]' of length '0' has no element at index '1'.
+src/gateway/server-methods/enterprise-data-events.ts(209,17): error TS7006: Parameter 'ctx' implicitly has an 'any' type.
+src/gateway/server-methods/enterprise-data-events.ts(209,22): error TS7006: Parameter 'run' implicitly has an 'any' type.
+src/memory/memory-continuity-gateway.http.integration.test.ts(190,11): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/memory/memory-continuity-gateway.http.integration.test.ts(308,5): error TS2739: Type '{ ok: true; user: string; }' is missing the following properties from type '{ ok: true; user: string | undefined; method: "device-token" | "none" | "password" | "tailscale" | "token" | "trusted-proxy" | undefined; trustedProxy: { provider: "trusted-proxy"; ... 4 more ...; tenantId?: string | undefined; } | undefined; }': method, trustedProxy
+src/memory/memory-continuity-gateway.http.integration.test.ts(387,5): error TS2739: Type '{ ok: true; user: string; }' is missing the following properties from type '{ ok: true; user: string | undefined; method: "device-token" | "none" | "password" | "tailscale" | "token" | "trusted-proxy" | undefined; trustedProxy: { provider: "trusted-proxy"; ... 4 more ...; tenantId?: string | undefined; } | undefined; }': method, trustedProxy
+src/memory/memory-continuity-gateway.http.integration.test.ts(418,5): error TS2739: Type '{ ok: true; user: string; }' is missing the following properties from type '{ ok: true; user: string | undefined; method: "device-token" | "none" | "password" | "tailscale" | "token" | "trusted-proxy" | undefined; trustedProxy: { provider: "trusted-proxy"; ... 4 more ...; tenantId?: string | undefined; } | undefined; }': method, trustedProxy
+src/memory/memory-continuity-gateway.http.integration.test.ts(440,5): error TS2739: Type '{ ok: true; user: string; }' is missing the following properties from type '{ ok: true; user: string | undefined; method: "device-token" | "none" | "password" | "tailscale" | "token" | "trusted-proxy" | undefined; trustedProxy: { provider: "trusted-proxy"; ... 4 more ...; tenantId?: string | undefined; } | undefined; }': method, trustedProxy
+ui/src/shims/node-crypto.ts(1,24): error TS2307: Cannot find module '@noble/hashes/sha2.js' or its corresponding type declarations.
+ui/src/shims/node-crypto.ts(2,41): error TS2307: Cannot find module '@noble/hashes/utils.js' or its corresponding type declarations.
+ui/src/ui/collaboration/collaboration-rules-summary.test.ts(88,30): error TS2322: Type '"governance.botMaySelfAdvanceWithoutHuman"' is not assignable to type '"participation.proactiveBots"'.
+ui/src/ui/device-identity.ts(1,53): error TS2307: Cannot find module '@noble/ed25519' or its corresponding type declarations.
+ui/src/ui/employee-shell/employee-embed-a11y.browser.test.ts(1,33): error TS2307: Cannot find module '@vitest/browser/context' or its corresponding type declarations.
+ui/src/ui/employee-shell/employee-embed-mobile.browser.test.ts(1,22): error TS2307: Cannot find module '@vitest/browser/context' or its corresponding type declarations.
+ui/src/ui/markdown.test.ts(1,24): error TS2307: Cannot find module 'marked' or its corresponding type declarations.
+ui/src/ui/markdown.ts(1,23): error TS2307: Cannot find module 'dompurify' or its corresponding type declarations.
+ui/src/ui/markdown.ts(2,24): error TS2307: Cannot find module 'marked' or its corresponding type declarations.
+ui/src/ui/vault-sync/client-crypto.ts(4,24): error TS2307: Cannot find module '@noble/hashes/scrypt.js' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/__tests__/empty-states.test.ts(5,45): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/__tests__/integration.test.ts(5,30): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/__tests__/robot-capability-components.test.ts(5,45): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/__tests__/term-blacklist.property.test.ts(6,30): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/__tests__/usage-governance-page.test.ts(4,45): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/__tests__/visual-regression.browser.test.ts(11,45): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/robot-capability-table.ts(9,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/robot-capability-view-page.ts(9,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/robot-detail-panel.ts(20,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/shared/empty-state.ts(10,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/shared/filter-bar.ts(6,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/shared/kpi-card.ts(7,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/usage-analytics-kpi-cards.ts(7,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/usage-analytics-page.ts(9,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/usage-governance-page.ts(11,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library-usage/usage-trend-chart.ts(10,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-asset-library/capability-center-usage-panels.ts(16,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/__tests__/empty-states.test.ts(5,45): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/__tests__/robot-capability-components.test.ts(5,45): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/__tests__/term-blacklist.property.test.ts(6,30): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/__tests__/visual-regression.browser.test.ts(11,45): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/install-management-dual-view-page.ts(9,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/install-relation-row.ts(5,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/robot-capability-table.ts(9,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/robot-capability-view-page.ts(9,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/robot-detail-panel.ts(20,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/shared/empty-state.ts(10,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/shared/filter-bar.ts(6,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/shared/kpi-card.ts(7,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/top-capabilities-table.ts(10,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/usage-analytics-kpi-cards.ts(7,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/usage-analytics-page.ts(9,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/usage-governance-page.ts(9,52): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/src/ui/views/enterprise-capability-usage-management/usage-trend-chart.ts(10,43): error TS2307: Cannot find module 'lit-html' or its corresponding type declarations.
+ui/vite.config.ts(3,30): error TS2307: Cannot find module 'vite' or its corresponding type declarations.
+ui/vite.config.ts(54,29): error TS7006: Parameter '_filename' implicitly has an 'any' type.
+ui/vite.config.ts(54,40): error TS7006: Parameter 'deps' implicitly has an 'any' type.
+ui/vite.config.ts(56,14): error TS7006: Parameter 'dep' implicitly has an 'any' type.
+ui/vite.config.ts(78,24): error TS7006: Parameter 'id' implicitly has an 'any' type.
+ui/vitest.config.ts(4,28): error TS2307: Cannot find module '@vitest/browser-playwright' or its corresponding type declarations.

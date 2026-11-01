@@ -1,0 +1,14 @@
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+
+ ✓ src/gateway/enterprise-data/sar-governance-bridge.test.ts (10 tests) 19ms
+ ✓ src/gateway/enterprise-data/controlled-sar-provider.test.ts (5 tests) 43ms
+ ✓ src/gateway/enterprise-data/event-driven-projection-materializer.test.ts (2 tests) 27ms
+ ✓ src/plugins/runtime/types.contract.test.ts (2 tests) 3ms
+
+ Test Files  4 passed (4)
+      Tests  19 passed (19)
+   Start at  23:06:33
+   Duration  12.43s (transform 14.53s, setup 802ms, import 22.32s, tests 92ms, environment 0ms)
+
+EXIT:0

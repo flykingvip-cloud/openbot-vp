@@ -1,0 +1,2 @@
+SBOM_STATUS=PASS_ARTIFACT
+note: CycloneDX JSON written; long runtime; not a live product PASS
