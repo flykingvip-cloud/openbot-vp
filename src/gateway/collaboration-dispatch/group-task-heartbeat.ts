@@ -130,7 +130,13 @@ export type HeartbeatItemDecision = Readonly<{
 export type GroupTaskHeartbeatItemState = {
   consecutiveNoResponse: number;
   lastNudgeAt?: number;
+  /** Set only after a successful emit escalate for the matching fingerprint. */
   lastEscalateAt?: number;
+  /** Fingerprint that lastEscalateAt applies to (stage-bound anti-spam). */
+  lastEscalateFingerprint?: string;
+  /** Bounded escalate dispatch failures on the current fingerprint. */
+  escalateFailCount?: number;
+  lastEscalateAttemptAt?: number;
   lastFingerprint?: string;
   lastStatus?: string;
 };
@@ -185,7 +191,7 @@ function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
-function uniqueIds(values: readonly string[] | undefined): string[] {
+function uniqueIds(values: readonly (string | null | undefined)[] | undefined): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const value of values ?? []) {
@@ -367,7 +373,46 @@ function isOverdue(item: { dueAtMs?: number }, nowMs: number): boolean {
   return typeof item.dueAtMs === "number" && Number.isFinite(item.dueAtMs) && item.dueAtMs < nowMs;
 }
 
+function clearEscalateFieldsWhenFingerprintChanges(
+  prior: GroupTaskHeartbeatItemState | null | undefined,
+  fingerprint: string,
+): Pick<
+  GroupTaskHeartbeatItemState,
+  "lastEscalateAt" | "lastEscalateFingerprint" | "escalateFailCount" | "lastEscalateAttemptAt"
+> {
+  const priorFp = compact(prior?.lastFingerprint);
+  if (priorFp && priorFp !== fingerprint) {
+    // New progress stage: old escalate must not suppress supervision.
+    return {};
+  }
+  const escalateFp = compact(prior?.lastEscalateFingerprint);
+  if (escalateFp && escalateFp !== fingerprint) {
+    return {};
+  }
+  return {
+    lastEscalateAt: prior?.lastEscalateAt,
+    lastEscalateFingerprint: prior?.lastEscalateFingerprint,
+    escalateFailCount: prior?.escalateFailCount,
+    lastEscalateAttemptAt: prior?.lastEscalateAttemptAt,
+  };
+}
+
 function nudgeTargets(item: GroupBoardClaimItem | HeartbeatBoardItemLike): string[] {
+  // submitted_for_review: wake reviewer chain (align with claim-contract submit wake),
+  // never the executor claimant alone.
+  if (item.status === "submitted_for_review") {
+    const reviewTargets = uniqueIds([
+      (item as HeartbeatBoardItemLike).reviewerId,
+      (item as HeartbeatBoardItemLike).approverId,
+      (item as HeartbeatBoardItemLike).coordinatorId,
+      (item as HeartbeatBoardItemLike).decisionAuthorityId,
+      (item as HeartbeatBoardItemLike).ownerId,
+      item.publishedBy,
+    ]);
+    if (reviewTargets.length > 0) {
+      return reviewTargets;
+    }
+  }
   const claimant = compact(item.claimantId);
   if (claimant) {
     return [claimant];
@@ -401,6 +446,12 @@ export type HeartbeatBoardItemLike = {
   /** S3/S4: 交卷身份 — fingerprint includes these so submit resets stall. */
   submissionId?: string;
   artifactVersion?: string;
+  /** Task responsibility projections for review-stage routing (optional). */
+  reviewerId?: string;
+  approverId?: string;
+  coordinatorId?: string;
+  ownerId?: string;
+  decisionAuthorityId?: string;
 };
 
 /**
@@ -461,7 +512,10 @@ export function planHeartbeatActionForItem(params: {
         : undefined;
     const returnCount = typeof item.returnCount === "number" ? item.returnCount : 0;
     if (maxReturns !== undefined && returnCount >= maxReturns) {
-      if (sameAsPrior && prior?.lastEscalateAt) {
+      const accEscalateFp = compact(prior?.lastEscalateFingerprint);
+      const accEscalated =
+        Boolean(prior?.lastEscalateAt) && Boolean(accEscalateFp) && accEscalateFp === fingerprint;
+      if (sameAsPrior && accEscalated) {
         return {
           itemId: item.itemId,
           taskId: item.taskId,
@@ -520,9 +574,12 @@ export function planHeartbeatActionForItem(params: {
   }
   const reasonBase = whyParts.join("+") || "needs_attention";
 
-  // Same board fingerprint after an escalate: do not keep nudging/escalating
-  // every scan (anti-spam). Wait for board/交卷 progress to change.
-  if (sameAsPrior && prior?.lastEscalateAt) {
+  // Same progress fingerprint after a *successful emit* escalate: anti-spam.
+  // Observe-mode stamps and failed dispatches must not suppress later emit.
+  const escalateFp = compact(prior?.lastEscalateFingerprint);
+  const successfulEscalateOnFingerprint =
+    Boolean(prior?.lastEscalateAt) && Boolean(escalateFp) && escalateFp === fingerprint;
+  if (sameAsPrior && successfulEscalateOnFingerprint) {
     return {
       itemId: item.itemId,
       taskId: item.taskId,
@@ -531,6 +588,20 @@ export function planHeartbeatActionForItem(params: {
       action: "skip",
       toAgentIds: [],
       reason: `already_escalated_awaiting_progress:${reasonBase}`,
+      consecutiveNoResponse: consecutive,
+    };
+  }
+  // Bounded recovery after escalate dispatch failures on this fingerprint.
+  const failCount = sameAsPrior ? (prior?.escalateFailCount ?? 0) : 0;
+  if (sameAsPrior && failCount >= 3) {
+    return {
+      itemId: item.itemId,
+      taskId: item.taskId,
+      groupId: item.groupId,
+      status: item.status,
+      action: "skip",
+      toAgentIds: [],
+      reason: `escalate_failures_exhausted:${reasonBase}`,
       consecutiveNoResponse: consecutive,
     };
   }
@@ -618,6 +689,11 @@ function toHeartbeatItem(raw: {
   blockedAt?: number;
   submissionId?: string;
   artifactVersion?: string;
+  reviewerId?: string;
+  approverId?: string;
+  coordinatorId?: string;
+  ownerId?: string;
+  decisionAuthorityId?: string;
 }): HeartbeatBoardItemLike {
   return {
     itemId: raw.itemId,
@@ -638,6 +714,11 @@ function toHeartbeatItem(raw: {
     blockedAt: raw.blockedAt,
     submissionId: raw.submissionId,
     artifactVersion: raw.artifactVersion,
+    reviewerId: raw.reviewerId,
+    approverId: raw.approverId,
+    coordinatorId: raw.coordinatorId,
+    ownerId: raw.ownerId,
+    decisionAuthorityId: raw.decisionAuthorityId,
   };
 }
 
@@ -915,6 +996,71 @@ async function isPersistedDispatchAuthRevoked(params: {
   return !auth.ok;
 }
 
+async function enrichHeartbeatItemsWithTaskResponsibility(
+  authority: RuntimeAuthority,
+  items: readonly HeartbeatBoardItemLike[],
+  cfg?: OpenBotConfig,
+): Promise<HeartbeatBoardItemLike[]> {
+  if (items.length === 0) {
+    return [];
+  }
+  const stores = resolveHeartbeatStores({ authority, cfg });
+  const cache = new Map<
+    string,
+    {
+      reviewerId?: string;
+      approverId?: string;
+      coordinatorId?: string;
+      ownerId?: string;
+      decisionAuthorityId?: string;
+    }
+  >();
+  const out: HeartbeatBoardItemLike[] = [];
+  for (const item of items) {
+    const taskId = compact(item.taskId);
+    if (!taskId) {
+      out.push(item);
+      continue;
+    }
+    let resp = cache.get(taskId);
+    if (!resp) {
+      try {
+        const current = await stores.objectStorage.readObject<Task>(
+          item.groupId || authority.groupId,
+          "task",
+          taskId,
+        );
+        const responsibility = (
+          current as {
+            responsibility?: {
+              reviewer?: string;
+              approver?: string;
+              coordinator?: string;
+              owner?: string;
+              decisionAuthority?: string;
+            };
+          } | null
+        )?.responsibility;
+        resp = {
+          reviewerId: compact(responsibility?.reviewer) || undefined,
+          approverId: compact(responsibility?.approver) || undefined,
+          coordinatorId: compact(responsibility?.coordinator) || undefined,
+          ownerId: compact(responsibility?.owner) || undefined,
+          decisionAuthorityId: compact(responsibility?.decisionAuthority) || undefined,
+        };
+      } catch {
+        resp = {};
+      }
+      cache.set(taskId, resp);
+    }
+    out.push({
+      ...item,
+      ...resp,
+    });
+  }
+  return out;
+}
+
 export async function runGroupTaskHeartbeat(
   authority: RuntimeAuthority,
   input: { groupId: string },
@@ -971,7 +1117,8 @@ export async function runGroupTaskHeartbeat(
     };
   }
 
-  const items = await loadGroupBoardItemsForHeartbeatRich(authority, groupId);
+  const loadedItems = await loadGroupBoardItemsForHeartbeatRich(authority, groupId);
+  const items = await enrichHeartbeatItemsWithTaskResponsibility(authority, loadedItems, cfg);
   const escalateTo = resolveEscalateTargets(options);
   const actorId = compact(options?.actorId) || "system:group_task_heartbeat";
   const decisions: HeartbeatItemDecision[] = [];
@@ -1072,12 +1219,14 @@ export async function runGroupTaskHeartbeat(
         reason: "pending_event_relay_guard",
         consecutiveNoResponse: priorState.items[item.itemId]?.consecutiveNoResponse ?? 0,
       });
+      const fingerprint = progressFingerprint(item);
+      const priorRelay = priorState.items[item.itemId];
       nextItems[item.itemId] = {
-        consecutiveNoResponse: priorState.items[item.itemId]?.consecutiveNoResponse ?? 0,
-        lastFingerprint: progressFingerprint(item),
+        consecutiveNoResponse: priorRelay?.consecutiveNoResponse ?? 0,
+        lastFingerprint: fingerprint,
         lastStatus: item.status,
-        lastNudgeAt: priorState.items[item.itemId]?.lastNudgeAt,
-        lastEscalateAt: priorState.items[item.itemId]?.lastEscalateAt,
+        lastNudgeAt: priorRelay?.lastNudgeAt,
+        ...clearEscalateFieldsWhenFingerprintChanges(priorRelay, fingerprint),
       };
       continue;
     }
@@ -1096,26 +1245,29 @@ export async function runGroupTaskHeartbeat(
       if (TERMINAL.has(item.status)) {
         delete nextItems[item.itemId];
       } else {
+        const fingerprint = progressFingerprint(item);
         nextItems[item.itemId] = {
           consecutiveNoResponse: 0,
-          lastFingerprint: progressFingerprint(item),
+          lastFingerprint: fingerprint,
           lastStatus: item.status,
           lastNudgeAt: prior?.lastNudgeAt,
-          lastEscalateAt: prior?.lastEscalateAt,
+          ...clearEscalateFieldsWhenFingerprintChanges(prior, fingerprint),
         };
       }
       continue;
     }
 
     if (decision.action === "nudge") {
+      const fingerprint = progressFingerprint(item);
+      const escalateCarry = clearEscalateFieldsWhenFingerprintChanges(prior, fingerprint);
       if (!dryRun && !unattendedTarget) {
         if (await isPersistedTaskStopped({ groupId, taskId: item.taskId, cfg, authority })) {
           nextItems[item.itemId] = {
             consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
             lastNudgeAt: prior?.lastNudgeAt,
-            lastEscalateAt: prior?.lastEscalateAt,
-            lastFingerprint: progressFingerprint(item),
+            lastFingerprint: fingerprint,
             lastStatus: item.status,
+            ...escalateCarry,
           };
           continue;
         }
@@ -1132,9 +1284,9 @@ export async function runGroupTaskHeartbeat(
           nextItems[item.itemId] = {
             consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
             lastNudgeAt: prior?.lastNudgeAt,
-            lastEscalateAt: prior?.lastEscalateAt,
-            lastFingerprint: progressFingerprint(item),
+            lastFingerprint: fingerprint,
             lastStatus: item.status,
+            ...escalateCarry,
           };
           continue;
         }
@@ -1158,28 +1310,52 @@ export async function runGroupTaskHeartbeat(
         if (consume.wakeEvent) {
           wakeEvents.push(consume.wakeEvent);
         }
+        // Emit path: only credit a nudge when dispatch was accepted with receipt.
+        // Failed/recorded must not advance anti-spam counters as if delivered.
+        if (!consume.dispatched) {
+          nextItems[item.itemId] = {
+            consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+            lastNudgeAt: prior?.lastNudgeAt,
+            lastFingerprint: fingerprint,
+            lastStatus: item.status,
+            ...escalateCarry,
+          };
+          continue;
+        }
+      } else {
+        // Observe / dry-run: record planned fingerprint without emitting escalate stamps.
+        const same = prior?.lastFingerprint === fingerprint;
+        nextItems[item.itemId] = {
+          consecutiveNoResponse: same ? (prior?.consecutiveNoResponse ?? 0) + 1 : 1,
+          lastNudgeAt: nowMs,
+          lastFingerprint: fingerprint,
+          lastStatus: item.status,
+          ...escalateCarry,
+        };
+        continue;
       }
-      const fingerprint = progressFingerprint(item);
       const same = prior?.lastFingerprint === fingerprint;
       nextItems[item.itemId] = {
         consecutiveNoResponse: same ? (prior?.consecutiveNoResponse ?? 0) + 1 : 1,
         lastNudgeAt: nowMs,
-        lastEscalateAt: prior?.lastEscalateAt,
         lastFingerprint: fingerprint,
         lastStatus: item.status,
+        ...escalateCarry,
       };
       continue;
     }
 
     if (decision.action === "escalate") {
+      const fingerprint = progressFingerprint(item);
+      const escalateCarry = clearEscalateFieldsWhenFingerprintChanges(prior, fingerprint);
       if (!dryRun && !unattendedTarget) {
         if (await isPersistedTaskStopped({ groupId, taskId: item.taskId, cfg, authority })) {
           nextItems[item.itemId] = {
             consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
             lastNudgeAt: prior?.lastNudgeAt,
-            lastEscalateAt: prior?.lastEscalateAt,
-            lastFingerprint: progressFingerprint(item),
+            lastFingerprint: fingerprint,
             lastStatus: item.status,
+            ...escalateCarry,
           };
           continue;
         }
@@ -1196,9 +1372,9 @@ export async function runGroupTaskHeartbeat(
           nextItems[item.itemId] = {
             consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
             lastNudgeAt: prior?.lastNudgeAt,
-            lastEscalateAt: prior?.lastEscalateAt,
-            lastFingerprint: progressFingerprint(item),
+            lastFingerprint: fingerprint,
             lastStatus: item.status,
+            ...escalateCarry,
           };
           continue;
         }
@@ -1222,13 +1398,45 @@ export async function runGroupTaskHeartbeat(
         if (consume.wakeEvent) {
           wakeEvents.push(consume.wakeEvent);
         }
+        if (consume.dispatched) {
+          nextItems[item.itemId] = {
+            consecutiveNoResponse: 0,
+            lastNudgeAt: prior?.lastNudgeAt,
+            lastEscalateAt: nowMs,
+            lastEscalateFingerprint: fingerprint,
+            escalateFailCount: 0,
+            lastEscalateAttemptAt: nowMs,
+            lastFingerprint: fingerprint,
+            lastStatus: item.status,
+          };
+        } else {
+          const priorFails =
+            compact(prior?.lastFingerprint) === fingerprint ? (prior?.escalateFailCount ?? 0) : 0;
+          nextItems[item.itemId] = {
+            consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+            lastNudgeAt: prior?.lastNudgeAt,
+            lastFingerprint: fingerprint,
+            lastStatus: item.status,
+            escalateFailCount: priorFails + 1,
+            lastEscalateAttemptAt: nowMs,
+            // Keep a prior successful escalate on this fingerprint if any; else none.
+            ...(escalateCarry.lastEscalateAt
+              ? {
+                  lastEscalateAt: escalateCarry.lastEscalateAt,
+                  lastEscalateFingerprint: escalateCarry.lastEscalateFingerprint,
+                }
+              : {}),
+          };
+        }
+        continue;
       }
+      // Observe / dry-run: never stamp lastEscalateAt (would suppress later emit).
       nextItems[item.itemId] = {
         consecutiveNoResponse: 0,
         lastNudgeAt: prior?.lastNudgeAt,
-        lastEscalateAt: nowMs,
-        lastFingerprint: progressFingerprint(item),
+        lastFingerprint: fingerprint,
         lastStatus: item.status,
+        ...escalateCarry,
       };
     }
   }
