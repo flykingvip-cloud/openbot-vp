@@ -54,4 +54,3 @@ async function writeCover() {
 }
 await writeCover();
 "
-
