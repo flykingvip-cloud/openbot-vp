@@ -475,6 +475,7 @@ export async function clearHeartbeatHumanAttention(params: {
     let state: {
       groupId: string;
       lastScanAt: number;
+      revision?: number;
       items: Record<string, Record<string, unknown>>;
     };
     try {
@@ -504,9 +505,11 @@ export async function clearHeartbeatHumanAttention(params: {
       escalateFailCount: 0,
     };
     delete nextItem.humanAttention;
+    const priorRevision = typeof state.revision === "number" ? state.revision : 0;
     const next = {
       ...state,
       lastScanAt: params.nowMs,
+      revision: priorRevision + 1,
       items: {
         ...items,
         [params.itemId]: nextItem,

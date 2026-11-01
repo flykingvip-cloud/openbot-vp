@@ -148,3 +148,54 @@ Review blockers addressed:
   re-enter depending on wake-op completion marking in the consumer; the acceptance
   proof for this round is: release unlocks exactly one following dispatch that
   leaves `unknown`.
+
+
+## Round: heartbeat stale-snapshot merge (P1) — 2026-11-01 ~11:25 Asia/Shanghai
+
+Review blocker: heartbeat could overwrite human recovery with a lock-free prior snapshot.
+
+### Root cause
+
+1. `runGroupTaskHeartbeat` reads `priorState` **outside** the lock.
+2. Async scan / dispatch proceeds.
+3. Human `clearHeartbeatHumanAttention` takes the lock, clears `humanAttention` + fail counts, durable-writes.
+4. Heartbeat `writeState` took the lock but wrote the **entire scanned snapshot** without re-read / version check → old `humanAttention` / fail counts resurrected.
+
+Atomic `writeJsonDurable` prevents torn JSON; it does **not** prevent stale whole-state overwrite. The prior lock interleave test re-read **inside** the lock and therefore did not prove the production path.
+
+### Fix
+
+- `writeState` now re-reads under `withRoundLock`, runs `mergeHeartbeatStatePreservingHumanRecovery` against `prior` + `live`, bumps `revision`, then durable-writes.
+- Merge rule: if live cleared the same-fingerprint `humanAttention` that `prior` had, strip that attention from the scanned item and keep live fail counters — other scanned item updates still apply.
+- Scan / model / external dispatch stay **outside** the lock; only merge+write holds it.
+- `clearHeartbeatHumanAttention` bumps `revision` on clear.
+- Test-only `_testAfterPriorReadBeforeWriteBarrier` pauses after scan, before save (does not hold the state lock across external work).
+
+### New tests (real `runGroupTaskHeartbeat`)
+
+- `pauses after old read before save: human clear wins; other item heartbeat updates kept`
+  - Barrier after old read / before save → clear → resume → protected item stays cleared; other item keep observe nudge updates.
+- `reverse interleave: heartbeat save then clear clears; clear then heartbeat keeps clear`
+  - HB then clear → cleared; clear then HB → stays cleared (other updates retained).
+
+### Vitest (six-file acceptance set)
+
+```bash
+pnpm exec vitest run \
+  src/gateway/collaboration-dispatch/human-attention-intake.test.ts \
+  src/gateway/collaboration-dispatch/human-attention-actions.integration.test.ts \
+  src/gateway/collaboration-dispatch/watchdog-task-closure.test.ts \
+  src/gateway/collaboration-dispatch/watchdog-task-closure.integration.test.ts \
+  ui/src/ui/chat/human-attention-card.node.test.ts \
+  src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts
+```
+
+Result: **6 files, 62 passed** (was 60; +2 stale-snapshot race tests).
+
+`oxfmt` on touched heartbeat / inbox / integration files: clean.
+
+### Unresolved / out of scope (unchanged)
+
+- No merge / prod deploy / force-push / cloud agent / approval skip.
+- GitHub API may be unreachable here; `/landpr` missing — local green ≠ landed.
+- Pre-existing `group-task-heartbeat.test.ts` “allowlist on: nudge → escalate” failure (nudgeFailCount path) is unrelated and fails on clean tip too.

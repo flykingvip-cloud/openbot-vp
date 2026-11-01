@@ -27,6 +27,7 @@ import {
   groupTaskHeartbeatDir,
   groupTaskHeartbeatStatePath,
   progressFingerprint,
+  runGroupTaskHeartbeat,
 } from "./group-task-heartbeat.js";
 import { actHumanAttentionCard } from "./human-attention-actions.js";
 import { buildHumanAttentionAuthority } from "./human-attention-business.js";
@@ -1211,6 +1212,7 @@ describe("human-attention inbox — heartbeat clear lock interleaving", () => {
     const initial = {
       groupId: GROUP,
       lastScanAt: 1,
+      revision: 1,
       items: {
         item_clear: {
           consecutiveNoResponse: 3,
@@ -1255,6 +1257,7 @@ describe("human-attention inbox — heartbeat clear lock interleaving", () => {
       const next = {
         ...state,
         lastScanAt: 4_000,
+        revision: (typeof state.revision === "number" ? state.revision : 0) + 1,
         items: {
           ...state.items,
           item_keep: item,
@@ -1276,5 +1279,280 @@ describe("human-attention inbox — heartbeat clear lock interleaving", () => {
     expect(finalState.items.item_keep.consecutiveNoResponse).toBe(42);
     expect(finalState.items.item_keep.nudgeFailCount).toBe(7);
     expect(finalState.items.item_keep.note).toBe("heartbeat-owned");
+  });
+});
+
+describe("human-attention — real runGroupTaskHeartbeat stale snapshot race", () => {
+  async function publishTwoItems(auth: RuntimeAuthority, cfg: OpenBotConfig) {
+    await seedOwnerOs(cfg);
+    const stores = createWorkspaceCollaborationStores(cfg);
+    for (const taskId of ["task_protect", "task_other"] as const) {
+      await stores.objectStorage.writeObject(GROUP, "task", taskId, {
+        taskId,
+        groupId: GROUP,
+        title: taskId,
+        status: "in_progress",
+        ownerMemberId: OWNER,
+        assignedMemberIds: [OWNER],
+        responsibility: {
+          owner: OWNER,
+          executors: [OWNER],
+          reviewers: [],
+          approvers: [OWNER],
+        },
+        createdAtMs: 1,
+        updatedAtMs: 1,
+      } as Task);
+    }
+    const protectPub = await publishBoardItem(
+      auth,
+      {
+        groupId: GROUP,
+        taskId: "task_protect",
+        remainingWork: "保护项",
+        acceptanceCriteria: ["ok"],
+        intendedClaimantIds: ["bot:analyst"],
+        publishedBy: OWNER,
+      },
+      { cfg, nowMs: 100 },
+    );
+    const otherPub = await publishBoardItem(
+      auth,
+      {
+        groupId: GROUP,
+        taskId: "task_other",
+        remainingWork: "其他项",
+        acceptanceCriteria: ["ok"],
+        intendedClaimantIds: ["bot:executor"],
+        publishedBy: OWNER,
+      },
+      { cfg, nowMs: 110 },
+    );
+    expect(protectPub.ok).toBe(true);
+    expect(otherPub.ok).toBe(true);
+    if (!protectPub.ok || !otherPub.ok) {
+      throw new Error("publish failed");
+    }
+    return { protect: protectPub.value, other: otherPub.value };
+  }
+
+  it("pauses after old read before save: human clear wins; other item heartbeat updates kept", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const { protect, other } = await publishTwoItems(auth, cfg);
+    const fpProtect = progressFingerprint(protect);
+    const fpOther = progressFingerprint(other);
+    const dir = groupTaskHeartbeatDir(auth);
+    await fs.mkdir(dir, { recursive: true });
+    const statePath = groupTaskHeartbeatStatePath(dir, GROUP);
+    await writeJsonDurable(statePath, {
+      groupId: GROUP,
+      lastScanAt: 1,
+      revision: 1,
+      items: {
+        [protect.itemId]: {
+          consecutiveNoResponse: 3,
+          lastFingerprint: fpProtect,
+          lastStatus: protect.status,
+          humanAttention: {
+            status: "needs_human",
+            fingerprint: fpProtect,
+            ownerIds: [OWNER],
+            reason: "stale_gate",
+            recoveryHint: "verify",
+            openedAt: 1,
+            source: "side_effect_unknown",
+          },
+          nudgeFailCount: 3,
+          escalateFailCount: 3,
+        },
+        [other.itemId]: {
+          consecutiveNoResponse: 0,
+          lastFingerprint: fpOther,
+          lastStatus: other.status,
+          nudgeFailCount: 0,
+          escalateFailCount: 0,
+        },
+      },
+    });
+
+    let releaseBarrier!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      releaseBarrier = resolve;
+    });
+    let barrierReached = false;
+
+    const hbPromise = runGroupTaskHeartbeat(
+      auth,
+      { groupId: GROUP },
+      {
+        cfg,
+        force: true,
+        nowMs: 50_000,
+        dryRun: true,
+        groupOwnerId: OWNER,
+        _testAfterPriorReadBeforeWriteBarrier: async () => {
+          barrierReached = true;
+          const cleared = await clearHeartbeatHumanAttention({
+            authority: auth,
+            groupId: GROUP,
+            itemId: protect.itemId,
+            fingerprint: fpProtect,
+            nowMs: 40_000,
+          });
+          expect(cleared).toBe(true);
+          const mid = JSON.parse(await fs.readFile(statePath, "utf8")) as {
+            items: Record<string, { humanAttention?: unknown; nudgeFailCount?: number }>;
+            revision?: number;
+          };
+          expect(mid.items[protect.itemId]?.humanAttention).toBeUndefined();
+          expect(mid.items[protect.itemId]?.nudgeFailCount).toBe(0);
+          expect((mid.revision ?? 0) >= 2).toBe(true);
+          await barrier;
+        },
+      },
+    );
+
+    // Wait until heartbeat has read old state, scanned, and is paused before save.
+    for (let i = 0; i < 200 && !barrierReached; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(barrierReached).toBe(true);
+    releaseBarrier();
+    const result = await hbPromise;
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.skipped) {
+      return;
+    }
+
+    const finalState = JSON.parse(await fs.readFile(statePath, "utf8")) as {
+      items: Record<
+        string,
+        {
+          humanAttention?: unknown;
+          nudgeFailCount?: number;
+          escalateFailCount?: number;
+          consecutiveNoResponse?: number;
+          lastNudgeAt?: number;
+        }
+      >;
+      revision?: number;
+    };
+    // Protected item: human recovery must not be resurrected by stale scan snapshot.
+    expect(finalState.items[protect.itemId]?.humanAttention).toBeUndefined();
+    expect(finalState.items[protect.itemId]?.nudgeFailCount).toBe(0);
+    expect(finalState.items[protect.itemId]?.escalateFailCount).toBe(0);
+    // Other item: observe nudge updates from this heartbeat tick must remain.
+    expect(finalState.items[other.itemId]?.lastNudgeAt).toBe(50_000);
+    expect(finalState.items[other.itemId]?.consecutiveNoResponse).toBeGreaterThan(0);
+    expect(result.state.items[protect.itemId]?.humanAttention).toBeUndefined();
+    expect((finalState.revision ?? 0) >= 3).toBe(true);
+  });
+
+  it("reverse interleave: heartbeat save then clear clears; clear then heartbeat keeps clear", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const { protect, other } = await publishTwoItems(auth, cfg);
+    const fpProtect = progressFingerprint(protect);
+    const fpOther = progressFingerprint(other);
+    const dir = groupTaskHeartbeatDir(auth);
+    await fs.mkdir(dir, { recursive: true });
+    const statePath = groupTaskHeartbeatStatePath(dir, GROUP);
+
+    const seed = {
+      groupId: GROUP,
+      lastScanAt: 1,
+      revision: 1,
+      items: {
+        [protect.itemId]: {
+          consecutiveNoResponse: 3,
+          lastFingerprint: fpProtect,
+          lastStatus: protect.status,
+          humanAttention: {
+            status: "needs_human",
+            fingerprint: fpProtect,
+            ownerIds: [OWNER],
+            reason: "stale_gate",
+            recoveryHint: "verify",
+            openedAt: 1,
+            source: "side_effect_unknown" as const,
+          },
+          nudgeFailCount: 3,
+          escalateFailCount: 3,
+        },
+        [other.itemId]: {
+          consecutiveNoResponse: 0,
+          lastFingerprint: fpOther,
+          lastStatus: other.status,
+          nudgeFailCount: 0,
+          escalateFailCount: 0,
+        },
+      },
+    };
+
+    // Order A (reverse of the bug window): heartbeat persists first, then human clear.
+    await writeJsonDurable(statePath, seed);
+    const hbFirst = await runGroupTaskHeartbeat(
+      auth,
+      { groupId: GROUP },
+      {
+        cfg,
+        force: true,
+        nowMs: 60_000,
+        dryRun: true,
+        groupOwnerId: OWNER,
+      },
+    );
+    expect(hbFirst.ok).toBe(true);
+    if (!hbFirst.ok || hbFirst.skipped) {
+      return;
+    }
+    // Without concurrent clear, human_todo carry may still be present after save.
+    expect(hbFirst.state.items[protect.itemId]?.humanAttention?.fingerprint).toBe(fpProtect);
+    const clearedAfterHb = await clearHeartbeatHumanAttention({
+      authority: auth,
+      groupId: GROUP,
+      itemId: protect.itemId,
+      fingerprint: fpProtect,
+      nowMs: 61_000,
+    });
+    expect(clearedAfterHb).toBe(true);
+    const afterClear = JSON.parse(await fs.readFile(statePath, "utf8")) as {
+      items: Record<string, { humanAttention?: unknown; lastNudgeAt?: number }>;
+    };
+    expect(afterClear.items[protect.itemId]?.humanAttention).toBeUndefined();
+    expect(afterClear.items[other.itemId]?.lastNudgeAt).toBe(60_000);
+
+    // Order B: human clear first, then heartbeat reads already-cleared state and must not reopen.
+    await writeJsonDurable(statePath, seed);
+    const clearedFirst = await clearHeartbeatHumanAttention({
+      authority: auth,
+      groupId: GROUP,
+      itemId: protect.itemId,
+      fingerprint: fpProtect,
+      nowMs: 70_000,
+    });
+    expect(clearedFirst).toBe(true);
+    const hbSecond = await runGroupTaskHeartbeat(
+      auth,
+      { groupId: GROUP },
+      {
+        cfg,
+        force: true,
+        nowMs: 80_000,
+        dryRun: true,
+        groupOwnerId: OWNER,
+      },
+    );
+    expect(hbSecond.ok).toBe(true);
+    if (!hbSecond.ok || hbSecond.skipped) {
+      return;
+    }
+    expect(hbSecond.state.items[protect.itemId]?.humanAttention).toBeUndefined();
+    const finalB = JSON.parse(await fs.readFile(statePath, "utf8")) as {
+      items: Record<string, { humanAttention?: unknown; lastNudgeAt?: number }>;
+    };
+    expect(finalB.items[protect.itemId]?.humanAttention).toBeUndefined();
+    expect(finalB.items[other.itemId]?.lastNudgeAt).toBe(80_000);
   });
 });

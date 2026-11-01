@@ -114,6 +114,13 @@ export type GroupTaskHeartbeatOptions = {
    * Ignored unless the group is the one allowlisted target.
    */
   roundDispatcher?: WakeRoundDispatcher | null;
+  /**
+   * Test-only barrier after priorState was read and the scan/dispatch work finished,
+   * immediately before persisting heartbeat state. Lets tests interleave human
+   * recovery against the real production path (lock-out read → async work → save).
+   * Must not be used to hold the state lock across model/external calls.
+   */
+  _testAfterPriorReadBeforeWriteBarrier?: () => Promise<void>;
 };
 
 export type HeartbeatActionKind = "nudge" | "escalate" | "skip" | "human_todo";
@@ -163,6 +170,12 @@ export type GroupTaskHeartbeatState = {
   groupId: string;
   lastScanAt: number;
   items: Record<string, GroupTaskHeartbeatItemState>;
+  /**
+   * Monotonic write counter. Heartbeat save re-reads under lock and merges when
+   * revision advanced (e.g. humanAttention cleared) so a stale scan snapshot cannot
+   * resurrect operator recovery. Optional for backward-compatible reads.
+   */
+  revision?: number;
 };
 
 export type HeartbeatClaimBridgeResult = Readonly<{
@@ -847,6 +860,7 @@ async function readState(statePath: string): Promise<GroupTaskHeartbeatState | n
       groupId: parsed.groupId,
       lastScanAt: typeof parsed.lastScanAt === "number" ? parsed.lastScanAt : 0,
       items: parsed.items && typeof parsed.items === "object" ? parsed.items : {},
+      revision: typeof parsed.revision === "number" ? parsed.revision : undefined,
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -856,11 +870,62 @@ async function readState(statePath: string): Promise<GroupTaskHeartbeatState | n
   }
 }
 
+/**
+ * Under lock: keep scan-computed updates, but do not resurrect humanAttention /
+ * fail counters that were cleared after priorState was read outside the lock.
+ * Scan/dispatch stays lock-free; only the final merge+write holds the lock.
+ */
+export function mergeHeartbeatStatePreservingHumanRecovery(params: {
+  scanned: GroupTaskHeartbeatState;
+  prior: GroupTaskHeartbeatState;
+  live: GroupTaskHeartbeatState;
+}): GroupTaskHeartbeatState {
+  const items: Record<string, GroupTaskHeartbeatItemState> = { ...params.scanned.items };
+  for (const [itemId, scannedItem] of Object.entries(items)) {
+    const priorItem = params.prior.items[itemId];
+    const liveItem = params.live.items[itemId];
+    const priorAtt = priorItem?.humanAttention;
+    if (!priorAtt || !liveItem) {
+      continue;
+    }
+    const priorFp = compact(priorAtt.fingerprint);
+    if (!priorFp) {
+      continue;
+    }
+    const liveAtt = liveItem.humanAttention;
+    const liveStillHasSame = Boolean(liveAtt) && compact(liveAtt?.fingerprint) === priorFp;
+    if (liveStillHasSame) {
+      continue;
+    }
+    const scannedAtt = scannedItem.humanAttention;
+    if (!scannedAtt || compact(scannedAtt.fingerprint) !== priorFp) {
+      continue;
+    }
+    const next: GroupTaskHeartbeatItemState = { ...scannedItem };
+    delete next.humanAttention;
+    if (typeof liveItem.nudgeFailCount === "number") {
+      next.nudgeFailCount = liveItem.nudgeFailCount;
+    }
+    if (typeof liveItem.escalateFailCount === "number") {
+      next.escalateFailCount = liveItem.escalateFailCount;
+    }
+    items[itemId] = next;
+  }
+  const liveRevision = typeof params.live.revision === "number" ? params.live.revision : 0;
+  return {
+    groupId: params.scanned.groupId,
+    lastScanAt: params.scanned.lastScanAt,
+    items,
+    revision: liveRevision + 1,
+  };
+}
+
 async function writeState(
   authority: RuntimeAuthority,
   state: GroupTaskHeartbeatState,
-  cfg?: OpenBotConfig,
-): Promise<void> {
+  cfg: OpenBotConfig | undefined,
+  priorState: GroupTaskHeartbeatState,
+): Promise<GroupTaskHeartbeatState> {
   const dir = groupTaskHeartbeatDir(authority);
   assertCollaborationRuntimeWritable(dir, cfg);
   const stem = safeStem(state.groupId);
@@ -868,9 +933,20 @@ async function writeState(
     throw new Error("group task heartbeat groupId is not a safe id");
   }
   const statePath = groupTaskHeartbeatStatePath(dir, state.groupId);
-  await withRoundLock(dir, stem, async () => {
+  return withRoundLock(dir, stem, async () => {
+    const live = (await readState(statePath)) ?? {
+      groupId: state.groupId,
+      lastScanAt: 0,
+      items: {},
+    };
+    const merged = mergeHeartbeatStatePreservingHumanRecovery({
+      scanned: state,
+      prior: priorState,
+      live,
+    });
     await fs.mkdir(dir, { recursive: true });
-    await writeJsonDurable(statePath, state);
+    await writeJsonDurable(statePath, merged);
+    return merged;
   });
 }
 
@@ -1841,12 +1917,18 @@ export async function runGroupTaskHeartbeat(
     }
   }
 
-  const state: GroupTaskHeartbeatState = {
+  const scanned: GroupTaskHeartbeatState = {
     groupId,
     lastScanAt: nowMs,
     items: nextItems,
+    revision: priorState.revision,
   };
-  await writeState(authority, state, cfg);
+  // Production race: priorState was read lock-free; human recovery may have cleared
+  // humanAttention under the same stem before we persist. Pause point is for tests only.
+  if (options?._testAfterPriorReadBeforeWriteBarrier) {
+    await options._testAfterPriorReadBeforeWriteBarrier();
+  }
+  const state = await writeState(authority, scanned, cfg, priorState);
 
   // Optional audit line (observe-only jsonl; not transcript).
   try {
