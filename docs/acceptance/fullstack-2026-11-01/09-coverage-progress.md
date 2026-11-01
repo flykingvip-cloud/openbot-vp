@@ -1,33 +1,37 @@
 # 09 — Fullstack coverage progress (credential-free batch2)
 
-**When:** 2026-11-01 23:40 Asia/Shanghai  
-**Worktree:** `/Users/daniel/AI VP/openbot-p1fix-f68a3c56b`  
-**Evidence pin:** `1ce8f5ee4e8c852d45a9c6a30a623e0bed082587`  
+**When:** 2026-11-01 23:40 Asia/Shanghai (coverage evidence); docs follow-up land 2026-11-01 Asia/Shanghai  
+**Worktree (land):** `/Users/daniel/AI VP/openbot-acceptance-coverage-20261101`  
+**Evidence pin (batch2):** `1ce8f5ee4e8c852d45a9c6a30a623e0bed082587`  
 **Denominator:** N≈118 (see [`../runs/2026-11-01-pr192-review/coverage-denominator.md`](../runs/2026-11-01-pr192-review/coverage-denominator.md))  
 **Constraints honored:** no live credentials; SwiftPM **BLOCKED**; no product drive-bys; `/Users/daniel/AI VP/openbot/` untouched.
+
+> **Landing note:** PR #192 product fix is **MERGED** on main (`bc843c70…`, head that merged `1ce8f5ee…`). Coverage expansion commit `33c45c5c1` was stranded only on `fix/p1-def001-002-004-20261101`. **This PR is a docs-only follow-up** to put coverage denominator + this progress file on tip of main lineage. No product code.
 
 ## main 状态
 
 | Item                                | Value                                                                                                             |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `origin/main` tip (fetch at write)  | `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c` (`docs(memory): final closeout acceptance (draft) (#182)` lineage tip) |
+| `origin/main` tip (fetch at land)   | `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c` (`docs(memory): final closeout acceptance (draft) (#182)` lineage tip) |
+| PR #192 merge commit on main        | `bc843c70ecdd3afdae0020403d4b4b22c8849371` — **MERGED** (outside coverage-agent no-merge auth)                    |
 | Earlier review-end main             | `5815006dccd3287676e836ad8238a8ca6becdab4` (#191 billing)                                                         |
-| Tip drift since PR #192 review docs | **YES** — main advanced past review-end; PR head still based on merge lineage                                     |
+| Tip drift since PR #192 review docs | **YES** — main advanced past review-end; product fix already on main                                              |
 | Live / deploy on main               | **NOT RUN** in this batch                                                                                         |
 | SwiftPM on main                     | **BLOCKED** (policy; not executed)                                                                                |
 
-## PR 候选状态
+## PR候选(已合入历史)
 
-| Item                                                           | Value                                                                                         |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| PR                                                             | https://github.com/flykingvip-cloud/openbot-vp/pull/192                                       |
-| Branch                                                         | `fix/p1-def001-002-004-20261101`                                                              |
-| HEAD (evidence pin)                                            | `1ce8f5ee4e8c852d45a9c6a30a623e0bed082587`                                                    |
-| Independent verdict (REVIEW.md)                                | **可合并（条件）** — DEF-001/002/004 verified; format delta 0; SwiftPM BLOCKED; live NOT RUN  |
-| Gates (from review/remediation)                                | tsgo PASS; `protocol:check` PASS; focused DEF tests PASS; oxfmt acceptance docs               |
-| GitHub state at batch2 write                                   | **MERGED** (merged outside this coverage agent; this agent did **not** merge)                 |
-| This batch product code                                        | **none** (acceptance docs + logs only)                                                        |
-| Remaining merge conditions (still open for product confidence) | SwiftPM compile; live credential surfaces; Stage4 credentials-omit FAIL; Stage6 audit network |
+| Item                                                | Value                                                                                         |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Product PR (history)                                | https://github.com/flykingvip-cloud/openbot-vp/pull/192 — **MERGED**                          |
+| Branch (historical)                                 | `fix/p1-def001-002-004-20261101`                                                              |
+| HEAD that merged                                    | `1ce8f5ee4e8c852d45a9c6a30a623e0bed082587`                                                    |
+| Merge commit                                        | `bc843c70ecdd3afdae0020403d4b4b22c8849371`                                                    |
+| Independent verdict (REVIEW.md)                     | **可合并（条件）** — DEF-001/002/004 verified; format delta 0; SwiftPM BLOCKED; live NOT RUN  |
+| Gates (from review/remediation)                     | tsgo PASS; `protocol:check` PASS; focused DEF tests PASS; oxfmt acceptance docs               |
+| Docs follow-up (this PR)                            | branch `docs/acceptance-coverage-20261101` — coverage denominator + 09 progress only          |
+| This batch product code                             | **none** (acceptance docs + logs only)                                                        |
+| Remaining confidence gaps (product already on main) | SwiftPM compile; live credential surfaces; Stage4 credentials-omit FAIL; Stage6 audit network |
 
 ## 未验证范围
 
