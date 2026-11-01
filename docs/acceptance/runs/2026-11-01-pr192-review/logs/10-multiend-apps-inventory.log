@@ -1,0 +1,107 @@
+=== multi-end apps inventory @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+----- apps/android -----
+PRESENT
+total 96
+drwxr-xr-x@ 18 daniel  staff   576 Nov  1 22:42 .
+drwxr-xr-x@  8 daniel  staff   256 Nov  1 22:42 ..
+-rwxr-xr-x@  1 daniel  staff    52 Nov  1 22:42 .gitignore
+drwxr-xr-x@  5 daniel  staff   160 Nov  1 22:42 .gradle
+-rwxr-xr-x@  1 daniel  staff  7220 Nov  1 22:42 README.md
+drwxr-xr-x@  3 daniel  staff    96 Nov  1 22:42 THIRD_PARTY_LICENSES
+drwxr-xr-x@  5 daniel  staff   160 Nov  1 22:42 app
+drwxr-xr-x@  4 daniel  staff   128 Nov  1 22:42 benchmark
+-rw-r--r--@  1 daniel  staff   344 Nov  1 22:42 build.gradle.kts
+drwxr-xr-x@  3 daniel  staff    96 Nov  1 22:42 docs
+drwxr-xr-x@  3 daniel  staff    96 Nov  1 22:42 evidence
+drwxr-xr-x@  4 daniel  staff   128 Nov  1 22:42 gradle
+-rwxr-xr-x@  1 daniel  staff   338 Nov  1 22:42 gradle.properties
+-rwxr-xr-x@  1 daniel  staff  8656 Nov  1 22:42 gradlew
+-rw-r--r--@  1 daniel  staff  4888 Nov  1 22:42 gradlew.bat
+drwxr-xr-x@  4 daniel  staff   128 Nov  1 22:42 scripts
+-rwxr-xr-x@  1 daniel  staff   331 Nov  1 22:42 settings.gradle.kts
+-rwxr-xr-x@  1 daniel  staff  3623 Nov  1 22:42 style.md
+----- apps/ios -----
+PRESENT
+total 72
+drwxr-xr-x@ 18 daniel  staff    576 Nov  1 22:42 .
+drwxr-xr-x@  8 daniel  staff    256 Nov  1 22:42 ..
+-rwxr-xr-x@  1 daniel  staff    144 Nov  1 22:42 .swiftlint.yml
+drwxr-xr-x@  6 daniel  staff    192 Nov  1 22:42 ActivityWidget
+drwxr-xr-x@  4 daniel  staff    128 Nov  1 22:42 Config
+-rwxr-xr-x@  1 daniel  staff    591 Nov  1 22:42 LocalSigning.xcconfig.example
+-rwxr-xr-x@  1 daniel  staff   6585 Nov  1 22:42 README.md
+drwxr-xr-x@  4 daniel  staff    128 Nov  1 22:42 ShareExtension
+-rwxr-xr-x@  1 daniel  staff    942 Nov  1 22:42 Signing.xcconfig
+drwxr-xr-x@ 38 daniel  staff   1216 Nov  1 22:42 Sources
+-rwxr-xr-x@  1 daniel  staff   3577 Nov  1 22:42 SwiftSources.input.xcfilelist
+drwxr-xr-x@ 38 daniel  staff   1216 Nov  1 22:42 Tests
+drwxr-xr-x@  4 daniel  staff    128 Nov  1 22:42 WatchApp
+drwxr-xr-x@  4 daniel  staff    128 Nov  1 22:42 WatchExtension
+drwxr-xr-x@  3 daniel  staff     96 Nov  1 22:42 docs
+drwxr-xr-x@  7 daniel  staff    224 Nov  1 22:42 fastlane
+-rwxr-xr-x@  1 daniel  staff  11841 Nov  1 22:42 project.yml
+drwxr-xr-x@  3 daniel  staff     96 Nov  1 22:42 screenshots
+----- apps/macos -----
+PRESENT
+total 24
+drwxr-xr-x@ 10 daniel  staff   320 Nov  1 22:42 .
+drwxr-xr-x@  8 daniel  staff   256 Nov  1 22:42 ..
+drwxr-xr-x@  5 daniel  staff   160 Nov  1 22:42 Icon.icon
+-rw-r--r--@  1 daniel  staff  3889 Nov  1 22:42 Package.resolved
+-rw-r--r--@  1 daniel  staff  3895 Nov  1 22:42 Package.swift
+-rwxr-xr-x@  1 daniel  staff  1600 Nov  1 22:42 README.md
+drwxr-xr-x@  7 daniel  staff   224 Nov  1 22:42 Sources
+drwxr-xr-x@  3 daniel  staff    96 Nov  1 22:42 Tests
+drwxr-xr-x@  3 daniel  staff    96 Nov  1 22:42 build
+drwxr-xr-x@  3 daniel  staff    96 Nov  1 22:42 docs
+----- apps/harmony -----
+PRESENT
+total 48
+drwxr-xr-x@ 10 daniel  staff   320 Nov  1 22:42 .
+drwxr-xr-x@  8 daniel  staff   256 Nov  1 22:42 ..
+-rw-r--r--@  1 daniel  staff   167 Nov  1 22:42 .gitignore
+drwxr-xr-x@  4 daniel  staff   128 Nov  1 22:42 AppScope
+-rw-r--r--@  1 daniel  staff  4210 Nov  1 22:42 README.md
+-rw-r--r--@  1 daniel  staff   603 Nov  1 22:42 build-profile.json5
+drwxr-xr-x@  7 daniel  staff   224 Nov  1 22:42 entry
+drwxr-xr-x@  3 daniel  staff    96 Nov  1 22:42 hvigor
+-rw-r--r--@  1 daniel  staff   109 Nov  1 22:42 hvigorfile.ts
+-rw-r--r--@  1 daniel  staff   253 Nov  1 22:42 oh-package.json5
+----- apps/windows -----
+PRESENT
+total 16
+drwxr-xr-x@ 7 daniel  staff   224 Nov  1 22:42 .
+drwxr-xr-x@ 8 daniel  staff   256 Nov  1 22:42 ..
+-rw-r--r--@ 1 daniel  staff  1562 Nov  1 22:42 OpenBot.Windows.sln
+-rw-r--r--@ 1 daniel  staff  1782 Nov  1 22:42 README.md
+drwxr-xr-x@ 3 daniel  staff    96 Nov  1 22:42 docs
+drwxr-xr-x@ 3 daniel  staff    96 Nov  1 22:42 src
+drwxr-xr-x@ 3 daniel  staff    96 Nov  1 22:42 tests
+----- apps/shared -----
+PRESENT
+total 0
+drwxr-xr-x@ 3 daniel  staff   96 Nov  1 22:42 .
+drwxr-xr-x@ 8 daniel  staff  256 Nov  1 22:42 ..
+drwxr-xr-x@ 7 daniel  staff  224 Nov  1 22:47 OpenBotKit
+===== xcodebuild -list (macos) =====
+Package.swift PRESENT
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -list -project .
+
+2026-11-01 23:30:14.761 xcodebuild[90450:18834159] Writing error result bundle to /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/ResultBundle_2026-01-11_23-30-0014.xcresult
+xcodebuild: error: '.' is not a project file.
+apps/macos/Package.swift
+apps/ios/project.yml
+----- macos xcodebuild -list via Package (SwiftPM BLOCKED for build; list only) -----
+(eval):27: command not found: timeout
+===== android gradlew tasks (no assemble) =====
+(eval):31: command not found: timeout
+===== windows / harmony markers =====
+apps/windows/OpenBot.Windows.sln
+apps/windows/tests/OpenBot.EmployeeShell.Tests/OpenBot.EmployeeShell.Tests.csproj
+apps/windows/src/OpenBot.EmployeeShell/OpenBot.EmployeeShell.csproj
+apps/harmony/entry/oh-package.json5
+apps/harmony/entry/build-profile.json5
+apps/harmony/oh-package.json5
+apps/harmony/build-profile.json5
+DONE

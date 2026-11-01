@@ -1,0 +1,6 @@
+# coverage-expansion-batch2 meta
+pin_sha=1ce8f5ee4e8c852d45a9c6a30a623e0bed082587
+short=1ce8f5ee4e8c
+when_asia_shanghai=2026-11-01 23:23:41 CST
+worktree=/Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+rule=credential-free-only no-live no-swiftpm no-merge

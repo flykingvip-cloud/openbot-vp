@@ -1,0 +1,11 @@
+=== stage6 sbom + sample audit evidence @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+
+No test files found, exiting with code 1
+
+filter: docs/acceptance/stage6-sbom-evidence.test.ts, docs/acceptance/stage6-audit-moderate-evidence.test.ts, docs/acceptance/stage6-audit-moderate-yaml-evidence.test.ts, docs/acceptance/stage6-audit-moderate-filetype-evidence.test.ts, docs/acceptance/stage6-audit-moderate-markdown-it-evidence.test.ts, docs/acceptance/stage6-audit-moderate-fast-xml-parser-evidence.test.ts
+include: src/**/*.test.ts, extensions/**/*.test.ts, test/**/*.test.ts, scripts/__tests__/**/*.test.ts, scripts/delivery/**/*.test.ts, scripts/*.test.ts, ui/src/ui/**/*.test.ts, ui/src/ui/views/usage-render-details.test.ts, ui/src/ui/controllers/agents.test.ts, ui/src/ui/controllers/chat.test.ts, ui/src/ui/ports/**/*.test.ts, ui/src/ui/ports/**/*.node.test.ts
+exclude:  dist/**, apps/macos/**, apps/macos/.build/**, **/node_modules/**, **/vendor/**, dist/OpenClaw.app/**, **/*.live.test.ts, **/*.e2e.test.ts, **/*.browser.test.ts
+
+EXIT:1

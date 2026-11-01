@@ -1,0 +1,149 @@
+=== install/delivery + channel completeness @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+----- AGENTS.md openbot.love cites -----
+AGENTS.md:4:- Canonical public web entry: `https://www.openbot.love/`. Use it for user-facing web links and recommendations. `https://gw.openbot.love/` remains a compatibility employee/gateway subdomain; never present it as the primary web entry unless the user explicitly asks for that subdomain.
+AGENTS.md:51:- Installers served from `https://openbot.love/*`: live in the sibling repo `../openbot.love` (`public/install.sh`, `public/install-cli.sh`, `public/install.ps1`).
+AGENTS.md:60:- Docs are hosted on Mintlify (docs.openbot.love).
+AGENTS.md:66:- When Peter asks for links, reply with full `https://docs.openbot.love/...` URLs (not root-relative).
+AGENTS.md:67:- When you touch docs, end the reply with the `https://docs.openbot.love/...` URLs you referenced.
+AGENTS.md:68:- README (GitHub): keep absolute docs URLs (`https://docs.openbot.love/...`) so links work on GitHub.
+----- sibling openbot.love -----
+ABSENT /Users/daniel/AI VP/openbot.love
+ABSENT /Users/daniel/openbot.love
+ABSENT /Users/daniel/AI VP/../openbot.love
+----- in-repo install/release scripts -----
+-rwxr-xr-x@ 1 daniel  staff  3436 Nov  1 22:42 scripts/test-install-sh-docker.sh
+-rwxr-xr-x@ 1 daniel  staff  1289 Nov  1 22:42 scripts/test-install-sh-e2e-docker.sh
+-rwxr-xr-x@ 1 daniel  staff  59785 Nov  1 22:42 scripts/install-cli.sh
+-rwxr-xr-x@ 1 daniel  staff  10513 Nov  1 22:42 scripts/install.ps1
+-rwxr-xr-x@ 1 daniel  staff  81071 Nov  1 22:42 scripts/install.sh
+-rw-r--r--@ 1 daniel  staff   4116 Nov  1 22:42 scripts/release-install-check.ts
+-rwxr-xr-x@ 1 daniel  staff   3436 Nov  1 22:42 scripts/test-install-sh-docker.sh
+-rwxr-xr-x@ 1 daniel  staff   1289 Nov  1 22:42 scripts/test-install-sh-e2e-docker.sh
+total 544
+drwxr-xr-x@  26 daniel  staff    832 Nov  1 22:42 .
+drwxr-xr-x@ 204 daniel  staff   6528 Nov  1 22:42 ..
+-rw-r--r--@   1 daniel  staff   5091 Nov  1 22:42 cli.test.ts
+-rw-r--r--@   1 daniel  staff   6632 Nov  1 22:42 cli.ts
+-rw-r--r--@   1 daniel  staff    814 Nov  1 22:42 cutover-from-ghcr.test.ts
+-rw-r--r--@   1 daniel  staff  15083 Nov  1 22:42 cutover-record.ts
+-rw-r--r--@   1 daniel  staff   7318 Nov  1 22:42 file-forward-guard.test.ts
+-rw-r--r--@   1 daniel  staff  10225 Nov  1 22:42 file-forward-guard.ts
+-rw-r--r--@   1 daniel  staff   4570 Nov  1 22:42 file-guard-cli.test.ts
+-rw-r--r--@   1 daniel  staff   7414 Nov  1 22:42 file-guard-cli.ts
+-rw-r--r--@   1 daniel  staff  10388 Nov  1 22:42 forward-guard.test.ts
+-rw-r--r--@   1 daniel  staff   6641 Nov  1 22:42 forward-guard.ts
+-rw-r--r--@   1 daniel  staff   1804 Nov  1 22:42 ledger-audit.ts
+-rw-r--r--@   1 daniel  staff  53517 Nov  1 22:42 ledger.test.ts
+-rw-r--r--@   1 daniel  staff  18384 Nov  1 22:42 ledger.ts
+-rw-r--r--@   1 daniel  staff   1505 Nov  1 22:42 merge-back.test.ts
+-rw-r--r--@   1 daniel  staff   2353 Nov  1 22:42 merge-back.ts
+-rw-r--r--@   1 daniel  staff   8886 Nov  1 22:42 release-record.test.ts
+-rw-r--r--@   1 daniel  staff  21807 Nov  1 22:42 release-record.ts
+android:install
+delivery:audit:files
+delivery:check-sot
+delivery:cutover:record
+delivery:ledger:audit
+delivery:merge-back-plan
+delivery:release-record:check
+delivery:release-record:generate
+delivery:retire:plan
+release:check
+release:openclaw:npm:check
+sbom:cyclonedx
+test:install:e2e
+test:install:e2e:anthropic
+test:install:e2e:openai
+test:install:smoke
+ui:install
+----- channel plugin vs docs completeness -----
+plugin_channels 24 ['bluebubbles', 'dingtalk', 'discord', 'feishu', 'googlechat', 'imessage', 'irc', 'line', 'matrix', 'mattermost', 'msteams', 'nextcloud-talk', 'nostr', 'signal', 'slack', 'synology-chat', 'telegram', 'tlon', 'twitch', 'wechat', 'wecom', 'whatsapp', 'zalo', 'zalouser']
+channel_docs_excl_meta 24 ['bluebubbles', 'dingtalk', 'discord', 'feishu', 'googlechat', 'imessage', 'irc', 'line', 'matrix', 'mattermost', 'msteams', 'nextcloud-talk', 'nostr', 'signal', 'slack', 'synology-chat', 'telegram', 'tlon', 'twitch', 'wechat', 'wecom', 'whatsapp', 'zalo', 'zalouser']
+in_plugins_not_docs []
+in_docs_not_plugins []
+COMPLETE
+packages_count 18 ['aor-backend-graph', 'aor-backend-openbot', 'aor-backend-stub', 'aor-core', 'aor-sdk-node', 'aor-sdk-python', 'clawdbot', 'cogniweave-sdk', 'collaboration-core', 'collaboration-openbot-adapter', 'collaboration-runtime', 'constitutional-conformance', 'constitutional-contracts', 'constitutional-registry', 'constitutional-runtime', 'evolution-core', 'moltbot', 'toolkit']
+extensions_count 44
+----- channels list CLI (offline help already done; try plugins list non-network) -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+[plugins] media-monitor register cookie=ref:env:XHS_COOKIE adapter=/Users/daniel/AI项目/openbot-media-adapter/.venv/bin/python -m openbot_media_adapter
+│
+◇  Config warnings ────────────────────────────────────────────────────────╮
+│                                                                          │
+│  - plugins.entries.media-monitor: plugin media-monitor: duplicate        │
+│    plugin id detected; later plugin may be overridden (/Users/daniel/AI  │
+│    VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)         │
+│  - plugins.entries.wecom: plugin wecom: duplicate plugin id detected;    │
+│    later plugin may be overridden (/Users/daniel/AI                      │
+│    VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)                 │
+│                                                                          │
+├──────────────────────────────────────────────────────────────────────────╯
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Plugins (5/45 loaded)
+Source roots:
+  stock: /Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions
+
+┌──────────────┬──────────┬──────────┬───────────────────────────────────────────────────────────────┬────────────────┐
+│ Name         │ ID       │ Status   │ Source                                                        │ Version        │
+├──────────────┼──────────┼──────────┼───────────────────────────────────────────────────────────────┼────────────────┤
+│ WeCom        │ wecom    │ loaded   │ ~/AI项目/openbot/extensions/wecom/index.ts                      │ 2026.7.12-rc.2 │
+│              │          │          │ OpenBot WeCom channel plugin                                  │                │
+│ Weixin       │ openclaw │ loaded   │ ~/.openbot/extensions/openclaw-weixin/index.ts                │ 1.0.2          │
+│              │ -weixin  │          │ Weixin channel (getUpdates long-poll + sendMessage)           │                │
+│ Media        │ media-   │ loaded   │ ~/AI项目/openbot/extensions/media-monitor/index.ts              │ 2026.7.12-rc.2 │
+│ Monitor      │ monitor  │          │ Read-only social media monitoring via an external             │                │
+│              │          │          │ MediaCrawler-compatible sidecar (MVP: xhs).                   │                │
+│ ACPX Runtime │ acpx     │ disabled │ stock:acpx/index.ts                                           │ 2026.7.12-rc.2 │
+│              │          │          │ ACP runtime backend powered by acpx with configurable         │                │
+│              │          │          │ command path and version policy.                              │                │
+│ @openclaw/   │ bluebubb │ disabled │ stock:bluebubbles/index.ts                                    │ 2026.7.12-rc.2 │
+│ bluebubbles  │ les      │          │ OpenClaw BlueBubbles channel plugin                           │                │
+│ @openclaw/   │ copilot- │ disabled │ stock:copilot-proxy/index.ts                                  │ 2026.7.12-rc.2 │
+│ copilot-     │ proxy    │          │ OpenClaw Copilot Proxy provider plugin                        │                │
+│ proxy        │          │          │                                                               │                │
+│ Device       │ device-  │ disabled │ stock:device-pair/index.ts                                    │                │
+│ Pairing      │ pair     │          │ Generate setup codes and approve device pairing requests.     │                │
+│ @openclaw/   │ diagnost │ disabled │ stock:diagnostics-otel/index.ts                               │ 2026.7.12-rc.2 │
+│ diagnostics- │ ics-otel │          │ OpenClaw diagnostics OpenTelemetry exporter                   │                │
+│ otel         │          │          │                                                               │                │
+│ Diffs        │ diffs    │ disabled │ stock:diffs/index.ts                                          │ 2026.7.12-rc.2 │
+│              │          │          │ Read-only diff viewer and file renderer for agents.           │                │
+│ @openclaw/   │ dingtalk │ disabled │ stock:dingtalk/index.ts                                       │ 2026.7.12-rc.2 │
+│ dingtalk     │          │          │ OpenBot DingTalk channel plugin                               │                │
+│ @openclaw/   │ discord  │ disabled │ stock:discord/index.ts                                        │ 2026.7.12-rc.2 │
+│ discord      │          │          │ OpenClaw Discord channel plugin                               │                │
+│ @openclaw/   │ feishu   │ disabled │ stock:feishu/index.ts                                         │ 2026.7.12-rc.2 │
+│ feishu       │          │          │ OpenClaw Feishu/Lark channel plugin (community maintained by  │                │
+│              │          │          │ @m1heng)                                                      │                │
+│ @openclaw/   │ google-  │ disabled │ stock:google-gemini-cli-auth/index.ts                         │ 2026.7.12-rc.2 │
+│ google-      │ gemini-  │          │ OpenClaw Gemini CLI OAuth provider plugin                     │                │
+│ gemini-cli-  │ cli-auth │          │                                                               │                │
+│ auth         │          │          │                                                               │                │
+│ @openclaw/   │ googlech │ disabled │ stock:googlechat/index.ts                                     │ 2026.7.12-rc.2 │
+│ googlechat   │ at       │          │ OpenClaw Google Chat channel plugin                           │                │
+│ @openclaw/   │ imessage │ disabled │ stock:imessage/index.ts                                       │ 2026.7.12-rc.2 │
+│ imessage     │          │          │ OpenClaw iMessage channel plugin                              │                │
+│ @openclaw/   │ irc      │ disabled │ stock:irc/index.ts                                            │ 2026.7.12-rc.2 │
+│ irc          │          │          │ OpenClaw IRC channel plugin                                   │                │
+│ @openclaw/   │ line     │ disabled │ stock:line/index.ts                                           │ 2026.7.12-rc.2 │
+│ line         │          │          │ OpenClaw LINE channel plugin                                  │                │
+│ LLM Task     │ llm-task │ disabled │ stock:llm-task/index.ts                                       │ 2026.7.12-rc.2 │
+│              │          │          │ Generic JSON-only LLM tool for structured tasks callable      │                │
+│              │          │          │ from workflows.                                               │                │
+│ Lobster      │ lobster  │ disabled │ stock:lobster/index.ts                                        │ 2026.7.12-rc.2 │
+│              │          │          │ Typed workflow tool with resumable approvals.                 │                │
+│ @openclaw/   │ matrix   │ disabled │ stock:matrix/index.ts                                         │ 2026.7.12-rc.2 │
+│ matrix       │          │          │ OpenClaw Matrix channel plugin                                │                │
+│ @openclaw/   │ mattermo │ disabled │ stock:mattermost/index.ts                                     │ 2026.7.12-rc.2 │
+│ mattermost   │ st       │          │ OpenClaw Mattermost channel plugin                            │                │
+│ Media        │ media-   │ disabled │ stock:media-monitor/index.ts                                  │ 2026.7.12-rc.2 │
+│ Monitor      │ monitor  │          │ Read-only social media monitoring via an external             │                │
+│              │          │          │ MediaCrawler-compatible sidecar. Not for auto-posting.        │                │
+│ Memory       │ memory-  │ loaded   │ stock:memory-core/index.ts                                    │ 2026.7.12-rc.2 │
+│ (Core)       │ core     │          │ File-backed memory search tools and CLI                       │                │
+plugins_list_exit=0
+DONE
