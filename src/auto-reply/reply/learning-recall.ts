@@ -117,12 +117,17 @@ function resolveInProcessLock(scopeId: string): ReturnType<typeof createAsyncLoc
  * 多个 gateway 实例共享同一 workspace 时，外层文件锁保证互斥；锁文件带 pid + 时间戳，
  * 持有者进程消失或超时即判定为 stale 自动接管，不会因崩溃留下死锁。
  */
-export function withLearningAssetLock<T>(scopeId: string, fn: () => Promise<T>): Promise<T> {
+export function withLearningAssetLock<T>(
+  scopeId: string,
+  fn: () => Promise<T>,
+  /** When omitted, production resolves stores via loadConfig(). Tests pass an isolated root. */
+  groupRootDir?: string,
+): Promise<T> {
   const normalizedScope = scopeId.trim();
   return resolveInProcessLock(normalizedScope)(async () => {
-    const { groupRootDir } = createWorkspaceCollaborationStores();
+    const resolvedRoot = groupRootDir ?? createWorkspaceCollaborationStores().groupRootDir;
     const filePath = resolveGroupStoreFilePath({
-      groupRootDir,
+      groupRootDir: resolvedRoot,
       groupId: normalizedScope,
       filename: LEARNING_ASSETS_FILENAME,
     });

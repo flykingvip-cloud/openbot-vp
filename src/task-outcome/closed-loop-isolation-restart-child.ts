@@ -4,13 +4,18 @@
  * Does not talk to a gateway, send messages, or read production state.
  */
 import fs from "node:fs";
+import path from "node:path";
+import type { OpenBotConfig } from "../config/config.js";
+import { createWorkspaceCollaborationStores } from "../gateway/collaboration-learning/shared.js";
 import {
   recordCapabilityGapEvent,
   getEmptyReplyGapCounterForTests,
 } from "../gateway/evolution-control/capability-gap-ingest.js";
 import { OutcomeConsumerRuntime } from "./consumers.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
+import { createExperienceVerifiedHandler } from "./experience-verified-handler.js";
 import { hydrateAwaitingDeliveriesFromDisk, peekAwaitingDelivery } from "./pending-delivery.js";
+import { rejectTaskOutcomeResult } from "./reject-result.js";
 import { TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import type { TrustedScope } from "./types.js";
@@ -155,6 +160,61 @@ try {
       taskId: peeked?.taskId ?? null,
       deliveryId: peeked?.deliveryId ?? null,
       runId: peeked?.runId ?? null,
+    });
+    process.exit(0);
+  }
+
+  if (command === "reject") {
+    const [agentDir, taskId, outcomeVersion, caller, commandId, outFile] = args;
+    if (!agentDir || !taskId || !outcomeVersion || !caller || !commandId || !outFile) {
+      throw new Error(
+        "reject requires <agentDir> <taskId> <outcomeVersion> <caller> <commandId> <outFile>",
+      );
+    }
+    const cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
+    const result = rejectTaskOutcomeResult({
+      cfg,
+      agentId: "bot",
+      taskId,
+      outcomeVersion: Number(outcomeVersion),
+      callerSubjectRaw: caller,
+      commandId,
+    });
+    writeResult(
+      outFile,
+      result.ok
+        ? { ok: true, version: result.record.outcomeVersion, replayed: result.replayed }
+        : result,
+    );
+    process.exit(0);
+  }
+
+  if (command === "experience-drain") {
+    const [agentDir, stateDir, scopeId, outFile] = args;
+    if (!agentDir || !stateDir || !scopeId || !outFile) {
+      throw new Error("experience-drain requires <agentDir> <stateDir> <scopeId> <outFile>");
+    }
+    process.env.OPENBOT_STATE_DIR = stateDir;
+    const cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
+    const stores = createWorkspaceCollaborationStores(cfg);
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, "task-outcomes"));
+    const runtime = new OutcomeConsumerRuntime(store, {
+      handlers: [createExperienceVerifiedHandler(store, { stores })],
+    });
+    const drained = await runtime.drain((taskId) => store.loadTask(taskId));
+    const assets = await stores.learningStorage.readLearningAssets(scopeId);
+    const pending = store.listPendingOutbox().length;
+    store.close();
+    writeResult(outFile, {
+      ok: true,
+      processed: drained.processed,
+      deferred: drained.deferred,
+      pending,
+      groupRootDir: stores.groupRootDir,
+      counts: assets.map((asset) => ({
+        assetId: asset.assetId,
+        outcomeVerifiedCount: asset.outcomeVerifiedCount ?? 0,
+      })),
     });
     process.exit(0);
   }

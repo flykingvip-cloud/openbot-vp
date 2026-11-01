@@ -81,6 +81,7 @@ import {
   type GrowthOutcomeCommitOpts,
   type RunnerTurnFailureReason,
 } from "../../task-outcome/runtime-from-runner.js";
+import { normalizeTaskOutcomeSubjectRef } from "../../task-outcome/subject-ref.js";
 import {
   isMarkdownCapableMessageChannel,
   resolveMessageChannel,
@@ -200,11 +201,7 @@ export async function runAgentTurnWithFallback(params: {
       agentId: growthAgentIdForEntry,
       runId,
       sessionKey: params.sessionKey,
-      subjectRef: subjectRef.startsWith("platform-user:")
-        ? subjectRef
-        : subjectRef.includes(":")
-          ? subjectRef
-          : `subject:${subjectRef}`,
+      subjectRef: normalizeTaskOutcomeSubjectRef(subjectRef),
       ...(tenantId ? { tenantId } : {}),
     });
     if (opened.ok) {

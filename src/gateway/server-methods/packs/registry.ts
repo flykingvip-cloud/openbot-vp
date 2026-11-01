@@ -27,6 +27,7 @@ import { stewardWorkspaceFilePack } from "../steward-workspace-file.pack.js";
 import { supervisorPack } from "../supervisor.pack.js";
 import { supportCasesPack } from "../support-cases.pack.js";
 import { taskContextPack } from "../task-context.pack.js";
+import { taskOutcomeRejectPack } from "../task-outcome-reject.pack.js";
 import { GATEWAY_METHOD_PACK_MANIFEST, PACK_OWNED_METHOD_NAMES } from "./manifest.js";
 
 export { GATEWAY_METHOD_PACK_MANIFEST, PACK_OWNED_METHOD_NAMES };
@@ -47,6 +48,7 @@ export const GATEWAY_METHOD_PACKS: readonly GatewayMethodPack[] = [
   daibaiPack,
   supportCasesPack,
   taskContextPack,
+  taskOutcomeRejectPack,
   dataGovernancePack,
   evolutionControlPack,
   evolutionDelegationPack,

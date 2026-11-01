@@ -42,6 +42,16 @@ export type CurateLearningSkillDraftsParams = {
    * (e.g. personal learning path). Otherwise read from asset metadata.
    */
   ownerUserId?: string | null;
+  /**
+   * Isolated collaboration stores. Omitted in production, which calls loadConfig().
+   */
+  stores?: {
+    groupRootDir?: string;
+    learningStorage: {
+      readLearningAssets: (scopeId: string, botId?: string) => Promise<AgentLearningAsset[]>;
+      writeLearningAssets: (scopeId: string, assets: AgentLearningAsset[]) => Promise<unknown>;
+    };
+  };
 };
 
 /** Lineage prefix written as skill sourceLineageId (`learning:<scopeId>`). */
@@ -84,8 +94,10 @@ export async function curateLearningSkillDrafts(
     return [];
   }
   // 与复用记账共用同一把锁：策展也是读改写，且要靠 curatedSkillId 保证幂等。
-  return withLearningAssetLock(scopeId, () =>
-    curateLearningSkillDraftsLocked({ ...params, scopeId }),
+  return withLearningAssetLock(
+    scopeId,
+    () => curateLearningSkillDraftsLocked({ ...params, scopeId }),
+    params.stores?.groupRootDir,
   );
 }
 
@@ -93,7 +105,7 @@ async function curateLearningSkillDraftsLocked(
   params: CurateLearningSkillDraftsParams & { scopeId: string },
 ): Promise<CuratedSkillDraft[]> {
   const scopeId = params.scopeId;
-  const { learningStorage } = createWorkspaceCollaborationStores();
+  const { learningStorage } = params.stores ?? createWorkspaceCollaborationStores();
   const allAssets = await learningStorage.readLearningAssets(scopeId);
   const botId = params.botId?.trim();
   const scopedAssets = botId ? allAssets.filter((asset) => asset.botId === botId) : allAssets;

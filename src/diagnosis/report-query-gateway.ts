@@ -6,10 +6,12 @@ import path from "node:path";
  * Live handlers read composite projection snapshots from CONFIG_DIR.
  * Grant inspection is injected; this file must not import evolution-control.
  */
+import type { OpenBotConfig } from "../config/config.js";
 import { ErrorCodes, errorShape } from "../gateway/protocol/index.js";
 import type { GatewayClient, GatewayRequestHandlers } from "../gateway/server-methods/types.js";
 import { resolveStewardChatCaller } from "../gateway/steward-call-authorization.js";
 import { resolveAuthoritativeMembership } from "../gateway/tenant-context.js";
+import { normalizeTaskOutcomeSubjectRef } from "../task-outcome/subject-ref.js";
 import { CONFIG_DIR } from "../utils.js";
 import {
   DIAGNOSIS_ACTION_DISPATCH_METHOD,
@@ -171,6 +173,8 @@ export type DiagnosisDiagnoseHandlerOptions = {
   configDir?: string;
   inspectGrant?: PrescriptionGrantInspector;
   confirmEnabled?: boolean;
+  /** Test seam. Production omits this and uses the loaded agent config. */
+  taskOutcomeCfg?: OpenBotConfig;
 };
 
 export function createLiveDiagnosisReportGatewayHandlers(
@@ -184,6 +188,7 @@ export function createLiveDiagnosisReportGatewayHandlers(
     ...(options.configDir ? { configDir: options.configDir } : {}),
     ...(options.inspectGrant ? { inspectGrant: options.inspectGrant } : {}),
     ...(options.confirmEnabled !== undefined ? { confirmEnabled: options.confirmEnabled } : {}),
+    ...(options.taskOutcomeCfg ? { taskOutcomeCfg: options.taskOutcomeCfg } : {}),
   });
 }
 
@@ -241,13 +246,18 @@ export function createDiagnosisReportGatewayHandlers(
           }),
         });
         const expandDeps = await createDiagnoseGroupExpandDeps();
+        const structuralPreview = loadStructuralPreviewConfig();
+        const callerRaw = authClient?.platformUserId?.trim() || auth.principal.principalId;
         const payload = await executeParsedDiagnoseRequest({
           request,
           trusted: auth.trusted,
           requestedBy: auth.principal,
           skillConfigDir: CONFIG_DIR,
           growthReads,
-          structuralPreview: loadStructuralPreviewConfig(),
+          structuralPreview,
+          taskOutcomeCfg: options.taskOutcomeCfg ?? structuralPreview?.cfg,
+          callerSubjectRaw: normalizeTaskOutcomeSubjectRef(callerRaw),
+          callerTenantId: auth.trusted.tenantId,
           registry: expandDeps.registry,
           loadGroupMembers: expandDeps.loadGroupMembers,
           sessionKeyExists: expandDeps.sessionKeyExists,

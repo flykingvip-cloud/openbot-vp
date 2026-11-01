@@ -127,10 +127,7 @@ import type { buildCommandContext } from "./commands.js";
 import { resolveComposerPluginMentionBindings } from "./composer-plugin-mention-bindings.js";
 import { executeComposerPluginMentionsForTurn } from "./composer-plugin-mention-execute.js";
 import type { InlineDirectives } from "./directive-handling.js";
-import {
-  applyGoalCorrectionMutation,
-  buildActivePrimaryObjectivePrompt,
-} from "./goal-correction-mutation.js";
+import { buildActivePrimaryObjectivePrompt } from "./goal-correction-mutation.js";
 import { buildGroupChatContext, buildGroupIntro } from "./groups.js";
 import {
   ceilingForDepth,
@@ -151,6 +148,7 @@ import {
   buildCurrentSpeakerUntrustedPrompt,
   buildInboundMetaSystemPrompt,
 } from "./inbound-meta.js";
+import { applyInboundTaskFeedback } from "./inbound-task-feedback.js";
 import { buildKnowledgeUniversePromptContext } from "./knowledge-universe-context.js";
 import { learningExperienceRunKey } from "./learning-experience-pending.js";
 import { buildLearningRecallSystemPrompt } from "./learning-recall-context.js";
@@ -691,6 +689,7 @@ export async function runPreparedReply(
       );
     }
   }
+  let inboundTaskClarify: string | undefined;
   if (!isHeartbeat && inboundMessage) {
     const sourceMessageId = String(
       sessionCtx.MessageSidFull ?? sessionCtx.MessageSid ?? opts?.runId ?? "",
@@ -702,7 +701,7 @@ export async function runPreparedReply(
           text: inboundMessage,
           sourceMessageId,
         });
-        await applyGoalCorrectionMutation({
+        const feedback = await applyInboundTaskFeedback({
           cfg,
           workspaceDir: runWorkspaceDir,
           agentId,
@@ -711,6 +710,9 @@ export async function runPreparedReply(
           text: inboundMessage,
           sourceMessageId,
         });
+        if (feedback.clarify) {
+          inboundTaskClarify = feedback.clarify;
+        }
       } catch {
         // Preference write must never block the chat turn.
       }
@@ -1239,6 +1241,9 @@ export async function runPreparedReply(
   }
   if (taskSurfaceNote) {
     extraSystemPromptParts = [...extraSystemPromptParts, taskSurfaceNote];
+  }
+  if (inboundTaskClarify) {
+    extraSystemPromptParts = [...extraSystemPromptParts, inboundTaskClarify];
   }
   const currentSpeakerPrompt = buildCurrentSpeakerUntrustedPrompt(sessionCtx);
   if (currentSpeakerPrompt) {
