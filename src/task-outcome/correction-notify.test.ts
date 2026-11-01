@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   CORRECTION_NOTIFY_ENABLED,
   deliverCorrectionNotice,
@@ -22,12 +22,16 @@ afterEach(() => {
 describe("correction notice", () => {
   it("stays off, fails closed without a verified user, and sends one factual notice", () => {
     expect(CORRECTION_NOTIFY_ENABLED).toBe(false);
-    const send = vi.fn(() => ({ accepted: true }));
+    const sent: Array<{ platformUserId: string; text: string }> = [];
+    const send = (input: { platformUserId: string; text: string }) => {
+      sent.push(input);
+      return { accepted: true };
+    };
     expect(maybeNotifyLandedCorrection({ ...base, send })).toEqual({
       ok: false,
       code: "not_enabled",
     });
-    expect(send).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
 
     const unresolved = deliverCorrectionNotice({
       ...base,
@@ -38,7 +42,7 @@ describe("correction notice", () => {
     expect(unresolved).toEqual({ ok: false, code: "recipient_unresolved" });
     expect(JSON.stringify(unresolved)).not.toContain("agent:main:main");
     expect(JSON.stringify(unresolved)).not.toContain("diagnosis:canary:daibai");
-    expect(send).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
 
     const forbidden = deliverCorrectionNotice({
       ...base,
@@ -48,7 +52,7 @@ describe("correction notice", () => {
       send,
     });
     expect(forbidden).toEqual({ ok: false, code: "recipient_unresolved" });
-    expect(send).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
 
     const first = deliverCorrectionNotice({
       ...base,
@@ -79,7 +83,7 @@ describe("correction notice", () => {
     if (second.ok) {
       expect(second.replayed).toBe(true);
     }
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(send.mock.calls[0]?.[0].platformUserId).toBe("platform-user:alice");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.platformUserId).toBe("platform-user:alice");
   });
 });
