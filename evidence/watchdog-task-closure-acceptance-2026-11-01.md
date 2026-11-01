@@ -3,9 +3,9 @@
 - Branch: `grok-sentinel-link/watchdog-task-closure`
 - Worktree: `/Users/daniel/.codex/worktrees/watchdog-task-closure/openbot`
 - Prior tip (human_todo state+JSONL only): `6da8dd6a8`
-- Pushed tip: \`fe78bd61158410fe1459d2e08e08256780c00295\`
+- Feature tip: `fe78bd61158410fe1459d2e08e08256780c00295`
 - Zone: Asia/Shanghai (UTC+8)
-- Written: 2026-11-01 ~10:10 Asia/Shanghai
+- Written: 2026-11-01 ~10:15 Asia/Shanghai
 
 ## Acceptance blockers addressed
 
@@ -45,21 +45,20 @@ pnpm exec vitest run \
   src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts
 ```
 
-Result (exit 0 for the four primary + scheduler):
+Result:
 
 ```
- ✓ ui/src/ui/chat/human-attention-card.node.test.ts (2 tests)
- ✓ src/gateway/collaboration-dispatch/human-attention-intake.test.ts (8 tests)
- ✓ src/gateway/collaboration-dispatch/watchdog-task-closure.test.ts (14 tests)
- ✓ src/gateway/collaboration-dispatch/watchdog-task-closure.integration.test.ts (7 tests)
- ✓ src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts (15 tests)
-
- Primary+UI: 31 passed; +scheduler 15 → 46 related passing
+ ✓ human-attention-card.node.test.ts (2)
+ ✓ human-attention-intake.test.ts (8)
+ ✓ watchdog-task-closure.test.ts (14)
+ ✓ watchdog-task-closure.integration.test.ts (7)
+ ✓ collab-s4-heartbeat-scheduler.test.ts (15)
+ Primary+UI 31 + scheduler 15 related passing
 ```
 
 ## Format
 
-`oxfmt --check` on touched files: **All matched files use the correct format.**
+`oxfmt --check` on touched files: All matched files use the correct format.
 
 ## Key files
 
