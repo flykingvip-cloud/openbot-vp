@@ -137,6 +137,8 @@ export async function resolveModelCostRates(
 ): Promise<{
   inputCostPer1MCents: number;
   outputCostPer1MCents: number;
+  cacheReadCostPer1MCents?: number;
+  cacheWriteCostPer1MCents?: number;
   source: "cost_version" | "catalog" | "none";
 }> {
   const id = modelId.trim();
@@ -146,15 +148,34 @@ export async function resolveModelCostRates(
     return {
       inputCostPer1MCents: fromVersion.inputCostPer1MCents,
       outputCostPer1MCents: fromVersion.outputCostPer1MCents,
+      ...(fromVersion.cacheReadCostPer1MCents !== undefined
+        ? { cacheReadCostPer1MCents: fromVersion.cacheReadCostPer1MCents }
+        : {}),
+      ...(fromVersion.cacheWriteCostPer1MCents !== undefined
+        ? { cacheWriteCostPer1MCents: fromVersion.cacheWriteCostPer1MCents }
+        : {}),
       source: "cost_version",
     };
   }
   const models = await listResourceModelCatalog(storePaths?.modelCatalog);
-  const catalog = models.find((m) => m.modelId === id);
+  const catalog = models.find((m) => m.modelId === id) as
+    | {
+        inputCostPer1MCents: number;
+        outputCostPer1MCents: number;
+        cacheReadCostPer1MCents?: number;
+        cacheWriteCostPer1MCents?: number;
+      }
+    | undefined;
   if (catalog) {
     return {
       inputCostPer1MCents: catalog.inputCostPer1MCents,
       outputCostPer1MCents: catalog.outputCostPer1MCents,
+      ...(catalog.cacheReadCostPer1MCents !== undefined
+        ? { cacheReadCostPer1MCents: catalog.cacheReadCostPer1MCents }
+        : {}),
+      ...(catalog.cacheWriteCostPer1MCents !== undefined
+        ? { cacheWriteCostPer1MCents: catalog.cacheWriteCostPer1MCents }
+        : {}),
       source: "catalog",
     };
   }

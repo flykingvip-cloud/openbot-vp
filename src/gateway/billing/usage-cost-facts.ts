@@ -13,6 +13,17 @@ export function describeProviderPrice(input: {
   source: "cost_version" | "catalog" | "none";
   inputCostPer1MCents: number;
   outputCostPer1MCents: number;
+  /** undefined = 缓存读单价未配置（有缓存用量时不得伪装已知 0）。 */
+  cacheReadCostPer1MCents?: number;
+  /** undefined = 缓存写单价未配置。 */
+  cacheWriteCostPer1MCents?: number;
+  /** 有用量时，免费判定必须覆盖实际计费维（含缓存）。 */
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+  };
 }): { providerPriceState: "known" | "missing"; providerPriceFree: boolean } {
   const inputRate = Math.max(0, Math.floor(input.inputCostPer1MCents));
   const outputRate = Math.max(0, Math.floor(input.outputCostPer1MCents));
@@ -22,9 +33,36 @@ export function describeProviderPrice(input: {
   if (unpriced) {
     return { providerPriceState: "missing", providerPriceFree: false };
   }
+
+  const cacheReadTokens = Math.max(0, Math.floor(input.usage?.cacheReadTokens ?? 0));
+  const cacheWriteTokens = Math.max(0, Math.floor(input.usage?.cacheWriteTokens ?? 0));
+  // 缺失缓存单价不得伪装已知 0 / 免费。
+  if (cacheReadTokens > 0 && input.cacheReadCostPer1MCents === undefined) {
+    return { providerPriceState: "missing", providerPriceFree: false };
+  }
+  if (cacheWriteTokens > 0 && input.cacheWriteCostPer1MCents === undefined) {
+    return { providerPriceState: "missing", providerPriceFree: false };
+  }
+
+  const cacheReadRate =
+    input.cacheReadCostPer1MCents === undefined
+      ? null
+      : Math.max(0, Math.floor(input.cacheReadCostPer1MCents));
+  const cacheWriteRate =
+    input.cacheWriteCostPer1MCents === undefined
+      ? null
+      : Math.max(0, Math.floor(input.cacheWriteCostPer1MCents));
+
+  // 显式零价可标免费，但须覆盖实际计费维（含缓存）。
+  const free =
+    inputRate === 0 &&
+    outputRate === 0 &&
+    (cacheReadTokens <= 0 || cacheReadRate === 0) &&
+    (cacheWriteTokens <= 0 || cacheWriteRate === 0);
+
   return {
     providerPriceState: "known",
-    providerPriceFree: inputRate === 0 && outputRate === 0,
+    providerPriceFree: free,
   };
 }
 

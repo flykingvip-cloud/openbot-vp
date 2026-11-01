@@ -93,6 +93,24 @@ describe("usage cost layer", () => {
     ).toEqual({ providerPriceState: "known", providerPriceFree: true });
     expect(
       describeProviderPrice({
+        source: "cost_version",
+        inputCostPer1MCents: 0,
+        outputCostPer1MCents: 0,
+        usage: { cacheReadTokens: 9 },
+      }),
+    ).toEqual({ providerPriceState: "missing", providerPriceFree: false });
+    expect(
+      describeProviderPrice({
+        source: "cost_version",
+        inputCostPer1MCents: 0,
+        outputCostPer1MCents: 0,
+        cacheReadCostPer1MCents: 0,
+        cacheWriteCostPer1MCents: 0,
+        usage: { cacheReadTokens: 9, cacheWriteTokens: 0 },
+      }),
+    ).toEqual({ providerPriceState: "known", providerPriceFree: true });
+    expect(
+      describeProviderPrice({
         source: "catalog",
         inputCostPer1MCents: 12,
         outputCostPer1MCents: 0,
@@ -116,11 +134,12 @@ describe("usage cost layer", () => {
       },
       ledgerPath,
     );
+    // 有缓存用量但写入时缺缓存单价 → missing，不得进零成本排名。
     const cached = await appendUsageLedgerEntry(
       {
         enterpriseId: "ent-a",
         taskId: "cached",
-        modelId: "openai/free",
+        modelId: "openai/cached",
         tier: "standard",
         policyId: "included",
         creditsCharged: 0,
@@ -130,6 +149,23 @@ describe("usage cost layer", () => {
         outputTokens: 1,
         cacheReadTokens: 9,
         cacheWriteTokens: 0,
+        providerPriceState: "missing",
+      },
+      ledgerPath,
+    );
+    // 确认过的免费模型且无缓存用量，仍可进零成本排名；与 Credits 结算分开。
+    const free = await appendUsageLedgerEntry(
+      {
+        enterpriseId: "ent-a",
+        taskId: "free",
+        modelId: "openai/free",
+        tier: "standard",
+        policyId: "included",
+        creditsCharged: 0,
+        providerCostCents: 0,
+        tenantRevenueCents: 0,
+        inputTokens: 2,
+        outputTokens: 1,
         providerPriceState: "known",
         providerPriceFree: true,
       },
@@ -143,24 +179,35 @@ describe("usage cost layer", () => {
       creditsCharged: 0,
       updatedAt: "2026-11-01T00:00:00.000Z",
     });
+    const freeFact = ledgerEntryToUsageFact(free.entry, {
+      enterpriseId: "ent-a",
+      taskId: "free",
+      stage: "done",
+      creditsCharged: 0,
+      updatedAt: "2026-11-01T00:00:00.000Z",
+    });
     expect(ledgerPriceKind(historical.entry)).toBe("missing");
     expect(historicalFact.cacheReadTokens).toBeNull();
     expect(historicalFact.procurementCents).toBeNull();
     expect(cachedFact.cacheReadTokens).toBe(9);
     expect(cachedFact.cacheWriteTokens).toBe(0);
-    expect(cachedFact.procurementPrice).toBe("free");
-    const presented = presentUsageCostLayer(platform, [historicalFact, cachedFact]);
+    expect(cachedFact.procurementPrice).toBe("missing");
+    expect(cachedFact.procurementCents).toBeNull();
+    expect(freeFact.procurementPrice).toBe("free");
+    const presented = presentUsageCostLayer(platform, [historicalFact, cachedFact, freeFact]);
     expect(presented.ok).toBe(true);
     if (!presented.ok) {
       return;
     }
     expect(presented.view.cacheRead.known).toBe(9);
-    expect(presented.view.cacheRead.unknownCount).toBe(1);
+    // historical + free 均无测到的缓存字段 → unknown；cached 贡献 known=9
+    expect(presented.view.cacheRead.unknownCount).toBe(2);
     expect(presented.view.cacheNote).toContain("不会显示成 0");
     expect(presented.view.ranking?.map((row) => row.model)).toEqual(["openai/free"]);
     expect(presented.view.ranking?.[0]?.priceKind).toBe("free");
     expect(presented.view.ranking?.[0]?.procurementCents).toBe(0);
-    expect(presented.view.excludedFromRanking?.map((row) => row.model)).toEqual([
+    expect(presented.view.excludedFromRanking?.map((row) => row.model).toSorted()).toEqual([
+      "openai/cached",
       "openai/unpriced",
     ]);
     expect(presented.view.procurementCents).toBeNull();
@@ -245,7 +292,36 @@ describe("usage cost layer", () => {
     expect(responseHasCommercialCost(views[1])).toBe(false);
     expect(views[2]?.procurementCents).toBe(58);
     expect(views[2]?.commercialMarginCents).toBe(22);
-    expect(views[2]?.ranking?.map((row) => row.model)).toEqual(["gpt-test", "claude-test"]);
+    // gpt-test 含一次失败重试，成功率更低；综合质量／成功率后 claude 优先于纯低价。
+    expect(views[2]?.ranking?.map((row) => row.model)).toEqual(["claude-test", "gpt-test"]);
+  });
+
+  it("ranks by quality, success, and latency rather than procurement alone", () => {
+    const presented = presentUsageCostLayer(platform, [
+      fact({
+        requestId: "cheap-flaky",
+        model: "cheap-flaky",
+        status: "failed",
+        acceptance: "failed",
+        latencyMs: 900,
+        procurementCents: 1,
+        revenueCents: 0,
+      }),
+      fact({
+        requestId: "solid",
+        model: "solid-paid",
+        status: "succeeded",
+        acceptance: "passed",
+        latencyMs: 100,
+        procurementCents: 40,
+        revenueCents: 50,
+      }),
+    ]);
+    expect(presented.ok).toBe(true);
+    if (!presented.ok) {
+      return;
+    }
+    expect(presented.view.ranking?.map((row) => row.model)).toEqual(["solid-paid", "cheap-flaky"]);
   });
 
   it("does not show unknown usage or missing price as zero and keeps them out of the cheap ranking", () => {

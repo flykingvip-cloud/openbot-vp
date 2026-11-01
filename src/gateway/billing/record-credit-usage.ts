@@ -8,7 +8,7 @@
 
 import { resolveModelCostRates } from "../cost-version/cost-version-store.js";
 import {
-  computeProviderCostCents,
+  computeProviderCostCentsOrMissing,
   computeTenantRevenueCents,
   type TokenUsageInput,
 } from "../cost-version/provider-cost.js";
@@ -333,12 +333,23 @@ export async function recordCreditUsage(
     costVersions: input.storePaths?.costVersions,
     modelCatalog: input.storePaths?.modelCatalog,
   });
-  const providerCostCents = computeProviderCostCents({
+  const providerCostOrMissing = computeProviderCostCentsOrMissing({
     usage: input.tokenUsage ?? {},
     inputCostPer1MCents: costRates.inputCostPer1MCents,
     outputCostPer1MCents: costRates.outputCostPer1MCents,
+    ...(costRates.cacheReadCostPer1MCents !== undefined
+      ? { cacheReadCostPer1MCents: costRates.cacheReadCostPer1MCents }
+      : {}),
+    ...(costRates.cacheWriteCostPer1MCents !== undefined
+      ? { cacheWriteCostPer1MCents: costRates.cacheWriteCostPer1MCents }
+      : {}),
   });
-  const providerPrice = describeProviderPrice(costRates);
+  // 有缓存用量但缺单价时记 0 分 + missing，禁止伪装 known/free 零成本。
+  const providerCostCents = providerCostOrMissing ?? 0;
+  const providerPrice = describeProviderPrice({
+    ...costRates,
+    usage: input.tokenUsage ?? {},
+  });
   const tenantRevenueCents = enterpriseByok
     ? 0
     : computeTenantRevenueCents({
