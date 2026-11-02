@@ -7,6 +7,8 @@ import {
   deliveryActorIdsEqual,
   isMappedDeliveryIdentity,
   preferMappedSessionSubjects,
+  resolveTrustedPrincipalAliases,
+  trustedPrincipalMatches,
 } from "./delivery-actor-binding.js";
 
 const membership = {
@@ -201,5 +203,176 @@ describe("delivery actor binding", () => {
         authorizedConfirmerIds: ["bot:bot"],
       }),
     ).toBe(true);
+  });
+});
+
+describe("trusted principal resolution (ACL + wake shared)", () => {
+  const uuid = "90fed19a-1c8b-4420-87e0-bcc6165e32fa";
+  const email = "daniel.hhd@gmail.com";
+  const roster = [
+    {
+      memberId: `human:${uuid}`,
+      userId: uuid,
+      agentId: undefined as string | undefined,
+    },
+    { memberId: "bot:bot-2", userId: undefined, agentId: "bot-2" },
+  ];
+
+  test("same auth identity: UUID and email aliases resolve together via session", () => {
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: email,
+      trustedAuthSubjects: [uuid, email],
+    });
+    expect(trustedPrincipalMatches(`human:${uuid}`, aliases)).toBe(true);
+    expect(trustedPrincipalMatches(uuid, aliases)).toBe(true);
+    expect(trustedPrincipalMatches(`human:${email}`, aliases)).toBe(true);
+  });
+
+  test("same roster row links UUID memberId to email duty without dual-form members", () => {
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: email,
+      trustedAuthSubjects: [uuid, email],
+      roster,
+    });
+    expect(trustedPrincipalMatches(`human:${uuid}`, aliases)).toBe(true);
+    // OS maps memberId=human:uuid; wake candidate may be bare email from duty.
+    expect(
+      isMappedDeliveryIdentity(
+        {
+          governance: { ownerUserId: uuid, coordinatorBotId: "bot-2" },
+          memberRoleMap: [{ memberId: `human:${uuid}` }, { memberId: "bot-2" }],
+        },
+        email,
+        null,
+        { trustedAuthSubjects: [uuid, email], roster },
+      ),
+    ).toBe(true);
+  });
+
+  test("forged alias: unrelated email cannot claim UUID principal", () => {
+    const forged = "attacker@example.com";
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: forged,
+      trustedAuthSubjects: ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", forged],
+      roster,
+    });
+    expect(trustedPrincipalMatches(`human:${uuid}`, aliases)).toBe(false);
+    expect(
+      isMappedDeliveryIdentity(
+        {
+          governance: { ownerUserId: uuid },
+          memberRoleMap: [{ memberId: `human:${uuid}` }],
+        },
+        forged,
+        null,
+        {
+          trustedAuthSubjects: ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", forged],
+          roster,
+        },
+      ),
+    ).toBe(false);
+  });
+
+  test("morphology alone does not prove UUID≡email without session or roster", () => {
+    const aliases = resolveTrustedPrincipalAliases({ actor: email });
+    expect(trustedPrincipalMatches(uuid, aliases)).toBe(false);
+    expect(trustedPrincipalMatches(`human:${uuid}`, aliases)).toBe(false);
+  });
+
+  test("bot canonical agentId maps via roster/morphology", () => {
+    expect(
+      isMappedDeliveryIdentity({ memberRoleMap: [{ memberId: "bot:bot-2" }] }, "bot-2", null, {
+        roster,
+      }),
+    ).toBe(true);
+  });
+
+  test("same-row legitimate linkage: email on row with UUID folds only that row", () => {
+    const uuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const shared = "shared@example.test";
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: shared,
+      trustedAuthSubjects: [shared],
+      roster: [{ userId: uuidA, memberId: shared }],
+    });
+    expect(trustedPrincipalMatches(uuidA, aliases)).toBe(true);
+    expect(trustedPrincipalMatches(`human:${uuidA}`, aliases)).toBe(true);
+  });
+
+  test("cross-row chain linkage is not expanded from growing matcher", () => {
+    const uuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const uuidB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const shared = "shared@example.test";
+    const chainRoster = [
+      { userId: uuidA, memberId: shared },
+      { userId: uuidB, memberId: shared },
+    ];
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: uuidA,
+      trustedAuthSubjects: [uuidA],
+      roster: chainRoster,
+    });
+    expect(trustedPrincipalMatches(uuidA, aliases)).toBe(true);
+    // Must NOT chain uuid-a → shared → uuid-b.
+    expect(trustedPrincipalMatches(uuidB, aliases)).toBe(false);
+    expect(trustedPrincipalMatches(`human:${uuidB}`, aliases)).toBe(false);
+  });
+
+  test("row-order swap yields the same safe outcome (no chain either order)", () => {
+    const uuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const uuidB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const shared = "shared@example.test";
+    const forward = [
+      { userId: uuidA, memberId: shared },
+      { userId: uuidB, memberId: shared },
+    ];
+    const swapped = [
+      { userId: uuidB, memberId: shared },
+      { userId: uuidA, memberId: shared },
+    ];
+    const aForward = resolveTrustedPrincipalAliases({
+      actor: uuidA,
+      trustedAuthSubjects: [uuidA],
+      roster: forward,
+    });
+    const aSwapped = resolveTrustedPrincipalAliases({
+      actor: uuidA,
+      trustedAuthSubjects: [uuidA],
+      roster: swapped,
+    });
+    expect(trustedPrincipalMatches(uuidB, aForward)).toBe(false);
+    expect(trustedPrincipalMatches(uuidB, aSwapped)).toBe(false);
+    expect(trustedPrincipalMatches(uuidA, aForward)).toBe(true);
+    expect(trustedPrincipalMatches(uuidA, aSwapped)).toBe(true);
+    // Deterministic membership of the other subject's id.
+    const norm = (ids: string[]) =>
+      [...ids]
+        .map((x) => x.toLowerCase())
+        .toSorted()
+        .join("|");
+    const forwardHasB = aForward.some((x) => deliveryActorIdsEqual(x, uuidB));
+    const swappedHasB = aSwapped.some((x) => deliveryActorIdsEqual(x, uuidB));
+    expect(forwardHasB).toBe(swappedHasB);
+    expect(forwardHasB).toBe(false);
+    void norm;
+  });
+
+  test("duplicate email with different UUIDs → ambiguity reject (no UUID fold)", () => {
+    const uuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const uuidB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const shared = "shared@example.test";
+    const ambiguous = [
+      { userId: uuidA, memberId: shared },
+      { userId: uuidB, memberId: shared },
+    ];
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: shared,
+      trustedAuthSubjects: [shared],
+      roster: ambiguous,
+    });
+    // Fail closed: neither platform UUID is chosen by row order.
+    expect(trustedPrincipalMatches(uuidA, aliases)).toBe(false);
+    expect(trustedPrincipalMatches(uuidB, aliases)).toBe(false);
+    expect(trustedPrincipalMatches(shared, aliases)).toBe(true);
   });
 });

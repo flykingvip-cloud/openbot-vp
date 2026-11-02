@@ -26,6 +26,12 @@ import { resolveSecurityProfile } from "../security-profile.js";
 import type { GatewayClient } from "../server-methods/types.js";
 import { loadAuthoritativeGroupMembers } from "../workspace/group-acl.js";
 import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
+import {
+  authenticatedSessionSubjects,
+  resolveTrustedPrincipalAliases,
+  trustedPrincipalMatches,
+  type DeliveryActorClient,
+} from "./delivery-actor-binding.js";
 import { createGroupFileStore, createWorkspaceGroupStoreFunctions } from "./shared.js";
 import {
   isAclSafeTenantTrust,
@@ -88,20 +94,38 @@ function normalizeIdentity(value: string): string {
   return value.trim().toLowerCase();
 }
 
+/**
+ * ACL membership match via shared trusted principal resolution.
+ * Keeps ACL permission duties here; does not grant wake/dispatch authority.
+ * Same-row roster fields (userId/memberId/agentId) + session subjects link
+ * UUID/email — never productize dual-form members.json as the identity bus.
+ */
 function memberMatchesActor(
   member: CollaborationMember,
   actor: string,
   identityAliases: readonly string[] = [],
+  trustedAuthSubjects: readonly string[] = [],
 ): boolean {
+  const aliases = resolveTrustedPrincipalAliases({
+    actor,
+    trustedAuthSubjects,
+    trustedAliases: identityAliases,
+    roster: [member],
+  });
+  const candidates = [member.userId, member.memberId, member.agentId];
+  if (candidates.some((candidate) => trustedPrincipalMatches(candidate, aliases))) {
+    return true;
+  }
+  // Case-insensitive exact fallback for legacy mixed-case ids (preserve prior ACL).
   const accepted = new Set(
-    [actor, ...identityAliases]
+    [actor, ...identityAliases, ...aliases]
       .map((entry) => (typeof entry === "string" ? normalizeIdentity(entry) : ""))
       .filter(Boolean),
   );
-  const candidates = [member.userId, member.memberId, member.agentId]
+  return candidates
     .map((entry) => (typeof entry === "string" ? normalizeIdentity(entry) : ""))
-    .filter(Boolean);
-  return candidates.some((id) => accepted.has(id));
+    .filter(Boolean)
+    .some((id) => accepted.has(id));
 }
 
 /**
@@ -454,7 +478,12 @@ export async function authorizeTeamGroupResourceAccess(params: {
   // Same C5 repair chat.send already uses. Without it, email-only members.json
   // rejects a UUID session actor and callers drop the locator — live confirm then
   // surfaces trusted_group_locator_required instead of the real ACL result.
+  // Prefer shared trusted principal resolution (session subjects + same-row roster)
+  // over productizing dual-form members.json entries.
   const identityAliases = collectTeamAuthAliases(params.identityAliases);
+  const trustedAuthSubjects = params.client
+    ? authenticatedSessionSubjects(params.client as DeliveryActorClient)
+    : [];
   let employeeActor: import("../employee-workbench-scope.js").EmployeeWorkbenchActor | null = null;
   if (params.client) {
     try {
@@ -485,7 +514,7 @@ export async function authorizeTeamGroupResourceAccess(params: {
   const matched = members.find(
     (row) =>
       (row.status === "active" || row.status === "invited") &&
-      memberMatchesActor(row, actor, identityAliases),
+      memberMatchesActor(row, actor, identityAliases, trustedAuthSubjects),
   );
   if (!matched) {
     return {
