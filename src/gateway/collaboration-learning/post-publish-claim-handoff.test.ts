@@ -3,22 +3,40 @@
  *
  * Positive proof: CEO `activateCollaborationTask` → production nudge consumer →
  * `createModeBWakeRoundDispatcher` + `resolveModeBWakeRoundContext` (Mode B boot) →
- * mock model only (`getReplyFromConfig`) → production claim/apply/propose entries
- * (same backends `collaboration_board` tools use). ACL composition stays on via
- * production boot (`enforceAcl: true`). Forbidden: a custom WakeRoundDispatcher
- * that itself performs claim→apply→propose for the member.
+ * mock **model** returns structured `collaboration_board` tool calls only →
+ * production tool runner (`createCollaborationBoardTool().execute`) runs
+ * claim_item → apply_claim → propose_todolist (real entry backends). ACL stays
+ * on via production boot (`enforceAcl: true`). Forbidden: (1) custom
+ * WakeRoundDispatcher that performs formal steps; (2) calling claim/apply/propose
+ * (or writing formal business state) inside the model mock.
+ *
+ * Mock boundary disclosure (honest):
+ * - Model: mocked via `getReplyFromConfig` — emits tool-call shapes only.
+ * - Space list: `listGatewayCollaborationSpaces` stays stubbed for Mode B boot
+ *   membership surface (harness); this is NOT "only mock model". Documented here
+ *   and in SUMMARY — do not claim full end-to-end without this caveat.
+ * - Trusted-team resolve for the board tool is bound to the same personal_local
+ *   workspace stores activate uses (harness SoT), so formal writes land on the
+ *   live board; production claim/apply/propose entry functions are not stubbed.
  *
  * Handoff audit (`recordHandoffWake`) is kept; consumable wake reuses source
  * `nudge` (already in WAKE_ROUND_DISPATCH_SOURCES) — no allowlist expansion.
  *
- * Status taxonomy: `wakeDispatched` = durable settle only; pending/unknown kept
- * separate (`wakePendingVerification`) and must not auto-retry or look like success.
+ * Status taxonomy: `wakeDispatched` = durable settle only; `wakeDispatcherAccepted`
+ * = clear acceptance only (same durable settle here — NOT unknown/in-flight/mere
+ * pending); `wakePendingVerification` kept separate and must not auto-retry or
+ * look like success/accepted.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  COLLABORATION_BOARD_TOOL,
+  createCollaborationBoardTool,
+  type CollaborationBoardToolDeps,
+} from "../../agents/tools/collaboration-board-tool.js";
 import {
   clearConfigCache,
   clearRuntimeConfigSnapshot,
@@ -42,14 +60,11 @@ import {
   resolveModeBWakeRoundContext,
   unbindGatewayWakeRoundDispatcher,
 } from "../wake-round-dispatcher-boot.js";
+import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
 import { activateCollaborationTask } from "./activate-collaboration-task.js";
-import {
-  applyCollaborationBoardClaim,
-  claimCollaborationBoardItem,
-  listCollaborationBoardItems,
-  proposeCollaborationTodolist,
-} from "./claim-contract-entry.js";
+import { listCollaborationBoardItems } from "./claim-contract-entry.js";
 import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
+import { createTrustedGroupStores } from "./team-resource-auth.js";
 import {
   buildPostPublishHandoffOpKey,
   tryClaimAfterBoardPublish,
@@ -202,6 +217,86 @@ function seedPersonalSpace(params?: { includeExecutor?: boolean }) {
   });
 }
 
+type BoardToolCall = {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+};
+
+function parseWakePromptToken(body: unknown, key: string): string | null {
+  const text = typeof body === "string" ? body : "";
+  const matched = text.match(new RegExp(`\\b${key}=([^\\s]+)`));
+  return matched?.[1]?.trim() || null;
+}
+
+/**
+ * Bind production collaboration_board tool to the same personal_local trusted
+ * locator activate uses (harness SoT). claim/apply/propose entry deps stay
+ * production defaults — not stubbed.
+ */
+function bindPersonalLocalBoardTool(cfg: OpenBotConfig) {
+  const groupLocator = resolveTrustedGroupLocator({
+    groupId: GROUP_ID,
+    tenantId: null,
+    profile: "personal_local",
+    cfg,
+  });
+  const groupsRoot = path.dirname(groupLocator);
+  const trusted = { groupsRoot, groupLocator };
+  const stores = createTrustedGroupStores(trusted);
+  const actorId = EXECUTOR.startsWith("bot:") ? EXECUTOR : `bot:${EXECUTOR}`;
+  return createCollaborationBoardTool({
+    requesterAgentIdOverride: EXECUTOR,
+    agentSessionKey: `agent:${EXECUTOR}:main:space:${GROUP_ID}`,
+    agentGroupId: GROUP_ID,
+    config: cfg,
+    deps: {
+      isEnabled: () => true,
+      resolveActor: async () => EXECUTOR,
+      resolveTrustedTeam: (async () => ({
+        ok: true as const,
+        auth: {
+          ok: true as const,
+          profile: "personal_local" as const,
+          tenantId: "_local",
+          actor: actorId,
+          groupLocator,
+          groupsRoot,
+          governanceRole: "member" as const,
+          memberStatus: "active" as const,
+        },
+        stores,
+        trusted,
+        tenant: { tenantId: "_local", trust: "local" as const },
+        groupsRoot,
+        groupLocator,
+      })) as CollaborationBoardToolDeps["resolveTrustedTeam"],
+      // Intentionally omit claimItem / applyClaim / proposeTodolist — production entries.
+    },
+  });
+}
+
+/** Production tool runner: executes structured collaboration_board tool calls only. */
+async function runBoardToolCallsThroughProductionTool(params: {
+  tool: ReturnType<typeof createCollaborationBoardTool>;
+  toolCalls: readonly BoardToolCall[];
+  toolTrace: string[];
+}): Promise<void> {
+  for (const tc of params.toolCalls) {
+    if (tc.name !== COLLABORATION_BOARD_TOOL) {
+      throw new Error(`unexpected tool name: ${tc.name}`);
+    }
+    const result = await params.tool.execute(tc.id, tc.arguments);
+    const details = (result as { details?: Record<string, unknown> }).details ?? {};
+    const actionRaw = tc.arguments.action;
+    const action = typeof actionRaw === "string" ? actionRaw : "";
+    params.toolTrace.push(`${action}:${details.ok === false ? "fail" : "ok"}`);
+    if (details.ok === false) {
+      throw new Error(`board tool ${action} failed: ${JSON.stringify(details)}`);
+    }
+  }
+}
+
 /** Production Mode B dispatcher — boot resolves identity/scope; ACL enforce stays on. */
 function createProductionModeBDispatcher(cfg: OpenBotConfig): WakeRoundDispatcher {
   return createModeBWakeRoundDispatcher(async (request) =>
@@ -210,7 +305,7 @@ function createProductionModeBDispatcher(cfg: OpenBotConfig): WakeRoundDispatche
 }
 
 describe("post-publish claim handoff (activate → consumable nudge dispatch)", () => {
-  it("CEO activate → Mode B boot → mock model → production claim→apply→propose (ACL on)", async () => {
+  it("CEO activate → Mode B boot → model tool-calls → production board tool runner (ACL on)", async () => {
     const { cfg } = await useConfig();
     const taskId = "task-post-publish-handoff";
     await seedMappedMembership({
@@ -218,48 +313,74 @@ describe("post-publish claim handoff (activate → consumable nudge dispatch)", 
       groupId: GROUP_ID,
       memberIds: [CEO, EXECUTOR],
     });
+    // Space-list mock boundary (disclosed): Mode B boot membership surface only.
+    // This is NOT "only mock model" — keep out of the model mock.
     seedPersonalSpace();
 
+    const boardTool = bindPersonalLocalBoardTool(cfg);
     const toolTrace: string[] = [];
-    getReplyFromConfig.mockImplementation(async () => {
-      // Model mock only: drive the same production entries collaboration_board
-      // tools call. Dispatcher itself must NOT perform these steps.
-      const items = await listCollaborationBoardItems({ groupId: GROUP_ID, taskId, cfg });
-      const published = items.find((row) => row.status === "published");
-      if (!published) {
-        return { text: "no published board item" };
+    const modelEmittedToolCalls: BoardToolCall[] = [];
+
+    // MODEL MOCK: structured collaboration_board tool-call shapes only.
+    // FORBIDDEN here: claim/apply/propose entry calls or any formal business write.
+    const modelReplyToolCallsOnly = vi.fn(async (ctx: { Body?: string }) => {
+      const itemId = parseWakePromptToken(ctx.Body, "board");
+      const taskFromPrompt = parseWakePromptToken(ctx.Body, "task") ?? taskId;
+      if (!itemId) {
+        return { text: "no board item in wake prompt", toolCalls: [] as BoardToolCall[] };
       }
-      const itemId = published.itemId;
-      const claimed = await claimCollaborationBoardItem({
-        groupId: GROUP_ID,
-        taskId,
-        itemId,
-        claimantId: EXECUTOR,
-        actor: EXECUTOR,
-        cfg,
-      });
-      toolTrace.push(`claim:${claimed.status}`);
-      const applied = await applyCollaborationBoardClaim({
-        groupId: GROUP_ID,
-        taskId,
-        itemId,
-        actor: EXECUTOR,
-        cfg,
-      });
-      toolTrace.push(`apply:${applied.item.status}`);
-      const proposed = await proposeCollaborationTodolist({
-        groupId: GROUP_ID,
-        taskId,
-        boardItemId: itemId,
-        ownerMemberId: EXECUTOR,
-        actor: EXECUTOR,
-        steps: [{ title: "draft handoff markdown" }],
-        cfg,
-      });
-      toolTrace.push(`propose:${proposed.todolist?.todolistId ? "ok" : "fail"}`);
+      const toolCalls: BoardToolCall[] = [
+        {
+          id: "tc-claim",
+          name: COLLABORATION_BOARD_TOOL,
+          arguments: {
+            action: "claim_item",
+            groupId: GROUP_ID,
+            taskId: taskFromPrompt,
+            itemId,
+            claimantId: EXECUTOR,
+          },
+        },
+        {
+          id: "tc-apply",
+          name: COLLABORATION_BOARD_TOOL,
+          arguments: {
+            action: "apply_claim",
+            groupId: GROUP_ID,
+            taskId: taskFromPrompt,
+            itemId,
+          },
+        },
+        {
+          id: "tc-propose",
+          name: COLLABORATION_BOARD_TOOL,
+          arguments: {
+            action: "propose_todolist",
+            groupId: GROUP_ID,
+            taskId: taskFromPrompt,
+            boardItemId: itemId,
+            steps: [{ title: "draft handoff markdown" }],
+          },
+        },
+      ];
       return {
-        text: "Mode B member run: claim_item → apply_claim → propose_todolist via production entries",
+        text: "Mode B member model: collaboration_board tool calls only",
+        toolCalls,
       };
+    });
+
+    // Harness stand-in for production agent tool loop: model reply → board tool.execute.
+    // Separated from the model mock so formal writes never live inside modelReplyToolCallsOnly.
+    getReplyFromConfig.mockImplementation(async (ctx: { Body?: string }) => {
+      const reply = await modelReplyToolCallsOnly(ctx);
+      const toolCalls = reply.toolCalls ?? [];
+      modelEmittedToolCalls.push(...toolCalls);
+      await runBoardToolCallsThroughProductionTool({
+        tool: boardTool,
+        toolCalls,
+        toolTrace,
+      });
+      return reply;
     });
 
     const modeBDispatcher = createProductionModeBDispatcher(cfg);
@@ -297,26 +418,32 @@ describe("post-publish claim handoff (activate → consumable nudge dispatch)", 
     expect(formalClaim.claimantId).toBeNull();
     expect(formalClaim.wakeRecorded).toBe(true);
 
-    // Mode B boot path must have run the member model.
+    // Model emitted tool calls only; production board tool runner executed them.
+    expect(modelReplyToolCallsOnly).toHaveBeenCalled();
     expect(getReplyFromConfig).toHaveBeenCalled();
-    expect(toolTrace.some((t) => t.startsWith("claim:"))).toBe(true);
-    expect(toolTrace.some((t) => t.startsWith("apply:"))).toBe(true);
+    expect(modelEmittedToolCalls.map((c) => c.arguments.action)).toEqual([
+      "claim_item",
+      "apply_claim",
+      "propose_todolist",
+    ]);
+    expect(toolTrace).toEqual(["claim_item:ok", "apply_claim:ok", "propose_todolist:ok"]);
 
-    // Deterministic taxonomy: confirmed settle vs pending/unknown must not collapse.
-    // Real claim/apply often bumps controlEpoch → external_sent_* → pending, not success.
+    // Deterministic taxonomy: accepted ≠ pending/unknown.
+    // wakeDispatcherAccepted only when wakeDispatched (durable settle); pending stays false.
     if (formalClaim.wakeDispatched) {
+      expect(formalClaim.wakeDispatcherAccepted).toBe(true);
       expect(formalClaim.wakePendingVerification).toBe(false);
       expect(formalClaim.reason).toContain("wake_dispatched");
       expect(formalClaim.reason).not.toContain("recorded_pending_verification");
       expect(formalClaim.reason).not.toContain("recorded_not_dispatched");
     } else {
       expect(formalClaim.wakePendingVerification).toBe(true);
-      expect(formalClaim.wakeDispatcherAccepted).toBe(true);
+      expect(formalClaim.wakeDispatcherAccepted).toBe(false);
       expect(formalClaim.reason).toContain("recorded_pending_verification");
       expect(formalClaim.reason).not.toMatch(/:wake_dispatched:/);
     }
 
-    // Board/responsibility advanced because the Mode B member run used production entries.
+    // Board/responsibility advanced via production collaboration_board tool.execute chain.
     const listed = await listCollaborationBoardItems({
       groupId: GROUP_ID,
       taskId,
@@ -384,7 +511,8 @@ describe("post-publish claim handoff (activate → consumable nudge dispatch)", 
     expect(formalClaim.wakeRecorded).toBe(true);
     expect(formalClaim.wakeDispatched).toBe(false);
     expect(formalClaim.wakePendingVerification).toBe(true);
-    expect(formalClaim.wakeDispatcherAccepted).toBe(true);
+    // unknown / in-flight / mere pending must NOT report dispatcher accepted
+    expect(formalClaim.wakeDispatcherAccepted).toBe(false);
     expect(formalClaim.wakeSideEffectClass).toBe("started_or_unknown");
     expect(formalClaim.reason).toContain("recorded_pending_verification");
     expect(formalClaim.reason).not.toContain("wake_dispatched");
@@ -412,6 +540,7 @@ describe("post-publish claim handoff (activate → consumable nudge dispatch)", 
     }
     expect(again.wakeDispatched).toBe(false);
     expect(again.wakePendingVerification).toBe(true);
+    expect(again.wakeDispatcherAccepted).toBe(false);
     expect(dispatchCalls).toBe(1);
   });
 

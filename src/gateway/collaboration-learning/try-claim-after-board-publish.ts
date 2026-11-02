@@ -102,14 +102,17 @@ export type TryClaimAfterBoardPublishResult =
        */
       wakeDispatched: boolean;
       /**
-       * Dispatcher-acceptance evidence: a round was handed off / started
-       * (confirmed settle OR pending-verification). Distinct from settlement.
+       * Dispatcher acceptance confirmed by clear evidence only (durable settle /
+       * confirmed accept paths that prove the dispatcher accepted). Distinct from
+       * `wakePendingVerification`: unknown / in-flight / mere pending must keep
+       * this false (or unset) — never true.
        */
       wakeDispatcherAccepted: boolean;
       /**
        * Side effects may have started but durable settlement is unknown
-       * (`started_or_unknown` / `external_sent_*` / unsettled completed class).
-       * Do not auto-retry; do not present as confirmed success.
+       * (`started_or_unknown` / `external_sent_*` / `wake_op_unknown` /
+       * `wake_op_in_flight` / unsettled completed class). Do not auto-retry;
+       * do not present as confirmed success or as accepted.
        */
       wakePendingVerification: boolean;
       /** Last consume side-effect class when known. */
@@ -387,13 +390,16 @@ export async function tryClaimAfterBoardPublish(params: {
     },
   });
 
-  // Deterministic status taxonomy (do NOT collapse unknown into success):
+  // Deterministic status taxonomy (do NOT collapse unknown into success/accept):
   // - wakeDispatched: only consume.dispatched===true (durable receipt settlement)
   // - wakePendingVerification: side effects may have started but settlement unknown
-  //   (external_sent_*, started_or_unknown, or unsettled completed_with_receipt)
-  // - wakeDispatcherAccepted: acceptance evidence (settled OR pending) — not success alone
+  //   (external_sent_*, wake_op_unknown, wake_op_in_flight, started_or_unknown,
+  //   or unsettled completed_with_receipt)
+  // - wakeDispatcherAccepted: ONLY clear acceptance evidence (durable settle /
+  //   confirmed accept). Unknown / in-flight / mere pending verification must
+  //   leave this false — never treat pending as accepted.
   // Unknown / pending must not auto-retry (wake-op ledger suppresses) and must not
-  // masquerade as confirmed dispatch success.
+  // masquerade as confirmed dispatch success or dispatcher acceptance.
   const consumeReason = compact(consume.reason);
   const wakeSideEffectClass: DispatchSideEffectClass | null = consume.sideEffectClass ?? null;
   const wakeDispatched = Boolean(consume.dispatched);
@@ -404,7 +410,9 @@ export async function tryClaimAfterBoardPublish(params: {
       consumeReason === "wake_op_in_flight" ||
       wakeSideEffectClass === "started_or_unknown" ||
       wakeSideEffectClass === "completed_with_receipt");
-  const wakeDispatcherAccepted = wakeDispatched || wakePendingVerification;
+  // Clear acceptance ≡ durable settle for this handoff surface. Pending /
+  // unknown / in-flight are explicitly NOT acceptance evidence.
+  const wakeDispatcherAccepted = wakeDispatched;
   const consumeDetail =
     consumeReason ||
     (wakeDispatched
