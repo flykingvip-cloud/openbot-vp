@@ -58,8 +58,7 @@ import {
 } from "../../gateway/billing/agent-run-governance.js";
 import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain.js";
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
-import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
-import { resolveEnterpriseRuntimeInvocation } from "../../gateway/enterprise-model/runtime-invocation.js";
+import { resolveEnterpriseEmbeddedTransport } from "../../gateway/enterprise-model/embedded-transport.js";
 import {
   buildRunModelSetSnapshot,
   forgetRunModelSet,
@@ -1242,46 +1241,18 @@ export async function runCronIsolatedAgentTurn(params: {
               });
               return result;
             }
-            let embeddedProvider = providerOverride;
-            let embeddedModel = modelOverride;
-            let providerAuthOverride:
-              | {
-                  apiKey: string;
-                  source?: string;
-                  baseUrl?: string;
-                  protocol?: string;
-                }
-              | undefined;
-            let enterpriseRuntimeModelId: string | undefined;
-            const candidateRuntimeId = `${providerOverride}/${modelOverride}`;
-            if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
-              const tenantId =
+            const transport = await resolveEnterpriseEmbeddedTransport({
+              provider: providerOverride,
+              model: modelOverride,
+              tenantId:
                 modelGate?.tenantId?.trim() ||
                 modelGate?.creditReporting?.enterpriseId?.trim() ||
-                "";
-              if (!tenantId) {
-                throw new Error(
-                  "Enterprise BYOK model selected but managed tenantId could not be resolved",
-                );
-              }
-              const invocation = await resolveEnterpriseRuntimeInvocation({
-                tenantId,
-                provider: providerOverride,
-                model: modelOverride,
-              });
-              if (!invocation) {
-                throw new Error(`Enterprise BYOK runtime config missing for ${candidateRuntimeId}`);
-              }
-              embeddedProvider = invocation.provider;
-              embeddedModel = invocation.model;
-              enterpriseRuntimeModelId = invocation.runtimeModelId;
-              providerAuthOverride = {
-                apiKey: invocation.apiKey,
-                source: "enterprise-byok",
-                ...(invocation.baseUrl ? { baseUrl: invocation.baseUrl } : {}),
-                protocol: invocation.protocol,
-              };
-            }
+                "",
+            });
+            const embeddedProvider = transport.provider;
+            const embeddedModel = transport.model;
+            const providerAuthOverride = transport.providerAuthOverride;
+            const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
             const result = await runEmbeddedPiAgent({
               sessionId: cronSession.sessionEntry.sessionId,
               sessionKey: agentSessionKey,

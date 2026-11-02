@@ -20,8 +20,7 @@ import {
 } from "../../gateway/billing/agent-run-governance.js";
 import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain.js";
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
-import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
-import { resolveEnterpriseRuntimeInvocation } from "../../gateway/enterprise-model/runtime-invocation.js";
+import { resolveEnterpriseEmbeddedTransport } from "../../gateway/enterprise-model/embedded-transport.js";
 import { inheritExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
 import {
   buildRunModelSetSnapshot,
@@ -438,48 +437,18 @@ export function createFollowupRunner(params: {
             }),
             run: async (provider, model, runOptions) => {
               const authProfile = resolveRunAuthProfile(queued.run, provider);
-              let embeddedProvider = provider;
-              let embeddedModel = model;
-              let providerAuthOverride:
-                | {
-                    apiKey: string;
-                    source?: string;
-                    baseUrl?: string;
-                    protocol?: string;
-                  }
-                | undefined;
-              let enterpriseRuntimeModelId: string | undefined;
-              const candidateRuntimeId = `${provider}/${model}`;
-              if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
-                const tenantId =
+              const transport = await resolveEnterpriseEmbeddedTransport({
+                provider,
+                model,
+                tenantId:
                   modelGate?.tenantId?.trim() ||
                   modelGate?.creditReporting?.enterpriseId?.trim() ||
-                  "";
-                if (!tenantId) {
-                  throw new Error(
-                    "Enterprise BYOK model selected but managed tenantId could not be resolved",
-                  );
-                }
-                const invocation = await resolveEnterpriseRuntimeInvocation({
-                  tenantId,
-                  provider,
-                  model,
-                });
-                if (!invocation) {
-                  throw new Error(
-                    `Enterprise BYOK runtime config missing for ${candidateRuntimeId}`,
-                  );
-                }
-                embeddedProvider = invocation.provider;
-                embeddedModel = invocation.model;
-                enterpriseRuntimeModelId = invocation.runtimeModelId;
-                providerAuthOverride = {
-                  apiKey: invocation.apiKey,
-                  source: "enterprise-byok",
-                  ...(invocation.baseUrl ? { baseUrl: invocation.baseUrl } : {}),
-                  protocol: invocation.protocol,
-                };
-              }
+                  "",
+              });
+              const embeddedProvider = transport.provider;
+              const embeddedModel = transport.model;
+              const providerAuthOverride = transport.providerAuthOverride;
+              const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
               if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
                 assertRunnerTurnBudgetAllowsModelCall(queued.run.config, queued.run.agentId, {
                   taskId: followupOutcomeTaskId,

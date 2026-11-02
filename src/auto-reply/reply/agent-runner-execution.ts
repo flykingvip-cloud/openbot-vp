@@ -45,6 +45,7 @@ import {
 } from "../../gateway/billing/agent-run-governance.js";
 import { recordCreditUsage } from "../../gateway/billing/record-credit-usage.js";
 import { emitChatInboundStage } from "../../gateway/chat-inbound-stage-events.js";
+import { resolveEnterpriseEmbeddedTransport } from "../../gateway/enterprise-model/embedded-transport.js";
 import { reportEvolutionOutcomeWriteFailure } from "../../gateway/evolution-control/evolution-loop-log.js";
 import { inheritExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
 import {
@@ -841,6 +842,25 @@ export async function runAgentTurnWithFallback(params: {
               allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
             });
             return (async () => {
+              // ent/<connection>/<upstream> is a tenant catalog id, not a registry provider.
+              // Without this remap the runner throws Unknown model before any reply.
+              const transport = await resolveEnterpriseEmbeddedTransport({
+                provider,
+                model,
+                tenantId:
+                  modelGate?.tenantId?.trim() ||
+                  modelGate?.creditReporting?.enterpriseId?.trim() ||
+                  params.followupRun.run.executionIdentity?.enterpriseId?.trim() ||
+                  params.sessionCtx.GatewayClientSessionEnterpriseId?.trim() ||
+                  params.sessionCtx.CollaborationGroupOwnerEntitlement?.tenantId?.trim() ||
+                  "",
+                resolveTenantId: async () => {
+                  const scope = await resolveAgentRunEntitlementScope({
+                    agentId: params.followupRun.run.agentId,
+                  });
+                  return scope?.tenantId;
+                },
+              });
               const modelStartedAtMs = Date.now();
               let firstTokenEmitted = false;
               const emitModelStage = (
@@ -893,6 +913,14 @@ export async function runAgentTurnWithFallback(params: {
                   groupSpace: params.sessionCtx.GroupSpace?.trim() ?? undefined,
                   ...senderContext,
                   ...runBaseParams,
+                  provider: transport.provider,
+                  model: transport.model,
+                  ...(transport.providerAuthOverride
+                    ? { providerAuthOverride: transport.providerAuthOverride }
+                    : {}),
+                  ...(transport.enterpriseRuntimeModelId
+                    ? { enterpriseRuntimeModelId: transport.enterpriseRuntimeModelId }
+                    : {}),
                   ...inheritExecutionIdentityRunFields({
                     ...params.followupRun.run,
                     gatewayClientUser: runGatewayClientUser,

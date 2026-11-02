@@ -85,8 +85,7 @@ import {
   updateSessionStore,
 } from "../config/sessions.js";
 import { resolveSessionTranscriptFile } from "../config/sessions/transcript.js";
-import { isEnterpriseRuntimeModelId } from "../gateway/enterprise-model/ids.js";
-import { resolveEnterpriseRuntimeInvocation } from "../gateway/enterprise-model/runtime-invocation.js";
+import { resolveEnterpriseEmbeddedTransport } from "../gateway/enterprise-model/embedded-transport.js";
 import { inheritExecutionIdentityRunFields } from "../gateway/execution-identity-context.js";
 import { buildKnowledgeReplyGatewayClient } from "../gateway/knowledge/reply-gateway-client.js";
 import { resolveAgentRunEntitlementScope } from "../gateway/model-entitlement/resolve-agent-run-scope.js";
@@ -552,52 +551,24 @@ function runAgentAttempt(params: {
     params.providerOverride === params.primaryProvider
       ? params.sessionEntry?.authProfileOverride
       : undefined;
-  // Mirror chat/auto-reply: remap ent/* → upstream provider + SecretRef before
-  // the embedded runner (which only understands catalog/provider models).
+  // Remap ent/* → upstream provider + SecretRef before the embedded runner
+  // (which only understands catalog/provider models).
   return (async () => {
-    let embeddedProvider = params.providerOverride;
-    let embeddedModel = params.modelOverride;
-    let providerAuthOverride:
-      | {
-          apiKey: string;
-          source?: string;
-          baseUrl?: string;
-          protocol?: string;
-        }
-      | undefined;
-    let enterpriseRuntimeModelId: string | undefined;
-    const candidateRuntimeId = `${params.providerOverride}/${params.modelOverride}`;
-    if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
-      let tenantId = params.opts.gatewayClientSessionTenantId?.trim() || "";
-      if (!tenantId) {
+    const transport = await resolveEnterpriseEmbeddedTransport({
+      provider: params.providerOverride,
+      model: params.modelOverride,
+      tenantId: params.opts.gatewayClientSessionTenantId,
+      resolveTenantId: async () => {
         const scope = await resolveAgentRunEntitlementScope({
           agentId: params.sessionAgentId,
         });
-        tenantId = scope?.tenantId?.trim() || "";
-      }
-      if (!tenantId) {
-        throw new Error(
-          "Enterprise BYOK model selected but managed tenantId could not be resolved",
-        );
-      }
-      const invocation = await resolveEnterpriseRuntimeInvocation({
-        tenantId,
-        provider: params.providerOverride,
-        model: params.modelOverride,
-      });
-      if (!invocation) {
-        throw new Error(`Enterprise BYOK runtime config missing for ${candidateRuntimeId}`);
-      }
-      embeddedProvider = invocation.provider;
-      embeddedModel = invocation.model;
-      enterpriseRuntimeModelId = invocation.runtimeModelId;
-      providerAuthOverride = {
-        apiKey: invocation.apiKey,
-        source: "enterprise-byok",
-        ...(invocation.baseUrl ? { baseUrl: invocation.baseUrl } : {}),
-        protocol: invocation.protocol,
-      };
-    }
+        return scope?.tenantId;
+      },
+    });
+    const embeddedProvider = transport.provider;
+    const embeddedModel = transport.model;
+    const providerAuthOverride = transport.providerAuthOverride;
+    const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
     return runEmbeddedPiAgent({
       sessionId: params.sessionId,
       sessionKey: params.sessionKey,
