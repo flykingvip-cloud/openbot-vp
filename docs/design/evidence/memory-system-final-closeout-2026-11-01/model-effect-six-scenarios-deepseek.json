@@ -3,7 +3,7 @@
   "generatedAtUtc": "2026-11-01T15:23:03.490Z",
   "startedAtUtc": "2026-11-01T15:22:59.463Z",
   "startedAtAsiaShanghai": "2026-11-01, 23:22:59",
-  "timezoneNote": "user Asia/Shanghai; ISO timestamps UTC unless labeled",
+  "timezoneNote": "User timezone is Europe/Berlin. startedAtAsiaShanghai / other Asia/Shanghai labels are from the Mac/box machine clock during the run (not the user-facing zone). ISO *Utc fields remain UTC.",
   "pinnedAcceptanceSha": "3460ef9faa8d7844367f4e2e4d28f656aeb27072",
   "productTree": "/Users/daniel/AI VP/openbot-closeout-accept-build-3460ef9fa",
   "closeoutWorktree": "/Users/daniel/AI VP/openbot-memory-final-closeout-182",
@@ -19,7 +19,7 @@
     "maxAttemptsPerScenario": 2,
     "hit": false,
     "modelCallCount": 6,
-    "spendCapNote": "~$5 equivalent; DeepSeek chat cheap — call-count gate primary"
+    "spendCapNote": "Cost evidence: 6 model calls; call-count hard-stop (maxModelCalls=40) not hit. Do NOT treat this as precise USD spend accounted."
   },
   "isolation": {
     "wroteRealUserMemory": false,
@@ -31,7 +31,10 @@
     "pass": 6,
     "fail": 0,
     "error": 0,
-    "notRun": 0
+    "notRun": 0,
+    "verdictZh": "限定范围通过",
+    "verdictEn": "scoped_pass",
+    "scopeNote": "All six scenarios are a scoped pass for this isolated SDK/manager + real DeepSeek answer synthetic run only. Not overall model-effect layer close and not production acceptance."
   },
   "overallModelEffectCloseable": true,
   "scenarios": [
@@ -51,11 +54,13 @@
       "id": "ME-S1",
       "nameZh": "保存后新会话采用",
       "attempts": 1,
-      "modelId": "deepseek-chat"
+      "modelId": "deepseek-chat",
+      "verdictZh": "限定范围通过",
+      "verdictEn": "scoped_pass"
     },
     {
       "status": "pass",
-      "reason": "relevant adopted; unrelated token absent from answer",
+      "reason": "scoped: relevant adopted; unrelated token absent from answer (irrelInRequest=true — NOT a relevance-filter proof)",
       "modelCalls": 1,
       "syntheticFactIds": ["SYN-FACT-S2-REL-3460EF9FA-A91C", "SYN-FACT-S2-IRREL-3460EF9FA-B02D"],
       "fragmentInRequest": true,
@@ -71,11 +76,21 @@
       "id": "ME-S2",
       "nameZh": "无关内容不乱入",
       "attempts": 1,
-      "modelId": "deepseek-chat"
+      "modelId": "deepseek-chat",
+      "verdictZh": "限定范围通过",
+      "verdictEn": "scoped_pass",
+      "coverageLimit": {
+        "id": "ME-S2",
+        "irrelInRequest": true,
+        "passMeansZh": "回答未采用无关内容",
+        "passMeansEn": "answer did not adopt unrelated content",
+        "doesNotProveZh": "检索相关性过滤有效",
+        "doesNotProveEn": "retrieval relevance filtering works"
+      }
     },
     {
       "status": "pass",
-      "reason": "supersede left only NEW in context; model adopted NEW not OLD",
+      "reason": "scoped: SDK supersedeAtom left only NEW in context; model adopted NEW not OLD (NOT full product conflict-entry flow)",
       "modelCalls": 1,
       "syntheticFactIds": ["SYN-FACT-S3-OLD-3460EF9FA-C13E", "SYN-FACT-S3-NEW-3460EF9FA-D24F"],
       "fragmentInRequest": true,
@@ -88,7 +103,17 @@
       "id": "ME-S3",
       "nameZh": "更新后不沿用旧事实",
       "attempts": 1,
-      "modelId": "deepseek-chat"
+      "modelId": "deepseek-chat",
+      "verdictZh": "限定范围通过",
+      "verdictEn": "scoped_pass",
+      "coverageLimit": {
+        "id": "ME-S3",
+        "method": "SDK supersedeAtom directly",
+        "passMeansZh": "更新后查询与回答采用新事实",
+        "passMeansEn": "post-update query/answer use NEW fact",
+        "doesNotProveZh": "产品入口完整冲突处理流程",
+        "doesNotProveEn": "full product conflict-handling entry flow"
+      }
     },
     {
       "status": "pass",
@@ -103,11 +128,13 @@
       "id": "ME-S4",
       "nameZh": "无权限不进上下文",
       "attempts": 1,
-      "modelId": "deepseek-chat"
+      "modelId": "deepseek-chat",
+      "verdictZh": "限定范围通过",
+      "verdictEn": "scoped_pass"
     },
     {
       "status": "pass",
-      "reason": "path1 forget removed source from recall; model did not use token",
+      "reason": "scoped: path1 forgetMemoryEntry removed source; model did not use token (NOT fact-level soft forget / all-sources / post-restart)",
       "modelCalls": 1,
       "syntheticFactIds": ["SYN-FACT-S5-FORGET-3460EF9FA-F46B"],
       "fragmentInRequest": false,
@@ -123,7 +150,17 @@
       "id": "ME-S5",
       "nameZh": "遗忘后不用被禁用来源",
       "attempts": 1,
-      "modelId": "deepseek-chat"
+      "modelId": "deepseek-chat",
+      "verdictZh": "限定范围通过",
+      "verdictEn": "scoped_pass",
+      "coverageLimit": {
+        "id": "ME-S5",
+        "method": "path1 file-delete forget",
+        "passMeansZh": "path1 文件删除遗忘后模型未采用被删来源",
+        "passMeansEn": "after path1 file-delete forget, model did not use deleted source",
+        "doesNotProveZh": "事实级 soft forget、全部来源处理、或重启后遗忘验收",
+        "doesNotProveEn": "fact-level soft forget, all-sources handling, or post-restart forget acceptance"
+      }
     },
     {
       "status": "pass",
@@ -142,13 +179,47 @@
       "id": "ME-S6",
       "nameZh": "未批准学习不采用",
       "attempts": 1,
-      "modelId": "deepseek-chat"
+      "modelId": "deepseek-chat",
+      "verdictZh": "限定范围通过",
+      "verdictEn": "scoped_pass"
     }
   ],
   "doesNotClaim": [
     "production online effect",
     "full gateway agent tool-loop E2E",
     "merge or deploy",
-    "real ~/.openbot user memory writes"
-  ]
+    "real ~/.openbot user memory writes",
+    "overall model-effect layer / production acceptance (only this six-scenario synthetic run)",
+    "S2 retrieval relevance filtering",
+    "S3 full product conflict-handling entry flow",
+    "S5 fact-level soft forget, all-sources handling, or post-restart forget acceptance",
+    "precise USD spend accounting"
+  ],
+  "overallModelEffectCloseableScope": "ONLY this six-scenario synthetic run is closeable. overallModelEffectCloseable=true does NOT mean the whole model-effect layer or production is closeable.",
+  "coverageLimits": {
+    "S2": {
+      "id": "ME-S2",
+      "irrelInRequest": true,
+      "passMeansZh": "回答未采用无关内容",
+      "passMeansEn": "answer did not adopt unrelated content",
+      "doesNotProveZh": "检索相关性过滤有效",
+      "doesNotProveEn": "retrieval relevance filtering works"
+    },
+    "S3": {
+      "id": "ME-S3",
+      "method": "SDK supersedeAtom directly",
+      "passMeansZh": "更新后查询与回答采用新事实",
+      "passMeansEn": "post-update query/answer use NEW fact",
+      "doesNotProveZh": "产品入口完整冲突处理流程",
+      "doesNotProveEn": "full product conflict-handling entry flow"
+    },
+    "S5": {
+      "id": "ME-S5",
+      "method": "path1 file-delete forget",
+      "passMeansZh": "path1 文件删除遗忘后模型未采用被删来源",
+      "passMeansEn": "after path1 file-delete forget, model did not use deleted source",
+      "doesNotProveZh": "事实级 soft forget、全部来源处理、或重启后遗忘验收",
+      "doesNotProveEn": "fact-level soft forget, all-sources handling, or post-restart forget acceptance"
+    }
+  }
 }
