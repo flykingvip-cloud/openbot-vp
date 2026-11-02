@@ -334,6 +334,45 @@ describe("classifyInboundDepth", () => {
   });
 });
 
+describe("enterprise data knowledge stays retrieve (chat-lane skip off)", () => {
+  it("keeps 用友 warehouse and inventory questions on the knowledge feed", () => {
+    const prompts = [
+      "帮我看用友T+仓库和存货",
+      "分析一下001-用友T+仓库",
+      "查一下库存和往来单位",
+      "登录用友后看销货单",
+    ];
+    for (const text of prompts) {
+      const result = classifyInboundDepth(baseInput({ text }));
+      expect(result.depth, text).toBe("retrieve");
+      expect(result.reasons, text).toContain("steward_enterprise_data_intent");
+      expect(result.ceiling.maxToolMode, text).toBe("read");
+      expect(
+        shouldApplyChatLaneSkip({
+          routerEnabled: false,
+          depth: result.depth,
+          stewardClassified: true,
+        }),
+        text,
+      ).toBe(false);
+    }
+  });
+
+  it("does not steal an explicit cloud PC request or a greeting", () => {
+    const computer = classifyInboundDepth(baseInput({ text: "打开云电脑看用友仓库" }));
+    expect(computer.depth).toBe("act");
+    expect(computer.reasons).toContain("account_computer_browser");
+
+    const greeting = classifyInboundDepth(baseInput({ text: "晚上好" }));
+    expect(greeting.depth).toBe("chat");
+
+    const outside = classifyInboundDepth(
+      baseInput({ text: "查一下用友仓库", sessionKind: "other" }),
+    );
+    expect(outside.depth).toBe("chat");
+  });
+});
+
 describe("explicit tool/exec keeps tools on (chat-lane skip off)", () => {
   it("enables tools for harness-like exec prompts and keeps greetings on chat-lane", () => {
     const execPrompts = [

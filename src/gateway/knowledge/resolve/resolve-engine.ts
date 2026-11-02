@@ -9,6 +9,10 @@ import {
 import { resolveKnowledgeSourceContext } from "../context.js";
 import { getWorkspaceDeliverableTrace } from "../deliverables/trace-model.js";
 import { ensureKnowledgeDocumentIndexed } from "../ensure-indexed-document.js";
+import {
+  knowledgeObjectMatchesQuery,
+  preferEnterpriseFeedMatches,
+} from "../enterprise-data-query.js";
 import { filterRelationshipGraph } from "../graph-builder.js";
 import { buildDocumentCiteUri } from "../ke/cite.js";
 import {
@@ -100,13 +104,7 @@ function routeTerms(query: string): string[] {
 }
 
 function matchesQuery(object: KnowledgeObject, query: string): boolean {
-  if (!query) {
-    return true;
-  }
-  const haystack = [object.title, object.summary, object.tags.join(" "), object.source, object.kind]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(query);
+  return knowledgeObjectMatchesQuery(object, query);
 }
 
 function filterObjectsBySources(
@@ -1237,7 +1235,10 @@ export async function runKnowledgeResolveEngine(
   );
   const kindFiltered = filterObjectsByKinds(sourceFiltered, profile.preferredKnowledgeKinds);
   const searchPool = kindFiltered.length ? kindFiltered : sourceFiltered;
-  const matched = searchPool.filter((item) => matchesQuery(item, query));
+  const matched = preferEnterpriseFeedMatches(
+    searchPool.filter((item) => matchesQuery(item, query)),
+    query,
+  );
   const objects = pinRequestedKnowledgeObjects(
     matched.length ? matched : searchPool,
     params.selection?.refs?.length || (params.sourcePolicy && selectedSources.length === 0)

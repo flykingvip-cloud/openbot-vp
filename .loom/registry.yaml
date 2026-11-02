@@ -10632,6 +10632,37 @@ tasks:
   since: 2026-11-01
   metadata: {}
 landingStreams:
+- id: yonyou-dh-knowledge-feed:cursor-cloud
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - CHANGELOG.md
+  - src/agents/tools/knowledge-consume-tool.test.ts
+  - src/agents/tools/knowledge-consume-tool.ts
+  - src/auto-reply/reply/enterprise-data-intent.ts
+  - src/auto-reply/reply/inbound-depth.test.ts
+  - src/auto-reply/reply/inbound-depth.ts
+  - src/auto-reply/reply/task-data-preflight.test.ts
+  - src/auto-reply/reply/task-data-preflight.ts
+  - src/gateway/knowledge/enterprise-data-query.test.ts
+  - src/gateway/knowledge/enterprise-data-query.ts
+  - src/gateway/knowledge/feed/enterprise-feed-adapter.ts
+  - src/gateway/knowledge/feed/knowledge-feed-adapter.test.ts
+  - src/gateway/knowledge/resolve/context-builder.ts
+  - src/gateway/knowledge/resolve/intent-classifier.ts
+  - src/gateway/knowledge/resolve/resolve-engine.ts
+  - src/gateway/knowledge/router.ts
+  - src/gateway/server-methods/enterprise-data.ts
+  - ui/src/ui/capability/enterprise-data-capability/types.ts
+  - ui/src/ui/controllers/enterprise-data-capability/gateway-client.ts
+  - ui/src/ui/ports/enterprise/views/enterprise-data-capability/outputs-page.ts
+  - ui/src/ui/ports/enterprise/views/enterprise-data-capability/product-detail-panel.ts
+  - ui/src/ui/ports/enterprise/views/enterprise-data-governance-center-surface.ts
+  canLandWith: []
+  metadata:
+    task: yonyou-dh-knowledge-feed
+    owner: cursor-cloud
+    purpose: Digital human 用友 warehouse and inventory questions consume the knowledge feed.
 - id: ft-taskid-usage-ledger-20261102
   landingPolicy: serial
   paths:

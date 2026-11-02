@@ -215,7 +215,8 @@ export function renderProjectionStudioSection(params: {
       <div class="enterprise-data-capability__subsection">
         <div class="edc-section-label">供给绑定与调度（${totalBindings}）</div>
         <div class="enterprise-data-capability__hint">
-          待物化表示绑定已启用，但还没有因为打开知识宇宙而自动写出供给记录。
+          打开知识宇宙不会自动物化。手动物化绑定在还没有供给记录时显示待物化；已供给表示
+          Feed 已写入，知识宇宙的新鲜度读这份记录，不是连接器实时查询。
         </div>
         ${
           totalBindings === 0
@@ -254,7 +255,9 @@ export function renderProjectionStudioSection(params: {
                                 ? renderDataStatusBadge("已停用", "neutral", true)
                                 : scheduled
                                   ? renderDataStatusBadge("调度中", "ok", true)
-                                  : renderDataStatusBadge("待物化", "neutral", true)
+                                  : (binding.supplyRecordCount ?? 0) > 0
+                                    ? renderDataStatusBadge("已供给", "ok", true)
+                                    : renderDataStatusBadge("待物化", "neutral", true)
                             }
                           </td>
                           <td class="edc-console-table__actions">

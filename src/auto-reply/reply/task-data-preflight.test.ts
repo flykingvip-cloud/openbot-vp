@@ -19,4 +19,13 @@ describe("task-data-preflight", () => {
   it("returns undefined for generic chat", () => {
     expect(buildTaskDataPreflightPrompt("你好")).toBeUndefined();
   });
+
+  it("points 用友 warehouse questions at the knowledge feed, not 云电脑", () => {
+    const prompt = buildTaskDataPreflightPrompt("帮我看用友T+仓库和存货");
+    expect(prompt).toContain("knowledge_search");
+    expect(prompt).toContain("001-用友T+仓库");
+    expect(prompt).toContain("云电脑");
+    expect(prompt).toContain("data_capability");
+    expect(detectTaskDataPreflightGaps("打开云电脑看用友仓库")).not.toContain("enterprise_feed");
+  });
 });

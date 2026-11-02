@@ -7,6 +7,32 @@ import type { ManagedCapabilityGovernanceView } from "../../../../capability/ent
 import { renderOrgTargetPicker } from "../../../../views/enterprise-data-capability/org-target-picker.ts";
 import type { EnterprisePortReadModel } from "../../semantic/enterprise-read-model.ts";
 
+const MATERIALIZER_SEAT_ID = "seat-projection-materializer";
+
+function summarizeGrantSeats(
+  grants: Array<{ seatId: string; revokedAt?: string }>,
+  readModel: EnterprisePortReadModel,
+): string {
+  const counts = new Map<string, number>();
+  for (const grant of grants) {
+    if (grant.revokedAt) {
+      continue;
+    }
+    counts.set(grant.seatId, (counts.get(grant.seatId) ?? 0) + 1);
+  }
+  if (counts.size === 0) {
+    return "当前没有未撤销的动作授权。";
+  }
+  const parts = [...counts.entries()].map(([seatId, count]) => {
+    if (seatId === MATERIALIZER_SEAT_ID) {
+      return `系统物化席位 ${count} 条`;
+    }
+    const title = readModel.seatSummaries.find((seat) => seat.seatId === seatId)?.title;
+    return `${title || seatId} ${count} 条`;
+  });
+  return `已写入：${parts.join("，")}。`;
+}
+
 const LIFECYCLE_LABEL: Record<string, string> = {
   draft: "草稿",
   active: "使用中",
@@ -114,6 +140,11 @@ export function renderProductDetailPanel(props: ProductDetailPanelProps): Templa
       <div class="edc-form-section">
         <div class="edc-form-section__title">开放范围</div>
         <div class="edc-cell-sub">当前有效授权 ${activeGrants.length} 条</div>
+        <div class="enterprise-data-capability__hint">
+          有效授权按动作条数计，含系统物化席位
+          seat-projection-materializer（岗位树里没有它）。下面的勾选只是这次要新开放的岗位，打开页面时是空的，不代表还没有授权。「已绑定」只表示岗位有人。
+          ${summarizeGrantSeats(activeGrants, props.readModel)}
+        </div>
         ${renderOrgTargetPicker({
           readModel: props.readModel,
           query: props.seatQuery,

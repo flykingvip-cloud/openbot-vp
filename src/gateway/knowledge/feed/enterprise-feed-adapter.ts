@@ -13,6 +13,54 @@ import type { KnowledgeObject, KnowledgeObjectKind } from "../types.js";
 import type { KnowledgeFeedItem } from "./types.js";
 import { evaluateProjectionVisibility, visibilityScopeLabel } from "./visibility-policy-mapping.js";
 
+const FEED_PAYLOAD_EXCERPT_MAX = 900;
+const SENSITIVE_PAYLOAD_KEY_RE =
+  /token|secret|password|passwd|appkey|appsecret|credential|opentoken|authorization/i;
+
+function redactFeedPayload(value: unknown, depth: number): unknown {
+  if (depth > 4) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((item) => redactFeedPayload(item, depth + 1));
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    if (SENSITIVE_PAYLOAD_KEY_RE.test(key) || key === "query") {
+      continue;
+    }
+    const next = redactFeedPayload(child, depth + 1);
+    if (next !== undefined) {
+      out[key] = next;
+    }
+  }
+  return out;
+}
+
+/** Bounded row excerpt for accessible feed objects. Restricted seats get none. */
+export function feedPayloadExcerpt(payload: Record<string, unknown>): string {
+  const redacted = redactFeedPayload(payload, 0);
+  if (!redacted || typeof redacted !== "object" || Array.isArray(redacted)) {
+    return "";
+  }
+  const record = { ...(redacted as Record<string, unknown>) };
+  delete record.summary;
+  delete record.publicationNotice;
+  if (Object.keys(record).length === 0) {
+    return "";
+  }
+  const text = JSON.stringify(record);
+  if (!text || text === "{}") {
+    return "";
+  }
+  return text.length > FEED_PAYLOAD_EXCERPT_MAX
+    ? `${text.slice(0, FEED_PAYLOAD_EXCERPT_MAX)}…`
+    : text;
+}
+
 function mapProjectionKind(
   kind: EnterpriseKnowledgeProjectionSpec["objectKind"],
 ): KnowledgeObjectKind {
@@ -62,10 +110,13 @@ export function adaptEnterpriseFeedRecord(params: {
   });
   const partialNotice =
     params.item.publication === "partial" ? "不完整输出，不是完整知识对象" : undefined;
-  const baseSummary =
+  const narrative =
     typeof params.item.payload.summary === "string"
       ? params.item.payload.summary
       : params.item.category;
+  const excerpt =
+    params.accessState === "accessible" ? feedPayloadExcerpt(params.item.payload) : "";
+  const baseSummary = excerpt ? `${narrative} ${excerpt}` : narrative;
   const maskingSummary =
     params.accessState === "restricted"
       ? "需申请访问权限后查看完整内容"

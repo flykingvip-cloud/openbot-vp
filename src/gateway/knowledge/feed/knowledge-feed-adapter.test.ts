@@ -1,9 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { listEnterpriseKnowledgeProjectionBindings } from "../../enterprise-data/enterprise-knowledge-projection-binding-store.js";
+import { upsertKnowledgeFeedItem } from "../../enterprise-data/knowledge-feed-item-store.js";
 import { runProjectionMaterialization } from "../../enterprise-data/projection-materializer.js";
 import { seedEnterpriseDataCatalog } from "../../enterprise-data/seeds.js";
 import { normalizeEnterpriseDataStore } from "../../enterprise-data/store.js";
+import { adaptEnterpriseFeedRecord } from "./enterprise-feed-adapter.js";
 import { loadKnowledgeFeedBundle } from "./knowledge-feed-adapter.js";
 
 const tenantId = "tenant-acme";
@@ -63,5 +65,50 @@ describe("knowledge feed adapter M6", () => {
     expect(bundle.enterpriseAccessible.length).toBeGreaterThan(0);
     expect(bundle.dataObjects).toEqual([]);
     expect(bundle.feedItems.every((item) => item.source === "enterprise")).toBe(true);
+  });
+
+  it("copies warehouse rows into accessible feed summaries and hides them when restricted", () => {
+    const store = normalizeEnterpriseDataStore(null);
+    const record = upsertKnowledgeFeedItem({
+      store,
+      tenantId,
+      nowIso,
+      item: {
+        projectionId: "proj-warehouse",
+        title: "001-用友T+仓库",
+        kind: "data",
+        category: "warehouse",
+        sourceSystems: ["erp-yonyou-tplus"],
+        scopeApplied: "team",
+        maskedFields: [],
+        generatedAt: nowIso,
+        traceRefs: ["trace-1"],
+        payload: {
+          items: [{ Code: "WH01", Name: "京扇子仓" }],
+          openToken: "should-not-leak",
+        },
+      },
+    });
+    const bundle = loadKnowledgeFeedBundle({
+      store,
+      context: {
+        tenantId,
+        seatId: "seat-ceo",
+        userId: "employee-1",
+        agentType: "employee-agent",
+        hasEnterpriseScope: true,
+      },
+    });
+    const accessible = bundle.enterpriseAccessible.find((item) => item.title === "001-用友T+仓库");
+    expect(accessible?.summary).toContain("京扇子仓");
+    expect(accessible?.summary).not.toContain("should-not-leak");
+
+    const restricted = adaptEnterpriseFeedRecord({
+      item: record,
+      binding: null,
+      accessState: "restricted",
+    });
+    expect(restricted.summary).not.toContain("京扇子仓");
+    expect(restricted.summary).not.toContain("should-not-leak");
   });
 });

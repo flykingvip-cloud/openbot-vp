@@ -300,6 +300,8 @@ export type ManagedProjectionBindingRecord = {
   enabled: boolean;
   materializationTeamLabel: string;
   updatedAt: string;
+  /** Persisted FeedItems for this projection. Absent on older gateway payloads. */
+  supplyRecordCount?: number;
 };
 
 export type ProjectionMaterializeResult = {
