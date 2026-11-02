@@ -10760,8 +10760,12 @@ landingStreams:
   - ui/src/ui/ports/platform/models/routing-decision-preview.ts
   - ui/src/ui/ports/platform/models/sections/SmartRoutingSection.ts
   - ui/src/ui/ports/platform/models/sections/ModelAssetsSection.ts
+  - ui/src/ui/ports/platform/models/sections/ModelAssetsSection.pool-gate.browser.test.ts
   - ui/src/ui/ports/platform/models/page.ts
   - ui/src/ui/ports/platform/models/capability-admission-batch3.node.test.ts
+  - ui/src/ui/ports/platform/models/admission/pooled-admission.ts
+  - src/gateway/models/capability-admission/sync-pooled-admission.ts
+  - src/gateway/models/capability-admission/sync-pooled-admission.test.ts
   canLandWith: []
   metadata:
     task: smart-model-routing-runtime-admission:智能模型路由

@@ -298,6 +298,7 @@ Docs: https://docs.openbot.love
 - Agents/chat: enterprise catalog models (`ent/<connection>/<upstream>`, including `mimo-v2.6-flash`) are translated to the tenant BYOK provider before the main reply. A pinned agent no longer stops before any reply with `Unknown model: ent/…`.
 - Agents/chat: a configured platform primary such as DeepSeek stays the run model when the only extra grant is an enterprise catalog id. A failed model call tells the user to check the primary model, and does not show the raw runtime id.
 - Control UI: creating a platform administrator still sets the initial password locally and does not send mail. The add-admin form and success notice now say to share that password; the account stays active immediately.
+- Platform/models: an allowlisted platform model whose latest connection probe succeeded can be called from chat when it had no admission row. The gateway records that model as eligible for execution and does not overwrite an existing pause or disable. The model pool shows 暂无用量 when 7-day usage analytics are missing, and it no longer repeats connection or health status in a banner.
 
 ## 2026.3.8
 
