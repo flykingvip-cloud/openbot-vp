@@ -22,7 +22,7 @@
 | PR #192 merge | `bc843c70ecdd3afdae0020403d4b4b22c8849371` | ancestor (−7) | P1 DEF-001/002/004 product fixes still on main — **reuse PASS** |
 | Old acceptance main WT | `3f7786f4aad2d439e499c42df9f8bcbd0480e313` | ancestor (−10) | Too old for Stage4 omit re-run claims |
 | PR192 review evidence batch | `1ce8f5ee4e8c852d45a9c6a30a623e0bed082587` | not on main lineage (docs/fix branch tip that merged) | Stage4 FAIL log reusable as **historical**; must re-run omit on main tip |
-| Coverage docs tip (PR #193 HEAD) | `5b87e6a2599d52fc34e66d1a5d647ab730b7dbf4` | 2 commits ahead of main (docs only) | Docs/evidence for N≈118 reusable as draft; **denominator must harden** this run |
+| Coverage docs tip (PR #193 HEAD) | 见分支 tip（含后续口径提交） | ahead of main（`docs/acceptance/**` + `.loom/registry.yaml`） | Docs/evidence for N≈118 reusable as draft; **行数≠功能分母**；须硬化口径 |
 
 ## What remains reusable vs must re-run
 
@@ -51,7 +51,7 @@
 ## 2026-11-02 independent reviewer corrections（口径收紧）
 
 - DEF-008：**代码根因与团队归档证据相互吻合** → 可接受为产品缺陷登记。
-- **验收方独立运行复现尚未完成**（诊断脚本重跑被缺失 `@openbot/collaboration-core` 阻断）。不得把团队复现写成「验收方已独立复现」。
+- **验收方独立运行复现尚未完成**（**双阻断**：缺 `node_modules/@openbot` 链接 **且** 无 `packages/collaboration-core/dist`；单项恢复未必够）。不得把团队复现写成「验收方已独立复现」。
 - 安全：凭证排除失效；可能在备份分享/上传/存储时暴露凭证；**无**远程攻击 / 提权 / 真实泄露已发生之证明。
 - 总评继续 **FAIL / NOT READY**。接受 DEF-008 登记及 Stage4 FAIL；**不核准**全栈通过；**不据此批准 #193 合并**。
-- 本轮仅文档 / 口径；未改产品代码、未装工具链。详见 `../2026-11-02-independent-reviewer-corrections/`。
+- 本轮：文档/口径 + `.loom/registry.yaml` 管理登记；未改产品代码、未装工具链、未 merge。详见 `../2026-11-02-independent-reviewer-corrections/`（含 `01-owner-confirm-round2.md`）。

@@ -6,7 +6,7 @@
 **Denominator:** N≈118 (see [`../runs/2026-11-01-pr192-review/coverage-denominator.md`](../runs/2026-11-01-pr192-review/coverage-denominator.md))  
 **Constraints honored:** no live credentials; SwiftPM **BLOCKED**; no product drive-bys; `/Users/daniel/AI VP/openbot/` untouched.
 
-> **Landing note:** PR #192 product fix is **MERGED** on main (`bc843c70…`, head that merged `1ce8f5ee…`). Coverage expansion commit `33c45c5c1` was stranded only on `fix/p1-def001-002-004-20261101`. **This PR is a docs-only follow-up** to put coverage denominator + this progress file on tip of main lineage. No product code.
+> **Landing note:** PR #192 product fix is **MERGED** on main (`bc843c70…`, head that merged `1ce8f5ee…`). Coverage expansion commit `33c45c5c1` was stranded only on `fix/p1-def001-002-004-20261101`. **This PR** lands coverage denominator + progress on tip of main lineage：**范围 = `docs/acceptance/**` + `.loom/registry.yaml`（管理登记）**；**无**产品 `src/**`。勿再用绝对「纯 docs-only」掩盖 loom 变更。
 
 ## main 状态
 
@@ -29,8 +29,8 @@
 | Merge commit                                        | `bc843c70ecdd3afdae0020403d4b4b22c8849371`                                                    |
 | Independent verdict (REVIEW.md)                     | **可合并（条件）** — DEF-001/002/004 verified; format delta 0; SwiftPM BLOCKED; live NOT RUN  |
 | Gates (from review/remediation)                     | tsgo PASS; `protocol:check` PASS; focused DEF tests PASS; oxfmt acceptance docs               |
-| Docs follow-up (this PR)                            | branch `docs/acceptance-coverage-20261101` — coverage denominator + 09 progress only          |
-| This batch product code                             | **none** (acceptance docs + logs only)                                                        |
+| Docs follow-up (this PR)                            | branch `docs/acceptance-coverage-20261101` — `docs/acceptance/**` + `.loom/registry.yaml`     |
+| This batch product code                             | **none**（验收文档/日志 + loom 管理登记；无 `src/**`）                                         |
 | Remaining confidence gaps (product already on main) | SwiftPM compile; live credential surfaces; Stage4 credentials-omit FAIL; Stage6 audit network |
 
 ## 未验证范围
@@ -67,7 +67,7 @@
 
 ## 2026-11-02 update (credentials-omit + denominator harden)
 
-- Soft “约 N=118” **superseded** by row-tracked inventory: [`10-coverage-inventory-tracked.md`](./10-coverage-inventory-tracked.md) (**N=66** stable IDs).
+- Soft “约 N=118” **superseded** by row-tracked inventory: [`10-coverage-inventory-tracked.md`](./10-coverage-inventory-tracked.md)（**~70 证据/检查行**；**不是**功能覆盖分母；DEF-008 多行按 1 缺陷计）。
 - DEF-008 OPEN — backup credentials-omit FAIL on main `d42fbc3ca2…` (security boundary YES). Evidence: `../runs/2026-11-02-credentials-omit/`.
 - Control UI: `ui:build` PASS + static smoke PASS; interactive NOT_RUN. Live creds NOT_RUN.
 - Fullstack still **NOT PASS**. See [`10-acceptance-conclusion.md`](./10-acceptance-conclusion.md).
@@ -75,7 +75,14 @@
 ## 2026-11-02 independent reviewer corrections
 
 - 总评继续 **FAIL / NOT READY**；接受 DEF-008 登记与 Stage4 FAIL；**不核准**全栈；**不据此批准 #193 合并**。
-- 独立复现：**未完成**（collaboration-core 阻断）；安全措辞收紧为凭证排除失效。
-- 覆盖表：**禁止 PARTIAL**，已拆原子行；**N 不能证明完整**（见穷尽性笔记）。
+- 独立复现：**未完成**；**双阻断** — 缺 `node_modules/@openbot` 链接 **且** 无 `packages/collaboration-core/dist`；单项恢复未必够。
+- 覆盖表：**禁止 PARTIAL**，已拆原子行；「表行数 / ~70」= 证据与检查行，**≠** 功能覆盖分母；DEF-008 多行 = 多证据面（见穷尽性笔记 + owner confirm round2）。
 - 修复建议收窄：canonicalize 实际凭证目录；保留 includeCredentials；拒绝无条件 `/credentials/` 排除。
+- PR 范围须写明含 `.loom/registry.yaml`（管理登记），不得绝对「仅文档与日志」。
 - 详见 [`../runs/2026-11-02-independent-reviewer-corrections/`](../runs/2026-11-02-independent-reviewer-corrections/)。
+
+## 2026-11-02 owner confirm round2（用户本机核查）
+
+- 接受上一轮口径整改；**仍不核准**验收完成 / #193 合入。
+- 纠正：行数不作能力分母；PR 范围含 loom；独立复现双阻断写清。
+- 见 [`../runs/2026-11-02-independent-reviewer-corrections/01-owner-confirm-round2.md`](../runs/2026-11-02-independent-reviewer-corrections/01-owner-confirm-round2.md)。

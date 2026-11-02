@@ -3,7 +3,7 @@
 **Pin:** `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`  
 **When:** 2026-11-02 Asia/Shanghai（含独立复核口径收紧）  
 **Supersedes soft claim:** “约 N=118” without stable IDs.  
-**重要：** 行数（含本轮拆分后的 N）**尚不能证明覆盖完整**。见 [`../runs/2026-11-02-independent-reviewer-corrections/00-exhaustiveness-note.md`](../runs/2026-11-02-independent-reviewer-corrections/00-exhaustiveness-note.md)。
+**重要：** 「表行数 / ~70」= 证据与检查行，**不是**公开能力分母；行数**不能**证明覆盖完整，也**不能**当成「覆盖了 N 个功能」。见 [`../runs/2026-11-02-independent-reviewer-corrections/00-exhaustiveness-note.md`](../runs/2026-11-02-independent-reviewer-corrections/00-exhaustiveness-note.md) 与 [`../runs/2026-11-02-independent-reviewer-corrections/01-owner-confirm-round2.md`](../runs/2026-11-02-independent-reviewer-corrections/01-owner-confirm-round2.md)。
 
 ## Claim narrowing (mandatory)
 
@@ -17,6 +17,9 @@
 | P1 DEF-001/002/004 cleared | ≠ fullstack PASS |
 | 团队诊断脚本 FAIL | ≠ 验收方已独立复现 |
 | Tracked N（任意固定行数） | ≠ 公开入口已穷尽 |
+| 「表行数 / ~70」 | = **证据与检查行**，**不是**公开能力 / 功能覆盖分母 |
+| DEF-008 相关多行（团队诊断 / 独立复现 / 登记别名 / 单测 / 缺陷行） | = **同一缺陷的多证据面**；计数按 **1 个缺陷 / 1 个 backup-create 能力点** |
+| 66/70 或任意「已覆盖 N 个功能」 | **禁止** — 行数 ≠ 功能数 |
 
 ## Column legend
 
@@ -36,10 +39,10 @@ Status vocabulary（**仅允许**）: `PASS` | `FAIL` | `NOT_RUN` | `BLOCKED` | 
 | --- | --- | --- | --- | --- | --- | --- |
 | C-CLI-HELP | openbot CLI help surface | Y | PASS | PASS | PASS | 49 top-level commands listed; ≠ per-command runtime |
 | C-BACKUP-CREATE-STATIC | Backup create 静态入口 / 单测期望存在 | Y | PASS | PASS | N/A | 命令与单测入口在树中；不作 runtime 宣称 |
-| C-BACKUP-OMIT-TEAM-DIAG | 默认 omit（团队诊断证据） | Y | PASS | PASS | **FAIL** | 团队脚本：includeCredentials=false 且归档含 credentials；DEF-008 |
-| C-BACKUP-OMIT-INDEP-REPRO | 默认 omit（验收方独立复现） | Y | PASS | **BLOCKED** | **BLOCKED** | 独立重跑诊断被缺失 `@openbot/collaboration-core` 阻断；**未完成** |
+| C-BACKUP-OMIT-TEAM-DIAG | 默认 omit（团队诊断证据） | Y | PASS | PASS | **FAIL** | DEF-008 **证据面**（团队）；≠ 独立能力；与同缺陷其他行合计按 1 缺陷计 |
+| C-BACKUP-OMIT-INDEP-REPRO | 默认 omit（验收方独立复现） | Y | PASS | **BLOCKED** | **BLOCKED** | DEF-008 **证据面**；双阻断：缺 `node_modules/@openbot` 链接 **且** 无 `packages/collaboration-core/dist`；单项恢复未必够；**未完成** |
 | C-BACKUP-INCLUDE-CREDS | 显式 includeCredentials 预期行为 | Y | PASS | PASS | **NOT_RUN** | 须保留 opt-in；本轮未独立跑通；unit 中相关用例曾 skip |
-| C-BACKUP-OMIT | Backup default omit（登记别名） | Y | PASS | PASS | **FAIL** | = DEF-008 缺陷登记口径（对齐团队诊断 FAIL；非独立复现成功） |
+| C-BACKUP-OMIT | Backup default omit（登记别名） | Y | PASS | PASS | **FAIL** | DEF-008 **登记别名**（非第五项独立能力）；对齐团队诊断 FAIL；非独立复现成功 |
 | C-BACKUP-VERIFY | Backup verify | Y | PASS | PASS | NOT_RUN | Stage4 suite import flap this WT |
 | C-STORE-STAGE4 | Stage4 store evidence suite | Y | PASS | BLOCKED | NOT_RUN | collaboration workspace resolve 阻断完整套件 |
 | C-GATEWAY-LOCAL | Local gateway bring-up | Y | PASS | NOT_RUN | NOT_RUN | |
@@ -127,9 +130,9 @@ Each channel Cap=Y. Static = plugin package + docs id match where applicable. Co
 | SC-SBOM-REGEN | SBOM regenerate | Y | PASS | **BLOCKED** | NOT_RUN | |
 | SC-LICENSE | License inventory | Y | PASS | NOT_RUN | NOT_RUN | |
 | SC-DEP-AUDIT | Dependency audit | Y | PASS | **BLOCKED** | NOT_RUN | |
-| DOC-ACCEPT | Acceptance docs tree | Y | PASS | N/A | N/A | this PR docs-only |
+| DOC-ACCEPT | Acceptance docs tree | Y | PASS | N/A | N/A | PR scope: docs/acceptance/** + .loom/registry.yaml（管理登记） |
 | DOC-LOOM | Loom register/claim | Y | PASS | N/A | N/A | |
-| TEST-UNIT-BACKUP-OMIT | Unit: default omit credentials | Y | PASS | PASS | **FAIL** | `backup.test.ts` omit assert；旁证，≠独立诊断复现完成 |
+| TEST-UNIT-BACKUP-OMIT | Unit: default omit credentials | Y | PASS | PASS | **FAIL** | DEF-008 **单测证据面**；`backup.test.ts` omit assert；≠独立诊断复现完成 |
 | TEST-UNIT-CORE-OTHER | Other core unit subset | Y | PASS | NOT_RUN | NOT_RUN | 本轮未跑全量；禁止用 PARTIAL 概括 |
 | TEST-STAGE4 | Stage4 acceptance file | Y | PASS | **BLOCKED** | **FAIL** | FAIL=缺陷登记/历史同 codepath；本轮套件加载 BLOCKED |
 
@@ -140,32 +143,37 @@ Each channel Cap=Y. Static = plugin package + docs id match where applicable. Co
 | P1-DEF001 | (merged PR192) | Y | PASS | PASS | PASS | |
 | P1-DEF002 | (merged PR192) | Y | PASS | PASS | PASS | |
 | P1-DEF004 | (merged PR192) | Y | PASS | PASS | PASS | |
-| P1-DEF008 | credentials-omit | Y | PASS | PASS | **FAIL** | 缺陷登记；独立复现 BLOCKED |
+| P1-DEF008 | credentials-omit | Y | PASS | PASS | **FAIL** | DEF-008 **缺陷状态行**；与上列证据面合计按 1 缺陷 / 1 backup-create 能力点；独立复现双阻断 |
 
-## Counts (row-tracked)
+## Counts (row-tracked) — 行数 ≠ 功能数
+
+> **口径（强制）：** 「表行数 / ~70」= **证据与检查行**，**不是**公开能力分母。  
+> DEF-008 相关多行（团队诊断 / 独立复现 / 登记别名 / 单测 / 缺陷行）是**同一缺陷的多证据面**，计数时按 **1 个缺陷 / 1 个 backup-create 能力点** 理解。  
+> **禁止**把 66/70 或任意总行数写成「覆盖了 N 个功能」。
 
 | Bucket | Rows | Notes |
 | --- | --- | --- |
-| **Total tracked IDs（本轮拆分后）** | **70** | A23 + B4 + C24 + D6 + E9 + F4；recount below |
+| **Total tracked IDs（证据/检查行）** | **~70** | A23 + B4 + C24 + D6 + E9 + F4；**仅行计数**，≠ 功能覆盖分母 |
 | Prior soft “≈118” | — | **do not use** as authoritative |
-| Prior “N=66” | — | 改进但仍**不能证明完整**；本轮拆 PARTIAL 后行数变化，完整性质疑仍在 |
+| Prior “N=66” | — | 曾作分母硬化改进；**仍不是**能力分母，也不能证明完整 |
+| DEF-008 多证据面 | **按 1 计** | 团队诊断 + 独立复现(BLOCKED) + 登记别名 + 单测 + P1-DEF008 状态行 |
 | Runtime **FAIL**（缺陷登记口径） | **DEF-008 / omit** | 团队诊断 + unit 旁证；**非**独立复现完成 |
 | Runtime **PASS**（本轮 credential-free） | **C-CLI-HELP, UI-STATIC** | |
 | **禁止 PARTIAL** | 已拆 | C-BACKUP-* 原子行；TEST-UNIT-* 原子行 |
 
-**Recount check:**  
+**Recount check（行数，非能力数）:**  
 A: C-CLI-HELP, C-BACKUP-CREATE-STATIC, C-BACKUP-OMIT-TEAM-DIAG, C-BACKUP-OMIT-INDEP-REPRO, C-BACKUP-INCLUDE-CREDS, C-BACKUP-OMIT, C-BACKUP-VERIFY, C-STORE-STAGE4, C-GATEWAY-LOCAL, C-DOCTOR, C-CONFIG, C-MEMORY, C-AUTH-PROFILES, C-SESSION, C-HOOKS, C-PLUGINS-LOAD, C-CRON, C-BROWSER-TOOL, C-TTS, C-MEDIA, C-AGENT-LOOP, C-SECURITY-AUDIT, C-UPDATE = **23**  
 B: **4**  
 C: **24**  
 D: **6**  
 E: SC×4 + DOC×2 + TEST×3 = **9**  
 F: **4**  
-**Total = 23+4+24+6+9+4 = 70**
+**Total rows = 23+4+24+6+9+4 = 70**（证据行合计）
 
 ### Core vs peripheral unverified
 
-**Core unverified / blocked / fail：** omit FAIL + 独立复现 BLOCKED + gateway/UI interactive/multi-end/Stage4 等大量 NOT_RUN/BLOCKED。
+**Core unverified / blocked / fail：** omit FAIL + 独立复现双阻断（缺 `@openbot` 链接 **且** 无 `collaboration-core/dist`；单项恢复未必够）+ gateway/UI interactive/multi-end/Stage4 等大量 NOT_RUN/BLOCKED。
 
 **Peripheral：** 全部 CH-* live、非 channel extensions、packages runtime、CLI 逐命令、Control UI 各路由、跨仓 install — **未穷尽**。
 
-**Conclusion:** Tracked rows（现 **70**）是改进后的可追踪分母，**不能**证明公开入口覆盖完整。Fullstack 继续 **FAIL / NOT READY**。**P1 clear ≠ PASS。不据此批准 #193 合并。**
+**Conclusion:** Tracked **~70 行**是证据与检查行清单，**不是**功能覆盖分母，也**不能**证明公开入口完整。Fullstack 继续 **FAIL / NOT READY**。**P1 clear ≠ PASS。不据此批准 #193 合并。**
