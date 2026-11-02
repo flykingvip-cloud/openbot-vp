@@ -80,7 +80,7 @@ OTLP / 诊断指标仍可能使用 `openclaw.*` 度量名（时序连续性）�
 | 项                                                              | 说明                                         |
 | --------------------------------------------------------------- | -------------------------------------------- |
 | iOS XcodeGen `OpenClaw` / `OpenClawKit` 包名、`ai.openclaw.ios` | 工程与 bundle id；改名需同步签名与商店       |
-| Android 包名 `ai.openclaw`                                      | 同上                                         |
+| Android `applicationId`                                         | 现行 `ai.openbot.app`。旧 `ai.openclaw.app` 不能覆盖升级（并列；重装并重新登录） |
 | Swift 类型前缀 `OpenClawChat*`、`OpenClaw*Payload` 等           | 内部类型；非用户可见；可在独立 PR 机械重命名 |
 | App Support 目录名 `OpenClaw`                                   | 已有用户数据路径；需迁移逻辑后才能改         |
 | ShareExtension `OpenClawShare` domain                           | 错误域字符串                                 |
@@ -100,8 +100,8 @@ OTLP / 诊断指标仍可能使用 `openclaw.*` 度量名（时序连续性）�
 1. Dockerfile / docker-compose 服务与镜像主名改为 `openbot`，旧名仅 alias。
 2. 新守护进程安装只写 `OPENBOT_*`（保留读 `OPENCLAW_*`）。
 3. UI 存储键迁移写入 `openbot.*`，读旧键。
-4. iOS/Android bundle / 包名与 XcodeGen 工程名。
+4. iOS XcodeGen 工程名。Android `applicationId` 已是 `ai.openbot.app`（旧 `ai.openclaw.app` 不能覆盖升级）。
 5. Swift `OpenClaw*` 类型前缀 → `OpenBot*`。
 6. 插件类型 `OpenClawPlugin*` → `OpenBotPlugin*`（TS）。
 7. OTLP 指标双写 `openbot.*` 后淘汰 `openclaw.*`。
-8. `openclaw.podman.env`、`appcast`、Android `ai.openclaw` 目录等。
+8. `openclaw.podman.env`、`appcast` 等遗留文件名。Android 可安装包名是 `ai.openbot.app`，不是 `ai.openclaw` 目录名。

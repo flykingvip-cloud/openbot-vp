@@ -20,7 +20,7 @@
 ## 2. 各端「环境跑绿」待办（阻塞 1.10/1.11）
 
 - **ios（唯一进行中）**：先完成 `1.4-ios`(登录/onboarding/会话接线) + `1.8-ios`(配对/Screen/Voice/相机/后台回归 + Me>Device)；再 Xcode 装 iOS 18+ 模拟器运行时 → `xcodebuild test -scheme OpenClaw -destination 'platform=iOS Simulator,id=<sim-udid>' -only-testing:OpenClawTests/EmployeeAccountIdentityTests -only-testing:OpenClawTests/EmployeeShellBridgeParseTests -only-testing:OpenClawTests/EmployeeEmbedRoutingTests`。
-- **android**：`export JAVA_HOME=$(/usr/libexec/java_home -v 17)` + 装/指向 Android SDK（`ANDROID_HOME` 或 `local.properties` 的 `sdk.dir`）→ `./gradlew :app:testDebugUnitTest --tests "ai.openclaw.app.deeplink.*" --tests "ai.openclaw.app.account.*" --tests "ai.openclaw.app.employeeshell.*" --tests "ai.openclaw.app.employeeauth.*"`。
+- **android**：`export JAVA_HOME=$(/usr/libexec/java_home -v 17)` + 装/指向 Android SDK（`ANDROID_HOME` 或 `local.properties` 的 `sdk.dir`）→ `./gradlew :app:testDebugUnitTest --tests "ai.openbot.app.deeplink.*" --tests "ai.openbot.app.account.*" --tests "ai.openbot.app.employeeshell.*" --tests "ai.openbot.app.employeeauth.*"`（过滤包名与现行 `applicationId` `ai.openbot.app` 一致；勿再用 `ai.openclaw.app.*`）。
 - **gateway**：本机 27/27 已绿；`native-bootstrap-cloud.live.test.ts` 需真实云网关（`gw.openbot.love` 可达 + mint→consume→302 + 测试账号），沙箱不可达 → **operator 在生产环境确认**（非本机复现）。
 - **web-ui / apple-shared / macos**：已本机跑绿，无待办。
 

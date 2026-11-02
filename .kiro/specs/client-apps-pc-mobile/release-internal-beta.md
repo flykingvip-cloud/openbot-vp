@@ -9,7 +9,7 @@
 ### A0. 通用前置（所有端）
 
 - [ ] **版本口径**：确认内部 beta 版本（`vYYYY.M.D-beta.N` 口径）；如需 bump 覆盖 version locations（`package.json`、`apps/android/app/build.gradle.kts`、iOS/macOS `Info.plist`）——**改版本需 operator 同意**；内部构建也可用 dev 版本号不 tag。
-- [ ] **Bundle ID / package 沿用现状**（D-RENAME 延后）：iOS `ai.openbot.*`、Android `ai.openclaw.app`、macOS OpenBot——**不在内部 beta 动迁移**。
+- [ ] **Bundle ID / package 沿用现行身份**（内部 beta 不再改 Android `applicationId`）：iOS `ai.openbot.*`、Android `ai.openbot.app`、macOS OpenBot。旧 Android 包 `ai.openclaw.app` 不能覆盖升级到 `ai.openbot.app`（并列安装；需重装并重新登录，仓库内无跨包数据迁移）。
 - [ ] **云连通**：客户端默认指向 `gw.openbot.love`（或内测网关）；确认可达 + 备好测试员工账号（登录→bootstrap→embed 端到端可跑）。
 - [ ] **埋点就绪**（1.11）：M-COLD / M-TTI / crash-free / 登录成功率 采集接入。
 - [ ] **测试跑绿**（1.10）：本端 employee 套件全绿（见 `wave1-status.md §2`）。
@@ -24,6 +24,7 @@
 ### A2. Android（owner: android + 发布）
 
 - [ ] 签名前置：release keystore（内部 beta 可用内测 keystore/debug 签名）；`versionCode`/`versionName`（`apps/android/app/build.gradle.kts`）。
+- [ ] 包名：`namespace` / `applicationId` = `ai.openbot.app`（无 productFlavor / 双包）。安装与查询用该 id：`adb shell pm path ai.openbot.app`。同包覆盖仍须同一签名；设备上若仍有 `ai.openclaw.app`，不能 `adb install -r` 盖到现行包。
 - [ ] 打包：`./gradlew :app:assembleRelease`（APK）或 `:app:bundleRelease`（AAB）→ 签名 → 内测分发（Play internal testing 或直接分发 APK）。
 - [ ] 门：employee 单测在 Android SDK 环境跑绿（`wave1-status.md §2`）+ companion 回归 + a11y。
 - [ ] 产物：**internal APK/AAB**（Play closed 属设计伙伴 beta/Wave 2）。
