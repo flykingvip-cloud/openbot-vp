@@ -168,14 +168,14 @@ export async function rewriteAttemptVisibleReply(params: {
     }
   }
 
-  // M2: plan-speak / mid-work finals → explicit pause (any reply language).
-  // Typeset, draft-box, and research plan-speak stays a progress sentence.
+  // Plan-speak pass-through: do not invent pause/confirm at reply layer.
+  // Continue / human-gate / completion stay with the executor + turn-completion.
   const planSpeakContext = latestUserText(params.messages);
   if (target && original.trim()) {
-    const paused = rewritePlanSpeakFinal(original, planSpeakContext);
-    if (paused !== original) {
-      applyMessageRewrite(original, paused);
-      original = paused;
+    const nextVisible = rewritePlanSpeakFinal(original, planSpeakContext);
+    if (nextVisible !== original) {
+      applyMessageRewrite(original, nextVisible);
+      original = nextVisible;
     }
   }
 
@@ -190,7 +190,7 @@ export async function rewriteAttemptVisibleReply(params: {
     }
   }
 
-  // Plan-speak gate on channel text payloads too.
+  // Same pass-through on channel text payloads (no invented pause CTA).
   for (let i = 0; i < params.assistantTexts.length; i += 1) {
     const cur = params.assistantTexts[i];
     if (typeof cur !== "string") {
