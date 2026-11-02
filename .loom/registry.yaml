@@ -10822,6 +10822,17 @@ tasks:
     since: 2026-11-01
     metadata: {}
 landingStreams:
+  - id: ft-dedupe-thinking-progress-ui-20261102
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/views/chat.test.ts
+    canLandWith: []
+    metadata:
+      task: FT-DEDUPE-THINKING-PROGRESS-UI
+      owner: cursor-grok
+      purpose: Prefer thinking-progress over work-progress 正在思考 reading-indicator on the same empty-body live turn.
   - id: ft-plan-speak-reply-passthrough-20261102
     landingPolicy: serial
     paths:
