@@ -85,3 +85,11 @@ composer
 - `src/auto-reply/reply/queue-policy.ts`, `queue-policy.test.ts`
 - `src/auto-reply/reply/agent-runner.ts`, `agent-runner.collect-amend-steer.test.ts`
 - `docs/slice2-chat-during-task-evidence.md`, `docs/slice2-chat-during-task-delivery.md`, `docs/slice1-decision-to-reply-path.md`
+
+
+## 8. 落地
+
+- PR: https://github.com/flykingvip-cloud/openbot-vp/pull/216
+- HEAD: `ab32aa1d680f2a087bd62e8c9762b3b417bd570a`
+- 定向：5 files / 159 passed（mid-task+outlet）；停止保护相关 9 files / 145 passed
+- 切片 3 暂缓；不含合并/生产部署
