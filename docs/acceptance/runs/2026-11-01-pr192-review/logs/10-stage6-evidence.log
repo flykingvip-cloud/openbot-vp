@@ -1,0 +1,85 @@
+=== stage6 SBOM+audit FILTERED @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ❯ docs/acceptance/stage6-audit-moderate-dompurify-cmwh-evidence.test.ts (3 tests | 1 failed) 33945ms
+     ✓ evidence JSON records the §5.4 field table for this one advisory 1ms
+     ✓ ui package + root override pin dompurify >=3.4.11 (current pin may be higher) 1ms
+     × local pnpm audit --prod no longer lists GHSA-cmwh (or lower-threshold side effects); exit stays non-zero 33841ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22051
+    throw new Error(
+          ^
+
+Error: Error when performing the request to https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz; for troubleshooting help, see https://github.com/nodejs/corepack#troubleshooting
+    at fetch (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22051:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async fetchUrlStream (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22081:20)
+    ... 4 lines matching cause stack trace ...
+    at async Object.runMain (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:23660:7) {
+  [cause]: TypeError: fetch failed
+      at node:internal/deps/undici/undici:13510:13
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async fetch (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22045:16)
+      at async fetchUrlStream (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22081:20)
+      at async download (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22208:18)
+      at async installVersion (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22300:55)
+      at async Engine.ensurePackageManager (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22851:32)
+      at async Engine.executePackageManagerRequest (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:22962:25)
+      at async Object.runMain (/usr/local/lib/node_modules/corepack/dist/lib/corepack.cjs:23660:7) {
+    [cause]: ConnectTimeoutError: Connect Timeout Error (attempted addresses: 2606:4700::6810:722:443, 104.16.7.34:443, 2606:4700::6810:322:443, timeout: 10000ms)
+        at onConnectTimeout (node:internal/deps/undici/undici:2602:28)
+        at Immediate._onImmediate (node:internal/deps/undici/undici:2583:11)
+        at process.processImmediate (node:internal/timers:485:21) {
+      code: 'UND_ERR_CONNECT_TIMEOUT'
+    }
+  }
+}
+
+Node.js v22.18.0
+ ❯ docs/acceptance/stage6-audit-moderate-dompurify-55q2-evidence.test.ts (3 tests | 1 failed) 10586ms
+     ✓ evidence JSON records the §5.4 field table for this one advisory 1ms
+     ✓ ui package + root override pin dompurify to 3.4.13 1ms
+     × local pnpm audit --prod no longer lists GHSA-55q2 (or lower-threshold side effect); exit stays non-zero 10580ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ❯ docs/acceptance/stage6-audit-moderate-dompurify-rp9w-evidence.test.ts (3 tests | 1 failed) 9258ms
+     ✓ evidence JSON records the §5.4 field table for this one advisory 1ms
+     ✓ ui package + root override pin dompurify >=3.4.7 (current pin may be higher) 1ms
+     × local pnpm audit --prod no longer lists GHSA-rp9w (or same-threshold side effects); exit stays non-zero 9157ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ❯ docs/acceptance/stage6-audit-moderate-dompurify-evidence.test.ts (3 tests | 1 failed) 13695ms
+     ✓ evidence JSON records the §5.4 field table for this one advisory 1ms
+     ✓ ui package + root override pin dompurify >=3.4.0 (current pin may be higher) 1ms
+     × local pnpm audit --prod no longer lists GHSA-v9jr (or same-threshold side effects); exit stays non-zero 13570ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ❯ docs/acceptance/stage6-audit-moderate-dompurify-hpcv-evidence.test.ts (3 tests | 1 failed) 10773ms
+     ✓ evidence JSON records the §5.4 field table for this one advisory 1ms
+     ✓ ui package + root override pin dompurify >=3.4.6 (current pin may be higher) 1ms
+     × local pnpm audit --prod no longer lists GHSA-hpcv (or same-threshold side effect); exit stays non-zero 10668ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ❯ docs/acceptance/stage6-audit-moderate-hono-gqvv-evidence.test.ts (3 tests | 1 failed) 23593ms
+     ✓ evidence JSON records the §5.4 field table for this one advisory 1ms
+     ✓ package.json pins hono >=4.13.5 (current pin may be higher) via dependency range and override 1ms
+     × local pnpm audit --prod no longer lists GHSA-gqvv-2mrq-wpjv; exit stays non-zero 23496ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ❯ docs/acceptance/stage6-audit-moderate-hono-8j4g-evidence.test.ts (3 tests | 1 failed) 27063ms
+     ✓ evidence JSON records the §5.4 field table for this one advisory 1ms
+     ✓ package.json pins hono >=4.12.34 (current pin may be higher) via dependency range and override 1ms
+     × local pnpm audit --prod no longer lists GHSA-8j4g-w8fx-2239; exit stays non-zero 26926ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ❯ docs/acceptance/stage6-audit-moderate-hono-node-server-evidence.test.ts (3 tests | 1 failed) 13712ms
+     ✓ evidence JSON records the §5.4 field table for this pin (primary + sibling) 1ms
+     ✓ package.json pins @hono/node-server >=1.19.15 via pnpm override 0ms
+     × local pnpm audit --prod no longer lists GHSA-frvp or GHSA-92pp; exit stays non-zero 13595ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ❯ docs/acceptance/stage6-audit-moderate-hono-hxh3-evidence.test.ts (3 tests | 1 failed) 33977ms
+     ✓ evidence JSON records the §5.4 field table for this one advisory 1ms
+     ✓ package.json pins hono >=4.13.7 via dependency range and override 1ms
+     × local pnpm audit --prod no longer lists GHSA-hxh3-vqpv-xpqv; exit stays non-zero 33882ms
+! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-10.23.0.tgz
+ ❯ docs/acceptance/stage6-audit-moderate-music-metadata-evidence.test.ts (3 tests | 1 failed) 28114ms
+     ✓ evidence JSON records the §5.4 field table for this one advisory 1ms
+     ✓ matrix dep + root override pin music-metadata >=11.16.0 0ms
+     × local pnpm audit --prod no longer lists GHSA-53v6-4h7p-p4gj; exit stays non-zero 28016ms
+EXIT:137

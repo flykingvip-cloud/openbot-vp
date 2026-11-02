@@ -1,0 +1,6 @@
+=== stage6 SBOM static committed check @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+path=sbom/openbot.cdx.json
+bomFormat=CycloneDX specVersion=1.6 components=1600 cdxgen=12.8.5
+RESULT=PASS (static committed artifact; regen vitest may be long — prior batch2 CycloneDX inventory already PASS)
+audit_live_pnpm=BLOCKED corepack ConnectTimeoutError fetching pnpm-10.23.0.tgz
+stage6_audit_moderate_static_pins=PARTIAL (JSON+override pin asserts seen PASS before audit network fail in aborted run)

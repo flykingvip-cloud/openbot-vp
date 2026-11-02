@@ -1,0 +1,421 @@
+=== CLI extra help/version/script checks @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+CLI_INVOKER=node openbot.mjs
+----- openbot --version -----
+OpenBot 2026.7.12-rc.2 (1ce8f5e)
+exit=0
+----- openbot version --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+[plugins] media-monitor register cookie=ref:env:XHS_COOKIE adapter=/Users/daniel/AI项目/openbot-media-adapter/.venv/bin/python -m openbot_media_adapter
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — I'm not magic—I'm just extremely persistent with retries and coping strategies.
+
+Usage: openbot [options] [command]
+
+Options:
+  --dev                Dev profile: isolate state under ~/.openbot-dev, default
+                       gateway port 19001, and shift derived ports
+                       (browser/canvas)
+  -h, --help           Display help for command
+  --log-level <level>  Global log level override for file + console
+                       (silent|fatal|error|warn|info|debug|trace)
+  --no-color           Disable ANSI colors
+  --profile <name>     Use a named profile (isolates
+                       OPENBOT_STATE_DIR/OPENBOT_CONFIG_PATH under
+                       ~/.openbot-<name>)
+  -V, --version        output the version number
+
+Commands:
+  Hint: commands suffixed with * have subcommands. Run <command> --help for details.
+  acp *                Agent Control Protocol tools
+  agent                Run one agent turn via the Gateway
+  agents *             Manage isolated agents (workspaces, auth, routing)
+  approvals *          Manage exec approvals (gateway or node host)
+  backup *             Create and verify local backup archives for OpenBot state
+  browser *            Manage OpenBot's dedicated browser (Chrome/Chromium)
+  channels *           Manage connected chat channels (Telegram, Discord, etc.)
+  clawbot *            Legacy clawbot command aliases
+  completion           Generate shell completion script
+  config *             Non-interactive config helpers
+                       (get/set/unset/file/validate). Default: starts setup
+                       wizard.
+  configure            Interactive setup wizard for credentials, channels,
+exit=0
+----- openbot status --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — Say "stop" and I'll stop—say "ship" and we'll both learn a lesson.
+
+Usage: openbot status [options]
+
+Show channel health and recent session recipients
+
+Options:
+  --all           Full diagnosis (read-only, pasteable) (default: false)
+  --debug         Alias for --verbose (default: false)
+  --deep          Probe channels (WhatsApp Web + Telegram + Discord + Slack +
+                  Signal) (default: false)
+  -h, --help      Display help for command
+  --json          Output JSON instead of text (default: false)
+  --timeout <ms>  Probe timeout in milliseconds (default: "10000")
+  --usage         Show model provider usage/quota snapshots (default: false)
+  --verbose       Verbose logging (default: false)
+
+Examples:
+  openbot status
+    Show channel health + session summary.
+  openbot status --all
+    Full diagnosis (read-only).
+  openbot status --json
+    Machine-readable output.
+  openbot status --usage
+    Show model provider usage/quota snapshots.
+  openbot status --deep
+    Run channel probes (WA + Telegram + Discord + Slack + Signal).
+  openbot status --deep --timeout 5000
+    Tighten probe timeout.
+
+Docs: https://docs.openbot.love/cli/status
+
+exit=0
+----- openbot plugins --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+[plugins] media-monitor register cookie=ref:env:XHS_COOKIE adapter=/Users/daniel/AI项目/openbot-media-adapter/.venv/bin/python -m openbot_media_adapter
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — iMessage green bubble energy, but for everyone.
+
+Usage: openbot plugins [options] [command]
+
+Manage OpenBot plugins and extensions
+
+Options:
+  -h, --help  Display help for command
+
+Commands:
+  disable     Disable a plugin in config
+  doctor      Report plugin load issues
+  enable      Enable a plugin in config
+  help        Display help for command
+  info        Show plugin details
+  install     Install a plugin (path, archive, or npm spec)
+  list        List discovered plugins
+  uninstall   Uninstall a plugin
+  update      Update installed plugins (npm installs only)
+
+Docs: https://docs.openbot.love/cli/plugins
+
+exit=0
+----- openbot gateway --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — Your personal assistant, minus the passive-aggressive calendar reminders.
+
+Usage: openbot gateway [options] [command]
+
+Run, inspect, and query the WebSocket Gateway
+
+Options:
+  --allow-unconfigured       Allow gateway start without gateway.mode=local in
+                             config (default: false)
+  --auth <mode>              Gateway auth mode
+                             ("none"|"token"|"password"|"trusted-proxy")
+  --bind <mode>              Bind mode
+                             ("loopback"|"lan"|"tailnet"|"auto"|"custom").
+                             Defaults to config gateway.bind (or loopback).
+  --claude-cli-logs          Only show claude-cli logs in the console (includes
+                             stdout/stderr) (default: false)
+  --compact                  Alias for "--ws-log compact" (default: false)
+  --dev                      Create a dev config + workspace if missing (no
+                             BOOTSTRAP.md) (default: false)
+  --force                    Kill any existing listener on the target port
+                             before starting (default: false)
+  -h, --help                 Display help for command
+  --password <password>      Password for auth mode=password
+  --password-file <path>     Read gateway password from file
+  --port <port>              Port for the gateway WebSocket
+  --raw-stream               Log raw model stream events to jsonl (default:
+                             false)
+  --raw-stream-path <path>   Raw stream jsonl path
+  --reset                    Reset dev config + credentials + sessions +
+                             workspace (requires --dev) (default: false)
+  --tailscale <mode>         Tailscale exposure mode ("off"|"serve"|"funnel")
+  --tailscale-reset-on-exit  Reset Tailscale serve/funnel configuration on
+                             shutdown (default: false)
+  --token <token>            Shared token required in connect.params.auth.token
+                             (default: OPENCLAW_GATEWAY_TOKEN env if set)
+exit=0
+----- openbot onboard --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — We ship features faster than Apple ships calculator updates.
+
+Usage: openbot onboard [options]
+
+Interactive wizard to set up the gateway, workspace, and skills
+
+Options:
+  --accept-risk                            Acknowledge that agents are powerful and full system access is risky (required for --non-interactive) (default: false)
+  --ai-gateway-api-key <key>               Vercel AI Gateway API key
+  --anthropic-api-key <key>                Anthropic API key
+  --auth-choice <choice>                   Auth: token|openai-codex|chutes|vllm|apiKey|openai-api-key|mistral-api-key|openrouter-api-key|kilocode-api-key|ai-gateway-api-key|cloudflare-ai-gateway-api-key|moonshot-api-key|kimi-code-api-key|gemini-api-key|zai-api-key|xiaomi-api-key|minimax-api|synthetic-api-key|venice-api-key|together-api-key|huggingface-api-key|opencode-zen|opencode-go|xai-api-key|litellm-api-key|qianfan-api-key|modelstudio-api-key-cn|modelstudio-api-key|volcengine-api-key|byteplus-api-key|moonshot-api-key-cn|github-copilot|gemini-api-key|google-gemini-cli|zai-api-key|zai-coding-global|zai-coding-cn|zai-global|zai-cn|xiaomi-api-key|minimax-portal|qwen-portal|copilot-proxy|apiKey|opencode-zen|minimax-api|minimax-api-key-cn|minimax-api-lightning|qianfan-api-key|modelstudio-api-key-cn|modelstudio-api-key|custom-api-key|skip|setup-token|oauth|claude-cli|codex-cli|minimax-cloud|minimax
+  --byteplus-api-key <key>                 BytePlus API key
+  --cloudflare-ai-gateway-account-id <id>  Cloudflare Account ID
+  --cloudflare-ai-gateway-api-key <key>    Cloudflare AI Gateway API key
+  --cloudflare-ai-gateway-gateway-id <id>  Cloudflare AI Gateway ID
+  --custom-api-key <key>                   Custom provider API key (optional)
+  --custom-base-url <url>                  Custom provider base URL
+  --custom-compatibility <mode>            Custom provider API compatibility: openai|anthropic (default: openai)
+  --custom-model-id <id>                   Custom provider model ID
+  --custom-provider-id <id>                Custom provider ID (optional; auto-derived by default)
+  --daemon-runtime <runtime>               Daemon runtime: node|bun
+  --flow <flow>                            Wizard flow: quickstart|advanced|manual
+  --gateway-auth <mode>                    Gateway auth: token|password
+  --gateway-bind <mode>                    Gateway bind: loopback|tailnet|lan|auto|custom
+  --gateway-password <password>            Gateway password (password auth)
+  --gateway-port <port>                    Gateway port
+  --gateway-token <token>                  Gateway token (token auth)
+  --gateway-token-ref-env <name>           Gateway token SecretRef env var name (token auth; e.g. OPENCLAW_GATEWAY_TOKEN)
+  --gemini-api-key <key>                   Gemini API key
+  -h, --help                               Display help for command
+  --huggingface-api-key <key>              Hugging Face API key (HF token)
+  --install-daemon                         Install gateway service
+  --json                                   Output JSON summary (default: false)
+  --kilocode-api-key <key>                 Kilo Gateway API key
+  --kimi-code-api-key <key>                Kimi Coding API key
+exit=0
+----- openbot nodes --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — Powered by open source, sustained by spite and good documentation.
+
+Usage: openbot nodes [options] [command]
+
+Manage gateway-owned nodes (pairing, status, invoke, and media)
+
+Options:
+  -h, --help  Display help for command
+
+Commands:
+  approve     Approve a pending pairing request
+  camera      Capture camera media from a paired node
+  canvas      Capture or render canvas content from a paired node
+  describe    Describe a node (capabilities + supported invoke commands)
+  help        Display help for command
+  invoke      Invoke a command on a paired node
+  list        List pending and paired nodes
+  location    Fetch location from a paired node
+  notify      Send a local notification on a node (mac only)
+  pending     List pending pairing requests
+  push        Send an APNs test push to an iOS node
+  reject      Reject a pending pairing request
+  rename      Rename a paired node (display name override)
+  run         Run a shell command on a node (mac only)
+  screen      Capture screen recordings from a paired node
+  status      List known nodes with connection status and capabilities
+
+Examples:
+  openbot nodes status
+    List known nodes with live status.
+  openbot nodes pairing pending
+    Show pending node pairing requests.
+  openbot nodes run --node <id> --raw "uname -a"
+    Run a shell command on a node.
+  openbot nodes camera snap --node <id>
+exit=0
+----- openbot skills --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — Alexa, but with taste.
+
+Usage: openbot skills [options] [command]
+
+List and inspect available skills
+
+Options:
+  -h, --help  Display help for command
+
+Commands:
+  check       Check which skills are ready vs missing requirements
+  info        Show detailed information about a skill
+  list        List all available skills
+
+Docs: https://docs.openbot.love/cli/skills
+
+exit=0
+----- openbot models --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — I'll do the boring stuff while you dramatically stare at the logs like it's cinema.
+
+Usage: openbot models [options] [command]
+
+Model discovery, scanning, and configuration
+
+Options:
+  --agent <id>     Agent id to inspect (overrides
+                   OPENCLAW_AGENT_DIR/PI_CODING_AGENT_DIR)
+  -h, --help       Display help for command
+  --status-json    Output JSON (alias for `models status --json`) (default:
+                   false)
+  --status-plain   Plain output (alias for `models status --plain`) (default:
+                   false)
+
+Commands:
+  aliases          Manage model aliases
+  auth             Manage model auth profiles
+  fallbacks        Manage model fallback list
+  image-fallbacks  Manage image model fallback list
+  list             List models (configured by default)
+  scan             Scan OpenRouter free models for tools + images
+  set              Set the default model
+  set-image        Set the image model
+  status           Show configured model state
+
+Docs: https://docs.openbot.love/cli/models
+
+exit=0
+----- openbot update --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — I'll do the boring stuff while you dramatically stare at the logs like it's cinema.
+
+Usage: openbot update [options] [command]
+
+Update OpenBot and inspect update channel status
+
+Options:
+  --channel <stable|beta|dev>  Persist update channel (git + npm)
+  --dry-run                    Preview update actions without making changes
+                               (default: false)
+  -h, --help                   Display help for command
+  --json                       Output result as JSON (default: false)
+  --no-restart                 Skip restarting the gateway service after a
+                               successful update
+  --tag <dist-tag|version>     Override npm dist-tag or version for this update
+  --timeout <seconds>          Timeout for each update step in seconds (default:
+                               1200)
+  --yes                        Skip confirmation prompts (non-interactive)
+                               (default: false)
+
+Commands:
+  status                       Show update channel and version status
+  wizard                       Interactive update wizard
+
+What this does:
+  - Git checkouts: fetches, rebases, installs deps, builds, and runs doctor
+  - npm installs: updates via detected package manager
+
+Switch channels:
+  - Use --channel stable|beta|dev to persist the update channel in config
+  - Run openbot update status to see the active channel and source
+  - Use --tag <dist-tag|version> for a one-off npm update without persisting
+
+Non-interactive:
+  - Use --yes to accept downgrade prompts
+exit=0
+----- openbot sandbox --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — I'm the middleware between your ambition and your attention span.
+
+Usage: openbot sandbox [options] [command]
+
+Manage sandbox containers (Docker-based agent isolation)
+
+Options:
+  -h, --help  Display help for command
+
+Commands:
+  explain     Explain effective sandbox/tool policy for a session/agent
+  list        List sandbox containers and their status
+  recreate    Remove containers to force recreation with updated config
+
+Examples:
+  openbot sandbox list
+    List all sandbox containers.
+  openbot sandbox list --browser
+    List only browser containers.
+  openbot sandbox recreate --all
+    Recreate all containers.
+  openbot sandbox recreate --session main
+    Recreate a specific session.
+  openbot sandbox recreate --agent mybot
+    Recreate agent containers.
+  openbot sandbox explain
+    Explain effective sandbox config.
+
+
+Docs: https://docs.openbot.love/cli/sandbox
+
+exit=0
+----- openbot agents --help -----
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot-p1fix-f68a3c56b/extensions/wecom/index.ts)
+
+🐲 OpenBot 2026.7.12-rc.2 (1ce8f5e) — Give me a workspace and I'll give you fewer tabs, fewer toggles, and more oxygen.
+
+Usage: openbot agents [options] [command]
+
+Manage isolated agents (workspaces + auth + routing)
+
+Options:
+  -h, --help    Display help for command
+
+Commands:
+  add           Add a new isolated agent
+  bind          Add routing bindings for an agent
+  bindings      List routing bindings
+  delete        Delete an agent and prune workspace/state
+  list          List configured agents
+  set-identity  Update an agent identity (name/theme/emoji/avatar)
+  unbind        Remove routing bindings for an agent
+
+Docs: https://docs.openbot.love/cli/agents
+
+exit=0
+----- script existence (package.json) -----
+sbom:cyclonedx PRESENT
+protocol:check PRESENT
+release:check PRESENT
+test:install:smoke PRESENT
+test:channels PRESENT
+android:assemble PRESENT
+ios:build PRESENT
+delivery:release-record:check PRESENT
+gateway:dev PRESENT
+EXIT:0

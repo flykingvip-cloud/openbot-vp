@@ -1,0 +1,15 @@
+=== stage5 HA FILTERED @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+
+stderr | docs/acceptance/stage5-ha-production-wiring-evidence.test.ts > Stage 5 HA production wiring (deploy topology) > E2: docker compose --profile ha config resolves HA service (skip if no docker)
+[stage5] docker compose unavailable — skipped --profile ha config smoke; ledger remains CONDITIONAL
+
+ ✓ docs/acceptance/stage5-ha-production-wiring-evidence.test.ts (6 tests) 263ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  23:30:08
+   Duration  529ms (transform 159ms, setup 187ms, import 6ms, tests 263ms, environment 0ms)
+
+EXIT:0

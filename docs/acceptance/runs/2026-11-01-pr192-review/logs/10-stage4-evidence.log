@@ -1,0 +1,83 @@
+=== stage4 evidence FILTERED @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot-p1fix-f68a3c56b
+
+ ❯ docs/acceptance/stage4-store-evidence.test.ts (13 tests | 1 failed) 86ms
+     ✓ canonical config path is openbot.json under state dir 1ms
+     ✓ default session store is agents/<id>/sessions/sessions.json 0ms
+     ✓ SAFE_SESSION_ID_RE / isValidSessionId reject path traversal shapes 0ms
+     ✓ resolveOAuthDir defaults to <stateDir>/credentials 0ms
+     ✓ ensureMemoryIndexSchema creates meta/files/chunks tables 17ms
+     ✓ documented memory index path pattern is memory/<agentId>.sqlite under state 0ms
+     ✓ ensureKnowledgeIndexSchema initializes without throwing 34ms
+     ✓ db-schema.ts documents aspirational runtime-status (not default SoT) 1ms
+     ✓ resolveReadOnlyQuery accepts SELECT and rejects mutating SQL 0ms
+     ✓ controller lease upserts ha_controller_instance 1ms
+     ✓ default plan skips credentials with reason excluded and does not list a credentials asset 5ms
+     ✓ includeCredentials: true restores prior include-via-state coverage (no excluded skip) 1ms
+     × temp OPENBOT_STATE_DIR: create archive then verify manifest+payload; default omits credentials 23ms
+ ✓ docs/acceptance/stage4-pin-single-shot-evidence.test.ts (4 tests) 338ms
+ ✓ docs/acceptance/stage4-knowledge-archive-restore-evidence.test.ts (2 tests) 47ms
+ ✓ docs/acceptance/stage4-tenant-store-shard-evidence.test.ts (4 tests) 5ms
+│
+◇  Cron ───────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  Legacy cron job storage detected at                                         │
+│  /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/stage4-doctor-cron-9ruat9  │
+│  /jobs.json.                                                                 │
+│  - 1 job still uses legacy `jobId`                                           │
+│  - 1 job still uses `schedule.cron`                                          │
+│  - 1 job still uses top-level payload fields                                 │
+│  Repair with openbot doctor --fix to normalize the store before the          │
+│  next scheduler run.                                                         │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────╯
+│
+◇  Cron ───────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  Legacy cron job storage detected at                                         │
+│  /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/stage4-doctor-cron-yes-or  │
+│  sUp5/jobs.json.                                                             │
+│  - 1 job still uses top-level payload fields                                 │
+│  Repair with openbot doctor --fix to normalize the store before the          │
+│  next scheduler run.                                                         │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────╯
+│
+◇  Doctor changes ─────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  Cron store normalized at                                                    │
+│  /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/stage4-doctor-cron-yes-or  │
+│  sUp5/jobs.json.                                                             │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────╯
+ ✓ docs/acceptance/stage4-doctor-migration-evidence.test.ts (3 tests) 9ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  docs/acceptance/stage4-store-evidence.test.ts > Stage 4 backup create→verify full-chain (E3, narrow PASS) > temp OPENBOT_STATE_DIR: create archive then verify manifest+payload; default omits credentials
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ docs/acceptance/stage4-store-evidence.test.ts:279:85
+    277|         expect(listed.some((p) => p.endsWith(`${path.sep}manifest.json…
+    278|         expect(listed.some((p) => p.endsWith(`${path.sep}state.txt`)))…
+    279|         expect(listed.some((p) => p.includes(`${path.sep}credentials${…
+       |                                                                                     ^
+    280|         expect(listed.some((p) => p.endsWith(`${path.sep}oauth.json`))…
+    281|         const manifestPath = listed.find((p) => p.endsWith(`${path.sep…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 25 passed (26)
+   Start at  23:30:07
+   Duration  9.43s (transform 3.13s, setup 329ms, import 8.24s, tests 485ms, environment 0ms)
+
+EXIT:1

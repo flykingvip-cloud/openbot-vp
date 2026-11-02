@@ -1,0 +1,4 @@
+2026-11-02 06:54:04 CST
+PIN=d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c
+REMOTE=git@github.com-flykingvip:flykingvip-cloud/openbot-vp.git
+/dev/disk3s5   926Gi   847Gi    22Gi    98%     40M  235M   14%   /System/Volumes/Data

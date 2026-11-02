@@ -1,0 +1,169 @@
+=== multi-end tool probes @ 1ce8f5ee4e8c852d45a9c6a30a623e0bed082587 ===
+----- which tools -----
+/usr/bin/xcodebuild
+Xcode 26.6
+Build version 17F113
+/usr/bin/swift
+swift-driver version: 1.148.6 Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)
+Target: arm64-apple-macosx26.0
+/usr/bin/java
+openjdk version "17.0.17" 2025-10-21
+OpenJDK Runtime Environment Homebrew (build 17.0.17+0)
+OpenJDK 64-Bit Server VM Homebrew (build 17.0.17+0, mixed mode, sharing)
+dotnet not found
+hvigorw not found
+apps/android/gradlew
+----- android ./gradlew tasks (python hard timeout 90s) -----
+
+ERROR: JAVA_HOME is set to an invalid directory: /opt/homebrew/Cellar/openjdk@17/17.0.17/libexec/openjdk.jdk/Contents/Home
+
+Please set the JAVA_HOME variable in your environment to match the
+location of your Java installation.
+
+
+gradle_exit=1
+----- ios: xcodegen project.yml present; xcodeproj may be generated -----
+-rwxr-xr-x@ 1 daniel  staff  11841 Nov  1 22:42 apps/ios/project.yml
+xcodeproj_count=0
+----- macos: SwiftPM list BLOCKED (no swift build); Package.swift targets via swift package dump-package dry -----
+{
+  "cLanguageStandard" : null,
+  "cxxLanguageStandard" : null,
+  "defaultLocalization" : null,
+  "dependencies" : [
+    {
+      "sourceControl" : [
+        {
+          "identity" : "menubarextraaccess",
+          "location" : {
+            "remote" : [
+              {
+                "urlString" : "https://github.com/orchetect/MenuBarExtraAccess"
+              }
+            ]
+          },
+          "productFilter" : null,
+          "requirement" : {
+            "exact" : [
+              "1.3.1"
+            ]
+          },
+          "traits" : [
+            {
+              "name" : "default"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sourceControl" : [
+        {
+          "identity" : "swift-subprocess",
+          "location" : {
+            "remote" : [
+              {
+                "urlString" : "https://github.com/swiftlang/swift-subprocess.git"
+              }
+            ]
+          },
+          "productFilter" : null,
+          "requirement" : {
+            "range" : [
+              {
+                "lowerBound" : "1.0.2",
+                "upperBound" : "2.0.0"
+              }
+            ]
+          },
+          "traits" : [
+            {
+              "name" : "default"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sourceControl" : [
+        {
+          "identity" : "swift-log",
+          "location" : {
+            "remote" : [
+              {
+                "urlString" : "https://github.com/apple/swift-log.git"
+              }
+            ]
+          },
+          "productFilter" : null,
+          "requirement" : {
+            "range" : [
+              {
+                "lowerBound" : "1.8.0",
+                "upperBound" : "2.0.0"
+              }
+            ]
+          },
+          "traits" : [
+            {
+              "name" : "default"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sourceControl" : [
+        {
+          "identity" : "sparkle",
+          "location" : {
+            "remote" : [
+              {
+                "urlString" : "https://github.com/sparkle-project/Sparkle"
+              }
+            ]
+          },
+          "productFilter" : null,
+          "requirement" : {
+            "range" : [
+              {
+                "lowerBound" : "2.8.1",
+                "upperBound" : "3.0.0"
+              }
+            ]
+          },
+          "traits" : [
+            {
+              "name" : "default"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sourceControl" : [
+        {
+          "identity" : "peekaboo",
+          "location" : {
+            "remote" : [
+              {
+                "urlString" : "https://github.com/steipete/Peekaboo.git"
+              }
+            ]
+          },
+          "productFilter" : null,
+          "requirement" : {
+            "revision" : [
+              "8d5e638e6ac9e93fae7d8dcb2ac0a0f01f3d49ec"
+            ]
+          },
+          "traits" : [
+            {
+              "name" : "default"
+            }
+      
+
+dump_package_exit=0
+----- windows: no dotnet build (presence only) -----
+----- harmony: no DevEco/hvigor assumed -----
+DONE

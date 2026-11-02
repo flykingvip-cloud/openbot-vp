@@ -1,0 +1,21 @@
+{
+  "url": "https://github.com/flykingvip-cloud/openbot-vp/pull/194",
+  "number": 194,
+  "state": "MERGED",
+  "mergedAt": "2026-11-02T00:16:06Z",
+  "mergedAtAsiaShanghai": "2026-11-02 08:16:06 Asia/Shanghai",
+  "title": "chore(ledger): Path B LIVE seq152 tip d42fbc3ca2b4",
+  "headRefName": "chore/ledger-seq152-d42fbc3ca2b4",
+  "headOid": "7ecc3edb8c324d08f2bab352bc983ece6f0c67d6",
+  "mergeCommit": "fde7444fba79cb74569c59e40e36106eeed29dc8",
+  "changedFiles": 2,
+  "files": ["deploy/production/RELEASE_RECORD.md", "deploy/production/releases.jsonl"],
+  "scopeNote": "ledger-only",
+  "localDetachedWorktree": {
+    "path": "/Users/daniel/AI VP/openbot-pr194-ledger-seq152-accept",
+    "HEAD": "7ecc3edb8c324d08f2bab352bc983ece6f0c67d6"
+  },
+  "readableDiffPath": "docs/acceptance/runs/2026-11-02-pr194-locate/pr194.diff",
+  "additions": 10,
+  "deletions": 9
+}

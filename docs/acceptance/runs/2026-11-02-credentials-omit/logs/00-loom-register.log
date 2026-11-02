@@ -1,0 +1,5 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 loom /Users/daniel/AI VP/openbot-acceptance-coverage-20261101
+> node --import tsx scripts/loom.ts register --task 'p1-fix-20261101:全栈验收' --owner grok-bot --paths 'docs/acceptance/runs/2026-11-02-credentials-omit/**' --ide cursor --agent grok-bot
+
+Registered "p1-fix-20261101:全栈验收" (owner=grok-bot, state=active, paths=62, sessions=1). Wrote /Users/daniel/AI VP/openbot-acceptance-coverage-20261101/.loom/registry.yaml
