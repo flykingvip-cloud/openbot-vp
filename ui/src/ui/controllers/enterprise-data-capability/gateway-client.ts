@@ -1177,6 +1177,8 @@ export function createEnterpriseDataCapabilityGateway(
           enabled: Boolean(binding.enabled),
           materializationTeamLabel: readRpcString(binding.materializationTeamLabel),
           updatedAt: readRpcString(binding.updatedAt),
+          supplyRecordCount:
+            typeof binding.supplyRecordCount === "number" ? binding.supplyRecordCount : undefined,
         }));
         return { ok: true, data: bindings };
       } catch {

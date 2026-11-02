@@ -26,6 +26,7 @@ import {
   findEnterpriseKnowledgeProjectionBinding,
   listEnterpriseKnowledgeProjectionBindings,
 } from "../enterprise-data/enterprise-knowledge-projection-binding-store.js";
+import { listKnowledgeFeedItems } from "../enterprise-data/knowledge-feed-item-store.js";
 import {
   classifyMcpCapabilityDiscovery,
   describeMcpDiscoveryForSeatFailure,
@@ -830,7 +831,14 @@ export const enterpriseDataHandlers: GatewayRequestHandlers = {
           tenantId,
           projectionId: stringValue(params.projectionId) || undefined,
           capabilityId: stringValue(params.capabilityId) || undefined,
-        }),
+        }).map((binding) => ({
+          ...binding,
+          supplyRecordCount: listKnowledgeFeedItems({
+            store,
+            tenantId,
+            projectionId: binding.projectionId,
+          }).length,
+        })),
       );
       respond(true, { tenantId, bindings });
     } catch (error) {

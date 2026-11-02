@@ -111,6 +111,34 @@ describe("knowledge consume tools", () => {
     );
   });
 
+  it("search keeps enterprise feed rows ahead of indexed library hits", async () => {
+    knowledgeSearch.mockResolvedValue({
+      searchMode: "indexed",
+      evidence: [evidence()],
+      results: [
+        {
+          id: "obj:enterprise:feed:warehouse",
+          title: "001-用友T+仓库",
+          source: "enterprise",
+          kind: "document",
+          summary: 'warehouse {"items":[{"Name":"京扇子仓"}]}',
+          tags: ["erp-yonyou-tplus"],
+        },
+      ],
+    });
+    const tool = createKnowledgeSearchTool({ gatewayClientUser: "user@example.com" });
+    const details = (await tool.execute("call-feed", { query: "用友仓库" })).details as {
+      searchMode: string;
+      note?: string;
+      hits: Array<{ objectId: string; title: string; excerpt: string }>;
+    };
+    expect(details.searchMode).toBe("enterprise_feed");
+    expect(details.hits[0]?.objectId).toBe("obj:enterprise:feed:warehouse");
+    expect(details.hits[0]?.excerpt).toContain("京扇子仓");
+    expect(details.hits[1]?.objectId).toBe("obj:doc:doc-resume");
+    expect(details.note).toContain("云电脑");
+  });
+
   it("search substring fallback returns object ids and not_indexed", async () => {
     knowledgeSearch.mockResolvedValue({
       searchMode: "substring",

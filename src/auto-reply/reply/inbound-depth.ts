@@ -2,6 +2,7 @@ import { resolveAccountComputerWebRoute } from "../../agents/sandbox/account-com
 import { getChatInboundDepthAgentAllowlist } from "../../gateway/chat-inbound-flags.js";
 import { parseKnowledgePublishIntentFromMessage } from "../../gateway/knowledge/publish-intent.js";
 import { parseAgentSessionKey } from "../../sessions/session-key-utils.js";
+import { isEnterpriseDataKnowledgeTurn } from "./enterprise-data-intent.js";
 
 export const INBOUND_DEPTH_CLASSIFIER_VERSION = "inbound-depth-v1";
 
@@ -387,6 +388,11 @@ export function classifyInboundDepth(input: InboundDepthInput): InboundDepthDeci
     }
     if (explicitKnowledge) {
       return decision("retrieve", ["explicit_knowledge_query"], "strong");
+    }
+    // Before account-computer routing. 登录 alone opens 云电脑; a warehouse /
+    // inventory question must stay retrieve so tools and the knowledge feed run.
+    if (input.sessionKind === "employee" && isEnterpriseDataKnowledgeTurn(text)) {
+      return decision("retrieve", ["steward_enterprise_data_intent"], "strong");
     }
     const accountComputerRoute = resolveAccountComputerWebRoute(text);
     if (accountComputerRoute === "public_fetch" || accountComputerRoute === "public_search") {

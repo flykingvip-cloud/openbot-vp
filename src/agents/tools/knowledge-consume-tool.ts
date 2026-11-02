@@ -225,14 +225,14 @@ function searchToolDescription(consumeScope: KnowledgeConsumeSearchScope): strin
   if (consumeScope.focused && consumeScope.knowledgeBaseIds.length > 0) {
     return `Search only the selected knowledge base(s): ${consumeScope.knowledgeBaseIds.join(", ")}. Do not search the rest of the library. Returns objectId and ku:// sourceUri for knowledge_get.`;
   }
-  return "Search ingested Knowledge Universe documents the signed-in employee can read. Use for library files, resumes, policies, and knowledge-base passages. Do not use for workspace/session memory (memory_search), API source bind/invoke (knowledge_source), or CRM/ERP rows (data_capability). Returns objectId and ku:// sourceUri for knowledge_get. Never search the filesystem.";
+  return "Search the signed-in employee's Knowledge Universe. Use for library files and for materialized enterprise feed objects such as 用友 T+ 仓库/存货. Do not use for workspace memory (memory_search) or API bind/invoke (knowledge_source). data_capability action=invoke does not return ERP rows. Returns objectId for knowledge_get. Never search the filesystem or open 云电脑 for these rows.";
 }
 
 function getToolDescription(consumeScope: KnowledgeConsumeSearchScope): string {
   if (consumeScope.focused && consumeScope.docIds.length === 1) {
     return `Read the currently selected Knowledge Universe document (${consumeScope.docIds[0]}). Omit objectId to load that file. Refuse documents outside this selection.`;
   }
-  return "Read more text from one ingested Knowledge Universe document after knowledge_search. Pass objectId or ku:// sourceUri. Returns object metadata plus current-version chunks. Not for memory files, API sources, or CRM/ERP. Do not guess workspace paths or run exec find.";
+  return "Read one Knowledge Universe object after knowledge_search. Pass objectId or ku:// sourceUri. For an enterprise feed object the summary is the materialized payload excerpt (warehouse and inventory rows). Not for memory files or live connector calls. Do not guess workspace paths, run exec find, or open 云电脑.";
 }
 
 async function loadScopedObject(
@@ -435,18 +435,34 @@ export function createKnowledgeSearchTool(options?: KnowledgeConsumeToolOptions)
       }
 
       const result = await knowledgeSearch(client, { query, limit });
+      const feedHits = result.results
+        .filter((item) => item.source === "enterprise")
+        .map(hitFromObject);
       if (result.searchMode === "indexed" && result.evidence.length > 0) {
+        const hits = [...feedHits, ...result.evidence.slice(0, limit).map(hitFromEvidence)].slice(
+          0,
+          limit,
+        );
         return jsonResult({
           ok: true,
-          searchMode: "indexed",
-          hits: result.evidence.slice(0, limit).map(hitFromEvidence),
+          searchMode: feedHits.length > 0 ? "enterprise_feed" : "indexed",
+          hits,
+          ...(feedHits.length > 0
+            ? {
+                note: "Enterprise feed hits are materialized knowledge objects. Cite their title and excerpt. Do not open 云电脑 and do not invoke connector actions.",
+              }
+            : {}),
         });
       }
       return jsonResult({
         ok: true,
-        searchMode: "substring",
+        searchMode: feedHits.length > 0 ? "enterprise_feed" : "substring",
         hits: result.results.slice(0, limit).map(hitFromObject),
-        hint: "not_indexed",
+        ...(feedHits.length > 0
+          ? {
+              note: "Enterprise feed hits are materialized knowledge objects. Cite their title and excerpt. Do not open 云电脑 and do not invoke connector actions.",
+            }
+          : { hint: "not_indexed" }),
       });
     },
   };
@@ -531,7 +547,10 @@ export function createKnowledgeGetTool(options?: KnowledgeConsumeToolOptions): A
           : null,
         chunks,
         truncated,
-        ...(chunks.length === 0 ? { hint: "not_indexed" } : {}),
+        ...(chunks.length === 0 && object?.source === "enterprise"
+          ? { hint: "enterprise_feed" }
+          : {}),
+        ...(chunks.length === 0 && object?.source !== "enterprise" ? { hint: "not_indexed" } : {}),
       });
     },
   };

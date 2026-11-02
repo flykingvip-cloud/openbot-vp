@@ -4695,6 +4695,9 @@ export function renderEnterpriseDataGovernanceCenterSurface(
     if (granted > 0) {
       state.seatGrantSeatIds.clear();
       state.seatGrantDepartmentPaths.clear();
+      if (state.capabilityDetailId) {
+        await loadCapabilityDetail(state, gateway, tenantId, state.capabilityDetailId);
+      }
     }
     state.seatGrantNotice =
       failures.length === 0

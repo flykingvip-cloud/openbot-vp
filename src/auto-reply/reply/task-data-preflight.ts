@@ -1,4 +1,5 @@
 import path from "node:path";
+import { isEnterpriseDataKnowledgeTurn } from "./enterprise-data-intent.js";
 
 const PROJECT_DATA_MARKERS =
   /(?:项目风险|风险清单|本周项目|portfolio|project\s+risk|risk\s+register)/iu;
@@ -14,7 +15,8 @@ export type TaskDataPreflightGap =
   | "project_kb"
   | "bot_directory"
   | "schedule_cron"
-  | "memory_history";
+  | "memory_history"
+  | "enterprise_feed";
 
 export function detectTaskDataPreflightGaps(text: string): TaskDataPreflightGap[] {
   const normalized = text.trim();
@@ -34,6 +36,9 @@ export function detectTaskDataPreflightGaps(text: string): TaskDataPreflightGap[
   if (MEMORY_DATA_MARKERS.test(normalized)) {
     gaps.push("memory_history");
   }
+  if (isEnterpriseDataKnowledgeTurn(normalized)) {
+    gaps.push("enterprise_feed");
+  }
   return gaps;
 }
 
@@ -46,6 +51,8 @@ const GAP_GUIDANCE: Record<TaskDataPreflightGap, string> = {
     "confirm user timezone and existing cron/schedule entries before proposing times; show local time, not UTC-only",
   memory_history:
     "run memory_search / read recent transcript before claiming prior work is missing; cite what was found or not found",
+  enterprise_feed:
+    "answer 用友 T+ warehouse and inventory from Knowledge Universe feed objects already in context (titles such as 001-用友T+仓库 / 001-用友T+存货). If they are not in context, call knowledge_search then knowledge_get with the native tool channel and cite the object title plus the excerpt rows. Do not call browser, do not open 云电脑, and do not use data_capability action=invoke (it is knowledge-object-only and returns no connector rows).",
 };
 
 /**

@@ -8,6 +8,10 @@ import type { KnowledgeActionSuggestion } from "./actions/types.js";
 import { resolveKnowledgeSourceContext } from "./context.js";
 import { listKnowledgeDiscoveryEvents } from "./discovery/event-projector.js";
 import type { KnowledgeDiscoveryEvent } from "./discovery/types.js";
+import {
+  knowledgeObjectMatchesQuery,
+  preferEnterpriseFeedMatches,
+} from "./enterprise-data-query.js";
 import { summarizeKnowledgeFeed } from "./feed/knowledge-feed-adapter.js";
 import type { KnowledgeFeedItem as FeedItem } from "./feed/types.js";
 import { filterRelationshipGraph } from "./graph-builder.js";
@@ -54,13 +58,7 @@ function normalizeQuery(query: string | undefined): string {
 }
 
 function matchesQuery(object: KnowledgeObject, query: string): boolean {
-  if (!query) {
-    return true;
-  }
-  const haystack = [object.title, object.summary, object.tags.join(" "), object.source, object.kind]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(query);
+  return knowledgeObjectMatchesQuery(object, query);
 }
 
 function objectIndex(bundle: KnowledgeSourceBundle): Map<string, KnowledgeObject> {
@@ -91,7 +89,10 @@ export function knowledgeSearchFromBundle(
 } {
   const query = normalizeQuery(params.query);
   const limit = Math.min(Math.max(params.limit ?? 20, 1), 50);
-  const results = bundle.objects.filter((item) => matchesQuery(item, query)).slice(0, limit);
+  const results = preferEnterpriseFeedMatches(
+    bundle.objects.filter((item) => matchesQuery(item, query)),
+    query,
+  ).slice(0, limit);
   return {
     results,
     evidence: [],
@@ -116,6 +117,7 @@ export async function knowledgeSearch(
   const context = await resolveKnowledgeSourceContext(client);
   const retrievalContext = retrievalContextFromKnowledgeSourceContext(context);
   const hasIndexedChunks = await anyAccessibleKnowledgeBaseHasIndexedChunks({ retrievalContext });
+  const substring = knowledgeSearchFromBundle(bundle, params);
   if (hasIndexedChunks) {
     const evidence = await searchKnowledgeEvidence({
       query,
@@ -123,8 +125,10 @@ export async function knowledgeSearch(
       maxResults: Math.min(Math.max(params.limit ?? 20, 1), 50),
     });
     if (evidence.length > 0) {
+      // Indexed library hits must not hide materialized enterprise feed objects
+      // (用友 T+ 仓库 / 存货). Those rows live on the feed, not in KB chunks.
       return {
-        results: [],
+        results: substring.results.filter((item) => item.source === "enterprise"),
         evidence,
         searchMode: "indexed" as const,
         sourceSummary: bundle.sourceSummary,
@@ -135,7 +139,7 @@ export async function knowledgeSearch(
     }
   }
 
-  return knowledgeSearchFromBundle(bundle, params);
+  return substring;
 }
 
 export function knowledgeRelationshipsFromBundle(

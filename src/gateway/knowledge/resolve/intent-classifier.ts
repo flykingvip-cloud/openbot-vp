@@ -15,7 +15,10 @@ type IntentRule = {
 const INTENT_RULES: IntentRule[] = [
   {
     intentType: "analysis",
-    patterns: [/分析|为什么|下降|趋势|指标|成交|流失|metric|rate|analyze|decline/i],
+    patterns: [
+      /分析|为什么|下降|趋势|指标|成交|流失|metric|rate|analyze|decline/i,
+      /用友|畅捷通|chanjet|yonyou|仓库|存货|库存|数据产品|往来单位|销货单/i,
+    ],
     sources: ["enterprise", "data"],
     signal: "analysis-keywords",
   },
