@@ -128,6 +128,37 @@ describe("createModelSelectionState no longer inherits session model overrides",
     expect(state.provider).toBe(defaultProvider);
     expect(state.model).toBe(defaultModel);
   });
+
+  it("ignores a sticky ent/* runtime pin on an enterprise session", async () => {
+    const { resolveKnowledgeSourceContext } = await import("../../gateway/knowledge/context.js");
+    vi.mocked(resolveKnowledgeSourceContext).mockResolvedValueOnce({
+      tenantId: "tenant-acme",
+      seatId: "seat-1",
+      userId: "user-1",
+      hasEnterpriseScope: true,
+    });
+    const state = await createModelSelectionState({
+      cfg: {} as OpenBotConfig,
+      agentCfg: undefined,
+      sessionEntry: makeEntry({
+        modelProvider: "ent",
+        model: "cc41dd5419/mimo-v2.6-flash",
+      }),
+      sessionStore: { "agent:main:main": makeEntry({}) },
+      sessionKey: "agent:main:main",
+      defaultProvider,
+      defaultModel,
+      provider: defaultProvider,
+      model: defaultModel,
+      hasModelDirective: false,
+      gatewayClientUser: "elledecke204@gmail.com",
+      gatewayClientSessionDomain: "employee",
+    });
+
+    expect(state.provider).toBe(defaultProvider);
+    expect(state.model).toBe(defaultModel);
+    expect(`${state.provider}/${state.model}`).not.toContain("mimo-v2.6-flash");
+  });
 });
 
 describe("createModelSelectionState resolveDefaultReasoningLevel", () => {

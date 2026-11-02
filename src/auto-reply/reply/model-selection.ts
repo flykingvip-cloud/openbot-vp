@@ -13,6 +13,7 @@ import {
 } from "../../agents/model-selection.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { type SessionEntry, updateSessionStore } from "../../config/sessions.js";
+import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 import { resolveKnowledgeSourceContext } from "../../gateway/knowledge/context.js";
 import { buildKnowledgeReplyGatewayClient } from "../../gateway/knowledge/reply-gateway-client.js";
 import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
@@ -349,7 +350,11 @@ export async function createModelSelectionState(params: {
 
   const runtimeModel = sessionEntry?.model?.trim();
   const runtimeProvider = sessionEntry?.modelProvider?.trim();
-  if (runtimeModel) {
+  const runtimeKey = runtimeModel ? `${runtimeProvider || provider}/${runtimeModel}` : "";
+  // Enterprise chats ignore a sticky ent/* runtime pin. That field is the last
+  // run, not the agent primary. A configured primary such as deepseek stays.
+  const stickyEnterprisePin = skipPersistedModelOverride && isEnterpriseRuntimeModelId(runtimeKey);
+  if (runtimeModel && !stickyEnterprisePin) {
     provider = runtimeProvider || defaultProvider;
     model = runtimeModel;
   }
