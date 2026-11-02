@@ -9,8 +9,8 @@ import { resolveTaskContextScope } from "../../auto-reply/reply/task-context-sto
 import type { OpenBotConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import {
+  mutateSessionTaskBoard,
   readSessionTaskBoard,
-  writeSessionTaskBoard,
   type SessionTaskBoard,
   type TrackedTask,
 } from "../../conversation-task/session-task-board.js";
@@ -305,7 +305,10 @@ export function replyForTaskSurfaceUtterance(params: TaskSurfaceReplyParams): st
     }
   }
   if (!plan.outOfRange && sessionFile) {
-    writeSessionTaskBoard(sessionFile, applyKeepOnlyToBoard(board, plan));
+    mutateSessionTaskBoard(sessionFile, (live) => ({
+      board: applyKeepOnlyToBoard(live, plan),
+      value: undefined,
+    }));
   }
   const nextShown = plan.outOfRange ? shownItems : plan.kept;
   writeSnapshot(sessionFile, {
