@@ -9,14 +9,16 @@
  * if targeted actors are no longer mapped. Paths with neither duty nor
  * membership SoT stay unchanged (no false revoke).
  */
-import type { Task } from "@openbot/collaboration-core";
+import type { CollaborationMember, Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
 import {
   hasDeliveryMembershipSurface,
   isMappedDeliveryIdentity,
+  type TrustedPrincipalRosterEntry,
 } from "../collaboration-learning/delivery-actor-binding.js";
 import {
   createWorkspaceCollaborationStores,
+  parseStoredGroupMembersFile,
   readGroupOperatingState,
 } from "../collaboration-learning/shared.js";
 import {
@@ -65,6 +67,40 @@ function uniqueMappedCandidates(ids: readonly string[]): string[] {
   return out;
 }
 
+function toRosterEntries(
+  members: CollaborationMember[] | null | undefined,
+): TrustedPrincipalRosterEntry[] {
+  if (!members?.length) {
+    return [];
+  }
+  return members.map((member) => ({
+    userId: member.userId,
+    memberId: member.memberId,
+    agentId: member.agentId,
+  }));
+}
+
+/**
+ * Best-effort authoritative members roster from the same trusted fileStore as OS.
+ * Used only for same-row principal linking (userId↔memberId) — not a dual-form bus.
+ */
+async function loadTrustedRosterFromFileStore(params: {
+  fileStore: DispatchAuthRecheckStores["fileStore"];
+  groupId: string;
+}): Promise<TrustedPrincipalRosterEntry[]> {
+  try {
+    const raw = await params.fileStore.readGroupFile<
+      CollaborationMember[] | { members?: CollaborationMember[] | null }
+    >({
+      groupId: params.groupId,
+      filename: "members.json",
+    });
+    return toRosterEntries(parseStoredGroupMembersFile(raw) ?? []);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Re-read operating-state membership and (optional) task duty binding.
  * Enforce only when duty binding and/or a membership surface exists.
@@ -85,6 +121,13 @@ export async function recheckCurrentDispatchAuthorization(params: {
    * Production callers omit this. Must not be treated as ok:true.
    */
   _testForceOperatingStateReadError?: Error | (() => Error);
+  /**
+   * Optional trusted auth subjects (handshake) — same shared principal resolution as ACL.
+   * Wake permission duties stay here; subjects only link aliases, they do not grant ACL write.
+   */
+  trustedAuthSubjects?: readonly string[] | null;
+  /** Optional preloaded roster; when omitted, recheck loads members.json from fileStore. */
+  roster?: readonly TrustedPrincipalRosterEntry[] | null;
 }): Promise<DispatchAuthRecheckResult> {
   const groupId = compact(params.groupId);
   if (!groupId) {
@@ -175,7 +218,17 @@ export async function recheckCurrentDispatchAuthorization(params: {
     return { ok: true };
   }
 
-  const revokedActorIds = candidates.filter((id) => !isMappedDeliveryIdentity(operatingState, id));
+  const roster =
+    params.roster !== undefined && params.roster !== null
+      ? [...params.roster]
+      : await loadTrustedRosterFromFileStore({ fileStore, groupId });
+  const resolution = {
+    trustedAuthSubjects: params.trustedAuthSubjects,
+    roster,
+  };
+  const revokedActorIds = candidates.filter(
+    (id) => !isMappedDeliveryIdentity(operatingState, id, undefined, resolution),
+  );
   if (revokedActorIds.length > 0) {
     return {
       ok: false,
