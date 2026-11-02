@@ -92,6 +92,16 @@ export function isGatewayControlUiClientId(raw?: string | null): boolean {
   return normalizeGatewayClientId(raw) === GATEWAY_CLIENT_IDS.CONTROL_UI;
 }
 
+/** First-party native apps that authenticate with the employee's platform session. */
+export function isFirstPartyNativeGatewayClientId(raw?: string | null): boolean {
+  const id = normalizeGatewayClientId(raw);
+  return (
+    id === GATEWAY_CLIENT_IDS.ANDROID_APP ||
+    id === GATEWAY_CLIENT_IDS.IOS_APP ||
+    id === GATEWAY_CLIENT_IDS.MACOS_APP
+  );
+}
+
 export function normalizeGatewayClientName(raw?: string | null): GatewayClientName | undefined {
   return normalizeGatewayClientId(raw);
 }

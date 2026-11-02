@@ -109,10 +109,12 @@ class EmployeeLoginStringsTest {
     assertFalse(source.contains("employee_login_switch_account"))
     assertFalse(source.contains("switchAccount"))
     assertFalse(source.contains("accounts()"))
-    assertTrue(source.contains("employee_login_advanced"))
+    assertFalse(source.contains("employee_login_advanced"))
+    assertFalse(source.contains("employee_login_hide_gateway"))
+    assertFalse(source.contains("employee_login_gateway_label"))
     assertTrue(source.contains("employee_login_forgot_link"))
     assertTrue(source.contains("openbot_auth_logo"))
-    assertTrue(source.contains("gatewayHiddenByDefault"))
+    assertTrue(source.contains("DEFAULT_GATEWAY_BASE_URL"))
   }
 
   @Test

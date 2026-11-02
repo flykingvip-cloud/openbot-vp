@@ -8,8 +8,8 @@ import org.junit.Test
 /** IA rules shared with Mac PlatformAuthView. No Compose runtime. */
 class EmployeeLoginFormTest {
   @Test
-  fun gatewayStartsHidden() {
-    assertTrue(EmployeeLoginForm.gatewayHiddenByDefault)
+  fun gatewayConfigRemovedForEmployees() {
+    assertTrue(EmployeeLoginForm.gatewayConfigRemovedForEmployees)
   }
 
   @Test

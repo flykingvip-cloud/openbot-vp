@@ -103,8 +103,10 @@ import { resolveConnectAuthDecision, resolveConnectAuthState } from "./auth-cont
 import { formatGatewayAuthFailureMessage, type AuthProvidedKind } from "./auth-messages.js";
 import {
   evaluateMissingDeviceIdentity,
+  isFirstPartyNativeTrustedProxyAuth,
   isTrustedProxyControlUiOperatorAuth,
   resolveControlUiAuthPolicy,
+  shouldAllowSilentLocalPairing,
   shouldSkipControlUiPairing,
 } from "./connect-policy.js";
 import { isUnauthorizedRoleError, UnauthorizedFloodGuard } from "./unauthorized-flood-guard.js";
@@ -158,34 +160,6 @@ function resolveHandshakeBrowserSecurityContext(params: {
         ? params.browserRateLimiter
         : params.rateLimiter,
   };
-}
-
-function shouldAllowSilentLocalPairing(params: {
-  isLocalClient: boolean;
-  hasBrowserOriginHeader: boolean;
-  isControlUi: boolean;
-  isWebchat: boolean;
-  reason: "not-paired" | "role-upgrade" | "scope-upgrade" | "metadata-upgrade";
-  /** Platform trusted-proxy Control UI / webchat: silent-approve even for remote clients. */
-  trustedProxyAuthOk?: boolean;
-}): boolean {
-  const reasonOk = params.reason === "not-paired" || params.reason === "scope-upgrade";
-  if (!reasonOk) {
-    return false;
-  }
-  // Production Control UI authenticates via trusted-proxy (nginx). Skipping
-  // pairing there left browsers out of paired.json and emptied "我的设备".
-  if (
-    params.trustedProxyAuthOk &&
-    (params.isControlUi || params.isWebchat) &&
-    (params.reason === "not-paired" || params.reason === "scope-upgrade")
-  ) {
-    return true;
-  }
-  return (
-    params.isLocalClient &&
-    (!params.hasBrowserOriginHeader || params.isControlUi || params.isWebchat)
-  );
 }
 
 function shouldSkipBackendSelfPairing(params: {
@@ -954,6 +928,11 @@ export function attachGatewayWsMessageHandler(params: {
           const requirePairing = async (
             reason: "not-paired" | "role-upgrade" | "scope-upgrade" | "metadata-upgrade",
           ) => {
+            const firstPartyNativeTrustedProxyAuthOk = isFirstPartyNativeTrustedProxyAuth({
+              clientId: connectParams.client.id,
+              authOk,
+              authMethod,
+            });
             const allowSilentLocalPairing = shouldAllowSilentLocalPairing({
               isLocalClient,
               hasBrowserOriginHeader,
@@ -961,6 +940,7 @@ export function attachGatewayWsMessageHandler(params: {
               isWebchat,
               reason,
               trustedProxyAuthOk,
+              firstPartyNativeTrustedProxyAuthOk,
             });
             const pairing = await requestDevicePairing({
               deviceId: device.id,

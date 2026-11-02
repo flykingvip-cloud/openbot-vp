@@ -1,3 +1,4 @@
+import { isFirstPartyNativeGatewayClientId } from "../../protocol/client-info.js";
 import type { ConnectParams } from "../../protocol/index.js";
 import type { GatewayRole } from "../../role-policy.js";
 import { roleCanSkipDeviceIdentity } from "../../role-policy.js";
@@ -63,6 +64,55 @@ export function isTrustedProxyControlUiOperatorAuth(params: {
     params.role === "operator" &&
     params.authOk &&
     params.authMethod === "trusted-proxy"
+  );
+}
+
+export function isFirstPartyNativeTrustedProxyAuth(params: {
+  clientId: string | undefined;
+  authOk: boolean;
+  authMethod: string | undefined;
+}): boolean {
+  return (
+    params.authOk &&
+    params.authMethod === "trusted-proxy" &&
+    isFirstPartyNativeGatewayClientId(params.clientId)
+  );
+}
+
+/**
+ * Silent-approve device pairing for local trusted clients and for employee
+ * sessions that already authenticated via platform trusted-proxy (Control UI,
+ * webchat, and first-party native apps). Remote unauthenticated clients still
+ * require an explicit pairing approval.
+ */
+export function shouldAllowSilentLocalPairing(params: {
+  isLocalClient: boolean;
+  hasBrowserOriginHeader: boolean;
+  isControlUi: boolean;
+  isWebchat: boolean;
+  reason: "not-paired" | "role-upgrade" | "scope-upgrade" | "metadata-upgrade";
+  /** Platform trusted-proxy Control UI / webchat operator auth. */
+  trustedProxyAuthOk?: boolean;
+  /** First-party native app + platform trusted-proxy session (operator or node). */
+  firstPartyNativeTrustedProxyAuthOk?: boolean;
+}): boolean {
+  const reasonOk = params.reason === "not-paired" || params.reason === "scope-upgrade";
+  if (!reasonOk) {
+    return false;
+  }
+  // Production Control UI / webchat authenticates via trusted-proxy (nginx).
+  // Silent-approve so browsers land in paired.json ("我的设备") without a prompt.
+  if (params.trustedProxyAuthOk && (params.isControlUi || params.isWebchat)) {
+    return true;
+  }
+  // Employee Android/iOS/macOS apps authenticate the same platform session over
+  // WS; without silent approve, remote phones hit "pairing required" after login.
+  if (params.firstPartyNativeTrustedProxyAuthOk) {
+    return true;
+  }
+  return (
+    params.isLocalClient &&
+    (!params.hasBrowserOriginHeader || params.isControlUi || params.isWebchat)
   );
 }
 

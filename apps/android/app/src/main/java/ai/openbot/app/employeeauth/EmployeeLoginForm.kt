@@ -6,9 +6,9 @@ import java.net.URI
 // Pure login-form rules for the cold-start employee screen.
 //
 // Behavioral counterpart to apps/macos/.../PlatformAuth/PlatformAuthView.swift:
-// login | register as the only segmented modes, gateway hidden until 高级,
-// and forgot → code → new password as inline modes (no third tab, no
-// account switcher).
+// login | register as the only segmented modes, gateway is not user-editable
+// (cloud default only), and forgot → code → new password as inline modes
+// (no third tab, no account switcher).
 //
 
 enum class EmployeeLoginMode {
@@ -19,8 +19,8 @@ enum class EmployeeLoginMode {
 }
 
 object EmployeeLoginForm {
-  /** PlatformAuth starts with the gateway field collapsed. */
-  const val gatewayHiddenByDefault: Boolean = true
+  /** Employee apps never expose a gateway field; cloud default is used. */
+  const val gatewayConfigRemovedForEmployees: Boolean = true
 
   fun showsSegmentedControl(mode: EmployeeLoginMode): Boolean = mode == EmployeeLoginMode.Login || mode == EmployeeLoginMode.Register
 

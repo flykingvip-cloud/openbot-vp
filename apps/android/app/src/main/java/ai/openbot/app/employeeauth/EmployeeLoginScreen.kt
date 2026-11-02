@@ -74,8 +74,8 @@ import kotlinx.coroutines.launch
 //
 // Login | register stay on a segmented control. Forgot password continues into
 // a code + new-password reset, then a successful reset signs in and the host
-// opens the Employee Shell WebView. Gateway stays under 高级. This screen does
-// not offer SSO or a multi-account switcher.
+// opens the Employee Shell WebView. Gateway URL is fixed to the cloud default
+// and is not shown. This screen does not offer SSO or a multi-account switcher.
 //
 // Palette is the Mac warm stone / charcoal gold set, not Material dynamic color.
 // The selected segment uses the green from the PlatformAuth reference card.
@@ -111,8 +111,8 @@ fun EmployeeLoginScreen(
   val forgotDevTemplate = stringResource(R.string.employee_login_forgot_dev_code)
 
   var mode by remember { mutableStateOf(EmployeeLoginMode.Login) }
-  var showGatewayField by remember { mutableStateOf(!EmployeeLoginForm.gatewayHiddenByDefault) }
-  var gatewayUrl by remember { mutableStateOf(DEFAULT_GATEWAY_BASE_URL) }
+  // Employee apps always use the cloud default; no gateway config UI.
+  val gatewayUrl = DEFAULT_GATEWAY_BASE_URL
   var email by remember { mutableStateOf("") }
   var password by remember { mutableStateOf("") }
   var inviteCode by remember { mutableStateOf("") }
@@ -221,10 +221,6 @@ fun EmployeeLoginScreen(
         )
         FormFields(
           mode = mode,
-          showGatewayField = showGatewayField,
-          gatewayUrl = gatewayUrl,
-          onGatewayUrl = { gatewayUrl = it },
-          gatewayInvalid = gatewayUrl.isNotBlank() && !gatewayValid,
           email = email,
           onEmail = { email = it },
           password = password,
@@ -246,11 +242,9 @@ fun EmployeeLoginScreen(
         )
         FooterLinks(
           mode = mode,
-          showGatewayField = showGatewayField,
           enabled = !isSubmitting,
           onForgot = { mode = EmployeeLoginMode.Forgot },
           onHaveCode = { mode = EmployeeLoginMode.Reset },
-          onToggleGateway = { showGatewayField = !showGatewayField },
         )
       }
     }
@@ -422,10 +416,6 @@ private fun AuthSegment(
 @Composable
 private fun FormFields(
   mode: EmployeeLoginMode,
-  showGatewayField: Boolean,
-  gatewayUrl: String,
-  onGatewayUrl: (String) -> Unit,
-  gatewayInvalid: Boolean,
   email: String,
   onEmail: (String) -> Unit,
   password: String,
@@ -442,17 +432,6 @@ private fun FormFields(
     modifier = Modifier.fillMaxWidth(),
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    if (showGatewayField) {
-      AuthField(
-        label = stringResource(R.string.employee_login_gateway_label),
-        value = gatewayUrl,
-        onValueChange = onGatewayUrl,
-        placeholder = stringResource(R.string.employee_login_gateway_placeholder),
-        keyboardType = KeyboardType.Uri,
-        isError = gatewayInvalid,
-        onSubmit = onSubmit,
-      )
-    }
     if (EmployeeLoginForm.showsDisplayName(mode)) {
       AuthField(
         label = stringResource(R.string.employee_login_display_name_label),
@@ -623,11 +602,9 @@ private fun PrimaryButton(
 @Composable
 private fun FooterLinks(
   mode: EmployeeLoginMode,
-  showGatewayField: Boolean,
   enabled: Boolean,
   onForgot: () -> Unit,
   onHaveCode: () -> Unit,
-  onToggleGateway: () -> Unit,
 ) {
   Row(
     modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
@@ -649,16 +626,6 @@ private fun FooterLinks(
         onClick = onHaveCode,
       )
     }
-    Spacer(modifier = Modifier.weight(1f))
-    FooterLink(
-      label =
-        stringResource(
-          if (showGatewayField) R.string.employee_login_hide_gateway else R.string.employee_login_advanced,
-        ),
-      color = EmployeeLoginPalette.muted,
-      enabled = enabled,
-      onClick = onToggleGateway,
-    )
   }
 }
 
