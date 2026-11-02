@@ -3083,6 +3083,10 @@ function renderAdminsTab(
             </div>
           </div>
 
+          <div class="muted platform-admin-password-handoff card-follow--sm">
+            请把初始密码告知对方。对方用该邮箱和密码登录；创建时不发送邮件。
+          </div>
+
           ${
             createAdminRolePreset === "admin"
               ? html`

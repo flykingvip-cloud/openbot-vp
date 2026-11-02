@@ -256,6 +256,9 @@ export async function handlePlatformAdminCreateRoute(
     });
     return true;
   }
+  // Password handoff: the super admin sets the initial password and the account
+  // is active immediately. This route does not enqueue invite, credentials, or
+  // welcome mail. The control UI tells the creator to share the password.
   const nowIso = new Date().toISOString();
   const userId = randomUUID();
   store.users[userId] = {

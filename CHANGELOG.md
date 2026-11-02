@@ -297,6 +297,7 @@ Docs: https://docs.openbot.love
 - Control UI: loading zh-CN no longer throws `process is not defined`. Logging reads `process.getBuiltinModule` through `globalThis.process?.getBuiltinModule`, so the browser bundle gets null instead of a missing `process` binding.
 - Agents/chat: enterprise catalog models (`ent/<connection>/<upstream>`, including `mimo-v2.6-flash`) are translated to the tenant BYOK provider before the main reply. A pinned agent no longer stops before any reply with `Unknown model: ent/…`.
 - Agents/chat: a configured platform primary such as DeepSeek stays the run model when the only extra grant is an enterprise catalog id. A failed model call tells the user to check the primary model, and does not show the raw runtime id.
+- Control UI: creating a platform administrator still sets the initial password locally and does not send mail. The add-admin form and success notice now say to share that password; the account stays active immediately.
 
 ## 2026.3.8
 
