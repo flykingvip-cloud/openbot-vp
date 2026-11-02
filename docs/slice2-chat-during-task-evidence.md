@@ -195,3 +195,19 @@ function defaultQueueModeForChannel(_channel?: string): QueueMode {
 
 - HEAD: `b46ca89f2c614f6e7c42b7b1d35f91f2122d923a`
 - Vitest: chat.test preserve/P0 + mid-task-dialogue + collect-amend-steer + event-sequence + inbound-stop → 150+3 passed on WT openbot-pr216-slice2.
+
+
+## 四项阻塞回炉取证（Asia/Shanghai 2026-11-02）
+
+- 阻塞1：`abortInFlight` on pause/cancel；gateway + agent-runner 走原 abort；事件序列断言 `abortEmbeddedPiRun`。
+- 阻塞2：`effectiveConstraints` 全文；`stop.summary` 仅展示截断；claim/resume 含第 48 字之后关键句。
+- 阻塞3：sole `appendSameTaskConstraint` / `commitSameTaskConstraint`；`mid-task-dialogue` 展示-only。
+- 阻塞4：进度文案「任务板最近记录」；不输出 `wakeSuppress`；普通 aside **未完成**。
+- 必测序列绿：`A→long constraint once→progress→pause abort→stale wake dead`。
+- Vitest（定向）：event-sequence + inbound-stop + mid-task-dialogue + collect-amend-steer + turn-relation + session-task-board → 41 passed。
+
+## SHA binding（四项阻塞回炉）
+
+- 行为完整 SHA：`6c4081a3c6c81bd63bbb317916f1d500c2466843`
+- 工作树：`/Users/daniel/AI VP/openbot-pr216-slice2`
+- PR：https://github.com/flykingvip-cloud/openbot-vp/pull/216
