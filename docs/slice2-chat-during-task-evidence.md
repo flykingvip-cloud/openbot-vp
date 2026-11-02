@@ -1,3 +1,49 @@
+# 切片 2 证据补充（Gateway 停止 / 约束身份 / board_readonly）
+
+时区：Asia/Shanghai。PR #216。
+
+## 绑定
+
+- 四项阻塞行为基线：`6c4081a3c6c81bd63bbb317916f1d500c2466843`
+- 本轮行为 tip：推送后完整 SHA（见 delivery §0）
+- **作废**：`ab32aa1…`、「steer 成功后不再 followup（已废止旧说法）」
+
+## A. Gateway chat.send 暂停事件序列（测试）
+
+文件：`src/gateway/server-methods/chat.owner-pause-abort.test.ts`
+
+1. 准备 transcript + 任务板 current=task-a，focusRevision=4  
+2. 注入活动 `chatAbortControllers[run-a-active]` + buffer  
+3. 调用 `chatHandlers["chat.send"]({ message: "暂停", … })`  
+4. 期望：`signal.aborted`；controller map 移除；`abortEmbeddedPiRun(sessionId)`；`clearSessionQueues`；`dispatchInboundMessage` **未**调用；respond ack 含暂停 statusLine；`broadcastChat` final 含暂停文案；板 `wakeSuppress`；`claimTaskBoardContinue` → `wake_suppress`  
+5. 对称测「取消当前」：abort、无 dispatch、current 空、tombstone
+
+## B. 约束任务身份
+
+文件：`src/conversation-task/session-task-board.constraint-identity.test.ts`  
+- match → 写入 effectiveConstraints  
+- 切换为 task-b 后仍用 expectedTaskId=task-a → false，B 无 A 约束  
+- 空 id / 无 current / writeFileSync throw → false  
+
+文件：`src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts`  
+- mid-steer 切 B：steer 1 次、无 followup、文案「不视为完整成功」、B 无约束  
+
+## C. board_readonly 局部检查点
+
+- `src/auto-reply/reply/mid-task-aside.ts` + `.test.ts`  
+- `agent-runner`：active 时 disposition；`board_readonly` 立即 return 文本  
+- 读问句优先于 turn-relation（「有效约束有哪些」即使被标 amend 也不 steer）  
+- reply_lane 仍 pending  
+
+## 能力边界一句话
+
+消息送达与进度/板只读问句即时答已具备；一般普通插问及时 LLM 回复仍未完成；四项阻塞已针对性修复；本轮补齐 Gateway 停止与约束身份交叉验证。
+
+---
+
+
+## 既有证据（保留）
+
 # 切片 2 取证：任务执行期间保持对话可用
 
 工作树：`/Users/daniel/AI VP/openbot`（`flykingvip-cloud/openbot-vp`，分支 `feat/ft-plan-speak-shopping-positive-admission-20261102`）。  
