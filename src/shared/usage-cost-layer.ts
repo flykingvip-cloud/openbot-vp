@@ -87,12 +87,37 @@ export type UsageCostExcludedRank = {
   reason: "unknown_usage" | "missing_price";
 };
 
+export type UsageTaskLedgerEmptyReason =
+  | "none"
+  | "no_ledger_entry"
+  | "skipped_consumption"
+  | "filtered_empty";
+
 export type UsageCostLayerView = {
   schemaVersion: 1;
   surface: UsageCostSurface;
   lifecycle: UsageCostLifecycle;
   headline: string;
   empty: boolean;
+  /**
+   * When empty=true for a taskId query: machine-readable why (B3).
+   * none when not empty / not a task-scoped query.
+   */
+  emptyReason?: UsageTaskLedgerEmptyReason;
+  /**
+   * FT-TASKID-USAGE-LEDGER B5: this view is usage ledger aggregation, not TaskOutcome tip spend.
+   */
+  ledgerBasis?: "usage_ledger_not_tip_spend";
+  /** Per-model rollup for taskId queries (B1). */
+  taskModelLedger?: Array<{
+    modelId: string;
+    callCount: number;
+    inputTokens: number | null;
+    outputTokens: number | null;
+    cacheReadTokens: number | null;
+    cacheWriteTokens: number | null;
+    settlementKind: string;
+  }>;
   coverage: "complete" | "truncated";
   freshness: "current" | "delayed";
   recoveredFromStore: true;

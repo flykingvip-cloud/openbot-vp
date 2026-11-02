@@ -154,6 +154,28 @@ export async function getUsageLedgerEntryByTaskId(
   return store.entries.find((e) => tenant(e.enterpriseId) === entId && e.taskId === tid) ?? null;
 }
 
+/** 按 taskId 权威读取（可跨企业或限定企业）；不做全局 top-N 截断。 */
+export async function listUsageLedgerEntriesByTaskId(
+  taskId: string,
+  options?: { enterpriseId?: string | null; storePath?: string },
+): Promise<UsageLedgerEntry[]> {
+  const tid = taskId.trim();
+  if (!tid) {
+    return [];
+  }
+  const store = await loadStore(options?.storePath);
+  const entFilter = options?.enterpriseId?.trim() ? tenant(options.enterpriseId.trim()) : null;
+  return store.entries.filter((e) => {
+    if (e.taskId !== tid) {
+      return false;
+    }
+    if (entFilter && tenant(e.enterpriseId) !== entFilter) {
+      return false;
+    }
+    return true;
+  });
+}
+
 export async function listUsageLedgerEntries(
   enterpriseId: string,
   filter?: { startTime?: string; endTime?: string },

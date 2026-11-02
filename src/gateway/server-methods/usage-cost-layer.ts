@@ -86,6 +86,7 @@ export const usageCostLayerHandlers: GatewayRequestHandlers = {
         const enterpriseFilter = stringValue(record.enterpriseId) ?? stringValue(record.tenantId);
         const loaded = await loadUsageCostFacts({
           allEnterprises: true,
+          ...(taskId ? { taskId } : {}),
           ...(startTime ? { startTime } : {}),
           ...(endTime ? { endTime } : {}),
           ledgerStorePath: ledgerPathOverride(),
@@ -97,7 +98,10 @@ export const usageCostLayerHandlers: GatewayRequestHandlers = {
           enterpriseId: enterpriseFilter,
           enterpriseWide: true,
         };
-        reply(respond, actor, loaded.facts, taskId, loaded.truncated);
+        reply(respond, actor, loaded.facts, taskId, loaded.truncated, {
+          emptyReason: loaded.emptyReason,
+          ledgerBasis: loaded.ledgerBasis,
+        });
         return;
       }
 
@@ -116,12 +120,18 @@ export const usageCostLayerHandlers: GatewayRequestHandlers = {
         const loaded = enterpriseId
           ? await loadUsageCostFacts({
               enterpriseId,
+              ...(taskId ? { taskId } : {}),
               ...(startTime ? { startTime } : {}),
               ...(endTime ? { endTime } : {}),
               ledgerStorePath: ledgerPathOverride(),
               stageStorePath: stagePathOverride(),
             })
-          : { facts: [], truncated: false };
+          : {
+              facts: [],
+              truncated: false,
+              emptyReason: "no_ledger_entry" as const,
+              ledgerBasis: "usage_ledger_not_tip_spend" as const,
+            };
         reply(
           respond,
           {
@@ -133,6 +143,10 @@ export const usageCostLayerHandlers: GatewayRequestHandlers = {
           loaded.facts,
           taskId,
           loaded.truncated,
+          {
+            emptyReason: loaded.emptyReason,
+            ledgerBasis: loaded.ledgerBasis,
+          },
         );
         return;
       }
@@ -149,6 +163,7 @@ export const usageCostLayerHandlers: GatewayRequestHandlers = {
       }
       const loaded = await loadUsageCostFacts({
         enterpriseId: scope.enterpriseId,
+        ...(taskId ? { taskId } : {}),
         ...(startTime ? { startTime } : {}),
         ...(endTime ? { endTime } : {}),
         ledgerStorePath: ledgerPathOverride(),
@@ -167,7 +182,10 @@ export const usageCostLayerHandlers: GatewayRequestHandlers = {
             enterpriseId: scope.enterpriseId,
             enterpriseWide: false,
           };
-      reply(respond, actor, loaded.facts, taskId, loaded.truncated);
+      reply(respond, actor, loaded.facts, taskId, loaded.truncated, {
+        emptyReason: loaded.emptyReason,
+        ledgerBasis: loaded.ledgerBasis,
+      });
     } catch {
       fail(respond, "用量暂时无法读取，请稍后重试", ErrorCodes.UNAVAILABLE);
     }
@@ -180,10 +198,16 @@ function reply(
   facts: Parameters<typeof presentUsageCostLayer>[1],
   taskId: string | undefined,
   truncated: boolean,
+  meta?: {
+    emptyReason?: "none" | "no_ledger_entry" | "skipped_consumption" | "filtered_empty";
+    ledgerBasis?: "usage_ledger_not_tip_spend";
+  },
 ) {
   const presented = presentUsageCostLayer(actor, facts, {
     ...(taskId ? { taskId } : {}),
     truncated,
+    ...(meta?.emptyReason ? { emptyReason: meta.emptyReason } : {}),
+    ...(meta?.ledgerBasis ? { ledgerBasis: meta.ledgerBasis } : {}),
   });
   if (!presented.ok) {
     fail(respond, presented.message);
