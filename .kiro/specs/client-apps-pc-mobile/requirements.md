@@ -222,7 +222,7 @@
 #### Acceptance Criteria
 
 1. 所有客户端**用户可见层**（App 名、图标、启动页、应用内文案、README 用户可见命令）SHALL 统一为 OpenBot。
-2. 内部命名债（`OpenClaw.xcodeproj` / `OpenClawKit` / `ai.openclaw.app` / `Theme.OpenClawNode` / logger `ai.openclaw` / `OpenClawChatView*`）SHALL 分批治理，不与本交付强绑（§7.2）。
+2. 内部命名债（`OpenClaw.xcodeproj` / `OpenClawKit` / `Theme.OpenClawNode` / logger `ai.openclaw` / `OpenClawChatView*`）SHALL 分批治理，不与本交付强绑（§7.2）。Android 现行 `applicationId` 是 `ai.openbot.app`，不再把 `ai.openclaw.app` 当作可安装包名；旧包不能覆盖升级（并列安装，需重装并重新登录）。
 3. Bundle ID / package name 迁移 SHALL 作为独立发布决策（D-RENAME），不作交付前置（§7.3）。
 4. 新增用户可见命令文本 SHALL 用 `openbot`（`openclaw` 仅向后兼容别名）。
 

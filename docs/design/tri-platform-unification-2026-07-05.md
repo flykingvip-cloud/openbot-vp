@@ -8,6 +8,7 @@
 > (3) §5.7 校正——tab 级子域门禁**已部分落地**（`isTabAllowedBySubdomain` 已存在），不再表述为"完全未做"；
 > (4) §7.2 扩充内部命名债清单（Swift chat 类名、macOS logger subsystem、Android 主题名）；
 > (5) Phase 1 增加**契约冻结测试 + embed 路由契约 + 原生桥接协议**为可交付物，并已落地对应基础模块（见 §14）。
+> (6) 2026-11-02：Android `namespace` / `applicationId` 已是 `ai.openbot.app`。§3.4 / §7.2 不再把 `ai.openclaw.app` 当作现行安装身份；旧包不能覆盖升级（并列安装，需重装并重新登录）。
 
 ## 1. 背景
 
@@ -119,7 +120,7 @@ OpenBot 员工端 Web 已经不是“只有聊天”的早期形态，而是拥�
 | iOS project / scheme / target 名 | 大量仍为 OpenClaw                                       |
 | iOS bundle 前缀                  | 已是 `ai.openbot.*`                                     |
 | Android app label                | `OpenBot Node`                                          |
-| Android package / namespace      | 仍为 `ai.openclaw.app`                                  |
+| Android package / namespace      | 现行 `ai.openbot.app`（2026-07 草稿曾记 `ai.openclaw.app`；旧包不能覆盖升级） |
 | macOS App 名                     | 已是 OpenBot                                            |
 | Apple shared package products    | 已是 `OpenBotProtocol` / `OpenBotKit` / `OpenBotChatUI` |
 | Apple shared package name / path | 已为 `OpenBotKit`                                       |
@@ -453,7 +454,7 @@ device companion 能力不应被删除，而应在迁移期明确收纳：
 
 - `OpenClaw` project / scheme / target（`apps/ios/OpenClaw.xcodeproj`）
 - `OpenBotKit` package name / path（`apps/shared/OpenBotKit/Package.swift`；产物已是 `OpenBotProtocol` / `OpenBotKit` / `OpenBotChatUI`，包目录与引用已统一为 `OpenBotKit`）
-- `ai.openclaw.*` package / namespace（Android `apps/android/app/build.gradle.kts` 的 `namespace` / `applicationId = "ai.openclaw.app"`）
+- Android package / namespace **已是** `ai.openbot.app`（`apps/android/app/build.gradle.kts` 的 `namespace` / `applicationId`），不再当作待改包名。2026-07 草稿写作 `ai.openclaw.app`；旧包不能覆盖升级到现行包（并列安装，需重装并重新登录，无跨包数据迁移）。
 - **Swift chat 类名仍是 `OpenClawChatView` / `OpenClawChatViewModel`**（在 `OpenBotChatUI` 模块内——模块已正名、类名未正名；iOS `apps/ios/Sources/Chat/ChatSheet.swift`、macOS `apps/macos/Sources/OpenBot/WebChatSwiftUI.swift` 都在消费）
 - **Android 主题名 `Theme.OpenClawNode`**（`apps/android/app/src/main/AndroidManifest.xml`；注意 app label 已是 `OpenBot Node`、APK 产物已是 `openbot-*.apk`，属"半迁移"典型）
 - **macOS logger subsystem `ai.openclaw`**（如 `apps/macos/Sources/OpenBot/CanvasManager.swift`；chat 侧 subsystem 已是 `ai.openbot`，两者混用）
