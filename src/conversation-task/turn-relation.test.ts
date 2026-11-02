@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { isWeakNewWorkCueOnly } from "./qualification.js";
 import {
   classifyTurnRelation,
+  isBareContinueCue,
+  isOwnerConstraintRevision,
+  shouldPersistOwnerConstraint,
   isLanguageAsideMessage,
   isPriorUtteranceCorrection,
   shouldTaskParkAbortInFlight,
@@ -81,6 +84,35 @@ describe("turn relation", () => {
     expect(classifyTurnRelation("现在改做供应商合同审查", novel)).toBe("new_work");
     expect(classifyTurnRelation("请继续写审查记录、完成绑定", "你帮我制作一个贪吃蛇的小游戏")).toBe(
       "new_work",
+    );
+  });
+});
+
+describe("slice3 constraint persist gates", () => {
+  it("bare continue is amend but not persistable", () => {
+    expect(classifyTurnRelation("请继续", CURRENT)).toBe("amend");
+    expect(isBareContinueCue("请继续")).toBe(true);
+    expect(isBareContinueCue("继续")).toBe(true);
+    expect(shouldPersistOwnerConstraint("请继续")).toBe(false);
+    expect(shouldPersistOwnerConstraint("继续")).toBe(false);
+  });
+
+  it("queries are not persistable", () => {
+    expect(shouldPersistOwnerConstraint("当前任务目标是什么")).toBe(false);
+    expect(shouldPersistOwnerConstraint("有效约束有哪些")).toBe(false);
+  });
+
+  it("revision openers are detected without deleting by keyword alone", () => {
+    expect(isOwnerConstraintRevision("不对，改为只要 iOS 机型")).toBe(true);
+    expect(isOwnerConstraintRevision("补充：只要国内安卓机型")).toBe(false);
+    expect(shouldPersistOwnerConstraint("不对，改为只要 iOS 机型")).toBe(true);
+    expect(shouldPersistOwnerConstraint("补充：只要国内安卓机型")).toBe(true);
+  });
+
+  it("classifyTurnRelation accepts context without scanning constraint history", () => {
+    const poisoned = "继续|暂停|取消|新任务";
+    expect(classifyTurnRelation("请用中文回复", CURRENT, { activeConstraints: [poisoned] })).toBe(
+      "aside",
     );
   });
 });

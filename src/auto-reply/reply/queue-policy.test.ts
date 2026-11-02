@@ -79,4 +79,14 @@ describe("shouldAttemptCollectAmendSteer", () => {
       shouldAttemptCollectAmendSteer({ ...base, isActive: false, turnRelation: "amend" }),
     ).toBe(false);
   });
+
+  it("refuses when persistOwnerConstraint is false (bare continue / queries)", () => {
+    expect(
+      shouldAttemptCollectAmendSteer({
+        ...base,
+        turnRelation: "amend",
+        persistOwnerConstraint: false,
+      }),
+    ).toBe(false);
+  });
 });

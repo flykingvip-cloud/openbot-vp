@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  activeConstraintTexts,
   appendSameTaskConstraint,
   commitSameTaskConstraint,
   emptySessionTaskBoard,
@@ -48,7 +49,7 @@ describe("commitSameTaskConstraint task identity", () => {
     expect(ok).toBe(true);
     const board = readSessionTaskBoard(sessionFile);
     expect(board.current?.taskId).toBe("task-a");
-    expect(board.current?.effectiveConstraints?.join("\n")).toContain("只要国内安卓机型");
+    expect(activeConstraintTexts(board.current).join("\n")).toContain("只要国内安卓机型");
   });
 
   it("refuses to write when current task switched to B (A constraint must not land on B)", () => {
@@ -72,7 +73,7 @@ describe("commitSameTaskConstraint task identity", () => {
     expect(ok).toBe(false);
     const board = readSessionTaskBoard(sessionFile);
     expect(board.current?.taskId).toBe("task-b");
-    expect(board.current?.effectiveConstraints ?? []).toEqual([]);
+    expect(activeConstraintTexts(board.current)).toEqual([]);
     expect(JSON.stringify(board)).not.toContain("只要国内安卓机型");
   });
 
@@ -114,7 +115,7 @@ describe("commitSameTaskConstraint task identity", () => {
     // Board must not be half-updated via a successful prior write in this process.
     // Re-read: either unchanged or still without the new constraint if write never landed.
     const board = readSessionTaskBoard(sessionFile);
-    const joined = board.current?.effectiveConstraints?.join("\n") ?? "";
+    const joined = activeConstraintTexts(board.current).join("\n");
     expect(joined).not.toContain("关键限制必须完整保留");
   });
 

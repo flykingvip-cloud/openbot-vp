@@ -21,6 +21,7 @@ import {
 import type { TypingMode } from "../../config/types.js";
 import {
   applyIncomingUserMessage,
+  activeConstraintTexts,
   commitSameTaskConstraint,
   isOwnerCurrentTaskControlUtterance,
   readSessionTaskBoard,
@@ -30,7 +31,10 @@ import {
   isTaskBoardContinueInternalPrompt,
   scheduleTaskBoardContinueWake,
 } from "../../conversation-task/task-board-continue.js";
-import { classifyTurnRelation } from "../../conversation-task/turn-relation.js";
+import {
+  classifyTurnRelation,
+  shouldPersistOwnerConstraint,
+} from "../../conversation-task/turn-relation.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 import { tryResolveCapabilityGapsFromUsage } from "../../gateway/evolution-control/capability-gap-ingest.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
@@ -116,11 +120,15 @@ function resolveCollectAmendTurnRelation(
   if (!file) {
     return null;
   }
-  const goal = readSessionTaskBoard(file).current?.goalText?.trim() ?? "";
+  const board = readSessionTaskBoard(file);
+  const goal = board.current?.goalText?.trim() ?? "";
   if (!goal) {
     return null;
   }
-  return classifyTurnRelation(prompt, goal);
+  // Do not concatenate constraint history into the classified string (slice3).
+  return classifyTurnRelation(prompt, goal, {
+    activeConstraints: activeConstraintTexts(board.current),
+  });
 }
 
 export async function runReplyAgent(params: {
@@ -336,6 +344,7 @@ export async function runReplyAgent(params: {
         followupRun.run.sessionFile,
         followupRun.prompt,
       ),
+      persistOwnerConstraint: shouldPersistOwnerConstraint(followupRun.prompt),
     })
   ) {
     // P1 once-consumption: successful amend steer acknowledges immediately and

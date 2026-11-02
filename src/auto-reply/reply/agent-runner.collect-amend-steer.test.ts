@@ -33,6 +33,7 @@ vi.mock("../../agents/model-fallback.js", () => ({
 }));
 
 import {
+  activeConstraintTexts,
   writeSessionTaskBoard,
   emptySessionTaskBoard,
   readSessionTaskBoard,
@@ -130,7 +131,7 @@ describe("runReplyAgent collect amend steer inject", () => {
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
     const board = readSessionTaskBoard(sessionFile);
     expect(board.current?.stop.summary).toContain("约束：");
-    expect(board.current?.effectiveConstraints?.join("\n")).toContain("只要国内安卓机型");
+    expect(activeConstraintTexts(board.current).join("\n")).toContain("只要国内安卓机型");
   });
 
   it("does not inject new_work into the active run (followup only)", async () => {
@@ -185,6 +186,6 @@ describe("runReplyAgent collect amend steer inject", () => {
     expect(result?.[0]?.text).not.toContain("仅一次");
     const board = readSessionTaskBoard(sessionFile);
     expect(board.current?.taskId).toBe("task-b");
-    expect(board.current?.effectiveConstraints ?? []).toEqual([]);
+    expect(activeConstraintTexts(board.current)).toEqual([]);
   });
 });

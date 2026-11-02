@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  activeConstraintTexts,
   applyIncomingUserMessage,
   emptySessionTaskBoard,
   readSessionTaskBoard,
@@ -95,7 +96,7 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
     });
     writeSessionTaskBoard(sessionFile, result.board);
     expect(result.board.focusRevision).toBe(3);
-    const stored = result.board.current?.effectiveConstraints ?? [];
+    const stored = activeConstraintTexts(result.board.current);
     expect(stored.some((row) => row.includes(critical))).toBe(true);
     // Display marker may truncate, but persistence must keep the full text.
     expect(stored.join("\n")).toContain(critical);

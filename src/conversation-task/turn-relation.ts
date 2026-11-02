@@ -136,10 +136,85 @@ export function isPriorUtteranceCorrection(message: string | undefined): boolean
 }
 
 /**
+ * Bare continue / resume cue: stays on the current task (amend relation) but is
+ * NOT a business constraint to persist. Slice3: 「继续」 must not enter effectiveConstraints.
+ */
+const BARE_CONTINUE_RE =
+  /^(?:请)?(?:继续|接着)(?:吧|呀|啊|喔|哦)?(?:当前(?:任务|工作)?)?[。.!！?？\s]*$/u;
+
+export function isBareContinueCue(message: string | undefined): boolean {
+  const compactText = message?.replace(/\s+/g, "").trim() ?? "";
+  if (!compactText || compactText.includes("@")) {
+    return false;
+  }
+  return BARE_CONTINUE_RE.test(compactText);
+}
+
+/**
+ * Owner explicitly revises / replaces prior same-task instructions.
+ * Reuses prior-utterance correction + clear replace openers — not a new adjudicator,
+ * and not keyword deletion of unrelated history rows.
+ */
+const CONSTRAINT_REVISION_OPENER_RE =
+  /^(?:不对|错了|纠正|改为|改成|以后以|以本条为准|不要再(?:用|按|采用)?|别再)/u;
+
+export function isOwnerConstraintRevision(message: string | undefined): boolean {
+  const text = stripInboundStamp(message ?? "");
+  if (!text || text.startsWith("/")) {
+    return false;
+  }
+  if (isPriorUtteranceCorrection(text)) {
+    return true;
+  }
+  const compactText = text.replace(/\s+/g, "").trim();
+  return CONSTRAINT_REVISION_OPENER_RE.test(compactText);
+}
+
+/**
+ * Whether the owner utterance should be persisted onto the constraint log.
+ * Queries / bare continue / empty / commands → false.
+ */
+export function shouldPersistOwnerConstraint(message: string | undefined): boolean {
+  const text = stripInboundStamp(message ?? "");
+  if (!text || text.startsWith("/")) {
+    return false;
+  }
+  if (isBareContinueCue(text)) {
+    return false;
+  }
+  // Goal / constraint *read* asks — never persist (board_readonly projection only).
+  if (
+    /^(?:请问?)?(?:当前)?(?:任务)?(?:目标|在做什么|做什么任务|任务是什么|现在的目标)(?:是|的)?(?:什么|嘛|吗)?[?？!！。.\s]*$/u.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /^(?:请问?)?(?:当前)?(?:有哪些|有什么|有效的?|有效)?(?:约束|限制|补充要求|补充约束)(?:有哪些|有什么|是什么)?[?？!！。.\s]*$/u.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export type TurnRelationContext = {
+  /** Present so callers need not concatenate constraint history into `incoming`. Unused for regex. */
+  activeConstraints?: readonly string[];
+};
+
+/**
  * Classify before the task board mutates focus.
  * `amend` and `aside` stay on the current task. Only `new_work` may cut context.
+ * Only `incoming` + `currentGoal` are scanned — never a pasted constraint history blob.
  */
-export function classifyTurnRelation(incoming: string, currentGoal: string): TurnRelation {
+export function classifyTurnRelation(
+  incoming: string,
+  currentGoal: string,
+  _context?: TurnRelationContext,
+): TurnRelation {
   const text = stripInboundStamp(incoming);
   if (!text || text.startsWith("/")) {
     return "aside";

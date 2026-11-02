@@ -4,6 +4,7 @@
  * General reply_lane timely LLM replies remain unfinished (see design doc).
  */
 import {
+  activeConstraintTexts,
   formatTaskBoardFocusLine,
   type SessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
@@ -43,7 +44,7 @@ export function formatBoardReadonlyAsideReply(
     const goal = current.goalText?.trim() || current.title;
     return `${focus}。任务板最近记录：目标「${truncateDisplay(goal, 120)}」。`;
   }
-  const list = (current.effectiveConstraints ?? []).map((row) => row.trim()).filter(Boolean);
+  const list = activeConstraintTexts(current);
   if (list.length === 0) {
     return `${focus}。任务板最近记录：尚无已登记的有效约束。`;
   }

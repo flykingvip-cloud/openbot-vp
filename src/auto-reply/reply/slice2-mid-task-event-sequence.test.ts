@@ -44,6 +44,7 @@ vi.mock("../../agents/model-fallback.js", () => ({
 }));
 
 import {
+  activeConstraintTexts,
   emptySessionTaskBoard,
   readSessionTaskBoard,
   writeSessionTaskBoard,
@@ -164,7 +165,7 @@ describe("slice2 mid-task event sequence", () => {
     expect(steerCount).toBe(1);
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
     const afterAmend = readSessionTaskBoard(sessionFile);
-    expect(afterAmend.current?.effectiveConstraints?.join("\n")).toContain(CRITICAL_TAIL);
+    expect(activeConstraintTexts(afterAmend.current).join("\n")).toContain(CRITICAL_TAIL);
     expect(afterAmend.current?.stop.summary).toContain("约束：");
 
     // B progress query — answered immediately (回答已产生), no followup, no internals.
