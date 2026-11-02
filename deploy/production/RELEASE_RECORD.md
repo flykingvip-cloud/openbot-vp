@@ -44,17 +44,17 @@ setting `enforcement=disabled` via the API, which is itself auditable.
 > It does **not** prove the running container identity was reconciled
 > (that is a separate LIVE verify / SSH / `delivery:check-sot` path).
 
-<!-- identity: seq=151 gatewaySha=d37bed5117d6969e5ad0ee47b32e4efa8b6d715a uiSha=d37bed5117d6969e5ad0ee47b32e4efa8b6d715a digest=sha256:09c9b4c0db843c8b977f21cc0e5fb78c43ab408dbd633cda9e41573756442c48 imageTag=rc-amd64-provenance-d37bed5117d6 tag=provenance/sha-d37bed5117d6 liveFrom=2026-10-31T03:21:00.871Z liveTo= liveVerified=true -->
+<!-- identity: seq=152 gatewaySha=d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c uiSha=d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c digest=sha256:64e66afa30f09c844b0a309b3f17d4ea6fda6b0dac0d1685cd3b44ba9518919a imageTag=rc-amd64-provenance-d42fbc3ca2b4 tag=provenance/sha-d42fbc3ca2b4 liveFrom=2026-11-01T23:04:06.294Z liveTo= liveVerified=true -->
 
 | Field | Value |
 | --- | --- |
-| seq | 151 |
-| gatewaySha | `d37bed5117d6969e5ad0ee47b32e4efa8b6d715a` |
-| uiSha | `d37bed5117d6969e5ad0ee47b32e4efa8b6d715a` |
-| artifactDigest | `sha256:09c9b4c0db843c8b977f21cc0e5fb78c43ab408dbd633cda9e41573756442c48` |
-| imageTag / artifactId | `rc-amd64-provenance-d37bed5117d6` |
-| tag | `provenance/sha-d37bed5117d6` |
-| liveFrom | `2026-10-31T03:21:00.871Z` |
+| seq | 152 |
+| gatewaySha | `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c` |
+| uiSha | `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c` |
+| artifactDigest | `sha256:64e66afa30f09c844b0a309b3f17d4ea6fda6b0dac0d1685cd3b44ba9518919a` |
+| imageTag / artifactId | `rc-amd64-provenance-d42fbc3ca2b4` |
+| tag | `provenance/sha-d42fbc3ca2b4` |
+| liveFrom | `2026-11-01T23:04:06.294Z` |
 | liveTo | _(open)_ |
 | liveVerified | `true` |
 <!-- END GENERATED: current-identity -->
