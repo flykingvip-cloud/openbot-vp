@@ -10628,6 +10628,23 @@ tasks:
   since: 2026-11-01
   metadata: {}
 landingStreams:
+- id: platform-admin-no-email-ux:cursor-grok
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - CHANGELOG.md
+  - src/gateway/platform-auth.test.ts
+  - src/gateway/platform-auth/routes-enterprise.ts
+  - ui/src/i18n/locales/en.ts
+  - ui/src/i18n/locales/zh-CN.ts
+  - ui/src/ui/ports/platform/system-settings/page.browser.test.ts
+  - ui/src/ui/ports/platform/system-settings/page.ts
+  - ui/src/ui/views/platform-auth-panel.ts
+  canLandWith: []
+  metadata:
+    task: platform-admin-no-email-ux
+    owner: cursor-grok
+    purpose: Platform admin create is a local password handoff. The form says no email is sent.
 - id: closed-loop-followup-wire-20261102
   landingPolicy: serial
   paths:

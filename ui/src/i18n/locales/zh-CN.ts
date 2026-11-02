@@ -4353,7 +4353,8 @@ export const zh_CN: TranslationMap = {
           formTitle: "添加管理员",
           scopeLabel: "授予权限",
           create: "创建",
-          createSuccess: "平台管理员已创建。",
+          createSuccess: "平台管理员已创建。请把刚才设置的初始密码告知对方（未发送邮件）。",
+          passwordHandoff: "请把初始密码告知对方。对方用该邮箱和密码登录；创建时不发送邮件。",
           removeSuccess: "已撤销平台管理员 {user}。",
           fields: {
             displayName: "管理员名称",

@@ -4548,7 +4548,10 @@ export const en: TranslationMap = {
           formTitle: "Create platform administrator",
           scopeLabel: "Granted scopes",
           create: "Create platform administrator",
-          createSuccess: "Platform administrator created.",
+          createSuccess:
+            "Platform administrator created. Share the initial password you just set (no email was sent).",
+          passwordHandoff:
+            "Share the initial password with them. They sign in with this email and password. Creating an admin does not send email.",
           removeSuccess: "Removed platform administrator {user}.",
           fields: {
             displayName: "Admin name",

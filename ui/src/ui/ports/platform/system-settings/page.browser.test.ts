@@ -219,6 +219,7 @@ describe("renderPlatformSystemSettingsSurface", () => {
     const { container } = mount("#platform-system-settings:admins");
     const text = container.textContent ?? "";
     expect(text).toContain("添加管理员");
+    expect(text).toContain("请把初始密码告知对方。对方用该邮箱和密码登录；创建时不发送邮件。");
     expect(text).toContain("平台管理员");
     expect(text.indexOf("添加管理员")).toBeLessThan(text.indexOf("暂无管理员"));
     expect(container.querySelector(".platform-admin-form-grid")).not.toBeNull();

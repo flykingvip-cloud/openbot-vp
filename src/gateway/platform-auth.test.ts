@@ -710,11 +710,26 @@ describe("platform auth", () => {
         platformAuth?: { platformAdmins?: Array<{ user: string; platformRole: string }> };
       };
       expect(createPayload.ok).toBe(true);
+      expect(createPayload).not.toHaveProperty("emailDelivery");
       expect(createPayload.platformAuth?.platformAdmins).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ user: "ops@example.com", platformRole: "admin" }),
         ]),
       );
+      const storeAfterCreate = JSON.parse(
+        await fs.readFile(trustedProxy.platformAuth.store, "utf8"),
+      ) as PlatformAuthStore;
+      expect(storeAfterCreate.leadNotifications).toEqual({});
+      const createdUser = Object.values(storeAfterCreate.users).find(
+        (user) => user.normalizedEmail === "ops@example.com",
+      );
+      expect(createdUser).toMatchObject({
+        status: "active",
+        source: "platform-created",
+        platformRole: "admin",
+      });
+      expect(createdUser?.passwordHash).toEqual(expect.any(String));
+      expect(createdUser?.emailVerifiedAt).toEqual(expect.any(String));
 
       const wrongLoginReq = makeJsonRequest({
         url: `${CONTROL_UI_PLATFORM_AUTH_BASE_PATH}/login`,

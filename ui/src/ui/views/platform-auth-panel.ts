@@ -1095,6 +1095,9 @@ function renderPlatformAdminManagement(props: PlatformAuthPanelProps) {
           onInput: props.onPlatformAdminPasswordChange,
         })}
       </div>
+      <div class="muted" style="margin-top: 8px;">
+        ${t("overview.platformAuth.platform.adminManager.passwordHandoff")}
+      </div>
       <div style="margin-top: 12px;">
         <div class="muted">${t("overview.platformAuth.platform.adminManager.scopeLabel")}</div>
         <div style="display:grid; gap:8px; margin-top: 8px;">
