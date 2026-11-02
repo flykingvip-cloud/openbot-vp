@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   applyIncomingUserMessage,
   emptySessionTaskBoard,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import {
   AUTHORITATIVE_STOP_INTERNAL_TENANT,
@@ -55,7 +55,7 @@ function parkOneTask(sessionFile: string): string {
     incomingText: RESEARCH,
     nowMs: 2_000,
   });
-  writeSessionTaskBoard(sessionFile, switched.board);
+  seedSessionTaskBoard(sessionFile, switched.board);
   return switched.board.parked[0]?.taskId ?? "";
 }
 
