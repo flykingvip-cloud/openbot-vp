@@ -8,7 +8,8 @@
  * - planOwnerMemberId  = confirmed plan executor (ownerMemberId)
  * - claimantId         = board responsibility, resolved from plan owner ∩ intended
  *
- * Claim/apply only when the authorizing actor IS the plan owner (self-claim path).
+ * Claim/apply only when a non-empty authorizing actor IS the plan owner (self-claim path).
+ * Missing authorizingActorId → `authorizing_actor_required` (no claimantId backfill).
  * Coordinator/human confirmer must NOT proxy-claim for the executor — return
  * `awaiting_executor_self_claim` so post-confirm can schedule controlled claim wake.
  * Never blindly takes intendedClaimantIds[0] or fakes auth subject as target executor.
@@ -155,10 +156,22 @@ export async function ensureBoardActiveAfterConfirm(params: {
     };
   }
   const claimantId = resolved.claimantId;
-  // Self-claim only: authorizing actor (when present) must match the plan-owner claimant.
+  // Production write path: require a non-empty trusted authorizing actor.
+  // Missing subject → explicit reject. Never backfill actor from claimantId
+  // (that would treat the target/plan-owner identity as the executing subject).
+  if (!authorizingActorId) {
+    return {
+      item: params.item,
+      activated: false,
+      reason: "authorizing_actor_required",
+      executorId: claimantId,
+      authorizingActorId,
+    };
+  }
+  // Self-claim only: authorizing actor must match the plan-owner claimant.
   // Distinct audit field authorizingActorId is preserved on the result; never claim as
   // authorizer while writing claimantId=executor (proxy claim / fake auth subject).
-  if (authorizingActorId && !deliveryActorIdsEqual(authorizingActorId, claimantId)) {
+  if (!deliveryActorIdsEqual(authorizingActorId, claimantId)) {
     return {
       item: params.item,
       activated: false,
@@ -167,7 +180,8 @@ export async function ensureBoardActiveAfterConfirm(params: {
       authorizingActorId,
     };
   }
-  const actor = claimantId;
+  // Trusted subject only — use authorizingActorId, never claimantId backfill.
+  const actor = authorizingActorId;
 
   const shared = {
     groupId: params.groupId,

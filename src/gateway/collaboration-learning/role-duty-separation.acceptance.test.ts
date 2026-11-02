@@ -275,6 +275,16 @@ describe("role-duty separation acceptance (1–9)", () => {
       actor: COORD,
       cfg,
     });
+    // Missing actor must reject — claimantId alone is not a trusted subject.
+    await expect(
+      claimCollaborationBoardItem({
+        groupId: GROUP,
+        taskId,
+        itemId: published.itemId,
+        claimantId: EXEC,
+        cfg,
+      }),
+    ).rejects.toMatchObject({ code: "actor_required" });
     await expect(
       claimCollaborationBoardItem({
         groupId: GROUP,
@@ -310,6 +320,17 @@ describe("role-duty separation acceptance (1–9)", () => {
       actor: COORD,
       cfg,
     });
+    const missingActor = await ensureBoardActiveAfterConfirm({
+      groupId: GROUP,
+      taskId,
+      item: published,
+      planOwnerMemberId: EXEC,
+      cfg,
+    });
+    expect(missingActor.activated).toBe(false);
+    expect(missingActor.reason).toBe("authorizing_actor_required");
+    expect(missingActor.item.claimantId).toBeFalsy();
+
     const refused = await ensureBoardActiveAfterConfirm({
       groupId: GROUP,
       taskId,
@@ -656,9 +677,9 @@ describe("role-duty separation acceptance (1–9)", () => {
     // Accepting summary must not auto-claim parallel
   });
 
-  it("7 misc: wrong-version / revoked-style actor mismatch / cross intended refuse", async () => {
+  it("7a: actor mismatch (proxy) is distinct from revoke — mismatch refuses without claiming", async () => {
     const { cfg } = await useConfig();
-    const taskId = "task-rej-1";
+    const taskId = "task-rej-mismatch";
     await seedTask(GROUP, taskId, cfg);
     const published = await publishCollaborationBoardItem({
       groupId: GROUP,
@@ -669,7 +690,50 @@ describe("role-duty separation acceptance (1–9)", () => {
       actor: COORD,
       cfg,
     });
-    // Non-intended cannot claim
+    // Actor≠claimant is proxy mismatch — not a revoke signal.
+    await expect(
+      claimCollaborationBoardItem({
+        groupId: GROUP,
+        taskId,
+        itemId: published.itemId,
+        claimantId: EXEC,
+        actor: COORD,
+        cfg,
+      }),
+    ).rejects.toMatchObject({ code: "claim_actor_mismatch" });
+    const after = await listCollaborationBoardItems({ groupId: GROUP, taskId, cfg });
+    const live = after.find((row) => row.itemId === published.itemId);
+    expect(live?.status).toBe("published");
+    expect(live?.claimantId).toBeFalsy();
+
+    // Authorizer≠executor → awaiting_executor_self_claim (mismatch path, not revoke).
+    const mismatch = await ensureBoardActiveAfterConfirm({
+      groupId: GROUP,
+      taskId,
+      item: published,
+      planOwnerMemberId: EXEC,
+      authorizingActorId: HUMAN,
+      cfg,
+    });
+    expect(mismatch.activated).toBe(false);
+    expect(mismatch.reason).toMatch(/awaiting_executor_self_claim/);
+    expect(mismatch.reason).not.toMatch(/revok|auth_revoked/i);
+  });
+
+  it("7b: cross-intended / plan_owner_not_in_intended refuse (not a revoke substitute)", async () => {
+    const { cfg } = await useConfig();
+    const taskId = "task-rej-intended";
+    await seedTask(GROUP, taskId, cfg);
+    const published = await publishCollaborationBoardItem({
+      groupId: GROUP,
+      taskId,
+      remainingWork: "x",
+      acceptanceCriteria: ["a"],
+      intendedClaimantIds: [EXEC],
+      actor: COORD,
+      cfg,
+    });
+    // Non-intended cannot claim (intended ACL — not actor-mismatch revoke stand-in).
     await expect(
       claimCollaborationBoardItem({
         groupId: GROUP,
@@ -681,8 +745,7 @@ describe("role-duty separation acceptance (1–9)", () => {
       }),
     ).rejects.toBeInstanceOf(ClaimContractEntryError);
 
-    // ensure plan owner not in intended
-    const mismatch = await ensureBoardActiveAfterConfirm({
+    const notIntended = await ensureBoardActiveAfterConfirm({
       groupId: GROUP,
       taskId,
       item: published,
@@ -690,7 +753,8 @@ describe("role-duty separation acceptance (1–9)", () => {
       authorizingActorId: EXEC_B,
       cfg,
     });
-    expect(mismatch.activated).toBe(false);
-    expect(mismatch.reason).toMatch(/plan_owner_not_in_intended/);
+    expect(notIntended.activated).toBe(false);
+    expect(notIntended.reason).toMatch(/plan_owner_not_in_intended/);
+    expect(notIntended.reason).not.toMatch(/revok|auth_revoked|claim_actor_mismatch/i);
   });
 });

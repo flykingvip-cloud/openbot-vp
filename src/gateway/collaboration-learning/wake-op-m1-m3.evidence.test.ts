@@ -2588,6 +2588,7 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
       taskId,
       itemId: published.itemId,
       claimantId: tenant.bot0,
+      actor: tenant.bot0,
       cfg,
     });
 
@@ -2668,6 +2669,7 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
       taskId,
       itemId: published.itemId,
       claimantId: tenant.bot0,
+      actor: tenant.bot0,
       cfg,
     });
     // Happy-path apply first (board + task).
@@ -3035,6 +3037,7 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
       taskId,
       itemId: published.itemId,
       claimantId: tenant.admin,
+      actor: tenant.admin,
       cfg,
     });
 
@@ -3104,6 +3107,7 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
       taskId,
       itemId: published.itemId,
       claimantId: tenant.admin,
+      actor: tenant.admin,
       cfg,
     });
     await applyCollaborationBoardClaim({
@@ -3202,6 +3206,7 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
       taskId,
       itemId: published.itemId,
       claimantId: tenant.admin,
+      actor: tenant.admin,
       cfg,
     });
     await expect(
@@ -3533,6 +3538,7 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
       taskId,
       itemId: published.itemId,
       claimantId: tenant.admin,
+      actor: tenant.admin,
       cfg,
     });
 

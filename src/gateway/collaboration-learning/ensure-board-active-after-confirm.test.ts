@@ -107,6 +107,23 @@ describe("ensureBoardActiveAfterConfirm", () => {
     expect(result.authorizingActorId).toBe("human:owner");
   });
 
+  it("published + missing authorizingActorId → authorizing_actor_required (no claimant backfill)", async () => {
+    const result = await ensureBoardActiveAfterConfirm({
+      groupId: "grp-1",
+      taskId: "task-1",
+      item: publishedItem(),
+      planOwnerMemberId: "bot:bot",
+      // intentionally omit authorizingActorId
+    });
+    expect(claimMock).not.toHaveBeenCalled();
+    expect(applyMock).not.toHaveBeenCalled();
+    expect(result.activated).toBe(false);
+    expect(result.reason).toBe("authorizing_actor_required");
+    expect(result.item.status).toBe("published");
+    expect(result.item.claimantId).toBeUndefined();
+    expect(result.executorId).toBe("bot");
+  });
+
   it("published + authorizer IS plan owner → self-claim then apply (distinct audit fields)", async () => {
     claimMock.mockResolvedValueOnce({
       ...publishedItem(),
@@ -137,13 +154,13 @@ describe("ensureBoardActiveAfterConfirm", () => {
     expect(claimMock.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         claimantId: "bot",
-        actor: "bot",
+        actor: "bot:bot", // trusted authorizingActorId — never claimantId backfill
       }),
     );
     expect(applyMock).toHaveBeenCalledTimes(1);
     expect(applyMock.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
-        actor: "bot",
+        actor: "bot:bot",
       }),
     );
     expect(result.activated).toBe(true);

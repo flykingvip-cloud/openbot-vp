@@ -18,6 +18,7 @@ import {
   applyCollaborationBoardClaim,
   claimCollaborationBoardItem,
   ClaimContractFlagOffError,
+  listCollaborationBoardItems,
   oralDispatchCreatesBoardFact,
   markCollaborationBoardItemInProgress,
   returnCollaborationBoardItemSubmission,
@@ -176,6 +177,7 @@ describe("P4b claim contract production entry", () => {
       taskId: seed.taskId,
       itemId: published.itemId,
       claimantId: "bot-analyst",
+      actor: "bot-analyst",
       cfg,
     });
     expect(claimed.status).toBe("claimed");
@@ -194,5 +196,33 @@ describe("P4b claim contract production entry", () => {
     const { fileStore } = createWorkspaceCollaborationStores();
     const operating = await readGroupOperatingState({ fileStore, groupId });
     expect(operating?.activeContext.currentTaskId).toBe(seed.taskId);
+  });
+
+  test("flag-on: missing actor → actor_required; claimantId alone does not claim", async () => {
+    const { cfg } = await useConfig(true);
+    await seedTask(groupId, seed);
+    const published = await publishCollaborationBoardItem({
+      groupId,
+      taskId: seed.taskId,
+      remainingWork: "tech chapter with authoritative data",
+      acceptanceCriteria: ["shared draft", "cite sources"],
+      intendedClaimantIds: ["bot-analyst"],
+      actor: "bot-secretary",
+      cfg,
+    });
+    await expect(
+      claimCollaborationBoardItem({
+        groupId,
+        taskId: seed.taskId,
+        itemId: published.itemId,
+        claimantId: "bot-analyst",
+        // intentionally omit actor — must not backfill from claimantId
+        cfg,
+      }),
+    ).rejects.toMatchObject({ code: "actor_required" });
+    const listed = await listCollaborationBoardItems({ groupId, taskId: seed.taskId, cfg });
+    const live = listed.find((row) => row.itemId === published.itemId);
+    expect(live?.status).toBe("published");
+    expect(live?.claimantId == null || live?.claimantId === "").toBe(true);
   });
 });

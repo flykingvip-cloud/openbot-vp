@@ -354,6 +354,7 @@ describe("askOutcome W1 collab claim/apply entry wiring", () => {
       taskId,
       itemId: published.itemId,
       claimantId: "member-a",
+      actor: "member-a",
       cfg,
     });
     expect(claimed.claimantId).toBe("member-a");

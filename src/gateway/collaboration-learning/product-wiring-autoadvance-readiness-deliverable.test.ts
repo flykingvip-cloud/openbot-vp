@@ -799,6 +799,219 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
   });
 });
 
+describe("confirm→claim handoff evidence (positive / idempotent / revoke)", () => {
+  function stubPublishedConfirmHandoff(params: {
+    cfg: OpenBotConfig;
+    groupId: string;
+    taskId?: string;
+    boardItemId?: string;
+    todolistId?: string;
+    executor?: string;
+  }) {
+    const groupId = params.groupId;
+    const taskId = params.taskId ?? "task-confirm-handoff";
+    const boardItemId = params.boardItemId ?? "board-confirm-handoff";
+    const todolistId = params.todolistId ?? "td-confirm-handoff";
+    const executor = params.executor ?? "bot-exec";
+    vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([
+      {
+        itemId: boardItemId,
+        taskId,
+        groupId,
+        status: "published",
+        intendedClaimantIds: [executor],
+        title: "step",
+        remainingWork: "do",
+        acceptanceCriteria: ["ok"],
+        publishedBy: "bot-coord",
+        publishedAt: 1,
+        revision: 1,
+      },
+    ] as never);
+    const claimSpy = vi.spyOn(claimEntry, "claimCollaborationBoardItem");
+    const applySpy = vi.spyOn(claimEntry, "applyCollaborationBoardClaim");
+    vi.spyOn(claimEntry, "buildClaimAuthority").mockResolvedValue({
+      authority: seedAuthority(params.cfg, groupId, null),
+      stores: null,
+      operatingState: null,
+    } as never);
+    vi.spyOn(executorTodolist, "loadExecutorTodolist").mockResolvedValue({
+      todolistId,
+      taskId,
+      boardItemId,
+      groupId,
+      ownerMemberId: executor,
+      status: "confirmed",
+      version: 1,
+      steps: [{ stepId: "s1", title: "step", status: "active" }],
+      visibility: "executor_private",
+    } as never);
+    vi.spyOn(executorTodolist, "buildExecutionTaskBag").mockReturnValue({
+      boardSummary: { itemId: boardItemId, goal: "g" },
+      groupContextPointer: { groupId, transcriptHint: "t" },
+      todolistCurrentStep: { stepId: "s1", version: 1, title: "step" },
+    } as never);
+    vi.spyOn(wakeContract, "recordNudgeWake").mockResolvedValue({ ok: true } as never);
+    return { taskId, boardItemId, todolistId, executor, claimSpy, applySpy };
+  }
+
+  it("positive: human confirm on published board → claim handoff wake_dispatched (not mere record)", async () => {
+    const groupId = "grp_confirm_handoff_pos";
+    const { cfg } = await useRoot({
+      selfAdvanceMode: "execute",
+      selfAdvanceExecuteAllowlist: [groupId],
+      wakeContract: true,
+      wakeContractGroupAllowlist: [groupId],
+    });
+    const stub = stubPublishedConfirmHandoff({ cfg, groupId });
+    let dispatchCalls = 0;
+    const counting: WakeRoundDispatcher = async (req) => {
+      dispatchCalls += 1;
+      expect(req.toAgentIds).toEqual([stub.executor]);
+      expect(String(req.reason)).toContain("post_confirm_executor_self_claim");
+      expect(String(req.dispatchPrompt ?? "")).toMatch(/claim|认领|handoff/i);
+      return {
+        ok: true,
+        roundId: `confirm-handoff-${dispatchCalls}`,
+        sideEffectClass: "completed_with_receipt",
+      };
+    };
+    const result = await triggerPostPlanConfirmAdvance({
+      groupId,
+      taskId: stub.taskId,
+      boardItemId: stub.boardItemId,
+      todolistId: stub.todolistId,
+      confirmedVersion: 1,
+      stepId: "s1",
+      confirmerId: "human:owner",
+      cfg,
+      roundDispatcher: counting,
+    });
+    expect(stub.claimSpy).not.toHaveBeenCalled();
+    expect(stub.applySpy).not.toHaveBeenCalled();
+    expect(result.dispatched, `reason=${result.reason}`).toBe(true);
+    expect(result.wakeRecorded).toBe(true);
+    expect(result.wakeConsumed).toBe(true);
+    expect(result.reason).toMatch(/confirm_awaiting_executor_self_claim:wake_dispatched/);
+    expect(result.targetAgentIds).toEqual([stub.executor]);
+    expect(dispatchCalls).toBe(1);
+  });
+
+  it("idempotent: duplicate confirm handoff reuses durable wake — no second dispatcher invoke", async () => {
+    const groupId = "grp_confirm_handoff_idem";
+    const { cfg } = await useRoot({
+      selfAdvanceMode: "execute",
+      selfAdvanceExecuteAllowlist: [groupId],
+      wakeContract: true,
+      wakeContractGroupAllowlist: [groupId],
+    });
+    const stub = stubPublishedConfirmHandoff({
+      cfg,
+      groupId,
+      taskId: "task-idem",
+      boardItemId: "board-idem",
+    });
+    let dispatchCalls = 0;
+    const counting: WakeRoundDispatcher = async () => {
+      dispatchCalls += 1;
+      return {
+        ok: true,
+        roundId: `confirm-idem-${dispatchCalls}`,
+        sideEffectClass: "completed_with_receipt",
+      };
+    };
+    const first = await triggerPostPlanConfirmAdvance({
+      groupId,
+      taskId: stub.taskId,
+      boardItemId: stub.boardItemId,
+      todolistId: stub.todolistId,
+      confirmedVersion: 1,
+      stepId: "s1",
+      confirmerId: "human:owner",
+      cfg,
+      roundDispatcher: counting,
+    });
+    expect(first.dispatched, `first=${first.reason}`).toBe(true);
+    expect(dispatchCalls).toBe(1);
+
+    const second = await triggerPostPlanConfirmAdvance({
+      groupId,
+      taskId: stub.taskId,
+      boardItemId: stub.boardItemId,
+      todolistId: stub.todolistId,
+      confirmedVersion: 1,
+      stepId: "s1",
+      confirmerId: "human:owner",
+      cfg,
+      roundDispatcher: counting,
+    });
+    expect(stub.claimSpy).not.toHaveBeenCalled();
+    expect(second.wakeRecorded).toBe(true);
+    expect(second.dispatched, `second=${second.reason}`).toBe(true);
+    expect(second.reason).toMatch(
+      /confirm_awaiting_executor_self_claim:(wake_dispatched|recorded_not_dispatched)|idempotent/i,
+    );
+    // Durable settle reused — dispatcher must not fire twice for the same opKey.
+    expect(dispatchCalls).toBe(1);
+  });
+
+  it("target revoked → recorded_not_dispatched with auth_revoked; no proxy claim (≠ actor mismatch)", async () => {
+    const groupId = "grp_confirm_handoff_revoked";
+    const { cfg } = await useRoot({
+      selfAdvanceMode: "execute",
+      selfAdvanceExecuteAllowlist: [groupId],
+      wakeContract: true,
+      wakeContractGroupAllowlist: [groupId],
+    });
+    const stub = stubPublishedConfirmHandoff({
+      cfg,
+      groupId,
+      taskId: "task-revoked",
+      boardItemId: "board-revoked",
+      executor: "bot-exec-revoked",
+    });
+    // Real revoke path: consume reports auth_revoked (membership stripped) — not claim_actor_mismatch.
+    vi.spyOn(wakeRound, "consumeWakeForRoundDispatch").mockResolvedValue({
+      outcome: "recorded",
+      dispatched: false,
+      reason: "auth_revoked",
+      gate: {
+        allowed: false,
+        reason: "auth_revoked",
+        wakeEnabled: true,
+        selfAdvanceWriteMode: "execute",
+        sourceEligible: false,
+      },
+      dispatcherPresent: true,
+      reused: false,
+    } as never);
+    let dispatchCalls = 0;
+    const counting: WakeRoundDispatcher = async () => {
+      dispatchCalls += 1;
+      return { ok: true, roundId: "must-not-run" };
+    };
+    const result = await triggerPostPlanConfirmAdvance({
+      groupId,
+      taskId: stub.taskId,
+      boardItemId: stub.boardItemId,
+      todolistId: stub.todolistId,
+      confirmedVersion: 1,
+      stepId: "s1",
+      confirmerId: "human:owner",
+      cfg,
+      roundDispatcher: counting,
+    });
+    expect(stub.claimSpy).not.toHaveBeenCalled();
+    expect(stub.applySpy).not.toHaveBeenCalled();
+    expect(result.dispatched).toBe(false);
+    expect(result.wakeRecorded).toBe(true);
+    expect(result.reason).toMatch(/confirm_awaiting_executor_self_claim:recorded_not_dispatched/);
+    expect(result.reason).toContain("auth_revoked");
+    expect(result.reason).not.toMatch(/claim_actor_mismatch/);
+    expect(dispatchCalls).toBe(0);
+  });
+});
+
 describe("R1 readiness — gateway agents.list ∩ active OS bot", () => {
   it("OS-active bot missing from gateway agents.list → dispatcher calls = 0", async () => {
     const tenantId = "tenant-r1-a";
