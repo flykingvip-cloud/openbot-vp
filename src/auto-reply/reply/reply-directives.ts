@@ -24,7 +24,7 @@ export function parseReplyDirectives(
     currentMessageId?: string;
     silentToken?: string;
     expectedLanguage?: VisibleReplyLanguage | null;
-    /** Latest user turn, so non-shopping plan-speak is not rewritten to a shopping pause. */
+    /** Latest user turn (compat). Reply layer no longer invents plan-speak pause CTAs. */
     planSpeakContext?: string;
   } = {},
 ): ReplyDirectiveParseResult {
@@ -43,7 +43,7 @@ export function parseReplyDirectives(
   if ("expectedLanguage" in options) {
     text = stripAssistantScratchpadFromText(text, options.expectedLanguage);
   }
-  // M2: unfinished plan-speak must not deliver as a terminal bubble.
+  // Pass-through: reply layer must not invent pause/confirm from plan-speak.
   text = rewritePlanSpeakFinal(text, options.planSpeakContext ?? "");
 
   const silentToken = options.silentToken ?? SILENT_REPLY_TOKEN;
