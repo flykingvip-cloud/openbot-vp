@@ -275,11 +275,25 @@ describe("enterprise-model-provider.*", () => {
       },
     );
     const connectionId = created.payload.connection.connectionId;
-    const registered = await invoke("enterprise-model-catalog.register", {
-      connectionId,
-      upstreamModelId: "gpt-x",
-    });
+    const registered = await invoke<{ asset: { runtimeModelId: string } }>(
+      "enterprise-model-catalog.register",
+      {
+        connectionId,
+        upstreamModelId: "gpt-x",
+      },
+    );
     expect(registered.ok).toBe(true);
+    const { getModelGrant, setModelGrant } =
+      await import("../model-entitlement/seat-model-grant-store.js");
+    await setModelGrant({
+      tenantId: "ent-a",
+      subjectType: "seat",
+      subjectId: "seat-1",
+      grantedModelIds: [
+        "api-proxy-deepseek/deepseek-chat",
+        registered.payload.asset.runtimeModelId,
+      ],
+    });
 
     const blocked = await invoke("enterprise-model-provider.delete", { connectionId });
     expect(blocked.ok).toBe(false);
@@ -292,6 +306,12 @@ describe("enterprise-model-provider.*", () => {
     expect(forced.ok).toBe(true);
     const listed = await invoke<{ connections: unknown[] }>("enterprise-model-provider.list");
     expect(listed.payload.connections).toHaveLength(0);
+    const grant = await getModelGrant({
+      tenantId: "ent-a",
+      subjectType: "seat",
+      subjectId: "seat-1",
+    });
+    expect(grant?.grantedModelIds).toEqual(["api-proxy-deepseek/deepseek-chat"]);
     vi.unstubAllGlobals();
   });
 });
