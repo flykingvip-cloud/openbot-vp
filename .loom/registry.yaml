@@ -1,5 +1,34 @@
 version: 1
 tasks:
+- id: recheck-notify-hardening:cursor-cloud
+  owner: cursor-cloud
+  intent:
+  - Harden recheck attempts, observation storage, scenario binding, and correction-notice dedup. Switches stay off.
+  paths:
+  - src/diagnosis/task-outcome-evidence.ts
+  - src/task-outcome/correction-notify.test.ts
+  - src/task-outcome/correction-notify.ts
+  - src/task-outcome/durable-json-file.ts
+  - src/task-outcome/recheck-executor.test.ts
+  - src/task-outcome/recheck-executor.ts
+  - src/task-outcome/recheck-label.ts
+  - src/task-outcome/recheck-notify-hardening-child.ts
+  - src/task-outcome/recheck-notify-hardening.test.ts
+  - src/task-outcome/recheck-observation.test.ts
+  - src/task-outcome/recheck-observation.ts
+  - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.ts
+  state: active
+  sessions:
+  - id: recheck-notify-hardening-20261102
+    taskId: recheck-notify-hardening:cursor-cloud
+    ide: cursor
+    agent: cursor-cloud
+    status: active
+    lastSignalAt: 2026-11-02 01:58:00+00:00
+    metadata: {}
+  ownerHistory: []
+  since: 2026-11-02
+  metadata: {}
 - id: batch11-s0-ogui-decision-lifecycle:cursor-cloud
   owner: cursor-cloud
   intent:
@@ -10599,6 +10628,27 @@ tasks:
   since: 2026-11-01
   metadata: {}
 landingStreams:
+- id: recheck-notify-hardening-20261102
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - src/diagnosis/task-outcome-evidence.ts
+  - src/task-outcome/correction-notify.test.ts
+  - src/task-outcome/correction-notify.ts
+  - src/task-outcome/durable-json-file.ts
+  - src/task-outcome/recheck-executor.test.ts
+  - src/task-outcome/recheck-executor.ts
+  - src/task-outcome/recheck-label.ts
+  - src/task-outcome/recheck-notify-hardening-child.ts
+  - src/task-outcome/recheck-notify-hardening.test.ts
+  - src/task-outcome/recheck-observation.test.ts
+  - src/task-outcome/recheck-observation.ts
+  - ui/src/ui/ports/enterprise/diagnosis/diagnosis-task-outcome-rows.ts
+  canLandWith: []
+  metadata:
+    task: recheck-notify-hardening:cursor-cloud
+    owner: cursor-cloud
+    purpose: Recheck attempt history, durable reads, scenario binding, and scoped notice dedup. Switches stay off.
 - id: p1-fix-20261101
   landingPolicy: serial
   paths:

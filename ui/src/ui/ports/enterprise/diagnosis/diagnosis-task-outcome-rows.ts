@@ -2,6 +2,7 @@
  * Four diagnosis rows plus the roster source label.
  * Values come only from taskOutcomeEvidence and the target the page already selected.
  */
+import { formatRecheckObservationLabel } from "../../../../../../src/task-outcome/recheck-label.js";
 
 export type DiagnosisTaskOutcomeEvidenceView =
   | {
@@ -12,6 +13,7 @@ export type DiagnosisTaskOutcomeEvidenceView =
       reasonCode?: string;
       revisionKind?: string;
       recheckStatus?: string;
+      recheckAttempt?: number;
     }
   | {
       ok: false;
@@ -66,7 +68,10 @@ export function diagnosisTaskOutcomeRows(input: {
       { label: "关联原任务", value: taskId, mono: taskId !== "未声明" },
       { label: "结果版本", value: version, mono: version !== "未声明" },
       { label: "当前处理", value: handlingCopy(evidence) },
-      { label: "复验结果", value: recheckCopy(evidence.recheckStatus) },
+      {
+        label: "复验结果",
+        value: formatRecheckObservationLabel(evidence.recheckStatus, evidence.recheckAttempt),
+      },
     ];
   }
   const taskId = evidence.taskId?.trim() || "未声明";
@@ -84,7 +89,11 @@ export function diagnosisTaskOutcomeRows(input: {
     { label: "关联原任务", value: taskId, mono: taskId !== "未声明" },
     { label: "结果版本", value: version },
     { label: "当前处理", value: handling },
-    { label: "复验结果", value: "未复验" },
+    {
+      label: "复验结果",
+      value:
+        evidence.code === "read_failed" ? formatRecheckObservationLabel("read_failed") : "未复验",
+    },
   ];
 }
 
@@ -138,16 +147,6 @@ export function diagnoseTaskOutcomeAttachNote(draft: DiagnoseTaskOutcomeDraft): 
     return null;
   }
   return "任务对照未附上：需要同时填写任务、数字人和结果版本。不会自动选择最近任务。";
-}
-
-function recheckCopy(status: string | undefined): string {
-  if (status === "incomplete") {
-    return "复验未完成";
-  }
-  if (status === "completed") {
-    return "复验已记录";
-  }
-  return "未复验";
 }
 
 function emptyRows(source: string): DiagnosisTaskOutcomeRow[] {

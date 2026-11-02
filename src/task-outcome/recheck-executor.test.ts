@@ -40,6 +40,7 @@ function correctionFixture() {
     ...snap,
     revisionKind: "correction" as const,
     taskJudgement: "failure" as const,
+    decisiveRunId: "run-1",
   };
   fs.writeFileSync(
     store.versionPath(opened.taskId, snap.outcomeVersion),
@@ -53,12 +54,12 @@ function correctionFixture() {
 }
 
 describe("original scenario recheck executor", () => {
-  it("stays off, fails closed without a scenario id, and does not change the correction judgement", () => {
+  it("stays off, fails closed without a scenario id, and does not change the correction judgement", async () => {
     expect(RECHECK_EXECUTION_ENABLED).toBe(false);
     const fixture = correctionFixture();
     const before = new DurableTaskOutcomeStore(fixture.root).loadTask(fixture.taskId);
     expect(
-      executeOriginalScenarioRecheck({
+      await executeOriginalScenarioRecheck({
         cfg: fixture.cfg,
         agentId: "bot",
         taskId: fixture.taskId,
@@ -72,7 +73,7 @@ describe("original scenario recheck executor", () => {
     );
 
     expect(
-      executeOriginalScenarioRecheck({
+      await executeOriginalScenarioRecheck({
         cfg: fixture.cfg,
         agentId: "bot",
         taskId: fixture.taskId,
@@ -85,13 +86,13 @@ describe("original scenario recheck executor", () => {
       before?.outcomeVersion,
     );
 
-    const failed = executeOriginalScenarioRecheck({
+    const failed = await executeOriginalScenarioRecheck({
       cfg: fixture.cfg,
       agentId: "bot",
       taskId: fixture.taskId,
       outcomeVersion: fixture.outcomeVersion,
       taskContractVersion: "1.0.0",
-      scenarioId: "scene-1",
+      scenarioId: "run-1",
       enabled: true,
       run: () => ({ ok: false, reason: "tool_failure" }),
     });
@@ -99,6 +100,7 @@ describe("original scenario recheck executor", () => {
       ok: true,
       status: "incomplete",
       outcomeVersion: fixture.outcomeVersion,
+      attempt: 1,
     });
     const after = new DurableTaskOutcomeStore(fixture.root).loadTask(fixture.taskId);
     expect(after?.outcomeVersion).toBe(before?.outcomeVersion);
