@@ -190,3 +190,8 @@ function defaultQueueModeForChannel(_channel?: string): QueueMode {
 - P3：进度查询板投影即时答。
 - 事件序列：`src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts`
 - 阻塞点变化：进度问不再被 collect followup 挡住；普通 aside 仍可能 followup。
+
+## SHA binding (Asia/Shanghai 2026-11-02 23:17)
+
+- HEAD: `b46ca89f2c614f6e7c42b7b1d35f91f2122d923a`
+- Vitest: chat.test preserve/P0 + mid-task-dialogue + collect-amend-steer + event-sequence + inbound-stop → 150+3 passed on WT openbot-pr216-slice2.
