@@ -341,7 +341,8 @@ export type ModelGovernanceIssue = {
     | "missing_price"
     | "aor_execution_unmapped"
     | "aor_no_policy_bindings"
-    | "aor_sync_degraded";
+    | "aor_sync_degraded"
+    | "platform_model_unusable";
   severity: "critical" | "warning" | "info";
   title: string;
   description: string;
