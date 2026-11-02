@@ -40,11 +40,15 @@ function shouldLogToConsole(level: LogLevel, settings: { level: LogLevel }): boo
 type ChalkInstance = InstanceType<typeof Chalk>;
 
 const inspectValue: ((value: unknown) => string) | null = (() => {
+  // Same browser guard as node-require.ts: a bare `process` read throws
+  // "process is not defined" if this module is evaluated in the Control UI.
   const getBuiltinModule = (
-    process as NodeJS.Process & {
-      getBuiltinModule?: (id: string) => unknown;
-    }
-  ).getBuiltinModule;
+    globalThis.process as
+      | (NodeJS.Process & {
+          getBuiltinModule?: (id: string) => unknown;
+        })
+      | undefined
+  )?.getBuiltinModule;
   if (typeof getBuiltinModule !== "function") {
     return null;
   }
