@@ -5,7 +5,7 @@
 ## 绑定
 
 - 四项阻塞行为基线：`6c4081a3c6c81bd63bbb317916f1d500c2466843`
-- 本轮行为 tip：推送后完整 SHA（见 delivery §0）
+- 本轮行为 tip：`cf7cf63f45611fbb56801f36380d2027648cdc34`
 - **作废**：`ab32aa1…`、「steer 成功后不再 followup（已废止旧说法）」
 
 ## A. Gateway chat.send 暂停事件序列（测试）
@@ -34,6 +34,10 @@
 - `agent-runner`：active 时 disposition；`board_readonly` 立即 return 文本  
 - 读问句优先于 turn-relation（「有效约束有哪些」即使被标 amend 也不 steer）  
 - reply_lane 仍 pending  
+
+## 定向测试结果
+
+7 files / 23 passed（Asia/Shanghai 本机 vitest）。行为 tip `cf7cf63f45611fbb56801f36380d2027648cdc34`。
 
 ## 能力边界一句话
 

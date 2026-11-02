@@ -5,7 +5,7 @@
 
 ## 0. 绑定 SHA
 
-- **行为完整 SHA（本轮 tip）**：见提交后 `git rev-parse HEAD`（以本 PR 推送 tip 为准；行为基线之上继续）。
+- **行为完整 SHA（本轮 tip）**：`cf7cf63f45611fbb56801f36380d2027648cdc34`
 - **四项阻塞行为基线**：`6c4081a3c6c81bd63bbb317916f1d500c2466843`
 - PR：https://github.com/flykingvip-cloud/openbot-vp/pull/216
 - **禁止**再引用旧 HEAD `ab32aa1…`、或「steer 成功后仍保留 followup」等过时表述（P1 已改为：steer 成功即返回，不再 followup）。
@@ -59,12 +59,17 @@
 
 ## 5. 定向测试（本机）
 
-见 evidence 与推送后 tip。典型：
-- `chat.owner-pause-abort.test.ts`
-- `session-task-board.constraint-identity.test.ts`
-- `agent-runner.collect-amend-steer.test.ts`
-- `mid-task-aside.test.ts`
-- `slice2-mid-task-event-sequence.test.ts`（及既有 inbound-stop / mid-task-dialogue）
+Asia/Shanghai 本机 vitest（7 files / **23 passed**）：
+
+- `src/gateway/server-methods/chat.owner-pause-abort.test.ts`（2）
+- `src/conversation-task/session-task-board.constraint-identity.test.ts`（5）
+- `src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts`（5）
+- `src/auto-reply/reply/mid-task-aside.test.ts`（4）
+- `src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts`（1）
+- `src/conversation-task/session-task-board.inbound-stop.test.ts`（3）
+- `src/auto-reply/reply/mid-task-dialogue.test.ts`（3）
+
+未独立宣称线上闪现已修复。行为 tip = `cf7cf63f45611fbb56801f36380d2027648cdc34`。
 
 ## 6. 不做
 
