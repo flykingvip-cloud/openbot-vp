@@ -1,12 +1,20 @@
 /**
- * Delivery ACL actor binding.
+ * Delivery ACL actor binding + shared trusted principal resolution.
+ *
+ * Auth primary key: trusted tenantId + platform userId; bots use in-tenant
+ * canonical agentId. Email/name are display / verified aliases only — never
+ * long-term auth PK. Alias links come from trusted auth context (handshake
+ * session subjects) or from one authoritative members roster row
+ * (userId + memberId + agentId on the same row). Morphology expands
+ * human:/bot:/agent: prefixes only and cannot prove UUID ≡ email.
+ *
+ * Dual-form members.json rows (writing both UUID and email memberIds as a
+ * productized identity bus) are forbidden as the normal fix path — keep ACL
+ * and wake permission duties separate; share only principal resolution.
  *
  * `client.connect.user` (and displayName / client id) is caller-chosen.
  * Handshake stamps the authenticated principal on `platformUserId`,
  * `sessionMembershipId`, and `user` via `resolveClientSessionIdentity`.
- * When the claimed id is already a memberRoleMap row, the operating-state
- * coordinator, or would be accepted as that string, the session subject
- * must match. There is no alias table from email/uuid to memberId.
  */
 
 import { createWorkspaceCollaborationStores, readGroupOperatingState } from "./shared.js";
@@ -158,19 +166,60 @@ export function expandDeliveryActorAliases(actorId: string | null | undefined): 
 }
 
 /**
- * When `actor` is one of the handshake-stamped session subjects (email / uuid /
- * membership id), every subject is the same person — expand all of them so
- * Owner email can match authorized `human:<uuid>` (and vice versa).
+ * One authoritative members.json / roster row. Fields on the SAME row are the
+ * same principal (trusted roster context). Do not invent cross-row UUID↔email.
  */
-export function sessionConfirmerAliases(params: {
-  actor: string;
-  sessionSubjects?: readonly string[] | null;
-}): string[] {
-  const actor = params.actor.trim();
+export type TrustedPrincipalRosterEntry = {
+  userId?: string | null;
+  memberId?: string | null;
+  agentId?: string | null;
+};
+
+export type TrustedPrincipalResolutionInput = {
+  actor: string | null | undefined;
+  /** Handshake-stamped subjects (platformUserId / user email / membershipId). */
+  trustedAuthSubjects?: readonly string[] | null;
+  /** Extra aliases already proven by trusted auth (e.g. employee workbench). */
+  trustedAliases?: readonly string[] | null;
+  /**
+   * Authoritative roster rows. userId+memberId+agentId on one row link that
+   * principal; never treat dual-form members.json as a productized bus.
+   */
+  roster?: readonly TrustedPrincipalRosterEntry[] | null;
+};
+
+/** Morphological expansion of one roster row into comparable aliases. */
+export function resolveRosterPrincipalAliases(
+  entry: TrustedPrincipalRosterEntry | null | undefined,
+): string[] {
+  if (!entry) {
+    return [];
+  }
+  const seeds = [entry.userId, entry.memberId, entry.agentId]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter(Boolean);
+  const out = new Set<string>();
+  for (const seed of seeds) {
+    for (const alias of expandDeliveryActorAliases(seed)) {
+      out.add(alias);
+    }
+  }
+  return [...out];
+}
+
+/**
+ * Shared trusted principal alias set for ACL and wake.
+ * Session subjects link UUID↔email only when the actor is already one of them;
+ * roster links only within a single members row. Morphology never proves identity.
+ */
+export function resolveTrustedPrincipalAliases(params: TrustedPrincipalResolutionInput): string[] {
+  const actor = (params.actor ?? "").trim();
   if (!actor) {
     return [];
   }
-  const subjects = (params.sessionSubjects ?? []).map((subject) => subject.trim()).filter(Boolean);
+  const subjects = (params.trustedAuthSubjects ?? [])
+    .map((subject) => subject.trim())
+    .filter(Boolean);
   const linked = subjects.some((subject) => deliveryActorIdsEqual(subject, actor));
   const seeds = linked ? [actor, ...subjects] : [actor];
   const out = new Set<string>();
@@ -179,7 +228,63 @@ export function sessionConfirmerAliases(params: {
       out.add(alias);
     }
   }
+  for (const raw of params.trustedAliases ?? []) {
+    const alias = typeof raw === "string" ? raw.trim() : "";
+    if (!alias) {
+      continue;
+    }
+    for (const expanded of expandDeliveryActorAliases(alias)) {
+      out.add(expanded);
+    }
+  }
+  // Roster: if any row matches the actor (morphology or already-collected aliases),
+  // fold that row's fields into the principal set (same-row proof only).
+  for (const row of params.roster ?? []) {
+    const rowAliases = resolveRosterPrincipalAliases(row);
+    if (rowAliases.length === 0) {
+      continue;
+    }
+    const hitsRow = rowAliases.some(
+      (rowAlias) =>
+        deliveryActorIdsEqual(rowAlias, actor) ||
+        [...out].some((alias) => deliveryActorIdsEqual(alias, rowAlias)),
+    );
+    if (!hitsRow) {
+      continue;
+    }
+    for (const rowAlias of rowAliases) {
+      out.add(rowAlias);
+    }
+  }
   return [...out];
+}
+
+/** True when candidate equals any trusted principal alias (morphology-aware). */
+export function trustedPrincipalMatches(
+  candidate: string | null | undefined,
+  principalAliases: readonly string[],
+): boolean {
+  const id = (candidate ?? "").trim();
+  if (!id || principalAliases.length === 0) {
+    return false;
+  }
+  return principalAliases.some((alias) => deliveryActorIdsEqual(alias, id));
+}
+
+/**
+ * When `actor` is one of the handshake-stamped session subjects (email / uuid /
+ * membership id), every subject is the same person — expand all of them so
+ * Owner email can match authorized `human:<uuid>` (and vice versa).
+ * Delegates to shared {@link resolveTrustedPrincipalAliases}.
+ */
+export function sessionConfirmerAliases(params: {
+  actor: string;
+  sessionSubjects?: readonly string[] | null;
+}): string[] {
+  return resolveTrustedPrincipalAliases({
+    actor: params.actor,
+    trustedAuthSubjects: params.sessionSubjects,
+  });
 }
 
 /**
@@ -239,18 +344,29 @@ export function isMappedDeliveryIdentity(
   state: DeliveryMembershipSource,
   actorId: string,
   publisherId?: string | null,
+  resolution?: Omit<TrustedPrincipalResolutionInput, "actor"> | null,
 ): boolean {
   const id = actorId.trim();
   if (!id) {
     return false;
   }
-  if (deliveryActorIdsEqual(state?.governance?.coordinatorBotId, id)) {
+  const aliases = resolveTrustedPrincipalAliases({
+    actor: id,
+    trustedAuthSubjects: resolution?.trustedAuthSubjects,
+    trustedAliases: resolution?.trustedAliases,
+    roster: resolution?.roster,
+  });
+  if (trustedPrincipalMatches(state?.governance?.coordinatorBotId, aliases)) {
     return true;
   }
-  if (deliveryActorIdsEqual(publisherId, id)) {
+  if (trustedPrincipalMatches(publisherId, aliases)) {
     return true;
   }
-  return (state?.memberRoleMap ?? []).some((row) => deliveryActorIdsEqual(row.memberId, id));
+  // Owner surface is also a membership-bound identity (often platform userId).
+  if (trustedPrincipalMatches(state?.governance?.ownerUserId, aliases)) {
+    return true;
+  }
+  return (state?.memberRoleMap ?? []).some((row) => trustedPrincipalMatches(row.memberId, aliases));
 }
 
 export function bindDeliveryActor(params: {

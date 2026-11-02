@@ -7,6 +7,8 @@ import {
   deliveryActorIdsEqual,
   isMappedDeliveryIdentity,
   preferMappedSessionSubjects,
+  resolveTrustedPrincipalAliases,
+  trustedPrincipalMatches,
 } from "./delivery-actor-binding.js";
 
 const membership = {
@@ -199,6 +201,88 @@ describe("delivery actor binding", () => {
       actorMatchesAuthorizedConfirmer({
         actor: "bot",
         authorizedConfirmerIds: ["bot:bot"],
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("trusted principal resolution (ACL + wake shared)", () => {
+  const uuid = "90fed19a-1c8b-4420-87e0-bcc6165e32fa";
+  const email = "daniel.hhd@gmail.com";
+  const roster = [
+    {
+      memberId: `human:${uuid}`,
+      userId: uuid,
+      agentId: undefined as string | undefined,
+    },
+    { memberId: "bot:bot-2", userId: undefined, agentId: "bot-2" },
+  ];
+
+  test("same auth identity: UUID and email aliases resolve together via session", () => {
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: email,
+      trustedAuthSubjects: [uuid, email],
+    });
+    expect(trustedPrincipalMatches(`human:${uuid}`, aliases)).toBe(true);
+    expect(trustedPrincipalMatches(uuid, aliases)).toBe(true);
+    expect(trustedPrincipalMatches(`human:${email}`, aliases)).toBe(true);
+  });
+
+  test("same roster row links UUID memberId to email duty without dual-form members", () => {
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: email,
+      trustedAuthSubjects: [uuid, email],
+      roster,
+    });
+    expect(trustedPrincipalMatches(`human:${uuid}`, aliases)).toBe(true);
+    // OS maps memberId=human:uuid; wake candidate may be bare email from duty.
+    expect(
+      isMappedDeliveryIdentity(
+        {
+          governance: { ownerUserId: uuid, coordinatorBotId: "bot-2" },
+          memberRoleMap: [{ memberId: `human:${uuid}` }, { memberId: "bot-2" }],
+        },
+        email,
+        null,
+        { trustedAuthSubjects: [uuid, email], roster },
+      ),
+    ).toBe(true);
+  });
+
+  test("forged alias: unrelated email cannot claim UUID principal", () => {
+    const forged = "attacker@example.com";
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: forged,
+      trustedAuthSubjects: ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", forged],
+      roster,
+    });
+    expect(trustedPrincipalMatches(`human:${uuid}`, aliases)).toBe(false);
+    expect(
+      isMappedDeliveryIdentity(
+        {
+          governance: { ownerUserId: uuid },
+          memberRoleMap: [{ memberId: `human:${uuid}` }],
+        },
+        forged,
+        null,
+        {
+          trustedAuthSubjects: ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", forged],
+          roster,
+        },
+      ),
+    ).toBe(false);
+  });
+
+  test("morphology alone does not prove UUID≡email without session or roster", () => {
+    const aliases = resolveTrustedPrincipalAliases({ actor: email });
+    expect(trustedPrincipalMatches(uuid, aliases)).toBe(false);
+    expect(trustedPrincipalMatches(`human:${uuid}`, aliases)).toBe(false);
+  });
+
+  test("bot canonical agentId maps via roster/morphology", () => {
+    expect(
+      isMappedDeliveryIdentity({ memberRoleMap: [{ memberId: "bot:bot-2" }] }, "bot-2", null, {
+        roster,
       }),
     ).toBe(true);
   });

@@ -30,7 +30,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { Task } from "@openbot/collaboration-core";
+import type { CollaborationMember, Task } from "@openbot/collaboration-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   COLLABORATION_BOARD_TOOL,
@@ -174,6 +174,30 @@ async function seedMappedMembership(params: {
 }): Promise<void> {
   const stores = createWorkspaceCollaborationStores(params.cfg);
   const owner = params.ownerUserId ?? CEO;
+  // Persist roster + profile so syncGroupOperatingState (now before handoff)
+  // reprojects the same membership surface instead of wiping OS-only seeds.
+  const members: CollaborationMember[] = params.memberIds.map((memberId) => {
+    const human = memberId.startsWith("human:");
+    return {
+      memberId,
+      memberKind: human ? ("human" as const) : ("bot" as const),
+      userId: human ? memberId.replace(/^human:/, "") : undefined,
+      agentId: human ? undefined : memberId.replace(/^(bot|agent):/, ""),
+      governanceRole: memberId === owner ? ("owner" as const) : ("member" as const),
+      status: "active" as const,
+      updatedAtMs: 1,
+    };
+  });
+  await stores.groupStorage.writeProfile({
+    groupId: params.groupId,
+    groupCode: params.groupId,
+    displayName: params.groupId,
+    ownerUserId: owner,
+    coordinatorBotId: "",
+    createdAtMs: 1,
+    updatedAtMs: 1,
+  });
+  await stores.groupStorage.writeMembers(params.groupId, members);
   const state = makeOperatingState({
     groupId: params.groupId,
     governance: {

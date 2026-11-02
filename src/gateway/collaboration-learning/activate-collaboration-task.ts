@@ -665,6 +665,40 @@ export async function activateCollaborationTask(
     idempotentReplay: boolean,
   ) => {
     const stores = teamStores;
+    // Sync OS auth/business projection BEFORE post-publish handoff / formalClaim
+    // so dispatch recheck sees legitimate membership updates (not pre-sync OS).
+    // Projection sync still runs OUTSIDE the task lock (auth lock separately) —
+    // preserve existing auth↔task lock order; do not nest locks.
+    try {
+      // Explicit activate focus switch: new task B must beat a stale OS A.
+      await syncGroupOperatingState({
+        fileStore: stores.fileStore,
+        groupStorage: stores.groupStorage,
+        metadataStorage: stores.metadataStorage,
+        memoryStorage: stores.memoryStorage,
+        learningStorage: stores.learningStorage,
+        objectStorage: stores.objectStorage,
+        groupId,
+        preferredTaskId: taskId,
+      });
+    } catch (error) {
+      return {
+        status: "partial_success" as const,
+        taskId,
+        activationKey,
+        boardItemId: item.itemId,
+        item,
+        taskCreated,
+        reason: "operating_state_sync_failed",
+        detail: error instanceof Error ? error.message : String(error),
+        taskEnsured: true as const,
+        boardPublished: true as const,
+        operatingStateSynced: false as const,
+        // Board publish is not dispatcher acceptance. Keep false.
+        // Skip formalClaim/handoff when OS sync failed — avoid wake on stale auth.
+        dispatched: ACTIVATE_SUCCESS_DISPATCHED,
+      };
+    }
     // Publish ≠ claim. Schedule a controlled handoff wake for the single
     // intended claimant (or claim only when the present actor IS that intended).
     // Never auto-claim as the publisher; never pick intended[0] among many.
@@ -689,36 +723,6 @@ export async function activateCollaborationTask(
       roundDispatcher: params.roundDispatcher,
     });
     const boardItem = formalClaim.item;
-    try {
-      // Explicit activate focus switch: new task B must beat a stale OS A.
-      await syncGroupOperatingState({
-        fileStore: stores.fileStore,
-        groupStorage: stores.groupStorage,
-        metadataStorage: stores.metadataStorage,
-        memoryStorage: stores.memoryStorage,
-        learningStorage: stores.learningStorage,
-        objectStorage: stores.objectStorage,
-        groupId,
-        preferredTaskId: taskId,
-      });
-    } catch (error) {
-      return {
-        status: "partial_success" as const,
-        taskId,
-        activationKey,
-        boardItemId: boardItem.itemId,
-        item: boardItem,
-        taskCreated,
-        reason: "operating_state_sync_failed",
-        detail: error instanceof Error ? error.message : String(error),
-        taskEnsured: true as const,
-        boardPublished: true as const,
-        operatingStateSynced: false as const,
-        // Board publish is not dispatcher acceptance. Keep false.
-        dispatched: ACTIVATE_SUCCESS_DISPATCHED,
-        formalClaim,
-      };
-    }
     const os = await readGroupOperatingState({ fileStore: stores.fileStore, groupId });
     return {
       status: "activated" as const,
