@@ -295,6 +295,8 @@ Docs: https://docs.openbot.love
 - Integrations/device platform: add, rebind, and revoke register the user grant on the loopback integrations stub when consent and service Basic env names are set. Device-control can `GET /grants/{authorizationRef}` on that origin with the exchange credential. Rebind and revoke show up on that GET. A stub rejection does not leave a management-only grant.
 - Collaboration: the group operating summary no longer treats another task's deliverable as the current formal result. When the active task has no matching deliverable, the summary says 当前任务无正式成果. A chat message that only says 完成 does not accept a board submission. Activate still reports dispatched false until the dispatcher accepts a wake.
 - Control UI: loading zh-CN no longer throws `process is not defined`. Logging reads `process.getBuiltinModule` through `globalThis.process?.getBuiltinModule`, so the browser bundle gets null instead of a missing `process` binding.
+- Agents/chat: enterprise catalog models (`ent/<connection>/<upstream>`, including `mimo-v2.6-flash`) are translated to the tenant BYOK provider before the main reply. A pinned agent no longer stops before any reply with `Unknown model: ent/…`.
+- Agents/chat: a configured platform primary such as DeepSeek stays the run model when the only extra grant is an enterprise catalog id. A failed model call tells the user to check the primary model, and does not show the raw runtime id.
 
 ## 2026.3.8
 

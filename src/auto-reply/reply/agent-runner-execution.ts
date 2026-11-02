@@ -45,6 +45,7 @@ import {
 } from "../../gateway/billing/agent-run-governance.js";
 import { recordCreditUsage } from "../../gateway/billing/record-credit-usage.js";
 import { emitChatInboundStage } from "../../gateway/chat-inbound-stage-events.js";
+import { resolveEnterpriseEmbeddedTransport } from "../../gateway/enterprise-model/embedded-transport.js";
 import { reportEvolutionOutcomeWriteFailure } from "../../gateway/evolution-control/evolution-loop-log.js";
 import { inheritExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
 import {
@@ -111,6 +112,7 @@ import {
 } from "./agent-runner-utils.js";
 import { type BlockReplyPipeline } from "./block-reply-pipeline.js";
 import { recordHonestCapabilityGap } from "./honest-empty-reply.js";
+import { buildUserFacingModelCallFailure } from "./model-call-failure-copy.js";
 import type { FollowupRun } from "./queue.js";
 import { createBlockReplyDeliveryHandler } from "./reply-delivery.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
@@ -841,6 +843,25 @@ export async function runAgentTurnWithFallback(params: {
               allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
             });
             return (async () => {
+              // ent/<connection>/<upstream> is a tenant catalog id, not a registry provider.
+              // Without this remap the runner throws Unknown model before any reply.
+              const transport = await resolveEnterpriseEmbeddedTransport({
+                provider,
+                model,
+                tenantId:
+                  modelGate?.tenantId?.trim() ||
+                  modelGate?.creditReporting?.enterpriseId?.trim() ||
+                  params.followupRun.run.executionIdentity?.enterpriseId?.trim() ||
+                  params.sessionCtx.GatewayClientSessionEnterpriseId?.trim() ||
+                  params.sessionCtx.CollaborationGroupOwnerEntitlement?.tenantId?.trim() ||
+                  "",
+                resolveTenantId: async () => {
+                  const scope = await resolveAgentRunEntitlementScope({
+                    agentId: params.followupRun.run.agentId,
+                  });
+                  return scope?.tenantId;
+                },
+              });
               const modelStartedAtMs = Date.now();
               let firstTokenEmitted = false;
               const emitModelStage = (
@@ -893,6 +914,14 @@ export async function runAgentTurnWithFallback(params: {
                   groupSpace: params.sessionCtx.GroupSpace?.trim() ?? undefined,
                   ...senderContext,
                   ...runBaseParams,
+                  provider: transport.provider,
+                  model: transport.model,
+                  ...(transport.providerAuthOverride
+                    ? { providerAuthOverride: transport.providerAuthOverride }
+                    : {}),
+                  ...(transport.enterpriseRuntimeModelId
+                    ? { enterpriseRuntimeModelId: transport.enterpriseRuntimeModelId }
+                    : {}),
                   ...inheritExecutionIdentityRunFields({
                     ...params.followupRun.run,
                     gatewayClientUser: runGatewayClientUser,
@@ -1369,15 +1398,21 @@ export async function runAgentTurnWithFallback(params: {
           ? sanitizeUserFacingText(message, { errorContext: true })
           : message;
         const trimmedMessage = safeMessage.replace(/\.\s*$/, "");
-        const fallbackText = dockerFailure
-          ? dockerFailure
-          : isContextOverflow
-            ? "⚠️ Context overflow — prompt too large for this model. Try a shorter message or a larger-context model."
-            : isRoleOrderingError
-              ? "⚠️ Message ordering conflict - please try again. If this persists, use /new to start a fresh session."
-              : isInfraStartupFailure
-                ? "这一轮没能完成回复。请再试一次，或 @ 对应助手。"
-                : `⚠️ Agent failed before reply: ${trimmedMessage}.\nLogs: openbot logs --follow`;
+        const modelCallFailure = buildUserFacingModelCallFailure(
+          message,
+          params.opts?.expectedReplyLanguage,
+        );
+        const fallbackText = modelCallFailure
+          ? `⚠️ ${modelCallFailure}`
+          : dockerFailure
+            ? dockerFailure
+            : isContextOverflow
+              ? "⚠️ Context overflow — prompt too large for this model. Try a shorter message or a larger-context model."
+              : isRoleOrderingError
+                ? "⚠️ Message ordering conflict - please try again. If this persists, use /new to start a fresh session."
+                : isInfraStartupFailure
+                  ? "这一轮没能完成回复。请再试一次，或 @ 对应助手。"
+                  : `⚠️ Agent failed before reply: ${trimmedMessage}.\nLogs: openbot logs --follow`;
 
         void recordGrowthTaskOutcome(false, {
           aborted: Boolean(params.opts?.abortSignal?.aborted),
