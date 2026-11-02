@@ -80,5 +80,5 @@ claimTaskBoardContinue → wake_suppress / tombstone / 新 stop 提示
 ## 7. 落地
 
 - PR: https://github.com/flykingvip-cloud/openbot-vp/pull/216
-- HEAD: 
+- HEAD: `b46ca89f2c614f6e7c42b7b1d35f91f2122d923a`
 - 切片 3 暂缓；不含合并/生产部署
