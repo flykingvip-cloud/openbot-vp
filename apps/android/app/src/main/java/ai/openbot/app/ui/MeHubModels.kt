@@ -27,8 +27,8 @@ import kotlinx.serialization.json.putJsonObject
  * 我的机器人:
  * - `agents.list` + `robot.workspace.get` / `robot.workspace.updateIdentity`
  *   (my-bot-read-model / my-bot-workspace-panel tabs:
- *   身份|能力|成长|运营授权|协作)
- * - 运营授权 grants: `user-operational-identity.access.list-for-agent` +
+ *   身份|能力|成长|授权|协作)
+ * - 授权 grants: `user-operational-identity.access.list-for-agent` +
  *   `user-operational-identity.grants.upsert`
  *
  * 我的协作小组:
@@ -408,7 +408,7 @@ fun meBotWorkspaceTabLabel(tab: MeBotWorkspaceTab): String =
     MeBotWorkspaceTab.Identity -> "身份"
     MeBotWorkspaceTab.Capabilities -> "能力"
     MeBotWorkspaceTab.Growth -> "成长"
-    MeBotWorkspaceTab.Auth -> "运营授权"
+    MeBotWorkspaceTab.Auth -> "授权"
     MeBotWorkspaceTab.Collaboration -> "协作"
   }
 

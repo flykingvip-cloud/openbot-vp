@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ScreenShare
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Groups
@@ -33,7 +32,6 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.CircularProgressIndicator
@@ -80,22 +78,19 @@ private enum class MeSheet {
   Prefs,
   Auth,
   Perms,
-  Devices,
   Robots,
   RobotEdit,
   Groups,
   GroupDetail,
   CreateBot,
   CreateGroup,
-  Voice,
-  Screen,
 }
 
 /**
- * Four-tab SoT 「我的」: 个人设置｜本机与连接｜更多.
+ * Employee 「我的」: 个人设置｜设备｜更多.
  *
- * Reuses Web personal-settings / devices / my-bots / collab-space flows
- * (no Android-only parallel Me system). Compose adapts UI only.
+ * Ordinary-user surface only: account, OS permissions, bots/collab, workbench.
+ * No gateway config, paired-device admin list, or debug capability pages.
  */
 @Composable
 fun MeTabScreen(
@@ -107,7 +102,6 @@ fun MeTabScreen(
   var segment by rememberSaveable { mutableStateOf(MeHubSegment.Account) }
   var sheet by rememberSaveable { mutableStateOf(MeSheet.None) }
   val isConnected by viewModel.isConnected.collectAsState()
-  val statusText by viewModel.statusText.collectAsState()
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val demoMe =
@@ -129,7 +123,6 @@ fun MeTabScreen(
   var bots by remember { mutableStateOf<List<MeBotRow>>(emptyList()) }
   var groups by remember { mutableStateOf<List<MeGroupRow>>(emptyList()) }
   var authRows by remember { mutableStateOf<List<MeAuthResourceRow>>(emptyList()) }
-  var devices by remember { mutableStateOf<List<MePairedDeviceRow>>(emptyList()) }
   var listBusy by remember { mutableStateOf(false) }
   var listError by remember { mutableStateOf<String?>(null) }
   var notice by remember { mutableStateOf<String?>(null) }
@@ -137,7 +130,7 @@ fun MeTabScreen(
   var selectedGroup by remember { mutableStateOf<MeGroupRow?>(null) }
 
   LaunchedEffect(sheet) {
-    onVoiceActiveChange(sheet == MeSheet.Voice)
+    onVoiceActiveChange(false)
   }
 
   suspend fun refreshMoreLists() {
@@ -216,30 +209,12 @@ fun MeTabScreen(
     }
   }
 
-  suspend fun refreshDevices() {
-    if (demoMe) {
-      devices = DEMO_ME_DEVICES
-      return
-    }
-    if (!isConnected) {
-      devices = emptyList()
-      return
-    }
-    try {
-      val raw = viewModel.gatewayRequest("device.pair.list", "{}")
-      devices = parseDevicePairList(raw)
-    } catch (err: Throwable) {
-      listError = err.message?.trim().orEmpty().ifEmpty { "加载设备失败" }.take(160)
-    }
-  }
 
   LaunchedEffect(segment, isConnected, demoMe, sheet) {
     when {
       sheet == MeSheet.Auth -> refreshAuth()
-      sheet == MeSheet.Devices -> refreshDevices()
       sheet == MeSheet.Robots || sheet == MeSheet.Groups || segment == MeHubSegment.More ->
         refreshMoreLists()
-      sheet == MeSheet.None && segment == MeHubSegment.Device -> refreshDevices()
     }
   }
 
@@ -302,7 +277,7 @@ fun MeTabScreen(
                       ),
                       MobileGroupedNavItem(
                         title = "授权",
-                        subtitle = "身份与模型",
+                        subtitle = "工作身份",
                         icon = Icons.Default.Link,
                         onClick = { sheet = MeSheet.Auth },
                       ),
@@ -311,28 +286,7 @@ fun MeTabScreen(
               }
             }
             MeHubSegment.Device -> {
-              if (!isConnected && !demoMe) {
-                item {
-                  MobileSoftBanner(
-                    text = "服务暂未就绪，登录后会自动连接，无需手动配置网关。",
-                    tone = MobileBannerTone.Warning,
-                  )
-                }
-              }
-              item { MobileSectionLabel(text = "本机") }
-              item {
-                MobileWhiteCard {
-                  MobileInfoBlock(
-                    label = "连接状态",
-                    value =
-                      if (isConnected) {
-                        statusText.ifBlank { "已连接" }
-                      } else {
-                        "未连接 · 登录后自动连接云端服务"
-                      },
-                  )
-                }
-              }
+              item { MobileSectionLabel(text = "系统权限") }
               item {
                 MobileNavRow(
                   title = "设备与权限",
@@ -341,51 +295,19 @@ fun MeTabScreen(
                   onClick = { sheet = MeSheet.Perms },
                 )
               }
-              item {
-                MeNavRowWithBadge(
-                  title = "我的设备",
-                  subtitle = "已配对设备只读列表 · Web device.pair.list",
-                  icon = Icons.Default.Settings,
-                  badge = if (devices.isEmpty()) "—" else "${devices.size} 台",
-                  badgeWarn = false,
-                  onClick = { sheet = MeSheet.Devices },
-                )
-              }
-              item { MobileSectionLabel(text = "本机权限预览") }
-              item { MePermissionPreviewGrid() }
-              item { MobileSectionLabel(text = "本机能力") }
-              item {
-                MobileGroupedNavCard(
-                  rows =
-                    listOf(
-                      MobileGroupedNavItem(
-                        title = "语音对话",
-                        subtitle = "可选能力",
-                        icon = Icons.Default.RecordVoiceOver,
-                        onClick = { sheet = MeSheet.Voice },
-                      ),
-                      MobileGroupedNavItem(
-                        title = "画布",
-                        subtitle = "查看服务推送的内容",
-                        icon = Icons.AutoMirrored.Filled.ScreenShare,
-                        onClick = { sheet = MeSheet.Screen },
-                      ),
-                    ),
-                )
-              }
             }
             MeHubSegment.More -> {
               item {
                 val moreRows = mutableListOf(
                   MobileGroupedNavItem(
                     title = "我的机器人",
-                    subtitle = "管理身份、能力、授权与协作。",
+                    subtitle = "身份、能力与协作",
                     icon = Icons.Default.SmartToy,
                     onClick = { sheet = MeSheet.Robots },
                   ),
                   MobileGroupedNavItem(
                     title = "我的协作小组",
-                    subtitle = "群主 · 成员",
+                    subtitle = "成员与协作",
                     icon = Icons.Default.Groups,
                     onClick = { sheet = MeSheet.Groups },
                   ),
@@ -394,7 +316,7 @@ fun MeTabScreen(
                   moreRows.add(
                     MobileGroupedNavItem(
                       title = "员工工作台",
-                      subtitle = "返回已登录的工作台（Web 同壳）",
+                      subtitle = "打开完整工作台",
                       icon = Icons.Default.CheckCircle,
                       onClick = { onOpenEmployeeWorkbench.invoke() },
                     ),
@@ -463,7 +385,7 @@ fun MeTabScreen(
       }
     }
     MeSheet.Auth -> {
-      MeSubScaffold(title = "授权资源", onBack = { sheet = MeSheet.None }, modifier = modifier) {
+      MeSubScaffold(title = "授权", onBack = { sheet = MeSheet.None }, modifier = modifier) {
         MeAuthSheet(
           rows = authRows,
           busy = listBusy,
@@ -481,9 +403,9 @@ fun MeTabScreen(
                   context,
                   "$base/embed/employee/me#operational-identity",
                 )
-                notice = "已打开 Web 授权页（若未登录请先在工作台登录）"
+                notice = "已打开授权页（若未登录请先在工作台登录）"
               } else {
-                notice = "请先登录账号，再打开 Web 身份向导"
+                notice = "请先登录账号，再到工作台绑定身份"
               }
             }
           },
@@ -493,11 +415,6 @@ fun MeTabScreen(
     MeSheet.Perms -> {
       MeSubScaffold(title = "设备与权限", onBack = { sheet = MeSheet.None }, modifier = modifier) {
         SettingsSheet(viewModel = viewModel, embedded = true)
-      }
-    }
-    MeSheet.Devices -> {
-      MeSubScaffold(title = "我的设备", onBack = { sheet = MeSheet.None }, modifier = modifier) {
-        MeDevicesSheet(devices = devices, offline = !isConnected && !demoMe)
       }
     }
     MeSheet.Robots -> {
@@ -634,7 +551,7 @@ fun MeTabScreen(
                     return@launch
                   }
                   if (demoMe) {
-                    notice = "DEMO：已本地更新「$title」"
+                    notice = "已本地更新「$title」（演示）"
                     groups =
                       groups.map {
                         if (it.groupId == group.groupId) it.copy(title = title, purpose = purpose) else it
@@ -667,7 +584,7 @@ fun MeTabScreen(
                     return@launch
                   }
                   if (demoMe) {
-                    notice = "DEMO：已模拟邀请 $email"
+                    notice = "已模拟邀请 $email（演示）"
                     return@launch
                   }
                   viewModel.gatewayRequest(
@@ -711,7 +628,7 @@ fun MeTabScreen(
                       subtitle = "可用",
                     )
                   bots = bots + row
-                  notice = "DEMO：已创建「$name」（未写网关）"
+                  notice = "已创建「$name」（演示，未同步到服务）"
                   sheet = MeSheet.Robots
                   return@launch
                 }
@@ -745,7 +662,7 @@ fun MeTabScreen(
                 sheet = MeSheet.Robots
               } catch (err: Throwable) {
                 notice =
-                  "创建失败：${err.message?.take(140) ?: "未知错误"}（需网关支持 workspaces.create 本地受管路径；云端向导仍见 Web）"
+                  "创建失败：${err.message?.take(140) ?: "未知错误"}。完整向导可在员工工作台继续。"
               }
             }
           },
@@ -776,7 +693,7 @@ fun MeTabScreen(
                         coordinatorBotLabel = null,
                         purpose = purpose,
                       )
-                  notice = "DEMO：已创建「$title」"
+                  notice = "已创建「$title」（演示）"
                   sheet = MeSheet.Groups
                   return@launch
                 }
@@ -795,18 +712,6 @@ fun MeTabScreen(
         )
       }
     }
-    MeSheet.Voice -> {
-      MeSubScaffold(title = "语音对话", onBack = { sheet = MeSheet.None }, modifier = modifier) {
-        VoiceTabScreen(viewModel = viewModel)
-      }
-    }
-    MeSheet.Screen -> {
-      MeSubScaffold(title = "画布", onBack = { sheet = MeSheet.None }, modifier = modifier) {
-        Box(modifier = Modifier.fillMaxSize()) {
-          CanvasScreen(viewModel = viewModel, modifier = Modifier.fillMaxSize())
-        }
-      }
-    }
   }
 }
 
@@ -816,7 +721,7 @@ private fun MeSegmentBar(
   onSelect: (MeHubSegment) -> Unit,
 ) {
   SoTSegmentedControl(
-    options = listOf("个人设置", "本机与连接", "更多"),
+    options = listOf("个人设置", "设备", "更多"),
     selectedIndex =
       when (segment) {
         MeHubSegment.Account -> 0
@@ -871,84 +776,6 @@ private fun MeIdentityCard(
   }
 }
 
-@Composable
-private fun MeNavRowWithBadge(
-  title: String,
-  subtitle: String,
-  icon: ImageVector,
-  badge: String,
-  badgeWarn: Boolean,
-  onClick: () -> Unit,
-) {
-  Surface(
-    onClick = onClick,
-    modifier = Modifier.fillMaxWidth(),
-    shape = RoundedCornerShape(14.dp),
-    color = Color.White,
-    border = BorderStroke(1.dp, mobileBorder),
-  ) {
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 14.dp),
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Surface(shape = RoundedCornerShape(10.dp), color = mobileAccentSoft) {
-        Icon(
-          imageVector = icon,
-          contentDescription = null,
-          tint = mobileAccent,
-          modifier = Modifier.padding(8.dp).size(20.dp),
-        )
-      }
-      Column(
-        modifier = Modifier.weight(1f),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-      ) {
-        Text(title, style = mobileHeadline, color = mobileText)
-        Text(subtitle, style = mobileCallout, color = mobileTextSecondary)
-      }
-      Surface(
-        shape = RoundedCornerShape(999.dp),
-        color = if (badgeWarn) mobileWarningSoft else mobileSuccessSoft,
-      ) {
-        Text(
-          badge,
-          modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-          style = mobileCaption1,
-          color = if (badgeWarn) mobileWarning else mobileSuccess,
-        )
-      }
-    }
-  }
-}
-
-@Composable
-private fun MePermissionPreviewGrid() {
-  val context = LocalContext.current
-  fun granted(permission: String): Boolean =
-    ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-  val mic = granted(Manifest.permission.RECORD_AUDIO)
-  val camera = granted(Manifest.permission.CAMERA)
-  val location =
-    granted(Manifest.permission.ACCESS_FINE_LOCATION) ||
-      granted(Manifest.permission.ACCESS_COARSE_LOCATION)
-  val notify =
-    if (Build.VERSION.SDK_INT >= 33) {
-      granted(Manifest.permission.POST_NOTIFICATIONS)
-    } else {
-      true
-    }
-  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-      MePermCard("麦克风", if (mic) "已允许" else "未开启", mic, Modifier.weight(1f))
-      MePermCard("相机", if (camera) "已允许" else "未开启", camera, Modifier.weight(1f))
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-      MePermCard("通知", if (notify) "已允许" else "未开启", notify, Modifier.weight(1f))
-      MePermCard("定位", if (location) "已允许" else "询问中", location, Modifier.weight(1f))
-    }
-  }
-}
 
 @Composable
 private fun MePermCard(
@@ -994,7 +821,7 @@ private fun MeAccountInfoSheet(identity: MeIdentityCardState) {
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     MobileSoftBanner(
-      text = "账号资料对齐 Web 个人设置 → 账号信息；手机端当前为只读投影（编辑走 Web / 后续 HTTP 写接口）。",
+      text = "账号资料当前为只读，完整编辑请到员工工作台。",
       tone = MobileBannerTone.Neutral,
     )
     MobileSectionLabel(text = "个人资料")
@@ -1027,7 +854,7 @@ private fun MeSecuritySheet(
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     MobileSoftBanner(
-      text = "对齐 Web `changePlatformAuthPassword` → `/__openbot/platform-auth/password/change`（EmployeeAuthClient）。",
+      text = "用于修改登录密码。",
       tone = MobileBannerTone.Neutral,
     )
     MobileSectionLabel(text = "修改密码")
@@ -1078,12 +905,12 @@ private fun MePrefsSheet() {
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     MobileSoftBanner(
-      text = "对齐 Web 工作台偏好（语言 / 主题）；手机端跟随系统，完整切换仍在 Web `workbench-personal-preferences-panel`。",
+      text = "语言与主题跟随系统；完整偏好可在员工工作台调整。",
       tone = MobileBannerTone.Neutral,
     )
     MobileSectionLabel(text = "界面与语言")
     MobileWhiteCard {
-      MobileInfoBlock(label = "语言", value = "跟随系统 / Web 设置")
+      MobileInfoBlock(label = "语言", value = "跟随系统")
       Spacer(Modifier.height(10.dp))
       MobileInfoBlock(label = "主题", value = "跟随系统")
     }
@@ -1109,9 +936,9 @@ private fun MeAuthSheet(
       MobileSoftBanner(
         text =
           if (demo) {
-            "DEMO 授权资源三区（个人 / 企业 / 模型）。"
+            "演示数据：个人 / 企业 / 模型授权。"
           } else {
-            "对齐 Web 授权：`user-operational-identity.list` + 企业席位 + `employee-model-access.summary`；完整 OAuth/微信扫码向导走员工工作台「我的」。"
+            "查看工作身份与可用模型；完整授权可在员工工作台完成。"
           },
         tone = MobileBannerTone.Neutral,
       )
@@ -1120,7 +947,7 @@ private fun MeAuthSheet(
       item {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
           CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = mobileAccent)
-          Text("加载授权资源…", style = mobileCallout, color = mobileTextSecondary)
+          Text("加载授权…", style = mobileCallout, color = mobileTextSecondary)
         }
       }
     }
@@ -1129,13 +956,13 @@ private fun MeAuthSheet(
     }
     item { MobileSectionLabel(text = "个人自有身份") }
     if (personal.isEmpty()) {
-      item { MobileSoftBanner(text = "暂无个人身份。可打开 Web 向导绑定。", tone = MobileBannerTone.Neutral) }
+      item { MobileSoftBanner(text = "暂无个人身份。可到员工工作台绑定。", tone = MobileBannerTone.Neutral) }
     } else {
       items(personal, key = { it.id }) { MeAuthItem(it) }
     }
     item {
       TextButton(onClick = onOpenWebIdentityWizard) {
-        Text("添加个人身份（打开 Web 向导）", color = mobileAccent)
+        Text("添加个人身份", color = mobileAccent)
       }
     }
     item { MobileSectionLabel(text = "企业身份") }
@@ -1146,7 +973,7 @@ private fun MeAuthSheet(
     }
     item {
       TextButton(onClick = onOpenWebIdentityWizard) {
-        Text("添加企业身份（打开 Web 向导）", color = mobileAccent)
+        Text("添加企业身份", color = mobileAccent)
       }
     }
     item { MobileSectionLabel(text = "可用模型") }
@@ -1167,63 +994,6 @@ private fun MeAuthItem(row: MeAuthResourceRow) {
   }
 }
 
-@Composable
-private fun MeDevicesSheet(
-  devices: List<MePairedDeviceRow>,
-  offline: Boolean,
-) {
-  LazyColumn(
-    contentPadding = PaddingValues(horizontal = mobilePageGutter, vertical = 8.dp),
-    verticalArrangement = Arrangement.spacedBy(10.dp),
-  ) {
-    item {
-      MobileSoftBanner(
-        text = "对齐 Web 系统设置 → 我的设备（`device.pair.list`）。",
-        tone = MobileBannerTone.Neutral,
-      )
-    }
-    if (offline) {
-      item {
-        MobileSoftBanner(text = "服务未就绪：连接后拉取已配对设备。", tone = MobileBannerTone.Warning)
-      }
-    } else if (devices.isEmpty()) {
-      item { MobileSoftBanner(text = "暂无已配对设备。", tone = MobileBannerTone.Neutral) }
-    } else {
-      items(devices, key = { it.deviceId }) { device ->
-        MobileWhiteCard {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-              Text(device.displayName, style = mobileHeadline, color = mobileText)
-              Text(
-                buildString {
-                  append(device.platform ?: "device")
-                  if (device.isCurrent) append(" · 当前设备")
-                },
-                style = mobileCallout,
-                color = mobileTextSecondary,
-              )
-            }
-            Surface(
-              shape = RoundedCornerShape(999.dp),
-              color = mobileSuccessSoft,
-            ) {
-              Text(
-                "已配对",
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                style = mobileCaption1,
-                color = mobileSuccess,
-              )
-            }
-          }
-        }
-      }
-    }
-  }
-}
 
 @Composable
 private fun MeBotsSheet(
@@ -1238,7 +1008,7 @@ private fun MeBotsSheet(
   ) {
     item {
       MobileSoftBanner(
-        text = "对齐 Web「我的机器人」：`agents.list` + `robot.workspace.get` / `updateIdentity`（tabs 身份|能力|成长|运营授权|协作）。",
+        text = "管理你的数字员工。",
         tone = MobileBannerTone.Neutral,
       )
     }
@@ -1280,7 +1050,7 @@ private fun MeGroupsSheet(
   ) {
     item {
       MobileSoftBanner(
-        text = "对齐 Web「我的协作小组」：`collaboration.spaces.list`。",
+        text = "管理协作小组。",
         tone = MobileBannerTone.Neutral,
       )
     }
@@ -1483,7 +1253,7 @@ private fun MeRobotWorkspaceEditor(
         .padding(horizontal = mobilePageGutter, vertical = 8.dp),
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    // Web my-bot-workspace-panel tabs (身份|能力|成长|运营授权|协作)
+    // Bot workspace tabs: 身份|能力|成长|授权|协作
     Row(
       modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
       horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -1566,7 +1336,7 @@ private fun MeRobotWorkspaceEditor(
                     return@launch
                   }
                   if (demoMe) {
-                    onNotice("DEMO：已本地更新「$n」身份（未写网关）")
+                    onNotice("已本地更新「$n」身份（演示，未同步）")
                     onIdentitySaved(n, p, r, pe)
                     return@launch
                   }
@@ -1632,7 +1402,7 @@ private fun MeRobotWorkspaceEditor(
         }
         MobilePrimaryButton(
           label = "探索能力",
-          onClick = { onNotice("探索能力请用 Web 能力中心（onExploreCapabilities）") },
+          onClick = { onNotice("请到员工工作台查看能力中心") },
         )
       }
       MeBotWorkspaceTab.Growth -> {
@@ -1645,7 +1415,7 @@ private fun MeRobotWorkspaceEditor(
           MeInfoLine("能力缺口", if (g.gapCount > 0) "${g.gapCount} 项待补" else "无")
         }
         MobileSoftBanner(
-          text = "对齐 Web 成长档案：`robot.workspace.get` → growth（my-bot-workspace-panel）。",
+          text = "查看能力成长情况。",
           tone = MobileBannerTone.Neutral,
         )
       }
@@ -1693,7 +1463,7 @@ private fun MeRobotWorkspaceEditor(
               scope.launch {
                 try {
                   if (demoMe) {
-                    onNotice("DEMO：已确认授权（未写网关）")
+                    onNotice("已确认授权（演示，未同步）")
                     return@launch
                   }
                   if (!isConnected) {
@@ -1820,7 +1590,7 @@ private fun MeGroupDetailSheet(
     MobileSectionLabel(text = "成员名单")
     if (group.members.isEmpty()) {
       MobileSoftBanner(
-        text = "暂无成员明细（`collaboration.spaces.list` members.humans/bots）。",
+        text = "暂无成员明细。",
         tone = MobileBannerTone.Neutral,
       )
     } else {
@@ -1837,7 +1607,7 @@ private fun MeGroupDetailSheet(
       OutlinedTextField(
         value = inviteEmail,
         onValueChange = { inviteEmail = it },
-        label = { Text("成员邮箱 / userId") },
+        label = { Text("成员邮箱") },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
       )
@@ -1847,7 +1617,7 @@ private fun MeGroupDetailSheet(
         onClick = { onInviteHuman(inviteEmail.trim()) },
       )
       MobileSoftBanner(
-        text = "复用 Web `collaboration.spaces.members.update` invites.humans。",
+        text = "输入邮箱后即可发送邀请。",
         tone = MobileBannerTone.Neutral,
       )
       MobilePrimaryButton(
@@ -1875,7 +1645,7 @@ private fun MeCreateBotSheet(onCreate: (name: String, emoji: String?) -> Unit) {
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     MobileSoftBanner(
-      text = "对齐 Web 新建数字员工：`workspaces.create`（受管 ~/.openbot/workspace）→ `agents.create` → `robots.bind-workspace`。完整设计向导 / 云端空间仍在 Web。",
+      text = "填写名称即可创建；更完整的设计可在员工工作台继续。",
       tone = MobileBannerTone.Neutral,
     )
     OutlinedTextField(
@@ -1914,7 +1684,7 @@ private fun MeCreateGroupSheet(onCreate: (title: String, avatar: String?, purpos
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     MobileSoftBanner(
-      text = "复用 Web 新建协作空间（`collaboration.spaces.members.update`）。手机为精简表单。",
+      text = "填写名称即可创建协作小组。",
       tone = MobileBannerTone.Neutral,
     )
     OutlinedTextField(
