@@ -112,6 +112,7 @@ import {
 } from "./agent-runner-utils.js";
 import { type BlockReplyPipeline } from "./block-reply-pipeline.js";
 import { recordHonestCapabilityGap } from "./honest-empty-reply.js";
+import { buildUserFacingModelCallFailure } from "./model-call-failure-copy.js";
 import type { FollowupRun } from "./queue.js";
 import { createBlockReplyDeliveryHandler } from "./reply-delivery.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
@@ -1397,15 +1398,21 @@ export async function runAgentTurnWithFallback(params: {
           ? sanitizeUserFacingText(message, { errorContext: true })
           : message;
         const trimmedMessage = safeMessage.replace(/\.\s*$/, "");
-        const fallbackText = dockerFailure
-          ? dockerFailure
-          : isContextOverflow
-            ? "⚠️ Context overflow — prompt too large for this model. Try a shorter message or a larger-context model."
-            : isRoleOrderingError
-              ? "⚠️ Message ordering conflict - please try again. If this persists, use /new to start a fresh session."
-              : isInfraStartupFailure
-                ? "这一轮没能完成回复。请再试一次，或 @ 对应助手。"
-                : `⚠️ Agent failed before reply: ${trimmedMessage}.\nLogs: openbot logs --follow`;
+        const modelCallFailure = buildUserFacingModelCallFailure(
+          message,
+          params.opts?.expectedReplyLanguage,
+        );
+        const fallbackText = modelCallFailure
+          ? `⚠️ ${modelCallFailure}`
+          : dockerFailure
+            ? dockerFailure
+            : isContextOverflow
+              ? "⚠️ Context overflow — prompt too large for this model. Try a shorter message or a larger-context model."
+              : isRoleOrderingError
+                ? "⚠️ Message ordering conflict - please try again. If this persists, use /new to start a fresh session."
+                : isInfraStartupFailure
+                  ? "这一轮没能完成回复。请再试一次，或 @ 对应助手。"
+                  : `⚠️ Agent failed before reply: ${trimmedMessage}.\nLogs: openbot logs --follow`;
 
         void recordGrowthTaskOutcome(false, {
           aborted: Boolean(params.opts?.abortSignal?.aborted),

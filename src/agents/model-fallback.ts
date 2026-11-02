@@ -140,6 +140,13 @@ export function appendGrantedEnterpriseCandidates(
   return next;
 }
 
+function allowlistIsEnterpriseCatalogOnly(allowlist: readonly string[] | undefined): boolean {
+  if (!allowlist || allowlist.length === 0) {
+    return false;
+  }
+  return allowlist.every((id) => isEnterpriseRuntimeModelId(id.trim()));
+}
+
 function entitlementFilterWillApply(params: {
   governanceMode?: GovernanceMode;
   entitlementAllowlist?: readonly string[];
@@ -830,13 +837,21 @@ export async function runWithModelFallback<T>(params: {
     model: params.model,
     fallbacksOverride: params.fallbacksOverride,
   });
+  const requestedKey = modelKey(params.provider, params.model);
+  const requestedIsEnterprise = isEnterpriseRuntimeModelId(requestedKey);
+  // An allowlist that contains only ent/* ids is a catalog substitute, not a
+  // configured primary. Do not append those ids or hard-filter the agent
+  // primary (for example deepseek) down to them.
+  const enterpriseSubstituteOnly =
+    !requestedIsEnterprise && allowlistIsEnterpriseCatalogOnly(params.entitlementAllowlist);
   // Only when the allowlist will actually hard-filter. Shadow-only mode must
   // keep today's session candidate and must not switch the run onto BYOK.
-  if (entitlementFilterWillApply(params)) {
+  // Append granted ent/* models only when this turn already selected one.
+  if (entitlementFilterWillApply(params) && requestedIsEnterprise && !enterpriseSubstituteOnly) {
     candidates = appendGrantedEnterpriseCandidates(candidates, params.entitlementAllowlist);
   }
   if (params.governanceMode === undefined) {
-    if (params.entitlementAllowlist !== undefined) {
+    if (params.entitlementAllowlist !== undefined && !enterpriseSubstituteOnly) {
       candidates = applyEntitlementHardDeny(candidates, params.entitlementAllowlist);
       if (candidates.length === 0) {
         // Resolved entitlement with no authorized candidate → hard deny, zero out-of-network.
@@ -847,9 +862,10 @@ export async function runWithModelFallback<T>(params: {
     const enforcement = params.allowlistEnforcement ?? "governance-mode";
     // The hard-filter result exists whenever the allowlist is an array, under any
     // explicit mode (P3-2 rework: legacy included). Whether it applies is decided below.
-    const filtered = Array.isArray(params.entitlementAllowlist)
-      ? applyEntitlementHardDeny(candidates, params.entitlementAllowlist)
-      : undefined;
+    const filtered =
+      Array.isArray(params.entitlementAllowlist) && !enterpriseSubstituteOnly
+        ? applyEntitlementHardDeny(candidates, params.entitlementAllowlist)
+        : undefined;
     // Preexisting: keep the hard-filter these paths already applied before explicit mode,
     // in every mode including legacy. governance-mode: only `enforced` applies the filter;
     // `shadow` and `legacy` record only. The legacy envelope stays `skipped`.
@@ -878,16 +894,14 @@ export async function runWithModelFallback<T>(params: {
   if (params.preferredModelOrder && params.preferredModelOrder.length > 0) {
     candidates = applyPreferredModelOrder(candidates, params.preferredModelOrder);
   }
-  // Explicit session pin for enterprise BYOK must stay primary after AOR reorder.
-  const requestedKey = modelKey(params.provider, params.model);
-  if (isEnterpriseRuntimeModelId(requestedKey)) {
-    const requestedIdx = candidates.findIndex(
-      (candidate) => modelKey(candidate.provider, candidate.model) === requestedKey,
-    );
-    if (requestedIdx > 0) {
-      const [requested] = candidates.splice(requestedIdx, 1);
-      candidates.unshift(requested);
-    }
+  // The model this turn already selected stays first. A preferred order must
+  // not move an enterprise catalog id ahead of a configured platform primary.
+  const requestedIdx = candidates.findIndex(
+    (candidate) => modelKey(candidate.provider, candidate.model) === requestedKey,
+  );
+  if (requestedIdx > 0) {
+    const [requested] = candidates.splice(requestedIdx, 1);
+    candidates.unshift(requested);
   }
   const admission = await filterModelCandidatesByPlatformAdmission({
     candidates,
