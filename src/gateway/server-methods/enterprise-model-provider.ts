@@ -32,7 +32,11 @@ import {
   SAVED_ENTERPRISE_ENDPOINT_SSRF_POLICY,
 } from "../enterprise-model/probe.js";
 import type { EnterpriseModelPublicConnection } from "../enterprise-model/types.js";
-import { forgetModelIdsFromTenantGrants } from "../model-entitlement/seat-model-grant-store.js";
+import { listUnusableEnterpriseModelWarnings } from "../enterprise-model/unusable-models.js";
+import {
+  forgetModelIdsFromTenantGrants,
+  listSeatModelGrantsForTenant,
+} from "../model-entitlement/seat-model-grant-store.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import {
   requireEnterpriseScope,
@@ -102,7 +106,25 @@ export const enterpriseModelProviderHandlers: GatewayRequestHandlers = {
           hasCredential: await hasEnterpriseModelSecret(row.credentialRef),
         });
       }
-      respond(true, { tenantId: scope.enterpriseId, connections: publicRows });
+      const assets = await listEnterpriseModelAssets(scope.enterpriseId);
+      const grants = await listSeatModelGrantsForTenant(scope.enterpriseId);
+      const grantedModelIds = grants.flatMap((grant) => grant.grantedModelIds);
+      const unusableModels = listUnusableEnterpriseModelWarnings({
+        connections,
+        assets,
+        grantedModelIds,
+      });
+      const staleGrantIds = unusableModels
+        .filter((warning) => warning.kind === "grant" && warning.modelId)
+        .map((warning) => warning.modelId as string);
+      if (staleGrantIds.length > 0) {
+        await forgetModelIdsFromTenantGrants({
+          tenantId: scope.enterpriseId,
+          modelIds: staleGrantIds,
+          ...(client?.user ? { actorUserId: client.user } : {}),
+        });
+      }
+      respond(true, { tenantId: scope.enterpriseId, connections: publicRows, unusableModels });
     } catch (err) {
       respondEnterpriseModelError(respond, err);
     }

@@ -118,6 +118,15 @@ export type GrantListResponse = {
   tenantOwnedModelIds?: ModelRef[];
   /** 套餐或已授权记录里未连通的平台模型，企业列表不渲染。 */
   suppressedPlatformModelIds?: ModelRef[];
+  /** 企业自供连接失败、资产不健康，或授权指向已删除的运行时模型。 */
+  unusableModels?: Array<{
+    kind: "connection" | "asset" | "grant";
+    id: string;
+    title: string;
+    detail: string;
+    modelId?: string;
+    connectionId?: string;
+  }>;
   grants: SeatModelGrant[];
 };
 

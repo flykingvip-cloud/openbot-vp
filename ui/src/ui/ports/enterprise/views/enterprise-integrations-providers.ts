@@ -17,6 +17,7 @@ import {
   buildModelAuthorizationOrgDepartments,
   type ModelAuthorizationOrgRoster,
 } from "../../../views/model-authorization-directory.ts";
+import { enterpriseUnusableBannerText } from "../../../views/model-authorization-presentation.ts";
 import { localizeEnterpriseGatewayThrown } from "../enterprise-connection-copy.ts";
 import {
   buildEnterpriseModelKeyRows,
@@ -118,6 +119,7 @@ export class EnterpriseIntegrationsProviders extends LitElement {
 
   @state() private connections: EnterpriseModelPublicConnection[] = [];
   @state() private assets: EnterpriseModelAsset[] = [];
+  @state() private unusableModels: Array<{ title: string; detail: string }> = [];
   @state() private editor: EditorState | null = null;
   @state() private rotateConnectionId: string | null = null;
   @state() private rotateKey = "";
@@ -169,6 +171,7 @@ export class EnterpriseIntegrationsProviders extends LitElement {
       ]);
       this.connections = providers.connections ?? [];
       this.assets = catalog.assets ?? [];
+      this.unusableModels = providers.unusableModels ?? [];
     } catch (error) {
       this.notice = errorText(error);
       this.noticeTone = "danger";
@@ -935,6 +938,7 @@ export class EnterpriseIntegrationsProviders extends LitElement {
         : "尚未配置模型提供方。机器人将无法路由 AI 调用。";
     const selfHosted =
       this.connections.length > 0 ? ` · ${this.connections.length} 个企业自供` : "";
+    const unusableText = enterpriseUnusableBannerText(this.unusableModels);
     return html`
       <article class="enterprise-settings-panel enterprise-settings-panel--flat">
         <div class="enterprise-settings-panel__head">
@@ -956,6 +960,15 @@ export class EnterpriseIntegrationsProviders extends LitElement {
         ${
           this.notice
             ? html`<div class="callout ${this.noticeTone === "ok" ? "ok" : "danger"}" data-testid="enterprise-provider-notice">${this.notice}</div>`
+            : nothing
+        }
+        ${
+          unusableText
+            ? html`
+                <div class="callout danger" role="alert" data-testid="enterprise-unusable-models">
+                  ${unusableText}
+                </div>
+              `
             : nothing
         }
         ${

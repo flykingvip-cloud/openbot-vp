@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAuthorizedModelCatalog,
   describeUnavailableModelGrants,
+  enterpriseUnusableBannerText,
   modelAuthorizationSubjectHeadline,
   presentAuthorizedModel,
 } from "./model-authorization-presentation.ts";
@@ -78,6 +79,17 @@ describe("describeUnavailableModelGrants", () => {
     expect(text).toContain(
       "已不在模型库，不能授权（取消勾选即可移除）：ent/cc41dd5419/mimo-v2.6-flash, ent/cea43bf898/deepseek-v4-flash",
     );
+  });
+});
+
+describe("enterpriseUnusableBannerText", () => {
+  it("names the enterprise connection the admin must fix", () => {
+    expect(
+      enterpriseUnusableBannerText([
+        { title: "内网推理", detail: "企业自供连接不可用（凭证无效）。" },
+      ]),
+    ).toContain("内网推理");
+    expect(enterpriseUnusableBannerText([])).toBe("");
   });
 });
 

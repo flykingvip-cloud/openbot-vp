@@ -1103,6 +1103,8 @@ function mapSnapshotGovernanceIssueType(type: string): ModelGovernanceIssue["typ
       return "aor_sync_degraded";
     case "task_without_candidate":
       return "task_without_candidate";
+    case "platform_model_unusable":
+      return "platform_model_unusable";
     default:
       return "aor_sync_degraded";
   }
@@ -2408,6 +2410,7 @@ const GOVERNANCE_TYPE_PRIORITY: Record<ModelGovernanceIssue["type"], number> = {
   aor_execution_unmapped: 11,
   aor_no_policy_bindings: 12,
   aor_sync_degraded: 13,
+  platform_model_unusable: 14,
 };
 
 const GOVERNANCE_SEVERITY_PRIORITY: Record<ModelGovernanceIssue["severity"], number> = {
@@ -2443,6 +2446,7 @@ function issueTargetTab(
     case "missing_capability_tag":
     case "unregistered_model_used":
     case "underused_model":
+    case "platform_model_unusable":
       return "modelAssets";
     default:
       return "governance";
@@ -2530,6 +2534,8 @@ function issueRootCause(
       return "备用链长期不生效，说明当前 fallback 设计可能不合理或没有真实覆盖价值。";
     case "underused_model":
       return "模型已经纳管但长期几乎没有进入有效调用路径。";
+    case "platform_model_unusable":
+      return "平台已配置的模型最近一次探测失败，员工聊天会直接失败。";
     default:
       return undefined;
   }

@@ -18,6 +18,7 @@ import type {
   PlatformModelsSelectorStrategy,
   PlatformModelsTaskProfileSnapshot,
 } from "./platform-models-types.js";
+import { listUnusablePlatformModels } from "./platform-models-unusable.js";
 import { buildPlatformModelsUsageProjection } from "./platform-models-usage-projection.js";
 
 function normalizeString(value: unknown): string | null {
@@ -350,9 +351,29 @@ function buildAssets(
   return [...assets.values()].toSorted((a, b) => a.modelRef.localeCompare(b.modelRef));
 }
 
+function configuredPlatformModelIds(params: {
+  assets: PlatformModelsAssetSnapshot[];
+  plans: PlatformModelsPlanSnapshot[];
+  policies: PlatformModelsRoutingPolicySnapshot[];
+}): string[] {
+  return [
+    ...params.assets.map((asset) => asset.modelRef),
+    ...params.plans.flatMap((plan) => [...plan.primaryModelIds, ...plan.fallbackModelIds]),
+    ...params.policies.flatMap((policy) => [...policy.primaryModelIds, ...policy.fallbackModelIds]),
+  ];
+}
+
 function buildGovernanceIssues(params: {
   plans: PlatformModelsPlanSnapshot[];
   policies: PlatformModelsRoutingPolicySnapshot[];
+  assets: PlatformModelsAssetSnapshot[];
+  probes: ReadonlyArray<{
+    provider?: string;
+    model?: string;
+    label?: string;
+    status: string;
+    error?: string;
+  }>;
   mode: "native" | "aor_enhanced";
 }): PlatformModelsGovernanceIssueSnapshot[] {
   const issues: PlatformModelsGovernanceIssueSnapshot[] = [];
@@ -396,6 +417,22 @@ function buildGovernanceIssues(params: {
     }
   }
 
+  for (const failed of listUnusablePlatformModels({
+    probes: params.probes,
+    configuredModelIds: configuredPlatformModelIds(params),
+  })) {
+    issues.push({
+      issueId: `platform-model-unusable:${failed.modelId}`,
+      type: "platform_model_unusable",
+      severity: failed.status === "auth" || failed.status === "no_model" ? "critical" : "warning",
+      title: `平台模型不可用：${failed.label}`,
+      description:
+        failed.error ??
+        `最近一次探测失败（${failed.status}）。该模型已配置在平台侧，员工调用会失败。`,
+      relatedModelRefs: [failed.modelId],
+    });
+  }
+
   return issues;
 }
 
@@ -409,9 +446,12 @@ export async function loadPlatformModelsManagementSnapshot(params: {
   const routingPolicies = parseRoutingPolicies(params.cfg);
   const taskProfiles = buildTaskProfilesFromPlans(taskPlans);
   const assets = buildAssets(params.cfg, params.catalog);
+  const lastModelProbe = await loadModelProbeSummary();
   const governanceIssues = buildGovernanceIssues({
     plans: taskPlans,
     policies: routingPolicies,
+    assets,
+    probes: lastModelProbe?.results ?? [],
     mode: config.mode,
   });
 
@@ -431,8 +471,6 @@ export async function loadPlatformModelsManagementSnapshot(params: {
     routingPolicies,
     routingExplanations: aor?.routingExplanations,
   });
-  const lastModelProbe = await loadModelProbeSummary();
-
   return {
     mode: config.mode,
     generatedAt: new Date().toISOString(),

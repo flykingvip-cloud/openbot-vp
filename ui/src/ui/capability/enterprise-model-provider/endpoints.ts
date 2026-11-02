@@ -84,9 +84,19 @@ export type EnterpriseModelAsset = {
   updatedAt: string;
 };
 
+export type UnusableEnterpriseModelWarning = {
+  kind: "connection" | "asset" | "grant";
+  id: string;
+  title: string;
+  detail: string;
+  modelId?: string;
+  connectionId?: string;
+};
+
 export type ProviderListResponse = {
   tenantId: string;
   connections: EnterpriseModelPublicConnection[];
+  unusableModels?: UnusableEnterpriseModelWarning[];
 };
 
 export type CatalogListResponse = {
