@@ -21,7 +21,7 @@ import {
   readSessionTaskBoard,
   recordCheckedTaskCompletion,
   sanitizeTaskBoardPathForPrompt,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
   pauseParkedTask,
   resumeParkedTask,
   type SessionTaskBoard,
@@ -278,7 +278,7 @@ it("announces a real close and a fourth automatic park drops the oldest file", (
     parked: [...parked].toReversed(),
     focusRevision: 0,
   };
-  writeSessionTaskBoard(sessionFile, board);
+  seedSessionTaskBoard(sessionFile, board);
   const dropped = commitAutomaticPark({
     sessionFile,
     incomingTaskId: "cron-job-9",
@@ -622,7 +622,7 @@ describe("board-latest rules v2 C1–C6 / AC13–AC20", () => {
       board: emptySessionTaskBoard(),
       ...turn(SNAKE, 1),
     });
-    writeSessionTaskBoard(sessionFile, started.board);
+    seedSessionTaskBoard(sessionFile, started.board);
     const rev = started.board.focusRevision;
     const first = commitBoardMutation({
       sessionFile,
