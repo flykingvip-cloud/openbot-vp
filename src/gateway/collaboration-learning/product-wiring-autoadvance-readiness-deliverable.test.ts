@@ -554,7 +554,7 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
     );
   });
 
-  it("inactive board (plan ok but activate fails) → refuse not_active; claim attempted with plan owner", async () => {
+  it("inactive board + authorizer≠executor → no proxy-claim; schedules executor self-claim wake", async () => {
     const { cfg } = await useRoot();
     vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([
       {
@@ -567,9 +567,7 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
         remainingWork: "do",
       },
     ] as never);
-    const claimSpy = vi
-      .spyOn(claimEntry, "claimCollaborationBoardItem")
-      .mockRejectedValue(new Error("claim_denied"));
+    const claimSpy = vi.spyOn(claimEntry, "claimCollaborationBoardItem");
     vi.spyOn(claimEntry, "buildClaimAuthority").mockResolvedValue({
       authority: seedAuthority(cfg, "grp_adv", null),
       stores: null,
@@ -591,6 +589,22 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
       groupContextPointer: { groupId: "grp_adv", transcriptHint: "t" },
       todolistCurrentStep: { stepId: "s1", version: 1, title: "step" },
     } as never);
+    const wakeSpy = vi
+      .spyOn(wakeContract, "recordNudgeWake")
+      .mockResolvedValue({ ok: true } as never);
+    vi.spyOn(wakeRound, "consumeWakeForRoundDispatch").mockResolvedValue({
+      outcome: "recorded",
+      dispatched: false,
+      reason: "self_advance_not_execute",
+      gate: {
+        allowed: false,
+        reason: "self_advance_not_execute",
+        wakeEnabled: true,
+        selfAdvanceWriteMode: "dry_run",
+        sourceEligible: true,
+      },
+      dispatcherPresent: false,
+    } as never);
 
     const result = await triggerPostPlanConfirmAdvance({
       groupId: "grp_adv",
@@ -601,10 +615,19 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
       confirmerId: "human:owner",
       cfg,
     });
-    expect(claimSpy).toHaveBeenCalled();
-    expect(result.reason).toMatch(/confirm_board_not_active/);
+    expect(claimSpy).not.toHaveBeenCalled();
+    expect(wakeSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        toAgentIds: ["bot-exec"],
+        reason: expect.stringContaining("post_confirm_executor_self_claim"),
+      }),
+      expect.anything(),
+    );
+    expect(result.reason).toMatch(/confirm_awaiting_executor_self_claim/);
     expect(result.dispatched).toBe(false);
-    expect(result.wakeRecorded).toBe(false);
+    expect(result.wakeRecorded).toBe(true);
+    expect(result.targetAgentIds).toEqual(["bot-exec"]);
   });
 
   it("plan missing on published board → refuse BEFORE claim (board/responsibility unchanged)", async () => {
@@ -688,7 +711,7 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
     expect(result.wakeRecorded).toBe(false);
   });
 
-  it("published board → ensure activates → advance does not early-exit not_active", async () => {
+  it("published board + human confirmer → no proxy-claim; claim wake to executor (not execute)", async () => {
     const { cfg } = await useRoot({ selfAdvanceMode: "dry_run" });
     const published = {
       itemId: "board-1",
@@ -703,26 +726,9 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
       publishedAt: 1,
       revision: 1,
     };
-    const applied = {
-      ...published,
-      status: "applied",
-      claimantId: "bot-exec",
-      claimedAt: 2,
-      appliedAt: 3,
-      revision: 3,
-    };
     vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([published] as never);
-    vi.spyOn(claimEntry, "claimCollaborationBoardItem").mockResolvedValue({
-      ...published,
-      status: "claimed",
-      claimantId: "bot-exec",
-      claimedAt: 2,
-      revision: 2,
-    } as never);
-    vi.spyOn(claimEntry, "applyCollaborationBoardClaim").mockResolvedValue({
-      task: { taskId: "task-1" },
-      item: applied,
-    } as never);
+    const claimSpy = vi.spyOn(claimEntry, "claimCollaborationBoardItem");
+    const applySpy = vi.spyOn(claimEntry, "applyCollaborationBoardClaim");
     vi.spyOn(claimEntry, "buildClaimAuthority").mockResolvedValue({
       authority: seedAuthority(cfg, "grp_adv", null),
       stores: null,
@@ -744,7 +750,9 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
       groupContextPointer: { groupId: "grp_adv", transcriptHint: "t" },
       todolistCurrentStep: { stepId: "s1", version: 1, title: "step" },
     } as never);
-    const wakeSpy = vi.spyOn(wakeContract, "recordNudgeWake").mockResolvedValue({ ok: true } as never);
+    const wakeSpy = vi
+      .spyOn(wakeContract, "recordNudgeWake")
+      .mockResolvedValue({ ok: true } as never);
     vi.spyOn(wakeRound, "consumeWakeForRoundDispatch").mockResolvedValue({
       outcome: "recorded",
       dispatched: false,
@@ -774,21 +782,20 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
       confirmerId: "human:owner",
       cfg,
     });
-    expect(result.reason).not.toMatch(/confirm_board_not_active/);
-    expect(result.reason).not.toBe("confirm_board_no_claimant");
-    expect(claimEntry.claimCollaborationBoardItem).toHaveBeenCalledWith(
+    expect(claimSpy).not.toHaveBeenCalled();
+    expect(applySpy).not.toHaveBeenCalled();
+    expect(result.reason).toMatch(/confirm_awaiting_executor_self_claim/);
+    expect(wakeSpy).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
-        claimantId: "bot-exec",
-        actor: "human:owner",
+        toAgentIds: ["bot-exec"],
+        reason: expect.stringContaining("post_confirm_executor_self_claim"),
       }),
+      expect.anything(),
     );
-    expect(claimEntry.applyCollaborationBoardClaim).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actor: "human:owner",
-      }),
-    );
-    expect(wakeSpy).toHaveBeenCalled();
     expect(result.wakeRecorded).toBe(true);
+    expect(result.targetAgentIds).toEqual(["bot-exec"]);
+    expect(result.dispatched).toBe(false);
   });
 });
 

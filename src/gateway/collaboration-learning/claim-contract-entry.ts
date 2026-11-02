@@ -786,6 +786,15 @@ export async function claimCollaborationBoardItem(
   if (!claimantId) {
     throw new ClaimContractEntryError("claimant_required", "claimantId / actor is required");
   }
+  // Formal claim must bind the authenticated actor to the claimant — no proxy claim.
+  // When actor is omitted, claimantId alone is treated as self-claim (legacy callers / tests).
+  const actorSubject = params.actor?.trim();
+  if (actorSubject && !deliveryActorIdsEqual(actorSubject, claimantId)) {
+    throw new ClaimContractEntryError(
+      "claim_actor_mismatch",
+      `claim actor ${actorSubject} must match claimant ${claimantId}; proxy claim is forbidden`,
+    );
+  }
   const tenantId = tenantIdForClaimFlag(params.groupId, params.tenant) ?? undefined;
   const subjectRef = claimantId.includes(":") ? claimantId : `subject:${claimantId}`;
   const tipRunId = `collab-claim:${params.groupId}:${params.itemId}:${claimantId}`;

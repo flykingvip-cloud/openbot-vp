@@ -106,7 +106,9 @@ describe("collaboration_board tool", () => {
       requesterAgentIdOverride: "bot-2",
       agentSessionKey: SESSION,
       deps: {
-        resolveTrustedTeam: stubTrustedTeam, isEnabled: () => true },
+        resolveTrustedTeam: stubTrustedTeam,
+        isEnabled: () => true,
+      },
     });
     expect(tool.name).toBe(COLLABORATION_BOARD_TOOL);
   });
@@ -160,6 +162,71 @@ describe("collaboration_board tool", () => {
       }),
     );
     expect(result).toMatchObject({ ok: false, reason: "not_claimant" });
+  });
+
+  it("refuses proxy claim_item for another claimantId (claim_actor_mismatch)", async () => {
+    const claimItem = vi.fn();
+    const tool = createCollaborationBoardTool({
+      requesterAgentIdOverride: "bot-2",
+      agentSessionKey: SESSION,
+      agentGroupId: GROUP,
+      deps: {
+        resolveTrustedTeam: stubTrustedTeam,
+        isEnabled: () => true,
+        resolveActor: async () => "bot-2",
+        claimItem: claimItem as unknown as CollaborationBoardToolDeps["claimItem"],
+      },
+    });
+    const result = detailsOf(
+      await tool.execute("t-claim-proxy", {
+        action: "claim_item",
+        taskId: TASK,
+        itemId: ITEM,
+        claimantId: "bot-other",
+      }),
+    );
+    expect(result).toMatchObject({ ok: false, reason: "claim_actor_mismatch" });
+    expect(claimItem).not.toHaveBeenCalled();
+  });
+
+  it("claim_item self path uses authenticated actor only", async () => {
+    const item = {
+      itemId: ITEM,
+      taskId: TASK,
+      groupId: GROUP,
+      status: "claimed",
+      claimantId: "bot-2",
+    };
+    const claimItem = vi.fn(async () => item);
+    const tool = createCollaborationBoardTool({
+      requesterAgentIdOverride: "bot-2",
+      agentSessionKey: SESSION,
+      agentGroupId: GROUP,
+      deps: {
+        resolveTrustedTeam: stubTrustedTeam,
+        isEnabled: () => true,
+        resolveActor: async () => "bot-2",
+        claimItem: claimItem as unknown as CollaborationBoardToolDeps["claimItem"],
+      },
+    });
+    const result = detailsOf(
+      await tool.execute("t-claim-self", {
+        action: "claim_item",
+        taskId: TASK,
+        itemId: ITEM,
+        claimantId: "bot-2",
+      }),
+    );
+    expect(result).toMatchObject({ ok: true, action: "claim_item", item });
+    expect(claimItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        groupId: GROUP,
+        taskId: TASK,
+        itemId: ITEM,
+        claimantId: "bot-2",
+        actor: "bot:bot-2",
+      }),
+    );
   });
 
   it("refuses empty submissionSummary before calling submit", async () => {
