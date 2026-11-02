@@ -12,10 +12,15 @@ tasks:
   sessions: []
 - id: ft-plan-speak-shopping-positive-admission
   owner: cursor-grok
-  intent: []
+  intent:
+  - Reply layer must not invent pause/confirm from plan-speak; express only; executor keeps stall/continue gates.
   paths:
   - src/shared/text/plan-speak-final.ts
   - src/shared/text/plan-speak-final.test.ts
+  - src/agents/pi-embedded-subscribe.plan-speak-outlet.test.ts
+  - src/agents/pi-embedded-runner/run/payloads.test.ts
+  - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
+  - src/auto-reply/reply/reply-directives.ts
   state: active
   sessions:
   - id: 2a5a3f36-196a-4b8b-8728-3686a1508090
@@ -10660,6 +10665,18 @@ tasks:
   since: 2026-11-01
   metadata: {}
 landingStreams:
+- id: ft-plan-speak-reply-passthrough-20261102
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - src/shared/text/plan-speak-final.ts
+  - src/shared/text/plan-speak-final.test.ts
+  - src/agents/pi-embedded-subscribe.plan-speak-outlet.test.ts
+  canLandWith: []
+  metadata:
+    task: ft-plan-speak-shopping-positive-admission
+    owner: cursor-grok
+    purpose: Reply layer must not invent pause CTA; partial/block outlet regressions; express only.
 - id: collab-role-duty-separation-20261102
   landingPolicy: serial
   paths:

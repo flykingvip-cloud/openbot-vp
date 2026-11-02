@@ -4,7 +4,6 @@ import {
   isExecutionStallFinal,
   isPlanSpeakFinal,
   rewritePlanSpeakFinal,
-  shouldApplyShoppingPauseCta,
 } from "./plan-speak-final.js";
 
 describe("plan-speak final gate (M2)", () => {
@@ -51,7 +50,6 @@ describe("plan-speak final gate (M2)", () => {
 
   it("does not invent pause CTA for bare checkout plan-speak", () => {
     expect(rewritePlanSpeakFinal("我继续去结算页。")).toBe("我继续去结算页。");
-    expect(shouldApplyShoppingPauseCta("我继续去结算页。")).toBe(false);
   });
 
   it("ignores ordinary completed answers", () => {

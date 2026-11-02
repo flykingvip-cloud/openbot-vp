@@ -102,14 +102,6 @@ export function isExecutionStallFinal(text: string): boolean {
 }
 
 /**
- * @deprecated Reply layer no longer invents shopping pause CTAs. Always false.
- * Kept so older call sites compile; do not use to drive task control.
- */
-export function shouldApplyShoppingPauseCta(_text: string, _contextText = ""): boolean {
-  return false;
-}
-
-/**
  * @deprecated Prefer `isPlanSpeakFinal`. Historically meant "do not rewrite to
  * shopping CTA"; all plan-speak is now left as progress text at reply layer.
  */
