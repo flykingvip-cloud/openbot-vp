@@ -6079,7 +6079,17 @@ export const chatHandlers: GatewayRequestHandlers = {
           recordFocusSwitchDecision("focus_state_unavailable");
         }
       }
-      if (shouldTaskParkAbortInFlight(taskTracking.cutContext)) {
+      const stewardRobotMention =
+        Boolean(extractEmployeeStewardUserIdFromSessionKey(sessionKey)) &&
+        !sessionKey.includes(":space:") &&
+        /@[^\s@]+/.test(rawMessage);
+      const taskStatusLine =
+        "statusLine" in taskTracking && typeof taskTracking.statusLine === "string"
+          ? taskTracking.statusLine.trim()
+          : "";
+      const ownerAbortInFlight =
+        "abortInFlight" in taskTracking && taskTracking.abortInFlight === true;
+      if (shouldTaskParkAbortInFlight(taskTracking.cutContext, ownerAbortInFlight)) {
         await abortChatRunsForSessionKeyWithPartials({
           context,
           ops: createChatAbortOps(context),
@@ -6096,14 +6106,6 @@ export const chatHandlers: GatewayRequestHandlers = {
           text: rawMessage,
         });
       }
-      const stewardRobotMention =
-        Boolean(extractEmployeeStewardUserIdFromSessionKey(sessionKey)) &&
-        !sessionKey.includes(":space:") &&
-        /@[^\s@]+/.test(rawMessage);
-      const taskStatusLine =
-        "statusLine" in taskTracking && typeof taskTracking.statusLine === "string"
-          ? taskTracking.statusLine.trim()
-          : "";
       const shouldPersistUserTranscript =
         normalizedAttachments.length > 0 ||
         (isChatInboundPersistEarlyEnabled() && Boolean(rawMessage.trim())) ||
@@ -6261,6 +6263,45 @@ export const chatHandlers: GatewayRequestHandlers = {
           context,
           runId: clientRunId,
           sessionKey: resolvedSessionKey,
+        });
+        endChatRunAndMaybeFlushRestore({
+          context,
+          runId: clientRunId,
+          client,
+          isWebchatConnect,
+        });
+        return;
+      }
+
+      // Owner pause/cancel: board updated + in-flight aborted above. Do not start a
+      // new business turn for the control utterance itself (status already in ack).
+      if (ownerAbortInFlight) {
+        setGatewayDedupeEntry({
+          dedupe: context.dedupe,
+          key: `chat:${clientRunId}`,
+          entry: {
+            ts: Date.now(),
+            ok: true,
+            payload: {
+              runId: clientRunId,
+              status: "ok" as const,
+              ...(taskStatusLine ? { taskStatusLine, taskId: taskTracking.taskId } : {}),
+            },
+          },
+        });
+        broadcastChatFinal({
+          context,
+          runId: clientRunId,
+          sessionKey: resolvedSessionKey,
+          ...(taskStatusLine
+            ? {
+                message: {
+                  role: "assistant",
+                  content: [{ type: "text", text: taskStatusLine }],
+                  timestamp: Date.now(),
+                },
+              }
+            : {}),
         });
         endChatRunAndMaybeFlushRestore({
           context,

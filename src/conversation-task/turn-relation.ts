@@ -193,7 +193,10 @@ export function classifyTurnRelation(incoming: string, currentGoal: string): Tur
   return "aside";
 }
 
-/** In-flight runs abort with task-park only when the turn actually cuts context. */
-export function shouldTaskParkAbortInFlight(cutContext: boolean): boolean {
-  return cutContext;
+/**
+ * In-flight runs abort when the turn cuts context (task park/switch) OR when the
+ * owner pauses/cancels the current task (abortInFlight from the task board).
+ */
+export function shouldTaskParkAbortInFlight(cutContext: boolean, abortInFlight?: boolean): boolean {
+  return cutContext || abortInFlight === true;
 }

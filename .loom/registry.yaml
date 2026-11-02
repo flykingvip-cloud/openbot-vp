@@ -13,7 +13,7 @@ tasks:
 - id: ft-plan-speak-shopping-positive-admission
   owner: cursor-grok
   intent:
-  - "Reply layer express-only; mid-task dialogue P0-P3: no occupancy revive on send fail; amend once-consumption; progress board reply; inbound pause/cancel/revise stop protection."
+  - "Slice2 blockers: pause/cancel abort in-flight via board abortInFlight+gateway/agent abort; full effectiveConstraints (no 48-char persist); sole board constraint entry; progress copy=任务板最近记录; ordinary aside still unfinished."
   paths:
   - src/shared/text/plan-speak-final.ts
   - src/shared/text/plan-speak-final.test.ts
@@ -30,6 +30,9 @@ tasks:
   - src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts
   - src/conversation-task/session-task-board.ts
   - src/conversation-task/session-task-board.inbound-stop.test.ts
+  - src/conversation-task/turn-relation.ts
+  - src/conversation-task/turn-relation.test.ts
+  - src/gateway/server-methods/chat.ts
   - ui/src/ui/app-chat.ts
   - ui/src/ui/app-chat.node.test.ts
   - ui/src/ui/controllers/chat.ts
@@ -44,7 +47,7 @@ tasks:
     ide: cursor
     agent: cursor-grok
     status: active
-    lastSignalAt: 2026-11-02T15:15:00+00:00
+    lastSignalAt: 2026-11-02T15:47:00+00:00
     metadata: {}
   ownerHistory: []
   since: 2026-11-02
@@ -10697,6 +10700,9 @@ landingStreams:
   - src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts
   - src/conversation-task/session-task-board.ts
   - src/conversation-task/session-task-board.inbound-stop.test.ts
+  - src/conversation-task/turn-relation.ts
+  - src/conversation-task/turn-relation.test.ts
+  - src/gateway/server-methods/chat.ts
   - ui/src/ui/app-chat.ts
   - ui/src/ui/app-chat.node.test.ts
   - ui/src/ui/controllers/chat.ts
@@ -10708,7 +10714,7 @@ landingStreams:
   metadata:
     task: ft-plan-speak-shopping-positive-admission
     owner: cursor-grok
-    purpose: "P0-P3 mid-task dialogue: no occupancy revive; amend once; progress board reply; inbound pause/cancel/revise stop."
+    purpose: "Slice2: abortInFlight pause/cancel; full effectiveConstraints; sole board writer; progress board projection; aside unfinished."
 - id: collab-role-duty-separation-20261102
   landingPolicy: serial
   paths:

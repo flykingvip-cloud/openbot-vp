@@ -6,7 +6,7 @@ import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
 import { isCliProvider } from "../../agents/model-selection.js";
-import { queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
+import { abortEmbeddedPiRun, queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage } from "../../agents/usage.js";
 import {
   resolveAgentIdFromSessionKey,
@@ -20,6 +20,9 @@ import {
 } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
 import {
+  applyIncomingUserMessage,
+  commitSameTaskConstraint,
+  isOwnerCurrentTaskControlUtterance,
   readSessionTaskBoard,
   writeSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
@@ -89,11 +92,11 @@ import {
   formatAmendConstraintAck,
   formatTaskBoardProgressReply,
   isProgressStatusQuery,
-  applySameTaskConstraintNote,
 } from "./mid-task-dialogue.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
 import { resolveActiveRunQueueAction, shouldAttemptCollectAmendSteer } from "./queue-policy.js";
+import { clearSessionQueues } from "./queue.js";
 import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queue.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
@@ -261,6 +264,29 @@ export async function runReplyAgent(params: {
     }
   };
 
+  // Owner pause/cancel while A is active: reuse board control + existing abort path.
+  // Must stop new business actions on the in-flight run; wakeSuppress alone is not enough.
+  if (
+    isActive &&
+    isOwnerCurrentTaskControlUtterance(followupRun.prompt) &&
+    followupRun.run.sessionFile
+  ) {
+    const sessionFile = followupRun.run.sessionFile.trim();
+    const control = applyIncomingUserMessage({
+      board: readSessionTaskBoard(sessionFile),
+      incomingText: followupRun.prompt,
+    });
+    writeSessionTaskBoard(sessionFile, control.board);
+    if (control.abortInFlight) {
+      const sessionId = followupRun.run.sessionId;
+      abortEmbeddedPiRun(sessionId);
+      clearSessionQueues([queueKey, sessionId, followupRun.run.sessionKey]);
+    }
+    await touchActiveSessionEntry();
+    typing.cleanup();
+    return [{ text: control.statusLine?.trim() || "已处理任务控制指令。" }];
+  }
+
   // P3: progress / status asks answered from the live task board — no steer,
   // no followup wait. Board is a projection of existing state, not a new controller.
   if (isActive && isProgressStatusQuery(followupRun.prompt) && followupRun.run.sessionFile) {
@@ -296,17 +322,15 @@ export async function runReplyAgent(params: {
     // P1 once-consumption: successful amend steer acknowledges immediately and
     // must NOT also enqueue-followup (would re-apply the same constraint). Steer
     // failure falls through so followup still carries the constraint — no drop.
+    // Constraint persistence goes through the sole board entry (not a reply-layer rewrite).
     const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
     if (steered) {
       const sessionFile = followupRun.run.sessionFile?.trim();
       if (sessionFile) {
-        const board = readSessionTaskBoard(sessionFile);
-        if (board.current?.unfinished) {
-          writeSessionTaskBoard(sessionFile, {
-            ...board,
-            current: applySameTaskConstraintNote(board.current, followupRun.prompt),
-          });
-        }
+        commitSameTaskConstraint({
+          sessionFile,
+          constraintText: followupRun.prompt,
+        });
       }
       await touchActiveSessionEntry();
       typing.cleanup();

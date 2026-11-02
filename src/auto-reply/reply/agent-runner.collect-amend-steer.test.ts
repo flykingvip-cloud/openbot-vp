@@ -130,6 +130,7 @@ describe("runReplyAgent collect amend steer inject", () => {
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
     const board = readSessionTaskBoard(sessionFile);
     expect(board.current?.stop.summary).toContain("约束：");
+    expect(board.current?.effectiveConstraints?.join("\n")).toContain("只要国内安卓机型");
   });
 
   it("does not inject new_work into the active run (followup only)", async () => {
@@ -154,7 +155,7 @@ describe("runReplyAgent collect amend steer inject", () => {
     const result = await runReplyAgent(buildParams("进度如何"));
     expect(result).toEqual([
       expect.objectContaining({
-        text: expect.stringMatching(/手机调研|进行中|进行中/),
+        text: expect.stringMatching(/手机调研|任务板最近记录|未完成/),
       }),
     ]);
     expect(queueEmbeddedPiMessageMock).not.toHaveBeenCalled();

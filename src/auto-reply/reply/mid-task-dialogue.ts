@@ -1,11 +1,10 @@
 /**
  * Mid-task dialogue helpers: progress status projection and amend-once ack.
- * Reuses SessionTaskBoard as the sole task-state projection — not a second controller.
+ * Display / classification only — task mutations go through session-task-board.
  */
 import {
   formatTaskBoardFocusLine,
   type SessionTaskBoard,
-  type TrackedTask,
 } from "../../conversation-task/session-task-board.js";
 
 const INBOUND_STAMP_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} [0-9:]{4,8} GMT[+-]\d+\]\s*/;
@@ -26,21 +25,34 @@ export function isProgressStatusQuery(text: string): boolean {
   return PROGRESS_STATUS_QUERY_RE.test(cleaned);
 }
 
+function truncateDisplay(text: string, max: number): string {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= max) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, max)}…`;
+}
+
+/**
+ * Progress answer from the task-board projection only.
+ * unfinished ≠ "正在推进"; never echo internal fields such as wakeSuppress.
+ */
 export function formatTaskBoardProgressReply(board: SessionTaskBoard): string {
   const current = board.current;
   const focus = formatTaskBoardFocusLine(board);
   if (!current) {
-    return `${focus}。没有正在推进的任务可汇报。`;
+    return `${focus}。任务板最近记录：没有未完成任务可汇报。`;
   }
-  const parts = [
-    focus,
-    current.unfinished ? "状态：进行中" : "状态：已结束待核对",
-    current.wakeSuppress === true ? "自动续跑：已暂停（wakeSuppress）" : "自动续跑：未抑制",
-    `停点：${current.stop.summary || "未记录"}`,
-  ];
+  const parts = [focus, `任务板最近记录：${current.unfinished ? "未完成" : "已结束待核对"}`];
+  if (current.wakeSuppress === true) {
+    parts.push("主人已暂停自动续跑");
+  }
+  const stopSummary = current.stop.summary?.trim();
+  if (stopSummary) {
+    parts.push(`停点摘要：${truncateDisplay(stopSummary, 80)}`);
+  }
   if (current.goalText?.trim()) {
-    const goal = current.goalText.trim().replace(/\s+/g, " ");
-    parts.push(`目标：${goal.length > 80 ? `${goal.slice(0, 80)}…` : goal}`);
+    parts.push(`目标：${truncateDisplay(current.goalText, 80)}`);
   }
   return parts.join("。") + "。";
 }
@@ -49,28 +61,4 @@ export function formatAmendConstraintAck(prompt: string): string {
   const cleaned = stripInboundStampForDialogue(prompt).replace(/\s+/g, " ").trim();
   const short = cleaned.length > 60 ? `${cleaned.slice(0, 60)}…` : cleaned;
   return `已将补充约束注入当前执行（仅一次）：${short || "（空）"}。后台任务继续，不会因这条补充另起一轮业务执行。`;
-}
-
-/** Append a same-task constraint note onto stop.summary without bumping focusRevision. */
-export function applySameTaskConstraintNote(
-  task: TrackedTask,
-  constraintText: string,
-): TrackedTask {
-  const cleaned = stripInboundStampForDialogue(constraintText).replace(/\s+/g, " ").trim();
-  if (!cleaned) {
-    return task;
-  }
-  const short = cleaned.length > 48 ? `${cleaned.slice(0, 48)}…` : cleaned;
-  const marker = `约束：${short}`;
-  const prior = task.stop.summary?.trim() || `未完成：${task.title}`;
-  if (prior.includes(marker)) {
-    return task;
-  }
-  return {
-    ...task,
-    stop: {
-      ...task.stop,
-      summary: `${marker}｜${prior}`,
-    },
-  };
 }

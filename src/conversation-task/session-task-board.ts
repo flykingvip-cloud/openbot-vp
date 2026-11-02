@@ -31,6 +31,11 @@ export type TrackedTask = {
   parkReason?: string;
   /** When true, automatic task_board_continue wake stays suppressed until resume. */
   wakeSuppress?: boolean;
+  /**
+   * Full owner same-task constraint texts (not truncated).
+   * stop.summary may carry a short display marker only — resume/claim must use this list.
+   */
+  effectiveConstraints?: string[];
   /** Deliverable version stamp for late-complete isolation (C4). */
   deliverableVersion?: string;
   /** Execution attempt stamp for late-complete isolation (C4). */
@@ -95,6 +100,12 @@ export type IncomingTurnResult = {
    */
   scheduleContinue?: boolean;
   rejectedReason?: string;
+  /**
+   * Owner pause/cancel of the *current* unfinished task: callers must abort the
+   * in-flight run via the existing abort path (same as task-park cutContext).
+   * Does not by itself bump focusRevision.
+   */
+  abortInFlight?: boolean;
 };
 
 export function emptySessionTaskBoard(scope?: TaskBoardScope): SessionTaskBoard {
@@ -298,13 +309,22 @@ export function buildResumePrompt(task: TrackedTask): string {
     .map((entry) => sanitizeTaskBoardPathForPrompt(entry))
     .filter(Boolean);
   const pathLine = paths.length > 0 ? `\n文件：${paths.join("、")}` : "";
+  const constraints = (task.effectiveConstraints ?? []).map((row) => row.trim()).filter(Boolean);
+  const constraintBlock =
+    constraints.length > 0
+      ? `\n有效约束：\n${constraints.map((row, index) => `${index + 1}. ${row}`).join("\n")}`
+      : "";
   // Keep taskId on a machine line for the model; never echo raw ids in the
   // human-facing 「继续任务」 sentence (that line previously leaked into chat).
+  // Full owner constraints live in effectiveConstraints — stop.summary is display/stop only.
   return [
     `task_id: ${task.taskId}`,
     `继续任务「${task.title}」。`,
     `停在：${task.stop.summary}${pathLine}`,
-  ].join("\n");
+    constraintBlock,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function findParked(board: SessionTaskBoard, token: string): TrackedTask | undefined {
@@ -442,6 +462,78 @@ export function insertLatestTaskDeferringCurrent(params: {
   };
 }
 
+/** Display-only short constraint marker for stop.summary (not the persistence source). */
+function constraintDisplayMarker(fullText: string): string {
+  const short = fullText.length > 48 ? `${fullText.slice(0, 48)}…` : fullText;
+  return `约束：${short}`;
+}
+
+/**
+ * Sole same-task constraint updater for the board.
+ * Persists the *full* owner text on effectiveConstraints; stop.summary gets a short display marker only.
+ */
+export function appendSameTaskConstraint(params: {
+  board: SessionTaskBoard;
+  constraintText: string;
+}): SessionTaskBoard {
+  const board = cloneBoardShell(params.board);
+  const current = board.current;
+  if (!current?.unfinished) {
+    return board;
+  }
+  const cleaned = stripStamp(params.constraintText).replace(/\s+/g, " ").trim();
+  if (!cleaned) {
+    return board;
+  }
+  const priorList = current.effectiveConstraints ?? [];
+  if (priorList.includes(cleaned)) {
+    return board;
+  }
+  const marker = constraintDisplayMarker(cleaned);
+  const priorSummary = current.stop.summary?.trim() || `未完成：${current.title}`;
+  const nextSummary = priorSummary.includes(marker) ? priorSummary : `${marker}｜${priorSummary}`;
+  return {
+    ...board,
+    current: {
+      ...current,
+      effectiveConstraints: [...priorList, cleaned],
+      stop: {
+        ...current.stop,
+        summary: nextSummary,
+      },
+    },
+  };
+}
+
+/** File-backed entry used by reply path — does not invent a second update rule. */
+export function commitSameTaskConstraint(params: {
+  sessionFile: string;
+  constraintText: string;
+}): boolean {
+  const sessionFile = params.sessionFile.trim();
+  if (!sessionFile) {
+    return false;
+  }
+  const board = readSessionTaskBoard(sessionFile);
+  if (!board.current?.unfinished) {
+    return false;
+  }
+  const next = appendSameTaskConstraint({ board, constraintText: params.constraintText });
+  writeSessionTaskBoard(sessionFile, next);
+  return true;
+}
+
+export function isOwnerCurrentTaskControlUtterance(text: string): boolean {
+  const incoming = stripStamp(text);
+  if (!incoming || incoming.startsWith("/")) {
+    return false;
+  }
+  return (
+    /^(?:暂停(?:当前(?:任务)?)?|先暂停)[。.!！]?$/u.test(incoming) ||
+    /^(?:取消当前(?:任务)?|取消任务)[。.!！]?$/u.test(incoming)
+  );
+}
+
 export function applyIncomingUserMessage(params: {
   board: SessionTaskBoard;
   incomingText: string;
@@ -518,27 +610,22 @@ export function applyIncomingUserMessage(params: {
     });
   }
   if (!isSureDistinctWork(incoming, current.goalText)) {
-    // Same-task amend: project the constraint into stop.summary so a later claim
-    // rebuilds continue prompt from the revised plan (no focusRevision bump).
-    let summary = current.stop.summary;
-    if (classifyTurnRelation(incoming, current.goalText) === "amend") {
-      const cleaned = incoming.replace(/\s+/g, " ").trim();
-      const short = cleaned.length > 48 ? `${cleaned.slice(0, 48)}…` : cleaned;
-      const marker = `约束：${short}`;
-      const prior = summary?.trim() || `未完成：${current.title}`;
-      if (cleaned && !prior.includes(marker)) {
-        summary = `${marker}｜${prior}`;
-      }
-    }
-    const nextCurrent: TrackedTask = {
-      ...current,
-      stop: {
-        summary,
-        workspacePaths: paths.length > 0 ? paths : current.stop.workspacePaths,
+    // Same-task amend: persist full constraint via the sole board updater (no focusRevision bump).
+    let nextBoard: SessionTaskBoard = {
+      ...board,
+      current: {
+        ...current,
+        stop: {
+          ...current.stop,
+          workspacePaths: paths.length > 0 ? paths : current.stop.workspacePaths,
+        },
       },
     };
+    if (classifyTurnRelation(incoming, current.goalText) === "amend") {
+      nextBoard = appendSameTaskConstraint({ board: nextBoard, constraintText: incoming });
+    }
     return {
-      ...continueResult({ ...board, current: nextCurrent }, current.taskId),
+      ...continueResult(nextBoard, current.taskId),
       focusRevision: board.focusRevision,
     };
   }
@@ -710,7 +797,8 @@ export function suppressCurrentTaskWake(params: {
   return {
     ...continueResult(nextBoard, current.taskId),
     focusRevision: board.focusRevision,
-    statusLine: `已暂停「${current.title}」的自动续跑。不会因旧唤醒复活。`,
+    abortInFlight: true,
+    statusLine: `已暂停「${current.title}」：活动执行将停止新增业务动作，且不会因旧唤醒复活。`,
   };
 }
 
@@ -744,7 +832,8 @@ export function cancelCurrentTask(params: {
     cutContext: false,
     focusRevision: board.focusRevision,
     scheduleContinue: false,
-    statusLine: `已取消「${current.title}」，已移出任务板。`,
+    abortInFlight: true,
+    statusLine: `已取消「${current.title}」：活动执行将停止新增业务动作，已移出任务板。`,
     incomingTitle: current.title,
   };
 }
@@ -1190,6 +1279,8 @@ export type FocusSwitchGateDecision =
       cutContext: false;
       taskId: string;
       statusLine?: string;
+      /** Owner pause/cancel: abort in-flight via existing chat abort path. */
+      abortInFlight?: boolean;
     }
   | {
       action: "auto_park" | "resume";
@@ -1202,6 +1293,7 @@ export type FocusSwitchGateDecision =
       restoredPrompt?: string;
       droppedTitle?: string;
       droppedPaths?: string[];
+      abortInFlight?: boolean;
     };
 
 const focusDecisionCounts = new Map<string, number>();
@@ -1295,6 +1387,7 @@ export function applyFocusSwitchGate(params: {
       cutContext: false,
       taskId: result.taskId,
       ...(result.statusLine ? { statusLine: result.statusLine } : {}),
+      ...(result.abortInFlight ? { abortInFlight: true } : {}),
     });
   } catch {
     return recordFocusDecision({

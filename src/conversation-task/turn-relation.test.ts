@@ -19,6 +19,8 @@ describe("turn relation", () => {
       expect(shouldTaskParkAbortInFlight(false)).toBe(false);
       expect(classifyTurnRelation(phrase, CURRENT)).not.toBe("new_work");
     }
+    expect(shouldTaskParkAbortInFlight(false, true)).toBe(true);
+    expect(shouldTaskParkAbortInFlight(true, false)).toBe(true);
   });
 
   it("classifies explicit new work that does not overlap the current goal", () => {

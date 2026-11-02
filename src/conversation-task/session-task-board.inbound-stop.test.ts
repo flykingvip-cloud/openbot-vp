@@ -1,5 +1,6 @@
 /**
  * P2: stop protection through real inbound applyIncomingUserMessage + claim.
+ * Also covers full (non-truncated) constraint persistence and abortInFlight signaling.
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -12,6 +13,7 @@ import {
   writeSessionTaskBoard,
 } from "./session-task-board.js";
 import { claimTaskBoardContinue } from "./task-board-continue.js";
+import { shouldTaskParkAbortInFlight } from "./turn-relation.js";
 
 describe("inbound stop / cancel / same-task revise → claim", () => {
   let tmpDir = "";
@@ -38,13 +40,15 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("owner 暂停 → wakeSuppress → claim rejects", () => {
+  it("owner 暂停 → wakeSuppress + abortInFlight → claim rejects", () => {
     const result = applyIncomingUserMessage({
       board: readSessionTaskBoard(sessionFile),
       incomingText: "暂停",
     });
     writeSessionTaskBoard(sessionFile, result.board);
     expect(result.board.current?.wakeSuppress).toBe(true);
+    expect(result.abortInFlight).toBe(true);
+    expect(shouldTaskParkAbortInFlight(result.cutContext, result.abortInFlight)).toBe(true);
     expect(result.board.focusRevision).toBe(3);
     const claim = claimTaskBoardContinue({
       sessionFile,
@@ -57,13 +61,15 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
     }
   });
 
-  it("owner 取消当前 → tombstone → claim rejects", () => {
+  it("owner 取消当前 → tombstone + abortInFlight → claim rejects", () => {
     const result = applyIncomingUserMessage({
       board: readSessionTaskBoard(sessionFile),
       incomingText: "取消当前",
     });
     writeSessionTaskBoard(sessionFile, result.board);
     expect(result.board.current).toBeUndefined();
+    expect(result.abortInFlight).toBe(true);
+    expect(shouldTaskParkAbortInFlight(result.cutContext, result.abortInFlight)).toBe(true);
     expect(result.board.tombstones?.some((t) => t.taskId === "task-a")).toBe(true);
     const claim = claimTaskBoardContinue({
       sessionFile,
@@ -76,15 +82,25 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
     }
   });
 
-  it("same-task amend updates stop; claim prompt follows revised plan (no rev bump)", () => {
+  it("same-task amend keeps full constraint past 48 chars for resume/claim", () => {
+    const longTail =
+      "补充：只要国内安卓机型，并且本次调研的关键限制条件必须完整保留；下列限制必须出现在第四十八个字符之后才能生效——禁止引用任何海外评测站点的份额数据";
+    expect(longTail.length).toBeGreaterThan(48);
+    const critical = "禁止引用任何海外评测站点的份额数据";
+    expect(longTail.indexOf(critical)).toBeGreaterThan(47);
+
     const result = applyIncomingUserMessage({
       board: readSessionTaskBoard(sessionFile),
-      incomingText: "补充：只要国内安卓机型",
+      incomingText: longTail,
     });
     writeSessionTaskBoard(sessionFile, result.board);
     expect(result.board.focusRevision).toBe(3);
+    const stored = result.board.current?.effectiveConstraints ?? [];
+    expect(stored.some((row) => row.includes(critical))).toBe(true);
+    // Display marker may truncate, but persistence must keep the full text.
+    expect(stored.join("\n")).toContain(critical);
     expect(result.board.current?.stop.summary).toContain("约束：");
-    expect(result.board.current?.stop.summary).toContain("旧计划");
+
     const claim = claimTaskBoardContinue({
       sessionFile,
       taskId: "task-a",
@@ -92,11 +108,8 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
     });
     expect(claim.ok).toBe(true);
     if (claim.ok) {
-      // Live rebuild must carry the new constraint; prior stop may remain after ｜.
-      expect(claim.prompt).toMatch(/约束：.*只要国内/);
-      expect(claim.prompt.indexOf("约束：")).toBeLessThan(
-        claim.prompt.indexOf("旧计划：先写竞品表"),
-      );
+      expect(claim.prompt).toContain(critical);
+      expect(claim.prompt).toContain("有效约束");
     }
   });
 });

@@ -4,7 +4,6 @@ import {
   type SessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import {
-  applySameTaskConstraintNote,
   formatAmendConstraintAck,
   formatTaskBoardProgressReply,
   isProgressStatusQuery,
@@ -20,7 +19,7 @@ describe("mid-task-dialogue helpers", () => {
     expect(isProgressStatusQuery("现在改做合同审查")).toBe(false);
   });
 
-  it("formats progress from board projection", () => {
+  it("formats progress from board projection without internal fields", () => {
     const board: SessionTaskBoard = {
       ...emptySessionTaskBoard(),
       current: {
@@ -28,6 +27,7 @@ describe("mid-task-dialogue helpers", () => {
         title: "手机调研",
         goalText: "调研国内手机市场并写报告",
         unfinished: true,
+        wakeSuppress: true,
         stop: { summary: "正在收集评测", workspacePaths: [] },
         createdAtMs: 1,
       },
@@ -35,27 +35,16 @@ describe("mid-task-dialogue helpers", () => {
     };
     const text = formatTaskBoardProgressReply(board);
     expect(text).toContain("手机调研");
-    expect(text).toContain("进行中");
+    expect(text).toContain("任务板最近记录");
+    expect(text).toContain("未完成");
+    expect(text).toContain("主人已暂停自动续跑");
     expect(text).toContain("正在收集评测");
+    expect(text).not.toContain("wakeSuppress");
+    expect(text).not.toContain("进行中");
     expect(text).not.toContain("请确认");
   });
 
   it("acks amend once without inventing a second controller", () => {
     expect(formatAmendConstraintAck("补充：只要国内安卓机型")).toContain("仅一次");
-  });
-
-  it("applies constraint note without changing taskId", () => {
-    const task = {
-      taskId: "task-a",
-      title: "手机调研",
-      goalText: "调研国内手机市场并写报告",
-      unfinished: true,
-      stop: { summary: "进行中", workspacePaths: [] as string[] },
-      createdAtMs: 1,
-    };
-    const next = applySameTaskConstraintNote(task, "补充：只要国内安卓机型");
-    expect(next.taskId).toBe("task-a");
-    expect(next.stop.summary).toContain("约束：");
-    expect(next.stop.summary).toContain("进行中");
   });
 });

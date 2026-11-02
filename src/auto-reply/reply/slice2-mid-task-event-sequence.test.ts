@@ -1,8 +1,9 @@
 /**
  * Required delivery evidence: one continuous event sequence through real inbound
- * board + claim paths (not a second controller).
+ * reply + board + claim paths (not a second controller).
  *
- * A running → B progress answered → amend once → owner pause → stale wake dead.
+ * A running → long constraint once → progress answered → owner pause aborts
+ * activity → stale wake dead.
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -13,7 +14,9 @@ import type { FollowupRun, QueueSettings } from "./queue.js";
 import { createMockTypingController } from "./test-helpers.js";
 
 const queueEmbeddedPiMessageMock = vi.fn();
+const abortEmbeddedPiRunMock = vi.fn();
 const enqueueFollowupRunMock = vi.fn();
+const clearSessionQueuesMock = vi.fn();
 
 vi.mock("../../agents/pi-embedded.js", async () => {
   const actual = await vi.importActual<typeof import("../../agents/pi-embedded.js")>(
@@ -22,6 +25,7 @@ vi.mock("../../agents/pi-embedded.js", async () => {
   return {
     ...actual,
     queueEmbeddedPiMessage: (...args: unknown[]) => queueEmbeddedPiMessageMock(...args),
+    abortEmbeddedPiRun: (...args: unknown[]) => abortEmbeddedPiRunMock(...args),
   };
 });
 
@@ -30,6 +34,7 @@ vi.mock("./queue.js", async () => {
   return {
     ...actual,
     enqueueFollowupRun: (...args: unknown[]) => enqueueFollowupRunMock(...args),
+    clearSessionQueues: (...args: unknown[]) => clearSessionQueuesMock(...args),
     scheduleFollowupDrain: vi.fn(),
   };
 });
@@ -39,7 +44,6 @@ vi.mock("../../agents/model-fallback.js", () => ({
 }));
 
 import {
-  applyIncomingUserMessage,
   emptySessionTaskBoard,
   readSessionTaskBoard,
   writeSessionTaskBoard,
@@ -52,10 +56,22 @@ describe("slice2 mid-task event sequence", () => {
   let sessionFile = "";
   let steerCount = 0;
 
+  const LONG_CONSTRAINT =
+    "补充：只要国内安卓机型，并且本次调研的关键限制条件必须完整保留；下列限制必须出现在第四十八个字符之后才能生效——禁止引用任何海外评测站点的份额数据";
+  const CRITICAL_TAIL = "禁止引用任何海外评测站点的份额数据";
+
   beforeEach(() => {
     steerCount = 0;
     queueEmbeddedPiMessageMock.mockReset();
+    abortEmbeddedPiRunMock.mockReset();
     enqueueFollowupRunMock.mockReset();
+    clearSessionQueuesMock.mockReset();
+    abortEmbeddedPiRunMock.mockReturnValue(true);
+    clearSessionQueuesMock.mockReturnValue({
+      followupCleared: 0,
+      laneCleared: 0,
+      keys: [],
+    });
     queueEmbeddedPiMessageMock.mockImplementation(() => {
       steerCount += 1;
       return true;
@@ -74,6 +90,8 @@ describe("slice2 mid-task event sequence", () => {
       createdAtMs: Date.now(),
     };
     writeSessionTaskBoard(sessionFile, board);
+    expect(LONG_CONSTRAINT.length).toBeGreaterThan(48);
+    expect(LONG_CONSTRAINT.indexOf(CRITICAL_TAIL)).toBeGreaterThan(47);
   });
 
   afterEach(() => {
@@ -131,37 +149,42 @@ describe("slice2 mid-task event sequence", () => {
     };
   }
 
-  it("A→B progress answer→amend once→pause→stale wake dead", async () => {
+  it("A→long constraint once→progress answer→pause aborts→stale wake dead", async () => {
     const events: string[] = [];
 
     // A is active (board unfinished + isActive streaming).
     events.push("A_active");
     expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
 
-    // B progress query — answered immediately (回答已产生), no followup.
-    const progress = await runReplyAgent(buildParams("进度如何"));
-    events.push("B_progress_answered");
-    expect(progress?.[0]?.text).toMatch(/手机调研/);
-    expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
-
-    // Amend constraint — steer once, no followup re-exec (约束已应用).
+    // Long amend — steer once, full constraint persisted (约束已应用 / 消息已送达).
     enqueueFollowupRunMock.mockClear();
-    const amend = await runReplyAgent(buildParams("补充：只要国内安卓机型"));
+    const amend = await runReplyAgent(buildParams(LONG_CONSTRAINT));
     events.push("amend_applied_once");
     expect(amend?.[0]?.text).toContain("仅一次");
     expect(steerCount).toBe(1);
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
-    expect(readSessionTaskBoard(sessionFile).current?.stop.summary).toContain("约束：");
+    const afterAmend = readSessionTaskBoard(sessionFile);
+    expect(afterAmend.current?.effectiveConstraints?.join("\n")).toContain(CRITICAL_TAIL);
+    expect(afterAmend.current?.stop.summary).toContain("约束：");
 
-    // Owner pause via real inbound path.
-    const paused = applyIncomingUserMessage({
-      board: readSessionTaskBoard(sessionFile),
-      incomingText: "暂停",
-    });
-    writeSessionTaskBoard(sessionFile, paused.board);
-    events.push("owner_pause");
-    expect(paused.board.current?.wakeSuppress).toBe(true);
-    expect(paused.board.focusRevision).toBe(1);
+    // B progress query — answered immediately (回答已产生), no followup, no internals.
+    const progress = await runReplyAgent(buildParams("进度如何"));
+    events.push("B_progress_answered");
+    expect(progress?.[0]?.text).toMatch(/手机调研/);
+    expect(progress?.[0]?.text).toContain("任务板最近记录");
+    expect(progress?.[0]?.text).not.toContain("wakeSuppress");
+    expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
+
+    // Owner pause via real reply entry — aborts activity (活动已停).
+    abortEmbeddedPiRunMock.mockClear();
+    clearSessionQueuesMock.mockClear();
+    const paused = await runReplyAgent(buildParams("暂停"));
+    events.push("owner_pause_aborts_activity");
+    expect(paused?.[0]?.text).toMatch(/暂停|停止新增业务动作/);
+    expect(abortEmbeddedPiRunMock).toHaveBeenCalledWith("session-a");
+    expect(clearSessionQueuesMock).toHaveBeenCalled();
+    expect(readSessionTaskBoard(sessionFile).current?.wakeSuppress).toBe(true);
+    expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
 
     // Stale continue ticket (same revision) arrives → claim rejects.
     const claim = claimTaskBoardContinue({
@@ -177,9 +200,9 @@ describe("slice2 mid-task event sequence", () => {
 
     expect(events).toEqual([
       "A_active",
-      "B_progress_answered",
       "amend_applied_once",
-      "owner_pause",
+      "B_progress_answered",
+      "owner_pause_aborts_activity",
       "stale_wake_rejected",
     ]);
   });
