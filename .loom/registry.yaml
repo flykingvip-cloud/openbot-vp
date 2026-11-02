@@ -10663,6 +10663,17 @@ landingStreams:
     task: FT-COLLAB-ROLE-DUTY-SEPARATION
     owner: cursor-grok
     purpose: Coordinator must not default-claim/proxy-claim; publish≠claim; execute/review wakes target claimant/reviewer; synthetic acceptance 1–9. P1 non-empty trusted actor on production write paths.
+- id: ft-dedupe-thinking-progress-ui-20261102
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - ui/src/ui/views/chat.ts
+  - ui/src/ui/views/chat.test.ts
+  canLandWith: []
+  metadata:
+    task: FT-DEDUPE-THINKING-PROGRESS-UI
+    owner: cursor-grok
+    purpose: Prefer thinking-progress over work-progress 正在思考 reading-indicator on the same empty-body live turn.
 - id: yonyou-dh-knowledge-feed:cursor-cloud
   landingPolicy: serial
   paths:
