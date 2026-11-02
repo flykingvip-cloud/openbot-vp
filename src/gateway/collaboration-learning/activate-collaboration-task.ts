@@ -658,13 +658,22 @@ export async function activateCollaborationTask(
     idempotentReplay: boolean,
   ) => {
     const stores = teamStores;
-    // After a legal publish, invoke the real claim entry when the present actor
-    // is rightful. Never auto-mint for an absent intended claimant.
+    // Publish ≠ claim. Schedule a controlled handoff wake for the single
+    // intended claimant (or claim only when the present actor IS that intended).
+    // Never auto-claim as the publisher; never pick intended[0] among many.
+    const { authority } = await buildTrustedBoardAuthority({
+      groupId,
+      taskId,
+      cfg,
+      stores,
+      tenant: params.tenant,
+    });
     const formalClaim = await tryClaimAfterBoardPublish({
       groupId,
       taskId,
       item,
       actorId: actor,
+      authority,
       auth: params.auth,
       trusted: params.trusted,
       stores,
@@ -673,6 +682,7 @@ export async function activateCollaborationTask(
     });
     const boardItem = formalClaim.item;
     try {
+      // Explicit activate focus switch: new task B must beat a stale OS A.
       await syncGroupOperatingState({
         fileStore: stores.fileStore,
         groupStorage: stores.groupStorage,
@@ -681,6 +691,7 @@ export async function activateCollaborationTask(
         learningStorage: stores.learningStorage,
         objectStorage: stores.objectStorage,
         groupId,
+        preferredTaskId: taskId,
       });
     } catch (error) {
       return {

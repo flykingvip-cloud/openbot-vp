@@ -1,13 +1,20 @@
 /**
- * After a legal board publish, advance through the existing claim entry when a
- * rightful actor is present. Does not invent claimants, bypass policy confirm,
- * or mint humanConfirmed. activate success stays dispatched:false.
+ * After a legal board publish, distinguish publish from claim.
+ *
+ * Ordinary publish must NOT implicitly claim for the publisher. When exactly one
+ * intended claimant is determined, reuse Wake Contract handoff so that bot can
+ * enter claim → apply → propose plan as itself (no identity impersonation, no
+ * policy/human-confirm bypass). Multiple intended candidates → blocked (never
+ * pick first). Empty intended → blocked (no single legal target). Activate
+ * success stays dispatched:false.
  */
 import type { OpenBotConfig } from "../../config/types.js";
 import {
   isIntendedClaimantId,
   type GroupBoardClaimItem,
 } from "../collaboration-dispatch/claim-contract.js";
+import type { RuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { recordHandoffWake } from "../collaboration-dispatch/wake-contract.js";
 import {
   claimCollaborationBoardItem,
   ClaimContractEntryError,
@@ -34,6 +41,17 @@ export type TryClaimAfterBoardPublishResult =
       claimantId: string;
       nextEntryPoint: null;
       reason: "claimed_via_entry";
+      scheduledClaimantId: null;
+      wakeRecorded: false;
+    }
+  | {
+      outcome: "scheduled";
+      item: GroupBoardClaimItem;
+      claimantId: null;
+      nextEntryPoint: typeof POST_PUBLISH_CLAIM_ENTRY;
+      reason: string;
+      scheduledClaimantId: string;
+      wakeRecorded: boolean;
     }
   | {
       outcome: "blocked";
@@ -41,6 +59,8 @@ export type TryClaimAfterBoardPublishResult =
       claimantId: null;
       nextEntryPoint: typeof POST_PUBLISH_CLAIM_ENTRY;
       reason: string;
+      scheduledClaimantId: null;
+      wakeRecorded: false;
     }
   | {
       outcome: "unchanged";
@@ -48,6 +68,8 @@ export type TryClaimAfterBoardPublishResult =
       claimantId: string | null;
       nextEntryPoint: typeof POST_PUBLISH_CLAIM_ENTRY | null;
       reason: string;
+      scheduledClaimantId: null;
+      wakeRecorded: false;
     };
 
 function compact(value: string | null | undefined): string {
@@ -66,16 +88,68 @@ function intendedIds(item: GroupBoardClaimItem): string[] {
   return out;
 }
 
+function unchanged(
+  item: GroupBoardClaimItem,
+  reason: string,
+  nextEntryPoint: typeof POST_PUBLISH_CLAIM_ENTRY | null,
+  claimantId: string | null,
+): TryClaimAfterBoardPublishResult {
+  return {
+    outcome: "unchanged",
+    item,
+    claimantId,
+    nextEntryPoint,
+    reason,
+    scheduledClaimantId: null,
+    wakeRecorded: false,
+  };
+}
+
+function blocked(item: GroupBoardClaimItem, reason: string): TryClaimAfterBoardPublishResult {
+  return {
+    outcome: "blocked",
+    item,
+    claimantId: null,
+    nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
+    reason,
+    scheduledClaimantId: null,
+    wakeRecorded: false,
+  };
+}
+
 /**
- * Invoke claimCollaborationBoardItem only when the present actor is rightful.
- * Never auto-picks intendedClaimantIds[0] for an absent claimant.
+ * Resolve a single legal intended claimant, or a clear blocked reason.
+ * Never picks intended[0] among many; never falls back to the publisher.
+ */
+export function resolvePostPublishClaimTarget(
+  item: GroupBoardClaimItem,
+): { ok: true; claimantId: string } | { ok: false; reason: string } {
+  const intended = intendedIds(item);
+  if (intended.length === 0) {
+    return { ok: false, reason: "no_single_legal_claimant" };
+  }
+  if (intended.length > 1) {
+    return {
+      ok: false,
+      reason: `ambiguous_intended_claimants:intended=${intended.join(",")}`,
+    };
+  }
+  return { ok: true, claimantId: intended[0] };
+}
+
+/**
+ * After publish: claim only when the present actor IS the single intended
+ * claimant. Otherwise schedule a controlled handoff wake for that intended bot
+ * (or block with a clear reason). Never auto-claims for the publisher.
  */
 export async function tryClaimAfterBoardPublish(params: {
   groupId: string;
   taskId: string;
   item: GroupBoardClaimItem;
-  /** Present actor at the publish site. Required to attempt a real claim. */
+  /** Present actor at the publish site. May claim only when they are the single intended. */
   actorId: string | null | undefined;
+  /** Required to record a Wake Contract handoff for an absent intended claimant. */
+  authority?: RuntimeAuthority | null;
   auth?: TeamResourceAuthOk | null;
   trusted?: { groupsRoot: string; groupLocator: string } | null;
   stores?: TrustedGroupStores | null;
@@ -86,102 +160,101 @@ export async function tryClaimAfterBoardPublish(params: {
   const status = compact(item.status);
   const existingClaimant = compact(item.claimantId);
   if (ALREADY_CLAIMED.has(status) && existingClaimant) {
-    return {
-      outcome: "unchanged",
-      item,
-      claimantId: existingClaimant,
-      nextEntryPoint: null,
-      reason: "already_claimed",
-    };
+    return unchanged(item, "already_claimed", null, existingClaimant);
   }
   if (status !== "published") {
-    return {
-      outcome: "unchanged",
+    return unchanged(
       item,
-      claimantId: existingClaimant || null,
-      nextEntryPoint: status ? POST_PUBLISH_CLAIM_ENTRY : null,
-      reason: `board_not_published:${status || "missing"}`,
-    };
+      `board_not_published:${status || "missing"}`,
+      status ? POST_PUBLISH_CLAIM_ENTRY : null,
+      existingClaimant || null,
+    );
   }
+
+  const target = resolvePostPublishClaimTarget(item);
+  if (!target.ok) {
+    return blocked(item, target.reason);
+  }
+  const intendedClaimantId = target.claimantId;
 
   const actorId = compact(params.actorId);
-  if (!actorId) {
-    return {
-      outcome: "blocked",
-      item,
-      claimantId: null,
-      nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
-      reason: "claimant_actor_required",
-    };
-  }
-
-  const intended = intendedIds(item);
-  if (intended.length > 0 && !isIntendedClaimantId(intended, actorId)) {
-    return {
-      outcome: "blocked",
-      item,
-      claimantId: null,
-      nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
-      reason: `awaiting_intended_claimant:actor=${actorId}:intended=${intended.join(",")}`,
-    };
-  }
-
   const itemId = compact(item.itemId);
   if (!itemId) {
-    return {
-      outcome: "blocked",
-      item,
-      claimantId: null,
-      nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
-      reason: "board_item_id_missing",
-    };
+    return blocked(item, "board_item_id_missing");
   }
 
-  try {
-    const claimed = await claimCollaborationBoardItem({
-      groupId: params.groupId,
-      taskId: params.taskId,
-      itemId,
-      claimantId: actorId,
-      actor: actorId,
-      auth: params.auth,
-      trusted: params.trusted,
-      stores: params.stores,
-      tenant: params.tenant,
-      cfg: params.cfg,
-    });
-    return {
-      outcome: "claimed",
-      item: claimed,
-      claimantId: compact(claimed.claimantId) || actorId,
-      nextEntryPoint: null,
-      reason: "claimed_via_entry",
-    };
-  } catch (error) {
-    if (error instanceof ClaimContractFlagOffError) {
+  // Present actor is the single intended → real self-claim via production entry.
+  if (actorId && isIntendedClaimantId([intendedClaimantId], actorId)) {
+    try {
+      const claimed = await claimCollaborationBoardItem({
+        groupId: params.groupId,
+        taskId: params.taskId,
+        itemId,
+        claimantId: intendedClaimantId,
+        actor: actorId,
+        auth: params.auth,
+        trusted: params.trusted,
+        stores: params.stores,
+        tenant: params.tenant,
+        cfg: params.cfg,
+      });
       return {
-        outcome: "blocked",
-        item,
-        claimantId: null,
-        nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
-        reason: "claim_contract_flag_off",
+        outcome: "claimed",
+        item: claimed,
+        claimantId: compact(claimed.claimantId) || intendedClaimantId,
+        nextEntryPoint: null,
+        reason: "claimed_via_entry",
+        scheduledClaimantId: null,
+        wakeRecorded: false,
       };
+    } catch (error) {
+      if (error instanceof ClaimContractFlagOffError) {
+        return blocked(item, "claim_contract_flag_off");
+      }
+      if (error instanceof ClaimContractEntryError) {
+        return blocked(item, error.code || "claim_entry_failed");
+      }
+      return blocked(item, error instanceof Error ? error.message : "claim_entry_failed");
     }
-    if (error instanceof ClaimContractEntryError) {
-      return {
-        outcome: "blocked",
-        item,
-        claimantId: null,
-        nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
-        reason: error.code || "claim_entry_failed",
-      };
-    }
-    return {
-      outcome: "blocked",
-      item,
-      claimantId: null,
-      nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
-      reason: error instanceof Error ? error.message : "claim_entry_failed",
-    };
   }
+
+  // Publisher / other present actor is NOT the intended claimant: do not claim
+  // as them. Schedule a controlled handoff wake so the intended bot can claim.
+  const authority = params.authority ?? null;
+  if (!authority) {
+    return blocked(
+      item,
+      `awaiting_intended_claimant:actor=${actorId || "none"}:intended=${intendedClaimantId}:wake_authority_required`,
+    );
+  }
+
+  const fromAgentId = actorId || compact(item.publishedBy) || "system:board_publish";
+  const wake = await recordHandoffWake(
+    authority,
+    {
+      groupId: params.groupId,
+      fromAgentId,
+      toAgentId: intendedClaimantId,
+      taskId: params.taskId,
+      handoffId: itemId,
+    },
+    { cfg: params.cfg },
+  );
+  const wakeRecorded = wake.ok;
+  if (!wakeRecorded) {
+    return blocked(
+      item,
+      `awaiting_intended_claimant:actor=${actorId || "none"}:intended=${intendedClaimantId}:wake_failed:${!wake.ok ? wake.reason : "unknown"}`,
+    );
+  }
+
+  return {
+    outcome: "scheduled",
+    item,
+    claimantId: null,
+    nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
+    reason: `scheduled_intended_claimant:intended=${intendedClaimantId}`,
+    scheduledClaimantId: intendedClaimantId,
+    wakeRecorded: true,
+  };
 }

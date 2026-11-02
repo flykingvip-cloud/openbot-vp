@@ -496,4 +496,96 @@ describe("syncGroupOperatingState real storage authority", () => {
     expect(persisted?.activeContext.currentOperatingPhase).toBe("explore");
     expect(persisted?.activeContext.summary).toBe(synced.activeContext.summary);
   });
+
+  it("explicit preferredTaskId (activate B) switches focus while stale A stays active", async () => {
+    const { cfg, groupId, stores } = await useSyncHarness();
+    const taskA = "task-a-stale-focus";
+    const taskB = "task-b-activated";
+    await stores.objectStorage.writeObject(groupId, "task", taskA, {
+      taskId: taskA,
+      groupId,
+      title: "A",
+      status: "in_progress",
+      createdAtMs: 1,
+      updatedAtMs: 50,
+    } satisfies Task);
+    await stores.objectStorage.writeObject(groupId, "task", taskB, {
+      taskId: taskB,
+      groupId,
+      title: "B",
+      status: "ready",
+      createdAtMs: 60,
+      updatedAtMs: 60,
+    } satisfies Task);
+    await stores.objectStorage.writeObject(groupId, "deliverable", "del-a", {
+      deliverableId: "del-a",
+      groupId,
+      taskId: taskA,
+      title: "A del",
+      status: "draft",
+      version: 1,
+      createdAtMs: 1,
+      updatedAtMs: 50,
+    } satisfies Deliverable);
+    await stores.objectStorage.writeObject(groupId, "deliverable", "del-b", {
+      deliverableId: "del-b",
+      groupId,
+      taskId: taskB,
+      title: "B del",
+      status: "draft",
+      version: 1,
+      createdAtMs: 60,
+      updatedAtMs: 60,
+    } satisfies Deliverable);
+
+    const seeded = makeOperatingState({ groupId });
+    seeded.activeContext = {
+      ...seeded.activeContext,
+      currentTaskId: taskA,
+      currentDeliverableId: "del-a",
+      summary: "stale A",
+      updatedAtMs: 50,
+    };
+    await writeGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupId,
+      state: seeded,
+      cfg,
+    });
+
+    // Background sync without override keeps A (A still active).
+    const background = await syncGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupStorage: stores.groupStorage,
+      metadataStorage: stores.metadataStorage,
+      memoryStorage: stores.memoryStorage,
+      learningStorage: stores.learningStorage,
+      objectStorage: stores.objectStorage,
+      groupId,
+    });
+    expect(background.activeContext.currentTaskId).toBe(taskA);
+    expect(background.activeContext.currentDeliverableId).toBe("del-a");
+
+    // Explicit activate/switch preferredTaskId=B beats stale A.
+    const activated = await syncGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupStorage: stores.groupStorage,
+      metadataStorage: stores.metadataStorage,
+      memoryStorage: stores.memoryStorage,
+      learningStorage: stores.learningStorage,
+      objectStorage: stores.objectStorage,
+      groupId,
+      preferredTaskId: taskB,
+    });
+    expect(activated.activeContext.currentTaskId).toBe(taskB);
+    expect(activated.activeContext.currentDeliverableId).toBe("del-b");
+    expect(activated.activeContext.currentDeliverableId).not.toBe("del-a");
+
+    const persisted = await readGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupId,
+    });
+    expect(persisted?.activeContext.currentTaskId).toBe(taskB);
+    expect(persisted?.activeContext.currentDeliverableId).toBe("del-b");
+  });
 });

@@ -1268,6 +1268,12 @@ export async function syncGroupOperatingState(params: {
   objectStorage: OpenBotObjectStorage;
   groupId: string;
   titleFallback?: string | null;
+  /**
+   * Explicit focus switch (e.g. activate of task B). When set, beats a stale OS
+   * currentTaskId that is still active. Omit for background/ordinary sync so
+   * old-task updates cannot steal focus.
+   */
+  preferredTaskId?: string | null;
 }) {
   const [
     profile,
@@ -1300,15 +1306,21 @@ export async function syncGroupOperatingState(params: {
     params.groupId;
   const review = selectActiveReview(reviews);
   const decision = selectActiveDecision(decisions);
-  // Bind the formal deliverable to system task authority (existing OS
-  // currentTaskId when still active). A newer row / old-task update must not
-  // steal the current binding or pose as the active deliverable.
+  // Bind the formal deliverable to system task authority. Explicit
+  // preferredTaskId (activate / switch) beats a stale OS currentTaskId while
+  // that old task is still active. Ordinary/background sync omits the override
+  // so an old-task update cannot steal focus.
+  const explicitPreferred =
+    params.preferredTaskId !== undefined ? params.preferredTaskId : undefined;
   const deliverableBinding = projectOperatingDeliverableBinding({
     tasks,
     deliverables,
     decision,
     review,
-    preferredTaskId: existingState?.activeContext?.currentTaskId ?? null,
+    preferredTaskId:
+      explicitPreferred !== undefined
+        ? explicitPreferred
+        : (existingState?.activeContext?.currentTaskId ?? null),
   });
   const task = deliverableBinding.task;
   const deliverable = deliverableBinding.deliverable;
