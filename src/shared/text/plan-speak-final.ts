@@ -1,22 +1,26 @@
 /**
- * M2 finalization gate: plan-speak / "still working" prose must not be a
- * terminal assistant final. Rewrite to an explicit pause that asks the user
- * to confirm or take over (covers 高密度分析 early-final class).
+ * Plan-speak / "still working" detection for the **executor** continue path,
+ * plus a reply-layer pass-through.
  *
- * Short holding lines such as 「正在收尾排版，稍等片刻。」 are a different
- * class: the user already said go, and the line is not a decision. They are
- * detected by `isExecutionStallFinal` so the run can continue. Do not fold
- * them into `PLAN_SPEAK_MARKERS_RE` — that rewrite asks about price, spec,
- * and payment, which is the wrong pause for typeset/publish.
+ * Who decides task control (continue / wait / ask owner / complete):
+ * - `executionContinueKind` + `runExecutionStallContinueLoop` (progress stall,
+ *   false-confirm, recoverable tools, silent-exec, empty-after-tools)
+ * - real human gates in stall-continue (`HARD_DECISION_RE`, waiting_confirmation,
+ *   missing choice) and OGUI / turn-completion elsewhere
+ * - `settleTurnCompletion` (delivered / permanent_block / true_fork)
  *
- * Shopping CTA uses **positive admission** (checkout/cart/order/compare-price
- * markers, or a shopping user goal + lexicon). Bare 「价格」「支付」 words are
- * not enough. Non-shopping plan-speak stays progress text so stall continuation
- * can keep the turn moving. This module only rewrites visible text — it must
- * not create task pause or authorization state.
+ * Reply outlets (`rewriteAttemptVisibleReply`, `parseReplyDirectives` →
+ * partial/block) must **express** text, not invent pause/confirm/authorization
+ * from keywords. Shopping CTA used to be such an invention; it is retired here.
+ * Streaming may show progress before a stop result exists; it must not fabricate
+ * a pause reason.
+ *
+ * Short holding lines such as 「正在收尾排版，稍等片刻。」 are detected by
+ * `isExecutionStallFinal` so the run can continue — not rewritten into a
+ * shopping or generic confirm template.
  */
 
-/** User-facing pause when the model ends mid-plan without asking. */
+/** @deprecated Retired reply-layer template; kept for tests that assert absence. */
 export const PLAN_SPEAK_PAUSE_CTA =
   "任务还没做完。请确认下一步（选哪个价/规格/支付方式），或点「接管」在电脑里自己操作；也可以回我「继续」。";
 
@@ -97,100 +101,28 @@ export function isExecutionStallFinal(text: string): boolean {
   return SHORT_HOLDING_RE.test(t);
 }
 
-/** Short factual lead before the first plan-speak marker (prices / status). */
-function extractFactualLead(text: string): string {
-  const match = PLAN_SPEAK_MARKERS_RE.exec(text);
-  if (!match || match.index === undefined || match.index < 8) {
-    const firstLine = text.split(/\n+/)[0]?.trim() ?? "";
-    if (
-      firstLine.length >= 8 &&
-      firstLine.length <= 120 &&
-      !PLAN_SPEAK_MARKERS_RE.test(firstLine) &&
-      /[\u4e00-\u9fff\d¥￥]/.test(firstLine)
-    ) {
-      return firstLine;
-    }
-    return "";
-  }
-  const lead = text
-    .slice(0, match.index)
-    .replace(/[，,。；;、\s]+$/u, "")
-    .trim();
-  if (lead.length < 8 || lead.length > 160) {
-    return "";
-  }
-  if (!/[\u4e00-\u9fff\d¥￥]/.test(lead)) {
-    return "";
-  }
-  return lead;
-}
-
 /**
- * Weak shopping lexicon. Alone (e.g. 「价格」「支付」 in a research/analysis
- * sentence) does **not** prove the user needs a shopping decision pause.
+ * @deprecated Reply layer no longer invents shopping pause CTAs. Always false.
+ * Kept so older call sites compile; do not use to drive task control.
  */
-const SHOPPING_LEXICON_RE =
-  /(?:价格|规格|尺码|支付|付款|收银台|购物车|下单|比价|结算|最低价|接管|[¥￥])/u;
-
-/**
- * Positive admission markers in plan-speak itself: checkout / cart / order /
- * compare-price workflows, not bare price words.
- */
-const SHOPPING_PAUSE_ADMISSION_RE =
-  /(?:购物车|结算(?:页)?|收银台|下单|比价|加购|付款码|扫码支付|选哪个价|哪个规格|最低价|哪一单|尺码)/u;
-
-/** User goal that positively frames the turn as shopping. */
-const SHOPPING_GOAL_CONTEXT_RE =
-  /(?:帮我买|去买|购买|下单|比价|加购|购物车|结算|京东|淘宝|拼多多|得物|买鞋|买件)/u;
-
-/**
- * True when shopping pause CTA is positively admitted.
- * Bare 「价格」「支付」 / currency mentions are not enough without checkout-ish
- * admission or a shopping user goal.
- */
-export function shouldApplyShoppingPauseCta(text: string, contextText = ""): boolean {
-  const raw = text.trim();
-  if (!raw || !isPlanSpeakFinal(raw)) {
-    return false;
-  }
-  if (SHOPPING_PAUSE_ADMISSION_RE.test(raw)) {
-    return true;
-  }
-  if (SHOPPING_GOAL_CONTEXT_RE.test(contextText) && SHOPPING_LEXICON_RE.test(raw)) {
-    return true;
-  }
+export function shouldApplyShoppingPauseCta(_text: string, _contextText = ""): boolean {
   return false;
 }
 
 /**
- * Backward-compatible helper: plan-speak that must not become the shopping CTA.
- * Equivalent to plan-speak finals that fail positive shopping admission.
+ * @deprecated Prefer `isPlanSpeakFinal`. Historically meant "do not rewrite to
+ * shopping CTA"; all plan-speak is now left as progress text at reply layer.
  */
-export function shouldPreserveNonShoppingPlanSpeak(text: string, contextText = ""): boolean {
-  const raw = text.trim();
-  if (!raw || !isPlanSpeakFinal(raw)) {
-    return false;
-  }
-  return !shouldApplyShoppingPauseCta(raw, contextText);
+export function shouldPreserveNonShoppingPlanSpeak(text: string, _contextText = ""): boolean {
+  return isPlanSpeakFinal(text);
 }
 
 /**
- * If `text` is a plan-speak terminal **and** shopping pause is positively
- * admitted, rewrite to a pause CTA. Otherwise leave plan-speak alone (progress
- * / stall continue can keep moving). Keeps a short factual lead when present.
- * Reply rewrite never creates task pause or auth state — text only.
+ * Reply-layer pass-through. Never invents pause / confirm / shopping takeover
+ * from plan-speak keywords. Task control stays with the executor continue loop,
+ * real human gates, and turn-completion. `contextText` is accepted for call-site
+ * compatibility only.
  */
-export function rewritePlanSpeakFinal(text: string, contextText = ""): string {
-  const raw = text.trim();
-  if (!raw || !isPlanSpeakFinal(raw)) {
-    return text;
-  }
-  if (!shouldApplyShoppingPauseCta(raw, contextText)) {
-    return text;
-  }
-  const lead = extractFactualLead(raw);
-  if (lead && lead !== PLAN_SPEAK_PAUSE_CTA) {
-    return `${lead}\n\n${PLAN_SPEAK_PAUSE_CTA}`;
-  }
-  return PLAN_SPEAK_PAUSE_CTA;
+export function rewritePlanSpeakFinal(text: string, _contextText = ""): string {
+  return text;
 }
