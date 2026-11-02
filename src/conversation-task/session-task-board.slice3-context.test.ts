@@ -15,7 +15,7 @@ import {
   commitSameTaskConstraint,
   emptySessionTaskBoard,
   readSessionTaskBoard,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
   type SessionTaskBoard,
 } from "./session-task-board.js";
 import { classifyTurnRelation } from "./turn-relation.js";
@@ -44,7 +44,7 @@ describe("slice3 constraint context — red then green", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "slice3-ctx-"));
     sessionFile = path.join(tmpDir, "session.jsonl");
     fs.writeFileSync(sessionFile, "", "utf8");
-    writeSessionTaskBoard(sessionFile, baseBoard());
+    seedSessionTaskBoard(sessionFile, baseBoard());
   });
 
   afterEach(() => {
@@ -189,7 +189,7 @@ describe("slice3 constraint context — red then green", () => {
       board: readSessionTaskBoard(sessionFile),
       constraintText: LONG,
     });
-    writeSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(sessionFile, board);
 
     const reloaded = readSessionTaskBoard(sessionFile);
     expect(activeConstraintTexts(reloaded.current).join("\n")).toContain(TAIL);
@@ -215,7 +215,7 @@ describe("slice3 constraint context — red then green", () => {
       stop: { summary: "新焦点", workspacePaths: [] },
       createdAtMs: Date.now(),
     };
-    writeSessionTaskBoard(sessionFile, switched);
+    seedSessionTaskBoard(sessionFile, switched);
 
     const ok = commitSameTaskConstraint({
       sessionFile,
@@ -242,9 +242,9 @@ describe("slice3 constraint context — red then green", () => {
       },
     };
     // Directly bump epoch as if another writer committed.
-    writeSessionTaskBoard(sessionFile, {
+    seedSessionTaskBoard(sessionFile, {
       ...concurrent,
-      writeEpoch: epoch, // writeSessionTaskBoard itself bumps; capture after
+      writeEpoch: epoch, // seedSessionTaskBoard itself bumps; capture after
     });
     const afterConcurrent = readSessionTaskBoard(sessionFile);
     expect(afterConcurrent.writeEpoch ?? 0).toBeGreaterThan(epoch);

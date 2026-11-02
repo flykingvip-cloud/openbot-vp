@@ -11,7 +11,7 @@ import type { MsgContext } from "../../auto-reply/templating.js";
 import {
   emptySessionTaskBoard,
   readSessionTaskBoard,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import { claimTaskBoardContinue } from "../../conversation-task/task-board-continue.js";
 import type { GatewayRequestContext } from "./types.js";
@@ -126,7 +126,7 @@ function createTranscriptWithBoard(prefix: string) {
     stop: { summary: "正在抓取评测站点", workspacePaths: [] },
     createdAtMs: Date.now(),
   };
-  writeSessionTaskBoard(transcriptPath, board);
+  seedSessionTaskBoard(transcriptPath, board);
   return { dir, transcriptPath };
 }
 

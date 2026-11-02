@@ -13,7 +13,7 @@ import {
   commitSameTaskConstraint,
   emptySessionTaskBoard,
   readSessionTaskBoard,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
 } from "./session-task-board.js";
 
 describe("commitSameTaskConstraint task identity", () => {
@@ -33,7 +33,7 @@ describe("commitSameTaskConstraint task identity", () => {
       stop: { summary: "进行中", workspacePaths: [] },
       createdAtMs: Date.now(),
     };
-    writeSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(sessionFile, board);
   });
 
   afterEach(() => {
@@ -63,7 +63,7 @@ describe("commitSameTaskConstraint task identity", () => {
       stop: { summary: "新焦点", workspacePaths: [] },
       createdAtMs: Date.now(),
     };
-    writeSessionTaskBoard(sessionFile, switched);
+    seedSessionTaskBoard(sessionFile, switched);
 
     const ok = commitSameTaskConstraint({
       sessionFile,
@@ -86,7 +86,7 @@ describe("commitSameTaskConstraint task identity", () => {
       }),
     ).toBe(false);
 
-    writeSessionTaskBoard(sessionFile, emptySessionTaskBoard());
+    seedSessionTaskBoard(sessionFile, emptySessionTaskBoard());
     expect(
       commitSameTaskConstraint({
         sessionFile,
@@ -96,7 +96,7 @@ describe("commitSameTaskConstraint task identity", () => {
     ).toBe(false);
   });
 
-  it("returns false when writeSessionTaskBoard throws (persist failure)", () => {
+  it("returns false when board write throws (persist failure)", () => {
     const spy = vi.spyOn(fs, "writeFileSync").mockImplementation(() => {
       throw new Error("disk full");
     });

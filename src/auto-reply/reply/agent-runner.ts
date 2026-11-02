@@ -24,8 +24,8 @@ import {
   activeConstraintTexts,
   commitSameTaskConstraint,
   isOwnerCurrentTaskControlUtterance,
+  mutateSessionTaskBoard,
   readSessionTaskBoard,
-  writeSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import {
   isTaskBoardContinueInternalPrompt,
@@ -281,11 +281,13 @@ export async function runReplyAgent(params: {
     followupRun.run.sessionFile
   ) {
     const sessionFile = followupRun.run.sessionFile.trim();
-    const control = applyIncomingUserMessage({
-      board: readSessionTaskBoard(sessionFile),
-      incomingText: followupRun.prompt,
+    const control = mutateSessionTaskBoard(sessionFile, (board) => {
+      const result = applyIncomingUserMessage({
+        board,
+        incomingText: followupRun.prompt,
+      });
+      return { board: result.board, value: result };
     });
-    writeSessionTaskBoard(sessionFile, control.board);
     if (control.abortInFlight) {
       const sessionId = followupRun.run.sessionId;
       abortEmbeddedPiRun(sessionId);

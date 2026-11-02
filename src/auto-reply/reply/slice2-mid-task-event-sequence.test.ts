@@ -47,7 +47,7 @@ import {
   activeConstraintTexts,
   emptySessionTaskBoard,
   readSessionTaskBoard,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import { claimTaskBoardContinue } from "../../conversation-task/task-board-continue.js";
 import { runReplyAgent } from "./agent-runner.js";
@@ -90,7 +90,7 @@ describe("slice2 mid-task event sequence", () => {
       stop: { summary: "正在抓取评测站点", workspacePaths: [] },
       createdAtMs: Date.now(),
     };
-    writeSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(sessionFile, board);
     expect(LONG_CONSTRAINT.length).toBeGreaterThan(48);
     expect(LONG_CONSTRAINT.indexOf(CRITICAL_TAIL)).toBeGreaterThan(47);
   });

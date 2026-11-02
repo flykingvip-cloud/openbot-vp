@@ -49,7 +49,7 @@ import {
   buildResumePrompt,
   emptySessionTaskBoard,
   readSessionTaskBoard,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import { claimTaskBoardContinue } from "../../conversation-task/task-board-continue.js";
 import { runReplyAgent } from "./agent-runner.js";
@@ -94,7 +94,7 @@ describe("slice3 context event sequence", () => {
       stop: { summary: "正在抓取评测站点", workspacePaths: [] },
       createdAtMs: Date.now(),
     };
-    writeSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(sessionFile, board);
   });
 
   afterEach(() => {
@@ -207,7 +207,7 @@ describe("slice3 context event sequence", () => {
     // Resume prompt must not clear wakeSuppress / invent wake
     const boardForResume = readSessionTaskBoard(sessionFile);
     boardForResume.current = { ...boardForResume.current!, wakeSuppress: true };
-    writeSessionTaskBoard(sessionFile, boardForResume);
+    seedSessionTaskBoard(sessionFile, boardForResume);
     const resumed = applyIncomingUserMessage({
       board: readSessionTaskBoard(sessionFile),
       incomingText: "请继续",
@@ -222,7 +222,7 @@ describe("slice3 context event sequence", () => {
     // Clear wakeSuppress first so pause path is meaningful from active state
     const activeBoard = readSessionTaskBoard(sessionFile);
     activeBoard.current = { ...activeBoard.current!, wakeSuppress: false };
-    writeSessionTaskBoard(sessionFile, activeBoard);
+    seedSessionTaskBoard(sessionFile, activeBoard);
     const paused = await runReplyAgent(buildParams("暂停"));
     events.push("owner_pause");
     expect(paused?.[0]?.text).toMatch(/暂停|停止新增业务动作/);

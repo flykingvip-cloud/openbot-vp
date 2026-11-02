@@ -11,7 +11,7 @@ import {
   applyIncomingUserMessage,
   emptySessionTaskBoard,
   readSessionTaskBoard,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
 } from "./session-task-board.js";
 import { claimTaskBoardContinue } from "./task-board-continue.js";
 import { shouldTaskParkAbortInFlight } from "./turn-relation.js";
@@ -34,7 +34,7 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
       stop: { summary: "旧计划：先写竞品表", workspacePaths: [] },
       createdAtMs: Date.now(),
     };
-    writeSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(sessionFile, board);
   });
 
   afterEach(() => {
@@ -46,7 +46,7 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
       board: readSessionTaskBoard(sessionFile),
       incomingText: "暂停",
     });
-    writeSessionTaskBoard(sessionFile, result.board);
+    seedSessionTaskBoard(sessionFile, result.board);
     expect(result.board.current?.wakeSuppress).toBe(true);
     expect(result.abortInFlight).toBe(true);
     expect(shouldTaskParkAbortInFlight(result.cutContext, result.abortInFlight)).toBe(true);
@@ -67,7 +67,7 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
       board: readSessionTaskBoard(sessionFile),
       incomingText: "取消当前",
     });
-    writeSessionTaskBoard(sessionFile, result.board);
+    seedSessionTaskBoard(sessionFile, result.board);
     expect(result.board.current).toBeUndefined();
     expect(result.abortInFlight).toBe(true);
     expect(shouldTaskParkAbortInFlight(result.cutContext, result.abortInFlight)).toBe(true);
@@ -94,7 +94,7 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
       board: readSessionTaskBoard(sessionFile),
       incomingText: longTail,
     });
-    writeSessionTaskBoard(sessionFile, result.board);
+    seedSessionTaskBoard(sessionFile, result.board);
     expect(result.board.focusRevision).toBe(3);
     const stored = activeConstraintTexts(result.board.current);
     expect(stored.some((row) => row.includes(critical))).toBe(true);

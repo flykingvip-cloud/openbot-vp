@@ -34,7 +34,7 @@ vi.mock("../../agents/model-fallback.js", () => ({
 
 import {
   activeConstraintTexts,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
   emptySessionTaskBoard,
   readSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
@@ -65,7 +65,7 @@ describe("runReplyAgent collect amend steer inject", () => {
       stop: { summary: "进行中", workspacePaths: [] },
       createdAtMs: Date.now(),
     };
-    writeSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(sessionFile, board);
   });
 
   afterEach(() => {
@@ -175,7 +175,7 @@ describe("runReplyAgent collect amend steer inject", () => {
         stop: { summary: "新焦点", workspacePaths: [] },
         createdAtMs: Date.now(),
       };
-      writeSessionTaskBoard(sessionFile, switched);
+      seedSessionTaskBoard(sessionFile, switched);
       steerCount += 1;
       return true;
     });

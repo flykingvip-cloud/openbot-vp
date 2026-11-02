@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { writeSessionTaskBoard, type SessionTaskBoard } from "./session-task-board.js";
+import { seedSessionTaskBoard, type SessionTaskBoard } from "./session-task-board.js";
 import {
   insertLatestTaskDeferringCurrent,
   emptySessionTaskBoard,
@@ -66,7 +66,7 @@ describe("isExplicitHumanGateWait", () => {
 describe("decideTaskBoardContinue", () => {
   it("schedules when unfinished and not a human gate", () => {
     const sessionFile = tempSessionFile();
-    writeSessionTaskBoard(sessionFile, unfinishedBoard());
+    seedSessionTaskBoard(sessionFile, unfinishedBoard());
     const decision = decideTaskBoardContinue({
       sessionFile,
       assistantText:
@@ -89,7 +89,7 @@ describe("decideTaskBoardContinue", () => {
 
   it("skips human gate even when unfinished", () => {
     const sessionFile = tempSessionFile();
-    writeSessionTaskBoard(sessionFile, unfinishedBoard());
+    seedSessionTaskBoard(sessionFile, unfinishedBoard());
     const decision = decideTaskBoardContinue({
       sessionFile,
       assistantText:
@@ -104,7 +104,7 @@ describe("decideTaskBoardContinue", () => {
 
   it("skips when board has no unfinished current", () => {
     const sessionFile = tempSessionFile();
-    writeSessionTaskBoard(sessionFile, emptySessionTaskBoard());
+    seedSessionTaskBoard(sessionFile, emptySessionTaskBoard());
     expect(decideTaskBoardContinue({ sessionFile, assistantText: "done for now" })).toMatchObject({
       action: "skip",
       reason: "no_unfinished_current",
@@ -124,7 +124,7 @@ describe("decideTaskBoardContinue", () => {
     const sessionFile = tempSessionFile();
     const board = unfinishedBoard("task-suppress");
     board.current!.wakeSuppress = true;
-    writeSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(sessionFile, board);
     expect(
       decideTaskBoardContinue({
         sessionFile,
@@ -140,7 +140,7 @@ describe("decideTaskBoardContinue", () => {
 
   it("caps chained continues per task", () => {
     const sessionFile = tempSessionFile();
-    writeSessionTaskBoard(sessionFile, unfinishedBoard("task-cap"));
+    seedSessionTaskBoard(sessionFile, unfinishedBoard("task-cap"));
     const nowMs = 1_000_000;
     for (let i = 0; i < TASK_BOARD_CONTINUE_MAX_PER_TASK; i += 1) {
       const d = scheduleTaskBoardContinueWake({
@@ -190,7 +190,7 @@ describe("decideTaskBoardContinue", () => {
       ],
       focusRevision: 2,
     };
-    writeSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(sessionFile, board);
     const decision = decideTaskBoardContinue({
       sessionFile,
       assistantText: "chapter draft ready for next beat",
@@ -212,7 +212,7 @@ describe("decideTaskBoardContinue", () => {
 describe("scheduleTaskBoardContinueWake", () => {
   it("arms a timer and enqueues with observability fields", () => {
     const sessionFile = tempSessionFile();
-    writeSessionTaskBoard(sessionFile, unfinishedBoard("task-timer"));
+    seedSessionTaskBoard(sessionFile, unfinishedBoard("task-timer"));
     const enqueue = vi.fn(() => true);
     const timers: Array<{ ms: number; fn: () => void }> = [];
     const decision = scheduleTaskBoardContinueWake({
@@ -240,7 +240,7 @@ describe("scheduleTaskBoardContinueWake", () => {
 describe("board-latest v2 C2 continue ticket / AC13", () => {
   it("schedules with taskId + focusRevision ticket", () => {
     const sessionFile = tempSessionFile();
-    writeSessionTaskBoard(sessionFile, unfinishedBoard("task-rev", 5));
+    seedSessionTaskBoard(sessionFile, unfinishedBoard("task-rev", 5));
     const decision = decideTaskBoardContinue({
       sessionFile,
       assistantText: "still working",
@@ -263,7 +263,7 @@ describe("board-latest v2 C2 continue ticket / AC13", () => {
       incomingText: "你帮我制作一个贪吃蛇的小游戏",
       nowMs: 1,
     });
-    writeSessionTaskBoard(sessionFile, started.board);
+    seedSessionTaskBoard(sessionFile, started.board);
     const decision = decideTaskBoardContinue({
       sessionFile,
       assistantText: "snake draft in progress",
@@ -278,7 +278,7 @@ describe("board-latest v2 C2 continue ticket / AC13", () => {
       goalText: "请继续写《调律》小说第七章，六时启闸，并验收交付",
       nowMs: 2,
     });
-    writeSessionTaskBoard(sessionFile, inserted.board);
+    seedSessionTaskBoard(sessionFile, inserted.board);
     expect(inserted.board.focusRevision).toBeGreaterThan(ticket.focusRevision);
     const claimed = claimTaskBoardContinue({
       sessionFile,
@@ -297,7 +297,7 @@ describe("board-latest v2 C2 continue ticket / AC13", () => {
     const sessionFile = tempSessionFile();
     const board = unfinishedBoard("task-dead", 3);
     board.tombstones = [{ taskId: "task-dead", closedAtMs: 1, title: "dead" }];
-    writeSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(sessionFile, board);
     const claimed = claimTaskBoardContinue({
       sessionFile,
       taskId: "task-dead",
@@ -311,7 +311,7 @@ describe("board-latest v2 C2 continue ticket / AC13", () => {
 
   it("AC13 timer path: claim rejects stale ticket and does not enqueue", () => {
     const sessionFile = tempSessionFile();
-    writeSessionTaskBoard(sessionFile, unfinishedBoard("task-stale", 1));
+    seedSessionTaskBoard(sessionFile, unfinishedBoard("task-stale", 1));
     const enqueue = vi.fn(() => true);
     const timers: Array<{ ms: number; fn: () => void }> = [];
     const decision = scheduleTaskBoardContinueWake({
@@ -331,7 +331,7 @@ describe("board-latest v2 C2 continue ticket / AC13", () => {
       goalText: "现在改做供应商合同审查",
       nowMs: 9,
     });
-    writeSessionTaskBoard(sessionFile, switched.board);
+    seedSessionTaskBoard(sessionFile, switched.board);
     timers[0]?.fn();
     expect(enqueue).not.toHaveBeenCalled();
   });

@@ -14,7 +14,7 @@ tasks:
     ownerHistory: []
     metadata: {}
   - id: ft-plan-speak-shopping-positive-admission
-    owner: cursor-grok
+    owner: grok-bot
     intent:
       - "Slice2 cross-check: Gateway chat.send pause/cancel abort+queue clear+no
         dispatch; commitSameTaskConstraint expectedTaskId; board_readonly aside
@@ -65,9 +65,13 @@ tasks:
         ide: cursor
         agent: cursor-grok
         status: active
-        lastSignalAt: 2026-11-02T23:06:20.672Z
+        lastSignalAt: 2026-11-02T23:31:07.475Z
         metadata: {}
-    ownerHistory: []
+    ownerHistory:
+      - fromOwner: cursor-grok
+        toOwner: grok-bot
+        at: 2026-11-02T23:31:07.475Z
+        via: confirmed
     since: 2026-11-02
     metadata: {}
   - id: recheck-notify-hardening:cursor-cloud

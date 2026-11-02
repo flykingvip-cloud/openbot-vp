@@ -1100,24 +1100,26 @@ export function recordCheckedTaskCompletion(params: { sessionFile?: string; clos
     return { persisted: false };
   }
   const file = params.sessionFile?.trim();
-  const board = file ? readSessionTaskBoard(file) : emptySessionTaskBoard();
-  const finished = board.current
-    ? finishCurrentTask({ board, deliverableChecked: true })
-    : { board, notice: renderCompletionNotice(board.parked) };
-  const notice = finished.notice ?? renderCompletionNotice(board.parked);
+  if (!file) {
+    return { persisted: false };
+  }
+  const finished = mutateSessionTaskBoard(file, (board) => {
+    const result = board.current
+      ? finishCurrentTask({ board, deliverableChecked: true })
+      : { board, notice: renderCompletionNotice(board.parked) };
+    return { board: result.board, value: result };
+  });
+  const notice = finished.notice ?? renderCompletionNotice(finished.board.parked);
   let persisted = false;
-  if (file) {
-    writeSessionTaskBoard(file, finished.board);
-    if (fs.existsSync(file)) {
-      const message = {
-        role: "assistant",
-        content: [{ type: "text", text: notice }],
-        timestamp: Date.now(),
-        taskCompletionNotice: true,
-      };
-      fs.appendFileSync(file, `${JSON.stringify({ message })}\n`, "utf8");
-      persisted = true;
-    }
+  if (fs.existsSync(file)) {
+    const message = {
+      role: "assistant",
+      content: [{ type: "text", text: notice }],
+      timestamp: Date.now(),
+      taskCompletionNotice: true,
+    };
+    fs.appendFileSync(file, `${JSON.stringify({ message })}\n`, "utf8");
+    persisted = true;
   }
   return { notice, persisted };
 }
@@ -1154,36 +1156,39 @@ export function commitAutomaticPark(params: {
   if (!file || !incomingTaskId) {
     return undefined;
   }
-  const board = readSessionTaskBoard(file);
-  if (board.parked.some((row) => row.taskId === incomingTaskId)) {
-    return undefined;
-  }
-  if (isTaskTombstoned(board, incomingTaskId)) {
-    return undefined;
-  }
   const nowMs = params.nowMs ?? Date.now();
-  const incoming: TrackedTask = {
-    taskId: incomingTaskId,
-    title: incomingTaskId,
-    goalText: incomingTaskId,
-    unfinished: true,
-    stop: { summary: `未完成：${incomingTaskId}`, workspacePaths: [] },
-    createdAtMs: nowMs,
-    parkReason: "automatic_incoming",
-    wakeSuppress: true,
-  };
-  const parked = parkTask(board.parked, incoming, nowMs, "automatic_incoming");
-  const archived = [...(board.archived ?? [])];
-  if (parked.archived) {
-    archived.unshift(parked.archived);
-  }
-  writeSessionTaskBoard(file, {
-    ...board,
-    current: board.current,
-    parked: parked.parked,
-    ...(archived.length > 0 ? { archived } : {}),
+  return mutateSessionTaskBoard(file, (board) => {
+    if (board.parked.some((row) => row.taskId === incomingTaskId)) {
+      return { board, value: undefined };
+    }
+    if (isTaskTombstoned(board, incomingTaskId)) {
+      return { board, value: undefined };
+    }
+    const incoming: TrackedTask = {
+      taskId: incomingTaskId,
+      title: incomingTaskId,
+      goalText: incomingTaskId,
+      unfinished: true,
+      stop: { summary: `未完成：${incomingTaskId}`, workspacePaths: [] },
+      createdAtMs: nowMs,
+      parkReason: "automatic_incoming",
+      wakeSuppress: true,
+    };
+    const parked = parkTask(board.parked, incoming, nowMs, "automatic_incoming");
+    const archived = [...(board.archived ?? [])];
+    if (parked.archived) {
+      archived.unshift(parked.archived);
+    }
+    return {
+      board: {
+        ...board,
+        current: board.current,
+        parked: parked.parked,
+        ...(archived.length > 0 ? { archived } : {}),
+      },
+      value: parked.archived,
+    };
   });
-  return parked.archived;
 }
 
 export function finishCurrentTask(params: {
@@ -1349,8 +1354,61 @@ export function readSessionTaskBoard(sessionFile?: string): SessionTaskBoard {
   return readSessionTaskBoardUnlocked(sessionFile);
 }
 
+export class StaleSessionTaskBoardWriteError extends Error {
+  readonly claimedEpoch: number | undefined;
+  readonly diskEpoch: number;
+  constructor(claimedEpoch: number | undefined, diskEpoch: number) {
+    super(
+      `stale session task board write: claimed writeEpoch=${String(claimedEpoch)} disk=${diskEpoch}`,
+    );
+    this.name = "StaleSessionTaskBoardWriteError";
+    this.claimedEpoch = claimedEpoch;
+    this.diskEpoch = diskEpoch;
+  }
+}
+
+/**
+ * Locked read → mutate → write. Production RMW must use this (or commitSameTaskConstraint /
+ * commitBoardMutation). Never read outside the lock and call writeSessionTaskBoard with a snapshot.
+ */
+export function mutateSessionTaskBoard<T>(
+  sessionFile: string,
+  mutate: (live: SessionTaskBoard) => { board: SessionTaskBoard; value: T },
+): T {
+  return withSessionTaskBoardLock(sessionFile, () => {
+    const live = readSessionTaskBoardUnlocked(sessionFile);
+    const { board, value } = mutate(live);
+    writeSessionTaskBoardUnlocked(sessionFile, board);
+    return value;
+  });
+}
+
+/**
+ * Fixture/bootstrap replace under the same file lock, without writeEpoch CAS.
+ * Runtime production paths must not call this — use mutateSessionTaskBoard /
+ * commitSameTaskConstraint / commitBoardMutation.
+ */
+export function seedSessionTaskBoard(sessionFile: string, board: SessionTaskBoard): void {
+  withSessionTaskBoardLock(sessionFile, () => {
+    writeSessionTaskBoardUnlocked(sessionFile, board);
+  });
+}
+
+/**
+ * Locked write with explicit writeEpoch compare-and-set against the on-disk board.
+ * - Empty / epoch-0 disk: bootstrap allowed without a claimed epoch.
+ * - Non-zero disk epoch: caller must pass board.writeEpoch equal to disk; otherwise throws
+ *   StaleSessionTaskBoardWriteError (closes the stale-snapshot overwrite window).
+ * Production RMW should prefer mutateSessionTaskBoard so the mutate fn sees the live board.
+ */
 export function writeSessionTaskBoard(sessionFile: string, board: SessionTaskBoard): void {
   withSessionTaskBoardLock(sessionFile, () => {
+    const disk = readSessionTaskBoardUnlocked(sessionFile);
+    const diskEpoch = typeof disk.writeEpoch === "number" ? disk.writeEpoch : 0;
+    const claimed = board.writeEpoch;
+    if (diskEpoch > 0 && claimed !== diskEpoch) {
+      throw new StaleSessionTaskBoardWriteError(claimed, diskEpoch);
+    }
     writeSessionTaskBoardUnlocked(sessionFile, board);
   });
 }
@@ -1547,14 +1605,16 @@ export function applyFocusSwitchGate(params: {
         taskId: "",
       });
     }
-    const result = applyIncomingUserMessage({
-      board: readSessionTaskBoard(sessionFile),
-      incomingText: incoming,
-      nowMs: params.nowMs,
-      workspacePaths: params.workspacePaths,
-      recheck: params.recheck,
+    const result = mutateSessionTaskBoard(sessionFile, (board) => {
+      const next = applyIncomingUserMessage({
+        board,
+        incomingText: incoming,
+        nowMs: params.nowMs,
+        workspacePaths: params.workspacePaths,
+        recheck: params.recheck,
+      });
+      return { board: next.board, value: next };
     });
-    writeSessionTaskBoard(sessionFile, result.board);
     if (result.action === "switch" || result.action === "resume") {
       return recordFocusDecision({
         action: result.action === "resume" ? "resume" : "auto_park",
