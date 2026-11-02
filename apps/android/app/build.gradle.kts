@@ -67,8 +67,8 @@ android {
         // Android-only internal beta. Root package.json stays the CLI/iOS source
         // of truth (currently 2026.7.12-rc.2); bumping it would move npm and the
         // other clients. versionCode is YYYYMMDD + revision (previous 202603090).
-        versionCode = 202611021
-        versionName = "2026.11.2-beta.1"
+        versionCode = 202611022
+        versionName = "2026.11.2-beta.2"
         ndk {
             // Support all major ABIs — native libs are tiny (~47 KB per ABI)
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
