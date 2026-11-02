@@ -474,9 +474,18 @@ export function applyIncomingUserMessage(params: {
       recheck: params.recheck,
     });
   }
+  // Owner pause of the *current* unfinished task: suppress auto-continue wakes.
+  // Does not bump focusRevision (same-task control, not a focus switch).
+  if (/^(?:暂停(?:当前(?:任务)?)?|先暂停)[。.!！]?$/u.test(incoming)) {
+    return suppressCurrentTaskWake({ board });
+  }
   const pauseMatch = incoming.match(/^暂停挂起\s+(\S+)/u);
   if (pauseMatch) {
     return pauseParkedTask({ board, taskId: pauseMatch[1] ?? "" });
+  }
+  // Cancel the *current* unfinished task (tombstone + clear current).
+  if (/^(?:取消当前(?:任务)?|取消任务)[。.!！]?$/u.test(incoming)) {
+    return cancelCurrentTask({ board, nowMs });
   }
   // CLOSE / 关闭挂起 / 取消挂起 — remove deferred item from the board entirely.
   const cancelMatch = incoming.match(/^(?:取消挂起|关闭挂起|CLOSE)\s+(\S+)/iu);
@@ -509,10 +518,22 @@ export function applyIncomingUserMessage(params: {
     });
   }
   if (!isSureDistinctWork(incoming, current.goalText)) {
+    // Same-task amend: project the constraint into stop.summary so a later claim
+    // rebuilds continue prompt from the revised plan (no focusRevision bump).
+    let summary = current.stop.summary;
+    if (classifyTurnRelation(incoming, current.goalText) === "amend") {
+      const cleaned = incoming.replace(/\s+/g, " ").trim();
+      const short = cleaned.length > 48 ? `${cleaned.slice(0, 48)}…` : cleaned;
+      const marker = `约束：${short}`;
+      const prior = summary?.trim() || `未完成：${current.title}`;
+      if (cleaned && !prior.includes(marker)) {
+        summary = `${marker}｜${prior}`;
+      }
+    }
     const nextCurrent: TrackedTask = {
       ...current,
       stop: {
-        summary: current.stop.summary,
+        summary,
         workspacePaths: paths.length > 0 ? paths : current.stop.workspacePaths,
       },
     };
@@ -666,6 +687,65 @@ export function resumeParkedTask(params: {
     ...(archived
       ? { droppedTitle: archived.title, droppedPaths: archived.stop.workspacePaths }
       : {}),
+  };
+}
+
+export function suppressCurrentTaskWake(params: {
+  board: SessionTaskBoard;
+  reason?: string;
+}): IncomingTurnResult {
+  const board = cloneBoardShell(params.board);
+  const current = board.current;
+  if (!current?.unfinished) {
+    return {
+      ...continueResult(board, current?.taskId ?? ""),
+      focusRevision: board.focusRevision,
+      statusLine: "当前没有进行中的任务可暂停。",
+    };
+  }
+  const nextBoard: SessionTaskBoard = {
+    ...board,
+    current: { ...current, wakeSuppress: true },
+  };
+  return {
+    ...continueResult(nextBoard, current.taskId),
+    focusRevision: board.focusRevision,
+    statusLine: `已暂停「${current.title}」的自动续跑。不会因旧唤醒复活。`,
+  };
+}
+
+export function cancelCurrentTask(params: {
+  board: SessionTaskBoard;
+  nowMs?: number;
+}): IncomingTurnResult {
+  const board = cloneBoardShell(params.board);
+  const current = board.current;
+  if (!current) {
+    return {
+      ...continueResult(board, ""),
+      focusRevision: board.focusRevision,
+      statusLine: "当前没有任务可取消。",
+    };
+  }
+  const closedAtMs = params.nowMs ?? Date.now();
+  const tombstones = [
+    { taskId: current.taskId, closedAtMs, title: current.title },
+    ...(board.tombstones ?? []).filter((row) => row.taskId !== current.taskId),
+  ];
+  const nextBoard: SessionTaskBoard = {
+    ...board,
+    current: undefined,
+    tombstones,
+  };
+  return {
+    board: nextBoard,
+    action: "cancel_parked",
+    taskId: "",
+    cutContext: false,
+    focusRevision: board.focusRevision,
+    scheduleContinue: false,
+    statusLine: `已取消「${current.title}」，已移出任务板。`,
+    incomingTitle: current.title,
   };
 }
 

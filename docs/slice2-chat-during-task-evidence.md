@@ -181,3 +181,12 @@ function defaultQueueModeForChannel(_channel?: string): QueueMode {
 2. 最小拆分 run 占用后再放行送达。
 3. 分别测 steer 成功/失败与 followup 回复；停止保护四场景事件序列/测试。
 4. 写入交付报告；更新 Loom 范围与 PR。
+
+## P0–P3 回炉取证（Asia/Shanghai）
+
+- P0：preserve 失败不再恢复占用快照；见 chat.test P0 竞态。
+- P1：steer 成功无 followup；失败保留 followup。
+- P2：入站 暂停/取消当前/同任务修订 → claim。
+- P3：进度查询板投影即时答。
+- 事件序列：`src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts`
+- 阻塞点变化：进度问不再被 collect followup 挡住；普通 aside 仍可能 followup。

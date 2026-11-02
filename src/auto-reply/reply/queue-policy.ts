@@ -22,8 +22,9 @@ export function resolveActiveRunQueueAction(params: {
 
 /**
  * Under default collect/followup, optionally inject an amend constraint into the
- * active streaming run via steer. This is not an independent reply path and must
- * not skip enqueue-followup. new_work/aside are excluded (focus switch / reply-after).
+ * active streaming run via steer. On steer success the runner acknowledges once and
+ * must NOT also enqueue-followup (once-consumption). On steer failure, followup keeps
+ * the constraint. new_work/aside/progress queries are excluded.
  */
 export function shouldAttemptCollectAmendSteer(params: {
   isActive: boolean;

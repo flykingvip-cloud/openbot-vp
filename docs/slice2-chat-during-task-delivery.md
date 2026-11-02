@@ -1,95 +1,84 @@
-# 切片 2 交付：执行中对话 + 停止保护
+# 切片 2 交付：执行中对话 + 停止保护（P0–P3 回炉）
 
-工作树：`/Users/daniel/AI VP/openbot`（`openbot-vp`）。对照树未改。  
-时区：Asia/Shanghai。不含合并/生产部署。
+工作树：实施于 `/Users/daniel/AI VP/openbot-pr216-slice2`（同分支 worktree；主路径曾被 android 分支占用）。对照树未改。  
+时区：Asia/Shanghai。不含合并/生产部署。切片 3 暂缓。
 
-## 0. 切片 1 核对
+## 0. 切片 1
 
-**交付齐**（见 `docs/slice2-chat-during-task-evidence.md` §0）：UI 净差零、`shouldApplyShoppingPauseCta` 已删、partial/block 出口测试可绿、文档两句正确。
+交付齐（见 evidence §0）。历史 UI+revert 提交不重写；净差清晰。
 
-## 1. 原阻塞点
+## 1. 行为分录（强制分开记录）
 
-**主阻塞在前端**：`isChatBusy = chatSending || chatRunId` 时 `handleSendChat` 只 `enqueueChatMessage`，不调 `chat.send`。  
-**次阻塞在后端默认 `collect`**：即便送达，活跃 run 期间入站走 followup 串行；steer 默认不开；steer ≠ 独立回复。
-
-详见 `docs/slice2-chat-during-task-evidence.md`。
-
-## 2. 修改后调用链
-
-```
-composer
-  → handleSendChat
-       ├─ chatSending → 本地队列（防重复提交）
-       └─ 否则 sendChatMessageNow(preserveActiveRunOccupancy=Boolean(chatRunId))
-            → chat.send（idempotencyKey）
-            → 若 preserve：不覆盖 chatRunId/stream/工具流；短回复终局不清 A
-  → gateway get-reply-run → runReplyAgent
-       ├─ 原 shouldSteer 路径不变
-       ├─ collect/followup + streaming + turnRelation===amend
-       │     → 额外 queueEmbeddedPiMessage（失败如实；不跳过 followup）
-       └─ enqueue-followup（用户可见回复仍在 A 结束后的 followup）
-```
-
-暂停/取消/焦点切换：仍走原控制入口与任务板；前端不做业务分类。
-
-## 3. 状态归属
-
-| 状态 | 标记 | 本切片行为 |
+| 维度 | 含义 | 本轮证据 |
 |---|---|---|
-| 本条发送 | `chatSending` | 唯一重复提交门；`isChatSendInFlight` |
-| 对话流式占用 | `chatRunId` + stream | 后台 A 保留；中途 send 用 `preserveActiveRunOccupancy` |
-| 后台任务 | 任务板 + embedded active run | 不与 composer 共用「全扣消息」门闩 |
-| 异 run 终局 | `clearActiveChatRunState` / foreign final | 异 runId 不清 A；foreign final 只追加气泡 |
+| **消息已送达** | 前端不再因 `chatRunId` 扣住；`chat.send` 发出 | `app-chat` mid-task + preserve 测 |
+| **约束已应用** | amend steer 成功且**仅一次**；板 `stop.summary` 含约束；**无** followup 再执行 | `agent-runner.collect-amend-steer` P1；事件序列 `amend_applied_once` |
+| **回答已产生** | 进度查询**立即**返回板投影文本，不等 A followup | `进度如何` → `[{ text }]`；事件序列 `B_progress_answered` |
 
-## 4. 实际并发能力与限制（诚实）
+入队 ≠ 即时对话。普通插问（非进度、非 amend）在默认 collect 下仍可能 followup 串行——见 §4。
 
-**已实现**
+## 2. P0–P3 修改摘要
 
-1. 长程 A 运行中，主人消息可及时到达服务端（不再仅因 `chatRunId` 扣在前端）。
-2. 连续消息：发送中仍入本地队，RPC 结束后带 preserve 冲刷，保序送达。
-3. amend 约束在 collect+streaming 下尽力 steer 注入当前 run；followup 仍排队产出可见回复。
-4. 停止保护沿用 `wakeSuppress` / `focusRevision` / tombstone / `claimTaskBoardContinue`（定向测试通过）。
+### P0 发送失败不得复活占用
+`sendChatMessage` 在 `preserveActiveRunOccupancy` 下**不再**于 RPC 失败时恢复占用快照。发送本未改 A，失败只记 `lastError`、撤乐观气泡。  
+补测：A 完成／取消／新 delta 后 B RPC 失败。
 
-**未宣称 / 已知限制**
+### P1 steering 与 followup 一次消费
+collect+streaming+amend：steer **成功** → 即时 ack + 写板约束 + **不** `enqueueFollowupRun`；steer **失败** → 仍 followup（不丢）。可计数 `steerCount===1`。
 
-1. **独立插问 B 的「即时独立回复」**在默认 `collect` 下仍等 A 回合边界后的 followup；**入队 ≠ 即时对话**。
-2. 未新开第二执行器并行改同一任务/同一工作资源；aside 进度问不走 amend-steer（避免污染 A），回复仍 followup。
-3. 未改全局 `messages.queue.mode`；未重排 `attempt.ts`；无新状态枚举体系。
-4. 若要 A 与 B 真正并行可见回复，需另给资源隔离与 run 身份设计（超出本切片最小改动）。
+### P2 停止保护贯通入站
+真实 `applyIncomingUserMessage`：
+- `暂停` → `suppressCurrentTaskWake` → claim `wake_suppress`
+- `取消当前` → tombstone + 清 current → claim 拒绝
+- 同任务 amend → `stop.summary` 含约束（**不** bump `focusRevision`）→ claim 提示含新约束
 
-## 5. 场景对照
+### P3 执行中可对话（进度）
+`isProgressStatusQuery` 命中且板有 current → `formatTaskBoardProgressReply` 立即返回。不走 steer/followup。
 
-| 场景 | 本切片证据 |
+## 3. 完整事件序列（测试）
+
+`src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts`：
+
+`A_active → B_progress_answered → amend_applied_once → owner_pause → stale_wake_rejected`
+
+另：`chat.test.ts` P0 三条交错回归。
+
+## 4. 普通插问：实际能力与限制（诚实）
+
+| 能力 | 状态 |
 |---|---|
-| A 中查进度 | FE 测：busy 仍 `chat.send`+preserve；回复仍 followup（限制已写明） |
-| A 中补约束 | amend → steer 注入测；followup 仍入队 |
-| A 中插问 B | 送达 + preserve；B 独立即时回复未宣称 |
-| 暂停 A 答 B | stop 仍优先；板 wakeSuppress/claim 测 |
-| 插问期间 A 完成 | preserve + foreign clear 守卫；不覆盖 A 占用 |
-| 修改后旧唤醒 | claim revision/tombstone 原测 |
-| 多条连续 | 本地队 + flush preserve + 服务端 collect |
+| 进度查询即时答 | **已实现**（板投影） |
+| amend 约束一次注入 + ack | **已实现** |
+| 普通 aside 插问即时独立回复 | **未实现**：默认 collect 仍 `enqueue-followup`，可见答在 A 回合后 |
+| 第二执行器并行改同一任务 | **不做**（指令禁止） |
+
+若要普通插问也即时答，最小下一刀应在 `runReplyAgent` 对 `turnRelation===aside` 增加只读答或短路径，且不得改板/不得并发写同一资源——**本轮未做**，避免扩成第二控制者。
+
+## 5. 调用链（修改后）
+
+```
+composer → handleSendChat
+  → sendChatMessage(preserve?) → chat.send
+  → runReplyAgent
+       ├─ progress query → board reply（立即，无 followup）
+       ├─ collect amend + streaming → steer
+       │     ├─ success → ack + board note（无 followup）
+       │     └─ fail → enqueue-followup（不丢）
+       └─ 其它 active → resolveActiveRunQueueAction（多为 followup）
+applyIncomingUserMessage("暂停"|"取消当前"|amend) → 板状态
+claimTaskBoardContinue → wake_suppress / tombstone / 新 stop 提示
+```
 
 ## 6. 定向测试
 
-- `ui/src/ui/app-chat.node.test.ts`（含 mid-task delivery）
-- `ui/src/ui/controllers/chat.test.ts` `-t preserveActiveRunOccupancy`
-- `src/auto-reply/reply/queue-policy.test.ts`
+- `ui/.../chat.test.ts` `-t preserveActiveRunOccupancy`（含 P0 竞态）
+- `src/auto-reply/reply/mid-task-dialogue.test.ts`
 - `src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts`
-- `src/conversation-task/task-board-continue.test.ts`（停止保护）
-- 切片1 outlet 回归抽样
+- `src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts`
+- `src/conversation-task/session-task-board.inbound-stop.test.ts`
 
-## 7. 改动文件
-
-- `ui/src/ui/app-chat.ts`, `ui/src/ui/app-chat.node.test.ts`
-- `ui/src/ui/controllers/chat.ts`, `ui/src/ui/controllers/chat.test.ts`
-- `src/auto-reply/reply/queue-policy.ts`, `queue-policy.test.ts`
-- `src/auto-reply/reply/agent-runner.ts`, `agent-runner.collect-amend-steer.test.ts`
-- `docs/slice2-chat-during-task-evidence.md`, `docs/slice2-chat-during-task-delivery.md`, `docs/slice1-decision-to-reply-path.md`
-
-
-## 8. 落地
+## 7. 落地
 
 - PR: https://github.com/flykingvip-cloud/openbot-vp/pull/216
-- HEAD: `ab32aa1d680f2a087bd62e8c9762b3b417bd570a`
-- 定向：5 files / 159 passed（mid-task+outlet）；停止保护相关 9 files / 145 passed
+- HEAD: `__FULL_SHA__`
 - 切片 3 暂缓；不含合并/生产部署

@@ -2068,16 +2068,11 @@ export async function sendChatMessage(
       return runId;
     }
     const error = formatChatSendError(err);
-    if (preservedOccupancy) {
-      state.chatRunId = preservedOccupancy.chatRunId;
-      state.chatStream = preservedOccupancy.chatStream;
-      state.chatStreamStartedAt = preservedOccupancy.chatStreamStartedAt;
-      state.chatStreamSessionKey = preservedOccupancy.chatStreamSessionKey;
-      state.chatThinkingProgress = preservedOccupancy.chatThinkingProgress;
-      state.workProgressPhase = preservedOccupancy.workProgressPhase;
-      state.workProgressToolsInFlight = preservedOccupancy.workProgressToolsInFlight;
-      state.workProgressNarration = preservedOccupancy.workProgressNarration;
-    } else {
+    // Mid-task send never mutates A's occupancy while preserveActiveRunOccupancy
+    // is set. Restoring the pre-await snapshot would resurrect a finished/cancelled
+    // run or roll back deltas that landed during the RPC wait. Leave lifecycle
+    // fields alone; only clear when this send itself owned the occupancy.
+    if (!preservedOccupancy) {
       state.chatRunId = null;
       state.chatStream = null;
       state.chatStreamStartedAt = null;

@@ -19,7 +19,10 @@ import {
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
-import { readSessionTaskBoard } from "../../conversation-task/session-task-board.js";
+import {
+  readSessionTaskBoard,
+  writeSessionTaskBoard,
+} from "../../conversation-task/session-task-board.js";
 import {
   isTaskBoardContinueInternalPrompt,
   scheduleTaskBoardContinueWake,
@@ -82,6 +85,12 @@ import {
   recordHonestCapabilityGap,
   stripCapabilityGapMarkers,
 } from "./honest-empty-reply.js";
+import {
+  formatAmendConstraintAck,
+  formatTaskBoardProgressReply,
+  isProgressStatusQuery,
+  applySameTaskConstraintNote,
+} from "./mid-task-dialogue.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
 import { resolveActiveRunQueueAction, shouldAttemptCollectAmendSteer } from "./queue-policy.js";
@@ -252,6 +261,18 @@ export async function runReplyAgent(params: {
     }
   };
 
+  // P3: progress / status asks answered from the live task board — no steer,
+  // no followup wait. Board is a projection of existing state, not a new controller.
+  if (isActive && isProgressStatusQuery(followupRun.prompt) && followupRun.run.sessionFile) {
+    const board = readSessionTaskBoard(followupRun.run.sessionFile);
+    if (board.current) {
+      const text = formatTaskBoardProgressReply(board);
+      await touchActiveSessionEntry();
+      typing.cleanup();
+      return [{ text }];
+    }
+  }
+
   if (shouldSteer && isStreaming) {
     const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
     if (steered && !shouldFollowup) {
@@ -272,9 +293,25 @@ export async function runReplyAgent(params: {
       ),
     })
   ) {
-    // Best-effort constraint inject into the active run. Failure must not be
-    // reported as applied; followup still carries the user-visible reply.
-    queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
+    // P1 once-consumption: successful amend steer acknowledges immediately and
+    // must NOT also enqueue-followup (would re-apply the same constraint). Steer
+    // failure falls through so followup still carries the constraint — no drop.
+    const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
+    if (steered) {
+      const sessionFile = followupRun.run.sessionFile?.trim();
+      if (sessionFile) {
+        const board = readSessionTaskBoard(sessionFile);
+        if (board.current?.unfinished) {
+          writeSessionTaskBoard(sessionFile, {
+            ...board,
+            current: applySameTaskConstraintNote(board.current, followupRun.prompt),
+          });
+        }
+      }
+      await touchActiveSessionEntry();
+      typing.cleanup();
+      return [{ text: formatAmendConstraintAck(followupRun.prompt) }];
+    }
   }
 
   const activeRunQueueAction = resolveActiveRunQueueAction({

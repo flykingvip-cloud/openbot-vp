@@ -35,17 +35,23 @@ vi.mock("../../agents/model-fallback.js", () => ({
 import {
   writeSessionTaskBoard,
   emptySessionTaskBoard,
+  readSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import { runReplyAgent } from "./agent-runner.js";
 
 describe("runReplyAgent collect amend steer inject", () => {
   let tmpDir = "";
   let sessionFile = "";
+  let steerCount = 0;
 
   beforeEach(() => {
+    steerCount = 0;
     queueEmbeddedPiMessageMock.mockReset();
     enqueueFollowupRunMock.mockReset();
-    queueEmbeddedPiMessageMock.mockReturnValue(true);
+    queueEmbeddedPiMessageMock.mockImplementation(() => {
+      steerCount += 1;
+      return true;
+    });
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "collect-amend-steer-"));
     sessionFile = path.join(tmpDir, "session.jsonl");
     fs.writeFileSync(sessionFile, "", "utf8");
@@ -116,14 +122,14 @@ describe("runReplyAgent collect amend steer inject", () => {
     };
   }
 
-  it("injects amend via steer and still enqueues followup under collect", async () => {
+  it("P1: steer success applies constraint once — no followup re-exec", async () => {
     const result = await runReplyAgent(buildParams("补充：只要国内安卓机型"));
-    expect(result).toBeUndefined();
-    expect(queueEmbeddedPiMessageMock).toHaveBeenCalledWith(
-      "session-a",
-      expect.stringContaining("只要国内"),
-    );
-    expect(enqueueFollowupRunMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual([expect.objectContaining({ text: expect.stringContaining("仅一次") })]);
+    expect(steerCount).toBe(1);
+    expect(queueEmbeddedPiMessageMock).toHaveBeenCalledTimes(1);
+    expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
+    const board = readSessionTaskBoard(sessionFile);
+    expect(board.current?.stop.summary).toContain("约束：");
   });
 
   it("does not inject new_work into the active run (followup only)", async () => {
@@ -133,11 +139,25 @@ describe("runReplyAgent collect amend steer inject", () => {
     expect(enqueueFollowupRunMock).toHaveBeenCalledTimes(1);
   });
 
-  it("does not pretend steer succeeded when inject returns false", async () => {
-    queueEmbeddedPiMessageMock.mockReturnValue(false);
+  it("P1: steer failure keeps followup — constraint not dropped", async () => {
+    queueEmbeddedPiMessageMock.mockImplementation(() => {
+      steerCount += 1;
+      return false;
+    });
     const result = await runReplyAgent(buildParams("补充：改成英文摘要"));
     expect(result).toBeUndefined();
-    expect(queueEmbeddedPiMessageMock).toHaveBeenCalled();
+    expect(steerCount).toBe(1);
     expect(enqueueFollowupRunMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("P3: progress query answers from board without followup wait", async () => {
+    const result = await runReplyAgent(buildParams("进度如何"));
+    expect(result).toEqual([
+      expect.objectContaining({
+        text: expect.stringMatching(/手机调研|进行中|进行中/),
+      }),
+    ]);
+    expect(queueEmbeddedPiMessageMock).not.toHaveBeenCalled();
+    expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
   });
 });
