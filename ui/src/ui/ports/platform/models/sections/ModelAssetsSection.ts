@@ -15,6 +15,7 @@ import {
   setModelRoutingEligibility,
   startCapabilityVerification,
 } from "../admission/controller.ts";
+import { admitPooledModelAfterConnection } from "../admission/pooled-admission.ts";
 import { isCapabilityAdmissionRpcActive } from "../admission/verification-service.ts";
 import { statusLabel as capabilityStatusLabel } from "../capability-evidence.ts";
 import { assetMatchesRequiredCapabilities, capabilityLabel } from "../capability-ids.ts";
@@ -328,7 +329,13 @@ function parseProbeSummaryForModel(
 async function verifyModelCall(
   modelRef: string,
   actions: PlatformModelsActions,
-  endpoint?: { providerId?: string; baseUrl?: string | null; api?: string | null },
+  endpoint?: {
+    providerId?: string;
+    baseUrl?: string | null;
+    api?: string | null;
+    /** Model is already in the pool; a successful probe should sync admission. */
+    admitAfterSuccess?: boolean;
+  },
 ) {
   const slash = modelRef.indexOf("/");
   const providerId = endpoint?.providerId || (slash >= 0 ? modelRef.slice(0, slash) : "");
@@ -350,6 +357,9 @@ async function verifyModelCall(
       baseUrl: endpoint?.baseUrl,
       api: endpoint?.api,
     });
+    if (endpoint?.admitAfterSuccess) {
+      await admitPooledModelAfterConnection(modelRef);
+    }
   }
   modelVerificationState = {
     modelId: modelRef,
@@ -388,6 +398,9 @@ async function commitAddedModels(
       });
     },
   });
+  for (const modelRef of allowlisted) {
+    await admitPooledModelAfterConnection(modelRef);
+  }
   const focusRef =
     allowlisted[allowlisted.length - 1] ??
     `${inputs[inputs.length - 1].providerId}/${inputs[inputs.length - 1].modelId}`;
@@ -507,6 +520,10 @@ function contextWindowLabel(value?: number) {
   }
   return String(value);
 }
+
+/** Missing usage analytics. Not a connection or call-readiness state. */
+const USAGE_ANALYTICS_MISSING = "暂无用量";
+const USAGE_ANALYTICS_MISSING_TITLE = "暂无 7 日使用统计，不影响连接和调用";
 
 function costTierLabel(value: ModelAsset["costTier"]) {
   switch (value) {
@@ -1438,7 +1455,9 @@ function renderModelDetailDrawer(params: {
             ${
               usageMissing
                 ? html`
-                    <div class="callout card-follow--sm">使用分析数据尚未接入，当前仅展示目录与配置信息。</div>
+                    <div class="callout card-follow--sm" title=${USAGE_ANALYTICS_MISSING_TITLE}>
+                      暂无 7 日使用分析，不影响连接和调用。当前只展示目录和配置。
+                    </div>
                   `
                 : html`
                     <div class="model-assets-drawer__kv-stack">
@@ -1451,7 +1470,9 @@ function renderModelDetailDrawer(params: {
                       )}
                       ${renderDrawerKvRow(
                         "7 日调用",
-                        selectedModel.usage7d ? `${selectedModel.usage7d.calls} 次` : "未接入",
+                        selectedModel.usage7d
+                          ? `${selectedModel.usage7d.calls} 次`
+                          : USAGE_ANALYTICS_MISSING,
                       )}
                       ${renderDrawerKvRow(
                         "7 日成本",
@@ -1461,13 +1482,13 @@ function renderModelDetailDrawer(params: {
                         "成功率",
                         selectedModel.usage7d?.successRate != null
                           ? `${selectedModel.usage7d.successRate}%`
-                          : "未接入",
+                          : "暂无",
                       )}
                       ${renderDrawerKvRow(
                         "平均延迟",
                         selectedModel.avgLatencyMs != null
                           ? `${selectedModel.avgLatencyMs}ms`
-                          : "未接入",
+                          : "暂无",
                       )}
                     </div>
                   `
@@ -1526,7 +1547,10 @@ async function importPendingModel(asset: ModelAsset, actions: PlatformModelsActi
   if (!hasSuccessfulModelConnection(asset)) {
     return;
   }
-  await commitPoolImport({ asset, actions, connectionVerified: true });
+  const imported = await commitPoolImport({ asset, actions, connectionVerified: true });
+  if (imported) {
+    await admitPooledModelAfterConnection(asset.modelId);
+  }
   requestRerender();
 }
 
@@ -1586,6 +1610,7 @@ function renderModelVerificationSection(
               providerId: selectedModel.providerId,
               baseUrl: selectedModel.baseUrl,
               api: selectedModel.api,
+              admitAfterSuccess: isManagedPoolModel(selectedModel),
             })}
         >
           ${phase === "probing" ? "测试中…" : "重新测试调用"}
@@ -1692,9 +1717,7 @@ function renderDrawerActionSection(params: {
                   modelRef: selectedModel.modelId,
                   autoRouting: next,
                   reason:
-                    next === "eligible"
-                      ? "UI 抽屉写入自动路由资格（预览）"
-                      : "UI 抽屉关闭自动路由资格",
+                    next === "eligible" ? "UI 抽屉写入自动路由资格" : "UI 抽屉关闭自动路由资格",
                 }).then(() => requestPlatformSurfaceRerender());
               }}
             >
@@ -1710,7 +1733,7 @@ function renderDrawerActionSection(params: {
               controlsAvailable
                 ? html`
                     <div class="muted card-follow--xs" data-testid="model-drawer-admission-scope-note">
-                      租户可选／自动路由资格写入 gateway 准入存档，并参与干跑试配预览；尚未被线上会话／Agent 选型消费。
+                      准入写入 gateway 后，员工会话会按它决定能否调用。已入池且探测成功的模型会自动补上可执行准入。
                     </div>
                   `
                 : ""
@@ -2687,9 +2710,6 @@ function renderPendingConnectSection(params: {
   return html`
     <section class="stack card-follow" data-testid="model-pending-connect">
       <div class="card-title">尚未连通</div>
-      <div class="callout">
-        这些模型还没有通过连接验证，不会进入模型池。请先验证连接，成功后再入池。
-      </div>
       <div class="enterprise-data-table-wrap">
         <table class="enterprise-data-table platform-model-assets-table">
           <thead>
@@ -2760,24 +2780,6 @@ function renderPendingConnectSection(params: {
   `;
 }
 
-function renderUnusablePlatformCallout(models: readonly ModelAsset[]) {
-  const failed = models.filter(
-    (asset) =>
-      asset.healthBasis === "live_probe_failed" ||
-      (asset.healthBasis === "auth_missing" &&
-        (asset.inRecommendationPool || asset.source === "configured")),
-  );
-  if (failed.length === 0) {
-    return nothing;
-  }
-  const names = failed.map((asset) => asset.displayName?.trim() || asset.modelId).join("、");
-  return html`
-    <div class="callout danger card-follow" role="alert" data-testid="platform-unusable-models">
-      以下平台模型当前不可用，员工调用会失败：${names}。请先修复连接或移出推荐池。
-    </div>
-  `;
-}
-
 export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
   const { vm, actions, compat, onNavigateTab, context, onToggleRecommendationPool, loading } =
     props;
@@ -2813,7 +2815,6 @@ export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
 
   return html`
     <section class="platform-model-assets-surface">
-      ${renderUnusablePlatformCallout(vm.models)}
       ${renderSummaryCards(poolUniverse, vm)}
       ${renderFilterBar(vm, visiblePool.length, poolUniverse.length)}
       ${
@@ -2945,8 +2946,10 @@ export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
                         <td class="platform-model-assets-table__col-calls">
                           <div
                             class=${`platform-model-assets-table__metric${asset.usage7d ? "" : " is-muted"}`}
+                            title=${asset.usage7d ? `${asset.usage7d.calls} 次` : USAGE_ANALYTICS_MISSING_TITLE}
+                            data-testid="model-usage-7d"
                           >
-                            ${asset.usage7d ? `${asset.usage7d.calls}` : "未接入"}
+                            ${asset.usage7d ? `${asset.usage7d.calls}` : USAGE_ANALYTICS_MISSING}
                           </div>
                         </td>
                         <td class="platform-model-assets-table__col-cost7d">

@@ -4,5 +4,6 @@ export * from "./protocol-runner.js";
 export * from "./routing-decision.js";
 export * from "./runtime-decision.js";
 export * from "./store.js";
+export * from "./sync-pooled-admission.js";
 export * from "./types.js";
 export * from "./verification-service.js";

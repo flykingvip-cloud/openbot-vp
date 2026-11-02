@@ -107,6 +107,35 @@ export async function readStoredModelAdmissions(
   return { ...store.admissions };
 }
 
+/**
+ * Create a row only when none is stored. An existing pause, disable, or
+ * eligible row is returned unchanged. The check and write share the store lock.
+ */
+export async function insertModelAdmissionIfAbsent(
+  modelRef: string,
+  patch: Partial<Omit<ModelAdmissionRecord, "modelRef">>,
+  storePath?: string,
+): Promise<{ record: ModelAdmissionRecord; created: boolean }> {
+  const key = modelRef.trim();
+  return await withLock(async () => {
+    const store = await loadStore(storePath);
+    const existing = store.admissions[key];
+    if (existing) {
+      return { record: existing, created: false };
+    }
+    const next: ModelAdmissionRecord = {
+      ...defaultRecord(key),
+      ...patch,
+      modelRef: key,
+      platformEffective: true,
+      updatedAt: Date.now(),
+    };
+    store.admissions[key] = next;
+    await saveStore(store, storePath);
+    return { record: next, created: true };
+  });
+}
+
 export async function upsertModelAdmission(
   modelRef: string,
   patch: Partial<Omit<ModelAdmissionRecord, "modelRef">>,
