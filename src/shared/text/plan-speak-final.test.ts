@@ -4,6 +4,7 @@ import {
   isExecutionStallFinal,
   isPlanSpeakFinal,
   rewritePlanSpeakFinal,
+  shouldApplyShoppingPauseCta,
 } from "./plan-speak-final.js";
 
 describe("plan-speak final gate (M2)", () => {
@@ -58,6 +59,28 @@ describe("plan-speak final gate (M2)", () => {
   it("ignores ordinary completed answers", () => {
     const done = "已把特步 160X 加入购物车，合计 ¥699。";
     expect(isPlanSpeakFinal(done)).toBe(false);
+  });
+
+  it("does not treat bare 价格/支付 in research or analysis as shopping pause", () => {
+    const researchPrice = "我继续把各厂商价格变化写进研究报告，这一步正在做。";
+    expect(isPlanSpeakFinal(researchPrice)).toBe(true);
+    expect(shouldApplyShoppingPauseCta(researchPrice, "写一份行业价格调研报告")).toBe(false);
+    expect(rewritePlanSpeakFinal(researchPrice, "写一份行业价格调研报告")).toBe(researchPrice);
+
+    const payAnalysis = "我需要先梳理支付权限问题，这一步正在做。";
+    expect(rewritePlanSpeakFinal(payAnalysis, "分析一下登录与支付权限失败原因")).toBe(payAnalysis);
+  });
+
+  it("does not rewrite video/subtitle plan-speak into the shopping pause", () => {
+    const video = "我继续处理视频字幕导出，这一步正在做。";
+    expect(isPlanSpeakFinal(video)).toBe(true);
+    expect(rewritePlanSpeakFinal(video, "帮我给这段视频加字幕")).toBe(video);
+  });
+
+  it("admits shopping pause when user goal is shopping even if markers are soft", () => {
+    const soft = "我需要核对价格和规格，这一步正在做。";
+    expect(shouldApplyShoppingPauseCta(soft, "帮我比价买鞋")).toBe(true);
+    expect(rewritePlanSpeakFinal(soft, "帮我比价买鞋")).toBe(PLAN_SPEAK_PAUSE_CTA);
   });
 
   it("does not rewrite typeset or research plan-speak into the shopping pause", () => {

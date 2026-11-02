@@ -9,9 +9,11 @@
  * them into `PLAN_SPEAK_MARKERS_RE` — that rewrite asks about price, spec,
  * and payment, which is the wrong pause for typeset/publish.
  *
- * The shopping CTA is only for shopping plan-speak. Typeset, draft-box, and
- * research-write plan tone stays a progress sentence so the stall continuation
- * can keep the turn moving.
+ * Shopping CTA uses **positive admission** (checkout/cart/order/compare-price
+ * markers, or a shopping user goal + lexicon). Bare 「价格」「支付」 words are
+ * not enough. Non-shopping plan-speak stays progress text so stall continuation
+ * can keep the turn moving. This module only rewrites visible text — it must
+ * not create task pause or authorization state.
  */
 
 /** User-facing pause when the model ends mid-plan without asking. */
@@ -123,41 +125,67 @@ function extractFactualLead(text: string): string {
   return lead;
 }
 
-/** Shopping plan-speak. A typeset sentence that also names a price still pauses. */
-const SHOPPING_PLAN_RE =
+/**
+ * Weak shopping lexicon. Alone (e.g. 「价格」「支付」 in a research/analysis
+ * sentence) does **not** prove the user needs a shopping decision pause.
+ */
+const SHOPPING_LEXICON_RE =
   /(?:价格|规格|尺码|支付|付款|收银台|购物车|下单|比价|结算|最低价|接管|[¥￥])/u;
 
 /**
- * Non-shopping execution the shopping CTA must not interrupt: WeChat typeset,
- * draft box, or a research write.
+ * Positive admission markers in plan-speak itself: checkout / cart / order /
+ * compare-price workflows, not bare price words.
  */
-const NON_SHOPPING_EXEC_RE =
-  /(?:排版|草稿箱|公众号|调研|撰写|写完|写出来|研究报告|定版|typeset|draft box|wechat|weixin)/iu;
+const SHOPPING_PAUSE_ADMISSION_RE =
+  /(?:购物车|结算(?:页)?|收银台|下单|比价|加购|付款码|扫码支付|选哪个价|哪个规格|最低价|哪一单|尺码)/u;
+
+/** User goal that positively frames the turn as shopping. */
+const SHOPPING_GOAL_CONTEXT_RE =
+  /(?:帮我买|去买|购买|下单|比价|加购|购物车|结算|京东|淘宝|拼多多|得物|买鞋|买件)/u;
 
 /**
- * True when this plan-speak final is typeset, draft-box, or research work.
- * Shopping words in the sentence itself still take the pause CTA.
+ * True when shopping pause CTA is positively admitted.
+ * Bare 「价格」「支付」 / currency mentions are not enough without checkout-ish
+ * admission or a shopping user goal.
  */
-export function shouldPreserveNonShoppingPlanSpeak(text: string, contextText = ""): boolean {
+export function shouldApplyShoppingPauseCta(text: string, contextText = ""): boolean {
   const raw = text.trim();
-  if (!raw || !isPlanSpeakFinal(raw) || SHOPPING_PLAN_RE.test(raw)) {
+  if (!raw || !isPlanSpeakFinal(raw)) {
     return false;
   }
-  return NON_SHOPPING_EXEC_RE.test(`${contextText}\n${raw}`);
+  if (SHOPPING_PAUSE_ADMISSION_RE.test(raw)) {
+    return true;
+  }
+  if (SHOPPING_GOAL_CONTEXT_RE.test(contextText) && SHOPPING_LEXICON_RE.test(raw)) {
+    return true;
+  }
+  return false;
 }
 
 /**
- * If `text` is a plan-speak terminal, rewrite to a pause CTA.
- * Keeps a short leading factual span when present (prices / status), then CTA.
- * `contextText` is the latest user turn, so 「我继续。」 after a typeset GO is
- * left alone. Shopping plan-speak still becomes the pause CTA.
+ * Backward-compatible helper: plan-speak that must not become the shopping CTA.
+ * Equivalent to plan-speak finals that fail positive shopping admission.
+ */
+export function shouldPreserveNonShoppingPlanSpeak(text: string, contextText = ""): boolean {
+  const raw = text.trim();
+  if (!raw || !isPlanSpeakFinal(raw)) {
+    return false;
+  }
+  return !shouldApplyShoppingPauseCta(raw, contextText);
+}
+
+/**
+ * If `text` is a plan-speak terminal **and** shopping pause is positively
+ * admitted, rewrite to a pause CTA. Otherwise leave plan-speak alone (progress
+ * / stall continue can keep moving). Keeps a short factual lead when present.
+ * Reply rewrite never creates task pause or auth state — text only.
  */
 export function rewritePlanSpeakFinal(text: string, contextText = ""): string {
   const raw = text.trim();
   if (!raw || !isPlanSpeakFinal(raw)) {
     return text;
   }
-  if (shouldPreserveNonShoppingPlanSpeak(raw, contextText)) {
+  if (!shouldApplyShoppingPauseCta(raw, contextText)) {
     return text;
   }
   const lead = extractFactualLead(raw);
