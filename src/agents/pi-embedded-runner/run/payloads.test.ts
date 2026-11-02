@@ -103,11 +103,13 @@ describe("buildEmbeddedRunPayloads plan-speak", () => {
     expect(payloads.map((payload) => payload.text)).toEqual([progress]);
   });
 
-  it("still rewrites a checkout plan-speak final into the shopping pause", () => {
+  it("does not invent a shopping pause CTA for checkout plan-speak", () => {
+    const progress = "我继续去结算页。";
     const payloads = buildPayloads({
-      assistantTexts: ["我继续去结算页。"],
+      assistantTexts: [progress],
       planSpeakContext: "开始排版和发布这篇文章到公众号",
     });
-    expect(payloads[0]?.text).toContain("选哪个价/规格/支付方式");
+    expect(payloads.map((payload) => payload.text)).toEqual([progress]);
+    expect(payloads[0]?.text).not.toContain("选哪个价/规格/支付方式");
   });
 });
