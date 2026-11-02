@@ -44,17 +44,17 @@ setting `enforcement=disabled` via the API, which is itself auditable.
 > It does **not** prove the running container identity was reconciled
 > (that is a separate LIVE verify / SSH / `delivery:check-sot` path).
 
-<!-- identity: seq=153 gatewaySha=e037fed74758800fe137caec1aa0da0ca2fab0af uiSha=e037fed74758800fe137caec1aa0da0ca2fab0af digest=sha256:5925b998be10fe3902511a0db665c649ee492fa24acbc866ef8ce797e7428d02 imageTag=rc-amd64-provenance-e037fed74758 tag=provenance/sha-e037fed74758 liveFrom=2026-11-02T03:18:11.198Z liveTo= liveVerified=true -->
+<!-- identity: seq=154 gatewaySha=a17b60872cb62122449a170a24b2f4e150cf9557 uiSha=a17b60872cb62122449a170a24b2f4e150cf9557 digest=sha256:32b20f638067923bb21fdfede7130a34c6199042fc77dee07271436429f6a54e imageTag=rc-amd64-provenance-a17b60872cb6 tag=provenance/sha-a17b60872cb6 liveFrom=2026-11-02T05:24:45.706Z liveTo= liveVerified=true -->
 
 | Field | Value |
 | --- | --- |
-| seq | 153 |
-| gatewaySha | `e037fed74758800fe137caec1aa0da0ca2fab0af` |
-| uiSha | `e037fed74758800fe137caec1aa0da0ca2fab0af` |
-| artifactDigest | `sha256:5925b998be10fe3902511a0db665c649ee492fa24acbc866ef8ce797e7428d02` |
-| imageTag / artifactId | `rc-amd64-provenance-e037fed74758` |
-| tag | `provenance/sha-e037fed74758` |
-| liveFrom | `2026-11-02T03:18:11.198Z` |
+| seq | 154 |
+| gatewaySha | `a17b60872cb62122449a170a24b2f4e150cf9557` |
+| uiSha | `a17b60872cb62122449a170a24b2f4e150cf9557` |
+| artifactDigest | `sha256:32b20f638067923bb21fdfede7130a34c6199042fc77dee07271436429f6a54e` |
+| imageTag / artifactId | `rc-amd64-provenance-a17b60872cb6` |
+| tag | `provenance/sha-a17b60872cb6` |
+| liveFrom | `2026-11-02T05:24:45.706Z` |
 | liveTo | _(open)_ |
 | liveVerified | `true` |
 <!-- END GENERATED: current-identity -->
