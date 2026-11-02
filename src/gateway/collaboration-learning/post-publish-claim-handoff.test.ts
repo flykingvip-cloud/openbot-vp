@@ -253,7 +253,9 @@ function bindPersonalLocalBoardTool(cfg: OpenBotConfig) {
     deps: {
       isEnabled: () => true,
       resolveActor: async () => EXECUTOR,
-      resolveTrustedTeam: (async () => ({
+      resolveTrustedTeam: async (): Promise<
+        Awaited<ReturnType<NonNullable<CollaborationBoardToolDeps["resolveTrustedTeam"]>>>
+      > => ({
         ok: true as const,
         auth: {
           ok: true as const,
@@ -267,10 +269,9 @@ function bindPersonalLocalBoardTool(cfg: OpenBotConfig) {
         },
         stores,
         trusted,
-        tenant: { tenantId: "_local", trust: "local" as const },
-        groupsRoot,
-        groupLocator,
-      })) as CollaborationBoardToolDeps["resolveTrustedTeam"],
+        // personal_local harness: I/O tenant label (not ACL membership). Valid CollaborationTenantTrustLevel — no cast.
+        tenant: { tenantId: "_local", trust: "actor_fallback" as const },
+      }),
       // Intentionally omit claimItem / applyClaim / proposeTodolist — production entries.
     },
   });
@@ -528,7 +529,7 @@ describe("post-publish claim handoff (activate → consumable nudge dispatch)", 
     const again = await tryClaimAfterBoardPublish({
       groupId: GROUP_ID,
       taskId,
-      item: { ...liveItem, status: "published", claimantId: null },
+      item: { ...liveItem, status: "published", claimantId: undefined },
       actorId: CEO,
       authority: auth,
       cfg,
@@ -739,7 +740,7 @@ describe("post-publish claim handoff (activate → consumable nudge dispatch)", 
     const again = await tryClaimAfterBoardPublish({
       groupId: GROUP_ID,
       taskId,
-      item: { ...liveItem, status: "published", claimantId: null },
+      item: { ...liveItem, status: "published", claimantId: undefined },
       actorId: CEO,
       authority: auth,
       cfg,
