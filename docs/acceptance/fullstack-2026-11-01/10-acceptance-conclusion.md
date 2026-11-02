@@ -54,3 +54,10 @@
 1. 按收窄建议修复 backup oauth 路径规范化（保留 includeCredentials）。
 2. 恢复 `@openbot` 工作区链接 **与** collaboration-core 构建产物后，由验收方**独立**重跑诊断 + Stage4 omit（单项恢复未必够）。
 3. 再谈 credential-free gateway + Control UI interactive；穷尽性补清单（行数仍不作能力分母）。
+
+## Cross-ref — PR #194（独立验收 Agent；2026-11-02 Asia/Shanghai）
+
+- 账本变更一致性：**PASS**；生产交付真实性证据：**未闭合** → **整体暂不核准 PASS**
+- 材料：[`../runs/2026-11-02-pr194-acceptance/00-acceptance-conclusion.md`](../runs/2026-11-02-pr194-acceptance/00-acceptance-conclusion.md)
+- **不得**据此把全栈改成 PASS；**不是** OHBE / 生产交付 PASS；**#193 文档不能替代 #194**
+- 全栈总评仍 **FAIL / NOT READY**；DEF-008 独立复现未完成

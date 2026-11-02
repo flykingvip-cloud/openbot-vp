@@ -10469,6 +10469,7 @@ tasks:
   - docs/acceptance/runs/2026-11-02-credentials-omit/**
   - docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/**
   - docs/acceptance/runs/2026-11-02-pr194-locate/**
+  - docs/acceptance/runs/2026-11-02-pr194-acceptance/**
   - .loom/registry.yaml
   - src/gateway/enterprise-data/event-driven-projection-materializer.ts
   - src/plugins/runtime/types-core.ts
@@ -10613,6 +10614,7 @@ landingStreams:
   - docs/acceptance/runs/2026-11-02-credentials-omit/**
   - docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/**
   - docs/acceptance/runs/2026-11-02-pr194-locate/**
+  - docs/acceptance/runs/2026-11-02-pr194-acceptance/**
   - apps/macos/Sources/OpenBotProtocol/GatewayModels.swift
   - apps/shared/OpenBotKit/Sources/OpenBotProtocol/GatewayModels.swift
   - src/gateway/enterprise-data/event-driven-projection-materializer.ts
