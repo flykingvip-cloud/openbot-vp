@@ -14,6 +14,7 @@
 import { loadConfig } from "../../config/config.js";
 import { getPlanVersion, listPlans } from "../billing/plans-store.js";
 import { listSeats } from "../billing/seats-store.js";
+import { listEnterpriseModelAssets } from "../enterprise-model/asset-store.js";
 import {
   reconcileVerifiedEnterpriseModelAssets,
   resolveEnterpriseModelCeiling,
@@ -37,6 +38,8 @@ import {
 } from "../model-entitlement/plan-version-model-binding-store.js";
 import { listConfiguredModelIds } from "../model-entitlement/resolve-effective-model-set.js";
 import {
+  forgetModelIdsFromTenantGrants,
+  getModelGrant,
   listSeatModelGrantsForTenant,
   revokeModelGrant,
   setModelGrant,
@@ -157,11 +160,30 @@ async function loadGatewayCatalogModelIds(context: {
   }
 }
 
+function idsNotAlreadyGranted(
+  requested: readonly ModelRef[],
+  retained: readonly ModelRef[],
+): ModelRef[] {
+  const kept = new Set(retained.map((id) => id.trim()).filter((id) => id.length > 0));
+  return requested.filter((id) => !kept.has(id.trim()));
+}
+
 async function assertGrantedWithinCeiling(params: {
   tenantId: string;
   grantedModelIds: ModelRef[];
+  /**
+   * Ids already stored on this subject's active grant.
+   * Keeping or removing them is not a new authorization. Only ids that are
+   * not in this set must sit inside the current ceiling. Otherwise one stale
+   * `ent/…` row blocks every later checkbox on the seat.
+   */
+  retainedModelIds?: readonly ModelRef[];
   respond: RespondFn;
 }): Promise<boolean> {
+  const fresh = idsNotAlreadyGranted(params.grantedModelIds, params.retainedModelIds ?? []);
+  if (fresh.length === 0) {
+    return true;
+  }
   // 先按需回填套餐投影：存量租户的 entitlement 可能从未投影过（投影只在 billing
   // 事件时跑），否则套餐里明明有的模型会被判为越权。管理写路径可以承担这次回填。
   const platformPlan = await resolvePlatformPlanModels({
@@ -177,7 +199,7 @@ async function assertGrantedWithinCeiling(params: {
     return false;
   }
   const allowed = new Set(ceiling.ceilingModelIds);
-  const overreach = params.grantedModelIds.filter((m) => !allowed.has(m));
+  const overreach = fresh.filter((id) => !allowed.has(id));
   if (overreach.length > 0) {
     respondInvalid(
       params.respond,
@@ -186,6 +208,22 @@ async function assertGrantedWithinCeiling(params: {
     return false;
   }
   return true;
+}
+
+async function retainedGrantModelIds(params: {
+  tenantId: string;
+  subjectType: ModelGrantSubjectType;
+  subjectId: string;
+}): Promise<ModelRef[]> {
+  const existing = await getModelGrant({
+    tenantId: params.tenantId,
+    subjectType: params.subjectType,
+    subjectId: params.subjectId,
+  });
+  if (!existing || existing.status !== "active") {
+    return [];
+  }
+  return existing.grantedModelIds;
 }
 
 async function mirrorSeatGrantIfNeeded(params: {
@@ -367,12 +405,18 @@ export const enterpriseModelGrantHandlers: GatewayRequestHandlers = {
         respondInvalid(respond, "mergeMode 仅支持 replace|union");
         return;
       }
-      // 越权校验：授权集合必须 ⊆ EnterpriseModelCeiling（套餐 ∪ 企业 BYOK）。
-      // union 时仅校验本次新增 ids；最终集合由 store 合并。
+      // 越权校验：新加入的 id 必须 ⊆ EnterpriseModelCeiling（套餐 ∪ 企业 BYOK）。
+      // 已经写在授权里、后来离开上界的 id 可以保留或取消，不能挡住同一次保存。
+      const retainedModelIds = await retainedGrantModelIds({
+        tenantId: scope.enterpriseId,
+        subjectType,
+        subjectId,
+      });
       if (
         !(await assertGrantedWithinCeiling({
           tenantId: scope.enterpriseId,
           grantedModelIds,
+          retainedModelIds,
           respond,
         }))
       ) {
@@ -455,7 +499,12 @@ export const enterpriseModelGrantHandlers: GatewayRequestHandlers = {
           respondInvalid(respond, "grants[].mergeMode 仅支持 replace|union");
           return;
         }
-        for (const id of grantedModelIds) {
+        const retainedModelIds = await retainedGrantModelIds({
+          tenantId: scope.enterpriseId,
+          subjectType,
+          subjectId,
+        });
+        for (const id of idsNotAlreadyGranted(grantedModelIds, retainedModelIds)) {
           allModelIds.add(id);
         }
         items.push({
@@ -543,7 +592,28 @@ export const enterpriseModelGrantHandlers: GatewayRequestHandlers = {
       // 否则席位勾选只剩套餐模型（上界不含企业自供）。
       await reconcileVerifiedEnterpriseModelAssets({ tenantId: scope.enterpriseId });
       const ceiling = await resolveEnterpriseModelCeiling({ tenantId: scope.enterpriseId });
-      const grants = await listSeatModelGrantsForTenant(scope.enterpriseId);
+      const knownAssets = await listEnterpriseModelAssets(scope.enterpriseId);
+      const knownRuntimeIds = new Set(
+        knownAssets.map((asset) => asset.runtimeModelId.trim()).filter((id) => id.length > 0),
+      );
+      let grants = await listSeatModelGrantsForTenant(scope.enterpriseId);
+      const staleEnterpriseIds = [
+        ...new Set(
+          grants.flatMap((grant) =>
+            grant.grantedModelIds
+              .map((id) => id.trim())
+              .filter((id) => id.startsWith("ent/") && !knownRuntimeIds.has(id)),
+          ),
+        ),
+      ];
+      if (staleEnterpriseIds.length > 0) {
+        await forgetModelIdsFromTenantGrants({
+          tenantId: scope.enterpriseId,
+          modelIds: staleEnterpriseIds,
+          ...(client?.user ? { actorUserId: client.user } : {}),
+        });
+        grants = await listSeatModelGrantsForTenant(scope.enterpriseId);
+      }
       const connected = await loadEnterpriseVisiblePlatformModelIds({
         cfg: loadConfig(),
         gatewayCatalogModelIds: await loadGatewayCatalogModelIds(context),

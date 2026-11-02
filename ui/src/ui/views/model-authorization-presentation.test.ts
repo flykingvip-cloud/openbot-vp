@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAuthorizedModelCatalog,
+  describeUnavailableModelGrants,
   modelAuthorizationSubjectHeadline,
   presentAuthorizedModel,
 } from "./model-authorization-presentation.ts";
@@ -52,6 +53,31 @@ describe("presentAuthorizedModel", () => {
       title: "通义千问 3",
       badge: "企业自供 · 内网推理",
     });
+  });
+});
+
+describe("describeUnavailableModelGrants", () => {
+  it("separates deleted enterprise assets from models still outside the ceiling", () => {
+    const catalog = buildAuthorizedModelCatalog({
+      assets: [
+        {
+          runtimeModelId: "ent/1b45c754c9/coder390-27b-int8",
+          connectionName: "网域星辰",
+        },
+      ],
+    });
+    const text = describeUnavailableModelGrants({
+      modelIds: [
+        "ent/cc41dd5419/mimo-v2.6-flash",
+        "ent/1b45c754c9/coder390-27b-int8",
+        "ent/cea43bf898/deepseek-v4-flash",
+      ],
+      catalog,
+    });
+    expect(text).toContain("不能授权：ent/1b45c754c9/coder390-27b-int8");
+    expect(text).toContain(
+      "已不在模型库，不能授权（取消勾选即可移除）：ent/cc41dd5419/mimo-v2.6-flash, ent/cea43bf898/deepseek-v4-flash",
+    );
   });
 });
 

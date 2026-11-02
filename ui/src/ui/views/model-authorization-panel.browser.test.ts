@@ -62,6 +62,55 @@ describe("renderModelAuthorizationPanel (browser)", () => {
     expect(call[2]).toBe(true);
   });
 
+  it("已授权的越界模型可以取消勾选，未授权的越界模型保持锁定", async () => {
+    const onToggleModel = vi.fn();
+    const view: EnterpriseAuthorizationView = {
+      ...baseView,
+      subjects: [
+        {
+          ...baseView.subjects[0],
+          rows: [
+            { modelId: "p/a", withinEntitlement: true, granted: true },
+            {
+              modelId: "ent/cea43bf898/deepseek-v4-flash",
+              withinEntitlement: false,
+              granted: true,
+            },
+            { modelId: "ent/cc41dd5419/mimo-v2.6-flash", withinEntitlement: false, granted: false },
+          ],
+        },
+      ],
+    };
+    const container = mount({
+      view,
+      unavailableModelIds: ["ent/cea43bf898/deepseek-v4-flash", "ent/cc41dd5419/mimo-v2.6-flash"],
+      onToggleModel,
+      onRevokeSubject: () => undefined,
+    });
+    await Promise.resolve();
+    const granted = container.querySelector<HTMLInputElement>(
+      "[data-model-id='ent/cea43bf898/deepseek-v4-flash'] input",
+    );
+    const locked = container.querySelector<HTMLInputElement>(
+      "[data-model-id='ent/cc41dd5419/mimo-v2.6-flash'] input",
+    );
+    expect(granted?.disabled).toBe(false);
+    expect(granted?.checked).toBe(true);
+    expect(locked?.disabled).toBe(true);
+    if (granted) {
+      granted.checked = false;
+    }
+    granted?.dispatchEvent(new Event("change"));
+    expect(onToggleModel).toHaveBeenCalledWith(
+      expect.objectContaining({ subjectId: "seat-1" }),
+      "ent/cea43bf898/deepseek-v4-flash",
+      false,
+    );
+    expect(container.querySelector("[data-testid='model-auth-blocked']")?.textContent).toContain(
+      "不能授权",
+    );
+  });
+
   it("撤销按钮触发 onRevokeSubject", async () => {
     const onRevokeSubject = vi.fn();
     const container = mount({

@@ -100,6 +100,43 @@ function usableDisplayName(
   return trimmed;
 }
 
+/**
+ * 越界文案。目录已加载时，把「资产已删除」和「还在库里但不在上界」分开，
+ * 避免把已移除的连接哈希说成套餐不允许。
+ */
+export function describeUnavailableModelGrants(input: {
+  modelIds: readonly string[];
+  catalog?: AuthorizedModelCatalog | null;
+}): string {
+  const ids = [
+    ...new Set(input.modelIds.map((id) => id.trim()).filter((id) => id.length > 0)),
+  ].toSorted();
+  if (ids.length === 0) {
+    return "";
+  }
+  const catalog = input.catalog;
+  if (!catalog) {
+    return `以下模型不在本企业模型上界（套餐∪企业自供）内，不能授权：${ids.join(", ")}`;
+  }
+  const missing: string[] = [];
+  const outside: string[] = [];
+  for (const id of ids) {
+    if (id.startsWith("ent/") && !catalog.byRuntimeId.has(id)) {
+      missing.push(id);
+    } else {
+      outside.push(id);
+    }
+  }
+  const parts: string[] = [];
+  if (outside.length > 0) {
+    parts.push(`以下模型不在本企业模型上界（套餐∪企业自供）内，不能授权：${outside.join(", ")}`);
+  }
+  if (missing.length > 0) {
+    parts.push(`以下模型已不在模型库，不能授权（取消勾选即可移除）：${missing.join(", ")}`);
+  }
+  return parts.join(" ");
+}
+
 export function presentAuthorizedModel(
   modelId: string,
   catalog?: AuthorizedModelCatalog | null,

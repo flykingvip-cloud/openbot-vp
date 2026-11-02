@@ -32,6 +32,7 @@ import {
   SAVED_ENTERPRISE_ENDPOINT_SSRF_POLICY,
 } from "../enterprise-model/probe.js";
 import type { EnterpriseModelPublicConnection } from "../enterprise-model/types.js";
+import { forgetModelIdsFromTenantGrants } from "../model-entitlement/seat-model-grant-store.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import {
   requireEnterpriseScope,
@@ -457,6 +458,11 @@ export const enterpriseModelProviderHandlers: GatewayRequestHandlers = {
       const assets = await listEnterpriseModelAssets(scope.enterpriseId, { connectionId });
       const connection = await deleteEnterpriseModelConnection(scope.enterpriseId, connectionId);
       await deleteEnterpriseModelAssetsForConnection(scope.enterpriseId, connectionId);
+      await forgetModelIdsFromTenantGrants({
+        tenantId: scope.enterpriseId,
+        modelIds: assets.map((asset) => asset.runtimeModelId),
+        ...(client?.user ? { actorUserId: client.user } : {}),
+      });
       await deleteEnterpriseModelSecret(connection.credentialRef);
       await recordEnterpriseModelAuditEvent({
         tenantId: scope.enterpriseId,

@@ -16,6 +16,7 @@ import "./model-authorization-panel.css";
 import { renderEnterpriseOrgTree } from "../ports/enterprise/views/enterprise-org-tree-view.ts";
 import type { ModelAuthorizationDirectoryEntry } from "./model-authorization-directory.ts";
 import {
+  describeUnavailableModelGrants,
   modelAuthorizationSubjectHeadline,
   presentAuthorizedModel,
   type AuthorizedModelCatalog,
@@ -328,12 +329,23 @@ function renderPreview(
       <div class="model-auth-rows">
         ${subject.rows.map((row) => {
           const presented = presentAuthorizedModel(row.modelId, props.modelCatalog);
+          const missingFromLibrary =
+            !row.withinEntitlement &&
+            row.modelId.startsWith("ent/") &&
+            props.modelCatalog != null &&
+            !props.modelCatalog.byRuntimeId.has(row.modelId);
+          const scopeLabel = missingFromLibrary ? "已移除" : "越界";
+          const scopeTitle = missingFromLibrary
+            ? "模型库里已经没有这个企业模型。取消勾选即可从授权中移除。"
+            : "不在企业模型上界内。不能新授权；已勾选的可以取消。";
+          // 未授权且不在上界：不能勾上。已经授权的越界行必须能取消，否则整次保存都会被拒。
+          const lockedOut = !row.withinEntitlement && !row.granted;
           return html`
             <label class="model-auth-row" data-model-id=${row.modelId}>
               <input
                 type="checkbox"
                 .checked=${row.granted}
-                ?disabled=${disabled || !row.withinEntitlement}
+                ?disabled=${disabled || lockedOut}
                 @change=${(event: Event) =>
                   props.onToggleModel(
                     subject,
@@ -350,9 +362,7 @@ function renderPreview(
                   ${
                     row.withinEntitlement
                       ? nothing
-                      : html`
-                          <span class="badge warn" title="不在企业模型上界内">越界</span>
-                        `
+                      : html` <span class="badge warn" title=${scopeTitle}>${scopeLabel}</span> `
                   }
                 </span>
                 <span class="model-auth-row__id">${row.modelId}</span>
@@ -370,14 +380,13 @@ export function renderModelAuthorizationPanel(props: ModelAuthorizationPanelProp
   const preview = resolvePreview(props, directory);
   const selectedKey = props.selectedKey ?? (preview ? subjectKey(preview.subject) : null);
   const unavailable = [...(props.unavailableModelIds ?? unavailableFromView(props.view))];
-  const blockedSentence =
-    unavailable.length > 0
-      ? `以下模型不在本企业模型上界（套餐∪企业自供）内，不能授权：${unavailable.join(", ")}`
-      : "";
+  const blockedSentence = describeUnavailableModelGrants({
+    modelIds: unavailable,
+    catalog: props.modelCatalog,
+  });
   const errorText = props.error?.trim() || "";
   const showError = errorText.length > 0 && errorText !== blockedSentence;
   const showCeilingModels = props.view.hasEntitlement;
-  const showAdvanced = showCeilingModels || blockedSentence.length > 0;
   return html`
     <section class="model-auth-panel" data-testid="model-auth-panel">
       ${
@@ -390,7 +399,19 @@ export function renderModelAuthorizationPanel(props: ModelAuthorizationPanelProp
       <div class="model-auth-ceiling" data-testid="model-auth-summary">
         ${props.summary ? html`<div class="model-auth-kpi">${props.summary}</div>` : nothing}
         ${
-          showAdvanced
+          blockedSentence
+            ? html`
+                <div
+                  class="callout danger model-auth-ceiling__blocked"
+                  data-testid="model-auth-blocked"
+                >
+                  ${blockedSentence}
+                </div>
+              `
+            : nothing
+        }
+        ${
+          showCeilingModels || blockedSentence
             ? html`
                 <details class="model-auth-advanced" data-testid="model-auth-ceiling-details">
                   <summary>上界明细</summary>

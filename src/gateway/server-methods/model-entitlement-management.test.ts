@@ -261,6 +261,94 @@ describe("enterprise-model-grant.*", () => {
     expect(res.error.message).toContain("c/z");
   });
 
+  it("drops grants for deleted enterprise assets and still allows edits around a registered but unverified model", async () => {
+    const { setModelGrant, getModelGrant } =
+      await import("../model-entitlement/seat-model-grant-store.js");
+    const { createEnterpriseModelConnection } =
+      await import("../enterprise-model/connection-store.js");
+    const { registerEnterpriseModelAsset } = await import("../enterprise-model/asset-store.js");
+    await upsertEnterpriseModelEntitlement({
+      tenantId: "ent-test",
+      allowedModelIds: ["api-proxy-deepseek/deepseek-chat", "ollama/llama3.2"],
+    });
+    const draft = await createEnterpriseModelConnection({
+      tenantId: "ent-test",
+      providerType: "openai-compatible",
+      displayName: "未验证连接",
+      baseUrl: "https://draft.example/v1",
+    });
+    const unverified = await registerEnterpriseModelAsset({
+      tenantId: "ent-test",
+      connectionId: draft.connectionId,
+      upstreamModelId: "mimo-v2.6-flash",
+      enabled: true,
+      healthStatus: "unknown",
+    });
+    await setModelGrant({
+      tenantId: "ent-test",
+      subjectType: "seat",
+      subjectId: "seat-stale",
+      grantedModelIds: [
+        "api-proxy-deepseek/deepseek-chat",
+        unverified.runtimeModelId,
+        "ent/cea43bf898/deepseek-v4-flash",
+        "ent/cc41dd5419/mimo-v2.6-flash",
+      ],
+    });
+
+    const listed = await invoke<{
+      grants: Array<{ subjectId: string; grantedModelIds: string[] }>;
+      ceilingModelIds: string[];
+    }>("enterprise-model-grant.list");
+    expect(listed.ok).toBe(true);
+    const seat = listed.payload.grants.find((grant) => grant.subjectId === "seat-stale");
+    expect(seat?.grantedModelIds).toEqual([
+      "api-proxy-deepseek/deepseek-chat",
+      unverified.runtimeModelId,
+    ]);
+    expect(listed.payload.ceilingModelIds).not.toContain(unverified.runtimeModelId);
+    expect(listed.payload.ceilingModelIds).not.toContain("ent/cea43bf898/deepseek-v4-flash");
+
+    const kept = await invoke("enterprise-model-grant.grant", {
+      subjectType: "seat",
+      subjectId: "seat-stale",
+      grantedModelIds: [
+        "api-proxy-deepseek/deepseek-chat",
+        "ollama/llama3.2",
+        unverified.runtimeModelId,
+      ],
+    });
+    expect(kept.ok).toBe(true);
+
+    const removed = await invoke("enterprise-model-grant.grant", {
+      subjectType: "seat",
+      subjectId: "seat-stale",
+      grantedModelIds: ["api-proxy-deepseek/deepseek-chat", "ollama/llama3.2"],
+    });
+    expect(removed.ok).toBe(true);
+    expect(
+      (
+        await getModelGrant({
+          tenantId: "ent-test",
+          subjectType: "seat",
+          subjectId: "seat-stale",
+        })
+      )?.grantedModelIds.toSorted(),
+    ).toEqual(["api-proxy-deepseek/deepseek-chat", "ollama/llama3.2"]);
+
+    const added = await invoke("enterprise-model-grant.grant", {
+      subjectType: "seat",
+      subjectId: "seat-stale",
+      grantedModelIds: [
+        "api-proxy-deepseek/deepseek-chat",
+        "ollama/llama3.2",
+        "ent/cea43bf898/qwen3.6-35b-a3b",
+      ],
+    });
+    expect(added.ok).toBe(false);
+    expect(added.error.message).toContain("ent/cea43bf898/qwen3.6-35b-a3b");
+  });
+
   it("rejects grant when no entitlement record exists", async () => {
     const res = await invoke("enterprise-model-grant.grant", {
       subjectType: "seat",

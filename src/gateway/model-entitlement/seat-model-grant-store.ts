@@ -273,6 +273,67 @@ export async function listSeatModelGrantsForTenant(
   return Object.values(store.grants).filter((g) => g.tenantId === canonical);
 }
 
+/**
+ * Remove runtime ids from every grant in the tenant.
+ * Used when an enterprise asset/connection is deleted, and when the
+ * authorization list finds `ent/…` grants whose assets are already gone.
+ * Returns how many grant records changed.
+ */
+export async function forgetModelIdsFromTenantGrants(
+  input: {
+    tenantId: string;
+    modelIds: readonly ModelRef[];
+    actorUserId?: string;
+  },
+  storePath?: string,
+): Promise<number> {
+  const canonical = canonicalizeTenantId(input.tenantId);
+  const drop = new Set(input.modelIds.map((id) => id.trim()).filter((id) => id.length > 0));
+  if (!canonical || drop.size === 0) {
+    return 0;
+  }
+  const changed = await withLock(async () => {
+    const store = await loadStore(storePath);
+    const now = new Date().toISOString();
+    const updates: Array<{ record: SeatModelGrant; removed: ModelRef[] }> = [];
+    for (const [key, grant] of Object.entries(store.grants)) {
+      if (grant.tenantId !== canonical) {
+        continue;
+      }
+      const removed = grant.grantedModelIds.filter((id) => drop.has(id.trim()));
+      if (removed.length === 0) {
+        continue;
+      }
+      const nextIds = grant.grantedModelIds.filter((id) => !drop.has(id.trim()));
+      const record: SeatModelGrant = {
+        ...grant,
+        grantedModelIds: nextIds,
+        updatedAt: now,
+      };
+      store.grants[key] = record;
+      updates.push({ record, removed });
+    }
+    if (updates.length === 0) {
+      return [];
+    }
+    await saveStore(store, storePath);
+    return updates;
+  });
+  for (const update of changed) {
+    await recordModelGrantAuditEvent({
+      type: "model.revoked",
+      tenantId: canonical,
+      subjectType: update.record.subjectType,
+      subjectId: update.record.subjectId,
+      seatId: update.record.seatId,
+      employeeId: update.record.employeeId,
+      modelIds: update.removed,
+      ...(input.actorUserId ? { actorUserId: input.actorUserId } : {}),
+    });
+  }
+  return changed.length;
+}
+
 // ── seat 级便捷包装（向后兼容） ───────────────────────────────────────────────
 
 export function getSeatModelGrant(
