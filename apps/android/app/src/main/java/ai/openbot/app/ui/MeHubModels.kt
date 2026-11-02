@@ -194,7 +194,7 @@ fun meIdentityCardFromAccount(
     name.firstOrNull { !it.isWhitespace() }?.uppercaseChar()?.toString() ?: "·"
   val orgLine =
     when {
-      orgId.isNullOrBlank() && trimmedEmail.isEmpty() -> "连接网关并登录后同步身份"
+      orgId.isNullOrBlank() && trimmedEmail.isEmpty() -> "登录后同步身份"
       orgId.isNullOrBlank() -> "个人账号"
       else -> "组织 $orgId"
     }

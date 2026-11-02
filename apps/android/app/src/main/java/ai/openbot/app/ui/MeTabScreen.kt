@@ -79,7 +79,6 @@ private enum class MeSheet {
   Security,
   Prefs,
   Auth,
-  Gateway,
   Perms,
   Devices,
   Robots,
@@ -315,27 +314,24 @@ fun MeTabScreen(
               if (!isConnected && !demoMe) {
                 item {
                   MobileSoftBanner(
-                    text = "未连接网关。点此或下方「去连接网关」进行连接。",
+                    text = "服务暂未就绪，登录后会自动连接，无需手动配置网关。",
                     tone = MobileBannerTone.Warning,
-                    modifier = Modifier.clickable { sheet = MeSheet.Gateway },
                   )
                 }
               }
-              item { MobileSectionLabel(text = "连接") }
+              item { MobileSectionLabel(text = "本机") }
               item {
-                MeNavRowWithBadge(
-                  title = "连接网关",
-                  subtitle =
-                    if (isConnected) {
-                      statusText.ifBlank { "已连接" }
-                    } else {
-                      "云端账号登录 · 查看连接状态"
-                    },
-                  icon = Icons.Default.CheckCircle,
-                  badge = if (isConnected) "已连接" else "未连接",
-                  badgeWarn = !isConnected,
-                  onClick = { sheet = MeSheet.Gateway },
-                )
+                MobileWhiteCard {
+                  MobileInfoBlock(
+                    label = "连接状态",
+                    value =
+                      if (isConnected) {
+                        statusText.ifBlank { "已连接" }
+                      } else {
+                        "未连接 · 登录后自动连接云端服务"
+                      },
+                  )
+                }
               }
               item {
                 MobileNavRow(
@@ -357,12 +353,6 @@ fun MeTabScreen(
               }
               item { MobileSectionLabel(text = "本机权限预览") }
               item { MePermissionPreviewGrid() }
-              item {
-                MobilePrimaryButton(
-                  label = if (isConnected) "查看连接状态" else "去连接网关",
-                  onClick = { sheet = MeSheet.Gateway },
-                )
-              }
               item { MobileSectionLabel(text = "本机能力") }
               item {
                 MobileGroupedNavCard(
@@ -376,7 +366,7 @@ fun MeTabScreen(
                       ),
                       MobileGroupedNavItem(
                         title = "画布",
-                        subtitle = "查看网关推送的内容",
+                        subtitle = "查看服务推送的内容",
                         icon = Icons.AutoMirrored.Filled.ScreenShare,
                         onClick = { sheet = MeSheet.Screen },
                       ),
@@ -493,16 +483,11 @@ fun MeTabScreen(
                 )
                 notice = "已打开 Web 授权页（若未登录请先在工作台登录）"
               } else {
-                notice = "请先连接网关并登录，再打开 Web 身份向导"
+                notice = "请先登录账号，再打开 Web 身份向导"
               }
             }
           },
         )
-      }
-    }
-    MeSheet.Gateway -> {
-      MeSubScaffold(title = "连接网关", onBack = { sheet = MeSheet.None }, modifier = modifier) {
-        ConnectTabScreen(viewModel = viewModel, embedded = true)
       }
     }
     MeSheet.Perms -> {
@@ -645,7 +630,7 @@ fun MeTabScreen(
               scope.launch {
                 try {
                   if (!isConnected && !demoMe) {
-                    notice = "未连接网关，无法保存设置"
+                    notice = "服务未就绪，无法保存设置"
                     return@launch
                   }
                   if (demoMe) {
@@ -678,7 +663,7 @@ fun MeTabScreen(
               scope.launch {
                 try {
                   if (!isConnected && !demoMe) {
-                    notice = "未连接网关，无法邀请"
+                    notice = "服务未就绪，无法邀请"
                     return@launch
                   }
                   if (demoMe) {
@@ -713,7 +698,7 @@ fun MeTabScreen(
             scope.launch {
               try {
                 if (!isConnected && !demoMe) {
-                  notice = "未连接网关，无法创建"
+                  notice = "服务未就绪，无法创建"
                   return@launch
                 }
                 if (demoMe) {
@@ -774,7 +759,7 @@ fun MeTabScreen(
             scope.launch {
               try {
                 if (!isConnected && !demoMe) {
-                  notice = "未连接网关，无法创建"
+                  notice = "服务未就绪，无法创建"
                   return@launch
                 }
                 val groupId = slugifyMeEntityId("space", title)
@@ -1199,7 +1184,7 @@ private fun MeDevicesSheet(
     }
     if (offline) {
       item {
-        MobileSoftBanner(text = "未连接网关：连接后拉取已配对设备。", tone = MobileBannerTone.Warning)
+        MobileSoftBanner(text = "服务未就绪：连接后拉取已配对设备。", tone = MobileBannerTone.Warning)
       }
     } else if (devices.isEmpty()) {
       item { MobileSoftBanner(text = "暂无已配对设备。", tone = MobileBannerTone.Neutral) }
@@ -1419,7 +1404,7 @@ private fun MeRobotWorkspaceEditor(
             role = bot.roleTitle,
             personaTraits = bot.persona,
           )
-        loadError = "未连接网关：仅展示列表缓存，能力/成长/授权需联网。"
+        loadError = "服务未就绪：仅展示列表缓存，能力/成长/授权需联网。"
         return@LaunchedEffect
       }
       val raw =
@@ -1577,7 +1562,7 @@ private fun MeRobotWorkspaceEditor(
                 val pe = persona.trim().ifEmpty { null }
                 try {
                   if (!isConnected && !demoMe) {
-                    onNotice("未连接网关，无法保存身份")
+                    onNotice("服务未就绪，无法保存身份")
                     return@launch
                   }
                   if (demoMe) {
@@ -1712,7 +1697,7 @@ private fun MeRobotWorkspaceEditor(
                     return@launch
                   }
                   if (!isConnected) {
-                    onNotice("未连接网关，无法确认授权")
+                    onNotice("服务未就绪，无法确认授权")
                     return@launch
                   }
                   val scope = if (bot.access == MeBotAccess.Owned) "owned" else "shared"
