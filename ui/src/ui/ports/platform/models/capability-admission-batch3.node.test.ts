@@ -4,7 +4,15 @@ import {
   createLocalProtocolVerificationService,
   normalizeQualityScore,
 } from "./admission/local-protocol-adapter.ts";
+import {
+  admitPooledModelAfterConnection,
+  POOLED_HEALTHY_ADMISSION_REASON,
+} from "./admission/pooled-admission.ts";
 import { previewRoutingDecisionViaService } from "./admission/routing-decision-service.ts";
+import {
+  __resetCapabilityVerificationServiceForTest,
+  bindCapabilityAdmissionGateway,
+} from "./admission/verification-service.ts";
 import { verifiedCapabilityIds } from "./capability-evidence.ts";
 import {
   assetHasCapability,
@@ -415,5 +423,70 @@ describe("batch3 specialized score pipeline through protocol adapter", () => {
     );
     expect(persisted?.status).toBe("passed");
     expect(persisted?.qualityScore).toBeUndefined();
+  });
+});
+
+describe("pooled connection writes executable admission", () => {
+  beforeEach(() => {
+    __resetModelAdmissionStoreForTest();
+    __resetCapabilityVerificationServiceForTest();
+  });
+
+  it("writes eligible admission through the gateway when no row exists", async () => {
+    const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
+    await bindCapabilityAdmissionGateway(async (method, params) => {
+      calls.push({ method, params });
+      if (method === "models.admission.listModelAdmissions") {
+        return { admissions: [] };
+      }
+      if (method === "models.admission.setRoutingEligibility") {
+        return {
+          status: "applied",
+          modelRef: params?.modelRef,
+          autoRouting: params?.autoRouting,
+          admission: {
+            modelRef: params?.modelRef,
+            autoRouting: "eligible",
+            tenantSelectable: false,
+            autoRoutingTaskCategories: [],
+            capabilityEvidence: [],
+            updatedAt: 1,
+            platformEffective: true,
+            autoRoutingReason: params?.reason,
+          },
+        };
+      }
+      return {};
+    });
+    expect(await admitPooledModelAfterConnection("api-proxy-deepseek/deepseek-v4-flash")).toBe(
+      true,
+    );
+    expect(
+      calls.find((call) => call.method === "models.admission.setRoutingEligibility")?.params,
+    ).toMatchObject({
+      modelRef: "api-proxy-deepseek/deepseek-v4-flash",
+      autoRouting: "eligible",
+      reason: POOLED_HEALTHY_ADMISSION_REASON,
+    });
+  });
+
+  it("leaves an existing gateway admission row unchanged", async () => {
+    upsertModelAdmission("api-proxy-deepseek/deepseek-v4-flash", {
+      autoRouting: "paused",
+      autoRoutingReason: "管理员暂停",
+      platformEffective: true,
+    });
+    const calls: string[] = [];
+    await bindCapabilityAdmissionGateway(async (method) => {
+      calls.push(method);
+      if (method === "models.admission.listModelAdmissions") {
+        return { admissions: [] };
+      }
+      return {};
+    });
+    expect(await admitPooledModelAfterConnection("api-proxy-deepseek/deepseek-v4-flash")).toBe(
+      false,
+    );
+    expect(calls).not.toContain("models.admission.setRoutingEligibility");
   });
 });

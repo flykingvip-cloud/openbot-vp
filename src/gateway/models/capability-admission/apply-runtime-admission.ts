@@ -6,6 +6,7 @@
  */
 
 import type { ModelCandidate } from "../../../agents/model-fallback.types.js";
+import type { OpenBotConfig } from "../../../config/types.js";
 import { listEnabledResourceCatalogModelIds } from "../../resource-catalog/list-enabled-model-ids.js";
 import { isEnterpriseSuppliedModelId } from "../platform-model-connection.js";
 import {
@@ -16,6 +17,7 @@ import {
   type RuntimeDecisionRole,
 } from "./runtime-decision.js";
 import { readStoredModelAdmissions } from "./store.js";
+import { ensureExecutableAdmissionForAllowlistedConnections } from "./sync-pooled-admission.js";
 import type { ModelAdmissionRecord } from "./types.js";
 
 export type RuntimeAdmissionInput = RuntimeDecisionRequest & {
@@ -33,6 +35,18 @@ export type RuntimeAdmissionInput = RuntimeDecisionRequest & {
    * stored admission rows still count. Tests use this for a closed scope.
    */
   discoverPlatformScope?: boolean;
+  /**
+   * Config used to see which models are allowlisted (入池). When omitted, sync
+   * loads the gateway config. Tests pass a closed config instead.
+   */
+  cfg?: OpenBotConfig;
+  /** Probe store used to require status `ok` before writing a missing admission. */
+  probeStorePath?: string;
+  /**
+   * When false, do not write an admission row for an allowlisted probe-ok model.
+   * Default: sync when platform scope discovery is on, or when set true in tests.
+   */
+  syncPooledHealthyAdmission?: boolean;
 };
 
 export class PlatformAdmissionEmptyError extends Error {
@@ -84,6 +98,51 @@ function notEngaged(candidates: readonly ModelCandidate[]): {
   return { engaged: false, candidates: [...candidates], decision: null };
 }
 
+/**
+ * Allowlisted + probe-ok platform models with no admission row are not callable.
+ * Write eligible once so the same turn can proceed. Existing rows stay as written.
+ */
+async function syncMissingAdmissionForPooledHealthyModels(params: {
+  runtime: RuntimeAdmissionInput | undefined;
+  records: Record<string, ModelAdmissionRecord>;
+  platformScope: ReadonlySet<string>;
+  candidates: readonly ModelCandidate[];
+  personal: ReadonlySet<string>;
+  storeUnreadable: boolean;
+}): Promise<boolean> {
+  const runtime = params.runtime;
+  const shouldSync =
+    runtime?.syncPooledHealthyAdmission === true ||
+    (runtime?.syncPooledHealthyAdmission !== false && runtime?.discoverPlatformScope !== false);
+  if (!shouldSync || params.storeUnreadable || params.platformScope.size === 0) {
+    return false;
+  }
+  const missing = params.candidates.some((candidate) => {
+    const modelId = candidateId(candidate);
+    return (
+      params.platformScope.has(modelId) && !params.personal.has(modelId) && !params.records[modelId]
+    );
+  });
+  if (!missing) {
+    return false;
+  }
+  try {
+    const cfg = runtime?.cfg ?? (await import("../../../config/config.js")).loadConfig();
+    await ensureExecutableAdmissionForAllowlistedConnections({
+      cfg,
+      storePath: runtime?.storePath,
+      probeStorePath: runtime?.probeStorePath,
+      limitToModelIds: params.platformScope,
+      personalByokModelIds: runtime?.personalByokModelIds,
+    });
+    // Re-read even when this call inserted nothing: a concurrent writer may
+    // have stored a pause that must win over the empty snapshot.
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function filterModelCandidatesByPlatformAdmission(params: {
   candidates: readonly ModelCandidate[];
   runtime?: RuntimeAdmissionInput;
@@ -122,6 +181,21 @@ export async function filterModelCandidatesByPlatformAdmission(params: {
       continue;
     }
     platformScope.add(id);
+  }
+  const syncedAdmission = await syncMissingAdmissionForPooledHealthyModels({
+    runtime,
+    records,
+    platformScope,
+    candidates: params.candidates,
+    personal,
+    storeUnreadable,
+  });
+  if (syncedAdmission) {
+    try {
+      records = await readStoredModelAdmissions(runtime?.storePath);
+    } catch {
+      // Keep the rows already loaded. Losing them would fail the turn closed.
+    }
   }
   if (platformScope.size === 0) {
     return notEngaged(params.candidates);

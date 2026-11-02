@@ -61,6 +61,15 @@ function vm(): ModelAssetsVM {
         healthBasis: "catalog_verified",
         source: "discovered",
       }),
+      asset({
+        modelId: "private/down",
+        displayName: "Down Flash",
+        providerId: "private",
+        health: "unavailable",
+        healthBasis: "live_probe_failed",
+        source: "configured",
+        inRecommendationPool: true,
+      }),
     ],
     filters: {
       providers: ["deepseek", "private"],
@@ -120,6 +129,16 @@ describe("model pool connection gate", () => {
     expect(host.textContent).not.toContain("已连通并纳入模型池");
     expect(host.textContent).not.toContain("按调用频次排序");
     expect(host.textContent).not.toContain("使用分析数据尚未接入");
+    expect(host.textContent).not.toContain("暂无 7 日使用分析");
+    const usage = pool?.querySelector("[data-testid='model-usage-7d']");
+    expect(usage?.textContent?.trim()).toBe("暂无用量");
+    expect(usage?.textContent).not.toContain("未接入");
+    expect(usage?.getAttribute("title")).toContain("不影响连接和调用");
+    expect(pending?.textContent).toContain("Down Flash");
+    expect(pending?.textContent).toContain("未连通");
+    expect(pending?.textContent).not.toContain("这些模型还没有通过连接验证");
+    expect(host.textContent).not.toContain("员工调用会失败");
+    expect(host.querySelector("[data-testid='platform-unusable-models']")).toBeNull();
     expect(host.textContent).not.toContain("不代表模型已进入模型池");
     expect(host.querySelector(".platform-model-assets-topbar")).not.toBeNull();
     expect(host.querySelector(".platform-model-assets-search input")).not.toBeNull();
