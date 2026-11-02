@@ -505,22 +505,41 @@ export function appendSameTaskConstraint(params: {
   };
 }
 
-/** File-backed entry used by reply path — does not invent a second update rule. */
+/**
+ * File-backed entry used by reply path — does not invent a second update rule.
+ * `expectedTaskId` must still be the unfinished current task that received the
+ * constraint; a focus switch mid-steer must not write A's constraint onto B.
+ * Returns false on identity mismatch or write failure (caller must not claim full success).
+ */
 export function commitSameTaskConstraint(params: {
   sessionFile: string;
   constraintText: string;
+  expectedTaskId: string;
 }): boolean {
   const sessionFile = params.sessionFile.trim();
-  if (!sessionFile) {
+  const expectedTaskId = params.expectedTaskId.trim();
+  if (!sessionFile || !expectedTaskId) {
     return false;
   }
-  const board = readSessionTaskBoard(sessionFile);
-  if (!board.current?.unfinished) {
+  try {
+    const board = readSessionTaskBoard(sessionFile);
+    const current = board.current;
+    if (!current?.unfinished) {
+      return false;
+    }
+    if (current.taskId !== expectedTaskId) {
+      return false;
+    }
+    const next = appendSameTaskConstraint({ board, constraintText: params.constraintText });
+    // Identity must still hold after append (defensive; append never switches task).
+    if (next.current?.taskId !== expectedTaskId) {
+      return false;
+    }
+    writeSessionTaskBoard(sessionFile, next);
+    return true;
+  } catch {
     return false;
   }
-  const next = appendSameTaskConstraint({ board, constraintText: params.constraintText });
-  writeSessionTaskBoard(sessionFile, next);
-  return true;
 }
 
 export function isOwnerCurrentTaskControlUtterance(text: string): boolean {

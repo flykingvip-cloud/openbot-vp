@@ -88,6 +88,7 @@ import {
   recordHonestCapabilityGap,
   stripCapabilityGapMarkers,
 } from "./honest-empty-reply.js";
+import { resolveMidTaskAsideDisposition } from "./mid-task-aside.js";
 import {
   formatAmendConstraintAck,
   formatTaskBoardProgressReply,
@@ -299,6 +300,24 @@ export async function runReplyAgent(params: {
     }
   }
 
+  // Slice2 local checkpoint: board_readonly asides (goal/constraint asks) reply
+  // from the task-board projection only — never mutate A or start a second controller.
+  // General reply_lane timely LLM asides remain unfinished (see aside design doc).
+  if (isActive && followupRun.run.sessionFile) {
+    const board = readSessionTaskBoard(followupRun.run.sessionFile);
+    if (board.current) {
+      const aside = resolveMidTaskAsideDisposition({
+        prompt: followupRun.prompt,
+        board,
+      });
+      if (aside.kind === "board_readonly") {
+        await touchActiveSessionEntry();
+        typing.cleanup();
+        return [{ text: aside.reply }];
+      }
+    }
+  }
+
   if (shouldSteer && isStreaming) {
     const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
     if (steered && !shouldFollowup) {
@@ -323,17 +342,31 @@ export async function runReplyAgent(params: {
     // must NOT also enqueue-followup (would re-apply the same constraint). Steer
     // failure falls through so followup still carries the constraint — no drop.
     // Constraint persistence goes through the sole board entry (not a reply-layer rewrite).
+    // Capture the receiving task id BEFORE steer so a mid-steer focus switch cannot
+    // attribute A's constraint to B; persist failure must not claim full success.
+    const sessionFile = followupRun.run.sessionFile?.trim() ?? "";
+    const expectedTaskId = sessionFile
+      ? (readSessionTaskBoard(sessionFile).current?.taskId?.trim() ?? "")
+      : "";
     const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
     if (steered) {
-      const sessionFile = followupRun.run.sessionFile?.trim();
-      if (sessionFile) {
+      const persisted =
+        Boolean(sessionFile) &&
+        Boolean(expectedTaskId) &&
         commitSameTaskConstraint({
           sessionFile,
           constraintText: followupRun.prompt,
+          expectedTaskId,
         });
-      }
       await touchActiveSessionEntry();
       typing.cleanup();
+      if (!persisted) {
+        return [
+          {
+            text: "约束已尝试注入当前执行，但未能写入原任务板（任务可能已切换或写入失败）。请重新发送该补充约束；本次不视为完整成功。",
+          },
+        ];
+      }
       return [{ text: formatAmendConstraintAck(followupRun.prompt) }];
     }
   }

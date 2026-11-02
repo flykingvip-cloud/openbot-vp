@@ -10,6 +10,7 @@ import {
 } from "../../agents/builtin-steward/employee-isolation.js";
 import { isBuiltinStewardAgent } from "../../agents/builtin-steward/identity.js";
 import { resolveThinkingDefault } from "../../agents/model-selection.js";
+import { abortEmbeddedPiRun } from "../../agents/pi-embedded.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { gateChatHistoryText, stripToolMessages } from "../../agents/tools/sessions-helpers.js";
 import { omitImagePayloadForHistory } from "../../agents/transcript-image-omit.js";
@@ -19,6 +20,7 @@ import { isTranscriptStartBoundary } from "../../auto-reply/reply/chat-checkpoin
 import { noteUnresolvedChatRunError } from "../../auto-reply/reply/chat-run-error-escalation.js";
 import { isInternalContinueHistoryMessage } from "../../auto-reply/reply/internal-continue-prompt.js";
 import { isMemoryFlushHistoryMessage } from "../../auto-reply/reply/memory-flush-prompt.js";
+import { clearSessionQueues } from "../../auto-reply/reply/queue.js";
 import { createReplyDispatcher } from "../../auto-reply/reply/reply-dispatcher.js";
 import {
   emptyRestoreTaskReconciliation,
@@ -6099,6 +6101,15 @@ export const chatHandlers: GatewayRequestHandlers = {
           client,
           sessionFile: entry?.sessionFile,
         });
+        // Mirror agent-runner pause/cancel: stop embedded run + drop pending followups
+        // so the original queue cannot continue business actions after owner stop.
+        if (ownerAbortInFlight) {
+          const embeddedSessionId = entry?.sessionId?.trim();
+          if (embeddedSessionId) {
+            abortEmbeddedPiRun(embeddedSessionId);
+          }
+          clearSessionQueues([resolvedSessionKey, sessionKey, rawSessionKey, entry?.sessionId]);
+        }
       }
       if (taskTracking.action === "cancel_parked") {
         observeConversationTaskCancelPathConsult({

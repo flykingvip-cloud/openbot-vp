@@ -161,4 +161,30 @@ describe("runReplyAgent collect amend steer inject", () => {
     expect(queueEmbeddedPiMessageMock).not.toHaveBeenCalled();
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
   });
+
+  it("constraint identity: mid-steer switch to B refuses A constraint and does not claim full success", async () => {
+    queueEmbeddedPiMessageMock.mockImplementation(() => {
+      // Simulate focus switch after steer inject succeeded but before board commit.
+      const switched = emptySessionTaskBoard();
+      switched.current = {
+        taskId: "task-b",
+        title: "合同审查",
+        goalText: "审查供应商合同",
+        unfinished: true,
+        stop: { summary: "新焦点", workspacePaths: [] },
+        createdAtMs: Date.now(),
+      };
+      writeSessionTaskBoard(sessionFile, switched);
+      steerCount += 1;
+      return true;
+    });
+    const result = await runReplyAgent(buildParams("补充：只要国内安卓机型——给 A 的约束"));
+    expect(steerCount).toBe(1);
+    expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
+    expect(result?.[0]?.text).toMatch(/未能写入原任务板|不视为完整成功/);
+    expect(result?.[0]?.text).not.toContain("仅一次");
+    const board = readSessionTaskBoard(sessionFile);
+    expect(board.current?.taskId).toBe("task-b");
+    expect(board.current?.effectiveConstraints ?? []).toEqual([]);
+  });
 });
