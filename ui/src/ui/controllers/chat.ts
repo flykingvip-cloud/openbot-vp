@@ -1637,21 +1637,16 @@ function handleFinalChatEvent(state: ChatEventState, payload: ChatEventPayload) 
   clearActiveChatRunState(state, payload.runId);
 }
 
+/**
+ * FT-RESULT-CARD-UX: ordinary user chat must not append the tip-backed 「任务结果」 card.
+ * Gateway default emission is already gated; this is defense-in-depth for stale clients.
+ * Tip store and `task.outcome.rejectResult` remain available on diagnosis / admin paths.
+ */
 function appendTaskUpdateMessage(
-  state: Pick<ChatEventState, "chatMessages">,
-  taskUpdate: ChatEventPayload["taskUpdate"],
+  _state: Pick<ChatEventState, "chatMessages">,
+  _taskUpdate: ChatEventPayload["taskUpdate"],
 ) {
-  if (!taskUpdate || taskUpdate.type !== "task_update" || !taskUpdate.task) {
-    return;
-  }
-  const task = taskUpdate.task;
-  const taskId = typeof task.taskId === "string" ? task.taskId.trim() : "";
-  const agentId = typeof task.agentId === "string" ? task.agentId.trim() : "";
-  const outcomeVersion = task.outcomeVersion;
-  if (!taskId || !agentId || typeof outcomeVersion !== "number" || outcomeVersion < 1) {
-    return;
-  }
-  appendChatMessage(state, taskUpdate as unknown as Record<string, unknown>);
+  return;
 }
 
 function handleAbortedChatEvent(state: ChatEventState, payload: ChatEventPayload) {

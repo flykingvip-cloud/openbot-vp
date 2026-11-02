@@ -30,8 +30,8 @@ const assistant = {
   content: [{ type: "text", text: "做完了" }],
 };
 
-describe("chat final task update", () => {
-  it("appends a task card only when the final event carries a complete tip", () => {
+describe("FT-RESULT-CARD-UX chat final task update", () => {
+  it("A1/A3: does not append tip-backed 任务结果 cards into ordinary user chat", () => {
     const bare = createState();
     handleChatEvent(bare, {
       runId: "run-1",
@@ -40,19 +40,6 @@ describe("chat final task update", () => {
       message: assistant,
     });
     expect(JSON.stringify(bare.chatMessages)).not.toContain("task_update");
-
-    const partial = createState();
-    handleChatEvent(partial, {
-      runId: "run-1",
-      sessionKey: "agent:bot:main",
-      state: "final",
-      message: assistant,
-      taskUpdate: {
-        type: "task_update",
-        task: { id: "card-1", agentId: "bot", outcomeVersion: 2 },
-      },
-    } as ChatEventPayload);
-    expect(JSON.stringify(partial.chatMessages)).not.toContain("task_update");
 
     const ready = createState();
     handleChatEvent(ready, {
@@ -67,24 +54,43 @@ describe("chat final task update", () => {
           title: "任务结果",
           step_current: 1,
           step_total: 1,
-          step_name: "已完成",
-          status: "success",
+          step_name: "进行中",
+          status: "running",
           taskId: "chat:bot:agent:bot:main:run-1",
           agentId: "bot",
           outcomeVersion: 3,
         },
       },
     });
-    const card = ready.chatMessages.find(
-      (message) =>
-        message &&
-        typeof message === "object" &&
-        (message as { type?: string }).type === "task_update",
-    ) as { task?: { taskId?: string; agentId?: string; outcomeVersion?: number } } | undefined;
-    expect(card?.task).toMatchObject({
-      taskId: "chat:bot:agent:bot:main:run-1",
-      agentId: "bot",
-      outcomeVersion: 3,
-    });
+    expect(JSON.stringify(ready.chatMessages)).not.toContain("task_update");
+    expect(JSON.stringify(ready.chatMessages)).not.toContain("任务结果");
+    expect(JSON.stringify(ready.chatMessages)).not.toContain("暂无用量");
+  });
+
+  it("A2: incomplete tip payload with 进行中 + reject triple is still not appended", () => {
+    const state = createState();
+    handleChatEvent(state, {
+      runId: "run-1",
+      sessionKey: "agent:bot:main",
+      state: "final",
+      message: assistant,
+      taskUpdate: {
+        type: "task_update",
+        task: {
+          id: "chat:bot:agent:bot:main:run-1",
+          title: "任务结果",
+          step_current: 1,
+          step_total: 1,
+          step_name: "进行中",
+          status: "running",
+          taskId: "chat:bot:agent:bot:main:run-1",
+          agentId: "bot",
+          outcomeVersion: 1,
+        },
+      },
+    } as ChatEventPayload);
+    const blob = JSON.stringify(state.chatMessages);
+    expect(blob).not.toContain("task_update");
+    expect(blob).not.toContain("进行中");
   });
 });
