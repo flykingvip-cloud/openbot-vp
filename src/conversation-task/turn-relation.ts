@@ -154,20 +154,42 @@ export function isBareContinueCue(message: string | undefined): boolean {
  * Owner explicitly revises / replaces prior same-task instructions.
  * Reuses prior-utterance correction + clear replace openers — not a new adjudicator,
  * and not keyword deletion of unrelated history rows.
+ * Local revise ≠ full replace: only {@link isOwnerConstraintFullReplace} may supersede
+ * all prior active rows; otherwise history stays active and resume notes conflict coverage.
  */
 const CONSTRAINT_REVISION_OPENER_RE =
   /^(?:不对|错了|纠正|改为|改成|以后以|以本条为准|不要再(?:用|按|采用)?|别再)/u;
+
+/** Explicit whole-constraint replacement — the only case that supersedes all active rows. */
+const CONSTRAINT_FULL_REPLACE_RE =
+  /(?:以本条为准|全部(?:改成|改为|替换)|整体替换|废弃此前(?:全部)?(?:约束|要求|限制)?|之前的?(?:约束|要求|限制)(?:全部)?(?:作废|无效)|(?:只|仅)按本条|以后只按(?:本条|这条))/u;
 
 export function isOwnerConstraintRevision(message: string | undefined): boolean {
   const text = stripInboundStamp(message ?? "");
   if (!text || text.startsWith("/")) {
     return false;
   }
+  if (isOwnerConstraintFullReplace(text)) {
+    return true;
+  }
   if (isPriorUtteranceCorrection(text)) {
     return true;
   }
   const compactText = text.replace(/\s+/g, "").trim();
   return CONSTRAINT_REVISION_OPENER_RE.test(compactText);
+}
+
+/**
+ * True only when the owner clearly demands wholesale replacement of prior constraints.
+ * Partial corrections ("改为覆盖亚洲市场") must return false so unrelated limits stay active.
+ */
+export function isOwnerConstraintFullReplace(message: string | undefined): boolean {
+  const text = stripInboundStamp(message ?? "");
+  if (!text || text.startsWith("/")) {
+    return false;
+  }
+  const compactText = text.replace(/\s+/g, "").trim();
+  return CONSTRAINT_FULL_REPLACE_RE.test(compactText);
 }
 
 /**

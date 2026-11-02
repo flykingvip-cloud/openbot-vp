@@ -1,3 +1,4 @@
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { isPidAlive } from "../shared/pid-alive.js";
@@ -157,5 +158,154 @@ export async function withFileLock<T>(
     return await fn();
   } finally {
     await lock.release();
+  }
+}
+
+type HeldLockSync = {
+  count: number;
+  fd: number;
+  lockPath: string;
+};
+
+const HELD_LOCKS_SYNC_KEY = Symbol.for("openclaw.fileLockHeldLocksSync");
+const HELD_LOCKS_SYNC = resolveProcessScopedMap<HeldLockSync>(HELD_LOCKS_SYNC_KEY);
+
+function sleepMs(ms: number): void {
+  const ia = new Int32Array(new SharedArrayBuffer(4));
+  Atomics.wait(ia, 0, 0, ms);
+}
+
+function resolveNormalizedFilePathSync(filePath: string): string {
+  const resolved = path.resolve(filePath);
+  const dir = path.dirname(resolved);
+  fsSync.mkdirSync(dir, { recursive: true });
+  try {
+    const realDir = fsSync.realpathSync(dir);
+    return path.join(realDir, path.basename(resolved));
+  } catch {
+    return resolved;
+  }
+}
+
+function readLockPayloadSync(lockPath: string): LockFilePayload | null {
+  try {
+    const raw = fsSync.readFileSync(lockPath, "utf8");
+    const parsed = JSON.parse(raw) as Partial<LockFilePayload>;
+    if (typeof parsed.pid !== "number" || typeof parsed.createdAt !== "string") {
+      return null;
+    }
+    return { pid: parsed.pid, createdAt: parsed.createdAt };
+  } catch {
+    return null;
+  }
+}
+
+function isStaleLockSync(lockPath: string, staleMs: number): boolean {
+  const payload = readLockPayloadSync(lockPath);
+  if (payload?.pid && !isPidAlive(payload.pid)) {
+    return true;
+  }
+  if (payload?.createdAt) {
+    const createdAt = Date.parse(payload.createdAt);
+    if (!Number.isFinite(createdAt) || Date.now() - createdAt > staleMs) {
+      return true;
+    }
+  }
+  try {
+    const stat = fsSync.statSync(lockPath);
+    return Date.now() - stat.mtimeMs > staleMs;
+  } catch {
+    return true;
+  }
+}
+
+function releaseHeldLockSync(normalizedFile: string): void {
+  const current = HELD_LOCKS_SYNC.get(normalizedFile);
+  if (!current) {
+    return;
+  }
+  current.count -= 1;
+  if (current.count > 0) {
+    return;
+  }
+  HELD_LOCKS_SYNC.delete(normalizedFile);
+  try {
+    fsSync.closeSync(current.fd);
+  } catch {
+    // ignore
+  }
+  try {
+    fsSync.rmSync(current.lockPath, { force: true });
+  } catch {
+    // ignore
+  }
+}
+
+export type FileLockHandleSync = {
+  lockPath: string;
+  release: () => void;
+};
+
+/**
+ * Sync counterpart of acquireFileLock — same `${file}.lock` protocol + stale pid break.
+ * Used by sync stores (session task board) so cross-process writers share one mechanism.
+ */
+export function acquireFileLockSync(
+  filePath: string,
+  options: FileLockOptions,
+): FileLockHandleSync {
+  const normalizedFile = resolveNormalizedFilePathSync(filePath);
+  const lockPath = `${normalizedFile}.lock`;
+  const held = HELD_LOCKS_SYNC.get(normalizedFile);
+  if (held) {
+    held.count += 1;
+    return {
+      lockPath,
+      release: () => releaseHeldLockSync(normalizedFile),
+    };
+  }
+
+  const attempts = Math.max(1, options.retries.retries + 1);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const fd = fsSync.openSync(lockPath, "wx");
+      fsSync.writeFileSync(
+        fd,
+        JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }, null, 2),
+      );
+      HELD_LOCKS_SYNC.set(normalizedFile, { count: 1, fd, lockPath });
+      return {
+        lockPath,
+        release: () => releaseHeldLockSync(normalizedFile),
+      };
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code !== "EEXIST") {
+        throw err;
+      }
+      if (isStaleLockSync(lockPath, options.stale)) {
+        try {
+          fsSync.rmSync(lockPath, { force: true });
+        } catch {
+          // race
+        }
+        continue;
+      }
+      if (attempt >= attempts - 1) {
+        break;
+      }
+      sleepMs(computeDelayMs(options.retries, attempt));
+    }
+  }
+
+  throw new Error(`file lock timeout for ${normalizedFile}`);
+}
+
+export function withFileLockSync<T>(filePath: string, options: FileLockOptions, fn: () => T): T {
+  const lock = acquireFileLockSync(filePath, options);
+  try {
+    return fn();
+  } finally {
+    lock.release();
   }
 }

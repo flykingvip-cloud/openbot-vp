@@ -173,8 +173,8 @@ describe("slice3 context event sequence", () => {
     const afterRevise = readSessionTaskBoard(sessionFile);
     const active = activeConstraintTexts(afterRevise.current);
     expect(active.some((t) => t.includes("只要 iOS 机型"))).toBe(true);
-    expect(active.some((t) => t.includes("只要国内安卓机型") && !t.includes("iOS"))).toBe(false);
-    // History retained
+    // Local revise must not auto-discard unrelated/prior rows — both stay active.
+    expect(active.some((t) => t.includes("只要国内安卓机型"))).toBe(true);
     expect((afterRevise.current?.effectiveConstraints ?? []).length).toBeGreaterThanOrEqual(2);
     // Goal retained
     expect(afterRevise.current?.goalText).toContain("调研国内手机市场");
@@ -198,12 +198,12 @@ describe("slice3 context event sequence", () => {
       beforeAside,
     );
 
-    // Resume prompt from board (park→resume path uses buildResumePrompt) — only active constraints.
+    // Resume prompt lists active constraints; local revise notes conflict coverage.
     const resumePrompt = buildResumePrompt(readSessionTaskBoard(sessionFile).current!);
     events.push("resume_prompt_active_only");
     expect(resumePrompt).toContain("只要 iOS 机型");
     expect(resumePrompt).toContain(CRITICAL_TAIL);
-    expect(resumePrompt).not.toMatch(/有效约束[\s\S]*只要国内安卓机型(?![\s\S]*iOS)/);
+    expect(resumePrompt).toMatch(/仅覆盖.*冲突/);
     // Resume prompt must not clear wakeSuppress / invent wake
     const boardForResume = readSessionTaskBoard(sessionFile);
     boardForResume.current = { ...boardForResume.current!, wakeSuppress: true };

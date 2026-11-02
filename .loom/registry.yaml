@@ -65,7 +65,7 @@ tasks:
         ide: cursor
         agent: cursor-grok
         status: active
-        lastSignalAt: 2026-11-02T20:52:10.431Z
+        lastSignalAt: 2026-11-02T23:06:20.672Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-02
@@ -10809,12 +10809,16 @@ landingStreams:
       - src/auto-reply/reply/slice3-context-event-sequence.test.ts
       - docs/slice3-context-enhancement-delivery.md
       - docs/slice2-aside-reply-concurrency-design.md
+      - src/plugin-sdk/file-lock.ts
+      - src/infra/file-lock.ts
+      - src/conversation-task/session-task-board.cross-process-child.ts
+      - src/conversation-task/session-task-board.cross-process.test.ts
     canLandWith: []
     metadata:
       task: ft-plan-speak-shopping-positive-admission
       owner: cursor-grok
-      purpose: "Slice3 constraint log revise/supersede + writeEpoch CAS + persist gates;
-        aside reply_lane still unfinished."
+      purpose: Slice3 constraint log revise/supersede + writeEpoch CAS + persist
+        gates; aside reply_lane still unfinished.
   - id: collab-role-duty-separation-20261102
     landingPolicy: serial
     paths:

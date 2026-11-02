@@ -3,6 +3,7 @@ import { isWeakNewWorkCueOnly } from "./qualification.js";
 import {
   classifyTurnRelation,
   isBareContinueCue,
+  isOwnerConstraintFullReplace,
   isOwnerConstraintRevision,
   shouldPersistOwnerConstraint,
   isLanguageAsideMessage,
@@ -107,6 +108,14 @@ describe("slice3 constraint persist gates", () => {
     expect(isOwnerConstraintRevision("补充：只要国内安卓机型")).toBe(false);
     expect(shouldPersistOwnerConstraint("不对，改为只要 iOS 机型")).toBe(true);
     expect(shouldPersistOwnerConstraint("补充：只要国内安卓机型")).toBe(true);
+  });
+
+  it("full replace is distinct from local revision", () => {
+    expect(isOwnerConstraintFullReplace("改为覆盖亚洲市场")).toBe(false);
+    expect(isOwnerConstraintFullReplace("不对，改为只要 iOS 机型")).toBe(false);
+    expect(isOwnerConstraintFullReplace("以本条为准：只要 iOS 机型，不要安卓")).toBe(true);
+    expect(isOwnerConstraintFullReplace("整体替换为：只用公开资料")).toBe(true);
+    expect(isOwnerConstraintRevision("以本条为准：只要 iOS 机型")).toBe(true);
   });
 
   it("classifyTurnRelation accepts context without scanning constraint history", () => {

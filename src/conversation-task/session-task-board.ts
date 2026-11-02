@@ -3,12 +3,14 @@
  * This record — not transcript fence markers or token overlap — decides
  * whether a turn stays on the current task or starts different work.
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import { isTaskSurfaceUtterance } from "../agents/task-surface/surface.js";
+import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLockSync } from "../infra/file-lock.js";
 import { formatDroppedParkedTaskSentence, type FocusSnapshot } from "./focus-policy.js";
 import {
   classifyTurnRelation,
+  isOwnerConstraintFullReplace,
   isOwnerConstraintRevision,
   shouldPersistOwnerConstraint,
   titleFromGoal,
@@ -26,7 +28,8 @@ export type TaskStop = {
 /**
  * One owner constraint / revision entry (slice3).
  * History is append-only; `superseded` marks coverage for resume — rows are never deleted
- * by keyword scanning. `revise` supersedes prior *active* rows; `supplement` keeps them.
+ * by keyword scanning. Only an explicit *full replace* supersedes prior active rows;
+ * local `revise` / `supplement` keep them active (resume notes conflict coverage).
  */
 export type ConstraintEntry = {
   text: string;
@@ -95,8 +98,8 @@ export type SessionTaskBoard = {
    */
   focusRevision: number;
   /**
-   * Monotonic board write generation (slice3). Bumps on every successful
-   * writeSessionTaskBoard — used by constraint CAS; independent of focusRevision.
+   * Monotonic board write generation (slice3). Bumped from *on-disk* epoch inside
+   * the shared file lock on every successful write — independent of focusRevision.
    */
   writeEpoch?: number;
   /** CLOSE tombstones (C5). */
@@ -380,10 +383,18 @@ export function buildResumePrompt(task: TrackedTask): string {
   const pathLine = paths.length > 0 ? `\n文件：${paths.join("、")}` : "";
   // Only currently binding constraints — superseded history stays on the board
   // but must not be presented as simultaneously valid instructions (slice3).
-  const constraints = activeConstraintTexts(task);
+  const entries = normalizeConstraintEntries(task.effectiveConstraints).filter(
+    (row) => !row.superseded,
+  );
+  const constraints = entries.map((row) => row.text);
+  const hasLocalReviseAmongActive =
+    entries.length > 1 && entries.some((row) => row.kind === "revise");
+  const constraintHeader = hasLocalReviseAmongActive
+    ? "有效约束（按登记顺序；后文修订仅覆盖与其冲突的部分，其余条目仍有效）："
+    : "有效约束（按登记顺序）：";
   const constraintBlock =
     constraints.length > 0
-      ? `\n有效约束（按登记顺序；后文显式修订覆盖此前仍有效的条目）：\n${constraints
+      ? `\n${constraintHeader}\n${constraints
           .map((row, index) => `${index + 1}. ${row}`)
           .join("\n")}`
       : "";
@@ -545,8 +556,8 @@ function constraintDisplayMarker(fullText: string): string {
  * Sole same-task constraint updater for the board.
  * Persists the *full* owner text on the constraint log; stop.summary gets a short display marker only.
  * - Bare continue / read queries are not persisted.
- * - Explicit revision supersedes prior *active* rows (history kept with superseded=true).
- * - Supplement appends without clearing prior active rows.
+ * - Explicit *full replace* supersedes prior active rows (history kept with superseded=true).
+ * - Local revision / supplement append without auto-discarding unrelated active rows.
  * Never deletes rows by keyword scan; never invents a second adjudicator.
  */
 export function appendSameTaskConstraint(params: {
@@ -571,8 +582,10 @@ export function appendSameTaskConstraint(params: {
   if (priorList.some((row) => row.text === cleaned && !row.superseded)) {
     return board;
   }
-  const revise = isOwnerConstraintRevision(cleaned);
-  const nextList: ConstraintEntry[] = revise
+  const fullReplace = isOwnerConstraintFullReplace(cleaned);
+  const revise = fullReplace || isOwnerConstraintRevision(cleaned);
+  // Only wholesale replace marks prior active rows superseded. Local revise keeps them.
+  const nextList: ConstraintEntry[] = fullReplace
     ? priorList.map((row) => (row.superseded ? row : { ...row, superseded: true }))
     : [...priorList];
   nextList.push({
@@ -600,8 +613,8 @@ export function appendSameTaskConstraint(params: {
  * File-backed entry used by reply path — does not invent a second update rule.
  * `expectedTaskId` must still be the unfinished current task that received the
  * constraint; a focus switch mid-steer must not write A's constraint onto B.
- * Optional `expectedWriteEpoch` enables CAS against concurrent board writers
- * (writeEpoch bumps on every successful writeSessionTaskBoard).
+ * Optional `expectedWriteEpoch` refuses stale callers; the read/check/mutate/write
+ * runs under the shared board file lock (`withFileLockSync` on the board path).
  * Returns false on identity mismatch, epoch mismatch, non-persistable text, or write failure.
  */
 export function commitSameTaskConstraint(params: {
@@ -619,51 +632,37 @@ export function commitSameTaskConstraint(params: {
     return false;
   }
   try {
-    const board = readSessionTaskBoard(sessionFile);
-    const current = board.current;
-    if (!current?.unfinished) {
-      return false;
-    }
-    if (current.taskId !== expectedTaskId) {
-      return false;
-    }
-    const epoch = board.writeEpoch ?? 0;
-    if (typeof params.expectedWriteEpoch === "number" && params.expectedWriteEpoch !== epoch) {
-      return false;
-    }
-    // Re-read CAS immediately before mutate+write (identity + writeEpoch).
-    const live = readSessionTaskBoard(sessionFile);
-    if ((live.writeEpoch ?? 0) !== epoch) {
-      return false;
-    }
-    if (live.current?.taskId !== expectedTaskId || !live.current.unfinished) {
-      return false;
-    }
-    const beforeLog = JSON.stringify(normalizeConstraintEntries(live.current.effectiveConstraints));
-    const committed = appendSameTaskConstraint({
-      board: live,
-      constraintText: params.constraintText,
+    return withSessionTaskBoardLock(sessionFile, () => {
+      const live = readSessionTaskBoardUnlocked(sessionFile);
+      const current = live.current;
+      if (!current?.unfinished) {
+        return false;
+      }
+      if (current.taskId !== expectedTaskId) {
+        return false;
+      }
+      const epoch = live.writeEpoch ?? 0;
+      if (typeof params.expectedWriteEpoch === "number" && params.expectedWriteEpoch !== epoch) {
+        return false;
+      }
+      const beforeLog = JSON.stringify(normalizeConstraintEntries(current.effectiveConstraints));
+      const committed = appendSameTaskConstraint({
+        board: live,
+        constraintText: params.constraintText,
+      });
+      if (committed.current?.taskId !== expectedTaskId) {
+        return false;
+      }
+      const afterLog = JSON.stringify(
+        normalizeConstraintEntries(committed.current?.effectiveConstraints),
+      );
+      if (beforeLog === afterLog) {
+        // Duplicate or filtered — not a successful new persist.
+        return false;
+      }
+      writeSessionTaskBoardUnlocked(sessionFile, committed);
+      return true;
     });
-    if (committed.current?.taskId !== expectedTaskId) {
-      return false;
-    }
-    const afterLog = JSON.stringify(
-      normalizeConstraintEntries(committed.current?.effectiveConstraints),
-    );
-    if (beforeLog === afterLog) {
-      // Duplicate or filtered — not a successful new persist.
-      return false;
-    }
-    // Final CAS: refuse if another writer landed between our live read and write.
-    const latest = readSessionTaskBoard(sessionFile);
-    if ((latest.writeEpoch ?? 0) !== epoch) {
-      return false;
-    }
-    if (latest.current?.taskId !== expectedTaskId) {
-      return false;
-    }
-    writeSessionTaskBoard(sessionFile, committed);
-    return true;
   } catch {
     return false;
   }
@@ -1296,7 +1295,12 @@ function normalizeTrackedTask(task: TrackedTask | undefined): TrackedTask | unde
   };
 }
 
-export function readSessionTaskBoard(sessionFile?: string): SessionTaskBoard {
+function withSessionTaskBoardLock<T>(sessionFile: string, fn: () => T): T {
+  const boardPath = sessionTaskBoardPath(sessionFile);
+  return withFileLockSync(boardPath, SESSION_TASK_BOARD_LOCK_OPTIONS, fn);
+}
+
+function readSessionTaskBoardUnlocked(sessionFile?: string): SessionTaskBoard {
   const file = sessionFile?.trim();
   if (!file) {
     return emptySessionTaskBoard();
@@ -1321,37 +1325,54 @@ export function readSessionTaskBoard(sessionFile?: string): SessionTaskBoard {
   }
 }
 
-export function writeSessionTaskBoard(sessionFile: string, board: SessionTaskBoard): void {
-  const priorEpoch = typeof board.writeEpoch === "number" ? board.writeEpoch : 0;
+/**
+ * Write under an already-held board lock. Epoch always advances from the *on-disk*
+ * value so concurrent callers cannot invent a non-monotonic generation from a stale board.
+ */
+function writeSessionTaskBoardUnlocked(sessionFile: string, board: SessionTaskBoard): void {
+  const disk = readSessionTaskBoardUnlocked(sessionFile);
+  const diskEpoch = typeof disk.writeEpoch === "number" ? disk.writeEpoch : 0;
   const normalized: SessionTaskBoard = {
     ...board,
     focusRevision: board.focusRevision ?? 0,
-    writeEpoch: priorEpoch + 1,
+    writeEpoch: diskEpoch + 1,
     parked: board.parked ?? [],
     current: normalizeTrackedTask(board.current) ?? board.current,
   };
-  fs.writeFileSync(sessionTaskBoardPath(sessionFile), `${JSON.stringify(normalized)}\n`, "utf8");
+  const target = sessionTaskBoardPath(sessionFile);
+  const tmp = `${target}.${process.pid}.${randomUUID()}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(normalized)}\n`, "utf8");
+  fs.renameSync(tmp, target);
+}
+
+export function readSessionTaskBoard(sessionFile?: string): SessionTaskBoard {
+  return readSessionTaskBoardUnlocked(sessionFile);
+}
+
+export function writeSessionTaskBoard(sessionFile: string, board: SessionTaskBoard): void {
+  withSessionTaskBoardLock(sessionFile, () => {
+    writeSessionTaskBoardUnlocked(sessionFile, board);
+  });
 }
 
 /**
- * Atomic file-backed switch: read → apply → write only if focusRevision still matches (C6/AC16).
- * Concurrent losers must retry; tasks are not silently dropped.
+ * Locked file-backed switch: read → apply → write only if focusRevision still matches (C6/AC16).
+ * Uses the same board file lock as other writers; concurrent losers must retry.
  */
 export function commitBoardMutation(params: {
   sessionFile: string;
   expectedRevision: number;
   mutate: (board: SessionTaskBoard) => IncomingTurnResult;
 }): IncomingTurnResult | { rejected: true; reason: "revision_mismatch"; board: SessionTaskBoard } {
-  const board = readSessionTaskBoard(params.sessionFile);
-  if ((board.focusRevision ?? 0) !== params.expectedRevision) {
-    return { rejected: true, reason: "revision_mismatch", board };
-  }
-  const result = params.mutate(board);
-  if ((board.focusRevision ?? 0) !== params.expectedRevision) {
-    return { rejected: true, reason: "revision_mismatch", board };
-  }
-  writeSessionTaskBoard(params.sessionFile, result.board);
-  return result;
+  return withSessionTaskBoardLock(params.sessionFile, () => {
+    const board = readSessionTaskBoardUnlocked(params.sessionFile);
+    if ((board.focusRevision ?? 0) !== params.expectedRevision) {
+      return { rejected: true, reason: "revision_mismatch", board };
+    }
+    const result = params.mutate(board);
+    writeSessionTaskBoardUnlocked(params.sessionFile, result.board);
+    return result;
+  });
 }
 
 export type FocusSwitchDecision =

@@ -109,7 +109,59 @@ describe("slice3 constraint context — red then green", () => {
     expect(activeConstraintTexts(readSessionTaskBoard(sessionFile).current).length).toBe(0);
   });
 
-  it("explicit replacement does not present both old and new as simultaneously binding", () => {
+  it("local revision keeps unrelated prior constraints active", () => {
+    let board = appendSameTaskConstraint({
+      board: readSessionTaskBoard(sessionFile),
+      constraintText: "补充：只用公开资料",
+    });
+    board = appendSameTaskConstraint({
+      board,
+      constraintText: "补充：不超过十页",
+    });
+    board = appendSameTaskConstraint({
+      board,
+      constraintText: "补充：覆盖欧洲市场",
+    });
+    board = appendSameTaskConstraint({
+      board,
+      constraintText: "改为覆盖亚洲市场",
+    });
+    const active = activeConstraintTexts(board.current);
+    expect(active.some((t) => t.includes("只用公开资料"))).toBe(true);
+    expect(active.some((t) => t.includes("不超过十页"))).toBe(true);
+    expect(active.some((t) => t.includes("覆盖欧洲市场"))).toBe(true);
+    expect(active.some((t) => t.includes("覆盖亚洲市场"))).toBe(true);
+    const prompt = buildResumePrompt(board.current!);
+    expect(prompt).toMatch(/仅覆盖.*冲突/);
+    expect(prompt).toContain("只用公开资料");
+    expect(prompt).toContain("覆盖亚洲市场");
+  });
+
+  it("explicit full replace supersedes prior active constraints", () => {
+    let board = appendSameTaskConstraint({
+      board: readSessionTaskBoard(sessionFile),
+      constraintText: "补充：只要国内安卓机型",
+    });
+    board = appendSameTaskConstraint({
+      board,
+      constraintText: "补充：不超过十页",
+    });
+    board = appendSameTaskConstraint({
+      board,
+      constraintText: "以本条为准：只要 iOS 机型，不要安卓",
+    });
+    const active = activeConstraintTexts(board.current);
+    expect(active.some((t) => t.includes("只要国内安卓机型"))).toBe(false);
+    expect(active.some((t) => t.includes("不超过十页"))).toBe(false);
+    expect(active.some((t) => t.includes("只要 iOS 机型"))).toBe(true);
+    const all = board.current?.effectiveConstraints ?? [];
+    expect(all.length).toBeGreaterThanOrEqual(3);
+    const prompt = buildResumePrompt(board.current!);
+    expect(prompt).toContain("只要 iOS 机型");
+    expect(prompt).not.toMatch(/有效约束[\s\S]*只要国内安卓机型/);
+  });
+
+  it("fuzzy correction keeps ordered originals and notes conflict coverage", () => {
     let board = appendSameTaskConstraint({
       board: readSessionTaskBoard(sessionFile),
       constraintText: "补充：只要国内安卓机型",
@@ -119,15 +171,12 @@ describe("slice3 constraint context — red then green", () => {
       constraintText: "不对，改为只要 iOS 机型，不要安卓",
     });
     const active = activeConstraintTexts(board.current);
-    expect(active.some((t) => t.includes("只要国内安卓机型"))).toBe(false);
+    expect(active.some((t) => t.includes("只要国内安卓机型"))).toBe(true);
     expect(active.some((t) => t.includes("只要 iOS 机型"))).toBe(true);
-    // History retained
-    const all = board.current?.effectiveConstraints ?? [];
-    expect(all.length).toBeGreaterThanOrEqual(2);
-
     const prompt = buildResumePrompt(board.current!);
+    expect(prompt).toMatch(/仅覆盖.*冲突/);
+    expect(prompt).toContain("只要国内安卓机型");
     expect(prompt).toContain("只要 iOS 机型");
-    expect(prompt).not.toMatch(/有效约束：[\s\S]*只要国内安卓机型/);
   });
 
   it("long constraint critical tail survives resume/retry via full records", () => {
@@ -179,7 +228,7 @@ describe("slice3 constraint context — red then green", () => {
     expect(JSON.stringify(board)).not.toContain("只要国内安卓机型");
   });
 
-  it("commitSameTaskConstraint refuses when writeEpoch changed (CAS)", () => {
+  it("commitSameTaskConstraint refuses when expectedWriteEpoch is stale", () => {
     const board = readSessionTaskBoard(sessionFile);
     const epoch = board.writeEpoch ?? 0;
 
