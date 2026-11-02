@@ -62,6 +62,22 @@ class ColdStartRootTest {
   }
 
   @Test
+  fun loggedInColdStartIgnoresStaleShellFlag() {
+    // No saved snapshot: a default false companion flag must not open the
+    // Employee Shell (or its offline placeholder). Home is the four-tab chat.
+    val plan =
+      ColdStartRoot.restore(
+        loggedIn = true,
+        hasSavedState = false,
+        savedCompanion = false,
+        savedCoversShell = false,
+        explicitCompanion = false,
+      )
+    assertEquals(ColdStartRoot.Destination.Companion, plan.destination)
+    assertEquals(false, plan.companionCoversShell)
+  }
+
+  @Test
   fun restoreCompanionHomeWithoutSessionFallsBackToLogin() {
     val plan =
       ColdStartRoot.restore(

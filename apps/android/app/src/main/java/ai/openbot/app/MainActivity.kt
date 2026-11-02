@@ -3,6 +3,7 @@ package ai.openbot.app
 import android.content.Intent
 import android.os.Bundle
 import android.os.Process
+import android.os.StrictMode
 import android.os.SystemClock
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -17,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.colorResource
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -40,12 +42,23 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     WindowCompat.setDecorFitsSystemWindows(window, false)
-    permissionRequester = PermissionRequester(this)
-    viewModel.camera.attachLifecycleOwner(this)
-    viewModel.camera.attachPermissionRequester(permissionRequester)
-    viewModel.sms.attachPermissionRequester(permissionRequester)
-    employeeLoggedIn = EmployeeShell.controller(this).isLoggedIn()
-    restoreChrome(savedInstanceState)
+    val insets = WindowCompat.getInsetsController(window, window.decorView)
+    insets.isAppearanceLightStatusBars = true
+    insets.isAppearanceLightNavigationBars = true
+    // Keystore prefs and the node runtime read disk before the first frame.
+    // Keep that work synchronous so the first screen is the login card or the
+    // four-tab chat, and allow the reads so debug StrictMode does not flag them.
+    val startupDiskPolicy = StrictMode.allowThreadDiskReads()
+    try {
+      permissionRequester = PermissionRequester(this)
+      viewModel.camera.attachLifecycleOwner(this)
+      viewModel.camera.attachPermissionRequester(permissionRequester)
+      viewModel.sms.attachPermissionRequester(permissionRequester)
+      employeeLoggedIn = EmployeeShell.controller(this).isLoggedIn()
+      restoreChrome(savedInstanceState)
+    } finally {
+      StrictMode.setThreadPolicy(startupDiskPolicy)
+    }
 
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -61,7 +74,10 @@ class MainActivity : ComponentActivity() {
 
     setContent {
       OpenBotTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
+        Surface(
+          modifier = Modifier.fillMaxSize(),
+          color = colorResource(R.color.window_background),
+        ) {
           val controller = EmployeeShell.controller(this@MainActivity)
           val navigation by controller.navigation.collectAsState()
           LaunchedEffect(navigation, showCompanion, employeeLoggedIn) {
