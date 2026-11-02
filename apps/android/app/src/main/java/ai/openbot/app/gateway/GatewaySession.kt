@@ -330,7 +330,7 @@ class GatewaySession(
         if (isClosed.compareAndSet(false, true)) {
           failPending()
           closedDeferred.complete(Unit)
-          onDisconnected("Gateway error: ${t.message ?: t::class.java.simpleName}")
+          onDisconnected(friendlyGatewayDisconnectMessage(t.message ?: t::class.java.simpleName))
         }
       }
 
@@ -601,6 +601,20 @@ class GatewaySession(
     }
   }
 
+
+  private fun friendlyGatewayDisconnectMessage(raw: String?): String {
+    val message = raw?.trim().orEmpty()
+    if (message.isEmpty()) {
+      return "Gateway error: unknown"
+    }
+    val lower = message.lowercase()
+    if (lower.contains("pairing required")) {
+      // Fallback copy when the deployed gateway still requires device pairing.
+      return "需要管理员批准此设备，或重新登录后再连接网关"
+    }
+    return if (message.startsWith("Gateway error:")) message else "Gateway error: $message"
+  }
+
   private suspend fun runLoop() {
     var attempt = 0
     while (scope.isActive) {
@@ -618,7 +632,7 @@ class GatewaySession(
         attempt = 0
       } catch (err: Throwable) {
         attempt += 1
-        onDisconnected("Gateway error: ${err.message ?: err::class.java.simpleName}")
+        onDisconnected(friendlyGatewayDisconnectMessage(err.message ?: err::class.java.simpleName))
         val sleepMs = minOf(8_000L, (350.0 * Math.pow(1.7, attempt.toDouble())).toLong())
         delay(sleepMs)
       }

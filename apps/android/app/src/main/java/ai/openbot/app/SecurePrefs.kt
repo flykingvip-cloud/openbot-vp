@@ -80,6 +80,10 @@ class SecurePrefs(context: Context) {
     MutableStateFlow(plainPrefs.getBoolean("onboarding.completed", false))
   val onboardingCompleted: StateFlow<Boolean> = _onboardingCompleted
 
+  private val _employeeWelcomeSeen =
+    MutableStateFlow(resolveEmployeeWelcomeSeen())
+  val employeeWelcomeSeen: StateFlow<Boolean> = _employeeWelcomeSeen
+
   private val _lastDiscoveredStableId =
     MutableStateFlow(
       plainPrefs.getString("gateway.lastDiscoveredStableID", "") ?: "",
@@ -168,6 +172,31 @@ class SecurePrefs(context: Context) {
   fun setOnboardingCompleted(value: Boolean) {
     plainPrefs.edit { putBoolean("onboarding.completed", value) }
     _onboardingCompleted.value = value
+  }
+
+  fun setEmployeeWelcomeSeen(value: Boolean) {
+    plainPrefs.edit { putBoolean("employee.welcome.seen", value) }
+    _employeeWelcomeSeen.value = value
+  }
+
+  /**
+   * Fresh install → false (show welcome once).
+   * Existing installs upgrading into this build → treat as already seen so
+   * returning employees are not bounced through a first-run card.
+   */
+  private fun resolveEmployeeWelcomeSeen(): Boolean {
+    if (plainPrefs.contains("employee.welcome.seen")) {
+      return plainPrefs.getBoolean("employee.welcome.seen", false)
+    }
+    val legacyUser =
+      plainPrefs.getBoolean("onboarding.completed", false) ||
+        !plainPrefs.getString("gateway.manual.host", "").isNullOrBlank() ||
+        plainPrefs.contains("gateway.lastDiscoveredStableID")
+    if (legacyUser) {
+      plainPrefs.edit { putBoolean("employee.welcome.seen", true) }
+      return true
+    }
+    return false
   }
 
   fun setCanvasDebugStatusEnabled(value: Boolean) {

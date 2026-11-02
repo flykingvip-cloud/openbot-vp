@@ -49,7 +49,7 @@ fun MobilePageHeader(
 
 /**
  * HTML SoT `.seg` control: white track + 1px line, active = --blue fill / white label.
- * Used by Tasks (定时任务|待我处理) and Me (个人设置|本机与连接|更多).
+ * Used by Tasks (定时任务|待我处理) and Me (个人设置|设备|更多).
  */
 @Composable
 fun SoTSegmentedControl(

@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
   evaluateMissingDeviceIdentity,
+  isFirstPartyNativeTrustedProxyAuth,
   isTrustedProxyControlUiOperatorAuth,
   resolveControlUiAuthPolicy,
+  shouldAllowSilentLocalPairing,
   shouldSkipControlUiPairing,
 } from "./connect-policy.js";
 
@@ -245,5 +247,122 @@ describe("ws connect policy", () => {
         }),
       ).toBe(tc.expected);
     }
+  });
+
+  test("first-party native trusted-proxy auth matches android/ios/macos only", () => {
+    expect(
+      isFirstPartyNativeTrustedProxyAuth({
+        clientId: "openbot-android",
+        authOk: true,
+        authMethod: "trusted-proxy",
+      }),
+    ).toBe(true);
+    expect(
+      isFirstPartyNativeTrustedProxyAuth({
+        clientId: "openclaw-android",
+        authOk: true,
+        authMethod: "trusted-proxy",
+      }),
+    ).toBe(true);
+    expect(
+      isFirstPartyNativeTrustedProxyAuth({
+        clientId: "openbot-ios",
+        authOk: true,
+        authMethod: "trusted-proxy",
+      }),
+    ).toBe(true);
+    expect(
+      isFirstPartyNativeTrustedProxyAuth({
+        clientId: "openbot-macos",
+        authOk: true,
+        authMethod: "trusted-proxy",
+      }),
+    ).toBe(true);
+    expect(
+      isFirstPartyNativeTrustedProxyAuth({
+        clientId: "openbot-android",
+        authOk: true,
+        authMethod: "token",
+      }),
+    ).toBe(false);
+    expect(
+      isFirstPartyNativeTrustedProxyAuth({
+        clientId: "openbot-control-ui",
+        authOk: true,
+        authMethod: "trusted-proxy",
+      }),
+    ).toBe(false);
+    expect(
+      isFirstPartyNativeTrustedProxyAuth({
+        clientId: "openbot-android",
+        authOk: false,
+        authMethod: "trusted-proxy",
+      }),
+    ).toBe(false);
+  });
+
+  test("silent pairing allows trusted-proxy native apps remotely", () => {
+    expect(
+      shouldAllowSilentLocalPairing({
+        isLocalClient: false,
+        hasBrowserOriginHeader: false,
+        isControlUi: false,
+        isWebchat: false,
+        reason: "not-paired",
+        trustedProxyAuthOk: false,
+        firstPartyNativeTrustedProxyAuthOk: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldAllowSilentLocalPairing({
+        isLocalClient: false,
+        hasBrowserOriginHeader: false,
+        isControlUi: false,
+        isWebchat: false,
+        reason: "scope-upgrade",
+        firstPartyNativeTrustedProxyAuthOk: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldAllowSilentLocalPairing({
+        isLocalClient: false,
+        hasBrowserOriginHeader: false,
+        isControlUi: false,
+        isWebchat: false,
+        reason: "role-upgrade",
+        firstPartyNativeTrustedProxyAuthOk: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldAllowSilentLocalPairing({
+        isLocalClient: false,
+        hasBrowserOriginHeader: false,
+        isControlUi: false,
+        isWebchat: false,
+        reason: "not-paired",
+        firstPartyNativeTrustedProxyAuthOk: false,
+      }),
+    ).toBe(false);
+    // Existing Control UI trusted-proxy path still works.
+    expect(
+      shouldAllowSilentLocalPairing({
+        isLocalClient: false,
+        hasBrowserOriginHeader: true,
+        isControlUi: true,
+        isWebchat: false,
+        reason: "not-paired",
+        trustedProxyAuthOk: true,
+      }),
+    ).toBe(true);
+    // Local CLI without browser origin still silent-approves.
+    expect(
+      shouldAllowSilentLocalPairing({
+        isLocalClient: true,
+        hasBrowserOriginHeader: false,
+        isControlUi: false,
+        isWebchat: false,
+        reason: "not-paired",
+      }),
+    ).toBe(true);
   });
 });
