@@ -4,7 +4,10 @@
  */
 import type { OpenBotConfig } from "../../config/config.js";
 import { loadConfig } from "../../config/config.js";
-import { rejectTaskOutcomeResult } from "../../task-outcome/reject-result.js";
+import {
+  rejectTaskOutcomeAndFollowUp,
+  type LandedCorrectionFollowUpOptions,
+} from "../../task-outcome/landed-correction-followup.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { resolveAuthoritativeMembership } from "../tenant-context.js";
 import type { GatewayClient, GatewayRequestHandlers } from "./types.js";
@@ -57,6 +60,11 @@ export function createTaskOutcomeRejectHandlers(
   options: {
     cfg?: OpenBotConfig;
     resolveCaller?: (client: GatewayClient | null) => Promise<TaskOutcomeRejectCaller>;
+    /**
+     * Test seam. Production leaves the switches off.
+     * Request body strings are not read from here.
+     */
+    followUp?: LandedCorrectionFollowUpOptions;
   } = {},
 ): GatewayRequestHandlers {
   const resolveCaller = options.resolveCaller ?? defaultResolveCaller;
@@ -85,7 +93,7 @@ export function createTaskOutcomeRejectHandlers(
           return;
         }
       }
-      const result = rejectTaskOutcomeResult({
+      const result = await rejectTaskOutcomeAndFollowUp({
         cfg,
         agentId,
         taskId,
@@ -93,6 +101,12 @@ export function createTaskOutcomeRejectHandlers(
         callerSubjectRaw: caller.subjectRaw,
         callerTenantId: caller.tenantId,
         commandId,
+        notifyEnabled: options.followUp?.notifyEnabled,
+        recheckEnabled: options.followUp?.recheckEnabled,
+        send: options.followUp?.send,
+        run: options.followUp?.run,
+        inject: options.followUp?.inject,
+        observe: options.followUp?.observe,
       });
       respond(true, result);
     },

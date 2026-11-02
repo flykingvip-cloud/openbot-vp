@@ -10628,6 +10628,22 @@ tasks:
   since: 2026-11-01
   metadata: {}
 landingStreams:
+- id: closed-loop-followup-wire-20261102
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - src/gateway/server-methods/task-outcome-reject.ts
+  - src/task-outcome/correction-notice-inject.runtime.ts
+  - src/task-outcome/correction-notice-inject.ts
+  - src/task-outcome/correction-notice-session.ts
+  - src/task-outcome/landed-correction-followup.test.ts
+  - src/task-outcome/landed-correction-followup.ts
+  - src/task-outcome/scenario-recheck-run.ts
+  canLandWith: []
+  metadata:
+    task: closed-loop-followup-wire
+    owner: cursor-cloud-a40e
+    purpose: Wire recheck and correction notice after a landed correction. Both switches stay off.
 - id: recheck-notify-hardening-20261102
   landingPolicy: serial
   paths:
