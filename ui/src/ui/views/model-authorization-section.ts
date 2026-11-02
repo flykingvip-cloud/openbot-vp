@@ -38,6 +38,7 @@ import {
 } from "./model-authorization-panel.ts";
 import {
   buildAuthorizedModelCatalog,
+  enterpriseUnusableBannerText,
   type AuthorizedModelCatalog,
 } from "./model-authorization-presentation.ts";
 
@@ -79,6 +80,7 @@ export class ModelAuthorizationSection extends LitElement {
   @state() private directoryQuery = "";
   @state() private selectedKey: string | null = null;
   @state() private modelCatalog: AuthorizedModelCatalog | null = null;
+  @state() private unusableModels: Array<{ title: string; detail: string }> = [];
 
   connectedCallback() {
     super.connectedCallback();
@@ -104,6 +106,7 @@ export class ModelAuthorizationSection extends LitElement {
       this.ceilingModelIds = res.ceilingModelIds ?? res.allowedModelIds;
       this.suppressedPlatformModelIds = res.suppressedPlatformModelIds ?? [];
       this.grants = res.grants;
+      this.unusableModels = res.unusableModels ?? [];
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -357,8 +360,18 @@ export class ModelAuthorizationSection extends LitElement {
     const options = this.filteredOptions();
     const usePicker =
       options.length > 0 || this.seatOptions.length > 0 || this.memberOptions.length > 0;
+    const unusableText = enterpriseUnusableBannerText(this.unusableModels);
     return html`
       <div class="model-authorization-section" data-testid="model-authorization-section">
+        ${
+          unusableText
+            ? html`
+                <div class="callout danger" role="alert" data-testid="enterprise-unusable-models">
+                  ${unusableText}
+                </div>
+              `
+            : nothing
+        }
         ${renderModelAuthorizationPanel(panelProps)}
         ${
           view.hasEntitlement && !this.hasOrgSeats()

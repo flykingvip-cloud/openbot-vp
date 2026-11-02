@@ -349,6 +349,52 @@ describe("enterprise-model-grant.*", () => {
     expect(added.error.message).toContain("ent/cea43bf898/qwen3.6-35b-a3b");
   });
 
+  it("tells the enterprise admin when a self-supplied connection probe has failed", async () => {
+    const { createEnterpriseModelConnection, updateEnterpriseModelConnection } =
+      await import("../enterprise-model/connection-store.js");
+    const { registerEnterpriseModelAsset } = await import("../enterprise-model/asset-store.js");
+    await upsertEnterpriseModelEntitlement({
+      tenantId: "ent-test",
+      allowedModelIds: ["api-proxy-deepseek/deepseek-chat"],
+    });
+    const connection = await createEnterpriseModelConnection({
+      tenantId: "ent-test",
+      providerType: "openai-compatible",
+      displayName: "内网推理",
+      baseUrl: "https://private.example/v1",
+    });
+    await updateEnterpriseModelConnection({
+      tenantId: "ent-test",
+      connectionId: connection.connectionId,
+      status: "invalid_credential",
+      healthStatus: "unhealthy",
+      skipEndpointInvalidation: true,
+      lastVerificationResult: {
+        code: "ENTERPRISE_MODEL_INVALID_CREDENTIAL",
+        message: "凭证无效",
+      },
+    });
+    await registerEnterpriseModelAsset({
+      tenantId: "ent-test",
+      connectionId: connection.connectionId,
+      upstreamModelId: "deepseek-v4-flash",
+      enabled: true,
+      healthStatus: "unhealthy",
+    });
+
+    const listed = await invoke<{
+      unusableModels: Array<{ kind: string; title: string; detail: string }>;
+    }>("enterprise-model-grant.list");
+    expect(listed.ok).toBe(true);
+    expect(listed.payload.unusableModels).toEqual([
+      expect.objectContaining({
+        kind: "connection",
+        title: "内网推理",
+      }),
+    ]);
+    expect(listed.payload.unusableModels[0]?.detail).toContain("凭证无效");
+  });
+
   it("rejects grant when no entitlement record exists", async () => {
     const res = await invoke("enterprise-model-grant.grant", {
       subjectType: "seat",

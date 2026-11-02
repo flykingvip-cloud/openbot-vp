@@ -137,6 +137,16 @@ export function describeUnavailableModelGrants(input: {
   return parts.join(" ");
 }
 
+export function enterpriseUnusableBannerText(
+  warnings: readonly { title: string; detail: string }[],
+): string {
+  if (warnings.length === 0) {
+    return "";
+  }
+  const lines = warnings.map((warning) => `${warning.title}：${warning.detail}`);
+  return `以下企业自供模型当前不可用，请先处理，不要等到员工聊天失败。${lines.join(" ")}`;
+}
+
 export function presentAuthorizedModel(
   modelId: string,
   catalog?: AuthorizedModelCatalog | null,

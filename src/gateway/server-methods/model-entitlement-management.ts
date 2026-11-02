@@ -19,10 +19,12 @@ import {
   reconcileVerifiedEnterpriseModelAssets,
   resolveEnterpriseModelCeiling,
 } from "../enterprise-model/ceiling.js";
+import { listEnterpriseModelConnections } from "../enterprise-model/connection-store.js";
 import {
   resolvePlatformPlanModels,
   type PlatformPlanModelState,
 } from "../enterprise-model/plan-model-projection.js";
+import { listUnusableEnterpriseModelWarnings } from "../enterprise-model/unusable-models.js";
 import { getEnterpriseModelEntitlement } from "../model-entitlement/enterprise-model-entitlement-store.js";
 import { resolveModelEntitlementRoutingMode } from "../model-entitlement/entitlement-config.js";
 import {
@@ -593,19 +595,16 @@ export const enterpriseModelGrantHandlers: GatewayRequestHandlers = {
       await reconcileVerifiedEnterpriseModelAssets({ tenantId: scope.enterpriseId });
       const ceiling = await resolveEnterpriseModelCeiling({ tenantId: scope.enterpriseId });
       const knownAssets = await listEnterpriseModelAssets(scope.enterpriseId);
-      const knownRuntimeIds = new Set(
-        knownAssets.map((asset) => asset.runtimeModelId.trim()).filter((id) => id.length > 0),
-      );
+      const connections = await listEnterpriseModelConnections(scope.enterpriseId);
       let grants = await listSeatModelGrantsForTenant(scope.enterpriseId);
-      const staleEnterpriseIds = [
-        ...new Set(
-          grants.flatMap((grant) =>
-            grant.grantedModelIds
-              .map((id) => id.trim())
-              .filter((id) => id.startsWith("ent/") && !knownRuntimeIds.has(id)),
-          ),
-        ),
-      ];
+      const unusableModels = listUnusableEnterpriseModelWarnings({
+        connections,
+        assets: knownAssets,
+        grantedModelIds: grants.flatMap((grant) => grant.grantedModelIds),
+      });
+      const staleEnterpriseIds = unusableModels
+        .filter((warning) => warning.kind === "grant" && warning.modelId)
+        .map((warning) => warning.modelId as string);
       if (staleEnterpriseIds.length > 0) {
         await forgetModelIdsFromTenantGrants({
           tenantId: scope.enterpriseId,
@@ -636,6 +635,8 @@ export const enterpriseModelGrantHandlers: GatewayRequestHandlers = {
         ceilingModelIds: visibleCeiling.visible,
         subscriptionModelIds: visibleSubscription.visible,
         tenantOwnedModelIds: ceiling.tenantOwnedModelIds,
+        /** 企业自供连接失败、资产不健康，或授权指向已删除的运行时模型。 */
+        unusableModels,
         /**
          * 套餐或历史授权里的平台模型，但已离开平台模型池，或未通过连通校验。
          * 企业列表不渲染，授权记录仍保留。
