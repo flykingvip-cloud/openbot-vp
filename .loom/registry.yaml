@@ -10604,6 +10604,7 @@ tasks:
   - src/gateway/collaboration-learning/shared.ts
   - src/gateway/collaboration-learning/try-claim-after-board-publish.ts
   - src/gateway/collaboration-learning/try-claim-after-board-publish.test.ts
+  - src/gateway/collaboration-learning/post-publish-claim-handoff.test.ts
   - src/gateway/collaboration-dispatch/claim-contract.ts
   state: active
   sessions: []
@@ -10668,6 +10669,29 @@ landingStreams:
     task: recheck-notify-hardening:cursor-cloud
     owner: cursor-cloud
     purpose: Recheck attempt history, durable reads, scenario binding, and scoped notice dedup. Switches stay off.
+- id: controlled-collab-formal-chain-20261101
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - docs/notes/controlled-collab-formal-chain-breakpoints-2026-11-01.md
+  - src/gateway/collaboration-learning/activate-collaboration-task.ts
+  - src/gateway/collaboration-learning/activate-collaboration-task.test.ts
+  - src/gateway/collaboration-learning/discuss-to-task-chat-receipt.ts
+  - src/gateway/collaboration-learning/discuss-to-task-chat-receipt.test.ts
+  - src/gateway/collaboration-learning/formal-delivery-acceptance.ts
+  - src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts
+  - src/gateway/collaboration-learning/operating-deliverable-binding.test.ts
+  - src/gateway/collaboration-learning/shared.ts
+  - src/gateway/collaboration-learning/try-claim-after-board-publish.ts
+  - src/gateway/collaboration-learning/try-claim-after-board-publish.test.ts
+  - src/gateway/collaboration-learning/post-publish-claim-handoff.test.ts
+  - src/gateway/collaboration-dispatch/claim-contract.ts
+  canLandWith: []
+  metadata:
+    task: controlled-collab-formal-chain
+    owner: cursor-cloud
+    purpose: Wire post-publish claim entry; withdraw parallel formal acceptance SM; OS sync prefers currentTaskId
+      authority with real storage tests.
 - id: p1-fix-20261101
   landingPolicy: serial
   paths:
@@ -23504,28 +23528,7 @@ landingStreams:
     purpose: PR143 merge-prep audit notes (pointer to outside evidence; no DIGEST)
     task: pr143-market-assistant-merge-notes
     owner: grok-bot
-- id: controlled-collab-formal-chain-20261101
-  landingPolicy: serial
-  paths:
-  - .loom/registry.yaml
-  - docs/notes/controlled-collab-formal-chain-breakpoints-2026-11-01.md
-  - src/gateway/collaboration-learning/activate-collaboration-task.ts
-  - src/gateway/collaboration-learning/activate-collaboration-task.test.ts
-  - src/gateway/collaboration-learning/discuss-to-task-chat-receipt.ts
-  - src/gateway/collaboration-learning/discuss-to-task-chat-receipt.test.ts
-  - src/gateway/collaboration-learning/formal-delivery-acceptance.ts
-  - src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts
-  - src/gateway/collaboration-learning/operating-deliverable-binding.test.ts
-  - src/gateway/collaboration-learning/shared.ts
-  - src/gateway/collaboration-learning/try-claim-after-board-publish.ts
-  - src/gateway/collaboration-learning/try-claim-after-board-publish.test.ts
-  - src/gateway/collaboration-dispatch/claim-contract.ts
-  canLandWith: []
-  metadata:
-    task: controlled-collab-formal-chain
-    owner: cursor-cloud
-    purpose: Wire post-publish claim entry; withdraw parallel formal acceptance SM; OS sync prefers currentTaskId
-      authority with real storage tests.
+
 - id: memory-system-final-closeout-20261101
   landingPolicy: serial
   paths:

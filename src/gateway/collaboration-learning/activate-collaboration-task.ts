@@ -29,6 +29,7 @@ import {
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { buildRuntimeNamespace } from "../collaboration-dispatch/runtime-namespace.js";
 import { withTaskControlLock } from "../collaboration-dispatch/task-control-cas.js";
+import type { WakeRoundDispatcher } from "../collaboration-dispatch/wake-round-dispatch.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { ClaimContractEntryError } from "./claim-contract-entry.js";
 import {
@@ -81,6 +82,12 @@ export type ActivateCollaborationTaskInput = {
   nowMs?: number;
   /** Extra tags merged under withTaskControlLock (e.g. discuss-to-task source/contract). */
   extraTags?: readonly string[];
+  /**
+   * Test/boot override for post-publish handoff consumeWake. undefined → process
+   * registry; null → force recorded-not-dispatched (dispatcher unavailable).
+   * Activate.dispatched stays false either way.
+   */
+  roundDispatcher?: WakeRoundDispatcher | null;
 };
 
 export type ActivateCollaborationTaskResult =
@@ -658,21 +665,32 @@ export async function activateCollaborationTask(
     idempotentReplay: boolean,
   ) => {
     const stores = teamStores;
-    // After a legal publish, invoke the real claim entry when the present actor
-    // is rightful. Never auto-mint for an absent intended claimant.
+    // Publish ≠ claim. Schedule a controlled handoff wake for the single
+    // intended claimant (or claim only when the present actor IS that intended).
+    // Never auto-claim as the publisher; never pick intended[0] among many.
+    const { authority } = await buildTrustedBoardAuthority({
+      groupId,
+      taskId,
+      cfg,
+      stores,
+      tenant: params.tenant,
+    });
     const formalClaim = await tryClaimAfterBoardPublish({
       groupId,
       taskId,
       item,
       actorId: actor,
+      authority,
       auth: params.auth,
       trusted: params.trusted,
       stores,
       tenant: params.tenant,
       cfg,
+      roundDispatcher: params.roundDispatcher,
     });
     const boardItem = formalClaim.item;
     try {
+      // Explicit activate focus switch: new task B must beat a stale OS A.
       await syncGroupOperatingState({
         fileStore: stores.fileStore,
         groupStorage: stores.groupStorage,
@@ -681,6 +699,7 @@ export async function activateCollaborationTask(
         learningStorage: stores.learningStorage,
         objectStorage: stores.objectStorage,
         groupId,
+        preferredTaskId: taskId,
       });
     } catch (error) {
       return {
