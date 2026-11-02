@@ -81,7 +81,7 @@
 - PR 范围须写明含 `.loom/registry.yaml`（管理登记），不得绝对「仅文档与日志」。
 - 详见 [`../runs/2026-11-02-independent-reviewer-corrections/`](../runs/2026-11-02-independent-reviewer-corrections/)。
 
-## 2026-11-02 owner confirm round2（用户本机核查）
+## 2026-11-02 owner confirm round2（独立验收 Agent 本机核实）
 
 - 接受上一轮口径整改；**仍不核准**验收完成 / #193 合入。
 - 纠正：行数不作能力分母；PR 范围含 loom；独立复现双阻断写清。

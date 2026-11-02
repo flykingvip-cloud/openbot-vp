@@ -3,7 +3,7 @@
 **URL:** https://github.com/flykingvip-cloud/openbot-vp/pull/193  
 **Base:** `main` @ `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`  
 **Branch:** `docs/acceptance-coverage-20261101`  
-**When reviewed:** 2026-11-02 Asia/Shanghai（含用户本机确认第 2 轮口径）
+**When reviewed:** 2026-11-02 Asia/Shanghai（含独立验收 Agent 本机核实第 2 轮口径）
 
 ## Scope check
 

@@ -2,7 +2,7 @@
 
 **Repo:** flykingvip-cloud/openbot-vp  
 **main SHA:** `d42fbc3ca2b4041ee70bb1dfb9cd70f33678370c`  
-**When:** 2026-11-02 Asia/Shanghai（含独立复核口径收紧 + 用户本机确认第 2 轮）
+**When:** 2026-11-02 Asia/Shanghai（含独立复核口径收紧 + 独立验收 Agent 本机核实第 2 轮）
 
 ## Verdict
 

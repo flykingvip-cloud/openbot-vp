@@ -71,4 +71,4 @@ See `docs/acceptance/p1-fix-2026-11-01/defect-status.md`（documentation only; n
 
 ## 本轮范围声明
 
-本轮**未修改产品代码**、**未安装工具链**、**未 merge**；文档 / 口径更新，且 PR 范围包含 `.loom/registry.yaml` 管理登记（**不是**绝对「仅文档与日志」）。独立复现双阻断已由用户本机确认；本轮**不安依赖、不构建**。详见 `../2026-11-02-independent-reviewer-corrections/01-owner-confirm-round2.md`。
+本轮**未修改产品代码**、**未安装工具链**、**未 merge**；文档 / 口径更新，且 PR 范围包含 `.loom/registry.yaml` 管理登记（**不是**绝对「仅文档与日志」）。独立复现双阻断已由独立验收 Agent 本机核实；本轮**不安依赖、不构建**。详见 `../2026-11-02-independent-reviewer-corrections/01-owner-confirm-round2.md`。

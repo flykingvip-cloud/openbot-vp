@@ -38,6 +38,6 @@
 - 未 `gh pr merge`  
 - 未触碰共享脏树 `/Users/daniel/AI VP/openbot/` 作产品写入（本轮文档工作仅在 coverage worktree）
 
-## 后续：用户本机确认第 2 轮
+## 后续：独立验收 Agent 本机核实第 2 轮
 
 见同目录 [`01-owner-confirm-round2.md`](./01-owner-confirm-round2.md)（行数≠功能分母；PR 范围含 loom；独立复现双阻断）。
