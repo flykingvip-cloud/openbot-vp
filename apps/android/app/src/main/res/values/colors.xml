@@ -1,3 +1,5 @@
 <resources>
     <color name="ic_launcher_background">#000000</color>
+    <!-- First frame before Compose. Matches the light four-tab home, not the launcher black. -->
+    <color name="window_background">#F7F8FA</color>
 </resources>

@@ -64,8 +64,11 @@ android {
         applicationId = "ai.openbot.app"
         minSdk = 31
         targetSdk = 36
-        versionCode = 202603090
-        versionName = "1.0.0"
+        // Android-only internal beta. Root package.json stays the CLI/iOS source
+        // of truth (currently 2026.7.12-rc.2); bumping it would move npm and the
+        // other clients. versionCode is YYYYMMDD + revision (previous 202603090).
+        versionCode = 202611021
+        versionName = "2026.11.2-beta.1"
         ndk {
             // Support all major ABIs — native libs are tiny (~47 KB per ABI)
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
@@ -82,7 +85,12 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
+            // Internal tester APK: debug keystore, minify off, and no
+            // applicationId suffix — the package must stay ai.openbot.app.
+            // Release R8 (isMinifyEnabled below) still needs OPENCLAW_ANDROID_*
+            // signing properties; this build does not invent a keystore.
             isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 
@@ -179,7 +187,8 @@ dependencies {
     // Material Components (XML theme + resources)
     implementation("com.google.android.material:material:1.14.0")
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.12.0")
+    // 1.12.0 is not on Maven Central; 1.11.0 is the latest published release.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
     implementation("androidx.security:security-crypto:1.1.0")
@@ -203,7 +212,7 @@ dependencies {
     implementation("dnsjava:dnsjava:3.7.0")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.12.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("io.kotest:kotest-runner-junit5-jvm:6.2.6")
     testImplementation("io.kotest:kotest-assertions-core-jvm:6.2.6")
     testImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
