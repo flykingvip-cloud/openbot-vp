@@ -29,6 +29,7 @@ import {
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { buildRuntimeNamespace } from "../collaboration-dispatch/runtime-namespace.js";
 import { withTaskControlLock } from "../collaboration-dispatch/task-control-cas.js";
+import type { WakeRoundDispatcher } from "../collaboration-dispatch/wake-round-dispatch.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { ClaimContractEntryError } from "./claim-contract-entry.js";
 import {
@@ -81,6 +82,12 @@ export type ActivateCollaborationTaskInput = {
   nowMs?: number;
   /** Extra tags merged under withTaskControlLock (e.g. discuss-to-task source/contract). */
   extraTags?: readonly string[];
+  /**
+   * Test/boot override for post-publish handoff consumeWake. undefined → process
+   * registry; null → force recorded-not-dispatched (dispatcher unavailable).
+   * Activate.dispatched stays false either way.
+   */
+  roundDispatcher?: WakeRoundDispatcher | null;
 };
 
 export type ActivateCollaborationTaskResult =
@@ -679,6 +686,7 @@ export async function activateCollaborationTask(
       stores,
       tenant: params.tenant,
       cfg,
+      roundDispatcher: params.roundDispatcher,
     });
     const boardItem = formalClaim.item;
     try {

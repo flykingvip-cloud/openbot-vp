@@ -2,11 +2,13 @@
  * After a legal board publish, distinguish publish from claim.
  *
  * Ordinary publish must NOT implicitly claim for the publisher. When exactly one
- * intended claimant is determined, reuse Wake Contract handoff so that bot can
+ * intended claimant is determined, keep handoff audit AND reuse the existing
+ * consumable Wake Round path (`recordNudgeWake` + `consumeWakeForRoundDispatch`
+ * with source=nudge — already in WAKE_ROUND_DISPATCH_SOURCES) so that bot can
  * enter claim → apply → propose plan as itself (no identity impersonation, no
- * policy/human-confirm bypass). Multiple intended candidates → blocked (never
- * pick first). Empty intended → blocked (no single legal target). Activate
- * success stays dispatched:false.
+ * policy/human-confirm bypass, no source-allowlist expansion, no new scheduler).
+ * Multiple intended candidates → blocked (never pick first). Empty intended →
+ * blocked (no single legal target). Activate success stays dispatched:false.
  */
 import type { OpenBotConfig } from "../../config/types.js";
 import {
@@ -14,7 +16,12 @@ import {
   type GroupBoardClaimItem,
 } from "../collaboration-dispatch/claim-contract.js";
 import type { RuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
-import { recordHandoffWake } from "../collaboration-dispatch/wake-contract.js";
+import { recordHandoffWake, recordNudgeWake } from "../collaboration-dispatch/wake-contract.js";
+import {
+  consumeWakeForRoundDispatch,
+  getWakeRoundDispatcher,
+  type WakeRoundDispatcher,
+} from "../collaboration-dispatch/wake-round-dispatch.js";
 import {
   claimCollaborationBoardItem,
   ClaimContractEntryError,
@@ -24,6 +31,39 @@ import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-aut
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
 export const POST_PUBLISH_CLAIM_ENTRY = "claimCollaborationBoardItem" as const;
+
+/** Stable U3 op key so retries / concurrent publish do not double-wake. */
+export function buildPostPublishHandoffOpKey(params: {
+  groupId: string;
+  taskId: string;
+  itemId: string;
+  intendedClaimantId: string;
+}): string {
+  return [
+    "post_publish_intended_claim_handoff",
+    params.groupId.trim(),
+    params.taskId.trim(),
+    params.itemId.trim(),
+    params.intendedClaimantId.trim(),
+  ].join("|");
+}
+
+export function buildPostPublishHandoffDispatchPrompt(params: {
+  taskId: string;
+  itemId: string;
+  intendedClaimantId: string;
+  reason: string;
+}): string {
+  return [
+    "【建板后受控接力】来源=nudge（handoff 审计已另行记账；不扩 source 清单）",
+    `task=${params.taskId}`,
+    `board=${params.itemId}`,
+    `intended=${params.intendedClaimantId}`,
+    "你是唯一合法 intended claimant。请以本人身份通过工具自行：claim_item → apply_claim → propose_todolist。",
+    "禁止由他人代认领或冒充执行者；计划确认仍按策略执行（人闸不得绕过）。",
+    params.reason,
+  ].join("\n");
+}
 
 const ALREADY_CLAIMED = new Set([
   "claimed",
@@ -43,6 +83,7 @@ export type TryClaimAfterBoardPublishResult =
       reason: "claimed_via_entry";
       scheduledClaimantId: null;
       wakeRecorded: false;
+      wakeDispatched: false;
     }
   | {
       outcome: "scheduled";
@@ -51,7 +92,13 @@ export type TryClaimAfterBoardPublishResult =
       nextEntryPoint: typeof POST_PUBLISH_CLAIM_ENTRY;
       reason: string;
       scheduledClaimantId: string;
+      /** Handoff audit and/or consumable nudge wake row written. */
       wakeRecorded: boolean;
+      /**
+       * True only when consumeWakeForRoundDispatch accepted a dispatcher round
+       * (or durable idempotent_reuse). Activate.dispatched stays false.
+       */
+      wakeDispatched: boolean;
     }
   | {
       outcome: "blocked";
@@ -61,6 +108,7 @@ export type TryClaimAfterBoardPublishResult =
       reason: string;
       scheduledClaimantId: null;
       wakeRecorded: false;
+      wakeDispatched: false;
     }
   | {
       outcome: "unchanged";
@@ -70,6 +118,7 @@ export type TryClaimAfterBoardPublishResult =
       reason: string;
       scheduledClaimantId: null;
       wakeRecorded: false;
+      wakeDispatched: false;
     };
 
 function compact(value: string | null | undefined): string {
@@ -102,6 +151,7 @@ function unchanged(
     reason,
     scheduledClaimantId: null,
     wakeRecorded: false,
+    wakeDispatched: false,
   };
 }
 
@@ -114,6 +164,7 @@ function blocked(item: GroupBoardClaimItem, reason: string): TryClaimAfterBoardP
     reason,
     scheduledClaimantId: null,
     wakeRecorded: false,
+    wakeDispatched: false,
   };
 }
 
@@ -139,8 +190,9 @@ export function resolvePostPublishClaimTarget(
 
 /**
  * After publish: claim only when the present actor IS the single intended
- * claimant. Otherwise schedule a controlled handoff wake for that intended bot
- * (or block with a clear reason). Never auto-claims for the publisher.
+ * claimant. Otherwise schedule a controlled handoff (audit) + consumable nudge
+ * wake for that intended bot (or block with a clear reason). Never auto-claims
+ * for the publisher; never expands WAKE_ROUND_DISPATCH_SOURCES.
  */
 export async function tryClaimAfterBoardPublish(params: {
   groupId: string;
@@ -148,13 +200,19 @@ export async function tryClaimAfterBoardPublish(params: {
   item: GroupBoardClaimItem;
   /** Present actor at the publish site. May claim only when they are the single intended. */
   actorId: string | null | undefined;
-  /** Required to record a Wake Contract handoff for an absent intended claimant. */
+  /** Required to record Wake Contract events for an absent intended claimant. */
   authority?: RuntimeAuthority | null;
   auth?: TeamResourceAuthOk | null;
   trusted?: { groupsRoot: string; groupLocator: string } | null;
   stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
+  /**
+   * Override process registry for consumeWake (tests). undefined → getWakeRoundDispatcher();
+   * null → force recorded-not-dispatched (dispatcher unavailable).
+   */
+  roundDispatcher?: WakeRoundDispatcher | null;
+  nowMs?: number;
 }): Promise<TryClaimAfterBoardPublishResult> {
   const item = params.item;
   const status = compact(item.status);
@@ -206,6 +264,7 @@ export async function tryClaimAfterBoardPublish(params: {
         reason: "claimed_via_entry",
         scheduledClaimantId: null,
         wakeRecorded: false,
+        wakeDispatched: false,
       };
     } catch (error) {
       if (error instanceof ClaimContractFlagOffError) {
@@ -219,7 +278,7 @@ export async function tryClaimAfterBoardPublish(params: {
   }
 
   // Publisher / other present actor is NOT the intended claimant: do not claim
-  // as them. Schedule a controlled handoff wake so the intended bot can claim.
+  // as them. Keep handoff audit + reuse consumable nudge→consumeWake path.
   const authority = params.authority ?? null;
   if (!authority) {
     return blocked(
@@ -229,7 +288,9 @@ export async function tryClaimAfterBoardPublish(params: {
   }
 
   const fromAgentId = actorId || compact(item.publishedBy) || "system:board_publish";
-  const wake = await recordHandoffWake(
+  const handoffReason = `post_publish_intended_claim_handoff:intended=${intendedClaimantId}:item=${itemId}`;
+
+  const handoff = await recordHandoffWake(
     authority,
     {
       groupId: params.groupId,
@@ -240,21 +301,97 @@ export async function tryClaimAfterBoardPublish(params: {
     },
     { cfg: params.cfg },
   );
-  const wakeRecorded = wake.ok;
-  if (!wakeRecorded) {
+  if (!handoff.ok) {
     return blocked(
       item,
-      `awaiting_intended_claimant:actor=${actorId || "none"}:intended=${intendedClaimantId}:wake_failed:${!wake.ok ? wake.reason : "unknown"}`,
+      `awaiting_intended_claimant:actor=${actorId || "none"}:intended=${intendedClaimantId}:handoff_audit_failed:${handoff.reason}`,
     );
   }
 
+  // Consumable path: source=nudge is already accepted by consumeWakeForRoundDispatch.
+  // Do NOT expand WAKE_ROUND_DISPATCH_SOURCES; do not impersonate the executor.
+  const nudge = await recordNudgeWake(
+    authority,
+    {
+      groupId: params.groupId,
+      fromAgentId,
+      toAgentIds: [intendedClaimantId],
+      taskId: params.taskId,
+      itemId,
+      reason: handoffReason,
+    },
+    { cfg: params.cfg },
+  );
+  if (!nudge.ok) {
+    return {
+      outcome: "scheduled",
+      item,
+      claimantId: null,
+      nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
+      reason: `scheduled_intended_claimant:intended=${intendedClaimantId}:recorded_not_dispatched:nudge_failed:${nudge.reason ?? "unknown"}`,
+      scheduledClaimantId: intendedClaimantId,
+      wakeRecorded: true,
+      wakeDispatched: false,
+    };
+  }
+
+  const roundDispatcher =
+    params.roundDispatcher !== undefined ? params.roundDispatcher : getWakeRoundDispatcher();
+  const opKey = buildPostPublishHandoffOpKey({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    itemId,
+    intendedClaimantId,
+  });
+  const dispatchPrompt = buildPostPublishHandoffDispatchPrompt({
+    taskId: params.taskId,
+    itemId,
+    intendedClaimantId,
+    reason: handoffReason,
+  });
+
+  const consume = await consumeWakeForRoundDispatch({
+    authority,
+    cfg: params.cfg,
+    roundDispatcher,
+    nowMs: params.nowMs,
+    request: {
+      groupId: params.groupId,
+      tenantId: params.tenant?.tenantId ?? params.auth?.tenantId ?? null,
+      fromAgentId,
+      toAgentIds: [intendedClaimantId],
+      source: "nudge",
+      taskId: params.taskId,
+      itemId,
+      reason: handoffReason,
+      opKey,
+      dispatchPrompt,
+    },
+  });
+
+  // Durable wake receipt is `dispatched:true`. When the woken executor's own
+  // claim/apply bumps task controlEpoch (or auth fingerprint) before receipt,
+  // consume reports `external_sent_*` with dispatched:false — the Mode B round
+  // still ran. Count that as wakeDispatched so handoff proof is not a false
+  // negative of the executor's legitimate writes.
+  const consumeReason = compact(consume.reason);
+  const externalSent =
+    !consume.dispatched &&
+    (consumeReason.startsWith("external_sent_") ||
+      consume.sideEffectClass === "completed_with_receipt" ||
+      consume.sideEffectClass === "started_or_unknown");
+  const wakeDispatched = Boolean(consume.dispatched) || externalSent;
+  const consumeDetail = consumeReason || (wakeDispatched ? "dispatched" : "wake_recorded");
   return {
     outcome: "scheduled",
     item,
     claimantId: null,
     nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
-    reason: `scheduled_intended_claimant:intended=${intendedClaimantId}`,
+    reason: wakeDispatched
+      ? `scheduled_intended_claimant:intended=${intendedClaimantId}:wake_dispatched:${consumeDetail}`
+      : `scheduled_intended_claimant:intended=${intendedClaimantId}:recorded_not_dispatched:${consumeDetail}`,
     scheduledClaimantId: intendedClaimantId,
     wakeRecorded: true,
+    wakeDispatched,
   };
 }

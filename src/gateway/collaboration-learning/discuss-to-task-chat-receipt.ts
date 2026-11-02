@@ -34,7 +34,7 @@ function formatFormalClaimLine(result: ControlledDiscussToTaskResult): string | 
     return `formalClaim=claimed; claimantId=${formalClaim.claimantId}; activateDispatched=false`;
   }
   if (formalClaim.outcome === "scheduled") {
-    return `formalClaim=scheduled; scheduledClaimantId=${formalClaim.scheduledClaimantId}; wakeRecorded=${formalClaim.wakeRecorded}; nextEntry=${formalClaim.nextEntryPoint}; activateDispatched=false`;
+    return `formalClaim=scheduled; scheduledClaimantId=${formalClaim.scheduledClaimantId}; wakeRecorded=${formalClaim.wakeRecorded}; wakeDispatched=${formalClaim.wakeDispatched}; nextEntry=${formalClaim.nextEntryPoint}; activateDispatched=false`;
   }
   if (formalClaim.outcome === "blocked") {
     return `formalClaim=blocked; reason=${formalClaim.reason}; nextEntry=${formalClaim.nextEntryPoint}; activateDispatched=false`;

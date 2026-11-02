@@ -1,12 +1,15 @@
 /**
- * Positive formal handoff entry path (no manual claimant seed/patch):
- * CEO publishes board with intended=executor → controlled handoff wake
- * schedules that bot → bot claims via production entry → apply → propose
- * plan → legal confirm → mark in_progress → formal submit → accept.
+ * Post-publish intended-claim handoff — consumable wake path.
  *
- * Model may be absent/mocked; claim/plan/submit/accept use real entries.
+ * Positive proof starts at the real CEO `activateCollaborationTask` entry.
+ * Only the woken executor run (inside WakeRoundDispatcher) may call claim →
+ * apply → propose via production entries/tools. Tests must not manually seed
+ * those steps outside the dispatcher to paper over a missing consumer.
+ *
+ * Handoff audit (`recordHandoffWake`) is kept; consumable wake reuses source
+ * `nudge` (already in WAKE_ROUND_DISPATCH_SOURCES) — no allowlist expansion,
+ * no executor impersonation, no new scheduler.
  */
-import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -18,13 +21,8 @@ import {
   setRuntimeConfigSnapshot,
 } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
-import {
-  acceptBoardItemSubmission,
-  applyClaim,
-  markBoardItemInProgress,
-  publishBoardItem,
-  submitBoardItemForReview,
-} from "../collaboration-dispatch/claim-contract.js";
+import { makeOperatingState } from "../collaboration-dispatch/__fixtures__/policy-source-matrix.js";
+import { loadBoardClaimItem } from "../collaboration-dispatch/claim-contract.js";
 import { createRoundPolicySnapshot } from "../collaboration-dispatch/round-policy-snapshot.js";
 import {
   createRuntimeAuthority,
@@ -32,9 +30,21 @@ import {
 } from "../collaboration-dispatch/runtime-authority.js";
 import { listWakeEvents } from "../collaboration-dispatch/wake-contract.js";
 import {
-  P2_LINKED_DELIVERABLE_FIXTURE_BODY,
-  seedLinkedTeamDeliverableFixture,
-} from "./verify-linked-team-deliverable.js";
+  setWakeRoundDispatcher,
+  type WakeRoundDispatcher,
+} from "../collaboration-dispatch/wake-round-dispatch.js";
+import { activateCollaborationTask } from "./activate-collaboration-task.js";
+import {
+  applyCollaborationBoardClaim,
+  claimCollaborationBoardItem,
+  listCollaborationBoardItems,
+  proposeCollaborationTodolist,
+} from "./claim-contract-entry.js";
+import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
+import {
+  buildPostPublishHandoffOpKey,
+  tryClaimAfterBoardPublish,
+} from "./try-claim-after-board-publish.js";
 
 const tempDirs: string[] = [];
 const savedStateDir = process.env.OPENBOT_STATE_DIR;
@@ -42,6 +52,7 @@ const savedOpenbotConfigPath = process.env.OPENBOT_CONFIG_PATH;
 const savedOpenclawConfigPath = process.env.OPENCLAW_CONFIG_PATH;
 
 afterEach(async () => {
+  setWakeRoundDispatcher(null);
   clearRuntimeConfigSnapshot();
   clearConfigCache();
   if (savedStateDir === undefined) {
@@ -63,6 +74,8 @@ afterEach(async () => {
 });
 
 const GROUP_ID = "grp_post_publish_handoff";
+const CEO = "human:ceo";
+const EXECUTOR = "bot-exec";
 
 function flagConfig(root: string): OpenBotConfig {
   return {
@@ -109,208 +122,392 @@ function authority(cfg: OpenBotConfig): RuntimeAuthority {
   });
 }
 
-describe("post-publish claim handoff (positive entry path)", () => {
-  it("CEO publish schedules intended bot; bot claims→plan→confirm→submit→accept", async () => {
-    const { cfg } = await useConfig();
-    const auth = authority(cfg);
-    const taskId = "task-post-publish-handoff";
-    const ceo = "human:ceo";
-    const executor = "bot-exec";
-    const reviewer = "bot-reviewer";
+async function seedMappedMembership(params: {
+  cfg: OpenBotConfig;
+  groupId: string;
+  memberIds: readonly string[];
+  ownerUserId?: string;
+}): Promise<void> {
+  const stores = createWorkspaceCollaborationStores(params.cfg);
+  const owner = params.ownerUserId ?? CEO;
+  const state = makeOperatingState({
+    groupId: params.groupId,
+    governance: {
+      ownerUserId: owner,
+      coordinatorBotId: "",
+      adminUserIds: [],
+    },
+  });
+  state.memberRoleMap = params.memberIds.map((memberId) => ({
+    memberId,
+    memberKind: memberId.startsWith("human:") ? "human" : "bot",
+    governanceRole: memberId === owner ? "owner" : "member",
+    collaborationRole: null,
+    status: "active",
+  }));
+  await writeGroupOperatingState({
+    fileStore: stores.fileStore,
+    groupId: params.groupId,
+    state,
+    writeKind: "auth",
+  });
+}
 
-    // 1) CEO publishes board with intended=executor (publish ≠ claim).
-    const published = await publishBoardItem(
-      auth,
-      {
-        groupId: GROUP_ID,
-        taskId,
-        remainingWork: "draft handoff markdown",
-        acceptanceCriteria: ["has title", "has body"],
-        intendedClaimantIds: [executor],
-        publishedBy: ceo,
-      },
-      { cfg },
-    );
-    expect(published.ok).toBe(true);
-    if (!published.ok) {
-      throw new Error(published.message);
+/** Production entries invoked only from inside the woken dispatcher (executor run). */
+function createExecutorToolDispatcher(params: {
+  cfg: OpenBotConfig;
+  groupId: string;
+  taskId: string;
+  executor: string;
+  onDispatch?: () => void;
+}): WakeRoundDispatcher {
+  return async (req) => {
+    params.onDispatch?.();
+    const itemId = (req.itemId ?? "").trim();
+    if (!itemId) {
+      return { ok: false, reason: "missing_item_id", sideEffectClass: "not_started" };
     }
-    expect(published.value.status).toBe("published");
-    expect(published.value.claimantId == null || published.value.claimantId === "").toBe(true);
-
-    // 2) Post-publish helper: publisher must NOT become claimant; wake intended.
-    const { tryClaimAfterBoardPublish: tryClaim } =
-      await import("./try-claim-after-board-publish.js");
-    const scheduled = await tryClaim({
-      groupId: GROUP_ID,
-      taskId,
-      item: published.value,
-      actorId: ceo,
-      authority: auth,
-      cfg,
-    });
-    expect(scheduled.outcome).toBe("scheduled");
-    if (scheduled.outcome !== "scheduled") {
-      throw new Error(`expected scheduled, got ${JSON.stringify(scheduled)}`);
-    }
-    expect(scheduled.claimantId).toBeNull();
-    expect(scheduled.scheduledClaimantId).toBe(executor);
-    expect(scheduled.wakeRecorded).toBe(true);
-    expect(scheduled.item.status).toBe("published");
-    expect(scheduled.item.claimantId == null || scheduled.item.claimantId === "").toBe(true);
-
-    const wakes = await listWakeEvents(auth, { groupId: GROUP_ID, taskId });
-    const handoff = wakes.filter((w) => w.source === "handoff" && w.toAgentIds.includes(executor));
-    expect(handoff.length).toBeGreaterThan(0);
-
-    // 3) Intended bot claims via production entry (no manual claimant patch).
-    const { claimCollaborationBoardItem } = await import("./claim-contract-entry.js");
+    // claim_item → apply_claim → propose_todolist via production organizer entries
+    // (same backends the collaboration-board tool uses). Actor = intended executor.
     const claimed = await claimCollaborationBoardItem({
-      groupId: GROUP_ID,
-      taskId,
-      itemId: published.value.itemId,
-      claimantId: executor,
-      actor: executor,
-      cfg,
+      groupId: params.groupId,
+      taskId: params.taskId,
+      itemId,
+      claimantId: params.executor,
+      actor: params.executor,
+      cfg: params.cfg,
     });
-    expect(claimed.status).toBe("claimed");
-    expect(claimed.claimantId).toBe(executor);
-
-    // Self-claim path also succeeds when actor IS intended (idempotent already_claimed).
-    const selfClaim = await tryClaim({
-      groupId: GROUP_ID,
-      taskId,
-      item: claimed,
-      actorId: executor,
-      authority: auth,
-      cfg,
-    });
-    expect(selfClaim.outcome).toBe("unchanged");
-    if (selfClaim.outcome === "unchanged") {
-      expect(selfClaim.reason).toBe("already_claimed");
-      expect(selfClaim.claimantId).toBe(executor);
+    if (claimed.status !== "claimed" && claimed.status !== "applied") {
+      return {
+        ok: false,
+        reason: `claim_failed:${claimed.status}`,
+        sideEffectClass: "started_or_unknown",
+      };
     }
-
-    // 4) apply → propose plan → legal confirm → in_progress.
-    const seedTask: Task = {
-      taskId,
-      groupId: GROUP_ID,
-      title: "post publish handoff",
-      status: "in_progress",
-      ownerMemberId: reviewer,
-      assignedMemberIds: [reviewer],
-      createdBy: ceo,
-      updatedBy: ceo,
-      createdAtMs: 1,
-      updatedAtMs: 1,
+    const applied = await applyCollaborationBoardClaim({
+      groupId: params.groupId,
+      taskId: params.taskId,
+      itemId,
+      actor: params.executor,
+      cfg: params.cfg,
+    });
+    if (applied.item.status !== "applied") {
+      return {
+        ok: false,
+        reason: `apply_failed:${applied.item.status}`,
+        sideEffectClass: "started_or_unknown",
+      };
+    }
+    const proposed = await proposeCollaborationTodolist({
+      groupId: params.groupId,
+      taskId: params.taskId,
+      boardItemId: itemId,
+      ownerMemberId: params.executor,
+      actor: params.executor,
+      steps: [{ title: "draft handoff markdown" }],
+      cfg: params.cfg,
+    });
+    if (!proposed.todolist?.todolistId) {
+      return {
+        ok: false,
+        reason: "propose_failed",
+        sideEffectClass: "started_or_unknown",
+      };
+    }
+    return {
+      ok: true,
+      roundId: `handoff-round:${params.taskId}:${itemId}`,
+      sideEffectClass: "completed_with_receipt",
     };
-    const applied = await applyClaim(
-      auth,
-      { taskId, itemId: published.value.itemId },
-      seedTask,
-      auth.policy.effective,
-      { cfg },
-    );
-    expect(applied.ok).toBe(true);
-    if (!applied.ok) {
-      throw new Error(applied.message);
-    }
+  };
+}
 
-    const { proposeTodolist, confirmTodolist } =
-      await import("../collaboration-dispatch/executor-private-todolist.js");
-    const proposed = await proposeTodolist(
-      auth,
-      {
-        boardItemId: published.value.itemId,
-        taskId,
-        groupId: GROUP_ID,
-        ownerMemberId: executor,
-        steps: [{ title: "draft handoff md" }],
-      },
-      { cfg },
-    );
-    expect(proposed.ok).toBe(true);
-    if (!proposed.ok) {
-      throw new Error(proposed.message);
-    }
-    const confirmed = await confirmTodolist(
-      auth,
-      {
-        taskId,
-        todolistId: proposed.value.todolistId,
-        confirmerId: reviewer,
-      },
-      { cfg, authorizedConfirmerIds: [reviewer] },
-    );
-    expect(confirmed.ok).toBe(true);
-    if (!confirmed.ok) {
-      throw new Error(confirmed.message);
-    }
-
-    const started = await markBoardItemInProgress(
-      auth,
-      {
-        taskId,
-        itemId: published.value.itemId,
-        actorId: executor,
-      },
-      { cfg },
-    );
-    expect(started.ok).toBe(true);
-    if (!started.ok) {
-      throw new Error(`${started.reason}: ${started.message}`);
-    }
-
-    // 5) Formal submit → accept (production entries).
-    const seeded = await seedLinkedTeamDeliverableFixture({
-      authority: auth,
+describe("post-publish claim handoff (activate → consumable nudge dispatch)", () => {
+  it("CEO activate schedules intended bot; production dispatcher/tools claim→apply→propose", async () => {
+    const { cfg } = await useConfig();
+    const taskId = "task-post-publish-handoff";
+    let dispatchCalls = 0;
+    const dispatcher = createExecutorToolDispatcher({
+      cfg,
+      groupId: GROUP_ID,
       taskId,
-      deliverableId: "del-post-publish-handoff",
-      version: 1,
-      content: P2_LINKED_DELIVERABLE_FIXTURE_BODY,
+      executor: EXECUTOR,
+      onDispatch: () => {
+        dispatchCalls += 1;
+      },
     });
-    expect(seeded.ok).toBe(true);
-    if (!seeded.ok) {
-      throw new Error(seeded.reason);
-    }
-    const submissionId = randomUUID();
-    const submitted = await submitBoardItemForReview(
-      auth,
-      {
-        taskId,
-        itemId: published.value.itemId,
-        actorId: executor,
-        submissionId,
-        artifactVersion: "art-handoff-v1",
-        submissionSummary: "# Handoff draft\nbody",
-        linkedDeliverableId: seeded.deliverableId,
-        linkedDeliverableVersion: seeded.version,
-        linkedContentSha256: seeded.contentSha256,
-      },
-      { cfg, coordinatorBotId: reviewer },
-    );
-    expect(submitted.ok).toBe(true);
-    if (!submitted.ok) {
-      throw new Error(submitted.message);
-    }
 
-    const accepted = await acceptBoardItemSubmission(
-      auth,
-      {
-        taskId,
-        itemId: published.value.itemId,
-        actorId: reviewer,
-        expectedSubmissionId: submissionId,
-        reason: "meets acceptance criteria: has title and body",
-        checkedAcceptanceCriteria: ["has title", "has body"],
-      },
-      { cfg },
-    );
-    expect(accepted.ok, accepted.ok ? "" : `${accepted.reason}: ${accepted.message}`).toBe(true);
-    if (!accepted.ok) {
-      throw new Error(`${accepted.reason}: ${accepted.message}`);
+    // Membership surface must map CEO + intended executor or consume fails auth_revoked
+    // (task owner is a duty candidate). Do not claim here — only auth mapping.
+    await seedMappedMembership({
+      cfg,
+      groupId: GROUP_ID,
+      memberIds: [CEO, EXECUTOR],
+    });
+
+    // Real CEO activate entry — do NOT pre-claim or manually call claim outside dispatcher.
+    const activated = await activateCollaborationTask({
+      groupId: GROUP_ID,
+      taskId,
+      title: "建板后受控接力",
+      message: "请发布看板并由唯一 intended 执行者接手起草，验收标题与正文",
+      actor: CEO,
+      goal: "handoff wake 被消费且执行者自行认领提计划",
+      acceptanceCriteria: ["has title", "has body"],
+      constraints: ["publish≠publisher claim", "不扩 source 清单"],
+      suggestedClaimantIds: [EXECUTOR],
+      humanConfirmed: true,
+      requireHumanConfirm: true,
+      skipChallengeWindow: true,
+      cfg,
+      roundDispatcher: dispatcher,
+    });
+
+    expect(["activated", "partial_success"]).toContain(activated.status);
+    if (activated.status !== "activated" && activated.status !== "partial_success") {
+      throw new Error(`activate failed: ${JSON.stringify(activated)}`);
     }
-    expect(accepted.value.status).toBe("accepted");
-    expect(accepted.value.claimantId).toBe(executor);
+    // Activate envelope never flips dispatched (建板 ≠ 派工验收).
+    expect(activated.dispatched).toBe(false);
+
+    const formalClaim = activated.formalClaim;
+    expect(formalClaim).toBeTruthy();
+    if (!formalClaim) {
+      throw new Error("formalClaim missing");
+    }
+    expect(formalClaim.outcome).toBe("scheduled");
+    if (formalClaim.outcome !== "scheduled") {
+      throw new Error(`expected scheduled, got ${JSON.stringify(formalClaim)}`);
+    }
+    expect(formalClaim.scheduledClaimantId).toBe(EXECUTOR);
+    expect(formalClaim.claimantId).toBeNull();
+    expect(formalClaim.wakeRecorded).toBe(true);
+    expect(formalClaim.wakeDispatched, `formalClaim.reason=${formalClaim.reason}`).toBe(true);
+    expect(formalClaim.reason).toContain("wake_dispatched");
+    expect(formalClaim.reason).not.toContain("recorded_not_dispatched");
+    expect(dispatchCalls).toBe(1);
+
+    // Board/responsibility advanced only because dispatcher ran production tools.
+    const listed = await listCollaborationBoardItems({
+      groupId: GROUP_ID,
+      taskId,
+      cfg,
+    });
+    const live = listed.find((row) => row.itemId === activated.boardItemId);
+    expect(live).toBeTruthy();
+    expect(live?.claimantId).toBe(EXECUTOR);
+    expect(["claimed", "applied", "in_progress"]).toContain(live?.status ?? "");
+
+    const auth = authority(cfg);
+    const wakes = await listWakeEvents(auth, { groupId: GROUP_ID, taskId });
+    const handoff = wakes.filter((w) => w.source === "handoff" && w.toAgentIds.includes(EXECUTOR));
+    const nudge = wakes.filter((w) => w.source === "nudge" && w.toAgentIds.includes(EXECUTOR));
+    expect(handoff.length).toBeGreaterThan(0);
+    expect(nudge.length).toBeGreaterThan(0);
+  });
+
+  it("dispatcher unavailable → recorded_not_dispatched; no claim/responsibility", async () => {
+    const { cfg } = await useConfig();
+    const taskId = "task-handoff-no-consumer";
+    await seedMappedMembership({
+      cfg,
+      groupId: GROUP_ID,
+      memberIds: [CEO, EXECUTOR],
+    });
+
+    const activated = await activateCollaborationTask({
+      groupId: GROUP_ID,
+      taskId,
+      title: "无消费派发",
+      message: "请发布看板；dispatcher 不可用时应仅记账不派发，验收无认领",
+      actor: CEO,
+      goal: "recorded but not dispatched",
+      acceptanceCriteria: ["无认领", "无责任投影"],
+      constraints: ["仅记账不派发", "禁止自动代认领"],
+      suggestedClaimantIds: [EXECUTOR],
+      humanConfirmed: true,
+      requireHumanConfirm: true,
+      skipChallengeWindow: true,
+      cfg,
+      roundDispatcher: null,
+    });
+
+    expect(["activated", "partial_success"]).toContain(activated.status);
+    if (activated.status !== "activated" && activated.status !== "partial_success") {
+      throw new Error(`activate failed: ${JSON.stringify(activated)}`);
+    }
+    expect(activated.dispatched).toBe(false);
+    const formalClaim = activated.formalClaim;
+    expect(formalClaim?.outcome).toBe("scheduled");
+    if (formalClaim?.outcome !== "scheduled") {
+      throw new Error(`expected scheduled, got ${JSON.stringify(formalClaim)}`);
+    }
+    expect(formalClaim.wakeRecorded).toBe(true);
+    expect(formalClaim.wakeDispatched).toBe(false);
+    expect(formalClaim.reason).toContain("recorded_not_dispatched");
+    expect(formalClaim.reason).toContain("no_consumer");
+    expect(formalClaim.claimantId).toBeNull();
+    expect(formalClaim.item.claimantId == null || formalClaim.item.claimantId === "").toBe(true);
+
+    const listed = await listCollaborationBoardItems({ groupId: GROUP_ID, taskId, cfg });
+    const live = listed.find((row) => row.itemId === activated.boardItemId);
+    expect(live?.status).toBe("published");
+    expect(live?.claimantId == null || live?.claimantId === "").toBe(true);
+
+    const stores = createWorkspaceCollaborationStores(cfg);
+    const task = await stores.objectStorage.readObject<Task>(GROUP_ID, "task", taskId);
+    const responsibility = (task as { responsibility?: { executors?: string[] } } | null)
+      ?.responsibility;
+    const executors = responsibility?.executors ?? [];
+    expect(executors.includes(EXECUTOR)).toBe(false);
+  });
+
+  it("target de-authorized → recorded_not_dispatched; dispatcher not invoked; no claim", async () => {
+    const { cfg } = await useConfig();
+    const taskId = "task-handoff-auth-revoked";
+    const stores = createWorkspaceCollaborationStores(cfg);
+
+    // Membership surface present but executor not mapped → auth_revoked at consume.
+    const revoked = makeOperatingState({
+      groupId: GROUP_ID,
+      governance: { ownerUserId: CEO, coordinatorBotId: "", adminUserIds: [] },
+    });
+    revoked.memberRoleMap = [
+      {
+        memberId: CEO,
+        memberKind: "human",
+        governanceRole: "owner",
+        collaborationRole: null,
+        status: "active",
+      },
+    ];
+    await writeGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupId: GROUP_ID,
+      state: revoked,
+      writeKind: "auth",
+    });
+
+    let dispatchCalls = 0;
+    const activated = await activateCollaborationTask({
+      groupId: GROUP_ID,
+      taskId,
+      title: "撤权不派发",
+      message: "请发布看板；目标撤权后应记账不派发，验收无认领",
+      actor: CEO,
+      goal: "auth_revoked recorded_not_dispatched",
+      acceptanceCriteria: ["无认领", "dispatcher未调用"],
+      constraints: ["目标撤权不得派发", "禁止代认领"],
+      suggestedClaimantIds: [EXECUTOR],
+      humanConfirmed: true,
+      requireHumanConfirm: true,
+      skipChallengeWindow: true,
+      cfg,
+      roundDispatcher: async () => {
+        dispatchCalls += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+    });
+
+    expect(["activated", "partial_success"]).toContain(activated.status);
+    if (activated.status !== "activated" && activated.status !== "partial_success") {
+      throw new Error(`activate failed: ${JSON.stringify(activated)}`);
+    }
+    expect(activated.dispatched).toBe(false);
+    const formalClaim = activated.formalClaim;
+    expect(formalClaim?.outcome).toBe("scheduled");
+    if (formalClaim?.outcome !== "scheduled") {
+      throw new Error(`expected scheduled, got ${JSON.stringify(formalClaim)}`);
+    }
+    expect(formalClaim.wakeRecorded).toBe(true);
+    expect(formalClaim.wakeDispatched).toBe(false);
+    expect(formalClaim.reason).toContain("recorded_not_dispatched");
+    expect(formalClaim.reason).toContain("auth_revoked");
+    expect(dispatchCalls).toBe(0);
+
+    const listed = await listCollaborationBoardItems({ groupId: GROUP_ID, taskId, cfg });
+    const live = listed.find((row) => row.itemId === activated.boardItemId);
+    expect(live?.status).toBe("published");
+    expect(live?.claimantId == null || live?.claimantId === "").toBe(true);
+  });
+
+  it("retry / concurrent publish does not double-wake (stable opKey)", async () => {
+    const { cfg } = await useConfig();
+    const taskId = "task-handoff-idempotent";
+    const auth = authority(cfg);
+    await seedMappedMembership({
+      cfg,
+      groupId: GROUP_ID,
+      memberIds: [CEO, EXECUTOR],
+    });
+
+    // Publish via activate with a counting dispatcher (no tool side effects needed).
+    let dispatchCalls = 0;
+    const counting: WakeRoundDispatcher = async (req) => {
+      dispatchCalls += 1;
+      return {
+        ok: true,
+        roundId: `idem-${req.itemId ?? "x"}`,
+        sideEffectClass: "completed_with_receipt",
+      };
+    };
+
+    const activated = await activateCollaborationTask({
+      groupId: GROUP_ID,
+      taskId,
+      title: "幂等接力",
+      message: "请发布看板；重复 tryClaim 不得二次唤醒，验收单次派发",
+      actor: CEO,
+      goal: "no double wake",
+      acceptanceCriteria: ["单次派发", "opKey幂等"],
+      constraints: ["禁止重复唤醒", "稳定 opKey"],
+      suggestedClaimantIds: [EXECUTOR],
+      humanConfirmed: true,
+      requireHumanConfirm: true,
+      skipChallengeWindow: true,
+      cfg,
+      roundDispatcher: counting,
+    });
+    expect(["activated", "partial_success"]).toContain(activated.status);
+    if (activated.status !== "activated" && activated.status !== "partial_success") {
+      throw new Error(`activate failed: ${JSON.stringify(activated)}`);
+    }
+    const formalClaim = activated.formalClaim;
+    expect(formalClaim?.outcome).toBe("scheduled");
+    if (formalClaim?.outcome !== "scheduled") {
+      throw new Error(JSON.stringify(formalClaim));
+    }
+    expect(formalClaim.wakeDispatched).toBe(true);
+    expect(dispatchCalls).toBe(1);
+
+    const itemId = activated.boardItemId;
+    const expectedOpKey = buildPostPublishHandoffOpKey({
+      groupId: GROUP_ID,
+      taskId,
+      itemId,
+      intendedClaimantId: EXECUTOR,
+    });
+    expect(expectedOpKey).toContain("post_publish_intended_claim_handoff");
+
+    // Second tryClaim with the same published snapshot + same opKey consumer path.
+    const liveItem = (await loadBoardClaimItem(auth, { taskId, itemId })) ?? formalClaim.item;
+    const again = await tryClaimAfterBoardPublish({
+      groupId: GROUP_ID,
+      taskId,
+      item: { ...liveItem, status: "published", claimantId: null },
+      actorId: CEO,
+      authority: auth,
+      cfg,
+      roundDispatcher: counting,
+    });
+    expect(again.outcome).toBe("scheduled");
+    if (again.outcome !== "scheduled") {
+      throw new Error(JSON.stringify(again));
+    }
+    // Consumable path reuses durable wake-op — no second dispatcher invoke.
+    expect(again.wakeRecorded).toBe(true);
+    expect(again.wakeDispatched).toBe(true);
+    expect(again.reason).toMatch(/idempotent_reuse|wake_dispatched/);
+    expect(dispatchCalls).toBe(1);
   });
 });
