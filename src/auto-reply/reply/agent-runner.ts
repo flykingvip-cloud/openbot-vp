@@ -19,10 +19,12 @@ import {
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
+import { readSessionTaskBoard } from "../../conversation-task/session-task-board.js";
 import {
   isTaskBoardContinueInternalPrompt,
   scheduleTaskBoardContinueWake,
 } from "../../conversation-task/task-board-continue.js";
+import { classifyTurnRelation } from "../../conversation-task/turn-relation.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 import { tryResolveCapabilityGapsFromUsage } from "../../gateway/evolution-control/capability-gap-ingest.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
@@ -82,7 +84,7 @@ import {
 } from "./honest-empty-reply.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
-import { resolveActiveRunQueueAction } from "./queue-policy.js";
+import { resolveActiveRunQueueAction, shouldAttemptCollectAmendSteer } from "./queue-policy.js";
 import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queue.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
@@ -92,6 +94,21 @@ import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
 const BLOCK_REPLY_SEND_TIMEOUT_MS = 15_000;
+
+function resolveCollectAmendTurnRelation(
+  sessionFile: string | undefined,
+  prompt: string,
+): "amend" | "aside" | "new_work" | null {
+  const file = sessionFile?.trim();
+  if (!file) {
+    return null;
+  }
+  const goal = readSessionTaskBoard(file).current?.goalText?.trim() ?? "";
+  if (!goal) {
+    return null;
+  }
+  return classifyTurnRelation(prompt, goal);
+}
 
 export async function runReplyAgent(params: {
   commandBody: string;
@@ -242,6 +259,22 @@ export async function runReplyAgent(params: {
       typing.cleanup();
       return undefined;
     }
+  } else if (
+    shouldAttemptCollectAmendSteer({
+      isActive,
+      isStreaming,
+      shouldSteer,
+      shouldFollowup,
+      queueMode: resolvedQueue.mode,
+      turnRelation: resolveCollectAmendTurnRelation(
+        followupRun.run.sessionFile,
+        followupRun.prompt,
+      ),
+    })
+  ) {
+    // Best-effort constraint inject into the active run. Failure must not be
+    // reported as applied; followup still carries the user-visible reply.
+    queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
   }
 
   const activeRunQueueAction = resolveActiveRunQueueAction({

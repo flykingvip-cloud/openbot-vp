@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { handleSendChat, refreshChat } from "./app-chat.ts";
+import { handleSendChat, isChatBusy, isChatSendInFlight, refreshChat } from "./app-chat.ts";
 import * as appScroll from "./app-scroll.ts";
 import { chatCapability } from "./capability/chat/index.ts";
 import { sessionsCapability } from "./capability/sessions/index.ts";
@@ -89,6 +89,44 @@ describe("handleSendChat", () => {
     expect(host.chatMessage).toBe("请继续");
     expect(host.chatQuoteDraft).toEqual(quote);
     expect(host.chatAttachments).toEqual(attachments);
+  });
+});
+
+describe("handleSendChat mid-task delivery", () => {
+  beforeEach(() => {
+    vi.spyOn(appScroll, "scheduleChatScroll").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("reaches chat.send while background run occupies chatRunId (does not FE-hold)", async () => {
+    const send = vi.spyOn(chatCapability, "sendMessage").mockResolvedValue("run-b" as never);
+    const host = createSendHost({ chatMessage: "进度如何？" });
+    host.chatRunId = "run-a";
+    host.chatSending = false;
+    expect(isChatBusy(host as never)).toBe(true);
+    expect(isChatSendInFlight(host as never)).toBe(false);
+
+    await handleSendChat(host as never);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[3]).toMatchObject({ preserveActiveRunOccupancy: true });
+    expect(host.chatQueue).toEqual([]);
+  });
+
+  it("still enqueues when chatSending (duplicate-submit guard)", async () => {
+    const send = vi.spyOn(chatCapability, "sendMessage").mockResolvedValue("run-b" as never);
+    const host = createSendHost({ chatMessage: "补充：只要国内" });
+    host.chatRunId = "run-a";
+    host.chatSending = true;
+
+    await handleSendChat(host as never);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(host.chatQueue).toHaveLength(1);
+    expect(host.chatQueue[0]?.text).toContain("补充：只要国内");
   });
 });
 

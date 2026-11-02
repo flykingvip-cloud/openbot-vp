@@ -258,6 +258,7 @@ export type ChatSendState = Pick<
   | "chatThinkingProgress"
   | "workProgressPhase"
   | "workProgressToolsInFlight"
+  | "workProgressNarration"
   | "lastError"
   | "chatHumanTakeoverObserved"
 > & {
@@ -323,6 +324,12 @@ export type ChatSendOptions = {
    * OGUI Form P0 passes submission_id here so retries with the same submit do not double-run.
    */
   idempotencyKey?: string;
+  /**
+   * Mid-task send: call chat.send without stealing stream occupancy from the
+   * active background run. Optimistic user row still appears; chatSending still
+   * guards duplicate RPC. Foreign run finals must not clear the preserved run.
+   */
+  preserveActiveRunOccupancy?: boolean;
 };
 
 export type ChatAbortState = Pick<
@@ -1467,6 +1474,17 @@ function clearActiveChatRunState(
   >,
   eventRunId?: string | null,
 ) {
+  // Foreign / mid-task transport run must not wipe the preserved background owner.
+  const eventId = eventRunId?.trim() ?? "";
+  const openId = state.chatRunId?.trim() ?? "";
+  if (eventId && openId) {
+    const same =
+      eventId === openId || eventId.startsWith(`${openId}:`) || openId.startsWith(`${eventId}:`);
+    if (!same) {
+      noteTerminalChatRun(eventId);
+      return;
+    }
+  }
   // Remember the id before wiping it. A later chat.history can still report
   // this run until the gateway drops its abort controller.
   noteTerminalChatRun(state.chatRunId);
@@ -1858,14 +1876,30 @@ export async function sendChatMessage(
   state.lastError = null;
   const sessionKey = resolveChatSendSessionKey(state);
   realignSessionKeyForSend(state, sessionKey);
-  state.chatRunId = runId;
-  state.chatStream = "";
-  state.chatStreamStartedAt = now;
-  state.chatThinkingProgress = null;
-  applyWorkProgress(state, { type: "turn-start" });
+  const preserveOccupancy =
+    options.preserveActiveRunOccupancy === true && Boolean(state.chatRunId?.trim());
+  const preservedOccupancy = preserveOccupancy
+    ? {
+        chatRunId: state.chatRunId,
+        chatStream: state.chatStream,
+        chatStreamStartedAt: state.chatStreamStartedAt,
+        chatStreamSessionKey: state.chatStreamSessionKey,
+        chatThinkingProgress: state.chatThinkingProgress,
+        workProgressPhase: state.workProgressPhase ?? null,
+        workProgressToolsInFlight: state.workProgressToolsInFlight ?? 0,
+        workProgressNarration: state.workProgressNarration ?? null,
+      }
+    : null;
+  if (!preserveOccupancy) {
+    state.chatRunId = runId;
+    state.chatStream = "";
+    state.chatStreamStartedAt = now;
+    state.chatThinkingProgress = null;
+    applyWorkProgress(state, { type: "turn-start" });
+  }
   // Steward workbench may still hold a template prelude from user.daibai.ask; clear it
   // when a real model turn starts so inventory text cannot look like the assistant reply.
-  if ("daibaiAskResult" in state) {
+  if (!preserveOccupancy && "daibaiAskResult" in state) {
     (state as { daibaiAskResult: unknown }).daibaiAskResult = null;
   }
 
@@ -1949,19 +1983,23 @@ export async function sendChatMessage(
         return pending ? pending.id !== authorizationId : true;
       });
       if (result.status === "accepted" && result.runId) {
-        state.chatRunId = result.runId;
-        state.chatStream = state.chatStream ?? "";
-        if (state.chatStreamStartedAt == null) {
-          state.chatStreamStartedAt = Date.now();
+        if (!preservedOccupancy) {
+          state.chatRunId = result.runId;
+          state.chatStream = state.chatStream ?? "";
+          if (state.chatStreamStartedAt == null) {
+            state.chatStreamStartedAt = Date.now();
+          }
         }
         return result.runId;
       }
-      state.chatRunId = null;
-      state.chatStream = null;
-      state.chatStreamStartedAt = null;
-      state.chatStreamSessionKey = null;
-      state.chatThinkingProgress = null;
-      clearWorkProgress(state);
+      if (!preservedOccupancy) {
+        state.chatRunId = null;
+        state.chatStream = null;
+        state.chatStreamStartedAt = null;
+        state.chatStreamSessionKey = null;
+        state.chatThinkingProgress = null;
+        clearWorkProgress(state);
+      }
       return null;
     }
     const { applyGrowthGateBlocked, isGrowthGateBlockedResult } = await importWithStaleChunkReload(
@@ -2030,12 +2068,23 @@ export async function sendChatMessage(
       return runId;
     }
     const error = formatChatSendError(err);
-    state.chatRunId = null;
-    state.chatStream = null;
-    state.chatStreamStartedAt = null;
-    state.chatStreamSessionKey = null;
-    state.chatThinkingProgress = null;
-    clearWorkProgress(state);
+    if (preservedOccupancy) {
+      state.chatRunId = preservedOccupancy.chatRunId;
+      state.chatStream = preservedOccupancy.chatStream;
+      state.chatStreamStartedAt = preservedOccupancy.chatStreamStartedAt;
+      state.chatStreamSessionKey = preservedOccupancy.chatStreamSessionKey;
+      state.chatThinkingProgress = preservedOccupancy.chatThinkingProgress;
+      state.workProgressPhase = preservedOccupancy.workProgressPhase;
+      state.workProgressToolsInFlight = preservedOccupancy.workProgressToolsInFlight;
+      state.workProgressNarration = preservedOccupancy.workProgressNarration;
+    } else {
+      state.chatRunId = null;
+      state.chatStream = null;
+      state.chatStreamStartedAt = null;
+      state.chatStreamSessionKey = null;
+      state.chatThinkingProgress = null;
+      clearWorkProgress(state);
+    }
     state.lastError = error;
     // Optimistic rows are pending, not transcript. RPC deny must not leave a
     // successful-looking user bubble (ACL / unknown space / attach reject).

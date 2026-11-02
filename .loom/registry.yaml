@@ -13,7 +13,7 @@ tasks:
 - id: ft-plan-speak-shopping-positive-admission
   owner: cursor-grok
   intent:
-  - Reply layer must not invent pause/confirm from plan-speak; express only; executor keeps stall/continue gates.
+  - Reply layer express-only; mid-task chat delivery with occupancy split; amend collect-steer inject; stop protection via existing board claim.
   paths:
   - src/shared/text/plan-speak-final.ts
   - src/shared/text/plan-speak-final.test.ts
@@ -21,6 +21,17 @@ tasks:
   - src/agents/pi-embedded-runner/run/payloads.test.ts
   - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
   - src/auto-reply/reply/reply-directives.ts
+  - src/auto-reply/reply/queue-policy.ts
+  - src/auto-reply/reply/queue-policy.test.ts
+  - src/auto-reply/reply/agent-runner.ts
+  - src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts
+  - ui/src/ui/app-chat.ts
+  - ui/src/ui/app-chat.node.test.ts
+  - ui/src/ui/controllers/chat.ts
+  - ui/src/ui/controllers/chat.test.ts
+  - docs/slice1-decision-to-reply-path.md
+  - docs/slice2-chat-during-task-evidence.md
+  - docs/slice2-chat-during-task-delivery.md
   state: active
   sessions:
   - id: 2a5a3f36-196a-4b8b-8728-3686a1508090
@@ -28,7 +39,7 @@ tasks:
     ide: cursor
     agent: cursor-grok
     status: active
-    lastSignalAt: 2026-11-02T13:23:00+00:00
+    lastSignalAt: 2026-11-02T14:22:00+00:00
     metadata: {}
   ownerHistory: []
   since: 2026-11-02
@@ -10672,11 +10683,22 @@ landingStreams:
   - src/shared/text/plan-speak-final.ts
   - src/shared/text/plan-speak-final.test.ts
   - src/agents/pi-embedded-subscribe.plan-speak-outlet.test.ts
+  - src/auto-reply/reply/queue-policy.ts
+  - src/auto-reply/reply/queue-policy.test.ts
+  - src/auto-reply/reply/agent-runner.ts
+  - src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts
+  - ui/src/ui/app-chat.ts
+  - ui/src/ui/app-chat.node.test.ts
+  - ui/src/ui/controllers/chat.ts
+  - ui/src/ui/controllers/chat.test.ts
+  - docs/slice1-decision-to-reply-path.md
+  - docs/slice2-chat-during-task-evidence.md
+  - docs/slice2-chat-during-task-delivery.md
   canLandWith: []
   metadata:
     task: ft-plan-speak-shopping-positive-admission
     owner: cursor-grok
-    purpose: Reply layer must not invent pause CTA; partial/block outlet regressions; express only.
+    purpose: Reply express-only + mid-task chat occupancy split + amend collect-steer; stop protection via board claim.
 - id: collab-role-duty-separation-20261102
   landingPolicy: serial
   paths:
