@@ -10632,6 +10632,27 @@ tasks:
   since: 2026-11-01
   metadata: {}
 landingStreams:
+- id: collab-role-duty-separation-20261102
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - src/agents/tools/collaboration-board-tool.ts
+  - src/agents/tools/collaboration-board-tool.test.ts
+  - src/gateway/collaboration-learning/claim-contract-entry.ts
+  - src/gateway/collaboration-learning/claim-contract-entry.test.ts
+  - src/gateway/collaboration-learning/ensure-board-active-after-confirm.ts
+  - src/gateway/collaboration-learning/ensure-board-active-after-confirm.test.ts
+  - src/gateway/collaboration-learning/post-plan-confirm-advance.ts
+  - src/gateway/collaboration-learning/product-wiring-autoadvance-readiness-deliverable.test.ts
+  - src/gateway/collaboration-learning/role-duty-separation.acceptance.test.ts
+  - src/gateway/collaboration-learning/todolist-acl-rpc.test.ts
+  - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts
+  - src/task-outcome/cli-gateway-collab-entry-wiring.test.ts
+  canLandWith: []
+  metadata:
+    task: FT-COLLAB-ROLE-DUTY-SEPARATION
+    owner: cursor-grok
+    purpose: Coordinator must not default-claim/proxy-claim; publish≠claim; execute/review wakes target claimant/reviewer; synthetic acceptance 1–9. P1 non-empty trusted actor on production write paths.
 - id: yonyou-dh-knowledge-feed:cursor-cloud
   landingPolicy: serial
   paths:

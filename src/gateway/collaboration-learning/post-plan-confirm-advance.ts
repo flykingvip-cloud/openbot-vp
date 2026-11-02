@@ -43,6 +43,7 @@ import {
 } from "./execution-deliverable-binding.js";
 import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
+import { buildPostPublishHandoffDispatchPrompt } from "./try-claim-after-board-publish.js";
 
 function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
@@ -300,6 +301,88 @@ export async function triggerPostPlanConfirmAdvance(params: {
           boardItemId,
           status: compact(liveItem.status),
           planOwnerMemberId,
+        });
+      }
+      // Proxy-claim refused: schedule controlled claim wake to plan owner (not execute wake).
+      if (!ensured.activated && ensured.reason.startsWith("awaiting_executor_self_claim")) {
+        const executorTarget = compact(ensured.executorId) || planOwnerMemberId;
+        if (!executorTarget) {
+          return finishAdvance({
+            autoAdvanceWired: true,
+            wakeRecorded: false,
+            wakeConsumed: false,
+            dispatched: false,
+            reason: ensured.reason,
+            targetAgentIds: [],
+          });
+        }
+        const handoffReason = `post_confirm_executor_self_claim:${ensured.reason}`;
+        const nudge = await recordNudgeWake(
+          authority,
+          {
+            groupId,
+            fromAgentId: confirmerId,
+            toAgentIds: [executorTarget],
+            taskId,
+            itemId: boardItemId,
+            reason: handoffReason,
+          },
+          { cfg },
+        );
+        if (!nudge.ok) {
+          return finishAdvance({
+            autoAdvanceWired: true,
+            wakeRecorded: false,
+            wakeConsumed: false,
+            dispatched: false,
+            reason: `${ensured.reason}:nudge_failed:${nudge.reason ?? "unknown"}`,
+            targetAgentIds: [executorTarget],
+          });
+        }
+        const opKey = [
+          "post_confirm_executor_self_claim",
+          groupId,
+          taskId,
+          boardItemId,
+          executorTarget,
+          `v${confirmedVersion}`,
+        ].join("|");
+        const dispatchPrompt = buildPostPublishHandoffDispatchPrompt({
+          taskId,
+          itemId: boardItemId,
+          intendedClaimantId: executorTarget,
+          reason: handoffReason,
+        });
+        const roundDispatcher =
+          params.roundDispatcher !== undefined ? params.roundDispatcher : getWakeRoundDispatcher();
+        const consume = await consumeWakeForRoundDispatch({
+          authority,
+          cfg,
+          roundDispatcher,
+          request: {
+            groupId,
+            tenantId: params.tenant?.tenantId ?? params.auth?.tenantId ?? null,
+            fromAgentId: confirmerId,
+            toAgentIds: [executorTarget],
+            source: "nudge",
+            taskId,
+            itemId: boardItemId,
+            reason: handoffReason,
+            opKey,
+            dispatchPrompt,
+          },
+        });
+        // recorded / pendingVerification must NOT report as definite dispatch success.
+        const wakeDispatched = Boolean(consume.dispatched);
+        return finishAdvance({
+          autoAdvanceWired: true,
+          wakeRecorded: true,
+          wakeConsumed: true,
+          dispatched: wakeDispatched,
+          reason: wakeDispatched
+            ? `confirm_awaiting_executor_self_claim:wake_dispatched:${compact(consume.reason) || "dispatched"}`
+            : `confirm_awaiting_executor_self_claim:recorded_not_dispatched:${compact(consume.reason) || "wake_recorded"}`,
+          targetAgentIds: [executorTarget],
         });
       }
     }

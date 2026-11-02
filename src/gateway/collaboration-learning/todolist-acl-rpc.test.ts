@@ -166,6 +166,7 @@ async function seedBoardAndProposal(cfg: OpenBotConfig) {
     taskId: seed.taskId,
     itemId: published.itemId,
     claimantId: "bot-analyst",
+    actor: "bot-analyst",
     cfg,
   });
   await applyCollaborationBoardClaim({
@@ -623,6 +624,7 @@ describe("owner-decision delivery is independent of plan creation", () => {
       taskId: seed.taskId,
       itemId: published.itemId,
       claimantId: "bot-analyst",
+      actor: "bot-analyst",
       cfg,
     });
     await applyCollaborationBoardClaim({
@@ -949,6 +951,7 @@ describe("owner-decision delivery is independent of plan creation", () => {
       taskId: seed.taskId,
       itemId: published.itemId,
       claimantId: "bot-analyst",
+      actor: "bot-analyst",
       cfg,
     });
     await applyCollaborationBoardClaim({

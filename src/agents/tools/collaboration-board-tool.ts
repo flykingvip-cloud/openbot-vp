@@ -40,6 +40,7 @@ import {
 } from "../../gateway/collaboration-learning/claim-contract-entry.js";
 import { controlledDiscussToTask } from "../../gateway/collaboration-learning/controlled-discuss-to-task.js";
 import {
+  deliveryActorIdsEqual,
   resolveDeliveryAclActor,
   type DeliveryActorClient,
 } from "../../gateway/collaboration-learning/delivery-actor-binding.js";
@@ -197,7 +198,7 @@ const CollaborationBoardSchema = Type.Object({
   suggestedClaimantIds: Type.Optional(
     Type.Array(Type.String(), {
       description:
-        "activate_task intended claimants. Use gateway agent ids (bare id, not bot: prefix).",
+        "activate_task / discuss_to_task intended claimants (optional). Omit = awaiting assignment; never auto-defaults to the publisher. Use gateway agent ids (bare id, not bot: prefix).",
     }),
   ),
   humanConfirmed: Type.Optional(
@@ -210,7 +211,7 @@ const CollaborationBoardSchema = Type.Object({
   claimantId: Type.Optional(
     Type.String({
       description:
-        "claim_item claimant. Defaults to the session agent id (gateway agents.list id).",
+        "claim_item claimant. Must match the authenticated session actor (defaults to self). Proxy claim for another id is refused.",
     }),
   ),
   deliverableTitle: Type.Optional(
@@ -665,9 +666,9 @@ export function createCollaborationBoardTool(options?: {
           }
           const title = readStringParam(params, "title");
           const message = readStringParam(params, "message", { required: true });
-          const suggested = readStringList(params.suggestedClaimantIds) ?? [
-            bareCollaborationAgentId(agentId),
-          ];
+          // Do NOT default intended/suggested to the executing agent — publish ≠ claim.
+          // Empty → tryClaimAfterBoardPublish blocks (awaiting assignment); never list[0]/self.
+          const suggested = readStringList(params.suggestedClaimantIds);
           const tenantId = team.auth?.tenantId?.trim() || team.tenant?.tenantId?.trim() || "_local";
           // Columns: principal (owner) ≠ executing agent ≠ execution run.
           const principalActor =
@@ -739,9 +740,8 @@ export function createCollaborationBoardTool(options?: {
           }
           const title = readStringParam(params, "title", { required: true });
           const message = readStringParam(params, "message", { required: true });
-          const suggested = readStringList(params.suggestedClaimantIds) ?? [
-            bareCollaborationAgentId(agentId),
-          ];
+          // Do NOT default intended/suggested to the executing agent — publish ≠ claim.
+          const suggested = readStringList(params.suggestedClaimantIds);
           const activated = await activateTask({
             groupId,
             taskId,
@@ -773,9 +773,21 @@ export function createCollaborationBoardTool(options?: {
           if (!taskId || !itemId) {
             return failResult("invalid_input", "claim_item requires taskId and itemId");
           }
-          const claimantId = bareCollaborationAgentId(
-            readStringParam(params, "claimantId") || agentId,
-          );
+          // Claim only as the authenticated actor — never proxy-claim for another id.
+          const selfClaimant = bareCollaborationAgentId(agentId);
+          const requestedRaw = readStringParam(params, "claimantId");
+          if (
+            requestedRaw &&
+            !deliveryActorIdsEqual(bareCollaborationAgentId(requestedRaw), selfClaimant) &&
+            !deliveryActorIdsEqual(requestedRaw, actorId)
+          ) {
+            return failResult(
+              "claim_actor_mismatch",
+              "claim_item may only claim as the authenticated actor; proxy claim is forbidden",
+              { requested: requestedRaw, actor: actorId },
+            );
+          }
+          const claimantId = selfClaimant;
           const item = await claimItem({
             groupId,
             taskId,

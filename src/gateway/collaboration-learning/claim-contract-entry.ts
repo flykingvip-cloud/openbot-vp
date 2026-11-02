@@ -782,9 +782,23 @@ export async function claimCollaborationBoardItem(
     cfg,
     objectStorage: stores.objectStorage,
   });
-  const claimantId = params.claimantId?.trim() || params.actor?.trim();
+  // Production write path: require a non-empty trusted actor subject.
+  // Missing actor → explicit reject. Never backfill actor from claimantId
+  // (that would treat the target identity as the executing subject).
+  const actorSubject = params.actor?.trim();
+  if (!actorSubject) {
+    throw new ClaimContractEntryError("actor_required", "actor is required");
+  }
+  const claimantId = params.claimantId?.trim() || actorSubject;
   if (!claimantId) {
     throw new ClaimContractEntryError("claimant_required", "claimantId / actor is required");
+  }
+  // Formal claim must bind the authenticated actor to the claimant — no proxy claim.
+  if (!deliveryActorIdsEqual(actorSubject, claimantId)) {
+    throw new ClaimContractEntryError(
+      "claim_actor_mismatch",
+      `claim actor ${actorSubject} must match claimant ${claimantId}; proxy claim is forbidden`,
+    );
   }
   const tenantId = tenantIdForClaimFlag(params.groupId, params.tenant) ?? undefined;
   const subjectRef = claimantId.includes(":") ? claimantId : `subject:${claimantId}`;

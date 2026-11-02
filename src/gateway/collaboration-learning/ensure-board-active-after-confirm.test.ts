@@ -89,7 +89,42 @@ describe("ensureBoardActiveAfterConfirm", () => {
     applyMock.mockReset();
   });
 
-  it("published + plan owner matched intended → claim then apply (actor≠claimant when authorizer set)", async () => {
+  it("published + authorizer≠plan owner → refuse proxy-claim (awaiting_executor_self_claim)", async () => {
+    const result = await ensureBoardActiveAfterConfirm({
+      groupId: "grp-1",
+      taskId: "task-1",
+      item: publishedItem(),
+      planOwnerMemberId: "bot:bot",
+      authorizingActorId: "human:owner",
+    });
+    expect(claimMock).not.toHaveBeenCalled();
+    expect(applyMock).not.toHaveBeenCalled();
+    expect(result.activated).toBe(false);
+    expect(result.item.status).toBe("published");
+    expect(result.item.claimantId).toBeUndefined();
+    expect(result.reason).toMatch(/awaiting_executor_self_claim/);
+    expect(result.executorId).toBe("bot");
+    expect(result.authorizingActorId).toBe("human:owner");
+  });
+
+  it("published + missing authorizingActorId → authorizing_actor_required (no claimant backfill)", async () => {
+    const result = await ensureBoardActiveAfterConfirm({
+      groupId: "grp-1",
+      taskId: "task-1",
+      item: publishedItem(),
+      planOwnerMemberId: "bot:bot",
+      // intentionally omit authorizingActorId
+    });
+    expect(claimMock).not.toHaveBeenCalled();
+    expect(applyMock).not.toHaveBeenCalled();
+    expect(result.activated).toBe(false);
+    expect(result.reason).toBe("authorizing_actor_required");
+    expect(result.item.status).toBe("published");
+    expect(result.item.claimantId).toBeUndefined();
+    expect(result.executorId).toBe("bot");
+  });
+
+  it("published + authorizer IS plan owner → self-claim then apply (distinct audit fields)", async () => {
     claimMock.mockResolvedValueOnce({
       ...publishedItem(),
       status: "claimed",
@@ -113,19 +148,19 @@ describe("ensureBoardActiveAfterConfirm", () => {
       taskId: "task-1",
       item: publishedItem(),
       planOwnerMemberId: "bot:bot",
-      authorizingActorId: "human:owner",
+      authorizingActorId: "bot:bot",
     });
     expect(claimMock).toHaveBeenCalledTimes(1);
     expect(claimMock.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         claimantId: "bot",
-        actor: "human:owner",
+        actor: "bot:bot", // trusted authorizingActorId — never claimantId backfill
       }),
     );
     expect(applyMock).toHaveBeenCalledTimes(1);
     expect(applyMock.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
-        actor: "human:owner",
+        actor: "bot:bot",
       }),
     );
     expect(result.activated).toBe(true);
@@ -133,28 +168,10 @@ describe("ensureBoardActiveAfterConfirm", () => {
     expect(result.item.claimantId).toBe("bot");
     expect(result.reason).toBe("claimed_and_applied");
     expect(result.executorId).toBe("bot");
-    expect(result.authorizingActorId).toBe("human:owner");
+    expect(result.authorizingActorId).toBe("bot:bot");
   });
 
-  it("multi intended + owner≠first → binds matching owner, not intended[0]", async () => {
-    claimMock.mockResolvedValueOnce({
-      ...publishedItem({ intendedClaimantIds: ["bot-a", "bot-exec"] }),
-      status: "claimed",
-      claimantId: "bot-exec",
-      claimedAt: 2,
-      revision: 2,
-    });
-    applyMock.mockResolvedValueOnce({
-      task: { taskId: "task-1" },
-      item: {
-        ...publishedItem({ intendedClaimantIds: ["bot-a", "bot-exec"] }),
-        status: "applied",
-        claimantId: "bot-exec",
-        claimedAt: 2,
-        appliedAt: 3,
-        revision: 3,
-      },
-    });
+  it("multi intended + owner≠first + authorizer≠owner → refuse proxy, no intended[0]", async () => {
     const result = await ensureBoardActiveAfterConfirm({
       groupId: "grp-1",
       taskId: "task-1",
@@ -162,9 +179,11 @@ describe("ensureBoardActiveAfterConfirm", () => {
       planOwnerMemberId: "bot-exec",
       authorizingActorId: "human:owner",
     });
-    expect(claimMock.mock.calls[0]?.[0]?.claimantId).toBe("bot-exec");
-    expect(result.activated).toBe(true);
-    expect(result.item.claimantId).toBe("bot-exec");
+    expect(claimMock).not.toHaveBeenCalled();
+    expect(applyMock).not.toHaveBeenCalled();
+    expect(result.activated).toBe(false);
+    expect(result.reason).toMatch(/awaiting_executor_self_claim/);
+    expect(result.executorId).toBe("bot-exec");
   });
 
   it("multi intended + owner not in list → refuse, no claim (board unchanged)", async () => {
@@ -209,7 +228,7 @@ describe("ensureBoardActiveAfterConfirm", () => {
       taskId: "task-1",
       item,
       planOwnerMemberId: "bot",
-      authorizingActorId: "human:owner",
+      authorizingActorId: "bot",
     });
     expect(result.activated).toBe(false);
     expect(result.item.status).toBe("published");

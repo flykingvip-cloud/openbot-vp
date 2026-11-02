@@ -4,11 +4,15 @@
  * does not early-return confirm_board_not_active / confirm_board_no_claimant.
  *
  * Responsibility binding (who authorized / who executes / who is responsible):
- * - authorizingActorId = confirmer / peer coordinator who authorized confirm
+ * - authorizingActorId = confirmer / peer coordinator who authorized confirm (audit)
  * - planOwnerMemberId  = confirmed plan executor (ownerMemberId)
  * - claimantId         = board responsibility, resolved from plan owner ∩ intended
  *
- * Never blindly takes intendedClaimantIds[0] or uses claimantId as actor.
+ * Claim/apply only when a non-empty authorizing actor IS the plan owner (self-claim path).
+ * Missing authorizingActorId → `authorizing_actor_required` (no claimantId backfill).
+ * Coordinator/human confirmer must NOT proxy-claim for the executor — return
+ * `awaiting_executor_self_claim` so post-confirm can schedule controlled claim wake.
+ * Never blindly takes intendedClaimantIds[0] or fakes auth subject as target executor.
  * Best-effort only: never throws to roll back a committed confirm.
  * Uses existing claim → apply entry points (no new orchestrator).
  */
@@ -108,7 +112,7 @@ export async function ensureBoardActiveAfterConfirm(params: {
   item: GroupBoardClaimItem;
   /** Confirmed plan executor (todolist.ownerMemberId). Required to activate. */
   planOwnerMemberId?: string | null;
-  /** Confirmer / peer coordinator who authorized; recorded as apply actor, not claimant. */
+  /** Confirmer / peer coordinator who authorized (audit). Must match plan owner to self-claim/apply; else awaiting_executor_self_claim. */
   authorizingActorId?: string | null;
   auth?: TeamResourceAuthOk | null;
   trusted?: { groupsRoot: string; groupLocator: string } | null;
@@ -152,8 +156,32 @@ export async function ensureBoardActiveAfterConfirm(params: {
     };
   }
   const claimantId = resolved.claimantId;
-  // Actor = who authorized; never silently reuse claimant as the authorizer.
-  const actor = authorizingActorId || claimantId;
+  // Production write path: require a non-empty trusted authorizing actor.
+  // Missing subject → explicit reject. Never backfill actor from claimantId
+  // (that would treat the target/plan-owner identity as the executing subject).
+  if (!authorizingActorId) {
+    return {
+      item: params.item,
+      activated: false,
+      reason: "authorizing_actor_required",
+      executorId: claimantId,
+      authorizingActorId,
+    };
+  }
+  // Self-claim only: authorizing actor must match the plan-owner claimant.
+  // Distinct audit field authorizingActorId is preserved on the result; never claim as
+  // authorizer while writing claimantId=executor (proxy claim / fake auth subject).
+  if (!deliveryActorIdsEqual(authorizingActorId, claimantId)) {
+    return {
+      item: params.item,
+      activated: false,
+      reason: `awaiting_executor_self_claim:authorizer=${authorizingActorId}:executor=${claimantId}`,
+      executorId: claimantId,
+      authorizingActorId,
+    };
+  }
+  // Trusted subject only — use authorizingActorId, never claimantId backfill.
+  const actor = authorizingActorId;
 
   const shared = {
     groupId: params.groupId,
