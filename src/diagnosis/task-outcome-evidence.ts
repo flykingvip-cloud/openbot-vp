@@ -3,7 +3,8 @@
  * Tool failures stay observations. They do not change taskJudgement.
  */
 import type { OpenBotConfig } from "../config/config.js";
-import { readRecheckStatus } from "../task-outcome/recheck-observation.js";
+import { formatRecheckObservationLabel } from "../task-outcome/recheck-label.js";
+import { readRecheckObservation } from "../task-outcome/recheck-observation.js";
 import {
   callerOwnsTaskOutcome,
   resolveConfiguredTaskOutcomeRoot,
@@ -37,7 +38,8 @@ export type TaskOutcomeEvidence =
       judgement: TaskJudgement;
       reasonCode?: string;
       revisionKind?: "new_execution" | "correction";
-      recheckStatus: "not_checked" | "incomplete" | "completed";
+      recheckStatus: "not_checked" | "incomplete" | "completed" | "read_failed";
+      recheckAttempt?: number;
       lifecycle: string;
       toolObservations: TaskOutcomeToolObservation[];
     }
@@ -48,19 +50,10 @@ export type TaskOutcomeEvidence =
       tipVersion?: number;
     };
 
-function recheckLabel(status: "not_checked" | "incomplete" | "completed"): string {
-  if (status === "incomplete") {
-    return "复验未完成";
-  }
-  if (status === "completed") {
-    return "复验已记录";
-  }
-  return "未复验";
-}
-
 export function formatTaskOutcomeEvidenceText(evidence: TaskOutcomeEvidence): string {
   if (evidence.ok) {
     const failed = evidence.toolObservations.filter((row) => !row.ok).length;
+    const recheck = formatRecheckObservationLabel(evidence.recheckStatus, evidence.recheckAttempt);
     return [
       "【任务权威结果】",
       `taskId=${evidence.taskId}`,
@@ -68,7 +61,7 @@ export function formatTaskOutcomeEvidenceText(evidence: TaskOutcomeEvidence): st
       `判定=${evidence.judgement}`,
       `reasonCode=${evidence.reasonCode ?? ""}`,
       `工具失败观察=${failed}。工具失败不改变任务判定。`,
-      `复验=${recheckLabel(evidence.recheckStatus)}。`,
+      `复验=${recheck}。`,
     ].join("\n");
   }
   return [
@@ -134,6 +127,7 @@ export function readTaskOutcomeEvidence(input: {
           ...(row.summary ? { summary: row.summary } : {}),
         })),
       );
+      const recheck = readRecheckObservation(located.root, taskId, snap.outcomeVersion);
       return {
         ok: true,
         code: "ok",
@@ -142,7 +136,8 @@ export function readTaskOutcomeEvidence(input: {
         judgement: snap.taskJudgement,
         ...(snap.reasonCode ? { reasonCode: snap.reasonCode } : {}),
         ...(snap.revisionKind ? { revisionKind: snap.revisionKind } : {}),
-        recheckStatus: readRecheckStatus(located.root, taskId, snap.outcomeVersion),
+        recheckStatus: recheck.ok ? recheck.status : "read_failed",
+        ...(recheck.ok && recheck.attempt !== null ? { recheckAttempt: recheck.attempt } : {}),
         lifecycle: snap.lifecycle,
         toolObservations,
       };

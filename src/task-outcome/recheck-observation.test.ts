@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 describe("recheck observation read model", () => {
-  it("stays 未复验 until an incomplete observation is recorded, without changing judgement", () => {
+  it("stays 未复验 until an incomplete observation is recorded, without changing judgement", async () => {
     const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "recheck-read-"));
     dirs.push(agentDir);
     const cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
@@ -68,12 +68,12 @@ describe("recheck observation read model", () => {
     ).toBe("未复验");
 
     expect(
-      recordIncompleteRecheckObservation({
+      await recordIncompleteRecheckObservation({
         rootDir: root,
         taskId: opened.taskId,
         outcomeVersion: opened.record.outcomeVersion,
       }),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: true, attempt: 1, status: "incomplete" });
     const after = new DurableTaskOutcomeStore(root).loadTaskVersion(
       opened.taskId,
       opened.record.outcomeVersion,
@@ -93,7 +93,14 @@ describe("recheck observation read model", () => {
     expect(recorded.ok).toBe(true);
     if (recorded.ok) {
       expect(recorded.recheckStatus).toBe("incomplete");
+      expect(recorded.recheckAttempt).toBe(1);
       expect(recorded.judgement).toBe(before?.taskJudgement);
+      expect(
+        diagnosisTaskOutcomeRows({
+          sourceLabel: "数字人 客服",
+          evidence: recorded,
+        }).find((row) => row.label === "复验结果")?.value,
+      ).toBe("第1次复验未完成");
     }
     expect(
       diagnosisTaskOutcomeRows({
@@ -101,5 +108,11 @@ describe("recheck observation read model", () => {
         evidence: { ok: true, recheckStatus: "incomplete" },
       }).find((row) => row.label === "复验结果")?.value,
     ).toBe("复验未完成");
+    expect(
+      diagnosisTaskOutcomeRows({
+        sourceLabel: "数字人 客服",
+        evidence: { ok: false, code: "read_failed", taskId: opened.taskId },
+      }).find((row) => row.label === "复验结果")?.value,
+    ).toBe("复验记录读取失败");
   });
 });
