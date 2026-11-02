@@ -10,6 +10,24 @@ tasks:
   - src/gateway/collaboration-learning/main-chain-p1-p3-short-closed-loop.test.ts
   state: active
   sessions: []
+- id: ft-plan-speak-shopping-positive-admission
+  owner: cursor-grok
+  intent: []
+  paths:
+  - src/shared/text/plan-speak-final.ts
+  - src/shared/text/plan-speak-final.test.ts
+  state: active
+  sessions:
+  - id: 2a5a3f36-196a-4b8b-8728-3686a1508090
+    taskId: ft-plan-speak-shopping-positive-admission
+    ide: cursor
+    agent: cursor-grok
+    status: active
+    lastSignalAt: 2026-11-02T13:23:00+00:00
+    metadata: {}
+  ownerHistory: []
+  since: 2026-11-02
+  metadata: {}
 - id: recheck-notify-hardening:cursor-cloud
   owner: cursor-cloud
   intent:
