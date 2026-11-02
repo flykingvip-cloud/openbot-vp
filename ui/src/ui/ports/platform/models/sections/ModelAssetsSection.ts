@@ -2760,6 +2760,24 @@ function renderPendingConnectSection(params: {
   `;
 }
 
+function renderUnusablePlatformCallout(models: readonly ModelAsset[]) {
+  const failed = models.filter(
+    (asset) =>
+      asset.healthBasis === "live_probe_failed" ||
+      (asset.healthBasis === "auth_missing" &&
+        (asset.inRecommendationPool || asset.source === "configured")),
+  );
+  if (failed.length === 0) {
+    return nothing;
+  }
+  const names = failed.map((asset) => asset.displayName?.trim() || asset.modelId).join("、");
+  return html`
+    <div class="callout danger card-follow" role="alert" data-testid="platform-unusable-models">
+      以下平台模型当前不可用，员工调用会失败：${names}。请先修复连接或移出推荐池。
+    </div>
+  `;
+}
+
 export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
   const { vm, actions, compat, onNavigateTab, context, onToggleRecommendationPool, loading } =
     props;
@@ -2795,6 +2813,7 @@ export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
 
   return html`
     <section class="platform-model-assets-surface">
+      ${renderUnusablePlatformCallout(vm.models)}
       ${renderSummaryCards(poolUniverse, vm)}
       ${renderFilterBar(vm, visiblePool.length, poolUniverse.length)}
       ${
