@@ -217,8 +217,10 @@ describe("runAgentTurnWithFallback enterprise catalog models", () => {
     expect(mocks.runEmbeddedPiAgent).not.toHaveBeenCalled();
     const text =
       result && !Array.isArray(result) && typeof result.text === "string" ? result.text : "";
-    expect(text).toContain("managed tenantId could not be resolved");
+    expect(text).toContain("已配置的模型");
     expect(text).not.toContain("Unknown model");
+    expect(text).not.toContain("ent/");
+    expect(text).not.toContain("Logs:");
   });
 
   it("does not remap an ordinary catalog model", async () => {
