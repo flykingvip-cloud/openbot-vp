@@ -59,6 +59,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val manualTls: StateFlow<Boolean> = runtime.manualTls
   val gatewayToken: StateFlow<String> = runtime.gatewayToken
   val onboardingCompleted: StateFlow<Boolean> = runtime.onboardingCompleted
+  val employeeWelcomeSeen: StateFlow<Boolean> = runtime.employeeWelcomeSeen
   val canvasDebugStatusEnabled: StateFlow<Boolean> = runtime.canvasDebugStatusEnabled
 
   val chatSessionKey: StateFlow<String> = runtime.chatSessionKey
@@ -125,6 +126,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setOnboardingCompleted(value: Boolean) {
     runtime.setOnboardingCompleted(value)
+  }
+
+  fun setEmployeeWelcomeSeen(value: Boolean) {
+    runtime.setEmployeeWelcomeSeen(value)
   }
 
   fun setCanvasDebugStatusEnabled(value: Boolean) {

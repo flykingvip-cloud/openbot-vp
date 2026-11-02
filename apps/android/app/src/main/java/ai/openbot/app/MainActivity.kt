@@ -24,6 +24,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import ai.openbot.app.employeeauth.EmployeeShell
+import ai.openbot.app.employeeauth.EmployeeWelcomeScreen
 import ai.openbot.app.employeeauth.EmployeeTelemetry
 import ai.openbot.app.employeeshell.EmployeeNotificationRouter
 import ai.openbot.app.employeeshell.EmployeeShellHost
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
   private var showCompanion by mutableStateOf(false)
   private var companionCoversShell by mutableStateOf(false)
   private var employeeLoggedIn by mutableStateOf(false)
+  private var showEmployeeWelcome by mutableStateOf(false)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -56,6 +58,22 @@ class MainActivity : ComponentActivity() {
       viewModel.sms.attachPermissionRequester(permissionRequester)
       employeeLoggedIn = EmployeeShell.controller(this).isLoggedIn()
       restoreChrome(savedInstanceState)
+      // First-install welcome only; upgrade users / saved accounts skip it.
+      val controllerEarly = EmployeeShell.controller(this)
+      if (!viewModel.employeeWelcomeSeen.value) {
+        val returning =
+          employeeLoggedIn ||
+            controllerEarly.accounts().isNotEmpty() ||
+            viewModel.onboardingCompleted.value
+        if (returning) {
+          viewModel.setEmployeeWelcomeSeen(true)
+          showEmployeeWelcome = false
+        } else {
+          showEmployeeWelcome = !employeeLoggedIn
+        }
+      } else {
+        showEmployeeWelcome = false
+      }
     } finally {
       StrictMode.setThreadPolicy(startupDiskPolicy)
     }
@@ -96,7 +114,15 @@ class MainActivity : ComponentActivity() {
             }
           }
 
-          if (showCompanion) {
+          if (showEmployeeWelcome) {
+            EmployeeWelcomeScreen(
+              onContinue = {
+                viewModel.setEmployeeWelcomeSeen(true)
+                showEmployeeWelcome = false
+              },
+              modifier = Modifier.fillMaxSize(),
+            )
+          } else if (showCompanion) {
             if (companionCoversShell) {
               BackHandler {
                 showCompanion = false
