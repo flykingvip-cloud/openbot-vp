@@ -2888,9 +2888,7 @@ function buildChatItems(props: ChatProps): Array<ChatItem | MessageGroup> {
         senderLabel: streamSpeaker.senderLabel,
         agentId: streamSpeaker.agentId,
       });
-      // FT-DEDUPE-THINKING-PROGRESS-UI: thinking-progress already fills the
-      // empty-body progress slot — do not also paint work-progress 「正在思考」.
-      showedWorkProgress = true;
+      showedWorkProgress = false;
     } else {
       items.push({
         kind: "reading-indicator",

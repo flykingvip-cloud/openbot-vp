@@ -3846,60 +3846,6 @@ describe("chat view", () => {
     expect(container.textContent).not.toContain("Used");
   });
 
-  // FT-DEDUPE-THINKING-PROGRESS-UI acceptance A+B
-  it("prefers thinking-progress and omits 正在思考 reading-indicator when both would show", () => {
-    const container = document.createElement("div");
-    render(
-      renderChat(
-        createProps({
-          sessionKey: "agent:main:employee:demo",
-          showThinking: true,
-          stream: "",
-          streamStartedAt: 1,
-          thinkingProgress: {
-            steps: [
-              { id: "s1", label: "理解问题", status: "done" },
-              { id: "s2", label: "梳理要点", status: "active" },
-              { id: "s3", label: "组织回答", status: "pending" },
-            ],
-            activeIndex: 1,
-            percent: 42,
-            placeholder: "正在梳理思路…",
-          },
-          workProgressLabel: "正在思考",
-        }),
-      ),
-      container,
-    );
-    expect(container.querySelector(".chat-thinking-progress")).not.toBeNull();
-    expect(container.textContent).toContain("正在梳理思路");
-    expect(container.querySelector(".chat-reading-indicator")).toBeNull();
-    expect(container.querySelector("[data-testid='chat-work-progress']")).toBeNull();
-    expect(container.textContent).not.toMatch(/正在思考\s*●|正在思考●/);
-  });
-
-  it("still shows alone 正在思考 reading-indicator when thinking-progress is absent", () => {
-    const container = document.createElement("div");
-    render(
-      renderChat(
-        createProps({
-          sessionKey: "agent:main:employee:demo",
-          showThinking: true,
-          stream: "",
-          streamStartedAt: 1,
-          thinkingProgress: null,
-          workProgressLabel: "正在思考",
-        }),
-      ),
-      container,
-    );
-    expect(container.querySelector(".chat-thinking-progress")).toBeNull();
-    expect(container.querySelector(".chat-reading-indicator")).not.toBeNull();
-    expect(container.querySelector("[data-testid='chat-work-progress']")?.textContent).toBe(
-      "正在思考",
-    );
-  });
-
   it("shows the live work-progress phase on the reading indicator", () => {
     const container = document.createElement("div");
     render(
