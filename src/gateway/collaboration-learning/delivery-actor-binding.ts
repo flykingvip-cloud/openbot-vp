@@ -208,9 +208,48 @@ export function resolveRosterPrincipalAliases(
 }
 
 /**
+ * Platform userIds attested on one roster row (userId, else non-email memberId).
+ * Used only for ambiguity checks — never as a cross-row chain key by itself.
+ */
+function rosterPlatformUserIds(entry: TrustedPrincipalRosterEntry): string[] {
+  const rawUserId = (entry.userId ?? "").trim();
+  if (rawUserId) {
+    const bare = rawUserId.startsWith("human:")
+      ? rawUserId.slice("human:".length).trim()
+      : rawUserId;
+    if (bare && !bare.includes("@") && !bare.startsWith("bot:") && !bare.startsWith("agent:")) {
+      return [bare];
+    }
+  }
+  const rawMemberId = (entry.memberId ?? "").trim();
+  if (rawMemberId) {
+    const bare = rawMemberId.startsWith("human:")
+      ? rawMemberId.slice("human:".length).trim()
+      : rawMemberId;
+    if (bare && !bare.includes("@") && !bare.startsWith("bot:") && !bare.startsWith("agent:")) {
+      return [bare];
+    }
+  }
+  return [];
+}
+
+function addUniquePlatformId(into: string[], candidate: string): void {
+  if (into.some((existing) => deliveryActorIdsEqual(existing, candidate))) {
+    return;
+  }
+  into.push(candidate);
+}
+
+/**
  * Shared trusted principal alias set for ACL and wake.
  * Session subjects link UUID↔email only when the actor is already one of them;
  * roster links only within a single members row. Morphology never proves identity.
+ *
+ * Matcher seed is an **immutable** authentication-subject set (actor + trusted
+ * auth subjects + trustedAliases). Newly discovered roster aliases are never
+ * fed back into the matcher (no cross-row chaining / no row-order dependence).
+ * When the same auth alias hits multiple roster rows with distinct platform
+ * UUIDs, reject roster expansion (fail closed) rather than picking by order.
  */
 export function resolveTrustedPrincipalAliases(params: TrustedPrincipalResolutionInput): string[] {
   const actor = (params.actor ?? "").trim();
@@ -222,10 +261,11 @@ export function resolveTrustedPrincipalAliases(params: TrustedPrincipalResolutio
     .filter(Boolean);
   const linked = subjects.some((subject) => deliveryActorIdsEqual(subject, actor));
   const seeds = linked ? [actor, ...subjects] : [actor];
-  const out = new Set<string>();
+  // Immutable auth-context matcher — do not grow this while scanning roster.
+  const authAliases = new Set<string>();
   for (const seed of seeds) {
     for (const alias of expandDeliveryActorAliases(seed)) {
-      out.add(alias);
+      authAliases.add(alias);
     }
   }
   for (const raw of params.trustedAliases ?? []) {
@@ -234,25 +274,39 @@ export function resolveTrustedPrincipalAliases(params: TrustedPrincipalResolutio
       continue;
     }
     for (const expanded of expandDeliveryActorAliases(alias)) {
-      out.add(expanded);
+      authAliases.add(expanded);
     }
   }
-  // Roster: if any row matches the actor (morphology or already-collected aliases),
-  // fold that row's fields into the principal set (same-row proof only).
+  const authAliasList = [...authAliases];
+  const matchesAuth = (candidate: string): boolean =>
+    authAliasList.some((alias) => deliveryActorIdsEqual(alias, candidate));
+
+  const matchedRows: TrustedPrincipalRosterEntry[] = [];
   for (const row of params.roster ?? []) {
     const rowAliases = resolveRosterPrincipalAliases(row);
     if (rowAliases.length === 0) {
       continue;
     }
-    const hitsRow = rowAliases.some(
-      (rowAlias) =>
-        deliveryActorIdsEqual(rowAlias, actor) ||
-        [...out].some((alias) => deliveryActorIdsEqual(alias, rowAlias)),
-    );
-    if (!hitsRow) {
-      continue;
+    // Same-row proof only: row must intersect the immutable auth set.
+    if (rowAliases.some((rowAlias) => matchesAuth(rowAlias))) {
+      matchedRows.push(row);
     }
-    for (const rowAlias of rowAliases) {
+  }
+
+  const distinctPlatformIds: string[] = [];
+  for (const row of matchedRows) {
+    for (const id of rosterPlatformUserIds(row)) {
+      addUniquePlatformId(distinctPlatformIds, id);
+    }
+  }
+  // Ambiguous shared alias → multiple platform UUIDs: reject roster fold.
+  if (distinctPlatformIds.length > 1) {
+    return authAliasList;
+  }
+
+  const out = new Set(authAliases);
+  for (const row of matchedRows) {
+    for (const rowAlias of resolveRosterPrincipalAliases(row)) {
       out.add(rowAlias);
     }
   }

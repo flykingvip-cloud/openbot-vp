@@ -261,6 +261,149 @@ describe("FT-IDENTITY-PRINCIPAL-SYNC acceptance", () => {
     expect(failBlock).not.toMatch(/tryClaimAfterBoardPublish/);
   });
 
+  it("ISO1: same-row legitimate email↔UUID linkage still passes", () => {
+    const uuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const shared = "shared@example.test";
+    const roster = [{ userId: uuidA, memberId: shared }];
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: shared,
+      trustedAuthSubjects: [shared],
+      roster,
+    });
+    expect(trustedPrincipalMatches(uuidA, aliases)).toBe(true);
+    expect(
+      isMappedDeliveryIdentity({ memberRoleMap: [{ memberId: `human:${uuidA}` }] }, shared, null, {
+        trustedAuthSubjects: [shared],
+        roster,
+      }),
+    ).toBe(true);
+  });
+
+  it("ISO2: cross-row chain uuid-a→shared→uuid-b is not expanded", () => {
+    const uuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const uuidB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const shared = "shared@example.test";
+    const roster = [
+      { userId: uuidA, memberId: shared },
+      { userId: uuidB, memberId: shared },
+    ];
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: uuidA,
+      trustedAuthSubjects: [uuidA],
+      roster,
+    });
+    expect(trustedPrincipalMatches(uuidB, aliases)).toBe(false);
+    expect(
+      isMappedDeliveryIdentity(
+        { memberRoleMap: [{ memberId: `human:${uuidB}` }], governance: { ownerUserId: uuidB } },
+        uuidA,
+        null,
+        { trustedAuthSubjects: [uuidA], roster },
+      ),
+    ).toBe(false);
+  });
+
+  it("ISO3: row-order swap is deterministic (neither order chains to the other UUID)", () => {
+    const uuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const uuidB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const shared = "shared@example.test";
+    const forward = [
+      { userId: uuidA, memberId: shared },
+      { userId: uuidB, memberId: shared },
+    ];
+    const swapped = [...forward].toReversed();
+    for (const roster of [forward, swapped]) {
+      const aliases = resolveTrustedPrincipalAliases({
+        actor: uuidA,
+        trustedAuthSubjects: [uuidA],
+        roster,
+      });
+      expect(trustedPrincipalMatches(uuidA, aliases)).toBe(true);
+      expect(trustedPrincipalMatches(uuidB, aliases)).toBe(false);
+    }
+  });
+
+  it("ISO4: duplicate email / distinct UUIDs → ambiguity reject (no order pick)", () => {
+    const uuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const uuidB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const shared = "shared@example.test";
+    const roster = [
+      { userId: uuidA, memberId: shared },
+      { userId: uuidB, memberId: shared },
+    ];
+    const aliases = resolveTrustedPrincipalAliases({
+      actor: shared,
+      trustedAuthSubjects: [shared],
+      roster,
+    });
+    expect(trustedPrincipalMatches(uuidA, aliases)).toBe(false);
+    expect(trustedPrincipalMatches(uuidB, aliases)).toBe(false);
+  });
+
+  it("ISO5: wake recheck cannot pass via chained aliases onto another subject", async () => {
+    const uuidA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const uuidB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    const shared = "shared@example.test";
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-id-iso5-"));
+    tempDirs.push(root);
+    process.env.OPENBOT_STATE_DIR = path.join(root, "state");
+    const groupId = "grp-identity-iso-chain";
+    const groupsRoot = path.join(root, "collaboration", "groups");
+    const groupLocator = path.join(groupsRoot, groupId);
+    await fs.mkdir(groupLocator, { recursive: true });
+    const stores = createTrustedGroupStores({ groupsRoot, groupLocator });
+
+    // Overlapping/stale roster that would previously chain uuid-a → shared → uuid-b.
+    await stores.fileStore.writeGroupFile({
+      groupId,
+      filename: "members.json",
+      data: {
+        members: [
+          {
+            memberId: shared,
+            userId: uuidA,
+            memberKind: "human",
+            status: "active",
+          },
+          {
+            memberId: shared,
+            userId: uuidB,
+            memberKind: "human",
+            status: "active",
+          },
+        ],
+      },
+    });
+    // OS surface belongs only to uuid-b — uuid-a must not wake-map onto it via chain.
+    await stores.fileStore.writeGroupFile({
+      groupId,
+      filename: "operating-state.json",
+      data: {
+        groupId,
+        memberRoleMap: [{ memberId: `human:${uuidB}`, status: "active" }],
+        governance: {
+          ownerUserId: uuidB,
+          adminUserIds: [],
+          coordinatorBotId: "other-bot",
+        },
+        activeContext: {},
+      },
+    });
+
+    const auth = await recheckCurrentDispatchAuthorization({
+      groupId,
+      targetActorIds: [uuidA],
+      fileStore: stores.fileStore,
+      objectStorage: stores.objectStorage,
+      trustedAuthSubjects: [uuidA],
+    });
+    expect(auth.ok).toBe(false);
+    if (!auth.ok) {
+      expect(auth.reason).toBe("auth_revoked");
+      expect(auth.revokedActorIds).toContain(uuidA);
+    }
+  });
+
   it("D: SA allowlist / self-advance flags are not modified by this package (static)", async () => {
     const dir = path.dirname(fileURLToPath(import.meta.url));
     const files = [
