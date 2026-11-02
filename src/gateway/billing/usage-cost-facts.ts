@@ -5,9 +5,13 @@
 
 import type { UsageLedgerEntry } from "../package-entitlement/types.js";
 import type { CreditUsageStageRecord } from "./credit-usage-stage-store.js";
-import { listCreditUsageStages } from "./credit-usage-stage-store.js";
+import { getCreditUsageStage, listCreditUsageStages } from "./credit-usage-stage-store.js";
 import type { UsageRequestFact, UsageSettlementFact } from "./usage-cost-layer.js";
-import { listAllUsageLedgerEntries, listUsageLedgerEntries } from "./usage-ledger-store.js";
+import {
+  listAllUsageLedgerEntries,
+  listUsageLedgerEntries,
+  listUsageLedgerEntriesByTaskId,
+} from "./usage-ledger-store.js";
 
 export function describeProviderPrice(input: {
   source: "cost_version" | "catalog" | "none";
@@ -89,6 +93,26 @@ export type LoadUsageCostFactsInput = {
   endTime?: string;
   ledgerStorePath?: string;
   stageStorePath?: string;
+  /**
+   * When set, load that taskId authoritatively (no global USAGE_COST_FACT_LIMIT window).
+   * FT-TASKID-USAGE-LEDGER / B2.
+   */
+  taskId?: string | null;
+};
+
+/** Distinguishes unbooked / BYOK skip vs truly empty UI (B3). */
+export type UsageTaskLedgerEmptyReason =
+  | "none"
+  | "no_ledger_entry"
+  | "skipped_consumption"
+  | "filtered_empty";
+
+export type LoadUsageCostFactsResult = {
+  facts: UsageRequestFact[];
+  truncated: boolean;
+  emptyReason: UsageTaskLedgerEmptyReason;
+  /** Tip spend is a separate projection; never treat it as this ledger (B5). */
+  ledgerBasis: "usage_ledger_not_tip_spend";
 };
 
 function measuredToken(value: number | undefined): number | null {
@@ -193,7 +217,18 @@ export function ledgerEntryToUsageFact(
 
 export async function loadUsageCostFacts(
   input: LoadUsageCostFactsInput,
-): Promise<{ facts: UsageRequestFact[]; truncated: boolean }> {
+): Promise<LoadUsageCostFactsResult> {
+  const taskId = input.taskId?.trim() || "";
+  if (taskId) {
+    return loadUsageCostFactsForTaskId({
+      taskId,
+      enterpriseId: input.enterpriseId,
+      allEnterprises: input.allEnterprises,
+      ledgerStorePath: input.ledgerStorePath,
+      stageStorePath: input.stageStorePath,
+    });
+  }
+
   const window = {
     ...(input.startTime ? { startTime: input.startTime } : {}),
     ...(input.endTime ? { endTime: input.endTime } : {}),
@@ -214,10 +249,77 @@ export async function loadUsageCostFacts(
   );
   const truncated = ordered.length > USAGE_COST_FACT_LIMIT;
   const selected = ordered.slice(0, USAGE_COST_FACT_LIMIT);
+  const facts = selected.map((entry) =>
+    ledgerEntryToUsageFact(entry, stageByTask.get(`${entry.enterpriseId}|${entry.taskId}`)),
+  );
   return {
     truncated,
-    facts: selected.map((entry) =>
+    facts,
+    emptyReason: facts.length === 0 ? "no_ledger_entry" : "none",
+    ledgerBasis: "usage_ledger_not_tip_spend",
+  };
+}
+
+/**
+ * Authoritative per-taskId aggregation for the platform usage ledger (FT-TASKID-USAGE-LEDGER).
+ * Bypasses USAGE_COST_FACT_LIMIT so a live task is not mis-emptied by the global last-200 window.
+ */
+export async function loadUsageCostFactsForTaskId(input: {
+  taskId: string;
+  enterpriseId?: string | null;
+  allEnterprises?: boolean;
+  ledgerStorePath?: string;
+  stageStorePath?: string;
+}): Promise<LoadUsageCostFactsResult> {
+  const taskId = input.taskId.trim();
+  const enterpriseId = input.enterpriseId?.trim() || "";
+  const entries = await listUsageLedgerEntriesByTaskId(taskId, {
+    enterpriseId: input.allEnterprises || !enterpriseId ? null : enterpriseId,
+    storePath: input.ledgerStorePath,
+  });
+
+  const stages = await listCreditUsageStages(
+    input.allEnterprises || !enterpriseId ? null : enterpriseId,
+    input.stageStorePath,
+  );
+  const stageByTask = new Map<string, CreditUsageStageRecord>();
+  for (const stage of stages) {
+    stageByTask.set(`${stage.enterpriseId}|${stage.taskId}`, stage);
+  }
+
+  const facts = entries
+    .toSorted((left, right) => right.occurredAt.localeCompare(left.occurredAt))
+    .map((entry) =>
       ledgerEntryToUsageFact(entry, stageByTask.get(`${entry.enterpriseId}|${entry.taskId}`)),
-    ),
+    );
+
+  if (facts.length > 0) {
+    return {
+      truncated: false,
+      facts,
+      emptyReason: "none",
+      ledgerBasis: "usage_ledger_not_tip_spend",
+    };
+  }
+
+  // No ledger row: distinguish skippedConsumption / unbooked from plain empty UI (B3).
+  let skipped = false;
+  if (enterpriseId) {
+    const stage = await getCreditUsageStage(enterpriseId, taskId, input.stageStorePath);
+    skipped = Boolean(stage?.skippedConsumption);
+  } else {
+    for (const stage of stages) {
+      if (stage.taskId === taskId && stage.skippedConsumption) {
+        skipped = true;
+        break;
+      }
+    }
+  }
+
+  return {
+    truncated: false,
+    facts: [],
+    emptyReason: skipped ? "skipped_consumption" : "no_ledger_entry",
+    ledgerBasis: "usage_ledger_not_tip_spend",
   };
 }

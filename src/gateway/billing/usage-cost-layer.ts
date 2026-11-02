@@ -14,6 +14,7 @@ import {
   type UsageCostRankRow,
   type UsageCostSurface,
   type UsageCostTaskNode,
+  type UsageTaskLedgerEmptyReason,
   type UsageTokenTally,
   EMPTY_TOKEN_TALLY,
   formatChargeLine,
@@ -83,6 +84,8 @@ export type UsageCostPresentOptions = {
   taskId?: string | null;
   budgetLevel?: "ok" | "alert" | "exceeded" | null;
   truncated?: boolean;
+  emptyReason?: UsageTaskLedgerEmptyReason;
+  ledgerBasis?: "usage_ledger_not_tip_spend";
 };
 
 const EMPTY_TALLY = (): UsageTokenTally => ({ ...EMPTY_TOKEN_TALLY });
@@ -621,6 +624,69 @@ function currenciesOf(lines: readonly UsageChargeLine[]): Set<string> {
   );
 }
 
+/** Aggregate model structure + call counts + tokens for one taskId (B1). */
+export function aggregateTaskIdUsageLedger(facts: readonly UsageRequestFact[]): {
+  taskId: string | null;
+  models: Array<{
+    modelId: string;
+    callCount: number;
+    inputTokens: number | null;
+    outputTokens: number | null;
+    cacheReadTokens: number | null;
+    cacheWriteTokens: number | null;
+    settlementKind: UsageRequestFact["settlement"]["kind"];
+  }>;
+  callCount: number;
+} {
+  const byModel = new Map<
+    string,
+    {
+      modelId: string;
+      callCount: number;
+      inputTokens: number | null;
+      outputTokens: number | null;
+      cacheReadTokens: number | null;
+      cacheWriteTokens: number | null;
+      settlementKind: UsageRequestFact["settlement"]["kind"];
+    }
+  >();
+  let taskId: string | null = null;
+  for (const fact of facts) {
+    taskId = taskId ?? fact.taskId;
+    const modelId = (fact.model ?? "").trim() || "unknown";
+    const existing = byModel.get(modelId);
+    if (!existing) {
+      byModel.set(modelId, {
+        modelId,
+        callCount: 1,
+        inputTokens: fact.inputTokens,
+        outputTokens: fact.outputTokens,
+        cacheReadTokens: fact.cacheReadTokens,
+        cacheWriteTokens: fact.cacheWriteTokens,
+        settlementKind: fact.settlement.kind,
+      });
+      continue;
+    }
+    existing.callCount += 1;
+    existing.inputTokens = sumNullableToken(existing.inputTokens, fact.inputTokens);
+    existing.outputTokens = sumNullableToken(existing.outputTokens, fact.outputTokens);
+    existing.cacheReadTokens = sumNullableToken(existing.cacheReadTokens, fact.cacheReadTokens);
+    existing.cacheWriteTokens = sumNullableToken(existing.cacheWriteTokens, fact.cacheWriteTokens);
+  }
+  return {
+    taskId,
+    models: [...byModel.values()],
+    callCount: facts.length,
+  };
+}
+
+function sumNullableToken(left: number | null, right: number | null): number | null {
+  if (left === null && right === null) {
+    return null;
+  }
+  return (left ?? 0) + (right ?? 0);
+}
+
 export function presentUsageCostLayer(
   actor: UsageCostActor,
   facts: readonly UsageRequestFact[],
@@ -637,7 +703,19 @@ export function presentUsageCostLayer(
     if (matched.length === 0 && hidden.length > 0) {
       return { ok: false, message: "无权查看该任务" };
     }
-    return { ok: true, view: projectSurface(actor.surface, matched, options) };
+    const taskOptions: UsageCostPresentOptions = {
+      ...options,
+      emptyReason:
+        matched.length > 0
+          ? "none"
+          : options.emptyReason && options.emptyReason !== "none"
+            ? options.emptyReason
+            : facts.length > 0
+              ? "filtered_empty"
+              : (options.emptyReason ?? "no_ledger_entry"),
+      ledgerBasis: options.ledgerBasis ?? "usage_ledger_not_tip_spend",
+    };
+    return { ok: true, view: projectSurface(actor.surface, matched, taskOptions) };
   }
   return { ok: true, view: projectSurface(actor.surface, scoped, options) };
 }
@@ -711,13 +789,41 @@ function projectSurface(
           : priceKinds.has("missing")
             ? "missing"
             : "known";
+  const taskLedger =
+    options.taskId?.trim() && counted.length > 0 ? aggregateTaskIdUsageLedger(counted) : null;
+  const emptyReason: UsageTaskLedgerEmptyReason | undefined = options.taskId?.trim()
+    ? counted.length === 0
+      ? (options.emptyReason ?? "no_ledger_entry")
+      : "none"
+    : options.emptyReason;
   const view: UsageCostLayerView = {
     schemaVersion: 1,
     surface,
     lifecycle: counted.length === 0 ? "finished" : lifecycle,
     headline:
-      counted.length === 0 ? "暂无用量" : headlineFor(lifecycle, tallies.charges, tallies.input),
+      counted.length === 0
+        ? emptyReason === "skipped_consumption"
+          ? "用量未入账（已跳过消费）"
+          : "暂无用量"
+        : headlineFor(lifecycle, tallies.charges, tallies.input),
     empty: counted.length === 0,
+    ...(emptyReason ? { emptyReason } : {}),
+    ...(options.ledgerBasis || options.taskId?.trim()
+      ? { ledgerBasis: "usage_ledger_not_tip_spend" as const }
+      : {}),
+    ...(taskLedger
+      ? {
+          taskModelLedger: taskLedger.models.map((row) => ({
+            modelId: row.modelId,
+            callCount: row.callCount,
+            inputTokens: row.inputTokens,
+            outputTokens: row.outputTokens,
+            cacheReadTokens: row.cacheReadTokens,
+            cacheWriteTokens: row.cacheWriteTokens,
+            settlementKind: row.settlementKind,
+          })),
+        }
+      : {}),
     coverage: options.truncated ? "truncated" : "complete",
     freshness: lifecycle === "running" ? "delayed" : "current",
     recoveredFromStore: true,

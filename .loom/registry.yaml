@@ -10632,6 +10632,21 @@ tasks:
   since: 2026-11-01
   metadata: {}
 landingStreams:
+- id: ft-taskid-usage-ledger-20261102
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - src/gateway/billing/usage-cost-facts.ts
+  - src/gateway/billing/usage-cost-layer.ts
+  - src/gateway/billing/usage-ledger-store.ts
+  - src/gateway/billing/usage-taskid-ledger.test.ts
+  - src/gateway/server-methods/usage-cost-layer.ts
+  - src/shared/usage-cost-layer.ts
+  canLandWith: []
+  metadata:
+    task: FT-TASKID-USAGE-LEDGER
+    owner: cursor-grok
+    purpose: Durable per-taskId model/count/tokens ledger; bypass USAGE_COST_FACT_LIMIT=200; emptyReason distinct from tip spend.
 - id: ft-result-card-ux-20261102
   landingPolicy: serial
   paths:
