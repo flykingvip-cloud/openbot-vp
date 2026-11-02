@@ -111,13 +111,27 @@ export function buildChatTaskUpdateEvent(
   };
 }
 
-/** Live chat final helper. No tip, or a store that is not already there, returns null. */
+/**
+ * Audience for the closed-loop 「任务结果」 card.
+ * - user_chat (default): ordinary personal/employee chat must NOT receive the card (FT-RESULT-CARD-UX).
+ * - admin_debug: explicit non-user path may still resolve the tip-backed payload for diagnosis tooling.
+ * Tip store and `task.outcome.rejectResult` stay intact either way.
+ */
+export type ChatTaskUpdateAudience = "user_chat" | "admin_debug";
+
+/** Live chat final helper. Default audience is user_chat → always null (no card emission). */
 export function resolveChatFinalTaskUpdate(params: {
   cfg: OpenBotConfig;
   sessionKey: string;
   runId: string;
   agentId?: string;
+  /** Defaults to user_chat; pass admin_debug only from an explicit non-user path. */
+  audience?: ChatTaskUpdateAudience;
 }): ChatTaskUpdateEvent | null {
+  const audience: ChatTaskUpdateAudience = params.audience ?? "user_chat";
+  if (audience === "user_chat") {
+    return null;
+  }
   const sessionKey = params.sessionKey.trim();
   const runId = params.runId.trim();
   if (!sessionKey || !runId) {
@@ -140,4 +154,24 @@ export function resolveChatFinalTaskUpdate(params: {
       sessionKey,
     }),
   );
+}
+
+/** True when a chat event/history row is the tip-backed 「任务结果」 closed-loop card. */
+export function isClosedLoopResultTaskUpdate(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  if (record.type !== "task_update") {
+    return false;
+  }
+  const task = record.task;
+  if (!task || typeof task !== "object" || Array.isArray(task)) {
+    return false;
+  }
+  const title =
+    typeof (task as { title?: unknown }).title === "string"
+      ? (task as { title: string }).title.trim()
+      : "";
+  return title === "任务结果";
 }

@@ -2919,6 +2919,16 @@ function parseChatEvent(value: unknown) {
   }
   const record = value as Record<string, unknown>;
   if (record.type === "task_update") {
+    // FT-RESULT-CARD-UX: do not project tip-backed 「任务结果」 cards into ordinary chat UI
+    // (live or history). Generic progress task_update cards without that title still render.
+    const taskRecord =
+      record.task && typeof record.task === "object" && !Array.isArray(record.task)
+        ? (record.task as Record<string, unknown>)
+        : null;
+    const closedLoopTitle = typeof taskRecord?.title === "string" ? taskRecord.title.trim() : "";
+    if (closedLoopTitle === "任务结果") {
+      return null;
+    }
     const task = parseTaskCard(record.task);
     return task ? { type: "task_update" as const, task } : null;
   }

@@ -691,6 +691,9 @@ export function createAgentEventHandler({
     chatRunState.deltaSentAt.set(clientRunId, now);
   };
 
+  // FT-RESULT-CARD-UX: default audience is user_chat → resolveChatFinalTaskUpdate returns null.
+  // Do not pass audience: "admin_debug" here; diagnosis keeps tip visibility via diagnosis.diagnose
+  // and task.outcome.rejectResult, not the ordinary chat bubble.
   const resolveVisibleChatTaskUpdate = (sessionKey: string, runId: string) => {
     try {
       const { cfg } = loadSessionEntrySyncFallback(sessionKey);
@@ -699,6 +702,7 @@ export function createAgentEventHandler({
           cfg,
           sessionKey,
           runId,
+          audience: "user_chat",
         }) ?? undefined
       );
     } catch {

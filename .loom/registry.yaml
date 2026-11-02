@@ -10632,6 +10632,22 @@ tasks:
   since: 2026-11-01
   metadata: {}
 landingStreams:
+- id: ft-result-card-ux-20261102
+  landingPolicy: serial
+  paths:
+  - .loom/registry.yaml
+  - src/gateway/server-chat.ts
+  - src/task-outcome/chat-task-update.ts
+  - src/task-outcome/chat-task-update.test.ts
+  - ui/src/ui/controllers/chat.ts
+  - ui/src/ui/controllers/chat.task-update.test.ts
+  - ui/src/ui/views/chat.ts
+  - ui/src/ui/views/chat.result-card-ux.test.ts
+  canLandWith: []
+  metadata:
+    task: FT-RESULT-CARD-UX
+    owner: cursor-grok
+    purpose: Ordinary user chat must not show tip-backed 任务结果 task_update cards; admin_debug retains.
 - id: platform-admin-no-email-ux:cursor-grok
   landingPolicy: serial
   paths:
