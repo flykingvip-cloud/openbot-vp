@@ -549,15 +549,16 @@ describe("runWithModelFallback allowlistEnforcement (P3-1)", () => {
     });
   });
 
-  it("preexisting hard-filter runs a granted ent/* model when the session model is outside the allowlist", async () => {
+  it("preexisting hard-filter does not replace the configured primary with a granted ent/* model", async () => {
     const mimo = "ent/abc123def4/mimo-v2.6-flash";
     const { run, result } = await runWith({
       governanceMode: "shadow",
       allowlistEnforcement: "preexisting",
       entitlementAllowlist: [mimo],
     });
-    expect(calledKeys(run)).toEqual([mimo]);
-    expect(result.result).toBe(`ok:${mimo}`);
+    expect(calledKeys(run)[0]).toBe(PRIMARY);
+    expect(calledKeys(run)).not.toContain(mimo);
+    expect(result.result).toBe(`ok:${FALLBACK}`);
   });
 
   it("shadow without preexisting does not switch the run onto a granted ent/* model", async () => {
