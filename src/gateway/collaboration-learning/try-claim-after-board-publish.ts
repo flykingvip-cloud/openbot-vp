@@ -20,6 +20,7 @@ import { recordHandoffWake, recordNudgeWake } from "../collaboration-dispatch/wa
 import {
   consumeWakeForRoundDispatch,
   getWakeRoundDispatcher,
+  type DispatchSideEffectClass,
   type WakeRoundDispatcher,
 } from "../collaboration-dispatch/wake-round-dispatch.js";
 import {
@@ -95,10 +96,24 @@ export type TryClaimAfterBoardPublishResult =
       /** Handoff audit and/or consumable nudge wake row written. */
       wakeRecorded: boolean;
       /**
-       * True only when consumeWakeForRoundDispatch accepted a dispatcher round
-       * (or durable idempotent_reuse). Activate.dispatched stays false.
+       * Confirmed durable receipt settlement only (`consume.dispatched===true`,
+       * including durable idempotent_reuse). Activate.dispatched stays false.
+       * Unknown / external_sent / started_or_unknown must NOT set this true.
        */
       wakeDispatched: boolean;
+      /**
+       * Dispatcher-acceptance evidence: a round was handed off / started
+       * (confirmed settle OR pending-verification). Distinct from settlement.
+       */
+      wakeDispatcherAccepted: boolean;
+      /**
+       * Side effects may have started but durable settlement is unknown
+       * (`started_or_unknown` / `external_sent_*` / unsettled completed class).
+       * Do not auto-retry; do not present as confirmed success.
+       */
+      wakePendingVerification: boolean;
+      /** Last consume side-effect class when known. */
+      wakeSideEffectClass?: DispatchSideEffectClass | null;
     }
   | {
       outcome: "blocked";
@@ -332,6 +347,9 @@ export async function tryClaimAfterBoardPublish(params: {
       scheduledClaimantId: intendedClaimantId,
       wakeRecorded: true,
       wakeDispatched: false,
+      wakeDispatcherAccepted: false,
+      wakePendingVerification: false,
+      wakeSideEffectClass: null,
     };
   }
 
@@ -369,29 +387,47 @@ export async function tryClaimAfterBoardPublish(params: {
     },
   });
 
-  // Durable wake receipt is `dispatched:true`. When the woken executor's own
-  // claim/apply bumps task controlEpoch (or auth fingerprint) before receipt,
-  // consume reports `external_sent_*` with dispatched:false — the Mode B round
-  // still ran. Count that as wakeDispatched so handoff proof is not a false
-  // negative of the executor's legitimate writes.
+  // Deterministic status taxonomy (do NOT collapse unknown into success):
+  // - wakeDispatched: only consume.dispatched===true (durable receipt settlement)
+  // - wakePendingVerification: side effects may have started but settlement unknown
+  //   (external_sent_*, started_or_unknown, or unsettled completed_with_receipt)
+  // - wakeDispatcherAccepted: acceptance evidence (settled OR pending) — not success alone
+  // Unknown / pending must not auto-retry (wake-op ledger suppresses) and must not
+  // masquerade as confirmed dispatch success.
   const consumeReason = compact(consume.reason);
-  const externalSent =
-    !consume.dispatched &&
+  const wakeSideEffectClass: DispatchSideEffectClass | null = consume.sideEffectClass ?? null;
+  const wakeDispatched = Boolean(consume.dispatched);
+  const wakePendingVerification =
+    !wakeDispatched &&
     (consumeReason.startsWith("external_sent_") ||
-      consume.sideEffectClass === "completed_with_receipt" ||
-      consume.sideEffectClass === "started_or_unknown");
-  const wakeDispatched = Boolean(consume.dispatched) || externalSent;
-  const consumeDetail = consumeReason || (wakeDispatched ? "dispatched" : "wake_recorded");
+      consumeReason === "wake_op_unknown" ||
+      consumeReason === "wake_op_in_flight" ||
+      wakeSideEffectClass === "started_or_unknown" ||
+      wakeSideEffectClass === "completed_with_receipt");
+  const wakeDispatcherAccepted = wakeDispatched || wakePendingVerification;
+  const consumeDetail =
+    consumeReason ||
+    (wakeDispatched
+      ? "dispatched"
+      : wakePendingVerification
+        ? "pending_verification"
+        : "wake_recorded");
+  const reasonKind = wakeDispatched
+    ? "wake_dispatched"
+    : wakePendingVerification
+      ? "recorded_pending_verification"
+      : "recorded_not_dispatched";
   return {
     outcome: "scheduled",
     item,
     claimantId: null,
     nextEntryPoint: POST_PUBLISH_CLAIM_ENTRY,
-    reason: wakeDispatched
-      ? `scheduled_intended_claimant:intended=${intendedClaimantId}:wake_dispatched:${consumeDetail}`
-      : `scheduled_intended_claimant:intended=${intendedClaimantId}:recorded_not_dispatched:${consumeDetail}`,
+    reason: `scheduled_intended_claimant:intended=${intendedClaimantId}:${reasonKind}:${consumeDetail}`,
     scheduledClaimantId: intendedClaimantId,
     wakeRecorded: true,
     wakeDispatched,
+    wakeDispatcherAccepted,
+    wakePendingVerification,
+    wakeSideEffectClass,
   };
 }
