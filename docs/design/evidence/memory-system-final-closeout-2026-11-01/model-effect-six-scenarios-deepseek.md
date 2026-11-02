@@ -3,31 +3,31 @@
 **Verdict: 限定范围通过（scoped pass）** — isolated SDK/manager + real DeepSeek answers only.  
 **Not** overall model-effect layer close; **not** production acceptance.
 
-| Field | Value |
-| --- | --- |
-| User timezone | **Europe/Berlin** |
-| Asia/Shanghai clock labels | From Mac/box machine clock during the run (kept for provenance); not the user zone |
-| UTC | `generatedAtUtc` / `startedAtUtc` |
-| Provider | `api-proxy-deepseek` (`https://api.deepseek.com`) |
-| Model | `deepseek-chat` |
-| Pinned product SHA (scenario run) | `3460ef9faa8d7844367f4e2e4d28f656aeb27072` |
-| Product tree | `/Users/daniel/AI VP/openbot-closeout-accept-build-3460ef9fa` |
-| State root | `/private/tmp/openbot-closeout-model-effect-3460ef9fa/` (synthetic only) |
-| Machine calls | **6** (1 per scenario); call-count hard-stop (40) **not hit** |
-| Cost evidence | **Only** “6 calls; call-count hard-stop not hit” — **not** precise USD spend accounted |
-| Gateway | none started; did not touch :18789/:18790/:19001 |
-| Real `~/.openbot` memory writes | **no** (key read-only for provider) |
+| Field                             | Value                                                                                  |
+| --------------------------------- | -------------------------------------------------------------------------------------- |
+| User timezone                     | **Europe/Berlin**                                                                      |
+| Asia/Shanghai clock labels        | From Mac/box machine clock during the run (kept for provenance); not the user zone     |
+| UTC                               | `generatedAtUtc` / `startedAtUtc`                                                      |
+| Provider                          | `api-proxy-deepseek` (`https://api.deepseek.com`)                                      |
+| Model                             | `deepseek-chat`                                                                        |
+| Pinned product SHA (scenario run) | `3460ef9faa8d7844367f4e2e4d28f656aeb27072`                                             |
+| Product tree                      | `/Users/daniel/AI VP/openbot-closeout-accept-build-3460ef9fa`                          |
+| State root                        | `/private/tmp/openbot-closeout-model-effect-3460ef9fa/` (synthetic only)               |
+| Machine calls                     | **6** (1 per scenario); call-count hard-stop (40) **not hit**                          |
+| Cost evidence                     | **Only** “6 calls; call-count hard-stop not hit” — **not** precise USD spend accounted |
+| Gateway                           | none started; did not touch :18789/:18790/:19001                                       |
+| Real `~/.openbot` memory writes   | **no** (key read-only for provider)                                                    |
 
 ## Results（限定范围通过）
 
-| Scenario | Status | One-line reason |
-| --- | --- | --- |
-| 保存后新会话采用 | **限定范围通过** | New-session manager recall injected fact; model quoted token |
-| 无关内容不乱入 | **限定范围通过** | Relevant adopted; unrelated hobby token absent from answer |
-| 更新后不沿用旧事实 | **限定范围通过** | After SDK `supersedeAtom`, only NEW in context; model adopted NEW not OLD |
-| 无权限不进上下文 | **限定范围通过** | Wrong-owner ACL empty context; model did not adopt secret |
-| 遗忘后不用被禁用来源 | **限定范围通过** | path1 `forgetMemoryEntry` removed source; model did not use token |
-| 未批准学习不采用 | **限定范围通过** | Candidate excluded from recall/context; model did not adopt; approve control injects |
+| Scenario             | Status           | One-line reason                                                                      |
+| -------------------- | ---------------- | ------------------------------------------------------------------------------------ |
+| 保存后新会话采用     | **限定范围通过** | New-session manager recall injected fact; model quoted token                         |
+| 无关内容不乱入       | **限定范围通过** | Relevant adopted; unrelated hobby token absent from answer                           |
+| 更新后不沿用旧事实   | **限定范围通过** | After SDK `supersedeAtom`, only NEW in context; model adopted NEW not OLD            |
+| 无权限不进上下文     | **限定范围通过** | Wrong-owner ACL empty context; model did not adopt secret                            |
+| 遗忘后不用被禁用来源 | **限定范围通过** | path1 `forgetMemoryEntry` removed source; model did not use token                    |
+| 未批准学习不采用     | **限定范围通过** | Candidate excluded from recall/context; model did not adopt; approve control injects |
 
 Machine-readable: `model-effect-six-scenarios-deepseek.json`  
 Driver: `model-effect-six-scenarios-deepseek.driver.ts`
