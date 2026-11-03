@@ -10821,7 +10821,41 @@ tasks:
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
+  - id: agent-runtime-convergence
+    owner: codex-runtime-manager
+    intent:
+      - Unify runtime architecture and retire redundant control paths
+      - Unify runtime architecture; M0 authority audit; M1 equivalent context
+        assembly
+    paths:
+      - .kiro/specs/agent-runtime-convergence/**
+      - src/agent-runtime/context/**
+      - src/auto-reply/reply/get-reply-run.ts
+      - scripts/architecture/manifest.json
+    state: active
+    sessions:
+      - id: 6cce1901-02ad-4d31-aede-6013384aae12
+        taskId: agent-runtime-convergence
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-03T08:33:37.235Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-03
+    metadata: {}
 landingStreams:
+  - id: agent-runtime-convergence-m1
+    landingPolicy: serial
+    paths:
+      - src/agent-runtime/context/**
+      - src/auto-reply/reply/get-reply-run.ts
+    canLandWith: []
+    metadata:
+      task: agent-runtime-convergence
+      owner: codex-runtime-manager
+      purpose: M1 equivalent system context assembly; explicit scoped migration from
+        existing reply stream, no new execution path.
   - id: ft-dedupe-thinking-progress-ui-20261102
     landingPolicy: serial
     paths:
