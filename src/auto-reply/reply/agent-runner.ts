@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { queryCurrentTaskStatus } from "../../agent-runtime/command/task-status.js";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
@@ -95,11 +96,7 @@ import {
 } from "./honest-empty-reply.js";
 import { abortMidTaskAsideLanes, runMidTaskAsideReplyLane } from "./mid-task-aside-reply-lane.js";
 import { resolveMidTaskAsideDisposition } from "./mid-task-aside.js";
-import {
-  formatAmendConstraintAck,
-  formatTaskBoardProgressReply,
-  isProgressStatusQuery,
-} from "./mid-task-dialogue.js";
+import { formatAmendConstraintAck } from "./mid-task-dialogue.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
 import { resolveActiveRunQueueAction, shouldAttemptCollectAmendSteer } from "./queue-policy.js";
@@ -303,10 +300,11 @@ export async function runReplyAgent(params: {
 
   // P3: progress / status asks answered from the live task board — no steer,
   // no followup wait. Board is a projection of existing state, not a new controller.
-  if (isActive && isProgressStatusQuery(followupRun.prompt) && followupRun.run.sessionFile) {
-    const board = readSessionTaskBoard(followupRun.run.sessionFile);
-    if (board.current) {
-      const text = formatTaskBoardProgressReply(board);
+  if (isActive && followupRun.run.sessionFile) {
+    const text = queryCurrentTaskStatus(followupRun.prompt, () =>
+      readSessionTaskBoard(followupRun.run.sessionFile),
+    );
+    if (text !== undefined) {
       await touchActiveSessionEntry();
       typing.cleanup();
       return [{ text }];
