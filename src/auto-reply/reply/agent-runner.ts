@@ -7,12 +7,16 @@ import {
   queryCurrentTaskStatus,
 } from "../../agent-runtime/command/index.js";
 import { buildReplyPayloads } from "../../agent-runtime/delivery/index.js";
+import {
+  bindOwnerControlPorts,
+  bindAmendmentPorts,
+} from "../../agent-runtime/wiring/command-adapters.js";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
 import { isCliProvider } from "../../agents/model-selection.js";
-import { abortEmbeddedPiRun, queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
+import { queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage } from "../../agents/usage.js";
 import {
   resolveAgentIdFromSessionKey,
@@ -26,11 +30,8 @@ import {
 } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
 import {
-  applyIncomingUserMessage,
   activeConstraintTexts,
-  commitSameTaskConstraint,
   isOwnerCurrentTaskControlUtterance,
-  mutateSessionTaskBoard,
   readSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import {
@@ -98,13 +99,12 @@ import {
   recordHonestCapabilityGap,
   stripCapabilityGapMarkers,
 } from "./honest-empty-reply.js";
-import { abortMidTaskAsideLanes, runMidTaskAsideReplyLane } from "./mid-task-aside-reply-lane.js";
+import { runMidTaskAsideReplyLane } from "./mid-task-aside-reply-lane.js";
 import { resolveMidTaskAsideDisposition } from "./mid-task-aside.js";
 import { formatAmendConstraintAck } from "./mid-task-dialogue.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
 import { resolveActiveRunQueueAction, shouldAttemptCollectAmendSteer } from "./queue-policy.js";
-import { clearSessionQueues } from "./queue.js";
 import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queue.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
@@ -285,22 +285,14 @@ export async function runReplyAgent(params: {
   ) {
     const sessionFile = followupRun.run.sessionFile.trim();
     const sessionId = followupRun.run.sessionId;
-    const control = controlCurrentTask(followupRun.prompt, {
-      applyControl: (prompt) =>
-        mutateSessionTaskBoard(sessionFile, (board) => {
-          const result = applyIncomingUserMessage({ board, incomingText: prompt });
-          return { board: result.board, value: result };
-        }),
-      abortMain: () => {
-        abortEmbeddedPiRun(sessionId);
-      },
-      abortAsides: () => {
-        abortMidTaskAsideLanes(sessionId);
-      },
-      clearPending: () => {
-        clearSessionQueues([queueKey, sessionId, followupRun.run.sessionKey]);
-      },
-    });
+    const control = controlCurrentTask(
+      followupRun.prompt,
+      bindOwnerControlPorts({
+        sessionFile,
+        sessionId,
+        queueKeys: [queueKey, sessionId, followupRun.run.sessionKey],
+      }),
+    );
     await touchActiveSessionEntry();
     typing.cleanup();
     return [{ text: control.statusLine?.trim() || "已处理任务控制指令。" }];
@@ -377,18 +369,14 @@ export async function runReplyAgent(params: {
     })
   ) {
     const sessionFile = followupRun.run.sessionFile?.trim() ?? "";
-    const amendment = amendActiveTask(isOwnerExecutionBarrierUtterance(followupRun.prompt), {
-      readTaskId: () =>
-        sessionFile ? (readSessionTaskBoard(sessionFile).current?.taskId?.trim() ?? "") : "",
-      persist: (expectedTaskId) =>
-        Boolean(sessionFile) &&
-        commitSameTaskConstraint({
-          sessionFile,
-          constraintText: followupRun.prompt,
-          expectedTaskId,
-        }),
-      steer: () => queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt),
-    });
+    const amendment = amendActiveTask(
+      isOwnerExecutionBarrierUtterance(followupRun.prompt),
+      bindAmendmentPorts({
+        sessionFile,
+        sessionId: followupRun.run.sessionId,
+        prompt: followupRun.prompt,
+      }),
+    );
     if (amendment.kind !== "defer") {
       await touchActiveSessionEntry();
       typing.cleanup();
