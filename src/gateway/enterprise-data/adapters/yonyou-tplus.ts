@@ -12,6 +12,7 @@ import {
   YONYOU_TPLUS_GATEWAY_ORIGIN,
   YONYOU_TPLUS_SIMULATED_TOKEN_PREFIX,
 } from "./yonyou-tplus-oauth.js";
+import { extractYonyouTplusRows } from "../yonyou-tplus-rows.js";
 
 export const YONYOU_TPLUS_HANDLERS = {
   version: "enterprise-data/handlers/yonyou-tplus-account-version-v1",
@@ -537,5 +538,5 @@ export async function executeYonyouTplusHandler(
   if (!result.ok) {
     throw new Error(result.message);
   }
-  return { payload: { records: result.body } };
+  return { payload: { records: extractYonyouTplusRows(result.body) } };
 }

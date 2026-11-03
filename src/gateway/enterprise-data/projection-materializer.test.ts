@@ -417,4 +417,119 @@ describe("yonyou projection cursor window", () => {
       },
     });
   });
+
+  it("does not inject UpdateDate cursor for AggregateTemplate inventory", async () => {
+    fs.rmSync(yonyouVaultDir.tmpDir, { recursive: true, force: true });
+    fs.mkdirSync(yonyouVaultDir.tmpDir, { recursive: true });
+    const store = normalizeEnterpriseDataStore({});
+    seedEnterpriseDataCatalog({ store, tenantId, nowIso });
+    ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      nowIso,
+    });
+    const credential = upsertDataConnectorCredential({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      label: "京扇子 T+",
+      kind: "oauth2",
+      nowIso,
+    });
+    await saveCredentialSecret(credential.credentialId, {
+      oauthAccessToken: "simulated-yonyou-tplus-token-abc",
+    });
+    upsertDataSource({
+      store,
+      tenantId,
+      nowIso,
+      source: {
+        sourceId,
+        sourceKey: "yonyou-tplus",
+        displayName: "用友 T+",
+        category: "erp",
+        status: "connected",
+        connectorId: "erp-yonyou-tplus",
+        credentialId: credential.credentialId,
+      },
+    });
+    upsertScopePolicy({
+      store,
+      tenantId,
+      nowIso,
+      policy: {
+        scopePolicyId: "scope-all-readonly",
+        displayName: "全量只读范围",
+        scopeType: "ALL",
+        filterDescription: "租户内全量只读",
+      },
+    });
+    upsertSeatActionGrant({
+      store,
+      tenantId,
+      seatId: MATERIALIZER_SEAT_ID,
+      connectorId: "erp-yonyou-tplus",
+      actionKey: "erp.inventory.query_page",
+      version: "v1",
+      scopePolicyId: "scope-all-readonly",
+      nowIso,
+    });
+    const cursorId = `${sourceId}::inventory`;
+    store.connectorSyncCursors ??= {};
+    store.connectorSyncCursors[cursorId] = {
+      cursorId,
+      tenantId,
+      sourceId,
+      streamKey: "inventory",
+      watermark: "2026-10-20 00:00:00",
+      updatedAt: "2026-10-21T00:00:00.000Z",
+    };
+    const spec = upsertEnterpriseKnowledgeProjectionSpec({
+      store,
+      tenantId,
+      nowIso,
+      spec: {
+        projectionKey: "erp.inventory.aggregate",
+        displayName: "001-用友T+存货",
+        category: "inventory",
+        sourceId,
+        sourceActions: [
+          {
+            connectorId: "erp-yonyou-tplus",
+            actionKey: "erp.inventory.query_page",
+            version: "v1",
+          },
+        ],
+        objectKind: "aggregate",
+        templateKey: "AggregateTemplate",
+        description: "用友存货汇总，不应用同步水位窗",
+        outputSchema: { type: "object" },
+        lifecycle: "active",
+      },
+    });
+    const binding = upsertEnterpriseKnowledgeProjectionBinding({
+      store,
+      tenantId,
+      nowIso,
+      binding: {
+        projectionId: spec.projectionId,
+        materializationMode: "on_demand",
+        materializationTeamLabel: "京扇子",
+        enabled: true,
+        generatorVersion: "yonyou-aggregate-1",
+      },
+    });
+    const result = await runProjectionMaterialization({
+      store,
+      tenantId,
+      bindingId: binding.bindingId,
+      nowIso,
+    });
+    const query = result.feedItem.payload.query as Record<string, unknown> | undefined;
+    expect(query).toBeUndefined();
+    expect(result.feedItem.payload.count).toBeGreaterThanOrEqual(1);
+    expect(result.feedItem.title).toContain("汇总");
+  });
+
 });

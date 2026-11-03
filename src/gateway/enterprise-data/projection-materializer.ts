@@ -177,15 +177,20 @@ export async function runProjectionMaterialization(params: {
     const cursorNow = Number.isFinite(Date.parse(params.nowIso))
       ? new Date(params.nowIso)
       : new Date();
-    const input = applyYonyouTplusSyncCursorToInput({
-      store: params.store,
-      tenantId: params.tenantId,
-      sourceId: projectionSourceId(spec),
-      connectorId: sourceRef.connectorId,
-      actionKey: sourceRef.actionKey,
-      input: params.input,
-      now: cursorNow,
-    });
+    // AggregateTemplate = list/汇总 knowledge: do not inject incremental sync watermark
+    // (NormalizeTemplate "存货增量" still receives the cursor window).
+    const input =
+      spec.templateKey === "AggregateTemplate"
+        ? params.input
+        : applyYonyouTplusSyncCursorToInput({
+            store: params.store,
+            tenantId: params.tenantId,
+            sourceId: projectionSourceId(spec),
+            connectorId: sourceRef.connectorId,
+            actionKey: sourceRef.actionKey,
+            input: params.input,
+            now: cursorNow,
+          });
 
     const published = await invokeSourceAction({
       store: params.store,
