@@ -248,3 +248,10 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Guard and read errors are inside original cleanup boundary. Real runEmbeddedAttempt test pauses during create-session preparation, uses the actual active-run registry, asserts no provider prompt, session lock released exactly once, and active handle removed. Four suites / 88 PASS; independent lifecycle review PASS. — codex-runtime-manager
 - Typed lint clean; architecture 25 rules PASS; tsgo 44 baseline/candidate unchanged; final build PASS, dynamic-import warnings 209 unchanged. — codex-runtime-manager
 - Scope is same-process embedded startup only. Earlier preparation I/O/hooks may occur; CLI remains startup-guarded but has no equivalent registration handshake; cross-process real-time abort is not established. Do not claim all execution surfaces are race-free or all side effects cancellable. — codex-runtime-manager
+
+## CLI host cancellation checkpoint
+
+- runCliAgent and legacy Claude wrapper accept the host AbortSignal. Existing supervisor is reused: entry/pre-spawn abort checks, post-spawn cancellation catch-up, live managedRun.cancel listener, post-wait abort assertion, listener removal in finally. Normal CLI caller forwards existing opts signal. No new cancel registry. — codex-runtime-manager
+- AbortError is preserved before failover/session-expired handling, so a cancelled host request does not return late success or start a recovery retry. Cancellation callback exceptions are logged without error content and do not escape EventTarget. — codex-runtime-manager
+- Two CLI suites / 16 PASS, original configured e2e 47 PASS; independent review PASS; typed lint clean; tsgo baseline/candidate 44; final build PASS, warnings 209 unchanged. — codex-runtime-manager
+- Guarantee requires a provided host signal. If supervisor cancellation fails, logical abort/late-result suppression does not prove the child process exited. Unsignalled and cross-process cancellation still need separate evidence; do not claim universal owner-stop coverage. — codex-runtime-manager
