@@ -1,5 +1,10 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import {
+  appendSystemContextPart,
+  finalizeSystemContext,
+  selectSystemContextParts,
+} from "../../agent-runtime/context/assembly.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
 import { extractEmployeeStewardUserIdFromSessionKey } from "../../agents/builtin-steward/employee-isolation.js";
@@ -1117,7 +1122,7 @@ export async function runPreparedReply(
       : undefined;
   let extraSystemPromptParts: string[];
   if (useCollaborationAssembly) {
-    extraSystemPromptParts = [
+    extraSystemPromptParts = selectSystemContextParts([
       ...(await assembleCollaborationRuntimeContextParts({
         cfg,
         workspaceDir: runWorkspaceDir,
@@ -1149,7 +1154,7 @@ export async function runPreparedReply(
       composerPluginMentionExecution?.summaryPrompt,
       growthBirthPrompt,
       cronReplyPrompt,
-    ].filter((entry): entry is string => Boolean(entry?.trim()));
+    ]);
   } else {
     const groupChatContext = isGroupChat
       ? buildGroupChatContext({ sessionCtx, organizationContext })
@@ -1223,7 +1228,7 @@ export async function runPreparedReply(
             ...(applyChatLane ? { listingMode: "lightweight" as const } : {}),
           })
         : undefined;
-    extraSystemPromptParts = [
+    extraSystemPromptParts = selectSystemContextParts([
       inboundMetaPrompt,
       groupChatContext,
       groupIntro,
@@ -1245,17 +1250,17 @@ export async function runPreparedReply(
       composerPluginMentionExecution?.summaryPrompt,
       growthBirthPrompt,
       cronReplyPrompt,
-    ].filter((entry): entry is string => Boolean(entry?.trim()));
+    ]);
   }
   if (taskSurfaceNote) {
-    extraSystemPromptParts = [...extraSystemPromptParts, taskSurfaceNote];
+    extraSystemPromptParts = appendSystemContextPart(extraSystemPromptParts, taskSurfaceNote);
   }
   if (inboundTaskClarify) {
-    extraSystemPromptParts = [...extraSystemPromptParts, inboundTaskClarify];
+    extraSystemPromptParts = appendSystemContextPart(extraSystemPromptParts, inboundTaskClarify);
   }
   const currentSpeakerPrompt = buildCurrentSpeakerUntrustedPrompt(sessionCtx);
   if (currentSpeakerPrompt) {
-    extraSystemPromptParts = [...extraSystemPromptParts, currentSpeakerPrompt];
+    extraSystemPromptParts = appendSystemContextPart(extraSystemPromptParts, currentSpeakerPrompt);
   }
   if (!isHeartbeat && !applyChatLane) {
     const learningExposureKey = learningExperienceRunKey(opts?.runId);
@@ -1270,7 +1275,10 @@ export async function runPreparedReply(
       exposureKey: learningExposureKey,
     });
     if (learningRecallPrompt) {
-      extraSystemPromptParts = [...extraSystemPromptParts, learningRecallPrompt];
+      extraSystemPromptParts = appendSystemContextPart(
+        extraSystemPromptParts,
+        learningRecallPrompt,
+      );
     }
   }
   const baseBody = sessionCtx.BodyStripped ?? sessionCtx.Body ?? "";
@@ -1386,7 +1394,7 @@ export async function runPreparedReply(
   const preferSkillNames = applyChatLane ? [] : resolveTurnPreferSkillNames(inboundMessage);
   const preferSkillHint = formatTurnPreferSkillHint(preferSkillNames);
   if (preferSkillHint) {
-    extraSystemPromptParts = [...extraSystemPromptParts, preferSkillHint];
+    extraSystemPromptParts = appendSystemContextPart(extraSystemPromptParts, preferSkillHint);
   }
   // Chat-lane: empty skill window. Retrieve: keep agent/channel filter without
   // forcing STEWARD_REQUIRED. Act: re-apply ensureStewardRequiredSkills so
@@ -1667,7 +1675,7 @@ export async function runPreparedReply(
       blockReplyBreak: resolvedBlockStreamingBreak,
       ownerNumbers: command.ownerList.length > 0 ? command.ownerList : undefined,
       inputProvenance: ctx.InputProvenance ?? sessionCtx.InputProvenance,
-      extraSystemPrompt: extraSystemPromptParts.join("\n\n") || undefined,
+      extraSystemPrompt: finalizeSystemContext(extraSystemPromptParts),
       organizationContext,
       ...(isReasoningTagProvider(provider) ? { enforceFinalTag: true } : {}),
       ...(chatLaneSkipsOptionalKnowledge ? { disableTools: true } : {}),
