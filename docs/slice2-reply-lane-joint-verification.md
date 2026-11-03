@@ -7,7 +7,7 @@
 ## 绑定
 
 - 行为基线（slice3 RMW）：`e82695c145629277cf3e2b656929e4b63bac3cfb`
-- 本轮 tip（含 reply_lane hardening + 分流）：`TIP_PLACEHOLDER`
+- 本轮 tip（含 reply_lane hardening + 分流）：`bb949e8e508e18b32a59749b63b234e963749bd3`
 - 祖先门禁：`git fetch origin && git merge-base --is-ancestor origin/main HEAD` → PASS（合入前再验）
 
 ## seedSessionTaskBoard 审计

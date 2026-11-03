@@ -5,7 +5,7 @@
 ## 绑定
 
 - 四项阻塞行为基线：`6c4081a3c6c81bd63bbb317916f1d500c2466843`
-- 本轮行为 tip：`cf7cf63f45611fbb56801f36380d2027648cdc34`
+- 本轮行为 tip：`bb949e8e508e18b32a59749b63b234e963749bd3`
 - **作废**：`ab32aa1…`、「steer 成功后不再 followup（已废止旧说法）」
 
 ## A. Gateway chat.send 暂停事件序列（测试）
@@ -37,7 +37,7 @@
 
 ## 定向测试结果
 
-7 files / 23 passed（Asia/Shanghai 本机 vitest）。行为 tip `cf7cf63f45611fbb56801f36380d2027648cdc34`。
+7 files / 23 passed（Asia/Shanghai 本机 vitest）。行为 tip `bb949e8e508e18b32a59749b63b234e963749bd3`。
 
 ## 能力边界一句话
 
