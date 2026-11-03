@@ -303,5 +303,13 @@ session-task-board.seed-audit.test.ts
 | 不写任务板 / disableTools | 已落地 |
 | 暂停取消覆盖 aside | 已落地 |
 | B 写入 A 的 jsonl 共址 | **仍缺口**（有意：避免会话锁争用） |
-| Gateway chatRun 清桶专项 | **仍缺口**（复用既有 runId） |
+| Gateway A/B final/cancel 隔离交叉测 | **本轮已补**（`server-chat.aside-ab-run-isolation.test.ts`） |
 | 第二任务控制者 / 关键词特例堆叠 | **不做** |
+
+## SHA binding（reply_lane harden + typed routing）
+
+- 行为 tip：`bb949e8e508e18b32a59749b63b234e963749bd3`
+- 时区：Asia/Shanghai 2026-11-03 09:45
+- 联合回归：21 files / 252 passed
+- 分流：普通插问→reply_lane；amend/安全限制→原任务板（屏障优先）；暂停取消→原停止路径
+- Gateway A/B：`server-chat.aside-ab-run-isolation.test.ts`
