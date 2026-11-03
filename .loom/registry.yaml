@@ -10828,6 +10828,14 @@ tasks:
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - src/auto-reply/reply/dispatch-from-config.ts
+      - src/conversation-task/reply-completion.ts
+      - src/conversation-task/reply-completion.test.ts
+      - src/conversation-task/session-task-board.test.ts
+      - src/conversation-task/session-task-board.cross-process-child.ts
+      - src/conversation-task/completion-binding.test.ts
+      - src/task-orchestration/complex-task-loop.ts
+      - src/task-orchestration/complex-task-loop.test.ts
       - src/agent-runtime/wiring/**
       - src/agents/execution-stall-continue-loop.test.ts
       - src/agents/pi-embedded-runner/run/attempt.test.ts
@@ -10899,6 +10907,14 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/auto-reply/reply/dispatch-from-config.ts
+      - src/conversation-task/reply-completion.ts
+      - src/conversation-task/reply-completion.test.ts
+      - src/conversation-task/session-task-board.test.ts
+      - src/conversation-task/session-task-board.cross-process-child.ts
+      - src/conversation-task/completion-binding.test.ts
+      - src/task-orchestration/complex-task-loop.ts
+      - src/task-orchestration/complex-task-loop.test.ts
       - src/agent-runtime/wiring/**
       - src/agents/execution-stall-continue-loop.test.ts
       - src/agents/pi-embedded-runner/run/attempt.test.ts
