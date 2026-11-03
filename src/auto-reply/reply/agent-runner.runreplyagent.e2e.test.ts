@@ -2102,3 +2102,48 @@ describe("runReplyAgent memory flush", () => {
   });
 });
 import type { ReplyPayload } from "../types.js";
+
+it("rejects a stale original task before memory flush or provider execution", async () => {
+  const boardApi = await import("../../conversation-task/session-task-board.js");
+  const dir = await fs.mkdtemp(path.join(tmpdir(), "normal-task-start-"));
+  try {
+    const sessionFile = path.join(dir, "session.jsonl");
+    await fs.writeFile(sessionFile, "");
+    const task = {
+      taskId: "a",
+      title: "A",
+      goalText: "hello",
+      unfinished: true,
+      createdAtMs: 1,
+      stop: { summary: "", workspacePaths: [] },
+    };
+    boardApi.mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...boardApi.emptySessionTaskBoard(),
+        current: task,
+      },
+      value: undefined,
+    }));
+    const binding = boardApi.captureTaskCompletionBinding(sessionFile);
+    boardApi.mutateSessionTaskBoard(sessionFile, (board) => ({
+      board: { ...board, current: { ...task, taskId: "b" } },
+      value: undefined,
+    }));
+    state.runEmbeddedPiAgentMock.mockClear();
+    state.runCliAgentMock.mockClear();
+    const { run, typing } = createMinimalRun({
+      runOverrides: { sessionFile, taskCompletionBinding: binding },
+    });
+    vi.mocked(scheduleFollowupDrain).mockClear();
+    const result = await run();
+    expect(JSON.stringify(result)).toContain("任务身份已失效");
+    expect(scheduleFollowupDrain).toHaveBeenCalled();
+    expect(state.runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+    expect(state.runCliAgentMock).not.toHaveBeenCalled();
+    expect(boardApi.readSessionTaskBoard(sessionFile).current?.taskId).toBe("b");
+    expect(typing.markRunComplete).toHaveBeenCalled();
+    expect(typing.markDispatchIdle).toHaveBeenCalled();
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});

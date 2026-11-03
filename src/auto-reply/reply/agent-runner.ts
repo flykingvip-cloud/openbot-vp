@@ -434,6 +434,49 @@ export async function runReplyAgent(params: {
   // generated it before P3-2. Lifecycle events after the turn use `outcomeRunId`.
   const runId = opts?.runId ?? crypto.randomUUID();
 
+  const makeRunFollowupTurn = () =>
+    createFollowupRunner({
+      opts,
+      typing,
+      typingMode,
+      sessionEntry: activeSessionEntry,
+      sessionStore: activeSessionStore,
+      sessionKey,
+      storePath,
+      defaultModel,
+      agentCfgContextTokens,
+    });
+
+  const requiresTaskBinding =
+    Boolean(completionBinding) ||
+    (!followupRun.run.collaborationRoundInvoked &&
+      !followupRun.run.privateRunBag &&
+      Boolean(readSessionTaskBoard(followupRun.run.sessionFile).current));
+  if (requiresTaskBinding) {
+    try {
+      completionBinding = startBoundTaskExecution(
+        followupRun.run.sessionFile,
+        completionBinding,
+        runId,
+      );
+      if (!completionBinding) {
+        typing.markRunComplete();
+        typing.markDispatchIdle();
+        return finalizeWithFollowup(
+          { text: "这条请求的任务身份已失效或尚未绑定，未继续执行。请确认当前任务后重新发送。" },
+          queueKey,
+          makeRunFollowupTurn(),
+        );
+      }
+      followupRun.run.taskCompletionBinding = completionBinding;
+      opts?.onTaskExecutionBound?.(completionBinding);
+    } catch (error) {
+      typing.markRunComplete();
+      typing.markDispatchIdle();
+      finalizeWithFollowup(undefined, queueKey, makeRunFollowupTurn());
+      throw error;
+    }
+  }
   activeSessionEntry = await runMemoryFlushIfNeeded({
     cfg,
     followupRun,
@@ -454,17 +497,7 @@ export async function runReplyAgent(params: {
     },
   });
 
-  const runFollowupTurn = createFollowupRunner({
-    opts,
-    typing,
-    typingMode,
-    sessionEntry: activeSessionEntry,
-    sessionStore: activeSessionStore,
-    sessionKey,
-    storePath,
-    defaultModel,
-    agentCfgContextTokens,
-  });
+  const runFollowupTurn = makeRunFollowupTurn();
 
   const maybeScheduleTaskBoardContinue = (payloads: ReplyPayload[] | undefined) => {
     if (isHeartbeat) {
@@ -603,15 +636,6 @@ export async function runReplyAgent(params: {
     : undefined;
   try {
     const runStartedAt = Date.now();
-    completionBinding = startBoundTaskExecution(
-      followupRun.run.sessionFile,
-      completionBinding,
-      runId,
-    );
-    if (completionBinding) {
-      followupRun.run.taskCompletionBinding = completionBinding;
-      opts?.onTaskExecutionBound?.(completionBinding);
-    }
     const runOutcome = await runAgentTurnWithFallback({
       commandBody,
       followupRun,

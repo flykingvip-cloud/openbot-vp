@@ -303,6 +303,7 @@ Docs: https://docs.openbot.love
 - Agent/tool replies: preserve structured execution approval cards when protocol text is removed, while keeping silent and heartbeat results suppressed.
 - Tasks: reject checked-completion callbacks whose original task, attempt, or artifact version no longer matches the current task; unbound callbacks no longer close the latest task.
 - Tasks/queue: reject stale queued task bindings and recheck owner pause before starting a prepared followup; preserve typing cleanup on rejected claims.
+- Tasks/runtime: reject stale task requests before memory flush and provider startup, while continuing to drain subsequent queued work.
 
 ## 2026.3.8
 

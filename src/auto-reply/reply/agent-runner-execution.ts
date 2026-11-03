@@ -38,6 +38,7 @@ import {
 } from "../../config/sessions.js";
 import { createConversationTurnToolObserver } from "../../conversation-task/ledger-binding.js";
 import { defaultShadowStoreRoot } from "../../conversation-task/runtime-bootstrap.js";
+import { isTaskExecutionBindingCurrent } from "../../conversation-task/session-task-board.js";
 import { resolveCronStorePath } from "../../cron/store.js";
 import { syncRobotGrowthFromOperationalMetrics } from "../../gateway/agent-growth/operational-growth.js";
 import {
@@ -174,6 +175,12 @@ export async function runAgentTurnWithFallback(params: {
   storePath?: string;
   resolvedVerboseLevel: VerboseLevel;
 }): Promise<AgentRunLoopResult> {
+  const assertOriginalTaskCurrent = () => {
+    const binding = params.followupRun.run.taskCompletionBinding;
+    if (binding && !isTaskExecutionBindingCurrent(params.followupRun.run.sessionFile, binding)) {
+      throw new Error("Original task was paused, closed or replaced before provider startup");
+    }
+  };
   const TRANSIENT_HTTP_RETRY_DELAY_MS = 2_500;
   const SOFT_ENTITLEMENT_RETRY_DELAY_MS = 400;
   let didLogHeartbeatStrip = false;
@@ -712,6 +719,7 @@ export async function runAgentTurnWithFallback(params: {
                 }
                 let lifecycleTerminalEmitted = false;
                 try {
+                  assertOriginalTaskCurrent();
                   const result = await runCliAgent({
                     sessionId: params.followupRun.run.sessionId,
                     sessionKey: params.sessionKey,
@@ -903,6 +911,7 @@ export async function runAgentTurnWithFallback(params: {
                 cronStorePath: resolveCronStorePath(params.followupRun.run.config.cron?.store),
               });
               try {
+                assertOriginalTaskCurrent();
                 const result = await runEmbeddedPiAgent({
                   ...embeddedContext,
                   trigger: params.isHeartbeat ? "heartbeat" : "user",
