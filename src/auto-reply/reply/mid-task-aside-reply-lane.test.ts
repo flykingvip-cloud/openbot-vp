@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   activeConstraintTexts,
+  cancelCurrentTask,
   emptySessionTaskBoard,
   mutateSessionTaskBoard,
   readSessionTaskBoard,
@@ -16,6 +17,9 @@ import {
   buildAsideReplyLanePrompt,
   isMidTaskAsideLaneCancelled,
   listMidTaskAsideLanesForTests,
+  loadAsideReplyContextHistory,
+  mergeAsideAndParentHistoryTurns,
+  midTaskAsideLaneTaskIdForTests,
   readAsideDialogueTurns,
   registerMidTaskAsideLane,
   resetMidTaskAsideLaneRegistryForTests,
@@ -131,6 +135,8 @@ describe("mid-task aside reply_lane isolation", () => {
       expect(args.runId).toBe("run-b");
       expect(String(args.sessionFile)).toContain("openbot-aside-reply-");
       expect(String(args.prompt)).toContain("只要国内安卓机型");
+      expect(args.abortSignal).toBeInstanceOf(AbortSignal);
+      expect((args.abortSignal as AbortSignal).aborted).toBe(false);
       return {
         payloads: [{ text: "北京今天晴，气温适宜。" }],
         meta: { durationMs: 1 },
@@ -377,5 +383,185 @@ describe("mid-task aside reply_lane isolation", () => {
     expect(listMidTaskAsideLanesForTests("session-a")).toEqual(["aside-live"]);
     unregisterMidTaskAsideLane("session-a", "aside-live");
     expect(listMidTaskAsideLanesForTests("session-a")).toEqual([]);
+  });
+
+  it("registers cancel signal before first await; cancel during mkdtemp blocks start", async () => {
+    const runEmbedded = vi.fn(async () => {
+      throw new Error("must not start after prepare-window cancel");
+    });
+    const realMkdtemp = fs.promises.mkdtemp.bind(fs.promises);
+    const result = await runMidTaskAsideReplyLane({
+      parentSessionId: "session-a",
+      parentSessionFile,
+      board: readSessionTaskBoard(parentSessionFile),
+      userPrompt: "准备窗口插问",
+      runId: "run-prep-window",
+      run: {
+        sessionId: "session-a",
+        provider: "anthropic",
+        model: "claude",
+        workspaceDir: tmpDir,
+        config: {},
+        timeoutMs: 5_000,
+      },
+      runEmbedded: runEmbedded as never,
+      fsPrepare: {
+        mkdtemp: async (prefix, options) => {
+          expect(listMidTaskAsideLanesForTests("session-a")).toContain(
+            "aside-reply-run-prep-window",
+          );
+          expect(midTaskAsideLaneTaskIdForTests("session-a", "aside-reply-run-prep-window")).toBe(
+            "task-a",
+          );
+          abortMidTaskAsideLanes("session-a");
+          expect(isMidTaskAsideLaneCancelled("session-a", "aside-reply-run-prep-window")).toBe(
+            true,
+          );
+          return realMkdtemp(prefix, options);
+        },
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(runEmbedded).not.toHaveBeenCalled();
+  });
+
+  it("cancel tombstone blocks delivery after current is cleared", async () => {
+    let resolveRun: ((value: unknown) => void) | undefined;
+    const runEmbedded = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveRun = resolve;
+        }),
+    );
+    const pending = runMidTaskAsideReplyLane({
+      parentSessionId: "session-a",
+      parentSessionFile,
+      board: readSessionTaskBoard(parentSessionFile),
+      userPrompt: "取消窗口插问",
+      runId: "run-b-tombstone",
+      run: {
+        sessionId: "session-a",
+        provider: "anthropic",
+        model: "claude",
+        workspaceDir: tmpDir,
+        config: {},
+        timeoutMs: 5_000,
+      },
+      runEmbedded: runEmbedded as never,
+    });
+    for (let i = 0; i < 50 && !resolveRun; i += 1) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(resolveRun).toBeTypeOf("function");
+
+    mutateSessionTaskBoard(parentSessionFile, (board) => {
+      const cancelled = cancelCurrentTask({ board });
+      return { board: cancelled.board, value: cancelled };
+    });
+    expect(readSessionTaskBoard(parentSessionFile).current).toBeUndefined();
+    abortMidTaskAsideLanes("session-a");
+
+    resolveRun?.({
+      payloads: [{ text: "墓碑后迟到回答" }],
+      meta: { durationMs: 1 },
+    });
+    const result = await pending;
+    expect(result.ok).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(result.text).not.toContain("墓碑后迟到回答");
+  });
+
+  it("passes abortSignal into runner so cancel before ACTIVE_EMBEDDED_RUNS still aborts", async () => {
+    let seenSignal: AbortSignal | undefined;
+    const runEmbedded = vi.fn(async (args: Record<string, unknown>) => {
+      seenSignal = args.abortSignal as AbortSignal;
+      abortMidTaskAsideLanes("session-a");
+      expect(seenSignal?.aborted).toBe(true);
+      return {
+        payloads: [{ text: "不应交付" }],
+        meta: { durationMs: 1 },
+      };
+    });
+    const result = await runMidTaskAsideReplyLane({
+      parentSessionId: "session-a",
+      parentSessionFile,
+      board: readSessionTaskBoard(parentSessionFile),
+      userPrompt: "信号窗口插问",
+      runId: "run-b-signal",
+      run: {
+        sessionId: "session-a",
+        provider: "anthropic",
+        model: "claude",
+        workspaceDir: tmpDir,
+        config: {},
+        timeoutMs: 5_000,
+      },
+      runEmbedded: runEmbedded as never,
+    });
+    expect(seenSignal).toBeInstanceOf(AbortSignal);
+    expect(result.ok).toBe(false);
+    expect(result.cancelled).toBe(true);
+    expect(result.text).not.toContain("不应交付");
+  });
+
+  it("full aside log still keeps latest parent turns via time+identity merge", async () => {
+    const parentTurns = Array.from({ length: 8 }, (_, i) => ({
+      atMs: 1_000 + i,
+      runId: `p-${i}`,
+      role: i % 2 === 0 ? "user" : "assistant",
+      text: `主对话轮次-${i}`,
+    }));
+    parentTurns.push({
+      atMs: 50_000,
+      runId: "p-latest",
+      role: "assistant",
+      text: "A 刚说的最新主对话内容",
+    });
+    const asideTurns = Array.from({ length: 20 }, (_, i) => ({
+      atMs: 10_000 + i,
+      runId: `b-${i}`,
+      role: i % 2 === 0 ? "user" : "assistant",
+      text: `旁路轮次-${i}`,
+    }));
+    const merged = mergeAsideAndParentHistoryTurns({
+      parentTurns,
+      asideTurns,
+      limit: 12,
+    });
+    expect(merged.length).toBeLessThanOrEqual(12);
+    expect(merged.some((t) => t.text.includes("A 刚说的最新主对话内容"))).toBe(true);
+    expect(merged.some((t) => t.text.includes("旁路轮次-"))).toBe(true);
+
+    const sessionId = "sess-merge";
+    const lines = [
+      JSON.stringify({
+        type: "session",
+        version: 1,
+        id: sessionId,
+        timestamp: new Date(0).toISOString(),
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "m-a-latest",
+        timestamp: new Date(60_000).toISOString(),
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "A 新回复：欧洲市场已覆盖" }],
+        },
+      }),
+    ];
+    fs.writeFileSync(parentSessionFile, `${lines.join("\n")}\n`, "utf8");
+    for (let i = 0; i < 16; i += 1) {
+      appendAsideDialogueTurn(parentSessionFile, {
+        atMs: 20_000 + i,
+        runId: `b-fill-${i}`,
+        role: i % 2 === 0 ? "user" : "assistant",
+        text: `多轮B-${i}`,
+      });
+    }
+    const loaded = await loadAsideReplyContextHistory({ parentSessionFile, limit: 12 });
+    expect(loaded.some((t) => t.text.includes("欧洲市场已覆盖"))).toBe(true);
+    expect(loaded.some((t) => t.text.includes("多轮B-"))).toBe(true);
   });
 });

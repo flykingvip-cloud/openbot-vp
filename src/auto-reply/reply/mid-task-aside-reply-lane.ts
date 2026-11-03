@@ -6,9 +6,11 @@
  * write the task board, and do not become a second task controller.
  *
  * Dialogue continuity: Q&A is persisted to a durable aside-dialogue sidecar
- * (not A's agent jsonl). Follow-ups / refresh read that log + full active
- * constraints. Cancel uses a prepare→run→end signal so abort cannot drop the
- * registration and let a late start deliver.
+ * (not A's agent jsonl). Follow-ups / refresh read a time-merged view of that
+ * log + parent transcript; chat.history also paints sidecar turns so refresh /
+ * reconnect recover bubbles without co-writing A's jsonl. Cancel registers the
+ * lane (with taskId + AbortSignal) before the first await so prepare-window
+ * abort is visible; tombstones still block after current is cleared.
  */
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -20,6 +22,7 @@ import type { OpenBotConfig } from "../../config/config.js";
 import {
   activeConstraintTexts,
   formatTaskBoardFocusLine,
+  isTaskTombstoned,
   readSessionTaskBoard,
   type SessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
@@ -57,10 +60,19 @@ type AsideRunHandle = {
 
 type AsideLaneState = {
   cancelled: boolean;
+  /** Task that owned this aside when registered — tombstone check after current cleared. */
+  taskId?: string;
+  /** Prepare→run→end cancel; aborted by owner pause/cancel even before ACTIVE_EMBEDDED_RUNS. */
+  abortController?: AbortController;
 };
 
 /** parentSessionId → asideSessionId → cancel signal (survives prepare/run/end). */
 const ASIDE_LANES_BY_PARENT = new Map<string, Map<string, AsideLaneState>>();
+
+export type RegisterMidTaskAsideLaneOptions = {
+  taskId?: string;
+  abortController?: AbortController;
+};
 
 export function asideDialogueLogPath(parentSessionFile: string): string {
   return `${parentSessionFile.trim()}.aside-dialogue.jsonl`;
@@ -124,7 +136,11 @@ export function readAsideDialogueTurns(parentSessionFile: string): AsideDialogue
   return turns;
 }
 
-export function registerMidTaskAsideLane(parentSessionId: string, asideSessionId: string): void {
+export function registerMidTaskAsideLane(
+  parentSessionId: string,
+  asideSessionId: string,
+  opts?: RegisterMidTaskAsideLaneOptions,
+): void {
   const parent = parentSessionId.trim();
   const aside = asideSessionId.trim();
   if (!parent || !aside) {
@@ -138,14 +154,33 @@ export function registerMidTaskAsideLane(parentSessionId: string, asideSessionId
   const existing = map.get(aside);
   if (existing) {
     // Keep cancelled=true if abort already raced ahead of register.
+    // Still attach a late abortController so prepare-window abort reaches the runner.
+    if (!existing.abortController && opts?.abortController) {
+      existing.abortController = opts.abortController;
+      if (existing.cancelled) {
+        try {
+          opts.abortController.abort();
+        } catch {
+          // ignore
+        }
+      }
+    }
+    if (!existing.taskId && opts?.taskId?.trim()) {
+      existing.taskId = opts.taskId.trim();
+    }
     return;
   }
-  map.set(aside, { cancelled: false });
+  map.set(aside, {
+    cancelled: false,
+    ...(opts?.taskId?.trim() ? { taskId: opts.taskId.trim() } : {}),
+    ...(opts?.abortController ? { abortController: opts.abortController } : {}),
+  });
 }
 
 /**
- * Mark cancelled *without* dropping the registration. Abort embedded if already
- * registered with ACTIVE_EMBEDDED_RUNS; late starts must observe cancelled.
+ * Mark cancelled *without* dropping the registration. Abort the prepare→run
+ * AbortSignal and embedded run if already in ACTIVE_EMBEDDED_RUNS; late starts
+ * must observe cancelled.
  */
 export function abortMidTaskAsideLanes(parentSessionId: string): string[] {
   const parent = parentSessionId.trim();
@@ -156,6 +191,11 @@ export function abortMidTaskAsideLanes(parentSessionId: string): string[] {
   const aborted: string[] = [];
   for (const [asideId, state] of map) {
     state.cancelled = true;
+    try {
+      state.abortController?.abort();
+    } catch {
+      // ignore double-abort
+    }
     try {
       if (abortEmbeddedPiRun(asideId)) {
         aborted.push(asideId);
@@ -176,6 +216,13 @@ export function isMidTaskAsideLaneCancelled(
 ): boolean {
   const state = ASIDE_LANES_BY_PARENT.get(parentSessionId.trim())?.get(asideSessionId.trim());
   return state?.cancelled === true;
+}
+
+export function midTaskAsideLaneTaskIdForTests(
+  parentSessionId: string,
+  asideSessionId: string,
+): string | undefined {
+  return ASIDE_LANES_BY_PARENT.get(parentSessionId.trim())?.get(asideSessionId.trim())?.taskId;
 }
 
 export function unregisterMidTaskAsideLane(parentSessionId: string, asideSessionId: string): void {
@@ -208,8 +255,47 @@ function truncateDisplay(text: string, max: number): string {
 }
 
 /**
- * Build related history for the aside prompt: durable aside log first, then
- * recent parent-session user/assistant lines (read-only). Never mutates either.
+ * Merge parent transcript turns and aside sidecar turns by time + message identity.
+ * Never returns aside-only when the sidecar is "full" — latest parent lines must remain.
+ */
+export function mergeAsideAndParentHistoryTurns(params: {
+  parentTurns: AsideDialogueTurn[];
+  asideTurns: AsideDialogueTurn[];
+  limit?: number;
+}): AsideDialogueTurn[] {
+  const limit = Math.max(2, Math.min(params.limit ?? 12, 24));
+  type Tagged = AsideDialogueTurn & { _key: string };
+  const tagged: Tagged[] = [
+    ...params.parentTurns.map((turn, index) => ({
+      ...turn,
+      _key: `parent:${turn.runId || index}:${turn.role}:${turn.atMs}:${turn.text.slice(0, 48)}`,
+    })),
+    ...params.asideTurns.map((turn, index) => ({
+      ...turn,
+      _key: `aside:${turn.runId || index}:${turn.role}:${turn.atMs}:${turn.text.slice(0, 48)}`,
+    })),
+  ];
+  tagged.sort((a, b) => a.atMs - b.atMs || a._key.localeCompare(b._key));
+  const seen = new Set<string>();
+  const merged: AsideDialogueTurn[] = [];
+  for (const row of tagged) {
+    if (seen.has(row._key)) {
+      continue;
+    }
+    seen.add(row._key);
+    merged.push({
+      atMs: row.atMs,
+      runId: row.runId,
+      role: row.role,
+      text: row.text,
+    });
+  }
+  return merged.slice(-limit);
+}
+
+/**
+ * Build related history for the aside prompt: time-merge durable aside log with
+ * parent-session user/assistant lines (read-only). Never mutates either.
  */
 export async function loadAsideReplyContextHistory(params: {
   parentSessionFile: string;
@@ -217,24 +303,90 @@ export async function loadAsideReplyContextHistory(params: {
 }): Promise<AsideDialogueTurn[]> {
   const limit = Math.max(2, Math.min(params.limit ?? 12, 24));
   const fromLog = readAsideDialogueTurns(params.parentSessionFile);
-  if (fromLog.length >= limit) {
-    return fromLog.slice(-limit);
-  }
-  const needed = limit - fromLog.length;
   let fromParent: AsideDialogueTurn[] = [];
   try {
     const messages = await readSessionMessages(params.parentSessionFile);
-    fromParent = messages.slice(-needed).map((m) => ({
-      atMs: 0,
-      runId: "",
+    fromParent = messages.map((m, index) => ({
+      atMs: m.timestamp ? Date.parse(m.timestamp) || 0 : 0,
+      runId: typeof m.id === "string" ? m.id : `parent-${index}`,
       role: m.role === "assistant" ? "assistant" : "user",
       text: m.text,
     }));
   } catch {
     fromParent = [];
   }
-  // Prefer durable aside log for overlap; prepend older parent turns.
-  return [...fromParent, ...fromLog].slice(-limit);
+  return mergeAsideAndParentHistoryTurns({
+    parentTurns: fromParent,
+    asideTurns: fromLog,
+    limit,
+  });
+}
+
+/** Paint sidecar Q&A in chat.history bubble shape (not A's agent jsonl). */
+export function asideDialogueAsChatHistoryMessages(
+  parentSessionFile: string,
+): Array<Record<string, unknown>> {
+  return readAsideDialogueTurns(parentSessionFile).map((turn) => {
+    const marker = { kind: "aside_dialogue", runId: turn.runId };
+    return {
+      role: turn.role,
+      timestamp: turn.atMs > 0 ? turn.atMs : Date.now(),
+      content: [{ type: "text", text: turn.text }],
+      id: `aside:${turn.runId}:${turn.role}:${turn.atMs}`,
+      messageId: `aside:${turn.runId}:${turn.role}:${turn.atMs}`,
+      __openbot: marker,
+      __openclaw: marker,
+    };
+  });
+}
+
+function chatHistoryMessageTimestamp(message: unknown, fallbackIndex: number): number {
+  if (message && typeof message === "object") {
+    const row = message as { timestamp?: unknown };
+    if (typeof row.timestamp === "number" && Number.isFinite(row.timestamp)) {
+      return row.timestamp;
+    }
+    if (typeof row.timestamp === "string") {
+      const parsed = Date.parse(row.timestamp);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return fallbackIndex;
+}
+
+/**
+ * Merge chat.history transcript messages with aside sidecar turns by timestamp
+ * and stable message identity. Used by the real chat.history RPC path.
+ */
+export function mergeChatHistoryWithAsideDialogue(params: {
+  messages: unknown[];
+  parentSessionFile: string;
+}): unknown[] {
+  const aside = asideDialogueAsChatHistoryMessages(params.parentSessionFile);
+  if (aside.length === 0) {
+    return params.messages;
+  }
+  type Stamped = { msg: unknown; ts: number; key: string };
+  const stamped: Stamped[] = [
+    ...params.messages.map((msg, index) => ({
+      msg,
+      ts: chatHistoryMessageTimestamp(msg, index),
+      key: `transcript:${index}`,
+    })),
+    ...aside.map((msg, index) => {
+      const id = (msg as { id?: unknown }).id;
+      const idKey = typeof id === "string" || typeof id === "number" ? String(id) : String(index);
+      return {
+        msg,
+        ts: chatHistoryMessageTimestamp(msg, index),
+        key: `aside:${idKey}`,
+      };
+    }),
+  ];
+  stamped.sort((a, b) => a.ts - b.ts || a.key.localeCompare(b.key));
+  return stamped.map((row) => row.msg);
 }
 
 /**
@@ -332,13 +484,26 @@ export type RunMidTaskAsideReplyLaneParams = {
   runId: string;
   /** Injectable for tests. */
   runEmbedded?: typeof runEmbeddedPiAgent;
+  /** Injectable prepare FS — tests abort during the former mkdtemp/writeFile window. */
+  fsPrepare?: {
+    mkdtemp?: typeof fsp.mkdtemp;
+    writeFile?: typeof fsp.writeFile;
+  };
 };
 
-function ownerStopBlocksAside(parentSessionFile: string): boolean {
+function ownerStopBlocksAside(parentSessionFile: string, taskId?: string): boolean {
   try {
     const live = readSessionTaskBoard(parentSessionFile);
     // Owner pause sets wakeSuppress. Task completion must NOT block delivering B.
-    return live.current?.wakeSuppress === true;
+    if (live.current?.wakeSuppress === true) {
+      return true;
+    }
+    const id = taskId?.trim() ?? "";
+    // Cancel clears current and writes a tombstone — must still block late B.
+    if (id && isTaskTombstoned(live, id)) {
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -361,23 +526,33 @@ export async function runMidTaskAsideReplyLane(
   const asideSessionId = `aside-reply-${params.runId}`;
   const runEmbedded = params.runEmbedded ?? runEmbeddedPiAgent;
   const cleanedPrompt = stripInboundStampForDialogue(params.userPrompt);
+  const taskId = params.board.current?.taskId?.trim() ?? "";
+  const abortController = new AbortController();
+  const mkdtemp = params.fsPrepare?.mkdtemp ?? fsp.mkdtemp.bind(fsp);
+  const writeFile = params.fsPrepare?.writeFile ?? fsp.writeFile.bind(fsp);
 
-  const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "openbot-aside-reply-"));
-  const asideSessionFile = path.join(tmpRoot, "session.jsonl");
-  await fsp.writeFile(asideSessionFile, "", "utf8");
+  // Register BEFORE the first await (mkdtemp/writeFile) so cancel during prepare
+  // finds B, binds the owning taskId, and can abort the runner signal.
+  registerMidTaskAsideLane(parentSessionId, asideSessionId, {
+    taskId,
+    abortController,
+  });
 
-  const isolation = assertAsideReplyLaneIsolation({
+  let tmpRoot = "";
+  // Placeholder isolation until prepare creates the ephemeral file; fail paths need a shape.
+  const pendingIsolation = assertAsideReplyLaneIsolation({
     parentSessionId,
     asideSessionId,
     parentSessionFile,
-    asideSessionFile,
+    asideSessionFile: path.join(os.tmpdir(), `openbot-aside-reply-pending-${params.runId}.jsonl`),
     disableTools: true,
   });
 
-  // Register cancel signal before any await that could race with owner pause.
-  registerMidTaskAsideLane(parentSessionId, asideSessionId);
-
-  const fail = (text: string, cancelled = false): AsideReplyLaneResult => ({
+  const fail = (
+    text: string,
+    cancelled = false,
+    isolation: AsideReplyLaneIsolation = pendingIsolation,
+  ): AsideReplyLaneResult => ({
     ok: false,
     text,
     runId: params.runId,
@@ -388,9 +563,30 @@ export async function runMidTaskAsideReplyLane(
   try {
     if (
       isMidTaskAsideLaneCancelled(parentSessionId, asideSessionId) ||
-      ownerStopBlocksAside(parentSessionFile)
+      abortController.signal.aborted ||
+      ownerStopBlocksAside(parentSessionFile, taskId)
     ) {
       return fail(CANCELLED_TEXT, true);
+    }
+
+    tmpRoot = await mkdtemp(path.join(os.tmpdir(), "openbot-aside-reply-"));
+    const asideSessionFile = path.join(tmpRoot, "session.jsonl");
+    await writeFile(asideSessionFile, "", "utf8");
+
+    const isolation = assertAsideReplyLaneIsolation({
+      parentSessionId,
+      asideSessionId,
+      parentSessionFile,
+      asideSessionFile,
+      disableTools: true,
+    });
+
+    if (
+      isMidTaskAsideLaneCancelled(parentSessionId, asideSessionId) ||
+      abortController.signal.aborted ||
+      ownerStopBlocksAside(parentSessionFile, taskId)
+    ) {
+      return fail(CANCELLED_TEXT, true, isolation);
     }
 
     const agentId =
@@ -416,9 +612,10 @@ export async function runMidTaskAsideReplyLane(
 
     if (
       isMidTaskAsideLaneCancelled(parentSessionId, asideSessionId) ||
-      ownerStopBlocksAside(parentSessionFile)
+      abortController.signal.aborted ||
+      ownerStopBlocksAside(parentSessionFile, taskId)
     ) {
-      return fail(CANCELLED_TEXT, true);
+      return fail(CANCELLED_TEXT, true, isolation);
     }
 
     const result = await runEmbedded({
@@ -435,22 +632,24 @@ export async function runMidTaskAsideReplyLane(
       timeoutMs: Math.min(params.run.timeoutMs ?? 60_000, 60_000),
       runId: params.runId,
       disableTools: true,
+      abortSignal: abortController.signal,
       ...(params.run.thinkLevel ? { thinkLevel: params.run.thinkLevel as never } : {}),
     });
 
     // Cancel after start: do not deliver a late answer.
     if (
       isMidTaskAsideLaneCancelled(parentSessionId, asideSessionId) ||
-      ownerStopBlocksAside(parentSessionFile)
+      abortController.signal.aborted ||
+      ownerStopBlocksAside(parentSessionFile, taskId)
     ) {
-      return fail(CANCELLED_TEXT, true);
+      return fail(CANCELLED_TEXT, true, isolation);
     }
 
     // Call-boundary guarantee: this path never imports/calls board writers.
     // A may update/complete concurrently — that must NOT discard B's answer.
     const text = extractAssistantText(result.payloads);
     if (!text) {
-      return fail(FAIL_TEXT);
+      return fail(FAIL_TEXT, false, isolation);
     }
 
     appendAsideDialogueTurn(parentSessionFile, {
@@ -462,16 +661,21 @@ export async function runMidTaskAsideReplyLane(
 
     return { ok: true, text, runId: params.runId, isolation };
   } catch {
-    if (isMidTaskAsideLaneCancelled(parentSessionId, asideSessionId)) {
+    if (
+      isMidTaskAsideLaneCancelled(parentSessionId, asideSessionId) ||
+      abortController.signal.aborted
+    ) {
       return fail(CANCELLED_TEXT, true);
     }
     return fail(FAIL_TEXT);
   } finally {
     unregisterMidTaskAsideLane(parentSessionId, asideSessionId);
-    try {
-      await fsp.rm(tmpRoot, { recursive: true, force: true });
-    } catch {
-      // ignore cleanup errors
+    if (tmpRoot) {
+      try {
+        await fsp.rm(tmpRoot, { recursive: true, force: true });
+      } catch {
+        // ignore cleanup errors
+      }
     }
   }
 }

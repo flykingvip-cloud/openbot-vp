@@ -3,10 +3,10 @@ tasks:
   - id: ft-plan-speak-shopping-positive-admission
     owner: grok-bot
     intent:
-      - "Slice2 reply_lane harden: no epoch-invariant discard; cancel keep
-        registration until finally; full constraints+sidecar history; typed
-        mid-task routing (not all reply_lane); barrier-first for 先别发布/不要付款;
-        Gateway A/B isolation cross-test; wakeSuppress preserve under pause RMW."
+      - "Slice2 reply_lane: register before first await + AbortSignal into runner;
+        tombstone stop after current cleared; chat.history merges sidecar for
+        refresh/reconnect/A-ended; time+identity merge so aside-full never drops
+        latest A; typed mid-task routing retained. No new scheduler."
       - "Slice3 context kept; no feature expand. No merge/deploy."
     paths:
       - src/shared/text/plan-speak-final.ts
@@ -49,6 +49,7 @@ tasks:
       - src/auto-reply/reply/mid-task-aside-reply-lane.test.ts
       - src/conversation-task/session-task-board.seed-audit.test.ts
       - docs/slice2-reply-lane-joint-verification.md
+      - src/gateway/server-methods/chat.aside-dialogue-history.test.ts
       - src/gateway/server-chat.aside-ab-run-isolation.test.ts
       - src/conversation-task/session-task-board.cross-process-child.ts
       - src/conversation-task/session-task-board.cross-process.test.ts
@@ -10849,6 +10850,7 @@ landingStreams:
       - src/conversation-task/session-task-board.seed-audit.test.ts
       - docs/slice2-reply-lane-joint-verification.md
       - src/gateway/server-chat.aside-ab-run-isolation.test.ts
+      - src/gateway/server-methods/chat.aside-dialogue-history.test.ts
     canLandWith: []
     metadata:
       task: ft-plan-speak-shopping-positive-admission
