@@ -20,7 +20,7 @@ import { isTranscriptStartBoundary } from "../../auto-reply/reply/chat-checkpoin
 import { noteUnresolvedChatRunError } from "../../auto-reply/reply/chat-run-error-escalation.js";
 import { isInternalContinueHistoryMessage } from "../../auto-reply/reply/internal-continue-prompt.js";
 import { isMemoryFlushHistoryMessage } from "../../auto-reply/reply/memory-flush-prompt.js";
-import { mergeChatHistoryWithAsideDialogue } from "../../auto-reply/reply/mid-task-aside-reply-lane.js";
+import { mergeChatHistoryWithAsideDialogue } from "../../auto-reply/reply/mid-task-aside-dialogue-history.js";
 import { clearSessionQueues } from "../../auto-reply/reply/queue.js";
 import { createReplyDispatcher } from "../../auto-reply/reply/reply-dispatcher.js";
 import {

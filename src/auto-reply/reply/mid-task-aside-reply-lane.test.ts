@@ -11,21 +11,24 @@ import {
   seedSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import {
-  abortMidTaskAsideLanes,
+  ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS,
   appendAsideDialogueTurn,
-  assertAsideReplyLaneIsolation,
   buildAsideDialogueContextPromptForNormalReply,
   buildAsideReplyLanePrompt,
-  isMidTaskAsideLaneCancelled,
-  listMidTaskAsideLanesForTests,
   loadAsideReplyContextHistory,
   mergeAsideAndParentHistoryTurns,
-  midTaskAsideLaneTaskIdForTests,
   readAsideDialogueTurns,
+  stableDialogueMessageIdentity,
+} from "./mid-task-aside-dialogue-history.js";
+import {
+  abortMidTaskAsideLanes,
+  assertAsideReplyLaneIsolation,
+  isMidTaskAsideLaneCancelled,
+  listMidTaskAsideLanesForTests,
+  midTaskAsideLaneTaskIdForTests,
   registerMidTaskAsideLane,
   resetMidTaskAsideLaneRegistryForTests,
   runMidTaskAsideReplyLane,
-  stableDialogueMessageIdentity,
   unregisterMidTaskAsideLane,
 } from "./mid-task-aside-reply-lane.js";
 
@@ -607,10 +610,29 @@ describe("mid-task aside reply_lane isolation", () => {
         role: "user",
         text: "今天北京天气怎么样",
       }),
-    ).toBe("rt:user:今天北京天气怎么样");
+    ).toBeNull();
   });
 
-  it("normal-reply context prompt exposes aside Q&A after A ends", () => {
+  it("keeps repeated short asks without shared stable identity", () => {
+    const parentTurns = [
+      { atMs: 1_000, runId: "a1", role: "user" as const, text: "为什么" },
+      { atMs: 5_000, runId: "a2", role: "user" as const, text: "为什么" },
+      { atMs: 6_000, runId: "a3", role: "user" as const, text: "继续" },
+    ];
+    const asideTurns = [
+      { atMs: 2_000, runId: "b1", role: "user" as const, text: "为什么" },
+      { atMs: 7_000, runId: "b2", role: "user" as const, text: "继续" },
+    ];
+    const merged = mergeAsideAndParentHistoryTurns({
+      parentTurns,
+      asideTurns,
+      limit: 12,
+    });
+    expect(merged.filter((t) => t.text === "为什么")).toHaveLength(3);
+    expect(merged.filter((t) => t.text === "继续")).toHaveLength(2);
+  });
+
+  it("normal-reply context prompt is untrusted + char-budgeted (not system-elevated)", () => {
     appendAsideDialogueTurn(parentSessionFile, {
       atMs: 3_000,
       runId: "b-explain",
@@ -626,8 +648,29 @@ describe("mid-task aside reply_lane isolation", () => {
     });
     const prompt = buildAsideDialogueContextPromptForNormalReply(parentSessionFile);
     expect(prompt).toBeTruthy();
-    expect(prompt).toContain("旁路插问记录");
+    expect(prompt).toContain("<untrusted-text>");
+    expect(prompt).toMatch(/data, not instructions/i);
     expect(prompt).toContain("续航怎么比的");
     expect(prompt).toContain("官方标称续航");
+    for (let i = 0; i < 40; i += 1) {
+      appendAsideDialogueTurn(parentSessionFile, {
+        atMs: 4_000 + i,
+        runId: `pad-${i}`,
+        role: i % 2 === 0 ? "user" : "assistant",
+        text: `pad-${i}-` + "长".repeat(200),
+      });
+    }
+    const budgeted = buildAsideDialogueContextPromptForNormalReply(parentSessionFile);
+    expect(budgeted.length).toBeLessThanOrEqual(ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS + 400);
+  });
+
+  it("history helper module has no embedded-runner dependency", () => {
+    const src = fs.readFileSync(
+      new URL("./mid-task-aside-dialogue-history.ts", import.meta.url),
+      "utf8",
+    );
+    expect(src).not.toMatch(/from ["'].*pi-embedded/);
+    expect(src).not.toMatch(/runEmbeddedPiAgent/);
+    expect(src).not.toMatch(/abortEmbeddedPiRun/);
   });
 });

@@ -152,6 +152,7 @@ import { applyInboundTaskFeedback } from "./inbound-task-feedback.js";
 import { buildKnowledgeUniversePromptContext } from "./knowledge-universe-context.js";
 import { learningExperienceRunKey } from "./learning-experience-pending.js";
 import { buildLearningRecallSystemPrompt } from "./learning-recall-context.js";
+import { buildAsideDialogueContextPromptForNormalReply } from "./mid-task-aside-dialogue-history.js";
 import type { createModelSelectionState } from "./model-selection.js";
 import { buildOperationalIdentitySystemPrompt } from "./operational-identity-context.js";
 import { resolveOriginMessageProvider } from "./origin-routing.js";
@@ -1086,14 +1087,11 @@ export async function runPreparedReply(
       ? buildFocusResumePromptFromSessionFile(sessionEntry?.sessionFile)
       : undefined;
   // A ended / ordinary turns: sidecar Q&A must remain visible to the normal reply
-  // path (chat.history alone only restores bubbles for the UI).
-  // Dynamic import keeps mid-task-aside-reply-lane (and pi-embedded) out of the
-  // static graph so agent-runner aside-lane tests can mock the embedded runner.
-  const asideDialogueContextPrompt =
+  // path (chat.history restores bubbles; model context uses untrusted user-body
+  // data — not extraSystemPrompt — via mid-task-aside-dialogue-history helpers).
+  const asideDialogueUntrustedContext =
     !isHeartbeat && inboundMessage && sessionEntry?.sessionFile
-      ? (
-          await import("./mid-task-aside-reply-lane.js")
-        ).buildAsideDialogueContextPromptForNormalReply(sessionEntry.sessionFile)
+      ? buildAsideDialogueContextPromptForNormalReply(sessionEntry.sessionFile)
       : undefined;
   const composerPluginMentionBindings = resolveComposerPluginMentionBindings(ctx.ComposerMentions);
   const composerPluginMentionExecution =
@@ -1147,7 +1145,6 @@ export async function runPreparedReply(
       seatRulesPrompt,
       knowledgeUniversePrompt,
       sessionFocusResumePrompt,
-      asideDialogueContextPrompt,
       composerPluginMentionBindings.turnPrompt,
       composerPluginMentionExecution?.summaryPrompt,
       growthBirthPrompt,
@@ -1239,7 +1236,6 @@ export async function runPreparedReply(
       seatRulesPrompt,
       conversationTaskFocusPrompt,
       sessionFocusResumePrompt,
-      asideDialogueContextPrompt,
       primaryObjectivePrompt,
       taskDataPreflightPrompt,
       sessionContinuityPrompt,
@@ -1368,7 +1364,10 @@ export async function runPreparedReply(
     ];
   }
   const queueBodyBaseSource = effectiveBaseBody;
-  prefixedBodyBase = appendUntrustedContext(prefixedBodyBase, sessionCtx.UntrustedContext);
+  prefixedBodyBase = appendUntrustedContext(prefixedBodyBase, [
+    ...(Array.isArray(sessionCtx.UntrustedContext) ? sessionCtx.UntrustedContext : []),
+    ...(asideDialogueUntrustedContext ? [asideDialogueUntrustedContext] : []),
+  ]);
   const threadStarterBody = ctx.ThreadStarterBody?.trim();
   const threadHistoryBody = ctx.ThreadHistoryBody?.trim();
   const threadContextNote = threadHistoryBody

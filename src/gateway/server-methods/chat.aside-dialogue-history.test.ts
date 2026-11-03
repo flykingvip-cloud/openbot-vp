@@ -11,7 +11,7 @@ import {
   appendAsideDialogueTurn,
   mergeChatHistoryWithAsideDialogue,
   stableDialogueMessageIdentity,
-} from "../../auto-reply/reply/mid-task-aside-reply-lane.js";
+} from "../../auto-reply/reply/mid-task-aside-dialogue-history.js";
 import { __setMaxChatHistoryMessagesBytesForTest } from "../server-constants.js";
 import type { GatewayRequestContext } from "./types.js";
 
@@ -358,7 +358,61 @@ describe("chat.history aside dialogue recovery", () => {
         role: "user",
         text: "请继续调研手机市场",
       }),
-    ).toBe("rt:user:请继续调研手机市场");
+    ).toBeNull();
+  });
+
+  it("does not fold repeated short asks that lack a shared stable identity", () => {
+    dir = createTranscriptWithMainTurns();
+    appendAsideDialogueTurn(mockState.transcriptPath, {
+      atMs: 10_000,
+      runId: "run-b-why-1",
+      role: "user",
+      text: "为什么",
+    });
+    appendAsideDialogueTurn(mockState.transcriptPath, {
+      atMs: 10_100,
+      runId: "run-b-why-1",
+      role: "assistant",
+      text: "因为样本不同。",
+    });
+    appendAsideDialogueTurn(mockState.transcriptPath, {
+      atMs: 20_000,
+      runId: "run-b-why-2",
+      role: "user",
+      text: "为什么",
+    });
+    appendAsideDialogueTurn(mockState.transcriptPath, {
+      atMs: 20_100,
+      runId: "run-b-why-2",
+      role: "assistant",
+      text: "因为口径不同。",
+    });
+    const transcript = [
+      {
+        role: "user",
+        id: "m-why-main",
+        messageId: "m-why-main",
+        timestamp: 15_000,
+        content: [{ type: "text", text: "为什么" }],
+      },
+      {
+        role: "user",
+        timestamp: 25_000,
+        content: [{ type: "text", text: "继续" }],
+      },
+      {
+        role: "user",
+        timestamp: 26_000,
+        content: [{ type: "text", text: "继续" }],
+      },
+    ];
+    const merged = mergeChatHistoryWithAsideDialogue({
+      messages: transcript,
+      parentSessionFile: mockState.transcriptPath,
+    });
+    const texts = collectTexts(merged);
+    expect(texts.filter((t) => t === "为什么")).toHaveLength(3);
+    expect(texts.filter((t) => t === "继续")).toHaveLength(2);
   });
 
   it("chat.history byte budget still applies after aside merge", async () => {

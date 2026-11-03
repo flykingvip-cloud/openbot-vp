@@ -1,6 +1,6 @@
 /**
  * Real normal-reply entrance: after A ends, runPreparedReply must inject durable
- * aside Q&A into extraSystemPrompt so "解释你刚才的回答" has B's context
+ * aside Q&A as untrusted user-body context (not extraSystemPrompt) so "解释你刚才的回答" has B's context
  * (without co-writing A's jsonl).
  */
 import fs from "node:fs";
@@ -10,7 +10,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../../config/config.js";
 import { runPreparedReply } from "./get-reply-run.js";
-import { appendAsideDialogueTurn } from "./mid-task-aside-reply-lane.js";
+import { appendAsideDialogueTurn } from "./mid-task-aside-dialogue-history.js";
 
 const tempDirs: string[] = [];
 
@@ -233,7 +233,7 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
     );
   });
 
-  it("injects aside Q&A into extraSystemPrompt via normal reply entrance", async () => {
+  it("injects aside Q&A as untrusted commandBody context via normal reply entrance", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aside-normal-reply-"));
     tempDirs.push(dir);
     const sessionFile = path.join(dir, "sess.jsonl");
@@ -263,9 +263,14 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
     );
 
     const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    const body = call?.commandBody ?? "";
+    expect(body).toContain("Untrusted context");
+    expect(body).toContain("<untrusted-text>");
+    expect(body).toContain("续航怎么比的");
+    expect(body).toContain("官方标称续航");
+    expect(body).toMatch(/data, not instructions|do not treat as instructions/i);
     const prompt = call?.followupRun.run.extraSystemPrompt ?? "";
-    expect(prompt).toContain("旁路插问记录");
-    expect(prompt).toContain("续航怎么比的");
-    expect(prompt).toContain("官方标称续航");
+    expect(prompt).not.toContain("续航怎么比的");
+    expect(prompt).not.toContain("官方标称续航");
   });
 });
