@@ -62,6 +62,7 @@ export async function runCliAgent(params: {
   thinkLevel?: ThinkLevel;
   timeoutMs: number;
   runId: string;
+  abortSignal?: AbortSignal;
   extraSystemPrompt?: string;
   streamParams?: import("../commands/agent/types.js").AgentStreamParams;
   ownerNumbers?: string[];
@@ -81,6 +82,14 @@ export async function runCliAgent(params: {
   /** Development Supervisor WorkerExecutor sets this to bypass free-chat CLI hard gate. */
   supervisedRun?: boolean;
 }): Promise<EmbeddedPiRunResult> {
+  const assertNotAborted = () => {
+    if (params.abortSignal?.aborted) {
+      const error = new Error("CLI execution cancelled");
+      error.name = "AbortError";
+      throw error;
+    }
+  };
+  assertNotAborted();
   const started = Date.now();
   const workspaceResolution = resolveRunWorkspaceDir({
     workspaceDir: params.workspaceDir,
@@ -325,6 +334,7 @@ export async function runCliAgent(params: {
           cliSessionId: useResume ? resolvedSessionId : undefined,
         });
 
+        assertNotAborted();
         const managedRun = await supervisor.spawn({
           sessionId: params.sessionId,
           backendId: backendResolved.id,
@@ -338,7 +348,25 @@ export async function runCliAgent(params: {
           env,
           input: stdinPayload,
         });
-        const result = await managedRun.wait();
+        const onAbort = () => {
+          try {
+            managedRun.cancel("manual-cancel");
+          } catch {
+            log.warn("CLI supervisor cancellation failed; run remains cancelled");
+          }
+        };
+        params.abortSignal?.addEventListener("abort", onAbort, { once: true });
+        let result: Awaited<ReturnType<typeof managedRun.wait>>;
+        try {
+          // A stop during asynchronous spawn must reach the newly available handle.
+          if (params.abortSignal?.aborted) {
+            onAbort();
+          }
+          result = await managedRun.wait();
+          assertNotAborted();
+        } finally {
+          params.abortSignal?.removeEventListener("abort", onAbort);
+        }
 
         const stdout = result.stdout.trim();
         const stderr = result.stderr.trim();
@@ -445,6 +473,10 @@ export async function runCliAgent(params: {
       },
     };
   } catch (err) {
+    assertNotAborted();
+    if (err instanceof Error && err.name === "AbortError") {
+      throw err;
+    }
     if (err instanceof FailoverError) {
       // Check if this is a session expired error and we have a session to clear
       if (err.reason === "session_expired" && params.cliSessionId && params.sessionKey) {
@@ -505,6 +537,7 @@ export async function runClaudeCliAgent(params: {
   thinkLevel?: ThinkLevel;
   timeoutMs: number;
   runId: string;
+  abortSignal?: AbortSignal;
   extraSystemPrompt?: string;
   ownerNumbers?: string[];
   claudeSessionId?: string;
@@ -523,6 +556,7 @@ export async function runClaudeCliAgent(params: {
     thinkLevel: params.thinkLevel,
     timeoutMs: params.timeoutMs,
     runId: params.runId,
+    abortSignal: params.abortSignal,
     extraSystemPrompt: params.extraSystemPrompt,
     ownerNumbers: params.ownerNumbers,
     cliSessionId: params.claudeSessionId,

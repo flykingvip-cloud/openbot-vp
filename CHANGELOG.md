@@ -305,6 +305,7 @@ Docs: https://docs.openbot.love
 - Tasks/queue: reject stale queued task bindings and recheck owner pause before starting a prepared followup; preserve typing cleanup on rejected claims.
 - Tasks/runtime: reject stale task requests before memory flush and provider startup, while continuing to drain subsequent queued work.
 - Tasks/embedded: revalidate the original task immediately after active-run registration so stops during runtime preparation prevent prompt startup without a second cancellation registry.
+- Agents/CLI: forward host cancellation to supervised processes, handle stops during asynchronous spawn, and prevent cancelled runs from returning late success or triggering session-expired retries.
 
 ## 2026.3.8
 
