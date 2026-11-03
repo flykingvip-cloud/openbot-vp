@@ -28,6 +28,7 @@ import {
   resetConversationTaskDeliveryCloseConsultsForTest,
 } from "./reply-completion.js";
 import * as runtimeBootstrap from "./runtime-bootstrap.js";
+import { captureTaskCompletionBinding } from "./session-task-board.js";
 import { openTaskStore } from "./store.js";
 
 let root: string;
@@ -496,6 +497,7 @@ describe("session task completion notice", () => {
       text: goal,
       cronStorePath: path.join(root, "cron.json"),
       sessionFile,
+      completionBinding: captureTaskCompletionBinding(sessionFile),
     });
     expect(notice).toContain("当前任务已完成，交付已核对。");
     expect(notice).toContain("价格表");
@@ -531,6 +533,7 @@ describe("session task completion notice", () => {
       assistantReplyText: "我检索了知识库中关于中医诊断学的笔记，没有找到完整的望闻问切章节摘要。",
       cronStorePath: path.join(root, "cron.json"),
       sessionFile,
+      completionBinding: captureTaskCompletionBinding(sessionFile),
     });
     expect(notice).toBeUndefined();
     expect(fs.readFileSync(sessionFile, "utf8")).toBe("keep\n");

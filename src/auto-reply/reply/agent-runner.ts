@@ -31,6 +31,7 @@ import {
 import type { TypingMode } from "../../config/types.js";
 import {
   activeConstraintTexts,
+  captureTaskCompletionBinding,
   isOwnerCurrentTaskControlUtterance,
   readSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
@@ -192,6 +193,7 @@ export async function runReplyAgent(params: {
     typingMode,
   } = params;
 
+  const completionBinding = captureTaskCompletionBinding(followupRun.run.sessionFile, commandBody);
   let activeSessionEntry = sessionEntry;
   const activeSessionStore = sessionStore;
   let activeIsNewSession = isNewSession;
@@ -1240,6 +1242,7 @@ export async function runReplyAgent(params: {
           : "direct",
       fromAgentId: sessionCtx.CollaborationBotAgentId,
       sessionFile: followupRun.run.sessionFile,
+      completionBinding,
       sessionKey: sessionKey ?? followupRun.run.sessionKey,
       cfg: followupRun.run.config,
       disableTools: followupRun.run.disableTools === true,

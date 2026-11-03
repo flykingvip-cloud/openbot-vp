@@ -301,6 +301,7 @@ Docs: https://docs.openbot.love
 - Platform/models: an allowlisted platform model whose latest connection probe succeeded can be called from chat when it had no admission row. The gateway records that model as eligible for execution and does not overwrite an existing pause or disable. The model pool shows 暂无用量 when 7-day usage analytics are missing, and it no longer repeats connection or health status in a banner.
 - Employee/大白管家: 用友 T+ warehouse and inventory questions stay on the knowledge feed. They are no longer classified as chat, which disabled tools and turned a DeepSeek body tool call into 「本步工具调用未能执行，请重试。」. A bare 登录 in that question no longer opens 云电脑. Materialized feed rows (for example 001-用友T+仓库 / 001-用友T+存货) are searchable beside library hits, and the object summary carries a redacted payload excerpt. `data_capability` invoke stays knowledge-object-only. The product page states that 有效授权 counts action grants including the system materializer seat, and a manual binding shows 已供给 only after a Feed record exists.
 - Agent/tool replies: preserve structured execution approval cards when protocol text is removed, while keeping silent and heartbeat results suppressed.
+- Tasks: reject checked-completion callbacks whose original task, attempt, or artifact version no longer matches the current task; unbound callbacks no longer close the latest task.
 
 ## 2026.3.8
 

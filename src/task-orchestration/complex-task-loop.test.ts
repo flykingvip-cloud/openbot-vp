@@ -7,6 +7,7 @@ import { resolveSubagentToolPolicy } from "../agents/pi-tools.policy.js";
 import { decideHonestEmptyReply } from "../auto-reply/reply/honest-empty-reply.js";
 import { DEFAULT_SUBAGENT_MAX_SPAWN_DEPTH } from "../config/agent-limits.js";
 import type { OpenBotConfig } from "../config/config.js";
+import { captureTaskCompletionBinding } from "../conversation-task/session-task-board.js";
 import {
   applyIncomingUserMessage,
   emptySessionTaskBoard,
@@ -222,6 +223,7 @@ describe("P3 complex task loop", () => {
       toolNames: ["read"],
       payloads: [{ text: drift }],
       sessionFile,
+      completionBinding: captureTaskCompletionBinding(sessionFile),
       currentGoal: started.board.current?.goalText,
       env: admitEnv(),
     });
@@ -272,6 +274,7 @@ describe("P3 complex task loop", () => {
       toolNames: ["read"],
       payloads: [{ text: draft }],
       sessionFile,
+      completionBinding: captureTaskCompletionBinding(sessionFile),
       env: admitEnv(),
     });
     expect(checked.deliverableChecked).toBe(true);

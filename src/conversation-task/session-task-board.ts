@@ -995,12 +995,46 @@ function renderCompletionNotice(parked: readonly TrackedTask[]): string {
   return lines.join("\n");
 }
 
+export type TaskCompletionBinding = {
+  taskId: string;
+  executionAttempt?: string;
+  deliverableVersion?: string;
+};
+
+/** Capture only an already-associated task; never bind completion to a newer current task. */
+export function captureTaskCompletionBinding(
+  sessionFile?: string | null,
+  expectedGoal?: string,
+): TaskCompletionBinding | undefined {
+  if (!sessionFile?.trim()) {
+    return undefined;
+  }
+  const task = readSessionTaskBoard(sessionFile).current;
+  if (
+    expectedGoal !== undefined &&
+    task?.goalText.replace(/\s+/g, " ").trim() !== expectedGoal.replace(/\s+/g, " ").trim()
+  ) {
+    return undefined;
+  }
+  return task?.unfinished
+    ? {
+        taskId: task.taskId,
+        executionAttempt: task.executionAttempt,
+        deliverableVersion: task.deliverableVersion,
+      }
+    : undefined;
+}
+
 /** Real close only. A model claim with closed=false does not announce or rewrite the board. */
-export function recordCheckedTaskCompletion(params: { sessionFile?: string; closed: boolean }): {
+export function recordCheckedTaskCompletion(params: {
+  sessionFile?: string;
+  closed: boolean;
+  binding?: TaskCompletionBinding;
+}): {
   notice?: string;
   persisted: boolean;
 } {
-  if (!params.closed) {
+  if (!params.closed || !params.binding?.taskId?.trim()) {
     return { persisted: false };
   }
   const file = params.sessionFile?.trim();
@@ -1009,12 +1043,19 @@ export function recordCheckedTaskCompletion(params: { sessionFile?: string; clos
   }
   // Lock contention / stale CAS must not crash the caller (cross-process completer
   // busy-loops). Surface persisted:false so the peer can retry.
-  let finished: { board: SessionTaskBoard; notice?: string };
+  let finished: { board: SessionTaskBoard; notice?: string; rejected?: boolean };
   try {
     finished = mutateSessionTaskBoard(file, (board) => {
-      const result = board.current
-        ? finishCurrentTask({ board, deliverableChecked: true })
-        : { board, notice: renderCompletionNotice(board.parked) };
+      const binding = params.binding!;
+      if (
+        !board.current ||
+        board.current.taskId !== binding.taskId ||
+        board.current.executionAttempt !== binding.executionAttempt ||
+        board.current.deliverableVersion !== binding.deliverableVersion
+      ) {
+        return { board, value: { board, rejected: true } };
+      }
+      const result = finishCurrentTask({ board, deliverableChecked: true, ...binding });
       return { board: result.board, value: result };
     });
   } catch (err) {
@@ -1027,6 +1068,9 @@ export function recordCheckedTaskCompletion(params: { sessionFile?: string; clos
       return { persisted: false };
     }
     throw err;
+  }
+  if (finished.rejected) {
+    return { persisted: false };
   }
   const notice = finished.notice ?? renderCompletionNotice(finished.board.parked);
   let persisted = false;

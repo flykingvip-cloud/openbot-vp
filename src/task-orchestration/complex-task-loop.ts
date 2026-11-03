@@ -9,7 +9,10 @@
  * not write an evolution proposal.
  */
 import type { OpenBotConfig } from "../config/config.js";
-import { recordCheckedTaskCompletion } from "../conversation-task/session-task-board.js";
+import {
+  recordCheckedTaskCompletion,
+  type TaskCompletionBinding,
+} from "../conversation-task/session-task-board.js";
 import { classifyTurnRelation, titleFromGoal } from "../conversation-task/turn-relation.js";
 import { assessTaskOutputAlignment } from "../cron/task-focus.js";
 import { resolveOrchestrationObserve } from "./observe-gate.js";
@@ -41,6 +44,7 @@ export type ComplexTaskLoopInput = {
   payloads?: readonly ComplexTaskReplyPayload[];
   currentGoal?: string;
   sessionFile?: string | null;
+  completionBinding?: TaskCompletionBinding;
   env?: NodeJS.ProcessEnv;
   /** Test spy. The loop never invokes it. */
   directSend?: (target: string) => void;
@@ -241,6 +245,7 @@ export function applyComplexTaskLoop(input: ComplexTaskLoopInput): ComplexTaskLo
     const recorded = recordCheckedTaskCompletion({
       sessionFile: input.sessionFile,
       closed: true,
+      binding: input.completionBinding,
     });
     deliverableChecked = recorded.persisted || Boolean(recorded.notice);
   }
@@ -284,6 +289,7 @@ export function shapeAdmittedComplexTaskReply<T extends ComplexTaskReplyPayload>
   surface: "group" | "direct";
   fromAgentId?: string | null;
   sessionFile?: string | null;
+  completionBinding?: TaskCompletionBinding;
   sessionKey?: string;
   cfg?: OpenBotConfig;
   disableTools?: boolean;
@@ -305,6 +311,7 @@ export function shapeAdmittedComplexTaskReply<T extends ComplexTaskReplyPayload>
       payloads: params.payloads,
       currentGoal: params.currentGoal,
       sessionFile: params.sessionFile,
+      completionBinding: params.completionBinding,
       env: params.env ?? process.env,
     });
     if (!shaped.admitted) {

@@ -10,6 +10,7 @@ import {
 import { observeInboundTurnActivation } from "../../conversation-task/gateway-activation-hook.js";
 import { observeInboundTurnShadow } from "../../conversation-task/gateway-shadow-hook.js";
 import { observeConversationTaskReplyCompleted } from "../../conversation-task/reply-completion.js";
+import { captureTaskCompletionBinding } from "../../conversation-task/session-task-board.js";
 import { resolveCronStorePath } from "../../cron/store.js";
 import { shouldSuppressLocalDiscordExecApprovalPrompt } from "../../discord/exec-approvals.js";
 import { resolveKnowledgeSourceContext } from "../../gateway/knowledge/context.js";
@@ -582,6 +583,12 @@ export async function dispatchReplyFromConfig(params: {
       systemEvent: shouldRouteToOriginating,
     });
 
+    const completionBinding = captureTaskCompletionBinding(
+      sessionStoreEntry.entry?.sessionFile,
+      [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
+        (value): value is string => typeof value === "string" && value.trim() !== "",
+      ) ?? "",
+    );
     const replyResult = await (params.replyResolver ?? getReplyFromConfig)(
       ctx,
       {
@@ -911,6 +918,7 @@ export async function dispatchReplyFromConfig(params: {
       assistantReplyText: assistantReplyText || accumulatedBlockText.trim() || undefined,
       cronStorePath: resolveCronStorePath(effectiveCfg.cron?.store),
       sessionFile: sessionStoreEntry.entry?.sessionFile,
+      completionBinding,
     }).then((notice) => {
       if (!notice) {
         return;
