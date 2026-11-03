@@ -1,3 +1,11 @@
+import {
+  isSidePathLabel,
+  assistantRestopsCleared,
+  isMainlineBlockNarrative,
+} from "../../agent-runtime/policy/index.js";
+import type { BlockerGrade, EnvProbe } from "../../agent-runtime/policy/index.js";
+export { BLOCKER_GRADES, gradeBlocker, isSidePathLabel } from "../../agent-runtime/policy/index.js";
+export type { BlockerGrade, EnvProbe } from "../../agent-runtime/policy/index.js";
 /**
  * Batch 6 turn-completion contract.
  *
@@ -26,9 +34,6 @@ import { applyTrialGate, isPreviewOkFormalBlocked } from "../skill-gates/trial-g
 export const TURN_COMPLETION_STATES = ["delivered", "permanent_block", "true_fork"] as const;
 export type TurnCompletionState = (typeof TURN_COMPLETION_STATES)[number];
 
-export const BLOCKER_GRADES = ["mainline", "side_path", "already_cleared"] as const;
-export type BlockerGrade = (typeof BLOCKER_GRADES)[number];
-
 export const DEFAULT_SKILL_SMOKE_SLA_MS = 15 * 60 * 1000;
 export const SKILL_SMOKE_SLA_ENV = "OPENBOT_SKILL_SMOKE_SLA_MS";
 export const PROGRESS_PROSE_MAX_CHARS = 180;
@@ -48,11 +53,6 @@ export type TurnCompletionContract = {
   requiredUserAction?: string;
   options?: string[];
   sidePathReceipt?: string;
-};
-
-export type EnvProbe = {
-  reason: string;
-  passed: boolean;
 };
 
 export type WritabilityProbe = {
@@ -110,9 +110,6 @@ const SILENT_EXEC_RE =
   /(?:请)?继续尝试|我只要结果|只要结果|直接给(?:我)?结果|别再问|不要再问|别问了|(?:^|[\s，,。；;！!])(?:请)?继续(?!讨论|聊聊|聊下去|分析这个问题)/u;
 
 const SKILL_SMOKE_RE = /技能试跑|\bsmoke\b|样张|skill孵化|consulting-report/iu;
-
-const SIDE_PATH_RE =
-  /task_ledger(?:\.json)?|memory\/task_ledger|chmod|非交付文件|幽灵任务|清表|清理任务/iu;
 
 const TRUE_FORK_RE =
   /(?:两种规格|两个规格|两款|两个\s*SKU|\bSKU\b|规格\s*[AＡa]\s*(?:或|\/|、|还是)\s*(?:规格\s*)?[BＢb]|价(?:格)?\s*[AＡa].{0,24}(?:或|\/|还是).{0,24}价(?:格)?\s*[BＢb]|支付方式.{0,16}(?:或|\/|还是))/u;
@@ -219,10 +216,6 @@ export function formatTrueFork(options: readonly string[]): string {
 
 function hasContractMarker(text: string): boolean {
   return /\[turn_completion\s+state=/.test(text);
-}
-
-export function isSidePathLabel(text: string): boolean {
-  return SIDE_PATH_RE.test(text);
 }
 
 export function isTrueForkText(text: string, options?: readonly string[]): boolean {
@@ -485,56 +478,6 @@ export function annotateToolResultText(text: string): string {
     probe = { ...probe, lsMode: mode };
   }
   return `${text}\n${formatWritabilityProbe(probe)}`;
-}
-
-export function gradeBlocker(params: {
-  narrative: string;
-  deliverableProducible: boolean;
-  clearedReasons?: readonly string[];
-  probes?: readonly EnvProbe[];
-}): BlockerGrade {
-  const narrative = params.narrative;
-  const probes = params.probes ?? [];
-  for (const probe of probes) {
-    if (!probe.passed) {
-      continue;
-    }
-    if (
-      params.clearedReasons?.includes(probe.reason) ||
-      assistantRestopsCleared(narrative, probe)
-    ) {
-      return "already_cleared";
-    }
-  }
-  if (isSidePathLabel(narrative) && params.deliverableProducible) {
-    return "side_path";
-  }
-  if (isSidePathLabel(narrative) && !isMainlineBlockNarrative(narrative)) {
-    return "side_path";
-  }
-  return "mainline";
-}
-
-function assistantRestopsCleared(narrative: string, probe: EnvProbe): boolean {
-  if (!probe.passed) {
-    return false;
-  }
-  if (probe.reason === "node") {
-    return /node\s*v?18|只有\s*18|需要\s*node\s*20|升(?:级)?\s*node/iu.test(narrative);
-  }
-  if (probe.reason === "playwright") {
-    return /没有\s*playwright|playwright\s*不可用|缺少\s*playwright|安装\s*playwright/iu.test(
-      narrative,
-    );
-  }
-  return (
-    narrative.toLowerCase().includes(probe.reason.toLowerCase()) &&
-    /不可用|缺少|没有|仍缺/.test(narrative)
-  );
-}
-
-function isMainlineBlockNarrative(text: string): boolean {
-  return /渲染引擎缺失|无法产生交付物|无法写出成果正文|mainline_block|成果正文写不出来/u.test(text);
 }
 
 export function defaultEnvProbes(userText: string): EnvProbe[] {
