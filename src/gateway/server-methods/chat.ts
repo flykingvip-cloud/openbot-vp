@@ -4401,13 +4401,26 @@ export const chatHandlers: GatewayRequestHandlers = {
     } else if (sessionId && storePath) {
       rawMessages = readSessionMessages(sessionId, storePath, entry?.sessionFile);
     }
+    // Mid-task aside reply_lane persists Q&A beside the transcript (not A's jsonl).
+    // Merge FIRST, then apply the original bound/limit/byte rules so sidecar growth
+    // cannot bypass chat.history caps.
+    const asideSessionFile =
+      (typeof entry?.sessionFile === "string" && entry.sessionFile.trim()) ||
+      (typeof jsonlPath === "string" && jsonlPath.trim()) ||
+      "";
+    const rawWithAside = asideSessionFile
+      ? mergeChatHistoryWithAsideDialogue({
+          messages: rawMessages,
+          parentSessionFile: asideSessionFile,
+        })
+      : rawMessages;
     let boundedMessages: unknown[];
     let placeholderCount: number;
     let nextBefore: string | null | undefined;
     let hasMore: boolean | undefined;
     try {
       const bounded = boundChatHistoryMessages({
-        rawMessages,
+        rawMessages: rawWithAside,
         limit: usedTranscriptIndex ? pageLimit : limit,
         includeTools: usedTranscriptIndex ? true : includeTools,
         sessionId: typeof sessionId === "string" ? sessionId : undefined,
@@ -4460,28 +4473,17 @@ export const chatHandlers: GatewayRequestHandlers = {
       stewardOwner && !(typeof before === "string" && before.trim())
         ? stewardCallAuthorizationHistoryEntries(stewardOwner)
         : [];
+    // Auth overlays stay after bound so they are not truncated away.
     const historyMessages =
       authorizationMessages.length > 0
         ? [...boundedMessages, ...authorizationMessages]
         : boundedMessages;
-    // Mid-task aside reply_lane persists Q&A beside the transcript (not A's jsonl).
-    // Merge into chat.history so refresh/reconnect/A-ended follow-up can recover bubbles.
-    const asideSessionFile =
-      (typeof entry?.sessionFile === "string" && entry.sessionFile.trim()) ||
-      (typeof jsonlPath === "string" && jsonlPath.trim()) ||
-      "";
-    const historyWithAside = asideSessionFile
-      ? mergeChatHistoryWithAsideDialogue({
-          messages: historyMessages,
-          parentSessionFile: asideSessionFile,
-        })
-      : historyMessages;
     respond(true, {
       sessionKey,
       sessionId,
       messages: overlayChatDeliverablePublish({
         sessionKey,
-        messages: historyWithAside,
+        messages: historyMessages,
       }),
       thinkingLevel,
       verboseLevel,

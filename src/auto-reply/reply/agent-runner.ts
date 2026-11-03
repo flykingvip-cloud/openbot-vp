@@ -337,6 +337,10 @@ export async function runReplyAgent(params: {
           userPrompt: followupRun.prompt,
           run: followupRun.run,
           runId: asideRunId,
+          messageId: (() => {
+            const raw = sessionCtx.MessageSidFull ?? sessionCtx.MessageSid;
+            return typeof raw === "string" ? raw : undefined;
+          })(),
         });
         await touchActiveSessionEntry();
         typing.cleanup();

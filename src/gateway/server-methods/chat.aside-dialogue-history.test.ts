@@ -10,7 +10,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   appendAsideDialogueTurn,
   mergeChatHistoryWithAsideDialogue,
+  stableDialogueMessageIdentity,
 } from "../../auto-reply/reply/mid-task-aside-reply-lane.js";
+import { __setMaxChatHistoryMessagesBytesForTest } from "../server-constants.js";
 import type { GatewayRequestContext } from "./types.js";
 
 const mockState = vi.hoisted(() => ({
@@ -34,7 +36,7 @@ vi.mock("../tenant-context.js", async (importOriginal) => {
   };
 });
 
-const { chatHandlers } = await import("./chat.js");
+const { chatHandlers, boundChatHistoryMessages } = await import("./chat.js");
 
 const sessionKey = "agent:main:main";
 
@@ -254,5 +256,139 @@ describe("chat.history aside dialogue recovery", () => {
     const texts = collectTexts(payload.messages ?? []);
     expect(texts.some((t) => t.includes("A 新回复：已加上欧洲市场"))).toBe(true);
     expect(texts.some((t) => t.includes("多轮B内容-"))).toBe(true);
+  });
+
+  it("merge then unified bound: sidecar cannot bypass history limit", async () => {
+    dir = createTranscriptWithMainTurns();
+    for (let i = 0; i < 40; i += 1) {
+      appendAsideDialogueTurn(mockState.transcriptPath, {
+        atMs: 10_000 + i,
+        runId: `flood-${i}`,
+        role: i % 2 === 0 ? "user" : "assistant",
+        text: `旁路洪水-${i}`,
+      });
+    }
+    const respond = vi.fn();
+    await chatHandlers["chat.history"]({
+      params: { sessionKey, limit: 8 },
+      respond,
+      req: {} as never,
+      client: null as never,
+      isWebchatConnect: () => false,
+      context: context(),
+    });
+    expect(respond.mock.calls.at(-1)?.[0]).toBe(true);
+    const payload = respond.mock.calls.at(-1)?.[1] as { messages?: unknown[] };
+    const messages = payload.messages ?? [];
+    expect(messages.length).toBeLessThanOrEqual(8);
+    // Pre-bound merge of 2 transcript + 40 aside would be >> 8 without re-bound.
+    const mergedOnly = mergeChatHistoryWithAsideDialogue({
+      messages: [
+        {
+          role: "user",
+          timestamp: 1_000,
+          content: [{ type: "text", text: "请继续调研手机市场" }],
+        },
+        {
+          role: "assistant",
+          timestamp: 2_000,
+          content: [{ type: "text", text: "A 进度：已收集三款机型" }],
+        },
+      ],
+      parentSessionFile: mockState.transcriptPath,
+    });
+    expect(mergedOnly.length).toBeGreaterThan(8);
+    const rebounded = boundChatHistoryMessages({
+      rawMessages: mergedOnly,
+      limit: 8,
+      includeTools: false,
+      historyCursorEnabled: false,
+    });
+    expect(rebounded.messages.length).toBeLessThanOrEqual(8);
+  });
+
+  it("cross-source stable identity dedupes same user message in transcript and sidecar", () => {
+    dir = createTranscriptWithMainTurns();
+    appendAsideDialogueTurn(mockState.transcriptPath, {
+      atMs: 1_000,
+      runId: "run-b-dup",
+      role: "user",
+      text: "请继续调研手机市场",
+      messageId: "m-a-user",
+    });
+    appendAsideDialogueTurn(mockState.transcriptPath, {
+      atMs: 1_050,
+      runId: "run-b-dup",
+      role: "assistant",
+      text: "这是旁路回答。",
+    });
+    const transcript = [
+      {
+        role: "user",
+        id: "m-a-user",
+        messageId: "m-a-user",
+        timestamp: 1_000,
+        content: [{ type: "text", text: "请继续调研手机市场" }],
+      },
+      {
+        role: "assistant",
+        id: "m-a-asst",
+        timestamp: 2_000,
+        content: [{ type: "text", text: "A 进度：已收集三款机型" }],
+      },
+    ];
+    const merged = mergeChatHistoryWithAsideDialogue({
+      messages: transcript,
+      parentSessionFile: mockState.transcriptPath,
+    });
+    const texts = collectTexts(merged);
+    expect(texts.filter((t) => t === "请继续调研手机市场")).toHaveLength(1);
+    expect(texts.some((t) => t.includes("这是旁路回答"))).toBe(true);
+    // Identity must not rely on transcript:/aside: source prefixes.
+    expect(
+      stableDialogueMessageIdentity({
+        messageId: "m-a-user",
+        role: "user",
+        text: "请继续调研手机市场",
+      }),
+    ).toBe("mid:m-a-user");
+    expect(
+      stableDialogueMessageIdentity({
+        messageId: "aside:run-b-dup:user:1000",
+        role: "user",
+        text: "请继续调研手机市场",
+      }),
+    ).toBe("rt:user:请继续调研手机市场");
+  });
+
+  it("chat.history byte budget still applies after aside merge", async () => {
+    dir = createTranscriptWithMainTurns();
+    const previous = undefined;
+    __setMaxChatHistoryMessagesBytesForTest(2_500);
+    try {
+      for (let i = 0; i < 30; i += 1) {
+        appendAsideDialogueTurn(mockState.transcriptPath, {
+          atMs: 20_000 + i,
+          runId: `bytes-${i}`,
+          role: i % 2 === 0 ? "user" : "assistant",
+          text: `旁路大段内容-${i}-` + "x".repeat(200),
+        });
+      }
+      const respond = vi.fn();
+      await chatHandlers["chat.history"]({
+        params: { sessionKey, limit: 200 },
+        respond,
+        req: {} as never,
+        client: null as never,
+        isWebchatConnect: () => false,
+        context: context(),
+      });
+      expect(respond.mock.calls.at(-1)?.[0]).toBe(true);
+      const payload = respond.mock.calls.at(-1)?.[1] as { messages?: unknown[] };
+      const bytes = Buffer.byteLength(JSON.stringify(payload.messages ?? []), "utf8");
+      expect(bytes).toBeLessThanOrEqual(2_500);
+    } finally {
+      __setMaxChatHistoryMessagesBytesForTest(previous);
+    }
   });
 });

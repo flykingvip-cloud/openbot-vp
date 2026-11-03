@@ -14,6 +14,7 @@ import {
   abortMidTaskAsideLanes,
   appendAsideDialogueTurn,
   assertAsideReplyLaneIsolation,
+  buildAsideDialogueContextPromptForNormalReply,
   buildAsideReplyLanePrompt,
   isMidTaskAsideLaneCancelled,
   listMidTaskAsideLanesForTests,
@@ -24,6 +25,7 @@ import {
   registerMidTaskAsideLane,
   resetMidTaskAsideLaneRegistryForTests,
   runMidTaskAsideReplyLane,
+  stableDialogueMessageIdentity,
   unregisterMidTaskAsideLane,
 } from "./mid-task-aside-reply-lane.js";
 
@@ -563,5 +565,69 @@ describe("mid-task aside reply_lane isolation", () => {
     const loaded = await loadAsideReplyContextHistory({ parentSessionFile, limit: 12 });
     expect(loaded.some((t) => t.text.includes("欧洲市场已覆盖"))).toBe(true);
     expect(loaded.some((t) => t.text.includes("多轮B-"))).toBe(true);
+  });
+
+  it("cross-source identity dedupes same user ask in parent and aside", () => {
+    const parentTurns = [
+      {
+        atMs: 1_000,
+        runId: "m-user-1",
+        role: "user" as const,
+        text: "今天北京天气怎么样",
+        messageId: "m-user-1",
+      },
+      {
+        atMs: 2_000,
+        runId: "m-a-1",
+        role: "assistant" as const,
+        text: "A 仍在调研。",
+      },
+    ];
+    const asideTurns = [
+      {
+        atMs: 1_000,
+        runId: "aside-run",
+        role: "user" as const,
+        text: "今天北京天气怎么样",
+        messageId: "m-user-1",
+      },
+      {
+        atMs: 1_100,
+        runId: "aside-run",
+        role: "assistant" as const,
+        text: "北京晴，气温适宜。",
+      },
+    ];
+    const merged = mergeAsideAndParentHistoryTurns({ parentTurns, asideTurns, limit: 12 });
+    expect(merged.filter((t) => t.text === "今天北京天气怎么样")).toHaveLength(1);
+    expect(merged.some((t) => t.text.includes("北京晴"))).toBe(true);
+    expect(
+      stableDialogueMessageIdentity({
+        messageId: "aside:x:user:1",
+        role: "user",
+        text: "今天北京天气怎么样",
+      }),
+    ).toBe("rt:user:今天北京天气怎么样");
+  });
+
+  it("normal-reply context prompt exposes aside Q&A after A ends", () => {
+    appendAsideDialogueTurn(parentSessionFile, {
+      atMs: 3_000,
+      runId: "b-explain",
+      role: "user",
+      text: "续航怎么比的",
+      messageId: "msg-b-1",
+    });
+    appendAsideDialogueTurn(parentSessionFile, {
+      atMs: 3_100,
+      runId: "b-explain",
+      role: "assistant",
+      text: "刚才是按官方标称续航对比的。",
+    });
+    const prompt = buildAsideDialogueContextPromptForNormalReply(parentSessionFile);
+    expect(prompt).toBeTruthy();
+    expect(prompt).toContain("旁路插问记录");
+    expect(prompt).toContain("续航怎么比的");
+    expect(prompt).toContain("官方标称续航");
   });
 });

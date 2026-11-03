@@ -1085,6 +1085,16 @@ export async function runPreparedReply(
     !isHeartbeat && inboundMessage
       ? buildFocusResumePromptFromSessionFile(sessionEntry?.sessionFile)
       : undefined;
+  // A ended / ordinary turns: sidecar Q&A must remain visible to the normal reply
+  // path (chat.history alone only restores bubbles for the UI).
+  // Dynamic import keeps mid-task-aside-reply-lane (and pi-embedded) out of the
+  // static graph so agent-runner aside-lane tests can mock the embedded runner.
+  const asideDialogueContextPrompt =
+    !isHeartbeat && inboundMessage && sessionEntry?.sessionFile
+      ? (
+          await import("./mid-task-aside-reply-lane.js")
+        ).buildAsideDialogueContextPromptForNormalReply(sessionEntry.sessionFile)
+      : undefined;
   const composerPluginMentionBindings = resolveComposerPluginMentionBindings(ctx.ComposerMentions);
   const composerPluginMentionExecution =
     !isHeartbeat &&
@@ -1137,6 +1147,7 @@ export async function runPreparedReply(
       seatRulesPrompt,
       knowledgeUniversePrompt,
       sessionFocusResumePrompt,
+      asideDialogueContextPrompt,
       composerPluginMentionBindings.turnPrompt,
       composerPluginMentionExecution?.summaryPrompt,
       growthBirthPrompt,
@@ -1228,6 +1239,7 @@ export async function runPreparedReply(
       seatRulesPrompt,
       conversationTaskFocusPrompt,
       sessionFocusResumePrompt,
+      asideDialogueContextPrompt,
       primaryObjectivePrompt,
       taskDataPreflightPrompt,
       sessionContinuityPrompt,

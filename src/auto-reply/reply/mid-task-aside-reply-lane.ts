@@ -83,6 +83,8 @@ export type AsideDialogueTurn = {
   runId: string;
   role: "user" | "assistant";
   text: string;
+  /** Stable inbound / transcript message id when known (cross-source dedupe). */
+  messageId?: string;
 };
 
 /** Append one durable aside turn (not A's agent jsonl; not the task board). */
@@ -96,6 +98,9 @@ export function appendAsideDialogueTurn(parentSessionFile: string, turn: AsideDi
     runId: turn.runId,
     role: turn.role,
     text: turn.text.trim(),
+    ...(typeof turn.messageId === "string" && turn.messageId.trim()
+      ? { messageId: turn.messageId.trim() }
+      : {}),
   })}\n`;
   fs.appendFileSync(asideDialogueLogPath(file), line, "utf8");
 }
@@ -127,6 +132,9 @@ export function readAsideDialogueTurns(parentSessionFile: string): AsideDialogue
           runId: typeof row.runId === "string" ? row.runId : "",
           role: row.role,
           text: row.text.trim(),
+          ...(typeof row.messageId === "string" && row.messageId.trim()
+            ? { messageId: row.messageId.trim() }
+            : {}),
         });
       }
     } catch {
@@ -254,6 +262,28 @@ function truncateDisplay(text: string, max: number): string {
   return `${cleaned.slice(0, max)}…`;
 }
 
+export function normalizeDialogueIdentityText(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Cross-source stable message identity. Never keyed by transcript:/aside: source
+ * prefixes — those only describe origin and cannot prove dedupe across sources.
+ */
+export function stableDialogueMessageIdentity(params: {
+  messageId?: string | null;
+  role: string;
+  text: string;
+}): string {
+  const mid = typeof params.messageId === "string" ? params.messageId.trim() : "";
+  // Synthetic aside: ids are display-only; they are not shared with the transcript.
+  if (mid && !mid.startsWith("aside:")) {
+    return `mid:${mid}`;
+  }
+  const role = params.role === "assistant" ? "assistant" : "user";
+  return `rt:${role}:${normalizeDialogueIdentityText(params.text)}`;
+}
+
 /**
  * Merge parent transcript turns and aside sidecar turns by time + message identity.
  * Never returns aside-only when the sidecar is "full" — latest parent lines must remain.
@@ -264,30 +294,42 @@ export function mergeAsideAndParentHistoryTurns(params: {
   limit?: number;
 }): AsideDialogueTurn[] {
   const limit = Math.max(2, Math.min(params.limit ?? 12, 24));
-  type Tagged = AsideDialogueTurn & { _key: string };
+  type Tagged = AsideDialogueTurn & { _identity: string; _tie: string };
   const tagged: Tagged[] = [
     ...params.parentTurns.map((turn, index) => ({
       ...turn,
-      _key: `parent:${turn.runId || index}:${turn.role}:${turn.atMs}:${turn.text.slice(0, 48)}`,
+      _identity: stableDialogueMessageIdentity({
+        messageId: turn.messageId ?? (turn.runId.startsWith("aside:") ? undefined : turn.runId),
+        role: turn.role,
+        text: turn.text,
+      }),
+      _tie: `parent:${index}`,
     })),
     ...params.asideTurns.map((turn, index) => ({
       ...turn,
-      _key: `aside:${turn.runId || index}:${turn.role}:${turn.atMs}:${turn.text.slice(0, 48)}`,
+      _identity: stableDialogueMessageIdentity({
+        messageId: turn.messageId,
+        role: turn.role,
+        text: turn.text,
+      }),
+      _tie: `aside:${index}`,
     })),
   ];
-  tagged.sort((a, b) => a.atMs - b.atMs || a._key.localeCompare(b._key));
+  // Prefer parent/transcript when timestamps tie (stable sort: parent rows first).
+  tagged.sort((a, b) => a.atMs - b.atMs || a._tie.localeCompare(b._tie));
   const seen = new Set<string>();
   const merged: AsideDialogueTurn[] = [];
   for (const row of tagged) {
-    if (seen.has(row._key)) {
+    if (seen.has(row._identity)) {
       continue;
     }
-    seen.add(row._key);
+    seen.add(row._identity);
     merged.push({
       atMs: row.atMs,
       runId: row.runId,
       role: row.role,
       text: row.text,
+      ...(row.messageId ? { messageId: row.messageId } : {}),
     });
   }
   return merged.slice(-limit);
@@ -311,6 +353,7 @@ export async function loadAsideReplyContextHistory(params: {
       runId: typeof m.id === "string" ? m.id : `parent-${index}`,
       role: m.role === "assistant" ? "assistant" : "user",
       text: m.text,
+      ...(typeof m.id === "string" && m.id.trim() ? { messageId: m.id.trim() } : {}),
     }));
   } catch {
     fromParent = [];
@@ -328,12 +371,15 @@ export function asideDialogueAsChatHistoryMessages(
 ): Array<Record<string, unknown>> {
   return readAsideDialogueTurns(parentSessionFile).map((turn) => {
     const marker = { kind: "aside_dialogue", runId: turn.runId };
+    const syntheticId = `aside:${turn.runId}:${turn.role}:${turn.atMs}`;
+    // Prefer inbound messageId for cross-source identity; keep synthetic id for display only.
+    const stableId = turn.messageId?.trim() || syntheticId;
     return {
       role: turn.role,
       timestamp: turn.atMs > 0 ? turn.atMs : Date.now(),
       content: [{ type: "text", text: turn.text }],
-      id: `aside:${turn.runId}:${turn.role}:${turn.atMs}`,
-      messageId: `aside:${turn.runId}:${turn.role}:${turn.atMs}`,
+      id: stableId,
+      messageId: stableId,
       __openbot: marker,
       __openclaw: marker,
     };
@@ -356,9 +402,49 @@ function chatHistoryMessageTimestamp(message: unknown, fallbackIndex: number): n
   return fallbackIndex;
 }
 
+function extractChatHistoryRoleText(message: unknown): {
+  role: string;
+  text: string;
+  messageId?: string;
+} {
+  if (!message || typeof message !== "object") {
+    return { role: "user", text: "" };
+  }
+  const row = message as {
+    role?: unknown;
+    id?: unknown;
+    messageId?: unknown;
+    content?: unknown;
+  };
+  const role = row.role === "assistant" ? "assistant" : "user";
+  let text = "";
+  if (typeof row.content === "string") {
+    text = row.content;
+  } else if (Array.isArray(row.content)) {
+    text = row.content
+      .map((block) =>
+        block && typeof block === "object" && typeof (block as { text?: unknown }).text === "string"
+          ? (block as { text: string }).text
+          : "",
+      )
+      .filter(Boolean)
+      .join("\n");
+  }
+  const messageIdRaw =
+    (typeof row.messageId === "string" && row.messageId.trim()) ||
+    (typeof row.id === "string" && row.id.trim()) ||
+    "";
+  return {
+    role,
+    text,
+    ...(messageIdRaw ? { messageId: messageIdRaw } : {}),
+  };
+}
+
 /**
  * Merge chat.history transcript messages with aside sidecar turns by timestamp
- * and stable message identity. Used by the real chat.history RPC path.
+ * and stable message identity (cross-source). Caller must apply the original
+ * history bound/limit rules AFTER this merge.
  */
 export function mergeChatHistoryWithAsideDialogue(params: {
   messages: unknown[];
@@ -368,25 +454,64 @@ export function mergeChatHistoryWithAsideDialogue(params: {
   if (aside.length === 0) {
     return params.messages;
   }
-  type Stamped = { msg: unknown; ts: number; key: string };
+  type Stamped = { msg: unknown; ts: number; identity: string; tie: string };
   const stamped: Stamped[] = [
-    ...params.messages.map((msg, index) => ({
-      msg,
-      ts: chatHistoryMessageTimestamp(msg, index),
-      key: `transcript:${index}`,
-    })),
-    ...aside.map((msg, index) => {
-      const id = (msg as { id?: unknown }).id;
-      const idKey = typeof id === "string" || typeof id === "number" ? String(id) : String(index);
+    ...params.messages.map((msg, index) => {
+      const extracted = extractChatHistoryRoleText(msg);
       return {
         msg,
         ts: chatHistoryMessageTimestamp(msg, index),
-        key: `aside:${idKey}`,
+        identity: stableDialogueMessageIdentity(extracted),
+        tie: `transcript:${index}`,
+      };
+    }),
+    ...aside.map((msg, index) => {
+      const extracted = extractChatHistoryRoleText(msg);
+      return {
+        msg,
+        ts: chatHistoryMessageTimestamp(msg, index),
+        identity: stableDialogueMessageIdentity(extracted),
+        tie: `aside:${index}`,
       };
     }),
   ];
-  stamped.sort((a, b) => a.ts - b.ts || a.key.localeCompare(b.key));
-  return stamped.map((row) => row.msg);
+  stamped.sort((a, b) => a.ts - b.ts || a.tie.localeCompare(b.tie));
+  const seen = new Set<string>();
+  const merged: unknown[] = [];
+  for (const row of stamped) {
+    if (seen.has(row.identity)) {
+      continue;
+    }
+    seen.add(row.identity);
+    merged.push(row.msg);
+  }
+  return merged;
+}
+
+/**
+ * Inject durable aside Q&A into the normal (post-A) reply context path via
+ * extraSystemPrompt — does not co-write A's agent jsonl.
+ */
+export function buildAsideDialogueContextPromptForNormalReply(
+  sessionFile?: string,
+): string | undefined {
+  const file = sessionFile?.trim() ?? "";
+  if (!file) {
+    return undefined;
+  }
+  const turns = readAsideDialogueTurns(file);
+  if (turns.length === 0) {
+    return undefined;
+  }
+  const recent = turns.slice(-24);
+  const block = recent
+    .map((turn) => `${turn.role === "user" ? "主人" : "助手"}：${turn.text}`)
+    .join("\n");
+  return [
+    "【旁路插问记录（任务执行期间，未写入主任务 jsonl）】",
+    "同一对话中已发生的旁路问答；刷新、重连或任务结束后的正常追问应把它们当作已发生上下文。",
+    block,
+  ].join("\n");
 }
 
 /**
@@ -482,6 +607,8 @@ export type RunMidTaskAsideReplyLaneParams = {
   run: AsideRunHandle;
   /** Gateway / chat.send run identity for B — must not reuse A's buffered chatRunId ownership. */
   runId: string;
+  /** Stable inbound message id for cross-source history dedupe with the transcript. */
+  messageId?: string;
   /** Injectable for tests. */
   runEmbedded?: typeof runEmbeddedPiAgent;
   /** Injectable prepare FS — tests abort during the former mkdtemp/writeFile window. */
@@ -608,6 +735,7 @@ export async function runMidTaskAsideReplyLane(
       runId: params.runId,
       role: "user",
       text: cleanedPrompt,
+      ...(params.messageId?.trim() ? { messageId: params.messageId.trim() } : {}),
     });
 
     if (

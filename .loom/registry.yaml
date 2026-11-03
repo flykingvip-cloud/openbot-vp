@@ -10858,6 +10858,8 @@ landingStreams:
       - docs/slice2-reply-lane-joint-verification.md
       - src/gateway/server-chat.aside-ab-run-isolation.test.ts
       - src/gateway/server-methods/chat.aside-dialogue-history.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
     canLandWith: []
     metadata:
       task: ft-plan-speak-shopping-positive-admission
