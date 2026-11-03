@@ -119,6 +119,7 @@ vi.mock("./runtime-context-assembly.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./runtime-context-assembly.js")>();
   return {
     ...actual,
+    shouldUseCollaborationRuntimeAssembly: vi.fn().mockReturnValue(false),
     assembleCollaborationRuntimeContextParts: vi.fn().mockResolvedValue([]),
     resolveCollaborationRunWorkspaceDir: vi.fn(
       ({ agentWorkspaceDir }: { agentWorkspaceDir: string }) => agentWorkspaceDir,
@@ -152,6 +153,13 @@ vi.mock("./typing-mode.js", () => ({
 }));
 
 import { runReplyAgent } from "./agent-runner.js";
+import { buildInboundMetaSystemPrompt } from "./inbound-meta.js";
+import { buildKnowledgeUniversePromptContext } from "./knowledge-universe-context.js";
+import {
+  assembleCollaborationRuntimeContextParts,
+  shouldUseCollaborationRuntimeAssembly,
+} from "./runtime-context-assembly.js";
+import { drainFormattedSystemEvents } from "./session-updates.js";
 
 function baseParams(
   overrides: Partial<Parameters<typeof runPreparedReply>[0]> = {},
@@ -225,6 +233,10 @@ function baseParams(
 describe("runPreparedReply aside dialogue context (A-ended normal path)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(shouldUseCollaborationRuntimeAssembly).mockReturnValue(false);
+    vi.mocked(assembleCollaborationRuntimeContextParts).mockResolvedValue([]);
+    vi.mocked(buildInboundMetaSystemPrompt).mockReturnValue("");
+    vi.mocked(drainFormattedSystemEvents).mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -273,4 +285,50 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
     expect(prompt).not.toContain("续航怎么比的");
     expect(prompt).not.toContain("官方标称续航");
   });
+
+  it.each([false, true])(
+    "preserves context order and trust at the real runner boundary (collab=%s)",
+    async (collab) => {
+      vi.mocked(shouldUseCollaborationRuntimeAssembly).mockReturnValue(collab);
+      vi.mocked(assembleCollaborationRuntimeContextParts).mockResolvedValue([
+        "  COLLAB_FIRST  ",
+        "",
+        "  ",
+        "COLLAB_SECOND",
+        "  COLLAB_FIRST  ",
+      ]);
+      vi.mocked(buildInboundMetaSystemPrompt).mockReturnValue("  DIRECT_FIRST  ");
+      vi.mocked(drainFormattedSystemEvents).mockResolvedValue("EVENT_LAST");
+      const params = baseParams();
+      await runPreparedReply({
+        ...params,
+        sessionCtx: {
+          ...params.sessionCtx,
+          GroupSystemPrompt: "GROUP_MIDDLE",
+          UntrustedContext: ["USER_ONLY_SENTINEL"],
+        },
+      });
+      const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+      expect(runReplyAgent).toHaveBeenCalledTimes(1);
+      expect(drainFormattedSystemEvents).toHaveBeenCalledTimes(1);
+      expect(buildKnowledgeUniversePromptContext).toHaveBeenCalledTimes(1);
+      const system = call?.followupRun.run.extraSystemPrompt ?? "";
+      expect(system).not.toContain("USER_ONLY_SENTINEL");
+      expect(call?.commandBody).toContain("USER_ONLY_SENTINEL");
+      expect(call?.commandBody).toContain("Untrusted context");
+      if (collab) {
+        expect(assembleCollaborationRuntimeContextParts).toHaveBeenCalledTimes(1);
+        expect(buildInboundMetaSystemPrompt).not.toHaveBeenCalled();
+        expect(system.startsWith("  COLLAB_FIRST  \n\nCOLLAB_SECOND\n\n  COLLAB_FIRST  ")).toBe(
+          true,
+        );
+        expect(system.indexOf("COLLAB_SECOND")).toBeLessThan(system.indexOf("EVENT_LAST"));
+      } else {
+        expect(assembleCollaborationRuntimeContextParts).not.toHaveBeenCalled();
+        expect(buildInboundMetaSystemPrompt).toHaveBeenCalledTimes(1);
+        expect(system.startsWith("  DIRECT_FIRST  \n\nGROUP_MIDDLE")).toBe(true);
+        expect(system.indexOf("GROUP_MIDDLE")).toBeLessThan(system.indexOf("EVENT_LAST"));
+      }
+    },
+  );
 });
