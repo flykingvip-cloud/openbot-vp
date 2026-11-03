@@ -112,3 +112,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Gateway task-stop transaction extracted to command/gateway-task-stop.ts (036e9a66b), preserving async chat abort before owner-only embedded/queue cleanup. Original admission, board mutation, transcript, dedupe, final and cleanup stay in protocol adapter. — codex-runtime-manager
 - Four suites / 11 tests PASS, including real Gateway owner stop and A/B final isolation; independent review PASS; typed lint clean; architecture 15 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS and 209 dynamic-import warnings unchanged. — codex-runtime-manager
 - Gateway and agent-runner control remain distinct use cases with legitimate sequencing/scope differences. Shared command ownership does not claim all control flow or planning migrated. Next review should consolidate command public contracts and adapter dependency inventory before adding more port wrappers. — codex-runtime-manager
+
+## Command public facade checkpoint
+
+- Explicit named/type exports in command/index.ts; auto-reply and Gateway consumers now import the facade (65001431e). No new use case, registration bus, model call or task state. — codex-runtime-manager
+- Ten suites / 38 tests PASS; architecture 17 rules PASS and forbidden deep-import negative probe PASS; changed-file typed lint clean; tsgo baseline/candidate 52; build PASS, 209 dynamic import warnings unchanged. — codex-runtime-manager
+- command-public-api.md records each port and remaining adapter responsibilities. Board focus formatter remains a static dependency; coherent read-only projection extraction is the next boundary candidate, not another callback wrapper. — codex-runtime-manager
