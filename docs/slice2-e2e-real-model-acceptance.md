@@ -12,7 +12,9 @@
 
 开工 tip（信任边界收尾 merge）：`01e15de99c77efa1ef49020e5760dda06a5ceae4`  
 行为祖先（旁路信任边界）：`c533c4d79f33861379922534a1341a66f9fcd42b`  
-本轮缺口修复 tip（产品）：`3a712e86e8b1fd8f2af2a09e1276cd443f47b475`；随后 commit 含验收文档与 e2e 驱动（见 `git log -2`）。行为祖先仍为 `c533c4d79f33861379922534a1341a66f9fcd42b`。
+本轮 tip：`6de605dd0da78eaf41ceb93d708570357d69e49a`（验收文档 + e2e 驱动）。
+产品缺口修复：`3a712e86e8b1fd8f2af2a09e1276cd443f47b475`。
+行为祖先（trust-boundary）：`c533c4d79f33861379922534a1341a66f9fcd42b`。
 
 ## 验收点结论
 
