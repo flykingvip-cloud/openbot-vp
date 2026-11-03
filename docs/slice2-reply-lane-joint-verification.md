@@ -7,8 +7,8 @@
 ## 绑定
 
 - 行为基线（slice3 RMW）：`e82695c145629277cf3e2b656929e4b63bac3cfb`
-- 上一轮 tip（分流 + 三项初修）：`bb949e8e508e18b32a59749b63b234e963749bd3`
-- 本轮 tip（取消生命周期 + 真实 chat.history 衔接 + 时间合并）：`b1f6481da42a8cf2299f3b084c8fa3e5c0b51ab1`
+- 取消/历史衔接 tip：`b1f6481da42a8cf2299f3b084c8fa3e5c0b51ab1`
+- **本轮行为 tip（历史链路收尾）**：`08d1f319849d819c1ae609fe40ab5104603f9fbf`
 - 祖先门禁：`git fetch origin && git merge-base --is-ancestor origin/main HEAD` → PASS（推送前再验）
 
 ## seedSessionTaskBoard 审计
@@ -47,7 +47,7 @@ pnpm exec vitest run \
   ui/src/ui/controllers/chat.test.ts
 ```
 
-**结果：22 files / 259 passed**（Asia/Shanghai 2026-11-03 09:58；含 `chat.aside-dialogue-history.test.ts` 真实 chat.history 接口；A/B 终局隔离仍绿）。
+**结果：23 files / 265 passed**（Asia/Shanghai 2026-11-03 10:13；含 merge-then-bound、跨来源去重、`get-reply-run.aside-dialogue-context`；取消与 A/B 终局隔离仍绿）。
 
 ## 只读独立回复实证（须验证四项）
 
@@ -81,6 +81,8 @@ pnpm exec vitest run \
 
 - `src/auto-reply/reply/mid-task-aside-reply-lane.ts`
 - `src/auto-reply/reply/agent-runner.ts`（`reply_lane_pending` 分支 + abort 旁路）
+- `src/auto-reply/reply/get-reply-run.ts`（正常回复注入旁路上下文）
+- `src/gateway/server-methods/chat.ts`（chat.history merge-then-bound）
 
 
 ## 本轮历史链路收尾（合并后裁剪 / 跨来源去重 / 正常回复上下文）
