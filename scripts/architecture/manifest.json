@@ -90,5 +90,23 @@
       "src/cron/**"
     ],
     "description": "Pure context assembly cannot invoke runtime, task mutations, tools or scheduling; sources remain injected values."
+  },
+  {
+    "name": "agent-runtime-contracts-pure-data",
+    "from": "src/agent-runtime/contracts/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/conversation-task/**",
+      "src/auto-reply/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/context/**",
+      "src/agent-runtime/command/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/delivery/**",
+      "src/agent-runtime/state/**"
+    ],
+    "description": "Cross-layer contracts own types only; they cannot depend on runtime implementations or persistence."
   }
 ]
