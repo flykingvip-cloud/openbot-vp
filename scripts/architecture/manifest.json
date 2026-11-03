@@ -77,5 +77,18 @@
       "src/plugins/hooks/gateway-lifecycle-events"
     ],
     "description": "plugins/hooks: event-family files must not depend on each other; the runner is the only assembler."
+  },
+  {
+    "name": "agent-runtime-context-assembly-isolation",
+    "from": "src/agent-runtime/context/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/conversation-task/**",
+      "src/auto-reply/**",
+      "src/plugins/**",
+      "src/cron/**"
+    ],
+    "description": "Pure context assembly cannot invoke runtime, task mutations, tools or scheduling; sources remain injected values."
   }
 ]
