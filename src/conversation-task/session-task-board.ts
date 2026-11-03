@@ -1055,6 +1055,23 @@ export function startBoundTaskExecution(
   });
 }
 
+/** Read-only startup guard for an already-claimed execution. */
+export function isTaskExecutionBindingCurrent(
+  sessionFile: string,
+  binding: TaskCompletionBinding,
+): boolean {
+  const board = readSessionTaskBoard(sessionFile);
+  const current = board.current;
+  return Boolean(
+    current?.unfinished &&
+    !current.wakeSuppress &&
+    !isTaskTombstoned(board, binding.taskId) &&
+    current.taskId === binding.taskId &&
+    current.executionAttempt === binding.executionAttempt &&
+    current.deliverableVersion === binding.deliverableVersion,
+  );
+}
+
 /** Real close only. A model claim with closed=false does not announce or rewrite the board. */
 export function recordCheckedTaskCompletion(params: {
   sessionFile?: string;

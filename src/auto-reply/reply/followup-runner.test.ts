@@ -666,3 +666,106 @@ describe("createFollowupRunner agentDir forwarding", () => {
     expect(call?.gatewayClientUser).toBe("employee@acme.example");
   });
 });
+
+describe("queued task binding claim", () => {
+  it("rejects a queued A request after same-goal B becomes current without invoking the provider", async () => {
+    const {
+      mutateSessionTaskBoard,
+      emptySessionTaskBoard,
+      captureTaskCompletionBinding,
+      readSessionTaskBoard,
+    } = await import("../../conversation-task/session-task-board.js");
+    const dir = await fs.mkdtemp(path.join(tmpdir(), "followup-binding-"));
+    try {
+      const sessionFile = path.join(dir, "session.jsonl");
+      await fs.writeFile(sessionFile, "");
+      const task = {
+        taskId: "a",
+        title: "same",
+        goalText: "same",
+        unfinished: true,
+        createdAtMs: 1,
+        stop: { summary: "", workspacePaths: [] },
+      };
+      mutateSessionTaskBoard(sessionFile, () => ({
+        board: { ...emptySessionTaskBoard(), current: task },
+        value: undefined,
+      }));
+      const binding = captureTaskCompletionBinding(sessionFile);
+      mutateSessionTaskBoard(sessionFile, (board) => ({
+        board: { ...board, current: { ...task, taskId: "b" } },
+        value: undefined,
+      }));
+      const typing = createMockTypingController();
+      const onBlockReply = createAsyncReplySpy();
+      const runner = createFollowupRunner({
+        opts: { onBlockReply },
+        typing,
+        typingMode: "instant",
+        sessionStore: {},
+        sessionKey: "main",
+        defaultModel: "anthropic/claude",
+      });
+      runEmbeddedPiAgentMock.mockClear();
+      await runner(createQueuedRun({ run: { sessionFile, taskCompletionBinding: binding } }));
+      expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+      expect(readSessionTaskBoard(sessionFile).current?.taskId).toBe("b");
+      expect(readSessionTaskBoard(sessionFile).current?.executionAttempt).toBeUndefined();
+      expect(typing.markRunComplete).toHaveBeenCalled();
+      expect(typing.markDispatchIdle).toHaveBeenCalled();
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+it("does not start queued provider work when owner pause arrives during async transport preparation", async () => {
+  const boardApi = await import("../../conversation-task/session-task-board.js");
+  const transportApi = await import("../../gateway/enterprise-model/embedded-transport.js");
+  const dir = await fs.mkdtemp(path.join(tmpdir(), "followup-pause-prep-"));
+  const sessionFile = path.join(dir, "session.jsonl");
+  await fs.writeFile(sessionFile, "");
+  const task = {
+    taskId: "a",
+    title: "A",
+    goalText: "A",
+    unfinished: true,
+    createdAtMs: 1,
+    stop: { summary: "", workspacePaths: [] },
+  };
+  boardApi.mutateSessionTaskBoard(sessionFile, () => ({
+    board: { ...boardApi.emptySessionTaskBoard(), current: task },
+    value: undefined,
+  }));
+  const queued = createQueuedRun({
+    run: { sessionFile, taskCompletionBinding: boardApi.captureTaskCompletionBinding(sessionFile) },
+  });
+  const spy = vi
+    .spyOn(transportApi, "resolveEnterpriseEmbeddedTransport")
+    .mockImplementationOnce(async ({ provider, model }) => {
+      boardApi.mutateSessionTaskBoard(sessionFile, (board) => ({
+        board: { ...board, current: { ...board.current!, wakeSuppress: true } },
+        value: undefined,
+      }));
+      return { provider, model };
+    });
+  try {
+    runEmbeddedPiAgentMock.mockClear();
+    const typing = createMockTypingController();
+    await createFollowupRunner({
+      opts: { onBlockReply: createAsyncReplySpy() },
+      typing,
+      typingMode: "instant",
+      sessionStore: {},
+      sessionKey: "main",
+      defaultModel: "anthropic/claude",
+    })(queued);
+    expect(spy).toHaveBeenCalled();
+    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+    expect(typing.markRunComplete).toHaveBeenCalled();
+    expect(typing.markDispatchIdle).toHaveBeenCalled();
+  } finally {
+    spy.mockRestore();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});

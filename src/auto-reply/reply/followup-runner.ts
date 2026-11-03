@@ -15,6 +15,11 @@ import {
 } from "../../config/sessions/ogui-decision-engine.js";
 import type { TypingMode } from "../../config/types.js";
 import {
+  readSessionTaskBoard,
+  startBoundTaskExecution,
+  isTaskExecutionBindingCurrent,
+} from "../../conversation-task/session-task-board.js";
+import {
   tryAcquireEnterpriseAgentRun,
   releaseEnterpriseAgentRun,
 } from "../../gateway/billing/agent-run-governance.js";
@@ -170,6 +175,40 @@ export function createFollowupRunner(params: {
   return async (queued: FollowupRun) => {
     // Agent run correlation id (may differ across retries of the same queue item).
     const runId = crypto.randomUUID();
+    // Claim the original queued task before creating outcome/admission/provider side effects.
+    // Collaboration plans retain their own admission when no session-task binding exists.
+    try {
+      const incomingBinding = queued.run.taskCompletionBinding;
+      const trackedIndividual =
+        !queued.run.collaborationRoundInvoked &&
+        !queued.run.privateRunBag &&
+        Boolean(readSessionTaskBoard(queued.run.sessionFile).current);
+      if (incomingBinding || trackedIndividual) {
+        const claimed = startBoundTaskExecution(queued.run.sessionFile, incomingBinding, runId);
+        if (!claimed) {
+          try {
+            await sendFollowupPayloads(
+              [
+                {
+                  text: "这条排队请求的任务身份已失效或尚未绑定，未继续执行。请确认当前任务后重新发送。",
+                },
+              ],
+              queued,
+            );
+          } finally {
+            typing.markRunComplete();
+            typing.markDispatchIdle();
+          }
+          return;
+        }
+        queued.run.taskCompletionBinding = claimed;
+      }
+    } catch (error) {
+      logVerbose(`followup task binding claim failed: ${String(error)}`);
+      typing.markRunComplete();
+      typing.markDispatchIdle();
+      return;
+    }
     // askOutcome W1: TaskOutcome identity is the enqueue-stable followupItemId.
     const followupItemId =
       queued.followupItemId?.trim() || (queued.followupItemId = crypto.randomUUID());
@@ -456,8 +495,20 @@ export function createFollowupRunner(params: {
                   ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
                 });
               }
+              if (
+                queued.run.taskCompletionBinding &&
+                !isTaskExecutionBindingCurrent(
+                  queued.run.sessionFile,
+                  queued.run.taskCompletionBinding,
+                )
+              ) {
+                throw new Error(
+                  "Queued task was paused, closed or replaced before provider startup",
+                );
+              }
               const result = await runEmbeddedPiAgent({
                 sessionId: queued.run.sessionId,
+                abortSignal: opts?.abortSignal,
                 sessionKey: queued.run.sessionKey,
                 agentId: queued.run.agentId,
                 trigger: "user",

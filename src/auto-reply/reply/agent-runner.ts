@@ -609,6 +609,7 @@ export async function runReplyAgent(params: {
       runId,
     );
     if (completionBinding) {
+      followupRun.run.taskCompletionBinding = completionBinding;
       opts?.onTaskExecutionBound?.(completionBinding);
     }
     const runOutcome = await runAgentTurnWithFallback({
