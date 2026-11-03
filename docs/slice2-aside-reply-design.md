@@ -31,15 +31,21 @@ steering 把插问注入 A 会混流、并可能驱动 A 的工具动作 — 不
 
 ## 3. 最小方案（原调度内）
 
-### 3.1 分类（复用 `classifyTurnRelation`，不新造裁决层）
+### 3.1 分类（复用 `classifyTurnRelation`，不新造裁决层；**不全进 reply_lane**）
 
-对 `isActive && turnRelation === "aside"`：
+插话分流（看板跟任务变化，不跟每条聊天堆待办）：
 
-| 子类 | 处理 | 资源 |
+| 插话类型 | 立即回应 | 后续处理 |
 |---|---|---|
-| **board_readonly** | 立即从任务板投影回答（目标/有效约束/停点摘要等只读问句） | 只读板；不写板、不 steer、不 followup |
-| **reply_lane**（一般插问） | 见 3.2 | 见下 |
-| 控制 / amend / progress | 既有短路 | 既有 |
+| 普通插问（aside） | **reply_lane** 及时答 | 通常不改看板 |
+| 查询进度 | progress 投影 | 不新增待办 |
+| 目标/约束只读问 | **board_readonly** | 不写板 |
+| 补充/纠正（amend） | 简述理解（收到/已注入） | **原任务板入口** `commitSameTaskConstraint` |
+| 安全限制（先别发布/不要付款） | **先写板屏障** 再 ack | 原 amend 路径；不得只走 reply_lane |
+| 切换优先级（new_work） | 确认焦点/停点 | 原 focus 路径 |
+| 暂停/取消 | **立即确认** | **立即** abort A + aside lanes |
+
+对 `isActive`：`resolveMidTaskAsideDisposition` 仅在 turn-relation 为 **aside** 时进入 reply_lane；amend/new_work → `not_aside`。
 
 
 ### 3.1.1 读问句与 turn-relation

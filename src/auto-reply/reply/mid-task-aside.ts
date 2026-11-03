@@ -1,8 +1,10 @@
 /**
- * Mid-task aside disposition (slice2): classify aside while A is active.
- * board_readonly answers are projections only — never mutate the task board.
- * reply_lane_pending is handled by mid-task-aside-reply-lane (tools-disabled
- * ephemeral embedded turn); not a second task controller.
+ * Mid-task aside disposition (slice2): classify mid-task utterances while A is active.
+ * Routing (not everything → reply_lane):
+ * - progress / goal / constraint *reads* → board_readonly or progress (projection only)
+ * - amend / new_work / control → not_aside (original board / stop / focus paths)
+ * - ordinary aside asks → reply_lane_pending (tools-disabled ephemeral; no board write)
+ * Board follows task changes, not every chat turn. Not a second task controller.
  */
 import {
   activeConstraintTexts,
@@ -54,10 +56,13 @@ export function formatBoardReadonlyAsideReply(
 }
 
 /**
- * Resolve aside / board-readonly handling while a background task is active.
+ * Resolve mid-task disposition while a background task is active.
  * Goal/constraint *read* asks are recognized before turn-relation (which may
  * label them amend). Does not write the board. progress stays a separate kind
  * so the existing progress path remains the sole owner of progress replies.
+ * Supplement/correct/safety limits and priority switches return not_aside so
+ * agent-runner uses the original task-board / stop / focus entry — never
+ * swallow them into read-only reply_lane.
  */
 export function resolveMidTaskAsideDisposition(params: {
   prompt: string;
@@ -88,6 +93,9 @@ export function resolveMidTaskAsideDisposition(params: {
   if (!goal) {
     return { kind: "not_aside" };
   }
+  // Only true ordinary asides enter reply_lane. amend / new_work stay on the
+  // original board entry (steer+persist / focus switch). Control utterances are
+  // handled earlier in agent-runner via isOwnerCurrentTaskControlUtterance.
   if (classifyTurnRelation(cleaned, goal) !== "aside") {
     return { kind: "not_aside" };
   }

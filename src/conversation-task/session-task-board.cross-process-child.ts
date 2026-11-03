@@ -68,15 +68,20 @@ if (mode === "constraint") {
 
 if (mode === "complete") {
   // Busy-loop complete attempts interleaved with constraint writers.
+  // Never let lock/stale throws kill the child mid-loop (stdout must stay JSON).
   let ok = 0;
   let fail = 0;
   for (let i = 0; i < rounds; i += 1) {
-    const result = recordCheckedTaskCompletion({ sessionFile, closed: true });
-    if (result.persisted) {
-      ok += 1;
-      break;
+    try {
+      const result = recordCheckedTaskCompletion({ sessionFile, closed: true });
+      if (result.persisted) {
+        ok += 1;
+        break;
+      }
+      fail += 1;
+    } catch {
+      fail += 1;
     }
-    fail += 1;
   }
   const board = snapshot();
   process.stdout.write(
@@ -97,17 +102,24 @@ if (mode === "cancel" || mode === "pause") {
   const text = mode === "cancel" ? "取消当前任务" : "暂停";
   let applied = false;
   for (let i = 0; i < rounds; i += 1) {
-    const result = mutateSessionTaskBoard(sessionFile, (board) => {
-      const next = applyIncomingUserMessage({ board, incomingText: text });
-      return { board: next.board, value: next };
-    });
-    if (mode === "cancel" && result.action === "cancel_parked") {
-      applied = true;
-      break;
-    }
-    if (mode === "pause" && result.abortInFlight) {
-      applied = true;
-      break;
+    try {
+      const result = mutateSessionTaskBoard(sessionFile, (board) => {
+        const next = applyIncomingUserMessage({ board, incomingText: text });
+        return { board: next.board, value: next };
+      });
+      if (mode === "cancel" && result.action === "cancel_parked") {
+        applied = true;
+        break;
+      }
+      if (mode === "pause" && result.abortInFlight) {
+        // Confirm disk retained wakeSuppress before claiming applied (writer races).
+        if (snapshot().current?.wakeSuppress === true) {
+          applied = true;
+          break;
+        }
+      }
+    } catch {
+      // lock timeout / stale — retry
     }
   }
   const board = snapshot();

@@ -600,6 +600,8 @@ export function appendSameTaskConstraint(params: {
     ...board,
     current: {
       ...current,
+      // Owner pause must survive concurrent constraint appends (cross-process).
+      ...(current.wakeSuppress ? { wakeSuppress: true } : {}),
       effectiveConstraints: nextList,
       stop: {
         ...current.stop,
@@ -1103,12 +1105,27 @@ export function recordCheckedTaskCompletion(params: { sessionFile?: string; clos
   if (!file) {
     return { persisted: false };
   }
-  const finished = mutateSessionTaskBoard(file, (board) => {
-    const result = board.current
-      ? finishCurrentTask({ board, deliverableChecked: true })
-      : { board, notice: renderCompletionNotice(board.parked) };
-    return { board: result.board, value: result };
-  });
+  // Lock contention / stale CAS must not crash the caller (cross-process completer
+  // busy-loops). Surface persisted:false so the peer can retry.
+  let finished: { board: SessionTaskBoard; notice?: string };
+  try {
+    finished = mutateSessionTaskBoard(file, (board) => {
+      const result = board.current
+        ? finishCurrentTask({ board, deliverableChecked: true })
+        : { board, notice: renderCompletionNotice(board.parked) };
+      return { board: result.board, value: result };
+    });
+  } catch (err) {
+    const name = err instanceof Error ? err.name : "";
+    const message = err instanceof Error ? err.message : String(err);
+    if (
+      name === "StaleSessionTaskBoardWriteError" ||
+      /lock|ELOCKED|timed out|timeout/i.test(message)
+    ) {
+      return { persisted: false };
+    }
+    throw err;
+  }
   const notice = finished.notice ?? renderCompletionNotice(finished.board.parked);
   let persisted = false;
   if (fs.existsSync(file)) {

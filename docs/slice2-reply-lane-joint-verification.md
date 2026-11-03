@@ -7,7 +7,7 @@
 ## 绑定
 
 - 行为基线（slice3 RMW）：`e82695c145629277cf3e2b656929e4b63bac3cfb`
-- 本轮 tip（含 reply_lane）：`dcf4fbb76d57a3da0e489d2ad9fba356f4a7826a`
+- 本轮 tip（含 reply_lane hardening + 分流）：`TIP_PLACEHOLDER`
 - 祖先门禁：`git fetch origin && git merge-base --is-ancestor origin/main HEAD` → PASS（合入前再验）
 
 ## seedSessionTaskBoard 审计
@@ -40,11 +40,12 @@ pnpm exec vitest run \
   src/conversation-task/session-task-board.seed-audit.test.ts \
   src/conversation-task/turn-relation.test.ts \
   src/gateway/server-methods/chat.owner-pause-abort.test.ts \
+  src/gateway/server-chat.aside-ab-run-isolation.test.ts \
   ui/src/ui/app-chat.node.test.ts \
   ui/src/ui/controllers/chat.test.ts
 ```
 
-**结果：20 files / 240 passed**（偶发 cross-process completion 竞态 flake；连续重跑 3 次全绿后本联合跑全绿）。
+**结果：21 files / 252 passed**（Asia/Shanghai 2026-11-03 09:45；含 `server-chat.aside-ab-run-isolation.test.ts`；completion/pause 竞态已加固）。
 
 ## 只读独立回复实证（须验证四项）
 
@@ -55,6 +56,10 @@ pnpm exec vitest run \
 | 消息归属 | aside `runId` = 本次 `opts.runId`；`runReplyAgent` 直接返回，不 followup 串 A | `agent-runner.aside-reply-lane.test.ts` |
 | 取消范围 | pause/cancel → abort A + `abortMidTaskAsideLanes`；仅 abort A 的 embedded id 不清 aside 登记 | reply_lane + agent-runner 测 |
 
+## 插话分流（不全进 reply_lane）
+
+普通插问 → reply_lane；进度/只读板问 → 投影；补充纠正/安全限制 → 原任务板（屏障优先）；暂停取消 → 原停止路径。详见 `slice2-aside-reply-design.md` §3.1。
+
 ## 普通插问边界（诚实）
 
 | 能力 | 状态 |
@@ -63,7 +68,7 @@ pnpm exec vitest run \
 | reply_lane 及时答（不跟 A 串行） | **本轮已落地** |
 | 不写板、disableTools、无第二控制者 | **本轮已落地** |
 | A/B 共址 jsonl | **仍缺口** |
-| Gateway 清桶专项 hardening | **仍缺口** |
+| Gateway A/B final/cancel 隔离交叉测 | **本轮已补**（`server-chat.aside-ab-run-isolation.test.ts`） |
 | 关键词特例堆叠 / 第二任务引擎 | **不做** |
 
 ## 代码入口

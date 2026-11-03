@@ -28,7 +28,7 @@ export const PRIOR_UTTERANCE_CORRECTION_ANYWHERE_RE =
   /误会了|理解错|搞错了|弄错了|不是这个意思|并没有让你|我没有让你|我没说|你说的不对/u;
 
 const AMEND_CONSTRAINT_RE =
-  /继续|接着|然后|再补|补一|补上|加上|补充|加一节|多写一节|交叉验证|在此基础上|同样按照|进度|做到哪|怎么样了|还差|约束|口径|改成|改为|改一下|不要超过|当前(?:你做的)?(?:这个|这份)?工作|刚才/u;
+  /继续|接着|然后|再补|补一|补上|加上|增加|补充|加一节|多写一节|交叉验证|在此基础上|同样按照|进度|做到哪|怎么样了|还差|约束|口径|改成|改为|改一下|不要超过|当前(?:你做的)?(?:这个|这份)?工作|刚才|先别(?:发布|发出|发送|付款|支付|下单)|不要(?:付款|支付|发布|发出|发送|下单)|别发布|禁止(?:付款|支付|发布)/u;
 
 /**
  * Same-goal appendix / next chapter / charts — stay amend (v2 wording).
@@ -196,6 +196,21 @@ export function isOwnerConstraintFullReplace(message: string | undefined): boole
  * Whether the owner utterance should be persisted onto the constraint log.
  * Queries / bare continue / empty / commands → false.
  */
+/**
+ * Hard execution limits (do-not-publish / do-not-pay). Must establish a board
+ * barrier before or with ack — never answer-only via reply_lane while A continues.
+ */
+const OWNER_EXECUTION_BARRIER_RE =
+  /(?:^|[，,。.\s])(?:先别(?:发布|发出|发送|付款|支付|下单)|不要(?:付款|支付|发布|发出|发送|下单)|别发布|禁止(?:付款|支付|发布))(?:[。.!！]?|$)/u;
+
+export function isOwnerExecutionBarrierUtterance(message: string | undefined): boolean {
+  const text = stripInboundStamp(message ?? "");
+  if (!text || text.startsWith("/")) {
+    return false;
+  }
+  return OWNER_EXECUTION_BARRIER_RE.test(text.replace(/\s+/g, ""));
+}
+
 export function shouldPersistOwnerConstraint(message: string | undefined): boolean {
   const text = stripInboundStamp(message ?? "");
   if (!text || text.startsWith("/")) {

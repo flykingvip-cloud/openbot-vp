@@ -59,4 +59,22 @@ describe("resolveMidTaskAsideDisposition", () => {
     expect(text).toContain("有效约束 2 条");
     expect(text).not.toContain("wakeSuppress");
   });
+
+  it("routes supplement/correct/safety to not_aside (board entry), not reply_lane", () => {
+    const board = boardWithConstraints();
+    for (const prompt of ["报告增加欧洲市场", "改为只要公开资料", "先别发布", "不要付款"]) {
+      const d = resolveMidTaskAsideDisposition({ prompt, board });
+      expect(d.kind, prompt).toBe("not_aside");
+      expect(classifyTurnRelation(prompt, board.current!.goalText)).toBe("amend");
+    }
+  });
+
+  it("keeps ordinary questions on reply_lane_pending", () => {
+    expect(
+      resolveMidTaskAsideDisposition({
+        prompt: "今天北京天气怎么样",
+        board: boardWithConstraints(),
+      }).kind,
+    ).toBe("reply_lane_pending");
+  });
 });

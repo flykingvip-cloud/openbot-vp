@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isWeakNewWorkCueOnly } from "./qualification.js";
 import {
   classifyTurnRelation,
+  isOwnerExecutionBarrierUtterance,
   isBareContinueCue,
   isOwnerConstraintFullReplace,
   isOwnerConstraintRevision,
@@ -123,5 +124,18 @@ describe("slice3 constraint persist gates", () => {
     expect(classifyTurnRelation("请用中文回复", CURRENT, { activeConstraints: [poisoned] })).toBe(
       "aside",
     );
+  });
+});
+
+describe("slice2 mid-task routing amend cues", () => {
+  const goal = "调研国内手机市场并写报告";
+
+  it("treats supplement and safety barriers as amend (not aside/reply_lane)", () => {
+    expect(classifyTurnRelation("报告增加欧洲市场", goal)).toBe("amend");
+    expect(classifyTurnRelation("先别发布", goal)).toBe("amend");
+    expect(classifyTurnRelation("不要付款", goal)).toBe("amend");
+    expect(isOwnerExecutionBarrierUtterance("先别发布")).toBe(true);
+    expect(isOwnerExecutionBarrierUtterance("不要付款")).toBe(true);
+    expect(isOwnerExecutionBarrierUtterance("今天北京天气怎么样")).toBe(false);
   });
 });

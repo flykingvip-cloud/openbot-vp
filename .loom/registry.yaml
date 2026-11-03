@@ -3,12 +3,11 @@ tasks:
   - id: ft-plan-speak-shopping-positive-admission
     owner: grok-bot
     intent:
-      - "Slice2 cross-check: Gateway chat.send pause/cancel abort+queue clear+no
-        dispatch; commitSameTaskConstraint expectedTaskId; board_readonly aside
-        checkpoint; reply_lane unfinished. Four blockers retained on 6c4081a3c."
-      - "Slice3: ConstraintEntry log+revise supersede; buildResumePrompt
-        active-only; writeEpoch CAS; persist gates (bare continue/queries); no
-        reply_lane. Aside LLM still unfinished."
+      - "Slice2 reply_lane harden: no epoch-invariant discard; cancel keep
+        registration until finally; full constraints+sidecar history; typed
+        mid-task routing (not all reply_lane); barrier-first for 先别发布/不要付款;
+        Gateway A/B isolation cross-test; wakeSuppress preserve under pause RMW."
+      - "Slice3 context kept; no feature expand. No merge/deploy."
     paths:
       - src/shared/text/plan-speak-final.ts
       - src/shared/text/plan-speak-final.test.ts
@@ -50,6 +49,9 @@ tasks:
       - src/auto-reply/reply/mid-task-aside-reply-lane.test.ts
       - src/conversation-task/session-task-board.seed-audit.test.ts
       - docs/slice2-reply-lane-joint-verification.md
+      - src/gateway/server-chat.aside-ab-run-isolation.test.ts
+      - src/conversation-task/session-task-board.cross-process-child.ts
+      - src/conversation-task/session-task-board.cross-process.test.ts
     state: active
     sessions:
       - id: 2a5a3f36-196a-4b8b-8728-3686a1508090
@@ -57,7 +59,7 @@ tasks:
         ide: cursor
         agent: cursor-grok
         status: active
-        lastSignalAt: 2026-11-02T23:59:41.035Z
+        lastSignalAt: 2026-11-03T01:45:58.572Z
         metadata: {}
     ownerHistory:
       - fromOwner: cursor-grok
@@ -10846,12 +10848,13 @@ landingStreams:
       - src/auto-reply/reply/agent-runner.aside-reply-lane.test.ts
       - src/conversation-task/session-task-board.seed-audit.test.ts
       - docs/slice2-reply-lane-joint-verification.md
+      - src/gateway/server-chat.aside-ab-run-isolation.test.ts
     canLandWith: []
     metadata:
       task: ft-plan-speak-shopping-positive-admission
       owner: cursor-grok
-      purpose: Slice3 constraint log revise/supersede + writeEpoch CAS + persist
-        gates; aside reply_lane still unfinished.
+      purpose: Slice2 reply_lane harden + typed mid-task routing + Gateway A/B
+        isolation; Slice3 context retained; no merge/deploy.
   - id: identity-principal-sync-20261103
     landingPolicy: serial
     paths:

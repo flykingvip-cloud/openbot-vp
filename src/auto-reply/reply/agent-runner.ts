@@ -33,6 +33,7 @@ import {
 } from "../../conversation-task/task-board-continue.js";
 import {
   classifyTurnRelation,
+  isOwnerExecutionBarrierUtterance,
   shouldPersistOwnerConstraint,
 } from "../../conversation-task/turn-relation.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
@@ -375,16 +376,37 @@ export async function runReplyAgent(params: {
     const expectedTaskId = sessionFile
       ? (readSessionTaskBoard(sessionFile).current?.taskId?.trim() ?? "")
       : "";
+    // Safety limits (先别发布 / 不要付款): persist board barrier BEFORE steer/ack
+    // so A cannot keep acting while we only say "收到".
+    const barrierFirst = isOwnerExecutionBarrierUtterance(followupRun.prompt);
+    let persistedEarly = false;
+    if (barrierFirst && sessionFile && expectedTaskId) {
+      persistedEarly = commitSameTaskConstraint({
+        sessionFile,
+        constraintText: followupRun.prompt,
+        expectedTaskId,
+      });
+      if (!persistedEarly) {
+        await touchActiveSessionEntry();
+        typing.cleanup();
+        return [
+          {
+            text: "限制未能写入原任务板（任务可能已切换或写入失败）。尚未视为生效；请重新发送该限制。",
+          },
+        ];
+      }
+    }
     const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
     if (steered) {
       const persisted =
-        Boolean(sessionFile) &&
-        Boolean(expectedTaskId) &&
-        commitSameTaskConstraint({
-          sessionFile,
-          constraintText: followupRun.prompt,
-          expectedTaskId,
-        });
+        persistedEarly ||
+        (Boolean(sessionFile) &&
+          Boolean(expectedTaskId) &&
+          commitSameTaskConstraint({
+            sessionFile,
+            constraintText: followupRun.prompt,
+            expectedTaskId,
+          }));
       await touchActiveSessionEntry();
       typing.cleanup();
       if (!persisted) {
@@ -395,6 +417,16 @@ export async function runReplyAgent(params: {
         ];
       }
       return [{ text: formatAmendConstraintAck(followupRun.prompt) }];
+    }
+    // Barrier already on the board even if steer missed — surface applied vs pending.
+    if (persistedEarly) {
+      await touchActiveSessionEntry();
+      typing.cleanup();
+      return [
+        {
+          text: `限制已写入任务板并生效：${followupRun.prompt.replace(/\s+/g, " ").trim().slice(0, 60)}。注入当前执行未成功，后台仍应按板约束停止相关动作；如需确认请再发一次。`,
+        },
+      ];
     }
   }
 

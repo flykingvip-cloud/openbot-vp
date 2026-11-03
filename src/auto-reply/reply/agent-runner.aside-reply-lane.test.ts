@@ -157,7 +157,7 @@ describe("runReplyAgent aside reply_lane timely path", () => {
 
   it("owner pause aborts parent and registered aside lanes", async () => {
     // Pre-register a live aside as if a concurrent reply_lane were in flight.
-    const { registerMidTaskAsideLane, listMidTaskAsideLanesForTests } =
+    const { registerMidTaskAsideLane, listMidTaskAsideLanesForTests, isMidTaskAsideLaneCancelled } =
       await import("./mid-task-aside-reply-lane.js");
     registerMidTaskAsideLane("session-a", "aside-live-1");
     expect(listMidTaskAsideLanesForTests("session-a")).toEqual(["aside-live-1"]);
@@ -166,7 +166,9 @@ describe("runReplyAgent aside reply_lane timely path", () => {
     expect(Array.isArray(payloads)).toBe(true);
     expect(abortEmbeddedPiRunMock).toHaveBeenCalledWith("session-a");
     expect(abortEmbeddedPiRunMock).toHaveBeenCalledWith("aside-live-1");
-    expect(listMidTaskAsideLanesForTests("session-a")).toEqual([]);
+    // Cancel signal must remain observable (not dropped) until the aside finally cleans up.
+    expect(isMidTaskAsideLaneCancelled("session-a", "aside-live-1")).toBe(true);
+    expect(listMidTaskAsideLanesForTests("session-a")).toEqual(["aside-live-1"]);
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
   });
 });
