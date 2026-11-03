@@ -205,3 +205,10 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Original explicit collaboration assembly admission and group-ID resolution now owned by command/scenarios, with original adapter compatibility and metadata precedence. This is not a new semantic classifier, permission gate or complete collaboration migration. — codex-runtime-manager
 - Four suites / 29 PASS; original adapter/normal entrance rechecked 15 PASS after correcting missing internal import caught by tsgo. Final typed lint clean; architecture 25 rules PASS; tsgo baseline/candidate 52; final build PASS with 209 warnings unchanged. — codex-runtime-manager
 - Remaining work: admitted work-item execution main entry, per-scenario acceptance and stop scope, production extension consumer inventory. Do not count scenario routing as completion of shared executor convergence. — codex-runtime-manager
+
+## Shared execution and per-scenario acceptance audit
+
+- Explicitly retain individual vs group lifecycle separation. task-close-audit.md finds recordCheckedTaskCompletion drops task/attempt/artifact identity; original finishCurrentTask guards are optional and bypassed by the wrapper. — codex-runtime-manager
+- API-level isolated repro on temporary board with task-b current: calling old closed:true record (unable to carry task-a identity) produces BIncorrectlyClosed=true. No production task data touched. This is a pre-existing correctness gap, not a migration-induced failure. — codex-runtime-manager
+- [ ] Priority correctness slice: bind completion to originating session-board task/attempt/artifact through real caller paths; never substitute CTR id or newest current task. Preserve old checked-notice design, examine raw transcript append via SessionManager evidence; do not silently delete notices. — codex-runtime-manager
+- admitted-backend-port.md defines the next shared execution component: full admitted candidate CLI/embedded dispatch/prepare/invoke/lifecycle, leaving admission/fallback/aggregate/finalizers at their existing owner. No three-line forwarding wrapper, new retry loop or optional governance. — codex-runtime-manager
