@@ -45,7 +45,7 @@ describe("resolveMidTaskAsideDisposition", () => {
     }
   });
 
-  it("marks general aside as reply_lane_pending (not yet timely LLM)", () => {
+  it("marks general aside as reply_lane_pending (timely lane owns the answer)", () => {
     expect(
       resolveMidTaskAsideDisposition({
         prompt: "今天北京天气怎么样",

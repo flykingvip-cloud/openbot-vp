@@ -92,6 +92,7 @@ import {
   recordHonestCapabilityGap,
   stripCapabilityGapMarkers,
 } from "./honest-empty-reply.js";
+import { abortMidTaskAsideLanes, runMidTaskAsideReplyLane } from "./mid-task-aside-reply-lane.js";
 import { resolveMidTaskAsideDisposition } from "./mid-task-aside.js";
 import {
   formatAmendConstraintAck,
@@ -291,6 +292,7 @@ export async function runReplyAgent(params: {
     if (control.abortInFlight) {
       const sessionId = followupRun.run.sessionId;
       abortEmbeddedPiRun(sessionId);
+      abortMidTaskAsideLanes(sessionId);
       clearSessionQueues([queueKey, sessionId, followupRun.run.sessionKey]);
     }
     await touchActiveSessionEntry();
@@ -310,9 +312,9 @@ export async function runReplyAgent(params: {
     }
   }
 
-  // Slice2 local checkpoint: board_readonly asides (goal/constraint asks) reply
-  // from the task-board projection only — never mutate A or start a second controller.
-  // General reply_lane timely LLM asides remain unfinished (see aside design doc).
+  // Slice2: board_readonly = projection only; reply_lane = tools-disabled ephemeral
+  // embedded turn (distinct sessionId/file) so ordinary asides answer while A stays
+  // active — not a second task controller; never mutates the task board.
   if (isActive && followupRun.run.sessionFile) {
     const board = readSessionTaskBoard(followupRun.run.sessionFile);
     if (board.current) {
@@ -324,6 +326,20 @@ export async function runReplyAgent(params: {
         await touchActiveSessionEntry();
         typing.cleanup();
         return [{ text: aside.reply }];
+      }
+      if (aside.kind === "reply_lane_pending") {
+        const asideRunId = opts?.runId ?? crypto.randomUUID();
+        const lane = await runMidTaskAsideReplyLane({
+          parentSessionId: followupRun.run.sessionId,
+          parentSessionFile: followupRun.run.sessionFile,
+          board,
+          userPrompt: followupRun.prompt,
+          run: followupRun.run,
+          runId: asideRunId,
+        });
+        await touchActiveSessionEntry();
+        typing.cleanup();
+        return [{ text: lane.text }];
       }
     }
   }

@@ -1,7 +1,8 @@
 /**
- * Mid-task aside disposition (slice2 design): classify aside while A is active.
+ * Mid-task aside disposition (slice2): classify aside while A is active.
  * board_readonly answers are projections only — never mutate the task board.
- * General reply_lane timely LLM replies remain unfinished (see design doc).
+ * reply_lane_pending is handled by mid-task-aside-reply-lane (tools-disabled
+ * ephemeral embedded turn); not a second task controller.
  */
 import {
   activeConstraintTexts,
