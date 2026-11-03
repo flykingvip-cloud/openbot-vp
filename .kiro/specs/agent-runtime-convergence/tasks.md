@@ -165,3 +165,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Reproduced product issue: sanitizeUserFacingText removes raw approve protocol to empty; generic skip dropped the structured execApproval card. Fix only restores safe APPROVE_CARD_CTA for sanitized-empty text carrying valid existing metadata and explicit allow-once protocol; silent/heartbeat/empty/malformed remain suppressed. This is a separate behavior fix, not equivalent migration. — codex-runtime-manager
 - Configured e2e now 46/46 PASS (including silent/card, heartbeat/card and empty-id negative cases). Independent review PASS; typed lint clean; tsgo baseline/candidate 52 unchanged; final build PASS and dynamic-import warnings 209 unchanged. Raw command/approval protocol is not restored in visible text. — codex-runtime-manager
 - Earlier 8-failure baseline is superseded by the mock repair and this explicit product regression fix. Existing unrelated entitlement suite remains baseline-red as separately recorded. — codex-runtime-manager
+
+## Pure blocker policy checkpoint
+
+- Existing blocker grades/probe DTO/side-path and cleared-evidence classification moved unchanged to policy/index (020bf5a37). Original contract imports shared rules and re-exports existing public symbols; FS probes/writes, clock, OGUI, trial and settlement remain original. — codex-runtime-manager
+- Three suites / 26 PASS; independent equivalence review PASS; typed lint clean; architecture 24 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS, 209 dynamic-import warnings unchanged. — codex-runtime-manager
+- Policy is PARTIAL: this is not a new transition engine or complete acceptance migration. Next settlement migration must retain lazy side effects and original precedence as recorded in acceptance-boundary.md. — codex-runtime-manager

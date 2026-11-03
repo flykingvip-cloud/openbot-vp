@@ -73,3 +73,5 @@ Execution is now PARTIAL through bounded in-turn stall recovery (ac0f448e1). It 
 Execution preparation is PARTIAL through the original embedded parameter projection (7878b9bf9), with a separate preparation public entry. This does not migrate commercial admission, fallback, model transport, provider invocation or result accounting; legacy input/identity dependencies remain.
 
 Delivery is PARTIAL through candidate payload preparation (5907080c3). Actual task acceptance, send/acknowledgement, artifacts and reuse remain in original owners. Additional e2e suite is baseline-red and must not be represented as complete integration acceptance.
+
+Policy is PARTIAL through pure blocker classification (020bf5a37), with no runtime imports or effects. Full transition/authorization/limit consolidation and acceptance orchestration are not implemented by this checkpoint.
