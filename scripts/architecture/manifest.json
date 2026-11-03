@@ -119,9 +119,10 @@
       "src/cron/**",
       "src/auto-reply/**",
       "src/agent-runtime/execution/**",
-      "src/agent-runtime/capabilities/**"
+      "src/agent-runtime/capabilities/**",
+      "src/conversation-task/**"
     ],
-    "description": "Command use cases cannot directly invoke models, tools or scheduling; state and steering effects use explicit injected ports."
+    "description": "Command use cases cannot directly invoke models, tools, scheduling or task persistence; effects use explicit injected ports and pure projections."
   },
   {
     "name": "runtime-command-auto-reply-public-entry",
