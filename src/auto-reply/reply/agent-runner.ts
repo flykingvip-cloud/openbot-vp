@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { amendActiveTask } from "../../agent-runtime/command/amend-active-task.js";
+import { controlCurrentTask } from "../../agent-runtime/command/current-task-control.js";
 import { queryCurrentTaskStatus } from "../../agent-runtime/command/task-status.js";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
@@ -281,19 +282,23 @@ export async function runReplyAgent(params: {
     followupRun.run.sessionFile
   ) {
     const sessionFile = followupRun.run.sessionFile.trim();
-    const control = mutateSessionTaskBoard(sessionFile, (board) => {
-      const result = applyIncomingUserMessage({
-        board,
-        incomingText: followupRun.prompt,
-      });
-      return { board: result.board, value: result };
+    const sessionId = followupRun.run.sessionId;
+    const control = controlCurrentTask(followupRun.prompt, {
+      applyControl: (prompt) =>
+        mutateSessionTaskBoard(sessionFile, (board) => {
+          const result = applyIncomingUserMessage({ board, incomingText: prompt });
+          return { board: result.board, value: result };
+        }),
+      abortMain: () => {
+        abortEmbeddedPiRun(sessionId);
+      },
+      abortAsides: () => {
+        abortMidTaskAsideLanes(sessionId);
+      },
+      clearPending: () => {
+        clearSessionQueues([queueKey, sessionId, followupRun.run.sessionKey]);
+      },
     });
-    if (control.abortInFlight) {
-      const sessionId = followupRun.run.sessionId;
-      abortEmbeddedPiRun(sessionId);
-      abortMidTaskAsideLanes(sessionId);
-      clearSessionQueues([queueKey, sessionId, followupRun.run.sessionKey]);
-    }
     await touchActiveSessionEntry();
     typing.cleanup();
     return [{ text: control.statusLine?.trim() || "已处理任务控制指令。" }];
