@@ -1,0 +1,146 @@
+{
+  "recordedAtAsiaShanghai": "2026-11-03T11:42:41+08:00",
+  "gatewayPort": 19101,
+  "stateDir": "/tmp/openbot-pr216-e2e-state-01e15de99",
+  "sessionKey": "agent:main:main",
+  "runStamp": "BR056mxl",
+  "buildInfo": {
+    "version": "2026.7.12-rc.2",
+    "commit": "f7b459fd8691cb7f0b737ea95ddee5de3017fda4",
+    "builtAt": "2026-11-03T03:34:18.781Z",
+    "probeModuleSha": "b9b9d3350ef20546"
+  },
+  "timeline": [
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:31+08:00",
+      "tMs": 1793677351850,
+      "phase": "browser.start",
+      "message": "agent:main:main"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:32+08:00",
+      "tMs": 1793677352745,
+      "phase": "page.goto",
+      "message": "port=19101 stamp=BR056mxl"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:33+08:00",
+      "tMs": 1793677353756,
+      "phase": "ui.connected",
+      "ok": true
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:33+08:00",
+      "tMs": 1793677353790,
+      "phase": "screenshot",
+      "message": "/tmp/openbot-pr216-e2e-out/final/screenshots/01-connected.png"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:35+08:00",
+      "tMs": 1793677355551,
+      "phase": "session.renewed",
+      "ok": true
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:35+08:00",
+      "tMs": 1793677355785,
+      "phase": "A.sent",
+      "ok": true,
+      "message": "任务A-浏览器-BR056mxl"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:35+08:00",
+      "tMs": 1793677355786,
+      "phase": "stop.visible_while_A",
+      "ok": true
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:35+08:00",
+      "tMs": 1793677355828,
+      "phase": "screenshot",
+      "message": "/tmp/openbot-pr216-e2e-out/final/screenshots/02-stop-while-A.png"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:36+08:00",
+      "tMs": 1793677356059,
+      "phase": "B.aside.sent",
+      "ok": true,
+      "message": "{\"usedEnter\":true,\"used\":\"enter\"}"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:36+08:00",
+      "tMs": 1793677356060,
+      "phase": "B.prompt.visible",
+      "ok": true
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:36+08:00",
+      "tMs": 1793677356061,
+      "phase": "B.bubble.visible",
+      "ok": true
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:36+08:00",
+      "tMs": 1793677356062,
+      "phase": "bubbles.A_and_B",
+      "ok": true,
+      "message": "hasA=true hasB=true bubbleCount=5"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:36+08:00",
+      "tMs": 1793677356095,
+      "phase": "screenshot",
+      "message": "/tmp/openbot-pr216-e2e-out/final/screenshots/03-A-B-bubbles.png"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:38+08:00",
+      "tMs": 1793677358118,
+      "phase": "stop.clicked",
+      "ok": true,
+      "message": "class"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:41+08:00",
+      "tMs": 1793677361164,
+      "phase": "screenshot",
+      "message": "/tmp/openbot-pr216-e2e-out/final/screenshots/04-after-stop.png"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:41+08:00",
+      "tMs": 1793677361318,
+      "phase": "refresh.ui",
+      "ok": true,
+      "message": "hasA=true hasB=true waitOk=true text=Y\n\nA new session was started via /new or /reset. Execute your Session Startup sequence now - read the required files before responding to the user. Then greet the user in your configured persona, if one is provided. Be yourself - use your defined voice, mannerisms, and mood. Keep it to 1-3 sentences and ask what they want to do. If the runtime model differs "
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:41+08:00",
+      "tMs": 1793677361416,
+      "phase": "screenshot",
+      "message": "/tmp/openbot-pr216-e2e-out/final/screenshots/05-after-refresh.png"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:42:41+08:00",
+      "tMs": 1793677361434,
+      "phase": "verdict",
+      "ok": true,
+      "message": "{\"stop_button_while_A\":true,\"composer_aside_while_A\":true,\"B_prompt_in_thread\":true,\"B_bubble_visible\":true,\"A_B_bubbles_present\":true,\"refresh_UI_visible\":true}"
+    }
+  ],
+  "checks": {
+    "stop_button_while_A": true,
+    "composer_aside_while_A": true,
+    "B_prompt_in_thread": true,
+    "B_bubble_visible": true,
+    "A_B_bubbles_present": true,
+    "refresh_UI_visible": true
+  },
+  "screenshots": {
+    "connected": "/tmp/openbot-pr216-e2e-out/final/screenshots/01-connected.png",
+    "stopVisible": "/tmp/openbot-pr216-e2e-out/final/screenshots/02-stop-while-A.png",
+    "abBubbles": "/tmp/openbot-pr216-e2e-out/final/screenshots/03-A-B-bubbles.png",
+    "afterStop": "/tmp/openbot-pr216-e2e-out/final/screenshots/04-after-stop.png",
+    "afterRefresh": "/tmp/openbot-pr216-e2e-out/final/screenshots/05-after-refresh.png"
+  },
+  "pass": true,
+  "noteZh": "浏览器端：A 运行中输入框可发插问；停止按钮可见并可点；A/B 气泡同线程可见；刷新后 UI 仍可见（含 stamp 标记）。"
+}

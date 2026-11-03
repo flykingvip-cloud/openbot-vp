@@ -1,0 +1,35 @@
+{
+  "recordedAtAsiaShanghai": "2026-11-03T11:43:00+08:00",
+  "runtimeBuildTipSha": "f7b459fd8691cb7f0b737ea95ddee5de3017fda4",
+  "mainMergeSha": "2ab9ded920287b40f010bfb0b8742b1ab4a45629",
+  "gateway": {
+    "port": 19101,
+    "pid": 77323,
+    "stateDir": "/tmp/openbot-pr216-e2e-state-01e15de99",
+    "model": "api-proxy-deepseek/deepseek-v4-flash",
+    "buildSource": "worktree pnpm/tsdown + write-build-info + ui:build; dist/build-info.json commit f7b459fd…; Control UI force-sync; cwd openbot-pr216-slice2"
+  },
+  "items": {
+    "mid_exec_stop": {
+      "pass": true,
+      "json": "docs/slice2-final-acceptance-evidence/slice2-e2e-mid-exec-interrupt.json"
+    },
+    "browser_ui": {
+      "pass": true,
+      "json": "docs/slice2-final-acceptance-evidence/slice2-e2e-browser-ui.json",
+      "screenshots": "docs/slice2-final-acceptance-evidence/screenshots/"
+    },
+    "diagnostics_build": {
+      "format_exit": 1,
+      "oxlint_exit": 0,
+      "tsgo_exit": 2,
+      "ts_error_count": 41,
+      "aor": 0,
+      "arch": 0,
+      "ineffective_dynamic_import_warnings": 209,
+      "build_ok": true
+    }
+  },
+  "merged": false,
+  "deployed": false
+}

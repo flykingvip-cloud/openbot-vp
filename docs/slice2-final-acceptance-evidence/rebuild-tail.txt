@@ -1,0 +1,40 @@
+../dist/control-ui/assets/port-state-DFB2oCqp.js                              3.04 kB │ gzip:   1.07 kB │ map:      5.27 kB
+../dist/control-ui/assets/zh-TW-BBESyrgs.js                                   3.69 kB │ gzip:   2.21 kB │ map:      6.16 kB
+../dist/control-ui/assets/pt-BR-CTUfYAYm.js                                   4.15 kB │ gzip:   2.02 kB │ map:      6.69 kB
+../dist/control-ui/assets/de-CCyqaO4u.js                                      4.30 kB │ gzip:   2.11 kB │ map:      6.87 kB
+../dist/control-ui/assets/knowledge-universe-document-reader-CBGjW88e.js      5.95 kB │ gzip:   1.81 kB │ map:     20.44 kB
+../dist/control-ui/assets/github-adapter-DSqLNHN7.js                          7.65 kB │ gzip:   2.79 kB │ map:     28.88 kB
+../dist/control-ui/assets/capability-governance-state-DSA7ctoi.js             9.46 kB │ gzip:   4.24 kB │ map:     34.24 kB
+../dist/control-ui/assets/asset-detail-vm-dHowJQOL.js                        10.83 kB │ gzip:   3.91 kB │ map:     41.09 kB
+../dist/control-ui/assets/es-CBXzzZpB.js                                     11.92 kB │ gzip:   4.79 kB │ map:     19.05 kB
+../dist/control-ui/assets/knowledge-universe-connector-bind-DLiQ8Z_h.js      15.31 kB │ gzip:   3.44 kB │ map:     45.75 kB
+../dist/control-ui/assets/vendor-noble-D0EWqFJs.js                           16.91 kB │ gzip:   7.65 kB │ map:    107.03 kB
+../dist/control-ui/assets/daibai-guide-history-wire-C3tT0WUK.js              19.19 kB │ gzip:   7.70 kB │ map:     65.02 kB
+../dist/control-ui/assets/render-actions-BCaq5B1e.js                         19.63 kB │ gzip:   5.35 kB │ map:     86.50 kB
+../dist/control-ui/assets/render-model-Dev3YOtx.js                           27.85 kB │ gzip:   8.40 kB │ map:     99.45 kB
+../dist/control-ui/assets/supervisor-task-board-CkKsfUB7.js                  31.41 kB │ gzip:   7.62 kB │ map:     63.61 kB
+../dist/control-ui/assets/workbench-stage-assistant-CMzHq2WN.js              60.55 kB │ gzip:  14.22 kB │ map:    176.59 kB
+../dist/control-ui/assets/personal-email-browser-guide-yaprgy69.js           70.37 kB │ gzip:  22.44 kB │ map:    274.37 kB
+../dist/control-ui/assets/builders-dju3-PGt.js                               88.10 kB │ gzip:  26.78 kB │ map:    262.41 kB
+../dist/control-ui/assets/vendor-jszip-CF_QwUG1.js                           96.98 kB │ gzip:  29.97 kB │ map:    226.82 kB
+../dist/control-ui/assets/page-DHgW7s46.js                                  122.63 kB │ gzip:  25.57 kB │ map:    272.01 kB
+../dist/control-ui/assets/zh-CN-Djn-wXEa.js                                 214.17 kB │ gzip:  76.97 kB │ map:    354.63 kB
+../dist/control-ui/assets/en-z5DuBfNR.js                                    218.21 kB │ gzip:  69.71 kB │ map:    363.44 kB
+../dist/control-ui/assets/render-model-CiWyidR6.js                          276.63 kB │ gzip:  70.35 kB │ map:    943.40 kB
+../dist/control-ui/assets/workbench-D8F4REy7.js                             835.84 kB │ gzip: 182.58 kB │ map:  2,224.82 kB
+../dist/control-ui/assets/platform-shell-D9pW0cLw.js                      1,173.66 kB │ gzip: 275.55 kB │ map:  3,367.12 kB
+../dist/control-ui/assets/index-UkLCfllh.js                               3,280.83 kB │ gzip: 819.90 kB │ map: 10,954.94 kB
+
+(!) Some chunks are larger than 1024 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.84s
+Skipped Control UI sync — pin active (PINNED-post-deploy-beb0ee226ab6-until-next-auth beb0ee226ab6eb7bdd10338b43da42c38478f225 deployed-2026-11-01). Set OPENBOT_CONTROL_UI_FORCE_SYNC=1 to override.
+=== BUILD_DONE ===
+{
+  "version": "2026.7.12-rc.2",
+  "commit": "2ab9ded920287b40f010bfb0b8742b1ab4a45629",
+  "builtAt": "2026-11-03T03:33:34.431Z",
+  "probeModuleSha": "b9b9d3350ef20546"
+}

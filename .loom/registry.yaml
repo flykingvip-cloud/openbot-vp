@@ -70,6 +70,10 @@ tasks:
       - docs/slice2-aside-trust-boundary-delivery.md
       - docs/slice2-e2e-real-model-acceptance.md
       - src/auto-reply/reply/slice2-e2e-real-model-accept.mjs
+      - src/auto-reply/reply/slice2-e2e-mid-exec-interrupt.mjs
+      - src/auto-reply/reply/slice2-e2e-browser-ui.mjs
+      - docs/slice2-e2e-final-acceptance-pack.md
+      - docs/slice2-final-acceptance-evidence/**
     state: active
     sessions:
       - id: 2a5a3f36-196a-4b8b-8728-3686a1508090
@@ -10885,6 +10889,10 @@ landingStreams:
       - docs/slice2-aside-trust-boundary-delivery.md
       - docs/slice2-e2e-real-model-acceptance.md
       - src/auto-reply/reply/slice2-e2e-real-model-accept.mjs
+      - src/auto-reply/reply/slice2-e2e-mid-exec-interrupt.mjs
+      - src/auto-reply/reply/slice2-e2e-browser-ui.mjs
+      - docs/slice2-e2e-final-acceptance-pack.md
+      - docs/slice2-final-acceptance-evidence/**
     canLandWith: []
     metadata:
       task: ft-plan-speak-shopping-positive-admission

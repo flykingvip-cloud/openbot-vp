@@ -1,0 +1,182 @@
+date: illegal time format
+usage: date [-jnRu] [-I[date|hours|minutes|seconds|ns]] [-f input_fmt]
+            [ -z output_zone ] [-r filename|seconds] [-v[+|-]val[y|m|w|d|H|M|S]]
+            [[[[mm]dd]HH]MM[[cc]yy][.SS] | new_date] [+output_fmt]
+=== format:check  ===
+
+> @upbeyond/openbot@2026.7.12-rc.2 format:check /Users/daniel/AI VP/openbot-pr216-slice2
+> oxfmt --check
+
+Checking formatting...
+
+.kiro/specs/watchdog-task-closure/tasks.md (16ms)
+deploy/production/RELEASE_RECORD.md (5264ms)
+docs/OPENBOT_OPENCLAW_COMPAT.md (18ms)
+docs/PR143-MERGE-NOTES.md (10ms)
+docs/acceptance/fullstack-2026-11-01/09-coverage-progress.md (56ms)
+docs/acceptance/fullstack-2026-11-01/10-acceptance-conclusion.md (17ms)
+docs/acceptance/fullstack-2026-11-01/10-control-ui-credential-free.md (16ms)
+docs/acceptance/fullstack-2026-11-01/10-coverage-inventory-tracked.md (41ms)
+docs/acceptance/fullstack-2026-11-01/10-pr193-review.md (11ms)
+docs/acceptance/p1-fix-2026-11-01/defect-status.md (10ms)
+docs/acceptance/runs/2026-11-02-credentials-omit/00-pin.md (10ms)
+docs/acceptance/runs/2026-11-02-credentials-omit/01-credentials-omit-root-cause.md (17ms)
+docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/00-exhaustiveness-note.md (17ms)
+docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/00-reviewer-corrections.md (12ms)
+docs/acceptance/runs/2026-11-02-independent-reviewer-corrections/01-owner-confirm-round2.md (12ms)
+docs/acceptance/runs/2026-11-02-pr194-locate/README.md (14ms)
+docs/audits/2026-11-01-closed-loop-demand-diagnosis-notify.md (318ms)
+docs/design/collab-context-p3-private-memory-promote-2026-10-14.md (11ms)
+docs/design/evidence/memory-system-final-closeout-2026-11-01/composition-root-loc-fix-2026-11-01.md (22ms)
+docs/design/evidence/memory-system-final-closeout-2026-11-01/pr182-local-rerun-comment.md (20ms)
+docs/design/memory-continuity-acceptance.md (36ms)
+docs/design/tri-platform-unification-2026-07-05.md (254ms)
+docs/notes/controlled-collab-formal-chain-breakpoints-2026-11-01.md (22ms)
+docs/notes/controlled-discuss-to-task-p1-2026-10-31.md (4ms)
+docs/notes/fix-ab-ghost-confirm-chat-history-20261029.md (10ms)
+docs/notes/fix-member-governance-owner-identity-20261029.md (16ms)
+docs/notes/infrastructure-audit-2026-10-31.md (13ms)
+docs/notes/infrastructure-audit-2026-10-31/a3-control-experiment-plan-PENDING-AUTH.md (15ms)
+docs/notes/infrastructure-audit-2026-10-31/a3-implementation-pack-PENDING-AUTH.md (28ms)
+docs/notes/infrastructure-audit-2026-10-31/batch-b-local-gate-2026-10-31.md (4ms)
+docs/notes/infrastructure-audit-2026-10-31/batch-c-provenance-staging-2026-10-31.md (21ms)
+docs/notes/infrastructure-audit-2026-10-31/billing-h1-blocked-2026-10-31.md (8ms)
+docs/notes/infrastructure-audit-2026-10-31/closeout-2026-11-01.md (126ms)
+docs/notes/infrastructure-audit-2026-10-31/closeout-evidence-index-2026-11-01.md (10ms)
+docs/notes/infrastructure-audit-2026-10-31/closeout-residual-handoff-2026-11-01.md (19ms)
+docs/notes/infrastructure-audit-2026-10-31/disk-inventory-2026-10-31.md (11ms)
+docs/notes/infrastructure-audit-2026-10-31/ledger-audit-2026-10-31.md (6ms)
+docs/notes/infrastructure-audit-2026-10-31/ledger-audit-finding-codes-exit30-2026-10-31.md (13ms)
+docs/notes/infrastructure-audit-2026-10-31/ledger-error-classification-2026-10-31.md (14ms)
+docs/notes/infrastructure-audit-2026-10-31/p1-dag-break-evidence-closure-2026-10-31.md (19ms)
+docs/notes/infrastructure-audit-2026-10-31/p1-object-recovery-reclassification-2026-10-31.md (61ms)
+docs/notes/infrastructure-audit-2026-10-31/plan.md (150ms)
+docs/notes/infrastructure-audit-2026-10-31/release-record-anti-drift-2026-10-31.md (11ms)
+docs/notes/team-real-f4-board-confirmer-chain-2026-10-28.md (25ms)
+docs/reference/ci-local-merge-gate.md (14ms)
+docs/repo-split/G1-inventory.md (134ms)
+docs/repo-split/README.md (18ms)
+docs/repo-split/decisions.md (11ms)
+docs/slice1-decision-to-reply-path.md (25ms)
+docs/slice2-aside-reply-concurrency-design.md (22ms)
+docs/slice2-aside-reply-design.md (46ms)
+docs/slice2-chat-during-task-delivery.md (31ms)
+docs/slice2-chat-during-task-evidence.md (125ms)
+docs/slice2-reply-lane-joint-verification.md (12ms)
+docs/slice3-context-enhancement-delivery.md (37ms)
+evidence/watchdog-task-closure-acceptance-2026-11-01.md (109ms)
+src/agents/sandbox/ACCOUNT_WORKER_SANDBOX_IMAGES.md (21ms)
+src/gateway/collaboration-dispatch/executor-private-todolist.test.ts (2ms)
+
+Format issues found in above 58 files. Run without `--check` to fix.
+Finished in 14443ms on 17387 files using 14 threads.
+ ELIFECYCLE  Command failed with exit code 1.
+FORMAT_EXIT:1
+=== oxlint e2e+fix files ===
+Found 0 warnings and 0 errors.
+Finished in 21ms on 3 files with 117 rules using 14 threads.
+OXLINT_EXIT:0
+=== lint boundaries ===
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:aor:boundaries /Users/daniel/AI VP/openbot-pr216-slice2
+> node --import tsx scripts/check-aor-boundaries.ts
+
+AOR boundary guard: OK (no forbidden imports in packages/aor-*).
+AOR:0
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:ui:capability-boundaries /Users/daniel/AI VP/openbot-pr216-slice2
+> node scripts/check-openbot-ui-boundaries.mjs
+
+OpenBot UI boundary check passed.
+UI_BOUND:0
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:core:architecture-manifest /Users/daniel/AI VP/openbot-pr216-slice2
+> node --import tsx scripts/check-architecture-manifest.ts
+
+Architecture manifest passed (12 rules, 13644 files scanned).
+ARCH:0
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:gateway:method-packs /Users/daniel/AI VP/openbot-pr216-slice2
+> node --import tsx src/gateway/server-methods/check-gateway-method-packs.ts
+
+check-gateway-method-packs ok (24 packs, 157 methods)
+GW_PACKS:0
+=== tsgo (record; may have pre-existing) ===
+src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts(185,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts(186,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/mid-task-aside-reply-lane.test.ts(425,38): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'ObjectEncodingOptions | BufferEncoding | BufferEncodingOption | null | undefined' is not assignable to parameter of type 'ObjectEncodingOptions | BufferEncoding | null | undefined'.
+      Type '"buffer"' is not assignable to type 'ObjectEncodingOptions | BufferEncoding | null | undefined'.
+src/auto-reply/reply/mid-task-aside-reply-lane.test.ts(533,7): error TS2322: Type '{ atMs: number; runId: string; role: string; text: string; }[]' is not assignable to type 'AsideDialogueTurn[]'.
+  Type '{ atMs: number; runId: string; role: string; text: string; }' is not assignable to type 'AsideDialogueTurn'.
+    Types of property 'role' are incompatible.
+      Type 'string' is not assignable to type '"assistant" | "user"'.
+src/auto-reply/reply/mid-task-aside-reply-lane.test.ts(534,7): error TS2322: Type '{ atMs: number; runId: string; role: string; text: string; }[]' is not assignable to type 'AsideDialogueTurn[]'.
+  Type '{ atMs: number; runId: string; role: string; text: string; }' is not assignable to type 'AsideDialogueTurn'.
+    Types of property 'role' are incompatible.
+      Type 'string' is not assignable to type '"assistant" | "user"'.
+src/auto-reply/reply/mid-task-aside-reply-lane.test.ts(664,12): error TS18048: 'budgeted' is possibly 'undefined'.
+src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts(164,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts(174,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts(175,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts(176,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts(184,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/slice3-context-event-sequence.test.ts(162,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/slice3-context-event-sequence.test.ts(171,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/slice3-context-event-sequence.test.ts(185,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/slice3-context-event-sequence.test.ts(186,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/auto-reply/reply/slice3-context-event-sequence.test.ts(228,12): error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'ReplyPayload[] | ReplyPayload'.
+  Property '0' does not exist on type 'ReplyPayload[] | ReplyPayload'.
+src/conversation-task/session-task-board.cross-process-child.ts(136,31): error TS2339: Property 'superseded' does not exist on type 'ConstraintEntryInput'.
+  Property 'superseded' does not exist on type 'string'.
+src/conversation-task/session-task-board.cross-process-child.ts(137,27): error TS2339: Property 'text' does not exist on type 'ConstraintEntryInput'.
+  Property 'text' does not exist on type 'string'.
+src/conversation-task/session-task-board.cross-process-child.ts(140,37): error TS2339: Property 'superseded' does not exist on type 'ConstraintEntryInput'.
+  Property 'superseded' does not exist on type 'string'.
+src/conversation-task/session-task-board.cross-process-child.ts(141,33): error TS2339: Property 'text' does not exist on type 'ConstraintEntryInput'.
+  Property 'text' does not exist on type 'string'.
+src/conversation-task/session-task-board.cross-process-child.ts(173,37): error TS2339: Property 'superseded' does not exist on type 'ConstraintEntryInput'.
+  Property 'superseded' does not exist on type 'string'.
+src/conversation-task/session-task-board.cross-process-child.ts(174,33): error TS2339: Property 'text' does not exist on type 'ConstraintEntryInput'.
+  Property 'text' does not exist on type 'string'.
+src/conversation-task/session-task-board.cross-process-child.ts(177,31): error TS2339: Property 'superseded' does not exist on type 'ConstraintEntryInput'.
+  Property 'superseded' does not exist on type 'string'.
+src/conversation-task/session-task-board.cross-process-child.ts(178,27): error TS2339: Property 'text' does not exist on type 'ConstraintEntryInput'.
+  Property 'text' does not exist on type 'string'.
+src/gateway/collaboration-learning/operating-deliverable-binding.test.ts(99,5): error TS2741: Property 'updatedAtMs' is missing in type '{ memberId: string; memberKind: "human"; userId: string; name: string; governanceRole: "owner"; status: "active"; }' but required in type 'CollaborationMember'.
+src/gateway/collaboration-learning/operating-deliverable-binding.test.ts(107,5): error TS2741: Property 'updatedAtMs' is missing in type '{ memberId: string; memberKind: "bot"; agentId: string; name: string; governanceRole: "member"; status: "active"; }' but required in type 'CollaborationMember'.
+src/gateway/models/capability-admission/sync-pooled-admission.test.ts(89,32): error TS2493: Tuple type '[]' of length '0' has no element at index '0'.
+src/gateway/models/capability-admission/sync-pooled-admission.test.ts(90,32): error TS2493: Tuple type '[]' of length '0' has no element at index '1'.
+src/gateway/server-methods/chat.owner-pause-abort.test.ts(89,72): error TS2556: A spread argument must either have a tuple type or be passed to a rest parameter.
+src/gateway/server-methods/chat.owner-pause-abort.test.ts(97,72): error TS2556: A spread argument must either have a tuple type or be passed to a rest parameter.
+ui/src/ui/app-chat.node.test.ts(107,5): error TS2322: Type '"run-a"' is not assignable to type 'null'.
+ui/src/ui/app-chat.node.test.ts(122,5): error TS2322: Type '"run-a"' is not assignable to type 'null'.
+ui/src/ui/app-chat.node.test.ts(129,31): error TS2339: Property 'text' does not exist on type 'never'.
+ui/src/ui/controllers/chat.test.ts(4065,5): error TS2322: Type 'null' is not assignable to type 'string'.
+ui/src/ui/controllers/chat.test.ts(4066,5): error TS2322: Type 'null' is not assignable to type 'string'.
+ui/src/ui/controllers/chat.test.ts(4067,5): error TS2322: Type 'null' is not assignable to type 'number'.
+ui/src/ui/controllers/chat.test.ts(4068,5): error TS2322: Type 'null' is not assignable to type 'string'.
+ui/src/ui/controllers/chat.test.ts(4106,5): error TS2322: Type 'null' is not assignable to type 'string'.
+ui/src/ui/controllers/chat.test.ts(4107,5): error TS2322: Type 'null' is not assignable to type 'string'.
+ui/src/ui/ports/platform/models/capability-admission-batch3.node.test.ts(437,42): error TS2345: Argument of type '<T>(method: string, params: Record<string, unknown> | undefined) => Promise<{ status?: undefined; admissions: never[]; modelRef?: undefined; autoRouting?: undefined; admission?: undefined; } | { ...; } | { ...; }>' is not assignable to parameter of type 'AdmissionGatewayRequest'.
+  Type 'Promise<{ status?: undefined; admissions: never[]; modelRef?: undefined; autoRouting?: undefined; admission?: undefined; } | { admissions?: undefined; status: string; modelRef: unknown; autoRouting: unknown; admission: { ...; }; } | { ...; }>' is not assignable to type 'Promise<T>'.
+    Type '{ status?: undefined; admissions: never[]; modelRef?: undefined; autoRouting?: undefined; admission?: undefined; } | { admissions?: undefined; status: string; modelRef: unknown; autoRouting: unknown; admission: { modelRef: unknown; ... 6 more ...; autoRoutingReason: unknown; }; } | { ...; }' is not assignable to type 'T'.
+      'T' could be instantiated with an arbitrary type which could be unrelated to '{ status?: undefined; admissions: never[]; modelRef?: undefined; autoRouting?: undefined; admission?: undefined; } | { admissions?: undefined; status: string; modelRef: unknown; autoRouting: unknown; admission: { modelRef: unknown; ... 6 more ...; autoRoutingReason: unknown; }; } | { ...; }'.
+ui/src/ui/ports/platform/models/capability-admission-batch3.node.test.ts(480,42): error TS2345: Argument of type '<T>(method: string) => Promise<{ admissions: never[]; } | { admissions?: undefined; }>' is not assignable to parameter of type 'AdmissionGatewayRequest'.
+  Type 'Promise<{ admissions: never[]; } | { admissions?: undefined; }>' is not assignable to type 'Promise<T>'.
+    Type '{ admissions: never[]; } | { admissions?: undefined; }' is not assignable to type 'T'.
+      'T' could be instantiated with an arbitrary type which could be unrelated to '{ admissions: never[]; } | { admissions?: undefined; }'.
+TSGO_EXIT:2
+=== DIAG_DONE ===

@@ -19,44 +19,44 @@
 
 ## 验收点结论
 
-| 点 | 结果 |
-|---|---|
-| A 长任务 occupancy | PASS（exec `sleep 35` / `sleep 25`） |
-| 普通插问 reply_lane 即时答 | PASS（B「星期二」~1s，A 仍运行） |
-| 补充约束：已收到 vs 已生效 | PASS（即时 ack「已将补充约束注入…」；A 终局含 `E2E_CONSTRAINT_OK`；板 `effectiveConstraints` 仅 1 条补充约束） |
-| 刷新后可见/追问 B | PASS（`chat.history` 含插问；追问与 A 结束后复述均为「星期二」；旁路写入 aside-dialogue，非 extraSystemPrompt） |
-| 暂停／取消，旧结果不复活 | PASS（暂停点名任务 A；`lateRevive=0`；a_first「取消当前」移出任务板） |
-| 完成顺序 B 先于 A | PASS |
-| 完成顺序 A 先于 B | PASS（reply_lane `disableTools`，以近完成门控 + 长流式 B 覆盖重叠窗口） |
+| 点                         | 结果                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| A 长任务 occupancy         | PASS（exec `sleep 35` / `sleep 25`）                                                                            |
+| 普通插问 reply_lane 即时答 | PASS（B「星期二」~1s，A 仍运行）                                                                                |
+| 补充约束：已收到 vs 已生效 | PASS（即时 ack「已将补充约束注入…」；A 终局含 `E2E_CONSTRAINT_OK`；板 `effectiveConstraints` 仅 1 条补充约束）  |
+| 刷新后可见/追问 B          | PASS（`chat.history` 含插问；追问与 A 结束后复述均为「星期二」；旁路写入 aside-dialogue，非 extraSystemPrompt） |
+| 暂停／取消，旧结果不复活   | PASS（暂停点名任务 A；`lateRevive=0`；a_first「取消当前」移出任务板）                                           |
+| 完成顺序 B 先于 A          | PASS                                                                                                            |
+| 完成顺序 A 先于 B          | PASS（reply_lane `disableTools`，以近完成门控 + 长流式 B 覆盖重叠窗口）                                         |
 
 ## 事件时间线 — B 先完成（session `agent:main:slice2-e2e-1793675831`）
 
-| Asia/Shanghai | 事件 | 可见结果 |
-|---|---|---|
-| 11:17:11 | scenario.b_first.start | |
-| 11:17:15 | A_long.occupancy | ready=true（exec sleep 35） |
-| 11:17:17 | B_aside final | 「星期二」；`order.check.b_first` A 仍运行 |
-| 11:17:17 | refresh.visible.B | chat.history 可见插问 B |
-| 11:17:17 | constraint ack | 「已将补充约束注入当前执行（仅一次）…」 |
-| 11:17:17 | followup_B final | 「星期二」（reply_lane，未写入约束） |
-| 11:17:48 | A_long.final | 含 `A_LONG_DONE E2E_CONSTRAINT_OK` |
-| 11:17:50 | post_A_recall_B | 「星期二」（不可信旁路历史 user-body） |
-| 11:17:55 | owner_pause | 已暂停「任务A-长…」；不因旧唤醒复活 |
-| 11:18:03 | no_revive_A | lateRevive=0 |
+| Asia/Shanghai | 事件                   | 可见结果                                   |
+| ------------- | ---------------------- | ------------------------------------------ |
+| 11:17:11      | scenario.b_first.start |                                            |
+| 11:17:15      | A_long.occupancy       | ready=true（exec sleep 35）                |
+| 11:17:17      | B_aside final          | 「星期二」；`order.check.b_first` A 仍运行 |
+| 11:17:17      | refresh.visible.B      | chat.history 可见插问 B                    |
+| 11:17:17      | constraint ack         | 「已将补充约束注入当前执行（仅一次）…」    |
+| 11:17:17      | followup_B final       | 「星期二」（reply_lane，未写入约束）       |
+| 11:17:48      | A_long.final           | 含 `A_LONG_DONE E2E_CONSTRAINT_OK`         |
+| 11:17:50      | post_A_recall_B        | 「星期二」（不可信旁路历史 user-body）     |
+| 11:17:55      | owner_pause            | 已暂停「任务A-长…」；不因旧唤醒复活        |
+| 11:18:03      | no_revive_A            | lateRevive=0                               |
 
 板证：`effectiveConstraints` 仅补充约束一条；aside-dialogue 4 轮；`wakeSuppress=true`。
 
 ## 事件时间线 — A 先完成（session `…-a-first`）
 
-| Asia/Shanghai | 事件 | 可见结果 |
-|---|---|---|
-| 11:18:03 | scenario.a_first.start | |
-| 11:18:06 | A_short.occupancy | exec sleep 25 |
-| 11:18:27 | near_complete_gate | elapsed≈24s，A 未 final |
-| 11:18:27+ | B_slow 流式 | 逐行重复长文（tools-off） |
-| 11:18:31 量级 | A_SHORT_DONE | A final 早于 B final |
-| 11:18:43 | order.check.a_first | A_before_B=true |
-| 11:18:43 | owner_cancel | 取消 A；tombstone；终局隔离 |
+| Asia/Shanghai | 事件                   | 可见结果                    |
+| ------------- | ---------------------- | --------------------------- |
+| 11:18:03      | scenario.a_first.start |                             |
+| 11:18:06      | A_short.occupancy      | exec sleep 25               |
+| 11:18:27      | near_complete_gate     | elapsed≈24s，A 未 final     |
+| 11:18:27+     | B_slow 流式            | 逐行重复长文（tools-off）   |
+| 11:18:31 量级 | A_SHORT_DONE           | A final 早于 B final        |
+| 11:18:43      | order.check.a_first    | A_before_B=true             |
+| 11:18:43      | owner_cancel           | 取消 A；tombstone；终局隔离 |
 
 ## 本轮缺口修复（仅对应失败点）
 
@@ -77,14 +77,9 @@
 
 ## 诊断 / 构建
 
-```
-pnpm exec vitest run …（联合清单 + get-reply-run.aside-dialogue-context）
-→ 23 files / 270 passed（Asia/Shanghai 2026-11-03；非 flake 重跑充绿）
-```
+详见最终验收包（三项收尾，含 format/oxlint/tsgo/边界/构建与 `INEFFECTIVE_DYNAMIC_IMPORT`）：
 
-实机：`node src/auto-reply/reply/slice2-e2e-real-model-accept.mjs` → `pass=true`。
+- `docs/slice2-e2e-final-acceptance-pack.md`
+- `docs/slice2-final-acceptance-evidence/`
 
-## 未做
-
-- **未 merge PR #216**
-- **未部署 / 无 agent 部署**
+运行时构建 tip：`f7b459fd8691cb7f0b737ea95ddee5de3017fda4`。**未合并、未部署。**

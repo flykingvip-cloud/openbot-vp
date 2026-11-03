@@ -1,0 +1,962 @@
+{
+  "recordedAtAsiaShanghai": "2026-11-03T11:37:39+08:00",
+  "gatewayPort": 19101,
+  "stateDir": "/tmp/openbot-pr216-e2e-state-01e15de99",
+  "sleepSec": 50,
+  "postWaitMs": 70000,
+  "buildInfo": {
+    "version": "2026.7.12-rc.2",
+    "commit": "f7b459fd8691cb7f0b737ea95ddee5de3017fda4",
+    "builtAt": "2026-11-03T03:34:18.781Z",
+    "probeModuleSha": "b9b9d3350ef20546"
+  },
+  "timeline": [
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:13+08:00",
+      "tMs": 1793676913578,
+      "phase": "ws.open",
+      "url": "ws://127.0.0.1:19101"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:13+08:00",
+      "tMs": 1793676913592,
+      "phase": "connect.ok",
+      "caps": ["tool-events"]
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:13+08:00",
+      "tMs": 1793676913593,
+      "phase": "scenario.pause.start",
+      "sessionKey": "agent:main:slice2-mid-pause-1793676913593",
+      "sleepSec": 50
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:13+08:00",
+      "tMs": 1793676913593,
+      "phase": "chat.send",
+      "label": "A_pause",
+      "sessionKey": "agent:main:slice2-mid-pause-1793676913593",
+      "message": "【任务A-活动暂停测】请务必调用 exec 工具执行命令：sleep 50（不要跳过工具、不要口头假装已睡、不要提前输出完成标记）。命令返回后再只输出一行：A_MID_PAUSE_DONE。",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:13+08:00",
+      "tMs": 1793676913733,
+      "phase": "chat.send.ack",
+      "label": "A_pause",
+      "ok": true,
+      "status": "started",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:17+08:00",
+      "tMs": 1793676917562,
+      "phase": "pause.occupancy_active",
+      "ok": true,
+      "message": "toolStart={\"at\":1793676917361,\"atAsiaShanghai\":\"2026-11-03T11:35:17+08:00\",\"runId\":\"eced86b9-5af2-4df3-8b3b-43b7adb7658f\",\"stream\":\"tool\",\"phase\":\"start\",\"name\":\"exec\",\"rawKeys\":[\"runId\",\"st… aFinalBeforeInterrupt=false elapsedMs=3969"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:17+08:00",
+      "tMs": 1793676917562,
+      "phase": "pause.interrupt.send",
+      "ok": true,
+      "message": "A_still_no_terminal=true text=暂停"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:17+08:00",
+      "tMs": 1793676917562,
+      "phase": "chat.send",
+      "label": "owner_pause",
+      "sessionKey": "agent:main:slice2-mid-pause-1793676913593",
+      "message": "暂停",
+      "runId": "a823acf6-8c84-4887-8ac8-87d6efeb43d4"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "tMs": 1793676918038,
+      "phase": "chat.aborted",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "message": ""
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "tMs": 1793676918071,
+      "phase": "chat.send.ack",
+      "label": "owner_pause",
+      "ok": true,
+      "status": "started",
+      "runId": "a823acf6-8c84-4887-8ac8-87d6efeb43d4"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "tMs": 1793676918076,
+      "phase": "chat.final",
+      "runId": "a823acf6-8c84-4887-8ac8-87d6efeb43d4",
+      "message": "已暂停「任务A-活动暂停测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，且不会因旧唤醒复活。"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "tMs": 1793676918323,
+      "phase": "owner_pause.result",
+      "ok": true,
+      "message": "已暂停「任务A-活动暂停测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，且不会因旧唤醒复活。",
+      "aHadNoFinalBeforeAck": true
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "tMs": 1793676918323,
+      "phase": "pause.watch_start",
+      "message": "postWaitMs=70000"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "tMs": 1793676988324,
+      "phase": "pause.no_revive",
+      "ok": true,
+      "message": "lateDone=0 lateBusinessFinal=0 aAborted=true"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "tMs": 1793676988324,
+      "phase": "pause.ack_targets_active_task",
+      "ok": true,
+      "message": "已暂停「任务A-活动暂停测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，且不会因旧唤醒复活。",
+      "ackNamesMidTask": true
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "tMs": 1793676988325,
+      "phase": "scenario.cancel.start",
+      "sessionKey": "agent:main:slice2-mid-cancel-1793676988324",
+      "sleepSec": 50
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "tMs": 1793676988325,
+      "phase": "chat.send",
+      "label": "A_cancel",
+      "sessionKey": "agent:main:slice2-mid-cancel-1793676988324",
+      "message": "【任务A-活动取消测】请务必调用 exec 工具执行命令：sleep 50（不要跳过工具、不要口头假装已睡、不要提前输出完成标记）。命令返回后再只输出一行：A_MID_CANCEL_DONE。",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "tMs": 1793676988418,
+      "phase": "chat.send.ack",
+      "label": "A_cancel",
+      "ok": true,
+      "status": "started",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "tMs": 1793676989623,
+      "phase": "cancel.occupancy_active",
+      "ok": true,
+      "message": "toolStart={\"at\":1793676989585,\"atAsiaShanghai\":\"2026-11-03T11:36:29+08:00\",\"runId\":\"bee19f23-0f1a-4e0f-9a82-bfbc58e1275e\",\"stream\":\"tool\",\"phase\":\"start\",\"name\":\"exec\",\"rawKeys\":[\"runId\",\"st… aFinalBeforeInterrupt=false elapsedMs=1297"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "tMs": 1793676989623,
+      "phase": "cancel.interrupt.send",
+      "ok": true,
+      "message": "A_still_no_terminal=true text=取消当前"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "tMs": 1793676989623,
+      "phase": "chat.send",
+      "label": "owner_cancel",
+      "sessionKey": "agent:main:slice2-mid-cancel-1793676988324",
+      "message": "取消当前",
+      "runId": "86468cea-c4c4-4be8-9f5b-8f17b747e16c"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "tMs": 1793676989646,
+      "phase": "chat.aborted",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "message": ""
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "tMs": 1793676989653,
+      "phase": "chat.send.ack",
+      "label": "owner_cancel",
+      "ok": true,
+      "status": "started",
+      "runId": "86468cea-c4c4-4be8-9f5b-8f17b747e16c"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "tMs": 1793676989654,
+      "phase": "chat.final",
+      "runId": "86468cea-c4c4-4be8-9f5b-8f17b747e16c",
+      "message": "已取消「任务A-活动取消测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，已移出任务板。"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "tMs": 1793676989905,
+      "phase": "owner_cancel.result",
+      "ok": true,
+      "message": "已取消「任务A-活动取消测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，已移出任务板。",
+      "aHadNoFinalBeforeAck": true
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "tMs": 1793676989905,
+      "phase": "cancel.watch_start",
+      "message": "postWaitMs=70000"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:37:39+08:00",
+      "tMs": 1793677059906,
+      "phase": "cancel.no_revive",
+      "ok": true,
+      "message": "lateDone=0 lateBusinessFinal=0 aAborted=true"
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:37:39+08:00",
+      "tMs": 1793677059906,
+      "phase": "cancel.ack_targets_active_task",
+      "ok": true,
+      "message": "已取消「任务A-活动取消测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，已移出任务板。",
+      "ackNamesMidTask": true
+    },
+    {
+      "atAsiaShanghai": "2026-11-03T11:37:39+08:00",
+      "tMs": 1793677059908,
+      "phase": "verdict",
+      "ok": true,
+      "message": "{\"mid_exec_pause\":true,\"mid_exec_cancel\":true}"
+    }
+  ],
+  "chatEvents": [
+    {
+      "at": 1793676916178,
+      "atAsiaShanghai": "2026-11-03T11:35:16+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "sessionKey": "agent:main:slice2-mid-pause-1793676913593",
+      "state": "thinking",
+      "text": ""
+    },
+    {
+      "at": 1793676918038,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "sessionKey": "agent:main:slice2-mid-pause-1793676913593",
+      "state": "aborted",
+      "text": ""
+    },
+    {
+      "at": 1793676918069,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "a823acf6-8c84-4887-8ac8-87d6efeb43d4:user",
+      "sessionKey": "agent:main:slice2-mid-pause-1793676913593",
+      "state": "user_echo",
+      "text": "暂停"
+    },
+    {
+      "at": 1793676918076,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "a823acf6-8c84-4887-8ac8-87d6efeb43d4",
+      "sessionKey": "agent:main:slice2-mid-pause-1793676913593",
+      "state": "final",
+      "text": "已暂停「任务A-活动暂停测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，且不会因旧唤醒复活。"
+    },
+    {
+      "at": 1793676988801,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "sessionKey": "agent:main:slice2-mid-cancel-1793676988324",
+      "state": "thinking",
+      "text": ""
+    },
+    {
+      "at": 1793676989645,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "sessionKey": "agent:main:slice2-mid-cancel-1793676988324",
+      "state": "aborted",
+      "text": ""
+    },
+    {
+      "at": 1793676989653,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "86468cea-c4c4-4be8-9f5b-8f17b747e16c:user",
+      "sessionKey": "agent:main:slice2-mid-cancel-1793676988324",
+      "state": "user_echo",
+      "text": "取消当前"
+    },
+    {
+      "at": 1793676989653,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "86468cea-c4c4-4be8-9f5b-8f17b747e16c",
+      "sessionKey": "agent:main:slice2-mid-cancel-1793676988324",
+      "state": "final",
+      "text": "已取消「任务A-活动取消测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，已移出任务板。"
+    }
+  ],
+  "agentEvents": [
+    {
+      "at": 1793676913738,
+      "atAsiaShanghai": "2026-11-03T11:35:13+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags"]
+    },
+    {
+      "at": 1793676913870,
+      "atAsiaShanghai": "2026-11-03T11:35:13+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "applySourcePolicy"]
+    },
+    {
+      "at": 1793676913898,
+      "atAsiaShanghai": "2026-11-03T11:35:13+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "knowledgeMs",
+        "selectedSourceCount",
+        "excludedReasons",
+        "liveSkipped",
+        "liveInvoked",
+        "consumeReceipts",
+        "degraded"
+      ]
+    },
+    {
+      "at": 1793676915239,
+      "atAsiaShanghai": "2026-11-03T11:35:15+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags"]
+    },
+    {
+      "at": 1793676915956,
+      "atAsiaShanghai": "2026-11-03T11:35:15+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["event", "taskId", "sessionId", "attemptNumber", "intentClass"]
+    },
+    {
+      "at": 1793676915986,
+      "atAsiaShanghai": "2026-11-03T11:35:15+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["event", "taskId", "sessionId", "attemptNumber", "intentClass", "decisionCode"]
+    },
+    {
+      "at": 1793676915989,
+      "atAsiaShanghai": "2026-11-03T11:35:15+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["event", "taskId", "sessionId", "attemptNumber", "intentClass", "decisionCode"]
+    },
+    {
+      "at": 1793676915990,
+      "atAsiaShanghai": "2026-11-03T11:35:15+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["event", "taskId", "sessionId", "attemptNumber", "intentClass"]
+    },
+    {
+      "at": 1793676916013,
+      "atAsiaShanghai": "2026-11-03T11:35:16+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "taskId",
+        "sessionId",
+        "attemptNumber",
+        "constructedTools",
+        "afterPolicyTools",
+        "afterPreflightTools",
+        "clientTools",
+        "passedToSession"
+      ]
+    },
+    {
+      "at": 1793676916039,
+      "atAsiaShanghai": "2026-11-03T11:35:16+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "phase": "start",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["phase", "startedAt"]
+    },
+    {
+      "at": 1793676916185,
+      "atAsiaShanghai": "2026-11-03T11:35:16+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "lane",
+        "preCompileMessageCount",
+        "postCompileMessageCount",
+        "preCompileEstimatedTokens",
+        "postCompileEstimatedTokens",
+        "admissionBudgetTokens",
+        "targetBudgetTokens",
+        "unitCountBefore",
+        "unitCountAfter",
+        "compileMs",
+        "dropCount",
+        "dropReasons",
+        "currentTurnPreserved",
+        "activeTaskPreserved",
+        "toolTransactionIntegrity",
+        "requiredMemoryPreserved",
+        "taskSummaryPresent"
+      ]
+    },
+    {
+      "at": 1793676916188,
+      "atAsiaShanghai": "2026-11-03T11:35:16+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "lane",
+        "preCompileMessageCount",
+        "postCompileMessageCount",
+        "preCompileEstimatedTokens",
+        "postCompileEstimatedTokens",
+        "admissionBudgetTokens",
+        "targetBudgetTokens",
+        "unitCountBefore",
+        "unitCountAfter",
+        "compileMs",
+        "dropCount",
+        "dropReasons",
+        "currentTurnPreserved",
+        "activeTaskPreserved",
+        "toolTransactionIntegrity",
+        "requiredMemoryPreserved",
+        "providerMessageCount",
+        "providerBoundaryMatch"
+      ]
+    },
+    {
+      "at": 1793676916981,
+      "atAsiaShanghai": "2026-11-03T11:35:16+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "modelTtftMs"]
+    },
+    {
+      "at": 1793676917361,
+      "atAsiaShanghai": "2026-11-03T11:35:17+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "tool",
+      "phase": "start",
+      "name": "exec",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["phase", "name", "toolCallId", "args"]
+    },
+    {
+      "at": 1793676918051,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "error",
+      "rawKeys": ["runId", "stream", "ts", "sessionKey", "data"],
+      "dataKeys": ["reason", "expected", "received"]
+    },
+    {
+      "at": 1793676918052,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "taskId",
+        "sessionId",
+        "attemptNumber",
+        "intentClass",
+        "decisionStage",
+        "decisionCode",
+        "deliveryOutcome",
+        "validationResult"
+      ]
+    },
+    {
+      "at": 1793676918052,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "a823acf6-8c84-4887-8ac8-87d6efeb43d4",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "persistMs", "hadAttachments"]
+    },
+    {
+      "at": 1793676918074,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "a823acf6-8c84-4887-8ac8-87d6efeb43d4",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags"]
+    },
+    {
+      "at": 1793676918087,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "lane",
+        "preCompileMessageCount",
+        "postCompileMessageCount",
+        "preCompileEstimatedTokens",
+        "postCompileEstimatedTokens",
+        "admissionBudgetTokens",
+        "targetBudgetTokens",
+        "unitCountBefore",
+        "unitCountAfter",
+        "compileMs",
+        "dropCount",
+        "dropReasons",
+        "currentTurnPreserved",
+        "activeTaskPreserved",
+        "toolTransactionIntegrity",
+        "requiredMemoryPreserved",
+        "taskSummaryPresent"
+      ]
+    },
+    {
+      "at": 1793676918089,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "lane",
+        "preCompileMessageCount",
+        "postCompileMessageCount",
+        "preCompileEstimatedTokens",
+        "postCompileEstimatedTokens",
+        "admissionBudgetTokens",
+        "targetBudgetTokens",
+        "unitCountBefore",
+        "unitCountAfter",
+        "compileMs",
+        "dropCount",
+        "dropReasons",
+        "currentTurnPreserved",
+        "activeTaskPreserved",
+        "toolTransactionIntegrity",
+        "requiredMemoryPreserved",
+        "providerMessageCount",
+        "providerBoundaryMatch"
+      ]
+    },
+    {
+      "at": 1793676918207,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "modelMs", "ok"]
+    },
+    {
+      "at": 1793676918207,
+      "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+      "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "source"]
+    },
+    {
+      "at": 1793676988420,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags"]
+    },
+    {
+      "at": 1793676988478,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "applySourcePolicy"]
+    },
+    {
+      "at": 1793676988480,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "knowledgeMs",
+        "selectedSourceCount",
+        "excludedReasons",
+        "liveSkipped",
+        "liveInvoked",
+        "consumeReceipts",
+        "degraded"
+      ]
+    },
+    {
+      "at": 1793676988759,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags"]
+    },
+    {
+      "at": 1793676988786,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["event", "taskId", "sessionId", "attemptNumber", "intentClass"]
+    },
+    {
+      "at": 1793676988787,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["event", "taskId", "sessionId", "attemptNumber", "intentClass", "decisionCode"]
+    },
+    {
+      "at": 1793676988787,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["event", "taskId", "sessionId", "attemptNumber", "intentClass", "decisionCode"]
+    },
+    {
+      "at": 1793676988787,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["event", "taskId", "sessionId", "attemptNumber", "intentClass"]
+    },
+    {
+      "at": 1793676988793,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "taskId",
+        "sessionId",
+        "attemptNumber",
+        "constructedTools",
+        "afterPolicyTools",
+        "afterPreflightTools",
+        "clientTools",
+        "passedToSession"
+      ]
+    },
+    {
+      "at": 1793676988801,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "phase": "start",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["phase", "startedAt"]
+    },
+    {
+      "at": 1793676988801,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "lane",
+        "preCompileMessageCount",
+        "postCompileMessageCount",
+        "preCompileEstimatedTokens",
+        "postCompileEstimatedTokens",
+        "admissionBudgetTokens",
+        "targetBudgetTokens",
+        "unitCountBefore",
+        "unitCountAfter",
+        "compileMs",
+        "dropCount",
+        "dropReasons",
+        "currentTurnPreserved",
+        "activeTaskPreserved",
+        "toolTransactionIntegrity",
+        "requiredMemoryPreserved",
+        "taskSummaryPresent"
+      ]
+    },
+    {
+      "at": 1793676988802,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "lane",
+        "preCompileMessageCount",
+        "postCompileMessageCount",
+        "preCompileEstimatedTokens",
+        "postCompileEstimatedTokens",
+        "admissionBudgetTokens",
+        "targetBudgetTokens",
+        "unitCountBefore",
+        "unitCountAfter",
+        "compileMs",
+        "dropCount",
+        "dropReasons",
+        "currentTurnPreserved",
+        "activeTaskPreserved",
+        "toolTransactionIntegrity",
+        "requiredMemoryPreserved",
+        "providerMessageCount",
+        "providerBoundaryMatch"
+      ]
+    },
+    {
+      "at": 1793676988949,
+      "atAsiaShanghai": "2026-11-03T11:36:28+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "modelTtftMs"]
+    },
+    {
+      "at": 1793676989585,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "tool",
+      "phase": "start",
+      "name": "exec",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": ["phase", "name", "toolCallId", "args"]
+    },
+    {
+      "at": 1793676989652,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "error",
+      "rawKeys": ["runId", "stream", "ts", "sessionKey", "data"],
+      "dataKeys": ["reason", "expected", "received"]
+    },
+    {
+      "at": 1793676989652,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "taskId",
+        "sessionId",
+        "attemptNumber",
+        "intentClass",
+        "decisionStage",
+        "decisionCode",
+        "deliveryOutcome",
+        "validationResult"
+      ]
+    },
+    {
+      "at": 1793676989652,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "86468cea-c4c4-4be8-9f5b-8f17b747e16c",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "persistMs", "hadAttachments"]
+    },
+    {
+      "at": 1793676989653,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "86468cea-c4c4-4be8-9f5b-8f17b747e16c",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags"]
+    },
+    {
+      "at": 1793676989657,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "lane",
+        "preCompileMessageCount",
+        "postCompileMessageCount",
+        "preCompileEstimatedTokens",
+        "postCompileEstimatedTokens",
+        "admissionBudgetTokens",
+        "targetBudgetTokens",
+        "unitCountBefore",
+        "unitCountAfter",
+        "compileMs",
+        "dropCount",
+        "dropReasons",
+        "currentTurnPreserved",
+        "activeTaskPreserved",
+        "toolTransactionIntegrity",
+        "requiredMemoryPreserved",
+        "taskSummaryPresent"
+      ]
+    },
+    {
+      "at": 1793676989658,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": [
+        "event",
+        "sessionKeyHash",
+        "flags",
+        "lane",
+        "preCompileMessageCount",
+        "postCompileMessageCount",
+        "preCompileEstimatedTokens",
+        "postCompileEstimatedTokens",
+        "admissionBudgetTokens",
+        "targetBudgetTokens",
+        "unitCountBefore",
+        "unitCountAfter",
+        "compileMs",
+        "dropCount",
+        "dropReasons",
+        "currentTurnPreserved",
+        "activeTaskPreserved",
+        "toolTransactionIntegrity",
+        "requiredMemoryPreserved",
+        "providerMessageCount",
+        "providerBoundaryMatch"
+      ]
+    },
+    {
+      "at": 1793676989662,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "modelMs", "ok"]
+    },
+    {
+      "at": 1793676989662,
+      "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+      "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "stream": "lifecycle",
+      "rawKeys": ["runId", "stream", "sessionKey", "data", "seq", "ts"],
+      "dataKeys": ["event", "sessionKeyHash", "flags", "source"]
+    }
+  ],
+  "results": {
+    "pause": {
+      "kind": "pause",
+      "pass": true,
+      "sessionKey": "agent:main:slice2-mid-pause-1793676913593",
+      "aRun": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+      "interruptRun": "a823acf6-8c84-4887-8ac8-87d6efeb43d4",
+      "toolStart": {
+        "at": 1793676917361,
+        "atAsiaShanghai": "2026-11-03T11:35:17+08:00",
+        "runId": "eced86b9-5af2-4df3-8b3b-43b7adb7658f",
+        "stream": "tool",
+        "phase": "start",
+        "name": "exec",
+        "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+        "dataKeys": ["phase", "name", "toolCallId", "args"]
+      },
+      "ack": {
+        "at": 1793676918076,
+        "atAsiaShanghai": "2026-11-03T11:35:18+08:00",
+        "runId": "a823acf6-8c84-4887-8ac8-87d6efeb43d4",
+        "sessionKey": "agent:main:slice2-mid-pause-1793676913593",
+        "state": "final",
+        "text": "已暂停「任务A-活动暂停测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，且不会因旧唤醒复活。"
+      },
+      "lateDone": 0,
+      "lateBusinessFinal": 0,
+      "aAborted": true,
+      "occupancyOk": true,
+      "stillActiveBeforeSend": true
+    },
+    "cancel": {
+      "kind": "cancel",
+      "pass": true,
+      "sessionKey": "agent:main:slice2-mid-cancel-1793676988324",
+      "aRun": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+      "interruptRun": "86468cea-c4c4-4be8-9f5b-8f17b747e16c",
+      "toolStart": {
+        "at": 1793676989585,
+        "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+        "runId": "bee19f23-0f1a-4e0f-9a82-bfbc58e1275e",
+        "stream": "tool",
+        "phase": "start",
+        "name": "exec",
+        "rawKeys": ["runId", "stream", "data", "sessionKey", "seq", "ts"],
+        "dataKeys": ["phase", "name", "toolCallId", "args"]
+      },
+      "ack": {
+        "at": 1793676989653,
+        "atAsiaShanghai": "2026-11-03T11:36:29+08:00",
+        "runId": "86468cea-c4c4-4be8-9f5b-8f17b747e16c",
+        "sessionKey": "agent:main:slice2-mid-cancel-1793676988324",
+        "state": "final",
+        "text": "已取消「任务A-活动取消测】请务必调用 exec 工具执行命令：sleep 50…」：活动执行将停止新增业务动作，已移出任务板。"
+      },
+      "lateDone": 0,
+      "lateBusinessFinal": 0,
+      "aAborted": true,
+      "occupancyOk": true,
+      "stillActiveBeforeSend": true
+    }
+  },
+  "verdict": {
+    "mid_exec_pause": true,
+    "mid_exec_cancel": true
+  },
+  "pass": true,
+  "noteZh": "活动执行期间暂停/取消：occupancy 成立（tool-events 或忙碌回退）后打断；观察窗大于 sleep，验证无 DONE 迟到、无后续业务 final。"
+}
