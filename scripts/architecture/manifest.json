@@ -159,5 +159,24 @@
     "from": "src/agents/**",
     "denyImportsFrom": ["src/agent-runtime/execution/recovery/**"],
     "description": "Legacy runner and adapters consume the explicit execution facade, not recovery internals."
+  },
+  {
+    "name": "runtime-preparation-no-execution-effects",
+    "from": "src/agent-runtime/execution/preparation/**",
+    "denyImportsFrom": [
+      "src/agents/**",
+      "src/conversation-task/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/gateway/!(execution-identity-context).ts",
+      "src/gateway/*/**"
+    ],
+    "description": "Legacy parameter preparation may inherit trusted identity but cannot invoke providers, task mutations or scheduling."
+  },
+  {
+    "name": "runtime-preparation-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/preparation/!(index).ts"],
+    "description": "Existing reply adapters use the explicit preparation API, not its implementation."
   }
 ]
