@@ -124,3 +124,10 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - transition-baseline.md records existing event/guard/mutation/recovery invariants; no empty policy implementation or parallel state enum introduced. wiring-policy-boundaries.md records target five execution responsibilities and mandatory governance boundaries. — codex-runtime-manager
 - Focus projection dependency debt closed by 434c47b6c: command consumes pure projection, board only re-exports; command cannot import task persistence implementation. Eight suites / 46 PASS; independent review PASS; typed lint clean; architecture 17 rules PASS; tsgo baseline/candidate 52; build PASS with 209 dynamic import warnings unchanged. — codex-runtime-manager
 - Accepted external review constraints: Gateway remains same process with explicit APIs; planning governs goals/acceptance/skeleton, not a competing model loop; transcript authority remains SessionManager; mandatory AOR/constitutional constraints cannot become optional plugins. — codex-runtime-manager
+
+## Execution bounded-recovery checkpoint
+
+- execution-five-stage-map.md distinguishes selection/preparation/runner/verification/recovery and actual side effects. No monolithic attempt relocation or empty stage facades. — codex-runtime-manager
+- Existing bounded stall loop moved unchanged to execution/recovery and exposed via execution/index (ac0f448e1); original attempt consumer imports public entry; old path is same-function compatibility export. Only one production loop implementation remains. — codex-runtime-manager
+- Four suites / 81 tests PASS including original attempt integration; independent byte-equivalence review PASS; typed lint clean; architecture 19 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS and 209 dynamic import warnings unchanged. — codex-runtime-manager
+- Narrow legacy dependencies remain: continuation prompts/type and protocol guard. Recovery owns no task persistence, completion, model provider selection or cross-turn wake scheduling. Remaining execution stages are NOT migrated. — codex-runtime-manager

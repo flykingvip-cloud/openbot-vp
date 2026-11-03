@@ -67,3 +67,5 @@ Command additionally owns the active-task amendment transaction (8906041c7), wit
 Current-task control is partially migrated through the agent-runner transaction component. Gateway control stays in its original async protocol path. Neither state persistence nor the underlying abort mechanisms have moved; no claim of a fully independent command/state layer.
 
 Gateway stop execution is now delegated to a command use case (036e9a66b), while protocol/partial transcript/final delivery remain at Gateway. The existing async-vs-sync control differences are explicit rather than flattened. command remains PARTIAL; no broader execution/delivery/state migration is implied.
+
+Execution is now PARTIAL through bounded in-turn stall recovery (ac0f448e1). It is not a full runner facade: original Pi runner, failover, compaction, ledgers and cross-turn wake retain their original owners. Narrow legacy policy dependencies are explicit migration debt.
