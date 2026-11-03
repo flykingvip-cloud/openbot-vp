@@ -184,3 +184,10 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Five suites / 34 PASS including WAIT, real write/clock order and original tool WAIT gates; independent semantic review PASS; typed lint clean; architecture 25 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS, dynamic-import warnings 209 unchanged. — codex-runtime-manager
 - Approx. 23 effect/predicate ports are a transitional legacy boundary, NOT configurable callbacks or plugin API. Do not add arbitrary registration; future cleanup groups coherent policy/environment/result adapters after characterization. No new queue or executor invocation. — codex-runtime-manager
 - This settles an applicable TURN contract, not general task acceptance or transport success. State/delivery artifact lifecycle and reuse remain unmigrated. — codex-runtime-manager
+
+## Whole-runtime completion gates and first retirements
+
+- completion-gates.md and final-convergence-plan.md supersede any assumption that directories imply completion. Core accepted-turn execution, general task evidence close, async job recovery and production extension consumers remain required gates. — codex-runtime-manager
+- safe-retirements.md records repo-wide import/SDK/build/dynamic-reference audit. Removed three consumed compatibility shells; original capability implementations remain, tests now consume public APIs. Four suites / 75 PASS. — codex-runtime-manager
+- Real command host binding moved to wiring/command-adapters.ts; original runner no longer binds state/steer/abort/queue inline. Wiring contains no routing or transition decision. Seven suites / 24 PASS and independent semantic review PASS. — codex-runtime-manager
+- Combined candidate tsgo baseline/candidate 52, no new; build PASS with 209 warnings unchanged. Three-layer convergence remains INCOMPLETE; do not delete externally used hooks/workflows without effective enablement and consumer evidence. — codex-runtime-manager
