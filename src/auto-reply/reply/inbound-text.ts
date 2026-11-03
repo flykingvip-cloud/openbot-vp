@@ -1,9 +1,4 @@
-export function normalizeInboundTextNewlines(input: string): string {
-  // Normalize actual newline characters (CR+LF and CR to LF).
-  // Do NOT replace literal backslash-n sequences (\\n) as they may be part of
-  // Windows paths like C:\Work\nxxx\README.md or user-intended escape sequences.
-  return input.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
-}
+export { normalizeInboundTextNewlines } from "../../shared/text/normalize-newlines.js";
 
 const BRACKETED_SYSTEM_TAG_RE = /\[\s*(System\s*Message|System|Assistant|Internal)\s*\]/gi;
 const LINE_SYSTEM_PREFIX_RE = /^(\s*)System:(?=\s|$)/gim;
