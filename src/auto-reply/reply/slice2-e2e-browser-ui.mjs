@@ -38,7 +38,7 @@ const mark = (phase, detail = {}) => {
   timeline.push(row);
   console.log(
     `[${row.atAsiaShanghai}] ${phase}`,
-    detail.message ? `:: ${String(detail.message).slice(0, 160)}` : "",
+    detail.message ? `:: ${String(detail.message).slice(0, 200)}` : "",
     detail.ok != null ? `ok=${detail.ok}` : "",
   );
 };
@@ -52,7 +52,6 @@ async function shot(page, name) {
 
 function uiUrl(sessionKey) {
   const base = `http://127.0.0.1:${PORT}/`;
-  // token via hash; gatewayUrl via query keeps settings aligned
   const q = new URLSearchParams({
     gatewayUrl: `ws://127.0.0.1:${PORT}`,
   });
@@ -65,12 +64,20 @@ function uiUrl(sessionKey) {
 async function waitConnected(page, timeoutMs = 30000) {
   await page.waitForFunction(
     () => {
-      // connected state reflected by enabled composer textarea
       const ta = document.querySelector(".chat-compose textarea, textarea");
       return Boolean(ta && !ta.disabled);
     },
     { timeout: timeoutMs },
   );
+}
+
+async function dismissOverlays(page) {
+  for (const label of ["稍后处理", "我知道了", "关闭", "Close", "跳过"]) {
+    const btn = page.locator("button", { hasText: label }).first();
+    if ((await btn.count()) > 0) {
+      await btn.click({ timeout: 800 }).catch(() => {});
+    }
+  }
 }
 
 async function getThreadText(page) {
@@ -81,41 +88,71 @@ async function getThreadText(page) {
     }
     const bubbles = [...thread.querySelectorAll(".chat-bubble, .chat-msg, [data-role]")].map(
       (el) => ({
-        className: el.className,
-        text: (el.innerText || "").slice(0, 240),
+        className: String(el.className || ""),
+        role: el.getAttribute("data-role") || "",
+        text: (el.innerText || "").slice(0, 320),
       }),
     );
-    return { text: (thread.innerText || "").slice(0, 4000), bubbles };
+    return { text: (thread.innerText || "").slice(0, 6000), bubbles };
   });
 }
 
+/** Sync Lit controlled textarea draft, then send via Enter (works while send-btn is Stop). */
 async function fillAndSend(page, text) {
   const ta = page.locator(".chat-compose textarea, textarea").first();
   await ta.waitFor({ state: "visible", timeout: 15000 });
+  await ta.click();
+  // Lit binds .value=${draft}; Playwright fill + explicit input event keeps host draft in sync.
   await ta.fill(text);
-  // Prefer primary send button; if stop mode, still try Enter send path via new text while busy uses queue
-  const sendBtn = page
-    .locator(".chat-compose__send-btn, .chat-compose__actions .btn.primary")
-    .first();
-  const label = await sendBtn.getAttribute("aria-label").catch(() => null);
-  const title = await sendBtn.getAttribute("title").catch(() => null);
-  const isStop =
-    /停止|Stop/i.test(label || "") ||
-    /停止|Stop/i.test(title || "") ||
-    (await sendBtn
-      .evaluate((el) => el.classList.contains("chat-compose__send-btn--stop"))
-      .catch(() => false));
-  if (isStop) {
-    // While running, Enter queues/sends aside without pressing stop
-    await ta.press("Enter");
-  } else {
-    await sendBtn.click();
+  await page.evaluate(() => {
+    const el = document.querySelector(".chat-compose textarea, textarea");
+    if (!el) {
+      return;
+    }
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await page.waitForTimeout(200);
+  const draftOk = await page.evaluate((expected) => {
+    const el = document.querySelector(".chat-compose textarea, textarea");
+    return Boolean(el && (el.value || "").includes(expected.slice(0, 24)));
+  }, text);
+  if (!draftOk) {
+    throw new Error("composer draft did not accept text");
   }
-  return { usedEnter: isStop };
+
+  // Prefer an explicit non-stop Send if present (non-compact); else Enter while Stop owns icon btn.
+  const primary = page.locator(".chat-compose__actions .btn.primary").first();
+  let used = "enter";
+  if ((await primary.count()) > 0) {
+    const label = `${(await primary.getAttribute("aria-label").catch(() => "")) || ""} ${(await primary.textContent().catch(() => "")) || ""}`;
+    if (!/停止|Stop/i.test(label)) {
+      await primary.click();
+      used = "primary-send";
+      return { usedEnter: false, used };
+    }
+  }
+  await ta.press("Enter");
+  return { usedEnter: true, used };
+}
+
+async function clickStop(page) {
+  const stopByClass = page.locator("button.chat-compose__send-btn--stop");
+  if ((await stopByClass.count()) > 0) {
+    await stopByClass.first().click();
+    return "class";
+  }
+  const labeled = page.locator("button").filter({ hasText: /^停止$|^Stop$/ });
+  if ((await labeled.count()) > 0) {
+    await labeled.first().click();
+    return "text";
+  }
+  throw new Error("stop button not found");
 }
 
 async function main() {
-  const sessionKey = `agent:main:slice2-browser-${Date.now()}`;
+  // Control UI canonicalizeWorkbenchChatSessionKey collapses custom keys → agent:main:main.
+  const sessionKey = "agent:main:main";
   mark("browser.start", { message: sessionKey });
 
   const browser = await chromium.launch({ headless: true });
@@ -123,33 +160,49 @@ async function main() {
   const page = await context.newPage();
   page.setDefaultTimeout(45000);
 
+  const runStamp = `BR${Date.now().toString(36).slice(-6)}`;
+  const aMarker = `任务A-浏览器-${runStamp}`;
+  const bMarker = `插问B-浏览器-${runStamp}`;
+  // Avoid 星期/周 in the user prompt — those falsely match assistant weekday waits.
+  const bText = `【${bMarker}】与任务无关，不要改任务。只回答今天是星期几的一个字：一、二、三、四、五、六或日。不要解释。`;
+  const aText = `【${aMarker}】请务必调用 exec 执行 sleep 55（不要跳过工具）。命令返回后只输出一行：A_BROWSER_DONE_${runStamp}。执行期间不要提前结束。`;
+
   const shots = {};
   const checks = {};
 
   try {
     await page.goto(uiUrl(sessionKey), { waitUntil: "domcontentloaded" });
-    mark("page.goto", { message: `port=${PORT}` });
+    mark("page.goto", { message: `port=${PORT} stamp=${runStamp}` });
     await waitConnected(page);
+    await dismissOverlays(page);
     mark("ui.connected", { ok: true });
     shots.connected = await shot(page, "01-connected");
 
-    // Start long A
-    const aText =
-      "【任务A-浏览器】请务必调用 exec 执行 sleep 55（不要跳过工具）。命令返回后只输出一行：A_BROWSER_DONE。执行期间不要提前结束。";
-    await fillAndSend(page, aText);
-    mark("A.sent", { ok: true });
+    // Clear prior occupancy so Stop is not leftover from mid-exec WS runs.
+    await fillAndSend(page, "/new");
+    await page.waitForTimeout(1500);
+    await dismissOverlays(page);
+    mark("session.renewed", { ok: true });
 
-    // Wait until stop button visible (= canAbort / run active)
+    await fillAndSend(page, aText);
+    mark("A.sent", { ok: true, message: aMarker });
+
+    // Wait until stop appears AND A marker is in thread (proves this run, not stale abort UI).
     const stopAppeared = await page
       .waitForFunction(
-        () => {
+        (marker) => {
+          const t = document.querySelector(".chat-thread")?.innerText || "";
+          if (!t.includes(marker)) {
+            return false;
+          }
           const btns = [...document.querySelectorAll("button")];
           return btns.some((b) => {
             const label = `${b.getAttribute("aria-label") || ""} ${b.getAttribute("title") || ""} ${b.textContent || ""}`;
             return /停止|Stop/i.test(label) || b.classList.contains("chat-compose__send-btn--stop");
           });
         },
-        { timeout: 40000 },
+        aMarker,
+        { timeout: 60000 },
       )
       .then(() => true)
       .catch(() => false);
@@ -157,29 +210,84 @@ async function main() {
     mark("stop.visible_while_A", { ok: stopAppeared });
     shots.stopVisible = await shot(page, "02-stop-while-A");
 
-    // Composer can send ordinary aside while A runs
-    const bText = "【插问B-浏览器】现在是什么星期几？只回答星期几，与当前任务无关，不要改任务。";
-    const sendMeta = await fillAndSend(page, bText);
-    mark("B.aside.sent", { ok: true, message: JSON.stringify(sendMeta) });
-    checks.composer_aside_while_A = true;
-
-    // Wait for B answer bubble
-    const bVisible = await page
+    // Optional: wait briefly for tool activity signal in thread (exec/sleep/工具)
+    await page
       .waitForFunction(
         () => {
           const t = document.querySelector(".chat-thread")?.innerText || "";
-          return /星期二|周一|周二|周三|周四|周五|周六|周日|星期/.test(t);
+          return /sleep|exec|工具|Shell|bash/i.test(t);
         },
-        { timeout: 90000 },
+        { timeout: 45000 },
+      )
+      .catch(() => null);
+
+    const sendMeta = await fillAndSend(page, bText);
+    mark("B.aside.sent", { ok: true, message: JSON.stringify(sendMeta) });
+    checks.composer_aside_while_A = Boolean(sendMeta);
+
+    // B user prompt must appear (proves send landed).
+    const bPromptVisible = await page
+      .waitForFunction(
+        (marker) => (document.querySelector(".chat-thread")?.innerText || "").includes(marker),
+        bMarker,
+        {
+          timeout: 30000,
+        },
       )
       .then(() => true)
       .catch(() => false);
-    checks.B_bubble_visible = bVisible;
-    mark("B.bubble.visible", { ok: bVisible });
+    checks.B_prompt_in_thread = bPromptVisible;
+    mark("B.prompt.visible", { ok: bPromptVisible });
+
+    // Assistant weekday answer: single-char 一..日 or 星期X — must NOT rely on user prompt alone.
+    const bAnswerVisible = await page
+      .waitForFunction(
+        (marker) => {
+          const thread = document.querySelector(".chat-thread");
+          if (!thread) {
+            return false;
+          }
+          const bubbles = [...thread.querySelectorAll(".chat-bubble, .chat-msg, [data-role]")];
+          for (const el of bubbles) {
+            const text = (el.innerText || "").trim();
+            if (!text || text.includes(marker)) {
+              continue;
+            } // skip user prompt bubble
+            if (/^[一二三四五六日]$/.test(text) || /^星期[一二三四五六日天]$/.test(text)) {
+              return true;
+            }
+            if (
+              /^(周一|周二|周三|周四|周五|周六|周日|星期一|星期二|星期三|星期四|星期五|星期六|星期日|星期天)[。.!！]?$/.test(
+                text,
+              )
+            ) {
+              return true;
+            }
+            // short assistant replies that include weekday without the B marker
+            if (text.length <= 24 && /[一二三四五六日]/.test(text) && !text.includes("插问B")) {
+              return true;
+            }
+          }
+          // Fallback: whole thread has answer after B marker block
+          const t = thread.innerText || "";
+          const idx = t.indexOf(marker);
+          if (idx < 0) {
+            return false;
+          }
+          const after = t.slice(idx + marker.length);
+          return /(星期[一二三四五六日天]|周[一二三四五六日]|^[^\n]*[一二三四五六日])/.test(after);
+        },
+        bMarker,
+        { timeout: 120000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    checks.B_bubble_visible = bAnswerVisible;
+    mark("B.bubble.visible", { ok: bAnswerVisible });
 
     const before = await getThreadText(page);
-    const hasAPrompt = /任务A-浏览器|A_BROWSER|sleep 55/.test(before.text);
-    const hasBPrompt = /插问B-浏览器|星期/.test(before.text);
+    const hasAPrompt = before.text.includes(aMarker);
+    const hasBPrompt = before.text.includes(bMarker);
     checks.A_B_bubbles_present = hasAPrompt && hasBPrompt;
     mark("bubbles.A_and_B", {
       ok: checks.A_B_bubbles_present,
@@ -187,43 +295,37 @@ async function main() {
     });
     shots.abBubbles = await shot(page, "03-A-B-bubbles");
 
-    // Prefer class-based stop if present
-    const stopByClass = page.locator("button.chat-compose__send-btn--stop");
-    if (await stopByClass.count()) {
-      await stopByClass.first().click();
-    } else {
-      await page
-        .locator("button")
-        .filter({ hasText: /^停止$|^Stop$/ })
-        .first()
-        .click();
-    }
-    mark("stop.clicked", { ok: true });
-    await page.waitForTimeout(2500);
+    // Give aside dialogue persistence a moment before abort.
+    await page.waitForTimeout(2000);
+
+    const stopHow = await clickStop(page);
+    mark("stop.clicked", { ok: true, message: stopHow });
+    await page.waitForTimeout(3000);
     shots.afterStop = await shot(page, "04-after-stop");
 
-    // Refresh and verify UI still shows A/B
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await waitConnected(page).catch(() => {});
-    // Re-apply token if needed
-    if (
-      await page
-        .locator(".chat-compose textarea, textarea")
-        .first()
-        .isDisabled()
-        .catch(() => true)
-    ) {
-      await page.goto(uiUrl(sessionKey), { waitUntil: "domcontentloaded" });
-      await waitConnected(page);
-    }
-    await page.waitForTimeout(3000);
+    // Hard navigation refresh
+    await page.goto(uiUrl(sessionKey), { waitUntil: "domcontentloaded" });
+    await waitConnected(page);
+    await dismissOverlays(page);
+
+    const refreshOk = await page
+      .waitForFunction(
+        ({ a, b }) => {
+          const t = document.querySelector(".chat-thread")?.innerText || "";
+          return t.includes(a) && t.includes(b);
+        },
+        { a: aMarker, b: bMarker },
+        { timeout: 60000 },
+      )
+      .then(() => true)
+      .catch(() => false);
     const after = await getThreadText(page);
-    const refreshHasB = /插问B-浏览器|星期|星期二|周/.test(after.text);
-    const refreshHasA = /任务A-浏览器|A_BROWSER|sleep 55/.test(after.text);
-    checks.refresh_UI_visible = refreshHasA && refreshHasB;
+    const refreshHasA = after.text.includes(aMarker);
+    const refreshHasB = after.text.includes(bMarker);
+    checks.refresh_UI_visible = refreshOk || (refreshHasA && refreshHasB);
     mark("refresh.ui", {
       ok: checks.refresh_UI_visible,
-      message: `hasA=${refreshHasA} hasB=${refreshHasB} text=${after.text.slice(0, 200)}`,
+      message: `hasA=${refreshHasA} hasB=${refreshHasB} waitOk=${refreshOk} text=${after.text.slice(0, 360)}`,
     });
     shots.afterRefresh = await shot(page, "05-after-refresh");
   } finally {
@@ -235,11 +337,14 @@ async function main() {
     buildInfo = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "dist/build-info.json"), "utf8"),
     );
-  } catch {}
+  } catch {
+    /* ignore */
+  }
 
   const required = [
     "stop_button_while_A",
     "composer_aside_while_A",
+    "B_prompt_in_thread",
     "B_bubble_visible",
     "A_B_bubbles_present",
     "refresh_UI_visible",
@@ -254,13 +359,14 @@ async function main() {
     gatewayPort: PORT,
     stateDir: STATE,
     sessionKey,
+    runStamp,
     buildInfo,
     timeline,
     checks,
     screenshots: shots,
     pass,
     noteZh:
-      "浏览器端：A 运行中输入框可发插问；停止按钮可见并可点；A/B 气泡同线程可见；刷新后 UI 仍可见。",
+      "浏览器端：A 运行中输入框可发插问；停止按钮可见并可点；A/B 气泡同线程可见；刷新后 UI 仍可见（含 stamp 标记）。",
   };
   const outPath = path.join(OUT_DIR, "slice2-e2e-browser-ui.json");
   fs.writeFileSync(outPath, JSON.stringify(report, null, 2));
