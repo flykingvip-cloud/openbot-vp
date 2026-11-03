@@ -3972,3 +3972,179 @@ describe("discuss-to-task receipt identity dedupe (R7)", () => {
     expect(state.chatStream).toBe("partial");
   });
 });
+
+describe("sendChatMessage preserveActiveRunOccupancy", () => {
+  it("keeps background chatRunId when mid-task send succeeds", async () => {
+    const request = vi.fn().mockResolvedValue({ ok: true });
+    const state = {
+      client: { request },
+      connected: true,
+      sessionKey: "agent:main:main",
+      chatMessages: [],
+      chatSending: false,
+      chatRunId: "run-a",
+      chatStream: "正在调研…",
+      chatStreamStartedAt: 1000,
+      chatStreamSessionKey: "agent:main:main",
+      chatThinkingProgress: null,
+      workProgressPhase: "thinking" as const,
+      workProgressToolsInFlight: 1,
+      workProgressNarration: null,
+      lastError: null,
+      chatHumanTakeoverObserved: false,
+    };
+    const result = await sendChatMessage(state as never, "进度如何？", undefined, {
+      preserveActiveRunOccupancy: true,
+    });
+    expect(result).toBeTruthy();
+    expect(request).toHaveBeenCalledWith(
+      "chat.send",
+      expect.objectContaining({ message: "进度如何？" }),
+    );
+    expect(state.chatRunId).toBe("run-a");
+    expect(state.chatStream).toBe("正在调研…");
+    expect(state.chatSending).toBe(false);
+  });
+
+  it("does not clear background occupancy when mid-task send fails", async () => {
+    const request = vi.fn().mockRejectedValue(new Error("ACL deny"));
+    const state = {
+      client: { request },
+      connected: true,
+      sessionKey: "agent:main:main",
+      chatMessages: [],
+      chatSending: false,
+      chatRunId: "run-a",
+      chatStream: "partial-a",
+      chatStreamStartedAt: 1000,
+      chatStreamSessionKey: "agent:main:main",
+      chatThinkingProgress: null,
+      workProgressPhase: "thinking" as const,
+      workProgressToolsInFlight: 0,
+      workProgressNarration: null,
+      lastError: null,
+      chatHumanTakeoverObserved: false,
+    };
+    const result = await sendChatMessage(state as never, "插问", undefined, {
+      preserveActiveRunOccupancy: true,
+    });
+    expect(result).toBeNull();
+    expect(state.chatRunId).toBe("run-a");
+    expect(state.chatStream).toBe("partial-a");
+    expect(state.lastError).toBeTruthy();
+  });
+  it("P0: A completed during RPC wait — fail must not resurrect occupancy", async () => {
+    let rejectRpc!: (err: Error) => void;
+    const request = vi.fn(
+      () =>
+        new Promise((_, rej) => {
+          rejectRpc = rej as (err: Error) => void;
+        }),
+    );
+    const state = {
+      client: { request },
+      connected: true,
+      sessionKey: "agent:main:main",
+      chatMessages: [],
+      chatSending: false,
+      chatRunId: "run-a",
+      chatStream: "partial-a",
+      chatStreamStartedAt: 1000,
+      chatStreamSessionKey: "agent:main:main",
+      chatThinkingProgress: null,
+      workProgressPhase: "thinking" as const,
+      workProgressToolsInFlight: 0,
+      workProgressNarration: null,
+      lastError: null,
+      chatHumanTakeoverObserved: false,
+    };
+    const pending = sendChatMessage(state as never, "插问B", undefined, {
+      preserveActiveRunOccupancy: true,
+    });
+    // A completed while B's RPC was in flight.
+    state.chatRunId = null;
+    state.chatStream = null;
+    state.chatStreamStartedAt = null;
+    state.chatStreamSessionKey = null;
+    state.workProgressPhase = null as never;
+    rejectRpc(new Error("ACL deny"));
+    const result = await pending;
+    expect(result).toBeNull();
+    expect(state.chatRunId).toBeNull();
+    expect(state.chatStream).toBeNull();
+    expect(state.lastError).toBeTruthy();
+  });
+
+  it("P0: A cancelled during RPC wait — fail must not restore old runId", async () => {
+    let rejectRpc!: (err: Error) => void;
+    const request = vi.fn(
+      () =>
+        new Promise((_, rej) => {
+          rejectRpc = rej as (err: Error) => void;
+        }),
+    );
+    const state = {
+      client: { request },
+      connected: true,
+      sessionKey: "agent:main:main",
+      chatMessages: [],
+      chatSending: false,
+      chatRunId: "run-a",
+      chatStream: "partial-a",
+      chatStreamStartedAt: 1000,
+      chatStreamSessionKey: "agent:main:main",
+      chatThinkingProgress: null,
+      workProgressPhase: "thinking" as const,
+      workProgressToolsInFlight: 1,
+      workProgressNarration: null,
+      lastError: null,
+      chatHumanTakeoverObserved: false,
+    };
+    const pending = sendChatMessage(state as never, "插问B", undefined, {
+      preserveActiveRunOccupancy: true,
+    });
+    state.chatRunId = null;
+    state.chatStream = null;
+    rejectRpc(new Error("network"));
+    await pending;
+    expect(state.chatRunId).toBeNull();
+    expect(state.chatStream).toBeNull();
+  });
+
+  it("P0: A produced new delta during RPC wait — fail must not roll back stream", async () => {
+    let rejectRpc!: (err: Error) => void;
+    const request = vi.fn(
+      () =>
+        new Promise((_, rej) => {
+          rejectRpc = rej as (err: Error) => void;
+        }),
+    );
+    const state = {
+      client: { request },
+      connected: true,
+      sessionKey: "agent:main:main",
+      chatMessages: [],
+      chatSending: false,
+      chatRunId: "run-a",
+      chatStream: "partial-a",
+      chatStreamStartedAt: 1000,
+      chatStreamSessionKey: "agent:main:main",
+      chatThinkingProgress: null,
+      workProgressPhase: "thinking" as const,
+      workProgressToolsInFlight: 0,
+      workProgressNarration: null,
+      lastError: null,
+      chatHumanTakeoverObserved: false,
+    };
+    const pending = sendChatMessage(state as never, "插问B", undefined, {
+      preserveActiveRunOccupancy: true,
+    });
+    state.chatStream = "partial-a\n新进度 delta";
+    state.workProgressToolsInFlight = 2;
+    rejectRpc(new Error("timeout"));
+    await pending;
+    expect(state.chatRunId).toBe("run-a");
+    expect(state.chatStream).toBe("partial-a\n新进度 delta");
+    expect(state.workProgressToolsInFlight).toBe(2);
+  });
+});

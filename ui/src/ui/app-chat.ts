@@ -99,6 +99,11 @@ export function isChatBusy(host: ChatBusyState) {
   return host.chatSending || Boolean(host.chatRunId);
 }
 
+/** RPC in flight only — duplicate-submit guard. Background chatRunId must not block delivery. */
+export function isChatSendInFlight(host: Pick<ChatBusyState, "chatSending">) {
+  return host.chatSending;
+}
+
 export function isChatStopCommand(text: string) {
   const trimmed = text.trim();
   if (!trimmed) {
@@ -198,9 +203,14 @@ async function sendChatMessageNow(
     suppressOptimisticUserMessage?: boolean;
     stewardCallAuthorizationId?: string;
     idempotencyKey?: string;
+    /** Keep background run as stream owner while still calling chat.send. */
+    preserveActiveRunOccupancy?: boolean;
   },
 ) {
-  resetToolStream(adaptToolStreamHost(host));
+  // Mid-task sends must not wipe the background run's live tool stream.
+  if (!opts?.preserveActiveRunOccupancy) {
+    resetToolStream(adaptToolStreamHost(host));
+  }
   const runId = await chatCapability.sendMessage(
     adaptChatSendCapabilityState(host),
     body,
@@ -219,6 +229,7 @@ async function sendChatMessageNow(
         ? { stewardCallAuthorizationId: opts.stewardCallAuthorizationId }
         : {}),
       ...(opts?.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : {}),
+      ...(opts?.preserveActiveRunOccupancy ? { preserveActiveRunOccupancy: true } : {}),
     },
   );
   const ok = Boolean(runId);
@@ -241,7 +252,9 @@ async function sendChatMessageNow(
     host.chatAttachments = opts.previousAttachments;
   }
   scheduleChatScroll(adaptScrollHost(host));
-  if (ok && !host.chatRunId) {
+  // Drain local queue even while a background run still occupies chatRunId;
+  // each item uses preserveActiveRunOccupancy so A is not stolen.
+  if (ok) {
     void flushChatQueue(host);
   }
   if (ok && opts?.refreshSessions && runId) {
@@ -251,7 +264,7 @@ async function sendChatMessageNow(
 }
 
 async function flushChatQueue(host: ChatSendHost) {
-  if (!host.connected || isChatBusy(host)) {
+  if (!host.connected || isChatSendInFlight(host)) {
     return;
   }
   const [next, ...rest] = host.chatQueue;
@@ -262,6 +275,7 @@ async function flushChatQueue(host: ChatSendHost) {
   const ok = await sendChatMessageNow(host, next.text, {
     attachments: next.attachments,
     refreshSessions: next.refreshSessions,
+    preserveActiveRunOccupancy: Boolean(host.chatRunId),
   });
   if (!ok) {
     host.chatQueue = [next, ...host.chatQueue];
@@ -447,7 +461,9 @@ export async function handleSendChat(
     host.chatQuoteDraft = null;
   }
 
-  if (isChatBusy(host)) {
+  // Duplicate-submit only. An active background run must still reach chat.send
+  // (preserve occupancy inside send). Do not FE-hold all mid-task messages.
+  if (isChatSendInFlight(host)) {
     enqueueChatMessage(host, displayMessage, attachmentsToSend, refreshSessions);
     return;
   }
@@ -471,6 +487,7 @@ export async function handleSendChat(
     suppressOptimisticUserMessage: opts?.suppressOptimisticUserMessage,
     stewardCallAuthorizationId: opts?.stewardCallAuthorizationId,
     idempotencyKey: opts?.idempotencyKey,
+    preserveActiveRunOccupancy: Boolean(host.chatRunId),
   });
 }
 

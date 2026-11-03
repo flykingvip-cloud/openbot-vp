@@ -28,7 +28,7 @@ export const PRIOR_UTTERANCE_CORRECTION_ANYWHERE_RE =
   /误会了|理解错|搞错了|弄错了|不是这个意思|并没有让你|我没有让你|我没说|你说的不对/u;
 
 const AMEND_CONSTRAINT_RE =
-  /继续|接着|然后|再补|补一|补上|加上|补充|加一节|多写一节|交叉验证|在此基础上|同样按照|进度|做到哪|怎么样了|还差|约束|口径|改成|改为|改一下|不要超过|当前(?:你做的)?(?:这个|这份)?工作|刚才/u;
+  /继续|接着|然后|再补|补一|补上|加上|增加|补充|加一节|多写一节|交叉验证|在此基础上|同样按照|进度|做到哪|怎么样了|还差|约束|口径|改成|改为|改一下|不要超过|当前(?:你做的)?(?:这个|这份)?工作|刚才|先别(?:发布|发出|发送|付款|支付|下单)|不要(?:付款|支付|发布|发出|发送|下单)|别发布|禁止(?:付款|支付|发布)/u;
 
 /**
  * Same-goal appendix / next chapter / charts — stay amend (v2 wording).
@@ -136,10 +136,122 @@ export function isPriorUtteranceCorrection(message: string | undefined): boolean
 }
 
 /**
+ * Bare continue / resume cue: stays on the current task (amend relation) but is
+ * NOT a business constraint to persist. Slice3: 「继续」 must not enter effectiveConstraints.
+ */
+const BARE_CONTINUE_RE =
+  /^(?:请)?(?:继续|接着)(?:吧|呀|啊|喔|哦)?(?:当前(?:任务|工作)?)?[。.!！?？\s]*$/u;
+
+export function isBareContinueCue(message: string | undefined): boolean {
+  const compactText = message?.replace(/\s+/g, "").trim() ?? "";
+  if (!compactText || compactText.includes("@")) {
+    return false;
+  }
+  return BARE_CONTINUE_RE.test(compactText);
+}
+
+/**
+ * Owner explicitly revises / replaces prior same-task instructions.
+ * Reuses prior-utterance correction + clear replace openers — not a new adjudicator,
+ * and not keyword deletion of unrelated history rows.
+ * Local revise ≠ full replace: only {@link isOwnerConstraintFullReplace} may supersede
+ * all prior active rows; otherwise history stays active and resume notes conflict coverage.
+ */
+const CONSTRAINT_REVISION_OPENER_RE =
+  /^(?:不对|错了|纠正|改为|改成|以后以|以本条为准|不要再(?:用|按|采用)?|别再)/u;
+
+/** Explicit whole-constraint replacement — the only case that supersedes all active rows. */
+const CONSTRAINT_FULL_REPLACE_RE =
+  /(?:以本条为准|全部(?:改成|改为|替换)|整体替换|废弃此前(?:全部)?(?:约束|要求|限制)?|之前的?(?:约束|要求|限制)(?:全部)?(?:作废|无效)|(?:只|仅)按本条|以后只按(?:本条|这条))/u;
+
+export function isOwnerConstraintRevision(message: string | undefined): boolean {
+  const text = stripInboundStamp(message ?? "");
+  if (!text || text.startsWith("/")) {
+    return false;
+  }
+  if (isOwnerConstraintFullReplace(text)) {
+    return true;
+  }
+  if (isPriorUtteranceCorrection(text)) {
+    return true;
+  }
+  const compactText = text.replace(/\s+/g, "").trim();
+  return CONSTRAINT_REVISION_OPENER_RE.test(compactText);
+}
+
+/**
+ * True only when the owner clearly demands wholesale replacement of prior constraints.
+ * Partial corrections ("改为覆盖亚洲市场") must return false so unrelated limits stay active.
+ */
+export function isOwnerConstraintFullReplace(message: string | undefined): boolean {
+  const text = stripInboundStamp(message ?? "");
+  if (!text || text.startsWith("/")) {
+    return false;
+  }
+  const compactText = text.replace(/\s+/g, "").trim();
+  return CONSTRAINT_FULL_REPLACE_RE.test(compactText);
+}
+
+/**
+ * Whether the owner utterance should be persisted onto the constraint log.
+ * Queries / bare continue / empty / commands → false.
+ */
+/**
+ * Hard execution limits (do-not-publish / do-not-pay). Must establish a board
+ * barrier before or with ack — never answer-only via reply_lane while A continues.
+ */
+const OWNER_EXECUTION_BARRIER_RE =
+  /(?:^|[，,。.\s])(?:先别(?:发布|发出|发送|付款|支付|下单)|不要(?:付款|支付|发布|发出|发送|下单)|别发布|禁止(?:付款|支付|发布))(?:[。.!！]?|$)/u;
+
+export function isOwnerExecutionBarrierUtterance(message: string | undefined): boolean {
+  const text = stripInboundStamp(message ?? "");
+  if (!text || text.startsWith("/")) {
+    return false;
+  }
+  return OWNER_EXECUTION_BARRIER_RE.test(text.replace(/\s+/g, ""));
+}
+
+export function shouldPersistOwnerConstraint(message: string | undefined): boolean {
+  const text = stripInboundStamp(message ?? "");
+  if (!text || text.startsWith("/")) {
+    return false;
+  }
+  if (isBareContinueCue(text)) {
+    return false;
+  }
+  // Goal / constraint *read* asks — never persist (board_readonly projection only).
+  if (
+    /^(?:请问?)?(?:当前)?(?:任务)?(?:目标|在做什么|做什么任务|任务是什么|现在的目标)(?:是|的)?(?:什么|嘛|吗)?[?？!！。.\s]*$/u.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  if (
+    /^(?:请问?)?(?:当前)?(?:有哪些|有什么|有效的?|有效)?(?:约束|限制|补充要求|补充约束)(?:有哪些|有什么|是什么)?[?？!！。.\s]*$/u.test(
+      text,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export type TurnRelationContext = {
+  /** Present so callers need not concatenate constraint history into `incoming`. Unused for regex. */
+  activeConstraints?: readonly string[];
+};
+
+/**
  * Classify before the task board mutates focus.
  * `amend` and `aside` stay on the current task. Only `new_work` may cut context.
+ * Only `incoming` + `currentGoal` are scanned — never a pasted constraint history blob.
  */
-export function classifyTurnRelation(incoming: string, currentGoal: string): TurnRelation {
+export function classifyTurnRelation(
+  incoming: string,
+  currentGoal: string,
+  _context?: TurnRelationContext,
+): TurnRelation {
   const text = stripInboundStamp(incoming);
   if (!text || text.startsWith("/")) {
     return "aside";
@@ -152,6 +264,21 @@ export function classifyTurnRelation(incoming: string, currentGoal: string): Tur
   }
   if (isPriorUtteranceCorrection(text)) {
     return "amend";
+  }
+  // Owner explicitly marks the turn as unrelated to the current task — ordinary
+  // aside, even when the body mentions words that also appear in constraint cues
+  // (e.g. an essay topic containing「约束」). Do not swallow into amend/steer.
+  if (/(?:与(?:当前)?任务无关|不(?:要|用)改(?:当前)?任务)/u.test(text.replace(/\s+/g, ""))) {
+    return "aside";
+  }
+  // Recalling / following up on a mid-task aside (插问 / 旁路) is ordinary aside —
+  // do not treat「刚才插问…」「旁路历史…」as same-task constraint amend via「刚才」.
+  if (
+    /(?:插问|旁路(?:历史)?|回顾(?:一下)?(?:插问|旁路)|追问\s*[BbＢｂ]|关于\s*[BbＢｂ]\s*(?:的|插问))/u.test(
+      text.replace(/\s+/g, ""),
+    )
+  ) {
+    return "aside";
   }
   // Same-goal appendix / next chapter / charts stay amend (v2); do not over-flip.
   if (SAME_GOAL_APPENDIX_RE.test(text) && !LEAVE_CURRENT_RE.test(text)) {
@@ -193,7 +320,10 @@ export function classifyTurnRelation(incoming: string, currentGoal: string): Tur
   return "aside";
 }
 
-/** In-flight runs abort with task-park only when the turn actually cuts context. */
-export function shouldTaskParkAbortInFlight(cutContext: boolean): boolean {
-  return cutContext;
+/**
+ * In-flight runs abort when the turn cuts context (task park/switch) OR when the
+ * owner pauses/cancels the current task (abortInFlight from the task board).
+ */
+export function shouldTaskParkAbortInFlight(cutContext: boolean, abortInFlight?: boolean): boolean {
+  return cutContext || abortInFlight === true;
 }

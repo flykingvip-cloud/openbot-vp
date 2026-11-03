@@ -1,20 +1,26 @@
 /**
- * M2 finalization gate: plan-speak / "still working" prose must not be a
- * terminal assistant final. Rewrite to an explicit pause that asks the user
- * to confirm or take over (covers 高密度分析 early-final class).
+ * Plan-speak / "still working" detection for the **executor** continue path,
+ * plus a reply-layer pass-through.
  *
- * Short holding lines such as 「正在收尾排版，稍等片刻。」 are a different
- * class: the user already said go, and the line is not a decision. They are
- * detected by `isExecutionStallFinal` so the run can continue. Do not fold
- * them into `PLAN_SPEAK_MARKERS_RE` — that rewrite asks about price, spec,
- * and payment, which is the wrong pause for typeset/publish.
+ * Who decides task control (continue / wait / ask owner / complete):
+ * - `executionContinueKind` + `runExecutionStallContinueLoop` (progress stall,
+ *   false-confirm, recoverable tools, silent-exec, empty-after-tools)
+ * - real human gates in stall-continue (`HARD_DECISION_RE`, waiting_confirmation,
+ *   missing choice) and OGUI / turn-completion elsewhere
+ * - `settleTurnCompletion` (delivered / permanent_block / true_fork)
  *
- * The shopping CTA is only for shopping plan-speak. Typeset, draft-box, and
- * research-write plan tone stays a progress sentence so the stall continuation
- * can keep the turn moving.
+ * Reply outlets (`rewriteAttemptVisibleReply`, `parseReplyDirectives` →
+ * partial/block) must **express** text, not invent pause/confirm/authorization
+ * from keywords. Shopping CTA used to be such an invention; it is retired here.
+ * Streaming may show progress before a stop result exists; it must not fabricate
+ * a pause reason.
+ *
+ * Short holding lines such as 「正在收尾排版，稍等片刻。」 are detected by
+ * `isExecutionStallFinal` so the run can continue — not rewritten into a
+ * shopping or generic confirm template.
  */
 
-/** User-facing pause when the model ends mid-plan without asking. */
+/** @deprecated Retired reply-layer template; kept for tests that assert absence. */
 export const PLAN_SPEAK_PAUSE_CTA =
   "任务还没做完。请确认下一步（选哪个价/规格/支付方式），或点「接管」在电脑里自己操作；也可以回我「继续」。";
 
@@ -95,74 +101,20 @@ export function isExecutionStallFinal(text: string): boolean {
   return SHORT_HOLDING_RE.test(t);
 }
 
-/** Short factual lead before the first plan-speak marker (prices / status). */
-function extractFactualLead(text: string): string {
-  const match = PLAN_SPEAK_MARKERS_RE.exec(text);
-  if (!match || match.index === undefined || match.index < 8) {
-    const firstLine = text.split(/\n+/)[0]?.trim() ?? "";
-    if (
-      firstLine.length >= 8 &&
-      firstLine.length <= 120 &&
-      !PLAN_SPEAK_MARKERS_RE.test(firstLine) &&
-      /[\u4e00-\u9fff\d¥￥]/.test(firstLine)
-    ) {
-      return firstLine;
-    }
-    return "";
-  }
-  const lead = text
-    .slice(0, match.index)
-    .replace(/[，,。；;、\s]+$/u, "")
-    .trim();
-  if (lead.length < 8 || lead.length > 160) {
-    return "";
-  }
-  if (!/[\u4e00-\u9fff\d¥￥]/.test(lead)) {
-    return "";
-  }
-  return lead;
-}
-
-/** Shopping plan-speak. A typeset sentence that also names a price still pauses. */
-const SHOPPING_PLAN_RE =
-  /(?:价格|规格|尺码|支付|付款|收银台|购物车|下单|比价|结算|最低价|接管|[¥￥])/u;
-
 /**
- * Non-shopping execution the shopping CTA must not interrupt: WeChat typeset,
- * draft box, or a research write.
+ * @deprecated Prefer `isPlanSpeakFinal`. Historically meant "do not rewrite to
+ * shopping CTA"; all plan-speak is now left as progress text at reply layer.
  */
-const NON_SHOPPING_EXEC_RE =
-  /(?:排版|草稿箱|公众号|调研|撰写|写完|写出来|研究报告|定版|typeset|draft box|wechat|weixin)/iu;
-
-/**
- * True when this plan-speak final is typeset, draft-box, or research work.
- * Shopping words in the sentence itself still take the pause CTA.
- */
-export function shouldPreserveNonShoppingPlanSpeak(text: string, contextText = ""): boolean {
-  const raw = text.trim();
-  if (!raw || !isPlanSpeakFinal(raw) || SHOPPING_PLAN_RE.test(raw)) {
-    return false;
-  }
-  return NON_SHOPPING_EXEC_RE.test(`${contextText}\n${raw}`);
+export function shouldPreserveNonShoppingPlanSpeak(text: string, _contextText = ""): boolean {
+  return isPlanSpeakFinal(text);
 }
 
 /**
- * If `text` is a plan-speak terminal, rewrite to a pause CTA.
- * Keeps a short leading factual span when present (prices / status), then CTA.
- * `contextText` is the latest user turn, so 「我继续。」 after a typeset GO is
- * left alone. Shopping plan-speak still becomes the pause CTA.
+ * Reply-layer pass-through. Never invents pause / confirm / shopping takeover
+ * from plan-speak keywords. Task control stays with the executor continue loop,
+ * real human gates, and turn-completion. `contextText` is accepted for call-site
+ * compatibility only.
  */
-export function rewritePlanSpeakFinal(text: string, contextText = ""): string {
-  const raw = text.trim();
-  if (!raw || !isPlanSpeakFinal(raw)) {
-    return text;
-  }
-  if (shouldPreserveNonShoppingPlanSpeak(raw, contextText)) {
-    return text;
-  }
-  const lead = extractFactualLead(raw);
-  if (lead && lead !== PLAN_SPEAK_PAUSE_CTA) {
-    return `${lead}\n\n${PLAN_SPEAK_PAUSE_CTA}`;
-  }
-  return PLAN_SPEAK_PAUSE_CTA;
+export function rewritePlanSpeakFinal(text: string, _contextText = ""): string {
+  return text;
 }

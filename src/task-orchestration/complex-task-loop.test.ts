@@ -11,7 +11,7 @@ import {
   applyIncomingUserMessage,
   emptySessionTaskBoard,
   readSessionTaskBoard,
-  writeSessionTaskBoard,
+  seedSessionTaskBoard,
 } from "../conversation-task/session-task-board.js";
 import { assessTaskOutputAlignment } from "../cron/task-focus.js";
 import {
@@ -212,7 +212,7 @@ describe("P3 complex task loop", () => {
       incomingText: "请分步骤做竞品分析",
       nowMs: 1,
     });
-    writeSessionTaskBoard(sessionFile, started.board);
+    seedSessionTaskBoard(sessionFile, started.board);
 
     const drift = "这是一份中医诊断学教材笔记，按章节整理望闻问切知识库课程论文摘要。".repeat(3);
     const missed = applyComplexTaskLoop({
@@ -255,7 +255,7 @@ describe("P3 complex task loop", () => {
       incomingText: "请分步骤做竞品分析",
       nowMs: 1,
     });
-    writeSessionTaskBoard(sessionFile, started.board);
+    seedSessionTaskBoard(sessionFile, started.board);
     const draft = `${"每一步都有可见结果。".repeat(12)}竞品分析已按步骤写完。`;
     expect(
       assessTaskOutputAlignment({

@@ -6,7 +6,7 @@ import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
 import { isCliProvider } from "../../agents/model-selection.js";
-import { queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
+import { abortEmbeddedPiRun, queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage } from "../../agents/usage.js";
 import {
   resolveAgentIdFromSessionKey,
@@ -20,9 +20,22 @@ import {
 } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
 import {
+  applyIncomingUserMessage,
+  activeConstraintTexts,
+  commitSameTaskConstraint,
+  isOwnerCurrentTaskControlUtterance,
+  mutateSessionTaskBoard,
+  readSessionTaskBoard,
+} from "../../conversation-task/session-task-board.js";
+import {
   isTaskBoardContinueInternalPrompt,
   scheduleTaskBoardContinueWake,
 } from "../../conversation-task/task-board-continue.js";
+import {
+  classifyTurnRelation,
+  isOwnerExecutionBarrierUtterance,
+  shouldPersistOwnerConstraint,
+} from "../../conversation-task/turn-relation.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 import { tryResolveCapabilityGapsFromUsage } from "../../gateway/evolution-control/capability-gap-ingest.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
@@ -80,9 +93,17 @@ import {
   recordHonestCapabilityGap,
   stripCapabilityGapMarkers,
 } from "./honest-empty-reply.js";
+import { abortMidTaskAsideLanes, runMidTaskAsideReplyLane } from "./mid-task-aside-reply-lane.js";
+import { resolveMidTaskAsideDisposition } from "./mid-task-aside.js";
+import {
+  formatAmendConstraintAck,
+  formatTaskBoardProgressReply,
+  isProgressStatusQuery,
+} from "./mid-task-dialogue.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
-import { resolveActiveRunQueueAction } from "./queue-policy.js";
+import { resolveActiveRunQueueAction, shouldAttemptCollectAmendSteer } from "./queue-policy.js";
+import { clearSessionQueues } from "./queue.js";
 import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queue.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
@@ -92,6 +113,25 @@ import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
 const BLOCK_REPLY_SEND_TIMEOUT_MS = 15_000;
+
+function resolveCollectAmendTurnRelation(
+  sessionFile: string | undefined,
+  prompt: string,
+): "amend" | "aside" | "new_work" | null {
+  const file = sessionFile?.trim();
+  if (!file) {
+    return null;
+  }
+  const board = readSessionTaskBoard(file);
+  const goal = board.current?.goalText?.trim() ?? "";
+  if (!goal) {
+    return null;
+  }
+  // Do not concatenate constraint history into the classified string (slice3).
+  return classifyTurnRelation(prompt, goal, {
+    activeConstraints: activeConstraintTexts(board.current),
+  });
+}
 
 export async function runReplyAgent(params: {
   commandBody: string;
@@ -235,12 +275,162 @@ export async function runReplyAgent(params: {
     }
   };
 
+  // Owner pause/cancel while A is active: reuse board control + existing abort path.
+  // Must stop new business actions on the in-flight run; wakeSuppress alone is not enough.
+  if (
+    isActive &&
+    isOwnerCurrentTaskControlUtterance(followupRun.prompt) &&
+    followupRun.run.sessionFile
+  ) {
+    const sessionFile = followupRun.run.sessionFile.trim();
+    const control = mutateSessionTaskBoard(sessionFile, (board) => {
+      const result = applyIncomingUserMessage({
+        board,
+        incomingText: followupRun.prompt,
+      });
+      return { board: result.board, value: result };
+    });
+    if (control.abortInFlight) {
+      const sessionId = followupRun.run.sessionId;
+      abortEmbeddedPiRun(sessionId);
+      abortMidTaskAsideLanes(sessionId);
+      clearSessionQueues([queueKey, sessionId, followupRun.run.sessionKey]);
+    }
+    await touchActiveSessionEntry();
+    typing.cleanup();
+    return [{ text: control.statusLine?.trim() || "已处理任务控制指令。" }];
+  }
+
+  // P3: progress / status asks answered from the live task board — no steer,
+  // no followup wait. Board is a projection of existing state, not a new controller.
+  if (isActive && isProgressStatusQuery(followupRun.prompt) && followupRun.run.sessionFile) {
+    const board = readSessionTaskBoard(followupRun.run.sessionFile);
+    if (board.current) {
+      const text = formatTaskBoardProgressReply(board);
+      await touchActiveSessionEntry();
+      typing.cleanup();
+      return [{ text }];
+    }
+  }
+
+  // Slice2: board_readonly = projection only; reply_lane = tools-disabled ephemeral
+  // embedded turn (distinct sessionId/file) so ordinary asides answer while A stays
+  // active — not a second task controller; never mutates the task board.
+  if (isActive && followupRun.run.sessionFile) {
+    const board = readSessionTaskBoard(followupRun.run.sessionFile);
+    if (board.current) {
+      const aside = resolveMidTaskAsideDisposition({
+        prompt: followupRun.prompt,
+        board,
+      });
+      if (aside.kind === "board_readonly") {
+        await touchActiveSessionEntry();
+        typing.cleanup();
+        return [{ text: aside.reply }];
+      }
+      if (aside.kind === "reply_lane_pending") {
+        const asideRunId = opts?.runId ?? crypto.randomUUID();
+        const lane = await runMidTaskAsideReplyLane({
+          parentSessionId: followupRun.run.sessionId,
+          parentSessionFile: followupRun.run.sessionFile,
+          board,
+          userPrompt: followupRun.prompt,
+          run: followupRun.run,
+          runId: asideRunId,
+          messageId: (() => {
+            const raw = sessionCtx.MessageSidFull ?? sessionCtx.MessageSid;
+            return typeof raw === "string" ? raw : undefined;
+          })(),
+        });
+        await touchActiveSessionEntry();
+        typing.cleanup();
+        return [{ text: lane.text }];
+      }
+    }
+  }
+
   if (shouldSteer && isStreaming) {
     const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
     if (steered && !shouldFollowup) {
       await touchActiveSessionEntry();
       typing.cleanup();
       return undefined;
+    }
+  } else if (
+    shouldAttemptCollectAmendSteer({
+      isActive,
+      isStreaming,
+      shouldSteer,
+      shouldFollowup,
+      queueMode: resolvedQueue.mode,
+      turnRelation: resolveCollectAmendTurnRelation(
+        followupRun.run.sessionFile,
+        followupRun.prompt,
+      ),
+      persistOwnerConstraint: shouldPersistOwnerConstraint(followupRun.prompt),
+    })
+  ) {
+    // P1 once-consumption: successful amend steer acknowledges immediately and
+    // must NOT also enqueue-followup (would re-apply the same constraint). Steer
+    // failure falls through so followup still carries the constraint — no drop.
+    // Constraint persistence goes through the sole board entry (not a reply-layer rewrite).
+    // Capture the receiving task id BEFORE steer so a mid-steer focus switch cannot
+    // attribute A's constraint to B; persist failure must not claim full success.
+    const sessionFile = followupRun.run.sessionFile?.trim() ?? "";
+    const expectedTaskId = sessionFile
+      ? (readSessionTaskBoard(sessionFile).current?.taskId?.trim() ?? "")
+      : "";
+    // Safety limits (先别发布 / 不要付款): persist board barrier BEFORE steer/ack
+    // so A cannot keep acting while we only say "收到".
+    const barrierFirst = isOwnerExecutionBarrierUtterance(followupRun.prompt);
+    let persistedEarly = false;
+    if (barrierFirst && sessionFile && expectedTaskId) {
+      persistedEarly = commitSameTaskConstraint({
+        sessionFile,
+        constraintText: followupRun.prompt,
+        expectedTaskId,
+      });
+      if (!persistedEarly) {
+        await touchActiveSessionEntry();
+        typing.cleanup();
+        return [
+          {
+            text: "限制未能写入原任务板（任务可能已切换或写入失败）。尚未视为生效；请重新发送该限制。",
+          },
+        ];
+      }
+    }
+    const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
+    if (steered) {
+      const persisted =
+        persistedEarly ||
+        (Boolean(sessionFile) &&
+          Boolean(expectedTaskId) &&
+          commitSameTaskConstraint({
+            sessionFile,
+            constraintText: followupRun.prompt,
+            expectedTaskId,
+          }));
+      await touchActiveSessionEntry();
+      typing.cleanup();
+      if (!persisted) {
+        return [
+          {
+            text: "约束已尝试注入当前执行，但未能写入原任务板（任务可能已切换或写入失败）。请重新发送该补充约束；本次不视为完整成功。",
+          },
+        ];
+      }
+      return [{ text: formatAmendConstraintAck(followupRun.prompt) }];
+    }
+    // Barrier already on the board even if steer missed — surface applied vs pending.
+    if (persistedEarly) {
+      await touchActiveSessionEntry();
+      typing.cleanup();
+      return [
+        {
+          text: `限制已写入任务板并生效：${followupRun.prompt.replace(/\s+/g, " ").trim().slice(0, 60)}。注入当前执行未成功，后台仍应按板约束停止相关动作；如需确认请再发一次。`,
+        },
+      ];
     }
   }
 

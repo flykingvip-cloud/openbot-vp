@@ -465,8 +465,8 @@ describe("session task completion notice", () => {
     store.close();
     const sessionFile = path.join(root, "session.jsonl");
     fs.writeFileSync(sessionFile, "", "utf8");
-    const { writeSessionTaskBoard, readSessionTaskBoard } = await import("./session-task-board.js");
-    writeSessionTaskBoard(sessionFile, {
+    const { seedSessionTaskBoard, readSessionTaskBoard } = await import("./session-task-board.js");
+    seedSessionTaskBoard(sessionFile, {
       current: {
         taskId: "live",
         title: "竞品监控",

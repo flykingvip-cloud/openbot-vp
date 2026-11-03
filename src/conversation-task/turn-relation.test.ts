@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { isWeakNewWorkCueOnly } from "./qualification.js";
 import {
   classifyTurnRelation,
+  isOwnerExecutionBarrierUtterance,
+  isBareContinueCue,
+  isOwnerConstraintFullReplace,
+  isOwnerConstraintRevision,
+  shouldPersistOwnerConstraint,
   isLanguageAsideMessage,
   isPriorUtteranceCorrection,
   shouldTaskParkAbortInFlight,
@@ -12,6 +17,19 @@ const CURRENT = "生成今日竞品价格检查结果，并验收至少一个竞
 describe("turn relation", () => {
   it("classifies language, correction, and continuation as non-cutting", () => {
     expect(classifyTurnRelation("请用中文回复", CURRENT)).toBe("aside");
+    // Explicit unrelated marker wins over constraint-cue words inside the body.
+    expect(
+      classifyTurnRelation(
+        "【插问】与任务无关：写一篇短文，主题是为何要区分旁路插问与任务约束",
+        CURRENT,
+      ),
+    ).toBe("aside");
+    expect(
+      classifyTurnRelation(
+        "【插问B】现在是什么星期几？只回答星期几，与当前任务无关，不要改任务。",
+        CURRENT,
+      ),
+    ).toBe("aside");
     expect(classifyTurnRelation("不对，我说的是国内", CURRENT)).toBe("amend");
     expect(classifyTurnRelation("补充一节", CURRENT)).toBe("amend");
     expect(classifyTurnRelation("把标题改成市场稿", CURRENT)).toBe("amend");
@@ -19,6 +37,8 @@ describe("turn relation", () => {
       expect(shouldTaskParkAbortInFlight(false)).toBe(false);
       expect(classifyTurnRelation(phrase, CURRENT)).not.toBe("new_work");
     }
+    expect(shouldTaskParkAbortInFlight(false, true)).toBe(true);
+    expect(shouldTaskParkAbortInFlight(true, false)).toBe(true);
   });
 
   it("classifies explicit new work that does not overlap the current goal", () => {
@@ -79,6 +99,72 @@ describe("turn relation", () => {
     expect(classifyTurnRelation("现在改做供应商合同审查", novel)).toBe("new_work");
     expect(classifyTurnRelation("请继续写审查记录、完成绑定", "你帮我制作一个贪吃蛇的小游戏")).toBe(
       "new_work",
+    );
+  });
+});
+
+describe("slice3 constraint persist gates", () => {
+  it("bare continue is amend but not persistable", () => {
+    expect(classifyTurnRelation("请继续", CURRENT)).toBe("amend");
+    expect(isBareContinueCue("请继续")).toBe(true);
+    expect(isBareContinueCue("继续")).toBe(true);
+    expect(shouldPersistOwnerConstraint("请继续")).toBe(false);
+    expect(shouldPersistOwnerConstraint("继续")).toBe(false);
+  });
+
+  it("queries are not persistable", () => {
+    expect(shouldPersistOwnerConstraint("当前任务目标是什么")).toBe(false);
+    expect(shouldPersistOwnerConstraint("有效约束有哪些")).toBe(false);
+  });
+
+  it("revision openers are detected without deleting by keyword alone", () => {
+    expect(isOwnerConstraintRevision("不对，改为只要 iOS 机型")).toBe(true);
+    expect(isOwnerConstraintRevision("补充：只要国内安卓机型")).toBe(false);
+    expect(shouldPersistOwnerConstraint("不对，改为只要 iOS 机型")).toBe(true);
+    expect(shouldPersistOwnerConstraint("补充：只要国内安卓机型")).toBe(true);
+  });
+
+  it("full replace is distinct from local revision", () => {
+    expect(isOwnerConstraintFullReplace("改为覆盖亚洲市场")).toBe(false);
+    expect(isOwnerConstraintFullReplace("不对，改为只要 iOS 机型")).toBe(false);
+    expect(isOwnerConstraintFullReplace("以本条为准：只要 iOS 机型，不要安卓")).toBe(true);
+    expect(isOwnerConstraintFullReplace("整体替换为：只用公开资料")).toBe(true);
+    expect(isOwnerConstraintRevision("以本条为准：只要 iOS 机型")).toBe(true);
+  });
+
+  it("classifyTurnRelation accepts context without scanning constraint history", () => {
+    const poisoned = "继续|暂停|取消|新任务";
+    expect(classifyTurnRelation("请用中文回复", CURRENT, { activeConstraints: [poisoned] })).toBe(
+      "aside",
+    );
+  });
+});
+
+describe("slice2 mid-task routing amend cues", () => {
+  const goal = "调研国内手机市场并写报告";
+
+  it("treats supplement and safety barriers as amend (not aside/reply_lane)", () => {
+    expect(classifyTurnRelation("报告增加欧洲市场", goal)).toBe("amend");
+    expect(classifyTurnRelation("先别发布", goal)).toBe("amend");
+    expect(classifyTurnRelation("不要付款", goal)).toBe("amend");
+    expect(isOwnerExecutionBarrierUtterance("先别发布")).toBe(true);
+    expect(isOwnerExecutionBarrierUtterance("不要付款")).toBe(true);
+    expect(isOwnerExecutionBarrierUtterance("今天北京天气怎么样")).toBe(false);
+  });
+
+  it("recalling mid-task aside (插问/旁路) stays aside, not amend via 刚才", () => {
+    expect(
+      classifyTurnRelation("【追问B】刚才插问里你回答的星期几是什么？只回顾插问B的答案。", goal),
+    ).toBe("aside");
+    expect(
+      classifyTurnRelation(
+        "【A结束后追问】请根据旁路历史，复述刚才插问B的星期几答案；不要编造任务A细节。",
+        goal,
+      ),
+    ).toBe("aside");
+    // Real constraint with 约束 cue still amends.
+    expect(classifyTurnRelation("【补充约束】最终输出必须包含 E2E_CONSTRAINT_OK", goal)).toBe(
+      "amend",
     );
   });
 });

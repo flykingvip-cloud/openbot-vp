@@ -10,6 +10,7 @@ import {
 } from "../../agents/builtin-steward/employee-isolation.js";
 import { isBuiltinStewardAgent } from "../../agents/builtin-steward/identity.js";
 import { resolveThinkingDefault } from "../../agents/model-selection.js";
+import { abortEmbeddedPiRun } from "../../agents/pi-embedded.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { gateChatHistoryText, stripToolMessages } from "../../agents/tools/sessions-helpers.js";
 import { omitImagePayloadForHistory } from "../../agents/transcript-image-omit.js";
@@ -19,6 +20,8 @@ import { isTranscriptStartBoundary } from "../../auto-reply/reply/chat-checkpoin
 import { noteUnresolvedChatRunError } from "../../auto-reply/reply/chat-run-error-escalation.js";
 import { isInternalContinueHistoryMessage } from "../../auto-reply/reply/internal-continue-prompt.js";
 import { isMemoryFlushHistoryMessage } from "../../auto-reply/reply/memory-flush-prompt.js";
+import { mergeChatHistoryWithAsideDialogue } from "../../auto-reply/reply/mid-task-aside-dialogue-history.js";
+import { clearSessionQueues } from "../../auto-reply/reply/queue.js";
 import { createReplyDispatcher } from "../../auto-reply/reply/reply-dispatcher.js";
 import {
   emptyRestoreTaskReconciliation,
@@ -46,6 +49,7 @@ import { isSharedTenantAddressingEnabled, resolveDataRoot } from "../../config/d
 import { withOperatorStateScope } from "../../config/operator-state-scope.js";
 import {
   loadSessionStore,
+  resolveAndPersistSessionFile,
   resolveSessionFilePath,
   updateSessionStore,
 } from "../../config/sessions.js";
@@ -4398,13 +4402,26 @@ export const chatHandlers: GatewayRequestHandlers = {
     } else if (sessionId && storePath) {
       rawMessages = readSessionMessages(sessionId, storePath, entry?.sessionFile);
     }
+    // Mid-task aside reply_lane persists Q&A beside the transcript (not A's jsonl).
+    // Merge FIRST, then apply the original bound/limit/byte rules so sidecar growth
+    // cannot bypass chat.history caps.
+    const asideSessionFile =
+      (typeof entry?.sessionFile === "string" && entry.sessionFile.trim()) ||
+      (typeof jsonlPath === "string" && jsonlPath.trim()) ||
+      "";
+    const rawWithAside = asideSessionFile
+      ? mergeChatHistoryWithAsideDialogue({
+          messages: rawMessages,
+          parentSessionFile: asideSessionFile,
+        })
+      : rawMessages;
     let boundedMessages: unknown[];
     let placeholderCount: number;
     let nextBefore: string | null | undefined;
     let hasMore: boolean | undefined;
     try {
       const bounded = boundChatHistoryMessages({
-        rawMessages,
+        rawMessages: rawWithAside,
         limit: usedTranscriptIndex ? pageLimit : limit,
         includeTools: usedTranscriptIndex ? true : includeTools,
         sessionId: typeof sessionId === "string" ? sessionId : undefined,
@@ -4457,6 +4474,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       stewardOwner && !(typeof before === "string" && before.trim())
         ? stewardCallAuthorizationHistoryEntries(stewardOwner)
         : [];
+    // Auth overlays stay after bound so they are not truncated away.
     const historyMessages =
       authorizationMessages.length > 0
         ? [...boundedMessages, ...authorizationMessages]
@@ -5888,10 +5906,12 @@ export const chatHandlers: GatewayRequestHandlers = {
     }
     const {
       cfg,
-      entry,
+      entry: loadedEntry,
       storePath,
       canonicalKey: sessionKey,
     } = await loadSessionEntryForClient(resolvedSessionKey, client);
+    // Mutable: first inbound may persist sessionFile before focus gate seeds the board.
+    let entry = loadedEntry;
     const timeoutMs = resolveAgentTimeoutMs({
       cfg,
       overrideMs: p.timeoutMs,
@@ -6045,6 +6065,38 @@ export const chatHandlers: GatewayRequestHandlers = {
       };
       if (!p.growthBirthTurn) {
         try {
+          // First inbound often has no sessionFile yet (session init is later in
+          // get-reply). Focus gate then returns focus_state_unavailable and skips
+          // board seed — a later aside can become current. Ensure transcript path
+          // exists so applyIncomingUserMessage can seed A before mid-task B.
+          const existingFocusFile = entry?.sessionFile?.trim() ?? "";
+          if (!existingFocusFile || !fs.existsSync(existingFocusFile)) {
+            const focusSessionId = entry?.sessionId?.trim() || randomUUID();
+            const sessionStore = loadSessionStore(storePath);
+            const persisted = await resolveAndPersistSessionFile({
+              sessionId: focusSessionId,
+              sessionKey,
+              sessionStore,
+              storePath,
+              sessionEntry: entry ?? { sessionId: focusSessionId, updatedAt: Date.now() },
+              agentId,
+              sessionsDir: path.dirname(storePath),
+              activeSessionKey: sessionKey,
+            });
+            entry = persisted.sessionEntry;
+            const ensuredFocusTranscript = await ensureTranscriptFile({
+              transcriptPath: persisted.sessionFile,
+              sessionId: focusSessionId,
+              cwd: callerWorkspaceCwd,
+              tenantId: transcriptGovernance.tenantId,
+              ownerUserId: transcriptGovernance.ownerUserId,
+              groupId: transcriptGovernance.groupId,
+              failClosed: transcriptGovernance.failClosed,
+            });
+            if (!ensuredFocusTranscript.ok && transcriptGovernance.failClosed) {
+              // Soft-path: still try focus gate; managed fail-closed keeps prior behavior.
+            }
+          }
           // Always inject live ResumeParkedRecheck so resume revalidates auth + stop.
           const stopIdentity = authoritativeStopIdentityFromClient(client);
           taskTracking = applyChatFocusSwitchGateWithResumeRecheck({
@@ -6079,7 +6131,17 @@ export const chatHandlers: GatewayRequestHandlers = {
           recordFocusSwitchDecision("focus_state_unavailable");
         }
       }
-      if (shouldTaskParkAbortInFlight(taskTracking.cutContext)) {
+      const stewardRobotMention =
+        Boolean(extractEmployeeStewardUserIdFromSessionKey(sessionKey)) &&
+        !sessionKey.includes(":space:") &&
+        /@[^\s@]+/.test(rawMessage);
+      const taskStatusLine =
+        "statusLine" in taskTracking && typeof taskTracking.statusLine === "string"
+          ? taskTracking.statusLine.trim()
+          : "";
+      const ownerAbortInFlight =
+        "abortInFlight" in taskTracking && taskTracking.abortInFlight === true;
+      if (shouldTaskParkAbortInFlight(taskTracking.cutContext, ownerAbortInFlight)) {
         await abortChatRunsForSessionKeyWithPartials({
           context,
           ops: createChatAbortOps(context),
@@ -6089,6 +6151,15 @@ export const chatHandlers: GatewayRequestHandlers = {
           client,
           sessionFile: entry?.sessionFile,
         });
+        // Mirror agent-runner pause/cancel: stop embedded run + drop pending followups
+        // so the original queue cannot continue business actions after owner stop.
+        if (ownerAbortInFlight) {
+          const embeddedSessionId = entry?.sessionId?.trim();
+          if (embeddedSessionId) {
+            abortEmbeddedPiRun(embeddedSessionId);
+          }
+          clearSessionQueues([resolvedSessionKey, sessionKey, rawSessionKey, entry?.sessionId]);
+        }
       }
       if (taskTracking.action === "cancel_parked") {
         observeConversationTaskCancelPathConsult({
@@ -6096,14 +6167,6 @@ export const chatHandlers: GatewayRequestHandlers = {
           text: rawMessage,
         });
       }
-      const stewardRobotMention =
-        Boolean(extractEmployeeStewardUserIdFromSessionKey(sessionKey)) &&
-        !sessionKey.includes(":space:") &&
-        /@[^\s@]+/.test(rawMessage);
-      const taskStatusLine =
-        "statusLine" in taskTracking && typeof taskTracking.statusLine === "string"
-          ? taskTracking.statusLine.trim()
-          : "";
       const shouldPersistUserTranscript =
         normalizedAttachments.length > 0 ||
         (isChatInboundPersistEarlyEnabled() && Boolean(rawMessage.trim())) ||
@@ -6261,6 +6324,45 @@ export const chatHandlers: GatewayRequestHandlers = {
           context,
           runId: clientRunId,
           sessionKey: resolvedSessionKey,
+        });
+        endChatRunAndMaybeFlushRestore({
+          context,
+          runId: clientRunId,
+          client,
+          isWebchatConnect,
+        });
+        return;
+      }
+
+      // Owner pause/cancel: board updated + in-flight aborted above. Do not start a
+      // new business turn for the control utterance itself (status already in ack).
+      if (ownerAbortInFlight) {
+        setGatewayDedupeEntry({
+          dedupe: context.dedupe,
+          key: `chat:${clientRunId}`,
+          entry: {
+            ts: Date.now(),
+            ok: true,
+            payload: {
+              runId: clientRunId,
+              status: "ok" as const,
+              ...(taskStatusLine ? { taskStatusLine, taskId: taskTracking.taskId } : {}),
+            },
+          },
+        });
+        broadcastChatFinal({
+          context,
+          runId: clientRunId,
+          sessionKey: resolvedSessionKey,
+          ...(taskStatusLine
+            ? {
+                message: {
+                  role: "assistant",
+                  content: [{ type: "text", text: taskStatusLine }],
+                  timestamp: Date.now(),
+                },
+              }
+            : {}),
         });
         endChatRunAndMaybeFlushRestore({
           context,
