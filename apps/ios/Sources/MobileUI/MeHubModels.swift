@@ -32,6 +32,10 @@ enum MeIdentityZone: String, Equatable, Sendable {
 
 enum MeHubRoute: Equatable, Sendable {
     case hub
+    case accountInfo
+    case security
+    case prefs
+    case auth
     case connect
     case permissions
     case devices
@@ -218,6 +222,14 @@ func meHubRouteTitle(_ route: MeHubRoute, bots: [MeBotRow], groups: [MeGroupRow]
     switch route {
     case .hub:
         "我的"
+    case .accountInfo:
+        "账号信息"
+    case .security:
+        "账号安全"
+    case .prefs:
+        "偏好"
+    case .auth:
+        "授权"
     case .connect:
         "连接网关"
     case .permissions:

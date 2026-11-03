@@ -1,7 +1,7 @@
 import OpenBotKit
 import SwiftUI
 
-/// 我的 hub — 个人设置｜本机与连接｜更多.
+/// 我的 hub — 个人设置｜设备｜更多（对齐 Android MeTabScreen）。
 /// Secondary pages stay inside the tab (「我的」 kicker + EmployeeRootTabs bar).
 /// Not a WebView tab. OAuth / WeChat identity wizard stays on Web.
 struct MeTabShell: View {
@@ -52,7 +52,7 @@ struct MeTabShell: View {
             VStack(alignment: .leading, spacing: 16) {
                 ModuleTitle(title: "我的")
                 SoTSegmentedControl(
-                    options: ["个人设置", "本机与连接", "更多"],
+                    options: ["个人设置", "设备", "更多"],
                     selectedIndex: self.$segmentIndex)
                 if let notice = self.notice, !notice.isEmpty {
                     MeSoftBanner(text: notice)
@@ -74,7 +74,36 @@ struct MeTabShell: View {
     private var personalSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             MeIdentityCardView(state: meIdentityCardFromAccount(email: self.accountEmail, orgId: self.accountOrgId))
-            MeSoftBanner(text: "身份 OAuth / 微信向导留在 Web 员工工作台，手机不内建向导。")
+            MeSectionLabel(text: "账号与安全")
+            MeHubNavRow(
+                systemImage: "person",
+                title: "账号信息",
+                subtitle: "个人资料 · 企业与岗位",
+                tint: OpenBotMobileTokens.textSecondary,
+                badge: nil,
+                action: { self.route = .accountInfo })
+            MeHubNavRow(
+                systemImage: "lock",
+                title: "安全",
+                subtitle: "登录密码",
+                tint: OpenBotMobileTokens.textSecondary,
+                badge: nil,
+                action: { self.route = .security })
+            MeHubNavRow(
+                systemImage: "gearshape",
+                title: "偏好",
+                subtitle: "语言 · 主题",
+                tint: OpenBotMobileTokens.textSecondary,
+                badge: nil,
+                action: { self.route = .prefs })
+            MeHubNavRow(
+                systemImage: "link",
+                title: "授权",
+                subtitle: "工作身份",
+                tint: OpenBotMobileTokens.textSecondary,
+                badge: nil,
+                action: { self.route = .auth })
+            // Residual vs Android: logout lives in native chrome here (Android shell handles it).
             MeHubNavRow(
                 systemImage: "rectangle.portrait.and.arrow.right",
                 title: "退出登录",
@@ -86,26 +115,10 @@ struct MeTabShell: View {
     }
 
     private var deviceSection: some View {
+        // Android SoT: only 「系统权限」→「设备与权限」. No 「连接状态」row in Me.
+        // Residual: connect / voice / canvas / paired-device routes remain reachable from Settings.
         VStack(alignment: .leading, spacing: 10) {
-            if !self.connected {
-                Button {
-                    self.route = .connect
-                } label: {
-                    MeSoftBanner(text: "未连接网关。点此或下方「去连接网关」进行连接。", warn: true)
-                }
-                .buttonStyle(.plain)
-            }
-            MeSectionLabel(text: "连接")
-            MeHubNavRow(
-                systemImage: "checkmark.circle",
-                title: "连接网关",
-                subtitle: self.connected
-                    ? (self.appModel.gatewayServerName ?? "已连接")
-                    : "云端账号登录 · 查看连接状态",
-                tint: self.connected ? OpenBotMobileTokens.success : OpenBotMobileTokens.warning,
-                badge: meConnectBadge(connected: self.connected),
-                badgeWarn: !self.connected,
-                action: { self.route = .connect })
+            MeSectionLabel(text: "系统权限")
             MeHubNavRow(
                 systemImage: "iphone",
                 title: "设备与权限",
@@ -113,31 +126,6 @@ struct MeTabShell: View {
                 tint: OpenBotMobileTokens.textSecondary,
                 badge: nil,
                 action: { self.route = .permissions })
-            MeHubNavRow(
-                systemImage: "desktopcomputer",
-                title: "我的设备",
-                subtitle: "已配对设备只读列表 · Web device.pair.list",
-                tint: OpenBotMobileTokens.textSecondary,
-                badge: meDevicePairBadge(self.devices.count),
-                action: { self.route = .devices })
-            MePrimaryButton(label: self.connected ? "查看连接状态" : "去连接网关") {
-                self.route = .connect
-            }
-            MeSectionLabel(text: "本机能力")
-            MeHubNavRow(
-                systemImage: "mic",
-                title: "语音对话",
-                subtitle: "可选能力",
-                tint: OpenBotMobileTokens.accent,
-                badge: nil,
-                action: { self.route = .voice })
-            MeHubNavRow(
-                systemImage: "rectangle.and.hand.point.up.left",
-                title: "画布",
-                subtitle: "查看网关推送的内容",
-                tint: OpenBotMobileTokens.textSecondary,
-                badge: nil,
-                action: { self.route = .canvas })
         }
     }
 
@@ -146,14 +134,14 @@ struct MeTabShell: View {
             MeHubNavRow(
                 systemImage: "cpu",
                 title: "我的机器人",
-                subtitle: "管理身份、能力、授权与协作。",
+                subtitle: "身份、能力与协作",
                 tint: OpenBotMobileTokens.accent,
                 badge: nil,
                 action: { self.route = .robots })
             MeHubNavRow(
                 systemImage: "person.3",
                 title: "我的协作小组",
-                subtitle: "群主 · 成员",
+                subtitle: "成员与协作",
                 tint: OpenBotMobileTokens.accent,
                 badge: nil,
                 action: { self.route = .groups })
@@ -161,7 +149,7 @@ struct MeTabShell: View {
                 MeHubNavRow(
                     systemImage: "safari",
                     title: "员工工作台",
-                    subtitle: "可选 Web Employee Shell（非主路径；不作四 Tab 正文）",
+                    subtitle: "打开完整工作台",
                     tint: OpenBotMobileTokens.textSecondary,
                     badge: nil,
                     action: onOpenEmployeeWorkbench)
@@ -182,6 +170,19 @@ struct MeTabShell: View {
             trailing: self.trailing)
         {
             switch self.route {
+            case .accountInfo:
+                MeAccountInfoPage(
+                    identity: meIdentityCardFromAccount(email: self.accountEmail, orgId: self.accountOrgId))
+            case .security:
+                MeSecurityPage(onNotice: { notice in
+                    self.notice = notice
+                    self.route = .hub
+                    self.segmentIndex = 0
+                })
+            case .prefs:
+                MePrefsPage()
+            case .auth:
+                MeAuthPage(onOpenWorkbench: self.onOpenEmployeeWorkbench)
             case .connect, .permissions:
                 SettingsTab(embedded: true)
             case .devices:
@@ -315,8 +316,6 @@ struct MeTabShell: View {
         case .hub:
             if self.segmentIndex == 2 {
                 await self.refreshMore()
-            } else if self.segmentIndex == 1 {
-                await self.refreshDevices()
             }
         default:
             break

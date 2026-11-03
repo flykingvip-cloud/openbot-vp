@@ -916,3 +916,149 @@ func meClipped(_ raw: String, fallback: String, limit: Int = 140) -> String {
     }
     return String(text.prefix(limit))
 }
+
+
+// MARK: - Account hub pages (Android MeTabScreen SoT)
+
+struct MeAccountInfoPage: View {
+    var identity: MeIdentityCardState
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                MeSoftBanner(text: "账号资料当前为只读，完整编辑请到员工工作台。")
+                MeSectionLabel(text: "个人资料")
+                VStack(alignment: .leading, spacing: 10) {
+                    MeInfoLine(label: "显示名称", value: self.identity.displayName)
+                    MeInfoLine(label: "邮箱", value: self.identity.email)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(OpenBotMobileTokens.border, lineWidth: 1))
+                MeSectionLabel(text: "企业与岗位")
+                VStack(alignment: .leading, spacing: 10) {
+                    MeInfoLine(label: "组织", value: self.identity.orgLine)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(OpenBotMobileTokens.border, lineWidth: 1))
+            }
+            .padding(.horizontal, OpenBotMobileTokens.pageGutter)
+            .padding(.vertical, 8)
+        }
+    }
+}
+
+struct MeSecurityPage: View {
+    var onNotice: (String) -> Void
+    @State private var current = ""
+    @State private var next = ""
+    @State private var confirm = ""
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                MeSoftBanner(text: "登录密码可在此修改；两步验证等高级项请到员工工作台。")
+                MeSectionLabel(text: "修改密码")
+                SecureField("当前密码", text: self.$current)
+                    .textContentType(.password)
+                    .padding(12)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(OpenBotMobileTokens.border, lineWidth: 1))
+                SecureField("新密码", text: self.$next)
+                    .textContentType(.newPassword)
+                    .padding(12)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(OpenBotMobileTokens.border, lineWidth: 1))
+                SecureField("确认新密码", text: self.$confirm)
+                    .textContentType(.newPassword)
+                    .padding(12)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(OpenBotMobileTokens.border, lineWidth: 1))
+                MePrimaryButton(label: "更新密码") {
+                    if self.current.isEmpty || self.next.isEmpty {
+                        self.onNotice("请填写当前密码与新密码")
+                        return
+                    }
+                    if self.next != self.confirm {
+                        self.onNotice("两次输入的新密码不一致")
+                        return
+                    }
+                    if self.next.count < 8 {
+                        self.onNotice("新密码至少 8 位")
+                        return
+                    }
+                    // iOS PlatformAuthClient 尚未暴露改密 RPC；IA 与 Android 对齐，提示走工作台。
+                    self.onNotice("请到员工工作台完成改密（手机端改密接口待对齐）")
+                }
+            }
+            .padding(.horizontal, OpenBotMobileTokens.pageGutter)
+            .padding(.vertical, 8)
+        }
+    }
+}
+
+struct MePrefsPage: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                MeSoftBanner(text: "语言与主题跟随系统；完整偏好可在员工工作台调整。")
+                MeSectionLabel(text: "界面与语言")
+                VStack(alignment: .leading, spacing: 10) {
+                    MeInfoLine(label: "语言", value: "跟随系统")
+                    MeInfoLine(label: "主题", value: "跟随系统")
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(OpenBotMobileTokens.border, lineWidth: 1))
+            }
+            .padding(.horizontal, OpenBotMobileTokens.pageGutter)
+            .padding(.vertical, 8)
+        }
+    }
+}
+
+struct MeAuthPage: View {
+    var onOpenWorkbench: (() -> Void)?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                MeSoftBanner(text: "查看工作身份与可用模型；完整授权可在员工工作台完成。")
+                MeSectionLabel(text: "工作身份")
+                MeHubNavRow(
+                    systemImage: "person.badge.key",
+                    title: "打开员工工作台授权",
+                    subtitle: "OAuth / 微信向导留在 Web",
+                    tint: OpenBotMobileTokens.accent,
+                    badge: nil,
+                    action: {
+                        if let open = self.onOpenWorkbench { open() }
+                    })
+            }
+            .padding(.horizontal, OpenBotMobileTokens.pageGutter)
+            .padding(.vertical, 8)
+        }
+    }
+}

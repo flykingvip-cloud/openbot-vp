@@ -39,13 +39,13 @@ export struct LoginPage {
   private subtitle(): string {
     switch (this.mode) {
       case 'register':
-        return '使用邀请码加入企业工作区。';
+        return '创建账号，开始使用数字员工';
       case 'forgot':
         return '输入邮箱，获取密码重置验证码。';
       case 'reset':
         return '输入验证码与新密码完成重置。';
       default:
-        return '登录工作区，继续你的协作。';
+        return '登录后使用数字员工与团队协作';
     }
   }
 
@@ -192,16 +192,16 @@ export struct LoginPage {
         Button('登录')
           .type(ButtonType.Capsule)
           .fontSize(13)
-          .backgroundColor(this.mode === 'login' ? '#FF3B82F6' : '#22FFFFFF')
-          .fontColor(Color.White)
+          .backgroundColor(this.mode === 'login' ? '#8C6629' : '#E7E5E4')
+          .fontColor(this.mode === 'login' ? Color.White : '#1C1917')
           .layoutWeight(1)
           .enabled(!this.busy)
           .onClick(() => this.switchMode('login'))
         Button('注册')
           .type(ButtonType.Capsule)
           .fontSize(13)
-          .backgroundColor(this.mode === 'register' ? '#FF3B82F6' : '#22FFFFFF')
-          .fontColor(Color.White)
+          .backgroundColor(this.mode === 'register' ? '#8C6629' : '#E7E5E4')
+          .fontColor(this.mode === 'register' ? Color.White : '#1C1917')
           .layoutWeight(1)
           .margin({ left: 10 })
           .enabled(!this.busy)
@@ -212,7 +212,7 @@ export struct LoginPage {
       Button('← 返回登录')
         .type(ButtonType.Normal)
         .fontSize(13)
-        .fontColor(Color.White)
+        .fontColor('#1C1917')
         .backgroundColor(Color.Transparent)
         .enabled(!this.busy)
         .onClick(() => this.switchMode('login'))
@@ -225,10 +225,10 @@ export struct LoginPage {
         Text('OpenBot')
           .fontSize(28)
           .fontWeight(FontWeight.Bold)
-          .fontColor(Color.White)
+          .fontColor('#1C1917')
         Text(this.subtitle())
           .fontSize(14)
-          .fontColor('#B3FFFFFF')
+          .fontColor('#78716C')
           .textAlign(TextAlign.Center)
 
         this.modeTabs()
@@ -236,8 +236,8 @@ export struct LoginPage {
         if (this.mode === 'register') {
           TextInput({ placeholder: '显示名称' })
             .height(48)
-            .backgroundColor('#1AFFFFFF')
-            .fontColor(Color.White)
+            .backgroundColor(Color.White)
+            .fontColor('#1C1917')
             .placeholderColor('#80FFFFFF')
             .onChange((value: string) => {
               this.displayName = value;
@@ -247,8 +247,8 @@ export struct LoginPage {
         TextInput({ placeholder: '邮箱' })
           .type(InputType.Email)
           .height(48)
-          .backgroundColor('#1AFFFFFF')
-          .fontColor(Color.White)
+          .backgroundColor(Color.White)
+          .fontColor('#1C1917')
           .placeholderColor('#80FFFFFF')
           .onChange((value: string) => {
             this.email = value;
@@ -258,8 +258,8 @@ export struct LoginPage {
           TextInput({ placeholder: this.mode === 'reset' ? '新密码' : '密码' })
             .type(InputType.Password)
             .height(48)
-            .backgroundColor('#1AFFFFFF')
-            .fontColor(Color.White)
+            .backgroundColor(Color.White)
+            .fontColor('#1C1917')
             .placeholderColor('#80FFFFFF')
             .onChange((value: string) => {
               this.password = value;
@@ -269,8 +269,8 @@ export struct LoginPage {
         if (this.mode === 'register') {
           TextInput({ placeholder: '企业邀请码' })
             .height(48)
-            .backgroundColor('#1AFFFFFF')
-            .fontColor(Color.White)
+            .backgroundColor(Color.White)
+            .fontColor('#1C1917')
             .placeholderColor('#80FFFFFF')
             .onChange((value: string) => {
               this.inviteCode = value;
@@ -280,8 +280,8 @@ export struct LoginPage {
         if (this.mode === 'reset') {
           TextInput({ placeholder: '邮件中的重置码' })
             .height(48)
-            .backgroundColor('#1AFFFFFF')
-            .fontColor(Color.White)
+            .backgroundColor(Color.White)
+            .fontColor('#1C1917')
             .placeholderColor('#80FFFFFF')
             .onChange((value: string) => {
               this.resetCode = value;
@@ -291,8 +291,8 @@ export struct LoginPage {
         if (this.mode === 'login' && this.showMfa) {
           TextInput({ placeholder: '两步验证码 / MFA' })
             .height(48)
-            .backgroundColor('#1AFFFFFF')
-            .fontColor(Color.White)
+            .backgroundColor(Color.White)
+            .fontColor('#1C1917')
             .placeholderColor('#80FFFFFF')
             .onChange((value: string) => {
               this.mfaCode = value;
@@ -302,9 +302,9 @@ export struct LoginPage {
         if (this.showGatewayField) {
           TextInput({ placeholder: 'Gateway 地址', text: this.gatewayBaseUrl })
             .height(44)
-            .backgroundColor('#12FFFFFF')
-            .fontColor('#E6FFFFFF')
-            .placeholderColor('#66FFFFFF')
+            .backgroundColor('#F5F5F4')
+            .fontColor('#44403C')
+            .placeholderColor('#A8A29E')
             .onChange((value: string) => {
               this.gatewayBaseUrl = value;
             })
@@ -313,12 +313,12 @@ export struct LoginPage {
         if (this.errorMessage.length > 0) {
           Text(this.errorMessage)
             .fontSize(13)
-            .fontColor('#FF8A80')
+            .fontColor('#B91C1C')
             .width('100%')
         } else if (this.noticeMessage.length > 0) {
           Text(this.noticeMessage)
             .fontSize(13)
-            .fontColor('#A5D6A7')
+            .fontColor('#15803D')
             .width('100%')
         }
 
@@ -326,6 +326,8 @@ export struct LoginPage {
           .type(ButtonType.Capsule)
           .width('100%')
           .height(48)
+          .backgroundColor('#8C6629')
+          .fontColor(Color.White)
           .enabled(!this.busy)
           .onClick(() => {
             void this.submit();
@@ -336,7 +338,7 @@ export struct LoginPage {
             Button('忘记密码？')
               .type(ButtonType.Normal)
               .fontSize(12)
-              .fontColor('#93C5FD')
+              .fontColor('#8C6629')
               .backgroundColor(Color.Transparent)
               .enabled(!this.busy)
               .onClick(() => this.switchMode('forgot'))
@@ -345,7 +347,7 @@ export struct LoginPage {
             Button('我有验证码')
               .type(ButtonType.Normal)
               .fontSize(12)
-              .fontColor('#93C5FD')
+              .fontColor('#8C6629')
               .backgroundColor(Color.Transparent)
               .enabled(!this.busy)
               .onClick(() => this.switchMode('reset'))
@@ -354,7 +356,7 @@ export struct LoginPage {
           Button(this.showGatewayField ? '收起网关' : '高级')
             .type(ButtonType.Normal)
             .fontSize(12)
-            .fontColor('#80FFFFFF')
+            .fontColor('#78716C')
             .backgroundColor(Color.Transparent)
             .enabled(!this.busy)
             .onClick(() => {
@@ -368,6 +370,6 @@ export struct LoginPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('app.color.page_background'))
+    .backgroundColor('#F6F5F2')
   }
 }

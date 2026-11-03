@@ -13,4 +13,9 @@
 material/
 p12.password
 signing.local.json5
-OpenBot*
+# Local package dumps / DevEco export dirs (not source)
+OpenBot-*.hap
+OpenBot-*.app
+OpenBot-harmony/
+# Allow public gateway defaults in-repo
+!entry/src/main/ets/common/OpenBotConfig.ets

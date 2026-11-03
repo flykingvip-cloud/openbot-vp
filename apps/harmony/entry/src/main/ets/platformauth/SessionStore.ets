@@ -9,6 +9,7 @@ const KEY_COOKIE: string = 'platform_session_cookie';
 const KEY_EMAIL: string = 'session_email';
 const KEY_DISPLAY: string = 'session_display_name';
 const KEY_USER_ID: string = 'session_user_id';
+const KEY_WELCOME_SEEN: string = 'employee.welcome.seen';
 
 export class PersistedAuthState {
   gatewayBaseUrl: string = DEFAULT_GATEWAY_BASE_URL;
@@ -53,6 +54,29 @@ export class SessionStore {
     await pref.delete(KEY_EMAIL);
     await pref.delete(KEY_DISPLAY);
     await pref.delete(KEY_USER_ID);
+    await pref.flush();
+  }
+
+  /** First-install welcome flag. Missing key → false (show once). */
+  static async isWelcomeSeen(context: common.UIAbilityContext): Promise<boolean> {
+    const pref = await SessionStore.prefs(context);
+    const has = await pref.has(KEY_WELCOME_SEEN);
+    if (!has) {
+      // Upgrade users with an existing session skip the first-run card.
+      const cookie = ((await pref.get(KEY_COOKIE, '')) as string).trim();
+      if (cookie.length > 0) {
+        await pref.put(KEY_WELCOME_SEEN, true);
+        await pref.flush();
+        return true;
+      }
+      return false;
+    }
+    return (await pref.get(KEY_WELCOME_SEEN, false)) as boolean;
+  }
+
+  static async setWelcomeSeen(context: common.UIAbilityContext, value: boolean): Promise<void> {
+    const pref = await SessionStore.prefs(context);
+    await pref.put(KEY_WELCOME_SEEN, value);
     await pref.flush();
   }
 }
