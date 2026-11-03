@@ -68,6 +68,8 @@ tasks:
       - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
       - src/auto-reply/reply/mid-task-aside-dialogue-history.ts
       - docs/slice2-aside-trust-boundary-delivery.md
+      - docs/slice2-e2e-real-model-acceptance.md
+      - src/auto-reply/reply/slice2-e2e-real-model-accept.mjs
     state: active
     sessions:
       - id: 2a5a3f36-196a-4b8b-8728-3686a1508090
@@ -10870,6 +10872,8 @@ landingStreams:
       - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
       - src/auto-reply/reply/mid-task-aside-dialogue-history.ts
       - docs/slice2-aside-trust-boundary-delivery.md
+      - docs/slice2-e2e-real-model-acceptance.md
+      - src/auto-reply/reply/slice2-e2e-real-model-accept.mjs
     canLandWith: []
     metadata:
       task: ft-plan-speak-shopping-positive-admission
