@@ -102,6 +102,32 @@ enum PlatformAuthClient {
             successEmail: trimmedEmail)
     }
 
+    /// Change password for the signed-in platform session (Android `EmployeeAuthClient.changePassword`).
+    static func changePassword(
+        currentPassword: String,
+        newPassword: String,
+        baseURL: URL = OpenBotCloudDefaults.baseURL) async -> PlatformAuthLoginOutcome
+    {
+        if currentPassword.isEmpty || newPassword.isEmpty {
+            return .failure(message: "请填写当前密码与新密码。")
+        }
+        if newPassword.count < 8 {
+            return .failure(message: "新密码至少 8 位")
+        }
+        if newPassword == currentPassword {
+            return .failure(message: "新密码不能与当前密码相同")
+        }
+        return await self.post(
+            path: OpenBotCloudDefaults.changePasswordPath,
+            body: [
+                "currentPassword": currentPassword,
+                "newPassword": newPassword,
+            ],
+            baseURL: baseURL,
+            successEmail: "",
+            treatSuccessAsNotice: "密码已更新")
+    }
+
     static func logout(baseURL: URL = OpenBotCloudDefaults.baseURL) async {
         if let logoutURL = URL(string: OpenBotCloudDefaults.logoutPath, relativeTo: baseURL)?.absoluteURL {
             var request = URLRequest(url: logoutURL)

@@ -2,15 +2,14 @@
 
 纯血 **HarmonyOS NEXT** 无法直接安装 Android APK。本目录是 **ArkTS Stage 模型** 工程：WebView 加载与 Mac / Android 员工壳相同的 Gateway 嵌入页（默认 `https://gw.openbot.love`）。
 
-## 能力范围（v3）
+## 能力范围（v4 — 对齐 Android 四 Tab）
 
-| 有 | 暂无 |
+| 有 | 暂无 / 平台差 |
 |----|------|
-| **原生登录 / 注册 / 找回密码 / 重置密码** | Android 节点 Gateway 配对 / Camera / Canvas invoke |
-| **MFA 提示**（`PLATFORM_AUTH_MFA_*` 时显示验证码框） | 完整 TOTP 扫码绑定 UI |
-| **Bootstrap Cookie**（mint → `/native/bootstrap` → HttpOnly 员工会话） | AppGallery 正式上架签名 |
-| **`openbotEmployeeShell` JS Bridge**（与 Web `native-host.ts` Android 通道兼容） | 原生独立 Chat Activity（手机壳仍走 Web workspace） |
-| 员工端 Web（`shell=mobile`） | — |
+| **原生登录 / 注册 / 找回密码 / 重置密码 / 改密** | Android 节点 Gateway 配对 / Camera / Canvas invoke |
+| **四 Tab 壳**：对话 / 任务 / 知识 / **原生「我的」** | Chat / Tasks / Knowledge 暂为 Web embed（Android 为原生） |
+| **我的 hub**：个人设置｜设备｜更多（无连接状态主入口、账号段无退出登录） | 机器人/协作小组列表需 Gateway；可走员工工作台 |
+| **Bootstrap Cookie** + **`openbotEmployeeShell` Bridge** | 完整 TOTP 扫码绑定 UI；AppGallery 正式签名 |
 
 ### 认证流程
 
@@ -37,7 +36,10 @@ Web 侧通过 `window.openbotEmployeeShell.postMessage(json)` 调用（与 Andro
 | 模块 | 路径 |
 |------|------|
 | 登录 / 注册 / 重置 | `entry/src/main/ets/pages/LoginPage.ets` |
-| WebView + bootstrap + bridge | `entry/src/main/ets/pages/EmployeeShellPage.ets` |
+| 四 Tab 壳 | `entry/src/main/ets/pages/EmployeeRootTabs.ets` |
+| 原生「我的」 | `entry/src/main/ets/pages/MeTabPage.ets` |
+| Chat/Tasks/Knowledge Web embed | `entry/src/main/ets/pages/EmployeeWebEmbed.ets` |
+| 员工工作台 overlay | `entry/src/main/ets/pages/EmployeeShellPage.ets` |
 | Platform Auth API | `entry/src/main/ets/platformauth/PlatformAuthApi.ets` |
 | Bridge 解析 | `entry/src/main/ets/employeeshell/EmployeeShellBridge.ets` |
 | Mint / bootstrap URL | `entry/src/main/ets/employeeshell/EmployeeShellBootstrap.ets` |

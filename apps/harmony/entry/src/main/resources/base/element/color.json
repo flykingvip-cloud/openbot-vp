@@ -2,11 +2,11 @@
   "color": [
     {
       "name": "start_window_background",
-      "value": "#FF000000"
+      "value": "#FFF7F8FA"
     },
     {
       "name": "page_background",
-      "value": "#FF000000"
+      "value": "#FFF7F8FA"
     }
   ]
 }

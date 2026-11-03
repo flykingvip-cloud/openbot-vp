@@ -10,6 +10,7 @@ enum OpenBotCloudDefaults {
     static let registerPath = "/__openbot/platform-auth/employee/register"
     static let forgotPasswordPath = "/__openbot/platform-auth/password/forgot"
     static let resetPasswordPath = "/__openbot/platform-auth/password/reset"
+    static let changePasswordPath = "/__openbot/platform-auth/password/change"
     static let logoutPath = "/__openbot/platform-auth/logout"
     static let sessionPath = "/__openbot/platform-auth/session"
 }

@@ -7,12 +7,18 @@ struct RootView: View {
     @Environment(GatewayConnectionController.self) private var gatewayController
 
     @AppStorage(WorkspaceEntryPolicy.cloudSignedInKey) private var cloudSignedIn = false
+    /// Aligns with Android SecurePrefs `employee.welcome.seen` (first-install only).
+    @AppStorage("employee.welcome.seen") private var employeeWelcomeSeen = false
     @State private var showLegacyCanvas = false
     @State private var restoreTask: Task<Void, Never>?
 
     var body: some View {
         Group {
-            if self.cloudSignedIn {
+            if !self.employeeWelcomeSeen {
+                EmployeeWelcomeView {
+                    self.employeeWelcomeSeen = true
+                }
+            } else if self.cloudSignedIn {
                 // Stage 39+: native four-tab companion (HTML/Android SoT).
                 // Employee Shell WebView is optional under 我的→更多 — not the primary shell.
                 EmployeeRootTabs {
@@ -72,6 +78,8 @@ struct RootView: View {
             await MainActor.run {
                 self.cloudSignedIn = true
                 self.showLegacyCanvas = false
+                // Existing session → skip first-install welcome (Android upgrade path).
+                self.employeeWelcomeSeen = true
             }
             WorkspaceEntryPolicy.setCloudSignedIn(true)
             return
@@ -81,6 +89,7 @@ struct RootView: View {
             await MainActor.run {
                 self.cloudSignedIn = true
                 self.showLegacyCanvas = false
+                self.employeeWelcomeSeen = true
             }
             WorkspaceEntryPolicy.setCloudSignedIn(true)
         } else {
