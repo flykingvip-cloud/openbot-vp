@@ -71,3 +71,5 @@ Gateway stop execution is now delegated to a command use case (036e9a66b), while
 Execution is now PARTIAL through bounded in-turn stall recovery (ac0f448e1). It is not a full runner facade: original Pi runner, failover, compaction, ledgers and cross-turn wake retain their original owners. Narrow legacy policy dependencies are explicit migration debt.
 
 Execution preparation is PARTIAL through the original embedded parameter projection (7878b9bf9), with a separate preparation public entry. This does not migrate commercial admission, fallback, model transport, provider invocation or result accounting; legacy input/identity dependencies remain.
+
+Delivery is PARTIAL through candidate payload preparation (5907080c3). Actual task acceptance, send/acknowledgement, artifacts and reuse remain in original owners. Additional e2e suite is baseline-red and must not be represented as complete integration acceptance.
