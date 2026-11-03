@@ -65,3 +65,19 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Aside budget selector/type/constants extracted without changing limits, UTF-16 truncation, newest suffix selection or header accounting; historical storage/merge/wrapping stays in its original module, with same-reference compatibility exports. — codex-runtime-manager
 - Four suites: 31 tests PASS after added UTF-16/minimum-budget case; architecture 13 rules PASS; changed-file typed lint clean; full tsgo baseline 47/candidate 47, zero new; build PASS with 209 dynamic import warnings unchanged. — codex-runtime-manager
 - Next: review source provider contracts before extracting any mixed-I/O builder; no unified-budget rewrite, new classifier or model invocation. Deferred action timeline remains outside current scope. — codex-runtime-manager
+
+## Deferred builder component standardization
+
+- [ ] After initial boundary migration: inventory the complete builder lifecycle (resolve/read/render/audit), define component contracts and rerun normal/collaboration/recovery/aside/heartbeat scenarios. Preserve existing design invariants and evaluation order; do not fragment cohesive builders for directory aesthetics. — codex-runtime-manager
+- [ ] Verify builder inputs/outputs, trust placement, budgets, cancellation, source invocation count and audit/exposure side effects; add regression evidence before any behavior-changing normalization. — codex-runtime-manager
+
+## M1d scope
+
+- Pure collaboration mission rendering only; original adapter retains profile selection and original call timing. No movement of mixed-I/O runtime-context assembly, knowledge, learning or composer execution. Latest main #223 merged before new edits. — codex-runtime-manager
+
+## M1d acceptance
+
+- Cohesive collaboration mission projection extracted as one domain component; original adapter retains resolved-profile selection and call timing. No mixed-I/O builder was moved. Independent review PASS. — codex-runtime-manager
+- Baseline runtime-context assembly 12 PASS; candidate component + assembly + normal/aside entrance 17 PASS. Typed lint clean; architecture 13 rules PASS; build PASS with 209 dynamic-import warnings unchanged. — codex-runtime-manager
+- Main #223 introduced five additional TS test diagnostics; after temporary restoration of the unchanged source, post-merge baseline 52 equals candidate 52 (zero added). Do not attribute these to this extraction or mix their fixes into runtime scope. — codex-runtime-manager
+- Deferred builder standardization and comprehensive retest explicitly remain mandatory follow-up; contract in builder-component-contract.md protects original business invariants and cohesive components. — codex-runtime-manager
