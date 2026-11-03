@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { amendActiveTask } from "../../agent-runtime/command/amend-active-task.js";
 import { queryCurrentTaskStatus } from "../../agent-runtime/command/task-status.js";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
@@ -368,62 +369,39 @@ export async function runReplyAgent(params: {
       persistOwnerConstraint: shouldPersistOwnerConstraint(followupRun.prompt),
     })
   ) {
-    // P1 once-consumption: successful amend steer acknowledges immediately and
-    // must NOT also enqueue-followup (would re-apply the same constraint). Steer
-    // failure falls through so followup still carries the constraint — no drop.
-    // Constraint persistence goes through the sole board entry (not a reply-layer rewrite).
-    // Capture the receiving task id BEFORE steer so a mid-steer focus switch cannot
-    // attribute A's constraint to B; persist failure must not claim full success.
     const sessionFile = followupRun.run.sessionFile?.trim() ?? "";
-    const expectedTaskId = sessionFile
-      ? (readSessionTaskBoard(sessionFile).current?.taskId?.trim() ?? "")
-      : "";
-    // Safety limits (先别发布 / 不要付款): persist board barrier BEFORE steer/ack
-    // so A cannot keep acting while we only say "收到".
-    const barrierFirst = isOwnerExecutionBarrierUtterance(followupRun.prompt);
-    let persistedEarly = false;
-    if (barrierFirst && sessionFile && expectedTaskId) {
-      persistedEarly = commitSameTaskConstraint({
-        sessionFile,
-        constraintText: followupRun.prompt,
-        expectedTaskId,
-      });
-      if (!persistedEarly) {
-        await touchActiveSessionEntry();
-        typing.cleanup();
+    const amendment = amendActiveTask(isOwnerExecutionBarrierUtterance(followupRun.prompt), {
+      readTaskId: () =>
+        sessionFile ? (readSessionTaskBoard(sessionFile).current?.taskId?.trim() ?? "") : "",
+      persist: (expectedTaskId) =>
+        Boolean(sessionFile) &&
+        commitSameTaskConstraint({
+          sessionFile,
+          constraintText: followupRun.prompt,
+          expectedTaskId,
+        }),
+      steer: () => queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt),
+    });
+    if (amendment.kind !== "defer") {
+      await touchActiveSessionEntry();
+      typing.cleanup();
+      if (amendment.kind === "barrier-rejected") {
         return [
           {
             text: "限制未能写入原任务板（任务可能已切换或写入失败）。尚未视为生效；请重新发送该限制。",
           },
         ];
       }
-    }
-    const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
-    if (steered) {
-      const persisted =
-        persistedEarly ||
-        (Boolean(sessionFile) &&
-          Boolean(expectedTaskId) &&
-          commitSameTaskConstraint({
-            sessionFile,
-            constraintText: followupRun.prompt,
-            expectedTaskId,
-          }));
-      await touchActiveSessionEntry();
-      typing.cleanup();
-      if (!persisted) {
-        return [
-          {
-            text: "约束已尝试注入当前执行，但未能写入原任务板（任务可能已切换或写入失败）。请重新发送该补充约束；本次不视为完整成功。",
-          },
-        ];
+      if (amendment.kind === "injected") {
+        if (!amendment.persisted) {
+          return [
+            {
+              text: "约束已尝试注入当前执行，但未能写入原任务板（任务可能已切换或写入失败）。请重新发送该补充约束；本次不视为完整成功。",
+            },
+          ];
+        }
+        return [{ text: formatAmendConstraintAck(followupRun.prompt) }];
       }
-      return [{ text: formatAmendConstraintAck(followupRun.prompt) }];
-    }
-    // Barrier already on the board even if steer missed — surface applied vs pending.
-    if (persistedEarly) {
-      await touchActiveSessionEntry();
-      typing.cleanup();
       return [
         {
           text: `限制已写入任务板并生效：${followupRun.prompt.replace(/\s+/g, " ").trim().slice(0, 60)}。注入当前执行未成功，后台仍应按板约束停止相关动作；如需确认请再发一次。`,
