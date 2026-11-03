@@ -159,3 +159,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - E2E missing-export diagnosis: model-fallback test mock omitted isModelEntitlementEmptyError. Partial real-module mock restores that export without altering production code. Full configured e2e improves from 35 PASS/8 FAIL/1 error to 42 PASS/1 FAIL/no unhandled errors. Remaining channelData approval-tool-result forwarding assertion fails independently and remains open. — codex-runtime-manager
 - Changed-file type-aware lint clean; tsgo remains 52 baseline/candidate, no new; architecture 23 rules PASS. No production files changed in this diagnostic slice. — codex-runtime-manager
 - [ ] Investigate remaining approval channelData forwarding failure with a faithful real-runner reproducer before altering normalization/approval behavior; do not weaken the test or silence it. — codex-runtime-manager
+
+## Approval forwarding correctness checkpoint
+
+- Reproduced product issue: sanitizeUserFacingText removes raw approve protocol to empty; generic skip dropped the structured execApproval card. Fix only restores safe APPROVE_CARD_CTA for sanitized-empty text carrying valid existing metadata and explicit allow-once protocol; silent/heartbeat/empty/malformed remain suppressed. This is a separate behavior fix, not equivalent migration. — codex-runtime-manager
+- Configured e2e now 46/46 PASS (including silent/card, heartbeat/card and empty-id negative cases). Independent review PASS; typed lint clean; tsgo baseline/candidate 52 unchanged; final build PASS and dynamic-import warnings 209 unchanged. Raw command/approval protocol is not restored in visible text. — codex-runtime-manager
+- Earlier 8-failure baseline is superseded by the mock repair and this explicit product regression fix. Existing unrelated entitlement suite remains baseline-red as separately recorded. — codex-runtime-manager
