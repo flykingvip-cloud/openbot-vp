@@ -131,3 +131,11 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Existing bounded stall loop moved unchanged to execution/recovery and exposed via execution/index (ac0f448e1); original attempt consumer imports public entry; old path is same-function compatibility export. Only one production loop implementation remains. — codex-runtime-manager
 - Four suites / 81 tests PASS including original attempt integration; independent byte-equivalence review PASS; typed lint clean; architecture 19 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS and 209 dynamic import warnings unchanged. — codex-runtime-manager
 - Narrow legacy dependencies remain: continuation prompts/type and protocol guard. Recovery owns no task persistence, completion, model provider selection or cross-turn wake scheduling. Remaining execution stages are NOT migrated. — codex-runtime-manager
+
+## Integrated checkpoint review
+
+- Complete branch reviewed independently for behavior and boundaries (overall-code-review.md, overall-boundary-review.md). No new P0/P1/P2 behavior blocker found; this is not production coverage or full migration completion. — codex-runtime-manager
+- Combined low-profile regression: 40 files / 483 tests PASS, including migrated components, original attempt, control, constraints/concurrency, aside history, Gateway and UI. No real model call or production rollout was performed. Log: /tmp/runtime-convergence-overall-tests.log (local diagnostic, not durable evidence). — codex-runtime-manager
+- git diff --check PASS; architecture 19 rules PASS. Nested command deep-import rejection verified with a temporary negative probe and removed; contracts deny all new runtime implementation areas. Existing full-type/build baseline remains recorded per last code change. — codex-runtime-manager
+- execution-ports-plan.md identifies preparation/result boundaries. Existing pure helpers already cover part of preparation, so the next implementation must demonstrate a coherent responsibility being removed from the old function rather than add another forwarding helper. Admission, task budget, failover, transport, identity and accounting/finalizers remain mandatory. — codex-runtime-manager
+- No main merge/deploy authorization. Builder and collapsible action timeline follow-ups remain deferred as registered. — codex-runtime-manager
