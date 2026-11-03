@@ -10,7 +10,7 @@
 | 进度查询（板投影） | 已实现 |
 | amend 约束一次注入 | 已实现 |
 | 主人暂停/取消打断活动执行 | 已实现（gateway + agent-runner） |
-| **普通 aside 插问及时独立回复** | **未完成**（本设计的实施对象） |
+| **普通 aside 插问及时独立回复** | **本轮已落地**（`mid-task-aside-reply-lane`：ephemeral `disableTools` embedded） |
 | 第二执行器并行改同一任务资源 | **不做** |
 
 “消息已入队 / 已收到”≠完成。必须有实际处理与可见回复，且消息归属不与 A 的流串线。
@@ -70,10 +70,10 @@ steering 把插问注入 A 会混流、并可能驱动 A 的工具动作 — 不
 | B 回复流 | B 的 runId | A final 不得 `removeChatRun(B)` |
 | A 后台任务 | A 的 session run / taskId | B 结束不得清 A 的 abort controller |
 
-## 4. 本回合局部检查点（可绿）
+## 4. 本回合检查点（可绿）
 
 - 落地 `resolveMidTaskAsideDisposition` + board_readonly 问句即时答（目标/约束），证明 aside 分类不写板。
-- **一般 reply_lane 并行短回合：未实施**，仍可能 followup 串行。
+- **一般 reply_lane**：`runMidTaskAsideReplyLane` — 独立 sessionId/sessionFile + `disableTools:true`；不写板；主人暂停/取消同时 abort 已登记 aside；`runReplyAgent` 直接返回 lane 文本、不 enqueue followup。
 
 ## 5. 验收场景映射
 
@@ -81,6 +81,21 @@ steering 把插问注入 A 会混流、并可能驱动 A 的工具动作 — 不
 |---|---|
 | A 中查询进度 | 已有 progress 短路 |
 | A 中补充约束 | 已有 amend 一次 |
-| A 中临时插问 B | board_readonly 可即时；一般 B → reply_lane（待做）或串行降级 |
+| A 中临时插问 B | board_readonly 可即时；一般 B → reply_lane（ephemeral disableTools） |
 | 暂停 A 后答 B | 暂停 abort 已贯通；B 再走正常入口 |
-| 插问期间 A 完成 | 归属键分离（reply_lane 实施时强制） |
+| 插问期间 A 完成 | 归属键分离（aside 用独立 session/runId；A 板不动） |
+
+## 6. 本轮落地与诚实缺口（Asia/Shanghai）
+
+**已落地**
+
+- `src/auto-reply/reply/mid-task-aside-reply-lane.ts`：ephemeral 会话 + `runEmbeddedPiAgent({ disableTools: true })`；登记/abort 旁路；隔离断言。
+- `agent-runner`：`reply_lane_pending` → `await runMidTaskAsideReplyLane` → 立即返回文本；`abortInFlight` 时 `abortMidTaskAsideLanes`。
+- 单测：隔离（session/file/tools）、板 epoch/约束不变、暂停取消 aside、agent-runner 接线。
+
+**仍缺口 / 刻意不做**
+
+- B 的 user/assistant **不**写入 A 的 jsonl（落在临时 aside sessionFile；对用户可见靠返回 payloads）。日后若需共址转录，须另开设计，避免抢 A 的会话写锁。
+- Gateway/UI `chatRunId` 分桶：本轮复用 `opts.runId` 作为 aside `runId`，未改 broadcast 清桶逻辑；终局误清风险依赖既有 run 身份，未新增第二控制器。
+- 不并发修改同一任务资源；不加第二任务控制者；不堆关键词特例。
+- 切片 3 停止功能扩展；不合并、不部署。

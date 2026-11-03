@@ -33,7 +33,7 @@
 - `src/auto-reply/reply/mid-task-aside.ts` + `.test.ts`  
 - `agent-runner`：active 时 disposition；`board_readonly` 立即 return 文本  
 - 读问句优先于 turn-relation（「有效约束有哪些」即使被标 amend 也不 steer）  
-- reply_lane 仍 pending  
+- reply_lane **本轮已落地**（见文末「普通插问落地实证」）  
 
 ## 定向测试结果
 
@@ -41,7 +41,7 @@
 
 ## 能力边界一句话
 
-消息送达与进度/板只读问句即时答已具备；一般普通插问及时 LLM 回复仍未完成；四项阻塞已针对性修复；本轮补齐 Gateway 停止与约束身份交叉验证。
+消息送达与进度/板只读问句即时答已具备；一般普通插问 reply_lane 本轮已落地（ephemeral disableTools）；四项阻塞已针对性修复；Gateway 停止与约束身份交叉验证保留。
 
 ---
 
@@ -252,7 +252,7 @@ function defaultQueueModeForChannel(_channel?: string): QueueMode {
 - 阻塞1：`abortInFlight` on pause/cancel；gateway + agent-runner 走原 abort；事件序列断言 `abortEmbeddedPiRun`。
 - 阻塞2：`effectiveConstraints` 全文；`stop.summary` 仅展示截断；claim/resume 含第 48 字之后关键句。
 - 阻塞3：sole `appendSameTaskConstraint` / `commitSameTaskConstraint`；`mid-task-dialogue` 展示-only。
-- 阻塞4：进度文案「任务板最近记录」；不输出 `wakeSuppress`；普通 aside **未完成**。
+- 阻塞4：进度文案「任务板最近记录」；不输出 `wakeSuppress`；普通 aside **本轮已落地**（仍缺口见设计 §6）。
 - 必测序列绿：`A→long constraint once→progress→pause abort→stale wake dead`。
 - Vitest（定向）：event-sequence + inbound-stop + mid-task-dialogue + collect-amend-steer + turn-relation + session-task-board → 41 passed。
 
@@ -261,3 +261,47 @@ function defaultQueueModeForChannel(_channel?: string): QueueMode {
 - 行为完整 SHA：`6c4081a3c6c81bd63bbb317916f1d500c2466843`
 - 工作树：`/Users/daniel/AI VP/openbot-pr216-slice2`
 - PR：https://github.com/flykingvip-cloud/openbot-vp/pull/216
+
+## 普通插问落地实证（Asia/Shanghai，本轮）
+
+### 机制
+
+- 文件：`src/auto-reply/reply/mid-task-aside-reply-lane.ts`
+- 调度：`agent-runner` 对 `reply_lane_pending` **立即** `runMidTaskAsideReplyLane`，不 enqueue followup
+- 复用：`runEmbeddedPiAgent` + `disableTools: true`；**非**第二任务控制者
+- 隔离：aside `sessionId` / `sessionFile` ≠ A；板 epoch 与约束在 lane 前后不变
+- 取消：主人暂停/取消 → `abortEmbeddedPiRun(A)` + `abortMidTaskAsideLanes(parentSessionId)`
+
+### 命令与结果
+
+```
+pnpm exec vitest run \
+  …(切片1–3 + reply_lane + seed-audit 共 20 files)…
+→ Test Files  20 passed | Tests  240 passed
+```
+
+定向 reply_lane / seed：
+
+```
+mid-task-aside-reply-lane.test.ts
+agent-runner.aside-reply-lane.test.ts
+mid-task-aside.test.ts
+session-task-board.seed-audit.test.ts
+→ 4 files / 12 passed
+```
+
+### seedSessionTaskBoard 审计
+
+- 生产：仅定义导出；**无**生产 importer
+- 引用：`*.test.ts` + docs + 定义本身（`session-task-board.seed-audit.test.ts` 守门）
+
+### 诚实边界
+
+| 项 | 状态 |
+|---|---|
+| 及时独立回复（不跟 A followup 串行） | 已落地 |
+| 不写任务板 / disableTools | 已落地 |
+| 暂停取消覆盖 aside | 已落地 |
+| B 写入 A 的 jsonl 共址 | **仍缺口**（有意：避免会话锁争用） |
+| Gateway chatRun 清桶专项 | **仍缺口**（复用既有 runId） |
+| 第二任务控制者 / 关键词特例堆叠 | **不做** |

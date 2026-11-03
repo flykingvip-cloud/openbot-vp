@@ -9,7 +9,7 @@
 - 本轮行为完整 SHA（拒过期快照 / locked RMW / 交叉测）：`e82695c145629277cf3e2b656929e4b63bac3cfb`
 - 分支 tip（含测试夹具重命名跟进提交）：`289470474facede2edf1f325d9ce57bcdf687491`
 - 基线：已 `merge origin/main`（含 #217）；推送前再次 `git fetch` + 祖先门禁
-- 切片 2 普通插问（reply_lane 及时独立 LLM）：**仍未完成**，不改名、不混入本切片；未实施
+- 切片 2 普通插问（reply_lane）：**另轮已落地**（见 `slice2-aside-reply-design.md` §6）；本切片文档不混名实施细节；切片 3 **停止功能扩展**
 - 执行入口 / 续跑循环 / 模型裁决调用 / 新并发框架：**未增加**；复用既有 `withFileLockSync` 与 mutation 入口
 
 ## 本轮阻塞与修复（通用写入口过期快照）

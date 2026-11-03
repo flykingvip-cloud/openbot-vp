@@ -1,8 +1,8 @@
-# 切片 2 旁白：普通插问并发回复 — 设计说明（不实施）
+# 切片 2 旁白：普通插问并发回复 — 设计与落地对照
 
 时区：Asia/Shanghai。PR #216。  
-**本文件仅设计，本轮不实施 reply_lane / 并发独立 LLM。**  
-切片 2 普通插问状态：**未完成**。不与切片 3 混名。
+**本文件原为设计闸门；本轮已按最小方案落地 reply_lane（见 `mid-task-aside-reply-lane.ts`）。**  
+切片 2 普通插问状态：**本轮已落地／仍有诚实缺口**（见文末）。不与切片 3 混名。
 
 ## 1. 问题
 
@@ -35,8 +35,15 @@
 切片 3 已增强约束日志、恢复提示与判定上下文；**不**依赖 reply_lane。  
 本设计实施与否不影响切片 3 验收序列（插问步骤可用 disposition / board_readonly 证明「查询不写状态」）。
 
-## 5. 实施前交付物（若获批准）
+## 5. 本轮实施对照
 
-- 红灯：并发转录串流、取消误伤、板被 B 写入
-- 最小 diff 范围清单 + 资源隔离测试
-- 仍禁止第二任务引擎 / 独立裁决模型 / 自动替代唤醒
+| 闸门 | 本轮做法 | 证据 |
+|---|---|---|
+| 转录写入隔离 | B 用 ephemeral `sessionFile`（`openbot-aside-reply-*`），不写 A jsonl | `mid-task-aside-reply-lane.test.ts` |
+| 会话锁 | 不同 sessionId → 不占 `ACTIVE_EMBEDDED_RUNS[A]`；aside 锁自己的文件 | isolation assert + run args |
+| 消息归属 | aside `runId` = 本次 chat `opts.runId`；返回 payloads 不走 followup | `agent-runner.aside-reply-lane.test.ts` |
+| 取消范围 | `abortInFlight` → `abortEmbeddedPiRun(A)` + `abortMidTaskAsideLanes(A)` | 同测 + registry |
+| 任务板 | `disableTools`；跑前后 epoch/约束断言不变 | reply_lane 单测 |
+
+**仍缺口**：A/B 共址 jsonl、Gateway 清桶专项 hardening、真实多模型流式并行压测。  
+仍禁止第二任务引擎 / 独立裁决模型 / 自动替代唤醒。

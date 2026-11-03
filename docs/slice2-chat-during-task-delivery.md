@@ -19,7 +19,7 @@
 | **回答已产生** | 进度查询立即「任务板最近记录…」；目标/约束只读问句 `board_readonly` 即时答；**不**输出 `wakeSuppress` | mid-task-dialogue / mid-task-aside；事件序列 |
 | **活动已停** | 真实 `chat.send`「暂停/取消」→ abort 活动 run + `abortEmbeddedPiRun` + `clearSessionQueues` → **不** `dispatchInboundMessage` → 板 `wakeSuppress`/tombstone → 旧 claim 拒绝 | `chat.owner-pause-abort.test.ts` |
 
-入队 ≠ 即时对话。**一般普通插问（reply_lane）及时独立 LLM 回复仍未完成**——不以进度/board_readonly 特例替代；见 §4 与 `docs/slice2-aside-reply-design.md`。
+入队 ≠ 即时对话。**一般普通插问（reply_lane）本轮已落地**：ephemeral `disableTools` embedded，不以进度/board_readonly 特例替代；见 §4 与 `docs/slice2-aside-reply-design.md`。诚实缺口见该文 §6。
 
 ## 2. 本轮交叉验证（相对四项基线）
 
@@ -52,10 +52,10 @@
 |---|---|
 | 进度查询即时答 | **已实现**（板投影） |
 | 目标/有效约束只读问句即时答 | **本轮局部检查点已实现**（`board_readonly`，不写板） |
-| 一般 aside 及时独立 LLM 回复（reply_lane） | **未完成**（设计见 `slice2-aside-reply-design.md`；仍可能 followup 串行） |
+| 一般 aside 及时独立 LLM 回复（reply_lane） | **本轮已落地**（`mid-task-aside-reply-lane`；隔离测绿；缺口：共址转录 / 清桶 hardening） |
 | 第二任务控制者 / 并发改同一任务资源 | **不做** |
 
-最小方案要点：reply_lane = 原入口旁路短回合，独立 runId，禁止写板/写工作区工具；不能沙箱隔离则降级串行并诚实标明。本回合仅落地 disposition + board_readonly 接线。
+最小方案要点：reply_lane = 原入口旁路短回合，独立 ephemeral session + `disableTools`，禁止写板/写工作区工具。本回合已接线 disposition → board_readonly **与** reply_lane。
 
 ## 5. 定向测试（本机）
 
