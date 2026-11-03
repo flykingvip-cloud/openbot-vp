@@ -1,9 +1,9 @@
-import { stripInboundStampForDialogue } from "../../agent-runtime/command/task-status.js";
+import { stripInboundStampForDialogue } from "../../agent-runtime/command/index.js";
 export {
   stripInboundStampForDialogue,
   isProgressStatusQuery,
   formatTaskBoardProgressReply,
-} from "../../agent-runtime/command/task-status.js";
+} from "../../agent-runtime/command/index.js";
 
 export function formatAmendConstraintAck(prompt: string): string {
   const cleaned = stripInboundStampForDialogue(prompt).replace(/\s+/g, " ").trim();

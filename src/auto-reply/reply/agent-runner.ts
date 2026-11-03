@@ -1,9 +1,11 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { amendActiveTask } from "../../agent-runtime/command/amend-active-task.js";
-import { controlCurrentTask } from "../../agent-runtime/command/current-task-control.js";
-import { queryCurrentTaskStatus } from "../../agent-runtime/command/task-status.js";
+import {
+  amendActiveTask,
+  controlCurrentTask,
+  queryCurrentTaskStatus,
+} from "../../agent-runtime/command/index.js";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
