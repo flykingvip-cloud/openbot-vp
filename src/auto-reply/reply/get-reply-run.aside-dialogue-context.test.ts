@@ -9,6 +9,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../../config/config.js";
+import { resolveSessionFilePath } from "../../config/sessions.js";
+import {
+  mutateSessionTaskBoard,
+  emptySessionTaskBoard,
+} from "../../conversation-task/session-task-board.js";
 import { runPreparedReply } from "./get-reply-run.js";
 import { appendAsideDialogueTurn } from "./mid-task-aside-dialogue-history.js";
 
@@ -233,6 +238,7 @@ function baseParams(
 describe("runPreparedReply aside dialogue context (A-ended normal path)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
     vi.mocked(shouldUseCollaborationRuntimeAssembly).mockReturnValue(false);
     vi.mocked(assembleCollaborationRuntimeContextParts).mockResolvedValue([]);
     vi.mocked(buildInboundMetaSystemPrompt).mockReturnValue("");
@@ -250,6 +256,21 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
     tempDirs.push(dir);
     const sessionFile = path.join(dir, "sess.jsonl");
     fs.writeFileSync(sessionFile, "", "utf8");
+    vi.mocked(resolveSessionFilePath).mockReturnValue(sessionFile);
+    mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...emptySessionTaskBoard(),
+        current: {
+          taskId: "request-task-a",
+          title: "解释",
+          goalText: "解释你刚才的回答",
+          unfinished: true,
+          createdAtMs: 1,
+          stop: { summary: "pending", workspacePaths: [] },
+        },
+      },
+      value: undefined,
+    }));
     appendAsideDialogueTurn(sessionFile, {
       atMs: 3_000,
       runId: "b1",
@@ -275,6 +296,7 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
     );
 
     const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    expect(call?.followupRun.run.taskCompletionBinding?.taskId).toBe("request-task-a");
     const body = call?.commandBody ?? "";
     expect(body).toContain("Untrusted context");
     expect(body).toContain("<untrusted-text>");

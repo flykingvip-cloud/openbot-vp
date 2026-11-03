@@ -117,3 +117,10 @@ export type IncomingTurnResult = {
    */
   abortInFlight?: boolean;
 };
+
+/** Binding captured at request admission and carried across queue/execution/completion. */
+export type TaskCompletionBinding = {
+  taskId: string;
+  executionAttempt?: string;
+  deliverableVersion?: string;
+};

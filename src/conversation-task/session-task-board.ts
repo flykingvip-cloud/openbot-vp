@@ -1,3 +1,5 @@
+import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
+export type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
 import { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
 export { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
 /**
@@ -995,12 +997,6 @@ function renderCompletionNotice(parked: readonly TrackedTask[]): string {
   return lines.join("\n");
 }
 
-export type TaskCompletionBinding = {
-  taskId: string;
-  executionAttempt?: string;
-  deliverableVersion?: string;
-};
-
 /** Capture only an already-associated task; never bind completion to a newer current task. */
 export function captureTaskCompletionBinding(
   sessionFile?: string | null,
@@ -1023,6 +1019,40 @@ export function captureTaskCompletionBinding(
         deliverableVersion: task.deliverableVersion,
       }
     : undefined;
+}
+
+/** Bind a new execution only to the task already captured by its request. */
+export function startBoundTaskExecution(
+  sessionFile: string,
+  binding: TaskCompletionBinding | undefined,
+  executionAttempt: string,
+): TaskCompletionBinding | undefined {
+  if (!binding?.taskId || !executionAttempt.trim()) {
+    return undefined;
+  }
+  return mutateSessionTaskBoard(sessionFile, (board) => {
+    const current = board.current;
+    if (
+      !current?.unfinished ||
+      current.wakeSuppress ||
+      isTaskTombstoned(board, binding.taskId) ||
+      current.taskId !== binding.taskId ||
+      current.executionAttempt !== binding.executionAttempt ||
+      current.deliverableVersion !== binding.deliverableVersion
+    ) {
+      return { board, value: undefined };
+    }
+    const next = { ...binding, executionAttempt, deliverableVersion: executionAttempt };
+    return {
+      board: bindCurrentExecution({
+        board,
+        taskId: next.taskId,
+        executionAttempt: next.executionAttempt,
+        deliverableVersion: next.deliverableVersion,
+      }),
+      value: next,
+    };
+  });
 }
 
 /** Real close only. A model claim with closed=false does not announce or rewrite the board. */

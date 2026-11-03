@@ -31,7 +31,7 @@ import {
 import type { TypingMode } from "../../config/types.js";
 import {
   activeConstraintTexts,
-  captureTaskCompletionBinding,
+  startBoundTaskExecution,
   isOwnerCurrentTaskControlUtterance,
   readSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
@@ -193,7 +193,7 @@ export async function runReplyAgent(params: {
     typingMode,
   } = params;
 
-  const completionBinding = captureTaskCompletionBinding(followupRun.run.sessionFile, commandBody);
+  let completionBinding = followupRun.run.taskCompletionBinding;
   let activeSessionEntry = sessionEntry;
   const activeSessionStore = sessionStore;
   let activeIsNewSession = isNewSession;
@@ -603,6 +603,14 @@ export async function runReplyAgent(params: {
     : undefined;
   try {
     const runStartedAt = Date.now();
+    completionBinding = startBoundTaskExecution(
+      followupRun.run.sessionFile,
+      completionBinding,
+      runId,
+    );
+    if (completionBinding) {
+      opts?.onTaskExecutionBound?.(completionBinding);
+    }
     const runOutcome = await runAgentTurnWithFallback({
       commandBody,
       followupRun,

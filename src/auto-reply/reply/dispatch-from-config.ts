@@ -583,7 +583,7 @@ export async function dispatchReplyFromConfig(params: {
       systemEvent: shouldRouteToOriginating,
     });
 
-    const completionBinding = captureTaskCompletionBinding(
+    let completionBinding = captureTaskCompletionBinding(
       sessionStoreEntry.entry?.sessionFile,
       [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
         (value): value is string => typeof value === "string" && value.trim() !== "",
@@ -593,6 +593,10 @@ export async function dispatchReplyFromConfig(params: {
       ctx,
       {
         ...params.replyOptions,
+        onTaskExecutionBound: (binding) => {
+          completionBinding = binding;
+          params.replyOptions?.onTaskExecutionBound?.(binding);
+        },
         pendingTurnDeliveryRef,
         typingPolicy: typing.typingPolicy,
         suppressTyping: typing.suppressTyping,

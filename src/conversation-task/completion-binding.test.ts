@@ -46,3 +46,44 @@ it("rejects late completion for A after focus switched to B without a completion
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it("does not bind an old queued request to a same-goal replacement task", async () => {
+  const { startBoundTaskExecution } = await import("./session-task-board.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "queued-binding-"));
+  try {
+    const file = path.join(dir, "session.jsonl");
+    fs.writeFileSync(file, "");
+    const task = {
+      taskId: "a",
+      title: "same",
+      goalText: "same goal",
+      unfinished: true,
+      createdAtMs: 1,
+      stop: { summary: "", workspacePaths: [] },
+    };
+    mutateSessionTaskBoard(file, () => ({
+      board: { ...emptySessionTaskBoard(), current: task },
+      value: undefined,
+    }));
+    const queued = captureTaskCompletionBinding(file, "same goal");
+    mutateSessionTaskBoard(file, (board) => ({
+      board: { ...board, current: { ...task, taskId: "b" } },
+      value: undefined,
+    }));
+    expect(startBoundTaskExecution(file, queued, "run-old")).toBeUndefined();
+    expect(readSessionTaskBoard(file).current?.executionAttempt).toBeUndefined();
+    const admitted = captureTaskCompletionBinding(file, "same goal");
+    const started = startBoundTaskExecution(file, admitted, "run-new");
+    expect(started?.taskId).toBe("b");
+    expect(started?.executionAttempt).toBe("run-new");
+    expect(startBoundTaskExecution(file, admitted, "run-stale")).toBeUndefined();
+    expect(
+      recordCheckedTaskCompletion({ sessionFile: file, closed: true, binding: admitted }).persisted,
+    ).toBe(false);
+    expect(
+      recordCheckedTaskCompletion({ sessionFile: file, closed: true, binding: started }).persisted,
+    ).toBe(true);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
