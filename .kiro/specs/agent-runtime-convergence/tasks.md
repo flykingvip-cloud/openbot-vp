@@ -93,3 +93,10 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Current-task status use case now lives in command/task-status.ts: recognize -> read once through port -> project recorded facts. Original agent-runner position and control priority preserved; compatibility exports are direct, amend ack stays separate. Commit ddc52146f. — codex-runtime-manager
 - Five suites / 18 tests PASS; changed-file typed lint clean; architecture 15 rules PASS; tsgo baseline 52/candidate 52 zero new; build PASS with 209 warnings unchanged. — codex-runtime-manager
 - Debt: status projection still uses original board focus formatter. No task mutation, model call, new queue or runtime path; command is PARTIAL, not independently managed in full. — codex-runtime-manager
+
+## Active-task amendment checkpoint
+
+- Transaction extracted to command/amend-active-task.ts, with read identity / persist / steer ports. Original runner owns eligibility, touch/cleanup, presentation and followup fallback. Commit 8906041c7. — codex-runtime-manager
+- Unit tests 7 plus original runner/sequence/identity tests 12 PASS (19 total distinct tests); typed lint clean; architecture 15 rules PASS; tsgo 52 baseline/candidate unchanged; build PASS, dynamic import warnings 209 unchanged. Independent semantic review PASS. — codex-runtime-manager
+- Existing limitation recorded for separate behavior fix: persisted restriction plus steering is not a per-tool hard barrier. Do not claim these records prove immediate tool enforcement; preserve current user-facing behavior only for this structural migration. — codex-runtime-manager
+- [ ] Follow-up correctness slice: trace restrictive amendments to actual before-tool enforcement, reproduce any gap, then fix through the original policy/tool boundary with red/green evidence (not a second execution loop). — codex-runtime-manager
