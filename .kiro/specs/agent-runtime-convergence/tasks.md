@@ -12,8 +12,8 @@ Registry is authoritative. Contributors below execute delegated bounded changes;
 - [x] Read-only three-part baseline audit — codex-runtime-manager
 - [x] M0 authority, extension disposition and boundary records — codex-runtime-manager
 - [x] M1 first checkpoint: equivalent system-material assembly extraction and contract tests — codex-runtime-manager
-- [ ] Integration tests, diagnostic delta, architecture gate and build
-- [ ] Owner review and scoped green checkpoint commit
+- [x] Scoped integration tests, diagnostic delta, architecture gate and build (baseline failures recorded below) — codex-runtime-manager
+- [x] Independent review and scoped checkpoint commits through aba67ae70 — codex-runtime-manager
 
 ## Scope
 
@@ -37,3 +37,11 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 ## Deferred follow-up
 
 - [ ] After runtime convergence acceptance: user-facing collapsible action timeline. Project actual execution events into readable actions; separate plan from history; preserve task/aside identity and expose important stop/failure/auth changes. No UI work in M1. — codex-runtime-manager
+
+## Accepted M1 checkpoint
+
+- Owner accepted equivalent system-material assembly checkpoint: 48a49d687; dependency boundary: 595512edd; real normal/collaboration entrance contract: aba67ae70. — codex-runtime-manager
+- Entrance suite now 3 PASS; component 3 PASS; other entry regressions unchanged (58 PASS / 2 reproduced baseline FAIL). Full tsgo remains 47 baseline diagnostics, no additions. Build passes, dynamic import warning count unchanged at 209. — codex-runtime-manager
+- Limited Loom proxy authorized by user; registration saved in 6f9624819 and 6b643d686, other registrations unchanged. — codex-runtime-manager
+- This is only the pure system-material base, not a complete unified context service. Remaining M1 source/trust/budget boundaries require separate review before further extraction. — codex-runtime-manager
+- No push, main merge or production deployment. Collapsible action timeline stays deferred until the principal convergence work is accepted. — codex-runtime-manager
