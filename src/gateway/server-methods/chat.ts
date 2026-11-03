@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
+import { stopTaskAtGateway } from "../../agent-runtime/command/gateway-task-stop.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
   extractEmployeeStewardUserIdFromSessionKey,
@@ -6142,24 +6143,28 @@ export const chatHandlers: GatewayRequestHandlers = {
       const ownerAbortInFlight =
         "abortInFlight" in taskTracking && taskTracking.abortInFlight === true;
       if (shouldTaskParkAbortInFlight(taskTracking.cutContext, ownerAbortInFlight)) {
-        await abortChatRunsForSessionKeyWithPartials({
-          context,
-          ops: createChatAbortOps(context),
-          sessionKey: resolvedSessionKey,
-          abortOrigin: "rpc",
-          stopReason: "task-park",
-          client,
-          sessionFile: entry?.sessionFile,
+        await stopTaskAtGateway(ownerAbortInFlight, {
+          abortChatRuns: async () => {
+            await abortChatRunsForSessionKeyWithPartials({
+              context,
+              ops: createChatAbortOps(context),
+              sessionKey: resolvedSessionKey,
+              abortOrigin: "rpc",
+              stopReason: "task-park",
+              client,
+              sessionFile: entry?.sessionFile,
+            });
+          },
+          abortEmbedded: () => {
+            const embeddedSessionId = entry?.sessionId?.trim();
+            if (embeddedSessionId) {
+              abortEmbeddedPiRun(embeddedSessionId);
+            }
+          },
+          clearPending: () => {
+            clearSessionQueues([resolvedSessionKey, sessionKey, rawSessionKey, entry?.sessionId]);
+          },
         });
-        // Mirror agent-runner pause/cancel: stop embedded run + drop pending followups
-        // so the original queue cannot continue business actions after owner stop.
-        if (ownerAbortInFlight) {
-          const embeddedSessionId = entry?.sessionId?.trim();
-          if (embeddedSessionId) {
-            abortEmbeddedPiRun(embeddedSessionId);
-          }
-          clearSessionQueues([resolvedSessionKey, sessionKey, rawSessionKey, entry?.sessionId]);
-        }
       }
       if (taskTracking.action === "cancel_parked") {
         observeConversationTaskCancelPathConsult({
