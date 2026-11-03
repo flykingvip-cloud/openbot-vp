@@ -105,7 +105,10 @@
       "src/agent-runtime/command/**",
       "src/agent-runtime/execution/**",
       "src/agent-runtime/delivery/**",
-      "src/agent-runtime/state/**"
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/capabilities/**",
+      "src/agent-runtime/policy/**",
+      "src/agent-runtime/wiring/**"
     ],
     "description": "Cross-layer contracts own types only; they cannot depend on runtime implementations or persistence."
   },
@@ -127,13 +130,13 @@
   {
     "name": "runtime-command-auto-reply-public-entry",
     "from": "src/auto-reply/**",
-    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts"],
+    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts", "src/agent-runtime/command/*/**"],
     "description": "Production entrances must use the explicit command facade, not individual use-case internals."
   },
   {
     "name": "runtime-command-gateway-public-entry",
     "from": "src/gateway/**",
-    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts"],
+    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts", "src/agent-runtime/command/*/**"],
     "description": "Production entrances must use the explicit command facade, not individual use-case internals."
   },
   {
