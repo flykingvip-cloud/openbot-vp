@@ -108,5 +108,19 @@
       "src/agent-runtime/state/**"
     ],
     "description": "Cross-layer contracts own types only; they cannot depend on runtime implementations or persistence."
+  },
+  {
+    "name": "runtime-status-query-readonly",
+    "from": "src/agent-runtime/command/task-status.ts",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/auto-reply/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/capabilities/**"
+    ],
+    "description": "Current-task status queries must not invoke models, tools or scheduling; state reads enter through the explicit read port."
   }
 ]
