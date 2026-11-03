@@ -122,5 +122,17 @@
       "src/agent-runtime/capabilities/**"
     ],
     "description": "Command use cases cannot directly invoke models, tools or scheduling; state and steering effects use explicit injected ports."
+  },
+  {
+    "name": "runtime-command-auto-reply-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts"],
+    "description": "Production entrances must use the explicit command facade, not individual use-case internals."
+  },
+  {
+    "name": "runtime-command-gateway-public-entry",
+    "from": "src/gateway/**",
+    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts"],
+    "description": "Production entrances must use the explicit command facade, not individual use-case internals."
   }
 ]
