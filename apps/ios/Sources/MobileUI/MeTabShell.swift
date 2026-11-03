@@ -6,7 +6,6 @@ import SwiftUI
 /// Not a WebView tab. OAuth / WeChat identity wizard stays on Web.
 struct MeTabShell: View {
     var gateway: GatewayNodeSession
-    var onLogout: () -> Void
     var onOpenEmployeeWorkbench: (() -> Void)?
 
     @Environment(NodeAppModel.self) private var appModel
@@ -103,14 +102,7 @@ struct MeTabShell: View {
                 tint: OpenBotMobileTokens.textSecondary,
                 badge: nil,
                 action: { self.route = .auth })
-            // Residual vs Android: logout lives in native chrome here (Android shell handles it).
-            MeHubNavRow(
-                systemImage: "rectangle.portrait.and.arrow.right",
-                title: "退出登录",
-                subtitle: "清除平台会话并返回登录",
-                tint: OpenBotMobileTokens.danger,
-                badge: nil,
-                action: self.onLogout)
+            // Android Me Account has no logout row — logout stays on 员工工作台 chrome only.
         }
     }
 

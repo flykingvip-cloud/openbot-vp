@@ -962,11 +962,12 @@ struct MeSecurityPage: View {
     @State private var current = ""
     @State private var next = ""
     @State private var confirm = ""
+    @State private var busy = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                MeSoftBanner(text: "登录密码可在此修改；两步验证等高级项请到员工工作台。")
+                MeSoftBanner(text: "用于修改登录密码。")
                 MeSectionLabel(text: "修改密码")
                 SecureField("当前密码", text: self.$current)
                     .textContentType(.password)
@@ -992,25 +993,52 @@ struct MeSecurityPage: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .stroke(OpenBotMobileTokens.border, lineWidth: 1))
-                MePrimaryButton(label: "更新密码") {
-                    if self.current.isEmpty || self.next.isEmpty {
-                        self.onNotice("请填写当前密码与新密码")
-                        return
-                    }
-                    if self.next != self.confirm {
-                        self.onNotice("两次输入的新密码不一致")
-                        return
-                    }
-                    if self.next.count < 8 {
-                        self.onNotice("新密码至少 8 位")
-                        return
-                    }
-                    // iOS PlatformAuthClient 尚未暴露改密 RPC；IA 与 Android 对齐，提示走工作台。
-                    self.onNotice("请到员工工作台完成改密（手机端改密接口待对齐）")
+                MePrimaryButton(label: self.busy ? "保存中…" : "保存") {
+                    self.submit()
                 }
+                .disabled(self.busy)
+                .opacity(self.busy ? 0.6 : 1)
             }
             .padding(.horizontal, OpenBotMobileTokens.pageGutter)
             .padding(.vertical, 8)
+        }
+    }
+
+    private func submit() {
+        if self.current.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            self.onNotice("请输入当前密码")
+            return
+        }
+        if self.next.count < 8 {
+            self.onNotice("新密码至少 8 位")
+            return
+        }
+        if self.next != self.confirm {
+            self.onNotice("两次输入的新密码不一致")
+            return
+        }
+        if self.next == self.current {
+            self.onNotice("新密码不能与当前密码相同")
+            return
+        }
+        self.busy = true
+        Task {
+            let outcome = await PlatformAuthClient.changePassword(
+                currentPassword: self.current,
+                newPassword: self.next)
+            await MainActor.run {
+                self.busy = false
+                switch outcome {
+                case .success:
+                    self.onNotice("密码已更新")
+                case let .notice(message):
+                    self.onNotice(message)
+                case .mfaRequired:
+                    self.onNotice("改密失败：需要二次验证，请到员工工作台完成")
+                case let .failure(message):
+                    self.onNotice("改密失败：\(message)")
+                }
+            }
         }
     }
 }

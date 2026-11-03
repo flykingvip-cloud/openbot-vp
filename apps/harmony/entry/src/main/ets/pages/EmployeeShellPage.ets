@@ -17,6 +17,9 @@ export struct EmployeeShellPage {
   gatewayBaseUrl: string = '';
   cookieValue: string = '';
   displayName: string = '';
+  /** When true, show 关闭 to dismiss overlay (我的→员工工作台). */
+  workbenchOverlay: boolean = false;
+  onCloseWorkbench: () => void = () => {};
   onSessionExpired: () => void = () => {};
   onLogoutComplete: () => void = () => {};
 
@@ -140,10 +143,27 @@ export struct EmployeeShellPage {
               .fontSize(11)
               .fontColor('#80FFFFFF')
               .margin({ top: 2 })
+          } else if (this.workbenchOverlay) {
+            Text('员工工作台')
+              .fontSize(11)
+              .fontColor('#80FFFFFF')
+              .margin({ top: 2 })
           }
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
+
+        if (this.workbenchOverlay) {
+          Button('关闭')
+            .type(ButtonType.Normal)
+            .fontSize(13)
+            .fontColor('#E6FFFFFF')
+            .backgroundColor('#22FFFFFF')
+            .margin({ right: 8 })
+            .onClick(() => {
+              this.onCloseWorkbench();
+            })
+        }
 
         Button('退出')
           .type(ButtonType.Normal)
