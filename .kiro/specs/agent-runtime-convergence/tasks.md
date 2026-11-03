@@ -139,3 +139,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - git diff --check PASS; architecture 19 rules PASS. Nested command deep-import rejection verified with a temporary negative probe and removed; contracts deny all new runtime implementation areas. Existing full-type/build baseline remains recorded per last code change. — codex-runtime-manager
 - execution-ports-plan.md identifies preparation/result boundaries. Existing pure helpers already cover part of preparation, so the next implementation must demonstrate a coherent responsibility being removed from the old function rather than add another forwarding helper. Admission, task budget, failover, transport, identity and accounting/finalizers remain mandatory. — codex-runtime-manager
 - No main merge/deploy authorization. Builder and collapsible action timeline follow-ups remain deferred as registered. — codex-runtime-manager
+
+## Legacy embedded preparation checkpoint
+
+- Existing buildEmbeddedRunBaseParams / resolveEnforceFinalTag / scoped-auth projection moved as a cohesive internal preparation adapter (7878b9bf9). Original helpers re-export one implementation. Separate preparation/index avoids widening recovery-only imports. — codex-runtime-manager
+- Four green suites / 82 PASS (utils, BYOK, credit snapshot, original attempt). Entitlement suite has 4 FAIL / 3 PASS reproduced on untouched HEAD; no claim that these baseline failures are fixed. Independent byte-equivalence review PASS; typed lint clean; architecture 21 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS with 209 warnings unchanged. — codex-runtime-manager
+- Preparation still uses FollowupRun type and original execution-identity helper; its transitive Gateway dependency is explicit debt. It is not a final SDK contract. Admission/fallback/transport/provider invocation/budget/accounting/finalizers remain at original positions. No extra preparation wrapper added. — codex-runtime-manager
