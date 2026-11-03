@@ -1,8 +1,21 @@
-import {
-  isSidePathLabel,
-  assistantRestopsCleared,
-  isMainlineBlockNarrative,
-} from "../../agent-runtime/policy/index.js";
+import type {
+  TurnCompletionContract,
+  WritabilityProbe,
+  TurnCompletionDeliverable,
+  TurnCompletionInput,
+  TurnCompletionHardStop,
+  TurnCompletionSettlement,
+} from "../../agent-runtime/contracts/acceptance.js";
+import { settleTurnCompletionWithPorts } from "../../agent-runtime/delivery/acceptance/index.js";
+export type {
+  TurnCompletionContract,
+  WritabilityProbe,
+  TurnCompletionDeliverable,
+  TurnCompletionInput,
+  TurnCompletionHardStop,
+  TurnCompletionSettlement,
+} from "../../agent-runtime/contracts/acceptance.js";
+import { isSidePathLabel, assistantRestopsCleared } from "../../agent-runtime/policy/index.js";
 import type { BlockerGrade, EnvProbe } from "../../agent-runtime/policy/index.js";
 export { BLOCKER_GRADES, gradeBlocker, isSidePathLabel } from "../../agent-runtime/policy/index.js";
 export type { BlockerGrade, EnvProbe } from "../../agent-runtime/policy/index.js";
@@ -44,67 +57,6 @@ export const SKILL_BIND_GLOSSARY_STUB = GLOSSARY_BIND;
 
 export const TURN_COMPLETION_CONTINUITY_LINE =
   "Turn completion contract: finish with an openable path, one permanent_block line (reason + degradation + one user action), or a true_fork of two exclusive choices. A side-path failure such as task_ledger does not block the deliverable. After 继续, do not ask open parameters. Skill 绑定 means analysis-review task.json sha256, not WeChat, email, or OAuth.";
-
-export type TurnCompletionContract = {
-  state: TurnCompletionState;
-  openablePath?: string;
-  reason?: string;
-  degradation?: string;
-  requiredUserAction?: string;
-  options?: string[];
-  sidePathReceipt?: string;
-};
-
-export type WritabilityProbe = {
-  path: string;
-  lsMode: string;
-  writeAttempt: "ok" | "eacces" | "eperm" | "erofs" | "enoent" | "not_attempted" | "error";
-  sandboxPolicyCode?: string;
-  /** False when the only evidence is an ls mode string, or the path is a side path. */
-  hardStop: boolean;
-  blockerGrade: BlockerGrade;
-};
-
-export type TurnCompletionDeliverable = {
-  relativePath: string;
-  body: string;
-};
-
-export type TurnCompletionInput = {
-  userText?: string;
-  assistantText?: string;
-  workspaceDir?: string | null;
-  envProbes?: readonly EnvProbe[];
-  /** Wall-clock start of the skill-smoke attempt. Absent on ordinary chat. */
-  smokeStartedAtMs?: number;
-  nowMs?: number;
-  slaMs?: number;
-  env?: NodeJS.ProcessEnv;
-  /** Force the skill-smoke SLA even when the text does not say smoke. */
-  skillSmoke?: boolean;
-  forkOptions?: readonly string[];
-  openablePaths?: readonly string[];
-  /** Simulated side-path write. A throw is bypassed; it must not cancel the deliverable. */
-  sidePathAttempt?: () => void;
-  sidePathLabel?: string;
-  deliverable?: TurnCompletionDeliverable;
-  sessionKey?: string;
-  /**
-   * Batch 11 E3. When true, do not settle this turn to delivered or
-   * permanent_block. Omit or false preserves the existing settlement.
-   * The default-off OGUI lifecycle never sets this.
-   */
-  oguiWaitActive?: boolean;
-};
-
-export type TurnCompletionHardStop = "empty_success" | "side_path_refusal";
-
-export type TurnCompletionSettlement = {
-  contract: TurnCompletionContract | null;
-  visibleText: string;
-  continueExecution: boolean;
-  hardStopPrevented: TurnCompletionHardStop | null;
-};
 
 const SILENT_EXEC_RE =
   /(?:请)?继续尝试|我只要结果|只要结果|直接给(?:我)?结果|别再问|不要再问|别问了|(?:^|[\s，,。；;！!])(?:请)?继续(?!讨论|聊聊|聊下去|分析这个问题)/u;
@@ -677,217 +629,29 @@ export function turnCompletionApplies(input: TurnCompletionInput): boolean {
  * Ordinary replies pass through unchanged.
  */
 export function settleTurnCompletion(input: TurnCompletionInput): TurnCompletionSettlement {
-  const assistantText = input.assistantText ?? "";
-  const userText = input.userText ?? "";
-  const unchanged = (): TurnCompletionSettlement => ({
-    contract: null,
-    visibleText: assistantText,
-    continueExecution: false,
-    hardStopPrevented: null,
-  });
-  // E3: a valid OGUI WAIT is not rewritten to delivered or permanent_block by
-  // deliverable write, trial, existing-deliverable, or SLA. Visible text stays
-  // so a deliverable mention can coexist with the waiting card. Flag-off
-  // callers omit the flag and leave the in-process registry empty.
-  if (input.oguiWaitActive === true || oguiWaitBlocksSession(input.sessionKey)) {
-    return unchanged();
-  }
-  const trial = input.skillSmoke === true || isSkillSmokeTurn(userText, assistantText);
-  const trialApplies = trial && isPreviewOkFormalBlocked(`${userText}\n${assistantText}`);
-  if (
-    !turnCompletionApplies(input) &&
-    !input.deliverable &&
-    !input.sidePathAttempt &&
-    !trialApplies
-  ) {
-    return unchanged();
-  }
-
-  let receipt: string | undefined;
-  if (input.sidePathAttempt) {
-    try {
-      input.sidePathAttempt();
-    } catch (err) {
-      receipt = sidePathReceipt(input.sidePathLabel ?? "memory/task_ledger.json", err);
-    }
-  } else if (isSidePathLabel(assistantText)) {
-    receipt = sidePathReceipt(extractNarratedPath(assistantText) ?? "memory/task_ledger.json");
-  }
-
-  const emptySuccess = claimsSuccessWithoutArtifact(assistantText);
-  const sideRefusal =
-    isSidePathLabel(assistantText) &&
-    /拒绝|无法出|不能出|不会.*(?:pdf|pptx|稿)|到此结束|写操作被拒绝/iu.test(assistantText);
-  const hardStopPrevented: TurnCompletionHardStop | null = emptySuccess
-    ? "empty_success"
-    : sideRefusal
-      ? "side_path_refusal"
-      : null;
-
-  const probes = input.envProbes ?? defaultEnvProbes(userText);
-  const slaMs = input.slaMs ?? resolveSkillSmokeSlaMs(input.env);
-  const nowMs = input.nowMs ?? Date.now();
-  const smoke = input.skillSmoke === true || isSkillSmokeTurn(userText, assistantText);
-  const slaExpired =
-    smoke && input.smokeStartedAtMs != null && nowMs - input.smokeStartedAtMs >= slaMs;
-  const misread = isSkillBindTerminologyMisread(assistantText, userText);
-  const fork = !misread && isTrueForkText(assistantText, input.forkOptions) && !slaExpired;
-  const cleared = probes.some((probe) => assistantRestopsCleared(assistantText, probe));
-  const lsOnly =
-    isLsOnlyHardStopNarrative(assistantText) &&
-    (isSilentExecWindow(userText) || /拒绝|无法|不能|到此结束|写操作被拒绝/u.test(assistantText));
-
-  if (input.deliverable && input.workspaceDir) {
-    const written = writeWorkspaceFile(
-      input.workspaceDir,
-      input.deliverable.relativePath,
-      input.deliverable.body,
-    );
-    if (written) {
-      return deliveredResult({
-        openablePath: written,
-        receipt,
-        note: "主线成果已落盘。",
-        hardStopPrevented,
-        sessionKey: input.sessionKey,
-      });
-    }
-  }
-
-  const trialDecision = applyTrialGate({
-    trial,
-    narrative: `${userText}\n${assistantText}`,
-    workspaceDir: input.workspaceDir,
-    previewPath: firstDeliverablePath(assistantText),
-  });
-  if (trialDecision?.openablePath) {
-    return deliveredResult({
-      openablePath: trialDecision.openablePath,
-      receipt,
-      note: trialDecision.declaration,
-      hardStopPrevented,
-      sessionKey: input.sessionKey,
-    });
-  }
-  if (trialDecision?.action === "permanent_block") {
-    return permanentResult({
-      reason: trialDecision.reason,
-      degradation: "unavailable",
-      requiredUserAction: "确认成果目录可写后回复继续",
-      receipt,
-      hardStopPrevented,
-    });
-  }
-
-  const existing =
-    firstDeliverablePath(assistantText) ?? input.openablePaths?.find((item) => item.trim()) ?? null;
-  if (existing && !emptySuccess && !slaExpired && !misread && !sideRefusal) {
-    return {
-      contract: {
-        state: "delivered",
-        openablePath: existing,
-        ...(receipt ? { sidePathReceipt: receipt } : {}),
-      },
-      visibleText: receipt ? `${assistantText.trim()}\n${receipt}` : assistantText,
-      continueExecution: false,
-      hardStopPrevented,
-    };
-  }
-
-  if (fork) {
-    const options =
-      input.forkOptions && input.forkOptions.length >= 2
-        ? [...input.forkOptions]
-        : ["option_a", "option_b"];
-    // formatTrueFork remains exported for structured consumers; never put the
-    // bracket marker into visibleText (end-user chat).
-    const speech = assistantText.trim();
-    const hasGate =
-      /等待你确认|等待确认后|waiting_confirmation|owner-decision|owner_decision|请扫码|请支付|二维码|验证码|授权登录/iu.test(
-        speech,
-      );
-    const visibleText = hasGate
-      ? speech
-      : speech
-        ? `${speech}\n\n等待你确认下一步。`
-        : "等待你确认下一步。";
-    return {
-      contract: { state: "true_fork", options },
-      visibleText,
-      continueExecution: false,
-      hardStopPrevented: null,
-    };
-  }
-
-  const mustForce =
-    slaExpired ||
-    misread ||
-    cleared ||
-    lsOnly ||
-    sideRefusal ||
-    emptySuccess ||
-    violatesProgressProseBan(assistantText) ||
-    (isSilentExecWindow(userText) && isSilentExecFishingStop(assistantText, userText)) ||
-    Boolean(input.deliverable);
-
-  if (!mustForce && isMainlineBlockNarrative(assistantText)) {
-    const degraded = input.workspaceDir
-      ? writeWorkspaceFile(
-          input.workspaceDir,
-          DEGRADED_DELIVERABLE_RELATIVE,
-          degradationBody({ reason: "mainline_degraded", receipt }),
-        )
-      : null;
-    if (degraded) {
-      return deliveredResult({
-        openablePath: degraded,
-        receipt,
-        hardStopPrevented,
-        sessionKey: input.sessionKey,
-      });
-    }
-    return permanentResult({
-      reason: "render_engine_missing",
-      degradation: "unavailable",
-      requiredUserAction: "提供可写成果目录或可用渲染环境后回复继续",
-      receipt,
-      hardStopPrevented,
-    });
-  }
-
-  if (!mustForce) {
-    return unchanged();
-  }
-
-  const reason = slaExpired
-    ? "skill_smoke_sla"
-    : emptySuccess
-      ? "empty_success"
-      : misread
-        ? "skill_bind_terminology"
-        : cleared
-          ? "already_cleared"
-          : "side_path_or_incomplete";
-  const degraded = input.workspaceDir
-    ? writeWorkspaceFile(
-        input.workspaceDir,
-        DEGRADED_DELIVERABLE_RELATIVE,
-        degradationBody({ reason, receipt }),
-      )
-    : null;
-  if (degraded) {
-    return deliveredResult({
-      openablePath: degraded,
-      receipt,
-      hardStopPrevented,
-      sessionKey: input.sessionKey,
-    });
-  }
-  return permanentResult({
-    reason: slaExpired ? "skill_smoke_sla" : reason,
-    degradation: "unavailable",
-    requiredUserAction: "确认成果目录可写后回复继续",
-    receipt,
-    hardStopPrevented,
+  return settleTurnCompletionWithPorts(input, {
+    oguiWaitBlocksSession,
+    isSkillSmokeTurn,
+    isPreviewOkFormalBlocked,
+    turnCompletionApplies,
+    sidePathReceipt,
+    extractNarratedPath,
+    claimsSuccessWithoutArtifact,
+    defaultEnvProbes,
+    resolveSkillSmokeSlaMs,
+    isSkillBindTerminologyMisread,
+    isTrueForkText,
+    isLsOnlyHardStopNarrative,
+    isSilentExecWindow,
+    writeWorkspaceFile,
+    deliveredResult,
+    applyTrialGate,
+    permanentResult,
+    firstDeliverablePath,
+    violatesProgressProseBan,
+    isSilentExecFishingStop,
+    degradationBody,
+    now: () => Date.now(),
+    degradedDeliverableRelative: DEGRADED_DELIVERABLE_RELATIVE,
   });
 }

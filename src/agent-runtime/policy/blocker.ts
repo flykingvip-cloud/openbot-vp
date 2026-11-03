@@ -1,11 +1,7 @@
 /** Existing blocker classification only. No probes, I/O, clocks, state changes or scheduling. */
 export const BLOCKER_GRADES = ["mainline", "side_path", "already_cleared"] as const;
-export type BlockerGrade = (typeof BLOCKER_GRADES)[number];
-
-export type EnvProbe = {
-  reason: string;
-  passed: boolean;
-};
+import type { BlockerGrade, EnvProbe } from "../contracts/blocker.js";
+export type { BlockerGrade, EnvProbe } from "../contracts/blocker.js";
 
 const SIDE_PATH_RE =
   /task_ledger(?:\.json)?|memory\/task_ledger|chmod|非交付文件|幽灵任务|清表|清理任务/iu;
