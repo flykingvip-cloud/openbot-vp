@@ -178,5 +178,24 @@
     "from": "src/auto-reply/**",
     "denyImportsFrom": ["src/agent-runtime/execution/preparation/!(index).ts"],
     "description": "Existing reply adapters use the explicit preparation API, not its implementation."
+  },
+  {
+    "name": "runtime-delivery-no-task-control",
+    "from": "src/agent-runtime/delivery/**",
+    "denyImportsFrom": [
+      "src/conversation-task/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/command/**",
+      "src/agents/**",
+      "src/cron/**",
+      "src/plugins/**"
+    ],
+    "description": "Candidate delivery preparation cannot mutate tasks, invoke model runners or schedule recovery."
+  },
+  {
+    "name": "runtime-delivery-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/delivery/presentation/**"],
+    "description": "Reply adapters consume the delivery public API rather than presentation internals."
   }
 ]
