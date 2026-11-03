@@ -118,3 +118,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Explicit named/type exports in command/index.ts; auto-reply and Gateway consumers now import the facade (65001431e). No new use case, registration bus, model call or task state. — codex-runtime-manager
 - Ten suites / 38 tests PASS; architecture 17 rules PASS and forbidden deep-import negative probe PASS; changed-file typed lint clean; tsgo baseline/candidate 52; build PASS, 209 dynamic import warnings unchanged. — codex-runtime-manager
 - command-public-api.md records each port and remaining adapter responsibilities. Board focus formatter remains a static dependency; coherent read-only projection extraction is the next boundary candidate, not another callback wrapper. — codex-runtime-manager
+
+## Transition and wiring checkpoint
+
+- transition-baseline.md records existing event/guard/mutation/recovery invariants; no empty policy implementation or parallel state enum introduced. wiring-policy-boundaries.md records target five execution responsibilities and mandatory governance boundaries. — codex-runtime-manager
+- Focus projection dependency debt closed by 434c47b6c: command consumes pure projection, board only re-exports; command cannot import task persistence implementation. Eight suites / 46 PASS; independent review PASS; typed lint clean; architecture 17 rules PASS; tsgo baseline/candidate 52; build PASS with 209 dynamic import warnings unchanged. — codex-runtime-manager
+- Accepted external review constraints: Gateway remains same process with explicit APIs; planning governs goals/acceptance/skeleton, not a competing model loop; transcript authority remains SessionManager; mandatory AOR/constitutional constraints cannot become optional plugins. — codex-runtime-manager

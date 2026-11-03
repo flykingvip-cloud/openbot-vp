@@ -13,7 +13,7 @@ The facade also exposes existing status formatting/classification compatibility 
 
 ## Remaining coupling
 
-Task status still imports the original board focus formatter. A single ESM facade therefore exposes its static loading closure even to stop consumers. Gateway already directly imports SessionTaskBoard; real Gateway regressions are retained. Do not claim this layer is fully independent. Future work should extract a coherent read-only task projection (rather than add a formatter callback per helper), then retire this implementation dependency.
+Task focus formatting has now moved to a pure context projection depending only on task data contracts. Command no longer imports the task persistence implementation, and the architecture rule rejects that dependency. Original board paths only re-export the same formatter for compatibility. Real Gateway regressions remain required; other command/planning migration is still incomplete.
 
 Command planning, general message interpretation and task storage are NOT migrated. The facade is an explicit boundary for current use cases, not completion of the full layer.
 
