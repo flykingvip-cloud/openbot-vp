@@ -53,7 +53,8 @@ async function getRunReplyAgent() {
   return await runReplyAgentPromise;
 }
 
-vi.mock("../../agents/model-fallback.js", () => ({
+vi.mock("../../agents/model-fallback.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agents/model-fallback.js")>()),
   runWithModelFallback: async ({
     provider,
     model,
