@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { buildEmbeddedRunBaseParams } from "../../agent-runtime/execution/preparation/index.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import {
   buildCliBackendCredentialGuidance,
@@ -105,11 +106,7 @@ import {
   buildCommercialRunCreditUsageInput,
   type RuntimeFallbackAttempt,
 } from "./agent-run-credit-usage.js";
-import {
-  buildEmbeddedRunBaseParams,
-  buildEmbeddedRunContexts,
-  resolveModelFallbackOptions,
-} from "./agent-runner-utils.js";
+import { buildEmbeddedRunContexts, resolveModelFallbackOptions } from "./agent-runner-utils.js";
 import { type BlockReplyPipeline } from "./block-reply-pipeline.js";
 import { recordHonestCapabilityGap } from "./honest-empty-reply.js";
 import { buildUserFacingModelCallFailure } from "./model-call-failure-copy.js";
