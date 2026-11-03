@@ -177,3 +177,10 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Added real contract tests for WAIT laziness and side-path receipt-before-artifact ordering, preserving actual filesystem trailing-newline and clock behavior. No production implementation moved in this checkpoint. — codex-runtime-manager
 - Three suites / 28 PASS; independent review corrected the test's newline assumption rather than changing implementation; typed lint clean; full tsgo baseline/candidate 52, zero added. No build required for this test/spec-only checkpoint. — codex-runtime-manager
 - Complete settlement remains original; further adapter extraction must preserve lazy probes, OGUI/trial precedence, existing artifact handling, degradation writes and clock cleanup. — codex-runtime-manager
+
+## Turn settlement orchestration checkpoint
+
+- Complete existing settle sequence moved to delivery/acceptance (ebb00f983), with explicit fixed source-code ports preserving lazy I/O/clock/OGUI/trial invocation. Legacy adapter retains implementations and compatible entry. Acceptance/probe data contracts single-source in contracts. — codex-runtime-manager
+- Five suites / 34 PASS including WAIT, real write/clock order and original tool WAIT gates; independent semantic review PASS; typed lint clean; architecture 25 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS, dynamic-import warnings 209 unchanged. — codex-runtime-manager
+- Approx. 23 effect/predicate ports are a transitional legacy boundary, NOT configurable callbacks or plugin API. Do not add arbitrary registration; future cleanup groups coherent policy/environment/result adapters after characterization. No new queue or executor invocation. — codex-runtime-manager
+- This settles an applicable TURN contract, not general task acceptance or transport success. State/delivery artifact lifecycle and reuse remain unmigrated. — codex-runtime-manager

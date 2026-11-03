@@ -75,3 +75,5 @@ Execution preparation is PARTIAL through the original embedded parameter project
 Delivery is PARTIAL through candidate payload preparation (5907080c3). Actual task acceptance, send/acknowledgement, artifacts and reuse remain in original owners. Additional e2e suite is baseline-red and must not be represented as complete integration acceptance.
 
 Policy is PARTIAL through pure blocker classification (020bf5a37), with no runtime imports or effects. Full transition/authorization/limit consolidation and acceptance orchestration are not implemented by this checkpoint.
+
+Delivery acceptance is PARTIAL through existing turn-completion settlement orchestration (ebb00f983). Lazy platform effects remain in the original adapter via fixed code ports. General task validation, transport receipts, storage/reuse and lifecycle consolidation are not complete.
