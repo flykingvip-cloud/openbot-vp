@@ -135,5 +135,26 @@
     "from": "src/gateway/**",
     "denyImportsFrom": ["src/agent-runtime/command/!(index).ts"],
     "description": "Production entrances must use the explicit command facade, not individual use-case internals."
+  },
+  {
+    "name": "runtime-recovery-no-state-side-effects",
+    "from": "src/agent-runtime/execution/recovery/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/conversation-task/**",
+      "src/auto-reply/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/state/**",
+      "src/agents/!(execution-stall-continue|protocol-violation).ts",
+      "src/agents/*/**"
+    ],
+    "description": "Bounded recovery owns loop sequencing only, not persistence, transport, task completion or scheduling."
+  },
+  {
+    "name": "runtime-recovery-public-entry",
+    "from": "src/agents/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/recovery/**"],
+    "description": "Legacy runner and adapters consume the explicit execution facade, not recovery internals."
   }
 ]
