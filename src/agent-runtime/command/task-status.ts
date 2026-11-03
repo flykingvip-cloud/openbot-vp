@@ -1,4 +1,4 @@
-import { formatTaskBoardFocusLine } from "../../conversation-task/session-task-board.js";
+import { formatTaskBoardFocusLine } from "../context/task-focus.js";
 /**
  * Current-task status query: classification, read-only lookup and factual projection.
  * Display / classification only — task mutations go through session-task-board.
