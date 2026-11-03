@@ -152,3 +152,10 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Three unit/integration suites / 27 PASS. Additional e2e configured run: 35 PASS / 8 FAIL / 1 unhandled error; restored HEAD implementation reproduces the same totals and failing cases. Do NOT mark e2e green. Typed lint clean; architecture 23 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS, 209 warnings unchanged. — codex-runtime-manager
 - Component is not pure: media callback and pipeline methods may have I/O/state. Legacy formatting/threading/dedupe dependencies remain. No task acceptance, completion, actual transport acknowledgement or growth commit moved. — codex-runtime-manager
 - [ ] Independently triage pre-existing agent-runner.runreplyagent.e2e failures before claiming full delivery-chain acceptance; do not mix those fixes into equivalent module relocation. — codex-runtime-manager
+
+## Acceptance boundary and e2e diagnostic checkpoint
+
+- acceptance-boundary.md documents mixed FS probes/writes, SLA clock, OGUI and trial short-circuit ownership. Do not relocate the entire contract as a pure acceptance module or eagerly evaluate effects. — codex-runtime-manager
+- E2E missing-export diagnosis: model-fallback test mock omitted isModelEntitlementEmptyError. Partial real-module mock restores that export without altering production code. Full configured e2e improves from 35 PASS/8 FAIL/1 error to 42 PASS/1 FAIL/no unhandled errors. Remaining channelData approval-tool-result forwarding assertion fails independently and remains open. — codex-runtime-manager
+- Changed-file type-aware lint clean; tsgo remains 52 baseline/candidate, no new; architecture 23 rules PASS. No production files changed in this diagnostic slice. — codex-runtime-manager
+- [ ] Investigate remaining approval channelData forwarding failure with a faithful real-runner reproducer before altering normalization/approval behavior; do not weaken the test or silence it. — codex-runtime-manager
