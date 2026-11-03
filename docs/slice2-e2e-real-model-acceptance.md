@@ -12,7 +12,8 @@
 
 开工 tip（信任边界收尾 merge）：`01e15de99c77efa1ef49020e5760dda06a5ceae4`  
 行为祖先（旁路信任边界）：`c533c4d79f33861379922534a1341a66f9fcd42b`  
-本轮 tip：`6de605dd0da78eaf41ceb93d708570357d69e49a`（验收文档 + e2e 驱动）。
+分支 tip（本 push）：`f3db4c502d8da5b948c8c75f7da188f8ddec2980`（SHA 绑定笔记）。
+验收文档 + e2e 驱动：`6de605dd0da78eaf41ceb93d708570357d69e49a`。
 产品缺口修复：`3a712e86e8b1fd8f2af2a09e1276cd443f47b475`。
 行为祖先（trust-boundary）：`c533c4d79f33861379922534a1341a66f9fcd42b`。
 
