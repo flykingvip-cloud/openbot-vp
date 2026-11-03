@@ -6,6 +6,7 @@ import {
   controlCurrentTask,
   queryCurrentTaskStatus,
 } from "../../agent-runtime/command/index.js";
+import { buildReplyPayloads } from "../../agent-runtime/delivery/index.js";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
@@ -79,7 +80,6 @@ import {
   signalTypingIfNeeded,
 } from "./agent-runner-helpers.js";
 import { runMemoryFlushIfNeeded } from "./agent-runner-memory.js";
-import { buildReplyPayloads } from "./agent-runner-payloads.js";
 import {
   appendUnscheduledReminderNote,
   hasSessionRelatedCronJobs,
