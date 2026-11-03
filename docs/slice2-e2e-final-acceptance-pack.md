@@ -14,7 +14,7 @@
 | main 合入（#216 squash）                                                          | `2ab9ded920287b40f010bfb0b8742b1ab4a45629`                                      |
 | 运行时网关构建 tip（`dist/build-info.json` / UI `data-openbot-build-commit`）     | `f7b459fd8691cb7f0b737ea95ddee5de3017fda4`                                      |
 | SessionTaskBoard 类型补丁（本树 `b38ad374e…`；main 侧已有等价 #220 `605e7c296…`） | `b38ad374eb395396292e0b181fa298b9d275bc5b`                                      |
-| 证据驱动 tip（mid-exec + Playwright，本树）                                       | `f7b459fd8691cb7f0b737ea95ddee5de3017fda4`（后续证据提交将更新为本包 push tip） |
+| 证据分支 tip（验收包正文）                                                              | `90f6763240b0df0c4f37ec303f316e700179eccf`                                                              |
 | 行为祖先（信任边界）                                                              | `c533c4d79f33861379922534a1341a66f9fcd42b`                                      |
 
 **本轮验收所跑产品构建 tip = `f7b459fd8691cb7f0b737ea95ddee5de3017fda4`。**
