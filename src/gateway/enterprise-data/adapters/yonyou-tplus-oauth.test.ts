@@ -205,6 +205,7 @@ describe("yonyou tplus oauth", () => {
       openToken: "token-1",
       refreshToken: undefined,
       permanentCode: undefined,
+      orgPermanentAuthCode: undefined,
       orgId: "9000",
       appName: undefined,
       sid: undefined,
@@ -212,5 +213,21 @@ describe("yonyou tplus oauth", () => {
     });
     expect(yonyouTplusCredentialInputHasMaterial(input)).toBe(true);
     expect(yonyouTplusCredentialInputHasMaterial({})).toBe(false);
+  });
+
+  it("prefers the env-registered Chanjet redirect URI over the request origin", () => {
+    vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY", "ak-test");
+    vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_SECRET", "as-test");
+    vi.stubEnv(
+      "OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_REDIRECT_URI",
+      "https://www.openbot.love/__openbot/enterprise-data/oauth/callback",
+    );
+    const cfg = resolveYonyouTplusOAuthConfig({
+      redirectUri: "https://gw.example.com/__openbot/enterprise-data/oauth/callback",
+      orgId: "90001198862",
+    });
+    expect(cfg?.redirectUri).toBe(
+      "https://www.openbot.love/__openbot/enterprise-data/oauth/callback",
+    );
   });
 });

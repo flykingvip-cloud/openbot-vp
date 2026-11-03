@@ -241,6 +241,56 @@ describe("decideRuntimeCapability", () => {
     expect(decision.requiredCapabilities).toEqual([]);
   });
 
+  it("does not forever fail-close coding prompts on pooled eligible models without coding evidence", () => {
+    const decision = decideRuntimeCapability({
+      role: "orchestrator",
+      dryRun: false,
+      request: { taskText: "重构这段代码并补充测试", nowMs: now },
+      candidates: [
+        {
+          modelId: "api-proxy-deepseek/deepseek-v4-flash",
+          scope: "platform",
+          record: record({
+            modelRef: "api-proxy-deepseek/deepseek-v4-flash",
+            autoRouting: "eligible",
+            autoRoutingReason: "已入池且连接健康，同步为可执行准入",
+            capabilityEvidence: [],
+          }),
+        },
+      ],
+    });
+    expect(decision.taskCategory).toBe("coding");
+    expect(decision.requiredCapabilities).toEqual([]);
+    expect(decision.primary).toEqual(["api-proxy-deepseek/deepseek-v4-flash"]);
+    expect(decision.excluded).toEqual([]);
+  });
+
+  it("still enforces coding evidence when the request explicitly requires it", () => {
+    const decision = decideRuntimeCapability({
+      role: "orchestrator",
+      dryRun: false,
+      request: {
+        taskText: "重构这段代码",
+        requiredCapabilities: ["coding"],
+        nowMs: now,
+      },
+      candidates: [
+        {
+          modelId: "platform/chat",
+          scope: "platform",
+          record: record({
+            modelRef: "platform/chat",
+            capabilityEvidence: [],
+          }),
+        },
+      ],
+    });
+    expect(decision.requiredCapabilities).toEqual(["coding"]);
+    expect(decision.primary).toEqual([]);
+    expect(decision.excluded[0]?.code).toBe("capability_unverified");
+    expect(decision.excluded[0]?.reason).toContain("coding");
+  });
+
   it("treats rate limit as transient and illegal scores as unverified", () => {
     const limited = decideRuntimeCapability({
       role: "orchestrator",

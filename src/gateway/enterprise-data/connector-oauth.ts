@@ -233,6 +233,23 @@ export function startDataConnectorOAuthSession(params: {
   if (connectorId === YONYOU_TPLUS_CONNECTOR_ID) {
     const app = resolveYonyouTplusAppCredentials();
     if (!app) {
+      const partialKey = process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY?.trim() || "";
+      const partialSecret =
+        process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_SECRET?.trim() || "";
+      if (partialKey || partialSecret) {
+        const missing: string[] = [];
+        if (!partialKey) {
+          missing.push("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY");
+        }
+        if (!partialSecret) {
+          missing.push("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_SECRET");
+        }
+        return {
+          ok: false,
+          code: "CONNECTOR_OAUTH_CONFIG_INCOMPLETE",
+          error: `已部分配置用友 T+ 应用凭证（缺少 ${missing.join("、")}）。有 appKey 时禁止静默走模拟授权，请补齐环境变量后再发起真实 OAuth。`,
+        };
+      }
       mode = "simulated";
     } else {
       const orgId =
@@ -240,7 +257,7 @@ export function startDataConnectorOAuthSession(params: {
         process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_ORG_ID?.trim() ||
         "";
       const redirectUri =
-        callbackUrl || process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_REDIRECT_URI?.trim() || "";
+        process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_REDIRECT_URI?.trim() || callbackUrl || "";
       if (!orgId) {
         return {
           ok: false,
@@ -422,6 +439,8 @@ export async function completeDataConnectorOAuthCallback(params: {
         workspaceId = exchanged.workspaceId;
         workspaceName = exchanged.workspaceName;
       } else if (session.mode === "yonyou_tplus_authorization_code") {
+        // Prefer the env-registered Chanjet redirect URI so token exchange matches the
+        // app console even when the browser callback arrives via a different Host.
         const yonyou = resolveYonyouTplusOAuthConfig({
           redirectUri: params.redirectUri,
           orgId: session.orgId,
@@ -431,12 +450,12 @@ export async function completeDataConnectorOAuthCallback(params: {
           return {
             ok: false,
             code: "CONNECTOR_OAUTH_CONFIG_MISSING",
-            error: "用友 T+ OAuth 未配置。",
+            error: "用友 T+ OAuth 未配置（需要 appKey、appSecret、回调地址与云企业 ID）。",
           };
         }
         const exchanged = await exchangeYonyouTplusAuthorizationCode({
           code: params.code,
-          redirectUri: params.redirectUri,
+          redirectUri: yonyou.redirectUri,
           appKey: yonyou.appKey,
           appSecret: yonyou.appSecret,
           gatewayOrigin: yonyou.gatewayOrigin,
@@ -445,6 +464,7 @@ export async function completeDataConnectorOAuthCallback(params: {
         workspaceId = yonyou.gatewayOrigin;
         workspaceName = session.label;
         extraSecret = {
+          appKey: yonyou.appKey,
           oauthRefreshToken: exchanged.refreshToken,
           oauthPermanentCode: exchanged.permanentCode,
           orgId: exchanged.orgId || session.orgId,

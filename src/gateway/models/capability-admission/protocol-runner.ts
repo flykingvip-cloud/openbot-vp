@@ -94,6 +94,16 @@ export function createDefaultProtocolRunner(
             sourceNote: "检查器不可用",
           };
         }
+        if (id === "coding") {
+          return {
+            capabilityId: id,
+            status: "checker_unavailable" as const,
+            failureReason:
+              "代码能力专项评测尚未接入；连接探测通过不等于代码能力已验证，未执行检查不记正式失败",
+            testVersion: "gateway-protocol-v1",
+            sourceNote: "检查器不可用",
+          };
+        }
         if (id === "image_generation" || id === "music_generation") {
           return {
             capabilityId: id,

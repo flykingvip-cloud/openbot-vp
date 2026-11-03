@@ -65,6 +65,20 @@ describe("yonyou tplus adapter", () => {
     expect(payload.records[0]?.Code).toBe("01");
   });
 
+  it("refuses simulated openToken when a real appKey is configured", async () => {
+    vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY", "D2rRuEgL");
+    const fetchMock = vi.fn(() => {
+      throw new Error("fetch should not be called");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const probe = await probeYonyouTplusConnection({
+      oauthAccessToken: "simulated-yonyou-tplus-token-abc",
+    });
+    expect(probe.ok).toBe(false);
+    expect(probe.message).toContain("禁止继续使用模拟凭证");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("fails closed when appKey, appSecret, or openToken is missing", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -199,6 +213,29 @@ describe("yonyou tplus adapter", () => {
       selectFields: ["SaleDelivery.ID", "SaleDelivery.VoucherDate", "SaleDelivery.Code"],
       paramDic: {},
     });
+  });
+
+  it("normalizes inventory QueryPage body into a records row array", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json(
+        {
+          TotalCount: 1,
+          TotalPage: 1,
+          CurrentPage: 1,
+          Data: [{ Code: "10001", Name: "扇子" }],
+        },
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await executeYonyouTplusHandler(
+      YONYOU_TPLUS_HANDLERS.inventory,
+      { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
+      LIVE_SECRET,
+    );
+    const payload = result.payload as { records: Array<{ Code: string }> };
+    expect(Array.isArray(payload.records)).toBe(true);
+    expect(payload.records[0]?.Code).toBe("10001");
   });
 
   it("uses the platform app credentials when the vault only stores the open token", async () => {

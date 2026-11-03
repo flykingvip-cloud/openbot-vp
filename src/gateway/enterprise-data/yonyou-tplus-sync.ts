@@ -5,6 +5,13 @@
  * per-source watermark plus sync-log rows on the tenant enterprise-data store.
  * A finished window advances the watermark. A failed or truncated window does not.
  *
+ * Inventory / partner (master QueryPage): the first sync with no watermark omits
+ * `UpdateDateBegin`/`UpdateDateEnd` so the full archive pages in (same idea as
+ * warehouse catalog semantics). Later runs keep the UpdateDate incremental
+ * window from the watermark. A bare LOOKBACK on first sync would return empty
+ * Data[] for archives that have not changed recently, then advance the
+ * watermark and permanently skip them.
+ *
  * Projection materialization calls `applyYonyouTplusSyncCursorToInput` so a
  * governed read of inventory, partner, sale delivery, or sale order uses the
  * same cursor window. Warehouse Query has no documented date filter
@@ -32,6 +39,7 @@ import type {
   EnterpriseDataStore,
   ScopeEvaluationResult,
 } from "./types.js";
+import { extractYonyouTplusRows, yonyouTplusPayloadBody } from "./yonyou-tplus-rows.js";
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 20;
@@ -251,14 +259,6 @@ function arrayLength(value: unknown): number | null {
   return Array.isArray(value) ? value.length : null;
 }
 
-function payloadBody(payload: unknown): unknown {
-  const record = objectRecord(payload);
-  if (record && "records" in record) {
-    return record.records;
-  }
-  return payload;
-}
-
 function rowCountFromBody(body: unknown): number {
   const direct = arrayLength(body);
   if (direct != null) {
@@ -314,44 +314,57 @@ function pageIsComplete(body: unknown, rows: number): boolean {
   return false;
 }
 
+type DateWindow = { mode: "range"; begin: string; end: string } | { mode: "full"; end: string };
+
 function windowFor(
   kind: "master" | "voucher",
   now: Date,
   watermark: string | undefined,
-): {
-  begin: string;
-  end: string;
-} {
+): DateWindow {
   const end = kind === "master" ? formatYonyouTplusDateTime(now) : formatYonyouTplusDate(now);
   if (watermark && watermark <= end) {
     const begin = kind === "voucher" ? watermark.slice(0, 10) : watermark;
     if (begin <= end) {
-      return { begin, end };
+      return { mode: "range", begin, end };
     }
   }
   if (watermark && watermark > end) {
-    return { begin: end, end };
+    return { mode: "range", begin: end, end };
+  }
+  // No watermark: master archives page without UpdateDate (full QueryPage).
+  // Voucher lists still need a bounded VoucherDate lookback.
+  if (kind === "master") {
+    return { mode: "full", end };
   }
   const start = new Date(now.getTime() - LOOKBACK_MS);
-  const begin = kind === "master" ? formatYonyouTplusDateTime(start) : formatYonyouTplusDate(start);
-  return { begin, end };
+  return { mode: "range", begin: formatYonyouTplusDate(start), end };
+}
+
+function windowLabel(window: DateWindow): string {
+  if (window.mode === "full") {
+    return "全量（无 UpdateDate 窗）";
+  }
+  return `${window.begin} 至 ${window.end}`;
 }
 
 function streamInput(
   stream: SyncStream,
-  begin: string,
-  end: string,
+  window: DateWindow,
   pageIndex: number,
 ): Record<string, unknown> {
   if (stream.kind === "master") {
-    return {
-      param: {
-        PageSize: `${PAGE_SIZE}`,
-        PageIndex: `${pageIndex}`,
-        UpdateDateBegin: begin,
-        UpdateDateEnd: end,
-      },
+    const param: Record<string, unknown> = {
+      PageSize: `${PAGE_SIZE}`,
+      PageIndex: `${pageIndex}`,
     };
+    if (window.mode === "range") {
+      param.UpdateDateBegin = window.begin;
+      param.UpdateDateEnd = window.end;
+    }
+    return { param };
+  }
+  if (window.mode !== "range") {
+    throw new Error("用友 T+ 单据同步需要日期窗口");
   }
   const prefix = stream.voucherPrefix ?? "SaleOrder";
   return {
@@ -359,8 +372,8 @@ function streamInput(
     pageIndex,
     paramDic: {
       [`${prefix}.VoucherDate`]: [
-        { text: begin, value: begin },
-        { text: end, value: end },
+        { text: window.begin, value: window.begin },
+        { text: window.end, value: window.end },
       ],
     },
   };
@@ -373,30 +386,6 @@ function errorText(error: unknown): string {
 function textField(record: Record<string, unknown>, key: string): string {
   const value = record[key];
   return typeof value === "string" ? value : "";
-}
-
-function listedRows(body: unknown): unknown[] {
-  if (Array.isArray(body)) {
-    return body;
-  }
-  const record = objectRecord(body);
-  if (!record) {
-    return [];
-  }
-  if (Array.isArray(record.result)) {
-    return record.result;
-  }
-  if (Array.isArray(record.Data)) {
-    return record.Data;
-  }
-  if (Array.isArray(record.Rows)) {
-    return record.Rows;
-  }
-  const data = objectRecord(record.data);
-  if (data && Array.isArray(data.Rows)) {
-    return data.Rows;
-  }
-  return [];
 }
 
 /** Stable catalog fingerprint. Ts is a documented return field, not a request filter. */
@@ -509,15 +498,14 @@ export function applyYonyouTplusSyncCursorToInput(params: {
   const now = params.now ?? new Date();
   const range = windowFor(stream.kind, now, watermark);
   const pageIndex = stream.kind === "master" ? 1 : 0;
-  return overlayMissing(params.input, streamInput(stream, range.begin, range.end, pageIndex));
+  return overlayMissing(params.input, streamInput(stream, range, pageIndex));
 }
 
 async function pullStream(params: {
   stream: SyncStream;
   secret: DataConnectorCredentialSecret;
   context: YonyouTplusProbeContext;
-  begin: string;
-  end: string;
+  window: DateWindow;
 }): Promise<{ recordCount: number; truncated: boolean }> {
   let recordCount = 0;
   for (let page = 0; page < MAX_PAGES; page += 1) {
@@ -525,14 +513,14 @@ async function pullStream(params: {
     const result = await executeYonyouTplusHandler(
       params.stream.handlerRef,
       {
-        input: streamInput(params.stream, params.begin, params.end, pageIndex),
+        input: streamInput(params.stream, params.window, pageIndex),
         scope: READ_SCOPE,
         employeeId: "enterprise-data-sync",
       },
       params.secret,
       params.context,
     );
-    const body = payloadBody(result.payload);
+    const body = yonyouTplusPayloadBody(result.payload);
     const rows = rowCountFromBody(body);
     recordCount += rows;
     if (pageIsComplete(body, rows)) {
@@ -557,7 +545,7 @@ async function pullCatalog(params: {
     params.secret,
     params.context,
   );
-  const rows = listedRows(payloadBody(result.payload));
+  const rows = extractYonyouTplusRows(result.payload);
   if (rows.length > WAREHOUSE_ROW_CAP) {
     return { recordCount: rows.length, truncated: true };
   }
@@ -790,11 +778,10 @@ async function runSync(params: YonyouTplusSyncParams): Promise<YonyouTplusSyncRe
         stream,
         secret: currentSecret,
         context,
-        begin: range.begin,
-        end: range.end,
+        window: range,
       });
       if (pulled.truncated) {
-        const detail = `已读取 ${pulled.recordCount} 条，窗口 ${range.begin} 至 ${range.end} 未拉完，水位保持不变。`;
+        const detail = `已读取 ${pulled.recordCount} 条，窗口 ${windowLabel(range)} 未拉完，水位保持不变。`;
         appendLog({
           store: params.store,
           tenantId: params.tenantId,
@@ -825,7 +812,10 @@ async function runSync(params: YonyouTplusSyncParams): Promise<YonyouTplusSyncRe
         watermark: range.end,
         nowIso,
       });
-      const detail = `已读取 ${pulled.recordCount} 条，水位从 ${range.begin} 推进到 ${range.end}。`;
+      const detail =
+        range.mode === "full"
+          ? `已读取 ${pulled.recordCount} 条（首次全量），水位推进到 ${range.end}。`
+          : `已读取 ${pulled.recordCount} 条，水位从 ${range.begin} 推进到 ${range.end}。`;
       appendLog({
         store: params.store,
         tenantId: params.tenantId,

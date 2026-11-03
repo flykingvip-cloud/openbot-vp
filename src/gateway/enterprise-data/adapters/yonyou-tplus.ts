@@ -5,6 +5,7 @@ import {
   loadYonyouTplusAppTicket,
   loadYonyouTplusOrgPermanentAuth,
 } from "../yonyou-tplus-message-store.js";
+import { extractYonyouTplusRows } from "../yonyou-tplus-rows.js";
 import {
   renewYonyouTplusOpenToken,
   resolveYonyouTplusAppCredentials,
@@ -66,6 +67,16 @@ function resolveCallCredentials(
     "",
   );
   if (openToken && isSimulatedToken(openToken)) {
+    const configuredAppKey =
+      secret.appKey?.trim() ||
+      process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY?.trim() ||
+      "";
+    if (configuredAppKey && !isSimulatedToken(configuredAppKey)) {
+      return {
+        error:
+          "用友 T+ 当前仍是模拟 openToken，但已配置真实 appKey。请重新完成 OAuth 或粘贴真实 openToken／永久授权码，禁止继续使用模拟凭证。",
+      };
+    }
     return {
       simulated: true,
       appKey: secret.appKey?.trim() || "simulated-app-key",
@@ -537,5 +548,5 @@ export async function executeYonyouTplusHandler(
   if (!result.ok) {
     throw new Error(result.message);
   }
-  return { payload: { records: result.body } };
+  return { payload: { records: extractYonyouTplusRows(result.body) } };
 }

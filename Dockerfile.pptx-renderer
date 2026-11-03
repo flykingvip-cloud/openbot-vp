@@ -1,0 +1,11 @@
+# Build separately: docker build -f Dockerfile.pptx-renderer -t openbot-pptx-renderer:1 .
+FROM node:22-bookworm-slim
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    libreoffice-impress poppler-utils fonts-liberation fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /renderer
+COPY src/gateway/office-pptx-render.ts src/gateway/office-pptx-render.ts
+COPY scripts/pptx-renderer/worker.mts scripts/pptx-renderer/worker.mts
+USER node
+ENV HOME=/tmp LANG=C.UTF-8 LC_ALL=C.UTF-8
+ENTRYPOINT ["node", "--experimental-strip-types", "/renderer/scripts/pptx-renderer/worker.mts"]

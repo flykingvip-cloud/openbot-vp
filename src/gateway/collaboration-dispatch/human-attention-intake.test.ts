@@ -10,6 +10,7 @@ import { actHumanAttentionCard } from "./human-attention-actions.js";
 import {
   assertsNoBlindRetryOption,
   buildHumanAttentionCard,
+  humanAttentionIdempotencyKey,
   optionsForHumanAttentionFailureKind,
   parseHumanAttentionFence,
   resolveHumanAttentionFailureKind,
@@ -18,6 +19,7 @@ import {
   humanAttentionTodoId,
   listHumanAttentionTodos,
   resetHumanAttentionInboxForTests,
+  resolveHumanAttentionTodo,
   upsertHumanAttentionTodo,
 } from "./human-attention-inbox.js";
 import { createRoundPolicySnapshot } from "./round-policy-snapshot.js";
@@ -205,6 +207,114 @@ describe("human-attention inbox + card loop", () => {
     });
     expect(bumped.deduped).toBe(true);
     expect(bumped.todo.version).toBe(2);
+    expect(listHumanAttentionTodos({ actorId: "amy" })).toHaveLength(1);
+  });
+
+  it("reopens terminal todo with bumped version so open card idempotency key is fresh", async () => {
+    const first = upsertHumanAttentionTodo({
+      groupId: "group-reopen",
+      itemId: "item-reopen",
+      taskId: "task-reopen",
+      fingerprint: "fp-reopen",
+      reason: "escalate_failures_exhausted:stalled",
+      ownerIds: ["human:amy"],
+      recoveryHint: "take over then resume",
+      source: "escalate_failures_exhausted",
+      boardStatus: "applied",
+      nowMs: 10_000,
+    });
+    expect(first.created).toBe(true);
+    expect(first.todo.version).toBe(1);
+    expect(first.todo.status).toBe("open");
+
+    const openCardV1 = buildHumanAttentionCard({
+      todoId: first.todo.id,
+      groupId: first.todo.groupId,
+      taskId: first.todo.taskId,
+      boardItemId: first.todo.itemId,
+      fingerprint: first.todo.fingerprint,
+      version: first.todo.version,
+      failureKind: first.todo.failureKind,
+      reason: first.todo.reason,
+      ownerIds: first.todo.ownerIds,
+      recoveryHint: first.todo.recoveryHint,
+      boardStatus: first.todo.boardStatus,
+      status: first.todo.status,
+    });
+    expect(openCardV1).not.toBeNull();
+    expect(humanAttentionIdempotencyKey(openCardV1!)).toBe(`human-attention:${first.todo.id}:v1`);
+
+    const resolved = await resolveHumanAttentionTodo({
+      id: first.todo.id,
+      actorId: "amy",
+      action: "take_over",
+      result: "人工接管完成",
+      nowMs: 20_000,
+    });
+    expect(resolved.ok).toBe(true);
+    if (!resolved.ok) {
+      return;
+    }
+    expect(resolved.todo.status).toBe("resolved");
+    expect(resolved.todo.version).toBe(1);
+    expect(resolved.todo.resolution?.action).toBe("take_over");
+
+    const receipt = buildHumanAttentionCard({
+      todoId: resolved.todo.id,
+      groupId: resolved.todo.groupId,
+      taskId: resolved.todo.taskId,
+      boardItemId: resolved.todo.itemId,
+      fingerprint: resolved.todo.fingerprint,
+      version: resolved.todo.version,
+      failureKind: resolved.todo.failureKind,
+      reason: resolved.todo.reason,
+      ownerIds: resolved.todo.ownerIds,
+      recoveryHint: resolved.todo.recoveryHint,
+      boardStatus: resolved.todo.boardStatus,
+      status: resolved.todo.status,
+      resolution: resolved.todo.resolution,
+    });
+    expect(receipt?.title).toBe("任务人工处理结果");
+
+    const reopened = upsertHumanAttentionTodo({
+      groupId: "group-reopen",
+      itemId: "item-reopen",
+      taskId: "task-reopen",
+      fingerprint: "fp-reopen",
+      reason: "escalate_failures_exhausted:stalled_again",
+      ownerIds: ["human:amy"],
+      recoveryHint: "needs human again",
+      source: "escalate_failures_exhausted",
+      boardStatus: "applied",
+      nowMs: 30_000,
+    });
+    expect(reopened.created).toBe(true);
+    expect(reopened.todo.status).toBe("open");
+    expect(reopened.todo.version).toBe(2);
+    expect(reopened.todo.resolution).toBeUndefined();
+
+    const openCardV2 = buildHumanAttentionCard({
+      todoId: reopened.todo.id,
+      groupId: reopened.todo.groupId,
+      taskId: reopened.todo.taskId,
+      boardItemId: reopened.todo.itemId,
+      fingerprint: reopened.todo.fingerprint,
+      version: reopened.todo.version,
+      failureKind: reopened.todo.failureKind,
+      reason: reopened.todo.reason,
+      ownerIds: reopened.todo.ownerIds,
+      recoveryHint: reopened.todo.recoveryHint,
+      boardStatus: reopened.todo.boardStatus,
+      status: reopened.todo.status,
+    });
+    expect(openCardV2).not.toBeNull();
+    expect(openCardV2?.title).toBe("任务需要你处理");
+    expect(humanAttentionIdempotencyKey(openCardV2!)).toBe(
+      `human-attention:${reopened.todo.id}:v2`,
+    );
+    expect(humanAttentionIdempotencyKey(openCardV2!)).not.toBe(
+      humanAttentionIdempotencyKey(openCardV1!),
+    );
     expect(listHumanAttentionTodos({ actorId: "amy" })).toHaveLength(1);
   });
 

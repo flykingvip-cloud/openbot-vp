@@ -1,5 +1,6 @@
 import { recordOrNull as asRecord } from "../records.js";
 import { EnterpriseDataStoreError } from "./connector-action-store.js";
+import { extractYonyouTplusRows } from "./yonyou-tplus-rows.js";
 import type {
   DataGatewaySuccessResponse,
   EnterpriseKnowledgeProjectionSpec,
@@ -35,14 +36,10 @@ function applyAggregateTemplate(params: {
   gatewayData: unknown;
 }): ProjectionTemplateResult {
   const root = asRecord(params.gatewayData);
-  // Yonyou T+ handlers return { records: [...] }; other connectors may use items or a bare array.
+  // Prefer explicit items; else unwrap Chanjet/Yonyou shapes (records array OR page.Data).
   const items = Array.isArray(root?.items)
     ? root.items
-    : Array.isArray(root?.records)
-      ? root.records
-      : Array.isArray(params.gatewayData)
-        ? params.gatewayData
-        : [];
+    : extractYonyouTplusRows(params.gatewayData);
   return {
     title: `${params.spec.displayName} 汇总`,
     payload: {
