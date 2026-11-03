@@ -10828,6 +10828,9 @@ tasks:
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - src/agent-runtime/command/**
+      - src/auto-reply/reply/agent-runner.ts
+      - src/auto-reply/reply/mid-task-dialogue.ts
       - src/agent-runtime/contracts/**
       - src/conversation-task/session-task-board.ts
       - src/auto-reply/reply/runtime-context-assembly.ts
@@ -10877,6 +10880,9 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/agent-runtime/command/**
+      - src/auto-reply/reply/agent-runner.ts
+      - src/auto-reply/reply/mid-task-dialogue.ts
       - src/agent-runtime/contracts/**
       - src/conversation-task/session-task-board.ts
       - src/auto-reply/reply/runtime-context-assembly.ts
