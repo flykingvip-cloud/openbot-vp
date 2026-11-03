@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { OpenBotConfig } from "../../../config/config.js";
@@ -97,7 +98,6 @@ import {
   toHookDeliveryResult,
   resolveSkillFrontmatter,
 } from "../../execution-preflight/index.js";
-import { runExecutionStallContinueLoop } from "../../execution-stall-continue-loop.js";
 import {
   dropSupersededStallTexts,
   EMPTY_AFTER_TOOLS_CONTINUE_LIMIT,
