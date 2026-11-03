@@ -106,3 +106,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Agent-runner owner control transaction now delegates to command/current-task-control.ts through explicit state/abort/queue ports. Atomic persistence then main/aside/queue order preserved. Gateway asynchronous protocol adaptation remains separate and NOT MIGRATED. — codex-runtime-manager
 - Four suites / 9 tests PASS (including real Gateway handler and original stop sequence); independent review PASS; typed lint clean; architecture 15 rules PASS; tsgo 52 baseline/candidate unchanged; build PASS, dynamic-import warnings 209 unchanged. — codex-runtime-manager
 - Next control work must first document Gateway async abort and queue-key differences; do not unify by flattening side-effect order. No new stop state machine or executor. — codex-runtime-manager
+
+## Gateway stop checkpoint
+
+- Gateway task-stop transaction extracted to command/gateway-task-stop.ts (036e9a66b), preserving async chat abort before owner-only embedded/queue cleanup. Original admission, board mutation, transcript, dedupe, final and cleanup stay in protocol adapter. — codex-runtime-manager
+- Four suites / 11 tests PASS, including real Gateway owner stop and A/B final isolation; independent review PASS; typed lint clean; architecture 15 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS and 209 dynamic-import warnings unchanged. — codex-runtime-manager
+- Gateway and agent-runner control remain distinct use cases with legitimate sequencing/scope differences. Shared command ownership does not claim all control flow or planning migrated. Next review should consolidate command public contracts and adapter dependency inventory before adding more port wrappers. — codex-runtime-manager

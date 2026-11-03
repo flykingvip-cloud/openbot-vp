@@ -65,3 +65,5 @@ Command is now PARTIAL through the read-only current-task status query use case 
 Command additionally owns the active-task amendment transaction (8906041c7), with effects injected by the existing runner. This removes duplicated inline transaction flow, not the existing authority/policy gate. Control, general interpretation and planning remain outside the migrated component.
 
 Current-task control is partially migrated through the agent-runner transaction component. Gateway control stays in its original async protocol path. Neither state persistence nor the underlying abort mechanisms have moved; no claim of a fully independent command/state layer.
+
+Gateway stop execution is now delegated to a command use case (036e9a66b), while protocol/partial transcript/final delivery remain at Gateway. The existing async-vs-sync control differences are explicit rather than flattened. command remains PARTIAL; no broader execution/delivery/state migration is implied.
