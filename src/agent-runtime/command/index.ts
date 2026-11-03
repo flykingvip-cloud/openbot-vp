@@ -11,3 +11,10 @@ export {
   formatTaskBoardProgressReply,
   stripInboundStampForDialogue,
 } from "./task-status.js";
+
+export {
+  shouldUseCollaborationRuntimeAssembly,
+  isCollaborationGroupRuntimeSession,
+  resolveCollaborationGroupIdForRun,
+} from "./scenarios/collaboration-entry.js";
+export type { CollaborationSessionScope } from "./scenarios/collaboration-entry.js";
