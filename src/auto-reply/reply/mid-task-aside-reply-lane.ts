@@ -20,6 +20,7 @@ import type { OpenBotConfig } from "../../config/config.js";
 import {
   isTaskTombstoned,
   readSessionTaskBoard,
+  type SessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import {
   appendAsideDialogueTurn,
