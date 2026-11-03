@@ -87,3 +87,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Full migration matrix, core authority contract map and retirement gates recorded. Existing SessionTaskBoard types extracted as type-only contracts; original state owner retains all runtime behavior. — codex-runtime-manager
 - State/continue/concurrency regression: 4 suites / 52 PASS. Architecture 14 rules PASS, changed-file typed lint clean; tsgo post-#223 baseline 52/candidate 52, zero new; build PASS and dynamic-import warning count remains 209. — codex-runtime-manager
 - This does NOT complete contracts or any business layer. Proposed next complete vertical component is task-status query; pause/cancel transaction extraction requires preserving distinct Gateway vs agent-runner side-effect order. — codex-runtime-manager
+
+## Command status-query checkpoint
+
+- Current-task status use case now lives in command/task-status.ts: recognize -> read once through port -> project recorded facts. Original agent-runner position and control priority preserved; compatibility exports are direct, amend ack stays separate. Commit ddc52146f. — codex-runtime-manager
+- Five suites / 18 tests PASS; changed-file typed lint clean; architecture 15 rules PASS; tsgo baseline 52/candidate 52 zero new; build PASS with 209 warnings unchanged. — codex-runtime-manager
+- Debt: status projection still uses original board focus formatter. No task mutation, model call, new queue or runtime path; command is PARTIAL, not independently managed in full. — codex-runtime-manager

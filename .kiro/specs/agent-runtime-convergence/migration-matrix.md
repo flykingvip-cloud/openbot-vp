@@ -59,3 +59,5 @@ G. 验证真实runReplyAgent与Gateway：活动A不被取消/写板，消息答�
 ## Current checkpoint update
 
 The inventory above records the pre-contract extraction baseline. The current candidate moves only existing SessionTaskBoard data types to src/agent-runtime/contracts/task.ts, with type-only compatibility exports in the existing owner. Contracts is PARTIAL: no new universal task schema, no message/execution/capability/events contract migration. Context remains PARTIAL. Command, execution, delivery, capabilities, policy, state and wiring remain NOT MIGRATED. Functional availability does not equal architectural migration.
+
+Command is now PARTIAL through the read-only current-task status query use case (ddc52146f). Existing controller ordering and absent-current fallback are preserved. Focus text rendering still adapts the original board formatter; do not claim the entire layer is decoupled.
