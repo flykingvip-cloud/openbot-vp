@@ -13,6 +13,12 @@ tasks:
         cross-source dedupe; normal reply (get-reply-run) injects aside context
         via extraSystemPrompt; dynamic import avoids pi-embedded mock break. No
         new scheduler. No merge/deploy."
+      - "Trust boundary: aside history as untrusted user-body (not
+        extraSystemPrompt) + char budget; identity-only cross-source dedupe (no
+        role+body fold); pure history helpers in mid-task-aside-dialogue-history
+        (static import"
+      - no pi-embedded). Keep merge-then-bound. No new scheduler. No
+        merge/deploy.
     paths:
       - src/shared/text/plan-speak-final.ts
       - src/shared/text/plan-speak-final.test.ts
@@ -60,6 +66,8 @@ tasks:
       - src/conversation-task/session-task-board.cross-process.test.ts
       - src/auto-reply/reply/get-reply-run.ts
       - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
+      - src/auto-reply/reply/mid-task-aside-dialogue-history.ts
+      - docs/slice2-aside-trust-boundary-delivery.md
     state: active
     sessions:
       - id: 2a5a3f36-196a-4b8b-8728-3686a1508090
@@ -67,7 +75,7 @@ tasks:
         ide: cursor
         agent: cursor-grok
         status: active
-        lastSignalAt: 2026-11-03T02:13:09.194Z
+        lastSignalAt: 2026-11-03T02:31:23.270Z
         metadata: {}
     ownerHistory:
       - fromOwner: cursor-grok
@@ -10860,12 +10868,14 @@ landingStreams:
       - src/gateway/server-methods/chat.aside-dialogue-history.test.ts
       - src/auto-reply/reply/get-reply-run.ts
       - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
+      - src/auto-reply/reply/mid-task-aside-dialogue-history.ts
+      - docs/slice2-aside-trust-boundary-delivery.md
     canLandWith: []
     metadata:
       task: ft-plan-speak-shopping-positive-admission
       owner: cursor-grok
-      purpose: Slice2 reply_lane cancel lifecycle + chat.history sidecar merge; typed
-        mid-task routing; Slice3 retained; no merge/deploy.
+      purpose: Slice2 aside trust boundary (untrusted user-body, identity-only
+        dedupe, history module split); merge-then-bound retained; no merge/deploy.
   - id: identity-principal-sync-20261103
     landingPolicy: serial
     paths:

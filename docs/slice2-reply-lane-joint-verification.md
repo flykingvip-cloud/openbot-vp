@@ -8,7 +8,8 @@
 
 - 行为基线（slice3 RMW）：`e82695c145629277cf3e2b656929e4b63bac3cfb`
 - 取消/历史衔接 tip：`b1f6481da42a8cf2299f3b084c8fa3e5c0b51ab1`
-- **本轮行为 tip（历史链路收尾）**：`08d1f319849d819c1ae609fe40ab5104603f9fbf`
+- **上一轮行为 tip（历史链路收尾）**：`08d1f319849d819c1ae609fe40ab5104603f9fbf`
+- **本轮行为 tip（信任边界／去重身份／历史模块拆分）**：`c533c4d79f33861379922534a1341a66f9fcd42b`
 - 祖先门禁：`git fetch origin && git merge-base --is-ancestor origin/main HEAD` → PASS（推送前再验）
 
 ## seedSessionTaskBoard 审计
@@ -47,7 +48,7 @@ pnpm exec vitest run \
   ui/src/ui/controllers/chat.test.ts
 ```
 
-**结果：23 files / 265 passed**（Asia/Shanghai 2026-11-03 10:13；含 merge-then-bound、跨来源去重、`get-reply-run.aside-dialogue-context`；取消与 A/B 终局隔离仍绿）。
+**结果：23 files / 268 passed**（Asia/Shanghai 2026-11-03；含信任边界、身份去重、历史模块拆分；取消与 A/B 终局隔离仍绿）。
 
 ## 只读独立回复实证（须验证四项）
 
@@ -79,23 +80,24 @@ pnpm exec vitest run \
 
 ## 代码入口
 
-- `src/auto-reply/reply/mid-task-aside-reply-lane.ts`
+- `src/auto-reply/reply/mid-task-aside-dialogue-history.ts`（纯历史；无 runner 依赖）
+- `src/auto-reply/reply/mid-task-aside-reply-lane.ts`（registry／cancel／ephemeral run）
 - `src/auto-reply/reply/agent-runner.ts`（`reply_lane_pending` 分支 + abort 旁路）
-- `src/auto-reply/reply/get-reply-run.ts`（正常回复注入旁路上下文）
+- `src/auto-reply/reply/get-reply-run.ts`（普通回复：untrusted user-body 注入旁路上下文）
 - `src/gateway/server-methods/chat.ts`（chat.history merge-then-bound）
 
 
-## 本轮历史链路收尾（合并后裁剪 / 跨来源去重 / 正常回复上下文）
+## 本轮信任边界／去重身份／模块拆分（在「先合并再裁剪」之上）
 
 | 缺口 | 改法 | 证据 |
 |---|---|---|
-| 1 chat.history 上限被绕过 | `mergeChatHistoryWithAsideDialogue` **先于** `boundChatHistoryMessages`；auth overlay 仍在 bound 之后 | `chat.aside-dialogue-history.test.ts`：`merge then boundChatHistoryMessages so sidecar cannot bypass limit` |
-| 2 A 结束后普通回复读不到 B | `runPreparedReply` 经动态 import 注入 `buildAsideDialogueContextPromptForNormalReply` → `extraSystemPrompt`（不共写 A jsonl） | `get-reply-run.aside-dialogue-context.test.ts` |
-| 3 跨来源去重 | `stableDialogueMessageIdentity`（`mid:` / `rt:role:text`）；禁止用 `transcript:`/`aside:` 前缀冒充 | history + reply_lane 测：同 messageId / 同 role+text 去重 |
+| 1 旁路原文抬到系统提示层 | 抽出 `mid-task-aside-dialogue-history.ts`（无 runner 依赖）；`chat.history` 仍按原角色画气泡；A 结束后普通回复经 `appendUntrustedContext` 注入 **user-body**（`wrapUntrustedPromptDataBlock` + 4k 字符预算），**不再**写入 `extraSystemPrompt` | `get-reply-run.aside-dialogue-context.test.ts`；`mid-task-aside-reply-lane.test.ts` untrusted+budget |
+| 2 角色＋正文折叠删真重复短问 | `stableDialogueMessageIdentity` **仅** `mid:<sharedId>`；`aside:` 合成 id / 缺 id → `null`，保留；禁止全历史按正文折叠 | `keeps repeated short asks…`；`does not fold repeated short asks…` |
+| 3 动态 import 与模块边界 | 纯历史读／格式／合并／预算 → history 模块静态引用；lane 模块只保留 registry／cancel／ephemeral run（可 re-export） | history 源无 `pi-embedded` 导入；get-reply-run／chat.ts 静态 import history |
 
-动态 import 说明：避免 `get-reply-run` 静态拉入 `mid-task-aside-reply-lane`→`pi-embedded`，以免破坏 agent-runner aside 测对 embedded runner 的 mock。
+先前「先合并再裁剪」与「正常回复可读 B」接线保留，未返工。不新增调度／任务状态逻辑。取消生命周期保持关闭。A/B 不共址 jsonl 不作阻塞。不合并、不部署。
 
-不新增调度／任务状态逻辑。取消生命周期保持关闭。A/B 不共址 jsonl 不作阻塞。不合并、不部署。
+行为 tip：`c533c4d79f33861379922534a1341a66f9fcd42b`
 
 ## 本轮三缺口收尾（取消生命周期 + 历史衔接）
 

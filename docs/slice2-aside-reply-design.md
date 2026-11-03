@@ -110,4 +110,4 @@ steering 把插问注入 A 会混流、并可能驱动 A 的工具动作 — 不
 
 - `chat.history`：sidecar 与主转录 **先合并、再**走原 `boundChatHistoryMessages` 条数/体积裁剪。
 - 跨来源去重：`stableDialogueMessageIdentity`（优先 inbound `messageId`，否则 `role+归一化正文`）；来源前缀只作展示，不作去重键。
-- A 结束后的**正常回复入口**（`get-reply-run` / `runPreparedReply`）通过 `extraSystemPrompt` 注入旁路问答摘要，刷新气泡靠 chat.history，追问依据靠该注入。
+- A 结束后的**正常回复入口**（`get-reply-run` / `runPreparedReply`）经 `appendUntrustedContext` 把旁路问答作为**不可信 user-body 数据**注入（非 `extraSystemPrompt`）；刷新气泡靠 chat.history 原角色合并；字符预算限制总长度。
