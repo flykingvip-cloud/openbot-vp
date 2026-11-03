@@ -36,6 +36,11 @@ class ResetBody {
   code: string = '';
 }
 
+class ChangePasswordBody {
+  currentPassword: string = '';
+  newPassword: string = '';
+}
+
 function buildPlatformAuthUrl(gatewayBaseUrl: string, authPath: string): string {
   const base = gatewayBaseUrl.replace(/\/+$/, '');
   const suffix = authPath.startsWith('/') ? authPath : `/${authPath}`;
@@ -83,7 +88,7 @@ function successFrom(responseStatus: number, body: string, requireCookie: boolea
     return fail(
       responseStatus,
       jsonString(json, 'code'),
-      jsonString(json, 'error').trim() || `请求失败（${responseStatus}）`,
+      jsonString(json, 'error').trim() || jsonString(json, 'message').trim() || `请求失败（${responseStatus}）`,
     );
   }
   const result = new PlatformAuthLoginResult();
@@ -94,6 +99,7 @@ function successFrom(responseStatus: number, body: string, requireCookie: boolea
   outcome.ok = true;
   outcome.statusCode = responseStatus;
   outcome.result = result;
+  outcome.message = jsonString(json, 'message').trim();
   if (requireCookie) {
     // Cookie attached by postJson
   }
@@ -187,6 +193,34 @@ export class PlatformAuthApi {
       await httpRequest(url, http.RequestMethod.POST, '', cookieHeader);
     } catch {
       // best-effort
+    }
+  }
+
+  /**
+   * Change password for the signed-in platform session
+   * (Android EmployeeAuthClient.changePassword → /password/change).
+   */
+  static async changePassword(
+    gatewayBaseUrl: string,
+    cookieValue: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<PlatformAuthOutcome> {
+    try {
+      const url = buildPlatformAuthUrl(gatewayBaseUrl, '/password/change');
+      const payload = new ChangePasswordBody();
+      payload.currentPassword = currentPassword;
+      payload.newPassword = newPassword;
+      const cookieHeader = PlatformAuthApi.cookieHeader(cookieValue);
+      const response = await httpRequest(
+        url,
+        http.RequestMethod.POST,
+        JSON.stringify(payload),
+        cookieHeader,
+      );
+      return successFrom(response.statusCode, response.body, false);
+    } catch {
+      return fail(-1, 'network', '网络错误或网关不可达');
     }
   }
 

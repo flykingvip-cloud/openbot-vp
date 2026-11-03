@@ -61,7 +61,6 @@ struct EmployeeRootTabs: View {
                     } else if self.activeTab == .me {
                         MeTabShell(
                             gateway: self.appModel.operatorSession,
-                            onLogout: self.onLogout,
                             onOpenEmployeeWorkbench: { self.showEmployeeWorkbench = true })
                     }
                 }
