@@ -214,5 +214,20 @@
       "src/agent-runtime/command/**"
     ],
     "description": "Policy classification must not read/write task state, perform environment probes or initiate execution and delivery."
+  },
+  {
+    "name": "runtime-acceptance-no-platform-effects",
+    "from": "src/agent-runtime/delivery/acceptance/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/auto-reply/**",
+      "src/conversation-task/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/execution/**"
+    ],
+    "description": "Settlement orchestration uses fixed effect ports; platform I/O and lifecycle ownership remain in the adapter."
   }
 ]
