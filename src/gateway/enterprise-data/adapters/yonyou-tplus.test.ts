@@ -201,6 +201,30 @@ describe("yonyou tplus adapter", () => {
     });
   });
 
+
+  it("normalizes inventory QueryPage body into a records row array", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json(
+        {
+          TotalCount: 1,
+          TotalPage: 1,
+          CurrentPage: 1,
+          Data: [{ Code: "10001", Name: "扇子" }],
+        },
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await executeYonyouTplusHandler(
+      YONYOU_TPLUS_HANDLERS.inventory,
+      { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
+      LIVE_SECRET,
+    );
+    const payload = result.payload as { records: Array<{ Code: string }> };
+    expect(Array.isArray(payload.records)).toBe(true);
+    expect(payload.records[0]?.Code).toBe("10001");
+  });
+
   it("uses the platform app credentials when the vault only stores the open token", async () => {
     vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY", "env-key");
     vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_SECRET", "env-secret");

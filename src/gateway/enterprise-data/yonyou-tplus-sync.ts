@@ -23,6 +23,10 @@ import {
   type YonyouTplusProbeContext,
 } from "./adapters/yonyou-tplus.js";
 import { loadCredentialSecret } from "./connector-credential-vault.js";
+import {
+  extractYonyouTplusRows,
+  yonyouTplusPayloadBody,
+} from "./yonyou-tplus-rows.js";
 import type {
   ConnectorSyncCursor,
   ConnectorSyncLogEntry,
@@ -251,14 +255,6 @@ function arrayLength(value: unknown): number | null {
   return Array.isArray(value) ? value.length : null;
 }
 
-function payloadBody(payload: unknown): unknown {
-  const record = objectRecord(payload);
-  if (record && "records" in record) {
-    return record.records;
-  }
-  return payload;
-}
-
 function rowCountFromBody(body: unknown): number {
   const direct = arrayLength(body);
   if (direct != null) {
@@ -373,30 +369,6 @@ function errorText(error: unknown): string {
 function textField(record: Record<string, unknown>, key: string): string {
   const value = record[key];
   return typeof value === "string" ? value : "";
-}
-
-function listedRows(body: unknown): unknown[] {
-  if (Array.isArray(body)) {
-    return body;
-  }
-  const record = objectRecord(body);
-  if (!record) {
-    return [];
-  }
-  if (Array.isArray(record.result)) {
-    return record.result;
-  }
-  if (Array.isArray(record.Data)) {
-    return record.Data;
-  }
-  if (Array.isArray(record.Rows)) {
-    return record.Rows;
-  }
-  const data = objectRecord(record.data);
-  if (data && Array.isArray(data.Rows)) {
-    return data.Rows;
-  }
-  return [];
 }
 
 /** Stable catalog fingerprint. Ts is a documented return field, not a request filter. */
@@ -532,7 +504,7 @@ async function pullStream(params: {
       params.secret,
       params.context,
     );
-    const body = payloadBody(result.payload);
+    const body = yonyouTplusPayloadBody(result.payload);
     const rows = rowCountFromBody(body);
     recordCount += rows;
     if (pageIsComplete(body, rows)) {
@@ -557,7 +529,7 @@ async function pullCatalog(params: {
     params.secret,
     params.context,
   );
-  const rows = listedRows(payloadBody(result.payload));
+  const rows = extractYonyouTplusRows(result.payload);
   if (rows.length > WAREHOUSE_ROW_CAP) {
     return { recordCount: rows.length, truncated: true };
   }

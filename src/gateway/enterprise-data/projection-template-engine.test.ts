@@ -47,4 +47,40 @@ describe("applyProjectionTemplate AggregateTemplate", () => {
     });
     expect(result.payload).toEqual({ count: 1, items: [{ id: 1 }] });
   });
+
+  it("aggregates inventory QueryPage Data nested under records", () => {
+    const result = applyProjectionTemplate({
+      templateKey: "AggregateTemplate",
+      spec,
+      gatewayData: {
+        records: {
+          TotalCount: 1,
+          TotalPage: 1,
+          CurrentPage: 1,
+          Data: [{ Code: "10001", Name: "扇子" }],
+        },
+      },
+      gatewayResponse,
+    });
+    expect(result.payload).toEqual({
+      count: 1,
+      items: [{ Code: "10001", Name: "扇子" }],
+    });
+  });
+
+  it("aggregates bare Data page objects without records wrapper", () => {
+    const result = applyProjectionTemplate({
+      templateKey: "AggregateTemplate",
+      spec,
+      gatewayData: {
+        TotalCount: 1,
+        Data: [{ Code: "01", Name: "温州仓" }],
+      },
+      gatewayResponse,
+    });
+    expect(result.payload).toEqual({
+      count: 1,
+      items: [{ Code: "01", Name: "温州仓" }],
+    });
+  });
 });
