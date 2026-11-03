@@ -509,6 +509,7 @@ export function createFollowupRunner(params: {
               const result = await runEmbeddedPiAgent({
                 sessionId: queued.run.sessionId,
                 abortSignal: opts?.abortSignal,
+                taskExecutionBinding: queued.run.taskCompletionBinding,
                 sessionKey: queued.run.sessionKey,
                 agentId: queued.run.agentId,
                 trigger: "user",

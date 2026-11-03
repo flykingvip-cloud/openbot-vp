@@ -8,6 +8,7 @@ import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { OpenBotConfig } from "../../../config/config.js";
+import { isTaskExecutionBindingCurrent } from "../../../conversation-task/session-task-board.js";
 import { readSessionTaskBoard } from "../../../conversation-task/session-task-board.js";
 import { emitChatInboundStage } from "../../../gateway/chat-inbound-stage-events.js";
 import {
@@ -2434,6 +2435,18 @@ export async function runEmbeddedAttempt(
       let promptErrorSource: "prompt" | "compaction" | null = null;
       const prePromptMessageCount = activeSession.messages.length;
       try {
+        // Register first, then synchronously recheck: earlier stops are durable in the
+        // task board; later stops can now reach this existing active-run abort handle.
+        if (
+          params.taskExecutionBinding &&
+          !isTaskExecutionBindingCurrent(params.sessionFile, params.taskExecutionBinding)
+        ) {
+          abortRun(false, new Error("Original task stopped before active-run registration"));
+        }
+
+        if (runAbortController.signal.aborted) {
+          throw makeAbortError(runAbortController.signal);
+        }
         const promptStartedAt = Date.now();
 
         // Run before_prompt_build hooks to allow plugins to inject prompt context.

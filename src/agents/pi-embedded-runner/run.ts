@@ -980,6 +980,7 @@ export async function runEmbeddedPiAgent(
             timeoutMs: params.timeoutMs,
             runId: params.runId,
             abortSignal: params.abortSignal,
+            taskExecutionBinding: params.taskExecutionBinding,
             shouldEmitToolResult: params.shouldEmitToolResult,
             shouldEmitToolOutput: params.shouldEmitToolOutput,
             onPartialReply: params.onPartialReply,

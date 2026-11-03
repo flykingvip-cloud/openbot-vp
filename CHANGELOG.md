@@ -304,6 +304,7 @@ Docs: https://docs.openbot.love
 - Tasks: reject checked-completion callbacks whose original task, attempt, or artifact version no longer matches the current task; unbound callbacks no longer close the latest task.
 - Tasks/queue: reject stale queued task bindings and recheck owner pause before starting a prepared followup; preserve typing cleanup on rejected claims.
 - Tasks/runtime: reject stale task requests before memory flush and provider startup, while continuing to drain subsequent queued work.
+- Tasks/embedded: revalidate the original task immediately after active-run registration so stops during runtime preparation prevent prompt startup without a second cancellation registry.
 
 ## 2026.3.8
 
