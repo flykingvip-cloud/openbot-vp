@@ -10828,6 +10828,10 @@ tasks:
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - src/agent-runtime/wiring/**
+      - src/agents/execution-stall-continue-loop.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.test.ts
+      - src/auto-reply/reply/agent-runner-payloads.test.ts
       - src/agent-runtime/contracts/acceptance.ts
       - src/agent-runtime/contracts/blocker.ts
       - src/agents/turn-completion/contract.test.ts
@@ -10895,6 +10899,10 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/agent-runtime/wiring/**
+      - src/agents/execution-stall-continue-loop.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.test.ts
+      - src/auto-reply/reply/agent-runner-payloads.test.ts
       - src/agent-runtime/contracts/acceptance.ts
       - src/agent-runtime/contracts/blocker.ts
       - src/agents/turn-completion/contract.test.ts
