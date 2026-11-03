@@ -5,7 +5,8 @@
 
 ## 0. 绑定 SHA
 
-- **行为完整 SHA（本轮 tip）**：`bb949e8e508e18b32a59749b63b234e963749bd3`
+- **行为完整 SHA（本轮 tip）**：`b1f6481da42a8cf2299f3b084c8fa3e5c0b51ab1`
+- **上一轮 tip**：`bb949e8e508e18b32a59749b63b234e963749bd3`
 - **四项阻塞行为基线**：`6c4081a3c6c81bd63bbb317916f1d500c2466843`
 - PR：https://github.com/flykingvip-cloud/openbot-vp/pull/216
 - **禁止**再引用旧 HEAD `ab32aa1…`、或「steer 成功后仍保留 followup」等过时表述（P1 已改为：steer 成功即返回，不再 followup）。
@@ -69,7 +70,7 @@ Asia/Shanghai 本机 vitest（7 files / **23 passed**）：
 - `src/conversation-task/session-task-board.inbound-stop.test.ts`（3）
 - `src/auto-reply/reply/mid-task-dialogue.test.ts`（3）
 
-未独立宣称线上闪现已修复。行为 tip = `bb949e8e508e18b32a59749b63b234e963749bd3`。
+未独立宣称线上闪现已修复。行为 tip = `b1f6481da42a8cf2299f3b084c8fa3e5c0b51ab1`（取消生命周期 + chat.history 衔接）。
 
 ## 6. 不做
 

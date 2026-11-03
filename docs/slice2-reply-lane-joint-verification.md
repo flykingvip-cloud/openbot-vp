@@ -7,8 +7,9 @@
 ## 绑定
 
 - 行为基线（slice3 RMW）：`e82695c145629277cf3e2b656929e4b63bac3cfb`
-- 本轮 tip（含 reply_lane hardening + 分流）：`bb949e8e508e18b32a59749b63b234e963749bd3`
-- 祖先门禁：`git fetch origin && git merge-base --is-ancestor origin/main HEAD` → PASS（合入前再验）
+- 上一轮 tip（分流 + 三项初修）：`bb949e8e508e18b32a59749b63b234e963749bd3`
+- 本轮 tip（取消生命周期 + 真实 chat.history 衔接 + 时间合并）：`b1f6481da42a8cf2299f3b084c8fa3e5c0b51ab1`
+- 祖先门禁：`git fetch origin && git merge-base --is-ancestor origin/main HEAD` → PASS（推送前再验）
 
 ## seedSessionTaskBoard 审计
 
@@ -40,12 +41,13 @@ pnpm exec vitest run \
   src/conversation-task/session-task-board.seed-audit.test.ts \
   src/conversation-task/turn-relation.test.ts \
   src/gateway/server-methods/chat.owner-pause-abort.test.ts \
+  src/gateway/server-methods/chat.aside-dialogue-history.test.ts \
   src/gateway/server-chat.aside-ab-run-isolation.test.ts \
   ui/src/ui/app-chat.node.test.ts \
   ui/src/ui/controllers/chat.test.ts
 ```
 
-**结果：21 files / 252 passed**（Asia/Shanghai 2026-11-03 09:45；含 `server-chat.aside-ab-run-isolation.test.ts`；completion/pause 竞态已加固）。
+**结果：22 files / 259 passed**（Asia/Shanghai 2026-11-03 09:58；含 `chat.aside-dialogue-history.test.ts` 真实 chat.history 接口；A/B 终局隔离仍绿）。
 
 ## 只读独立回复实证（须验证四项）
 
@@ -54,7 +56,9 @@ pnpm exec vitest run \
 | 转录写入 | B → ephemeral `sessionFile`（`openbot-aside-reply-*`），不写 A jsonl；用户可见靠 return payloads | `mid-task-aside-reply-lane.test.ts` |
 | 会话锁 | 独立 `sessionId`，不占 `ACTIVE_EMBEDDED_RUNS[A]`；aside 只锁自己的文件 | isolation assert + run args |
 | 消息归属 | aside `runId` = 本次 `opts.runId`；`runReplyAgent` 直接返回，不 followup 串 A | `agent-runner.aside-reply-lane.test.ts` |
-| 取消范围 | pause/cancel → abort A + `abortMidTaskAsideLanes`；仅 abort A 的 embedded id 不清 aside 登记 | reply_lane + agent-runner 测 |
+| 取消范围 | 首次 await 前登记 + AbortSignal 传入运行器；墓碑/taskId 阻断；pause/cancel → abort A + asides | reply_lane prep/tombstone/signal 测 + agent-runner |
+| 刷新可见 | sidecar 经 `mergeChatHistoryWithAsideDialogue` 接入 `chat.history`；A 结束后仍可恢复 B 气泡 | `chat.aside-dialogue-history.test.ts` |
+| 历史合并 | 旁路与主对话按时间+消息身份合并，sidecar 满也不挤掉最新 A | `mergeAsideAndParentHistoryTurns` + history 测 |
 
 ## 插话分流（不全进 reply_lane）
 
@@ -68,10 +72,22 @@ pnpm exec vitest run \
 | reply_lane 及时答（不跟 A 串行） | **本轮已落地** |
 | 不写板、disableTools、无第二控制者 | **本轮已落地** |
 | A/B 共址 jsonl | **仍缺口** |
-| Gateway A/B final/cancel 隔离交叉测 | **本轮已补**（`server-chat.aside-ab-run-isolation.test.ts`） |
+| Gateway A/B final/cancel 隔离交叉测 | **已绿**（`server-chat.aside-ab-run-isolation.test.ts`） |
+| 真实 chat.history 刷新／重连／A 结束后追问 | **本轮已补**（`chat.aside-dialogue-history.test.ts`） |
+| 取消 prepare 窗口 / 墓碑 / runner 前信号 | **本轮已补**（`mid-task-aside-reply-lane.test.ts`） |
 | 关键词特例堆叠 / 第二任务引擎 | **不做** |
 
 ## 代码入口
 
 - `src/auto-reply/reply/mid-task-aside-reply-lane.ts`
 - `src/auto-reply/reply/agent-runner.ts`（`reply_lane_pending` 分支 + abort 旁路）
+
+## 本轮三缺口收尾（取消生命周期 + 历史衔接）
+
+| 缺口 | 改法 | 证据 |
+|---|---|---|
+| 1 取消窗口 | `registerMidTaskAsideLane` 在首次 `mkdtemp`/`writeFile` **之前**；绑定 `taskId`；`abortSignal` 传入 `runEmbeddedPiAgent`；`ownerStopBlocksAside` 用 `isTaskTombstoned` 即使 current 已清 | `registers cancel signal before first await…`；`cancel tombstone blocks…`；`passes abortSignal into runner…` |
+| 2 刷新后可见 | `chat.history` 经 `mergeChatHistoryWithAsideDialogue` 画 sidecar；不共写 A jsonl | `chat.history paints aside bubbles after refresh (and after A-ended)` |
+| 3 旁路挤掉主对话 | `mergeAsideAndParentHistoryTurns` 时间+身份合并后再截取；`loadAsideReplyContextHistory` 不再在满载时只返回旁路 | `merge helper keeps A and B ordered by time`；`multi-round B then A new reply…` |
+
+不新增调度逻辑／任务机制。不合并、不部署。

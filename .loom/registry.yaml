@@ -10855,8 +10855,8 @@ landingStreams:
     metadata:
       task: ft-plan-speak-shopping-positive-admission
       owner: cursor-grok
-      purpose: Slice2 reply_lane harden + typed mid-task routing + Gateway A/B
-        isolation; Slice3 context retained; no merge/deploy.
+      purpose: Slice2 reply_lane cancel lifecycle + chat.history sidecar merge;
+        typed mid-task routing; Slice3 retained; no merge/deploy.
   - id: identity-principal-sync-20261103
     landingPolicy: serial
     paths:
