@@ -81,3 +81,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Baseline runtime-context assembly 12 PASS; candidate component + assembly + normal/aside entrance 17 PASS. Typed lint clean; architecture 13 rules PASS; build PASS with 209 dynamic-import warnings unchanged. — codex-runtime-manager
 - Main #223 introduced five additional TS test diagnostics; after temporary restoration of the unchanged source, post-merge baseline 52 equals candidate 52 (zero added). Do not attribute these to this extraction or mix their fixes into runtime scope. — codex-runtime-manager
 - Deferred builder standardization and comprehensive retest explicitly remain mandatory follow-up; contract in builder-component-contract.md protects original business invariants and cohesive components. — codex-runtime-manager
+
+## Cross-layer contract checkpoint
+
+- Full migration matrix, core authority contract map and retirement gates recorded. Existing SessionTaskBoard types extracted as type-only contracts; original state owner retains all runtime behavior. — codex-runtime-manager
+- State/continue/concurrency regression: 4 suites / 52 PASS. Architecture 14 rules PASS, changed-file typed lint clean; tsgo post-#223 baseline 52/candidate 52, zero new; build PASS and dynamic-import warning count remains 209. — codex-runtime-manager
+- This does NOT complete contracts or any business layer. Proposed next complete vertical component is task-status query; pause/cancel transaction extraction requires preserving distinct Gateway vs agent-runner side-effect order. — codex-runtime-manager
