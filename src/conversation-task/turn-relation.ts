@@ -265,6 +265,21 @@ export function classifyTurnRelation(
   if (isPriorUtteranceCorrection(text)) {
     return "amend";
   }
+  // Owner explicitly marks the turn as unrelated to the current task — ordinary
+  // aside, even when the body mentions words that also appear in constraint cues
+  // (e.g. an essay topic containing「约束」). Do not swallow into amend/steer.
+  if (/(?:与(?:当前)?任务无关|不(?:要|用)改(?:当前)?任务)/u.test(text.replace(/\s+/g, ""))) {
+    return "aside";
+  }
+  // Recalling / following up on a mid-task aside (插问 / 旁路) is ordinary aside —
+  // do not treat「刚才插问…」「旁路历史…」as same-task constraint amend via「刚才」.
+  if (
+    /(?:插问|旁路(?:历史)?|回顾(?:一下)?(?:插问|旁路)|追问\s*[BbＢｂ]|关于\s*[BbＢｂ]\s*(?:的|插问))/u.test(
+      text.replace(/\s+/g, ""),
+    )
+  ) {
+    return "aside";
+  }
   // Same-goal appendix / next chapter / charts stay amend (v2); do not over-flip.
   if (SAME_GOAL_APPENDIX_RE.test(text) && !LEAVE_CURRENT_RE.test(text)) {
     return "amend";

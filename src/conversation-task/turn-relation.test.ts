@@ -17,6 +17,19 @@ const CURRENT = "生成今日竞品价格检查结果，并验收至少一个竞
 describe("turn relation", () => {
   it("classifies language, correction, and continuation as non-cutting", () => {
     expect(classifyTurnRelation("请用中文回复", CURRENT)).toBe("aside");
+    // Explicit unrelated marker wins over constraint-cue words inside the body.
+    expect(
+      classifyTurnRelation(
+        "【插问】与任务无关：写一篇短文，主题是为何要区分旁路插问与任务约束",
+        CURRENT,
+      ),
+    ).toBe("aside");
+    expect(
+      classifyTurnRelation(
+        "【插问B】现在是什么星期几？只回答星期几，与当前任务无关，不要改任务。",
+        CURRENT,
+      ),
+    ).toBe("aside");
     expect(classifyTurnRelation("不对，我说的是国内", CURRENT)).toBe("amend");
     expect(classifyTurnRelation("补充一节", CURRENT)).toBe("amend");
     expect(classifyTurnRelation("把标题改成市场稿", CURRENT)).toBe("amend");
@@ -137,5 +150,21 @@ describe("slice2 mid-task routing amend cues", () => {
     expect(isOwnerExecutionBarrierUtterance("先别发布")).toBe(true);
     expect(isOwnerExecutionBarrierUtterance("不要付款")).toBe(true);
     expect(isOwnerExecutionBarrierUtterance("今天北京天气怎么样")).toBe(false);
+  });
+
+  it("recalling mid-task aside (插问/旁路) stays aside, not amend via 刚才", () => {
+    expect(
+      classifyTurnRelation("【追问B】刚才插问里你回答的星期几是什么？只回顾插问B的答案。", goal),
+    ).toBe("aside");
+    expect(
+      classifyTurnRelation(
+        "【A结束后追问】请根据旁路历史，复述刚才插问B的星期几答案；不要编造任务A细节。",
+        goal,
+      ),
+    ).toBe("aside");
+    // Real constraint with 约束 cue still amends.
+    expect(classifyTurnRelation("【补充约束】最终输出必须包含 E2E_CONSTRAINT_OK", goal)).toBe(
+      "amend",
+    );
   });
 });

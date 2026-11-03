@@ -77,6 +77,25 @@ describe("commitSameTaskConstraint task identity", () => {
     expect(JSON.stringify(board)).not.toContain("只要国内安卓机型");
   });
 
+  it("returns true when the same constraint is already active (idempotent after focus-gate write)", () => {
+    const first = commitSameTaskConstraint({
+      sessionFile,
+      constraintText: "补充：最终输出必须包含 E2E_CONSTRAINT_OK",
+      expectedTaskId: "task-a",
+    });
+    expect(first).toBe(true);
+    const again = commitSameTaskConstraint({
+      sessionFile,
+      constraintText: "补充：最终输出必须包含 E2E_CONSTRAINT_OK",
+      expectedTaskId: "task-a",
+    });
+    expect(again).toBe(true);
+    const board = readSessionTaskBoard(sessionFile);
+    expect(
+      activeConstraintTexts(board.current).filter((x) => x.includes("E2E_CONSTRAINT_OK")),
+    ).toHaveLength(1);
+  });
+
   it("returns false when expectedTaskId is empty or board has no unfinished current", () => {
     expect(
       commitSameTaskConstraint({

@@ -49,6 +49,7 @@ import { isSharedTenantAddressingEnabled, resolveDataRoot } from "../../config/d
 import { withOperatorStateScope } from "../../config/operator-state-scope.js";
 import {
   loadSessionStore,
+  resolveAndPersistSessionFile,
   resolveSessionFilePath,
   updateSessionStore,
 } from "../../config/sessions.js";
@@ -5905,10 +5906,12 @@ export const chatHandlers: GatewayRequestHandlers = {
     }
     const {
       cfg,
-      entry,
+      entry: loadedEntry,
       storePath,
       canonicalKey: sessionKey,
     } = await loadSessionEntryForClient(resolvedSessionKey, client);
+    // Mutable: first inbound may persist sessionFile before focus gate seeds the board.
+    let entry = loadedEntry;
     const timeoutMs = resolveAgentTimeoutMs({
       cfg,
       overrideMs: p.timeoutMs,
@@ -6062,6 +6065,38 @@ export const chatHandlers: GatewayRequestHandlers = {
       };
       if (!p.growthBirthTurn) {
         try {
+          // First inbound often has no sessionFile yet (session init is later in
+          // get-reply). Focus gate then returns focus_state_unavailable and skips
+          // board seed — a later aside can become current. Ensure transcript path
+          // exists so applyIncomingUserMessage can seed A before mid-task B.
+          const existingFocusFile = entry?.sessionFile?.trim() ?? "";
+          if (!existingFocusFile || !fs.existsSync(existingFocusFile)) {
+            const focusSessionId = entry?.sessionId?.trim() || randomUUID();
+            const sessionStore = loadSessionStore(storePath);
+            const persisted = await resolveAndPersistSessionFile({
+              sessionId: focusSessionId,
+              sessionKey,
+              sessionStore,
+              storePath,
+              sessionEntry: entry ?? { sessionId: focusSessionId, updatedAt: Date.now() },
+              agentId,
+              sessionsDir: path.dirname(storePath),
+              activeSessionKey: sessionKey,
+            });
+            entry = persisted.sessionEntry;
+            const ensuredFocusTranscript = await ensureTranscriptFile({
+              transcriptPath: persisted.sessionFile,
+              sessionId: focusSessionId,
+              cwd: callerWorkspaceCwd,
+              tenantId: transcriptGovernance.tenantId,
+              ownerUserId: transcriptGovernance.ownerUserId,
+              groupId: transcriptGovernance.groupId,
+              failClosed: transcriptGovernance.failClosed,
+            });
+            if (!ensuredFocusTranscript.ok && transcriptGovernance.failClosed) {
+              // Soft-path: still try focus gate; managed fail-closed keeps prior behavior.
+            }
+          }
           // Always inject live ResumeParkedRecheck so resume revalidates auth + stop.
           const stopIdentity = authoritativeStopIdentityFromClient(client);
           taskTracking = applyChatFocusSwitchGateWithResumeRecheck({

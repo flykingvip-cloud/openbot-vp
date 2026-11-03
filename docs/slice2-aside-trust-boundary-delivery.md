@@ -12,7 +12,7 @@
 
 ## 三项改法
 
-1. **信任边界**：旁路 Q&A 不再进入 `extraSystemPrompt`。`chat.history` 仍按 user/assistant 原角色展示；A 结束后普通回复把旁路记录经 `wrapUntrustedPromptDataBlock` + `appendUntrustedContext` 注入 commandBody，并标明不可信、不构成新指令／授权／当前事实；字符预算 `ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS=4000`（24 条 turn cap 之上再裁）。
+1. **信任边界**：旁路 Q&A 不再进入 `extraSystemPrompt`。`chat.history` 仍按 user/assistant 原角色展示；A 结束后普通回复把旁路记录经 `wrapUntrustedPromptDataBlock` + `appendUntrustedContext` 注入 commandBody，并标明不可信、不构成新指令／授权／当前事实；历史正文预算 `ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS=4000`（仅约束 `role: text` 正文行累计；24 条 turn soft-cap 之上再裁；包装说明／不可信声明另有固定开销，不是整个提示块硬上限）。
 2. **去重身份**：`stableDialogueMessageIdentity` 只认共享稳定 `messageId`（`mid:…`）。缺身份或 `aside:` 合成 id 返回 `null`，保留重复短问（「为什么」「继续」）。
 3. **模块边界**：纯历史读／格式／合并／预算落到 `mid-task-aside-dialogue-history.ts`（无 `pi-embedded`）；`get-reply-run`／`chat.ts` 静态引用；lane 模块保留执行与 re-export。
 
@@ -25,7 +25,7 @@ pnpm exec vitest run \
   …（见 slice2-reply-lane-joint-verification.md 联合清单，含 get-reply-run.aside-dialogue-context）
 ```
 
-**23 files / 268 passed**。
+**23 files / 270 passed**。
 
 ## 诚实缺口
 

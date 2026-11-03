@@ -21,7 +21,7 @@ import {
 import { stripInboundStampForDialogue } from "./mid-task-dialogue.js";
 import { readSessionMessages } from "./session-continuity.js";
 
-/** Cap for normal-reply untrusted aside context (chars of role:text body). */
+/** History-body budget for normal-reply untrusted aside context (chars of `role: text` lines only; wrapper/disclaimer overhead is separate). */
 export const ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS = 4_000;
 
 /** Soft cap on turns considered before the char budget trims further. */

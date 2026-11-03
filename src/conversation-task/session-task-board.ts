@@ -659,8 +659,14 @@ export function commitSameTaskConstraint(params: {
         normalizeConstraintEntries(committed.current?.effectiveConstraints),
       );
       if (beforeLog === afterLog) {
-        // Duplicate or filtered — not a successful new persist.
-        return false;
+        // Idempotent: focus-gate applyIncoming may already have written the same
+        // owner text. If it is already an active constraint on the expected task,
+        // treat as persisted success so steer ack is not a false "未能写入".
+        const cleaned = stripStamp(params.constraintText).replace(/\s+/g, " ").trim();
+        const alreadyActive = normalizeConstraintEntries(
+          committed.current?.effectiveConstraints,
+        ).some((row) => row.text === cleaned && !row.superseded);
+        return alreadyActive;
       }
       writeSessionTaskBoardUnlocked(sessionFile, committed);
       return true;

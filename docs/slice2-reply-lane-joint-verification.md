@@ -48,7 +48,7 @@ pnpm exec vitest run \
   ui/src/ui/controllers/chat.test.ts
 ```
 
-**结果：23 files / 268 passed**（Asia/Shanghai 2026-11-03；含信任边界、身份去重、历史模块拆分；取消与 A/B 终局隔离仍绿）。
+**结果：23 files / 270 passed**（Asia/Shanghai 2026-11-03；含信任边界、身份去重、历史模块拆分；取消与 A/B 终局隔离仍绿）。
 
 ## 只读独立回复实证（须验证四项）
 
@@ -91,7 +91,7 @@ pnpm exec vitest run \
 
 | 缺口 | 改法 | 证据 |
 |---|---|---|
-| 1 旁路原文抬到系统提示层 | 抽出 `mid-task-aside-dialogue-history.ts`（无 runner 依赖）；`chat.history` 仍按原角色画气泡；A 结束后普通回复经 `appendUntrustedContext` 注入 **user-body**（`wrapUntrustedPromptDataBlock` + 4k 字符预算），**不再**写入 `extraSystemPrompt` | `get-reply-run.aside-dialogue-context.test.ts`；`mid-task-aside-reply-lane.test.ts` untrusted+budget |
+| 1 旁路原文抬到系统提示层 | 抽出 `mid-task-aside-dialogue-history.ts`（无 runner 依赖）；`chat.history` 仍按原角色画气泡；A 结束后普通回复经 `appendUntrustedContext` 注入 **user-body**（`wrapUntrustedPromptDataBlock` + **历史正文预算** 4000 字符；包装说明另有固定开销，非整个提示块硬上限），**不再**写入 `extraSystemPrompt` | `get-reply-run.aside-dialogue-context.test.ts`；`mid-task-aside-reply-lane.test.ts` untrusted+budget |
 | 2 角色＋正文折叠删真重复短问 | `stableDialogueMessageIdentity` **仅** `mid:<sharedId>`；`aside:` 合成 id / 缺 id → `null`，保留；禁止全历史按正文折叠 | `keeps repeated short asks…`；`does not fold repeated short asks…` |
 | 3 动态 import 与模块边界 | 纯历史读／格式／合并／预算 → history 模块静态引用；lane 模块只保留 registry／cancel／ephemeral run（可 re-export） | history 源无 `pi-embedded` 导入；get-reply-run／chat.ts 静态 import history |
 
