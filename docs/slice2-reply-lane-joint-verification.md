@@ -82,6 +82,19 @@ pnpm exec vitest run \
 - `src/auto-reply/reply/mid-task-aside-reply-lane.ts`
 - `src/auto-reply/reply/agent-runner.ts`（`reply_lane_pending` 分支 + abort 旁路）
 
+
+## 本轮历史链路收尾（合并后裁剪 / 跨来源去重 / 正常回复上下文）
+
+| 缺口 | 改法 | 证据 |
+|---|---|---|
+| 1 chat.history 上限被绕过 | `mergeChatHistoryWithAsideDialogue` **先于** `boundChatHistoryMessages`；auth overlay 仍在 bound 之后 | `chat.aside-dialogue-history.test.ts`：`merge then boundChatHistoryMessages so sidecar cannot bypass limit` |
+| 2 A 结束后普通回复读不到 B | `runPreparedReply` 经动态 import 注入 `buildAsideDialogueContextPromptForNormalReply` → `extraSystemPrompt`（不共写 A jsonl） | `get-reply-run.aside-dialogue-context.test.ts` |
+| 3 跨来源去重 | `stableDialogueMessageIdentity`（`mid:` / `rt:role:text`）；禁止用 `transcript:`/`aside:` 前缀冒充 | history + reply_lane 测：同 messageId / 同 role+text 去重 |
+
+动态 import 说明：避免 `get-reply-run` 静态拉入 `mid-task-aside-reply-lane`→`pi-embedded`，以免破坏 agent-runner aside 测对 embedded runner 的 mock。
+
+不新增调度／任务状态逻辑。取消生命周期保持关闭。A/B 不共址 jsonl 不作阻塞。不合并、不部署。
+
 ## 本轮三缺口收尾（取消生命周期 + 历史衔接）
 
 | 缺口 | 改法 | 证据 |

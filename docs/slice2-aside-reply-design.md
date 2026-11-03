@@ -105,3 +105,9 @@ steering 把插问注入 A 会混流、并可能驱动 A 的工具动作 — 不
 - Gateway/UI `chatRunId` 分桶：本轮复用 `opts.runId` 作为 aside `runId`，未改 broadcast 清桶逻辑；终局误清风险依赖既有 run 身份，未新增第二控制器。
 - 不并发修改同一任务资源；不加第二任务控制者；不堆关键词特例。
 - 切片 3 停止功能扩展；不合并、不部署。
+
+## 历史链路（展示与执行）
+
+- `chat.history`：sidecar 与主转录 **先合并、再**走原 `boundChatHistoryMessages` 条数/体积裁剪。
+- 跨来源去重：`stableDialogueMessageIdentity`（优先 inbound `messageId`，否则 `role+归一化正文`）；来源前缀只作展示，不作去重键。
+- A 结束后的**正常回复入口**（`get-reply-run` / `runPreparedReply`）通过 `extraSystemPrompt` 注入旁路问答摘要，刷新气泡靠 chat.history，追问依据靠该注入。

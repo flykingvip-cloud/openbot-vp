@@ -3,11 +3,16 @@ tasks:
   - id: ft-plan-speak-shopping-positive-admission
     owner: grok-bot
     intent:
-      - "Slice2 reply_lane: register before first await + AbortSignal into runner;
-        tombstone stop after current cleared; chat.history merges sidecar for
-        refresh/reconnect/A-ended; time+identity merge so aside-full never drops
-        latest A; typed mid-task routing retained. No new scheduler."
-      - "Slice3 context kept; no feature expand. No merge/deploy."
+      - "Slice2 reply_lane: register before first await + AbortSignal into
+        runner; tombstone stop after current cleared; chat.history merges
+        sidecar for refresh/reconnect/A-ended; time+identity merge so aside-full
+        never drops latest A; typed mid-task routing retained. No new
+        scheduler."
+      - Slice3 context kept; no feature expand. No merge/deploy.
+      - "History收尾: merge-then-bound chat.history; stableDialogueMessageIdentity
+        cross-source dedupe; normal reply (get-reply-run) injects aside context
+        via extraSystemPrompt; dynamic import avoids pi-embedded mock break. No
+        new scheduler. No merge/deploy."
     paths:
       - src/shared/text/plan-speak-final.ts
       - src/shared/text/plan-speak-final.test.ts
@@ -53,6 +58,8 @@ tasks:
       - src/gateway/server-chat.aside-ab-run-isolation.test.ts
       - src/conversation-task/session-task-board.cross-process-child.ts
       - src/conversation-task/session-task-board.cross-process.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
     state: active
     sessions:
       - id: 2a5a3f36-196a-4b8b-8728-3686a1508090
@@ -60,7 +67,7 @@ tasks:
         ide: cursor
         agent: cursor-grok
         status: active
-        lastSignalAt: 2026-11-03T01:45:58.572Z
+        lastSignalAt: 2026-11-03T02:13:09.194Z
         metadata: {}
     ownerHistory:
       - fromOwner: cursor-grok
@@ -10855,8 +10862,8 @@ landingStreams:
     metadata:
       task: ft-plan-speak-shopping-positive-admission
       owner: cursor-grok
-      purpose: Slice2 reply_lane cancel lifecycle + chat.history sidecar merge;
-        typed mid-task routing; Slice3 retained; no merge/deploy.
+      purpose: Slice2 reply_lane cancel lifecycle + chat.history sidecar merge; typed
+        mid-task routing; Slice3 retained; no merge/deploy.
   - id: identity-principal-sync-20261103
     landingPolicy: serial
     paths:
