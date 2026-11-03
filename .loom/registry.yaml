@@ -10831,6 +10831,7 @@ tasks:
       - .kiro/specs/agent-runtime-convergence/**
       - src/agent-runtime/context/**
       - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
       - scripts/architecture/manifest.json
     state: active
     sessions:
@@ -10850,6 +10851,7 @@ landingStreams:
     paths:
       - src/agent-runtime/context/**
       - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
     canLandWith: []
     metadata:
       task: agent-runtime-convergence
