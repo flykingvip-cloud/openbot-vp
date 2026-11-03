@@ -100,3 +100,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Unit tests 7 plus original runner/sequence/identity tests 12 PASS (19 total distinct tests); typed lint clean; architecture 15 rules PASS; tsgo 52 baseline/candidate unchanged; build PASS, dynamic import warnings 209 unchanged. Independent semantic review PASS. — codex-runtime-manager
 - Existing limitation recorded for separate behavior fix: persisted restriction plus steering is not a per-tool hard barrier. Do not claim these records prove immediate tool enforcement; preserve current user-facing behavior only for this structural migration. — codex-runtime-manager
 - [ ] Follow-up correctness slice: trace restrictive amendments to actual before-tool enforcement, reproduce any gap, then fix through the original policy/tool boundary with red/green evidence (not a second execution loop). — codex-runtime-manager
+
+## Current-task control checkpoint
+
+- Agent-runner owner control transaction now delegates to command/current-task-control.ts through explicit state/abort/queue ports. Atomic persistence then main/aside/queue order preserved. Gateway asynchronous protocol adaptation remains separate and NOT MIGRATED. — codex-runtime-manager
+- Four suites / 9 tests PASS (including real Gateway handler and original stop sequence); independent review PASS; typed lint clean; architecture 15 rules PASS; tsgo 52 baseline/candidate unchanged; build PASS, dynamic-import warnings 209 unchanged. — codex-runtime-manager
+- Next control work must first document Gateway async abort and queue-key differences; do not unify by flattening side-effect order. No new stop state machine or executor. — codex-runtime-manager
