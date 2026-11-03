@@ -53,3 +53,15 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Independent reviewer confirmed no new trust decisions, sanitation behavior, task mutation or scheduling. Runtime identity check confirmed both compatibility exports are the same function references. — codex-runtime-manager
 - Budget and source builders have NOT been migrated. Next work first records their owners and side effects; no batch move or new general-purpose context engine. — codex-runtime-manager
 - Compatibility retirement: get-reply-run already consumes context directly. inbound-text still serves multiple inbound consumers; retain its re-export until those consumers migrate under a dedicated reviewed checkpoint. The legacy untrusted-context re-export is transitional and must not gain logic. — codex-runtime-manager
+
+## M1c in progress
+
+- Source and budget ownership inventories delegated to independent contributors (read-only). — codex-runtime-manager
+- Proposed bounded component: existing aside dialogue data contract and character-budget selection, extracted without changing limits or selection semantics. Storage, history merge, trusted/untrusted wrapping and source I/O remain with their existing owners. — codex-runtime-manager
+
+## M1c verification
+
+- Source inventory: context-source-map.md. Budget scope/unit/owner inventory: context-budget-map.md. Both explicitly distinguish I/O, tool execution and audit side effects; not all builders are pure context sources. — codex-runtime-manager
+- Aside budget selector/type/constants extracted without changing limits, UTF-16 truncation, newest suffix selection or header accounting; historical storage/merge/wrapping stays in its original module, with same-reference compatibility exports. — codex-runtime-manager
+- Four suites: 31 tests PASS after added UTF-16/minimum-budget case; architecture 13 rules PASS; changed-file typed lint clean; full tsgo baseline 47/candidate 47, zero new; build PASS with 209 dynamic import warnings unchanged. — codex-runtime-manager
+- Next: review source provider contracts before extracting any mixed-I/O builder; no unified-budget rewrite, new classifier or model invocation. Deferred action timeline remains outside current scope. — codex-runtime-manager
