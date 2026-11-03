@@ -35,11 +35,14 @@ function applyAggregateTemplate(params: {
   gatewayData: unknown;
 }): ProjectionTemplateResult {
   const root = asRecord(params.gatewayData);
+  // Yonyou T+ handlers return { records: [...] }; other connectors may use items or a bare array.
   const items = Array.isArray(root?.items)
     ? root.items
-    : Array.isArray(params.gatewayData)
-      ? params.gatewayData
-      : [];
+    : Array.isArray(root?.records)
+      ? root.records
+      : Array.isArray(params.gatewayData)
+        ? params.gatewayData
+        : [];
   return {
     title: `${params.spec.displayName} 汇总`,
     payload: {
