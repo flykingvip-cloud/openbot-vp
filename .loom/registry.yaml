@@ -10828,6 +10828,9 @@ tasks:
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - src/auto-reply/reply/inbound-text.ts
+      - src/auto-reply/reply/untrusted-context.ts
+      - src/shared/text/normalize-newlines.ts
       - .kiro/specs/agent-runtime-convergence/**
       - src/agent-runtime/context/**
       - src/auto-reply/reply/get-reply-run.ts
@@ -10849,6 +10852,9 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/auto-reply/reply/inbound-text.ts
+      - src/auto-reply/reply/untrusted-context.ts
+      - src/shared/text/normalize-newlines.ts
       - src/agent-runtime/context/**
       - src/auto-reply/reply/get-reply-run.ts
       - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
