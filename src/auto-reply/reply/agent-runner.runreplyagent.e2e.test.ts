@@ -619,7 +619,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
     await run();
 
     expect(onToolResult).toHaveBeenCalledWith({
-      text: "Approval required.\n\n```txt\n/approve 117ba06d allow-once\n```",
+      text: "请批准下面这条命令",
       channelData: {
         execApproval: {
           approvalId: "117ba06d-1111-2222-3333-444444444444",
@@ -628,6 +628,29 @@ describe("runReplyAgent typing (heartbeat)", () => {
         },
       },
     });
+  });
+
+  it.each([
+    { text: "NO_REPLY", approvalId: "valid", approvalSlug: "valid" },
+    { text: "HEARTBEAT_OK", approvalId: "valid", approvalSlug: "valid" },
+    {
+      text: "Approval required.\n\n```txt\n/approve 117ba06d allow-once\n```",
+      approvalId: "",
+      approvalSlug: "",
+    },
+  ])("keeps suppressed or malformed approval results hidden ($text)", async (sample) => {
+    const onToolResult = vi.fn();
+    state.runEmbeddedPiAgentMock.mockImplementationOnce(async (params: AgentRunParams) => {
+      await params.onToolResult?.({
+        text: sample.text,
+        channelData: {
+          execApproval: { approvalId: sample.approvalId, approvalSlug: sample.approvalSlug },
+        },
+      });
+      return { payloads: [{ text: "final" }], meta: {} };
+    });
+    await createMinimalRun({ typingMode: "message", opts: { onToolResult } }).run();
+    expect(onToolResult).not.toHaveBeenCalled();
   });
 
   it("retries transient HTTP failures once with timer-driven backoff", async () => {

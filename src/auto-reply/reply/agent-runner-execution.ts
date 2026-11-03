@@ -74,7 +74,9 @@ import {
 import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
+import { getExecApprovalReplyMetadata } from "../../infra/exec-approval-reply.js";
 import { defaultRuntime } from "../../runtime.js";
+import { APPROVE_CARD_CTA } from "../../shared/text/assistant-scratchpad.js";
 import { registerRunReplyLanguage } from "../../shared/text/run-reply-language.js";
 import { ensureChatTurnTaskOutcome } from "../../task-outcome/chat-entry.js";
 import type { ModalityExecutionArtifact } from "../../task-outcome/modality-artifact-evidence.js";
@@ -458,7 +460,7 @@ export async function runAgentTurnWithFallback(params: {
       try {
         const normalizeStreamingText = (
           payload: ReplyPayload,
-        ): { text?: string; skip: boolean } => {
+        ): { text?: string; skip: boolean; sanitizedEmpty?: boolean } => {
           let text = payload.text;
           if (!params.isHeartbeat && text?.includes("HEARTBEAT_OK")) {
             const stripped = stripHeartbeatToken(text, {
@@ -493,7 +495,7 @@ export async function runAgentTurnWithFallback(params: {
             errorContext: Boolean(payload.isError),
           });
           if (!sanitized.trim()) {
-            return { skip: true };
+            return { skip: true, sanitizedEmpty: true };
           }
           return { text: sanitized, skip: false };
         };
@@ -1062,8 +1064,19 @@ export async function runAgentTurnWithFallback(params: {
                         return (payload: ReplyPayload) => {
                           toolResultChain = toolResultChain
                             .then(async () => {
-                              const { text, skip } = normalizeStreamingText(payload);
-                              if (skip) {
+                              const normalized = normalizeStreamingText(payload);
+                              // Only restore a valid structured card when sanitation removed its protocol text.
+                              const hasApprovalCard =
+                                normalized.sanitizedEmpty === true &&
+                                getExecApprovalReplyMetadata(payload) !== null &&
+                                /\/approve\s+[0-9a-f-]{8,}\s+allow-once\b/i.test(
+                                  payload.text ?? "",
+                                );
+                              const text =
+                                normalized.skip && hasApprovalCard
+                                  ? APPROVE_CARD_CTA
+                                  : normalized.text;
+                              if (normalized.skip && !hasApprovalCard) {
                                 return;
                               }
                               await params.typingSignals.signalTextDelta(text);
