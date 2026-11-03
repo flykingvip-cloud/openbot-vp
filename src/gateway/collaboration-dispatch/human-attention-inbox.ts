@@ -199,6 +199,10 @@ export function getHumanAttentionTodo(id: string): HumanAttentionTodo | null {
  * Open or refresh a human-attention todo. Same groupId|itemId|fingerprint while
  * still active is deduped (no second open row). Content refresh keeps version
  * unless reason/source/failureKind change, then version bumps for card update.
+ * Re-opening a terminal (resolved|recovered) row continues version (prior+1) so
+ * transcript idempotency keys (`human-attention:…:vN`) allow a fresh open card
+ * after a result receipt — resetting to v1 would skip emit and leave sticky UI
+ * on the terminal card while inbox is open/needs_human again.
  */
 export function upsertHumanAttentionTodo(
   input: UpsertHumanAttentionTodoInput,
@@ -269,13 +273,23 @@ export function upsertHumanAttentionTodo(
       return { todo: refreshed, created: false, deduped: true };
     }
   }
+  // Terminal → open reopen: continue version so :vN idempotency does not collide
+  // with the prior open card still present in the group transcript.
+  const priorTerminal = index >= 0 && !ACTIVE.has(all[index].status) ? all[index] : null;
+  const reopenVersion =
+    priorTerminal &&
+    typeof priorTerminal.version === "number" &&
+    Number.isFinite(priorTerminal.version) &&
+    priorTerminal.version > 0
+      ? Math.floor(priorTerminal.version) + 1
+      : 1;
   const todo: HumanAttentionTodo = {
     id,
     groupId,
     itemId,
     taskId,
     fingerprint,
-    version: 1,
+    version: reopenVersion,
     status: "open",
     failureKind,
     reason,
