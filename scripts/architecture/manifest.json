@@ -197,5 +197,22 @@
     "from": "src/auto-reply/**",
     "denyImportsFrom": ["src/agent-runtime/delivery/presentation/**"],
     "description": "Reply adapters consume the delivery public API rather than presentation internals."
+  },
+  {
+    "name": "runtime-policy-no-effects",
+    "from": "src/agent-runtime/policy/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/auto-reply/**",
+      "src/conversation-task/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/delivery/**",
+      "src/agent-runtime/command/**"
+    ],
+    "description": "Policy classification must not read/write task state, perform environment probes or initiate execution and delivery."
   }
 ]
