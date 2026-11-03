@@ -10828,6 +10828,9 @@ tasks:
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
+      - src/agents/pi-embedded-runner/run.ts
+      - src/agents/pi-embedded-runner/run/params.ts
       - src/auto-reply/reply/followup-runner.ts
       - src/auto-reply/reply/followup-runner.test.ts
       - src/auto-reply/types.ts
@@ -10911,6 +10914,9 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
+      - src/agents/pi-embedded-runner/run.ts
+      - src/agents/pi-embedded-runner/run/params.ts
       - src/auto-reply/reply/followup-runner.ts
       - src/auto-reply/reply/followup-runner.test.ts
       - src/auto-reply/types.ts
