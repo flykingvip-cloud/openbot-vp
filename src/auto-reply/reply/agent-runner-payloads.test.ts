@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildReplyPayloads } from "./agent-runner-payloads.js";
+import { buildReplyPayloads } from "../../agent-runtime/delivery/index.js";
 
 const baseParams = {
   isHeartbeat: false,

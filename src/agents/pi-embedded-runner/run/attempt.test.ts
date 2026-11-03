@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
 import type { OpenBotConfig } from "../../../config/config.js";
-import { runExecutionStallContinueLoop } from "../../execution-stall-continue-loop.js";
 import { PROTOCOL_FAILURE_USER_TEXT } from "../../model-output-boundary.js";
 import { resolveOllamaBaseUrlForRun } from "../../ollama-stream.js";
 import {
