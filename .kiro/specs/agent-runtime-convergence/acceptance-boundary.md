@@ -59,3 +59,12 @@ Contributor runtime-mainline-audit。对象 `src/agents/turn-completion/contract
 ## 结论
 
 整搬contract.ts阻塞：它拥有FS写入、默认探测、clock、OGUI和trial side effects，且被执行层predicate消费。下一完整验收用例先固定副作用端口与调用矩阵；若范围超出可控检查点，选完整阻塞定性子组件，不做空壳统一验收器。
+
+## First executable preservation contracts
+
+The original contract test suite now explicitly locks two effect sequences before migration:
+
+- OGUI WAIT prevents probe evaluation, side-path callbacks and supplied-artifact writes, while retaining the existing smoke clock.
+- A side-path callback executes before supplied-artifact creation; failure becomes a bypass receipt, successful artifact creation retains original trailing-newline normalization and clears the smoke clock.
+
+These are real adapter tests using a temporary workspace and original clock registry, not mocked policy results. They are not proof that every settlement branch has coverage. The next implementation should isolate existing effects behind a cohesive acceptance adapter only after early-return/trial/existing-artifact/degradation paths are similarly understood; do not split every predicate into a component or introduce configurable callbacks.

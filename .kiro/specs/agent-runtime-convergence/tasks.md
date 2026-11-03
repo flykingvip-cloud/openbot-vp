@@ -171,3 +171,9 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Existing blocker grades/probe DTO/side-path and cleared-evidence classification moved unchanged to policy/index (020bf5a37). Original contract imports shared rules and re-exports existing public symbols; FS probes/writes, clock, OGUI, trial and settlement remain original. — codex-runtime-manager
 - Three suites / 26 PASS; independent equivalence review PASS; typed lint clean; architecture 24 rules PASS; tsgo baseline/candidate 52 unchanged; build PASS, 209 dynamic-import warnings unchanged. — codex-runtime-manager
 - Policy is PARTIAL: this is not a new transition engine or complete acceptance migration. Next settlement migration must retain lazy side effects and original precedence as recorded in acceptance-boundary.md. — codex-runtime-manager
+
+## Settlement effect-preservation contracts
+
+- Added real contract tests for WAIT laziness and side-path receipt-before-artifact ordering, preserving actual filesystem trailing-newline and clock behavior. No production implementation moved in this checkpoint. — codex-runtime-manager
+- Three suites / 28 PASS; independent review corrected the test's newline assumption rather than changing implementation; typed lint clean; full tsgo baseline/candidate 52, zero added. No build required for this test/spec-only checkpoint. — codex-runtime-manager
+- Complete settlement remains original; further adapter extraction must preserve lazy probes, OGUI/trial precedence, existing artifact handling, degradation writes and clock cleanup. — codex-runtime-manager
