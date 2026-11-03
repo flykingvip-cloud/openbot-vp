@@ -191,3 +191,10 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - safe-retirements.md records repo-wide import/SDK/build/dynamic-reference audit. Removed three consumed compatibility shells; original capability implementations remain, tests now consume public APIs. Four suites / 75 PASS. — codex-runtime-manager
 - Real command host binding moved to wiring/command-adapters.ts; original runner no longer binds state/steer/abort/queue inline. Wiring contains no routing or transition decision. Seven suites / 24 PASS and independent semantic review PASS. — codex-runtime-manager
 - Combined candidate tsgo baseline/candidate 52, no new; build PASS with 209 warnings unchanged. Three-layer convergence remains INCOMPLETE; do not delete externally used hooks/workflows without effective enablement and consumer evidence. — codex-runtime-manager
+
+## Original design intent preservation gate
+
+- User requires purpose recovery BEFORE further deletion. retirement-intent-contract.md now requires original motivation, invariants, replacement owner, evidence, external-consumer/rollback checks; zero imports alone is insufficient. — codex-runtime-manager
+- Retrospective three-shell audit (retirement-intent-audit.md): original untrusted data separation, payload delivery/dedupe/media handling and bounded protocol isolation remain in new components. Only consumed re-export shells were removed. Repository exports/build consumers checked; unknown private external imports require operator confirmation before production retirement claims. — codex-runtime-manager
+- original-intent-preservation.md maps group confirmation/ACL/version/review and complex-task shaping/acceptance constraints to future owners. Keep or explicitly replace these capabilities before old retirement; no blanket deletion of loops/DSLs by name. — codex-runtime-manager
+- Five intent-focused suites / 38 tests PASS, including group private plan and complex-task acceptance, plus migrated untrusted/payload/recovery behavior; architecture 25 rules PASS. This checkpoint changes specs only, no additional implementation deletion. — codex-runtime-manager
