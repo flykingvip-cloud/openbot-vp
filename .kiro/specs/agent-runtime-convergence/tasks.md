@@ -45,3 +45,11 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - Limited Loom proxy authorized by user; registration saved in 6f9624819 and 6b643d686, other registrations unchanged. — codex-runtime-manager
 - This is only the pure system-material base, not a complete unified context service. Remaining M1 source/trust/budget boundaries require separate review before further extraction. — codex-runtime-manager
 - No push, main merge or production deployment. Collapsible action timeline stays deferred until the principal convergence work is accepted. — codex-runtime-manager
+
+## Accepted M1b checkpoint
+
+- Untrusted formatter moved to context with identical bytes; newline normalization moved to shared. Existing source import paths directly re-export the same functions, no duplicate implementations. Commit de88944e2. — codex-runtime-manager
+- Four suites / 59 tests PASS; architecture 13 rules PASS; type-aware lint clean; tsgo 47 baseline diagnostics unchanged; build PASS and dynamic import warnings 209 unchanged. — codex-runtime-manager
+- Independent reviewer confirmed no new trust decisions, sanitation behavior, task mutation or scheduling. Runtime identity check confirmed both compatibility exports are the same function references. — codex-runtime-manager
+- Budget and source builders have NOT been migrated. Next work first records their owners and side effects; no batch move or new general-purpose context engine. — codex-runtime-manager
+- Compatibility retirement: get-reply-run already consumes context directly. inbound-text still serves multiple inbound consumers; retain its re-export until those consumers migrate under a dedicated reviewed checkpoint. The legacy untrusted-context re-export is transitional and must not gain logic. — codex-runtime-manager
