@@ -10828,6 +10828,8 @@ tasks:
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - src/agent-runtime/policy/**
+      - src/agents/turn-completion/contract.ts
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
       - src/agent-runtime/delivery/**
@@ -10890,6 +10892,8 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/agent-runtime/policy/**
+      - src/agents/turn-completion/contract.ts
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
       - src/agent-runtime/delivery/**
