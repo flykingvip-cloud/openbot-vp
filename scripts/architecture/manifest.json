@@ -241,5 +241,11 @@
     "from": "src/auto-reply/**",
     "denyImportsFrom": ["src/agent-runtime/execution/runner/!(index).ts"],
     "description": "Reply adapters use the admitted candidate public API; internal implementation is not directly imported."
+  },
+  {
+    "name": "runtime-candidate-no-outer-execution-dependency",
+    "from": "src/agent-runtime/execution/runner/**",
+    "denyImportsFrom": ["src/auto-reply/reply/agent-runner-execution"],
+    "description": "Candidate and turn contracts must not reverse-depend on the old outer execution owner, including types."
   }
 ]
