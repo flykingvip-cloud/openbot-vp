@@ -10857,6 +10857,20 @@ tasks:
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
       - src/agent-runtime/delivery/**
+      - src/gateway/office-render.ts
+      - src/gateway/office-render.test.ts
+      - src/gateway/office-pptx-render.ts
+      - src/gateway/office-pptx-render.test.ts
+      - ui/src/ui/wiring/workspace-file-preview.ts
+      - ui/src/ui/wiring/deliverable-save.ts
+      - ui/src/ui/wiring/deliverable-save.test.ts
+      - ui/src/ui/wiring/workspace-file-preview.node.test.ts
+      - ui/src/ui/views/artifact-sidebar.ts
+      - ui/src/ui/views/artifact-sidebar-download-lane.test.ts
+      - src/gateway/office-pptx-isolated.ts
+      - src/gateway/office-pptx-isolated.test.ts
+      - scripts/pptx-renderer/worker.mts
+      - Dockerfile.pptx-renderer
       - src/agents/execution-preflight/validation.ts
       - src/agents/execution-preflight/runtime-validation-ownership.test.ts
       - src/agents/execution-preflight/types.ts
@@ -10952,6 +10966,20 @@ landingStreams:
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
       - src/agent-runtime/delivery/**
+      - src/gateway/office-render.ts
+      - src/gateway/office-render.test.ts
+      - src/gateway/office-pptx-render.ts
+      - src/gateway/office-pptx-render.test.ts
+      - ui/src/ui/wiring/workspace-file-preview.ts
+      - ui/src/ui/wiring/deliverable-save.ts
+      - ui/src/ui/wiring/deliverable-save.test.ts
+      - ui/src/ui/wiring/workspace-file-preview.node.test.ts
+      - ui/src/ui/views/artifact-sidebar.ts
+      - ui/src/ui/views/artifact-sidebar-download-lane.test.ts
+      - src/gateway/office-pptx-isolated.ts
+      - src/gateway/office-pptx-isolated.test.ts
+      - scripts/pptx-renderer/worker.mts
+      - Dockerfile.pptx-renderer
       - src/agents/execution-preflight/validation.ts
       - src/agents/execution-preflight/runtime-validation-ownership.test.ts
       - src/agents/execution-preflight/types.ts
