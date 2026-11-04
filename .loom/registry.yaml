@@ -10859,6 +10859,8 @@ tasks:
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
       - src/agent-runtime/delivery/**
+      - src/task-outcome/pending-delivery.ts
+      - src/task-outcome/late-task-completion.test.ts
       - src/gateway/office-render.ts
       - src/gateway/office-render.test.ts
       - src/gateway/office-pptx-render.ts
@@ -10975,6 +10977,8 @@ landingStreams:
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
       - src/agent-runtime/delivery/**
+      - src/task-outcome/pending-delivery.ts
+      - src/task-outcome/late-task-completion.test.ts
       - src/gateway/office-render.ts
       - src/gateway/office-render.test.ts
       - src/gateway/office-pptx-render.ts
