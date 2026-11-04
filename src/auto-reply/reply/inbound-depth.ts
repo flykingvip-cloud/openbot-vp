@@ -89,6 +89,16 @@ const STEWARD_RETRIEVE_INTENT_RE =
 const EXPLICIT_TOOL_EXEC_RE =
   /(?:用\s*exec(?:\s*工具)?(?:\s*(?:执行|调用))?|(?:立刻|必须|再次)(?:立刻|必须|调用|用)*\s*exec|(?:调用|执行)\s*exec\b|use (?:the )?exec(?: tool)?|(?:call|run|invoke)\s+(?:the )?exec(?: tool)?)/iu;
 
+/**
+ * Coding / write-code intents need tools (write/exec/coding-agent). Chat-lane
+ * disableTools empties the allow-list; models then emit body DSML and the
+ * protocol gate terminates as no_tools_available (PROTOCOL_FAILURE_USER_TEXT).
+ * Explanations of "what is coding" and "不要用工具" stall copy must stay chat.
+ * Do NOT restore body-DSML promote — keep tools on via depth=act instead.
+ */
+const CODING_OR_CODE_WRITE_RE =
+  /(?:用\s*coding(?:\s*(?:工具|技能|agent))?|(?:调用|执行)\s*coding\b|use (?:the )?coding(?: (?:tool|skill|agent))?|(?:call|run|invoke)\s+(?:the )?coding(?: (?:tool|skill|agent))?\b|(?:写|编写|生成)(?:一行|一段|一个|个)?(?:代码|脚本|函数|程序)|写一行(?:\s|的|代码|hello|python|js|javascript)|(?:用代码(?:实现|写|打印)?)|用\s*(?:python|javascript|typescript|java|go|rust|bash|shell)\b.{0,32}(?:写|实现|打印)|write (?:(?:a|one|some) )?(?:line of )?code|write (?:a )?(?:python|javascript|typescript|bash) (?:script|function|one-?liner|program)|write (?:a |one )?line of hello|implement .{0,48}(?:in|with) code)/iu;
+
 export function shouldApplyChatLaneSkip(params: {
   routerEnabled: boolean;
   depth?: InboundDepth;
@@ -385,6 +395,9 @@ export function classifyInboundDepth(input: InboundDepthInput): InboundDepthDeci
     }
     if (EXPLICIT_TOOL_EXEC_RE.test(text)) {
       return decision("act", ["explicit_tool_exec_intent"], "strong");
+    }
+    if (CODING_OR_CODE_WRITE_RE.test(text)) {
+      return decision("act", ["coding_or_code_write_intent"], "strong");
     }
     if (explicitKnowledge) {
       return decision("retrieve", ["explicit_knowledge_query"], "strong");
