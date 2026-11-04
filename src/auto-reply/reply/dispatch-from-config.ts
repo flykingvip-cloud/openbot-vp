@@ -910,29 +910,32 @@ export async function dispatchReplyFromConfig(params: {
       .map((reply) => (typeof reply.text === "string" ? reply.text.trim() : ""))
       .filter(Boolean)
       .join("\n\n");
-    void observeConversationTaskReplyCompleted({
-      tenantId: sourceContext.tenantId,
-      requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
-      conversationId: sessionKey ?? null,
-      sourceMessageId: messageId ?? "",
-      text:
-        [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
-          (value): value is string => typeof value === "string" && value.trim() !== "",
-        ) ?? "",
-      assistantReplyText: assistantReplyText || accumulatedBlockText.trim() || undefined,
-      cronStorePath: resolveCronStorePath(effectiveCfg.cron?.store),
-      sessionFile: sessionStoreEntry.entry?.sessionFile,
-      completionBinding,
-    }).then((notice) => {
-      if (!notice) {
-        return;
-      }
-      try {
-        dispatcher.sendFinalReply({ text: notice });
-      } catch {
-        // Completion notice must not fail the already-finished reply.
-      }
-    });
+    // A queued or failed final must not close the conversation task.
+    if (resolveRequiredDeliveryConfirmStatus(requiredDeliveryAttempts) === "delivered") {
+      void observeConversationTaskReplyCompleted({
+        tenantId: sourceContext.tenantId,
+        requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
+        conversationId: sessionKey ?? null,
+        sourceMessageId: messageId ?? "",
+        text:
+          [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
+            (value): value is string => typeof value === "string" && value.trim() !== "",
+          ) ?? "",
+        assistantReplyText: assistantReplyText || accumulatedBlockText.trim() || undefined,
+        cronStorePath: resolveCronStorePath(effectiveCfg.cron?.store),
+        sessionFile: sessionStoreEntry.entry?.sessionFile,
+        completionBinding,
+      }).then((notice) => {
+        if (!notice) {
+          return;
+        }
+        try {
+          dispatcher.sendFinalReply({ text: notice });
+        } catch {
+          // Completion notice must not fail the already-finished reply.
+        }
+      });
+    }
     recordProcessed("completed");
     markIdle("message_completed");
     return { queuedFinal, counts };
