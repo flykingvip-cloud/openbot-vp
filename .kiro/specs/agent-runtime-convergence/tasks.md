@@ -303,7 +303,7 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 
 ## Follow-up after terminal outlet extraction
 
-- [ ] Separate legitimate silence from confirmed delivery in original skip settlement; first establish TaskOutcome/acceptance consequences and failing-before/passing-after evidence. Preserve private/group/collaboration behavior and task lifecycle responsibility. — codex-runtime-manager
+- [x] Separate legitimate silence from confirmed delivery in the terminal empty-reply outlet. No send evidence leaves delivery pending, without waiving task acceptance. — codex-runtime-manager
 
 ## Delivery quality and lifecycle workstream
 
@@ -367,3 +367,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Main reply consumes a fixed composition for command, session task state, admitted execution and delivery. Visible receipt storage resolution moved to wiring and remains lazy. The composition binds existing effects; it does not route, retry, or finish a turn. Transport, presentation sequencing and cleanup stay in the reply host. — codex-runtime-manager
 - Targeted 31 PASS, reply e2e 47 PASS, architecture 41 rules PASS, changed-file lint clean, build PASS with 209 existing dynamic import warnings. Typecheck unchanged at 44 diagnostics; full check stops at 66 existing formatting failures. Broader entrypoint convergence and task acceptance versus delivery receipt semantics remain open. — codex-runtime-manager
+
+## F3 silent delivery evidence checkpoint
+
+- Empty-turn settlement now distinguishes silence and unconfirmed stream/tool callbacks from recorded messaging-tool sends and reactions. The former keep delivery pending; the latter can satisfy the delivery gate independently of group silence rules. Acceptance uses the original contract and cancellation takes precedence. — codex-runtime-manager
+- Before/after regression: 8 failing assertions on the old behavior; the scoped suite passes 75 tests. No new scheduler or send path. Correlating stream/tool callbacks with transport receipts and general task acceptance remain separate work. — codex-runtime-manager
