@@ -1,9 +1,9 @@
 import { YONYOU_TPLUS_CONNECTOR_ID } from "./adapters/yonyou-tplus-oauth.js";
 import { listConnectorActions, upsertConnectorAction } from "./connector-action-store.js";
 import { MATERIALIZER_SEAT_ID } from "./enterprise-data-seat-context.js";
+import { upsertFieldClassification } from "./field-classification-store.js";
 import { registerRuntimeHandler } from "./runtime-registry.js";
 import { findScopePolicy, upsertScopePolicy } from "./scope-policy-store.js";
-import { upsertFieldClassification } from "./field-classification-store.js";
 import { findSeatActionGrant, upsertSeatActionGrant } from "./seat-action-grant-store.js";
 import type { EnterpriseDataStore, ScopePolicy } from "./types.js";
 
@@ -44,6 +44,16 @@ const ACTIONS = [
     actionKey: "erp.sale_delivery.query_list",
     displayName: "销货单列表",
     handlerRef: "enterprise-data/handlers/yonyou-tplus-sale-delivery-list-v1",
+  },
+  {
+    actionKey: "erp.purchase_receive.query_list",
+    displayName: "采购入库单列表",
+    handlerRef: "enterprise-data/handlers/yonyou-tplus-purchase-receive-list-v1",
+  },
+  {
+    actionKey: "erp.current_stock.query",
+    displayName: "现存量查询",
+    handlerRef: "enterprise-data/handlers/yonyou-tplus-current-stock-query-v1",
   },
   {
     actionKey: "erp.doc.query",
@@ -161,25 +171,97 @@ function ensureMaterializerSeatGrants(params: {
   }
 }
 
-
-const YONYOU_ROW_PUBLIC_FIELDS = ["Code", "Name", "ID"] as const;
-const YONYOU_CLASSIFIED_ACTIONS = [
-  "erp.warehouse.query",
-  "erp.inventory.query_page",
-] as const;
+/**
+ * Business identity / list-display fields that authorized enterprise seats may
+ * read in plaintext. Unknown scalars still fail_closed_redact to "***" (phones,
+ * bank accounts, id numbers, etc. stay masked unless explicitly classified).
+ * Paths use `records[*].…` wildcards (see resolveClassificationForPath).
+ */
+const YONYOU_PUBLIC_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
+  "erp.warehouse.query": ["Code", "Name", "ID"],
+  // Inventory QueryPage: identity + cost/price (phones/bank still fail_closed).
+  "erp.inventory.query_page": [
+    "Code",
+    "Name",
+    "ID",
+    "Specification",
+    "InvSCost",
+    "LatestCost",
+    "AvagCost",
+    "RetailPriceNew",
+  ],
+  // Partner QueryPage SelectFields include PartnerType.*; nest under records[*].
+  "erp.partner.query_page": ["Code", "Name", "ID", "PartnerType.Code", "PartnerType.Name"],
+  // Voucher Rows keys strip SaleDelivery./SaleOrder. root (see yonyouTplusSelectFieldPathKey).
+  "erp.sale_delivery.query_list": [
+    "Code",
+    "Name",
+    "ID",
+    "VoucherDate",
+    "Customer.Code",
+    "Customer.Name",
+    "Warehouse.Code",
+    "Warehouse.Name",
+    "SaleDeliveryDetails.Inventory.Code",
+    "SaleDeliveryDetails.Inventory.Name",
+    "SaleDeliveryDetails.Quantity",
+    "SaleDeliveryDetails.OrigTaxPrice",
+    "SaleDeliveryDetails.OrigTaxAmount",
+  ],
+  "erp.sale_order.query_list": [
+    "Code",
+    "Name",
+    "ID",
+    "VoucherDate",
+    "Customer.Code",
+    "Customer.Name",
+    "SaleOrderDetails.Inventory.Code",
+    "SaleOrderDetails.Inventory.Name",
+    "SaleOrderDetails.Quantity",
+    "SaleOrderDetails.OrigTaxPrice",
+    "SaleOrderDetails.OrigTaxAmount",
+  ],
+  // PurchaseReceive FindVoucherList strips RDRecord. root (see yonyouTplusSelectFieldPathKey).
+  "erp.purchase_receive.query_list": [
+    "Code",
+    "Name",
+    "ID",
+    "VoucherDate",
+    "Partner.Code",
+    "Partner.Name",
+    "Warehouse.Code",
+    "Warehouse.Name",
+    "RDRecordDetails.Inventory.Code",
+    "RDRecordDetails.Inventory.Name",
+    "RDRecordDetails.Quantity",
+    "RDRecordDetails.OrigTaxPrice",
+    "RDRecordDetails.OrigTaxAmount",
+  ],
+  // currentStock/Query documented response fields (no SelectFields / no nesting).
+  "erp.current_stock.query": [
+    "WarehouseCode",
+    "WarehouseName",
+    "InventoryCode",
+    "InventoryName",
+    "Specification",
+    "UnitName",
+    "AvailableQuantity",
+    "ExistingQuantity",
+  ],
+};
 
 /**
- * Mark list-row identity fields PUBLIC so fail_closed_redact does not turn
- * simulated/live `{ records: [{ Code, Name }] }` into Aggregate Feed count:0.
- * Paths use `records[*].…` wildcards (see resolveClassificationForPath).
+ * Mark list-row business fields PUBLIC so fail_closed_redact does not turn
+ * simulated/live partner / voucher rows into "***" while warehouse/inventory
+ * already stay plaintext after #228.
  */
 function ensureYonyouTplusFieldClassifications(params: {
   store: EnterpriseDataStore;
   tenantId: string;
   nowIso: string;
 }): void {
-  for (const actionKey of YONYOU_CLASSIFIED_ACTIONS) {
-    for (const field of YONYOU_ROW_PUBLIC_FIELDS) {
+  for (const [actionKey, fields] of Object.entries(YONYOU_PUBLIC_FIELDS_BY_ACTION)) {
+    for (const field of fields) {
       upsertFieldClassification({
         store: params.store,
         tenantId: params.tenantId,

@@ -24,6 +24,7 @@ import type {
   ManagedDataSourceRecord,
   ManagedDataSourceSyncLogEntry,
   ManagedGovernanceApprovalRequest,
+  ManagedKnowledgeFeedItemRecord,
   ManagedProjectionBindingRecord,
   ManagedProjectionSpecRecord,
   ManagedScopePolicyRecord,
@@ -309,6 +310,9 @@ type DataCapabilitySurfaceState = {
   projectionsNotice: string | null;
   projectionSpecs: ManagedProjectionSpecRecord[];
   projectionBindings: ManagedProjectionBindingRecord[];
+  feedItems: ManagedKnowledgeFeedItemRecord[];
+  feedItemsLoading: boolean;
+  feedDeleteBusyObjectId: string | null;
   materializeBusyBindingId: string | null;
   projectionEditor: ProjectionEditorState;
   projectionAuditFailureCount: number | null;
@@ -606,6 +610,9 @@ function getSurfaceState(key: string): DataCapabilitySurfaceState {
       projectionsNotice: null,
       projectionSpecs: [],
       projectionBindings: [],
+      feedItems: [],
+      feedItemsLoading: false,
+      feedDeleteBusyObjectId: null,
       materializeBusyBindingId: null,
       projectionEditor: createInitialProjectionEditor(),
       projectionAuditFailureCount: null,
@@ -879,13 +886,19 @@ async function loadProjectionsSection(
   refreshEnterpriseSurface();
   // 新建投影需要源动作目录；「近期物化失败」来自审计概览。两者 best-effort，不阻断列表。
   void loadManagementLookups(state, gateway, tenantId);
-  const [specs, bindings, lineage] = await Promise.all([
+  state.feedItemsLoading = true;
+  const [specs, bindings, lineage, feeds] = await Promise.all([
     gateway.listProjectionSpecs(tenantId),
     gateway.listProjectionBindings(tenantId),
     gateway.loadLineageOverview(tenantId),
+    gateway.listFeedItems(tenantId),
   ]);
   state.projectionsLoading = false;
+  state.feedItemsLoading = false;
   state.projectionAuditFailureCount = lineage.ok ? lineage.data.materializationFailureCount : null;
+  if (feeds.ok) {
+    state.feedItems = feeds.data;
+  }
   if (specs.ok && bindings.ok) {
     state.projectionSpecs = specs.data;
     state.projectionBindings = bindings.data;
@@ -1389,7 +1402,7 @@ function renderSourceEditorModal(
   ];
   const selectedConnector =
     catalog.find((entry) => entry.connectorId === state.connectorId) ?? null;
-  const showInstallPackage = selectedConnector != null && !selectedConnector.ready;
+  const showInstallPackage = selectedConnector != null;
   const isWebsiteSession = selectedConnector?.accessMethod === "website_session";
   const showCredentialFields =
     selectedConnector != null && selectedConnector.credentialKind !== "none" && !isWebsiteSession;
@@ -1989,7 +2002,7 @@ function renderSourceEditorModal(
                       ?disabled=${state.busy || state.probeBusy || !state.connectorId}
                       @click=${onInstallConnectorPackage}
                     >
-                      安装连接器包
+                      ${selectedConnector?.ready ? "更新连接器包" : "安装连接器包"}
                     </button>
                   `
                 : html``
@@ -4011,6 +4024,53 @@ export function renderEnterpriseDataGovernanceCenterSurface(
     }
     state.projectionsError = null;
     state.projectionsNotice = `物化成功：${result.data.title}（${result.data.objectId}）`;
+    state.projectionsLoaded = false;
+    await loadProjectionsSection(state, gateway, tenantId);
+    refreshEnterpriseSurface();
+  };
+
+  const deleteFeedItem = async (item: ManagedKnowledgeFeedItemRecord) => {
+    if (!gateway || !tenantId) {
+      return;
+    }
+    const title = item.title || item.objectId;
+    if (item.isCurrentSupplied) {
+      if (
+        !shouldProceed(
+          `「${title}」是已启用供给绑定的当前投影对象。删除后知识宇宙与检索将失去该投影最新供给。确认强制删除？`,
+        )
+      ) {
+        return;
+      }
+      if (
+        !shouldProceed(
+          `再次确认：强制删除当前供给「${title}」（${item.objectId}）？此操作不可在 UI 撤销。`,
+        )
+      ) {
+        return;
+      }
+    } else if (!shouldProceed(`确认删除知识对象「${title}」？删除后知识宇宙与检索将不可见。`)) {
+      return;
+    }
+    state.feedDeleteBusyObjectId = item.objectId;
+    state.projectionsNotice = null;
+    refreshEnterpriseSurface();
+    const result = await gateway.deleteFeedItem(tenantId, item.objectId, {
+      force: item.isCurrentSupplied === true,
+    });
+    state.feedDeleteBusyObjectId = null;
+    if (!result.ok) {
+      state.projectionsError = result.error;
+      refreshEnterpriseSurface();
+      return;
+    }
+    state.projectionsError = null;
+    state.projectionsNotice = result.data.forced
+      ? `已强制删除当前供给：${title}`
+      : `已删除知识对象：${title}`;
+    state.feedItems = state.feedItems.filter((entry) => entry.objectId !== item.objectId);
+    state.projectionsLoaded = false;
+    await loadProjectionsSection(state, gateway, tenantId);
     refreshEnterpriseSurface();
   };
 
@@ -5160,6 +5220,9 @@ export function renderEnterpriseDataGovernanceCenterSurface(
             state,
             onMaterialize: materializeProjectionBinding,
             onOpenCreate: openProjectionEditor,
+            onDeleteFeedItem: (item) => {
+              void deleteFeedItem(item);
+            },
           }),
         ];
       case "approvals":

@@ -122,6 +122,7 @@ export type KnowledgeSupplyOverview = {
     freshnessStatus: "fresh" | "stale" | "expired";
     generatedAt: string;
     sourceSystems: string[];
+    isCurrentSupplied?: boolean;
   }>;
 };
 
@@ -302,6 +303,20 @@ export type ManagedProjectionBindingRecord = {
   updatedAt: string;
   /** Persisted FeedItems for this projection. Absent on older gateway payloads. */
   supplyRecordCount?: number;
+};
+
+/** 知识对象 Feed（对应 `enterprise-data.feed-items.list`）。 */
+export type ManagedKnowledgeFeedItemRecord = {
+  objectId: string;
+  projectionId: string;
+  title: string;
+  kind: string;
+  category: string;
+  sourceSystems: string[];
+  generatedAt: string;
+  freshnessStatus: "fresh" | "stale" | "expired";
+  /** Newest active feed for an enabled projection binding. */
+  isCurrentSupplied?: boolean;
 };
 
 export type ProjectionMaterializeResult = {

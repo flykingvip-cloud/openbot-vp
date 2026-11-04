@@ -4,6 +4,7 @@
 
 import { html, type TemplateResult } from "lit";
 import type {
+  ManagedKnowledgeFeedItemRecord,
   ManagedProjectionBindingRecord,
   ManagedProjectionSpecRecord,
 } from "../../../../capability/enterprise-data-capability/types.ts";
@@ -11,6 +12,9 @@ import type {
 export type ProjectionStudioModel = {
   projectionSpecs: ManagedProjectionSpecRecord[];
   projectionBindings: ManagedProjectionBindingRecord[];
+  feedItems: ManagedKnowledgeFeedItemRecord[];
+  feedItemsLoading: boolean;
+  feedDeleteBusyObjectId: string | null;
   projectionsLoading: boolean;
   projectionsError: string | null;
   projectionsNotice: string | null;
@@ -106,8 +110,9 @@ export function renderProjectionStudioSection(params: {
   state: ProjectionStudioModel;
   onMaterialize: (bindingId: string) => void;
   onOpenCreate: () => void;
+  onDeleteFeedItem: (item: ManagedKnowledgeFeedItemRecord) => void;
 }): TemplateResult {
-  const { state, onMaterialize, onOpenCreate } = params;
+  const { state, onMaterialize, onOpenCreate, onDeleteFeedItem } = params;
   const specById = new Map(state.projectionSpecs.map((spec) => [spec.projectionId, spec] as const));
   if (state.projectionsLoading) {
     return html`
@@ -280,6 +285,77 @@ export function renderProjectionStudioSection(params: {
                   </tbody>
                 </table>
               `
+        }
+      </div>
+      <div class="enterprise-data-capability__subsection">
+        <div class="edc-section-label">知识对象（Feed）${
+          state.feedItemsLoading ? " · 加载中…" : ` · ${state.feedItems.length}`
+        }</div>
+        <div class="enterprise-data-capability__hint">
+          可删除单条已物化知识对象（软删）。删除后知识宇宙与 knowledge_search 不可见。「当前供给」表示该投影已启用绑定下的最新一条，删除需二次确认并强制执行。
+        </div>
+        ${
+          state.feedItemsLoading && state.feedItems.length === 0
+            ? html`
+                <div class="enterprise-data-capability__hint">加载知识对象…</div>
+              `
+            : state.feedItems.length === 0
+              ? html`
+                  <div class="enterprise-data-capability__hint">暂无知识对象。可对手动物化绑定执行「立即物化」。</div>
+                `
+              : html`
+                  <table class="edc-console-table edc-console-table--lean">
+                    <thead>
+                      <tr>
+                        <th>标题</th>
+                        <th>投影</th>
+                        <th>生成时间</th>
+                        <th>状态</th>
+                        <th class="edc-console-table__actions">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${state.feedItems.map((item) => {
+                        const spec = specById.get(item.projectionId);
+                        const busy = state.feedDeleteBusyObjectId === item.objectId;
+                        return html`
+                          <tr data-feed-object-id=${item.objectId}>
+                            <td>
+                              <div>${item.title}</div>
+                              <div class="enterprise-data-capability__hint">${item.objectId}</div>
+                            </td>
+                            <td>${spec?.displayName ?? item.projectionId}</td>
+                            <td>${formatApprovalTimestamp(item.generatedAt)}</td>
+                            <td>
+                              ${
+                                item.isCurrentSupplied
+                                  ? renderDataStatusBadge("当前供给", "ok", true)
+                                  : renderDataStatusBadge(
+                                      item.freshnessStatus === "fresh"
+                                        ? "可删除"
+                                        : item.freshnessStatus,
+                                      "neutral",
+                                      true,
+                                    )
+                              }
+                            </td>
+                            <td class="edc-console-table__actions">
+                              <button
+                                class="btn btn--sm btn--danger"
+                                type="button"
+                                data-testid="feed-item-delete"
+                                ?disabled=${busy || state.feedDeleteBusyObjectId != null}
+                                @click=${() => onDeleteFeedItem(item)}
+                              >
+                                ${busy ? "删除中…" : "删除"}
+                              </button>
+                            </td>
+                          </tr>
+                        `;
+                      })}
+                    </tbody>
+                  </table>
+                `
         }
       </div>
     </section>

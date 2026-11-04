@@ -215,7 +215,7 @@ function renderConnectorWizard(surface: WorkbenchKnowledgeSurface) {
   const catalog = surface.libraryWorkspaceConnectorCatalog;
   const credentials = surface.libraryWorkspaceConnectorCredentials;
   const connector = selectedConnector(catalog, draft.connectorId);
-  const showInstallPackage = connector != null && !connector.ready;
+  const showInstallPackage = connector != null;
 
   return html`
     <div class="ku-space-import__form ku-space-import__channel" data-testid="ku-space-import-connector-wizard">
@@ -312,7 +312,15 @@ function renderConnectorWizard(surface: WorkbenchKnowledgeSurface) {
                   ?disabled=${surface.personalActionBusy || surface.libraryWorkspaceConnectorProbeBusy}
                   @click=${() => void surface.onEnsureConnectorPackageForImport?.()}
                 >
-                  ${t("frontstage.workbench.knowledgeUniverse.importToSpace.connector.installPackage")}
+                  ${
+                    connector?.ready
+                      ? t(
+                          "frontstage.workbench.knowledgeUniverse.importToSpace.connector.updatePackage",
+                        )
+                      : t(
+                          "frontstage.workbench.knowledgeUniverse.importToSpace.connector.installPackage",
+                        )
+                  }
                 </button>
               `
             : nothing

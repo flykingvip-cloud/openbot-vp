@@ -63,3 +63,91 @@ export function extractYonyouTplusRows(value: unknown): unknown[] {
   }
   return [];
 }
+
+/** Last segment of a Chanjet selectFields path (`SaleDelivery.Code` → `Code`). */
+export function yonyouTplusSelectFieldLeaf(selectField: string): string {
+  const trimmed = selectField.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  const parts = trimmed.split(".");
+  return parts[parts.length - 1] ?? trimmed;
+}
+
+/**
+ * Stable record key for FindVoucherList positional Rows.
+ * Strip only the voucher root (`SaleDelivery.` / `SaleOrder.` / `RDRecord.`) so
+ * nested paths stay distinct: `SaleDelivery.Code` → `Code`, but
+ * `SaleDelivery.SaleDeliveryDetails.Inventory.Code` → `SaleDeliveryDetails.Inventory.Code`
+ * (leaf-only keys would collide on every `.Code`).
+ */
+export function yonyouTplusSelectFieldPathKey(selectField: string): string {
+  const trimmed = selectField.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  const dot = trimmed.indexOf(".");
+  if (dot <= 0) {
+    return trimmed;
+  }
+  return trimmed.slice(dot + 1);
+}
+
+/**
+ * Assign `value` at dotted path under `root`, creating plain objects as needed.
+ * Lets PUBLIC seeds like `records[*].Customer.Name` resolve via nested walk
+ * (masking splits on `.`; flat `"Customer.Name"` keys would not match).
+ */
+export function assignYonyouTplusPathValue(
+  root: Record<string, unknown>,
+  pathKey: string,
+  value: unknown,
+): void {
+  const segments = pathKey.split(".").filter(Boolean);
+  if (segments.length === 0) {
+    return;
+  }
+  let cursor: Record<string, unknown> = root;
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    const segment = segments[i];
+    const existing = cursor[segment];
+    if (existing == null || typeof existing !== "object" || Array.isArray(existing)) {
+      const next: Record<string, unknown> = {};
+      cursor[segment] = next;
+      cursor = next;
+    } else {
+      cursor = existing as Record<string, unknown>;
+    }
+  }
+  cursor[segments[segments.length - 1]] = value;
+}
+
+/**
+ * Chanjet FindVoucherList often returns `Rows` as positional arrays matching
+ * `selectFields`. Map those to nested objects so ensure-package PUBLIC seeds
+ * (`records[*].Code` / `VoucherDate` / `Customer.Name` / detail paths) apply
+ * the same way as partner QueryPage object rows. Non-array rows are left unchanged.
+ */
+export function normalizeYonyouTplusVoucherRows(
+  rows: unknown[],
+  selectFields: readonly string[] | undefined,
+): unknown[] {
+  if (!selectFields || selectFields.length === 0) {
+    return rows;
+  }
+  const keys = selectFields.map(yonyouTplusSelectFieldPathKey);
+  return rows.map((row) => {
+    if (!Array.isArray(row)) {
+      return row;
+    }
+    const record: Record<string, unknown> = {};
+    for (let index = 0; index < row.length && index < keys.length; index += 1) {
+      const key = keys[index];
+      if (!key) {
+        continue;
+      }
+      assignYonyouTplusPathValue(record, key, row[index]);
+    }
+    return record;
+  });
+}

@@ -1,5 +1,10 @@
 import fs from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  YONYOU_TPLUS_DEFAULT_PAGE_SIZE,
+  YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
+  YONYOU_TPLUS_PARTNER_SELECT_FIELDS,
+} from "./adapters/yonyou-tplus.js";
 import { saveCredentialSecret } from "./connector-credential-vault.js";
 import { normalizeEnterpriseDataStore } from "./store.js";
 import type { DataSource, EnterpriseDataStore } from "./types.js";
@@ -70,11 +75,16 @@ function jsonBody(init: RequestInit | undefined): Record<string, unknown> {
   return JSON.parse(body) as Record<string, unknown>;
 }
 
-function inventoryPage(count: number, totalPage = 1) {
+function pageIndexToken(param: Record<string, unknown>): string {
+  const value = param.PageIndex;
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+function inventoryPage(count: number, totalPage = 1, currentPage = 1) {
   return {
     TotalCount: count,
     TotalPage: totalPage,
-    CurrentPage: 1,
+    CurrentPage: currentPage,
     Data: Array.from({ length: count }, (_, index) => ({
       Code: `SKU-${index}`,
       Name: "扇子",
@@ -152,6 +162,16 @@ describe("yonyou tplus incremental sync", () => {
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
         }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -169,8 +189,9 @@ describe("yonyou tplus incremental sync", () => {
     expect(store.dataSources[sourceId]?.lastMaterializedAt).toBeUndefined();
     expect(store.dataSources[sourceId]?.status).toBe("connected");
     expect(inventoryBodies[0]?.param).toEqual({
-      PageSize: "20",
+      PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
       PageIndex: "1",
+      SelectFields: YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
     });
     expect(inventoryBodies[0]?.param).not.toHaveProperty("UpdateDateBegin");
     expect(inventoryBodies[0]?.param).not.toHaveProperty("UpdateDateEnd");
@@ -188,7 +209,7 @@ describe("yonyou tplus incremental sync", () => {
       watermark: catalog,
     });
     expect(deliveryBodies[0]).toMatchObject({
-      pageSize: 20,
+      pageSize: YONYOU_TPLUS_DEFAULT_PAGE_SIZE,
       pageIndex: 0,
       paramDic: {
         "SaleDelivery.VoucherDate": [
@@ -214,8 +235,9 @@ describe("yonyou tplus incremental sync", () => {
     });
     expect(second.status).toBe("success");
     expect(inventoryBodies[1]?.param).toEqual({
-      PageSize: "20",
+      PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
       PageIndex: "1",
+      SelectFields: YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
       UpdateDateBegin: "2026-10-22 06:00:00",
       UpdateDateEnd: "2026-10-22 08:30:00",
     });
@@ -265,6 +287,16 @@ describe("yonyou tplus incremental sync", () => {
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
         }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -288,16 +320,23 @@ describe("yonyou tplus incremental sync", () => {
     expect(store.dataSources[sourceId]?.materializationCount).toBeUndefined();
   });
 
-  it("keeps the watermark when a page is full and the window is truncated", async () => {
+  it("keeps the watermark when an incremental window hits the range page cap", async () => {
+    const inventoryIndexes: string[] = [];
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = requestUrl(input);
         if (url.endsWith("/accountAPI/GetVersionInfo")) {
           return Response.json({ result: "16.0" });
         }
         if (url.endsWith("/inventory/QueryPage")) {
-          return Response.json(inventoryPage(20, 9));
+          const body = jsonBody(init);
+          const param = (body.param ?? {}) as Record<string, unknown>;
+          inventoryIndexes.push(pageIndexToken(param));
+          // Full pages (PAGE_SIZE) so pageIsComplete stays false until MaxPages truncates.
+          return Response.json(
+            inventoryPage(YONYOU_TPLUS_DEFAULT_PAGE_SIZE, 9, Number(pageIndexToken(param) || "1")),
+          );
         }
         if (url.endsWith("/warehouse/Query")) {
           return Response.json(WAREHOUSE_ROWS);
@@ -312,10 +351,31 @@ describe("yonyou tplus incremental sync", () => {
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
         }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
         throw new Error(`unexpected ${url}`);
       }),
     );
     const store = storeWithSource();
+    // Seed a watermark so this run uses the incremental UpdateDate window
+    // (range page cap), not the first/full master budget.
+    store.connectorSyncCursors ??= {};
+    store.connectorSyncCursors[`${sourceId}::inventory`] = {
+      cursorId: `${sourceId}::inventory`,
+      tenantId,
+      sourceId,
+      streamKey: "inventory",
+      watermark: "2026-10-21 00:00:00",
+      updatedAt: "2026-10-21T00:00:00.000Z",
+    };
     const result = await syncYonyouTplusSource({
       store,
       tenantId,
@@ -325,11 +385,15 @@ describe("yonyou tplus incremental sync", () => {
     expect(result.status).toBe("warning");
     const inventory = result.streams.find((stream) => stream.streamKey === "inventory");
     expect(inventory?.status).toBe("warning");
-    expect(inventory?.recordCount).toBe(100);
+    expect(inventory?.recordCount).toBe(YONYOU_TPLUS_DEFAULT_PAGE_SIZE * 5);
     expect(inventory?.advanced).toBe(false);
-    expect(store.connectorSyncCursors?.[`${sourceId}::inventory`]).toBeUndefined();
+    expect(inventoryIndexes).toEqual(["1", "2", "3", "4", "5"]);
+    expect(store.connectorSyncCursors?.[`${sourceId}::inventory`]?.watermark).toBe(
+      "2026-10-21 00:00:00",
+    );
     const logs = listConnectorSyncLogEntries({ store, tenantId, sourceId });
     expect(logs.find((entry) => entry.streamKey === "inventory")?.status).toBe("warning");
+    expect(logs.find((entry) => entry.streamKey === "inventory")?.detail).toContain("未拉完");
   });
 
   it("does not advance the warehouse fingerprint when the catalog pull fails or exceeds the cap", async () => {
@@ -363,6 +427,16 @@ describe("yonyou tplus incremental sync", () => {
             message: "ok",
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
+        }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
         }
         throw new Error(`unexpected ${url}`);
       }),
@@ -414,6 +488,16 @@ describe("yonyou tplus incremental sync", () => {
             message: "ok",
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
+        }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
         }
         throw new Error(`unexpected ${url}`);
       }),
@@ -472,8 +556,9 @@ describe("yonyou tplus projection cursor window", () => {
     });
     expect(inventory).toEqual({
       param: {
-        PageSize: "20",
+        PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
         PageIndex: "1",
+        SelectFields: YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
         UpdateDateBegin: "2026-10-20 00:00:00",
         UpdateDateEnd: "2026-10-22 06:00:00",
       },
@@ -491,7 +576,7 @@ describe("yonyou tplus projection cursor window", () => {
     expect(partner).toEqual({
       param: {
         SelectFields: "Code",
-        PageSize: "20",
+        PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
         PageIndex: "1",
         UpdateDateBegin: "2026-10-19 08:00:00",
         UpdateDateEnd: "2026-10-22 06:00:00",
@@ -507,7 +592,7 @@ describe("yonyou tplus projection cursor window", () => {
       now,
     });
     expect(delivery).toMatchObject({
-      pageSize: 20,
+      pageSize: YONYOU_TPLUS_DEFAULT_PAGE_SIZE,
       pageIndex: 0,
       paramDic: {
         "SaleDelivery.VoucherDate": [
@@ -586,8 +671,9 @@ describe("yonyou tplus projection cursor window", () => {
     });
     expect(firstWindow).toEqual({
       param: {
-        PageSize: "20",
+        PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
         PageIndex: "1",
+        SelectFields: YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
       },
     });
   });
@@ -652,6 +738,16 @@ describe("yonyou tplus master first-sync full window", () => {
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
         }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -665,8 +761,16 @@ describe("yonyou tplus master first-sync full window", () => {
       now,
     });
     expect(result.status).toBe("success");
-    expect(inventoryBodies[0]?.param).toEqual({ PageSize: "20", PageIndex: "1" });
-    expect(partnerBodies[0]?.param).toEqual({ PageSize: "20", PageIndex: "1" });
+    expect(inventoryBodies[0]?.param).toEqual({
+      PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
+      PageIndex: "1",
+      SelectFields: YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
+    });
+    expect(partnerBodies[0]?.param).toEqual({
+      PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
+      PageIndex: "1",
+      SelectFields: YONYOU_TPLUS_PARTNER_SELECT_FIELDS,
+    });
     expect(inventoryBodies[0]?.param).not.toHaveProperty("UpdateDateBegin");
     expect(partnerBodies[0]?.param).not.toHaveProperty("UpdateDateBegin");
     expect(result.streams.find((stream) => stream.streamKey === "inventory")).toMatchObject({
@@ -699,16 +803,162 @@ describe("yonyou tplus master first-sync full window", () => {
     });
     expect(second.status).toBe("success");
     expect(inventoryBodies[0]?.param).toEqual({
-      PageSize: "20",
+      PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
       PageIndex: "1",
+      SelectFields: YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
       UpdateDateBegin: "2026-10-22 06:00:00",
       UpdateDateEnd: "2026-10-22 08:30:00",
     });
     expect(partnerBodies[0]?.param).toEqual({
-      PageSize: "20",
+      PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
       PageIndex: "1",
+      SelectFields: YONYOU_TPLUS_PARTNER_SELECT_FIELDS,
       UpdateDateBegin: "2026-10-22 06:00:00",
       UpdateDateEnd: "2026-10-22 08:30:00",
     });
+  });
+});
+
+describe("yonyou tplus master full sync page budget", () => {
+  beforeEach(async () => {
+    cleanStore();
+    vi.unstubAllGlobals();
+    delete process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MAX_PAGES_FULL;
+    delete process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MAX_PAGES;
+    await saveCredentialSecret(credentialId, {
+      appKey: "ak-test",
+      appSecret: "as-test",
+      oauthAccessToken: "open-token-1",
+      idMarketingOrgan: "1001",
+    });
+  });
+
+  it("first/full inventory sync pages past the old 5×PAGE_SIZE range hard cap and advances the watermark", async () => {
+    const inventoryIndexes: string[] = [];
+    const totalPages = 7;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
+        if (url.endsWith("/accountAPI/GetVersionInfo")) {
+          return Response.json({ result: "16.0" });
+        }
+        if (url.endsWith("/inventory/QueryPage")) {
+          const body = jsonBody(init);
+          const param = (body.param ?? {}) as Record<string, unknown>;
+          expect(param).not.toHaveProperty("UpdateDateBegin");
+          const pageIndex = Number(pageIndexToken(param) || "1");
+          inventoryIndexes.push(String(pageIndex));
+          const rows = pageIndex < totalPages ? YONYOU_TPLUS_DEFAULT_PAGE_SIZE : 5;
+          return Response.json(inventoryPage(rows, totalPages, pageIndex));
+        }
+        if (url.endsWith("/partner/QueryPage")) {
+          return Response.json({ TotalCount: 0, TotalPage: 1, CurrentPage: 1, Data: [] });
+        }
+        if (url.endsWith("/warehouse/Query")) {
+          return Response.json(WAREHOUSE_ROWS);
+        }
+        if (
+          url.endsWith("/SaleDeliveryOpenApi/FindVoucherList") ||
+          url.endsWith("/SaleOrderOpenApi/FindVoucherList")
+        ) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+
+    const store = storeWithSource();
+    const now = new Date("2026-10-22T06:00:00.000Z");
+    const result = await syncYonyouTplusSource({ store, tenantId, sourceId, now });
+    expect(result.status).toBe("success");
+    expect(inventoryIndexes).toEqual(["1", "2", "3", "4", "5", "6", "7"]);
+    expect(result.streams.find((stream) => stream.streamKey === "inventory")).toMatchObject({
+      status: "success",
+      recordCount: YONYOU_TPLUS_DEFAULT_PAGE_SIZE * 6 + 5,
+      advanced: true,
+      detail: expect.stringContaining("首次全量"),
+    });
+    expect(store.connectorSyncCursors?.[`${sourceId}::inventory`]?.watermark).toBe(
+      "2026-10-22 06:00:00",
+    );
+  });
+
+  it("honors OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MAX_PAGES_FULL when the full archive is still incomplete", async () => {
+    process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MAX_PAGES_FULL = "3";
+    const inventoryIndexes: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
+        if (url.endsWith("/accountAPI/GetVersionInfo")) {
+          return Response.json({ result: "16.0" });
+        }
+        if (url.endsWith("/inventory/QueryPage")) {
+          const body = jsonBody(init);
+          const param = (body.param ?? {}) as Record<string, unknown>;
+          const pageIndex = Number(pageIndexToken(param) || "1");
+          inventoryIndexes.push(String(pageIndex));
+          return Response.json(inventoryPage(YONYOU_TPLUS_DEFAULT_PAGE_SIZE, 9, pageIndex));
+        }
+        if (url.endsWith("/partner/QueryPage")) {
+          return Response.json({ TotalCount: 0, TotalPage: 1, CurrentPage: 1, Data: [] });
+        }
+        if (url.endsWith("/warehouse/Query")) {
+          return Response.json(WAREHOUSE_ROWS);
+        }
+        if (
+          url.endsWith("/SaleDeliveryOpenApi/FindVoucherList") ||
+          url.endsWith("/SaleOrderOpenApi/FindVoucherList")
+        ) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+
+    const store = storeWithSource();
+    const result = await syncYonyouTplusSource({
+      store,
+      tenantId,
+      sourceId,
+      now: new Date("2026-10-22T06:00:00.000Z"),
+    });
+    expect(result.status).toBe("warning");
+    expect(inventoryIndexes).toEqual(["1", "2", "3"]);
+    expect(result.streams.find((stream) => stream.streamKey === "inventory")).toMatchObject({
+      status: "warning",
+      recordCount: YONYOU_TPLUS_DEFAULT_PAGE_SIZE * 3,
+      advanced: false,
+    });
+    expect(store.connectorSyncCursors?.[`${sourceId}::inventory`]).toBeUndefined();
   });
 });

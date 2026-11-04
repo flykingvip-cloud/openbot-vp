@@ -413,6 +413,58 @@ describe("explicit tool/exec keeps tools on (chat-lane skip off)", () => {
   });
 });
 
+describe("coding / write-code keeps tools on (chat-lane skip off)", () => {
+  it("classifies coding prompts as act so disableTools stays off", () => {
+    const codingPrompts = [
+      "用 coding 写一行 hello",
+      "用coding写一行hello",
+      "调用 coding 写一段脚本",
+      "use the coding tool to write a hello one-liner",
+      "写一行 hello",
+      "写一段代码打印 hello",
+      "帮我写个函数",
+      "用代码实现冒泡排序",
+      "write a python script that prints hello",
+      "write one line of code",
+    ];
+    for (const text of codingPrompts) {
+      const result = classifyInboundDepth(baseInput({ text }));
+      expect(result.depth, text).toBe("act");
+      expect(result.reasons, text).toContain("coding_or_code_write_intent");
+      expect(result.ceiling.maxToolMode, text).toBe("write");
+      expect(
+        shouldApplyChatLaneSkip({
+          routerEnabled: false,
+          depth: result.depth,
+          stewardClassified: true,
+        }),
+        text,
+      ).toBe(false);
+    }
+  });
+
+  it("keeps explanations and no-tools stall copy on chat", () => {
+    for (const text of [
+      "晚上好",
+      "解释什么是 coding",
+      "用一句话解释什么是知识库",
+      "把这句话改得更礼貌：赶紧处理",
+      "新任务：生成今日销售日报。先只输出短句「请稍等，正在收尾排版。」不要写正文，不要提问，不要用工具。",
+    ]) {
+      const result = classifyInboundDepth(baseInput({ text }));
+      expect(result.depth, text).toBe("chat");
+      expect(
+        shouldApplyChatLaneSkip({
+          routerEnabled: false,
+          depth: result.depth,
+          stewardClassified: true,
+        }),
+        text,
+      ).toBe(true);
+    }
+  });
+});
+
 describe("resolveInboundSessionKind", () => {
   it("maps employee steward, space, and other keys", () => {
     expect(

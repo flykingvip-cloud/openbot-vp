@@ -10942,6 +10942,22 @@ tasks:
     ownerHistory: []
     since: 2026-11-04
     metadata: {}
+  - id: ensure-package-update-when-ready-20261105
+    owner: cursor-grok
+    intent:
+      - ensure package update when ready UI
+    paths:
+      - .loom/registry.yaml
+      - ui/src/i18n/locales/en.ts
+      - ui/src/i18n/locales/zh-CN.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-governance-center-surface.ts
+      - ui/src/ui/views/knowledge-universe-space-connector-bind.ts
+      - ui/src/ui/views/knowledge-universe-space-connector-bind.node.test.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-11-05
+    metadata: {}
 landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
@@ -11031,6 +11047,21 @@ landingStreams:
       owner: codex-runtime-manager
       purpose: M1 equivalent system context assembly; explicit scoped migration from
         existing reply stream, no new execution path.
+  - id: ensure-package-update-when-ready-20261105
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - ui/src/i18n/locales/en.ts
+      - ui/src/i18n/locales/zh-CN.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-governance-center-surface.ts
+      - ui/src/ui/views/knowledge-universe-space-connector-bind.node.test.ts
+      - ui/src/ui/views/knowledge-universe-space-connector-bind.ts
+    canLandWith: []
+    metadata:
+      task: ensure-package-update-when-ready-20261105
+      owner: cursor-grok
+      purpose: Keep ensureConnectorPackage reachable from product wizard and
+        knowledge-universe when connector.ready is already true.
   - id: agent-runtime-pptx-renderer-deploy
     landingPolicy: serial
     paths:
@@ -11053,7 +11084,8 @@ landingStreams:
     metadata:
       task: FT-DEDUPE-THINKING-PROGRESS-UI
       owner: cursor-grok
-      purpose: Prefer thinking-progress over work-progress 正在思考 reading-indicator on the same empty-body live turn.
+      purpose: Prefer thinking-progress over work-progress 正在思考 reading-indicator on
+        the same empty-body live turn.
   - id: ft-plan-speak-reply-passthrough-20261102
     landingPolicy: serial
     paths:
@@ -11110,8 +11142,8 @@ landingStreams:
     metadata:
       task: ft-plan-speak-shopping-positive-admission
       owner: cursor-grok
-      purpose: Slice2 aside trust boundary (untrusted user-body, identity-only
-        dedupe, history module split); merge-then-bound retained; no merge/deploy.
+      purpose: Slice2 aside trust boundary (untrusted user-body, identity-only dedupe,
+        history module split); merge-then-bound retained; no merge/deploy.
   - id: identity-principal-sync-20261103
     landingPolicy: serial
     paths:

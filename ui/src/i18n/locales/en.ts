@@ -2535,6 +2535,7 @@ export const en: TranslationMap = {
             probeFailed: "Connection test failed.",
             probeBusy: "Testing…",
             installPackage: "Install connector package",
+            updatePackage: "Update connector package",
             testConnection: "Test connection",
             bindAction: "Bind connector to space",
             oauthCredentialLabel: "Credential name for OAuth",
