@@ -26,6 +26,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import ai.openbot.app.employeeauth.EmployeeShell
 import ai.openbot.app.employeeauth.EmployeeWelcomeScreen
 import ai.openbot.app.employeeauth.EmployeeTelemetry
+import ai.openbot.app.gateway.CloudAuthClient
 import ai.openbot.app.employeeshell.EmployeeNotificationRouter
 import ai.openbot.app.employeeshell.EmployeeShellHost
 import ai.openbot.app.employeeshell.EmployeeShellRouteRequest
@@ -146,15 +147,16 @@ class MainActivity : ComponentActivity() {
             EmployeeShellHost(
               controller = controller,
               modifier = Modifier.fillMaxSize(),
-              onLoggedIn = { showCompanionHome() },
+              onLoggedIn = { showCompanionHome(connectGateway = true) },
               onSignedOut = {
                 employeeLoggedIn = false
                 companionCoversShell = false
                 showCompanion = false
+                CloudAuthClient.clearSession()
               },
               onLeaveWorkbench =
                 if (employeeLoggedIn) {
-                  { showCompanionHome() }
+                  { showCompanionHome(connectGateway = false) }
                 } else {
                   null
                 },
@@ -174,6 +176,10 @@ class MainActivity : ComponentActivity() {
     // node runtime (connection, vault, voice) and is not gated on employee login.
     window.decorView.post {
       NodeForegroundService.start(this)
+      // Employee sessions skip OnboardingFlow; still auto-connect the cloud gateway.
+      if (employeeLoggedIn) {
+        ensureEmployeeGatewayConnected()
+      }
       // M-COLD: process start -> first frame drawn (R-Matrix, task 1.11).
       EmployeeTelemetry.current.onColdStart(SystemClock.elapsedRealtime() - Process.getStartElapsedRealtime())
     }
@@ -218,11 +224,25 @@ class MainActivity : ComponentActivity() {
   }
 
   /** Post-login home: four tabs, back does not uncover the shell. */
-  private fun showCompanionHome() {
+  private fun showCompanionHome(connectGateway: Boolean = true) {
     val plan = ColdStartRoot.afterLogin()
     employeeLoggedIn = true
     showCompanion = plan.destination == ColdStartRoot.Destination.Companion
     companionCoversShell = plan.companionCoversShell
+    if (connectGateway) {
+      ensureEmployeeGatewayConnected()
+    }
+  }
+
+  /**
+   * Employee login skips OnboardingFlow, so apply the cloud/manual endpoint and
+   * bridge platform-auth cookies into the gateway WS jar (trusted-proxy).
+   */
+  private fun ensureEmployeeGatewayConnected() {
+    val controller = EmployeeShell.controller(this)
+    val account = controller.activeAccount()
+    viewModel.bridgeEmployeeSessionCookies(controller.session)
+    viewModel.connectEmployeeCloudGateway(account?.gatewayBaseURL)
   }
 
   /** Native chat / device settings pushed over the logged-in workbench. */
