@@ -229,5 +229,17 @@
       "src/agent-runtime/execution/**"
     ],
     "description": "Settlement orchestration uses fixed effect ports; platform I/O and lifecycle ownership remain in the adapter."
+  },
+  {
+    "name": "runtime-candidate-host-no-direct-provider",
+    "from": "src/auto-reply/reply/agent-runner-execution.ts",
+    "denyImportsFrom": ["src/agents/cli-runner", "src/agents/pi-embedded"],
+    "description": "Outer admission/fallback owner delegates actual candidate backend dispatch to execution/runner."
+  },
+  {
+    "name": "runtime-candidate-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/runner/!(index).ts"],
+    "description": "Reply adapters use the admitted candidate public API; internal implementation is not directly imported."
   }
 ]
