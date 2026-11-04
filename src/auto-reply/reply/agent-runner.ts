@@ -1,18 +1,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { handleActiveTurn } from "../../agent-runtime/command/index.js";
-import {
-  buildReplyPayloads,
-  prepareVisibleDelivery,
-  completeReplyDelivery,
-  type ReplyDeliveryResult,
-} from "../../agent-runtime/delivery/index.js";
-import { runAdmittedTurn } from "../../agent-runtime/execution/index.js";
-import { sessionTaskState } from "../../agent-runtime/state/session-task.js";
-import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
-import { bindActiveTurnPorts } from "../../agent-runtime/wiring/command-adapters.js";
-import { resolveAgentDir } from "../../agents/agent-scope.js";
+import type { ReplyDeliveryResult } from "../../agent-runtime/delivery/index.js";
+import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
@@ -43,10 +33,7 @@ import { defaultRuntime } from "../../runtime.js";
 import { enforceVisibleReplyLanguage } from "../../shared/text/visible-reply-language.js";
 import { shapeAdmittedComplexTaskReply } from "../../task-orchestration/complex-task-loop.js";
 import { resolveTurnContractFromRunMeta } from "../../task-outcome/chat-entry.js";
-import {
-  TASK_OUTCOME_STORE_DIRNAME,
-  type GrowthOutcomeCommitOpts,
-} from "../../task-outcome/runtime-from-runner.js";
+import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../utils/directive-tags.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
 import {
@@ -237,7 +224,7 @@ export async function runReplyAgent(params: {
     }
   };
 
-  const disposition = handleActiveTurn(
+  const disposition = replyTurnRuntime.command.handle(
     {
       prompt: followupRun.prompt,
       sessionFile: followupRun.run.sessionFile,
@@ -248,11 +235,11 @@ export async function runReplyAgent(params: {
       shouldFollowup,
       queueMode: resolvedQueue.mode,
     },
-    bindActiveTurnPorts({
+    {
       prompt: followupRun.prompt,
       sessionId: followupRun.run.sessionId,
       queueKeys: [queueKey, followupRun.run.sessionId, followupRun.run.sessionKey],
-    }),
+    },
   );
   if (disposition.kind === "aside") {
     const asideRunId = opts?.runId ?? crypto.randomUUID();
@@ -338,10 +325,10 @@ export async function runReplyAgent(params: {
     Boolean(completionBinding) ||
     (!followupRun.run.collaborationRoundInvoked &&
       !followupRun.run.privateRunBag &&
-      Boolean(sessionTaskState.read(followupRun.run.sessionFile).current));
+      Boolean(replyTurnRuntime.state.read(followupRun.run.sessionFile).current));
   if (requiresTaskBinding) {
     try {
-      completionBinding = sessionTaskState.startExecution(
+      completionBinding = replyTurnRuntime.state.startExecution(
         followupRun.run.sessionFile,
         completionBinding,
         runId,
@@ -523,36 +510,33 @@ export async function runReplyAgent(params: {
     : undefined;
   try {
     const runStartedAt = Date.now();
-    const runOutcome = await runAdmittedTurn(
-      {
-        commandBody,
-        followupRun,
-        sessionCtx,
-        opts: {
-          ...opts,
-          runId,
-          ...(trackedOnToolResult ? { onToolResult: trackedOnToolResult } : {}),
-        },
-        typingSignals,
-        blockReplyPipeline,
-        blockStreamingEnabled,
-        blockReplyChunking,
-        resolvedBlockStreamingBreak,
-        applyReplyToMode,
-        shouldEmitToolResult,
-        shouldEmitToolOutput,
-        pendingToolTasks,
-        resetSessionAfterCompactionFailure,
-        resetSessionAfterRoleOrderingConflict,
-        isHeartbeat,
-        sessionKey,
-        getActiveSessionEntry: () => activeSessionEntry,
-        activeSessionStore,
-        storePath,
-        resolvedVerboseLevel,
+    const runOutcome = await replyTurnRuntime.execution.runAdmittedTurn({
+      commandBody,
+      followupRun,
+      sessionCtx,
+      opts: {
+        ...opts,
+        runId,
+        ...(trackedOnToolResult ? { onToolResult: trackedOnToolResult } : {}),
       },
-      bindAdmittedTurnHost(),
-    );
+      typingSignals,
+      blockReplyPipeline,
+      blockStreamingEnabled,
+      blockReplyChunking,
+      resolvedBlockStreamingBreak,
+      applyReplyToMode,
+      shouldEmitToolResult,
+      shouldEmitToolOutput,
+      pendingToolTasks,
+      resetSessionAfterCompactionFailure,
+      resetSessionAfterRoleOrderingConflict,
+      isHeartbeat,
+      sessionKey,
+      getActiveSessionEntry: () => activeSessionEntry,
+      activeSessionStore,
+      storePath,
+      resolvedVerboseLevel,
+    });
 
     if (runOutcome.kind === "final") {
       return finalizeWithFollowup(runOutcome.payload, queueKey, runFollowupTurn);
@@ -702,7 +686,7 @@ export async function runReplyAgent(params: {
     });
 
     const completeDelivery = (result: ReplyDeliveryResult) =>
-      completeReplyDelivery(result, {
+      replyTurnRuntime.delivery.completeReplyDelivery(result, {
         runId: outcomeRunId,
         language: opts?.expectedReplyLanguage ?? null,
         readContract: resolveTurnContractFromRun,
@@ -753,7 +737,7 @@ export async function runReplyAgent(params: {
       return finalizeEmptyDelivery();
     }
 
-    const payloadResult = await buildReplyPayloads({
+    const payloadResult = await replyTurnRuntime.delivery.buildReplyPayloads({
       payloads: payloadArray,
       isHeartbeat,
       didLogHeartbeatStrip,
@@ -885,9 +869,7 @@ export async function runReplyAgent(params: {
       return completeDelivery({ kind: "language_filtered", didUseTools });
     }
 
-    await prepareVisibleDelivery({
-      resolvePersistRoot: (agentId) =>
-        path.join(resolveAgentDir(followupRun.run.config, agentId), TASK_OUTCOME_STORE_DIRNAME),
+    await replyTurnRuntime.delivery.prepareVisibleDelivery(followupRun.run.config, {
       agentId: followupRun.run.agentId,
       runId: outcomeRunId,
       sessionKey,
