@@ -30,3 +30,7 @@ Dedicated branch starts at origin/main 2ea87d9d6fbafa6384710ca65931b83c86fdf871.
 Initial API exposes ordered system-material selection, append and finalization. Inputs are source-code-created text values, never executable loaders or configuration callbacks. Migration points: get-reply-run collaboration and normal initial arrays, later source append operations, and final system prompt join. Untrusted user-body formatting stays on the original path for the first checkpoint. Original source builder calls stay in their current order and execute once. No new de-duplication or whitespace normalization.
 
 An architecture manifest rule explicitly prohibits context assembly imports of gateway, agents, conversation-task, auto-reply, plugins and cron. Root AGENTS applies; the new directory has no overriding instructions.
+
+## Delivery quality and artifact lifecycle scope
+
+Delivery includes version-bound quality acceptance (output conventions, source evidence, file integrity, real rendering, visual rubric) and consistent artifact presentation, save/edit/archive receipts and governed reuse. Extend existing validator receipts and artifact/archive identities through adapters; do not introduce a second quality runner, task state machine or artifact store. See delivery-quality-lifecycle-plan.md for verified existing anchors, compatibility constraints and DQ0–DQ4 gates. This scope is planned, not claimed implemented.

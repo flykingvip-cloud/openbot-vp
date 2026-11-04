@@ -304,3 +304,14 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 ## Follow-up after terminal outlet extraction
 
 - [ ] Separate legitimate silence from confirmed delivery in original skip settlement; first establish TaskOutcome/acceptance consequences and failing-before/passing-after evidence. Preserve private/group/collaboration behavior and task lifecycle responsibility. — codex-runtime-manager
+
+## Delivery quality and lifecycle workstream
+
+- [x] Inventory existing output conventions, validators, artifact/hash/preview/edit/save/archive/source-trace foundations; independent read-only quality/lifecycle audits reviewed. Existing backend foundation 4 files / 33 PASS and UI Node foundation 2 files / 21 PASS; no browser E2E or actual rendering/source verification claimed. Specification in delivery-quality-lifecycle-plan.md. — codex-runtime-manager
+- [ ] DQ0: Map existing artifact identities/hash/state/validator required-items, establish versioned quality profiles and standard/rubric matrix; audit actual validator invocation/receipt production before adding gates. — codex-runtime-manager
+- [ ] DQ1: Prove one existing PPTX lifecycle end to end; add stale-edit/preview-save counterexamples and correct original version-aware write boundaries, including concurrency and permissions. Reuse original individual/collaboration adapters. — codex-runtime-manager
+- [ ] DQ2: Bind report claims to original source locations, timestamps, data scope and reproducible computations; integrate original validator/acceptance receipts, preserving unknown/conflicting evidence. — codex-runtime-manager
+- [ ] DQ3: Real-format rendering/readability checks plus independent aesthetic rubric; bind evidence to original artifact bytes/version, recheck after edits, return failures through original recovery. — codex-runtime-manager
+- [ ] DQ4: Cross-entry preview/download/save/edit/archive/reload consistency, separate archive/index/send receipts, partial failure/idempotency/stop tests, then governed reuse. — codex-runtime-manager
+
+This workstream extends the existing delivery migration; no new orchestration engine, configurable scripts or parallel artifact authority. Existing silence-receipt correction, builder normalization/retesting and deferred action timeline remain tracked. This checkpoint records audited design and queued implementation only; no production code change or deployment. — codex-runtime-manager
