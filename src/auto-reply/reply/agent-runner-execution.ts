@@ -1,5 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import type {
+  AgentRunLoopResult,
+  AgentTurnExecutionParams,
+} from "../../agent-runtime/execution/runner/index.js";
 import { createAdmittedCandidateInvoker } from "../../agent-runtime/execution/runner/index.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import {
@@ -26,11 +30,7 @@ import { userFacingPreReplyFailure } from "../../agents/sandbox/docker-engine-cl
 import { isSoftRecoverableEntitlementFailure } from "../../agents/sandbox/user-facing-entitlement-failure.js";
 import { noteSkillSmokeClock } from "../../agents/turn-completion/contract.js";
 import { normalizeUsage } from "../../agents/usage.js";
-import {
-  resolveSessionTranscriptPath,
-  type SessionEntry,
-  updateSessionStore,
-} from "../../config/sessions.js";
+import { resolveSessionTranscriptPath, updateSessionStore } from "../../config/sessions.js";
 import { isTaskExecutionBindingCurrent } from "../../conversation-task/session-task-board.js";
 import { syncRobotGrowthFromOperationalMetrics } from "../../gateway/agent-growth/operational-growth.js";
 import {
@@ -78,84 +78,28 @@ import {
 import { normalizeTaskOutcomeSubjectRef } from "../../task-outcome/subject-ref.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
-import type { TemplateContext } from "../templating.js";
-import type { VerboseLevel } from "../thinking.js";
 import {
   HEARTBEAT_TOKEN,
   isSilentReplyPrefixText,
   isSilentReplyText,
   SILENT_REPLY_TOKEN,
 } from "../tokens.js";
-import type { GetReplyOptions, ReplyPayload } from "../types.js";
+import type { ReplyPayload } from "../types.js";
 import {
   buildCommercialRunCreditUsageInput,
   type RuntimeFallbackAttempt,
 } from "./agent-run-credit-usage.js";
 import { resolveModelFallbackOptions } from "./agent-runner-utils.js";
-import { type BlockReplyPipeline } from "./block-reply-pipeline.js";
 import { recordHonestCapabilityGap } from "./honest-empty-reply.js";
 import { buildUserFacingModelCallFailure } from "./model-call-failure-copy.js";
-import type { FollowupRun } from "./queue.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
-import type { TypingSignaler } from "./typing-mode.js";
 
 export type { RuntimeFallbackAttempt } from "./agent-run-credit-usage.js";
 
-export type AgentRunLoopResult =
-  | {
-      kind: "success";
-      runId: string;
-      runResult: EmbeddedPiRunResult;
-      fallbackProvider?: string;
-      fallbackModel?: string;
-      fallbackAttempts: RuntimeFallbackAttempt[];
-      didLogHeartbeatStrip: boolean;
-      autoCompactionCompleted: boolean;
-      /** Payload keys sent directly (not via pipeline) during tool flush. */
-      directlySentBlockKeys?: Set<string>;
-      /** True when this turn already invoked tools. Empty Layer C may then emit a process sentence. */
-      didUseTools?: boolean;
-      /**
-       * Commit growth/operational outcome after delivery classification.
-       * Must be called exactly once on the success path (agent-runner).
-       * Pass explicit acceptance/delivery from a resolved contract to close success;
-       * bare success or processPlaceholder leaves the task incomplete.
-       */
-      commitGrowthOutcome: (
-        success: boolean,
-        opts?: GrowthOutcomeCommitOpts,
-      ) => void | Promise<void>;
-    }
-  | { kind: "final"; payload: ReplyPayload };
-
-export type AgentTurnExecutionParams = {
-  commandBody: string;
-  followupRun: FollowupRun;
-  sessionCtx: TemplateContext;
-  opts?: GetReplyOptions;
-  typingSignals: TypingSignaler;
-  blockReplyPipeline: BlockReplyPipeline | null;
-  blockStreamingEnabled: boolean;
-  blockReplyChunking?: {
-    minChars: number;
-    maxChars: number;
-    breakPreference: "paragraph" | "newline" | "sentence";
-    flushOnParagraph?: boolean;
-  };
-  resolvedBlockStreamingBreak: "text_end" | "message_end";
-  applyReplyToMode: (payload: ReplyPayload) => ReplyPayload;
-  shouldEmitToolResult: () => boolean;
-  shouldEmitToolOutput: () => boolean;
-  pendingToolTasks: Set<Promise<void>>;
-  resetSessionAfterCompactionFailure: (reason: string) => Promise<boolean>;
-  resetSessionAfterRoleOrderingConflict: (reason: string) => Promise<boolean>;
-  isHeartbeat: boolean;
-  sessionKey?: string;
-  getActiveSessionEntry: () => SessionEntry | undefined;
-  activeSessionStore?: Record<string, SessionEntry>;
-  storePath?: string;
-  resolvedVerboseLevel: VerboseLevel;
-};
+export type {
+  AgentRunLoopResult,
+  AgentTurnExecutionParams,
+} from "../../agent-runtime/execution/runner/index.js";
 
 export async function runAgentTurnWithFallback(
   params: AgentTurnExecutionParams,

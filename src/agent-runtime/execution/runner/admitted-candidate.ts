@@ -5,8 +5,6 @@ import { runCliAgent } from "../../../agents/cli-runner.js";
 import { getCliSessionId } from "../../../agents/cli-session.js";
 import { isCliProvider } from "../../../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../../../agents/pi-embedded.js";
-/** Legacy single admitted candidate adapter. Outer admission/fallback/finalization remain with the caller. */
-import type { AgentTurnExecutionParams } from "../../../auto-reply/reply/agent-runner-execution.js";
 import { buildEmbeddedRunContexts } from "../../../auto-reply/reply/agent-runner-utils.js";
 import { createBlockReplyDeliveryHandler } from "../../../auto-reply/reply/reply-delivery.js";
 import type { ReplyPayload } from "../../../auto-reply/types.js";
@@ -31,6 +29,8 @@ import {
   resolveMessageChannel,
 } from "../../../utils/message-channel.js";
 import { buildEmbeddedRunBaseParams } from "../preparation/index.js";
+/** Legacy single admitted candidate adapter. Outer admission/fallback/finalization remain with the caller. */
+import type { AgentTurnExecutionParams } from "./turn-contract.js";
 export type AdmittedCandidateHost = {
   assertOriginalTaskCurrent: () => void;
   assertTipBudgetAllowsModelCall: () => void;
