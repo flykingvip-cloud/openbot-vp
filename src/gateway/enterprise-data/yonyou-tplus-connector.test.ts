@@ -335,6 +335,49 @@ describe("yonyou tplus connector registration", () => {
     expect(url.searchParams.get("appName")).toBe("tpluscloud");
   });
 
+  it("refuses silent simulate when only APP_KEY is configured", () => {
+    vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY", "D2rRuEgL");
+    const started = startDataConnectorOAuthSession({
+      store: { version: 1, sessions: {} },
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      label: "京扇子 T+",
+      callbackOrigin: "https://www.openbot.love",
+      orgId: "90001198862",
+      nowIso,
+    });
+    expect(started.ok).toBe(false);
+    if (!started.ok) {
+      expect(started.code).toBe("CONNECTOR_OAUTH_CONFIG_INCOMPLETE");
+      expect(started.error).toContain("禁止静默走模拟");
+      expect(started.error).toContain("APP_SECRET");
+    }
+  });
+
+  it("uses the configured Chanjet redirect URI for live authorize readiness", () => {
+    vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY", "ak-test");
+    vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_SECRET", "as-test");
+    vi.stubEnv(
+      "OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_REDIRECT_URI",
+      "https://www.openbot.love/__openbot/enterprise-data/oauth/callback",
+    );
+    const started = startDataConnectorOAuthSession({
+      store: { version: 1, sessions: {} },
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      label: "京扇子 T+",
+      // Intentionally omit callbackOrigin — env redirect must still allow live mode.
+      orgId: "90001198862",
+      nowIso,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) {
+      return;
+    }
+    expect(started.simulateAllowed).toBe(false);
+    expect(started.session.mode).toBe("yonyou_tplus_authorization_code");
+  });
+
   it("registers the sale delivery list action and fills it in on a later ensure", () => {
     const store = normalizeEnterpriseDataStore({});
     ensureConnectorPackage({ store, tenantId, connectorId: "erp-yonyou-tplus", nowIso });

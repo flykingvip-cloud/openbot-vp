@@ -341,6 +341,16 @@ export type EnterpriseDataCapabilityGateway = {
       instanceUrl?: string;
       apiKey?: string;
       kind?: "api_key" | "oauth2";
+      openToken?: string;
+      permanentCode?: string;
+      orgPermanentAuthCode?: string;
+      orgId?: string;
+      appName?: string;
+      refreshToken?: string;
+      appKey?: string;
+      appSecret?: string;
+      sid?: string;
+      idMarketingOrgan?: string;
     } & HttpRestConnectorConfig,
   ): Promise<GatewayResult<DataConnectorCredentialRecord>>;
   listProjectionSpecs(tenantId: string): Promise<GatewayResult<ManagedProjectionSpecRecord[]>>;

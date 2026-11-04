@@ -196,6 +196,12 @@ type SourceEditorState = {
   orgId?: string;
   /** Chanjet appName. T+Cloud defaults to tpluscloud. */
   appName?: string;
+  /** Optional pasted openToken (when not using browser OAuth). */
+  openTokenPaste?: string;
+  /** User permanent auth code from Chanjet. */
+  permanentCode?: string;
+  /** Org permanent auth code from Chanjet. */
+  orgPermanentAuthCode?: string;
 };
 
 type PolicyEditorState = {
@@ -419,6 +425,11 @@ function buildConnectorSecretOptions(editor: SourceEditorState): {
   authQueryParam?: string;
   basicUsername?: string;
   probePath?: string;
+  openToken?: string;
+  permanentCode?: string;
+  orgPermanentAuthCode?: string;
+  orgId?: string;
+  appName?: string;
 } {
   const connectorId = editor.connectorId.trim();
   if (connectorId === "http-rest") {
@@ -432,6 +443,15 @@ function buildConnectorSecretOptions(editor: SourceEditorState): {
   }
   if (connectorId === "db-postgres" || connectorId === "db-mysql") {
     return { basicUsername: editor.basicUsername.trim() || undefined };
+  }
+  if (connectorId === "erp-yonyou-tplus") {
+    return {
+      openToken: editor.openTokenPaste?.trim() || undefined,
+      permanentCode: editor.permanentCode?.trim() || undefined,
+      orgPermanentAuthCode: editor.orgPermanentAuthCode?.trim() || undefined,
+      orgId: editor.orgId?.trim() || undefined,
+      appName: editor.appName?.trim() || undefined,
+    };
   }
   return {};
 }
@@ -1335,7 +1355,7 @@ function renderMemoryScopePanel(state: DataCapabilitySurfaceState): TemplateResu
 
 function oauthConnectorHint(connectorId: string): string {
   if (connectorId === "erp-yonyou-tplus") {
-    return "通过畅捷通开放平台授权用友 T+。填写云企业 ID；未配置 appKey 时使用模拟模式。T+Cloud 的应用名为 tpluscloud。";
+    return "通过畅捷通开放平台授权用友 T+。填写云企业 ID 后走 OAuth；也可粘贴 openToken／永久授权码。有 appKey 时禁止静默模拟。T+Cloud 应用名默认 tpluscloud。";
   }
   if (connectorId === "crm-salesforce") {
     return "通过 Salesforce OAuth 完成授权；未配置 Client ID 时将使用模拟模式。";
@@ -1353,6 +1373,7 @@ function renderSourceEditorModal(
   onTestConnection: () => void,
   onInstallConnectorPackage: () => void,
   onStartOAuth: () => void,
+  onSaveYonyouMaterials: () => void,
   onRegisterWebsiteBinding: () => void,
 ): TemplateResult {
   if (!state.open) {
@@ -1455,6 +1476,9 @@ function renderSourceEditorModal(
                     saveNewCredential: false,
                     orgId: "",
                     appName: "",
+                    openTokenPaste: "",
+                    permanentCode: "",
+                    orgPermanentAuthCode: "",
                     oauthNotice: null,
                     probeMessage: null,
                     probeOk: null,
@@ -1795,6 +1819,44 @@ function renderSourceEditorModal(
                                           })}
                                       />
                                     </label>
+                                    <label class="field">
+                                      <span>openToken（可选粘贴）</span>
+                                      <input
+                                        .value=${state.openTokenPaste ?? ""}
+                                        placeholder="已有 openToken 时可直接粘贴"
+                                        ?disabled=${state.busy || state.oauthBusy}
+                                        @input=${(event: Event) =>
+                                          onUpdate({
+                                            openTokenPaste: (event.target as HTMLInputElement)
+                                              .value,
+                                          })}
+                                      />
+                                    </label>
+                                    <label class="field">
+                                      <span>用户永久授权码</span>
+                                      <input
+                                        .value=${state.permanentCode ?? ""}
+                                        placeholder="user_auth_permanent_code"
+                                        ?disabled=${state.busy || state.oauthBusy}
+                                        @input=${(event: Event) =>
+                                          onUpdate({
+                                            permanentCode: (event.target as HTMLInputElement).value,
+                                          })}
+                                      />
+                                    </label>
+                                    <label class="field">
+                                      <span>企业永久授权码</span>
+                                      <input
+                                        .value=${state.orgPermanentAuthCode ?? ""}
+                                        placeholder="org_permanent_auth_code"
+                                        ?disabled=${state.busy || state.oauthBusy}
+                                        @input=${(event: Event) =>
+                                          onUpdate({
+                                            orgPermanentAuthCode: (event.target as HTMLInputElement)
+                                              .value,
+                                          })}
+                                      />
+                                    </label>
                                   `
                                 : html``
                             }
@@ -1809,6 +1871,29 @@ function renderSourceEditorModal(
                               >
                                 ${state.oauthBusy ? "授权中…" : "OAuth 授权"}
                               </button>
+                              ${
+                                selectedConnector?.connectorId === "erp-yonyou-tplus"
+                                  ? html`
+                                      <button
+                                        class="btn btn--sm"
+                                        type="button"
+                                        ?disabled=${
+                                          state.busy ||
+                                          state.oauthBusy ||
+                                          !state.credentialLabel.trim() ||
+                                          !(
+                                            (state.openTokenPaste ?? "").trim() ||
+                                            (state.permanentCode ?? "").trim() ||
+                                            (state.orgPermanentAuthCode ?? "").trim()
+                                          )
+                                        }
+                                        @click=${onSaveYonyouMaterials}
+                                      >
+                                        保存永久授权码 / Token
+                                      </button>
+                                    `
+                                  : html``
+                              }
                               <small>
                                 ${oauthConnectorHint(selectedConnector?.connectorId ?? "")}
                               </small>
@@ -3511,6 +3596,11 @@ export function renderEnterpriseDataGovernanceCenterSurface(
       probeBusy: false,
       probeMessage: null,
       probeOk: null,
+      orgId: "",
+      appName: "",
+      openTokenPaste: "",
+      permanentCode: "",
+      orgPermanentAuthCode: "",
     };
     refreshEnterpriseSurface();
   };
@@ -3550,6 +3640,11 @@ export function renderEnterpriseDataGovernanceCenterSurface(
       probeBusy: false,
       probeMessage: null,
       probeOk: null,
+      orgId: "",
+      appName: "",
+      openTokenPaste: "",
+      permanentCode: "",
+      orgPermanentAuthCode: "",
     };
     refreshEnterpriseSurface();
   };
@@ -3591,6 +3686,11 @@ export function renderEnterpriseDataGovernanceCenterSurface(
       probeBusy: false,
       probeMessage: null,
       probeOk: null,
+      orgId: "",
+      appName: "",
+      openTokenPaste: "",
+      permanentCode: "",
+      orgPermanentAuthCode: "",
     };
     loadWebsiteCandidatesForEditor(source.connectorId);
     refreshEnterpriseSurface();
@@ -3743,6 +3843,61 @@ export function renderEnterpriseDataGovernanceCenterSurface(
     }
     editor.oauthBusy = false;
     editor.error = "当前连接器暂不支持 OAuth 授权。";
+    refreshEnterpriseSurface();
+  };
+
+  const saveYonyouCredentialMaterials = async () => {
+    if (!gateway || !tenantId) {
+      return;
+    }
+    const editor = state.sourceEditor;
+    const label = editor.credentialLabel.trim();
+    if (editor.connectorId.trim() !== "erp-yonyou-tplus") {
+      return;
+    }
+    if (!label) {
+      editor.error = "请先填写凭证名称。";
+      refreshEnterpriseSurface();
+      return;
+    }
+    const openToken = editor.openTokenPaste?.trim() || "";
+    const permanentCode = editor.permanentCode?.trim() || "";
+    const orgPermanentAuthCode = editor.orgPermanentAuthCode?.trim() || "";
+    if (!openToken && !permanentCode && !orgPermanentAuthCode) {
+      editor.error = "请粘贴 openToken，或至少填写用户／企业永久授权码。";
+      refreshEnterpriseSurface();
+      return;
+    }
+    editor.oauthBusy = true;
+    editor.error = null;
+    editor.oauthNotice = null;
+    refreshEnterpriseSurface();
+    const result = await gateway.upsertConnectorCredential(tenantId, {
+      credentialId: editor.credentialId.trim() || undefined,
+      connectorId: "erp-yonyou-tplus",
+      label,
+      kind: "oauth2",
+      instanceUrl: editor.instanceUrl.trim() || undefined,
+      apiKey: openToken || undefined,
+      openToken: openToken || undefined,
+      permanentCode: permanentCode || undefined,
+      orgPermanentAuthCode: orgPermanentAuthCode || undefined,
+      orgId: editor.orgId?.trim() || undefined,
+      appName: editor.appName?.trim() || undefined,
+    });
+    editor.oauthBusy = false;
+    if (!result.ok) {
+      editor.error = result.error;
+      refreshEnterpriseSurface();
+      return;
+    }
+    state.connectorCredentialsConnectorId = null;
+    await loadConnectorCredentialsForEditor(state, gateway, tenantId, "erp-yonyou-tplus");
+    editor.credentialId = result.data.credentialId;
+    editor.saveNewCredential = false;
+    editor.oauthNotice = openToken
+      ? "已写入 openToken／永久授权码，可进行连通性测试。"
+      : "已写入永久授权码。若尚无 openToken，探测时将尝试用永久授权码换取（需网关已配置 appKey／appSecret 且具备 appTicket）。";
     refreshEnterpriseSurface();
   };
 
@@ -5210,6 +5365,7 @@ export function renderEnterpriseDataGovernanceCenterSurface(
         testSourceConnection,
         installConnectorPackage,
         startConnectorOAuth,
+        saveYonyouCredentialMaterials,
         () => {
           void registerOwnedWebsiteBinding();
         },
