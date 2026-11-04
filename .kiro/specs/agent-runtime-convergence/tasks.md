@@ -362,3 +362,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - Main reply now consumes a typed command disposition for control, status, aside, steer, amendment and queue routing. Original classifier calls, fresh board reads and mutation order are preserved; async aside execution, enqueue and typing remain in the original host. — codex-runtime-manager
 - Session task state exposes existing reads, atomic control/constraint updates and execution binding without duplicating the board schema, storage or locks. Gateway protocol/focus and collaboration task stores retain their own adapters. — codex-runtime-manager
 - Targeted 50 PASS, configured reply e2e 47 PASS, independent review PASS, architecture 40 rules PASS. Build passed with 209 existing dynamic import warnings; typecheck retains 44 existing diagnostics and full check stops on 66 existing format failures. Composition-root convergence and broader task lifecycle work remain open. — codex-runtime-manager
+
+## F4 main reply composition checkpoint
+
+- Main reply consumes a fixed composition for command, session task state, admitted execution and delivery. Visible receipt storage resolution moved to wiring and remains lazy. The composition binds existing effects; it does not route, retry, or finish a turn. Transport, presentation sequencing and cleanup stay in the reply host. — codex-runtime-manager
+- Targeted 31 PASS, reply e2e 47 PASS, architecture 41 rules PASS, changed-file lint clean, build PASS with 209 existing dynamic import warnings. Typecheck unchanged at 44 diagnostics; full check stops at 66 existing formatting failures. Broader entrypoint convergence and task acceptance versus delivery receipt semantics remain open. — codex-runtime-manager
