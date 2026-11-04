@@ -10846,6 +10846,7 @@ tasks:
       - src/task-orchestration/complex-task-loop.ts
       - src/task-orchestration/complex-task-loop.test.ts
       - src/agent-runtime/wiring/**
+      - src/agent-runtime/state/**
       - src/agents/execution-stall-continue-loop.test.ts
       - src/agents/pi-embedded-runner/run/attempt.test.ts
       - src/auto-reply/reply/agent-runner-payloads.test.ts
@@ -10960,6 +10961,7 @@ landingStreams:
       - src/task-orchestration/complex-task-loop.ts
       - src/task-orchestration/complex-task-loop.test.ts
       - src/agent-runtime/wiring/**
+      - src/agent-runtime/state/**
       - src/agents/execution-stall-continue-loop.test.ts
       - src/agents/pi-embedded-runner/run/attempt.test.ts
       - src/auto-reply/reply/agent-runner-payloads.test.ts
