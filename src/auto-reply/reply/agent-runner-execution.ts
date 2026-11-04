@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { createRunAdmissionLease } from "../../agent-runtime/execution/lifecycle/index.js";
+import { createTurnOutcomeRecorder } from "../../agent-runtime/execution/outcomes/index.js";
 import type {
   AgentRunLoopResult,
   AgentTurnExecutionParams,
@@ -33,13 +34,11 @@ import { noteSkillSmokeClock } from "../../agents/turn-completion/contract.js";
 import { normalizeUsage } from "../../agents/usage.js";
 import { resolveSessionTranscriptPath, updateSessionStore } from "../../config/sessions.js";
 import { isTaskExecutionBindingCurrent } from "../../conversation-task/session-task-board.js";
-import { syncRobotGrowthFromOperationalMetrics } from "../../gateway/agent-growth/operational-growth.js";
 import {
   releaseEnterpriseAgentRun,
   tryAcquireEnterpriseAgentRun,
 } from "../../gateway/billing/agent-run-governance.js";
 import { recordCreditUsage } from "../../gateway/billing/record-credit-usage.js";
-import { reportEvolutionOutcomeWriteFailure } from "../../gateway/evolution-control/evolution-loop-log.js";
 import {
   buildRunModelSetSnapshot,
   forgetRunModelSet,
@@ -67,14 +66,10 @@ import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { registerRunReplyLanguage } from "../../shared/text/run-reply-language.js";
 import { ensureChatTurnTaskOutcome } from "../../task-outcome/chat-entry.js";
-import type { ModalityExecutionArtifact } from "../../task-outcome/modality-artifact-evidence.js";
 import {
   assessRunnerTurnBudgetGate,
   chargeModelCallAgainstTip,
-  recordRunnerTurnOutcome,
   TaskBudgetExceededError,
-  type GrowthOutcomeCommitOpts,
-  type RunnerTurnFailureReason,
 } from "../../task-outcome/runtime-from-runner.js";
 import { normalizeTaskOutcomeSubjectRef } from "../../task-outcome/subject-ref.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
@@ -153,9 +148,6 @@ export async function runAgentTurnWithFallback(
   // askOutcome P0：turn 收尾走统一 TaskOutcome（fire-and-forget，绝不影响回复）。
   // 心跳不算任务；run 成功不再直接记任务成功 / evolution success（挂起验收）。
   // 工具成功率仍在 turn 内内存累加、收尾一次落盘。
-  let growthToolTotal = 0;
-  let growthToolSucceeded = 0;
-  const modalityArtifacts: ModalityExecutionArtifact[] = [];
   const growthStartedAt = Date.now();
   /** Tip budget wall-clock start = task entry time (not first closeout spend). */
   const tipBudgetStartedAtMs = growthStartedAt;
@@ -196,134 +188,22 @@ export async function runAgentTurnWithFallback(
   };
   let modelGate: EmployeeModelGateResult | undefined;
   let capabilityOutcomeForTurn: CapabilityOutcomeForTurn | undefined;
-  const recordGrowthToolResult = (isError: boolean): void => {
-    growthToolTotal += 1;
-    if (!isError) {
-      growthToolSucceeded += 1;
-    }
-  };
-  const classifyFailureReason = (opts?: {
-    aborted?: boolean;
-    authzDenied?: boolean;
-    languageFiltered?: boolean;
-    providerFault?: boolean;
-    timeout?: boolean;
-    prepareFailed?: boolean;
-    message?: string;
-    explicit?: RunnerTurnFailureReason;
-  }): RunnerTurnFailureReason => {
-    if (opts?.explicit) {
-      return opts.explicit;
-    }
-    if (opts?.aborted || params.opts?.abortSignal?.aborted) {
-      return "user_cancelled";
-    }
-    if (opts?.authzDenied) {
-      return "authz_denied";
-    }
-    if (opts?.languageFiltered) {
-      return "user_filtered";
-    }
-    if (opts?.prepareFailed) {
-      return "prepare_failed";
-    }
-    if (opts?.timeout || /timeout|ETIMEDOUT|timed out/i.test(opts?.message ?? "")) {
-      return "timeout";
-    }
-    if (opts?.providerFault) {
-      return "provider_fault";
-    }
-    return "run_failed";
-  };
-
-  const recordGrowthTaskOutcome = (
-    success: boolean,
-    opts?: GrowthOutcomeCommitOpts & {
-      aborted?: boolean;
-      authzDenied?: boolean;
-      languageFiltered?: boolean;
-      providerFault?: boolean;
-      timeout?: boolean;
-      prepareFailed?: boolean;
-      errorMessage?: string;
-    },
-  ): void | Promise<void> => {
-    if (params.isHeartbeat) {
-      return;
-    }
-    const growthAgentId = params.followupRun.run.agentId;
-    if (!growthAgentId) {
-      return;
-    }
-    const toolsTotal = growthToolTotal;
-    const toolsSucceeded = growthToolSucceeded;
-    const artifactsForTurn = [...modalityArtifacts];
-    growthToolTotal = 0;
-    growthToolSucceeded = 0;
-    modalityArtifacts.length = 0;
-    const tenantId = modelGate?.tenantId?.trim();
-    // askOutcome R83: requires entry taskId; never invent run:${runId} at finish.
-    if (!chatOutcomeTaskId || !chatOutcomeScope) {
-      reportEvolutionOutcomeWriteFailure({
-        runId,
-        agentId: growthAgentId,
-        tenantId: tenantId ?? null,
-        taskId: null,
-        reason: "chat_entry_task_missing",
-      });
-      return;
-    }
-    const failureReason = !success
-      ? classifyFailureReason({
-          explicit: opts?.failureReason,
-          aborted: opts?.aborted,
-          authzDenied: opts?.authzDenied,
-          languageFiltered: opts?.languageFiltered,
-          providerFault: opts?.providerFault,
-          timeout: opts?.timeout,
-          prepareFailed: opts?.prepareFailed,
-          message: opts?.errorMessage ?? opts?.failureDetail,
-        })
-      : undefined;
-    return recordRunnerTurnOutcome(params.followupRun.run.config, growthAgentId, {
-      success,
-      toolsTotal,
-      toolsSucceeded,
-      runId,
+  const outcomeRecorder = createTurnOutcomeRecorder({
+    config: params.followupRun.run.config,
+    agentId: params.followupRun.run.agentId,
+    isHeartbeat: params.isHeartbeat,
+    runId,
+    startedAtMs: growthStartedAt,
+    abortSignal: params.opts?.abortSignal,
+    readContext: () => ({
       taskId: chatOutcomeTaskId,
       scope: chatOutcomeScope,
-      latencyMs: Math.max(0, Date.now() - growthStartedAt),
-      ...(tenantId ? { tenantId } : {}),
-      ...(capabilityOutcomeForTurn ? { capabilityOutcome: capabilityOutcomeForTurn } : {}),
-      ...(artifactsForTurn.length > 0 ? { modalityArtifacts: artifactsForTurn } : {}),
-      ...(failureReason ? { failureReason } : {}),
-      ...(opts?.failureDetail ? { failureDetail: opts.failureDetail } : {}),
-      ...(opts?.acceptance ? { acceptance: opts.acceptance } : {}),
-      ...(opts?.delivery ? { delivery: opts.delivery } : {}),
-      ...(opts?.deliveryId ? { deliveryId: opts.deliveryId } : {}),
-      ...(opts?.acceptanceEvidence ? { acceptanceEvidence: opts.acceptanceEvidence } : {}),
-      ...(opts?.processPlaceholder ? { processPlaceholder: true } : {}),
-      ...(opts?.allowRetry !== undefined ? { allowRetry: opts.allowRetry } : {}),
-      ...(opts?.adoptedAssetIds && opts.adoptedAssetIds.length > 0
-        ? { adoptedAssetIds: opts.adoptedAssetIds }
-        : {}),
-      ...(tipBudgetChargedThisTurn || opts?.skipBudgetCharge ? { skipBudgetCharge: true } : {}),
-    })
-      .then(async () => {
-        await syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId);
-      })
-      .catch((error: unknown) => {
-        // Evolution / TaskOutcome write must stay observable. The user-facing
-        // reply path is already decided and is not rewritten here.
-        reportEvolutionOutcomeWriteFailure({
-          runId,
-          agentId: growthAgentId,
-          tenantId: tenantId ?? null,
-          taskId: chatOutcomeTaskId ?? null,
-          reason: error instanceof Error ? error.message : "evolution_outcome_write_failed",
-        });
-      });
-  };
+      tenantId: modelGate?.tenantId,
+      capabilityOutcome: capabilityOutcomeForTurn,
+      budgetCharged: tipBudgetChargedThisTurn,
+    }),
+  });
+  const recordGrowthTaskOutcome = outcomeRecorder.commit;
   const normalizeReplyMediaPaths = createReplyMediaPathNormalizer({
     cfg: params.followupRun.run.config,
     sessionKey: params.sessionKey,
@@ -588,13 +468,13 @@ export async function runAgentTurnWithFallback(
           handlePartialForTyping,
           normalizeStreamingText,
           normalizeReplyMediaPaths,
-          recordGrowthToolResult,
+          recordGrowthToolResult: outcomeRecorder.recordToolResult,
           recordCommercialToolStart: (name) => {
             commercialToolCallCount += 1;
             commercialToolClasses.push(name);
           },
           recordModalityArtifact: (artifact) => {
-            modalityArtifacts.push(artifact);
+            outcomeRecorder.recordArtifact(artifact);
           },
           markAutoCompactionCompleted: () => {
             autoCompactionCompleted = true;
@@ -980,7 +860,7 @@ export async function runAgentTurnWithFallback(
       };
     }
 
-    const didUseTools = commercialToolCallCount > 0 || growthToolTotal > 0;
+    const didUseTools = commercialToolCallCount > 0 || outcomeRecorder.hasToolResults();
     // Defer success/failure until agent-runner classifies delivery (honest-empty /
     // abort / reaction). Same decideHonestEmptyReply drives both fallback and outcome.
     return {
