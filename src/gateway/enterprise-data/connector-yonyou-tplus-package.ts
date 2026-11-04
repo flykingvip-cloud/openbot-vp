@@ -3,6 +3,7 @@ import { listConnectorActions, upsertConnectorAction } from "./connector-action-
 import { MATERIALIZER_SEAT_ID } from "./enterprise-data-seat-context.js";
 import { registerRuntimeHandler } from "./runtime-registry.js";
 import { findScopePolicy, upsertScopePolicy } from "./scope-policy-store.js";
+import { upsertFieldClassification } from "./field-classification-store.js";
 import { findSeatActionGrant, upsertSeatActionGrant } from "./seat-action-grant-store.js";
 import type { EnterpriseDataStore, ScopePolicy } from "./types.js";
 
@@ -160,6 +161,41 @@ function ensureMaterializerSeatGrants(params: {
   }
 }
 
+
+const YONYOU_ROW_PUBLIC_FIELDS = ["Code", "Name", "ID"] as const;
+const YONYOU_CLASSIFIED_ACTIONS = [
+  "erp.warehouse.query",
+  "erp.inventory.query_page",
+] as const;
+
+/**
+ * Mark list-row identity fields PUBLIC so fail_closed_redact does not turn
+ * simulated/live `{ records: [{ Code, Name }] }` into Aggregate Feed count:0.
+ * Paths use `records[*].…` wildcards (see resolveClassificationForPath).
+ */
+function ensureYonyouTplusFieldClassifications(params: {
+  store: EnterpriseDataStore;
+  tenantId: string;
+  nowIso: string;
+}): void {
+  for (const actionKey of YONYOU_CLASSIFIED_ACTIONS) {
+    for (const field of YONYOU_ROW_PUBLIC_FIELDS) {
+      upsertFieldClassification({
+        store: params.store,
+        tenantId: params.tenantId,
+        nowIso: params.nowIso,
+        classification: {
+          connectorId: YONYOU_TPLUS_CONNECTOR_ID,
+          actionKey,
+          version: "v1",
+          fieldPath: `records[*].${field}`,
+          classification: "PUBLIC",
+        },
+      });
+    }
+  }
+}
+
 export function seedYonyouTplusConnectorPackage(params: {
   store: EnterpriseDataStore;
   tenantId: string;
@@ -167,6 +203,7 @@ export function seedYonyouTplusConnectorPackage(params: {
 }): void {
   installYonyouTplusActions({ ...params, actions: ACTIONS });
   ensureMaterializerSeatGrants(params);
+  ensureYonyouTplusFieldClassifications(params);
 }
 
 export function ensureYonyouTplusConnectorPackage(params: {
@@ -188,6 +225,7 @@ export function ensureYonyouTplusConnectorPackage(params: {
   // installed the package before this seed can repair 立即物化 by re-running
   // ensure-package. upsert is skipped when an active grant already exists.
   ensureMaterializerSeatGrants(params);
+  ensureYonyouTplusFieldClassifications(params);
   return {
     installed: missing.length > 0,
     actionCount: existing.length + missing.length,

@@ -21,13 +21,33 @@ function collectFieldPaths(value: unknown, prefix = ""): string[] {
   const paths: string[] = [];
   for (const [key, child] of Object.entries(record)) {
     const path = prefix ? `${prefix}.${key}` : key;
-    if (child != null && typeof child === "object" && !Array.isArray(child)) {
+    // Recurse into arrays and plain objects. Treating array props (e.g. yonyou
+    // `records`) as opaque leaves made fail_closed_redact replace the whole
+    // array with "***", so AggregateTemplate wrote Feed count:0 while sync
+    // (no masking) still saw rows.
+    if (child != null && typeof child === "object") {
       paths.push(...collectFieldPaths(child, path));
     } else if (child != null) {
       paths.push(path);
     }
   }
   return paths;
+}
+
+/** Exact path, then `records[0].Code` → `records[*].Code` for seeded wildcards. */
+function resolveClassificationForPath(
+  classificationByPath: Map<string, FieldClassification>,
+  fieldPath: string,
+): FieldClassification | undefined {
+  const exact = classificationByPath.get(fieldPath);
+  if (exact) {
+    return exact;
+  }
+  const starred = fieldPath.replace(/\[\d+\]/g, "[*]");
+  if (starred !== fieldPath) {
+    return classificationByPath.get(starred);
+  }
+  return undefined;
 }
 
 function getValueAtPath(value: unknown, fieldPath: string): unknown {
@@ -151,12 +171,17 @@ export function applyClassificationMasking(params: {
   const appliedClassifications = new Set<DataClassification>();
 
   for (const fieldPath of collectFieldPaths(params.payload)) {
-    const classification = classificationByPath.get(fieldPath);
+    const classification = resolveClassificationForPath(classificationByPath, fieldPath);
     if (!classification) {
       if (!runtimeConfig.strictMode) {
         continue;
       }
       unknownFields.push(fieldPath);
+      const rawUnknown = getValueAtPath(data, fieldPath);
+      // Never collapse structured values to a string redact token — only scalars.
+      if (rawUnknown != null && typeof rawUnknown === "object") {
+        continue;
+      }
       if (runtimeConfig.unknownFieldPolicy === "fail_closed_block") {
         data = deleteValueAtPath(data, fieldPath);
         blockedFields.push(fieldPath);
