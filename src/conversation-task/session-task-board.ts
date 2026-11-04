@@ -1060,7 +1060,10 @@ export function isTaskExecutionBindingCurrent(
   sessionFile: string,
   binding: TaskCompletionBinding,
 ): boolean {
-  const board = readSessionTaskBoard(sessionFile);
+  return isLiveTaskBinding(readSessionTaskBoard(sessionFile), binding);
+}
+
+function isLiveTaskBinding(board: SessionTaskBoard, binding: TaskCompletionBinding): boolean {
   const current = board.current;
   return Boolean(
     current?.unfinished &&
@@ -1092,18 +1095,17 @@ export function recordCheckedTaskCompletion(params: {
   // busy-loops). Surface persisted:false so the peer can retry.
   let finished: { board: SessionTaskBoard; notice?: string; rejected?: boolean };
   try {
-    finished = mutateSessionTaskBoard(file, (board) => {
+    finished = withSessionTaskBoardLock(file, () => {
+      const board = readSessionTaskBoardUnlocked(file);
       const binding = params.binding!;
-      if (
-        !board.current ||
-        board.current.taskId !== binding.taskId ||
-        board.current.executionAttempt !== binding.executionAttempt ||
-        board.current.deliverableVersion !== binding.deliverableVersion
-      ) {
-        return { board, value: { board, rejected: true } };
+      if (!isLiveTaskBinding(board, binding)) {
+        return { board, rejected: true };
       }
       const result = finishCurrentTask({ board, deliverableChecked: true, ...binding });
-      return { board: result.board, value: result };
+      if (!result.rejected) {
+        writeSessionTaskBoardUnlocked(file, result.board);
+      }
+      return result;
     });
   } catch (err) {
     const name = err instanceof Error ? err.name : "";

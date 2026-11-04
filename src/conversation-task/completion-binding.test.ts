@@ -87,3 +87,39 @@ it("does not bind an old queued request to a same-goal replacement task", async 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it.each(["paused", "already completed", "new attempt", "new deliverable version"] as const)(
+  "rejects a completion callback when the task is %s",
+  (change) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "completion-stale-"));
+    try {
+      const sessionFile = path.join(dir, "session.jsonl");
+      fs.writeFileSync(sessionFile, "");
+      const binding = { taskId: "a", executionAttempt: "run-1", deliverableVersion: "draft-1" };
+      const current = {
+        ...binding,
+        title: "A",
+        goalText: "A",
+        unfinished: change !== "already completed",
+        wakeSuppress: change === "paused",
+        stop: { summary: "checkpoint", workspacePaths: [] },
+        createdAtMs: 1,
+        executionAttempt: change === "new attempt" ? "run-2" : binding.executionAttempt,
+        deliverableVersion:
+          change === "new deliverable version" ? "draft-2" : binding.deliverableVersion,
+      };
+      mutateSessionTaskBoard(sessionFile, () => ({
+        board: { ...emptySessionTaskBoard(), current },
+        value: undefined,
+      }));
+      const before = readSessionTaskBoard(sessionFile);
+      expect(recordCheckedTaskCompletion({ sessionFile, closed: true, binding })).toEqual({
+        persisted: false,
+      });
+      expect(readSessionTaskBoard(sessionFile)).toEqual(before);
+      expect(fs.readFileSync(sessionFile, "utf8")).toBe("");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
