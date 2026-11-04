@@ -267,5 +267,24 @@
     "from": "src/auto-reply/**",
     "denyImportsFrom": ["src/agent-runtime/execution/lifecycle/!(index).ts"],
     "description": "Execution host consumes the lifecycle public entry rather than lease internals."
+  },
+  {
+    "name": "runtime-outcomes-no-execution-control",
+    "from": "src/agent-runtime/execution/outcomes/**",
+    "denyImportsFrom": [
+      "src/agents/**",
+      "src/conversation-task/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/command/**",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "Outcome aggregation records original evidence only; it cannot invoke providers, mutate session tasks or restart work."
+  },
+  {
+    "name": "runtime-outcomes-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/outcomes/!(index).ts"],
+    "description": "The original turn host uses the outcome public entry, not aggregate internals."
   }
 ]
