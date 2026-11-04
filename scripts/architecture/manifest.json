@@ -313,5 +313,23 @@
       "src/gateway/evolution-control/**"
     ],
     "description": "Terminal delivery owns settlement and projection; original queue, continuation and gap I/O are fixed host ports, never a reverse import into legacy control."
+  },
+  {
+    "name": "runtime-validation-delivery-public-entry",
+    "from": "src/agents/execution-preflight/delivery.ts",
+    "denyImportsFrom": [
+      "src/agents/execution-preflight/validation",
+      "src/agent-runtime/delivery/acceptance/!(index).ts"
+    ],
+    "description": "Production validation and delivery matching use the delivery acceptance public entry; the legacy validation module is compatibility only."
+  },
+  {
+    "name": "runtime-validation-production-validators-public-entry",
+    "from": "src/agents/execution-preflight/production-validators.ts",
+    "denyImportsFrom": [
+      "src/agents/execution-preflight/validation",
+      "src/agent-runtime/delivery/acceptance/!(index).ts"
+    ],
+    "description": "Production validation and delivery matching use the delivery acceptance public entry; the legacy validation module is compatibility only."
   }
 ]
