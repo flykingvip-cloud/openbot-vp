@@ -108,12 +108,12 @@ describe("gateway capability admission", () => {
     });
     const { task: created } = await service.createVerificationTask({
       modelRef: "openai/media",
-      capabilityIds: ["image_generation", "music_generation"],
+      capabilityIds: ["image_generation", "music_generation", "coding"],
       connectionOk: true,
     });
     const task = await waitTerminal(service, created.taskId);
     expect(task.status).toBe("partial");
-    for (const id of ["image_generation", "music_generation"] as const) {
+    for (const id of ["image_generation", "music_generation", "coding"] as const) {
       const item = task.results?.find((r) => r.id === id);
       expect(item?.status).toBe("checker_unavailable");
     }
@@ -121,7 +121,8 @@ describe("gateway capability admission", () => {
     expect(
       admission.capabilityEvidence.some(
         (e) =>
-          (e.id === "image_generation" || e.id === "music_generation") && e.status === "passed",
+          (e.id === "image_generation" || e.id === "music_generation" || e.id === "coding") &&
+          e.status === "passed",
       ),
     ).toBe(false);
   });

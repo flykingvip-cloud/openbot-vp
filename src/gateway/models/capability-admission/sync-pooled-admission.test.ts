@@ -94,6 +94,34 @@ describe("pooled healthy platform admission sync", () => {
     expect(stored[MODEL_REF]?.tenantSelectable).toBe(false);
   });
 
+  it("lets a coding prompt call an allowlisted probe-ok model without coding evidence", async () => {
+    const { storePath, probeStorePath } = await tempPair("openbot-pool-coding-");
+    await writeProbe(probeStorePath, MODEL_REF, "ok");
+    const run = vi.fn(async () => "refactored");
+    const result = await runWithModelFallback({
+      cfg: {},
+      provider: "api-proxy-deepseek",
+      model: "deepseek-v4-flash",
+      fallbacksOverride: [],
+      runtimeAdmission: {
+        storePath,
+        probeStorePath,
+        cfg: pooledConfig(),
+        platformModelIds: [MODEL_REF],
+        discoverPlatformScope: false,
+        syncPooledHealthyAdmission: true,
+        taskText: "重构这段代码并补充测试",
+      },
+      run,
+    });
+
+    expect(result.result).toBe("refactored");
+    expect(run).toHaveBeenCalledTimes(1);
+    const stored = await readStoredModelAdmissions(storePath);
+    expect(stored[MODEL_REF]?.autoRouting).toBe("eligible");
+    expect(stored[MODEL_REF]?.capabilityEvidence ?? []).toEqual([]);
+  });
+
   it("keeps an admin pause and still refuses that model", async () => {
     const { storePath, probeStorePath } = await tempPair("openbot-pool-pause-");
     await writeProbe(probeStorePath, MODEL_REF, "ok");
