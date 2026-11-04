@@ -10838,6 +10838,7 @@ tasks:
       - src/auto-reply/types.ts
       - src/auto-reply/reply/queue/types.ts
       - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/dispatch-from-config.test.ts
       - src/conversation-task/reply-completion.ts
       - src/conversation-task/reply-completion.test.ts
       - src/conversation-task/session-task-board.test.ts
@@ -10953,6 +10954,7 @@ landingStreams:
       - src/auto-reply/types.ts
       - src/auto-reply/reply/queue/types.ts
       - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/dispatch-from-config.test.ts
       - src/conversation-task/reply-completion.ts
       - src/conversation-task/reply-completion.test.ts
       - src/conversation-task/session-task-board.test.ts
