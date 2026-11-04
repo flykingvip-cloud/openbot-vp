@@ -870,6 +870,8 @@ export async function runReplyAgent(params: {
     }
 
     await replyTurnRuntime.delivery.prepareVisibleDelivery(followupRun.run.config, {
+      sessionFile: followupRun.run.sessionFile,
+      completionBinding,
       agentId: followupRun.run.agentId,
       runId: outcomeRunId,
       sessionKey,

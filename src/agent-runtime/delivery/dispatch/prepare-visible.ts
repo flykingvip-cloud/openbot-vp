@@ -5,6 +5,7 @@ import {
 } from "../../../task-outcome/chat-entry.js";
 import { registerAwaitingDelivery } from "../../../task-outcome/pending-delivery.js";
 import type { GrowthOutcomeCommitOpts } from "../../../task-outcome/runtime-from-runner.js";
+import type { TaskCompletionBinding } from "../../contracts/task.js";
 
 type PendingIdentity = { runId: string; deliveryId: string; taskId: string; agentId: string };
 
@@ -14,6 +15,8 @@ export async function prepareVisibleDelivery(params: {
   agentId?: string;
   runId: string;
   sessionKey?: string;
+  sessionFile?: string;
+  completionBinding?: TaskCompletionBinding;
   contract: ResolvedTurnTaskContract & { acceptanceVerified?: boolean };
   commitOutcome: (success: boolean, opts: GrowthOutcomeCommitOpts) => unknown;
   publishPending: (identity: PendingIdentity) => void;
@@ -38,6 +41,15 @@ export async function prepareVisibleDelivery(params: {
   const persistRoot = params.resolvePersistRoot(agentId);
   const taskId = chatTurnTaskId({ agentId, runId: params.runId, sessionKey: params.sessionKey });
   const identity = { runId: params.runId, deliveryId, taskId, agentId };
-  registerAwaitingDelivery({ ...identity, persistRoot });
+  const binding = params.completionBinding;
+  const checkedTask =
+    gates.acceptance.status === "passed" &&
+    params.sessionFile &&
+    binding?.taskId &&
+    binding.executionAttempt === params.runId &&
+    binding.deliverableVersion
+      ? { sessionFile: params.sessionFile, binding: { ...binding } }
+      : undefined;
+  registerAwaitingDelivery({ ...identity, persistRoot, ...(checkedTask ? { checkedTask } : {}) });
   params.publishPending(identity);
 }

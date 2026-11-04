@@ -10,7 +10,11 @@ import {
 import { observeInboundTurnActivation } from "../../conversation-task/gateway-activation-hook.js";
 import { observeInboundTurnShadow } from "../../conversation-task/gateway-shadow-hook.js";
 import { observeConversationTaskReplyCompleted } from "../../conversation-task/reply-completion.js";
-import { captureTaskCompletionBinding } from "../../conversation-task/session-task-board.js";
+import {
+  captureTaskCompletionBinding,
+  isTaskExecutionBindingCurrent,
+  recordCheckedTaskCompletion,
+} from "../../conversation-task/session-task-board.js";
 import { resolveCronStorePath } from "../../cron/store.js";
 import { shouldSuppressLocalDiscordExecApprovalPrompt } from "../../discord/exec-approvals.js";
 import { resolveKnowledgeSourceContext } from "../../gateway/knowledge/context.js";
@@ -116,16 +120,43 @@ export async function confirmPendingTurnDelivery(params: {
     ...(persistRoot ? { persistRoot } : {}),
   };
   const pending = peekAwaitingDelivery(lookup);
-  if (!pending) {
+  if (
+    !pending ||
+    (runId && pending.runId !== runId) ||
+    (deliveryId && pending.deliveryId !== deliveryId) ||
+    (taskId && pending.taskId !== taskId)
+  ) {
     return;
   }
   try {
-    await confirmRunnerTurnDelivery(params.cfg, pending.agentId, {
+    const confirmed = await confirmRunnerTurnDelivery(params.cfg, pending.agentId, {
       taskId: pending.taskId,
       deliveryId: pending.deliveryId,
       status: params.status,
       ...(params.error ? { failureDetail: params.error } : {}),
     });
+    if (
+      params.status === "delivered" &&
+      confirmed?.record.delivery.status === "delivered" &&
+      confirmed.record.taskId === pending.taskId &&
+      confirmed.record.decisiveRunId === pending.runId &&
+      confirmed.record.deliveryId === pending.deliveryId &&
+      confirmed.record.acceptance.status === "passed" &&
+      pending.checkedTask
+    ) {
+      const completed = recordCheckedTaskCompletion({
+        sessionFile: pending.checkedTask.sessionFile,
+        binding: pending.checkedTask.binding,
+        closed: true,
+        appendNotice: false,
+      });
+      if (
+        !completed.persisted &&
+        isTaskExecutionBindingCurrent(pending.checkedTask.sessionFile, pending.checkedTask.binding)
+      ) {
+        return; // Retain the durable association after transient lock failure.
+      }
+    }
     // R85e: unknown is not terminal — keep durable association for later verify.
     // Only clear after delivered / failed (or explicit abandon elsewhere).
     if (params.status === "delivered" || params.status === "failed") {

@@ -107,3 +107,40 @@ it("does not publish when pending registration fails", async () => {
   ).rejects.toThrow("register");
   expect(publish).not.toHaveBeenCalled();
 });
+it.each([true, false])(
+  "registers task completion identity only for verified acceptance: %s",
+  async (verified) => {
+    const binding = { taskId: "board-a", executionAttempt: "run-a", deliverableVersion: "v1" };
+    await prepareVisibleDelivery({
+      resolvePersistRoot: mocks.root,
+      agentId: "agent-a",
+      runId: "run-a",
+      sessionFile: "/tmp/test-session.jsonl",
+      completionBinding: binding,
+      contract: { ...contract, acceptanceVerified: verified },
+      commitOutcome: vi.fn(),
+      publishPending: vi.fn(),
+    });
+    const registration = mocks.register.mock.calls[0][0];
+    expect(registration.checkedTask).toEqual(
+      verified ? { sessionFile: "/tmp/test-session.jsonl", binding } : undefined,
+    );
+  },
+);
+it("does not register an identity from another execution run", async () => {
+  await prepareVisibleDelivery({
+    resolvePersistRoot: mocks.root,
+    agentId: "agent-a",
+    runId: "run-a",
+    sessionFile: "/tmp/test-session.jsonl",
+    completionBinding: {
+      taskId: "board-a",
+      executionAttempt: "other-run",
+      deliverableVersion: "v1",
+    },
+    contract: { ...contract, acceptanceVerified: true },
+    commitOutcome: vi.fn(),
+    publishPending: vi.fn(),
+  });
+  expect(mocks.register.mock.calls[0][0].checkedTask).toBeUndefined();
+});

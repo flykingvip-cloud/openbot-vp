@@ -7,6 +7,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
 
 export type AwaitingDeliveryRegistration = {
   taskId: string;
@@ -14,6 +15,7 @@ export type AwaitingDeliveryRegistration = {
   agentId: string;
   runId: string;
   registeredAtMs: number;
+  checkedTask?: { sessionFile: string; binding: TaskCompletionBinding };
 };
 
 const byRunId = new Map<string, AwaitingDeliveryRegistration>();
@@ -78,6 +80,13 @@ function readDurableFile(filePath: string): AwaitingDeliveryRegistration | undef
         deliveryId: raw.deliveryId,
         agentId: raw.agentId,
         runId: raw.runId,
+        ...(raw.checkedTask &&
+        typeof raw.checkedTask.sessionFile === "string" &&
+        typeof raw.checkedTask.binding?.taskId === "string" &&
+        typeof raw.checkedTask.binding.executionAttempt === "string" &&
+        typeof raw.checkedTask.binding.deliverableVersion === "string"
+          ? { checkedTask: raw.checkedTask }
+          : {}),
         registeredAtMs:
           typeof raw.registeredAtMs === "number" && Number.isFinite(raw.registeredAtMs)
             ? raw.registeredAtMs
@@ -155,6 +164,14 @@ export function registerAwaitingDelivery(
     agentId,
     runId,
     registeredAtMs: Date.now(),
+    ...(reg.checkedTask
+      ? {
+          checkedTask: {
+            sessionFile: reg.checkedTask.sessionFile,
+            binding: { ...reg.checkedTask.binding },
+          },
+        }
+      : {}),
   };
   indexMemory(full);
   const persistRoot = reg.persistRoot?.trim();

@@ -1080,6 +1080,8 @@ export function recordCheckedTaskCompletion(params: {
   sessionFile?: string;
   closed: boolean;
   binding?: TaskCompletionBinding;
+  /** Delivered result needs no extra transcript bubble. */
+  appendNotice?: boolean;
 }): {
   notice?: string;
   persisted: boolean;
@@ -1120,6 +1122,9 @@ export function recordCheckedTaskCompletion(params: {
   }
   if (finished.rejected) {
     return { persisted: false };
+  }
+  if (params.appendNotice === false) {
+    return { persisted: true };
   }
   const notice = finished.notice ?? renderCompletionNotice(finished.board.parked);
   let persisted = false;
