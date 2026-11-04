@@ -372,3 +372,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Empty-turn settlement now distinguishes silence and unconfirmed stream/tool callbacks from recorded messaging-tool sends and reactions. The former keep delivery pending; the latter can satisfy the delivery gate independently of group silence rules. Acceptance uses the original contract and cancellation takes precedence. — codex-runtime-manager
 - Before/after regression: 8 failing assertions on the old behavior; the scoped suite passes 75 tests. No new scheduler or send path. Correlating stream/tool callbacks with transport receipts and general task acceptance remain separate work. — codex-runtime-manager
+
+## F3 task-board completion fence checkpoint
+
+- Audited the two production callers of recordCheckedTaskCompletion: reply completion after ledger processing and complex-task reply shaping. Both provide captured task bindings; neither bypasses the board's completion gate. Ledger completion and transport receipt semantics still require separate verification. — codex-runtime-manager
+- Checked completion now shares the live-binding predicate with execution startup and evaluates it under the existing board lock. Paused, already finished, tombstoned or stale identities cannot write the board or append a completion notice. Rejected callbacks no longer increment writeEpoch. — codex-runtime-manager
+- Four before/after cases cover pause, duplicate completion, newer attempt and newer deliverable version. Targeted regression: 53 PASS. Existing successful completion-notice persistence is unchanged; its transcript adapter and acceptance/transport sequencing remain follow-up work. — codex-runtime-manager
