@@ -11133,6 +11133,8 @@ landingStreams:
       - ui/src/ui/ports/platform/models/admission/pooled-admission.ts
       - src/gateway/models/capability-admission/sync-pooled-admission.ts
       - src/gateway/models/capability-admission/sync-pooled-admission.test.ts
+      - src/gateway/models/capability-admission/protocol-runner.ts
+      - src/gateway/models/capability-admission/capability-admission.test.ts
     canLandWith: []
     metadata:
       task: smart-model-routing-runtime-admission:智能模型路由
