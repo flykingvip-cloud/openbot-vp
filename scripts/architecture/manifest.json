@@ -364,5 +364,16 @@
       "src/auto-reply/reply/agent-runner-execution"
     ],
     "description": "The fixed host adapter binds existing effects and session recovery I/O; it cannot start another execution/provider loop."
+  },
+  {
+    "name": "runtime-reply-task-state-port",
+    "from": "src/auto-reply/reply/agent-runner.ts",
+    "denyImportsFrom": [
+      "src/conversation-task/session-task-board",
+      "src/conversation-task/turn-relation",
+      "src/auto-reply/reply/queue-policy",
+      "src/auto-reply/reply/mid-task-aside"
+    ],
+    "description": "The main reply host delegates active-turn disposition and uses the state port for board access."
   }
 ]
