@@ -383,3 +383,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Dispatch previously called the conversation-task completion observer after enqueue-only or failed final sends as well as delivered replies. New fail-before/pass-after integration cases distinguish unknown, failed and successful real dispatcher outcomes. The observer is now called only when existing required-delivery AND aggregation confirms delivered. — codex-runtime-manager
 - Reply dispatch plus original completion regression: 67 PASS; changed-file typed lint clean; typecheck unchanged at 44 existing diagnostics. This prevents premature closure on this dispatch path; complex-task pre-send acceptance and delayed receipt-driven retry/closure remain unfinished, so pending tasks are not claimed automatically recovered. — codex-runtime-manager
+
+## F3 complex-task pre-send completion checkpoint
+
+- Complex reply shaping previously closed the task board on text alignment before dispatch. The former success test now asserts the board stays unfinished and no checked-delivery notice is appended; this fails against the old behavior and passes after removal of the pre-send state mutation. Text shaping/alignment remains unchanged. — codex-runtime-manager
+- The pure presentation path no longer calls recordCheckedTaskCompletion. Actual delivered completion remains on the separately guarded dispatch/ledger path. When that path is unavailable or a receipt arrives later, the task deliberately stays pending; durable acceptance-to-late-receipt completion is still unfinished and must preserve original task/attempt/version identity. — codex-runtime-manager
