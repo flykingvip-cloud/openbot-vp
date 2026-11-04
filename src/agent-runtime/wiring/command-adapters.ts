@@ -1,26 +1,35 @@
 /** Bind existing host effects. No classification, routing, loops or task decisions live here. */
 import { abortEmbeddedPiRun, queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
 import { abortMidTaskAsideLanes } from "../../auto-reply/reply/mid-task-aside-reply-lane.js";
+import { resolveMidTaskAsideDisposition } from "../../auto-reply/reply/mid-task-aside.js";
+import {
+  resolveActiveRunQueueAction,
+  shouldAttemptCollectAmendSteer,
+} from "../../auto-reply/reply/queue-policy.js";
 import { clearSessionQueues } from "../../auto-reply/reply/queue.js";
 import {
-  applyIncomingUserMessage,
-  commitSameTaskConstraint,
-  mutateSessionTaskBoard,
-  readSessionTaskBoard,
+  activeConstraintTexts,
+  isOwnerCurrentTaskControlUtterance,
 } from "../../conversation-task/session-task-board.js";
-import type { ActiveTaskAmendmentPorts, CurrentTaskControlPorts } from "../command/index.js";
+import {
+  classifyTurnRelation,
+  isOwnerExecutionBarrierUtterance,
+  shouldPersistOwnerConstraint,
+} from "../../conversation-task/turn-relation.js";
+import type {
+  ActiveTaskAmendmentPorts,
+  ActiveTurnPorts,
+  CurrentTaskControlPorts,
+} from "../command/index.js";
+import { sessionTaskState } from "../state/session-task.js";
 
-export function bindOwnerControlPorts(params: {
+function bindOwnerControlPorts(params: {
   sessionFile: string;
   sessionId: string;
   queueKeys: (string | undefined)[];
 }): CurrentTaskControlPorts {
   return {
-    applyControl: (prompt) =>
-      mutateSessionTaskBoard(params.sessionFile, (board) => {
-        const result = applyIncomingUserMessage({ board, incomingText: prompt });
-        return { board: result.board, value: result };
-      }),
+    applyControl: (prompt) => sessionTaskState.applyControl(params.sessionFile, prompt),
     abortMain: () => {
       abortEmbeddedPiRun(params.sessionId);
     },
@@ -33,7 +42,7 @@ export function bindOwnerControlPorts(params: {
   };
 }
 
-export function bindAmendmentPorts(params: {
+function bindAmendmentPorts(params: {
   sessionFile: string;
   sessionId: string;
   prompt: string;
@@ -41,15 +50,42 @@ export function bindAmendmentPorts(params: {
   return {
     readTaskId: () =>
       params.sessionFile
-        ? (readSessionTaskBoard(params.sessionFile).current?.taskId?.trim() ?? "")
+        ? (sessionTaskState.read(params.sessionFile).current?.taskId?.trim() ?? "")
         : "",
     persist: (expectedTaskId) =>
       Boolean(params.sessionFile) &&
-      commitSameTaskConstraint({
+      sessionTaskState.persistConstraint({
         sessionFile: params.sessionFile,
         constraintText: params.prompt,
         expectedTaskId,
       }),
     steer: () => queueEmbeddedPiMessage(params.sessionId, params.prompt),
+  };
+}
+
+export function bindActiveTurnPorts(params: {
+  sessionId: string;
+  prompt: string;
+  queueKeys: (string | undefined)[];
+}): ActiveTurnPorts {
+  return {
+    readBoard: sessionTaskState.read,
+    isOwnerControl: isOwnerCurrentTaskControlUtterance,
+    control: (sessionFile) => bindOwnerControlPorts({ ...params, sessionFile }),
+    resolveAside: resolveMidTaskAsideDisposition,
+    steer: () => queueEmbeddedPiMessage(params.sessionId, params.prompt),
+    resolveRelation: (prompt, board) => {
+      const goal = board.current?.goalText?.trim() ?? "";
+      return goal
+        ? classifyTurnRelation(prompt, goal, {
+            activeConstraints: activeConstraintTexts(board.current),
+          })
+        : null;
+    },
+    shouldPersistConstraint: shouldPersistOwnerConstraint,
+    shouldCollectAmend: shouldAttemptCollectAmendSteer,
+    isBarrier: isOwnerExecutionBarrierUtterance,
+    amendment: (sessionFile) => bindAmendmentPorts({ ...params, sessionFile }),
+    queueAction: resolveActiveRunQueueAction,
   };
 }

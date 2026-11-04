@@ -1,11 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import {
-  amendActiveTask,
-  controlCurrentTask,
-  queryCurrentTaskStatus,
-} from "../../agent-runtime/command/index.js";
+import { handleActiveTurn } from "../../agent-runtime/command/index.js";
 import {
   buildReplyPayloads,
   prepareVisibleDelivery,
@@ -13,17 +9,14 @@ import {
   type ReplyDeliveryResult,
 } from "../../agent-runtime/delivery/index.js";
 import { runAdmittedTurn } from "../../agent-runtime/execution/index.js";
+import { sessionTaskState } from "../../agent-runtime/state/session-task.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
-import {
-  bindOwnerControlPorts,
-  bindAmendmentPorts,
-} from "../../agent-runtime/wiring/command-adapters.js";
+import { bindActiveTurnPorts } from "../../agent-runtime/wiring/command-adapters.js";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
 import { isCliProvider } from "../../agents/model-selection.js";
-import { queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage } from "../../agents/usage.js";
 import {
   resolveAgentIdFromSessionKey,
@@ -37,20 +30,9 @@ import {
 } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
 import {
-  activeConstraintTexts,
-  startBoundTaskExecution,
-  isOwnerCurrentTaskControlUtterance,
-  readSessionTaskBoard,
-} from "../../conversation-task/session-task-board.js";
-import {
   isTaskBoardContinueInternalPrompt,
   scheduleTaskBoardContinueWake,
 } from "../../conversation-task/task-board-continue.js";
-import {
-  classifyTurnRelation,
-  isOwnerExecutionBarrierUtterance,
-  shouldPersistOwnerConstraint,
-} from "../../conversation-task/turn-relation.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 import { tryResolveCapabilityGapsFromUsage } from "../../gateway/evolution-control/capability-gap-ingest.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
@@ -99,11 +81,9 @@ import {
   stripCapabilityGapMarkers,
 } from "./honest-empty-reply.js";
 import { runMidTaskAsideReplyLane } from "./mid-task-aside-reply-lane.js";
-import { resolveMidTaskAsideDisposition } from "./mid-task-aside.js";
 import { formatAmendConstraintAck } from "./mid-task-dialogue.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
-import { resolveActiveRunQueueAction, shouldAttemptCollectAmendSteer } from "./queue-policy.js";
 import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queue.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
@@ -113,25 +93,6 @@ import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
 const BLOCK_REPLY_SEND_TIMEOUT_MS = 15_000;
-
-function resolveCollectAmendTurnRelation(
-  sessionFile: string | undefined,
-  prompt: string,
-): "amend" | "aside" | "new_work" | null {
-  const file = sessionFile?.trim();
-  if (!file) {
-    return null;
-  }
-  const board = readSessionTaskBoard(file);
-  const goal = board.current?.goalText?.trim() ?? "";
-  if (!goal) {
-    return null;
-  }
-  // Do not concatenate constraint history into the classified string (slice3).
-  return classifyTurnRelation(prompt, goal, {
-    activeConstraints: activeConstraintTexts(board.current),
-  });
-}
 
 export async function runReplyAgent(params: {
   commandBody: string;
@@ -276,110 +237,56 @@ export async function runReplyAgent(params: {
     }
   };
 
-  // Owner pause/cancel while A is active: reuse board control + existing abort path.
-  // Must stop new business actions on the in-flight run; wakeSuppress alone is not enough.
-  if (
-    isActive &&
-    isOwnerCurrentTaskControlUtterance(followupRun.prompt) &&
-    followupRun.run.sessionFile
-  ) {
-    const sessionFile = followupRun.run.sessionFile.trim();
-    const sessionId = followupRun.run.sessionId;
-    const control = controlCurrentTask(
-      followupRun.prompt,
-      bindOwnerControlPorts({
-        sessionFile,
-        sessionId,
-        queueKeys: [queueKey, sessionId, followupRun.run.sessionKey],
-      }),
-    );
-    await touchActiveSessionEntry();
-    typing.cleanup();
-    return [{ text: control.statusLine?.trim() || "已处理任务控制指令。" }];
-  }
-
-  // P3: progress / status asks answered from the live task board — no steer,
-  // no followup wait. Board is a projection of existing state, not a new controller.
-  if (isActive && followupRun.run.sessionFile) {
-    const text = queryCurrentTaskStatus(followupRun.prompt, () =>
-      readSessionTaskBoard(followupRun.run.sessionFile),
-    );
-    if (text !== undefined) {
-      await touchActiveSessionEntry();
-      typing.cleanup();
-      return [{ text }];
-    }
-  }
-
-  // Slice2: board_readonly = projection only; reply_lane = tools-disabled ephemeral
-  // embedded turn (distinct sessionId/file) so ordinary asides answer while A stays
-  // active — not a second task controller; never mutates the task board.
-  if (isActive && followupRun.run.sessionFile) {
-    const board = readSessionTaskBoard(followupRun.run.sessionFile);
-    if (board.current) {
-      const aside = resolveMidTaskAsideDisposition({
-        prompt: followupRun.prompt,
-        board,
-      });
-      if (aside.kind === "board_readonly") {
-        await touchActiveSessionEntry();
-        typing.cleanup();
-        return [{ text: aside.reply }];
-      }
-      if (aside.kind === "reply_lane_pending") {
-        const asideRunId = opts?.runId ?? crypto.randomUUID();
-        const lane = await runMidTaskAsideReplyLane({
-          parentSessionId: followupRun.run.sessionId,
-          parentSessionFile: followupRun.run.sessionFile,
-          board,
-          userPrompt: followupRun.prompt,
-          run: followupRun.run,
-          runId: asideRunId,
-          messageId: (() => {
-            const raw = sessionCtx.MessageSidFull ?? sessionCtx.MessageSid;
-            return typeof raw === "string" ? raw : undefined;
-          })(),
-        });
-        await touchActiveSessionEntry();
-        typing.cleanup();
-        return [{ text: lane.text }];
-      }
-    }
-  }
-
-  if (shouldSteer && isStreaming) {
-    const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
-    if (steered && !shouldFollowup) {
-      await touchActiveSessionEntry();
-      typing.cleanup();
-      return undefined;
-    }
-  } else if (
-    shouldAttemptCollectAmendSteer({
+  const disposition = handleActiveTurn(
+    {
+      prompt: followupRun.prompt,
+      sessionFile: followupRun.run.sessionFile,
       isActive,
       isStreaming,
+      isHeartbeat,
       shouldSteer,
       shouldFollowup,
       queueMode: resolvedQueue.mode,
-      turnRelation: resolveCollectAmendTurnRelation(
-        followupRun.run.sessionFile,
-        followupRun.prompt,
-      ),
-      persistOwnerConstraint: shouldPersistOwnerConstraint(followupRun.prompt),
-    })
-  ) {
-    const sessionFile = followupRun.run.sessionFile?.trim() ?? "";
-    const amendment = amendActiveTask(
-      isOwnerExecutionBarrierUtterance(followupRun.prompt),
-      bindAmendmentPorts({
-        sessionFile,
-        sessionId: followupRun.run.sessionId,
-        prompt: followupRun.prompt,
-      }),
-    );
-    if (amendment.kind !== "defer") {
-      await touchActiveSessionEntry();
-      typing.cleanup();
+    },
+    bindActiveTurnPorts({
+      prompt: followupRun.prompt,
+      sessionId: followupRun.run.sessionId,
+      queueKeys: [queueKey, followupRun.run.sessionId, followupRun.run.sessionKey],
+    }),
+  );
+  if (disposition.kind === "aside") {
+    const asideRunId = opts?.runId ?? crypto.randomUUID();
+    const lane = await runMidTaskAsideReplyLane({
+      parentSessionId: followupRun.run.sessionId,
+      parentSessionFile: followupRun.run.sessionFile,
+      board: disposition.board,
+      userPrompt: followupRun.prompt,
+      run: followupRun.run,
+      runId: asideRunId,
+      messageId: (() => {
+        const raw = sessionCtx.MessageSidFull ?? sessionCtx.MessageSid;
+        return typeof raw === "string" ? raw : undefined;
+      })(),
+    });
+    await touchActiveSessionEntry();
+    typing.cleanup();
+    return [{ text: lane.text }];
+  }
+  if (disposition.kind === "drop") {
+    typing.cleanup();
+    return undefined;
+  }
+  if (disposition.kind !== "execute") {
+    if (disposition.kind === "enqueue-followup") {
+      enqueueFollowupRun(queueKey, followupRun, resolvedQueue);
+    }
+    await touchActiveSessionEntry();
+    typing.cleanup();
+    if (disposition.kind === "reply") {
+      return [{ text: disposition.text }];
+    }
+    if (disposition.kind === "amended") {
+      const amendment = disposition.result;
       if (amendment.kind === "barrier-rejected") {
         return [
           {
@@ -403,24 +310,6 @@ export async function runReplyAgent(params: {
         },
       ];
     }
-  }
-
-  const activeRunQueueAction = resolveActiveRunQueueAction({
-    isActive,
-    isHeartbeat,
-    shouldFollowup,
-    queueMode: resolvedQueue.mode,
-  });
-
-  if (activeRunQueueAction === "drop") {
-    typing.cleanup();
-    return undefined;
-  }
-
-  if (activeRunQueueAction === "enqueue-followup") {
-    enqueueFollowupRun(queueKey, followupRun, resolvedQueue);
-    await touchActiveSessionEntry();
-    typing.cleanup();
     return undefined;
   }
 
@@ -449,10 +338,10 @@ export async function runReplyAgent(params: {
     Boolean(completionBinding) ||
     (!followupRun.run.collaborationRoundInvoked &&
       !followupRun.run.privateRunBag &&
-      Boolean(readSessionTaskBoard(followupRun.run.sessionFile).current));
+      Boolean(sessionTaskState.read(followupRun.run.sessionFile).current));
   if (requiresTaskBinding) {
     try {
-      completionBinding = startBoundTaskExecution(
+      completionBinding = sessionTaskState.startExecution(
         followupRun.run.sessionFile,
         completionBinding,
         runId,

@@ -18,3 +18,5 @@ export {
   resolveCollaborationGroupIdForRun,
 } from "./scenarios/collaboration-entry.js";
 export type { CollaborationSessionScope } from "./scenarios/collaboration-entry.js";
+
+export { handleActiveTurn, type ActiveTurnPorts } from "./active-turn.js";
