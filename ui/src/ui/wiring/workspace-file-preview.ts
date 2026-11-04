@@ -420,6 +420,15 @@ function applyHtmlPreviewLane(params: {
   // Mammoth/docx fragments stay on the inline sanitized-HTML path.
   const useIframe = isFullHtmlDocument(html);
   const htmlPreviewUrl = useIframe ? createHtmlPreviewBlobUrl(html) : null;
+  // The renderer produces a view; download must retain the original Office package bytes.
+  const originalBytes = typeof baseMeta.fileBase64 === "string" ? baseMeta.fileBase64 : "";
+  const originalDownloadUrl = originalBytes
+    ? createBlobUrlFromBase64(
+        originalBytes,
+        mimeType || workspace.artifact.mimeType || "application/octet-stream",
+      )
+    : null;
+
   // Preserve specialized kinds (e.g. canvas graph) when the HTML lane is used as a renderer.
   const inheritedKind = typeof baseMeta.previewKind === "string" ? baseMeta.previewKind.trim() : "";
   const previewKind = inheritedKind === "canvas" ? "canvas" : "html";
@@ -430,9 +439,12 @@ function applyHtmlPreviewLane(params: {
       ...workspace.artifact,
       mimeType: mimeType || "text/html",
       ...(htmlPreviewUrl ? { previewUrl: htmlPreviewUrl, openUrl: htmlPreviewUrl } : {}),
+      downloadUrl: originalDownloadUrl || undefined,
       providerMetadata: {
         ...baseMeta,
         previewKind,
+        downloadedBinary: false,
+        binaryDownloadUrl: originalDownloadUrl || undefined,
         ...(useIframe
           ? {
               ...(htmlPreviewUrl ? { htmlPreviewUrl } : {}),
@@ -548,13 +560,18 @@ export function applyWorkspaceFilePreview(params: {
       ? { fileBase64: file.base64.replace(/\s+/g, "") }
       : classified.lane === "html" && classified.base64
         ? { fileBase64: classified.base64 }
-        : {};
+        : { fileBase64: undefined };
   const officeSlides = parseOfficeSlidesInput(file.officeSlides);
   const slideDraft = officeSlides ? formatOfficeSlideDraft(officeSlides) : "";
   const baseMeta = {
     ...workspace.artifact.providerMetadata,
     workspaceFilename: relativePath,
     workspaceFileLoaded: true,
+    dataUrl: undefined,
+    binaryDownloadUrl: undefined,
+    htmlPreviewUrl: undefined,
+    htmlSrcdoc: undefined,
+    renderedHtml: undefined,
     ...retainedBytes,
     ...(officeSlides ? { officeSlides, previewText: slideDraft } : {}),
     ...extraMetadata,

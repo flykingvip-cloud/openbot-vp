@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import type { ArtifactWorkspaceSidebar } from "../types.ts";
 import type { StewardArtifactSidebarHost } from "./steward-workspace-file.ts";
@@ -560,4 +561,69 @@ describe("published HTML URL preview", () => {
     expect(lane).toBe("html");
     expect(host.artifactPreviewMissIds ?? []).not.toContain(workspace.artifact.artifactId);
   });
+});
+
+describe("Office original download isolation", () => {
+  it("downloads the original PPTX bytes rather than the rendered HTML", async () => {
+    const zip = new JSZip();
+    zip.file("[Content_Types].xml", "<Types/>");
+    zip.file("ppt/presentation.xml", "<p:presentation/>");
+    const bytes = await zip.generateAsync({ type: "uint8array" });
+    const base64 = Buffer.from(bytes).toString("base64");
+    const host = createHost();
+    applyWorkspaceFilePreview({
+      host,
+      workspace: buildWorkspace("deck.pptx"),
+      filename: "deck.pptx",
+      file: {
+        filename: "deck.pptx",
+        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        textLike: false,
+        renderKind: "html",
+        html: "<!doctype html><html><body>slide preview</body></html>",
+        base64,
+      },
+    });
+    const artifact = host.sidebarArtifactWorkspace!.artifact;
+    expect(artifact.downloadUrl).toBeTruthy();
+    expect(artifact.downloadUrl).not.toBe(artifact.previewUrl);
+    const downloaded = new Uint8Array(await (await fetch(artifact.downloadUrl!)).arrayBuffer());
+    expect(downloaded).toEqual(bytes);
+    expect(
+      await JSZip.loadAsync(downloaded).then((file) =>
+        file.file("ppt/presentation.xml")?.async("string"),
+      ),
+    ).toBe("<p:presentation/>");
+    URL.revokeObjectURL(artifact.downloadUrl!);
+    if (artifact.previewUrl) {
+      URL.revokeObjectURL(artifact.previewUrl);
+    }
+  });
+});
+
+it("clears stale original bytes and data URLs when a newer Office preview has no original bytes", () => {
+  const host = createHost();
+  const workspace = buildWorkspace("deck.pptx");
+  Object.assign(workspace.artifact.providerMetadata!, {
+    fileBase64: "OLD",
+    dataUrl: "data:application/octet-stream;base64,T0xE",
+    binaryDownloadUrl: "blob:old",
+  });
+  applyWorkspaceFilePreview({
+    host,
+    workspace,
+    filename: "deck.pptx",
+    file: {
+      filename: "deck.pptx",
+      mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      renderKind: "html",
+      textLike: false,
+      html: "<p>new preview only</p>",
+    },
+  });
+  const artifact = host.sidebarArtifactWorkspace!.artifact;
+  expect(artifact.providerMetadata?.fileBase64).toBeUndefined();
+  expect(artifact.providerMetadata?.dataUrl).toBeUndefined();
+  expect(artifact.providerMetadata?.binaryDownloadUrl).toBeUndefined();
+  expect(artifact.downloadUrl).toBeUndefined();
 });
