@@ -331,5 +331,38 @@
       "src/agent-runtime/delivery/acceptance/!(index).ts"
     ],
     "description": "Production validation and delivery matching use the delivery acceptance public entry; the legacy validation module is compatibility only."
+  },
+  {
+    "name": "runtime-admitted-turn-public-main-entry",
+    "from": "src/auto-reply/reply/agent-runner.ts",
+    "denyImportsFrom": [
+      "src/auto-reply/reply/agent-runner-execution",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "The main reply adapter consumes the execution public API; the legacy turn module is compatibility only."
+  },
+  {
+    "name": "runtime-admitted-turn-no-platform-control-imports",
+    "from": "src/agent-runtime/execution/runner/admitted-turn.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/wiring/**",
+      "src/conversation-task/**",
+      "src/config/sessions*",
+      "src/gateway/billing/**",
+      "src/gateway/governance/spawn-snapshot-handoff",
+      "src/auto-reply/reply/agent-runner-execution"
+    ],
+    "description": "Admitted turn sequencing uses mandatory typed host capabilities for authoritative task, commercial slot, snapshot and session persistence effects; it cannot reverse-import the old orchestrator."
+  },
+  {
+    "name": "runtime-admitted-host-no-orchestration",
+    "from": "src/agent-runtime/wiring/admitted-turn-host.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/admitted-turn",
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner",
+      "src/auto-reply/reply/agent-runner-execution"
+    ],
+    "description": "The fixed host adapter binds existing effects and session recovery I/O; it cannot start another execution/provider loop."
   }
 ]
