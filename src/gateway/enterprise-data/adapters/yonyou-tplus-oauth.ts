@@ -115,9 +115,10 @@ export function resolveYonyouTplusOAuthConfig(params?: {
   if (!app) {
     return null;
   }
+  // Chanjet app console registers one redirect URI; prefer that canonical value.
   const redirectUri =
-    params?.redirectUri?.trim() ||
     process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_REDIRECT_URI?.trim() ||
+    params?.redirectUri?.trim() ||
     "";
   const orgId =
     params?.orgId?.trim() || process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_ORG_ID?.trim() || "";

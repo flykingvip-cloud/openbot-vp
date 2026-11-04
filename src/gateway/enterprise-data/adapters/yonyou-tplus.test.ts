@@ -65,6 +65,20 @@ describe("yonyou tplus adapter", () => {
     expect(payload.records[0]?.Code).toBe("01");
   });
 
+  it("refuses simulated openToken when a real appKey is configured", async () => {
+    vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY", "D2rRuEgL");
+    const fetchMock = vi.fn(() => {
+      throw new Error("fetch should not be called");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const probe = await probeYonyouTplusConnection({
+      oauthAccessToken: "simulated-yonyou-tplus-token-abc",
+    });
+    expect(probe.ok).toBe(false);
+    expect(probe.message).toContain("禁止继续使用模拟凭证");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("fails closed when appKey, appSecret, or openToken is missing", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -200,7 +214,6 @@ describe("yonyou tplus adapter", () => {
       paramDic: {},
     });
   });
-
 
   it("normalizes inventory QueryPage body into a records row array", async () => {
     const fetchMock = vi.fn(async () =>
