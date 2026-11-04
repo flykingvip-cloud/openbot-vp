@@ -375,5 +375,16 @@
       "src/auto-reply/reply/mid-task-aside"
     ],
     "description": "The main reply host delegates active-turn disposition and uses the state port for board access."
+  },
+  {
+    "name": "runtime-reply-composition-boundary",
+    "from": "src/auto-reply/reply/agent-runner.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/command/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/wiring/!(reply-turn).ts"
+    ],
+    "description": "The main reply host uses the reply-turn composition for command, state and execution dependencies."
   }
 ]
