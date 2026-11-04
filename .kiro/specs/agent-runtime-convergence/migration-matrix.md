@@ -77,3 +77,5 @@ Delivery is PARTIAL through candidate payload preparation (5907080c3). Actual ta
 Policy is PARTIAL through pure blocker classification (020bf5a37), with no runtime imports or effects. Full transition/authorization/limit consolidation and acceptance orchestration are not implemented by this checkpoint.
 
 Delivery acceptance is PARTIAL through existing turn-completion settlement orchestration (ebb00f983). Lazy platform effects remain in the original adapter via fixed code ports. General task validation, transport receipts, storage/reuse and lifecycle consolidation are not complete.
+
+Execution now additionally owns the complete admitted single-candidate backend invocation (56bf21ea1), consumed by the existing model-fallback callback. This is real backend body retirement from the old module, not a forwarding-only facade. Outer admission/fallback/retry/accounting and full delivery lifecycle are still not migrated; execution remains PARTIAL.
