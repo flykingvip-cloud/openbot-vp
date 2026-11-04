@@ -195,8 +195,11 @@
   {
     "name": "runtime-delivery-public-entry",
     "from": "src/auto-reply/**",
-    "denyImportsFrom": ["src/agent-runtime/delivery/presentation/**"],
-    "description": "Reply adapters consume the delivery public API rather than presentation internals."
+    "denyImportsFrom": [
+      "src/agent-runtime/delivery/presentation/**",
+      "src/agent-runtime/delivery/dispatch/**"
+    ],
+    "description": "Reply adapters consume the delivery public API rather than presentation or terminal delivery internals."
   },
   {
     "name": "runtime-policy-no-effects",
@@ -298,5 +301,17 @@
       "src/conversation-task/**"
     ],
     "description": "Delivery receipt preparation cannot run providers, restart work or mutate the authoritative task board."
+  },
+  {
+    "name": "runtime-terminal-delivery-no-legacy-control",
+    "from": "src/agent-runtime/delivery/dispatch/**",
+    "denyImportsFrom": [
+      "src/auto-reply/reply/agent-runner*",
+      "src/auto-reply/reply/queue*",
+      "src/auto-reply/reply/honest-empty-reply",
+      "src/auto-reply/reply/turn-reply-language",
+      "src/gateway/evolution-control/**"
+    ],
+    "description": "Terminal delivery owns settlement and projection; original queue, continuation and gap I/O are fixed host ports, never a reverse import into legacy control."
   }
 ]
