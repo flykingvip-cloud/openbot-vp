@@ -68,3 +68,7 @@ execution公开入口应被主agent-runner直接消费，不再直导旧agent-ru
 先F1+F2的接口与调用闭包设计，随后优先F2“执行已接纳回合”，因为目前execution/index只给recovery，准备入口也仍legacy，主线最重要执行节点尚无公开归属。不要继续用formatter或usage小组件代替此工作。
 
 批次可以分绿色提交，但F2验收以主消费者已替换、原实现退场、强制门禁与重试保持为单位，不能以新增文件数宣布完成。
+
+## Current F2 checkpoint supersedes earlier inventory
+
+The original inventory above is historical. The current main reply consumer invokes execution/index.runAdmittedTurn with mandatory grouped host ports; the original outer normal-turn loop now exists only in execution/runner/admitted-turn.ts. The old agent-runner-execution module is a compatibility delegate. See admitted-turn-ownership.md for actual ownership, consumer changes and retained legacy dependencies. F1 command/state, F4 composition root, capability/policy and final whole-chain acceptance remain unfinished; do not infer their completion from this F2 entry checkpoint.
