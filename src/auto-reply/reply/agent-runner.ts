@@ -389,7 +389,7 @@ export async function runReplyAgent(params: {
       assistantText,
       isHeartbeat,
       toolsDisabled: followupRun.run.disableTools === true,
-      enqueue: (prompt, messageId) =>
+      enqueue: (prompt, messageId, ticket) =>
         enqueueFollowupRun(
           queueKey,
           {
@@ -397,6 +397,7 @@ export async function runReplyAgent(params: {
             prompt,
             messageId,
             summaryLine: "task_board_continue",
+            taskBoardContinueTicket: { taskId: ticket.taskId, focusRevision: ticket.focusRevision },
             enqueuedAt: Date.now(),
             followupItemId: undefined,
           },

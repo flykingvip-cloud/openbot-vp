@@ -33,6 +33,8 @@ export type FollowupRun = {
    * must not mint an unrelated task. Distinct from agent runId (correlation).
    */
   followupItemId?: string;
+  /** Original wake identity, revalidated when dequeued. */
+  taskBoardContinueTicket?: { taskId: string; focusRevision: number };
   /**
    * askOutcome W1: optional parent TaskOutcome taskId when this followup is
    * an independent child of a prior user/chat/collab task.

@@ -19,6 +19,7 @@ import {
   startBoundTaskExecution,
   isTaskExecutionBindingCurrent,
 } from "../../conversation-task/session-task-board.js";
+import { claimTaskBoardContinue } from "../../conversation-task/task-board-continue.js";
 import {
   tryAcquireEnterpriseAgentRun,
   releaseEnterpriseAgentRun,
@@ -178,6 +179,16 @@ export function createFollowupRunner(params: {
     // Claim the original queued task before creating outcome/admission/provider side effects.
     // Collaboration plans retain their own admission when no session-task binding exists.
     try {
+      const ticket = queued.taskBoardContinueTicket;
+      if (ticket) {
+        const wake = claimTaskBoardContinue({ sessionFile: queued.run.sessionFile, ...ticket });
+        if (!wake.ok || queued.run.taskCompletionBinding?.taskId !== ticket.taskId) {
+          typing.markRunComplete();
+          typing.markDispatchIdle();
+          return;
+        }
+        queued.prompt = wake.prompt;
+      }
       const incomingBinding = queued.run.taskCompletionBinding;
       const trackedIndividual =
         !queued.run.collaborationRoundInvoked &&

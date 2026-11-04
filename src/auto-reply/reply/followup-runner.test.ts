@@ -769,3 +769,123 @@ it("does not start queued provider work when owner pause arrives during async tr
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+it("refreshes queued task-board continuation with owner constraints accepted after enqueue", async () => {
+  const boardApi = await import("../../conversation-task/session-task-board.js");
+  const dir = await fs.mkdtemp(path.join(tmpdir(), "followup-continue-live-"));
+  try {
+    const sessionFile = path.join(dir, "session.jsonl");
+    await fs.writeFile(sessionFile, "");
+    boardApi.mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...boardApi.emptySessionTaskBoard(),
+        focusRevision: 1,
+        current: {
+          taskId: "a",
+          title: "report",
+          goalText: "write report",
+          unfinished: true,
+          createdAtMs: 1,
+          executionAttempt: "old-run",
+          deliverableVersion: "v1",
+          stop: { summary: "waiting", workspacePaths: [] },
+        },
+      },
+      value: undefined,
+    }));
+    const queued = createQueuedRun({
+      prompt: "old resume text",
+      taskBoardContinueTicket: { taskId: "a", focusRevision: 1 },
+      run: {
+        sessionFile,
+        taskCompletionBinding: boardApi.captureTaskCompletionBinding(sessionFile),
+      },
+    });
+    expect(
+      boardApi.commitSameTaskConstraint({
+        sessionFile,
+        expectedTaskId: "a",
+        constraintText: "必须保留来源链接，不要发布",
+      }),
+    ).toBe(true);
+    runEmbeddedPiAgentMock.mockReset();
+    runEmbeddedPiAgentMock.mockResolvedValue({
+      payloads: [{ text: "report with sources" }],
+      meta: {},
+    });
+    const runner = createFollowupRunner({
+      opts: { onBlockReply: createAsyncReplySpy() },
+      typing: createMockTypingController(),
+      typingMode: "instant",
+      defaultModel: "anthropic/claude",
+    });
+    await runner(queued);
+    expect(runEmbeddedPiAgentMock).toHaveBeenCalledOnce();
+    expect(runEmbeddedPiAgentMock.mock.calls[0][0].prompt).toContain("必须保留来源链接，不要发布");
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+it.each(["paused", "focus changed", "new attempt"] as const)(
+  "rejects a queued continue ticket after %s without provider execution",
+  async (change) => {
+    const api = await import("../../conversation-task/session-task-board.js");
+    const dir = await fs.mkdtemp(path.join(tmpdir(), "continue-revalidate-"));
+    try {
+      const sessionFile = path.join(dir, "session.jsonl");
+      await fs.writeFile(sessionFile, "");
+      api.mutateSessionTaskBoard(sessionFile, () => ({
+        board: {
+          ...api.emptySessionTaskBoard(),
+          focusRevision: 1,
+          current: {
+            taskId: "a",
+            title: "A",
+            goalText: "A",
+            unfinished: true,
+            createdAtMs: 1,
+            executionAttempt: "old",
+            deliverableVersion: "v1",
+            stop: { summary: "waiting", workspacePaths: [] },
+          },
+        },
+        value: undefined,
+      }));
+      const queued = createQueuedRun({
+        taskBoardContinueTicket: { taskId: "a", focusRevision: 1 },
+        run: { sessionFile, taskCompletionBinding: api.captureTaskCompletionBinding(sessionFile) },
+      });
+      api.mutateSessionTaskBoard(sessionFile, (board) => ({
+        board: {
+          ...board,
+          ...(change === "focus changed" ? { focusRevision: 2 } : {}),
+          current: {
+            ...board.current!,
+            ...(change === "paused"
+              ? { wakeSuppress: true }
+              : change === "new attempt"
+                ? { executionAttempt: "new" }
+                : {}),
+          },
+        },
+        value: undefined,
+      }));
+      const before = api.readSessionTaskBoard(sessionFile);
+      runEmbeddedPiAgentMock.mockClear();
+      const typing = createMockTypingController();
+      await createFollowupRunner({
+        opts: { onBlockReply: createAsyncReplySpy() },
+        typing,
+        typingMode: "instant",
+        defaultModel: "anthropic/claude",
+      })(queued);
+      expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+      expect(api.readSessionTaskBoard(sessionFile).current).toEqual(before.current);
+      expect(typing.markRunComplete).toHaveBeenCalled();
+      expect(typing.markDispatchIdle).toHaveBeenCalled();
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  },
+);

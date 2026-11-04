@@ -294,7 +294,11 @@ export function decideTaskBoardContinue(params: {
   };
 }
 
-export type TaskBoardContinueEnqueue = (prompt: string, messageId: string) => boolean;
+export type TaskBoardContinueEnqueue = (
+  prompt: string,
+  messageId: string,
+  ticket: TaskBoardContinueTicket,
+) => boolean;
 
 /**
  * Decide + optionally schedule a delayed enqueue. Returns the decision for tests
@@ -362,7 +366,7 @@ export function scheduleTaskBoardContinueWake(params: {
         });
         return;
       }
-      dispatched = params.enqueue(claimed.prompt, messageId);
+      dispatched = params.enqueue(claimed.prompt, messageId, { ...ticket, prompt: claimed.prompt });
     } catch (err) {
       log.warn("task_board_continue enqueue failed", {
         reason: decision.reason,
