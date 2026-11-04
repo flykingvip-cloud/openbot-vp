@@ -10857,6 +10857,11 @@ tasks:
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
       - src/agent-runtime/delivery/**
+      - src/agents/execution-preflight/validation.ts
+      - src/agents/execution-preflight/runtime-validation-ownership.test.ts
+      - src/agents/execution-preflight/types.ts
+      - src/agents/execution-preflight/delivery.ts
+      - src/agents/execution-preflight/production-validators.ts
       - src/auto-reply/reply/honest-empty-reply.ts
       - src/auto-reply/reply/agent-runner.honest-empty-reply.test.ts
       - src/auto-reply/reply/agent-runner-payloads.ts
@@ -10947,6 +10952,11 @@ landingStreams:
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
       - src/agent-runtime/delivery/**
+      - src/agents/execution-preflight/validation.ts
+      - src/agents/execution-preflight/runtime-validation-ownership.test.ts
+      - src/agents/execution-preflight/types.ts
+      - src/agents/execution-preflight/delivery.ts
+      - src/agents/execution-preflight/production-validators.ts
       - src/auto-reply/reply/honest-empty-reply.ts
       - src/auto-reply/reply/agent-runner.honest-empty-reply.test.ts
       - src/auto-reply/reply/agent-runner-payloads.ts
