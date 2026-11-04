@@ -209,7 +209,7 @@ dependencies {
     implementation("androidx.camera:camera-view:1.5.2")
 
     // Unicast DNS-SD (Wide-Area Bonjour) for tailnet discovery domains.
-    implementation("dnsjava:dnsjava:3.7.0")
+    implementation("dnsjava:dnsjava:3.7.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
