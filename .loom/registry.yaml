@@ -1195,7 +1195,6 @@ tasks:
       - src/agents/system-prompt.test.ts
       - src/auto-reply/reply/reply-directives.ts
       - src/auto-reply/reply/honest-empty-reply.ts
-      - src/auto-reply/reply/agent-runner.honest-empty-reply.test.ts
       - src/shared/text/plan-speak-final.ts
       - src/shared/text/plan-speak-final.test.ts
     state: active
@@ -8592,7 +8591,6 @@ tasks:
       - src/auto-reply/reply/agent-runner.ts
       - src/auto-reply/reply/honest-empty-reply.test.ts
       - src/auto-reply/reply/honest-empty-reply.ts
-      - src/auto-reply/reply/agent-runner.honest-empty-reply.test.ts
       - src/gateway/evolution-control/capability-gap-ingest.test.ts
       - src/gateway/evolution-control/capability-gap-ingest.ts
       - src/agents/model-fallback.run-embedded.e2e.test.ts
@@ -15581,7 +15579,6 @@ landingStreams:
       - src/agents/system-prompt.ts
       - src/agents/system-prompt.test.ts
       - src/auto-reply/reply/honest-empty-reply.ts
-      - src/auto-reply/reply/agent-runner.honest-empty-reply.test.ts
       - src/auto-reply/reply/reply-directives.ts
       - src/shared/text/plan-speak-final.ts
       - src/shared/text/plan-speak-final.test.ts
@@ -20210,7 +20207,6 @@ landingStreams:
       - src/auto-reply/reply/agent-runner.ts
       - src/auto-reply/reply/honest-empty-reply.test.ts
       - src/auto-reply/reply/honest-empty-reply.ts
-      - src/auto-reply/reply/agent-runner.honest-empty-reply.test.ts
       - src/gateway/evolution-control/capability-gap-consumer.ts
       - src/gateway/evolution-control/capability-gap-ingest.test.ts
       - src/gateway/evolution-control/capability-gap-ingest.ts
