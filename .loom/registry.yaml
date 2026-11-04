@@ -10886,6 +10886,8 @@ tasks:
       - src/auto-reply/reply/agent-runner-utils.ts
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/agent-runtime/execution/**
+      - src/conversation-task/task-board-continue.ts
+      - src/conversation-task/task-board-continue.test.ts
       - src/auto-reply/reply/agent-runner.run-id.test.ts
       - src/gateway/governance/model-caller-registry.ts
       - src/gateway/billing/commercial-run-entrypoints.registry.ts
@@ -11020,6 +11022,8 @@ landingStreams:
       - src/auto-reply/reply/agent-runner-utils.ts
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/agent-runtime/execution/**
+      - src/conversation-task/task-board-continue.ts
+      - src/conversation-task/task-board-continue.test.ts
       - src/auto-reply/reply/agent-runner.run-id.test.ts
       - src/gateway/governance/model-caller-registry.ts
       - src/gateway/billing/commercial-run-entrypoints.registry.ts
