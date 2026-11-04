@@ -24,3 +24,6 @@ On 2026-10-21 the openbot-vp copy of `releases.jsonl` was temporarily removed af
 - Failed DIGEST tip `cac11e761b2dccb962e7d58d55f0833bfcb528ca` (TS2741) never reached LIVE — no gap row.
 - seq **147** tip `d632f4627a158e079dc21810fdb15e17ac440119` was closed with `liveTo` = seq 148 `liveFrom` (`2026-10-30T06:59:55.083Z`) when recording Path B tip 3a391742f260.
 - seq **148** tip `3a391742f2603bc80d42ad3d4258e047224da352` is the current Path B LIVE open row.
+- seq **154** tip `a17b60872cb62122449a170a24b2f4e150cf9557` was closed with `liveTo` = seq 155 `liveFrom` (`2026-11-02T06:12:06.377Z`) when recording Path B tip 10b9f044707c.
+- seq **155** tip `10b9f044707c6439518cbe314fdf470ebd5f4f88` was closed with `liveTo` = seq 156 `liveFrom` (`2026-11-03T04:03:08.447Z`) when recording Path B tip 605e7c296dff.
+- seq **156** tip `605e7c296dff1f8bf890a05e80a902f6214a2eaa` is the current Path B LIVE open row.
