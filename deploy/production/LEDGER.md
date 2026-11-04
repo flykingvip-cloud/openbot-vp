@@ -28,4 +28,5 @@ On 2026-10-21 the openbot-vp copy of `releases.jsonl` was temporarily removed af
 - seq **155** tip `10b9f044707c6439518cbe314fdf470ebd5f4f88` was closed with `liveTo` = seq 156 `liveFrom` (`2026-11-03T04:03:08.447Z`) when recording Path B tip 605e7c296dff.
 - seq **156** tip `605e7c296dff1f8bf890a05e80a902f6214a2eaa` was closed with `liveTo` = seq 157 `liveFrom` (`2026-11-03T09:23:21.234Z`) when recording Path B tip 2ea87d9d6fba.
 - seq **157** tip `2ea87d9d6fbafa6384710ca65931b83c86fdf871` was closed with `liveTo` = seq 158 `liveFrom` (`2026-11-03T11:38:56.303Z`) when recording Path B tip bc342abbd68f (private soak for 2ea87d incomplete/paused — HK interval backfilled).
-- seq **158** tip `bc342abbd68f3a69ed7ad8a97fb1da340575be77` is the current Path B LIVE open row.
+- seq **158** tip `bc342abbd68f3a69ed7ad8a97fb1da340575be77` was closed with `liveTo` = seq 159 `liveFrom` (`2026-11-04T00:49:58.012Z`) when recording Path B tip ded9b6e160ab.
+- seq **159** tip `ded9b6e160ab64c65a86490da1311e4411dae783` is the current Path B LIVE open row.
