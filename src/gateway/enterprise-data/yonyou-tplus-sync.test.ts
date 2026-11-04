@@ -171,9 +171,9 @@ describe("yonyou tplus incremental sync", () => {
     expect(inventoryBodies[0]?.param).toEqual({
       PageSize: "20",
       PageIndex: "1",
-      UpdateDateBegin: "2026-10-15 06:00:00",
-      UpdateDateEnd: "2026-10-22 06:00:00",
     });
+    expect(inventoryBodies[0]?.param).not.toHaveProperty("UpdateDateBegin");
+    expect(inventoryBodies[0]?.param).not.toHaveProperty("UpdateDateEnd");
     expect(urls.some((url) => url.includes("idMarketingOrgan"))).toBe(false);
     expect(warehouseBodies[0]).toEqual({ param: { SelectFields: "ID,Code,Name,Ts" } });
     expect(urls.find((url) => url.includes("/warehouse/Query"))).toBe(
@@ -588,9 +588,127 @@ describe("yonyou tplus projection cursor window", () => {
       param: {
         PageSize: "20",
         PageIndex: "1",
-        UpdateDateBegin: "2026-10-15 06:00:00",
-        UpdateDateEnd: "2026-10-22 06:00:00",
       },
+    });
+  });
+});
+
+describe("yonyou tplus master first-sync full window", () => {
+  beforeEach(async () => {
+    cleanStore();
+    vi.unstubAllGlobals();
+    await saveCredentialSecret(credentialId, {
+      appKey: "ak-test",
+      appSecret: "as-test",
+      oauthAccessToken: "open-token-1",
+      idMarketingOrgan: "1001",
+    });
+  });
+
+  it("first inventory/partner sync omits the 7-day UpdateDate window so empty archives are not marked complete", async () => {
+    const inventoryBodies: Array<Record<string, unknown>> = [];
+    const partnerBodies: Array<Record<string, unknown>> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
+        const body = jsonBody(init);
+        if (url.endsWith("/accountAPI/GetVersionInfo")) {
+          return Response.json({ result: "16.0" });
+        }
+        if (url.endsWith("/inventory/QueryPage")) {
+          inventoryBodies.push(body);
+          const param = (body.param ?? {}) as Record<string, unknown>;
+          // Simulate Chanjet: archives with no recent UpdateDate are invisible
+          // under a LOOKBACK window, but present on a full QueryPage.
+          if ("UpdateDateBegin" in param || "UpdateDateEnd" in param) {
+            return Response.json({ TotalCount: 0, TotalPage: 1, CurrentPage: 1, Data: [] });
+          }
+          return Response.json(inventoryPage(1));
+        }
+        if (url.endsWith("/partner/QueryPage")) {
+          partnerBodies.push(body);
+          const param = (body.param ?? {}) as Record<string, unknown>;
+          if ("UpdateDateBegin" in param || "UpdateDateEnd" in param) {
+            return Response.json({ TotalCount: 0, TotalPage: 1, CurrentPage: 1, Data: [] });
+          }
+          return Response.json({
+            TotalCount: 1,
+            TotalPage: 1,
+            CurrentPage: 1,
+            Data: [{ Code: "C001", Name: "客户甲" }],
+          });
+        }
+        if (url.endsWith("/warehouse/Query")) {
+          return Response.json(WAREHOUSE_ROWS);
+        }
+        if (
+          url.endsWith("/SaleDeliveryOpenApi/FindVoucherList") ||
+          url.endsWith("/SaleOrderOpenApi/FindVoucherList")
+        ) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        throw new Error(`unexpected ${url}`);
+      }),
+    );
+
+    const store = storeWithSource();
+    const now = new Date("2026-10-22T06:00:00.000Z");
+    const result = await syncYonyouTplusSource({
+      store,
+      tenantId,
+      sourceId,
+      now,
+    });
+    expect(result.status).toBe("success");
+    expect(inventoryBodies[0]?.param).toEqual({ PageSize: "20", PageIndex: "1" });
+    expect(partnerBodies[0]?.param).toEqual({ PageSize: "20", PageIndex: "1" });
+    expect(inventoryBodies[0]?.param).not.toHaveProperty("UpdateDateBegin");
+    expect(partnerBodies[0]?.param).not.toHaveProperty("UpdateDateBegin");
+    expect(result.streams.find((stream) => stream.streamKey === "inventory")).toMatchObject({
+      status: "success",
+      recordCount: 1,
+      advanced: true,
+      detail: expect.stringContaining("首次全量"),
+    });
+    expect(result.streams.find((stream) => stream.streamKey === "partner")).toMatchObject({
+      status: "success",
+      recordCount: 1,
+      advanced: true,
+      detail: expect.stringContaining("首次全量"),
+    });
+    expect(store.connectorSyncCursors?.[`${sourceId}::inventory`]?.watermark).toBe(
+      "2026-10-22 06:00:00",
+    );
+    expect(store.connectorSyncCursors?.[`${sourceId}::partner`]?.watermark).toBe(
+      "2026-10-22 06:00:00",
+    );
+
+    // Incremental follow-up keeps UpdateDate from the watermark.
+    inventoryBodies.length = 0;
+    partnerBodies.length = 0;
+    const second = await syncYonyouTplusSource({
+      store,
+      tenantId,
+      sourceId,
+      now: new Date("2026-10-22T08:30:00.000Z"),
+    });
+    expect(second.status).toBe("success");
+    expect(inventoryBodies[0]?.param).toEqual({
+      PageSize: "20",
+      PageIndex: "1",
+      UpdateDateBegin: "2026-10-22 06:00:00",
+      UpdateDateEnd: "2026-10-22 08:30:00",
+    });
+    expect(partnerBodies[0]?.param).toEqual({
+      PageSize: "20",
+      PageIndex: "1",
+      UpdateDateBegin: "2026-10-22 06:00:00",
+      UpdateDateEnd: "2026-10-22 08:30:00",
     });
   });
 });
