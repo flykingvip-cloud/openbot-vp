@@ -32,7 +32,7 @@ export const COMMERCIAL_RUN_ENTRYPOINTS: readonly CommercialRunEntrypoint[] = [
     id: "agent_run_embedded",
     label: "Agent Run (embedded Pi)",
     paths: [
-      "src/auto-reply/reply/agent-runner-execution.ts",
+      "src/agent-runtime/execution/runner/admitted-turn.ts",
       "src/auto-reply/reply/followup-runner.ts",
     ],
     requiredGateSymbols: ["tryAcquireEnterpriseAgentRun"],
@@ -41,8 +41,9 @@ export const COMMERCIAL_RUN_ENTRYPOINTS: readonly CommercialRunEntrypoint[] = [
     id: "chat_reply_pipeline",
     label: "Chat / message reply pipeline",
     paths: ["src/auto-reply/reply/get-reply-run.ts", "src/auto-reply/reply/agent-runner.ts"],
-    requiredGateSymbols: ["runReplyAgent", "runAgentTurnWithFallback"],
-    notes: "Chat ingress delegates to agent-runner-execution commercial gate.",
+    requiredGateSymbols: ["runReplyAgent", "runAdmittedTurn"],
+    notes:
+      "Chat ingress delegates to the admitted-turn execution API and mandatory host admission port.",
   },
   {
     id: "gateway_agent_api",

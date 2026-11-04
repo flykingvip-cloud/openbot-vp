@@ -21,7 +21,7 @@ const RECONSTRUCT_HOPS = [
   "src/agents/pi-embedded-runner/compact.ts",
   "src/auto-reply/reply/agent-runner-utils.ts",
   "src/auto-reply/reply/followup-runner.ts",
-  "src/auto-reply/reply/agent-runner-execution.ts",
+  "src/agent-runtime/execution/runner/admitted-candidate.ts",
   "src/auto-reply/reply/commands-compact.ts",
   "src/auto-reply/reply/get-reply-inline-actions.ts",
   "src/agents/pi-tools.ts",

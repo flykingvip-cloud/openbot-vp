@@ -12,6 +12,8 @@ import {
   completeReplyDelivery,
   type ReplyDeliveryResult,
 } from "../../agent-runtime/delivery/index.js";
+import { runAdmittedTurn } from "../../agent-runtime/execution/index.js";
+import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import {
   bindOwnerControlPorts,
   bindAmendmentPorts,
@@ -73,7 +75,6 @@ import {
 import type { OriginatingChannelType, TemplateContext } from "../templating.js";
 import { resolveResponseUsageMode, type VerboseLevel } from "../thinking.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
-import { runAgentTurnWithFallback } from "./agent-runner-execution.js";
 import {
   createShouldEmitToolOutput,
   createShouldEmitToolResult,
@@ -633,33 +634,36 @@ export async function runReplyAgent(params: {
     : undefined;
   try {
     const runStartedAt = Date.now();
-    const runOutcome = await runAgentTurnWithFallback({
-      commandBody,
-      followupRun,
-      sessionCtx,
-      opts: {
-        ...opts,
-        runId,
-        ...(trackedOnToolResult ? { onToolResult: trackedOnToolResult } : {}),
+    const runOutcome = await runAdmittedTurn(
+      {
+        commandBody,
+        followupRun,
+        sessionCtx,
+        opts: {
+          ...opts,
+          runId,
+          ...(trackedOnToolResult ? { onToolResult: trackedOnToolResult } : {}),
+        },
+        typingSignals,
+        blockReplyPipeline,
+        blockStreamingEnabled,
+        blockReplyChunking,
+        resolvedBlockStreamingBreak,
+        applyReplyToMode,
+        shouldEmitToolResult,
+        shouldEmitToolOutput,
+        pendingToolTasks,
+        resetSessionAfterCompactionFailure,
+        resetSessionAfterRoleOrderingConflict,
+        isHeartbeat,
+        sessionKey,
+        getActiveSessionEntry: () => activeSessionEntry,
+        activeSessionStore,
+        storePath,
+        resolvedVerboseLevel,
       },
-      typingSignals,
-      blockReplyPipeline,
-      blockStreamingEnabled,
-      blockReplyChunking,
-      resolvedBlockStreamingBreak,
-      applyReplyToMode,
-      shouldEmitToolResult,
-      shouldEmitToolOutput,
-      pendingToolTasks,
-      resetSessionAfterCompactionFailure,
-      resetSessionAfterRoleOrderingConflict,
-      isHeartbeat,
-      sessionKey,
-      getActiveSessionEntry: () => activeSessionEntry,
-      activeSessionStore,
-      storePath,
-      resolvedVerboseLevel,
-    });
+      bindAdmittedTurnHost(),
+    );
 
     if (runOutcome.kind === "final") {
       return finalizeWithFollowup(runOutcome.payload, queueKey, runFollowupTurn);

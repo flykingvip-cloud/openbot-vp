@@ -14,7 +14,7 @@ import type { TemplateContext } from "../templating.js";
 import type { FollowupRun, QueueSettings } from "./queue.js";
 import { createMockTypingController } from "./test-helpers.js";
 
-type TurnFn = (typeof import("./agent-runner-execution.js"))["runAgentTurnWithFallback"];
+type TurnFn = (typeof import("../../agent-runtime/execution/index.js"))["runAdmittedTurn"];
 type FlushFn = (typeof import("./agent-runner-memory.js"))["runMemoryFlushIfNeeded"];
 
 const mocks = vi.hoisted(() => ({
@@ -43,10 +43,10 @@ vi.mock("./queue.js", async (importOriginal) => {
   return { ...actual, enqueueFollowupRun: vi.fn(), scheduleFollowupDrain: vi.fn() };
 });
 
-vi.mock("./agent-runner-execution.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./agent-runner-execution.js")>();
-  mocks.runAgentTurnWithFallback.mockImplementation(actual.runAgentTurnWithFallback);
-  return { ...actual, runAgentTurnWithFallback: mocks.runAgentTurnWithFallback };
+vi.mock("../../agent-runtime/execution/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../agent-runtime/execution/index.js")>();
+  mocks.runAgentTurnWithFallback.mockImplementation(actual.runAdmittedTurn);
+  return { ...actual, runAdmittedTurn: mocks.runAgentTurnWithFallback };
 });
 
 vi.mock("./agent-runner-memory.js", async (importOriginal) => {
