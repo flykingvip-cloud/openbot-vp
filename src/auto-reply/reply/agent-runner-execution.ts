@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { createRunAdmissionLease } from "../../agent-runtime/execution/lifecycle/index.js";
 import type {
   AgentRunLoopResult,
   AgentTurnExecutionParams,
@@ -383,7 +384,15 @@ export async function runAgentTurnWithFallback(
     params.getActiveSessionEntry()?.systemPromptReport,
   );
 
-  let enterpriseRunSlotHeld = false;
+  const admissionLease = createRunAdmissionLease({
+    acquire: tryAcquireEnterpriseAgentRun,
+    release: () => {
+      void releaseEnterpriseAgentRun(runId);
+    },
+    forgetSnapshot: () => {
+      forgetRunModelSet(runId);
+    },
+  });
   let commercialAuthDecisionId: string | undefined;
   let commercialSubscriptionId: string | undefined;
   let commercialPlanId: string | undefined;
@@ -477,9 +486,9 @@ export async function runAgentTurnWithFallback(
               }
             : {}),
         };
-        if (!enterpriseRunSlotHeld) {
+        if (!admissionLease.held) {
           const collaborationGroupId = params.sessionCtx.CollaborationGroupId?.trim();
-          const runSlot = await tryAcquireEnterpriseAgentRun({
+          const runSlot = await admissionLease.acquire({
             runId,
             agentId: params.followupRun.run.agentId,
             ...(collaborationGroupId ? { groupId: collaborationGroupId } : {}),
@@ -501,7 +510,6 @@ export async function runAgentTurnWithFallback(
             if (runSlot.modelGate) {
               modelGate = runSlot.modelGate;
             }
-            enterpriseRunSlotHeld = true;
             commercialAuthDecisionId = runSlot.authorizationDecisionId;
             commercialSubscriptionId = runSlot.subscriptionId;
             commercialPlanId = runSlot.planId;
@@ -537,7 +545,7 @@ export async function runAgentTurnWithFallback(
           };
         }
         const embeddedModelGovernance = resolveEmbeddedModelGovernance({
-          gateStatus: enterpriseRunSlotHeld ? "acquired" : "skipped",
+          gateStatus: admissionLease.held ? "acquired" : "skipped",
           allowlist: executionRouting.allowlist,
           tenantId: modelGate?.tenantId,
           commercialAuthorizationId: commercialAuthDecisionId,
@@ -558,7 +566,7 @@ export async function runAgentTurnWithFallback(
             ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
             : {}),
           // P4-1: parent billing context for child runs, only while this run holds the gate.
-          creditReporting: enterpriseRunSlotHeld
+          creditReporting: admissionLease.held
             ? snapshotCreditReportingFromGate({
                 modelGate,
                 subscriptionId: commercialSubscriptionId,
@@ -989,9 +997,6 @@ export async function runAgentTurnWithFallback(
       commitGrowthOutcome: recordGrowthTaskOutcome,
     };
   } finally {
-    if (enterpriseRunSlotHeld) {
-      void releaseEnterpriseAgentRun(runId);
-      forgetRunModelSet(runId);
-    }
+    admissionLease.dispose();
   }
 }
