@@ -10882,6 +10882,11 @@ tasks:
       - src/auto-reply/reply/agent-runner-utils.ts
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/agent-runtime/execution/**
+      - src/auto-reply/reply/agent-runner.run-id.test.ts
+      - src/gateway/governance/model-caller-registry.ts
+      - src/gateway/billing/commercial-run-entrypoints.registry.ts
+      - src/gateway/execution-identity-inherit-hops.test.ts
+      - src/conversation-task/chat-tool-observer-wiring.test.ts
       - src/agents/execution-stall-continue-loop.ts
       - src/agents/pi-embedded-runner/run/attempt.ts
       - src/gateway/server-methods/chat.ts
@@ -10991,6 +10996,11 @@ landingStreams:
       - src/auto-reply/reply/agent-runner-utils.ts
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/agent-runtime/execution/**
+      - src/auto-reply/reply/agent-runner.run-id.test.ts
+      - src/gateway/governance/model-caller-registry.ts
+      - src/gateway/billing/commercial-run-entrypoints.registry.ts
+      - src/gateway/execution-identity-inherit-hops.test.ts
+      - src/conversation-task/chat-tool-observer-wiring.test.ts
       - src/agents/execution-stall-continue-loop.ts
       - src/agents/pi-embedded-runner/run/attempt.ts
       - src/gateway/server-methods/chat.ts
