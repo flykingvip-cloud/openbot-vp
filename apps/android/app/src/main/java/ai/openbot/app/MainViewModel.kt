@@ -164,6 +164,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     runtime.connectManual()
   }
 
+  /**
+   * After employee login (or cold start with an active employee session): point
+   * manual gateway at the account/cloud endpoint and connect. Skips pairing
+   * onboarding; WS connects in the background for the four-tab home.
+   */
+  fun connectEmployeeCloudGateway(gatewayBaseURL: String? = null) {
+    val target = ai.openbot.app.gateway.resolveEmployeeManualGateway(gatewayBaseURL)
+    setManualEnabled(true)
+    setManualHost(target.host)
+    setManualPort(target.port)
+    setManualTls(target.tls)
+    setGatewayToken("")
+    connectManual()
+  }
+
+  /** Bridge employee platform-auth cookies into the gateway WebSocket CookieJar. */
+  fun bridgeEmployeeSessionCookies(session: ai.openbot.app.account.EmployeeSessionManager) {
+    ai.openbot.app.gateway.bridgeEmployeeCookiesIntoOpenBotHttp(session)
+  }
+
   fun disconnect() {
     runtime.disconnect()
   }

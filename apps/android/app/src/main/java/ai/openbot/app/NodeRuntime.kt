@@ -579,11 +579,13 @@ class NodeRuntime(context: Context) {
           val host = manualHost.value.trim()
           val port = manualPort.value
           if (host.isNotEmpty() && port in 1..65535) {
-            // Security: autoconnect only to previously trusted gateways (stored TLS pin).
+            // Security: autoconnect only to previously trusted gateways (stored TLS pin),
+            // except the known public cloud host (auto-pin on first connect).
             if (!manualTls.value) return@collect
             val stableId = GatewayEndpoint.manual(host = host, port = port).stableId
             val storedFingerprint = prefs.loadGatewayTlsFingerprint(stableId)?.trim().orEmpty()
-            if (storedFingerprint.isEmpty()) return@collect
+            val isCloud = ai.openbot.app.gateway.isOpenBotCloudGatewayHost(host)
+            if (storedFingerprint.isEmpty() && !isCloud) return@collect
 
             didAutoConnect = true
             connect(GatewayEndpoint.manual(host = host, port = port))
