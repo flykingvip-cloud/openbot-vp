@@ -286,5 +286,17 @@
     "from": "src/auto-reply/**",
     "denyImportsFrom": ["src/agent-runtime/execution/outcomes/!(index).ts"],
     "description": "The original turn host uses the outcome public entry, not aggregate internals."
+  },
+  {
+    "name": "runtime-visible-delivery-no-execution-control",
+    "from": "src/agent-runtime/delivery/dispatch/**",
+    "denyImportsFrom": [
+      "src/agents/pi-embedded*",
+      "src/agents/cli-runner*",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/command/**",
+      "src/conversation-task/**"
+    ],
+    "description": "Delivery receipt preparation cannot run providers, restart work or mutate the authoritative task board."
   }
 ]
