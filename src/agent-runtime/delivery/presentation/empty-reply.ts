@@ -136,12 +136,7 @@ export function decideHonestEmptyReply(
   if (input.reactionDelivered) {
     return { emit: false, reason: "reaction_delivered" };
   }
-  if (
-    input.didSendViaMessagingTool ||
-    (input.messagingToolSentTexts?.length ?? 0) > 0 ||
-    (input.messagingToolSentMediaUrls?.length ?? 0) > 0 ||
-    (input.messagingToolSentTargets?.length ?? 0) > 0
-  ) {
+  if (hasMessagingToolDelivery(input)) {
     return { emit: false, reason: "messaging_tool_delivered" };
   }
   if (hasUserVisibleReplyPayload(input.rawPayloads)) {
@@ -150,6 +145,15 @@ export function decideHonestEmptyReply(
     return { emit: false, reason: "visible_payload_filtered" };
   }
   return { emit: true, reason: "direct_chat_silent_or_empty_reply" };
+}
+
+export function hasMessagingToolDelivery(input: HonestEmptyReplyDecisionInput): boolean {
+  return Boolean(
+    input.didSendViaMessagingTool ||
+    (input.messagingToolSentTexts?.length ?? 0) > 0 ||
+    (input.messagingToolSentMediaUrls?.length ?? 0) > 0 ||
+    (input.messagingToolSentTargets?.length ?? 0) > 0,
+  );
 }
 
 /**

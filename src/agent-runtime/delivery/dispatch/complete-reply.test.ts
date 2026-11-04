@@ -94,7 +94,12 @@ describe("terminal reply delivery", () => {
     expect(completeReplyDelivery({ kind: "empty", probe: probe(evidence) }, ports)).toBeUndefined();
     expect(ports.commitOutcome).toHaveBeenCalledWith(true, {
       acceptance: { status: "pending" },
-      delivery: { status: "delivered" },
+      delivery: {
+        status:
+          reason === "messaging_tool_delivered" || reason === "reaction_delivered"
+            ? "delivered"
+            : "pending",
+      },
       deliveryId: `delivery:run-a:${reason}`,
     });
     expect(ports.recordEmptyGap).not.toHaveBeenCalled();
@@ -114,11 +119,36 @@ describe("terminal reply delivery", () => {
       expect(
         completeReplyDelivery({ kind: "empty", probe: probe(evidence) }, ports),
       ).toBeUndefined();
+      expect(ports.commitOutcome).toHaveBeenCalledWith(
+        true,
+        expect.objectContaining({
+          acceptance: { status: "pending" },
+          delivery: { status: "pending" },
+        }),
+      );
       expect(ports.recordEmptyGap).not.toHaveBeenCalled();
       expect(ports.considerContinuation).not.toHaveBeenCalled();
       expect(ports.finalize).toHaveBeenCalledOnce();
     },
   );
+
+  it("preserves confirmed messaging-tool delivery even when the group allows silence", () => {
+    const ports = fixture();
+    completeReplyDelivery(
+      {
+        kind: "empty",
+        probe: probe({ sessionCtx: { ChatType: "group" }, didSendViaMessagingTool: true }),
+      },
+      ports,
+    );
+    expect(ports.commitOutcome).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        acceptance: { status: "pending" },
+        delivery: { status: "delivered" },
+      }),
+    );
+  });
 
   it("does not turn a language-filtered reply without tools into success or a capability gap", () => {
     const ports = fixture();

@@ -12,6 +12,7 @@ import {
   classifySilentTurnGrowthOutcome,
   decideHonestEmptyReply,
   formatHonestEmptyReply,
+  hasMessagingToolDelivery,
   type HonestEmptyReplyDecisionInput,
 } from "../presentation/empty-reply.js";
 
@@ -70,13 +71,14 @@ export function completeReplyDelivery<T>(
         failureDetail: "user_aborted",
       });
     } else if (growth.success) {
-      // Preserve legacy skip-reason settlement, including legitimate silent turns.
-      // This is turn bookkeeping, not evidence of whole-task acceptance.
+      // A silent turn may be valid without a send. Stream/tool callbacks can
+      // enqueue or filter output, so their invocation does not confirm delivery.
+      const sent = result.probe.reactionDelivered || hasMessagingToolDelivery(result.probe);
       const contract = ports.readContract();
       const gates = resolveChatTurnCloseGates({
         deliveryId: `delivery:${ports.runId}:${decision.reason}`,
         contract,
-        deliveryPhase: "delivered",
+        deliveryPhase: sent ? "delivered" : "awaiting",
         acceptanceVerified: contract.acceptanceVerified === true,
       });
       void ports.commitOutcome(true, {
