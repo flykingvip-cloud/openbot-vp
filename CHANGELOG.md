@@ -307,6 +307,8 @@ Docs: https://docs.openbot.love
 - Tasks/embedded: revalidate the original task immediately after active-run registration so stops during runtime preparation prevent prompt startup without a second cancellation registry.
 - Agents/CLI: forward host cancellation to supervised processes, handle stops during asynchronous spawn, and prevent cancelled runs from returning late success or triggering session-expired retries.
 
+- Artifacts/PPTX: keep original Office bytes separate from HTML preview downloads and saves; render static slide layouts in a resource-limited local worker when available, retaining a labelled text fallback.
+
 ## 2026.3.8
 
 ### Changes
