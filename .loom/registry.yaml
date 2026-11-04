@@ -10821,7 +10821,40 @@ tasks:
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
+  - id: agent-runtime-pptx-renderer-deploy
+    owner: codex-runtime-manager
+    intent: []
+    paths:
+      - Dockerfile.pptx-renderer
+      - src/gateway/office-pptx-render.ts
+      - src/gateway/office-pptx-render.test.ts
+      - scripts/pptx-renderer/worker.mts
+      - .kiro/specs/agent-runtime-pptx-renderer-deploy/**
+    state: active
+    sessions:
+      - id: 80f91749-3fdd-4eb5-bd12-6ee01028a438
+        taskId: agent-runtime-pptx-renderer-deploy
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-04T04:09:36.924Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-04
+    metadata: {}
 landingStreams:
+  - id: agent-runtime-pptx-renderer-deploy
+    landingPolicy: serial
+    paths:
+      - Dockerfile.pptx-renderer
+      - src/gateway/office-pptx-render.ts
+      - src/gateway/office-pptx-render.test.ts
+      - scripts/pptx-renderer/worker.mts
+    canLandWith: []
+    metadata:
+      task: agent-runtime-pptx-renderer-deploy
+      owner: codex-runtime-manager
+      purpose: Dedicated local renderer image only; no Gateway/UI runtime cutover.
   - id: ft-dedupe-thinking-progress-ui-20261102
     landingPolicy: serial
     paths:
