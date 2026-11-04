@@ -263,3 +263,10 @@ Preserve source builder evaluation order, prompt content/order/trust, limits, ca
 - New component 3 PASS; original integration 24 PASS; configured original e2e 47 PASS. Post-migration joint low-profile run: 39 files / 418 PASS (pre-migration 38/415). Typed lint clean; architecture 27 rules PASS; tsgo baseline/candidate 44; build PASS, 209 warnings unchanged. — codex-runtime-manager
 - Old outer module no longer imports or calls CLI/embedded providers; manifest enforces this and public candidate entry. No new retry/queue/agent loop. Candidate extraction maps/invariants preserve original intent and side-effect order. — codex-runtime-manager
 - Legacy debt: candidate type-only references original AgentTurnExecutionParams and directly uses existing host identity/transport/observer/delivery helpers. It is an internal adapter, not a final SDK. Full admitted-turn outer lifecycle, common acceptance/delivery ownership, state and extension retirement gates remain unfinished. — codex-runtime-manager
+
+## Internal execution turn contract ownership checkpoint
+
+- Existing AgentRunLoopResult / AgentTurnExecutionParams type blocks moved unchanged to execution/runner/turn-contract.ts (1f6fde62e), with type-only compatibility exports. Candidate now depends locally rather than back on the old large outer execution module. — codex-runtime-manager
+- Full original fields/callback/result semantics retained; all contract dependencies are import type. This is an internal legacy adapter contract, not the final general work-item SDK. No runtime model/state effect moved. Independent byte-equivalence review PASS. — codex-runtime-manager
+- Four relevant suites / 26 PASS; typed lint clean; architecture 28 rules PASS; tsgo baseline/candidate 44; build PASS, warnings 209 unchanged. Reverse import from candidate to old outer owner is now denied by manifest. — codex-runtime-manager
+- Outer admitted-turn lifecycle and general delivery/state/capability boundaries remain unfinished. Do not equate request/result type ownership with complete shared execution entry migration. — codex-runtime-manager
