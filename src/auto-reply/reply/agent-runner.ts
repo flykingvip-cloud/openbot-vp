@@ -6,7 +6,7 @@ import {
   controlCurrentTask,
   queryCurrentTaskStatus,
 } from "../../agent-runtime/command/index.js";
-import { buildReplyPayloads } from "../../agent-runtime/delivery/index.js";
+import { buildReplyPayloads, prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
 import {
   bindOwnerControlPorts,
   bindAmendmentPorts,
@@ -54,11 +54,9 @@ import { defaultRuntime } from "../../runtime.js";
 import { enforceVisibleReplyLanguage } from "../../shared/text/visible-reply-language.js";
 import { shapeAdmittedComplexTaskReply } from "../../task-orchestration/complex-task-loop.js";
 import {
-  chatTurnTaskId,
   resolveChatTurnCloseGates,
   resolveTurnContractFromRunMeta,
 } from "../../task-outcome/chat-entry.js";
-import { registerAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
 import {
   TASK_OUTCOME_STORE_DIRNAME,
   type GrowthOutcomeCommitOpts,
@@ -1033,53 +1031,20 @@ export async function runReplyAgent(params: {
       return finalizeWithFollowup({ text: fallbackText }, queueKey, runFollowupTurn);
     }
 
-    // Visible reply prepared — acceptance from pinned contract; delivery stays
-    // awaiting until dispatch confirms the channel send (not "prepared" = delivered).
-    {
-      const contract = resolveTurnContractFromRun();
-      const deliveryId = `delivery:${outcomeRunId}:visible`;
-      const gates = resolveChatTurnCloseGates({
-        deliveryId,
-        contract,
-        deliveryPhase: "awaiting",
-        acceptanceVerified: contract.acceptanceVerified === true,
-      });
-      // Await prepare so confirm cannot race ahead of the pending write.
-      await commitGrowthOutcome(true, {
-        acceptance: gates.acceptance,
-        delivery: gates.delivery,
-        deliveryId: gates.deliveryId,
-      });
-      const growthAgentId = followupRun.run.agentId?.trim();
-      if (growthAgentId) {
-        const persistRoot = path.join(
-          resolveAgentDir(followupRun.run.config, growthAgentId),
-          TASK_OUTCOME_STORE_DIRNAME,
-        );
-        const pendingTaskId = chatTurnTaskId({
-          agentId: growthAgentId,
-          runId: outcomeRunId,
-          sessionKey,
-        });
-        registerAwaitingDelivery({
-          taskId: pendingTaskId,
-          deliveryId,
-          agentId: growthAgentId,
-          runId: outcomeRunId,
-          persistRoot,
-        });
-        // R85e: publish stable ids through shared ref so dispatch confirm
-        // can locate the task when replyOptions.runId is omitted.
+    await prepareVisibleDelivery({
+      resolvePersistRoot: (agentId) =>
+        path.join(resolveAgentDir(followupRun.run.config, agentId), TASK_OUTCOME_STORE_DIRNAME),
+      agentId: followupRun.run.agentId,
+      runId: outcomeRunId,
+      sessionKey,
+      contract: resolveTurnContractFromRun(),
+      commitOutcome: commitGrowthOutcome,
+      publishPending: (identity) => {
         if (opts?.pendingTurnDeliveryRef) {
-          opts.pendingTurnDeliveryRef.current = {
-            runId: outcomeRunId,
-            deliveryId,
-            taskId: pendingTaskId,
-            agentId: growthAgentId,
-          };
+          opts.pendingTurnDeliveryRef.current = identity;
         }
-      }
-    }
+      },
+    });
     try {
       const usedIds = (runResult.toolMetas ?? [])
         .map((row) => row.toolName)
