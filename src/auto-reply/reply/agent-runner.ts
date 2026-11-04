@@ -6,7 +6,12 @@ import {
   controlCurrentTask,
   queryCurrentTaskStatus,
 } from "../../agent-runtime/command/index.js";
-import { buildReplyPayloads, prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
+import {
+  buildReplyPayloads,
+  prepareVisibleDelivery,
+  completeReplyDelivery,
+  type ReplyDeliveryResult,
+} from "../../agent-runtime/delivery/index.js";
 import {
   bindOwnerControlPorts,
   bindAmendmentPorts,
@@ -53,10 +58,7 @@ import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { enforceVisibleReplyLanguage } from "../../shared/text/visible-reply-language.js";
 import { shapeAdmittedComplexTaskReply } from "../../task-orchestration/complex-task-loop.js";
-import {
-  resolveChatTurnCloseGates,
-  resolveTurnContractFromRunMeta,
-} from "../../task-outcome/chat-entry.js";
+import { resolveTurnContractFromRunMeta } from "../../task-outcome/chat-entry.js";
 import {
   TASK_OUTCOME_STORE_DIRNAME,
   type GrowthOutcomeCommitOpts,
@@ -91,9 +93,6 @@ import { resolveEffectiveBlockStreamingConfig } from "./block-streaming.js";
 import { runCollaborationLearningBackflowSafely } from "./collaboration-learning-backflow.js";
 import { createFollowupRunner } from "./followup-runner.js";
 import {
-  classifySilentTurnGrowthOutcome,
-  decideHonestEmptyReply,
-  formatHonestEmptyReply,
   parseCapabilityGapMarker,
   recordHonestCapabilityGap,
   stripCapabilityGapMarkers,
@@ -108,7 +107,7 @@ import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queu
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
 import { incrementRunCompactionCount, persistRunSessionUsage } from "./session-run-accounting.js";
-import { formatTurnProcessPlaceholder, sanitizeTurnVisibleReply } from "./turn-reply-language.js";
+import { sanitizeTurnVisibleReply } from "./turn-reply-language.js";
 import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
@@ -809,74 +808,50 @@ export async function runReplyAgent(params: {
       cliSessionId,
     });
 
-    // Nothing left to deliver. Private user-facing turns get an honest fallback;
-    // group / channel / collaboration / system turns may legitimately stay silent.
-    const finalizeEmptyDelivery = () => {
-      const decision = decideHonestEmptyReply({
-        isHeartbeat,
-        sessionCtx,
-        rawPayloads: payloadArray,
-        blockStreamDelivered: Boolean(blockReplyPipeline?.didStream()),
-        directlySentBlockCount: directlySentBlockKeys?.size ?? 0,
-        toolResultDelivered,
-        didSendViaMessagingTool: runResult.didSendViaMessagingTool,
-        messagingToolSentTexts: runResult.messagingToolSentTexts,
-        messagingToolSentMediaUrls: runResult.messagingToolSentMediaUrls,
-        messagingToolSentTargets: runResult.messagingToolSentTargets,
-        runAborted: Boolean(runResult.meta?.aborted),
-        reactionDelivered: Boolean(runResult.didSendReaction),
-      });
-      const growth = classifySilentTurnGrowthOutcome(decision);
-      if (decision.reason === "user_aborted") {
-        void commitGrowthOutcome(false, {
-          failureReason: "user_cancelled",
-          failureDetail: "user_aborted",
-        });
-      } else if (growth.success) {
-        // Silent success means delivery already happened in-run (messaging tool /
-        // block stream / reaction). Confirm delivered from resolved contract only.
-        const contract = resolveTurnContractFromRun();
-        const deliveryId = `delivery:${outcomeRunId}:${decision.reason}`;
-        const gates = resolveChatTurnCloseGates({
-          deliveryId,
-          contract,
-          deliveryPhase: "delivered",
-          acceptanceVerified: contract.acceptanceVerified === true,
-        });
-        void commitGrowthOutcome(true, {
-          acceptance: gates.acceptance,
-          delivery: gates.delivery,
-          deliveryId: gates.deliveryId,
-        });
-      } else {
-        void commitGrowthOutcome(false, {
-          failureReason: "run_failed",
-          failureDetail: decision.reason,
-        });
-      }
-      if (!decision.emit) {
-        return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
-      }
-      recordHonestCapabilityGap({
+    const completeDelivery = (result: ReplyDeliveryResult) =>
+      completeReplyDelivery(result, {
         runId: outcomeRunId,
-        agentId: followupRun.run.agentId ?? null,
-        tenantId: sessionCtx.GatewayClientSessionEnterpriseId?.trim() || null,
-        sessionKey: sessionKey ?? followupRun.run.sessionKey ?? null,
-        chatType: sessionCtx.ChatType ?? null,
-        reason: decision.reason,
-        category: "perception",
-        ownerUserId: sessionCtx.GatewayClientPlatformUserId?.trim() || null,
-        userLanguageSummary:
-          opts?.expectedReplyLanguage === "en"
-            ? "silent/empty private turn; missing actionable skill/tool or perception"
-            : "私聊静默/空回复；缺可执行技能/工具或可感知输入",
+        language: opts?.expectedReplyLanguage ?? null,
+        readContract: resolveTurnContractFromRun,
+        commitOutcome: commitGrowthOutcome,
+        recordEmptyGap: (reason) =>
+          recordHonestCapabilityGap({
+            runId: outcomeRunId,
+            agentId: followupRun.run.agentId ?? null,
+            tenantId: sessionCtx.GatewayClientSessionEnterpriseId?.trim() || null,
+            sessionKey: sessionKey ?? followupRun.run.sessionKey ?? null,
+            chatType: sessionCtx.ChatType ?? null,
+            reason,
+            category: "perception",
+            ownerUserId: sessionCtx.GatewayClientPlatformUserId?.trim() || null,
+            userLanguageSummary:
+              opts?.expectedReplyLanguage === "en"
+                ? "silent/empty private turn; missing actionable skill/tool or perception"
+                : "私聊静默/空回复；缺可执行技能/工具或可感知输入",
+          }),
+        considerContinuation: maybeScheduleTaskBoardContinue,
+        finalize: (payload) => finalizeWithFollowup(payload, queueKey, runFollowupTurn),
       });
-      return finalizeWithFollowup(
-        { text: formatHonestEmptyReply(opts?.expectedReplyLanguage ?? null) },
-        queueKey,
-        runFollowupTurn,
-      );
-    };
+
+    // Probe live delivery evidence only when the final payload path is empty.
+    const finalizeEmptyDelivery = () =>
+      completeDelivery({
+        kind: "empty",
+        probe: {
+          isHeartbeat,
+          sessionCtx,
+          rawPayloads: payloadArray,
+          blockStreamDelivered: Boolean(blockReplyPipeline?.didStream()),
+          directlySentBlockCount: directlySentBlockKeys?.size ?? 0,
+          toolResultDelivered,
+          didSendViaMessagingTool: runResult.didSendViaMessagingTool,
+          messagingToolSentTexts: runResult.messagingToolSentTexts,
+          messagingToolSentMediaUrls: runResult.messagingToolSentMediaUrls,
+          messagingToolSentTargets: runResult.messagingToolSentTargets,
+          runAborted: Boolean(runResult.meta?.aborted),
+          reactionDelivered: Boolean(runResult.didSendReaction),
+        },
+      });
 
     // Drain any late tool/block deliveries before deciding there's "nothing to send".
     // Otherwise, a late typing trigger (e.g. from a tool callback) can outlive the run and
@@ -1014,21 +989,7 @@ export async function runReplyAgent(params: {
     }
 
     if (languageGuardedReplyPayloads.length === 0 && guardedReplyPayloads.length > 0) {
-      const fallbackText = didUseTools
-        ? formatTurnProcessPlaceholder(expectedReplyLanguage, "lookup")
-        : undefined;
-      if (!fallbackText) {
-        // Language gate filtered all replies with nothing to show — not a success, do not close gaps.
-        void commitGrowthOutcome(false, {
-          failureReason: "user_filtered",
-          failureDetail: "language_gate_empty",
-        });
-        return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
-      }
-      // Process placeholder is not final delivery — leave incomplete (no evolution positive).
-      void commitGrowthOutcome(true, { processPlaceholder: true });
-      maybeScheduleTaskBoardContinue([{ text: fallbackText }]);
-      return finalizeWithFollowup({ text: fallbackText }, queueKey, runFollowupTurn);
+      return completeDelivery({ kind: "language_filtered", didUseTools });
     }
 
     await prepareVisibleDelivery({
@@ -1247,12 +1208,7 @@ export async function runReplyAgent(params: {
       env: process.env,
     });
 
-    maybeScheduleTaskBoardContinue(finalPayloads);
-    return finalizeWithFollowup(
-      finalPayloads.length === 1 ? finalPayloads[0] : finalPayloads,
-      queueKey,
-      runFollowupTurn,
-    );
+    return completeDelivery({ kind: "visible", payloads: finalPayloads });
   } catch (error) {
     // Keep the followup queue moving even when an unexpected exception escapes
     // the run path; the caller still receives the original error.
