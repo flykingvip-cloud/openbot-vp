@@ -208,9 +208,11 @@ function executorForCategory(category: string): { identity: string; path: string
 function requiredForCategory(category: string, role: RuntimeDecisionRole): CanonicalCapabilityId[] {
   if (role === "orchestrator") {
     // Image/music artifacts are produced by the modality tool, not the chat model.
-    if (category === "coding") {
-      return normalizeCapabilityIds(["coding"]);
-    }
+    // Coding stays a task category for routing labels, but the default protocol
+    // runner never marks coding passed (specialized eval is not wired). Requiring
+    // it here forever fail-closes every pooled + probe-ok chat model on coding
+    // prompts. Treat coding like other text categories until a real checker lands.
+    // Explicit request.requiredCapabilities: ["coding"] still enforces evidence.
     return normalizeCapabilityIds([]);
   }
   if (category === "image_generation") {
