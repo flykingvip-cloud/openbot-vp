@@ -347,6 +347,11 @@ export type EnterpriseKnowledgeObjectFeedItem = {
    * meaning. `partial` is a consumer-visible incomplete object, not a complete one.
    */
   publication?: KnowledgeObjectPublication;
+  /**
+   * Soft-delete timestamp. When set, the item is hidden from knowledge universe,
+   * knowledge_search, supply counts, and feed-items.list. Absent means active.
+   */
+  deletedAt?: string;
 };
 
 export type KnowledgeLineageRecord = {
