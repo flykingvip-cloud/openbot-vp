@@ -1,9 +1,9 @@
 import { YONYOU_TPLUS_CONNECTOR_ID } from "./adapters/yonyou-tplus-oauth.js";
 import { listConnectorActions, upsertConnectorAction } from "./connector-action-store.js";
 import { MATERIALIZER_SEAT_ID } from "./enterprise-data-seat-context.js";
+import { upsertFieldClassification } from "./field-classification-store.js";
 import { registerRuntimeHandler } from "./runtime-registry.js";
 import { findScopePolicy, upsertScopePolicy } from "./scope-policy-store.js";
-import { upsertFieldClassification } from "./field-classification-store.js";
 import { findSeatActionGrant, upsertSeatActionGrant } from "./seat-action-grant-store.js";
 import type { EnterpriseDataStore, ScopePolicy } from "./types.js";
 
@@ -161,25 +161,34 @@ function ensureMaterializerSeatGrants(params: {
   }
 }
 
-
-const YONYOU_ROW_PUBLIC_FIELDS = ["Code", "Name", "ID"] as const;
-const YONYOU_CLASSIFIED_ACTIONS = [
-  "erp.warehouse.query",
-  "erp.inventory.query_page",
-] as const;
+/**
+ * Business identity / list-display fields that authorized enterprise seats may
+ * read in plaintext. Unknown scalars still fail_closed_redact to "***" (phones,
+ * bank accounts, id numbers, etc. stay masked unless explicitly classified).
+ * Paths use `records[*].…` wildcards (see resolveClassificationForPath).
+ */
+const YONYOU_PUBLIC_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
+  "erp.warehouse.query": ["Code", "Name", "ID"],
+  "erp.inventory.query_page": ["Code", "Name", "ID"],
+  // Partner QueryPage SelectFields include PartnerType.*; nest under records[*].
+  "erp.partner.query_page": ["Code", "Name", "ID", "PartnerType.Code", "PartnerType.Name"],
+  // Voucher list default selectFields: {SaleDelivery|SaleOrder}.{ID,VoucherDate,Code}
+  "erp.sale_delivery.query_list": ["Code", "Name", "ID", "VoucherDate"],
+  "erp.sale_order.query_list": ["Code", "Name", "ID", "VoucherDate"],
+};
 
 /**
- * Mark list-row identity fields PUBLIC so fail_closed_redact does not turn
- * simulated/live `{ records: [{ Code, Name }] }` into Aggregate Feed count:0.
- * Paths use `records[*].…` wildcards (see resolveClassificationForPath).
+ * Mark list-row business fields PUBLIC so fail_closed_redact does not turn
+ * simulated/live partner / voucher rows into "***" while warehouse/inventory
+ * already stay plaintext after #228.
  */
 function ensureYonyouTplusFieldClassifications(params: {
   store: EnterpriseDataStore;
   tenantId: string;
   nowIso: string;
 }): void {
-  for (const actionKey of YONYOU_CLASSIFIED_ACTIONS) {
-    for (const field of YONYOU_ROW_PUBLIC_FIELDS) {
+  for (const [actionKey, fields] of Object.entries(YONYOU_PUBLIC_FIELDS_BY_ACTION)) {
+    for (const field of fields) {
       upsertFieldClassification({
         store: params.store,
         tenantId: params.tenantId,

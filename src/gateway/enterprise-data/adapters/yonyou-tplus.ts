@@ -5,7 +5,7 @@ import {
   loadYonyouTplusAppTicket,
   loadYonyouTplusOrgPermanentAuth,
 } from "../yonyou-tplus-message-store.js";
-import { extractYonyouTplusRows } from "../yonyou-tplus-rows.js";
+import { extractYonyouTplusRows, normalizeYonyouTplusVoucherRows } from "../yonyou-tplus-rows.js";
 import {
   renewYonyouTplusOpenToken,
   resolveYonyouTplusAppCredentials,
@@ -548,5 +548,29 @@ export async function executeYonyouTplusHandler(
   if (!result.ok) {
     throw new Error(result.message);
   }
-  return { payload: { records: extractYonyouTplusRows(result.body) } };
+  const rows = extractYonyouTplusRows(result.body);
+  const selectFields = voucherSelectFieldsForHandler(handlerRef, input.input);
+  return {
+    payload: {
+      records: selectFields ? normalizeYonyouTplusVoucherRows(rows, selectFields) : rows,
+    },
+  };
+}
+
+/** Default / override selectFields for voucher list handlers (positional Rows). */
+function voucherSelectFieldsForHandler(
+  handlerRef: string,
+  input: Record<string, unknown> | undefined,
+): string[] | undefined {
+  if (
+    handlerRef !== YONYOU_TPLUS_HANDLERS.saleOrder &&
+    handlerRef !== YONYOU_TPLUS_HANDLERS.saleDelivery
+  ) {
+    return undefined;
+  }
+  if (Array.isArray(input?.selectFields)) {
+    return input.selectFields.filter((field): field is string => typeof field === "string");
+  }
+  const prefix = handlerRef === YONYOU_TPLUS_HANDLERS.saleOrder ? "SaleOrder" : "SaleDelivery";
+  return [`${prefix}.ID`, `${prefix}.VoucherDate`, `${prefix}.Code`];
 }

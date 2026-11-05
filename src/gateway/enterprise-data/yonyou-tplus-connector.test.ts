@@ -378,6 +378,44 @@ describe("yonyou tplus connector registration", () => {
     expect(started.session.mode).toBe("yonyou_tplus_authorization_code");
   });
 
+  it("seeds PUBLIC business fields for partner and sale_delivery on ensure-package", () => {
+    const store = normalizeEnterpriseDataStore({});
+    ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      nowIso,
+    });
+    const pathsByAction = new Map<string, Set<string>>();
+    for (const item of Object.values(store.fieldClassifications ?? {})) {
+      if (item.tenantId !== tenantId || item.classification !== "PUBLIC") {
+        continue;
+      }
+      const bucket = pathsByAction.get(item.actionKey) ?? new Set<string>();
+      bucket.add(item.fieldPath);
+      pathsByAction.set(item.actionKey, bucket);
+    }
+    expect(pathsByAction.get("erp.partner.query_page")).toEqual(
+      new Set([
+        "records[*].Code",
+        "records[*].Name",
+        "records[*].ID",
+        "records[*].PartnerType.Code",
+        "records[*].PartnerType.Name",
+      ]),
+    );
+    expect(pathsByAction.get("erp.sale_delivery.query_list")).toEqual(
+      new Set(["records[*].Code", "records[*].Name", "records[*].ID", "records[*].VoucherDate"]),
+    );
+    expect(pathsByAction.get("erp.sale_order.query_list")).toEqual(
+      new Set(["records[*].Code", "records[*].Name", "records[*].ID", "records[*].VoucherDate"]),
+    );
+    // warehouse/inventory seeds from #228 stay in place
+    expect(pathsByAction.get("erp.warehouse.query")).toEqual(
+      new Set(["records[*].Code", "records[*].Name", "records[*].ID"]),
+    );
+  });
+
   it("registers the sale delivery list action and fills it in on a later ensure", () => {
     const store = normalizeEnterpriseDataStore({});
     ensureConnectorPackage({ store, tenantId, connectorId: "erp-yonyou-tplus", nowIso });

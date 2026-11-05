@@ -215,6 +215,28 @@ describe("yonyou tplus adapter", () => {
     });
   });
 
+  it("maps sale_delivery positional Rows onto named Code/VoucherDate/ID fields", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json(
+        {
+          code: "0",
+          message: "ok",
+          data: { TotalCount: "1", TotalPageNum: "1", Rows: [["1", "2026/10/20", "SA-1"]] },
+        },
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await executeYonyouTplusHandler(
+      YONYOU_TPLUS_HANDLERS.saleDelivery,
+      { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
+      LIVE_SECRET,
+    );
+    expect(result.payload).toEqual({
+      records: [{ ID: "1", VoucherDate: "2026/10/20", Code: "SA-1" }],
+    });
+  });
+
   it("normalizes inventory QueryPage body into a records row array", async () => {
     const fetchMock = vi.fn(async () =>
       Response.json(
