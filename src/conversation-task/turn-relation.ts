@@ -5,7 +5,7 @@
  */
 import { isWeakNewWorkCueOnly } from "./qualification.js";
 
-export type TurnRelation = "amend" | "aside" | "new_work";
+export type TurnRelation = "amend" | "conversation" | "new_work";
 
 const INBOUND_STAMP_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} [0-9:]{4,8} GMT[+-]\d+\]\s*/;
 
@@ -244,7 +244,7 @@ export type TurnRelationContext = {
 
 /**
  * Classify before the task board mutates focus.
- * `amend` and `aside` stay on the current task. Only `new_work` may cut context.
+ * `amend` and `conversation` stay on the current task. Only `new_work` may cut context.
  * Only `incoming` + `currentGoal` are scanned — never a pasted constraint history blob.
  */
 export function classifyTurnRelation(
@@ -254,10 +254,10 @@ export function classifyTurnRelation(
 ): TurnRelation {
   const text = stripInboundStamp(incoming);
   if (!text || text.startsWith("/")) {
-    return "aside";
+    return "conversation";
   }
   if (isLanguageAsideMessage(text)) {
-    return "aside";
+    return "conversation";
   }
   if (LEAVE_CURRENT_RE.test(text)) {
     return "new_work";
@@ -266,19 +266,21 @@ export function classifyTurnRelation(
     return "amend";
   }
   // Owner explicitly marks the turn as unrelated to the current task — ordinary
-  // aside, even when the body mentions words that also appear in constraint cues
+  // conversation, even when the body mentions words that also appear in constraint cues
   // (e.g. an essay topic containing「约束」). Do not swallow into amend/steer.
   if (/(?:与(?:当前)?任务无关|不(?:要|用)改(?:当前)?任务)/u.test(text.replace(/\s+/g, ""))) {
-    return "aside";
+    return "conversation";
   }
-  // Recalling / following up on a mid-task aside (插问 / 旁路) is ordinary aside —
-  // do not treat「刚才插问…」「旁路历史…」as same-task constraint amend via「刚才」.
+  // Classify requests to recall a prior answer by their action, not a lane label.
+  // Explicit task limits must still reach the task mutation path.
   if (
-    /(?:插问|旁路(?:历史)?|回顾(?:一下)?(?:插问|旁路)|追问\s*[BbＢｂ]|关于\s*[BbＢｂ]\s*(?:的|插问))/u.test(
-      text.replace(/\s+/g, ""),
-    )
+    !isOwnerExecutionBarrierUtterance(text) &&
+    /(?:回顾|复述|回忆|重述|回答的.*(?:是什么|什么)|答案(?:是什么|是什么内容))/u.test(text) &&
+    !/(?:增加|补充|改为|改成|必须|禁止)/u.test(text) &&
+    !EXPLICIT_NEW_WORK_RE.test(text) &&
+    !DISTINCT_IMPERATIVE_RE.test(text)
   ) {
-    return "aside";
+    return "conversation";
   }
   // Same-goal appendix / next chapter / charts stay amend (v2); do not over-flip.
   if (SAME_GOAL_APPENDIX_RE.test(text) && !LEAVE_CURRENT_RE.test(text)) {
@@ -309,15 +311,15 @@ export function classifyTurnRelation(
     return "new_work";
   }
   if (SHORT_ASIDE_RE.test(compact(text)) || ADDRESS_ASIDE_RE.test(text)) {
-    return "aside";
+    return "conversation";
   }
   if (isWeakNewWorkCueOnly(text)) {
-    return "aside";
+    return "conversation";
   }
   if (DISTINCT_IMPERATIVE_RE.test(text) && !sharesDistinctivePhrase(text, currentGoal)) {
     return "new_work";
   }
-  return "aside";
+  return "conversation";
 }
 
 /**

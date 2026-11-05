@@ -156,14 +156,14 @@ function edgeDirective(target: string, acceptance: string): string {
   return `[[collab_edge:handoff|to=${sanitizeField(target)}|reason=分步骤|remaining=按计划完成本步|acceptance=${sanitizeField(acceptance)}]]`;
 }
 
-function relationLabel(relation: "amend" | "aside" | "new_work"): string {
+function relationLabel(relation: "amend" | "conversation" | "new_work"): string {
   if (relation === "amend") {
     return "amend 补充纠正";
   }
   if (relation === "new_work") {
     return "new_work 新任务";
   }
-  return "aside 旁白";
+  return "conversation 对话";
 }
 
 export function applyComplexTaskLoop(input: ComplexTaskLoopInput): ComplexTaskLoopResult {

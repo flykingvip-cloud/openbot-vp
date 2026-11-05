@@ -32,7 +32,7 @@ export function shouldAttemptCollectAmendSteer(params: {
   shouldSteer: boolean;
   shouldFollowup: boolean;
   queueMode: QueueSettings["mode"];
-  turnRelation: "amend" | "aside" | "new_work" | null;
+  turnRelation: "amend" | "conversation" | "new_work" | null;
   /** Slice3: bare continue / read queries must not enter constraint persist path. */
   persistOwnerConstraint?: boolean;
 }): boolean {

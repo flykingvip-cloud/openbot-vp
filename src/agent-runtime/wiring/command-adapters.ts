@@ -1,7 +1,6 @@
 /** Bind existing host effects. No classification, routing, loops or task decisions live here. */
 import { abortEmbeddedPiRun, queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
 import { abortMidTaskAsideLanes } from "../../auto-reply/reply/mid-task-aside-reply-lane.js";
-import { resolveMidTaskAsideDisposition } from "../../auto-reply/reply/mid-task-aside.js";
 import {
   resolveActiveRunQueueAction,
   shouldAttemptCollectAmendSteer,
@@ -16,9 +15,10 @@ import {
   isOwnerExecutionBarrierUtterance,
   shouldPersistOwnerConstraint,
 } from "../../conversation-task/turn-relation.js";
+import { resolveDialogueIntent } from "../command/index.js";
 import type {
   ActiveTaskAmendmentPorts,
-  ActiveTurnPorts,
+  InteractionPorts,
   CurrentTaskControlPorts,
 } from "../command/index.js";
 import { sessionTaskState } from "../state/session-task.js";
@@ -63,24 +63,29 @@ function bindAmendmentPorts(params: {
   };
 }
 
-export function bindActiveTurnPorts(params: {
+export function bindInteractionPorts(params: {
   sessionId: string;
   prompt: string;
   queueKeys: (string | undefined)[];
-}): ActiveTurnPorts {
+}): InteractionPorts {
   return {
     readBoard: sessionTaskState.read,
     isOwnerControl: isOwnerCurrentTaskControlUtterance,
     control: (sessionFile) => bindOwnerControlPorts({ ...params, sessionFile }),
-    resolveAside: resolveMidTaskAsideDisposition,
+    resolveDialogue: (input) =>
+      resolveDialogueIntent(input, {
+        activeConstraints: activeConstraintTexts,
+        isConversation: (prompt, goal) => classifyTurnRelation(prompt, goal) === "conversation",
+      }),
     steer: () => queueEmbeddedPiMessage(params.sessionId, params.prompt),
     resolveRelation: (prompt, board) => {
       const goal = board.current?.goalText?.trim() ?? "";
-      return goal
+      const relation = goal
         ? classifyTurnRelation(prompt, goal, {
             activeConstraints: activeConstraintTexts(board.current),
           })
         : null;
+      return relation;
     },
     shouldPersistConstraint: shouldPersistOwnerConstraint,
     shouldCollectAmend: shouldAttemptCollectAmendSteer,

@@ -241,7 +241,7 @@ export async function runReplyAgent(params: {
       queueKeys: [queueKey, followupRun.run.sessionId, followupRun.run.sessionKey],
     },
   );
-  if (disposition.kind === "aside") {
+  if (disposition.kind === "dialogue") {
     const asideRunId = opts?.runId ?? crypto.randomUUID();
     const lane = await runMidTaskAsideReplyLane({
       parentSessionId: followupRun.run.sessionId,

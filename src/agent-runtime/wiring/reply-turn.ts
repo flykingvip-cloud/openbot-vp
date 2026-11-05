@@ -2,7 +2,7 @@ import path from "node:path";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { TASK_OUTCOME_STORE_DIRNAME } from "../../task-outcome/runtime-from-runner.js";
-import { handleActiveTurn } from "../command/index.js";
+import { handleInteraction } from "../command/index.js";
 import {
   buildReplyPayloads,
   completeReplyDelivery,
@@ -11,16 +11,16 @@ import {
 import { runAdmittedTurn } from "../execution/index.js";
 import { sessionTaskState } from "../state/session-task.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
-import { bindActiveTurnPorts } from "./command-adapters.js";
+import { bindInteractionPorts } from "./command-adapters.js";
 
 /** Compose the original reply-turn dependencies. The reply host owns transport and cleanup. */
 export const replyTurnRuntime = {
   command: {
     handle(
-      input: Parameters<typeof handleActiveTurn>[0],
-      host: Parameters<typeof bindActiveTurnPorts>[0],
+      input: Parameters<typeof handleInteraction>[0],
+      host: Parameters<typeof bindInteractionPorts>[0],
     ) {
-      return handleActiveTurn(input, bindActiveTurnPorts(host));
+      return handleInteraction(input, bindInteractionPorts(host));
     },
   },
   state: sessionTaskState,

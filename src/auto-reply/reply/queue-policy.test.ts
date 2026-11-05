@@ -61,7 +61,7 @@ describe("shouldAttemptCollectAmendSteer", () => {
   });
 
   it("rejects aside and new_work (not constraint inject)", () => {
-    expect(shouldAttemptCollectAmendSteer({ ...base, turnRelation: "aside" })).toBe(false);
+    expect(shouldAttemptCollectAmendSteer({ ...base, turnRelation: "conversation" })).toBe(false);
     expect(shouldAttemptCollectAmendSteer({ ...base, turnRelation: "new_work" })).toBe(false);
   });
 
