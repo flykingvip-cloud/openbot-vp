@@ -20,12 +20,8 @@ import {
 import type { EmbeddedPiRunResult } from "../../../agents/pi-embedded-runner/types.js";
 import { userFacingPreReplyFailure } from "../../../agents/sandbox/docker-engine-client.js";
 import { isSoftRecoverableEntitlementFailure } from "../../../agents/sandbox/user-facing-entitlement-failure.js";
-import { normalizeUsage } from "../../../agents/usage.js";
 import { stripHeartbeatToken } from "../../../auto-reply/heartbeat.js";
-import {
-  buildCommercialRunCreditUsageInput,
-  type RuntimeFallbackAttempt,
-} from "../../../auto-reply/reply/agent-run-credit-usage.js";
+import { type RuntimeFallbackAttempt } from "../../../auto-reply/reply/agent-run-credit-usage.js";
 import { resolveModelFallbackOptions } from "../../../auto-reply/reply/agent-runner-utils.js";
 import { buildUserFacingModelCallFailure } from "../../../auto-reply/reply/model-call-failure-copy.js";
 import { createReplyMediaPathNormalizer } from "../../../auto-reply/reply/reply-media-paths.js";
@@ -454,33 +450,22 @@ export async function runAdmittedTurn(
         }
         // V2 Phase 3：Credits 计量（ledger + ai_credits 用量双写）。
         if (modelGate?.creditReporting) {
-          const tokenUsage = normalizeUsage(runResult.meta?.agentMeta?.usage);
           const creditUserId =
             params.sessionCtx.CollaborationGroupOwnerEntitlement?.userEmail?.trim() ||
             params.sessionCtx.CollaborationGroupOwnerEntitlement?.employeeId?.trim() ||
             params.sessionCtx.GatewayClientUser;
-          void host.accounting
-            .recordCreditUsage(
-              buildCommercialRunCreditUsageInput({
-                enterpriseId: modelGate?.creditReporting.enterpriseId,
-                policyId: modelGate?.creditReporting.policyId,
-                runId,
-                provider: fallbackResult.provider,
-                model: fallbackResult.model,
-                creditUserId,
-                agentId: params.followupRun.run.agentId,
-                authorizationDecisionId: modelSession.billing.authorizationDecisionId,
-                subscriptionId: modelSession.billing.subscriptionId,
-                planId: modelSession.billing.planId,
-                planVersionId: modelSession.billing.planVersionId,
-                subscriptionSnapshotId: modelSession.billing.subscriptionSnapshotId,
-                durationMs: runResult.meta?.durationMs,
-                toolCallCount: commercialToolCallCount,
-                toolClasses: commercialToolClasses,
-                fallbackAttemptsRaw: fallbackResult.attempts,
-                tokenUsage,
-              }),
-            )
+          void modelSession
+            .recordUsage({
+              provider: fallbackResult.provider,
+              model: fallbackResult.model,
+              usage: runResult.meta?.agentMeta?.usage,
+              creditUserId,
+              agentId: params.followupRun.run.agentId,
+              durationMs: runResult.meta?.durationMs,
+              toolCallCount: commercialToolCallCount,
+              toolClasses: commercialToolClasses,
+              fallbackAttemptsRaw: fallbackResult.attempts,
+            })
             .catch((err) => {
               logVerbose(`credit usage record failed: ${String(err)}`);
             });

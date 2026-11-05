@@ -1,11 +1,14 @@
 /** Shared model authorization state. No task creation, scheduling, provider loop or delivery. */
 import type { resolveEmbeddedModelGovernance } from "../../agents/embedded-model-governance.js";
 import type { runWithModelFallback } from "../../agents/model-fallback.js";
+import { normalizeUsage, type UsageLike } from "../../agents/usage.js";
+import { buildCommercialRunCreditUsageInput } from "../../auto-reply/reply/agent-run-credit-usage.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type {
   tryAcquireEnterpriseAgentRun,
   releaseEnterpriseAgentRun,
 } from "../../gateway/billing/agent-run-governance.js";
+import type { recordCreditUsage } from "../../gateway/billing/record-credit-usage.js";
 import type {
   buildRunModelSetSnapshot,
   forgetRunModelSet,
@@ -17,6 +20,7 @@ import type { resolvePlatformModelsMode } from "../../gateway/models/platform-mo
 import { createRunAdmissionLease } from "./admission-lease.js";
 
 export type ModelSessionPorts = {
+  accounting: { recordCreditUsage: typeof recordCreditUsage };
   admission: {
     tryAcquireEnterpriseAgentRun: typeof tryAcquireEnterpriseAgentRun;
     releaseEnterpriseAgentRun: typeof releaseEnterpriseAgentRun;
@@ -167,6 +171,46 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
       });
       input.signal?.throwIfAborted();
       return result;
+    },
+    recordUsage(input: {
+      provider: string;
+      model: string;
+      usage?: UsageLike;
+      creditUserId?: string;
+      agentId?: string;
+      durationMs?: number;
+      toolCallCount: number;
+      toolClasses: readonly string[];
+      fallbackAttemptsRaw: unknown;
+    }) {
+      if (!admitted || disposed) {
+        throw new Error("Model session has not been authorized");
+      }
+      const reporting = acquired?.modelGate?.creditReporting;
+      if (!reporting) {
+        return Promise.resolve(undefined);
+      }
+      return ports.accounting.recordCreditUsage(
+        buildCommercialRunCreditUsageInput({
+          enterpriseId: reporting.enterpriseId,
+          policyId: reporting.policyId,
+          runId,
+          provider: input.provider,
+          model: input.model,
+          creditUserId: input.creditUserId,
+          agentId: input.agentId,
+          authorizationDecisionId: acquired?.authorizationDecisionId,
+          subscriptionId: acquired?.subscriptionId,
+          planId: acquired?.planId,
+          planVersionId: acquired?.planVersionId,
+          subscriptionSnapshotId: acquired?.subscriptionSnapshotId,
+          durationMs: input.durationMs,
+          toolCallCount: input.toolCallCount,
+          toolClasses: input.toolClasses,
+          fallbackAttemptsRaw: input.fallbackAttemptsRaw,
+          tokenUsage: normalizeUsage(input.usage),
+        }),
+      );
     },
     dispose() {
       disposed = true;

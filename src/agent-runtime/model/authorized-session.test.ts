@@ -125,3 +125,83 @@ it("rejects late inference after cancellation without scheduling execution", asy
   expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
   session.dispose();
 });
+
+it("records model usage with admitted billing identity without a task write", async () => {
+  const { host, session } = setup();
+  const record = vi.fn<typeof host.accounting.recordCreditUsage>();
+  record.mockResolvedValue({
+    recorded: true,
+    deduped: false,
+    creditsCharged: 0,
+    tier: "test",
+    providerCostCents: 0,
+    tenantRevenueCents: 0,
+    skippedConsumption: true,
+  });
+  host.accounting.recordCreditUsage = record;
+  vi.mocked(host.admission.tryAcquireEnterpriseAgentRun).mockResolvedValue({
+    acquired: true,
+    skipped: false,
+    enterpriseId: "tenant",
+    authorizationDecisionId: "auth",
+    subscriptionId: "subscription",
+    modelGate: { creditReporting: { enterpriseId: "tenant", policyId: "policy" } } as NonNullable<
+      Awaited<ReturnType<typeof host.admission.tryAcquireEnterpriseAgentRun>> extends infer R
+        ? R extends { acquired: true; modelGate?: infer G }
+          ? G
+          : never
+        : never
+    >,
+  });
+  await session.authorize({});
+  await session.recordUsage({
+    provider: "test",
+    model: "model",
+    usage: { input: 12, output: 4 },
+    creditUserId: "user",
+    toolCallCount: 0,
+    toolClasses: [],
+    fallbackAttemptsRaw: [],
+  });
+  expect(record).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      taskId: "model-call",
+      runId: "model-call",
+      authorizationDecisionId: "auth",
+      subscriptionId: "subscription",
+      enterpriseId: "tenant",
+      modelId: "test/model",
+      tokenUsage: { inputTokens: 12, outputTokens: 4 },
+      toolCallCount: 0,
+    }),
+  );
+  expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
+  session.dispose();
+  expect(() =>
+    session.recordUsage({
+      provider: "test",
+      model: "model",
+      toolCallCount: 0,
+      toolClasses: [],
+      fallbackAttemptsRaw: [],
+    }),
+  ).toThrow(/authorized/);
+});
+it("does not invent platform usage reporting for skipped authorization", async () => {
+  const { host, session } = setup();
+  host.accounting.recordCreditUsage = vi.fn();
+  vi.mocked(host.admission.tryAcquireEnterpriseAgentRun).mockResolvedValue({
+    acquired: false,
+    skipped: true,
+  });
+  await session.authorize({});
+  await session.recordUsage({
+    provider: "test",
+    model: "model",
+    toolCallCount: 0,
+    toolClasses: [],
+    fallbackAttemptsRaw: [],
+  });
+  expect(host.accounting.recordCreditUsage).not.toHaveBeenCalled();
+  session.dispose();
+});
