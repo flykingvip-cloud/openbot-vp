@@ -139,7 +139,6 @@ import { buildCollaborationCapabilitySystemPrompt } from "./collaboration-capabi
 import { resolveCollaborationAwareSessionFile } from "./collaboration-session-file.js";
 import type { buildCommandContext } from "./commands.js";
 import { resolveComposerPluginMentionBindings } from "./composer-plugin-mention-bindings.js";
-import { executeComposerPluginMentionsForTurn } from "./composer-plugin-mention-execute.js";
 import type { InlineDirectives } from "./directive-handling.js";
 import { buildActivePrimaryObjectivePrompt } from "./goal-correction-mutation.js";
 import { buildGroupChatContext, buildGroupIntro } from "./groups.js";
@@ -1101,28 +1100,8 @@ export async function runPreparedReply(
       ? buildAsideDialogueContextPromptForNormalReply(sessionEntry.sessionFile)
       : undefined;
   const composerPluginMentionBindings = resolveComposerPluginMentionBindings(ctx.ComposerMentions);
-  const composerPluginMentionExecution =
-    !isHeartbeat &&
-    !interactionIngress &&
-    (composerPluginMentionBindings.plugins.length > 0 ||
-      composerPluginMentionBindings.connectors.length > 0)
-      ? await executeComposerPluginMentionsForTurn({
-          bindings: composerPluginMentionBindings,
-          userMessage: inboundMessage || sessionCtx.Body || ctx.Body || "",
-          mentions: ctx.ComposerMentions,
-          config: cfg,
-          workspaceDir: runWorkspaceDir,
-          agentDir,
-          agentId,
-          sessionKey,
-          gatewayClientUser: knowledgeIdentity?.user ?? ctx.GatewayClientUser,
-          gatewayClientSessionDomain:
-            knowledgeIdentity?.sessionDomain ?? ctx.GatewayClientSessionDomain,
-          gatewayClientPlatformUserId:
-            knowledgeIdentity?.platformUserId ?? ctx.GatewayClientPlatformUserId,
-          executionIdentity,
-        })
-      : undefined;
+  // Mentions supply capability hints only. The admitted runner selects and calls
+  // tools through the common authorization, cancellation and task-action boundary.
   let extraSystemPromptParts: string[];
   if (useCollaborationAssembly) {
     extraSystemPromptParts = selectSystemContextParts([
@@ -1154,7 +1133,6 @@ export async function runPreparedReply(
       knowledgeUniversePrompt,
       sessionFocusResumePrompt,
       composerPluginMentionBindings.turnPrompt,
-      composerPluginMentionExecution?.summaryPrompt,
       growthBirthPrompt,
       cronReplyPrompt,
     ]);
@@ -1250,7 +1228,6 @@ export async function runPreparedReply(
       knowledgeUniversePrompt,
       operationalIdentityPrompt,
       composerPluginMentionBindings.turnPrompt,
-      composerPluginMentionExecution?.summaryPrompt,
       growthBirthPrompt,
       cronReplyPrompt,
     ]);

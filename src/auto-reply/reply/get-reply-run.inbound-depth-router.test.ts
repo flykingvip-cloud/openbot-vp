@@ -385,6 +385,18 @@ describe("runPreparedReply inbound depth router", () => {
         vi.mocked(runReplyAgent).mockClear();
         const result = await runPreparedReply(
           baseParams({
+            ctx: {
+              ...baseParams().ctx,
+              ComposerMentions: [
+                {
+                  mention_id: "plugin-mention",
+                  displayName: "Origin",
+                  offset: 0,
+                  length: 7,
+                  target: { kind: "plugin", pluginId: "plugin:ext:origin" },
+                },
+              ],
+            },
             sessionId: "ingress",
             sessionEntry: { sessionId: "ingress", sessionFile: file, updatedAt: 1 },
             opts: {
@@ -412,6 +424,9 @@ describe("runPreparedReply inbound depth router", () => {
             skipUserTranscriptPersist: true,
           });
           expect(run?.extraSystemPrompt).toContain("Acceptance criteria:");
+          expect(run?.mentionedPluginToolAllowlist).toEqual(["origin"]);
+          expect(run?.extraSystemPrompt).toContain("pluginId=origin");
+          expect(run?.extraSystemPrompt).not.toContain("host-executed");
         }
         if (kind === "respond") {
           expect(result).toEqual({ text: "你好" });
