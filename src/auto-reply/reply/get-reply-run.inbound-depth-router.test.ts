@@ -366,7 +366,7 @@ describe("runPreparedReply inbound depth router", () => {
     }
   });
 
-  it("applies classify-only chat-lane cuts for steward chat when the router flag is off", async () => {
+  it("restricts chat actions without emptying shared identity or skill context", async () => {
     const events: Array<Record<string, unknown>> = [];
     const stop = onAgentEvent((evt) => {
       events.push(evt.data);
@@ -383,8 +383,10 @@ describe("runPreparedReply inbound depth router", () => {
     expect(vi.mocked(buildOperationalIdentitySystemPrompt)).toHaveBeenCalledWith(
       expect.objectContaining({ listingMode: "lightweight" }),
     );
-    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({ skillFilter: [] });
-    expect(opts.bootstrapContextMode).toBe("lightweight");
+    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      skillFilter: undefined,
+    });
+    expect(opts.bootstrapContextMode).toBeUndefined();
     expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
     expect(lastReplyCall()?.followupRun.run.contextLane).toBe("chat");
     const tools = constructedToolsFromLastRun();
@@ -398,7 +400,7 @@ describe("runPreparedReply inbound depth router", () => {
     expect(toolEvents[0]?.toolSkippedReason).toBe("depth_chat");
   });
 
-  it("selected knowledge sources survive chat-lane: prefetch + tools stay available", async () => {
+  it("selected knowledge supplies context without granting execution tools", async () => {
     vi.mocked(loadContextScopeCatalog).mockResolvedValue([
       { type: "file", id: "article-1", label: "article" },
     ]);
@@ -424,15 +426,17 @@ describe("runPreparedReply inbound depth router", () => {
     expect(opts.contextScopePlan?.mode).toBe("focused");
     expect(vi.mocked(buildKnowledgeUniversePromptContext)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(resolveKnowledgeGatewayClientForAgentRun)).toHaveBeenCalledTimes(1);
-    expect(lastReplyCall()?.followupRun.run.disableTools).toBeUndefined();
+    expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
     const tools = constructedToolsFromLastRun();
-    expect(tools.length).toBeGreaterThan(0);
-    expect(embeddedToolSetContainsKnowledgeSource(tools)).toBe(true);
-    // Other chat-lane cuts still apply (OI lightweight, empty skill window).
+    expect(tools).toHaveLength(0);
+    expect(embeddedToolSetContainsKnowledgeSource(tools)).toBe(false);
+    // Identity stays concise while the skill filter remains available to context selection.
     expect(vi.mocked(buildOperationalIdentitySystemPrompt)).toHaveBeenCalledWith(
       expect.objectContaining({ listingMode: "lightweight" }),
     );
-    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({ skillFilter: [] });
+    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      skillFilter: undefined,
+    });
     expect(events.filter((evt) => evt.event === "chat.knowledge_degraded")).toEqual([]);
   });
 
@@ -467,7 +471,7 @@ describe("runPreparedReply inbound depth router", () => {
     );
     expect(opts.inboundDepthDecision?.depth).toBe("chat");
     expect(vi.mocked(buildKnowledgeUniversePromptContext)).toHaveBeenCalledTimes(1);
-    expect(lastReplyCall()?.followupRun.run.disableTools).toBeUndefined();
+    expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
   });
 
   it("keeps full bootstrap on chat-lane while workspace onboarding is incomplete", async () => {
@@ -477,6 +481,19 @@ describe("runPreparedReply inbound depth router", () => {
     expect(opts.inboundDepthDecision?.depth).toBe("chat");
     expect(opts.bootstrapContextMode).toBeUndefined();
     expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
+  });
+
+  it("retains selected skill guidance and memory in interaction without enabling tools", async () => {
+    vi.mocked(buildLearningRecallSystemPrompt).mockResolvedValueOnce("RELEVANT_MEMORY");
+    const opts: GetReplyOptions = { runId: "run-shared-supply", skillFilter: ["writing-guidance"] };
+    await runPreparedReply(baseParams({ opts }));
+    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      skillFilter: ["writing-guidance"],
+    });
+    expect(lastReplyCall()?.followupRun.run.extraSystemPrompt).toContain("RELEVANT_MEMORY");
+    expect(lastReplyCall()?.followupRun.run.extraSystemPrompt).toContain("identity");
+    expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
+    expect(opts.bootstrapContextMode).toBeUndefined();
   });
 
   it("does not force steward-required skills into retrieve skillFilter", async () => {
@@ -545,7 +562,7 @@ describe("runPreparedReply inbound depth router", () => {
     );
 
     // Space + round-invoked so collaboration assembly runs; act text avoids
-    // steward classify-only chat-lane emptying skillFilter.
+    // steward-specific chat action restriction.
     await runPreparedReply(
       baseParams({
         ...messageParams(ACT_WRITE),
@@ -588,7 +605,7 @@ describe("runPreparedReply inbound depth router", () => {
     expect(tools.map((tool) => tool.name)).not.toContain("web_search");
   });
 
-  it("skips knowledge, identity listing and tools for chat when the router is on", async () => {
+  it("keeps unselected knowledge optional and chat actions disabled when the router is on", async () => {
     process.env.OPENBOT_CHAT_INBOUND_DEPTH_ROUTER = "1";
     const events: Array<Record<string, unknown>> = [];
     const stop = onAgentEvent((evt) => {
@@ -605,8 +622,10 @@ describe("runPreparedReply inbound depth router", () => {
     expect(vi.mocked(buildOperationalIdentitySystemPrompt)).toHaveBeenCalledWith(
       expect.objectContaining({ listingMode: "lightweight" }),
     );
-    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({ skillFilter: [] });
-    expect(opts.bootstrapContextMode).toBe("lightweight");
+    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      skillFilter: undefined,
+    });
+    expect(opts.bootstrapContextMode).toBeUndefined();
     expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
     expect(lastReplyCall()?.followupRun.run.contextLane).toBe("chat");
     const constructedTools = constructedToolsFromLastRun();

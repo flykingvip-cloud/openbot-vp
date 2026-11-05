@@ -386,5 +386,14 @@
       "src/agent-runtime/wiring/!(reply-turn).ts"
     ],
     "description": "The main reply host uses the reply-turn composition for command, state and execution dependencies."
+  },
+  {
+    "name": "runtime-retired-interaction-entries",
+    "from": "src/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/command/active-turn",
+      "src/auto-reply/reply/mid-task-aside"
+    ],
+    "description": "Retired interaction adapters have no live consumers or fallback; all dialogue classification uses the unified command entry."
   }
 ]

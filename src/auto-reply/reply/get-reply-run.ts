@@ -31,7 +31,6 @@ import {
 import { applySkillPolicyToFilter } from "../../agents/skills/skill-policy.js";
 import { replyForTaskSurfaceUtterance } from "../../agents/task-surface/apply.js";
 import { isPrimarilyTaskSurfaceUtterance } from "../../agents/task-surface/surface.js";
-import { isWorkspaceOnboardingCompleted } from "../../agents/workspace.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import {
   resolveGroupSessionKey,
@@ -725,20 +724,8 @@ export async function runPreparedReply(
       }
     }
   }
-  // Chat lane already uses operational-identity listingMode=lightweight below.
-  // Also set bootstrapContextMode=lightweight (empty workspace bootstrap files)
-  // once onboarding is complete — same empty path as cron lightweight default.
-  // Guard: mid-onboarding still needs BOOTSTRAP.md / identity files in context;
-  // isWorkspaceOnboardingCompleted is false until that finishes.
-  if (applyChatLane && opts && opts.bootstrapContextMode === undefined) {
-    try {
-      if (await isWorkspaceOnboardingCompleted(runWorkspaceDir)) {
-        opts.bootstrapContextMode = "lightweight";
-      }
-    } catch {
-      // Onboarding probe must never block the turn; keep full bootstrap.
-    }
-  }
+  // Shared workspace identity and memory remain available to interaction.
+  // Source selection and token budgets do not grant action capabilities.
   if (chatLaneSkipsOptionalKnowledge) {
     const runId = opts?.runId?.trim();
     if (runId) {
@@ -1263,7 +1250,7 @@ export async function runPreparedReply(
   if (currentSpeakerPrompt) {
     extraSystemPromptParts = appendSystemContextPart(extraSystemPromptParts, currentSpeakerPrompt);
   }
-  if (!isHeartbeat && !applyChatLane) {
+  if (!isHeartbeat) {
     const learningExposureKey = learningExperienceRunKey(opts?.runId);
     const learningRecallPrompt = await buildLearningRecallSystemPrompt({
       agentId,
@@ -1397,12 +1384,9 @@ export async function runPreparedReply(
   if (preferSkillHint) {
     extraSystemPromptParts = appendSystemContextPart(extraSystemPromptParts, preferSkillHint);
   }
-  // Chat-lane: empty skill window. Retrieve: keep agent/channel filter without
-  // forcing STEWARD_REQUIRED. Act: re-apply ensureStewardRequiredSkills so
-  // governance skills re-enter the whitelist for side-effect / UI-nav turns.
-  const policySkillFilter = applyChatLane
-    ? []
-    : applySkillPolicyToFilter(opts?.skillFilter, runtimeSkillPolicy);
+  // Skill guidance is shared context. A conversation may select guidance without
+  // gaining executable tools; mandatory action skills remain execution-only.
+  const policySkillFilter = applySkillPolicyToFilter(opts?.skillFilter, runtimeSkillPolicy);
   const skillFilter =
     !applyChatLane &&
     isBuiltinStewardAgent(agentId) &&
@@ -1680,7 +1664,7 @@ export async function runPreparedReply(
       extraSystemPrompt: finalizeSystemContext(extraSystemPromptParts),
       organizationContext,
       ...(isReasoningTagProvider(provider) ? { enforceFinalTag: true } : {}),
-      ...(chatLaneSkipsOptionalKnowledge ? { disableTools: true } : {}),
+      ...(applyChatLane ? { disableTools: true } : {}),
       ...(useCollaborationAssembly && !applyChatLane ? { skillPolicy: runtimeSkillPolicy } : {}),
       ...(applyRetrieveToolPolicy && inboundDepthDecision
         ? {
