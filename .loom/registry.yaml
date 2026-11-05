@@ -24357,6 +24357,14 @@ landingStreams:
       purpose: Closeout doc, evidence logs, and isolated SDK probe. No product
         behavior change.
 sharedPaths:
+  - glob: src/agent-runtime/command/route-interaction.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized interaction execution admission integration.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/command/route-interaction.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized interaction execution admission integration.
+    reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/execution-admission.ts
     landerTask: agent-runtime-convergence
     reason: Human-authorized explicit execution admission migration; retain prior declarations.

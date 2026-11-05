@@ -478,3 +478,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - Added command admission requiring trusted authorization before state commit; cancellation during authorization refuses commit. Existing board lock rechecks task identity, focus revision and write epoch. Accepted tasks persist explicit acceptance criteria and request identity; duplicate requests return a non-executing duplicate disposition. Stale/conflicting/paused requests do not write. — codex-runtime-manager
 - Three suites / 29 PASS; architecture 41 rules PASS; changed-file lint clean; build PASS with 209 existing dynamic-import warnings. Typecheck currently 47 diagnostics, none in changed admission/board files; not globally green. Latest main #246 replayed and registry parses without conflict markers. — codex-runtime-manager
 - Gateway early task creation has NOT yet been replaced. This transaction is the tested replacement boundary, not a production cutover; individual/collaboration integration and whole-chain real-model acceptance remain open. No push/merge/deploy. — codex-runtime-manager
+
+## Interaction-to-admission routing checkpoint (2026-11-05)
+
+- Command routing joins validated interpretation to explicit execution admission. Replies/clarifications bypass admission and state mutation; bound task changes remain proposals; only execution_request invokes authorization/commit. No executor, queue or retry loop is introduced. — codex-runtime-manager
+- Four suites / 33 PASS; architecture 41 rules PASS; changed-file lint clean; typecheck remains 47 diagnostics; build PASS with 209 dynamic-import warnings. Production ingress/history and task-change application are still not switched. No push/merge/deploy. — codex-runtime-manager
