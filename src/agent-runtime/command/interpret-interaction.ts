@@ -11,6 +11,10 @@ function parseDecision(value: unknown): InteractionModelDecision {
   }
   const row = value as Record<string, unknown>;
   if (row.kind === "task_change" || row.kind === "task_control") {
+    if (row.answer !== undefined && (typeof row.answer !== "string" || !row.answer.trim())) {
+      throw new Error("Invalid interaction answer");
+    }
+    const answer = typeof row.answer === "string" ? { answer: row.answer } : {};
     const target = row.target;
     if (!target || typeof target !== "object" || Array.isArray(target)) {
       throw new Error("Invalid interaction target");
@@ -30,16 +34,16 @@ function parseDecision(value: unknown): InteractionModelDecision {
       row.kind === "task_change" &&
       typeof row.text === "string" &&
       row.text.trim() &&
-      Object.keys(row).every((key) => ["kind", "target", "text"].includes(key))
+      Object.keys(row).every((key) => ["kind", "target", "text", "answer"].includes(key))
     ) {
-      return { kind: "task_change", target: checkedTarget, text: row.text };
+      return { kind: "task_change", target: checkedTarget, text: row.text, ...answer };
     }
     if (
       row.kind === "task_control" &&
       (row.action === "pause" || row.action === "cancel" || row.action === "resume") &&
-      Object.keys(row).every((key) => ["kind", "target", "action"].includes(key))
+      Object.keys(row).every((key) => ["kind", "target", "action", "answer"].includes(key))
     ) {
-      return { kind: "task_control", target: checkedTarget, action: row.action };
+      return { kind: "task_control", target: checkedTarget, action: row.action, ...answer };
     }
     throw new Error("Invalid interaction task decision");
   }

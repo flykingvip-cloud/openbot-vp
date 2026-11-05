@@ -11,6 +11,7 @@ const PROTOCOL = [
   'For work use {"kind":"execution_request","request":{"goal":"...","acceptance":["..."]}}.',
   "For task changes use kind=task_change, target={taskId,revision}, and text. For controls use kind=task_control, the same target, and action=pause|cancel|resume.",
   "Only the host-bound task target is valid. A new message does not complete or replace an existing task.",
+  "If the message combines a question with a task change or control, return the bound task decision with optional answer for the question. The answer must not claim that the change/control has already happened; the host supplies its actual outcome. For ambiguous or conflicting mutations, clarify instead of guessing an action.",
 ].join("\n");
 
 export function buildInteractionCompletionContext(

@@ -1,6 +1,40 @@
 import { expect, it, vi } from "vitest";
 import { interpretInteraction } from "./interpret-interaction.js";
 
+it.each(["task_change", "task_control"] as const)(
+  "preserves a mixed question and bound %s in one inference",
+  async (kind) => {
+    const target = { taskId: "a", revision: "2" };
+    const decision =
+      kind === "task_change"
+        ? { kind, target, text: "改为三页", answer: "任务板最近记录为未完成。" }
+        : { kind, target, action: "pause", answer: "任务板最近记录为未完成。" };
+    const infer = vi.fn(async () => decision);
+    expect(
+      await interpretInteraction(
+        { message: "进度怎样，报告改为三页", context: [], taskTarget: target },
+        { infer },
+      ),
+    ).toEqual(decision);
+    expect(infer).toHaveBeenCalledOnce();
+    await expect(
+      interpretInteraction(
+        { message: "update", context: [], taskTarget: { ...target, revision: "3" } },
+        { infer },
+      ),
+    ).rejects.toThrow(/not bound/);
+  },
+);
+it.each([null, 1, " "])("rejects malformed mixed answer %j", async (answer) => {
+  const target = { taskId: "a", revision: "2" };
+  await expect(
+    interpretInteraction(
+      { message: "update", context: [], taskTarget: target },
+      { infer: async () => ({ kind: "task_change", target, text: "三页", answer }) },
+    ),
+  ).rejects.toThrow(/Invalid interaction answer/);
+});
+
 it("answers with one inference and preserves authorized context roles", async () => {
   const input = {
     message: "你好",

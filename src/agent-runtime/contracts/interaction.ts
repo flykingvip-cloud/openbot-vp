@@ -7,8 +7,13 @@ export type InteractionTaskTarget = { taskId: string; revision: string };
 export type InteractionModelDecision =
   | { kind: "reply"; text: string }
   | { kind: "clarify"; text: string }
-  | { kind: "task_change"; target: InteractionTaskTarget; text: string }
-  | { kind: "task_control"; target: InteractionTaskTarget; action: "pause" | "cancel" | "resume" }
+  | { kind: "task_change"; target: InteractionTaskTarget; text: string; answer?: string }
+  | {
+      kind: "task_control";
+      target: InteractionTaskTarget;
+      action: "pause" | "cancel" | "resume";
+      answer?: string;
+    }
   | { kind: "execution_request"; request: InteractionExecutionRequest };
 
 export type InteractionModelInput = {
