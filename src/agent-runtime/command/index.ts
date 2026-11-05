@@ -26,3 +26,5 @@ export {
   formatTaskQueryReply,
   type DialogueIntent,
 } from "./dialogue-intent.js";
+
+export { interpretInteraction, type InteractionInferencePort } from "./interpret-interaction.js";
