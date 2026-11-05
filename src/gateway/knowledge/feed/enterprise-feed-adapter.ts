@@ -13,7 +13,10 @@ import type { KnowledgeObject, KnowledgeObjectKind } from "../types.js";
 import type { KnowledgeFeedItem } from "./types.js";
 import { evaluateProjectionVisibility, visibilityScopeLabel } from "./visibility-policy-mapping.js";
 
-const FEED_PAYLOAD_EXCERPT_MAX = 1600;
+/** Char budget for DH feedPayloadExcerpt. Raised past 1600 so compact voucher
+ * rows (Code|Date|Customer|ΣQty|ΣAmount|首品) can cover ≥20 leading items rather
+ * than 1–2 fat SaleDeliveryDetails blobs (#246 follow-up). */
+const FEED_PAYLOAD_EXCERPT_MAX = 3200;
 const FEED_ITEMS_PREVIEW_MAX = 20;
 /** Exact fail_closed_redact placeholder — drop from DH excerpts so plaintext Code/Name survive. */
 const MASKED_SCALAR = "***";
@@ -22,7 +25,8 @@ const SENSITIVE_PAYLOAD_KEY_RE =
 /**
  * Prefer these leaf keys when an items[] row is still too wide after dropping "***".
  * Includes #244 T+ analytics leaves (costs, tax amounts, stock qtys). Nested containers
- * (Customer / SaleDeliveryDetails / …) are kept via recurse-if-children, not this regex.
+ * (Customer / Inventory / …) are kept via recurse-if-children; voucher *Details are
+ * flattened to ΣQuantity / ΣOrigTaxAmount before projection (#246 follow-up).
  */
 const BUSINESS_ITEM_KEY_RE =
   /^(id|code|name|voucherdate|specification|unitname|partnertype|warehousename|warehousecode|inventoryname|inventorycode|quantity|availablequantity|existingquantity|amount|total|origtaxamount|origtaxprice|invscost|latestcost|avagcost|retailpricenew)$/i;
@@ -86,12 +90,134 @@ function dropMaskedScalars(value: unknown, depth: number): unknown {
   return out;
 }
 
+function detailLinesFrom(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    return value.filter(
+      (item): item is Record<string, unknown> =>
+        !!item && typeof item === "object" && !Array.isArray(item),
+    );
+  }
+  if (value && typeof value === "object") {
+    return [value as Record<string, unknown>];
+  }
+  return [];
+}
+
+function readNumericField(row: Record<string, unknown>, name: string): number | undefined {
+  for (const [key, raw] of Object.entries(row)) {
+    if (
+      key.toLowerCase() !== name.toLowerCase() ||
+      raw === undefined ||
+      raw === null ||
+      raw === ""
+    ) {
+      continue;
+    }
+    const n = typeof raw === "number" ? raw : Number(raw);
+    if (!Number.isNaN(n)) {
+      return n;
+    }
+  }
+  return undefined;
+}
+
+function firstInventoryName(line: Record<string, unknown>): string | undefined {
+  const inventory = line.Inventory;
+  if (inventory && typeof inventory === "object" && !Array.isArray(inventory)) {
+    const name = (inventory as Record<string, unknown>).Name;
+    if (typeof name === "string" && name.trim()) {
+      return name;
+    }
+  }
+  if (typeof line.InventoryName === "string" && line.InventoryName.trim()) {
+    return line.InventoryName;
+  }
+  return undefined;
+}
+
+function leanParty(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const party = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (party.Code !== undefined) {
+    out.Code = party.Code;
+  }
+  if (party.Name !== undefined) {
+    out.Name = party.Name;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Collapse voucher *Details (SaleDeliveryDetails / PurchaseReceiveDetails / …)
+ * into header + ΣQuantity + ΣOrigTaxAmount + first Inventory.Name so many rows
+ * fit the 1600-char DH excerpt budget instead of 1–2 fat nested rows.
+ */
+function flattenVoucherRow(row: Record<string, unknown>): Record<string, unknown> {
+  const detailsKey = Object.keys(row).find((key) => /details$/i.test(key));
+  if (!detailsKey) {
+    return row;
+  }
+  const lines = detailLinesFrom(row[detailsKey]);
+  // Keep the task's compact shape: Code | VoucherDate | Customer.Name | ΣQty | ΣAmount | 首品.
+  // Drop ID / Warehouse / party Codes — they burn budget without helping DH Q&A.
+  const out: Record<string, unknown> = {};
+  for (const key of ["Code", "VoucherDate"]) {
+    if (row[key] !== undefined) {
+      out[key] = row[key];
+    }
+  }
+  const customer = leanParty(row.Customer);
+  if (customer?.Name !== undefined) {
+    out.Customer = { Name: customer.Name };
+  }
+  const partner = leanParty(row.Partner);
+  if (partner?.Name !== undefined) {
+    out.Partner = { Name: partner.Name };
+  }
+
+  let quantitySum = 0;
+  let amountSum = 0;
+  let hasQuantity = false;
+  let hasAmount = false;
+  let inventoryName: string | undefined;
+  for (const line of lines) {
+    const qty = readNumericField(line, "Quantity");
+    if (qty !== undefined) {
+      quantitySum += qty;
+      hasQuantity = true;
+    }
+    const amount = readNumericField(line, "OrigTaxAmount");
+    if (amount !== undefined) {
+      amountSum += amount;
+      hasAmount = true;
+    }
+    if (!inventoryName) {
+      inventoryName = firstInventoryName(line);
+    }
+  }
+  if (hasQuantity) {
+    out.Quantity = quantitySum;
+  }
+  if (hasAmount) {
+    out.OrigTaxAmount = Number.isInteger(amountSum) ? amountSum : Number(amountSum.toFixed(2));
+  }
+  if (inventoryName) {
+    out.Inventory = { Name: inventoryName };
+  }
+  return out;
+}
+
 function projectBusinessItemKeys(row: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(row)) {
-    // Keep nested business objects (Customer / SaleDeliveryDetails / Inventory / …)
-    // whenever their projected children are non-empty — do not require the container
-    // key itself to match BUSINESS_ITEM_KEY_RE (that was dropping Customer.Name etc.).
+    // Keep nested business objects (Customer / Inventory / …) whenever their
+    // projected children are non-empty — do not require the container key itself
+    // to match BUSINESS_ITEM_KEY_RE (that was dropping Customer.Name etc.).
+    // Voucher *Details arrays are flattened before this runs, so we do not keep
+    // fat SaleDeliveryDetails JSON in the excerpt.
     if (Array.isArray(child)) {
       const mapped = child
         .map((item) => {
@@ -129,6 +255,18 @@ function compactFeedPreview(record: Record<string, unknown>): Record<string, unk
     return record;
   }
   const preview = { ...(dropped as Record<string, unknown>) };
+  // Always flatten voucher *Details before budget checks so one fat SaleDeliveryDetails
+  // row cannot starve later vouchers of Customer / Quantity / OrigTaxAmount.
+  if (Array.isArray(preview.items)) {
+    preview.items = preview.items.map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return item;
+      }
+      const flattened = flattenVoucherRow(item as Record<string, unknown>);
+      // Flat master rows (inventory / stock / partner): project only when over budget.
+      return flattened === item ? item : projectBusinessItemKeys(flattened);
+    });
+  }
   let text = JSON.stringify(preview);
   if (text.length <= FEED_PAYLOAD_EXCERPT_MAX) {
     return preview;
