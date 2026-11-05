@@ -13,16 +13,22 @@ import type { KnowledgeObject, KnowledgeObjectKind } from "../types.js";
 import type { KnowledgeFeedItem } from "./types.js";
 import { evaluateProjectionVisibility, visibilityScopeLabel } from "./visibility-policy-mapping.js";
 
-const FEED_PAYLOAD_EXCERPT_MAX = 900;
+const FEED_PAYLOAD_EXCERPT_MAX = 1600;
+const FEED_ITEMS_PREVIEW_MAX = 20;
+/** Exact fail_closed_redact placeholder — drop from DH excerpts so plaintext Code/Name survive. */
+const MASKED_SCALAR = "***";
 const SENSITIVE_PAYLOAD_KEY_RE =
   /token|secret|password|passwd|appkey|appsecret|credential|opentoken|authorization/i;
+/** Prefer these keys when an items[] row is still too wide after dropping "***". */
+const BUSINESS_ITEM_KEY_RE =
+  /^(id|code|name|voucherdate|partnertype|warehousename|inventoryname|quantity|amount|total)$/i;
 
 function redactFeedPayload(value: unknown, depth: number): unknown {
   if (depth > 4) {
     return undefined;
   }
   if (Array.isArray(value)) {
-    return value.slice(0, 20).map((item) => redactFeedPayload(item, depth + 1));
+    return value.slice(0, FEED_ITEMS_PREVIEW_MAX).map((item) => redactFeedPayload(item, depth + 1));
   }
   if (!value || typeof value !== "object") {
     return value;
@@ -40,6 +46,97 @@ function redactFeedPayload(value: unknown, depth: number): unknown {
   return out;
 }
 
+function dropMaskedScalars(value: unknown, depth: number): unknown {
+  if (depth > 4) {
+    return undefined;
+  }
+  if (value === MASKED_SCALAR) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, FEED_ITEMS_PREVIEW_MAX)
+      .map((item) => dropMaskedScalars(item, depth + 1))
+      .filter((item) => item !== undefined);
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    const next = dropMaskedScalars(child, depth + 1);
+    if (next === undefined) {
+      continue;
+    }
+    if (
+      next &&
+      typeof next === "object" &&
+      !Array.isArray(next) &&
+      Object.keys(next as Record<string, unknown>).length === 0
+    ) {
+      continue;
+    }
+    out[key] = next;
+  }
+  return out;
+}
+
+function projectBusinessItemKeys(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(row)) {
+    if (!BUSINESS_ITEM_KEY_RE.test(key)) {
+      continue;
+    }
+    if (child && typeof child === "object" && !Array.isArray(child)) {
+      const nested = projectBusinessItemKeys(child as Record<string, unknown>);
+      if (Object.keys(nested).length > 0) {
+        out[key] = nested;
+      }
+      continue;
+    }
+    out[key] = child;
+  }
+  return Object.keys(out).length > 0 ? out : row;
+}
+
+/** Compact AggregateTemplate `{count,items}` so many "***" fail_closed keys do not starve Name/Code. */
+function compactFeedPreview(record: Record<string, unknown>): Record<string, unknown> {
+  const dropped = dropMaskedScalars(record, 0);
+  if (!dropped || typeof dropped !== "object" || Array.isArray(dropped)) {
+    return record;
+  }
+  const preview = { ...(dropped as Record<string, unknown>) };
+  let text = JSON.stringify(preview);
+  if (text.length <= FEED_PAYLOAD_EXCERPT_MAX) {
+    return preview;
+  }
+  if (Array.isArray(preview.items)) {
+    preview.items = preview.items.map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return item;
+      }
+      return projectBusinessItemKeys(item as Record<string, unknown>);
+    });
+  }
+  text = JSON.stringify(preview);
+  if (text.length <= FEED_PAYLOAD_EXCERPT_MAX) {
+    return preview;
+  }
+  // Last resort: shrink items[] until under budget while keeping as many leading rows as fit.
+  if (Array.isArray(preview.items) && preview.items.length > 1) {
+    const items = [...preview.items];
+    while (items.length > 1) {
+      items.pop();
+      const candidate = { ...preview, count: preview.count ?? items.length, items };
+      if (JSON.stringify(candidate).length <= FEED_PAYLOAD_EXCERPT_MAX) {
+        return candidate;
+      }
+    }
+    return { ...preview, count: preview.count ?? 1, items };
+  }
+  return preview;
+}
+
 /** Bounded row excerpt for accessible feed objects. Restricted seats get none. */
 export function feedPayloadExcerpt(payload: Record<string, unknown>): string {
   const redacted = redactFeedPayload(payload, 0);
@@ -52,7 +149,8 @@ export function feedPayloadExcerpt(payload: Record<string, unknown>): string {
   if (Object.keys(record).length === 0) {
     return "";
   }
-  const text = JSON.stringify(record);
+  const compacted = compactFeedPreview(record);
+  const text = JSON.stringify(compacted);
   if (!text || text === "{}") {
     return "";
   }

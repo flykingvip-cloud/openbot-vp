@@ -26,6 +26,8 @@ import {
 } from "./knowledge-consume-scope.js";
 
 const SEARCH_EXCERPT_CHARS = 800;
+/** Align with feedPayloadExcerpt budget so enterprise Name/Code rows are not re-cut in search hits. */
+const ENTERPRISE_SEARCH_EXCERPT_CHARS = 1600;
 const SEARCH_DEFAULT_LIMIT = 8;
 const SEARCH_MAX_LIMIT = 20;
 const GET_MAX_CHUNKS = 12;
@@ -135,6 +137,8 @@ function hitFromEvidence(evidence: KnowledgeEvidence): KnowledgeSearchHit {
 }
 
 function hitFromObject(object: KnowledgeObject): KnowledgeSearchHit {
+  const excerptLimit =
+    object.source === "enterprise" ? ENTERPRISE_SEARCH_EXCERPT_CHARS : SEARCH_EXCERPT_CHARS;
   return {
     objectId: object.id,
     docId: parseDocumentObjectId(object.id) ?? "",
@@ -142,7 +146,7 @@ function hitFromObject(object: KnowledgeObject): KnowledgeSearchHit {
     title: object.title,
     sourceUri: null,
     section: null,
-    excerpt: truncateUtf16Safe(object.summary.trim().replace(/\s+/g, " "), SEARCH_EXCERPT_CHARS),
+    excerpt: truncateUtf16Safe(object.summary.trim().replace(/\s+/g, " "), excerptLimit),
     score: null,
     governance: null,
   };
