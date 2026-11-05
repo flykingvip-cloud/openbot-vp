@@ -10933,6 +10933,18 @@ tasks:
       - src/auto-reply/reply/get-reply-run.ts
       - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
       - scripts/architecture/manifest.json
+      - src/agent-runtime/command/authorized-interaction.ts
+      - src/agent-runtime/context/interaction-history.ts
+      - src/agent-runtime/context/interaction-history.test.ts
+      - src/agent-runtime/wiring/interaction-turn.ts
+      - src/agent-runtime/wiring/interaction-turn.runtime.ts
+      - src/agents/pi-embedded-runner/session-manager-init.ts
+      - src/agents/pi-embedded-runner/session-manager-init.group-public.test.ts
+      - src/agents/session-tool-result-guard.ts
+      - src/agents/session-tool-result-guard-wrapper.ts
+      - src/gateway/server-methods/chat.owner-pause-abort.test.ts
+      - src/gateway/server-methods/chat-resume-parked-recheck.ts
+      - src/gateway/server-methods/chat.resume-parked-recheck.test.ts
     state: active
     sessions:
       - id: 6cce1901-02ad-4d31-aede-6013384aae12
@@ -10940,70 +10952,84 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
       - id: runtime-unified-interaction-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
       - id: runtime-mainline-retirement-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
       - id: runtime-inference-admission-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
       - id: runtime-interaction-contract-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
       - id: runtime-model-inference-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
       - id: runtime-interaction-production-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
       - id: runtime-one-shot-transport-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
       - id: runtime-candidate-resolution-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
       - id: runtime-execution-admission-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T10:29:38.829Z
+        lastSignalAt: 2026-11-05T12:26:59.106Z
+        metadata: {}
+      - id: codex-runtime-interaction-routing-20261105
+        taskId: agent-runtime-convergence
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-05T12:26:59.106Z
+        metadata: {}
+      - id: runtime-ingress-cutover-20261105
+        taskId: agent-runtime-convergence
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-05T12:26:59.106Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-03
@@ -11155,6 +11181,18 @@ landingStreams:
       - src/agent-runtime/context/**
       - src/auto-reply/reply/get-reply-run.ts
       - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
+      - src/agent-runtime/command/authorized-interaction.ts
+      - src/agent-runtime/context/interaction-history.ts
+      - src/agent-runtime/context/interaction-history.test.ts
+      - src/agent-runtime/wiring/interaction-turn.ts
+      - src/agent-runtime/wiring/interaction-turn.runtime.ts
+      - src/agents/pi-embedded-runner/session-manager-init.ts
+      - src/agents/pi-embedded-runner/session-manager-init.group-public.test.ts
+      - src/agents/session-tool-result-guard.ts
+      - src/agents/session-tool-result-guard-wrapper.ts
+      - src/gateway/server-methods/chat.owner-pause-abort.test.ts
+      - src/gateway/server-methods/chat-resume-parked-recheck.ts
+      - src/gateway/server-methods/chat.resume-parked-recheck.test.ts
     canLandWith: []
     metadata:
       task: agent-runtime-convergence
@@ -24367,31 +24405,38 @@ sharedPaths:
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/execution-admission.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized explicit execution admission migration; retain prior declarations.
+    reason: Human-authorized explicit execution admission migration; retain prior
+      declarations.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/execution-admission.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized explicit execution admission migration; retain prior declarations.
+    reason: Human-authorized explicit execution admission migration; retain prior
+      declarations.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/execution-admission.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized explicit execution admission migration; retain prior declarations.
+    reason: Human-authorized explicit execution admission migration; retain prior
+      declarations.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/execution-admission.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized explicit execution admission migration; retain prior declarations.
+    reason: Human-authorized explicit execution admission migration; retain prior
+      declarations.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/contracts/task.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized explicit execution admission migration; retain prior declarations.
+    reason: Human-authorized explicit execution admission migration; retain prior
+      declarations.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/state/session-task.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized explicit execution admission migration; retain prior declarations.
+    reason: Human-authorized explicit execution admission migration; retain prior
+      declarations.
     reviewAfter: 2026-11-30
   - glob: src/conversation-task/session-task-board.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized explicit execution admission migration; retain prior declarations.
+    reason: Human-authorized explicit execution admission migration; retain prior
+      declarations.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/interaction-candidate.ts
     landerTask: agent-runtime-convergence
@@ -24403,27 +24448,33 @@ sharedPaths:
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/prepared-interaction.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized bounded interaction transport migration; previous declarations retained.
+    reason: Human-authorized bounded interaction transport migration; previous
+      declarations retained.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/interaction-completion.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized bounded interaction transport migration; previous declarations retained.
+    reason: Human-authorized bounded interaction transport migration; previous
+      declarations retained.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/interaction-completion.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized bounded interaction transport migration; previous declarations retained.
+    reason: Human-authorized bounded interaction transport migration; previous
+      declarations retained.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/prepared-interaction.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized bounded interaction transport migration; previous declarations retained.
+    reason: Human-authorized bounded interaction transport migration; previous
+      declarations retained.
     reviewAfter: 2026-11-30
   - glob: src/gateway/governance/direct-model-invocation-registry.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized bounded interaction transport migration; previous declarations retained.
+    reason: Human-authorized bounded interaction transport migration; previous
+      declarations retained.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/index.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized bounded interaction transport migration; previous declarations retained.
+    reason: Human-authorized bounded interaction transport migration; previous
+      declarations retained.
     reviewAfter: 2026-11-30
   - glob: src/gateway/governance/model-caller-registry.ts
     landerTask: agent-runtime-convergence
@@ -24443,87 +24494,108 @@ sharedPaths:
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/admission-lease.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior
+      task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/admission-lease.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior
+      task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/index.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior
+      task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/authorized-session.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior
+      task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/model/authorized-session.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior
+      task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/admitted-turn.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior
+      task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/lifecycle/admission-lease.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior
+      task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/lifecycle/admission-lease.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior
+      task history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/lifecycle/index.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior
+      task history.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/fallback-state.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller migration.
+    reason: Human-authorized legacy execution adapter retirement with actual owner
+      evidence and caller migration.
     reviewAfter: 2026-11-30
   - glob: src/gateway/governance/execution-entry-registry.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller migration.
+    reason: Human-authorized legacy execution adapter retirement with actual owner
+      evidence and caller migration.
     reviewAfter: 2026-11-30
   - glob: src/gateway/governance/governance-contract.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller migration.
+    reason: Human-authorized legacy execution adapter retirement with actual owner
+      evidence and caller migration.
     reviewAfter: 2026-11-30
   - glob: src/agents/execution-preflight/execution-preflight.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller migration.
+    reason: Human-authorized legacy execution adapter retirement with actual owner
+      evidence and caller migration.
     reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
     landerTask: agent-runtime-convergence
-    reason: Human-authorized runtime migration guard for retired entry paths; retain prior ownership history.
+    reason: Human-authorized runtime migration guard for retired entry paths; retain
+      prior ownership history.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized shared-context boundary migration; one convergence lander, retain previous task history.
+    reason: Human-authorized shared-context boundary migration; one convergence
+      lander, retain previous task history.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/get-reply-run.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized shared-context boundary migration; one convergence lander, retain previous task history.
+    reason: Human-authorized shared-context boundary migration; one convergence
+      lander, retain previous task history.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/mid-task-aside-reply-lane.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reason: Human-authorized scoped runtime migration; preserve prior declarations
+      and histories, one convergence lander.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/mid-task-aside-reply-lane.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reason: Human-authorized scoped runtime migration; preserve prior declarations
+      and histories, one convergence lander.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/mid-task-aside.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reason: Human-authorized scoped runtime migration; preserve prior declarations
+      and histories, one convergence lander.
     reviewAfter: 2026-11-30
   - glob: src/conversation-task/session-task-board.slice3-context.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reason: Human-authorized scoped runtime migration; preserve prior declarations
+      and histories, one convergence lander.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/dialogue-intent.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reason: Human-authorized scoped runtime migration; preserve prior declarations
+      and histories, one convergence lander.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/active-turn.ts
     landerTask: agent-runtime-convergence
@@ -25087,11 +25159,12 @@ sharedPaths:
       tenant-context-propagation; agent-growth lifecycle may contribute
       upstream.
   - glob: src/gateway/server-methods/chat.ts
-    landerTask: knowledge-consume-precision:cursor-knowledge-consume
-    reason: Human-approved 2026-08-26 takeover for parent-scoped chat selection
-      protocol / typed runtime-context selection. Original session ACL /
-      checkpoint / routing behavior unchanged. Do not revert until the picker
-      work completes.
+    landerTask: agent-runtime-convergence
+    reason: "Human-authorized bounded runtime convergence takeover; prior scope
+      preserved: Human-approved 2026-08-26 takeover for parent-scoped chat
+      selection protocol / typed runtime-context selection. Original session ACL
+      / checkpoint / routing behavior unchanged. Do not revert until the picker
+      work completes."
   - glob: src/gateway/platform-auth/control-ui-dispatcher.ts
     landerTask: daibai-super-steward:codex-daibai
     reason: Gateway monolith decomposition owner; Phase-2c enterprise admin routes
@@ -26170,3 +26243,78 @@ sharedPaths:
     reason: Tests for the convergence registry validator. Exact-file lander.
       Resolves incidental overlap with pi-sdk-family-migration-v3:cursor
       scripts/**. Does not transfer that glob.
+  - glob: src/agent-runtime/command/authorized-interaction.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/context/interaction-history.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/context/interaction-history.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/wiring/interaction-turn.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/wiring/interaction-turn.runtime.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/agents/pi-embedded-runner/session-manager-init.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/agents/pi-embedded-runner/session-manager-init.group-public.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/agents/session-tool-result-guard.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/agents/session-tool-result-guard-wrapper.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/queue/types.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/types.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/chat.owner-pause-abort.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/chat-resume-parked-recheck.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/chat.resume-parked-recheck.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized exact-file runtime convergence takeover; retain other
+      task declarations and history.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/agent-runner.run-id.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized bounded runtime convergence takeover; retain prior
+      declarations and history.
+    reviewAfter: 2026-11-30
