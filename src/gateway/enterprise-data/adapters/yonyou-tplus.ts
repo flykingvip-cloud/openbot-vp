@@ -24,6 +24,53 @@ export const YONYOU_TPLUS_HANDLERS = {
   doc: "enterprise-data/handlers/yonyou-tplus-doc-query-v1",
 } as const;
 
+/** Default page size for QueryPage / FindVoucherList (aligned with sync PAGE_SIZE). */
+export const YONYOU_TPLUS_DEFAULT_PAGE_SIZE = 100;
+
+/**
+ * Inventory QueryPage SelectFields: identity + documented cost/price fields.
+ * AvailableQuantity / 现存量 live on currentStock/Query, not inventory QueryPage —
+ * do not invent stock qty fields here.
+ * @see https://open.chanjet.com/docs/file/apiFile/tcloud/t+jcda/t+ch
+ */
+export const YONYOU_TPLUS_INVENTORY_SELECT_FIELDS =
+  "ID,Code,Name,Specification,InvSCost,LatestCost,AvagCost,RetailPriceNew";
+
+/** Partner QueryPage SelectFields (identity + type). */
+export const YONYOU_TPLUS_PARTNER_SELECT_FIELDS = "ID,Code,Name,PartnerType.Code,PartnerType.Name";
+
+/**
+ * Default FindVoucherList selectFields for sale delivery / sale order.
+ * Paths follow Chanjet docs (明细前缀 SaleDelivery.SaleDeliveryDetails. /
+ * SaleOrder.SaleOrderDetails.). Warehouse on sale order is omitted — list
+ * examples document Customer + detail qty/amount, not header Warehouse.
+ * CostPrice/CostAmount appear on Create DTO (合并流程) but not on published
+ * FindVoucherList examples; skip rather than invent list columns.
+ */
+export function yonyouTplusDefaultVoucherSelectFields(
+  prefix: "SaleOrder" | "SaleDelivery",
+): string[] {
+  const details = prefix === "SaleOrder" ? "SaleOrderDetails" : "SaleDeliveryDetails";
+  const fields = [
+    `${prefix}.ID`,
+    `${prefix}.VoucherDate`,
+    `${prefix}.Code`,
+    `${prefix}.Customer.Code`,
+    `${prefix}.Customer.Name`,
+  ];
+  if (prefix === "SaleDelivery") {
+    fields.push(`${prefix}.Warehouse.Code`, `${prefix}.Warehouse.Name`);
+  }
+  fields.push(
+    `${prefix}.${details}.Inventory.Code`,
+    `${prefix}.${details}.Inventory.Name`,
+    `${prefix}.${details}.Quantity`,
+    `${prefix}.${details}.OrigTaxPrice`,
+    `${prefix}.${details}.OrigTaxAmount`,
+  );
+  return fields;
+}
+
 const VERSION_PATH = `${YONYOU_TPLUS_API_PREFIX}/accountAPI/GetVersionInfo`;
 
 type CallCredentials = {
@@ -437,8 +484,9 @@ function voucherListRequest(
 ): { path: string; body: unknown } {
   const selectFields = Array.isArray(input?.selectFields)
     ? input.selectFields
-    : [`${prefix}.ID`, `${prefix}.VoucherDate`, `${prefix}.Code`];
-  const pageSize = typeof input?.pageSize === "number" ? input.pageSize : 20;
+    : yonyouTplusDefaultVoucherSelectFields(prefix);
+  const pageSize =
+    typeof input?.pageSize === "number" ? input.pageSize : YONYOU_TPLUS_DEFAULT_PAGE_SIZE;
   const pageIndex = typeof input?.pageIndex === "number" ? input.pageIndex : 0;
   return {
     path: `${YONYOU_TPLUS_API_PREFIX}/${apiPath}`,
@@ -467,7 +515,11 @@ function liveRequest(
       return {
         path: `${YONYOU_TPLUS_API_PREFIX}/inventory/QueryPage`,
         body: queryBody(input, {
-          param: { PageSize: "20", PageIndex: "1", SelectFields: "ID,Code,Name" },
+          param: {
+            PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
+            PageIndex: "1",
+            SelectFields: YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
+          },
         }),
       };
     case YONYOU_TPLUS_HANDLERS.partner:
@@ -475,9 +527,9 @@ function liveRequest(
         path: `${YONYOU_TPLUS_API_PREFIX}/partner/QueryPage`,
         body: queryBody(input, {
           param: {
-            PageSize: "10",
+            PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
             PageIndex: "1",
-            SelectFields: "ID,Code,Name,PartnerType.Code,PartnerType.Name",
+            SelectFields: YONYOU_TPLUS_PARTNER_SELECT_FIELDS,
           },
         }),
       };
@@ -572,5 +624,5 @@ function voucherSelectFieldsForHandler(
     return input.selectFields.filter((field): field is string => typeof field === "string");
   }
   const prefix = handlerRef === YONYOU_TPLUS_HANDLERS.saleOrder ? "SaleOrder" : "SaleDelivery";
-  return [`${prefix}.ID`, `${prefix}.VoucherDate`, `${prefix}.Code`];
+  return yonyouTplusDefaultVoucherSelectFields(prefix);
 }

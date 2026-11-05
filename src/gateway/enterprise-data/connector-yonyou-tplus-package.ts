@@ -169,12 +169,48 @@ function ensureMaterializerSeatGrants(params: {
  */
 const YONYOU_PUBLIC_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
   "erp.warehouse.query": ["Code", "Name", "ID"],
-  "erp.inventory.query_page": ["Code", "Name", "ID"],
+  // Inventory QueryPage: identity + cost/price (phones/bank still fail_closed).
+  "erp.inventory.query_page": [
+    "Code",
+    "Name",
+    "ID",
+    "Specification",
+    "InvSCost",
+    "LatestCost",
+    "AvagCost",
+    "RetailPriceNew",
+  ],
   // Partner QueryPage SelectFields include PartnerType.*; nest under records[*].
   "erp.partner.query_page": ["Code", "Name", "ID", "PartnerType.Code", "PartnerType.Name"],
-  // Voucher list default selectFields: {SaleDelivery|SaleOrder}.{ID,VoucherDate,Code}
-  "erp.sale_delivery.query_list": ["Code", "Name", "ID", "VoucherDate"],
-  "erp.sale_order.query_list": ["Code", "Name", "ID", "VoucherDate"],
+  // Voucher Rows keys strip SaleDelivery./SaleOrder. root (see yonyouTplusSelectFieldPathKey).
+  "erp.sale_delivery.query_list": [
+    "Code",
+    "Name",
+    "ID",
+    "VoucherDate",
+    "Customer.Code",
+    "Customer.Name",
+    "Warehouse.Code",
+    "Warehouse.Name",
+    "SaleDeliveryDetails.Inventory.Code",
+    "SaleDeliveryDetails.Inventory.Name",
+    "SaleDeliveryDetails.Quantity",
+    "SaleDeliveryDetails.OrigTaxPrice",
+    "SaleDeliveryDetails.OrigTaxAmount",
+  ],
+  "erp.sale_order.query_list": [
+    "Code",
+    "Name",
+    "ID",
+    "VoucherDate",
+    "Customer.Code",
+    "Customer.Name",
+    "SaleOrderDetails.Inventory.Code",
+    "SaleOrderDetails.Inventory.Name",
+    "SaleOrderDetails.Quantity",
+    "SaleOrderDetails.OrigTaxPrice",
+    "SaleOrderDetails.OrigTaxAmount",
+  ],
 };
 
 /**

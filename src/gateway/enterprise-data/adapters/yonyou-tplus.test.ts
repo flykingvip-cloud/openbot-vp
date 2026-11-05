@@ -3,7 +3,10 @@ import type { ScopeEvaluationResult } from "../types.js";
 import {
   executeYonyouTplusHandler,
   probeYonyouTplusConnection,
+  YONYOU_TPLUS_DEFAULT_PAGE_SIZE,
   YONYOU_TPLUS_HANDLERS,
+  YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
+  yonyouTplusDefaultVoucherSelectFields,
 } from "./yonyou-tplus.js";
 
 const ALL_SCOPE: ScopeEvaluationResult = {
@@ -183,9 +186,9 @@ describe("yonyou tplus adapter", () => {
     const [url, init] = recordedFetch(fetchMock);
     expect(url).toBe("https://openapi.chanjet.com/tplus/api/v2/SaleOrderOpenApi/FindVoucherList");
     expect(readJsonBody(init)).toEqual({
-      pageSize: 20,
+      pageSize: YONYOU_TPLUS_DEFAULT_PAGE_SIZE,
       pageIndex: 0,
-      selectFields: ["SaleOrder.ID", "SaleOrder.VoucherDate", "SaleOrder.Code"],
+      selectFields: yonyouTplusDefaultVoucherSelectFields("SaleOrder"),
       paramDic: {},
     });
   });
@@ -208,20 +211,33 @@ describe("yonyou tplus adapter", () => {
       "https://openapi.chanjet.com/tplus/api/v2/SaleDeliveryOpenApi/FindVoucherList",
     );
     expect(readJsonBody(init)).toEqual({
-      pageSize: 20,
+      pageSize: YONYOU_TPLUS_DEFAULT_PAGE_SIZE,
       pageIndex: 0,
-      selectFields: ["SaleDelivery.ID", "SaleDelivery.VoucherDate", "SaleDelivery.Code"],
+      selectFields: yonyouTplusDefaultVoucherSelectFields("SaleDelivery"),
       paramDic: {},
     });
   });
 
-  it("maps sale_delivery positional Rows onto named Code/VoucherDate/ID fields", async () => {
+  it("maps sale_delivery positional Rows onto stable path keys (no Code collision)", async () => {
+    const selectFields = [
+      "SaleDelivery.ID",
+      "SaleDelivery.VoucherDate",
+      "SaleDelivery.Code",
+      "SaleDelivery.Customer.Name",
+      "SaleDelivery.SaleDeliveryDetails.Inventory.Code",
+      "SaleDelivery.SaleDeliveryDetails.Quantity",
+      "SaleDelivery.SaleDeliveryDetails.OrigTaxAmount",
+    ];
     const fetchMock = vi.fn(async () =>
       Response.json(
         {
           code: "0",
           message: "ok",
-          data: { TotalCount: "1", TotalPageNum: "1", Rows: [["1", "2026/10/20", "SA-1"]] },
+          data: {
+            TotalCount: "1",
+            TotalPageNum: "1",
+            Rows: [["1", "2026/10/20", "SA-1", "苏州扇来善往", "10001", "2", "180.00"]],
+          },
         },
         { status: 200 },
       ),
@@ -229,11 +245,43 @@ describe("yonyou tplus adapter", () => {
     vi.stubGlobal("fetch", fetchMock);
     const result = await executeYonyouTplusHandler(
       YONYOU_TPLUS_HANDLERS.saleDelivery,
-      { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
+      { input: { selectFields }, scope: ALL_SCOPE, employeeId: "emp-1" },
       LIVE_SECRET,
     );
     expect(result.payload).toEqual({
-      records: [{ ID: "1", VoucherDate: "2026/10/20", Code: "SA-1" }],
+      records: [
+        {
+          ID: "1",
+          VoucherDate: "2026/10/20",
+          Code: "SA-1",
+          Customer: { Name: "苏州扇来善往" },
+          SaleDeliveryDetails: {
+            Inventory: { Code: "10001" },
+            Quantity: "2",
+            OrigTaxAmount: "180.00",
+          },
+        },
+      ],
+    });
+  });
+
+  it("defaults inventory QueryPage SelectFields to identity plus cost/price", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ TotalCount: 0, Data: [] }, { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await executeYonyouTplusHandler(
+      YONYOU_TPLUS_HANDLERS.inventory,
+      { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
+      LIVE_SECRET,
+    );
+    const [, init] = recordedFetch(fetchMock);
+    expect(readJsonBody(init)).toEqual({
+      param: {
+        PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
+        PageIndex: "1",
+        SelectFields: YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
+      },
     });
   });
 

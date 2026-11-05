@@ -390,8 +390,9 @@ describe("yonyou projection cursor window", () => {
     });
     expect(result.feedItem.payload.query).toEqual({
       param: {
-        PageSize: "20",
+        PageSize: "100",
         PageIndex: "1",
+        SelectFields: "ID,Code,Name,Specification,InvSCost,LatestCost,AvagCost,RetailPriceNew",
         UpdateDateBegin: "2026-10-20 00:00:00",
         UpdateDateEnd: "2026-10-22 06:00:00",
       },
@@ -531,5 +532,4 @@ describe("yonyou projection cursor window", () => {
     expect(result.feedItem.payload.count).toBeGreaterThanOrEqual(1);
     expect(result.feedItem.title).toContain("汇总");
   });
-
 });

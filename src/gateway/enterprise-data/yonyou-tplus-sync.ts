@@ -20,7 +20,7 @@
  * fingerprinted by Code/Name/Ts. QueryPage and FindVoucherList do not document
  * `?idMarketingOrgan=`.
  *
- * Pagination: QueryPage uses PAGE_SIZE=20. Incremental UpdateDate / voucher
+ * Pagination: QueryPage uses PAGE_SIZE=100. Incremental UpdateDate / voucher
  * windows keep a tight MAX_PAGES_RANGE (default 5). First/full master pulls
  * (no watermark) use MAX_PAGES_FULL (default 500) so archives larger than 100
  * rows can finish and advance the watermark. Override with
@@ -33,7 +33,10 @@ import { YONYOU_TPLUS_CONNECTOR_ID } from "./adapters/yonyou-tplus-oauth.js";
 import {
   executeYonyouTplusHandler,
   probeYonyouTplusConnection,
+  YONYOU_TPLUS_DEFAULT_PAGE_SIZE,
   YONYOU_TPLUS_HANDLERS,
+  YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
+  YONYOU_TPLUS_PARTNER_SELECT_FIELDS,
   type YonyouTplusProbeContext,
 } from "./adapters/yonyou-tplus.js";
 import { loadCredentialSecret } from "./connector-credential-vault.js";
@@ -49,11 +52,11 @@ import type {
 import { extractYonyouTplusRows, yonyouTplusPayloadBody } from "./yonyou-tplus-rows.js";
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
-const PAGE_SIZE = 20;
+const PAGE_SIZE = YONYOU_TPLUS_DEFAULT_PAGE_SIZE;
 /** Incremental UpdateDate / voucher windows: keep a tight page budget. */
 const MAX_PAGES_RANGE_DEFAULT = 5;
 /**
- * First/full master QueryPage (no UpdateDate window). 500×20 ≈ 10k rows —
+ * First/full master QueryPage (no UpdateDate window). 500×100 ≈ 50k rows —
  * enough for typical inventory/partner archives without unbounded loops.
  */
 const MAX_PAGES_FULL_DEFAULT = 500;
@@ -384,6 +387,16 @@ function windowLabel(window: DateWindow): string {
   return `${window.begin} 至 ${window.end}`;
 }
 
+function masterSelectFields(stream: SyncStream): string | undefined {
+  if (stream.streamKey === "inventory") {
+    return YONYOU_TPLUS_INVENTORY_SELECT_FIELDS;
+  }
+  if (stream.streamKey === "partner") {
+    return YONYOU_TPLUS_PARTNER_SELECT_FIELDS;
+  }
+  return undefined;
+}
+
 function streamInput(
   stream: SyncStream,
   window: DateWindow,
@@ -394,6 +407,10 @@ function streamInput(
       PageSize: `${PAGE_SIZE}`,
       PageIndex: `${pageIndex}`,
     };
+    const selectFields = masterSelectFields(stream);
+    if (selectFields) {
+      param.SelectFields = selectFields;
+    }
     if (window.mode === "range") {
       param.UpdateDateBegin = window.begin;
       param.UpdateDateEnd = window.end;

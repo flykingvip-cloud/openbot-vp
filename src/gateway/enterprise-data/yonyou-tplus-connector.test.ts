@@ -405,14 +405,52 @@ describe("yonyou tplus connector registration", () => {
       ]),
     );
     expect(pathsByAction.get("erp.sale_delivery.query_list")).toEqual(
-      new Set(["records[*].Code", "records[*].Name", "records[*].ID", "records[*].VoucherDate"]),
+      new Set([
+        "records[*].Code",
+        "records[*].Name",
+        "records[*].ID",
+        "records[*].VoucherDate",
+        "records[*].Customer.Code",
+        "records[*].Customer.Name",
+        "records[*].Warehouse.Code",
+        "records[*].Warehouse.Name",
+        "records[*].SaleDeliveryDetails.Inventory.Code",
+        "records[*].SaleDeliveryDetails.Inventory.Name",
+        "records[*].SaleDeliveryDetails.Quantity",
+        "records[*].SaleDeliveryDetails.OrigTaxPrice",
+        "records[*].SaleDeliveryDetails.OrigTaxAmount",
+      ]),
     );
     expect(pathsByAction.get("erp.sale_order.query_list")).toEqual(
-      new Set(["records[*].Code", "records[*].Name", "records[*].ID", "records[*].VoucherDate"]),
+      new Set([
+        "records[*].Code",
+        "records[*].Name",
+        "records[*].ID",
+        "records[*].VoucherDate",
+        "records[*].Customer.Code",
+        "records[*].Customer.Name",
+        "records[*].SaleOrderDetails.Inventory.Code",
+        "records[*].SaleOrderDetails.Inventory.Name",
+        "records[*].SaleOrderDetails.Quantity",
+        "records[*].SaleOrderDetails.OrigTaxPrice",
+        "records[*].SaleOrderDetails.OrigTaxAmount",
+      ]),
     );
-    // warehouse/inventory seeds from #228 stay in place
+    // warehouse seeds from #228; inventory gains cost/price PUBLIC paths
     expect(pathsByAction.get("erp.warehouse.query")).toEqual(
       new Set(["records[*].Code", "records[*].Name", "records[*].ID"]),
+    );
+    expect(pathsByAction.get("erp.inventory.query_page")).toEqual(
+      new Set([
+        "records[*].Code",
+        "records[*].Name",
+        "records[*].ID",
+        "records[*].Specification",
+        "records[*].InvSCost",
+        "records[*].LatestCost",
+        "records[*].AvagCost",
+        "records[*].RetailPriceNew",
+      ]),
     );
   });
 
