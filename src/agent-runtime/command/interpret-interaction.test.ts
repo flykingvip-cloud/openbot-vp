@@ -60,3 +60,27 @@ it("rejects late output after cancellation without another inference", async () 
   ).rejects.toThrow();
   expect(infer).toHaveBeenCalledOnce();
 });
+
+it.each(["task_change", "task_control"] as const)(
+  "binds %s proposals to the captured task revision",
+  async (kind) => {
+    const target = { taskId: "task-a", revision: "epoch-1" };
+    const decision =
+      kind === "task_change"
+        ? { kind, target, text: "仅用公开资料" }
+        : { kind, target, action: "pause" };
+    const infer = vi.fn(async () => decision);
+    expect(
+      await interpretInteraction({ message: "update", context: [], taskTarget: target }, { infer }),
+    ).toEqual(decision);
+    await expect(
+      interpretInteraction({ message: "update", context: [] }, { infer }),
+    ).rejects.toThrow(/not bound/);
+    await expect(
+      interpretInteraction(
+        { message: "update", context: [], taskTarget: { ...target, revision: "epoch-2" } },
+        { infer },
+      ),
+    ).rejects.toThrow(/not bound/);
+  },
+);
