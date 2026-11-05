@@ -798,6 +798,7 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "enterprise-data.projection-specs.upsert",
     "enterprise-data.projection-bindings.upsert",
     "enterprise-data.visibility-policies.upsert",
+    "enterprise-data.feed-items.delete",
     "enterprise-data.projection-materializer.run",
     "enterprise-data.governance-approvals.create",
     "enterprise-data.governance-approvals.cancel",

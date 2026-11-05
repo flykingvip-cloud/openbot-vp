@@ -441,6 +441,82 @@ describe("enterprise-data M4 gateway handlers", () => {
     const policy = response.payload?.policy as { visibleSeats?: string[] };
     expect(policy.visibleSeats).toContain("seat-sales-director");
   });
+
+  it("rejects member on feed-items.delete", async () => {
+    const response = await invoke(
+      "enterprise-data.feed-items.delete",
+      { tenantId, objectId: "missing" },
+      { admin: false },
+    );
+    expect(response.ok).toBe(false);
+    expect(response.error?.message).toContain(GOVERNANCE_ADMIN_REQUIRED_MESSAGE);
+  });
+
+  it("soft-deletes a feed item and hides it from list", async () => {
+    const bindingId = await getProfileBindingId();
+    await invoke("enterprise-data.projection-materializer.run", { tenantId, bindingId });
+    await invoke("enterprise-data.projection-materializer.run", { tenantId, bindingId });
+    const listed = await invoke("enterprise-data.feed-items.list", { tenantId });
+    expect(listed.ok).toBe(true);
+    const items =
+      (listed.payload?.items as
+        | Array<{
+            objectId: string;
+            generatedAt: string;
+            isCurrentSupplied?: boolean;
+          }>
+        | undefined) ?? [];
+    expect(items.length).toBeGreaterThanOrEqual(2);
+    const superseded = [...items].toSorted((a, b) => a.generatedAt.localeCompare(b.generatedAt))[0];
+    const current = [...items].toSorted((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0];
+    expect(current.isCurrentSupplied).toBe(true);
+    expect(superseded.isCurrentSupplied).toBe(false);
+
+    const deleted = await invoke("enterprise-data.feed-items.delete", {
+      tenantId,
+      objectId: superseded.objectId,
+    });
+    expect(deleted.ok).toBe(true);
+    expect((deleted.payload?.item as { deletedAt?: string } | undefined)?.deletedAt).toBeTruthy();
+
+    const after = await invoke("enterprise-data.feed-items.list", { tenantId });
+    const afterIds = ((after.payload?.items as Array<{ objectId: string }>) ?? []).map(
+      (item) => item.objectId,
+    );
+    expect(afterIds).not.toContain(superseded.objectId);
+    expect(afterIds).toContain(current.objectId);
+  });
+
+  it("refuses deleting current supplied feed without force and allows with force", async () => {
+    const bindingId = await getProfileBindingId();
+    await invoke("enterprise-data.projection-materializer.run", { tenantId, bindingId });
+    const listed = await invoke("enterprise-data.feed-items.list", { tenantId });
+    const current = (
+      (listed.payload?.items as
+        | Array<{ objectId: string; isCurrentSupplied?: boolean }>
+        | undefined) ?? []
+    ).find((item) => item.isCurrentSupplied);
+    expect(current).toBeTruthy();
+
+    const refused = await invoke("enterprise-data.feed-items.delete", {
+      tenantId,
+      objectId: current!.objectId,
+    });
+    expect(refused.ok).toBe(false);
+    expect(refused.error?.message).toMatch(/force=true|已供给/);
+
+    const forced = await invoke("enterprise-data.feed-items.delete", {
+      tenantId,
+      objectId: current!.objectId,
+      force: true,
+    });
+    expect(forced.ok).toBe(true);
+    const after = await invoke("enterprise-data.feed-items.list", { tenantId });
+    const afterIds = ((after.payload?.items as Array<{ objectId: string }>) ?? []).map(
+      (item) => item.objectId,
+    );
+    expect(afterIds).not.toContain(current!.objectId);
+  });
 });
 
 async function getProfileBindingId(): Promise<string> {

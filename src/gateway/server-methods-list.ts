@@ -427,6 +427,7 @@ const BASE_METHODS = [
   "enterprise-data.visibility-policies.upsert",
   "enterprise-data.feed-items.list",
   "enterprise-data.feed-items.get",
+  "enterprise-data.feed-items.delete",
   "enterprise-data.projection-materializer.run",
   "enterprise-data.knowledge-supply.overview",
   "enterprise-data.lineage.list",
