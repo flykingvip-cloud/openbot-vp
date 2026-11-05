@@ -364,7 +364,7 @@ export async function runAdmittedTurn(
             },
           };
         }
-        const embeddedModelGovernance = modelSession.prepareModelSet({
+        modelSession.prepareModelSet({
           config: params.followupRun.run.config,
           actorId,
           routing: executionRouting,
@@ -400,16 +400,9 @@ export async function runAdmittedTurn(
             platformUserId: runGatewayClientPlatformUserId,
           },
         });
-        const fallbackResult = await host.model.runWithModelFallback({
+        const fallbackResult = await modelSession.infer({
           ...resolveModelFallbackOptions(params.followupRun.run),
-          ...embeddedModelGovernance,
-          ...(executionRouting.preferredModelOrder
-            ? { preferredModelOrder: executionRouting.preferredModelOrder }
-            : {}),
-          runtimeAdmission: {
-            taskText: params.followupRun.prompt || params.commandBody,
-          },
-          runId,
+          taskText: params.followupRun.prompt || params.commandBody,
           run: (provider, model, runOptions) => {
             // Notify that model selection is complete (including after fallback).
             // This allows responsePrefix template interpolation with the actual model.

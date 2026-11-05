@@ -10935,35 +10935,42 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T03:51:07.606Z
+        lastSignalAt: 2026-11-05T04:46:38.120Z
         metadata: {}
       - id: runtime-unified-interaction-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T03:51:07.606Z
+        lastSignalAt: 2026-11-05T04:46:38.120Z
         metadata: {}
       - id: runtime-mainline-retirement-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T03:51:07.606Z
+        lastSignalAt: 2026-11-05T04:46:38.120Z
         metadata: {}
       - id: runtime-inference-admission-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T03:51:07.606Z
+        lastSignalAt: 2026-11-05T04:46:38.120Z
         metadata: {}
       - id: runtime-interaction-contract-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T03:51:07.606Z
+        lastSignalAt: 2026-11-05T04:46:38.120Z
+        metadata: {}
+      - id: runtime-model-inference-20261105
+        taskId: agent-runtime-convergence
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-05T04:46:38.120Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-03
@@ -24312,6 +24319,10 @@ landingStreams:
       purpose: Closeout doc, evidence logs, and isolated SDK probe. No product
         behavior change.
 sharedPaths:
+  - glob: src/gateway/governance/model-caller-registry.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized shared inference caller ownership migration.
+    reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/interpret-interaction.ts
     landerTask: agent-runtime-convergence
     reason: Human-authorized scoped interaction admission contract migration.

@@ -449,3 +449,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Interpretation proposals now distinguish task changes and pause/cancel/resume controls, bound to a trusted host-captured task/revision. Missing or mismatched targets are rejected before returning a decision; proposals still cannot mutate or execute. Cancellation guards remain before and after the single inference. — codex-runtime-manager
 - Interpretation 11 PASS; architecture 41 rules PASS; changed-file lint clean. Current typecheck has 46 diagnostics: two newly integrated main feed-delete test errors versus prior 44; no errors in changed interaction files. Replayed onto main #240/#241; post-replay prior component group 16 PASS and build PASS with 209 warnings. Production inference transport and Gateway admission remain unfinished. No deployment. — codex-runtime-manager
+
+## Shared governed inference checkpoint (2026-11-05)
+
+- Shared authorized model session now owns the original governed fallback call; admitted execution supplies the same candidate callback. Calling inference requires successful admission and prepared model governance; disposed/unprepared sessions refuse calls. Optional cancellation is checked before/after each candidate and final response. No task writer or scheduler added. — codex-runtime-manager
+- Governance caller registration follows the actual shared owner. Six suites / 116 PASS; configured reply E2E 47 PASS; architecture 41 rules PASS; changed-file lint clean; typecheck remains 46 baseline diagnostics; build PASS with 209 existing dynamic-import warnings. — codex-runtime-manager
+- This is shared inference integration into the existing execution consumer, not production taskless interaction cutover. Provider transport, shared history, response accounting and Gateway execution admission still need connection. No push/merge/deploy. — codex-runtime-manager

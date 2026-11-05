@@ -1,5 +1,6 @@
 /** Shared model authorization state. No task creation, scheduling, provider loop or delivery. */
 import type { resolveEmbeddedModelGovernance } from "../../agents/embedded-model-governance.js";
+import type { runWithModelFallback } from "../../agents/model-fallback.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type {
   tryAcquireEnterpriseAgentRun,
@@ -27,6 +28,7 @@ export type ModelSessionPorts = {
     rememberRunModelSet: typeof rememberRunModelSet;
     snapshotCreditReportingFromGate: typeof snapshotCreditReportingFromGate;
     resolvePlatformModelsMode: typeof resolvePlatformModelsMode;
+    runWithModelFallback: typeof runWithModelFallback;
   };
 };
 type AdmissionResult = Awaited<ReturnType<typeof tryAcquireEnterpriseAgentRun>>;
@@ -36,6 +38,12 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
   let admitted = false;
   let disposed = false;
   let acquired: Acquired | undefined;
+  let prepared:
+    | {
+        governance: ReturnType<typeof resolveEmbeddedModelGovernance>;
+        preferredModelOrder?: string[];
+      }
+    | undefined;
   const lease = createRunAdmissionLease({
     acquire: ports.admission.tryAcquireEnterpriseAgentRun,
     release: () => {
@@ -71,6 +79,7 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
         return acquired;
       }
       admitted = false;
+      prepared = undefined;
       const result = await lease.acquire({ ...input, runId });
       admitted = result.acquired || result.skipped;
       if (result.acquired) {
@@ -120,11 +129,49 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
       if (snapshot) {
         ports.model.rememberRunModelSet(runId, snapshot);
       }
+      prepared = { governance, preferredModelOrder: input.routing.preferredModelOrder };
       return governance;
+    },
+    async infer<T>(input: {
+      cfg: OpenBotConfig;
+      provider: string;
+      model: string;
+      agentDir?: string;
+      fallbacksOverride?: string[];
+      taskText: string;
+      signal?: AbortSignal;
+      run: Parameters<typeof runWithModelFallback<T>>[0]["run"];
+    }) {
+      if (!admitted || !prepared || disposed) {
+        throw new Error("Model session is not prepared");
+      }
+      input.signal?.throwIfAborted();
+      const result = await ports.model.runWithModelFallback({
+        cfg: input.cfg,
+        provider: input.provider,
+        model: input.model,
+        agentDir: input.agentDir,
+        fallbacksOverride: input.fallbacksOverride,
+        ...prepared.governance,
+        ...(prepared.preferredModelOrder
+          ? { preferredModelOrder: prepared.preferredModelOrder }
+          : {}),
+        runtimeAdmission: { taskText: input.taskText },
+        runId,
+        run: async (provider, model, options) => {
+          input.signal?.throwIfAborted();
+          const response = await input.run(provider, model, options);
+          input.signal?.throwIfAborted();
+          return response;
+        },
+      });
+      input.signal?.throwIfAborted();
+      return result;
     },
     dispose() {
       disposed = true;
       admitted = false;
+      prepared = undefined;
       lease.dispose();
     },
   };

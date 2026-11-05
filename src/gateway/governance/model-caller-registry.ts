@@ -47,9 +47,9 @@ export type ModelCallerEntry = {
 export const MODEL_CALLER_REGISTRY: readonly ModelCallerEntry[] = [
   {
     id: "auto-reply",
-    file: "src/agent-runtime/execution/runner/admitted-turn.ts",
+    file: "src/agent-runtime/model/authorized-session.ts",
     fn: "runWithModelFallback",
-    caller: "runAdmittedTurn",
+    caller: "createAuthorizedModelSession",
     callSites: 1,
     inventoryIds: ["E1", "E14"],
     governanceToday: "allowlist-when-gated",
