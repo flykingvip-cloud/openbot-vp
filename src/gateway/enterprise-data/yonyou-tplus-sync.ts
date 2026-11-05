@@ -19,6 +19,13 @@
  * `{param:{}}` or `SelectFields`, so that stream is one bounded catalog read
  * fingerprinted by Code/Name/Ts. QueryPage and FindVoucherList do not document
  * `?idMarketingOrgan=`.
+ *
+ * Pagination: QueryPage uses PAGE_SIZE=20. Incremental UpdateDate / voucher
+ * windows keep a tight MAX_PAGES_RANGE (default 5). First/full master pulls
+ * (no watermark) use MAX_PAGES_FULL (default 500) so archives larger than 100
+ * rows can finish and advance the watermark. Override with
+ * OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MAX_PAGES or
+ * OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MAX_PAGES_FULL.
  */
 
 import { createHash, randomUUID } from "node:crypto";
@@ -43,7 +50,13 @@ import { extractYonyouTplusRows, yonyouTplusPayloadBody } from "./yonyou-tplus-r
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 20;
-const MAX_PAGES = 5;
+/** Incremental UpdateDate / voucher windows: keep a tight page budget. */
+const MAX_PAGES_RANGE_DEFAULT = 5;
+/**
+ * First/full master QueryPage (no UpdateDate window). 500×20 ≈ 10k rows —
+ * enough for typical inventory/partner archives without unbounded loops.
+ */
+const MAX_PAGES_FULL_DEFAULT = 500;
 const LOG_KEEP = 40;
 /** Warehouse Query returns the whole catalog in one response. Above this, refuse to store a fingerprint. */
 const WAREHOUSE_ROW_CAP = 500;
@@ -316,6 +329,30 @@ function pageIsComplete(body: unknown, rows: number): boolean {
 
 type DateWindow = { mode: "range"; begin: string; end: string } | { mode: "full"; end: string };
 
+function parsePositiveInt(raw: string | undefined, fallback: number): number {
+  if (!raw?.trim()) {
+    return fallback;
+  }
+  const value = Number(raw.trim());
+  if (!Number.isFinite(value) || value < 1) {
+    return fallback;
+  }
+  return Math.floor(value);
+}
+
+function maxPagesForWindow(window: DateWindow): number {
+  if (window.mode === "full") {
+    return parsePositiveInt(
+      process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MAX_PAGES_FULL,
+      MAX_PAGES_FULL_DEFAULT,
+    );
+  }
+  return parsePositiveInt(
+    process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MAX_PAGES,
+    MAX_PAGES_RANGE_DEFAULT,
+  );
+}
+
 function windowFor(
   kind: "master" | "voucher",
   now: Date,
@@ -508,7 +545,8 @@ async function pullStream(params: {
   window: DateWindow;
 }): Promise<{ recordCount: number; truncated: boolean }> {
   let recordCount = 0;
-  for (let page = 0; page < MAX_PAGES; page += 1) {
+  const maxPages = maxPagesForWindow(params.window);
+  for (let page = 0; page < maxPages; page += 1) {
     const pageIndex = params.stream.kind === "master" ? page + 1 : page;
     const result = await executeYonyouTplusHandler(
       params.stream.handlerRef,
