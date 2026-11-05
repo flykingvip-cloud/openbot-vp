@@ -24,6 +24,7 @@ function showArtifactPreviewMode(host: StewardArtifactSidebarHost) {
 }
 
 export type WorkspaceFilePreviewPayload = {
+  contentHash?: string;
   filename: string;
   relativePath?: string;
   mimeType: string;
@@ -567,6 +568,7 @@ export function applyWorkspaceFilePreview(params: {
     ...workspace.artifact.providerMetadata,
     workspaceFilename: relativePath,
     workspaceFileLoaded: true,
+    contentHash: file.contentHash,
     dataUrl: undefined,
     binaryDownloadUrl: undefined,
     htmlPreviewUrl: undefined,

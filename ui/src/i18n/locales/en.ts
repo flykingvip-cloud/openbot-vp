@@ -4822,6 +4822,8 @@ export const en: TranslationMap = {
     deliverableSaveCancel: "Cancel",
     deliverableSaveAsFilenameLabel: "Save-as filename",
     deliverableSaveStale: "The archived file changed. Choose overwrite or save as again.",
+    deliverableEditStale:
+      "The original changed and was not overwritten. Your draft is retained; reload the latest original and merge your edits.",
     artifactIncubationWeakHint: "This output looks reusable — you can organize it as a capability.",
     artifactIncubationWeakAction: "Organize as capability",
     artifactIncubationSuggestTitle: "Suggested capability to organize",
