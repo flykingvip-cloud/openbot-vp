@@ -1,4 +1,5 @@
 import { createReadTool } from "@earendil-works/pi-coding-agent";
+import { wrapToolWithBeforeToolCallHook } from "../agent-runtime/capabilities/index.js";
 import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
 import { captureTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
@@ -38,7 +39,6 @@ import type { ModelAuthMode } from "./model-auth.js";
 import { createOpenClawTools } from "./openclaw-tools.js";
 import { createWorkspaceCodingTools } from "./pi-sdk/coding-tools.js";
 import { wrapToolWithAbortSignal } from "./pi-tools.abort.js";
-import { wrapToolWithBeforeToolCallHook } from "./pi-tools.before-tool-call.js";
 import {
   isToolAllowedByPolicies,
   resolveEffectiveToolPolicy,

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
+import type { CapabilityDeclaration } from "../../agent-runtime/contracts/capability.js";
 import { detectMime } from "../../media/mime.js";
 import type { ImageSanitizationLimits } from "../image-sanitization.js";
 import { sanitizeToolResultImages } from "../tool-images.js";
@@ -7,6 +8,7 @@ import { sanitizeToolResultImages } from "../tool-images.js";
 // oxlint-disable-next-line typescript/no-explicit-any
 export type AnyAgentTool = AgentTool<any, unknown> & {
   ownerOnly?: boolean;
+  capability?: CapabilityDeclaration;
 };
 
 export type StringParamOptions = {
