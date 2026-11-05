@@ -1,5 +1,11 @@
 # Agent Runtime convergence
 
+## Autonomous closure checkpoint
+
+- Owner authorized autonomous remaining migration closure; no deployment until combined acceptance. Tool dispatch now rechecks original task/attempt and captured accepted constraints, including after asynchronous hooks; stale actions are refused before server execution or client delegation. Existing continuation refreshes its constraint snapshot with its rebuilt prompt. No new executor or model call introduced. — codex-runtime-manager
+- Completion notices now append through SessionManager with parent identity and an idempotency key; the raw JSONL message append was removed. This protects notice identity, not universal cross-process transcript serialization. — codex-runtime-manager
+- Joint eight suites / 89 PASS; before-tool integration E2E 9 PASS; changed-file typed lint clean; architecture 41 rules PASS; tsgo retains 47 existing diagnostics; build PASS with 209 existing dynamic-import warnings. Constraint gate fences stale attempts rather than proving arbitrary natural-language restrictions semantically executable. CLI delegation, mixed intents, remaining capability/context/quality/retirement work remain open. — codex-runtime-manager
+
 ## Agents
 
 - codex-runtime-manager · role: owner · scope: integration, M0 acceptance, M1 context extraction · paths: .kiro/specs/agent-runtime-convergence/**, src/agent-runtime/context/**, src/auto-reply/reply/get-reply-run.ts, src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts, scripts/architecture/manifest.json · since: 2026-11-03

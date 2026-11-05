@@ -4,6 +4,7 @@ import type {
   AgentToolUpdateCallback,
 } from "@earendil-works/pi-agent-core";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { checkTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { runDeliveryToolSideEffect } from "../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
 import type { DeliveryToolSideEffectSchedule } from "../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
@@ -270,6 +271,12 @@ export function toClientToolDefinitions(
         });
         if (outcome.blocked) {
           throw new Error(outcome.reason);
+        }
+        const refusal = hookContext?.taskBoundary
+          ? checkTaskActionBoundary(hookContext.taskBoundary)
+          : undefined;
+        if (refusal) {
+          throw new Error(refusal);
         }
         const adjustedParams = outcome.params;
         const paramsRecord = isPlainObject(adjustedParams) ? adjustedParams : {};

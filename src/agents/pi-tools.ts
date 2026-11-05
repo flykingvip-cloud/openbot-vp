@@ -1,4 +1,6 @@
 import { createReadTool } from "@earendil-works/pi-coding-agent";
+import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
+import { captureTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
 import type { ToolLoopDetectionConfig } from "../config/types.tools.js";
 import {
@@ -229,6 +231,8 @@ export const __testing = {
 } as const;
 
 export function createOpenClawCodingTools(options?: {
+  sessionFile?: string;
+  taskExecutionBinding?: TaskCompletionBinding;
   agentId?: string;
   exec?: ExecToolDefaults & ProcessToolDefaults;
   messageProvider?: string;
@@ -800,6 +804,10 @@ export function createOpenClawCodingTools(options?: {
       sessionKey: options?.sessionKey,
       sessionId: options?.sessionId,
       runId: options?.runId,
+      taskBoundary:
+        options?.sessionFile && options.taskExecutionBinding
+          ? captureTaskActionBoundary(options.sessionFile, options.taskExecutionBinding)
+          : undefined,
       loopDetection: resolveToolLoopDetectionConfig({ cfg: options?.config, agentId }),
       candidateCapabilities,
       policyFilteredCapabilities,

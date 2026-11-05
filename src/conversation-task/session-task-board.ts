@@ -1,5 +1,6 @@
 import type { InteractionModelDecision } from "../agent-runtime/contracts/interaction.js";
 import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
+import { appendTaskCompletionNotice } from "../agent-runtime/state/completion-notice.js";
 export type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
 import { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
 export { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
@@ -1020,6 +1021,7 @@ export function captureTaskCompletionBinding(
         taskId: task.taskId,
         executionAttempt: task.executionAttempt,
         deliverableVersion: task.deliverableVersion,
+        constraints: activeConstraintTexts(task),
       }
     : undefined;
 }
@@ -1045,7 +1047,17 @@ export function startBoundTaskExecution(
     ) {
       return { board, value: undefined };
     }
-    const next = { ...binding, executionAttempt, deliverableVersion: executionAttempt };
+    if (
+      JSON.stringify(binding.constraints ?? []) !== JSON.stringify(activeConstraintTexts(current))
+    ) {
+      return { board, value: undefined };
+    }
+    const next = {
+      ...binding,
+      executionAttempt,
+      deliverableVersion: executionAttempt,
+      constraints: activeConstraintTexts(current),
+    };
     return {
       board: bindCurrentExecution({
         board,
@@ -1074,7 +1086,9 @@ function isLiveTaskBinding(board: SessionTaskBoard, binding: TaskCompletionBindi
     !isTaskTombstoned(board, binding.taskId) &&
     current.taskId === binding.taskId &&
     current.executionAttempt === binding.executionAttempt &&
-    current.deliverableVersion === binding.deliverableVersion,
+    current.deliverableVersion === binding.deliverableVersion &&
+    (binding.constraints === undefined ||
+      JSON.stringify(binding.constraints) === JSON.stringify(activeConstraintTexts(current))),
   );
 }
 
@@ -1132,14 +1146,7 @@ export function recordCheckedTaskCompletion(params: {
   const notice = finished.notice ?? renderCompletionNotice(finished.board.parked);
   let persisted = false;
   if (fs.existsSync(file)) {
-    const message = {
-      role: "assistant",
-      content: [{ type: "text", text: notice }],
-      timestamp: Date.now(),
-      taskCompletionNotice: true,
-    };
-    fs.appendFileSync(file, `${JSON.stringify({ message })}\n`, "utf8");
-    persisted = true;
+    persisted = appendTaskCompletionNotice(file, params.binding, notice);
   }
   return { notice, persisted };
 }

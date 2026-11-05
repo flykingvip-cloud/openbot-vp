@@ -1,3 +1,7 @@
+import {
+  checkTaskActionBoundary,
+  type TaskActionBoundary,
+} from "../agent-runtime/state/task-action.js";
 import { oguiWaitBlocksSession } from "../config/sessions/ogui-decision-wait-registry.js";
 import type { ToolLoopDetectionConfig } from "../config/types.tools.js";
 import {
@@ -13,6 +17,7 @@ import { normalizeToolName } from "./tool-policy.js";
 import type { AnyAgentTool } from "./tools/common.js";
 
 export type HookContext = {
+  taskBoundary?: TaskActionBoundary;
   agentId?: string;
   sessionKey?: string;
   /** Ephemeral session UUID — regenerated on /new and /reset. */
@@ -106,6 +111,12 @@ export async function runBeforeToolCallHook(args: {
 }): Promise<HookOutcome> {
   const toolName = normalizeToolName(args.toolName || "tool");
   const params = args.params;
+  const taskRefusal = args.ctx?.taskBoundary
+    ? checkTaskActionBoundary(args.ctx.taskBoundary)
+    : undefined;
+  if (taskRefusal) {
+    return { blocked: true, reason: taskRefusal };
+  }
 
   // Mandatory re-check before execute. `filterToolsByPolicy` stays a name
   // filter and is not an answer-dependency gate. Tools that already started
@@ -226,12 +237,18 @@ export function wrapToolWithBeforeToolCallHook(
   const wrappedTool: AnyAgentTool = {
     ...tool,
     execute: async (toolCallId, params, signal, onUpdate) => {
-      const outcome = await runBeforeToolCallHook({
+      let outcome = await runBeforeToolCallHook({
         toolName,
         params,
         toolCallId,
         ctx,
       });
+      // Plugin hooks can await; an owner restriction accepted during that wait wins.
+      const lateRefusal = ctx?.taskBoundary ? checkTaskActionBoundary(ctx.taskBoundary) : undefined;
+      if (lateRefusal) {
+        outcome = { blocked: true, reason: lateRefusal };
+      }
+      signal?.throwIfAborted();
       const selection: ToolSelectionProvenance = {
         kind: "tool_selection",
         decision_owner: "model",

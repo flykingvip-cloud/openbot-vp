@@ -16,6 +16,7 @@ import {
 import type { TypingMode } from "../../config/types.js";
 import {
   readSessionTaskBoard,
+  activeConstraintTexts,
   startBoundTaskExecution,
   isTaskExecutionBindingCurrent,
 } from "../../conversation-task/session-task-board.js";
@@ -188,6 +189,10 @@ export function createFollowupRunner(params: {
           return;
         }
         queued.prompt = wake.prompt;
+        queued.run.taskCompletionBinding = {
+          ...queued.run.taskCompletionBinding,
+          constraints: activeConstraintTexts(wake.task),
+        };
       }
       const incomingBinding = queued.run.taskCompletionBinding;
       const trackedIndividual =

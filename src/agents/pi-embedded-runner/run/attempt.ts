@@ -5,6 +5,7 @@ import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
+import { captureTaskActionBoundary } from "../../../agent-runtime/state/task-action.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { OpenBotConfig } from "../../../config/config.js";
@@ -1278,6 +1279,8 @@ export async function runEmbeddedAttempt(
         : undefined;
     const toolConstruction = wrapCreateToolsForObservation(() => {
       const created = createOpenClawCodingTools({
+        sessionFile: params.sessionFile,
+        taskExecutionBinding: params.taskExecutionBinding,
         agentId: sessionAgentId,
         exec: {
           ...params.execOverrides,
@@ -1744,6 +1747,9 @@ export async function runEmbeddedAttempt(
               sessionId: params.sessionId,
               runId: params.runId,
               loopDetection: clientToolLoopDetection,
+              taskBoundary: params.taskExecutionBinding
+                ? captureTaskActionBoundary(params.sessionFile, params.taskExecutionBinding)
+                : undefined,
             },
           )
         : [];
