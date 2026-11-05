@@ -63,3 +63,43 @@ export function extractYonyouTplusRows(value: unknown): unknown[] {
   }
   return [];
 }
+
+/** Last segment of a Chanjet selectFields path (`SaleDelivery.Code` → `Code`). */
+export function yonyouTplusSelectFieldLeaf(selectField: string): string {
+  const trimmed = selectField.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+  const parts = trimmed.split(".");
+  return parts[parts.length - 1] ?? trimmed;
+}
+
+/**
+ * Chanjet FindVoucherList often returns `Rows` as positional arrays matching
+ * `selectFields`. Map those to named objects so ensure-package PUBLIC seeds
+ * (`records[*].Code` / `VoucherDate` / `ID`) apply the same way as partner
+ * QueryPage object rows. Non-array rows are left unchanged.
+ */
+export function normalizeYonyouTplusVoucherRows(
+  rows: unknown[],
+  selectFields: readonly string[] | undefined,
+): unknown[] {
+  if (!selectFields || selectFields.length === 0) {
+    return rows;
+  }
+  const keys = selectFields.map(yonyouTplusSelectFieldLeaf);
+  return rows.map((row) => {
+    if (!Array.isArray(row)) {
+      return row;
+    }
+    const record: Record<string, unknown> = {};
+    for (let index = 0; index < row.length && index < keys.length; index += 1) {
+      const key = keys[index];
+      if (!key) {
+        continue;
+      }
+      record[key] = row[index];
+    }
+    return record;
+  });
+}
