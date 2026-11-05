@@ -6,7 +6,9 @@ import {
 } from "../enterprise-data/enterprise-data-seat-context.js";
 import { upsertEnterpriseKnowledgeProjectionBinding } from "../enterprise-data/enterprise-knowledge-projection-binding-store.js";
 import {
+  deleteKnowledgeFeedItem,
   findKnowledgeFeedItem,
+  isCurrentSuppliedFeedItem,
   listKnowledgeFeedItems,
 } from "../enterprise-data/knowledge-feed-item-store.js";
 import { assertWritableMaterializationMode } from "../enterprise-data/knowledge-publication.js";
@@ -362,8 +364,17 @@ export function createEnterpriseDataM4Handlers(
                 ? (params.freshnessStatus as "fresh" | "stale" | "expired")
                 : undefined,
           });
+          const annotate = (feedItems: typeof items) =>
+            feedItems.map((item) => ({
+              ...item,
+              isCurrentSupplied: isCurrentSuppliedFeedItem({
+                store,
+                tenantId,
+                objectId: item.objectId,
+              }),
+            }));
           if (!seatId && !teamLabel && !departmentId && !roleCode && !agentType) {
-            return { items, visibilityFiltered: false };
+            return { items: annotate(items), visibilityFiltered: false };
           }
           const filtered = items.filter((item) => {
             const binding = Object.values(store.enterpriseKnowledgeProjectionBindings).find(
@@ -384,7 +395,7 @@ export function createEnterpriseDataM4Handlers(
             });
             return visibility.visible;
           });
-          return { items: filtered, visibilityFiltered: true };
+          return { items: annotate(filtered), visibilityFiltered: true };
         });
         respond(true, { tenantId, ...result });
       } catch (error) {
@@ -414,6 +425,38 @@ export function createEnterpriseDataM4Handlers(
           return found;
         });
         respond(true, { tenantId, item });
+      } catch (error) {
+        respond(false, undefined, toEnterpriseDataErrorShape(error));
+      }
+    },
+
+    "enterprise-data.feed-items.delete": async ({ client, params, respond }) => {
+      const tenantId = await requireResolvedEnterpriseAdminTenantId({ client, params, respond });
+      if (!tenantId) {
+        return;
+      }
+      const objectId = stringValue(params.objectId);
+      if (!objectId) {
+        respondInvalid(respond, "objectId is required");
+        return;
+      }
+      const force = params.force === true;
+      try {
+        const item = await withEnterpriseDataStore(tenantId, client, (store) =>
+          deleteKnowledgeFeedItem({
+            store,
+            tenantId,
+            objectId,
+            nowIso: new Date().toISOString(),
+            force,
+          }),
+        );
+        respond(true, {
+          tenantId,
+          item,
+          deleted: true,
+          forced: force,
+        });
       } catch (error) {
         respond(false, undefined, toEnterpriseDataErrorShape(error));
       }
