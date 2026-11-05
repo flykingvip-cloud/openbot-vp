@@ -2436,6 +2436,7 @@ export const zh_CN: TranslationMap = {
             probeFailed: "连通性测试失败。",
             probeBusy: "测试中…",
             installPackage: "安装连接器包",
+            updatePackage: "更新连接器包",
             testConnection: "测试连通性",
             bindAction: "绑定连接器到空间",
             oauthCredentialLabel: "OAuth 凭证名称",
