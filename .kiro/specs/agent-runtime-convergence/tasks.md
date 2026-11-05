@@ -483,3 +483,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Command routing joins validated interpretation to explicit execution admission. Replies/clarifications bypass admission and state mutation; bound task changes remain proposals; only execution_request invokes authorization/commit. No executor, queue or retry loop is introduced. — codex-runtime-manager
 - Four suites / 33 PASS; architecture 41 rules PASS; changed-file lint clean; typecheck remains 47 diagnostics; build PASS with 209 dynamic-import warnings. Production ingress/history and task-change application are still not switched. No push/merge/deploy. — codex-runtime-manager
+
+## Governed completion-to-admission checkpoint (2026-11-05)
+
+- Prepared interaction now routes its single governed completion directly through command admission. The admission binding is mandatory: no optional legacy bypass, second classifier inference, executor or scheduler. Direct replies bypass task authorization/write; execution proposals retain host authorization and atomic revision rejection. — codex-runtime-manager
+- Five suites / 22 PASS; final focused rerun 6 PASS; changed-file typed lint clean; architecture 41 rules PASS; typecheck remains 47 existing diagnostics with none in changed files; build PASS with 209 existing dynamic-import warnings. Production Gateway pre-seeding, transcript integration and interaction cutover remain unfinished. No push/merge/deploy. — codex-runtime-manager

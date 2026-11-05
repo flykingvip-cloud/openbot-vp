@@ -3,7 +3,7 @@ import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
 import { invokeInteractionCompletion, type createAuthorizedModelSession } from "../model/index.js";
-import { interpretInteraction } from "./interpret-interaction.js";
+import { routeInteraction } from "./route-interaction.js";
 
 export async function runPreparedInteraction(
   params: {
@@ -23,9 +23,13 @@ export async function runPreparedInteraction(
     provider: string,
     model: string,
   ) => Promise<{ model: Model<Api>; apiKey?: string }>,
+  admission: {
+    captured: Parameters<typeof routeInteraction>[1];
+    ports: Parameters<typeof routeInteraction>[2]["admission"];
+  },
 ) {
-  return interpretInteraction(params.input, {
-    infer: async (input) => {
+  const inference = {
+    infer: async (input: InteractionModelInput) => {
       const started = Date.now();
       const result = await session.infer({
         cfg: params.config,
@@ -58,5 +62,10 @@ export async function runPreparedInteraction(
       });
       return result.result.readDecision();
     },
+  };
+  // Route the same completion, never run a second classification inference.
+  return routeInteraction(params.input, admission.captured, {
+    inference,
+    admission: admission.ports,
   });
 }
