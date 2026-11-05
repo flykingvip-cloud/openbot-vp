@@ -1,6 +1,7 @@
 import {
   applyIncomingUserMessage,
   commitSameTaskConstraint,
+  commitAdmittedSessionTask,
   mutateSessionTaskBoard,
   readSessionTaskBoard,
   startBoundTaskExecution,
@@ -9,6 +10,7 @@ import {
 /** The existing board owns persistence, locking and identity validation. */
 export const sessionTaskState = {
   read: readSessionTaskBoard,
+  admitExecution: commitAdmittedSessionTask,
   startExecution: startBoundTaskExecution,
   applyControl(sessionFile: string, prompt: string) {
     return mutateSessionTaskBoard(sessionFile, (board) => {

@@ -23,6 +23,9 @@ export type ConstraintEntry = {
 export type ConstraintEntryInput = string | ConstraintEntry;
 
 export type TrackedTask = {
+  /** Criteria captured at explicit execution admission, not inferred from a finished reply. */
+  acceptanceCriteria?: string[];
+  admissionRequestId?: string;
   taskId: string;
   title: string;
   goalText: string;

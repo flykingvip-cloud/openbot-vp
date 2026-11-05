@@ -30,3 +30,9 @@ export {
 export { interpretInteraction, type InteractionInferencePort } from "./interpret-interaction.js";
 
 export { runPreparedInteraction } from "./prepared-interaction.js";
+export {
+  admitExecutionRequest,
+  type ExecutionAdmissionInput,
+  type ExecutionAdmissionResult,
+  type ExecutionAdmissionPorts,
+} from "./execution-admission.js";
