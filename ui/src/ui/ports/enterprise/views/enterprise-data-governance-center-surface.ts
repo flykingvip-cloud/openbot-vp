@@ -1402,7 +1402,7 @@ function renderSourceEditorModal(
   ];
   const selectedConnector =
     catalog.find((entry) => entry.connectorId === state.connectorId) ?? null;
-  const showInstallPackage = selectedConnector != null && !selectedConnector.ready;
+  const showInstallPackage = selectedConnector != null;
   const isWebsiteSession = selectedConnector?.accessMethod === "website_session";
   const showCredentialFields =
     selectedConnector != null && selectedConnector.credentialKind !== "none" && !isWebsiteSession;
@@ -2002,7 +2002,7 @@ function renderSourceEditorModal(
                       ?disabled=${state.busy || state.probeBusy || !state.connectorId}
                       @click=${onInstallConnectorPackage}
                     >
-                      安装连接器包
+                      ${selectedConnector?.ready ? "更新连接器包" : "安装连接器包"}
                     </button>
                   `
                 : html``
