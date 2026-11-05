@@ -1,4 +1,4 @@
-import type { tryAcquireEnterpriseAgentRun } from "../../../gateway/billing/agent-run-governance.js";
+import type { tryAcquireEnterpriseAgentRun } from "../../gateway/billing/agent-run-governance.js";
 
 type AdmissionInput = Parameters<typeof tryAcquireEnterpriseAgentRun>[0];
 type AdmissionResult = Awaited<ReturnType<typeof tryAcquireEnterpriseAgentRun>>;

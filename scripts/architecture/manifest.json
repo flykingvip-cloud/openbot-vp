@@ -246,26 +246,6 @@
     "description": "Candidate and turn contracts must not reverse-depend on the old outer execution owner, including types."
   },
   {
-    "name": "runtime-admission-lease-no-execution",
-    "from": "src/agent-runtime/execution/lifecycle/**",
-    "denyImportsFrom": [
-      "src/agents/**",
-      "src/auto-reply/**",
-      "src/conversation-task/**",
-      "src/plugins/**",
-      "src/cron/**",
-      "src/agent-runtime/command/**",
-      "src/agent-runtime/delivery/**"
-    ],
-    "description": "Admission slot lifetime only uses fixed host ports; it cannot invoke providers, mutate tasks or deliver replies."
-  },
-  {
-    "name": "runtime-admission-lease-public-entry",
-    "from": "src/auto-reply/**",
-    "denyImportsFrom": ["src/agent-runtime/execution/lifecycle/!(index).ts"],
-    "description": "Execution host consumes the lifecycle public entry rather than lease internals."
-  },
-  {
     "name": "runtime-outcomes-no-execution-control",
     "from": "src/agent-runtime/execution/outcomes/**",
     "denyImportsFrom": [
@@ -390,5 +370,26 @@
       "src/auto-reply/reply/agent-runner-execution"
     ],
     "description": "Retired reply and execution adapters cannot be imported by runtime sources; callers use the current command/execution entry."
+  },
+  {
+    "name": "runtime-shared-model-no-business-control",
+    "from": "src/agent-runtime/model/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/command/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/delivery/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/wiring/**",
+      "src/conversation-task/**",
+      "src/task-outcome/**"
+    ],
+    "description": "Shared model admission has no task state, execution loop or delivery dependency. Tests may bind fixed host ports.",
+    "exemptFiles": ["src/agent-runtime/model/authorized-session.test.ts"]
+  },
+  {
+    "name": "runtime-retired-admission-lifecycle",
+    "from": "src/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/lifecycle/**"],
+    "description": "Shared model admission has one owner; retired execution lifecycle paths cannot re-enter the runtime."
   }
 ]

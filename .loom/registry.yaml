@@ -10828,6 +10828,7 @@ tasks:
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - src/agent-runtime/model/**
       - src/auto-reply/fallback-state.ts
       - src/gateway/governance/execution-entry-registry.ts
       - src/gateway/governance/governance-contract.test.ts
@@ -10934,21 +10935,28 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T00:24:41.840Z
+        lastSignalAt: 2026-11-05T01:56:53.184Z
         metadata: {}
       - id: runtime-unified-interaction-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T00:24:41.840Z
+        lastSignalAt: 2026-11-05T01:56:53.184Z
         metadata: {}
       - id: runtime-mainline-retirement-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T00:24:41.840Z
+        lastSignalAt: 2026-11-05T01:56:53.184Z
+        metadata: {}
+      - id: runtime-inference-admission-20261105
+        taskId: agent-runtime-convergence
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-05T01:56:53.184Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-03
@@ -10994,6 +11002,7 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/agent-runtime/model/**
       - src/auto-reply/fallback-state.ts
       - src/gateway/governance/execution-entry-registry.ts
       - src/gateway/governance/governance-contract.test.ts
@@ -24296,6 +24305,42 @@ landingStreams:
       purpose: Closeout doc, evidence logs, and isolated SDK probe. No product
         behavior change.
 sharedPaths:
+  - glob: src/agent-runtime/model/admission-lease.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/model/admission-lease.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/model/index.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/model/authorized-session.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/model/authorized-session.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/execution/runner/admitted-turn.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/execution/lifecycle/admission-lease.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/execution/lifecycle/admission-lease.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/execution/lifecycle/index.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped shared-model boundary migration; preserve prior task history.
+    reviewAfter: 2026-11-30
   - glob: src/auto-reply/fallback-state.ts
     landerTask: agent-runtime-convergence
     reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller migration.

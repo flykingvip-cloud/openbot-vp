@@ -432,3 +432,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Removed unused runAgentTurnWithFallback adapter after checking production function callers (none) and migrating the sole type-only consumer to the actual type owner. Governance E1/E5 and source assertions now describe the live admitted-turn/candidate path, not compatibility comments. Persisted validator and submitter identities remain unchanged. — codex-runtime-manager
 - Fallback/governance/admitted-turn regression: 3 suites / 106 PASS; implicated original embedded-entry assertion 1 PASS / 21 unselected. Typecheck retains 44 existing diagnostics; build PASS with 209 existing dynamic-import warnings. Retired-import guard expanded; post-deletion gate still required after staging. No push/merge/deploy. — codex-runtime-manager
+
+## Shared model authorization session checkpoint (2026-11-05)
+
+- Extracted original commercial slot, model governance snapshot and billing identity lifetime into model/authorized-session. Existing admitted execution consumes that same component; task creation, budget charging, provider fallback and delivery remain outside it. Original execution/lifecycle lease moved without a compatibility implementation. — codex-runtime-manager
+- Six suites / 114 PASS, including acquired credit snapshot and BYOK identity; configured reply E2E 47 PASS. Typecheck retains 44 existing diagnostics; changed-file lint clean; build PASS with 209 existing dynamic-import warnings. Main #239 replayed before final verification; ancestry gate restored. — codex-runtime-manager
+- This establishes task-independent authorization infrastructure, not a completed taskless interaction service. Ordinary-chat admission, Gateway pre-seeding and embedded preflight separation remain required. No push/merge/deploy. — codex-runtime-manager

@@ -46,7 +46,7 @@ import { logVerbose } from "../../../globals.js";
 import { defaultRuntime } from "../../../runtime.js";
 import { TaskBudgetExceededError } from "../../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../../utils/message-channel.js";
-import { createRunAdmissionLease } from "../lifecycle/index.js";
+import { createAuthorizedModelSession } from "../../model/index.js";
 import { createTurnOutcomeRecorder } from "../outcomes/index.js";
 import { createAdmittedCandidateInvoker } from "./admitted-candidate.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
@@ -227,20 +227,7 @@ export async function runAdmittedTurn(
     params.getActiveSessionEntry()?.systemPromptReport,
   );
 
-  const admissionLease = createRunAdmissionLease({
-    acquire: host.admission.tryAcquireEnterpriseAgentRun,
-    release: () => {
-      void host.admission.releaseEnterpriseAgentRun(runId);
-    },
-    forgetSnapshot: () => {
-      host.model.forgetRunModelSet(runId);
-    },
-  });
-  let commercialAuthDecisionId: string | undefined;
-  let commercialSubscriptionId: string | undefined;
-  let commercialPlanId: string | undefined;
-  let commercialPlanVersionId: string | undefined;
-  let commercialSubscriptionSnapshotId: string | undefined;
+  const modelSession = createAuthorizedModelSession(runId, host);
   try {
     while (true) {
       commercialToolCallCount = 0;
@@ -329,10 +316,9 @@ export async function runAdmittedTurn(
               }
             : {}),
         };
-        if (!admissionLease.held) {
+        if (!modelSession.held) {
           const collaborationGroupId = params.sessionCtx.CollaborationGroupId?.trim();
-          const runSlot = await admissionLease.acquire({
-            runId,
+          const runSlot = await modelSession.authorize({
             agentId: params.followupRun.run.agentId,
             ...(collaborationGroupId ? { groupId: collaborationGroupId } : {}),
             modelGateInput,
@@ -349,16 +335,7 @@ export async function runAdmittedTurn(
               },
             };
           }
-          if (runSlot.acquired) {
-            if (runSlot.modelGate) {
-              modelGate = runSlot.modelGate;
-            }
-            commercialAuthDecisionId = runSlot.authorizationDecisionId;
-            commercialSubscriptionId = runSlot.subscriptionId;
-            commercialPlanId = runSlot.planId;
-            commercialPlanVersionId = runSlot.planVersionId;
-            commercialSubscriptionSnapshotId = runSlot.subscriptionSnapshotId;
-          }
+          modelGate = modelSession.gate;
         }
         const actorId = runGatewayClientPlatformUserId?.trim()
           ? `platform-user:${runGatewayClientPlatformUserId.trim()}`
@@ -387,41 +364,11 @@ export async function runAdmittedTurn(
             },
           };
         }
-        const embeddedModelGovernance = host.model.resolveEmbeddedModelGovernance({
-          gateStatus: admissionLease.held ? "acquired" : "skipped",
-          allowlist: executionRouting.allowlist,
-          tenantId: modelGate?.tenantId,
-          commercialAuthorizationId: commercialAuthDecisionId,
+        const embeddedModelGovernance = modelSession.prepareModelSet({
+          config: params.followupRun.run.config,
           actorId,
+          routing: executionRouting,
         });
-        const parentSnapshot = host.model.buildRunModelSetSnapshot({
-          runId,
-          allowlist: executionRouting.allowlist,
-          governanceMode: embeddedModelGovernance.governanceMode,
-          commercialAuthorizationId: commercialAuthDecisionId,
-          tenantId: modelGate?.tenantId,
-          actorId,
-          preferredModelOrder: executionRouting.preferredModelOrder,
-          platformModelsMode:
-            modelGate?.effectiveRouting?.mode ??
-            host.model.resolvePlatformModelsMode(params.followupRun.run.config),
-          ...(modelGate?.effectiveRouting?.selectorStrategy
-            ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
-            : {}),
-          // P4-1: parent billing context for child runs, only while this run holds the gate.
-          creditReporting: admissionLease.held
-            ? host.model.snapshotCreditReportingFromGate({
-                modelGate,
-                subscriptionId: commercialSubscriptionId,
-                subscriptionSnapshotId: commercialSubscriptionSnapshotId,
-                planId: commercialPlanId,
-                planVersionId: commercialPlanVersionId,
-              })
-            : undefined,
-        });
-        if (parentSnapshot) {
-          host.model.rememberRunModelSet(runId, parentSnapshot);
-        }
         const invokeCandidate = createAdmittedCandidateInvoker(params, runId, {
           assertOriginalTaskCurrent,
           directlySentBlockKeys,
@@ -529,11 +476,11 @@ export async function runAdmittedTurn(
                 model: fallbackResult.model,
                 creditUserId,
                 agentId: params.followupRun.run.agentId,
-                authorizationDecisionId: commercialAuthDecisionId,
-                subscriptionId: commercialSubscriptionId,
-                planId: commercialPlanId,
-                planVersionId: commercialPlanVersionId,
-                subscriptionSnapshotId: commercialSubscriptionSnapshotId,
+                authorizationDecisionId: modelSession.billing.authorizationDecisionId,
+                subscriptionId: modelSession.billing.subscriptionId,
+                planId: modelSession.billing.planId,
+                planVersionId: modelSession.billing.planVersionId,
+                subscriptionSnapshotId: modelSession.billing.subscriptionSnapshotId,
                 durationMs: runResult.meta?.durationMs,
                 toolCallCount: commercialToolCallCount,
                 toolClasses: commercialToolClasses,
@@ -819,6 +766,6 @@ export async function runAdmittedTurn(
       commitGrowthOutcome: recordGrowthTaskOutcome,
     };
   } finally {
-    admissionLease.dispose();
+    modelSession.dispose();
   }
 }
