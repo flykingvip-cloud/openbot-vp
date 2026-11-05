@@ -249,7 +249,7 @@ describe("§5 execution entry inventory", () => {
       expect(e5?.status).not.toBe("Bypass");
       expect(e5?.exemptReason).toMatch(/E1/);
       expect(e5?.exemptReason).toMatch(/getReplyFromConfig/);
-      expect(e5?.exemptReason).toMatch(/runAgentTurnWithFallback/);
+      expect(e5?.exemptReason).toMatch(/runAdmittedTurn/);
       expect(e5?.note).toMatch(/E1/);
       expect(e5?.symbols).toEqual(["runHeartbeatOnce", "getReplyFromConfig"]);
       const heartbeat = SOURCE_TEXT.get("src/infra/heartbeat-runner.ts");
@@ -264,7 +264,7 @@ describe("§5 execution entry inventory", () => {
       expect(prepared).toContain("runReplyAgent");
       const runner = SOURCE_TEXT.get("src/auto-reply/reply/agent-runner.ts");
       expect(runner).toBeDefined();
-      expect(runner).toContain("runAgentTurnWithFallback");
+      expect(runner).toContain("replyTurnRuntime.execution.runAdmittedTurn");
     });
 
     it("E16: commands/agent.ts CLI backend runs pass the commercial gate; stay Exempt", () => {

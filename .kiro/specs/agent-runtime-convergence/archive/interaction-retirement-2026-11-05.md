@@ -13,3 +13,9 @@ The response lane is NOT retired: parent session lock isolation, cancellation re
 Evidence: context forwarding test fails before fix (1 FAIL / 16 PASS) and passes after fix (17 PASS). Four affected suites pass 34 tests. Read-only repository searches find no imports of either retired module. Storage formats and historical sidecar names remain compatible.
 
 Remaining architectural gaps are explicit: idle conversation still enters task orchestration; depth classification is scoped to selected sessions; context lane rules currently conflate capability restriction and optional context reduction; actual whole-runtime acceptance and deployment are not complete. Do not enable an alternate runtime or claim full cutover from this checkpoint.
+
+## Execution compatibility adapter retirement
+
+Source snapshot: 5eed6824a. src/auto-reply/reply/agent-runner-execution.ts only delegated to runAdmittedTurn. Production runtime call consumers: none. The remaining fallback-state import was type-only and now targets its original type owner agent-run-credit-usage directly. Main reply continues through fixed replyTurnRuntime.execution -> execution/index -> runAdmittedTurn -> admitted candidate; no alternate entry survives.
+
+Governance E1/E5 metadata and actual-entry contract assertions now name the real execution owner. The preflight source assertion was stale (it looked for a provider call in a wrapper); it now examines the actual admitted candidate. Persisted submittedBy/validatorId values remain historical data identifiers and are intentionally not rewritten. Old closed-loop importer-list baseline failures are not weakened or represented as green. Source remains recoverable in Git; no runtime archive is loaded.

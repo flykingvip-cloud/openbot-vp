@@ -234,12 +234,6 @@
     "description": "Settlement orchestration uses fixed effect ports; platform I/O and lifecycle ownership remain in the adapter."
   },
   {
-    "name": "runtime-candidate-host-no-direct-provider",
-    "from": "src/auto-reply/reply/agent-runner-execution.ts",
-    "denyImportsFrom": ["src/agents/cli-runner", "src/agents/pi-embedded"],
-    "description": "Outer admission/fallback owner delegates actual candidate backend dispatch to execution/runner."
-  },
-  {
     "name": "runtime-candidate-public-entry",
     "from": "src/auto-reply/**",
     "denyImportsFrom": ["src/agent-runtime/execution/runner/!(index).ts"],
@@ -388,12 +382,13 @@
     "description": "The main reply host uses the reply-turn composition for command, state and execution dependencies."
   },
   {
-    "name": "runtime-retired-interaction-entries",
+    "name": "runtime-retired-entry-imports",
     "from": "src/**",
     "denyImportsFrom": [
       "src/agent-runtime/command/active-turn",
-      "src/auto-reply/reply/mid-task-aside"
+      "src/auto-reply/reply/mid-task-aside",
+      "src/auto-reply/reply/agent-runner-execution"
     ],
-    "description": "Retired interaction adapters have no live consumers or fallback; all dialogue classification uses the unified command entry."
+    "description": "Retired reply and execution adapters cannot be imported by runtime sources; callers use the current command/execution entry."
   }
 ]

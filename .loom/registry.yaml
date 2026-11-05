@@ -10828,6 +10828,10 @@ tasks:
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - src/auto-reply/fallback-state.ts
+      - src/gateway/governance/execution-entry-registry.ts
+      - src/gateway/governance/governance-contract.test.ts
+      - src/agents/execution-preflight/execution-preflight.test.ts
       - src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts
       - src/auto-reply/reply/mid-task-aside-reply-lane.ts
       - src/auto-reply/reply/mid-task-aside-reply-lane.test.ts
@@ -10990,6 +10994,10 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/auto-reply/fallback-state.ts
+      - src/gateway/governance/execution-entry-registry.ts
+      - src/gateway/governance/governance-contract.test.ts
+      - src/agents/execution-preflight/execution-preflight.test.ts
       - scripts/architecture/manifest.json
       - src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts
       - src/auto-reply/reply/mid-task-aside-reply-lane.ts
@@ -24288,6 +24296,22 @@ landingStreams:
       purpose: Closeout doc, evidence logs, and isolated SDK probe. No product
         behavior change.
 sharedPaths:
+  - glob: src/auto-reply/fallback-state.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller migration.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/governance/execution-entry-registry.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller migration.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/governance/governance-contract.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller migration.
+    reviewAfter: 2026-11-30
+  - glob: src/agents/execution-preflight/execution-preflight.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller migration.
+    reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
     landerTask: agent-runtime-convergence
     reason: Human-authorized runtime migration guard for retired entry paths; retain prior ownership history.
