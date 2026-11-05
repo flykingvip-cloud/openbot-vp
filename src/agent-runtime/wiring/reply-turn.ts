@@ -9,6 +9,7 @@ import {
   prepareVisibleDelivery,
 } from "../delivery/index.js";
 import { runAdmittedTurn } from "../execution/index.js";
+import { persistInteractionMessage } from "../state/interaction-transcript.js";
 import { sessionTaskState } from "../state/session-task.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 import {
@@ -20,6 +21,7 @@ import type { runGatewayInteraction } from "./interaction-turn.js";
 
 /** Compose the original reply-turn dependencies. The reply host owns transport and cleanup. */
 export const replyTurnRuntime = {
+  persistInteractionMessage,
   async interaction(...params: Parameters<typeof runGatewayInteraction>) {
     const runtime = await import("./interaction-turn.runtime.js");
     return runtime.runGatewayInteraction(...params);

@@ -22,7 +22,7 @@ export type TypingPolicy =
 
 export type GetReplyOptions = {
   /** Trusted Gateway user ingress: user transcript already persisted, execution not admitted. */
-  interactionIngress?: { userMessageId: string };
+  interactionIngress?: { userMessageId: string; persistOwnTranscript?: boolean };
   /** Explicit Gateway resume, after live authorization/stop recheck. */
   resumedTaskBinding?: import("../agent-runtime/contracts/task.js").TaskCompletionBinding;
   /** Trusted transport cleanup after an accepted task replacement or owner control. */

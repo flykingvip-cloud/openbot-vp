@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { isHumanInteractionIngress } from "../../agent-runtime/command/index.js";
 import { resolveAgentDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import {
@@ -7,7 +9,6 @@ import {
   resolveStorePath,
   type SessionEntry,
 } from "../../config/sessions.js";
-import { observeInboundTurnActivation } from "../../conversation-task/gateway-activation-hook.js";
 import { observeInboundTurnShadow } from "../../conversation-task/gateway-shadow-hook.js";
 import { observeConversationTaskReplyCompleted } from "../../conversation-task/reply-completion.js";
 import {
@@ -41,10 +42,7 @@ import {
 } from "../../logging/diagnostic.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
-import {
-  observeOrchestrationConsider,
-  observeWebReadShadowFromChat,
-} from "../../task-orchestration/gateway-hook.js";
+import { observeWebReadShadowFromChat } from "../../task-orchestration/gateway-hook.js";
 import {
   resolveRequiredDeliveryConfirmStatus,
   type RequiredDeliveryAttempt,
@@ -248,6 +246,22 @@ export async function dispatchReplyFromConfig(params: {
   replyResolver?: typeof getReplyFromConfig;
 }): Promise<DispatchFromConfigResult> {
   const { ctx, cfg, dispatcher } = params;
+  const humanInteraction = isHumanInteractionIngress({
+    provenanceKind: ctx.InputProvenance?.kind,
+    heartbeat: params.replyOptions?.isHeartbeat,
+    birthTurn: params.replyOptions?.growthBirthTurn,
+    collaborationRound: ctx.CollaborationRoundInvoked,
+  });
+  const interactionIngress =
+    params.replyOptions?.interactionIngress ??
+    (humanInteraction
+      ? {
+          userMessageId: String(
+            ctx.MessageSidFull ?? ctx.MessageSid ?? params.replyOptions?.runId ?? randomUUID(),
+          ),
+          persistOwnTranscript: true,
+        }
+      : undefined);
   const gatewayClient = buildKnowledgeReplyGatewayClient({
     gatewayClientUser: ctx.GatewayClientUser,
     gatewayClientSessionDomain: ctx.GatewayClientSessionDomain,
@@ -371,34 +385,7 @@ export async function dispatchReplyFromConfig(params: {
     text: ctx.BodyForCommands ?? ctx.Body ?? "",
   });
 
-  // ConversationTask Runtime — Activation (env-gated, default-dormant). Same
-  // identity fields as shadow. Uninitialized / flag-off is a no-op and never
-  // throws into this path. Does not open orchestration live invoke.
-  observeInboundTurnActivation({
-    tenantId: sourceContext.tenantId,
-    requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
-    conversationId: sessionKey ?? null,
-    employeeScopeAllowed: sourceContext.hasEnterpriseScope,
-    messageId: messageId ?? "",
-    text:
-      [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
-        (value): value is string => typeof value === "string" && value.trim() !== "",
-      ) ?? "",
-  });
-
-  // Orchestration Plane — dormant choke-point (P4.5b). Same contract as shadow:
-  // synchronous, never throws, never awaits tools, flag OFF / empty allowlist = no-op.
-  observeOrchestrationConsider({
-    tenantId: sourceContext.tenantId,
-    requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
-    conversationId: sessionKey ?? null,
-    messageId: messageId ?? "",
-    text:
-      [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
-        (value): value is string => typeof value === "string" && value.trim() !== "",
-      ) ?? "",
-  });
-
+  // Accepted execution requests replace automatic activation and parallel dispatch.
   // Phase B B2 — web_read shadow (ORCH_SHADOW && WEB_READ_SHADOW). Utterance
   // selected here; Profile resolved only inside the adapter. Never mutates reply.
   observeWebReadShadowFromChat({
@@ -614,16 +601,20 @@ export async function dispatchReplyFromConfig(params: {
       systemEvent: shouldRouteToOriginating,
     });
 
-    let completionBinding = captureTaskCompletionBinding(
-      sessionStoreEntry.entry?.sessionFile,
-      [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
-        (value): value is string => typeof value === "string" && value.trim() !== "",
-      ) ?? "",
-    );
+    let completionBinding =
+      interactionIngress && !params.replyOptions?.resumedTaskBinding
+        ? undefined
+        : captureTaskCompletionBinding(
+            sessionStoreEntry.entry?.sessionFile,
+            [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
+              (value): value is string => typeof value === "string" && value.trim() !== "",
+            ) ?? "",
+          );
     const replyResult = await (params.replyResolver ?? getReplyFromConfig)(
       ctx,
       {
         ...params.replyOptions,
+        ...(interactionIngress ? { interactionIngress } : {}),
         onTaskExecutionBound: (binding) => {
           completionBinding = binding;
           params.replyOptions?.onTaskExecutionBound?.(binding);

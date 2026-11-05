@@ -1488,6 +1488,29 @@ export async function runPreparedReply(
   });
   let admittedBinding = opts?.resumedTaskBinding;
   if (interactionIngress && !admittedBinding) {
+    const persistOwnReply = (text: string) => {
+      if (interactionIngress.persistOwnTranscript) {
+        replyTurnRuntime.persistInteractionMessage({
+          sessionFile,
+          sessionId: sessionIdFinal,
+          cwd: runWorkspaceDir,
+          messageId: interactionIngress.userMessageId,
+          role: "assistant",
+          text,
+        });
+      }
+      return { text };
+    };
+    if (interactionIngress.persistOwnTranscript) {
+      replyTurnRuntime.persistInteractionMessage({
+        sessionFile,
+        sessionId: sessionIdFinal,
+        cwd: runWorkspaceDir,
+        messageId: interactionIngress.userMessageId,
+        role: "user",
+        text: inboundMessage,
+      });
+    }
     const board = replyTurnRuntime.state.read(sessionFile);
     const captured = {
       expectedFocusRevision: board.focusRevision,
@@ -1552,7 +1575,7 @@ export async function runPreparedReply(
     });
     if (routed.kind === "respond") {
       typing.cleanup();
-      return { text: routed.text };
+      return persistOwnReply(routed.text);
     }
     if (routed.kind === "task_proposal") {
       opts?.abortSignal?.throwIfAborted();
@@ -1581,9 +1604,7 @@ export async function runPreparedReply(
         replyTurnRuntime.steer(sessionIdFinal, inboundMessage);
       }
       typing.cleanup();
-      return {
-        text: formatTaskProposalReply(routed.decision, applied),
-      };
+      return persistOwnReply(formatTaskProposalReply(routed.decision, applied));
     }
     if (routed.result.kind !== "accepted") {
       typing.cleanup();

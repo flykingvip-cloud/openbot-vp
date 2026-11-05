@@ -39,3 +39,4 @@ export {
 export { routeInteraction, type RoutedInteraction } from "./route-interaction.js";
 export { runAuthorizedInteraction } from "./authorized-interaction.js";
 export { formatTaskProposalReply } from "./task-proposal-reply.js";
+export { isHumanInteractionIngress } from "./ingress-kind.js";
