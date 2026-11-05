@@ -28,6 +28,7 @@ import type {
   DataConnectorCredentialRecord,
   ManagedProjectionSpecRecord,
   ManagedProjectionBindingRecord,
+  ManagedKnowledgeFeedItemRecord,
   ProjectionMaterializeResult,
   ProjectionSpecUpsertInput,
   ProjectionBindingUpsertInput,
@@ -369,6 +370,15 @@ export type EnterpriseDataCapabilityGateway = {
     tenantId: string,
     bindingId: string,
   ): Promise<GatewayResult<ProjectionMaterializeResult>>;
+  listFeedItems(
+    tenantId: string,
+    opts?: { projectionId?: string },
+  ): Promise<GatewayResult<ManagedKnowledgeFeedItemRecord[]>>;
+  deleteFeedItem(
+    tenantId: string,
+    objectId: string,
+    opts?: { force?: boolean },
+  ): Promise<GatewayResult<{ objectId: string; deletedAt?: string; forced: boolean }>>;
   upsertSource(
     tenantId: string,
     payload: {
@@ -1274,6 +1284,90 @@ export function createEnterpriseDataCapabilityGateway(
             feedItemId: materialized.feedItem.feedItemId,
             objectId: materialized.feedItem.objectId,
             title: materialized.feedItem.title,
+          },
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: localizeEnterpriseGatewayThrown(error, REQUEST_FAILED),
+        };
+      }
+    },
+
+    async listFeedItems(tenantId, opts) {
+      const normalizedTenant = tenantId.trim();
+      if (!normalizedTenant) {
+        return { ok: false, error: REQUEST_FAILED };
+      }
+      try {
+        const result = await client.request<{
+          tenantId: string;
+          items: Array<{
+            objectId: string;
+            projectionId: string;
+            title: string;
+            kind: string;
+            category: string;
+            sourceSystems?: string[];
+            generatedAt: string;
+            freshnessStatus: "fresh" | "stale" | "expired";
+            isCurrentSupplied?: boolean;
+          }>;
+        }>("enterprise-data.feed-items.list", {
+          tenantId: normalizedTenant,
+          ...(opts?.projectionId ? { projectionId: opts.projectionId } : {}),
+        });
+        if (!result || !Array.isArray(result.items)) {
+          return { ok: false, error: REQUEST_FAILED };
+        }
+        return {
+          ok: true,
+          data: result.items.map((item) => ({
+            objectId: item.objectId,
+            projectionId: item.projectionId,
+            title: item.title,
+            kind: item.kind,
+            category: item.category,
+            sourceSystems: Array.isArray(item.sourceSystems) ? item.sourceSystems : [],
+            generatedAt: item.generatedAt,
+            freshnessStatus: item.freshnessStatus,
+            isCurrentSupplied: item.isCurrentSupplied === true,
+          })),
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          error: localizeEnterpriseGatewayThrown(error, REQUEST_FAILED),
+        };
+      }
+    },
+
+    async deleteFeedItem(tenantId, objectId, opts) {
+      const normalizedTenant = tenantId.trim();
+      const normalizedObject = objectId.trim();
+      if (!normalizedTenant || !normalizedObject) {
+        return { ok: false, error: REQUEST_FAILED };
+      }
+      try {
+        const result = await client.request<{
+          tenantId: string;
+          item: { objectId: string; deletedAt?: string };
+          deleted: boolean;
+          forced: boolean;
+        }>("enterprise-data.feed-items.delete", {
+          tenantId: normalizedTenant,
+          objectId: normalizedObject,
+          ...(opts?.force ? { force: true } : {}),
+        });
+        if (!result?.item?.objectId) {
+          return { ok: false, error: REQUEST_FAILED };
+        }
+        return {
+          ok: true,
+          data: {
+            objectId: result.item.objectId,
+            deletedAt: result.item.deletedAt,
+            forced: result.forced,
           },
         };
       } catch (error) {
