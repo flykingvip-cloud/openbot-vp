@@ -46,7 +46,17 @@ export function buildInteractionCompletionContext(
     }
   }
   system.push(`Host-bound task target: ${JSON.stringify(input.taskTarget ?? null)}`);
-  messages.push({ role: "user", content: input.message, timestamp: Date.now() });
+  const images = input.images ?? [];
+  const canSeeImages = model.input?.includes("image");
+  const message =
+    images.length && !canSeeImages
+      ? `${input.message}\n[Image attachments are present, but pixels are unavailable to this interpretation model. Do not describe unseen content. Propose execution if inspecting the attachments is required.]`
+      : input.message;
+  messages.push({
+    role: "user",
+    content: images.length && canSeeImages ? [{ type: "text", text: message }, ...images] : message,
+    timestamp: Date.now(),
+  });
   return { systemPrompt: system.join("\n\n"), messages, tools: [] };
 }
 

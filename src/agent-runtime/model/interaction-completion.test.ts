@@ -22,6 +22,15 @@ const request = {
   timeoutMs: 1000,
   maxTokens: 200,
 };
+it("forwards sanitized images only to vision candidates and discloses unseen pixels otherwise", () => {
+  const image = { type: "image" as const, data: "cGl4ZWxz", mimeType: "image/png" };
+  const input = { message: "看看附件", context: [], images: [image] };
+  const vision = buildInteractionCompletionContext(input, { ...model, input: ["text", "image"] });
+  expect(vision.messages.at(-1)?.content).toEqual([{ type: "text", text: input.message }, image]);
+  const textOnly = buildInteractionCompletionContext(input, { ...model, input: ["text"] });
+  expect(textOnly.messages.at(-1)?.content).toContain("pixels are unavailable");
+  expect(textOnly.tools).toEqual([]);
+});
 beforeEach(() => {
   mocks.complete.mockReset();
 });

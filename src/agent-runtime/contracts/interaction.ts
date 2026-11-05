@@ -18,6 +18,8 @@ export type InteractionModelDecision =
 
 export type InteractionModelInput = {
   message: string;
+  /** Authorized, sanitized inbound pixels; no tool permission is implied. */
+  images?: readonly { type: "image"; data: string; mimeType: string }[];
   /** Captured by the trusted host, never inferred from quoted history. */
   taskTarget?: InteractionTaskTarget;
   /** Already authorized and budgeted shared view; never reclassified as system authority here. */

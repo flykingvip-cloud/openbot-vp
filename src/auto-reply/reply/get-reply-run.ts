@@ -1563,6 +1563,7 @@ export async function runPreparedReply(
       timeoutMs,
       input: {
         message: prefixedCommandBody,
+        images: opts?.images,
         abortSignal: opts?.abortSignal,
         taskTarget: board.current
           ? { taskId: board.current.taskId, revision: String(board.writeEpoch ?? 0) }

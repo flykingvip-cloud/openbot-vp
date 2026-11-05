@@ -62,6 +62,9 @@ export function runGatewayInteraction(params: {
             toolsKnown: true,
             toolsText: "",
             attachmentsKnown: true,
+            attachmentsText: params.input.images?.length
+              ? "x".repeat(params.input.images.length * 8000)
+              : "",
             outputReserveTokens: 2048,
           }).contextParts,
         },
