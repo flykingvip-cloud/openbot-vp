@@ -19,12 +19,17 @@ const FEED_ITEMS_PREVIEW_MAX = 20;
 const MASKED_SCALAR = "***";
 const SENSITIVE_PAYLOAD_KEY_RE =
   /token|secret|password|passwd|appkey|appsecret|credential|opentoken|authorization/i;
-/** Prefer these keys when an items[] row is still too wide after dropping "***". */
+/**
+ * Prefer these leaf keys when an items[] row is still too wide after dropping "***".
+ * Includes #244 T+ analytics leaves (costs, tax amounts, stock qtys). Nested containers
+ * (Customer / SaleDeliveryDetails / …) are kept via recurse-if-children, not this regex.
+ */
 const BUSINESS_ITEM_KEY_RE =
-  /^(id|code|name|voucherdate|partnertype|warehousename|inventoryname|quantity|amount|total)$/i;
+  /^(id|code|name|voucherdate|specification|unitname|partnertype|warehousename|warehousecode|inventoryname|inventorycode|quantity|availablequantity|existingquantity|amount|total|origtaxamount|origtaxprice|invscost|latestcost|avagcost|retailpricenew)$/i;
 
 function redactFeedPayload(value: unknown, depth: number): unknown {
-  if (depth > 4) {
+  // Allow items[] → row → *Details → Inventory → leaf (AggregateTemplate +2 vs flat).
+  if (depth > 6) {
     return undefined;
   }
   if (Array.isArray(value)) {
@@ -47,7 +52,7 @@ function redactFeedPayload(value: unknown, depth: number): unknown {
 }
 
 function dropMaskedScalars(value: unknown, depth: number): unknown {
-  if (depth > 4) {
+  if (depth > 6) {
     return undefined;
   }
   if (value === MASKED_SCALAR) {
@@ -84,14 +89,32 @@ function dropMaskedScalars(value: unknown, depth: number): unknown {
 function projectBusinessItemKeys(row: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(row)) {
-    if (!BUSINESS_ITEM_KEY_RE.test(key)) {
+    // Keep nested business objects (Customer / SaleDeliveryDetails / Inventory / …)
+    // whenever their projected children are non-empty — do not require the container
+    // key itself to match BUSINESS_ITEM_KEY_RE (that was dropping Customer.Name etc.).
+    if (Array.isArray(child)) {
+      const mapped = child
+        .map((item) => {
+          if (!item || typeof item !== "object" || Array.isArray(item)) {
+            return undefined;
+          }
+          const nested = projectBusinessItemKeys(item as Record<string, unknown>);
+          return Object.keys(nested).length > 0 ? nested : undefined;
+        })
+        .filter((item): item is Record<string, unknown> => item !== undefined);
+      if (mapped.length > 0) {
+        out[key] = mapped;
+      }
       continue;
     }
-    if (child && typeof child === "object" && !Array.isArray(child)) {
+    if (child && typeof child === "object") {
       const nested = projectBusinessItemKeys(child as Record<string, unknown>);
       if (Object.keys(nested).length > 0) {
         out[key] = nested;
       }
+      continue;
+    }
+    if (!BUSINESS_ITEM_KEY_RE.test(key)) {
       continue;
     }
     out[key] = child;
