@@ -136,4 +136,107 @@ describe("applyClassificationMasking array records", () => {
       records: [{ ID: "1", VoucherDate: "2026/10/20", Code: "SA-1", BankAccount: "***" }],
     });
   });
+
+  it("keeps sale_delivery analytics path keys when seeded PUBLIC", () => {
+    const actionKey = "erp.sale_delivery.query_list";
+    const store = emptyStore({
+      fieldClassifications: {
+        a: publicField({ actionKey, fieldPath: "records[*].Code" }),
+        b: publicField({ actionKey, fieldPath: "records[*].Customer.Name" }),
+        c: publicField({ actionKey, fieldPath: "records[*].SaleDeliveryDetails.Quantity" }),
+        d: publicField({
+          actionKey,
+          fieldPath: "records[*].SaleDeliveryDetails.OrigTaxAmount",
+        }),
+        e: publicField({
+          actionKey,
+          fieldPath: "records[*].SaleDeliveryDetails.Inventory.Name",
+        }),
+      },
+    });
+    const payload = {
+      records: [
+        {
+          Code: "SA-1",
+          Customer: { Name: "苏州扇来善往" },
+          SaleDeliveryDetails: {
+            Inventory: { Name: "宣纸扇" },
+            Quantity: "2",
+            OrigTaxAmount: "180.00",
+          },
+          BankAccount: "622200001",
+        },
+      ],
+    };
+    const result = applyClassificationMasking({
+      store,
+      tenantId: "001",
+      ref: {
+        connectorId: "erp-yonyou-tplus",
+        actionKey,
+        version: "v1",
+      },
+      payload,
+    });
+    expect(result.data).toEqual({
+      records: [
+        {
+          Code: "SA-1",
+          Customer: { Name: "苏州扇来善往" },
+          SaleDeliveryDetails: {
+            Inventory: { Name: "宣纸扇" },
+            Quantity: "2",
+            OrigTaxAmount: "180.00",
+          },
+          BankAccount: "***",
+        },
+      ],
+    });
+  });
+
+  it("keeps inventory cost/price when seeded PUBLIC", () => {
+    const actionKey = "erp.inventory.query_page";
+    const store = emptyStore({
+      fieldClassifications: {
+        a: publicField({ actionKey, fieldPath: "records[*].Code" }),
+        b: publicField({ actionKey, fieldPath: "records[*].Name" }),
+        c: publicField({ actionKey, fieldPath: "records[*].InvSCost" }),
+        d: publicField({ actionKey, fieldPath: "records[*].LatestCost" }),
+        e: publicField({ actionKey, fieldPath: "records[*].RetailPriceNew" }),
+      },
+    });
+    const result = applyClassificationMasking({
+      store,
+      tenantId: "001",
+      ref: {
+        connectorId: "erp-yonyou-tplus",
+        actionKey,
+        version: "v1",
+      },
+      payload: {
+        records: [
+          {
+            Code: "INV-1",
+            Name: "宣纸扇",
+            InvSCost: "12.5",
+            LatestCost: "13",
+            RetailPriceNew: "88",
+            BankAccount: "622200001",
+          },
+        ],
+      },
+    });
+    expect(result.data).toEqual({
+      records: [
+        {
+          Code: "INV-1",
+          Name: "宣纸扇",
+          InvSCost: "12.5",
+          LatestCost: "13",
+          RetailPriceNew: "88",
+          BankAccount: "***",
+        },
+      ],
+    });
+  });
 });

@@ -98,12 +98,12 @@ describe("yonyou tplus connector registration", () => {
       connectorId: "erp-yonyou-tplus",
       nowIso,
     });
-    expect(installed).toEqual({ installed: true, actionCount: 7 });
+    expect(installed).toEqual({ installed: true, actionCount: 9 });
     const entry = resolveDataConnectorCatalog({ store, tenantId }).find(
       (item) => item.connectorId === "erp-yonyou-tplus",
     );
     expect(entry?.ready).toBe(true);
-    expect(entry?.runtimeHandlerCount).toBe(7);
+    expect(entry?.runtimeHandlerCount).toBe(9);
     const probe = await probeDataSourceConnection({
       store,
       tenantId,
@@ -405,14 +405,81 @@ describe("yonyou tplus connector registration", () => {
       ]),
     );
     expect(pathsByAction.get("erp.sale_delivery.query_list")).toEqual(
-      new Set(["records[*].Code", "records[*].Name", "records[*].ID", "records[*].VoucherDate"]),
+      new Set([
+        "records[*].Code",
+        "records[*].Name",
+        "records[*].ID",
+        "records[*].VoucherDate",
+        "records[*].Customer.Code",
+        "records[*].Customer.Name",
+        "records[*].Warehouse.Code",
+        "records[*].Warehouse.Name",
+        "records[*].SaleDeliveryDetails.Inventory.Code",
+        "records[*].SaleDeliveryDetails.Inventory.Name",
+        "records[*].SaleDeliveryDetails.Quantity",
+        "records[*].SaleDeliveryDetails.OrigTaxPrice",
+        "records[*].SaleDeliveryDetails.OrigTaxAmount",
+      ]),
     );
     expect(pathsByAction.get("erp.sale_order.query_list")).toEqual(
-      new Set(["records[*].Code", "records[*].Name", "records[*].ID", "records[*].VoucherDate"]),
+      new Set([
+        "records[*].Code",
+        "records[*].Name",
+        "records[*].ID",
+        "records[*].VoucherDate",
+        "records[*].Customer.Code",
+        "records[*].Customer.Name",
+        "records[*].SaleOrderDetails.Inventory.Code",
+        "records[*].SaleOrderDetails.Inventory.Name",
+        "records[*].SaleOrderDetails.Quantity",
+        "records[*].SaleOrderDetails.OrigTaxPrice",
+        "records[*].SaleOrderDetails.OrigTaxAmount",
+      ]),
     );
-    // warehouse/inventory seeds from #228 stay in place
+    expect(pathsByAction.get("erp.purchase_receive.query_list")).toEqual(
+      new Set([
+        "records[*].Code",
+        "records[*].Name",
+        "records[*].ID",
+        "records[*].VoucherDate",
+        "records[*].Partner.Code",
+        "records[*].Partner.Name",
+        "records[*].Warehouse.Code",
+        "records[*].Warehouse.Name",
+        "records[*].RDRecordDetails.Inventory.Code",
+        "records[*].RDRecordDetails.Inventory.Name",
+        "records[*].RDRecordDetails.Quantity",
+        "records[*].RDRecordDetails.OrigTaxPrice",
+        "records[*].RDRecordDetails.OrigTaxAmount",
+      ]),
+    );
+    expect(pathsByAction.get("erp.current_stock.query")).toEqual(
+      new Set([
+        "records[*].WarehouseCode",
+        "records[*].WarehouseName",
+        "records[*].InventoryCode",
+        "records[*].InventoryName",
+        "records[*].Specification",
+        "records[*].UnitName",
+        "records[*].AvailableQuantity",
+        "records[*].ExistingQuantity",
+      ]),
+    );
+    // warehouse seeds from #228; inventory gains cost/price PUBLIC paths
     expect(pathsByAction.get("erp.warehouse.query")).toEqual(
       new Set(["records[*].Code", "records[*].Name", "records[*].ID"]),
+    );
+    expect(pathsByAction.get("erp.inventory.query_page")).toEqual(
+      new Set([
+        "records[*].Code",
+        "records[*].Name",
+        "records[*].ID",
+        "records[*].Specification",
+        "records[*].InvSCost",
+        "records[*].LatestCost",
+        "records[*].AvagCost",
+        "records[*].RetailPriceNew",
+      ]),
     );
   });
 
@@ -437,7 +504,7 @@ describe("yonyou tplus connector registration", () => {
       connectorId: "erp-yonyou-tplus",
       nowIso,
     });
-    expect(again).toEqual({ installed: true, actionCount: 7 });
+    expect(again).toEqual({ installed: true, actionCount: 9 });
   });
 
   it("grants the projection materializer seat on install and again when actions already exist", () => {
@@ -448,7 +515,7 @@ describe("yonyou tplus connector registration", () => {
       connectorId: "erp-yonyou-tplus",
       nowIso,
     });
-    expect(installed).toEqual({ installed: true, actionCount: 7 });
+    expect(installed).toEqual({ installed: true, actionCount: 9 });
     expect(findScopePolicy(store, tenantId, "scope-team-default")?.scopeType).toBe("TEAM");
     expect(findScopePolicy(store, tenantId, "scope-self-default")?.scopeType).toBe("SELF");
 
@@ -459,6 +526,8 @@ describe("yonyou tplus connector registration", () => {
       "erp.partner.query_page",
       "erp.sale_order.query_list",
       "erp.sale_delivery.query_list",
+      "erp.purchase_receive.query_list",
+      "erp.current_stock.query",
       "erp.doc.query",
     ];
     const grants = listSeatActionGrants({
@@ -479,7 +548,7 @@ describe("yonyou tplus connector registration", () => {
       connectorId: "erp-yonyou-tplus",
       nowIso: "2026-10-22T01:00:00.000Z",
     });
-    expect(repeated).toEqual({ installed: false, actionCount: 7 });
+    expect(repeated).toEqual({ installed: false, actionCount: 9 });
     const repeatedGrants = listSeatActionGrants({
       store,
       tenantId,
@@ -498,7 +567,7 @@ describe("yonyou tplus connector registration", () => {
       connectorId: "erp-yonyou-tplus",
       nowIso: "2026-10-22T02:00:00.000Z",
     });
-    expect(repaired).toEqual({ installed: false, actionCount: 7 });
+    expect(repaired).toEqual({ installed: false, actionCount: 9 });
     expect(listSeatActionGrants({ store, tenantId, seatId: MATERIALIZER_SEAT_ID })).toHaveLength(
       actionKeys.length,
     );
@@ -552,7 +621,7 @@ describe("yonyou tplus connector registration", () => {
       filterDescription: "保留管理员已写的范围说明",
       updatedAt: nowIso,
     });
-    expect(listSeatActionGrants({ store, tenantId, seatId: MATERIALIZER_SEAT_ID })).toHaveLength(7);
+    expect(listSeatActionGrants({ store, tenantId, seatId: MATERIALIZER_SEAT_ID })).toHaveLength(9);
   });
 
   it("refreshes an expired openToken during probe and writes the new tokens", async () => {

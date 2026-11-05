@@ -46,6 +46,16 @@ const ACTIONS = [
     handlerRef: "enterprise-data/handlers/yonyou-tplus-sale-delivery-list-v1",
   },
   {
+    actionKey: "erp.purchase_receive.query_list",
+    displayName: "采购入库单列表",
+    handlerRef: "enterprise-data/handlers/yonyou-tplus-purchase-receive-list-v1",
+  },
+  {
+    actionKey: "erp.current_stock.query",
+    displayName: "现存量查询",
+    handlerRef: "enterprise-data/handlers/yonyou-tplus-current-stock-query-v1",
+  },
+  {
     actionKey: "erp.doc.query",
     displayName: "凭证查询",
     handlerRef: "enterprise-data/handlers/yonyou-tplus-doc-query-v1",
@@ -169,12 +179,75 @@ function ensureMaterializerSeatGrants(params: {
  */
 const YONYOU_PUBLIC_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
   "erp.warehouse.query": ["Code", "Name", "ID"],
-  "erp.inventory.query_page": ["Code", "Name", "ID"],
+  // Inventory QueryPage: identity + cost/price (phones/bank still fail_closed).
+  "erp.inventory.query_page": [
+    "Code",
+    "Name",
+    "ID",
+    "Specification",
+    "InvSCost",
+    "LatestCost",
+    "AvagCost",
+    "RetailPriceNew",
+  ],
   // Partner QueryPage SelectFields include PartnerType.*; nest under records[*].
   "erp.partner.query_page": ["Code", "Name", "ID", "PartnerType.Code", "PartnerType.Name"],
-  // Voucher list default selectFields: {SaleDelivery|SaleOrder}.{ID,VoucherDate,Code}
-  "erp.sale_delivery.query_list": ["Code", "Name", "ID", "VoucherDate"],
-  "erp.sale_order.query_list": ["Code", "Name", "ID", "VoucherDate"],
+  // Voucher Rows keys strip SaleDelivery./SaleOrder. root (see yonyouTplusSelectFieldPathKey).
+  "erp.sale_delivery.query_list": [
+    "Code",
+    "Name",
+    "ID",
+    "VoucherDate",
+    "Customer.Code",
+    "Customer.Name",
+    "Warehouse.Code",
+    "Warehouse.Name",
+    "SaleDeliveryDetails.Inventory.Code",
+    "SaleDeliveryDetails.Inventory.Name",
+    "SaleDeliveryDetails.Quantity",
+    "SaleDeliveryDetails.OrigTaxPrice",
+    "SaleDeliveryDetails.OrigTaxAmount",
+  ],
+  "erp.sale_order.query_list": [
+    "Code",
+    "Name",
+    "ID",
+    "VoucherDate",
+    "Customer.Code",
+    "Customer.Name",
+    "SaleOrderDetails.Inventory.Code",
+    "SaleOrderDetails.Inventory.Name",
+    "SaleOrderDetails.Quantity",
+    "SaleOrderDetails.OrigTaxPrice",
+    "SaleOrderDetails.OrigTaxAmount",
+  ],
+  // PurchaseReceive FindVoucherList strips RDRecord. root (see yonyouTplusSelectFieldPathKey).
+  "erp.purchase_receive.query_list": [
+    "Code",
+    "Name",
+    "ID",
+    "VoucherDate",
+    "Partner.Code",
+    "Partner.Name",
+    "Warehouse.Code",
+    "Warehouse.Name",
+    "RDRecordDetails.Inventory.Code",
+    "RDRecordDetails.Inventory.Name",
+    "RDRecordDetails.Quantity",
+    "RDRecordDetails.OrigTaxPrice",
+    "RDRecordDetails.OrigTaxAmount",
+  ],
+  // currentStock/Query documented response fields (no SelectFields / no nesting).
+  "erp.current_stock.query": [
+    "WarehouseCode",
+    "WarehouseName",
+    "InventoryCode",
+    "InventoryName",
+    "Specification",
+    "UnitName",
+    "AvailableQuantity",
+    "ExistingQuantity",
+  ],
 };
 
 /**

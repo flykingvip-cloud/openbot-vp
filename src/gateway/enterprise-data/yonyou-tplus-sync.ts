@@ -20,7 +20,7 @@
  * fingerprinted by Code/Name/Ts. QueryPage and FindVoucherList do not document
  * `?idMarketingOrgan=`.
  *
- * Pagination: QueryPage uses PAGE_SIZE=20. Incremental UpdateDate / voucher
+ * Pagination: QueryPage uses PAGE_SIZE=100. Incremental UpdateDate / voucher
  * windows keep a tight MAX_PAGES_RANGE (default 5). First/full master pulls
  * (no watermark) use MAX_PAGES_FULL (default 500) so archives larger than 100
  * rows can finish and advance the watermark. Override with
@@ -33,7 +33,10 @@ import { YONYOU_TPLUS_CONNECTOR_ID } from "./adapters/yonyou-tplus-oauth.js";
 import {
   executeYonyouTplusHandler,
   probeYonyouTplusConnection,
+  YONYOU_TPLUS_DEFAULT_PAGE_SIZE,
   YONYOU_TPLUS_HANDLERS,
+  YONYOU_TPLUS_INVENTORY_SELECT_FIELDS,
+  YONYOU_TPLUS_PARTNER_SELECT_FIELDS,
   type YonyouTplusProbeContext,
 } from "./adapters/yonyou-tplus.js";
 import { loadCredentialSecret } from "./connector-credential-vault.js";
@@ -49,11 +52,11 @@ import type {
 import { extractYonyouTplusRows, yonyouTplusPayloadBody } from "./yonyou-tplus-rows.js";
 
 const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
-const PAGE_SIZE = 20;
+const PAGE_SIZE = YONYOU_TPLUS_DEFAULT_PAGE_SIZE;
 /** Incremental UpdateDate / voucher windows: keep a tight page budget. */
 const MAX_PAGES_RANGE_DEFAULT = 5;
 /**
- * First/full master QueryPage (no UpdateDate window). 500×20 ≈ 10k rows —
+ * First/full master QueryPage (no UpdateDate window). 500×100 ≈ 50k rows —
  * enough for typical inventory/partner archives without unbounded loops.
  */
 const MAX_PAGES_FULL_DEFAULT = 500;
@@ -76,8 +79,13 @@ type SyncStream = {
   title: string;
   handlerRef: string;
   kind: StreamKind;
-  voucherPrefix?: "SaleOrder" | "SaleDelivery";
+  voucherPrefix?: "SaleOrder" | "SaleDelivery" | "RDRecord";
   actionKey?: string;
+  /**
+   * When true, every sync uses a full page window (no UpdateDate / VoucherDate
+   * incremental). Used for currentStock/Query which has no date filter.
+   */
+  alwaysFull?: boolean;
 };
 
 const SYNC_STREAMS: SyncStream[] = [
@@ -117,6 +125,22 @@ const SYNC_STREAMS: SyncStream[] = [
     kind: "voucher",
     voucherPrefix: "SaleOrder",
     actionKey: "erp.sale_order.query_list",
+  },
+  {
+    streamKey: "purchase_receive",
+    title: "采购入库单",
+    handlerRef: YONYOU_TPLUS_HANDLERS.purchaseReceive,
+    kind: "voucher",
+    voucherPrefix: "RDRecord",
+    actionKey: "erp.purchase_receive.query_list",
+  },
+  {
+    streamKey: "current_stock",
+    title: "现存量",
+    handlerRef: YONYOU_TPLUS_HANDLERS.currentStock,
+    kind: "master",
+    alwaysFull: true,
+    actionKey: "erp.current_stock.query",
   },
 ];
 
@@ -353,12 +377,13 @@ function maxPagesForWindow(window: DateWindow): number {
   );
 }
 
-function windowFor(
-  kind: "master" | "voucher",
-  now: Date,
-  watermark: string | undefined,
-): DateWindow {
+function windowFor(stream: SyncStream, now: Date, watermark: string | undefined): DateWindow {
+  const kind: "master" | "voucher" = stream.kind === "voucher" ? "voucher" : "master";
   const end = kind === "master" ? formatYonyouTplusDateTime(now) : formatYonyouTplusDate(now);
+  // currentStock/Query has no UpdateDate filter — always full-page pull.
+  if (stream.alwaysFull) {
+    return { mode: "full", end };
+  }
   if (watermark && watermark <= end) {
     const begin = kind === "voucher" ? watermark.slice(0, 10) : watermark;
     if (begin <= end) {
@@ -384,16 +409,39 @@ function windowLabel(window: DateWindow): string {
   return `${window.begin} 至 ${window.end}`;
 }
 
+function masterSelectFields(stream: SyncStream): string | undefined {
+  if (stream.streamKey === "inventory") {
+    return YONYOU_TPLUS_INVENTORY_SELECT_FIELDS;
+  }
+  if (stream.streamKey === "partner") {
+    return YONYOU_TPLUS_PARTNER_SELECT_FIELDS;
+  }
+  return undefined;
+}
+
 function streamInput(
   stream: SyncStream,
   window: DateWindow,
   pageIndex: number,
 ): Record<string, unknown> {
+  if (stream.streamKey === "current_stock") {
+    return {
+      param: {
+        PageSize: `${PAGE_SIZE}`,
+        PageIndex: `${pageIndex}`,
+        GroupInfo: { Warehouse: true, Inventory: true },
+      },
+    };
+  }
   if (stream.kind === "master") {
     const param: Record<string, unknown> = {
       PageSize: `${PAGE_SIZE}`,
       PageIndex: `${pageIndex}`,
     };
+    const selectFields = masterSelectFields(stream);
+    if (selectFields) {
+      param.SelectFields = selectFields;
+    }
     if (window.mode === "range") {
       param.UpdateDateBegin = window.begin;
       param.UpdateDateEnd = window.end;
@@ -505,7 +553,7 @@ function inputHasWindow(input: Record<string, unknown> | undefined, stream: Sync
 
 /**
  * Fill a projection read with the sync cursor window for inventory, partner,
- * sale delivery, or sale order. An explicit date window on the input is kept.
+ * sale delivery, sale order, purchase receive, or current stock. An explicit date window on the input is kept.
  * Warehouse stays a catalog read and is not rewritten here.
  */
 export function applyYonyouTplusSyncCursorToInput(params: {
@@ -533,7 +581,7 @@ export function applyYonyouTplusSyncCursorToInput(params: {
     : undefined;
   const watermark = stored && !stored.startsWith("catalog:") ? stored : undefined;
   const now = params.now ?? new Date();
-  const range = windowFor(stream.kind, now, watermark);
+  const range = windowFor(stream, now, watermark);
   const pageIndex = stream.kind === "master" ? 1 : 0;
   return overlayMissing(params.input, streamInput(stream, range, pageIndex));
 }
@@ -784,7 +832,7 @@ async function runSync(params: YonyouTplusSyncParams): Promise<YonyouTplusSyncRe
       }
       continue;
     }
-    const range = windowFor(stream.kind, now, watermark);
+    const range = windowFor(stream, now, watermark);
     if (watermark && watermark > range.end) {
       const detail = `水位 ${watermark} 已覆盖当前时间，本次未重复拉取。`;
       appendLog({
