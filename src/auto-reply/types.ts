@@ -21,6 +21,16 @@ export type TypingPolicy =
   | "heartbeat";
 
 export type GetReplyOptions = {
+  /** Trusted Gateway user ingress: user transcript already persisted, execution not admitted. */
+  interactionIngress?: { userMessageId: string };
+  /** Explicit Gateway resume, after live authorization/stop recheck. */
+  resumedTaskBinding?: import("../agent-runtime/contracts/task.js").TaskCompletionBinding;
+  /** Trusted transport cleanup after an accepted task replacement or owner control. */
+  onInteractionTaskEffect?: (effect: {
+    kind: "replace" | "pause" | "cancel";
+    taskId: string;
+    previousRunId?: string;
+  }) => Promise<void>;
   /** Override run id for agent events (defaults to random UUID). */
   runId?: string;
   /** Abort signal for the underlying agent run. */

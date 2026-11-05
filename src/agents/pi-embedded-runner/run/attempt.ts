@@ -1658,6 +1658,8 @@ export async function runEmbeddedAttempt(
         allowSyntheticToolResults: transcriptPolicy.allowSyntheticToolResults,
         allowedToolNames,
         skipUserTranscriptPersist: params.skipUserTranscriptPersist === true,
+        refreshBeforeAppend:
+          params.skipUserTranscriptPersist === true && Boolean(params.taskExecutionBinding),
       });
       trackSessionManagerAccess(params.sessionFile);
 
@@ -1673,6 +1675,7 @@ export async function runEmbeddedAttempt(
       }
 
       await prepareSessionManagerForRun({
+        preserveUserTranscript: params.skipUserTranscriptPersist === true,
         sessionManager,
         sessionFile: params.sessionFile,
         hadSessionFile,

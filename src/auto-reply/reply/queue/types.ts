@@ -79,6 +79,8 @@ export type FollowupRun = {
     senderIsOwner?: boolean;
     sessionFile: string;
     taskCompletionBinding?: import("../../../agent-runtime/contracts/task.js").TaskCompletionBinding;
+    /** Host accepted this request; do not classify it again as ordinary dialogue. */
+    executionAdmitted?: boolean;
     /** Collaboration rounds: suppress SessionManager user persistence on shared transcripts. */
     skipUserTranscriptPersist?: boolean;
     collaborationRoundInvoked?: boolean;

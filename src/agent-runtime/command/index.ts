@@ -37,3 +37,4 @@ export {
   type ExecutionAdmissionPorts,
 } from "./execution-admission.js";
 export { routeInteraction, type RoutedInteraction } from "./route-interaction.js";
+export { runAuthorizedInteraction } from "./authorized-interaction.js";

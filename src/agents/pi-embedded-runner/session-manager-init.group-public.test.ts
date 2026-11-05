@@ -87,6 +87,74 @@ function messageRoles(lines: TranscriptLine[]): string[] {
 }
 
 describe("prepareSessionManagerForRun GROUP_PUBLIC", () => {
+  it("rebases an active executor append on concurrent persisted interaction leaves", async () => {
+    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-concurrent-history-"));
+    const transcriptPath = path.join(tempRoot, "session.jsonl");
+    await writeGatewayStyleTranscript({
+      transcriptPath,
+      sessionId: "concurrent",
+      cwd: tempRoot,
+      userText: "主任务",
+    });
+    const active = guardSessionManager(openSessionManager(transcriptPath), {
+      skipUserTranscriptPersist: true,
+      refreshBeforeAppend: true,
+    });
+    const interaction = openSessionManager(transcriptPath);
+    interaction.appendMessage({ role: "user", content: "你好", timestamp: Date.now() });
+    const reply = {
+      role: "assistant" as const,
+      content: [{ type: "text" as const, text: "你好" }],
+      api: "openai-completions" as const,
+      provider: "test",
+      model: "test",
+      stopReason: "stop" as const,
+      timestamp: Date.now(),
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    };
+    const replyId = interaction.appendMessage(reply);
+    active.appendMessage({ ...reply, content: [{ type: "text", text: "主任务完成" }] });
+    const reopened = openSessionManager(transcriptPath);
+    expect(reopened.getLeafEntry()?.parentId).toBe(replyId);
+    expect(reopened.buildSessionContext().messages.map((message) => message.role)).toEqual([
+      "user",
+      "user",
+      "assistant",
+      "assistant",
+    ]);
+  });
+  it("preserves an early-persisted Gateway user turn outside GROUP_PUBLIC", async () => {
+    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-ingress-sm-"));
+    const transcriptPath = path.join(tempRoot, "session.jsonl");
+    await writeGatewayStyleTranscript({
+      transcriptPath,
+      sessionId: "ingress",
+      cwd: tempRoot,
+      userText: "生成报告",
+    });
+    const before = await fs.readFile(transcriptPath, "utf8");
+    const manager = openSessionManager(transcriptPath);
+    await prepareSessionManagerForRun({
+      sessionManager: manager,
+      sessionFile: transcriptPath,
+      hadSessionFile: true,
+      sessionId: "ingress",
+      cwd: tempRoot,
+      preserveUserTranscript: true,
+    });
+    expect(await fs.readFile(transcriptPath, "utf8")).toBe(before);
+    const guarded = guardSessionManager(manager, { skipUserTranscriptPersist: true });
+    guarded.appendMessage({ role: "user", content: "生成报告", timestamp: Date.now() });
+    expect(messageRoles(await readTranscriptMessages(transcriptPath))).toEqual(["user"]);
+    expect(openSessionManager(transcriptPath).buildSessionContext().messages).toHaveLength(1);
+  });
   it("does not wipe header+user GROUP_PUBLIC transcripts (original wipe motivation)", async () => {
     const { transcriptPath, sessionId, dir } = await makeGroupPublicTranscriptPath();
     await writeGatewayStyleTranscript({

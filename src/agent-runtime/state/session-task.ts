@@ -2,6 +2,7 @@ import {
   applyIncomingUserMessage,
   commitSameTaskConstraint,
   commitAdmittedSessionTask,
+  commitInteractionTaskProposal,
   mutateSessionTaskBoard,
   readSessionTaskBoard,
   startBoundTaskExecution,
@@ -11,6 +12,7 @@ import {
 export const sessionTaskState = {
   read: readSessionTaskBoard,
   admitExecution: commitAdmittedSessionTask,
+  applyInteractionProposal: commitInteractionTaskProposal,
   startExecution: startBoundTaskExecution,
   applyControl(sessionFile: string, prompt: string) {
     return mutateSessionTaskBoard(sessionFile, (board) => {

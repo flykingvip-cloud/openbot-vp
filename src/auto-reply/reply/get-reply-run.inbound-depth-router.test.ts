@@ -1,4 +1,10 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
+import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
 import { STEWARD_REQUIRED_SKILLS } from "../../agents/builtin-steward/required-skills.js";
 import { listRetrieveReadOnlyCoreToolIds } from "../../agents/inbound-tool-policy.js";
 import { createOpenClawTools } from "../../agents/openclaw-tools.js";
@@ -8,6 +14,7 @@ import {
 } from "../../agents/pi-embedded-runner/run/resolve-embedded-tools.js";
 import { composeSkillPolicy } from "../../agents/skills/skill-policy.js";
 import { isWorkspaceOnboardingCompleted } from "../../agents/workspace.js";
+import { resolveSessionFilePath } from "../../config/sessions.js";
 import { resolveGroupSessionKey } from "../../config/sessions.js";
 import { loadContextScopeCatalog } from "../../gateway/context-scope/catalog.js";
 import { authorizeContextScopePlan } from "../../gateway/context-scope/index.js";
@@ -28,11 +35,18 @@ import { ensureSkillSnapshot } from "./session-updates.js";
 vi.mock("../../agents/auth-profiles/session-override.js", () => ({
   resolveSessionAuthProfileOverride: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("../../agents/bootstrap-files.js", () => ({
+  resolveBootstrapContextForRun: vi.fn().mockResolvedValue({
+    bootstrapFiles: [],
+    contextFiles: [{ path: "IDENTITY.md", content: "shared identity" }],
+  }),
+}));
 
 vi.mock("../../agents/pi-embedded.js", () => ({
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunActive: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunStreaming: vi.fn().mockReturnValue(false),
+  queueEmbeddedPiMessage: vi.fn().mockReturnValue(false),
   resolveEmbeddedSessionLane: vi.fn().mockReturnValue("session:session-key"),
 }));
 
@@ -322,6 +336,94 @@ function baseParams(
 }
 
 describe("runPreparedReply inbound depth router", () => {
+  it.each(["respond", "accepted", "duplicate", "rejected"] as const)(
+    "Gateway interaction %s enters execution only after acceptance",
+    async (kind) => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-ingress-reply-"));
+      const file = path.join(dir, "session.jsonl");
+      fs.writeFileSync(
+        file,
+        JSON.stringify({
+          type: "session",
+          version: CURRENT_SESSION_VERSION,
+          id: "ingress",
+          cwd: dir,
+          timestamp: new Date().toISOString(),
+        }) + "\n",
+      );
+      vi.mocked(resolveSessionFilePath).mockReturnValue(file);
+      const binding = { taskId: "accepted-task" };
+      const interaction = vi.spyOn(replyTurnRuntime, "interaction").mockResolvedValue(
+        kind === "respond"
+          ? { kind: "respond", text: "你好", clarification: false }
+          : {
+              kind: "execution_admission",
+              result:
+                kind === "accepted"
+                  ? { kind, binding, acceptance: ["来源"] }
+                  : kind === "duplicate"
+                    ? { kind, binding }
+                    : { kind, reason: "revision_mismatch" },
+            },
+      );
+      const read = vi.spyOn(replyTurnRuntime.state, "read").mockReturnValue({
+        focusRevision: 0,
+        parked: [],
+        current:
+          kind === "accepted"
+            ? {
+                taskId: binding.taskId,
+                title: "报告",
+                goalText: "生成报告",
+                unfinished: true,
+                createdAtMs: 1,
+                stop: { summary: "已接纳", workspacePaths: [] },
+              }
+            : undefined,
+      });
+      try {
+        vi.mocked(runReplyAgent).mockClear();
+        const result = await runPreparedReply(
+          baseParams({
+            sessionId: "ingress",
+            sessionEntry: { sessionId: "ingress", sessionFile: file, updatedAt: 1 },
+            opts: {
+              runId: "ingress-message",
+              interactionIngress: { userMessageId: "ingress-message" },
+            },
+          }),
+        );
+        expect(interaction).toHaveBeenCalledOnce();
+        expect(resolveBootstrapContextForRun).toHaveBeenCalled();
+        expect(interaction.mock.calls[0]?.[0].input.context).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              role: "system",
+              content: expect.stringContaining("shared identity"),
+            }),
+          ]),
+        );
+        expect(runReplyAgent).toHaveBeenCalledTimes(kind === "accepted" ? 1 : 0);
+        if (kind === "accepted") {
+          const run = vi.mocked(runReplyAgent).mock.calls[0]?.[0].followupRun.run;
+          expect(run).toMatchObject({
+            taskCompletionBinding: binding,
+            executionAdmitted: true,
+            skipUserTranscriptPersist: true,
+          });
+          expect(run?.extraSystemPrompt).toContain("Acceptance criteria:");
+        }
+        if (kind === "respond") {
+          expect(result).toEqual({ text: "你好" });
+        }
+      } finally {
+        interaction.mockRestore();
+        read.mockRestore();
+        vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
   let previousShadow: string | undefined;
   let previousRouter: string | undefined;
   let previousKnowledgePolicy: string | undefined;

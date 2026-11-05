@@ -11,10 +11,21 @@ import {
 import { runAdmittedTurn } from "../execution/index.js";
 import { sessionTaskState } from "../state/session-task.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
-import { bindInteractionPorts } from "./command-adapters.js";
+import {
+  bindInteractionPorts,
+  interruptInteractionTask,
+  steerInteractionTask,
+} from "./command-adapters.js";
+import type { runGatewayInteraction } from "./interaction-turn.js";
 
 /** Compose the original reply-turn dependencies. The reply host owns transport and cleanup. */
 export const replyTurnRuntime = {
+  async interaction(...params: Parameters<typeof runGatewayInteraction>) {
+    const runtime = await import("./interaction-turn.runtime.js");
+    return runtime.runGatewayInteraction(...params);
+  },
+  interrupt: interruptInteractionTask,
+  steer: steerInteractionTask,
   command: {
     handle(
       input: Parameters<typeof handleInteraction>[0],

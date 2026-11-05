@@ -121,6 +121,14 @@ function flushCall(): Parameters<FlushFn>[0] {
 }
 
 describe("runReplyAgent outer runId (P3-2 rework)", () => {
+  it("refuses an admitted marker without its captured task binding", async () => {
+    const params = buildParams({ runId: "missing-binding" });
+    params.followupRun.run.executionAdmitted = true;
+    const result = await runReplyAgent(params);
+    expect(result).toMatchObject({ text: expect.stringContaining("任务身份已失效或尚未绑定") });
+    expect(mocks.runEmbeddedPiAgent).not.toHaveBeenCalled();
+    expect(mocks.runAgentTurnWithFallback).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     mocks.runAgentTurnWithFallback.mockClear();
     mocks.runMemoryFlushIfNeeded.mockClear();

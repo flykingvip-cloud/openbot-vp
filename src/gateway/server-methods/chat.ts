@@ -64,7 +64,10 @@ import {
   transcriptEntriesForInboundTurn,
 } from "../../conversation-task/focus-switch.js";
 import { observeConversationTaskCancelPathConsult } from "../../conversation-task/reply-completion.js";
-import { readSessionTaskBoard } from "../../conversation-task/session-task-board.js";
+import {
+  readSessionTaskBoard,
+  captureTaskCompletionBinding,
+} from "../../conversation-task/session-task-board.js";
 import { shouldTaskParkAbortInFlight } from "../../conversation-task/turn-relation.js";
 import { resolveConversationFlags } from "../../conversations/flags.js";
 import { pageHistoryMessages } from "../../conversations/history-cursor.js";
@@ -163,7 +166,6 @@ import {
   scheduleGroupChatAclCacheRefresh,
   upsertAuthorizedGroupChatAclMember,
 } from "../chat-group-acl-cache.js";
-import { isChatInboundPersistEarlyEnabled } from "../chat-inbound-flags.js";
 import { emitChatInboundStage } from "../chat-inbound-stage-events.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import {
@@ -6066,10 +6068,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       };
       if (!p.growthBirthTurn) {
         try {
-          // First inbound often has no sessionFile yet (session init is later in
-          // get-reply). Focus gate then returns focus_state_unavailable and skips
-          // board seed — a later aside can become current. Ensure transcript path
-          // exists so applyIncomingUserMessage can seed A before mid-task B.
+          // Establish durable conversation identity independently of task admission.
           const existingFocusFile = entry?.sessionFile?.trim() ?? "";
           if (!existingFocusFile || !fs.existsSync(existingFocusFile)) {
             const focusSessionId = entry?.sessionId?.trim() || randomUUID();
@@ -6174,7 +6173,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       }
       const shouldPersistUserTranscript =
         normalizedAttachments.length > 0 ||
-        (isChatInboundPersistEarlyEnabled() && Boolean(rawMessage.trim())) ||
+        Boolean(rawMessage.trim()) ||
         (Boolean(taskStatusLine) && Boolean(rawMessage.trim())) ||
         (taskTracking.cutContext && Boolean(rawMessage.trim())) ||
         (stewardRobotMention && Boolean(rawMessage.trim()));
@@ -6477,6 +6476,50 @@ export const chatHandlers: GatewayRequestHandlers = {
         replyOptions: {
           runId: clientRunId,
           abortSignal: abortController.signal,
+          onInteractionTaskEffect: async (effect) => {
+            // Stop the captured execution only. Never abort this interpreting turn
+            // or a later task which took over while the model was answering.
+            const priorRunId = effect.previousRunId;
+            if (priorRunId && priorRunId !== clientRunId) {
+              const active = context.chatAbortControllers.get(priorRunId);
+              if (active?.sessionKey === resolvedSessionKey) {
+                const partial = context.chatRunBuffers.get(priorRunId);
+                abortChatRunById(createChatAbortOps(context), {
+                  runId: priorRunId,
+                  sessionKey: resolvedSessionKey,
+                  stopReason: effect.kind === "replace" ? "task-park" : "owner-control",
+                });
+                if (partial?.trim()) {
+                  await persistAbortedPartials({
+                    context,
+                    sessionKey: resolvedSessionKey,
+                    client,
+                    snapshots: [
+                      {
+                        runId: priorRunId,
+                        sessionId: active.sessionId,
+                        text: partial,
+                        abortOrigin: "rpc",
+                      },
+                    ],
+                  });
+                }
+              }
+            }
+            if (effect.kind !== "replace" && effect.taskId) {
+              recordAuthoritativeTaskStop({
+                ...authoritativeStopIdentityFromClient(client),
+                sessionKey: resolvedSessionKey,
+                taskId: effect.taskId,
+              });
+            }
+          },
+          ...(!systemInputProvenance && !p.growthBirthTurn
+            ? { interactionIngress: { userMessageId: clientRunId } }
+            : {}),
+          ...(taskTracking.action === "resume"
+            ? { resumedTaskBinding: captureTaskCompletionBinding(entry?.sessionFile) }
+            : {}),
           ...(p.growthBirthTurn ? { growthBirthTurn: true } : {}),
           ...(p.humanTakeoverObserved ? { humanTakeoverObserved: true } : {}),
           ...(p.contextScope ? { contextScopeRequest: p.contextScope } : {}),

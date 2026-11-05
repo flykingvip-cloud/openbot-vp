@@ -1,7 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import { expect, it, vi } from "vitest";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
-import { runPreparedInteraction } from "../command/prepared-interaction.js";
+import { runAuthorizedInteraction } from "../command/authorized-interaction.js";
 import { createAuthorizedModelSession } from "../model/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 const calls = vi.hoisted(() => ({ complete: vi.fn() }));
@@ -24,8 +24,9 @@ it.each(["reply", "execution_request"] as const)(
   async (kind) => {
     const host = bindAdmittedTurnHost();
     host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
-      acquired: false as const,
-      skipped: true as const,
+      acquired: true as const,
+      skipped: false as const,
+      enterpriseId: "tenant",
     }));
     host.model.runWithModelFallback = vi.fn(async (p) => ({
       result: await p.run("test", "test"),
@@ -34,12 +35,9 @@ it.each(["reply", "execution_request"] as const)(
       attempts: [],
     }));
     host.task.ensureChatTurnTaskOutcome = vi.fn();
+    host.admission.releaseEnterpriseAgentRun = vi.fn(async () => {});
+    host.model.forgetRunModelSet = vi.fn();
     const session = createAuthorizedModelSession("interaction-test", host);
-    await session.authorize({});
-    session.prepareModelSet({
-      config: {},
-      routing: host.model.resolveExecutionRoutingFromCapabilityPlan({}),
-    });
     const decision =
       kind === "reply"
         ? { kind, text: "你好" }
@@ -53,7 +51,7 @@ it.each(["reply", "execution_request"] as const)(
       usage: makeZeroUsageSnapshot(),
       stopReason: "stop",
     });
-    const result = await runPreparedInteraction(
+    const result = await runAuthorizedInteraction(
       {
         input: {
           message: "你好",
@@ -68,11 +66,20 @@ it.each(["reply", "execution_request"] as const)(
         timeoutMs: 1000,
         maxTokens: 200,
       },
-      session,
-      async () => ({ model }),
       {
-        captured: { requestId: "message-a", expectedFocusRevision: 0, expectedWriteEpoch: 0 },
-        ports: { authorize, commit },
+        session,
+        authorization: {},
+        prepare: (active) => {
+          active.prepareModelSet({
+            config: {},
+            routing: host.model.resolveExecutionRoutingFromCapabilityPlan({}),
+          });
+        },
+        candidate: async () => ({ model }),
+        admission: {
+          captured: { requestId: "message-a", expectedFocusRevision: 0, expectedWriteEpoch: 0 },
+          ports: { authorize, commit },
+        },
       },
     );
     expect(result).toEqual(
@@ -89,6 +96,8 @@ it.each(["reply", "execution_request"] as const)(
     expect(context.systemPrompt).not.toContain("untrusted knowledge");
     expect(context.messages[0]).toMatchObject({ role: "user", content: "untrusted knowledge" });
     expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
+    expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
+    expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();
     session.dispose();
   },
 );

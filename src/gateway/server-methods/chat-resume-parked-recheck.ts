@@ -47,6 +47,8 @@ import type { OpenBotConfig } from "../../config/types.js";
 import type { ResumeParkedRecheck } from "../../conversation-task/session-task-board.js";
 import {
   applyFocusSwitchGate,
+  isOwnerCurrentTaskControlUtterance,
+  readSessionTaskBoard,
   type FocusSwitchGateDecision,
 } from "../../conversation-task/session-task-board.js";
 import { resolveSecurityProfile } from "../security-profile.js";
@@ -536,6 +538,20 @@ export function applyChatFocusSwitchGateWithResumeRecheck(params: {
   proceed?: boolean;
   recheckInputs: ResolveResumeParkedRecheckParams;
 }): FocusSwitchGateDecision {
+  // Ingress may apply explicit controls, never infer/create/switch work from chat.
+  // New work is admitted only after interaction understanding and authorization.
+  const text = params.incomingText.trim();
+  if (
+    !isOwnerCurrentTaskControlUtterance(text) &&
+    !/^(?:继续挂起|CONTINUE|暂停挂起|取消挂起|关闭挂起|CLOSE)\s+\S+/iu.test(text)
+  ) {
+    return {
+      action: "continue",
+      decisionCode: "focus_clear",
+      cutContext: false,
+      taskId: readSessionTaskBoard(params.sessionFile).current?.taskId ?? "",
+    };
+  }
   return applyFocusSwitchGate({
     sessionFile: params.sessionFile,
     incomingText: params.incomingText,

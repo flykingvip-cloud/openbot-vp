@@ -23,6 +23,13 @@ import type {
 } from "../command/index.js";
 import { sessionTaskState } from "../state/session-task.js";
 
+export function interruptInteractionTask(sessionId: string, sessionKey?: string) {
+  abortEmbeddedPiRun(sessionId);
+  abortMidTaskAsideLanes(sessionId);
+  clearSessionQueues([sessionId, sessionKey]);
+}
+export const steerInteractionTask = queueEmbeddedPiMessage;
+
 function bindOwnerControlPorts(params: {
   sessionFile: string;
   sessionId: string;

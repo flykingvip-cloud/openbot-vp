@@ -5,9 +5,12 @@ import {
   finalizeSystemContext,
   selectSystemContextParts,
 } from "../../agent-runtime/context/assembly.js";
+import { projectInteractionHistory } from "../../agent-runtime/context/interaction-history.js";
 import { appendUntrustedContext } from "../../agent-runtime/context/untrusted.js";
+import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
+import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
 import { extractEmployeeStewardUserIdFromSessionKey } from "../../agents/builtin-steward/employee-isolation.js";
 import { isBuiltinStewardAgent } from "../../agents/builtin-steward/identity.js";
 import {
@@ -28,6 +31,7 @@ import {
   isEmbeddedPiRunStreaming,
   resolveEmbeddedSessionLane,
 } from "../../agents/pi-embedded.js";
+import { openSessionManager } from "../../agents/pi-sdk/session.js";
 import { applySkillPolicyToFilter } from "../../agents/skills/skill-policy.js";
 import { replyForTaskSurfaceUtterance } from "../../agents/task-surface/apply.js";
 import { isPrimarilyTaskSurfaceUtterance } from "../../agents/task-surface/surface.js";
@@ -45,7 +49,10 @@ import {
 } from "../../config/sessions/ogui-decision-engine.js";
 import { buildActiveConversationTaskFocusPrompt } from "../../conversation-task/focus-prompt.js";
 import { buildFocusResumePromptFromSessionFile } from "../../conversation-task/focus-resume.js";
-import { captureTaskCompletionBinding } from "../../conversation-task/session-task-board.js";
+import {
+  captureTaskCompletionBinding,
+  buildResumePrompt,
+} from "../../conversation-task/session-task-board.js";
 import { buildCronReplySystemPrompt } from "../../cron/cron-reply-context.js";
 import { buildGrowthBirthSystemPrompt } from "../../gateway/agent-growth/birth-context.js";
 import {
@@ -437,6 +444,10 @@ export async function runPreparedReply(
   const isGroupChat = sessionCtx.ChatType === "group";
   const wasMentioned = ctx.WasMentioned === true;
   const isHeartbeat = opts?.isHeartbeat === true;
+  const interactionIngress =
+    !isHeartbeat && !opts?.growthBirthTurn && sessionCtx.CollaborationRoundInvoked !== true
+      ? opts?.interactionIngress
+      : undefined;
   const { typingPolicy, suppressTyping } = resolveRunTypingPolicy({
     requestedPolicy: opts?.typingPolicy,
     suppressTyping: opts?.suppressTyping === true,
@@ -707,16 +718,18 @@ export async function runPreparedReply(
           text: inboundMessage,
           sourceMessageId,
         });
-        const feedback = await applyInboundTaskFeedback({
-          cfg,
-          workspaceDir: runWorkspaceDir,
-          agentId,
-          sessionKey,
-          sessionEntry,
-          text: inboundMessage,
-          sourceMessageId,
-        });
-        if (feedback.clarify) {
+        const feedback = !interactionIngress
+          ? await applyInboundTaskFeedback({
+              cfg,
+              workspaceDir: runWorkspaceDir,
+              agentId,
+              sessionKey,
+              sessionEntry,
+              text: inboundMessage,
+              sourceMessageId,
+            })
+          : undefined;
+        if (feedback?.clarify) {
           inboundTaskClarify = feedback.clarify;
         }
       } catch {
@@ -1089,6 +1102,7 @@ export async function runPreparedReply(
   const composerPluginMentionBindings = resolveComposerPluginMentionBindings(ctx.ComposerMentions);
   const composerPluginMentionExecution =
     !isHeartbeat &&
+    !interactionIngress &&
     (composerPluginMentionBindings.plugins.length > 0 ||
       composerPluginMentionBindings.connectors.length > 0)
       ? await executeComposerPluginMentionsForTurn({
@@ -1471,6 +1485,146 @@ export async function runPreparedReply(
     storePath,
     cfg,
   });
+  let admittedBinding = opts?.resumedTaskBinding;
+  if (interactionIngress && !admittedBinding) {
+    const board = replyTurnRuntime.state.read(sessionFile);
+    const captured = {
+      expectedFocusRevision: board.focusRevision,
+      expectedWriteEpoch: board.writeEpoch ?? 0,
+      expectedTaskId: board.current?.taskId,
+    };
+    const transcript = openSessionManager(sessionFile);
+    const history = transcript.buildSessionContext().messages;
+    const bootstrap = await resolveBootstrapContextForRun({
+      workspaceDir: runWorkspaceDir,
+      config: cfg,
+      sessionKey,
+      sessionId: sessionIdFinal,
+      agentId,
+    });
+    const systemContext = [
+      ...bootstrap.contextFiles.map((file) => `## ${file.path}\n${file.content}`),
+      skillsSnapshot?.prompt,
+      finalizeSystemContext(extraSystemPromptParts),
+    ].filter((part): part is string => Boolean(part));
+    const interactionAuthProfileId = await resolveSessionAuthProfileOverride({
+      cfg,
+      provider,
+      agentDir,
+      sessionEntry,
+      sessionStore,
+      sessionKey,
+      storePath,
+      isNewSession,
+    });
+    const routed = await replyTurnRuntime.interaction({
+      config: cfg,
+      runId: opts?.runId ?? crypto.randomUUID(),
+      agentId,
+      agentDir,
+      sessionKey,
+      sessionFile,
+      requestId: interactionIngress.userMessageId,
+      captured,
+      authorized: commandAuthorized && command.isAuthorizedSender,
+      identity: {
+        executionIdentity: turnExecutionIdentity,
+        gatewayClientUser: replyGatewayUser,
+        gatewayClientPlatformUserId: replyGatewayPlatformUserId,
+        gatewayClientSessionDomain: ctx.GatewayClientSessionDomain,
+      },
+      provider,
+      model,
+      authProfileId: interactionAuthProfileId,
+      timeoutMs,
+      input: {
+        message: prefixedCommandBody,
+        abortSignal: opts?.abortSignal,
+        taskTarget: board.current
+          ? { taskId: board.current.taskId, revision: String(board.writeEpoch ?? 0) }
+          : undefined,
+        context: [
+          ...systemContext.map((content) => ({ role: "system" as const, content })),
+          ...projectInteractionHistory(history, interactionIngress.userMessageId),
+        ],
+      },
+    });
+    if (routed.kind === "respond") {
+      typing.cleanup();
+      return { text: routed.text };
+    }
+    if (routed.kind === "task_proposal") {
+      opts?.abortSignal?.throwIfAborted();
+      const applied =
+        commandAuthorized && command.isAuthorizedSender
+          ? replyTurnRuntime.state.applyInteractionProposal({
+              sessionFile,
+              ...captured,
+              decision:
+                routed.decision.kind === "task_change"
+                  ? { ...routed.decision, text: inboundMessage }
+                  : routed.decision,
+            })
+          : { kind: "rejected" as const, reason: "unauthorized" };
+      if (applied.kind === "applied" && applied.abort) {
+        replyTurnRuntime.interrupt(sessionIdFinal, sessionKey);
+        if (routed.decision.kind === "task_control" && routed.decision.action !== "resume") {
+          await opts?.onInteractionTaskEffect?.({
+            kind: routed.decision.action,
+            taskId: routed.decision.target.taskId,
+            previousRunId: board.current?.executionAttempt,
+          });
+        }
+      }
+      if (applied.kind === "applied" && routed.decision.kind === "task_change") {
+        replyTurnRuntime.steer(sessionIdFinal, inboundMessage);
+      }
+      typing.cleanup();
+      return {
+        text:
+          applied.kind === "applied"
+            ? applied.text
+            : applied.reason === "resume_requires_live_recheck"
+              ? "恢复需要重新校验授权和停止状态，请使用任务板的恢复操作。"
+              : "任务状态已变化或变更未获准，本次未修改；请确认当前任务后重试。",
+      };
+    }
+    if (routed.result.kind !== "accepted") {
+      typing.cleanup();
+      return {
+        text:
+          routed.result.kind === "duplicate"
+            ? "该执行请求已经接纳，未重复启动。"
+            : "任务状态已变化或执行未获准，本次未启动；请确认当前目标后重试。",
+      };
+    }
+    admittedBinding = routed.result.binding;
+    await opts?.onInteractionTaskEffect?.({
+      kind: "replace",
+      taskId: board.current?.taskId ?? "",
+      previousRunId: board.current?.executionAttempt,
+    });
+    const acceptedTask = replyTurnRuntime.state.read(sessionFile).current;
+    if (acceptedTask?.taskId !== admittedBinding.taskId) {
+      typing.cleanup();
+      return { text: "任务焦点已变化，本次未启动执行。" };
+    }
+    extraSystemPromptParts = extraSystemPromptParts.filter(
+      (part) => part !== sessionFocusResumePrompt,
+    );
+    extraSystemPromptParts.push(
+      [
+        "## Admitted execution request",
+        "This is the authoritative accepted goal for this execution. Earlier task references are history only.",
+        buildResumePrompt(acceptedTask),
+        `Goal: ${acceptedTask.goalText}`,
+        "Acceptance criteria:",
+        ...routed.result.acceptance.map((criterion, index) => `${index + 1}. ${criterion}`),
+      ].join("\n"),
+    );
+    // New accepted focus supersedes the old active attempt, using the existing abort path.
+    abortEmbeddedPiRun(sessionIdFinal);
+  }
   const collaborationRoundInvoked = sessionCtx.CollaborationRoundInvoked === true;
   // Queue body stays the user utterance (plus thread/media notes). System events
   // travel with followupRun.run.extraSystemPrompt so deferred turns still see them.
@@ -1631,8 +1785,10 @@ export async function runPreparedReply(
       senderE164: sessionCtx.SenderE164?.trim() || undefined,
       senderIsOwner: command.senderIsOwner,
       sessionFile,
-      taskCompletionBinding: captureTaskCompletionBinding(sessionFile, inboundMessage),
-      skipUserTranscriptPersist: collaborationRoundInvoked,
+      taskCompletionBinding:
+        admittedBinding ?? captureTaskCompletionBinding(sessionFile, inboundMessage),
+      ...(admittedBinding ? { executionAdmitted: true } : {}),
+      skipUserTranscriptPersist: collaborationRoundInvoked || Boolean(interactionIngress),
       collaborationRoundInvoked,
       ...(sessionCtx.DeliveryToolSideEffect
         ? { deliveryToolSideEffect: sessionCtx.DeliveryToolSideEffect }
@@ -1664,9 +1820,9 @@ export async function runPreparedReply(
       extraSystemPrompt: finalizeSystemContext(extraSystemPromptParts),
       organizationContext,
       ...(isReasoningTagProvider(provider) ? { enforceFinalTag: true } : {}),
-      ...(applyChatLane ? { disableTools: true } : {}),
+      ...(applyChatLane && !admittedBinding ? { disableTools: true } : {}),
       ...(useCollaborationAssembly && !applyChatLane ? { skillPolicy: runtimeSkillPolicy } : {}),
-      ...(applyRetrieveToolPolicy && inboundDepthDecision
+      ...(applyRetrieveToolPolicy && inboundDepthDecision && !admittedBinding
         ? {
             inboundToolCeiling: {
               depth: inboundDepthDecision.depth,

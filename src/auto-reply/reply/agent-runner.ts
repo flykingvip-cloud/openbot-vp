@@ -224,23 +224,25 @@ export async function runReplyAgent(params: {
     }
   };
 
-  const disposition = replyTurnRuntime.command.handle(
-    {
-      prompt: followupRun.prompt,
-      sessionFile: followupRun.run.sessionFile,
-      isActive,
-      isStreaming,
-      isHeartbeat,
-      shouldSteer,
-      shouldFollowup,
-      queueMode: resolvedQueue.mode,
-    },
-    {
-      prompt: followupRun.prompt,
-      sessionId: followupRun.run.sessionId,
-      queueKeys: [queueKey, followupRun.run.sessionId, followupRun.run.sessionKey],
-    },
-  );
+  const disposition = followupRun.run.executionAdmitted
+    ? { kind: "execute" as const }
+    : replyTurnRuntime.command.handle(
+        {
+          prompt: followupRun.prompt,
+          sessionFile: followupRun.run.sessionFile,
+          isActive,
+          isStreaming,
+          isHeartbeat,
+          shouldSteer,
+          shouldFollowup,
+          queueMode: resolvedQueue.mode,
+        },
+        {
+          prompt: followupRun.prompt,
+          sessionId: followupRun.run.sessionId,
+          queueKeys: [queueKey, followupRun.run.sessionId, followupRun.run.sessionKey],
+        },
+      );
   if (disposition.kind === "dialogue") {
     const asideRunId = opts?.runId ?? crypto.randomUUID();
     const lane = await runMidTaskAsideReplyLane({
@@ -322,6 +324,7 @@ export async function runReplyAgent(params: {
     });
 
   const requiresTaskBinding =
+    followupRun.run.executionAdmitted === true ||
     Boolean(completionBinding) ||
     (!followupRun.run.collaborationRoundInvoked &&
       !followupRun.run.privateRunBag &&
