@@ -10828,6 +10828,11 @@ tasks:
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - src/auto-reply/reply/mid-task-aside-reply-lane.ts
+      - src/auto-reply/reply/mid-task-aside-reply-lane.test.ts
+      - src/auto-reply/reply/mid-task-aside.test.ts
+      - src/conversation-task/session-task-board.slice3-context.test.ts
+      - src/agent-runtime/wiring/dialogue-intent.test.ts
       - src/conversation-task/turn-relation.ts
       - src/conversation-task/turn-relation.test.ts
       - src/auto-reply/reply/queue-policy.ts
@@ -10924,14 +10929,21 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T00:08:38.045Z
+        lastSignalAt: 2026-11-05T00:24:41.840Z
         metadata: {}
       - id: runtime-unified-interaction-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-05T00:08:38.045Z
+        lastSignalAt: 2026-11-05T00:24:41.840Z
+        metadata: {}
+      - id: runtime-mainline-retirement-20261105
+        taskId: agent-runtime-convergence
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-05T00:24:41.840Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-03
@@ -10977,6 +10989,11 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/auto-reply/reply/mid-task-aside-reply-lane.ts
+      - src/auto-reply/reply/mid-task-aside-reply-lane.test.ts
+      - src/auto-reply/reply/mid-task-aside.test.ts
+      - src/conversation-task/session-task-board.slice3-context.test.ts
+      - src/agent-runtime/wiring/dialogue-intent.test.ts
       - .loom/registry.yaml
       - .kiro/specs/agent-runtime-convergence/**
       - src/conversation-task/turn-relation.ts
@@ -24268,61 +24285,109 @@ landingStreams:
       purpose: Closeout doc, evidence logs, and isolated SDK probe. No product
         behavior change.
 sharedPaths:
+  - glob: src/auto-reply/reply/mid-task-aside-reply-lane.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/mid-task-aside-reply-lane.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/mid-task-aside.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reviewAfter: 2026-11-30
+  - glob: src/conversation-task/session-task-board.slice3-context.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/wiring/dialogue-intent.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized scoped runtime migration; preserve prior declarations and histories, one convergence lander.
+    reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/active-turn.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/index.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/interaction.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/dialogue-intent.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/command-adapters.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/reply-turn.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/interaction.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/mid-task-aside.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/task-orchestration/complex-task-loop.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/conversation-task/turn-relation.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/conversation-task/turn-relation.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/queue-policy.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/queue-policy.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task declarations and session history retained. Sole lander is codex-runtime-manager for this convergence checkpoint.
+    reason: Human-authorized scoped landing transfer on 2026-11-05; prior task
+      declarations and session history retained. Sole lander is
+      codex-runtime-manager for this convergence checkpoint.
     reviewAfter: 2026-11-30
   - glob: src/context-engine/registry.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

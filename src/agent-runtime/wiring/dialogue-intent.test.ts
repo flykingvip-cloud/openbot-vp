@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { resolveInteractionDialogue } from "../../agent-runtime/wiring/command-adapters.js";
 import { emptySessionTaskBoard } from "../../conversation-task/session-task-board.js";
 import { classifyTurnRelation } from "../../conversation-task/turn-relation.js";
-import { formatBoardReadonlyAsideReply, resolveMidTaskAsideDisposition } from "./mid-task-aside.js";
 
 function boardWithConstraints() {
   const board = emptySessionTaskBoard();
@@ -17,10 +17,10 @@ function boardWithConstraints() {
   return board;
 }
 
-describe("resolveMidTaskAsideDisposition", () => {
+describe("resolveInteractionDialogue", () => {
   it("maps progress asks to progress (not board_readonly)", () => {
     expect(
-      resolveMidTaskAsideDisposition({ prompt: "进度如何", board: boardWithConstraints() }),
+      resolveInteractionDialogue({ prompt: "进度如何", board: boardWithConstraints() }),
     ).toEqual({
       kind: "progress",
     });
@@ -28,7 +28,7 @@ describe("resolveMidTaskAsideDisposition", () => {
 
   it("answers goal/constraint asks from board without implying write", () => {
     const board = boardWithConstraints();
-    const goal = resolveMidTaskAsideDisposition({ prompt: "当前目标是什么", board });
+    const goal = resolveInteractionDialogue({ prompt: "当前目标是什么", board });
     expect(goal.kind).toBe("board_readonly");
     if (goal.kind === "board_readonly") {
       expect(goal.reply).toContain("调研国内手机市场");
@@ -37,7 +37,7 @@ describe("resolveMidTaskAsideDisposition", () => {
     }
     // Even when turn-relation would label this amend, read ask stays board_readonly.
     expect(classifyTurnRelation("有效约束有哪些", board.current!.goalText)).toBe("amend");
-    const constraints = resolveMidTaskAsideDisposition({ prompt: "有效约束有哪些", board });
+    const constraints = resolveInteractionDialogue({ prompt: "有效约束有哪些", board });
     expect(constraints.kind).toBe("board_readonly");
     if (constraints.kind === "board_readonly") {
       expect(constraints.reply).toContain("只要国内安卓机型");
@@ -47,34 +47,28 @@ describe("resolveMidTaskAsideDisposition", () => {
 
   it("marks general aside as reply_lane_pending (timely lane owns the answer)", () => {
     expect(
-      resolveMidTaskAsideDisposition({
+      resolveInteractionDialogue({
         prompt: "今天北京天气怎么样",
         board: boardWithConstraints(),
       }),
-    ).toEqual({ kind: "reply_lane_pending" });
-  });
-
-  it("formatBoardReadonlyAsideReply stays projection-only", () => {
-    const text = formatBoardReadonlyAsideReply(boardWithConstraints(), "constraints");
-    expect(text).toContain("有效约束 2 条");
-    expect(text).not.toContain("wakeSuppress");
+    ).toEqual({ kind: "conversation" });
   });
 
   it("routes supplement/correct/safety to not_aside (board entry), not reply_lane", () => {
     const board = boardWithConstraints();
     for (const prompt of ["报告增加欧洲市场", "改为只要公开资料", "先别发布", "不要付款"]) {
-      const d = resolveMidTaskAsideDisposition({ prompt, board });
-      expect(d.kind, prompt).toBe("not_aside");
+      const d = resolveInteractionDialogue({ prompt, board });
+      expect(d.kind, prompt).toBe("task_command");
       expect(classifyTurnRelation(prompt, board.current!.goalText)).toBe("amend");
     }
   });
 
   it("keeps ordinary questions on reply_lane_pending", () => {
     expect(
-      resolveMidTaskAsideDisposition({
+      resolveInteractionDialogue({
         prompt: "今天北京天气怎么样",
         board: boardWithConstraints(),
       }).kind,
-    ).toBe("reply_lane_pending");
+    ).toBe("conversation");
   });
 });

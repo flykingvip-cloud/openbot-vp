@@ -63,6 +63,15 @@ function bindAmendmentPorts(params: {
   };
 }
 
+export function resolveInteractionDialogue(
+  input: Parameters<InteractionPorts["resolveDialogue"]>[0],
+) {
+  return resolveDialogueIntent(input, {
+    activeConstraints: activeConstraintTexts,
+    isConversation: (prompt, goal) => classifyTurnRelation(prompt, goal) === "conversation",
+  });
+}
+
 export function bindInteractionPorts(params: {
   sessionId: string;
   prompt: string;
@@ -72,11 +81,7 @@ export function bindInteractionPorts(params: {
     readBoard: sessionTaskState.read,
     isOwnerControl: isOwnerCurrentTaskControlUtterance,
     control: (sessionFile) => bindOwnerControlPorts({ ...params, sessionFile }),
-    resolveDialogue: (input) =>
-      resolveDialogueIntent(input, {
-        activeConstraints: activeConstraintTexts,
-        isConversation: (prompt, goal) => classifyTurnRelation(prompt, goal) === "conversation",
-      }),
+    resolveDialogue: resolveInteractionDialogue,
     steer: () => queueEmbeddedPiMessage(params.sessionId, params.prompt),
     resolveRelation: (prompt, board) => {
       const goal = board.current?.goalText?.trim() ?? "";

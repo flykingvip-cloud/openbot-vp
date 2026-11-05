@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resolveMidTaskAsideDisposition } from "../auto-reply/reply/mid-task-aside.js";
+import { resolveInteractionDialogue } from "../agent-runtime/wiring/command-adapters.js";
 import {
   activeConstraintTexts,
   appendSameTaskConstraint,
@@ -53,7 +53,7 @@ describe("slice3 constraint context — red then green", () => {
 
   it("goal/constraint queries do not write constraints", () => {
     const before = readSessionTaskBoard(sessionFile);
-    const goalAsk = resolveMidTaskAsideDisposition({
+    const goalAsk = resolveInteractionDialogue({
       prompt: "当前任务目标是什么",
       board: before,
     });
@@ -66,7 +66,7 @@ describe("slice3 constraint context — red then green", () => {
     });
     expect(activeConstraintTexts(afterGoal.board.current).length).toBe(0);
 
-    const constrAsk = resolveMidTaskAsideDisposition({
+    const constrAsk = resolveInteractionDialogue({
       prompt: "有效约束有哪些",
       board: before,
     });

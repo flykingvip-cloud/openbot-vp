@@ -135,6 +135,9 @@ describe("mid-task aside reply_lane isolation", () => {
 
     const runEmbedded = vi.fn(async (args: Record<string, unknown>) => {
       expect(args.disableTools).toBe(true);
+      expect(args.extraSystemPrompt).toBe("IDENTITY MEMORY KNOWLEDGE SKILL");
+      expect(args.skillsSnapshot).toEqual({ prompt: "skill guidance", skills: [] });
+      expect(args.gatewayClientPlatformUserId).toBe("test-user");
       expect(args.sessionId).not.toBe("session-a");
       expect(args.sessionFile).not.toBe(parentSessionFile);
       expect(args.runId).toBe("run-b");
@@ -161,6 +164,9 @@ describe("mid-task aside reply_lane isolation", () => {
         workspaceDir: tmpDir,
         config: {},
         timeoutMs: 5_000,
+        extraSystemPrompt: "IDENTITY MEMORY KNOWLEDGE SKILL",
+        skillsSnapshot: { prompt: "skill guidance", skills: [] },
+        gatewayClientPlatformUserId: "test-user",
       },
       runEmbedded: runEmbedded as never,
     });

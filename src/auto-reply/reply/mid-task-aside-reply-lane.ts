@@ -23,11 +23,16 @@ import {
   type SessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import {
+  inheritExecutionIdentityRunFields,
+  type ExecutionIdentityRunFields,
+} from "../../gateway/execution-identity-context.js";
+import {
   appendAsideDialogueTurn,
   buildAsideReplyLanePrompt,
   loadAsideReplyContextHistory,
 } from "./mid-task-aside-dialogue-history.js";
 import { stripInboundStampForDialogue } from "./mid-task-dialogue.js";
+import type { FollowupRun } from "./queue.js";
 
 // Re-export pure history helpers for existing test imports that still point here.
 export {
@@ -65,7 +70,7 @@ export type AsideReplyLaneResult = {
   cancelled?: boolean;
 };
 
-type AsideRunHandle = {
+type AsideRunHandle = ExecutionIdentityRunFields & {
   sessionId: string;
   provider: string;
   model: string;
@@ -75,6 +80,13 @@ type AsideRunHandle = {
   sessionKey?: string;
   timeoutMs?: number;
   thinkLevel?: string;
+  extraSystemPrompt?: string;
+  skillsSnapshot?: FollowupRun["run"]["skillsSnapshot"];
+  contextLane?: FollowupRun["run"]["contextLane"];
+  sessionEntry?: FollowupRun["run"]["sessionEntry"];
+  knowledgeConsumeRefs?: FollowupRun["run"]["knowledgeConsumeRefs"];
+  authProfileId?: string;
+  authProfileIdSource?: "auto" | "user";
 };
 
 type AsideLaneState = {
@@ -406,6 +418,15 @@ export async function runMidTaskAsideReplyLane(
       agentDir,
       config: params.run.config,
       prompt,
+      // Reuse admitted shared material; isolation must not discard identity, recall or knowledge.
+      extraSystemPrompt: params.run.extraSystemPrompt,
+      skillsSnapshot: params.run.skillsSnapshot,
+      contextLane: params.run.contextLane,
+      sessionEntry: params.run.sessionEntry,
+      knowledgeConsumeRefs: params.run.knowledgeConsumeRefs,
+      authProfileId: params.run.authProfileId,
+      authProfileIdSource: params.run.authProfileIdSource,
+      ...inheritExecutionIdentityRunFields(params.run),
       provider: params.run.provider,
       model: params.run.model,
       timeoutMs: Math.min(params.run.timeoutMs ?? 60_000, 60_000),
