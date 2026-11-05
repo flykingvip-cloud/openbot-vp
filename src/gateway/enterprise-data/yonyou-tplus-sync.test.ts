@@ -162,6 +162,16 @@ describe("yonyou tplus incremental sync", () => {
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
         }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -277,6 +287,16 @@ describe("yonyou tplus incremental sync", () => {
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
         }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -330,6 +350,16 @@ describe("yonyou tplus incremental sync", () => {
             message: "ok",
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
+        }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
         }
         throw new Error(`unexpected ${url}`);
       }),
@@ -398,6 +428,16 @@ describe("yonyou tplus incremental sync", () => {
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
         }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -448,6 +488,16 @@ describe("yonyou tplus incremental sync", () => {
             message: "ok",
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
+        }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
         }
         throw new Error(`unexpected ${url}`);
       }),
@@ -688,6 +738,16 @@ describe("yonyou tplus master first-sync full window", () => {
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
         }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -808,6 +868,16 @@ describe("yonyou tplus master full sync page budget", () => {
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
         }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
+        }
         throw new Error(`unexpected ${url}`);
       }),
     );
@@ -860,6 +930,16 @@ describe("yonyou tplus master full sync page budget", () => {
             message: "ok",
             data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
           });
+        }
+        if (url.endsWith("/PurchaseReceiveOpenApi/FindVoucherList")) {
+          return Response.json({
+            code: "0",
+            message: "ok",
+            data: { TotalCount: "0", TotalPageNum: "1", Rows: [] },
+          });
+        }
+        if (url.endsWith("/currentStock/Query")) {
+          return Response.json([]);
         }
         throw new Error(`unexpected ${url}`);
       }),

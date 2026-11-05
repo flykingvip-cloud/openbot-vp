@@ -21,6 +21,10 @@ export const YONYOU_TPLUS_HANDLERS = {
   partner: "enterprise-data/handlers/yonyou-tplus-partner-query-page-v1",
   saleOrder: "enterprise-data/handlers/yonyou-tplus-sale-order-list-v1",
   saleDelivery: "enterprise-data/handlers/yonyou-tplus-sale-delivery-list-v1",
+  /** PurchaseReceiveOpenApi/FindVoucherList — selectFields root is RDRecord (official docs). */
+  purchaseReceive: "enterprise-data/handlers/yonyou-tplus-purchase-receive-list-v1",
+  /** currentStock/Query — 现存量/可用量；no SelectFields. */
+  currentStock: "enterprise-data/handlers/yonyou-tplus-current-stock-query-v1",
   doc: "enterprise-data/handlers/yonyou-tplus-doc-query-v1",
 } as const;
 
@@ -29,9 +33,10 @@ export const YONYOU_TPLUS_DEFAULT_PAGE_SIZE = 100;
 
 /**
  * Inventory QueryPage SelectFields: identity + documented cost/price fields.
- * AvailableQuantity / 现存量 live on currentStock/Query, not inventory QueryPage —
- * do not invent stock qty fields here.
+ * AvailableQuantity / ExistingQuantity live on currentStock/Query (see
+ * YONYOU_TPLUS_HANDLERS.currentStock), not inventory QueryPage.
  * @see https://open.chanjet.com/docs/file/apiFile/tcloud/t+jcda/t+ch
+ * @see https://open.chanjet.com/docs/file/apiFile/tcloud/tjqt/xcl
  */
 export const YONYOU_TPLUS_INVENTORY_SELECT_FIELDS =
   "ID,Code,Name,Specification,InvSCost,LatestCost,AvagCost,RetailPriceNew";
@@ -40,16 +45,38 @@ export const YONYOU_TPLUS_INVENTORY_SELECT_FIELDS =
 export const YONYOU_TPLUS_PARTNER_SELECT_FIELDS = "ID,Code,Name,PartnerType.Code,PartnerType.Name";
 
 /**
- * Default FindVoucherList selectFields for sale delivery / sale order.
- * Paths follow Chanjet docs (明细前缀 SaleDelivery.SaleDeliveryDetails. /
- * SaleOrder.SaleOrderDetails.). Warehouse on sale order is omitted — list
- * examples document Customer + detail qty/amount, not header Warehouse.
- * CostPrice/CostAmount appear on Create DTO (合并流程) but not on published
- * FindVoucherList examples; skip rather than invent list columns.
+ * FindVoucherList root prefix. Purchase receive lists use RDRecord (not
+ * PurchaseReceive) per Chanjet PurchaseReceiveOpenApi/FindVoucherList docs.
  */
-export function yonyouTplusDefaultVoucherSelectFields(
-  prefix: "SaleOrder" | "SaleDelivery",
-): string[] {
+export type YonyouTplusVoucherPrefix = "SaleOrder" | "SaleDelivery" | "RDRecord";
+
+/**
+ * Default FindVoucherList selectFields for sale delivery / sale order /
+ * purchase receive.
+ * - Sale*: Customer + (delivery) Warehouse + detail Inventory/qty/tax amount.
+ * - RDRecord: Partner (供应商) + Warehouse + RDRecordDetails Inventory/qty/
+ *   OrigTaxPrice/OrigTaxAmount. List examples show Code/ID/VoucherDate/
+ *   Inventory; Partner/Warehouse/qty/tax fields are on Create + GetVoucherDTO
+ *   (same justification as sale_delivery Warehouse).
+ * CostPrice/CostAmount skipped — not on published FindVoucherList examples.
+ */
+export function yonyouTplusDefaultVoucherSelectFields(prefix: YonyouTplusVoucherPrefix): string[] {
+  if (prefix === "RDRecord") {
+    return [
+      "RDRecord.ID",
+      "RDRecord.VoucherDate",
+      "RDRecord.Code",
+      "RDRecord.Partner.Code",
+      "RDRecord.Partner.Name",
+      "RDRecord.Warehouse.Code",
+      "RDRecord.Warehouse.Name",
+      "RDRecord.RDRecordDetails.Inventory.Code",
+      "RDRecord.RDRecordDetails.Inventory.Name",
+      "RDRecord.RDRecordDetails.Quantity",
+      "RDRecord.RDRecordDetails.OrigTaxPrice",
+      "RDRecord.RDRecordDetails.OrigTaxAmount",
+    ];
+  }
   const details = prefix === "SaleOrder" ? "SaleOrderDetails" : "SaleDeliveryDetails";
   const fields = [
     `${prefix}.ID`,
@@ -461,6 +488,7 @@ function simulatedPayload(handlerRef: string): MockHandlerResult {
       return { payload: { records: [{ Code: "001", Name: "模拟往来单位" }] } };
     case YONYOU_TPLUS_HANDLERS.saleOrder:
     case YONYOU_TPLUS_HANDLERS.saleDelivery:
+    case YONYOU_TPLUS_HANDLERS.purchaseReceive:
       return {
         payload: {
           records: {
@@ -468,6 +496,23 @@ function simulatedPayload(handlerRef: string): MockHandlerResult {
             message: "ok",
             data: { TotalCount: 0, Rows: [] },
           },
+        },
+      };
+    case YONYOU_TPLUS_HANDLERS.currentStock:
+      return {
+        payload: {
+          records: [
+            {
+              WarehouseCode: "01",
+              WarehouseName: "模拟仓库",
+              InventoryCode: "10001",
+              InventoryName: "模拟存货",
+              Specification: "",
+              UnitName: "个",
+              AvailableQuantity: "0",
+              ExistingQuantity: "0",
+            },
+          ],
         },
       };
     case YONYOU_TPLUS_HANDLERS.doc:
@@ -480,7 +525,7 @@ function simulatedPayload(handlerRef: string): MockHandlerResult {
 function voucherListRequest(
   input: Record<string, unknown> | undefined,
   apiPath: string,
-  prefix: "SaleOrder" | "SaleDelivery",
+  prefix: YonyouTplusVoucherPrefix,
 ): { path: string; body: unknown } {
   const selectFields = Array.isArray(input?.selectFields)
     ? input.selectFields
@@ -537,6 +582,19 @@ function liveRequest(
       return voucherListRequest(input, "SaleOrderOpenApi/FindVoucherList", "SaleOrder");
     case YONYOU_TPLUS_HANDLERS.saleDelivery:
       return voucherListRequest(input, "SaleDeliveryOpenApi/FindVoucherList", "SaleDelivery");
+    case YONYOU_TPLUS_HANDLERS.purchaseReceive:
+      return voucherListRequest(input, "PurchaseReceiveOpenApi/FindVoucherList", "RDRecord");
+    case YONYOU_TPLUS_HANDLERS.currentStock:
+      return {
+        path: `${YONYOU_TPLUS_API_PREFIX}/currentStock/Query`,
+        body: queryBody(input, {
+          param: {
+            PageSize: `${YONYOU_TPLUS_DEFAULT_PAGE_SIZE}`,
+            PageIndex: "1",
+            GroupInfo: { Warehouse: true, Inventory: true },
+          },
+        }),
+      };
     case YONYOU_TPLUS_HANDLERS.doc:
       return {
         path: `${YONYOU_TPLUS_API_PREFIX}/doc/Query`,
@@ -614,15 +672,19 @@ function voucherSelectFieldsForHandler(
   handlerRef: string,
   input: Record<string, unknown> | undefined,
 ): string[] | undefined {
-  if (
-    handlerRef !== YONYOU_TPLUS_HANDLERS.saleOrder &&
-    handlerRef !== YONYOU_TPLUS_HANDLERS.saleDelivery
-  ) {
+  let prefix: YonyouTplusVoucherPrefix | undefined;
+  if (handlerRef === YONYOU_TPLUS_HANDLERS.saleOrder) {
+    prefix = "SaleOrder";
+  } else if (handlerRef === YONYOU_TPLUS_HANDLERS.saleDelivery) {
+    prefix = "SaleDelivery";
+  } else if (handlerRef === YONYOU_TPLUS_HANDLERS.purchaseReceive) {
+    prefix = "RDRecord";
+  }
+  if (!prefix) {
     return undefined;
   }
   if (Array.isArray(input?.selectFields)) {
     return input.selectFields.filter((field): field is string => typeof field === "string");
   }
-  const prefix = handlerRef === YONYOU_TPLUS_HANDLERS.saleOrder ? "SaleOrder" : "SaleDelivery";
   return yonyouTplusDefaultVoucherSelectFields(prefix);
 }

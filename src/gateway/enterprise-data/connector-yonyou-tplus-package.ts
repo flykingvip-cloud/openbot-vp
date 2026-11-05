@@ -46,6 +46,16 @@ const ACTIONS = [
     handlerRef: "enterprise-data/handlers/yonyou-tplus-sale-delivery-list-v1",
   },
   {
+    actionKey: "erp.purchase_receive.query_list",
+    displayName: "采购入库单列表",
+    handlerRef: "enterprise-data/handlers/yonyou-tplus-purchase-receive-list-v1",
+  },
+  {
+    actionKey: "erp.current_stock.query",
+    displayName: "现存量查询",
+    handlerRef: "enterprise-data/handlers/yonyou-tplus-current-stock-query-v1",
+  },
+  {
     actionKey: "erp.doc.query",
     displayName: "凭证查询",
     handlerRef: "enterprise-data/handlers/yonyou-tplus-doc-query-v1",
@@ -210,6 +220,33 @@ const YONYOU_PUBLIC_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
     "SaleOrderDetails.Quantity",
     "SaleOrderDetails.OrigTaxPrice",
     "SaleOrderDetails.OrigTaxAmount",
+  ],
+  // PurchaseReceive FindVoucherList strips RDRecord. root (see yonyouTplusSelectFieldPathKey).
+  "erp.purchase_receive.query_list": [
+    "Code",
+    "Name",
+    "ID",
+    "VoucherDate",
+    "Partner.Code",
+    "Partner.Name",
+    "Warehouse.Code",
+    "Warehouse.Name",
+    "RDRecordDetails.Inventory.Code",
+    "RDRecordDetails.Inventory.Name",
+    "RDRecordDetails.Quantity",
+    "RDRecordDetails.OrigTaxPrice",
+    "RDRecordDetails.OrigTaxAmount",
+  ],
+  // currentStock/Query documented response fields (no SelectFields / no nesting).
+  "erp.current_stock.query": [
+    "WarehouseCode",
+    "WarehouseName",
+    "InventoryCode",
+    "InventoryName",
+    "Specification",
+    "UnitName",
+    "AvailableQuantity",
+    "ExistingQuantity",
   ],
 };
 

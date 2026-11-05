@@ -76,8 +76,8 @@ export function yonyouTplusSelectFieldLeaf(selectField: string): string {
 
 /**
  * Stable record key for FindVoucherList positional Rows.
- * Strip only the voucher root (`SaleDelivery.` / `SaleOrder.`) so nested paths
- * stay distinct: `SaleDelivery.Code` → `Code`, but
+ * Strip only the voucher root (`SaleDelivery.` / `SaleOrder.` / `RDRecord.`) so
+ * nested paths stay distinct: `SaleDelivery.Code` → `Code`, but
  * `SaleDelivery.SaleDeliveryDetails.Inventory.Code` → `SaleDeliveryDetails.Inventory.Code`
  * (leaf-only keys would collide on every `.Code`).
  */
