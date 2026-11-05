@@ -50,6 +50,19 @@ export type DirectModelInvocationEntry = {
 
 export const DIRECT_MODEL_INVOCATION_REGISTRY: readonly DirectModelInvocationEntry[] = [
   {
+    id: "interaction-completion",
+    file: "src/agent-runtime/model/interaction-completion.ts",
+    invocation: "pi-complete",
+    caller: "invokeInteractionCompletion",
+    inventoryIds: ["E1"],
+    disposition: "instrumented",
+    evidenceFiles: [
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/agent-runtime/command/prepared-interaction.ts",
+    ],
+    note: "Prepared interaction completion uses shared governed fallback and accounting; not yet enabled on production ingress.",
+  },
+  {
     id: "media-understanding-image",
     file: "src/media-understanding/providers/image.ts",
     invocation: "pi-complete",

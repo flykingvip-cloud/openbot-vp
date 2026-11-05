@@ -28,3 +28,5 @@ export {
 } from "./dialogue-intent.js";
 
 export { interpretInteraction, type InteractionInferencePort } from "./interpret-interaction.js";
+
+export { runPreparedInteraction } from "./prepared-interaction.js";

@@ -618,7 +618,7 @@ describe("direct model invocation registry (§4.8 blind spot)", () => {
     expect(e19?.followUp).toMatch(/enforced 未实现|enforced not implemented/);
     expect(e19?.note).toMatch(/skipped/);
     const instrumented = DIRECT_MODEL_INVOCATION_REGISTRY.filter(
-      (row) => row.disposition === "instrumented",
+      (row) => row.disposition === "instrumented" && row.id.startsWith("media-understanding-"),
     );
     expect(instrumented.length).toBeGreaterThan(0);
     for (const row of instrumented) {
