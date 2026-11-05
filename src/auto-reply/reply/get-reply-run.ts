@@ -6,6 +6,7 @@ import {
   finalizeSystemContext,
   selectSystemContextParts,
 } from "../../agent-runtime/context/assembly.js";
+import { resolveContextLane } from "../../agent-runtime/context/index.js";
 import { projectInteractionHistory } from "../../agent-runtime/context/interaction-history.js";
 import { appendUntrustedContext } from "../../agent-runtime/context/untrusted.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
@@ -18,7 +19,6 @@ import {
   ensureStewardRequiredSkills,
   shouldForceStewardRequiredSkills,
 } from "../../agents/builtin-steward/required-skills.js";
-import { resolveContextLane } from "../../agents/context-compiler/lane-budget.js";
 import { applyPreferenceMutation } from "../../agents/context-compiler/preference-mutation.js";
 import { emitExecutionDisciplineObservation } from "../../agents/execution-preflight/observability.js";
 import { rememberInboundMediaGrants } from "../../agents/inbound-media-grants.js";

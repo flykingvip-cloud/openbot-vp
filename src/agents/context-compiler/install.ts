@@ -1,7 +1,9 @@
 import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
+import {
+  compileModelContext,
+  normalizeCompiledMessages,
+} from "../../agent-runtime/context/index.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
-import { compileModelContext } from "./compile.js";
-import { normalizeCompiledMessages } from "./normalize-outbound.js";
 import type {
   CollabCompileStrategyParams,
   ContextCandidates,
