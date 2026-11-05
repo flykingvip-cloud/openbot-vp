@@ -260,4 +260,70 @@ describe("knowledge feed adapter M6", () => {
     expect(stockExcerpt).toContain("存货1");
     expect(stockExcerpt).not.toContain('"***"');
   });
+
+  it("flattens sale voucher details so ≥20 rows keep Customer/Quantity/OrigTaxAmount under budget", () => {
+    // LIVE after #246: fat SaleDeliveryDetails JSON lets only ~2 of 242 rows keep经营键.
+    // Compact flatten: Code|Date|Customer.Name|ΣQty|ΣOrigTaxAmount|首品名 — no full details.
+    const noise: Record<string, string> = {};
+    for (let i = 0; i < 40; i += 1) {
+      noise[`UnknownField${String(i).padStart(2, "0")}`] = "***";
+    }
+    const saleItems = Array.from({ length: 24 }, (_, index) => ({
+      ID: index + 1,
+      Code: `SA-2026-${String(index + 1).padStart(4, "0")}`,
+      VoucherDate: "2026-11-01",
+      Customer: { Code: `C${index + 1}`, Name: `客户${index + 1}` },
+      Warehouse: { Code: "WH01", Name: "京扇子仓" },
+      // Multi-line details (array) — the fat shape that starved the 1600 budget.
+      SaleDeliveryDetails: [
+        {
+          Inventory: { Code: `SKU${index + 1}A`, Name: `存货${index + 1}甲` },
+          Quantity: 2 + index,
+          OrigTaxPrice: "90.00",
+          OrigTaxAmount: String(180 + index * 10),
+        },
+        {
+          Inventory: { Code: `SKU${index + 1}B`, Name: `存货${index + 1}乙` },
+          Quantity: 1,
+          OrigTaxPrice: "50.00",
+          OrigTaxAmount: "50.00",
+        },
+      ],
+      ...noise,
+    }));
+    const salePayload = { count: saleItems.length, items: saleItems };
+    expect(saleItems.length).toBeGreaterThanOrEqual(20);
+    expect(JSON.stringify(salePayload).length).toBeGreaterThan(3200);
+
+    const saleExcerpt = feedPayloadExcerpt(salePayload);
+    expect(saleExcerpt).not.toContain("SaleDeliveryDetails");
+    expect(saleExcerpt).not.toContain('"***"');
+
+    const parsed = JSON.parse(saleExcerpt.replace(/…$/, "")) as {
+      count?: number;
+      items?: Array<Record<string, unknown>>;
+    };
+    expect(Array.isArray(parsed.items)).toBe(true);
+    const items = parsed.items ?? [];
+    // With flatten + 3200 budget, most of the 20-preview rows keep经营键 — not just 1–2.
+    expect(items.length).toBeGreaterThanOrEqual(20);
+
+    const rich = items.filter((row) => {
+      const customer = row.Customer as { Name?: string } | undefined;
+      return (
+        typeof customer?.Name === "string" &&
+        customer.Name.length > 0 &&
+        row.Quantity !== undefined &&
+        row.OrigTaxAmount !== undefined
+      );
+    });
+    expect(rich.length).toBeGreaterThanOrEqual(Math.ceil(items.length * 0.5));
+    expect(rich.length).toBeGreaterThanOrEqual(20);
+    expect(saleExcerpt).toContain("客户1");
+    expect(saleExcerpt).toContain("客户20");
+    expect(saleExcerpt).toContain("存货1甲");
+    // ΣQuantity for row0 = (2+0)+1 = 3; ΣOrigTaxAmount = 180+50 = 230
+    expect(items[0]?.Quantity).toBe(3);
+    expect(items[0]?.OrigTaxAmount).toBe(230);
+  });
 });
