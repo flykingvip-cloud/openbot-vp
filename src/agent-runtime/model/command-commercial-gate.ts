@@ -2,6 +2,7 @@
  * CLI / Gateway agent 命令商业运行闸口（Wave 5）。
  */
 
+import type { AgentCommandGovernanceEntry } from "../../commands/agent/types.js";
 import { loadConfig } from "../../config/config.js";
 import { isSharedTenantAddressingEnabled } from "../../config/data-space.js";
 import { resolveAccountExecutionPaths } from "../../gateway/account-execution-paths.js";
@@ -11,7 +12,6 @@ import {
 } from "../../gateway/billing/agent-run-governance.js";
 import { recordCommercialRunDecision } from "../../gateway/governance/adapters/commercial-run-adapter.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
-import type { AgentCommandGovernanceEntry } from "./types.js";
 
 export type AgentCommandCommercialGateResult =
   | { status: "skipped" }

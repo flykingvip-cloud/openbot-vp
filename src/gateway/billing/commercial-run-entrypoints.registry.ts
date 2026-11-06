@@ -35,7 +35,8 @@ export const COMMERCIAL_RUN_ENTRYPOINTS: readonly CommercialRunEntrypoint[] = [
       "src/agent-runtime/execution/runner/admitted-turn.ts",
       "src/auto-reply/reply/followup-runner.ts",
     ],
-    requiredGateSymbols: ["tryAcquireEnterpriseAgentRun"],
+    gateOwnerPaths: ["src/agent-runtime/model/authorized-session.ts"],
+    requiredGateSymbols: ["createAuthorizedModelSession", "tryAcquireEnterpriseAgentRun"],
   },
   {
     id: "chat_reply_pipeline",
@@ -62,7 +63,8 @@ export const COMMERCIAL_RUN_ENTRYPOINTS: readonly CommercialRunEntrypoint[] = [
     id: "resources_high_tier",
     label: "Resources API high-tier gate",
     paths: ["src/gateway/server-methods/resources.ts"],
-    requiredGateSymbols: ["authorizeCommercialRun"],
+    gateOwnerPaths: ["src/gateway/billing/billable-bot.ts"],
+    requiredGateSymbols: ["authorizeBillableBotCreate", "authorizeCommercialRun"],
   },
   {
     id: "supervisor_gateway_worker",
@@ -79,7 +81,7 @@ export const COMMERCIAL_RUN_ENTRYPOINTS: readonly CommercialRunEntrypoint[] = [
   {
     id: "cli_agent_command",
     label: "CLI agent command",
-    paths: ["src/commands/agent.ts", "src/commands/agent/commercial-run-gate.ts"],
+    paths: ["src/commands/agent.ts", "src/agent-runtime/model/command-commercial-gate.ts"],
     requiredGateSymbols: ["acquireAgentCommandCommercialRun", "tryAcquireEnterpriseAgentRun"],
   },
   {

@@ -600,3 +600,13 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced 53 TypeScript diagnostics and corrected all implicated contracts: typed mock signatures, reply union narrowing, history role literals, nullable UI state, valid projection fixtures, collaboration timestamps, DOM button types and generic RPC test responses. Removed duplicate production workbench unit declaration; no compiler suppression or production enum widening. Files explicitly registered for bounded repair; unrelated observation WIP excluded. — codex-runtime-manager
 - pnpm tsgo PASS (zero diagnostics). Related backend suites 11 files / 62 PASS; UI suites 5 files / 172 PASS. Changed-file typed lint clean; architecture 48 PASS; full build PASS with 209 existing dynamic-import warnings. No gateway restart or deployment. — codex-runtime-manager
+
+## Independent three-perspective acceptance (2026-11-06)
+
+- Three independent read-only reviewers assessed architecture, personal/collaboration mainline and legacy retirement. All refuse overall completion/retirement; reports are expert-1-architecture-acceptance-2026-11-06.md, expert-2-mainline-acceptance-2026-11-06.md and expert-3-retirement-acceptance-2026-11-06.md. Mainline component tests 5 files / 37 PASS; no real-model, restart or production evidence. Preserve active Pi/CLI/ACP, cron and followup adapters until their original responsibilities are covered. — codex-runtime-manager
+- Next gates: thin command orchestration; complete builder/capability contracts; distinct execution/acceptance/delivery receipts; restart-safe recovery and personal/group real-model/channel matrix; effective hook/transform/workflow consumer and persisted-asset audit. Delete only after matching evidence and immutable archival; no bulk directory deletion. — codex-runtime-manager
+
+## Command commercial admission ownership (2026-11-06)
+
+- Existing command commercial gate moved into shared model infrastructure, consumed through model/index; old implementation removed. Preserved server-side identity, subscription snapshots, quota and concurrency, E2/E3/E6 attribution, best-effort observation and original release. Updated stale gate-owner registry to actual delegated owners (authorized-session and billable-bot); no gate bypass introduced. — codex-runtime-manager
+- Governance/credit/commercial regression 5 files / 127 PASS; full tsgo PASS, architecture 48 PASS, changed-file typed lint clean, build PASS with 209 existing dynamic-import warnings. Complete command orchestration remains open; no push/merge/deployment. — codex-runtime-manager

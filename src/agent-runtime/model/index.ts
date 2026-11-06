@@ -3,3 +3,9 @@ export { createAuthorizedModelSession, type ModelSessionPorts } from "./authoriz
 export { invokeInteractionCompletion } from "./interaction-completion.js";
 
 export { createRunAdmissionLease } from "./admission-lease.js";
+
+export {
+  acquireAgentCommandCommercialRun,
+  releaseAgentCommandCommercialRun,
+  type AgentCommandCommercialGateResult,
+} from "./command-commercial-gate.js";

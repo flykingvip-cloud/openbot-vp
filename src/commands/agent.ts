@@ -92,7 +92,7 @@ import {
   acquireAgentCommandCommercialRun,
   type AgentCommandCommercialGateResult,
   releaseAgentCommandCommercialRun,
-} from "./agent/commercial-run-gate.js";
+} from "../agent-runtime/model/index.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../gateway/model-entitlement/task-capability-plan.js";
 import { recordAgentCommandCreditUsage } from "./agent/credit-usage.js";
 import { deliverAgentCommandResult } from "../agent-runtime/delivery/index.js";

@@ -14,6 +14,7 @@
  * stay identical to the pre-PR behavior. The mode never comes from the security profile.
  */
 
+import type { AgentCommandCommercialGateResult } from "../../agent-runtime/model/index.js";
 import type { ModelGovernanceContext } from "../../agents/model-fallback-governance.js";
 import type { ExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
 import type { GovernanceMode } from "../../gateway/governance/decision.js";
@@ -21,7 +22,6 @@ import {
   resolveGovernanceModeForCommercialGate,
   resolveGovernanceModeFromEnv,
 } from "../../gateway/governance/mode.js";
-import type { AgentCommandCommercialGateResult } from "./commercial-run-gate.js";
 import type { AgentCommandGovernanceEntry } from "./types.js";
 
 export const AGENT_COMMAND_MODEL_MODE_ENV = "OPENBOT_GOVERNANCE_AGENT_COMMAND_MODEL_MODE";
