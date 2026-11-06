@@ -200,6 +200,10 @@ export function renderEnterpriseSurface(props: EnterpriseSurfaceProps) {
       return html`<openbot-diagnosis-panel
         .client=${normalizedProps.client ?? null}
         .observationHost=${document.querySelector("openbot-app")}
+        .connected=${normalizedProps.connected ?? false}
+        .scopes=${normalizedProps.scopes ?? null}
+        .sessionKind=${normalizedProps.sessionKind ?? null}
+        .gatewayMethods=${normalizedProps.gatewayMethods ?? null}
         role="enterprise"
         .tenantId=${normalizedProps.readModel.currentTenantId}
         .targets=${diagnosisTargetsFromEnterpriseRoster({

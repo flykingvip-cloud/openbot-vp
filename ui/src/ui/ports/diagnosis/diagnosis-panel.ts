@@ -111,6 +111,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
       this.scopes,
       this.sessionKind,
       this.taskOutcomeRef,
+      this.taskIdDraft,
+      this.agentIdDraft,
+      this.outcomeVersionDraft,
       this.connected,
       this.client?.connected,
       this.gatewayMethods,
@@ -127,6 +130,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
         "scopes",
         "sessionKind",
         "taskOutcomeRef",
+        "taskIdDraft",
+        "agentIdDraft",
+        "outcomeVersionDraft",
         "connected",
         "gatewayMethods",
         "observationSessionKey",
@@ -137,7 +143,15 @@ export class OpenBotDiagnosisPanel extends LitElement {
       const generation = ++this.evidenceGeneration;
       this.observationEvidenceNote = "业务结果未知 · 缺少结果引用、读取权限或查询能力";
       const client = this.client;
-      const ref = this.taskOutcomeRef;
+      const resolved = resolveDiagnoseTaskOutcome(
+        {
+          taskId: this.taskIdDraft,
+          agentId: this.agentIdDraft,
+          outcomeVersion: this.outcomeVersionDraft,
+        },
+        this.taskOutcomeRef,
+      );
+      const ref = resolved && Number.isSafeInteger(resolved.outcomeVersion) ? resolved : null;
       const fingerprint = this.evidenceFingerprint();
       if (
         !this.connected ||
@@ -690,6 +704,8 @@ export class OpenBotDiagnosisPanel extends LitElement {
       `;
     }
     return html`
+      <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
+      ${renderObservationEvidence(this.observationEvidence)}
       <div class="toolbar">
         <button
           type="button"

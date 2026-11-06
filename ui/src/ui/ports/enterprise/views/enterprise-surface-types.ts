@@ -21,6 +21,10 @@ export type EnterpriseSurfaceTab =
 export type EnterpriseSurfaceProps = {
   tab: EnterpriseSurfaceTab;
   basePath: string;
+  connected?: boolean;
+  scopes?: readonly string[] | null;
+  sessionKind?: string | null;
+  gatewayMethods?: readonly string[] | null;
   client?: GatewayBrowserClient | null;
   agentsList?: AgentsListResult | null;
   collaborationSpacesResult?: CollaborationSpacesListResult | null;
