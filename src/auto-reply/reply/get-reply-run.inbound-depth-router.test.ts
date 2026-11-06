@@ -401,7 +401,7 @@ describe("runPreparedReply inbound depth router", () => {
             sessionEntry: { sessionId: "ingress", sessionFile: file, updatedAt: 1 },
             opts: {
               runId: "ingress-message",
-              interactionIngress: { userMessageId: "ingress-message" },
+              interactionIngress: { userMessageId: "ingress-message", persistOwnTranscript: true },
             },
           }),
         );
@@ -430,6 +430,18 @@ describe("runPreparedReply inbound depth router", () => {
         }
         if (kind === "respond") {
           expect(result).toEqual({ text: "你好" });
+        }
+        if (kind !== "accepted") {
+          const entries = fs
+            .readFileSync(file, "utf8")
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as unknown);
+          expect(entries).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ message: expect.objectContaining({ role: "assistant" }) }),
+            ]),
+          );
         }
       } finally {
         interaction.mockRestore();

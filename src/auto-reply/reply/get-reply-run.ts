@@ -1586,12 +1586,11 @@ export async function runPreparedReply(
     }
     if (routed.result.kind !== "accepted") {
       typing.cleanup();
-      return {
-        text:
-          routed.result.kind === "duplicate"
-            ? "该执行请求已经接纳，未重复启动。"
-            : "任务状态已变化或执行未获准，本次未启动；请确认当前目标后重试。",
-      };
+      return persistOwnReply(
+        routed.result.kind === "duplicate"
+          ? "该执行请求已经接纳，未重复启动。"
+          : "任务状态已变化或执行未获准，本次未启动；请确认当前目标后重试。",
+      );
     }
     admittedBinding = routed.result.binding;
     await opts?.onInteractionTaskEffect?.({
@@ -1602,7 +1601,7 @@ export async function runPreparedReply(
     const acceptedTask = replyTurnRuntime.state.read(sessionFile).current;
     if (acceptedTask?.taskId !== admittedBinding.taskId) {
       typing.cleanup();
-      return { text: "任务焦点已变化，本次未启动执行。" };
+      return persistOwnReply("任务焦点已变化，本次未启动执行。");
     }
     extraSystemPromptParts = extraSystemPromptParts.filter(
       (part) => part !== sessionFocusResumePrompt,
