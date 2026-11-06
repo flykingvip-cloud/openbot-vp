@@ -22,6 +22,7 @@ describe("evidence panel", () => {
         reasons: ["retention_continuity_unknown"],
       },
       window: { from: 0, to: 200 },
+      evidenceLookupWindow: { from: -1000, to: 200 },
       coverage: {
         attemptedCount: 1,
         fullyLinkedCount: 0,
@@ -35,7 +36,7 @@ describe("evidence panel", () => {
         {
           sampleId: "sample-secret-id",
           qualification: "execution_only",
-          reasons: ["missing_outcome"],
+          reasons: ["missing_outcome", "outside_cohort_window"],
           provenance: ["seed"],
           outcome: null,
           executionRefs: [],
@@ -66,6 +67,9 @@ describe("evidence panel", () => {
       "非生产",
       "可归属成本：未知",
       "Asia/Shanghai",
+      "cohort统计窗口",
+      "支持证据检索窗口",
+      "不计入该窗口统计",
       "process_memory",
       "900000",
       "epoch-test",

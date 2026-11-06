@@ -1,6 +1,10 @@
 import type { projectExecutionEvidence } from "../../../../src/observation/execution-projection.js";
 import type { assembleObservationSamples } from "../../../../src/observation/sample-assembler.js";
-export type EvidenceProjection = ReturnType<typeof assembleObservationSamples> & {
+export type EvidenceProjection = Omit<
+  ReturnType<typeof assembleObservationSamples>,
+  "evidenceLookupWindow"
+> & {
+  evidenceLookupWindow?: ReturnType<typeof assembleObservationSamples>["evidenceLookupWindow"];
   executionSource?: ReturnType<typeof projectExecutionEvidence>["executionSource"];
 };
 export function evidenceModel(projection: EvidenceProjection | null) {
@@ -14,6 +18,7 @@ export function evidenceModel(projection: EvidenceProjection | null) {
     watermark: data?.sourceWatermark ?? null,
     coverage: data?.coverage ?? null,
     window: data?.window ?? null,
+    evidenceLookupWindow: data?.evidenceLookupWindow ?? null,
     metricDictVersion: data?.metricDictVersion ?? null,
     unavailableReason: supported ? null : "不支持的证据或指标字典版本",
   };
