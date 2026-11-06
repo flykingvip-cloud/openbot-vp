@@ -12,6 +12,8 @@ import { normalizeTaskOutcomeSubjectRef } from "../task-outcome/subject-ref.js";
 import { CONFIG_DIR } from "../utils.js";
 import { queryActionIntents } from "./action-intent-query.js";
 import { createActionIntentStore } from "./action-intent-store.js";
+import { createCapacityReader } from "./capacity-reader.js";
+import { createMetricCompareGatewayHelper } from "./metric-compare-gateway.js";
 import { queryObservation } from "./query.js";
 export const OBSERVATION_QUERY_METHOD = "diagnosis.observation.query";
 export function createObservationQueryHandlers(
@@ -19,6 +21,7 @@ export function createObservationQueryHandlers(
     authDeps?: DiagnosisGatewayAuthDeps;
     loadConfig?: () => OpenBotConfig;
     now?: () => number;
+    capacityReader?: ReturnType<typeof createCapacityReader>;
     actionIntentStore?: Pick<ReturnType<typeof createActionIntentStore>, "list" | "detail">;
   } = {},
 ): GatewayRequestHandlers {
@@ -47,9 +50,12 @@ export function createObservationQueryHandlers(
         "to",
         "evidenceLookupWindow",
         "actionIntents",
+        "capacity",
+        "comparison",
       ]);
       if (
         Object.keys(params).some((k) => !allowed.has(k)) ||
+        (params.capacity !== undefined && typeof params.capacity !== "boolean") ||
         typeof params.agentId !== "string" ||
         !params.agentId.trim() ||
         typeof params.taskId !== "string" ||
@@ -160,6 +166,62 @@ export function createObservationQueryHandlers(
           deny(result.code);
           return;
         }
+        let capacity: Awaited<ReturnType<ReturnType<typeof createCapacityReader>>> | undefined;
+        if (params.capacity === true) {
+          capacity = await (options.capacityReader ?? createCapacityReader())({
+            cfg,
+            caller,
+            agentId: params.agentId,
+            taskId: params.taskId,
+            outcomeVersion: params.outcomeVersion,
+            sampledAt: projectedAt,
+            projectedAt,
+            maxAgeMs: 60000,
+          });
+          const fresh = await resolveDiagnosisProductionAuth(
+            client as unknown as DiagnosisGatewayAuthClient,
+            options.authDeps,
+          );
+          if (
+            !fresh ||
+            fresh.trusted.tenantId !== auth.trusted.tenantId ||
+            fresh.principal.principalId !== auth.principal.principalId
+          ) {
+            deny("unauthorized");
+            return;
+          }
+          if (!capacity.ok) {
+            deny(capacity.code);
+            return;
+          }
+        }
+        let comparison:
+          | Awaited<ReturnType<ReturnType<typeof createMetricCompareGatewayHelper>>>
+          | undefined;
+        if (params.comparison !== undefined) {
+          comparison = await createMetricCompareGatewayHelper({
+            cfg,
+            authDeps: options.authDeps,
+            now: options.now,
+          })(client, params.comparison);
+          if (!comparison.ok) {
+            deny(comparison.code);
+            return;
+          }
+        }
+        const finalAuth = async () => {
+          const fresh = await resolveDiagnosisProductionAuth(
+            client as unknown as DiagnosisGatewayAuthClient,
+            options.authDeps,
+          );
+          const finalScopes = client.connect.scopes ?? [];
+          return Boolean(
+            fresh &&
+            fresh.trusted.tenantId === auth.trusted.tenantId &&
+            fresh.principal.principalId === auth.principal.principalId &&
+            (finalScopes.includes("operator.read") || finalScopes.includes("operator.admin")),
+          );
+        };
         if (actionIntents) {
           const intents = await queryActionIntents(
             {
@@ -189,10 +251,31 @@ export function createObservationQueryHandlers(
             deny(intents.code);
             return;
           }
-          respond(true, { ...result, actionIntents: intents }, undefined);
+          if (!(await finalAuth())) {
+            deny("unauthorized");
+            return;
+          }
+          respond(
+            true,
+            {
+              ...result,
+              ...(capacity ? { capacity } : {}),
+              ...(comparison ? { comparison } : {}),
+              actionIntents: intents,
+            },
+            undefined,
+          );
           return;
         }
-        respond(true, result, undefined);
+        if ((capacity || comparison) && !(await finalAuth())) {
+          deny("unauthorized");
+          return;
+        }
+        respond(
+          true,
+          { ...result, ...(capacity ? { capacity } : {}), ...(comparison ? { comparison } : {}) },
+          undefined,
+        );
       } catch {
         deny("read_failed");
       }
