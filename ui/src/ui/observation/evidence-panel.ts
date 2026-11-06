@@ -15,7 +15,7 @@ export function renderObservationEvidence(projection: EvidenceProjection | null)
         ? model.samples.map(
             (sample) => html`<article data-qualification=${sample.qualification}>
       <h3>${sample.qualification}</h3>
-      <p>来源：${sample.provenance.join(", ") || "unknown"}${sample.provenance.some((p) => p === "seed" || p === "injected" || p === "sample_ui" || p === "unknown") ? " · 非生产来源" : ""}</p>
+      <p>来源：${sample.provenance.join(", ") || "unknown"}${sample.provenance.some((p) => p === "seed" || p === "injected" || p === "sample_ui") ? " · 非生产来源" : ""}${sample.provenance.includes("unknown") || !sample.provenance.length ? " · 来源未核验，不作为生产验证" : ""}</p>
       <dl>${Object.entries(layers).map(([key, label]) => {
         const layer = key as keyof typeof layers;
         return html`<dt>${label}</dt><dd>${sample.evidence[layer]} · ${sample.evidenceReasons[layer].join(", ")}</dd>`;
@@ -34,8 +34,8 @@ export function renderObservationEvidence(projection: EvidenceProjection | null)
             <p>业务结果未知 · 无可用授权证据</p>
           `
     }
-    <p>关联覆盖率：${model.coverage?.link == null ? "未知" : model.coverage.link} · 样本分母：${model.coverage?.attemptedCount ?? "未知"} · 无效样本：${model.coverage?.invalidCount ?? "未知"}</p>
-    <p>事件覆盖率：未知 · 字段覆盖率：未知</p><p>${model.unavailableReason ?? ""} 指标字典版本：${model.metricDictVersion ?? "未知"} 窗口：[${evidenceTime(model.window?.from ?? null)}, ${evidenceTime(model.window?.to ?? null)})</p>
+    <p>关联覆盖率：${model.coverage?.link == null ? "未知" : model.coverage.link} · 关联分子：${model.coverage?.fullyLinkedCount ?? "未知"} · 样本分母：${model.coverage?.attemptedCount ?? "未知"} · 无效样本：${model.coverage?.invalidCount ?? "未知"}</p>
+    <p>事件覆盖率：未知（${model.coverage?.events.reason ?? "source_unavailable"}） · 字段覆盖率：未知（${model.coverage?.fields.reason ?? "source_unavailable"}）</p><p>${model.unavailableReason ?? ""} 指标字典版本：${model.metricDictVersion ?? "未知"} 窗口：[${evidenceTime(model.window?.from ?? null)}, ${evidenceTime(model.window?.to ?? null)})</p>
     <p>投影时间：${evidenceTime(model.projectedAt)} · 源水位：${model.watermark ?? "未知"}</p>
   </section>`;
 }

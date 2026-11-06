@@ -92,6 +92,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     void this.reload();
+    this.requestUpdate("connected", !this.connected);
   }
 
   updated(changed: Map<string | number | symbol, unknown>) {
@@ -103,6 +104,20 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @state() private observationEvidence: EvidenceProjection | null = null;
   @state() private observationEvidenceNote = "业务结果未知 · 无可用证据";
   private evidenceGeneration = 0;
+  private evidenceFingerprint() {
+    return JSON.stringify([
+      this.role,
+      this.tenantId,
+      this.scopes,
+      this.sessionKind,
+      this.taskOutcomeRef,
+      this.connected,
+      this.client?.connected,
+      this.gatewayMethods,
+      this.observationSessionKey,
+      this.observationWindow,
+    ]);
+  }
   willUpdate(changed: Map<string | number | symbol, unknown>) {
     if (
       [
@@ -123,6 +138,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
       this.observationEvidenceNote = "业务结果未知 · 缺少结果引用、读取权限或查询能力";
       const client = this.client;
       const ref = this.taskOutcomeRef;
+      const fingerprint = this.evidenceFingerprint();
       if (
         !this.connected ||
         !client?.connected ||
@@ -138,14 +154,23 @@ export class OpenBotDiagnosisPanel extends LitElement {
       void client
         .request<EvidenceProjection>("diagnosis.observation.query", { ...ref, from, to })
         .then((result) => {
-          if (generation !== this.evidenceGeneration || !this.isConnected) {
+          if (
+            generation !== this.evidenceGeneration ||
+            !this.isConnected ||
+            client !== this.client ||
+            fingerprint !== this.evidenceFingerprint()
+          ) {
             return;
           }
           this.observationEvidence = result;
           this.observationEvidenceNote = "只读结果证据；连接流仍为 execution_only";
         })
         .catch(() => {
-          if (generation !== this.evidenceGeneration) {
+          if (
+            generation !== this.evidenceGeneration ||
+            client !== this.client ||
+            fingerprint !== this.evidenceFingerprint()
+          ) {
             return;
           }
           this.observationEvidence = null;

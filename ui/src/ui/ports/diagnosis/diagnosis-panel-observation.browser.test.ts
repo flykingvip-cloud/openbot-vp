@@ -180,3 +180,88 @@ describe("observation evidence query", () => {
     container.remove();
   });
 });
+
+describe("evidence response races", () => {
+  it.each(["methods", "client", "tenant", "version"])(
+    "drops old business evidence after %s changes",
+    async (change) => {
+      const pending: ((value: unknown) => void)[] = [];
+      const request = vi.fn((method: string) =>
+        method === "diagnosis.observation.query"
+          ? new Promise((resolve) => pending.push(resolve))
+          : Promise.resolve({
+              items: [],
+              authorization: { outcome: "allow" },
+              audit: { decision: "allow" },
+            }),
+      );
+      const container = document.createElement("div");
+      document.body.append(container);
+      render(
+        html`<openbot-diagnosis-panel role="enterprise" tenant-id="t1" .client=${{ connected: true, request }} .scopes=${["operator.read"]} .gatewayMethods=${["diagnosis.observation.query"]} .taskOutcomeRef=${{ taskId: "task1", agentId: "main", outcomeVersion: 3 }} connected></openbot-diagnosis-panel>`,
+        container,
+      );
+      const panel = container.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
+      await waitFor(() => expect(pending.length).toBe(1));
+      if (change === "methods") {
+        panel.gatewayMethods = [];
+      }
+      if (change === "client") {
+        panel.client = { connected: true, request } as unknown as GatewayBrowserClient;
+      }
+      if (change === "tenant") {
+        panel.tenantId = "t2";
+      }
+      if (change === "version") {
+        panel.taskOutcomeRef = { taskId: "task1", agentId: "main", outcomeVersion: 4 };
+      }
+      const fixture = (taskId: string) => ({
+        schemaVersion: 1,
+        metricDictVersion: 1,
+        projectedAt: 1,
+        sourceWatermark: null,
+        window: { from: 0, to: 2 },
+        coverage: null,
+        samples: [
+          {
+            sampleId: taskId,
+            qualification: "outcome_only",
+            provenance: ["unknown"],
+            reasons: [],
+            evidence: {
+              resource: "unknown",
+              technical: "unknown",
+              execution: "unknown",
+              business: "present",
+            },
+            evidenceReasons: { resource: [], technical: [], execution: [], business: [] },
+            outcome: {
+              taskId,
+              outcomeVersion: 3,
+              isCurrentTip: true,
+              taskJudgement: "success",
+              lifecycle: "closed",
+              acceptanceStatus: "accepted",
+              deliveryStatus: "delivered",
+            },
+            executionRefs: [],
+            attributedCost: null,
+          },
+        ],
+      });
+      await panel.updateComplete;
+      if (change !== "methods") {
+        await waitFor(() => expect(pending.length).toBe(2));
+        pending[1](fixture("new-result"));
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      pending[0](fixture("stale-result"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(panel.textContent).not.toContain("stale-result");
+      if (change !== "methods") {
+        expect(panel.textContent).toContain("new-result");
+      }
+      container.remove();
+    },
+  );
+});
