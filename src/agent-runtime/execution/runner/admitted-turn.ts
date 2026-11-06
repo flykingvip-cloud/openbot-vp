@@ -61,6 +61,8 @@ export async function runAdmittedTurn(
       throw new Error("Original task was paused, closed or replaced before provider startup");
     }
   };
+  // Reject an obsolete admitted request before creating outcome or billing state.
+  assertOriginalTaskCurrent();
   const TRANSIENT_HTTP_RETRY_DELAY_MS = 2_500;
   const SOFT_ENTITLEMENT_RETRY_DELAY_MS = 400;
   let didLogHeartbeatStrip = false;

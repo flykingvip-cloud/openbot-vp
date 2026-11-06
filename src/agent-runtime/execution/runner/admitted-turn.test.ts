@@ -49,6 +49,22 @@ beforeEach(() => {
   mocks.create.mockReset();
   mocks.invoke.mockResolvedValue({ payloads: [{ text: "done" }] });
 });
+it("rejects a stale accepted task before outcome creation or commercial admission", async () => {
+  const { host, params } = setup();
+  params.isHeartbeat = false;
+  params.followupRun.run.agentId = "test";
+  params.followupRun.run.taskCompletionBinding = {
+    taskId: "old-task",
+    executionAttempt: "old-attempt",
+    deliverableVersion: "old-attempt",
+  };
+  host.task.isTaskExecutionBindingCurrent = vi.fn(() => false);
+  host.task.ensureChatTurnTaskOutcome = vi.fn();
+  await expect(runAdmittedTurn(params, host)).rejects.toThrow(/Original task/);
+  expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
+  expect(host.admission.tryAcquireEnterpriseAgentRun).not.toHaveBeenCalled();
+  expect(mocks.create).not.toHaveBeenCalled();
+});
 it("denies admission before candidate construction or model fallback", async () => {
   const { host, params } = setup();
   host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
