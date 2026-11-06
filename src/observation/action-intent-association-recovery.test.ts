@@ -502,4 +502,64 @@ describe("explicit association recovery", () => {
     const replay = await createAssociationRecoveryService({ ...x.ports, store })(x.request);
     expect(replay.ok).toBe(false);
   });
+  it("assembles a trusted isolated recovery host using real restarted stores and no effect ports", async () => {
+    const x = await interrupted();
+    const realRoot = await fs.realpath(x.root);
+    const temp = await fs.realpath(os.tmpdir());
+    expect(path.relative(temp, realRoot).startsWith("..")).toBe(false);
+    const apply = vi.spyOn(x.plane, "applyWorkingDna");
+    const rollback = vi.spyOn(x.plane, "rollbackApplication");
+    const store = createActionIntentStore(path.join(realRoot, "intents"));
+    const authorizationLedger = new Map<string, AssociationRecoveryAuthorization>();
+    const readback = vi.fn(async (agentId: string) => {
+      expect(agentId).toBe("bot");
+      const style = await readRobotWorkingStyle(x.cfg, agentId);
+      if (!style) {
+        throw new Error("style_missing");
+      }
+      return {
+        actualVersion: (await x.adapter.inspect({ domain: "agent", agentId })).version,
+        actualDiffDigest: workingDnaContentDigest(style),
+        observedAt: now,
+      };
+    });
+    // Host-only composition: request data cannot supply approval, scope, store or effects.
+    const service = createAssociationRecoveryService({
+      store,
+      plane: {
+        getApplication: x.plane.getApplication.bind(x.plane),
+        getProposal: x.plane.getProposal.bind(x.plane),
+      },
+      authorize: async (request) => {
+        const approval = authorizationLedger.get(request.recoveryCommandId);
+        return approval ? structuredClone(approval) : null;
+      },
+      readback,
+      now: () => now,
+    });
+    const before = await readRobotWorkingStyle(x.cfg, "bot");
+    expect((await service(x.request)).ok).toBe(false);
+    expect(readback).not.toHaveBeenCalled();
+    authorizationLedger.set(x.request.recoveryCommandId, structuredClone(x.authorization));
+    const restored = await service(x.request);
+    expect(restored.ok).toBe(true);
+    if (!restored.ok) {
+      throw new Error(restored.reason);
+    }
+    expect(restored.executionAuthorityRestored).toBe(false);
+    expect(restored.intent.state).toBe("effective");
+    expect(restored.intent.verification).toBeNull();
+    expect(x.intents.owns(restored.intent)).toBe(false);
+    expect(
+      (await createActionIntentStore(path.join(realRoot, "intents")).detail(x.scope, "intent"))
+        ?.associationRecovery?.authorizationId,
+    ).toBe(x.authorization.authorizationId);
+    expect((await service(x.request)).ok).toBe(true);
+    authorizationLedger.delete(x.request.recoveryCommandId);
+    expect((await service(x.request)).ok).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+    expect(rollback).not.toHaveBeenCalled();
+    expect(x.plane.listApplications()).toHaveLength(1);
+    expect(await readRobotWorkingStyle(x.cfg, "bot")).toEqual(before);
+  });
 });
