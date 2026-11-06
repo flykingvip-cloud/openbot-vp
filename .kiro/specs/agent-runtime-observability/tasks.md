@@ -33,5 +33,12 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - P0 owner rerun: 4 suites / 25 tests PASS; changed-file lint and format PASS. Chromium regression 7 PASS; UI build PASS with existing import/chunk warnings, pinned Control UI sync skipped. — codex-observe-owner
 - P1 reader: 065001e6c, hardened by e5fc10e32; 12 tests PASS including fail-before/pass-after scope and same-version conflict cases. No store writes or recovery. — codex-observe-owner
 - P1 assembler: d9f214b77; 17 tests PASS; reader + assembler joint 29 PASS. Fully-linked fixtures are not live validation. — codex-observe-owner
-- No production/real gateway validation, push, PR, deployment or automatic experiment. P1 RPC and host UI remain unconnected. — codex-observe-owner
+- No production/real gateway validation, push, PR, deployment or automatic experiment. P1 RPC and host UI connected in 32a341d03 and 29ca914a2; live execution linkage remains unavailable. — codex-observe-owner
 - Telemetry rollback: revert 8e7cab7a1. No database migration; missing/invalid provenance reads unknown. Old JSON disk reload was not specifically tested. — codex-observe-owner
+
+- P1 internal query c83d871df and RPC 32a341d03: explicit task/version/window, fresh membership and object ACL; missing execution source and unknown provenance remain explicit. — codex-observe-owner
+- Final owner node run: 8 suites / 62 PASS; pack and adapter 6 PASS; Chromium 3 suites / 9 PASS; final UI build PASS with pin sync skipped. — codex-observe-owner
+- Broader method-scopes suite: 10 PASS / 1 FAIL listing 8 unrelated unclassified methods; full-suite green not claimed. — codex-observe-owner
+- P1 scope remains partial: no queryable trustworthy live execution history, live fully_linked sample, cost attribution or durable execution projection. P2 is not opened. — codex-observe-owner
+- Query rollback: revert 32a341d03 and 29ca914a2 for RPC/UI integration; projection modules require no data migration. — codex-observe-owner
+- Shared registry has concurrent command-budget task changes; subsequent observation registration increments remain uncommitted rather than landing another owner WIP. — codex-observe-owner
