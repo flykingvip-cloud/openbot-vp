@@ -381,10 +381,28 @@ describe("delivery-queue", () => {
       expect(pending[0].retryCount).toBe(1);
     });
 
+    it.each([
+      { receipts: [] },
+      { receipts: [{ messageId: "unknown" }] },
+      { receipts: [{ messageId: "ok" }, { messageId: "unknown" }] },
+    ])("does not acknowledge unknown receipts: %j", async ({ receipts }) => {
+      const id = await enqueueDelivery(
+        { channel: "whatsapp", to: "+1", payloads: [{ text: "a" }] },
+        tmpDir,
+      );
+      const { result } = await runRecovery({ deliver: vi.fn().mockResolvedValue(receipts) });
+      expect(result.recovered).toBe(0);
+      expect(result.failed).toBe(1);
+      const replay = vi.fn();
+      await runRecovery({ deliver: replay });
+      expect(replay).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(tmpDir, "delivery-queue", "failed", `${id}.json`))).toBe(true);
+    });
+
     it("recovers entries from a simulated crash", async () => {
       // Manually create queue entries as if gateway crashed before delivery.
       await enqueueCrashRecoveryEntries();
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const { result } = await runRecovery({ deliver });
 
       expect(deliver).toHaveBeenCalledTimes(2);
@@ -457,7 +475,7 @@ describe("delivery-queue", () => {
     it("passes skipQueue: true to prevent re-enqueueing during recovery", async () => {
       await enqueueDelivery({ channel: "whatsapp", to: "+1", payloads: [{ text: "a" }] }, tmpDir);
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       await runRecovery({ deliver });
 
       expect(deliver).toHaveBeenCalledWith(expect.objectContaining({ skipQueue: true }));
@@ -481,7 +499,7 @@ describe("delivery-queue", () => {
         tmpDir,
       );
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       await runRecovery({ deliver });
 
       expect(deliver).toHaveBeenCalledWith(
@@ -502,7 +520,7 @@ describe("delivery-queue", () => {
       await enqueueCrashRecoveryEntries();
       await enqueueDelivery({ channel: "slack", to: "#c", payloads: [{ text: "c" }] }, tmpDir);
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const { result, log } = await runRecovery({
         deliver,
         maxRecoveryMs: 0, // Immediate timeout -- no entries should be processed.
@@ -529,7 +547,7 @@ describe("delivery-queue", () => {
       );
       setEntryState(id, { retryCount: 3, lastAttemptAt: Date.now() });
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const { result, log } = await runRecovery({
         deliver,
         maxRecoveryMs: 60_000,
@@ -563,7 +581,7 @@ describe("delivery-queue", () => {
       setEntryState(blockedId, { retryCount: 3, lastAttemptAt: now, enqueuedAt: now - 30_000 });
       setEntryState(readyId, { retryCount: 0, enqueuedAt: now - 10_000 });
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const { result } = await runRecovery({ deliver, maxRecoveryMs: 60_000 });
 
       expect(result).toEqual({
@@ -593,7 +611,7 @@ describe("delivery-queue", () => {
       );
       setEntryState(id, { retryCount: 3, lastAttemptAt: start.getTime() });
 
-      const firstDeliver = vi.fn().mockResolvedValue([]);
+      const firstDeliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const firstRun = await runRecovery({ deliver: firstDeliver, maxRecoveryMs: 60_000 });
       expect(firstRun.result).toEqual({
         recovered: 0,
@@ -604,7 +622,7 @@ describe("delivery-queue", () => {
       expect(firstDeliver).not.toHaveBeenCalled();
 
       vi.setSystemTime(new Date(start.getTime() + 600_000 + 1));
-      const secondDeliver = vi.fn().mockResolvedValue([]);
+      const secondDeliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const secondRun = await runRecovery({ deliver: secondDeliver, maxRecoveryMs: 60_000 });
       expect(secondRun.result).toEqual({
         recovered: 1,

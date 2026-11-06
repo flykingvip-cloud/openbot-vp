@@ -664,3 +664,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Combined current runtime components, command/ACP/delivery/governance/credit, real two-process pending delivery, local background child, embedded usage and overflow regressions: 58 files / 312 PASS. Provider/channel transports remain mocked except the explicitly local child-process evidence. No real external channel or model acceptance is claimed. — codex-runtime-manager
 - Full tsgo PASS and architecture 51 PASS at this integration checkpoint. Last full build passed with 209 existing warnings; subsequent candidate change was type-only. Original core loop, durable retry identity, complete builder/adapter contracts and final personal/group live acceptance remain open. No push, merge or deployment. — codex-runtime-manager
+
+## Unknown recovery receipt guard (2026-11-07)
+
+- Reproduced recovery falsely acknowledging missing and placeholder transport receipts (2 FAIL / 65 PASS). Recovery now requires every returned message id to be confirmed; unknown receipt batches are preserved under failed/ for reconciliation and are not automatically replayed on another recovery pass. Original return API and retry owner remain. This does not provide exactly-once transport or complete task-binding recovery. — codex-runtime-manager
+- Candidate queue/shared-receipt regression 2 files / 69 PASS; architecture 51 PASS; typed lint clean; build PASS with 209 existing warnings. Parallel comparison UI fixture has an unrelated type error at the latest check; no global green claim for this checkpoint. No external send, push, merge or deploy. — codex-runtime-manager

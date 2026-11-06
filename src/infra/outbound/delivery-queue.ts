@@ -3,6 +3,7 @@ import path from "node:path";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { resolveStateDir } from "../../config/paths.js";
+import { confirmedDeliveryMessageIds } from "../../shared/delivery-receipt.js";
 import { generateSecureUuid } from "../secure-random.js";
 import type { OutboundChannel } from "./targets.js";
 
@@ -378,7 +379,7 @@ export async function recoverPendingDeliveries(opts: {
     try {
       let payloadFailure: unknown;
       let hadPayloadFailure = false;
-      await opts.deliver({
+      const receipts = await opts.deliver({
         cfg: opts.cfg,
         channel: entry.channel,
         to: entry.to,
@@ -398,6 +399,19 @@ export async function recoverPendingDeliveries(opts: {
       });
       if (hadPayloadFailure) {
         throw payloadFailure instanceof Error ? payloadFailure : new Error(String(payloadFailure));
+      }
+      if (!confirmedDeliveryMessageIds(receipts)) {
+        // A successful call without acknowledgement may already have sent.
+        // Preserve it for reconciliation rather than blindly replaying the batch.
+        await failDelivery(
+          entry.id,
+          "delivery_unknown: transport acknowledgement missing",
+          opts.stateDir,
+        );
+        await moveToFailed(entry.id, opts.stateDir);
+        failed += 1;
+        opts.log.warn(`Delivery ${entry.id} has unknown acknowledgement — held for reconciliation`);
+        continue;
       }
       await ackDelivery(entry.id, opts.stateDir);
       recovered += 1;
