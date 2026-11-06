@@ -1,5 +1,12 @@
 import { expect, it } from "vitest";
 import { projectRuntimeObservation } from "./runtime-observation.ts";
+it("normalizes missing source identities consistently", () => {
+  const base = { runId: "client", seq: 1, ts: 1, stream: "lifecycle" };
+  const missing = projectRuntimeObservation(base, 2);
+  for (const sourceRunId of ["", "   ", null]) {
+    expect(projectRuntimeObservation({ ...base, sourceRunId }, 2)).toEqual(missing);
+  }
+});
 it("projects metadata without copying tool secrets or inventing task success", () => {
   const row = projectRuntimeObservation(
     {

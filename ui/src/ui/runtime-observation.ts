@@ -107,15 +107,12 @@ export function projectRuntimeObservation(
   }
   const data =
     row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {};
+  const sourceRunId =
+    typeof row.sourceRunId === "string" && row.sourceRunId.trim() ? row.sourceRunId : null;
   return {
-    eventId: JSON.stringify([
-      row.runId,
-      typeof row.sourceRunId === "string" ? row.sourceRunId : null,
-      row.seq,
-    ]),
+    eventId: JSON.stringify([row.runId, sourceRunId, row.seq]),
     runId: row.runId,
-    sourceRunId:
-      typeof row.sourceRunId === "string" && row.sourceRunId.trim() ? row.sourceRunId : null,
+    sourceRunId,
     sequence: row.seq,
     occurredAt: row.ts,
     receivedAt,
