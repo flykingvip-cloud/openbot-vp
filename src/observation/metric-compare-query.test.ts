@@ -158,4 +158,73 @@ describe("server-owned metric comparison query", () => {
     }
     expect(r.comparison.reasons).toContain("cohort_identity_unknown");
   });
+  it("matches only server-read authoritative contract dimensions and keeps source gates", async () => {
+    const { root, query, request } = setup();
+    const add = (taskId: string, kind = "document", version = "v1") => {
+      for (const location of ["tips/" + taskId + ".json", "versions/" + taskId + "__v1.json"]) {
+        const file = path.join(root, "task-outcomes", location);
+        const row = JSON.parse(fs.readFileSync(file, "utf8"));
+        fs.writeFileSync(
+          file,
+          JSON.stringify({
+            ...row,
+            taskContract: { id: "contract", kind, version, requiredValidators: ["b", "a"] },
+            taskContractVersion: "v1",
+            judgementPolicyVersion: "p1",
+            entrypoint: "chat",
+          }),
+        );
+      }
+    };
+    add("base");
+    add("candidate");
+    const matched = await query(request);
+    if (!matched.ok) {
+      throw new Error("failed");
+    }
+    expect(matched.cohort?.state).toBe("matched");
+    expect(matched.comparison.status).toBe("blocked");
+    expect(matched.comparison.reasons).toContain("ineligible_sample");
+    expect(matched.comparison.reasons).not.toContain("cohort_identity_unknown");
+    add("candidate", "code");
+    const mismatch = await query(request);
+    if (!mismatch.ok) {
+      throw new Error("failed");
+    }
+    expect(mismatch.comparison.reasons).toContain("cohort_dimensions_mismatch");
+  });
+  it("rejects a baseline cohort changing while candidate reads are awaited", async () => {
+    const { root, cfg, request } = setup();
+    let calls = 0;
+    const query = createMetricCompareQuery({
+      cfg,
+      now: () => at + 20,
+      authorize: async () => {
+        calls++;
+        if (calls === 6) {
+          for (const location of ["tips/base.json", "versions/base__v1.json"]) {
+            const file = path.join(root, "task-outcomes", location);
+            const row = JSON.parse(fs.readFileSync(file, "utf8"));
+            fs.writeFileSync(
+              file,
+              JSON.stringify({
+                ...row,
+                taskContract: {
+                  id: "changed",
+                  version: "v1",
+                  kind: "document",
+                  requiredValidators: [],
+                },
+                taskContractVersion: "v1",
+                judgementPolicyVersion: "p1",
+                entrypoint: "chat",
+              }),
+            );
+          }
+        }
+        return { subjectRef: "subject:alice", tenantId: "t" };
+      },
+    });
+    expect(await query(request)).toEqual({ ok: false, code: "evidence_unavailable" });
+  });
 });

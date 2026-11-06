@@ -1,7 +1,10 @@
 /** Server-owned read-only comparison. Requests contain references, never metric aggregates. */
 import type { OpenBotConfig } from "../config/config.js";
+import { buildCohortIdentity, cohortDimensionsKey } from "./cohort-identity.js";
 import { compareObservationMetrics, type MetricCohort } from "./metric-compare.js";
 import { OBSERVATION_METRIC_DICT, OBSERVATION_METRIC_DICT_VERSION } from "./metric-dict.js";
+import { readOutcomeMetadata } from "./outcome-reader.js";
+import { outcomeMetadataFingerprint } from "./outcome-source.js";
 import { queryObservationWithJournal } from "./query.js";
 export type ComparisonCaller = { subjectRef: string; tenantId?: string | null };
 type Ref = { agentId: string; taskId: string; outcomeVersion: number };
@@ -54,6 +57,10 @@ function side(value: unknown, now: number): value is Side {
       ref.outcomeVersion > 0,
   );
 }
+type CohortSummary = { state: "blocked" | "matched"; refs: string[]; reasons: string[] };
+function cohortSummary(cohort: CohortSummary): { cohort?: CohortSummary } {
+  return { cohort };
+}
 function callerKey(caller: ComparisonCaller): string {
   return JSON.stringify([caller.subjectRef, caller.tenantId ?? null]);
 }
@@ -99,14 +106,27 @@ export function createMetricCompareQuery(options: {
         const current = await options.authorize();
         return Boolean(current?.subjectRef.trim() && callerKey(current) === identity);
       };
+      const metadataStates: { ref: Ref; fingerprint: string; isCurrentTip: boolean }[] = [];
       const read = async (input: Side) => {
         const queries: {
           ref: Ref;
           result: Awaited<ReturnType<typeof queryObservationWithJournal>>;
         }[] = [];
+        const cohortIdentities: ReturnType<typeof buildCohortIdentity>[] = [];
         for (const ref of uniqueRefs(input.refs)) {
           if (!(await stillAuthorized())) {
             throw new Error("unauthorized");
+          }
+          const metadata = readOutcomeMetadata({
+            cfg: options.cfg,
+            ...ref,
+            callerSubjectRef: caller.subjectRef,
+            callerTenantId: caller.tenantId,
+          });
+          if (!metadata.ok) {
+            throw new Error(
+              metadata.code === "unauthorized" ? "unauthorized" : "evidence_unavailable",
+            );
           }
           const result = await queryObservationWithJournal({
             cfg: options.cfg,
@@ -133,6 +153,33 @@ export function createMetricCompareQuery(options: {
           ) {
             throw new Error("evidence_unavailable");
           }
+          const freshMetadata = readOutcomeMetadata({
+            cfg: options.cfg,
+            ...ref,
+            callerSubjectRef: caller.subjectRef,
+            callerTenantId: caller.tenantId,
+          });
+          if (
+            !freshMetadata.ok ||
+            cohortDimensionsKey(freshMetadata.outcome.cohortDimensions) !==
+              cohortDimensionsKey(metadata.outcome.cohortDimensions)
+          ) {
+            throw new Error("evidence_unavailable");
+          }
+          cohortIdentities.push(
+            buildCohortIdentity({
+              scope: freshMetadata.outcome.scope,
+              agentId: ref.agentId,
+              dimensions: freshMetadata.outcome.cohortDimensions,
+              metricDictVersion: OBSERVATION_METRIC_DICT_VERSION,
+              metricId: OBSERVATION_METRIC_DICT.linkCoverage.metricId,
+            }),
+          );
+          metadataStates.push({
+            ref,
+            fingerprint: outcomeMetadataFingerprint(freshMetadata.outcome),
+            isCurrentTip: freshMetadata.outcome.isCurrentTip,
+          });
           queries.push({ ref, result });
         }
         const samples: MetricCohort["samples"] = queries.flatMap(({ ref, result }) =>
@@ -152,7 +199,9 @@ export function createMetricCompareQuery(options: {
           metricDictVersion: OBSERVATION_METRIC_DICT_VERSION,
           metricId: OBSERVATION_METRIC_DICT.linkCoverage.metricId,
           denominatorDefinition: OBSERVATION_METRIC_DICT.linkCoverage.denominator,
-          cohortRef: JSON.stringify(["explicit_task_version_selection", all[0].agentId]),
+          cohortRef:
+            cohortIdentities.find((identity) => identity.state === "known")?.cohortRef ??
+            "cohort:unknown",
           window: input.window,
           windowDefinition: "TaskOutcome.decidedAt and execution occurredAt; [from,to)",
           numerator: samples.filter((sample) => sample.qualification === "fully_linked").length,
@@ -160,25 +209,64 @@ export function createMetricCompareQuery(options: {
           environment: "production",
           samples,
         };
-        return { metric, queries };
+        return { metric, queries, cohortIdentities };
       };
       const b = await read(baseline);
       const c = await read(candidate);
       if (!(await stillAuthorized())) {
         return deny("unauthorized");
       }
+      for (const expected of metadataStates) {
+        const current = readOutcomeMetadata({
+          cfg: options.cfg,
+          ...expected.ref,
+          callerSubjectRef: caller.subjectRef,
+          callerTenantId: caller.tenantId,
+        });
+        if (
+          !current.ok ||
+          current.outcome.isCurrentTip !== expected.isCurrentTip ||
+          outcomeMetadataFingerprint(current.outcome) !== expected.fingerprint
+        ) {
+          throw new Error("evidence_unavailable");
+        }
+      }
       const comparison = compareObservationMetrics({ baseline: b.metric, candidate: c.metric });
+      const identities = [...b.cohortIdentities, ...c.cohortIdentities];
+      const cohortReasons = [...new Set(identities.flatMap((identity) => identity.reasons))];
+      if (identities.some((identity) => identity.state !== "known")) {
+        cohortReasons.push("cohort_identity_unknown");
+      }
+      if (
+        new Set(
+          identities
+            .filter((identity) => identity.state === "known")
+            .map((identity) => identity.cohortRef),
+        ).size > 1
+      ) {
+        cohortReasons.push("cohort_dimensions_mismatch");
+      }
+      const cohortBlocked = cohortReasons.length > 0;
       return {
         ok: true as const,
         comparison: {
           ...comparison,
-          status: "blocked" as const,
-          reasons: [...new Set([...comparison.reasons, "cohort_identity_unknown"])].toSorted(),
-          baselineValue: null,
-          candidateValue: null,
-          delta: null,
+          status: cohortBlocked ? ("blocked" as const) : comparison.status,
+          reasons: [...new Set([...comparison.reasons, ...cohortReasons])].toSorted(),
+          baselineValue: cohortBlocked ? null : comparison.baselineValue,
+          candidateValue: cohortBlocked ? null : comparison.candidateValue,
+          delta: cohortBlocked ? null : comparison.delta,
         },
         evidence: { baseline: b.queries, candidate: c.queries },
+        ...cohortSummary({
+          state: cohortBlocked ? ("blocked" as const) : ("matched" as const),
+          refs: [
+            ...new Set(
+              identities.flatMap((identity) => (identity.cohortRef ? [identity.cohortRef] : [])),
+            ),
+          ].toSorted(),
+          reasons: cohortReasons.toSorted(),
+        }),
         selectionScope: "explicit_references_only" as const,
       };
     } catch (error) {

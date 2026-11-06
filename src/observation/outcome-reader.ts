@@ -8,6 +8,11 @@ import {
 } from "../task-outcome/reject-result.js";
 import { boundedOutcomePathSegment } from "../task-outcome/store.js";
 import type { TaskOutcomeRecord, TrustedScope } from "../task-outcome/types.js";
+import {
+  readOutcomeCohort,
+  cohortDimensionsKey,
+  type CohortDimensions,
+} from "./cohort-identity.js";
 
 export type OutcomeRecordMetadata = Pick<
   TaskOutcomeRecord,
@@ -21,6 +26,7 @@ export type OutcomeRecordMetadata = Pick<
   | "decisiveAttemptId"
   | "deliveryId"
 > & {
+  cohortDimensions?: CohortDimensions;
   acceptance: Pick<TaskOutcomeRecord["acceptance"], "status">;
   delivery: Pick<TaskOutcomeRecord["delivery"], "status">;
   runs: Pick<
@@ -144,6 +150,7 @@ function metadataKey(row: OutcomeRecordMetadata): string {
     .toSorted();
   return JSON.stringify([
     scopeKey(row.scope),
+    cohortDimensionsKey(row.cohortDimensions ?? readOutcomeCohort(row)),
     row.taskId,
     row.outcomeVersion,
     row.taskJudgement,
@@ -237,6 +244,7 @@ export function readOutcomeMetadata(input: {
     return {
       ok: true,
       outcome: {
+        cohortDimensions: readOutcomeCohort(snap),
         taskId: snap.taskId,
         outcomeVersion: snap.outcomeVersion,
         taskJudgement: snap.taskJudgement,

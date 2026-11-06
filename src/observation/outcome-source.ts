@@ -1,7 +1,8 @@
 /** Disposable submission-path declarations, never business acceptance or production validation. */
 import { createHash, randomUUID } from "node:crypto";
+import { readOutcomeCohort, cohortDimensionsKey } from "./cohort-identity.js";
 import type { OutcomeRecordMetadata } from "./outcome-reader.js";
-export const OUTCOME_METADATA_SCHEMA_VERSION = 1;
+export const OUTCOME_METADATA_SCHEMA_VERSION = 2;
 export function outcomeMetadataFingerprint(r: OutcomeRecordMetadata): string {
   const s = r.scope;
   const scope =
@@ -19,6 +20,7 @@ export function outcomeMetadataFingerprint(r: OutcomeRecordMetadata): string {
       JSON.stringify([
         OUTCOME_METADATA_SCHEMA_VERSION,
         scope,
+        cohortDimensionsKey(r.cohortDimensions ?? readOutcomeCohort(r)),
         r.taskId,
         r.outcomeVersion,
         r.decidedAt,

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../config/config.js";
 import { boundedOutcomePathSegment } from "../task-outcome/store.js";
 import { readOutcomeMetadata } from "./outcome-reader.js";
+import { outcomeMetadataFingerprint } from "./outcome-source.js";
 
 let dir = "";
 let cfg: OpenBotConfig;
@@ -147,5 +148,42 @@ describe("read-only outcome metadata", () => {
       },
     );
     expect(read()).toEqual({ ok: false, code: "tip_changed" });
+  });
+  it("projects authoritative contract cohort dimensions and detects same-version drift", () => {
+    const record = {
+      ...metadata(),
+      taskContractVersion: "contract-v1",
+      judgementPolicyVersion: "policy-v1",
+      entrypoint: "chat",
+      taskContract: {
+        id: "document",
+        version: "contract-v1",
+        kind: "document",
+        requiredValidators: ["b", "a", "a"],
+      },
+    };
+    fs.writeFileSync(tipPath(), JSON.stringify(record));
+    fs.writeFileSync(versionPath(), JSON.stringify(record));
+    const result = read();
+    if (!result.ok) {
+      throw new Error("failed");
+    }
+    expect(
+      outcomeMetadataFingerprint(
+        record as unknown as Parameters<typeof outcomeMetadataFingerprint>[0],
+      ),
+    ).toBe(outcomeMetadataFingerprint(result.outcome));
+    expect(result.outcome).toHaveProperty("cohortDimensions.taskContract.requiredValidators", [
+      "a",
+      "b",
+    ]);
+    fs.writeFileSync(
+      versionPath(),
+      JSON.stringify({
+        ...record,
+        taskContract: { ...record.taskContract, version: "contract-v2" },
+      }),
+    );
+    expect(read()).toEqual({ ok: false, code: "invalid_record" });
   });
 });
