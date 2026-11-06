@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { renderRunSkillContext } from "../../../agent-runtime/context/index.js";
 import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
 import { captureTaskActionBoundary } from "../../../agent-runtime/state/task-action.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
@@ -1159,14 +1160,17 @@ export async function runEmbeddedAttempt(
   let restoreSkillEnv: (() => void) | undefined;
   process.chdir(effectiveWorkspace);
   try {
-    const { shouldLoadSkillEntries, skillEntries, preferLiveEntries } =
-      resolveEmbeddedRunSkillEntries({
-        workspaceDir: effectiveWorkspace,
-        config: params.config,
-        skillsSnapshot: params.skillsSnapshot,
-        // Lifecycle skill projection (SkillExecutionBinding) is per-agent.
-        agentId: params.agentId,
-      });
+    const skillContextInput = {
+      workspaceDir: effectiveWorkspace,
+      config: params.config,
+      skillsSnapshot: params.skillsSnapshot,
+      agentId: params.agentId,
+    };
+    const preparedSkillContext = {
+      input: skillContextInput,
+      selection: resolveEmbeddedRunSkillEntries(skillContextInput),
+    };
+    const { skillEntries, preferLiveEntries } = preparedSkillContext.selection;
     restoreSkillEnv =
       params.skillsSnapshot && !preferLiveEntries
         ? applySkillEnvOverridesFromSnapshot({
@@ -1180,23 +1184,11 @@ export async function runEmbeddedAttempt(
 
     const accountSandboxLocations =
       sandbox?.enabled === true && sandbox.containerWorkdir === "/account/workspace";
-    const skillsPrompt = resolveSkillsPromptForRun({
-      skillsSnapshot: params.skillsSnapshot,
-      entries: shouldLoadSkillEntries ? skillEntries : undefined,
-      preferLiveEntries,
-      config: params.config,
-      workspaceDir: effectiveWorkspace,
-      accountSandboxLocations,
-    });
-    observeAttemptSkillPreparation({
-      runId: params.runId,
-      sessionKey: params.sessionKey,
-      skillsPrompt,
-      preferLiveEntries,
-      snapshot: params.skillsSnapshot,
-      liveEntries: shouldLoadSkillEntries ? skillEntries : [],
-      config: params.config,
-    });
+    const skillsPrompt = renderRunSkillContext(
+      preparedSkillContext,
+      { runId: params.runId, sessionKey: params.sessionKey, accountSandboxLocations },
+      { render: resolveSkillsPromptForRun, observe: observeAttemptSkillPreparation },
+    );
 
     const sessionLabel = params.sessionKey ?? params.sessionId;
     const { bootstrapFiles: hookAdjustedBootstrapFiles, contextFiles } =

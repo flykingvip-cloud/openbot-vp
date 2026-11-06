@@ -277,7 +277,10 @@ describe("§5 execution entry inventory", () => {
       expect(e16?.symbols).toEqual(["runCliAgent", "recordCliBackendUsage"]);
       const agent = SOURCE_TEXT.get("src/commands/agent.ts");
       expect(agent).toBeDefined();
-      expect(agent).toContain("acquireAgentCommandCommercialRun");
+      expect(agent).toContain("createCommandAdmissionSession");
+      expect(SOURCE_TEXT.get("src/agent-runtime/model/command-admission-session.ts")).toContain(
+        "await acquireAgentCommandCommercialRun",
+      );
       expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/command-candidate.ts")).toContain(
         "runCliAgent",
       );

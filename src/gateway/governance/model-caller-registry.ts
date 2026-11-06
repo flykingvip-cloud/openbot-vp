@@ -82,7 +82,11 @@ export const MODEL_CALLER_REGISTRY: readonly ModelCallerEntry[] = [
     governanceToday: "allowlist-when-gated",
     registration: "explicit-mode",
     followUp: "P3 enforced after §8.4 parity (default stays shadow)",
-    evidenceFiles: ["src/commands/agent/model-governance.ts", "src/commands/agent.ts"],
+    evidenceFiles: [
+      "src/agent-runtime/model/command-governance.ts",
+      "src/agent-runtime/model/command-admission-session.ts",
+      "src/commands/agent.ts",
+    ],
   },
   {
     id: "memory-flush",

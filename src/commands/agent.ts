@@ -1,6 +1,6 @@
 import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery.js";
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
-import { createRunAdmissionLease } from "../agent-runtime/model/index.js";
+import { createCommandAdmissionSession } from "../agent-runtime/model/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
 import { createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, runCommandFallback, runCommandAcpTurn } from "../agent-runtime/execution/index.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
@@ -24,11 +24,7 @@ import { formatAgentInternalEventsForPrompt } from "../agents/internal-events.js
 import { AGENT_LANE_SUBAGENT } from "../agents/lanes.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import {
-  buildRunModelSetSnapshot,
-  forgetRunModelSet,
   recordSubagentModelShadow,
-  rememberRunModelSet,
-  snapshotCreditReportingFromGate,
 } from "../gateway/governance/spawn-snapshot-handoff.js";
 import {
   buildAllowedModelSet,
@@ -90,11 +86,8 @@ import { applyModelOverrideToSessionEntry } from "../sessions/model-overrides.js
 import { resolveSendPolicy } from "../sessions/send-policy.js";
 import { resolveMessageChannel } from "../utils/message-channel.js";
 import {
-  acquireAgentCommandCommercialRun,
   type AgentCommandCommercialGateResult,
-  releaseAgentCommandCommercialRun,
 } from "../agent-runtime/model/index.js";
-import { resolveExecutionRoutingFromCapabilityPlan } from "../gateway/model-entitlement/task-capability-plan.js";
 import { recordAgentCommandCreditUsage } from "./agent/credit-usage.js";
 import { deliverAgentCommandResult } from "../agent-runtime/delivery/index.js";
 import {
@@ -103,7 +96,6 @@ import {
   type RunnerTurnFailureReason,
 } from "../task-outcome/runtime-from-runner.js";
 import { openCommandOutcomeEntry } from "../agent-runtime/command/index.js";
-import { resolveAgentCommandModelGovernance } from "./agent/model-governance.js";
 import { resolveAgentRunContext } from "./agent/run-context.js";
 import { updateSessionStoreAfterAgentRun } from "./agent/session-store.js";
 import { resolveSession } from "./agent/session.js";
@@ -372,14 +364,7 @@ async function agentCommandInternal(
   let sessionEntry = prepared.sessionEntry;
   const laneRaw = typeof opts.lane === "string" ? opts.lane.trim() : "";
   const isSubagentLane = laneRaw === String(AGENT_LANE_SUBAGENT);
-  const commercialLease = createRunAdmissionLease({
-    acquire: async (input: Parameters<typeof acquireAgentCommandCommercialRun>[0]) => {
-      const gate = await acquireAgentCommandCommercialRun(input);
-      return { acquired: gate.status === "acquired", gate };
-    },
-    release: () => { void releaseAgentCommandCommercialRun(runId); },
-    forgetSnapshot: () => forgetRunModelSet(runId),
-  });
+  const commercialLease = createCommandAdmissionSession({runId, isSubagentLane, identity: opts.executionIdentity, entry: opts.governanceEntry});
   // Subagent runs take their own commercial slot (quota + concurrency).
   // Model allowlists for the child still come from the parent snapshot.
   let commercialGate: AgentCommandCommercialGateResult | undefined;
@@ -423,52 +408,20 @@ async function agentCommandInternal(
       }
     }
 
-    commercialGate = (await commercialLease.acquire({
+    commercialGate = await commercialLease.acquire({
       runId,
       sessionAgentId,
       gatewayClientUser: opts.gatewayClientUser,
       enterpriseId: opts.gatewayClientSessionTenantId,
       taskText: opts.message ?? body,
       ...(isSubagentLane ? { entry: "E6" as const } : opts.governanceEntry ? { entry: opts.governanceEntry } : {}),
-    })).gate;
+    });
     if (commercialGate.status === "denied") {
       agentOutcomeSuccess = false;
       agentOutcomeFailureReason = "authz_denied";
       agentOutcomeFailureDetail = commercialGate.message;
       throw new Error(commercialGate.message);
     }
-    let commandExecutionRouting:
-      | ReturnType<typeof resolveExecutionRoutingFromCapabilityPlan>
-      | undefined;
-    if (commercialGate.status === "acquired") {
-      if (!isSubagentLane) {
-        const modelGovernance = resolveAgentCommandModelGovernance(
-          commercialGate,
-          process.env,
-          opts.executionIdentity,
-        );
-        commandExecutionRouting = resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGovernance.entitlementAllowlist,
-          preferredModelOrder: commercialGate.modelGate?.preferredModelOrder,
-          capabilityPlan: commercialGate.modelGate?.capabilityPlan,
-        });
-        const parentSnapshot = buildRunModelSetSnapshot({
-          runId,
-          allowlist: commandExecutionRouting.allowlist,
-          governanceMode: modelGovernance.governanceMode,
-          commercialAuthorizationId: modelGovernance.governanceContext?.commercialAuthorizationId,
-          tenantId: modelGovernance.governanceContext?.tenantId,
-          actorId: modelGovernance.governanceContext?.actorId,
-          preferredModelOrder: commandExecutionRouting.preferredModelOrder,
-          // P4-1: parent billing context for child runs (this branch: gate acquired).
-          creditReporting: snapshotCreditReportingFromGate(commercialGate),
-        });
-        if (parentSnapshot) {
-          rememberRunModelSet(runId, parentSnapshot);
-        }
-      }
-    }
-
     if (acpResolution?.kind === "stale") {
       throw acpResolution.error;
     }
@@ -777,12 +730,6 @@ async function agentCommandInternal(
         model,
         runId,
       });
-      const commandModelGovernance = resolveAgentCommandModelGovernance(
-        isSubagentLane ? undefined : commercialGate,
-        process.env,
-        opts.executionIdentity,
-        opts.governanceEntry,
-      );
       const fallbackResult = await runCommandFallback({
         cfg,
         provider,
@@ -795,13 +742,7 @@ async function agentCommandInternal(
         },
         // legacy when the gate skipped (no enterprise scope); otherwise
         // OPENBOT_GOVERNANCE_AGENT_COMMAND_MODEL_MODE (default shadow: record only).
-        ...commandModelGovernance,
-        ...(commandExecutionRouting?.allowlist !== undefined
-          ? { entitlementAllowlist: commandExecutionRouting.allowlist }
-          : {}),
-        ...(commandExecutionRouting?.preferredModelOrder
-          ? { preferredModelOrder: commandExecutionRouting.preferredModelOrder }
-          : {}),
+        ...commercialLease.fallbackGovernance(),
         run: (providerOverride, modelOverride, runOptions, isFallbackRetry) => {
           commandBudget.assertAllowed();
           return (async () => {
