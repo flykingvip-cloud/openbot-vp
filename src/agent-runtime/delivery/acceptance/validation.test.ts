@@ -16,6 +16,18 @@ const request = {
   artifactHash: hashArtifact("same bytes"),
   requiredValidators: ["sources"],
 };
+it("does not issue acceptance evidence without an explicit validation result", () => {
+  const unchecked = {
+    validatorId: "sources",
+    taskId: "task",
+    artifactPath: "report",
+    artifactBytes: "same bytes",
+  };
+  expect(
+    issueValidationReceipt(unchecked as Parameters<typeof issueValidationReceipt>[0]),
+  ).toBeUndefined();
+  expect(matchRequiredValidators(request)[0].status).toBe("missing");
+});
 it("uses the latest issued verdict for the exact artifact and registered validator version", () => {
   const input = {
     validatorId: "sources",

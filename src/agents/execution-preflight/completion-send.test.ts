@@ -259,6 +259,7 @@ describe("unified completion send", () => {
     writeFileSync(absolute, original);
     noteDeliveryArtifactPath(preflight.taskId, preflight.attemptNumber, relativePath);
     const receipt = issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: preflight.taskId,
       artifactPath: relativePath,
@@ -319,12 +320,14 @@ describe("unified completion send", () => {
     noteDeliveryArtifactPath(preflight.taskId, preflight.attemptNumber, "out/layout.bin");
     noteDeliveryArtifactPath(preflight.taskId, preflight.attemptNumber, "out/data.bin");
     issueValidationReceipt({
+      result: "passed",
       validatorId: "layout-validator",
       taskId: preflight.taskId,
       artifactPath: "out/data.bin",
       artifactBytes: data,
     });
     issueValidationReceipt({
+      result: "passed",
       validatorId: "data-validator",
       taskId: preflight.taskId,
       artifactPath: "out/data.bin",
@@ -334,6 +337,7 @@ describe("unified completion send", () => {
     expect(lastFileOnly.allowedToDeliver).toBe(false);
     expect(lastFileOnly.decisionCode).toBe("delivery_blocked");
     issueValidationReceipt({
+      result: "passed",
       validatorId: "layout-validator",
       taskId: preflight.taskId,
       artifactPath: "out/layout.bin",
@@ -343,6 +347,7 @@ describe("unified completion send", () => {
     expect(oneValidator.allowedToDeliver).toBe(false);
     expect(oneValidator.decisionCode).toBe("delivery_blocked");
     issueValidationReceipt({
+      result: "passed",
       validatorId: "data-validator",
       taskId: preflight.taskId,
       artifactPath: "out/layout.bin",

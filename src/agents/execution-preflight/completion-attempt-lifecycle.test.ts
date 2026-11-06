@@ -152,6 +152,7 @@ describe("delayed send after runEmbeddedPiAgent returns", () => {
     expect(readDeliveryContextMetrics().retained).toBe(1);
 
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: preflight.taskId,
       artifactPath: relativePath,

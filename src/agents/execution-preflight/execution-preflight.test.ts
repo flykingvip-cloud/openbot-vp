@@ -530,6 +530,7 @@ describe("execution preflight", () => {
   it("rejects a receipt whose path or validator version does not match", () => {
     const preflight = preflightFor("run sample-task");
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: preflight.taskId,
       artifactPath: "out/a.bin",

@@ -136,6 +136,7 @@ describe("execution preflight integration", () => {
     const artifactPath = "out/output.bin";
     const original = "version-1";
     const receipt = issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: preflight.taskId,
       artifactPath,
@@ -165,6 +166,7 @@ describe("execution preflight integration", () => {
     expect(fresh.allowedToDeliver).toBe(true);
     expect(
       issueValidationReceipt({
+        result: "passed",
         validatorId: "unregistered-validator",
         taskId: preflight.taskId,
         artifactPath,
@@ -206,6 +208,7 @@ describe("execution preflight integration", () => {
     const success = build("trace-success");
     const artifactPath = "out/output.bin";
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: success.taskId,
       artifactPath,
@@ -383,6 +386,7 @@ describe("execution preflight integration", () => {
       await guarded?.execute?.("call-1", { path: relativePath, content: "version-1" }, undefined);
       const bytes = readFileSync(absolutePath);
       issueValidationReceipt({
+        result: "passed",
         validatorId: "sample-validator",
         taskId: preflight.taskId,
         artifactPath: relativePath,

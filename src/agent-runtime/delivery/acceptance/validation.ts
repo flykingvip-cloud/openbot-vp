@@ -53,12 +53,17 @@ export function issueValidationReceipt(input: {
   artifactPath: string;
   artifactBytes: Buffer | string;
   now?: Date;
-  result?: ValidationReceipt["result"];
+  result: ValidationReceipt["result"];
 }): ValidationReceipt | undefined {
   const validator = trusted.get(input.validatorId.trim());
   const taskId = input.taskId.trim();
   const artifactPath = input.artifactPath.trim();
-  if (!validator || !taskId || !artifactPath) {
+  if (
+    !validator ||
+    !taskId ||
+    !artifactPath ||
+    (input.result !== "passed" && input.result !== "failed")
+  ) {
     return undefined;
   }
   const receipt: ValidationReceipt = {
@@ -68,7 +73,7 @@ export function issueValidationReceipt(input: {
     validatorId: validator.id,
     validatorVersion: validator.version,
     timestamp: (input.now ?? new Date()).toISOString(),
-    result: input.result ?? "passed",
+    result: input.result,
   };
   // Issued evidence is immutable even when exposed to observability callers.
   Object.freeze(receipt);

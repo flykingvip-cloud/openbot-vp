@@ -107,6 +107,7 @@ function armHeld(taskId: string, workspace: string, key = sessionKey) {
 
 function allowReceipt(taskId: string) {
   issueValidationReceipt({
+    result: "passed",
     validatorId: "sample-validator",
     taskId,
     artifactPath: "out/output.bin",
