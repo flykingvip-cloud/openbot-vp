@@ -1,4 +1,4 @@
-import type { ObservationRun, ObservationView } from "./model.ts";
+import type { ObservationEnterpriseEntry, ObservationRun, ObservationView } from "./model.ts";
 
 const execution = {
   key: "execution",
@@ -24,10 +24,59 @@ const wait = {
   state: "waiting",
   detail: "pause → resume 已记录，等待时间不等于工具失败。",
 } as const;
+
+/** Explicit acceptance-only sample tenants. Never treat as live directory health. */
+export const SAMPLE_ENTERPRISE_DIRECTORY: readonly ObservationEnterpriseEntry[] = [
+  {
+    tenantId: "sample-tenant-property",
+    label: "物业示例（样例）",
+    status: "paid",
+    plan: "样例套餐",
+    healthSummary: {
+      label: "样例健康标签",
+      tone: "warn",
+      incidentLabel: "样例：证据缺口示意",
+      successRate: 0.91,
+      avgLatencyMs: 1840,
+      updatedAt: Date.parse("2026-11-01T08:00:00.000Z"),
+    },
+    usageSummary: {
+      calls7d: 128,
+      cost7d: 18.4,
+      activeAgentCount: 3,
+      activeChannelCount: 2,
+      activeRuntimeCount: 1,
+      updatedAt: Date.parse("2026-11-01T08:00:00.000Z"),
+    },
+  },
+  {
+    tenantId: "sample-tenant-north",
+    label: "华北示例（样例）",
+    status: "trial",
+    plan: "样例试用",
+    healthSummary: {
+      label: "样例健康标签",
+      tone: "ok",
+      successRate: 0.97,
+      avgLatencyMs: 920,
+      updatedAt: Date.parse("2026-11-01T08:00:00.000Z"),
+    },
+    usageSummary: {
+      calls7d: 64,
+      cost7d: 6.2,
+      activeAgentCount: 2,
+      activeChannelCount: 1,
+      activeRuntimeCount: 1,
+      updatedAt: Date.parse("2026-11-01T08:00:00.000Z"),
+    },
+  },
+];
+
 function run(
   input: Partial<ObservationRun> & Pick<ObservationRun, "id" | "label" | "scope">,
 ): ObservationRun {
   return {
+    tenantId: null,
     tenantLabel: null,
     clientRunId: null,
     sourceRunId: null,
@@ -47,13 +96,15 @@ function run(
 }
 
 export function observationSamples(role: "platform" | "enterprise"): ObservationView {
-  const tenant = role === "platform" ? "企业样例（仅脱敏标识）" : null;
+  const property = SAMPLE_ENTERPRISE_DIRECTORY[0];
+  const north = SAMPLE_ENTERPRISE_DIRECTORY[1];
   const runs = [
     run({
       id: "sample-personal",
       label: "个人 · 周报资料整理",
       scope: "personal",
-      tenantLabel: tenant,
+      tenantId: role === "platform" ? property.tenantId : null,
+      tenantLabel: role === "platform" ? property.label : null,
       clientRunId: "client_01",
       sourceRunId: "engine_A",
       admittedWorkId: "admission_01",
@@ -94,7 +145,8 @@ export function observationSamples(role: "platform" | "enterprise"): Observation
       id: "sample-collaboration",
       label: "协作 · 客诉联合处理",
       scope: "collaboration",
-      tenantLabel: tenant,
+      tenantId: role === "platform" ? north.tenantId : null,
+      tenantLabel: role === "platform" ? north.label : null,
       clientRunId: "client_02",
       sourceRunId: "engine_B",
       admittedWorkId: "admission_02",
@@ -125,7 +177,8 @@ export function observationSamples(role: "platform" | "enterprise"): Observation
       id: "sample-partial",
       label: "个人 · 投递链路复核",
       scope: "personal",
-      tenantLabel: tenant,
+      tenantId: role === "platform" ? property.tenantId : null,
+      tenantLabel: role === "platform" ? property.label : null,
       clientRunId: "client_02",
       sourceRunId: "engine_C",
       admittedWorkId: "admission_03",

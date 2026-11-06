@@ -12,10 +12,35 @@ export type ObservationStage = {
   state: "observed" | "waiting" | "missing";
   detail: string;
 };
+export type ObservationEnterpriseEntry = {
+  tenantId: string;
+  label: string;
+  status: string;
+  plan?: string;
+  healthSummary?: {
+    label?: string;
+    tone?: "ok" | "warn" | "danger" | "neutral";
+    incidentLabel?: string;
+    errorRate?: number;
+    successRate?: number;
+    fallbackRate?: number;
+    avgLatencyMs?: number;
+    updatedAt?: number;
+  };
+  usageSummary?: {
+    calls7d?: number;
+    cost7d?: number;
+    activeAgentCount?: number;
+    activeChannelCount?: number;
+    activeRuntimeCount?: number;
+    updatedAt?: number;
+  };
+};
 export type ObservationRun = {
   id: string;
   label: string;
   scope: "personal" | "collaboration" | "unknown";
+  tenantId: string | null;
   tenantLabel: string | null;
   clientRunId: string | null;
   sourceRunId: string | null;
@@ -40,7 +65,7 @@ export type ObservationView = {
   runs: ObservationRun[];
   receivedAt: number | null;
 };
-export const OBSERVATION_TYPES = ["全部", "个人任务", "协作任务"] as const;
+export const OBSERVATION_TYPES = ["全部", "个人", "协作"] as const;
 export const MISSING_REASON_LABELS: Record<string, string> = {
   no_durable_replay: "没有持久化回放，当前只看到连接期间收到的片段",
   identity_links_missing: "业务身份与结果关联尚未完整供给",
@@ -112,6 +137,7 @@ function groupRuns(
         id: `${last.runId}@${last.sourceRunId ?? "unmapped"}`,
         label: `${last.runId}${last.sourceRunId ? ` → ${last.sourceRunId}` : ""}`,
         scope: "unknown",
+        tenantId: null,
         tenantLabel: null,
         clientRunId: last.runId,
         sourceRunId: last.sourceRunId,

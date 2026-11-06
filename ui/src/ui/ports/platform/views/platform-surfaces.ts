@@ -340,6 +340,7 @@ export function renderPlatformSurface(props: PlatformSurfaceProps) {
         connected: props.connected === true,
         observationHost: props.observationHost ?? null,
         basePath: props.basePath,
+        enterpriseDirectory: props.readModel.enterpriseDirectory ?? [],
       });
       break;
     case "platformDiagnosis":
