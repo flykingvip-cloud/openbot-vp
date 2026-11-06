@@ -41,3 +41,7 @@ ui/src/ui/runtime-observation.ts 的 projectRuntimeObservation(value, receivedAt
 - 工作树已出现 observation 工作台及 diagnosis 集成，仍为其他任务未提交 WIP，部分路径存在归属冲突。因此上文“尚未渲染页面”指本任务已验收交付边界，不代表工作树没有页面实现。未将这些页面改动纳入本任务提交或验收。
 - 给前端集成的审查要求：缺场景引用时 scope 必须 unknown，不默认 personal；没有来源证明时不得把 source=live 当数据资格；运行耗时必须匹配同一身份的 start/end，不能用任意阶段最大最小时差补齐；最后一条工具 end 不能概括整个运行全部工具完成；浏览器内缓存只代表当前连接观察范围，不代表平台跨任务查询。
 - 现阶段只能供给 execution_only/partial 元数据。fully_linked、成果验收、真实归属成本、跨重启回放与平台指标仍待服务端权威关联，不通过 UI 合成。下一验收应先补场景引用与准入身份的原始挂点，再做个人/协作同版本链路；不新增状态机或执行路径。 — codex-runtime-manager
+
+## 页面集成复验
+
+工作台提交 a2a8c6f5b 已进入本分支，ea3722b34 修正未知场景默认个人及非配对耗时；不再将这些文件标为未提交 WIP。逻辑测试两文件 8 项通过，Chromium 两文件 3 项通过；交互准入、状态持久化、恢复与原 followup 交付九文件 74 项通过。架构 44 条规则通过；UI 构建成功，仍有大 chunk 警告。这些为独立范围，不合计成全链真实验收。没有真实模型、生产持久回放或 fully_linked 样本证明；未部署。 — codex-runtime-manager
