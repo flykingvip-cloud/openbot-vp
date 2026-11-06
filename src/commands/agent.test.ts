@@ -468,8 +468,8 @@ describe("agentCommand", () => {
       await agentCommand({ message: "resume me", sessionId: "session-custom-123" }, runtime);
 
       const embeddedCall = getLastEmbeddedCall();
-      expect(embeddedCall?.sessionFile).toContain(
-        `${path.sep}agents${path.sep}main${path.sep}sessions${path.sep}session-custom-123.jsonl`,
+      expect(embeddedCall?.sessionFile).toBe(
+        path.join(fs.realpathSync(customStoreDir), "session-custom-123.jsonl"),
       );
 
       const saved = readSessionStore<{ sessionFile?: string }>(store);
@@ -740,7 +740,7 @@ describe("agentCommand", () => {
         agentsList: [{ id: "ops" }],
       });
       expect(callArgs?.sessionKey).toBe("agent:ops:main");
-      expect(callArgs?.sessionFile).toContain(`${path.sep}agents${path.sep}ops${path.sep}sessions`);
+      expect(path.dirname(callArgs?.sessionFile ?? "")).toBe(fs.realpathSync(home));
     });
   });
 
