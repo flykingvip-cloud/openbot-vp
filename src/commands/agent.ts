@@ -1,12 +1,8 @@
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
-import { createAcpVisibleTextAccumulator } from "../agent-runtime/delivery/index.js";
 import { createRunAdmissionLease } from "../agent-runtime/model/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
-import { createCommandBudget, runCommandCandidate, runCommandFallback } from "../agent-runtime/execution/index.js";
-import { observeAcpCliSteerPreflight } from "../acp/cli-steer-preflight-observe.js";
+import { createCommandBudget, runCommandCandidate, runCommandFallback, runCommandAcpTurn } from "../agent-runtime/execution/index.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
-import { resolveAcpAgentPolicyError, resolveAcpDispatchPolicyError } from "../acp/policy.js";
-import { toAcpRuntimeError } from "../acp/runtime/errors.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
 import { LEGACY_INTERNAL_EVENT_CONTEXT_PREFIXES } from "../compat/legacy-names.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
@@ -561,105 +557,10 @@ async function agentCommandInternal(
     }
 
     if (acpResolution?.kind === "ready" && sessionKey) {
-      const startedAt = Date.now();
-      registerAgentRunContext(runId, {
-        sessionKey,
+      const { startedAt, stopReason, finalTextRaw, finalText } = await runCommandAcpTurn({
+        cfg, sessionKey, runId, body, agent: acpResolution.meta.agent,
+        abortSignal: opts.abortSignal, manager: acpManager,
       });
-      emitAgentEvent({
-        runId,
-        stream: "lifecycle",
-        data: {
-          phase: "start",
-          startedAt,
-        },
-      });
-
-      const visibleTextAccumulator = createAcpVisibleTextAccumulator();
-      let stopReason: string | undefined;
-      try {
-        const dispatchPolicyError = resolveAcpDispatchPolicyError(cfg);
-        if (dispatchPolicyError) {
-          throw dispatchPolicyError;
-        }
-        const acpAgent = normalizeAgentId(
-          acpResolution.meta.agent || resolveAgentIdFromSessionKey(sessionKey),
-        );
-        const agentPolicyError = resolveAcpAgentPolicyError(cfg, acpAgent);
-        if (agentPolicyError) {
-          throw agentPolicyError;
-        }
-
-        observeAcpCliSteerPreflight({
-          kind: "cli-turn",
-          cfg,
-          sessionKey,
-          agentId: acpAgent,
-        });
-
-        await acpManager.runTurn({
-          cfg,
-          sessionKey,
-          text: body,
-          mode: "prompt",
-          requestId: runId,
-          signal: opts.abortSignal,
-          onEvent: (event) => {
-            if (event.type === "done") {
-              stopReason = event.stopReason;
-              return;
-            }
-            if (event.type !== "text_delta") {
-              return;
-            }
-            if (event.stream && event.stream !== "output") {
-              return;
-            }
-            if (!event.text) {
-              return;
-            }
-            const visibleUpdate = visibleTextAccumulator.consume(event.text);
-            if (!visibleUpdate) {
-              return;
-            }
-            emitAgentEvent({
-              runId,
-              stream: "assistant",
-              data: {
-                text: visibleUpdate.text,
-                delta: visibleUpdate.delta,
-              },
-            });
-          },
-        });
-      } catch (error) {
-        const acpError = toAcpRuntimeError({
-          error,
-          fallbackCode: "ACP_TURN_FAILED",
-          fallbackMessage: "ACP turn failed before completion.",
-        });
-        emitAgentEvent({
-          runId,
-          stream: "lifecycle",
-          data: {
-            phase: "error",
-            error: acpError.message,
-            endedAt: Date.now(),
-          },
-        });
-        throw acpError;
-      }
-
-      emitAgentEvent({
-        runId,
-        stream: "lifecycle",
-        data: {
-          phase: "end",
-          endedAt: Date.now(),
-        },
-      });
-
-      const finalTextRaw = visibleTextAccumulator.finalizeRaw();
-      const finalText = visibleTextAccumulator.finalize();
       try {
         sessionEntry = await persistAcpTurnTranscript({
           body,

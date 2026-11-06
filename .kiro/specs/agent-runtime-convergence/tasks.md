@@ -580,3 +580,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Original ACP transcript persistence moved into state/acp-transcript; command calls state/index and the old body is removed. SessionManager remains the message writer; raw transcript whitespace, session-file preparation, original synthetic usage and transcript update notification remain unchanged. Commit cb4fc7b61. — codex-runtime-manager
 - ACP/delivery/interaction-transcript joint 3 files / 29 PASS; changed-file typed lint clean; architecture 48 PASS. This does not claim cross-process transcript serialization or ACP execution orchestration migration. Channel receipts, ACP run ownership and final same-version acceptance remain open. No push/merge/deploy. — codex-runtime-manager
+
+## ACP execution ownership checkpoint (2026-11-06)
+
+- ACP command policy checks, observational preflight, backend invocation and lifecycle emission moved to execution/runner/acp-turn through execution/index. Removed original command-local body; transcript writes remain in state and text projection remains in delivery. Policy-before-backend ordering, cancellation signal, raw transcript text and error/end events preserved. — codex-runtime-manager
+- Joint command/ACP/delivery/governance/credit regression: 5 files / 82 PASS. Source contract now checks actual execution owner and command public-entry consumption. Architecture 48 PASS; changed-file typed lint clean; full build PASS with 209 dynamic-import warnings. Whole-tree tsgo 53 diagnostics, none in changed files. No gateway restart, push, merge or deployment. Commercial gate policy, command outcome settlement, channel receipt ownership and final same-version acceptance remain open. — codex-runtime-manager
