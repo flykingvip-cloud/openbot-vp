@@ -39,6 +39,10 @@ import {
   isPlatformAdmissionEmptyError,
 } from "../../../gateway/models/capability-admission/apply-runtime-admission.js";
 import { logVerbose } from "../../../globals.js";
+import {
+  createRunCostCollector,
+  snapshotRunCostPricing,
+} from "../../../observation/run-cost-collector.js";
 import { createRuntimeEvidenceObserver } from "../../../observation/runtime-evidence.js";
 import { defaultRuntime } from "../../../runtime.js";
 import { TaskBudgetExceededError } from "../../../task-outcome/runtime-from-runner.js";
@@ -128,6 +132,14 @@ export async function runAdmittedTurn(
       throw new TaskBudgetExceededError(chatOutcomeTaskId, gate.exhaustion);
     }
   };
+  const costEvidence = createRunCostCollector({
+    cfg: params.followupRun.run.config,
+    agentId: growthAgentIdForEntry,
+    taskId: chatOutcomeTaskId,
+    scope: chatOutcomeScope,
+    runId,
+    provenance: "live",
+  });
   const chargeTipBudgetAfterModelCall = (opts: {
     provider: string;
     model: string;
@@ -137,15 +149,26 @@ export async function runAdmittedTurn(
       return;
     }
     tipBudgetModelCallSeq += 1;
-    host.budget.chargeModelCallAgainstTip(params.followupRun.run.config, growthAgentIdForEntry, {
-      taskId: chatOutcomeTaskId,
-      scope: chatOutcomeScope,
-      runId,
-      callSeq: tipBudgetModelCallSeq,
-      usage: opts.usage,
-      provider: opts.provider,
-      model: opts.model,
-    });
+    costEvidence.beginCall(tipBudgetModelCallSeq);
+    const nowMs = Date.now();
+    const pricing = costEvidence.isEnabled()
+      ? snapshotRunCostPricing(params.followupRun.run.config, opts.provider, opts.model)
+      : null;
+    const receipt = host.budget.chargeModelCallAgainstTip(
+      params.followupRun.run.config,
+      growthAgentIdForEntry,
+      {
+        taskId: chatOutcomeTaskId,
+        scope: chatOutcomeScope,
+        runId,
+        callSeq: tipBudgetModelCallSeq,
+        nowMs,
+        usage: opts.usage,
+        provider: opts.provider,
+        model: opts.model,
+      },
+    );
+    costEvidence.capture({ ...opts, callSeq: tipBudgetModelCallSeq, nowMs, pricing, receipt });
     tipBudgetChargedThisTurn = true;
   };
   let modelGate: EmployeeModelGateResult | undefined;
@@ -158,6 +181,7 @@ export async function runAdmittedTurn(
     runId,
   });
   const outcomeRecorder = createTurnOutcomeRecorder({
+    costEvidence,
     runtimeEvidence,
     config: params.followupRun.run.config,
     agentId: params.followupRun.run.agentId,
