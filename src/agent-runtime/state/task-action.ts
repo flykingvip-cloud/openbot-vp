@@ -1,9 +1,9 @@
 import {
   activeConstraintTexts,
-  isTaskExecutionBindingCurrent,
   readSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import type { TaskCompletionBinding } from "../contracts/task.js";
+import { isLiveTaskBinding } from "../policy/index.js";
 
 export type TaskActionBoundary = {
   sessionFile: string;
@@ -26,16 +26,21 @@ export function captureTaskActionBoundary(
 
 /** Every action rechecks owner control, attempt identity and the model's constraint view. */
 export function checkTaskActionBoundary(boundary: TaskActionBoundary): string | undefined {
+  const board = readSessionTaskBoard(boundary.sessionFile);
+  const constraints = activeConstraintTexts(board.current);
   if (
-    !isTaskExecutionBindingCurrent(boundary.sessionFile, {
-      ...boundary.binding,
-      constraints: undefined,
-    })
+    !isLiveTaskBinding(
+      board,
+      {
+        ...boundary.binding,
+        constraints: undefined,
+      },
+      constraints,
+    )
   ) {
     return "Task action refused: original task was paused, cancelled, completed or replaced.";
   }
-  const current = readSessionTaskBoard(boundary.sessionFile).current;
-  if (JSON.stringify(activeConstraintTexts(current)) !== JSON.stringify(boundary.constraints)) {
+  if (JSON.stringify(constraints) !== JSON.stringify(boundary.constraints)) {
     return "Task action refused: accepted constraints changed; resume the original task with its latest constraints before another tool action.";
   }
   return undefined;
