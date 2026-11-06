@@ -2,6 +2,8 @@
 
 ## Autonomous closure checkpoint
 
+- Two-difference alignment: decisions and substantive gap ownership fixed in structure-alignment.md. Execution admission DTO moved to contracts/execution; state repository/resume mutation moved with old files removed; all existing repository consumers use state/index and three manifest rules prohibit deep imports. 39 files / 233 PASS; isolated cross-process 7 PASS; first joint race failure retained explicitly, not waived. Build PASS/209 warnings, manifest 44 PASS, tsgo 47 baseline. — codex-runtime-manager
+
 - Current paused-task semantic resume connected through original authenticated Gateway/state/admitted execution (ce8c74977, 259e36364). Two independent specified-path reviews found no confirmed blocker; process-local stop and parked-target selection limits remain explicit. Combined 122 files / 973 PASS; shared builder/source regression 8 files / 48 PASS. Build PASS/209 warnings, architecture 41 PASS, tsgo 47 baseline errors. Current evidence document updated; whole migration/live acceptance still not claimed. — codex-runtime-manager
 
 - Current evidence and remaining gates are consolidated in current-mainline-review-2026-11-06.md. Normal/queued delivery now shares receipt preparation and confirmation (ae945403f), and queued inference uses the shared governed model session (d89442132). Final combined 119 files / 927 PASS; separate receipt tests 23 PASS; build PASS/209 warnings; architecture 41 PASS; tsgo remains 47 baseline diagnostics. Independent queued-delivery review PASS. Whole migration and live acceptance remain open; no deployment. — codex-runtime-manager
