@@ -425,5 +425,23 @@
       "src/agent-runtime/state/resume-current"
     ],
     "description": "Task repository and mutations are private. Host consumers use state/index; narrow transcript/action adapters retain separate ownership."
+  },
+  {
+    "name": "runtime-task-state-adapter-gateway",
+    "from": "src/gateway/server-methods/chat.ts",
+    "denyImportsFrom": ["src/conversation-task/session-task-board"],
+    "description": "Migrated task-state consumers use state/index; the original board remains the sole lock and persistence adapter."
+  },
+  {
+    "name": "runtime-task-state-adapter-delivery",
+    "from": "src/agent-runtime/wiring/delivery-confirm.ts",
+    "denyImportsFrom": ["src/conversation-task/session-task-board"],
+    "description": "Migrated task-state consumers use state/index; the original board remains the sole lock and persistence adapter."
+  },
+  {
+    "name": "runtime-task-state-adapter-execution",
+    "from": "src/agent-runtime/wiring/admitted-turn-host.ts",
+    "denyImportsFrom": ["src/conversation-task/session-task-board"],
+    "description": "Migrated task-state consumers use state/index; the original board remains the sole lock and persistence adapter."
   }
 ]
