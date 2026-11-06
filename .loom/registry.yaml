@@ -10824,7 +10824,8 @@ tasks:
   - id: agent-runtime-convergence
     owner: codex-runtime-manager
     intent:
-      - Read-only live runtime observation UI with explicit samples; no writes or acceptance synthesis
+      - Read-only live runtime observation UI with explicit samples; no writes
+        or acceptance synthesis
       - Unify runtime architecture and retire redundant control paths
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
@@ -11057,245 +11058,252 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-unified-interaction-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-mainline-retirement-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-inference-admission-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-interaction-contract-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-model-inference-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-interaction-production-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-one-shot-transport-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-candidate-resolution-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-execution-admission-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: codex-runtime-interaction-routing-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-ingress-cutover-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-final-closure-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-mention-retirement-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-background-binding-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-activation-retirement-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-validator-verdict-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-explicit-verdict-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-preflight-acceptance-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-data-only-settlement-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-live-lock-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-followup-delivery-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-delivery-confirm-ports-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-semantic-resume-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-semantic-resume-entry-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-builder-regression-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-structure-alignment-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-architecture-deletion-scan-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-lock-disappearance-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-observability-supply-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-observation-integration-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-observation-connection-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-source-run-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: runtime-observation-wire-contract-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T06:54:16.160Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
       - id: agent-runtime-observation-ui-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T07:10:00.000Z
+        lastSignalAt: 2026-11-06T07:23:49.534Z
+        metadata: {}
+      - id: runtime-state-boundary-20261106
+        taskId: agent-runtime-convergence
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-06T07:23:49.534Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-03
@@ -26923,4 +26931,19 @@ sharedPaths:
     landerTask: agent-runtime-convergence
     reason: Human-authorized autonomous channel ingress convergence; preserve other
       scopes and history.
+    reviewAfter: 2026-11-30
+
+  - glob: src/agent-runtime/state/repository/session-task.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized bounded runtime state boundary migration; retain prior task scope and history.
+    reviewAfter: 2026-11-30
+
+  - glob: src/agent-runtime/wiring/admitted-turn-host.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized bounded runtime state boundary migration; retain prior task scope and history.
+    reviewAfter: 2026-11-30
+
+  - glob: src/agent-runtime/wiring/delivery-confirm.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized bounded runtime state boundary migration; retain prior task scope and history.
     reviewAfter: 2026-11-30
