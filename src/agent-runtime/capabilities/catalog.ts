@@ -20,8 +20,17 @@ const EFFECTS: Readonly<Record<string, CapabilityDeclaration["sideEffect"]>> = {
   process: "arbitrary",
 };
 export function declareCapability(id: string, ownerOnly = false): CapabilityDeclaration {
+  const executionKind: CapabilityDeclaration["executionKind"] =
+    id === "lobster" || id === "sessions_spawn"
+      ? "delegated_workflow"
+      : id === "process"
+        ? "lifecycle_adapter"
+        : EFFECTS[id] === "read" || EFFECTS[id] === "workspace_write" || EFFECTS[id] === "external"
+          ? "atomic"
+          : "unclassified";
   return {
     id,
+    executionKind,
     permission: { ownerOnly, authority: "existing-tool-policy" },
     sideEffect: EFFECTS[id] ?? "unknown",
     cancellation: "signal_forwarded",

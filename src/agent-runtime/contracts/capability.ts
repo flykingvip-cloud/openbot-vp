@@ -1,6 +1,12 @@
 /** Data only. Metadata never grants permissions or provides executable configuration. */
 export type CapabilityDeclaration = {
   id: string;
+  executionKind:
+    | "atomic"
+    | "inference"
+    | "delegated_workflow"
+    | "lifecycle_adapter"
+    | "unclassified";
   permission: { ownerOnly: boolean; authority: "existing-tool-policy" };
   sideEffect: "read" | "workspace_write" | "external" | "arbitrary" | "unknown";
   cancellation: "signal_forwarded";
