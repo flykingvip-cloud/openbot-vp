@@ -89,8 +89,8 @@ describe("optional reasoning pass", () => {
       enabled: true,
       modelRef: "test-model",
       model: async (value) => {
-        (value.evidence as { evidenceId: string }[])[0].evidenceId = "invented";
-        (value.findings as { code: string }[])[0].code = "forged";
+        Reflect.set(value.evidence[0], "evidenceId", "invented");
+        Reflect.set(value.findings[0], "code", "forged");
         return { schemaVersion: 1, items: [{ ...row, evidenceIds: ["invented"] }] };
       },
     });
