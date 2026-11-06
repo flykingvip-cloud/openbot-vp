@@ -11391,7 +11391,63 @@ tasks:
     ownerHistory: []
     since: 2026-11-05
     metadata: {}
+  - id: agent-runtime-observability:codex-observe-owner
+    owner: codex-observe-owner
+    intent:
+      - runtime-observability-p0-p1
+    paths:
+      - src/observation/**
+      - .kiro/specs/agent-runtime-observability/**
+      - src/gateway/agent-runtime-store.ts
+      - src/gateway/agent-runtime-seed.ts
+      - src/gateway/agent-runtime-telemetry.test.ts
+      - ui/src/ui/observation/stream.node.test.ts
+    state: active
+    sessions:
+      - id: observe-owner-20261106
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-owner
+        status: active
+        lastSignalAt: 2026-11-06T10:00:37.559Z
+        metadata: {}
+      - id: observe-backend-20261106
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-backend
+        status: active
+        lastSignalAt: 2026-11-06T10:00:37.559Z
+        metadata: {}
+      - id: observe-contract-20261106
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-contract
+        status: active
+        lastSignalAt: 2026-11-06T10:00:37.559Z
+        metadata: {}
+      - id: observe-ui-20261106
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-ui
+        status: active
+        lastSignalAt: 2026-11-06T10:00:37.559Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-06
+    metadata: {}
 landingStreams:
+  - id: agent-runtime-observability-p0
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/agent-runtime-observability/**
+      - src/observation/**
+      - src/gateway/agent-runtime-store.ts
+      - src/gateway/agent-runtime-seed.ts
+      - src/gateway/agent-runtime-telemetry.test.ts
+      - ui/src/ui/observation/stream.node.test.ts
+    canLandWith: []
+    metadata: {}
   - id: agent-runtime-observable-evolution-loop
     landingPolicy: serial
     paths:
@@ -27066,13 +27122,33 @@ sharedPaths:
     reason: Human-authorized bounded command execution migration; preserve prior
       scopes and history.
     reviewAfter: 2026-11-30
-
   - glob: src/agent-runtime/state/command-session.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized bounded command state migration; preserve prior scopes and history.
+    reason: Human-authorized bounded command state migration; preserve prior scopes
+      and history.
     reviewAfter: 2026-11-30
-
   - glob: src/agent-runtime/state/command-session.test.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized bounded command state migration; preserve prior scopes and history.
+    reason: Human-authorized bounded command state migration; preserve prior scopes
+      and history.
+    reviewAfter: 2026-11-30
+
+  - glob: src/observation/**
+    landerTask: agent-runtime-observability:codex-observe-owner
+    reason: Human-confirmed exact-path observability takeover on 2026-11-06; predecessor broad src scope and session history preserved. Only codex-observe-owner lands these paths.
+    reviewAfter: 2026-11-30
+
+  - glob: src/gateway/agent-runtime-store.ts
+    landerTask: agent-runtime-observability:codex-observe-owner
+    reason: Human-confirmed exact-path observability takeover on 2026-11-06; predecessor broad src scope and session history preserved. Only codex-observe-owner lands these paths.
+    reviewAfter: 2026-11-30
+
+  - glob: src/gateway/agent-runtime-seed.ts
+    landerTask: agent-runtime-observability:codex-observe-owner
+    reason: Human-confirmed exact-path observability takeover on 2026-11-06; predecessor broad src scope and session history preserved. Only codex-observe-owner lands these paths.
+    reviewAfter: 2026-11-30
+
+  - glob: src/gateway/agent-runtime-telemetry.test.ts
+    landerTask: agent-runtime-observability:codex-observe-owner
+    reason: Human-confirmed exact-path observability takeover on 2026-11-06; predecessor broad src scope and session history preserved. Only codex-observe-owner lands these paths.
     reviewAfter: 2026-11-30

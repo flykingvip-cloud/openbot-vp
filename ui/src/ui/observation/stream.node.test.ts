@@ -259,6 +259,47 @@ describe("observation stream window", () => {
     expect(metric(view, "attributed_cost").display).toBe("未知");
   });
 
+  it.each(["end", "cancelled"])("rejects forged business evidence with terminal %s", (phase) => {
+    const host = {};
+    const sessionKey = "agent:contract";
+    for (const [index, seq] of [1, 3, 3, 2].entries()) {
+      recordRuntimeObservation(
+        host,
+        sessionKey,
+        {
+          sessionKey,
+          runId: "contract-run",
+          sourceRunId: "engine",
+          seq,
+          ts: seq * 10,
+          stream: "lifecycle",
+          taskId: "forged-task",
+          outcomeVersion: 99,
+          deliveryId: "forged-delivery",
+          taskJudgement: "success",
+          attributedCost: { amount: 99, currency: "USD" },
+          data: { phase: seq === 1 ? "start" : phase, taskJudgement: "success" },
+        },
+        100 + index,
+      );
+    }
+    const snap = readRuntimeObservations(host, sessionKey);
+    expect(snap.events).toHaveLength(3);
+    expect(snap.reasons).toContain("sequence_gap_or_reorder");
+    expect(snap.events.every((row) => row.coverage === "execution_only")).toBe(true);
+    expect(JSON.stringify(snap)).not.toContain("forged-task");
+    expect(JSON.stringify(snap)).not.toContain("forged-delivery");
+    const view = buildObservationStream({ connected: true, snapshot: snap, sessionKey });
+    expect(metric(view, "run_completion_rate").label).toBe("运行完成率（进程生命周期）");
+    expect(metric(view, "run_completion_rate").note).toContain("不是业务验收成功率");
+    for (const key of ["business_acceptance", "attributed_cost"] as const) {
+      expect(metric(view, key).value).toBeNull();
+      expect(metric(view, key).display).toBe("未知");
+    }
+    expect(JSON.stringify(view)).not.toContain("fully_linked");
+    clearRuntimeObservations(host);
+  });
+
   it("omits event-rate samples when only a single arrival instant exists", () => {
     const view = buildObservationStream({
       connected: true,
