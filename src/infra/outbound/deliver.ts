@@ -499,15 +499,13 @@ export async function deliverOutboundPayloads(
   // without throwing — so the outer try/catch never fires. We track whether any
   // payload failed so we can call failDelivery instead of ackDelivery.
   let hadPartialFailure = false;
-  const wrappedParams = params.onError
-    ? {
-        ...params,
-        onError: (err: unknown, payload: NormalizedOutboundPayload) => {
-          hadPartialFailure = true;
-          params.onError!(err, payload);
-        },
-      }
-    : params;
+  const wrappedParams = {
+    ...params,
+    onError: (err: unknown, payload: NormalizedOutboundPayload) => {
+      hadPartialFailure = true;
+      params.onError?.(err, payload);
+    },
+  };
 
   try {
     const results = await deliverOutboundPayloadsCore(wrappedParams);

@@ -307,6 +307,7 @@ export type DeliverFn = (
     cfg: OpenBotConfig;
   } & QueuedDeliveryParams & {
       skipQueue?: boolean;
+      onError?: (error: unknown) => void;
     },
 ) => Promise<unknown>;
 
@@ -375,6 +376,8 @@ export async function recoverPendingDeliveries(opts: {
     }
 
     try {
+      let payloadFailure: unknown;
+      let hadPayloadFailure = false;
       await opts.deliver({
         cfg: opts.cfg,
         channel: entry.channel,
@@ -387,8 +390,15 @@ export async function recoverPendingDeliveries(opts: {
         gifPlayback: entry.gifPlayback,
         silent: entry.silent,
         mirror: entry.mirror,
+        onError: (error) => {
+          hadPayloadFailure = true;
+          payloadFailure = error;
+        },
         skipQueue: true, // Prevent re-enqueueing during recovery
       });
+      if (hadPayloadFailure) {
+        throw payloadFailure instanceof Error ? payloadFailure : new Error(String(payloadFailure));
+      }
       await ackDelivery(entry.id, opts.stateDir);
       recovered += 1;
       opts.log.info(`Recovered delivery ${entry.id} to ${entry.channel}:${entry.to}`);

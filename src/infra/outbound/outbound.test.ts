@@ -364,6 +364,23 @@ describe("delivery-queue", () => {
       return { result, log };
     };
 
+    it("does not ack bestEffort recovery failure", async () => {
+      await enqueueDelivery(
+        { channel: "whatsapp", to: "+1", payloads: [{ text: "a" }], bestEffort: true },
+        tmpDir,
+      );
+      const deliver = vi.fn(async (params: { onError?: (error: unknown) => void }) => {
+        params.onError?.(new Error("partial failure"));
+        return [];
+      });
+      const { result } = await runRecovery({ deliver });
+      expect(result.recovered).toBe(0);
+      expect(result.failed).toBe(1);
+      const pending = await loadPendingDeliveries(tmpDir);
+      expect(pending).toHaveLength(1);
+      expect(pending[0].retryCount).toBe(1);
+    });
+
     it("recovers entries from a simulated crash", async () => {
       // Manually create queue entries as if gateway crashed before delivery.
       await enqueueCrashRecoveryEntries();
