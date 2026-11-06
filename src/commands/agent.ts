@@ -98,16 +98,11 @@ import { resolveExecutionRoutingFromCapabilityPlan } from "../gateway/model-enti
 import { recordAgentCommandCreditUsage } from "./agent/credit-usage.js";
 import { deliverAgentCommandResult } from "../agent-runtime/delivery/index.js";
 import {
-  ensureCliTurnTaskOutcome,
-  ensureGatewayAgentTurnTaskOutcome,
-  ensureSubagentTurnTaskOutcome,
-} from "../task-outcome/entrypoint-ensure.js";
-import {
   estimateTipBudgetCostUsdFromUsage,
   TaskBudgetExceededError,
   type RunnerTurnFailureReason,
 } from "../task-outcome/runtime-from-runner.js";
-import type { Entrypoint, TrustedScope } from "../task-outcome/types.js";
+import { openCommandOutcomeEntry } from "../agent-runtime/command/index.js";
 import { resolveAgentCommandModelGovernance } from "./agent/model-governance.js";
 import { resolveAgentRunContext } from "./agent/run-context.js";
 import { updateSessionStoreAfterAgentRun } from "./agent/session-store.js";
@@ -391,13 +386,6 @@ async function agentCommandInternal(
 
   // askOutcome: CLI / gateway_agent / subagent share one tip closeout.
   // Subagent persists entrypoint "subagent" (not cli/gateway) and links parentTaskId when known.
-  const agentOutcomeEntrypoint: Entrypoint = isSubagentLane
-    ? "subagent"
-    : opts.governanceEntry === "E2"
-      ? "gateway_agent"
-      : "cli";
-  let agentOutcomeTaskId: string | undefined;
-  let agentOutcomeScope: TrustedScope | undefined;
   /** Real usage-derived USD for tip budget closeout when mid-run charge did not run. */
   let tipBudgetCostUsd: number | undefined;
   let tipBudgetChargedThisTurn = false;
@@ -406,49 +394,11 @@ async function agentCommandInternal(
   let agentOutcomeFailureReason: RunnerTurnFailureReason | undefined;
   let agentOutcomeFailureDetail: string | undefined;
   const agentOutcomeStartedAt = Date.now();
-  if (agentOutcomeEntrypoint) {
-    const subjectRaw = (
-      opts.gatewayClientPlatformUserId ??
-      opts.gatewayClientUser ??
-      (agentOutcomeEntrypoint === "cli" ? "cli-operator" : "gateway-agent")
-    )
-      .toString()
-      .trim();
-    const subjectRef =
-      subjectRaw.startsWith("platform-user:") || subjectRaw.includes(":")
-        ? subjectRaw
-        : `subject:${subjectRaw}`;
-    const tenantId =
-      opts.gatewayClientSessionTenantId?.trim() ||
-      opts.executionIdentity?.enterpriseId?.trim() ||
-      undefined;
-    const opened =
-      agentOutcomeEntrypoint === "subagent"
-        ? ensureSubagentTurnTaskOutcome(cfg, {
-            agentId: sessionAgentId,
-            runId,
-            subjectRef,
-            ...(tenantId ? { tenantId } : {}),
-            ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
-          })
-        : agentOutcomeEntrypoint === "cli"
-          ? ensureCliTurnTaskOutcome(cfg, {
-              agentId: sessionAgentId,
-              runId,
-              subjectRef,
-              ...(tenantId ? { tenantId } : {}),
-            })
-          : ensureGatewayAgentTurnTaskOutcome(cfg, {
-              agentId: sessionAgentId,
-              runId,
-              subjectRef,
-              ...(tenantId ? { tenantId } : {}),
-            });
-    if (opened.ok) {
-      agentOutcomeTaskId = opened.taskId;
-      agentOutcomeScope = opened.scope;
-    }
-  }
+  const { entrypoint: agentOutcomeEntrypoint, taskId: agentOutcomeTaskId, scope: agentOutcomeScope } = openCommandOutcomeEntry({
+    config: cfg, agentId: sessionAgentId, runId, isSubagentLane, governanceEntry: opts.governanceEntry,
+    platformUserId: opts.gatewayClientPlatformUserId, gatewayUser: opts.gatewayClientUser,
+    sessionTenantId: opts.gatewayClientSessionTenantId, executionEnterpriseId: opts.executionIdentity?.enterpriseId, parentTaskId: opts.parentTaskId,
+  });
 
   const commandBudget = createCommandBudget({ config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, taskId: agentOutcomeTaskId, scope: agentOutcomeScope, parentTaskId: opts.parentTaskId, parentAgentId: opts.parentAgentId });
   const submitAgentOutcomeCloseout = createCommandOutcomeCloseout({

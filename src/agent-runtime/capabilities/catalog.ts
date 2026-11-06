@@ -33,8 +33,12 @@ export function declareCapability(id: string, ownerOnly = false): CapabilityDecl
     executionKind,
     permission: { ownerOnly, authority: "existing-tool-policy" },
     sideEffect: EFFECTS[id] ?? "unknown",
-    cancellation: "signal_forwarded",
-    completion: "tool_result",
+    cancellation: { request: "unknown", confirmation: "not_declared" },
+    completion: { boundary: "tool_return", taskAcceptance: false },
+    recovery:
+      id === "lobster"
+        ? { owner: "external_workflow", token: "opaque_external" }
+        : { owner: "unknown", token: "unknown" },
     idempotency: "not_declared",
     automaticRetry: false,
   };
