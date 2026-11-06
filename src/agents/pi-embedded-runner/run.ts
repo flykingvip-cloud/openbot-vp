@@ -6,6 +6,7 @@ import {
   mergeUsageIntoAccumulator,
   toNormalizedUsage,
   buildErrorAgentMeta,
+  cleanupEmbeddedRun,
 } from "../../agent-runtime/execution/index.js";
 import { recoverContextOverflow } from "../../agent-runtime/execution/index.js";
 import { prepareEmbeddedModel } from "../../agent-runtime/model/index.js";
@@ -1242,9 +1243,11 @@ export async function runEmbeddedPiAgent(
           };
         }
       } finally {
-        await contextEngine.dispose?.();
-        copilotRefresh.stop();
-        process.chdir(prevCwd);
+        await cleanupEmbeddedRun({
+          disposeContext: () => contextEngine.dispose?.(),
+          stopCredentialRefresh: () => copilotRefresh.stop(),
+          restoreWorkingDirectory: () => process.chdir(prevCwd),
+        });
       }
     }),
   );

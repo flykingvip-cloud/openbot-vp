@@ -709,3 +709,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced an unhandled rejection when approval waiting fails and its detached failure notification also rejects. Gateway and node callers previously discarded the notification Promise. The existing approval helper now awaits and contains notification failure, retaining an unavailable decision and never authorizing execution. No second scheduler or execution path introduced. — codex-runtime-manager
 - Red regression exited 1 with an unhandled notification rejection; fixed shared-host/approval-request regression 2 files / 14 PASS. Full tsgo PASS, changed-file typed lint clean, architecture 51 PASS. Isolated Deepseek Gateway live prompt/read/exec probe exited 0 (1 PASS, 1 unrelated test skipped), without unhandled errors; temporary state removed and channels disabled. This does not establish complete personal/group/channel acceptance or old-runner retirement. No push, merge or deployment. — codex-runtime-manager
+
+## Embedded teardown ownership (2026-11-07)
+
+- Moved fixed context disposal, credential timer shutdown and working-directory restoration from the legacy runner into execution/runner/embedded-cleanup. Nested finally guarantees later cleanup even when context disposal or timer shutdown fails; errors remain observable. No configurable script, scheduling or additional execution loop. — codex-runtime-manager
+- Cleanup/overflow/usage regression 4 files / 29 PASS; full tsgo PASS; changed-file typed lint clean; architecture 51 PASS; full build PASS. Existing dynamic-import and UI chunk warnings remain. No gateway restart, push, merge or deployment; full old-runner retirement remains open. — codex-runtime-manager
