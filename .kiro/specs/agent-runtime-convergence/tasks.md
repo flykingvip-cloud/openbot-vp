@@ -575,3 +575,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Nested command output formatting and ACP visible-text accumulation now live in delivery/presentation/command-output; original command implementations removed and consumers use delivery/index. Preserved silent-prefix suppression, repeated deltas, cumulative snapshots, raw transcript whitespace and nested identity prefixes. Commits 3eb6b2546, 4185a5d1a. — codex-runtime-manager
 - Delivery and ACP regression 2 files / 28 PASS before and after; changed-file typed lint clean; architecture 48 PASS. Whole-tree tsgo 53 diagnostics, none in changed presentation/command files. This is presentation ownership only: channel dispatch, receipts, ACP run orchestration and transcript state migration remain open. No push/merge/deploy. — codex-runtime-manager
+
+## ACP transcript state checkpoint (2026-11-06)
+
+- Original ACP transcript persistence moved into state/acp-transcript; command calls state/index and the old body is removed. SessionManager remains the message writer; raw transcript whitespace, session-file preparation, original synthetic usage and transcript update notification remain unchanged. Commit cb4fc7b61. — codex-runtime-manager
+- ACP/delivery/interaction-transcript joint 3 files / 29 PASS; changed-file typed lint clean; architecture 48 PASS. This does not claim cross-process transcript serialization or ACP execution orchestration migration. Channel receipts, ACP run ownership and final same-version acceptance remain open. No push/merge/deploy. — codex-runtime-manager
