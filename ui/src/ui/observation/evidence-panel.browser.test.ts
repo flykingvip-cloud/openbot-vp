@@ -10,6 +10,17 @@ describe("evidence panel", () => {
       metricDictVersion: 1,
       projectedAt: 123,
       sourceWatermark: null,
+      executionSource: {
+        processId: "p1",
+        epoch: "epoch-test",
+        retention: "process_memory",
+        capacity: 1000,
+        ttlMs: 900000,
+        evictedCount: 0,
+        discardedThrough: null,
+        sourceWatermark: null,
+        reasons: ["retention_continuity_unknown"],
+      },
       window: { from: 0, to: 200 },
       coverage: {
         attemptedCount: 1,
@@ -55,6 +66,11 @@ describe("evidence panel", () => {
       "非生产",
       "可归属成本：未知",
       "Asia/Shanghai",
+      "process_memory",
+      "900000",
+      "epoch-test",
+      "retention_continuity_unknown",
+      "关联回执不等于执行事件",
     ]) {
       expect(container.textContent).toContain(label);
     }

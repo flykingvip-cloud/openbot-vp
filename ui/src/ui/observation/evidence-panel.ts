@@ -27,6 +27,8 @@ export function renderObservationEvidence(projection: EvidenceProjection | null)
               <p>业务结果未知 · 缺少关联结果版本</p>
             `
       }
+      <p>执行引用：run ${new Set(sample.executionRefs.map((ref) => ref.runId)).size} · attempt ${new Set(sample.executionRefs.map((ref) => ref.attemptId).filter(Boolean)).size} · event ${new Set(sample.executionRefs.map((ref) => JSON.stringify([ref.sourceId, ref.eventId]))).size}</p>
+      <p>turn / attempt 粒度；关联回执不等于执行事件，invalid 不代表成功。</p>
       <p>可归属成本：未知</p><p>断链原因：${sample.reasons.join(", ") || "无已报告断链"}</p>
     </article>`,
           )
@@ -36,6 +38,8 @@ export function renderObservationEvidence(projection: EvidenceProjection | null)
     }
     <p>关联覆盖率：${model.coverage?.link == null ? "未知" : model.coverage.link} · 关联分子：${model.coverage?.fullyLinkedCount ?? "未知"} · 样本分母：${model.coverage?.attemptedCount ?? "未知"} · 无效样本：${model.coverage?.invalidCount ?? "未知"}</p>
     <p>事件覆盖率：未知（${model.coverage?.events.reason ?? "source_unavailable"}） · 字段覆盖率：未知（${model.coverage?.fields.reason ?? "source_unavailable"}）</p><p>${model.unavailableReason ?? ""} 指标字典版本：${model.metricDictVersion ?? "未知"} 窗口：[${evidenceTime(model.window?.from ?? null)}, ${evidenceTime(model.window?.to ?? null)})</p>
+    <p>执行来源保留：${model.executionSource?.retention ?? "未知"} · TTL(ms)：${model.executionSource?.ttlMs ?? "未知"} · 容量：${model.executionSource?.capacity ?? "未知"} · epoch：${model.executionSource?.epoch ?? "未知"}</p>
+    <p>保留连续性：${model.executionSource?.reasons.join(", ") ?? "未知"} · 进程内存不代表耐久历史</p>
     <p>投影时间：${evidenceTime(model.projectedAt)} · 源水位：${model.watermark ?? "未知"}</p>
   </section>`;
 }

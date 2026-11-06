@@ -1,11 +1,15 @@
+import type { projectExecutionEvidence } from "../../../../src/observation/execution-projection.js";
 import type { assembleObservationSamples } from "../../../../src/observation/sample-assembler.js";
-export type EvidenceProjection = ReturnType<typeof assembleObservationSamples>;
+export type EvidenceProjection = ReturnType<typeof assembleObservationSamples> & {
+  executionSource?: ReturnType<typeof projectExecutionEvidence>["executionSource"];
+};
 export function evidenceModel(projection: EvidenceProjection | null) {
   const supported =
     projection === null || (projection.schemaVersion === 1 && projection.metricDictVersion === 1);
   const data = supported ? projection : null;
   return {
     samples: data?.samples ?? [],
+    executionSource: data?.executionSource ?? null,
     projectedAt: data?.projectedAt ?? null,
     watermark: data?.sourceWatermark ?? null,
     coverage: data?.coverage ?? null,
