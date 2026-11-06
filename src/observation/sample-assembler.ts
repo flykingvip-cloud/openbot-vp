@@ -203,7 +203,7 @@ export function assembleObservationSamples(input: AssembleInput) {
     if (!e.attemptId) {
       c.reasons.add("missing_attempt_link");
     }
-    const r = c.outcome?.record;
+    const r = c.reasons.has("outcome_conflict") ? undefined : c.outcome?.record;
     if (r) {
       const run = r.runs.find((x) => x.runId === e.runId);
       const attempt = r.attempts.find((x) => x.attemptId === e.attemptId);
@@ -226,7 +226,7 @@ export function assembleObservationSamples(input: AssembleInput) {
   const samples = [...groups.values()]
     .toSorted((a, b) => a.id.localeCompare(b.id))
     .map((c) => {
-      const r = c.outcome?.record;
+      const r = c.reasons.has("outcome_conflict") ? undefined : c.outcome?.record;
       if (!r) {
         c.reasons.add("missing_outcome");
       }
@@ -240,6 +240,24 @@ export function assembleObservationSamples(input: AssembleInput) {
         c.reasons.add("provenance_unknown");
       }
       if (r) {
+        if (
+          r.runs.some((run) =>
+            run.attemptIds.some(
+              (id) =>
+                !r.attempts.some(
+                  (attempt) => attempt.attemptId === id && attempt.runId === run.runId,
+                ),
+            ),
+          ) ||
+          r.attempts.some(
+            (attempt) =>
+              !r.runs.some(
+                (run) => run.runId === attempt.runId && run.attemptIds.includes(attempt.attemptId),
+              ),
+          )
+        ) {
+          fail(c, "outcome_attempt_membership_mismatch");
+        }
         if (
           new Set(r.runs.map((run) => run.runId)).size !== r.runs.length ||
           new Set(r.attempts.map((attempt) => attempt.attemptId)).size !== r.attempts.length ||
@@ -292,6 +310,13 @@ export function assembleObservationSamples(input: AssembleInput) {
       return {
         sampleId: createHash("sha256").update(c.id).digest("hex"),
         qualification,
+        // Linkage is not production validation; legacy events lack collector attestation.
+        improvementEligible: false as const,
+        improvementReasons: [
+          "trusted_execution_collector_unavailable",
+          ...(c.provenance.size === 1 && c.provenance.has("live") ? [] : ["non_live_provenance"]),
+          ...(qualification === "fully_linked" ? [] : ["incomplete_or_invalid_linkage"]),
+        ],
         reasons: [...c.reasons].toSorted(),
         provenance: [...c.provenance].toSorted(),
         outcome:

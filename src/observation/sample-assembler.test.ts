@@ -210,4 +210,41 @@ describe("pure sample assembler", () => {
       expect(r.samples[0].qualification).toBe("invalid");
     }
   });
+  it("rejects phantom attempt references and missing reverse membership", () => {
+    const executions = [event, { ...event, eventId: "a", attemptId: "a" }];
+    for (const runs of [
+      [{ ...outcome.record.runs[0], attemptIds: ["a", "b", "phantom"] }],
+      [{ ...outcome.record.runs[0], attemptIds: ["a"] }],
+    ]) {
+      const result = assembleObservationSamples(
+        input({ outcomes: [{ ...outcome, record: { ...outcome.record, runs } }], executions }),
+      );
+      expect(result.samples[0].qualification).toBe("invalid");
+      expect(result.samples[0].reasons).toContain("outcome_attempt_membership_mismatch");
+    }
+  });
+  it("keeps conflicting outcome causes stable when run identities differ", () => {
+    const conflict = { ...outcome, record: { ...outcome.record, runs: [] } };
+    expect(assembleObservationSamples(input({ outcomes: [outcome, conflict] }))).toEqual(
+      assembleObservationSamples(input({ outcomes: [conflict, outcome] })),
+    );
+  });
+  it("never promotes legacy or non-live evidence into an improvement candidate", () => {
+    for (const provenance of ["live", "unknown", "seed", "injected"] as const) {
+      const r = assembleObservationSamples(
+        input({
+          outcomes: [{ ...outcome, provenance }],
+          executions: [
+            { ...event, provenance },
+            { ...event, eventId: "a", attemptId: "a", provenance },
+          ],
+        }),
+      );
+      expect(r.samples[0].improvementEligible).toBe(false);
+      expect(r.samples[0].improvementReasons).toContain("trusted_execution_collector_unavailable");
+      if (provenance !== "live") {
+        expect(r.samples[0].improvementReasons).toContain("non_live_provenance");
+      }
+    }
+  });
 });
