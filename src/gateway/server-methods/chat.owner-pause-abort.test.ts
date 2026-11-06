@@ -27,9 +27,9 @@ const mockState = vi.hoisted(() => ({
 }));
 
 const clearSessionQueuesMock = vi.hoisted(() =>
-  vi.fn(() => ({ followupCleared: 1, laneCleared: 0, keys: ["main"] })),
+  vi.fn((..._args: unknown[]) => ({ followupCleared: 1, laneCleared: 0, keys: ["main"] })),
 );
-const abortEmbeddedPiRunMock = vi.hoisted(() => vi.fn(() => true));
+const abortEmbeddedPiRunMock = vi.hoisted(() => vi.fn((..._args: unknown[]) => true));
 
 vi.mock("../session-utils.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../session-utils.js")>();

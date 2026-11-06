@@ -159,7 +159,7 @@ describe("slice3 context event sequence", () => {
 
     const amend = await runReplyAgent(buildParams(LONG_CONSTRAINT));
     events.push("long_constraint_once");
-    expect(amend?.[0]?.text).toContain("仅一次");
+    expect((Array.isArray(amend) ? amend[0] : amend)?.text).toContain("仅一次");
     expect(steerCount).toBe(1);
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
     expect(activeConstraintTexts(readSessionTaskBoard(sessionFile).current).join("\n")).toContain(
@@ -168,7 +168,7 @@ describe("slice3 context event sequence", () => {
 
     const revise = await runReplyAgent(buildParams(REVISION));
     events.push("revision_applied");
-    expect(revise?.[0]?.text).toContain("仅一次");
+    expect((Array.isArray(revise) ? revise[0] : revise)?.text).toContain("仅一次");
     expect(steerCount).toBe(2);
     const afterRevise = readSessionTaskBoard(sessionFile);
     const active = activeConstraintTexts(afterRevise.current);
@@ -182,8 +182,8 @@ describe("slice3 context event sequence", () => {
     const beforeQuery = JSON.stringify(afterRevise.current?.effectiveConstraints);
     const query = await runReplyAgent(buildParams("有效约束有哪些"));
     events.push("constraint_query_readonly");
-    expect(query?.[0]?.text).toMatch(/任务板最近记录|有效约束/);
-    expect(query?.[0]?.text).toContain("iOS");
+    expect((Array.isArray(query) ? query[0] : query)?.text).toMatch(/任务板最近记录|有效约束/);
+    expect((Array.isArray(query) ? query[0] : query)?.text).toContain("iOS");
     expect(JSON.stringify(readSessionTaskBoard(sessionFile).current?.effectiveConstraints)).toBe(
       beforeQuery,
     );
@@ -225,7 +225,7 @@ describe("slice3 context event sequence", () => {
     seedSessionTaskBoard(sessionFile, activeBoard);
     const paused = await runReplyAgent(buildParams("暂停"));
     events.push("owner_pause");
-    expect(paused?.[0]?.text).toMatch(/暂停|停止新增业务动作/);
+    expect((Array.isArray(paused) ? paused[0] : paused)?.text).toMatch(/暂停|停止新增业务动作/);
     expect(abortEmbeddedPiRunMock).toHaveBeenCalledWith("session-a");
     expect(readSessionTaskBoard(sessionFile).current?.wakeSuppress).toBe(true);
     // Building resume prompt after pause must not clear suppress

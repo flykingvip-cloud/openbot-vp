@@ -11,6 +11,7 @@ import {
   seedSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import {
+  type AsideDialogueTurn,
   ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS,
   appendAsideDialogueTurn,
   buildAsideDialogueContextPromptForNormalReply,
@@ -417,19 +418,21 @@ describe("mid-task aside reply_lane isolation", () => {
       },
       runEmbedded: runEmbedded as never,
       fsPrepare: {
-        mkdtemp: async (prefix, options) => {
-          expect(listMidTaskAsideLanesForTests("session-a")).toContain(
-            "aside-reply-run-prep-window",
-          );
-          expect(midTaskAsideLaneTaskIdForTests("session-a", "aside-reply-run-prep-window")).toBe(
-            "task-a",
-          );
-          abortMidTaskAsideLanes("session-a");
-          expect(isMidTaskAsideLaneCancelled("session-a", "aside-reply-run-prep-window")).toBe(
-            true,
-          );
-          return realMkdtemp(prefix, options);
-        },
+        mkdtemp: new Proxy(realMkdtemp, {
+          apply(target, thisArg, args) {
+            expect(listMidTaskAsideLanesForTests("session-a")).toContain(
+              "aside-reply-run-prep-window",
+            );
+            expect(midTaskAsideLaneTaskIdForTests("session-a", "aside-reply-run-prep-window")).toBe(
+              "task-a",
+            );
+            abortMidTaskAsideLanes("session-a");
+            expect(isMidTaskAsideLaneCancelled("session-a", "aside-reply-run-prep-window")).toBe(
+              true,
+            );
+            return Reflect.apply(target, thisArg, args);
+          },
+        }),
       },
     });
     expect(result.ok).toBe(false);
@@ -517,7 +520,7 @@ describe("mid-task aside reply_lane isolation", () => {
   });
 
   it("full aside log still keeps latest parent turns via time+identity merge", async () => {
-    const parentTurns = Array.from({ length: 8 }, (_, i) => ({
+    const parentTurns: AsideDialogueTurn[] = Array.from({ length: 8 }, (_, i) => ({
       atMs: 1_000 + i,
       runId: `p-${i}`,
       role: i % 2 === 0 ? "user" : "assistant",
@@ -529,7 +532,7 @@ describe("mid-task aside reply_lane isolation", () => {
       role: "assistant",
       text: "A 刚说的最新主对话内容",
     });
-    const asideTurns = Array.from({ length: 20 }, (_, i) => ({
+    const asideTurns: AsideDialogueTurn[] = Array.from({ length: 20 }, (_, i) => ({
       atMs: 10_000 + i,
       runId: `b-${i}`,
       role: i % 2 === 0 ? "user" : "assistant",
@@ -667,7 +670,8 @@ describe("mid-task aside reply_lane isolation", () => {
       });
     }
     const budgeted = buildAsideDialogueContextPromptForNormalReply(parentSessionFile);
-    expect(budgeted.length).toBeLessThanOrEqual(ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS + 400);
+    expect(budgeted).toBeDefined();
+    expect(budgeted?.length).toBeLessThanOrEqual(ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS + 400);
   });
 
   it("history helper module has no embedded-runner dependency", () => {

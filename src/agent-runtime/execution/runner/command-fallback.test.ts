@@ -8,7 +8,7 @@ it("keeps retry identity local to each fallback invocation and forwards candidat
     const result = await input.run("second", "b");
     return { result, provider: "second", model: "b", attempts: [] };
   });
-  const run = vi.fn(async () => "done");
+  const run = vi.fn<Parameters<typeof runCommandFallback<string>>[0]["run"]>(async () => "done");
   const input = { cfg: {}, provider: "first", model: "a", governanceMode: "shadow" as const, run };
   await runCommandFallback(input);
   await runCommandFallback(input);

@@ -182,8 +182,10 @@ describe("runReplyAgent collect amend steer inject", () => {
     const result = await runReplyAgent(buildParams("补充：只要国内安卓机型——给 A 的约束"));
     expect(steerCount).toBe(1);
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
-    expect(result?.[0]?.text).toMatch(/未能写入原任务板|不视为完整成功/);
-    expect(result?.[0]?.text).not.toContain("仅一次");
+    expect((Array.isArray(result) ? result[0] : result)?.text).toMatch(
+      /未能写入原任务板|不视为完整成功/,
+    );
+    expect((Array.isArray(result) ? result[0] : result)?.text).not.toContain("仅一次");
     const board = readSessionTaskBoard(sessionFile);
     expect(board.current?.taskId).toBe("task-b");
     expect(activeConstraintTexts(board.current)).toEqual([]);

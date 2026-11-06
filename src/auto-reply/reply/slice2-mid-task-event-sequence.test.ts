@@ -161,7 +161,7 @@ describe("slice2 mid-task event sequence", () => {
     enqueueFollowupRunMock.mockClear();
     const amend = await runReplyAgent(buildParams(LONG_CONSTRAINT));
     events.push("amend_applied_once");
-    expect(amend?.[0]?.text).toContain("仅一次");
+    expect((Array.isArray(amend) ? amend[0] : amend)?.text).toContain("仅一次");
     expect(steerCount).toBe(1);
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
     const afterAmend = readSessionTaskBoard(sessionFile);
@@ -171,9 +171,9 @@ describe("slice2 mid-task event sequence", () => {
     // B progress query — answered immediately (回答已产生), no followup, no internals.
     const progress = await runReplyAgent(buildParams("进度如何"));
     events.push("B_progress_answered");
-    expect(progress?.[0]?.text).toMatch(/手机调研/);
-    expect(progress?.[0]?.text).toContain("任务板最近记录");
-    expect(progress?.[0]?.text).not.toContain("wakeSuppress");
+    expect((Array.isArray(progress) ? progress[0] : progress)?.text).toMatch(/手机调研/);
+    expect((Array.isArray(progress) ? progress[0] : progress)?.text).toContain("任务板最近记录");
+    expect((Array.isArray(progress) ? progress[0] : progress)?.text).not.toContain("wakeSuppress");
     expect(enqueueFollowupRunMock).not.toHaveBeenCalled();
 
     // Owner pause via real reply entry — aborts activity (活动已停).
@@ -181,7 +181,7 @@ describe("slice2 mid-task event sequence", () => {
     clearSessionQueuesMock.mockClear();
     const paused = await runReplyAgent(buildParams("暂停"));
     events.push("owner_pause_aborts_activity");
-    expect(paused?.[0]?.text).toMatch(/暂停|停止新增业务动作/);
+    expect((Array.isArray(paused) ? paused[0] : paused)?.text).toMatch(/暂停|停止新增业务动作/);
     expect(abortEmbeddedPiRunMock).toHaveBeenCalledWith("session-a");
     expect(clearSessionQueuesMock).toHaveBeenCalled();
     expect(readSessionTaskBoard(sessionFile).current?.wakeSuppress).toBe(true);

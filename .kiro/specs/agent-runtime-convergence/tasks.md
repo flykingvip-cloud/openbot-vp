@@ -595,3 +595,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Original command closeout moved to execution/outcomes/command-outcome through execution/index; old closure removed. Preserved missing-binding deferral, current budget snapshot, at-most-once persistence, failure reporting and explicit entrypoint. Execution success does not fabricate acceptance or delivery evidence. — codex-runtime-manager
 - Component plus command/governance/credit regression 4 files / 56 PASS. Tests cover deferred identity, concurrent repeated closeout, budget double-charge prevention and persistence failure. Architecture 48 PASS; changed-file typed lint clean; full build PASS with 209 existing dynamic-import warnings. Whole-tree tsgo 53 diagnostics, none in changed files. Commercial admission policy and final whole-chain acceptance remain open; no push, merge or deployment. — codex-runtime-manager
+
+## Whole-repository typecheck repair (2026-11-06)
+
+- Reproduced 53 TypeScript diagnostics and corrected all implicated contracts: typed mock signatures, reply union narrowing, history role literals, nullable UI state, valid projection fixtures, collaboration timestamps, DOM button types and generic RPC test responses. Removed duplicate production workbench unit declaration; no compiler suppression or production enum widening. Files explicitly registered for bounded repair; unrelated observation WIP excluded. — codex-runtime-manager
+- pnpm tsgo PASS (zero diagnostics). Related backend suites 11 files / 62 PASS; UI suites 5 files / 172 PASS. Changed-file typed lint clean; architecture 48 PASS; full build PASS with 209 existing dynamic-import warnings. No gateway restart or deployment. — codex-runtime-manager
