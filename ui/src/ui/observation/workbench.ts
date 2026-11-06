@@ -397,7 +397,6 @@ export class OpenBotObservationWorkbench extends LitElement {
     key: string;
     label: string;
     value: number | null;
-    unit: string;
     note: string;
     display?: string;
     unit?: string | null;
