@@ -65,6 +65,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @state() private loading = false;
   @state() private diagnosing = false;
   @state() private lastDiagnose: DiagnosisRunNote | null = null;
+  @state() private focusedRunId: string | null = null;
   @state() private evolutionProjections: DiagnosisEvolutionProjection[] = [];
   @state() private selectedTargetId: string | null = null;
   @state() private observationSessionKey: string | null = null;
@@ -131,6 +132,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
       return;
     }
     this.diagnosing = true;
+    const focusedRunId = this.focusedRunId;
     const draft = {
       taskId: this.taskIdDraft,
       agentId: this.agentIdDraft,
@@ -152,7 +154,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
           enterpriseAdmin: this.deliverToAdmin,
           owners: this.deliverToOwners,
         },
-        ...(target ? { sessionKey: target.sessionKey, agentId: target.agentId } : {}),
+        ...(target
+          ? { sessionKey: target.sessionKey, agentId: target.agentId, runId: focusedRunId }
+          : {}),
         ...(isAll
           ? {
               targets: this.targets.map((row) => ({
@@ -199,6 +203,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
         taskOutcomeEvidence: readTaskOutcomeEvidenceView(result.taskOutcomeEvidence),
       };
       this.evolutionProjections = result.evolutionProjections ?? [];
+      if (focusedRunId) {
+        this.focusedRunId = null;
+      }
       await this.reload();
     } catch (err) {
       const code =
@@ -496,6 +503,20 @@ export class OpenBotDiagnosisPanel extends LitElement {
           targets: this.targets,
           onSessionKey: (sessionKey) => {
             this.observationSessionKey = sessionKey || null;
+            this.selectedTargetId =
+              this.targets.find((row) => row.sessionKey === sessionKey)?.id ?? null;
+            this.focusedRunId = null;
+          },
+          onDiagnoseRun: ({ runId, sessionKey }) => {
+            this.focusedRunId = runId;
+            this.observationSessionKey = sessionKey;
+            this.selectedTargetId =
+              this.targets.find((row) => row.sessionKey === sessionKey)?.id ?? null;
+            void this.onDiagnoseNow().then(() => {
+              this.querySelector('[data-testid="diagnosis-evolution-projection"]')?.scrollIntoView({
+                block: "nearest",
+              });
+            });
           },
           connected: this.connected,
         })}
