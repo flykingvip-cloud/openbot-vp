@@ -34,7 +34,14 @@ export function createObservationQueryHandlers(
         deny("unauthorized");
         return;
       }
-      const allowed = new Set(["agentId", "taskId", "outcomeVersion", "from", "to"]);
+      const allowed = new Set([
+        "agentId",
+        "taskId",
+        "outcomeVersion",
+        "from",
+        "to",
+        "evidenceLookupWindow",
+      ]);
       if (
         Object.keys(params).some((k) => !allowed.has(k)) ||
         typeof params.agentId !== "string" ||
@@ -51,6 +58,36 @@ export function createObservationQueryHandlers(
         return;
       }
       try {
+        const projectedAt = (options.now ?? Date.now)();
+        const rawLookup = params.evidenceLookupWindow;
+        let evidenceLookupWindow: { from: number; to: number } | undefined;
+        if (rawLookup !== undefined) {
+          if (
+            !rawLookup ||
+            typeof rawLookup !== "object" ||
+            Array.isArray(rawLookup) ||
+            Object.keys(rawLookup).some((k) => k !== "from" && k !== "to")
+          ) {
+            deny("invalid_evidence_lookup_window");
+            return;
+          }
+          const lookup = rawLookup as Record<string, unknown>;
+          if (
+            typeof lookup.from !== "number" ||
+            typeof lookup.to !== "number" ||
+            !Number.isFinite(lookup.from) ||
+            !Number.isFinite(lookup.to) ||
+            lookup.from >= lookup.to ||
+            lookup.from > params.from ||
+            lookup.to < params.to ||
+            lookup.to - lookup.from > 30 * 86_400_000 ||
+            lookup.to > projectedAt
+          ) {
+            deny("invalid_evidence_lookup_window");
+            return;
+          }
+          evidenceLookupWindow = { from: lookup.from, to: lookup.to };
+        }
         const result = queryObservation({
           cfg: (options.loadConfig ?? loadConfig)(),
           caller: {
@@ -64,7 +101,8 @@ export function createObservationQueryHandlers(
           outcomeVersion: params.outcomeVersion,
           from: params.from,
           to: params.to,
-          projectedAt: (options.now ?? Date.now)(),
+          projectedAt,
+          ...(evidenceLookupWindow ? { evidenceLookupWindow } : {}),
         });
         if (!result.ok) {
           deny(result.code);

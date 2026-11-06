@@ -16,6 +16,7 @@ export function queryObservation(input: {
   to: number;
   projectedAt: number;
   executionStore?: ExecutionSource;
+  evidenceLookupWindow?: { from: number; to: number };
 }) {
   if (
     ![input.from, input.to, input.projectedAt].every(Number.isFinite) ||
@@ -24,6 +25,17 @@ export function queryObservation(input: {
     input.to > input.projectedAt
   ) {
     return { ok: false as const, code: "invalid_window" as const };
+  }
+  const lookup = input.evidenceLookupWindow ?? { from: input.from, to: input.to };
+  if (
+    ![lookup.from, lookup.to].every(Number.isFinite) ||
+    lookup.from > input.from ||
+    lookup.to < input.to ||
+    lookup.from >= lookup.to ||
+    lookup.to - lookup.from > 30 * 86_400_000 ||
+    lookup.to > input.projectedAt
+  ) {
+    return { ok: false as const, code: "invalid_evidence_lookup_window" as const };
   }
   const result = readOutcomeMetadata({
     cfg: input.cfg,
@@ -49,6 +61,7 @@ export function queryObservation(input: {
     to: input.to,
     projectedAt: input.projectedAt,
     sourceWatermark: null,
+    evidenceLookupWindow: lookup,
     outcomes: [{ record, sourceId: "task-outcome-version", provenance: "unknown", isCurrentTip }],
     executions: execution.executions,
   });

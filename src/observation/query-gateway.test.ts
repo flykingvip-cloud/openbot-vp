@@ -61,6 +61,45 @@ describe("observation query gateway", () => {
       ).toBe(false);
     }
   });
+  it("validates explicit lookup windows and rejects nested extra parameters", async () => {
+    const handler = createObservationQueryHandlers({
+      authDeps: { resolveMembership: async () => ({ tenantId: "tenant", userId: "alice" }) },
+      loadConfig: () => ({}),
+      now: () => 3,
+    })[OBSERVATION_QUERY_METHOD];
+    expect(
+      (
+        await invoke(handler, client(), {
+          ...params,
+          evidenceLookupWindow: { from: 0, to: 3 },
+        } as typeof params)
+      ).mock.calls[0][0],
+    ).toBe(true);
+    expect(query).toHaveBeenLastCalledWith(
+      expect.objectContaining({ evidenceLookupWindow: { from: 0, to: 3 }, from: 1, to: 2 }),
+    );
+    for (const lookup of [
+      null,
+      [],
+      {},
+      { from: 2, to: 3 },
+      { from: 0, to: 1 },
+      { from: 0, to: 4 },
+      { from: -31 * 86400000, to: 3 },
+      { from: 0, to: 3, tenantId: "fake" },
+      { from: "0", to: 3 },
+      { from: NaN, to: 3 },
+    ]) {
+      expect(
+        (
+          await invoke(handler, client(), {
+            ...params,
+            evidenceLookupWindow: lookup,
+          } as typeof params)
+        ).mock.calls[0][0],
+      ).toBe(false);
+    }
+  });
   it("rechecks membership and fails closed after revocation", async () => {
     const membership = vi
       .fn()

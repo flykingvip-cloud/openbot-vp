@@ -93,6 +93,20 @@ describe("internal observation query", () => {
     expect(result.coverage.attemptedCount).toBe(0);
     expect(result.metrics.every((m) => m.value === null)).toBe(true);
   });
+  it("rejects invalid independent lookup windows", () => {
+    for (const evidenceLookupWindow of [
+      { from: time + 1, to: time + 2 },
+      { from: time - 1, to: time },
+      { from: time - 31 * 86400000, to: time + 1 },
+      { from: NaN, to: time + 1 },
+      { from: time, to: time + 2 },
+    ]) {
+      expect(query({ evidenceLookupWindow })).toEqual({
+        ok: false,
+        code: "invalid_evidence_lookup_window",
+      });
+    }
+  });
   it("rejects unbounded or future windows and missing tasks", () => {
     expect(query({ from: time - 31 * 86400000 })).toEqual({ ok: false, code: "invalid_window" });
     expect(query({ projectedAt: time })).toEqual({ ok: false, code: "invalid_window" });
@@ -134,7 +148,7 @@ describe("internal observation query", () => {
       executionStore.recordFact({
         eventId,
         stage,
-        occurredAt: time,
+        occurredAt: time - 10,
         scope: record.scope as Parameters<typeof executionStore.query>[0],
         taskId: "task",
         runId: "run",
@@ -150,11 +164,19 @@ describe("internal observation query", () => {
       attemptGranularity: "turn",
       eventIds: ["s", "e"],
     });
-    const r = query({ executionStore });
+    const oldWindow = query({ executionStore });
+    if (!oldWindow.ok || !("samples" in oldWindow)) {
+      throw new Error("failed");
+    }
+    expect(oldWindow.samples[0].executionRefs).toHaveLength(0);
+    const r = query({ executionStore, evidenceLookupWindow: { from: time - 10, to: time + 1 } });
     if (!r.ok || !("samples" in r)) {
       throw new Error("failed");
     }
     expect(r.samples[0].executionRefs).toHaveLength(2);
+    expect(r.coverage.attemptedCount).toBe(1);
+    expect(r.metrics[1].value).toBeNull();
+    expect(r.window).toEqual({ from: time, to: time + 1 });
     expect(r.samples[0].qualification).toBe("invalid");
     expect(r.samples[0].provenance).toEqual(["live", "unknown"]);
     expect(r.samples[0].improvementEligible).toBe(false);

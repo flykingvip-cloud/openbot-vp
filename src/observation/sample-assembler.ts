@@ -25,6 +25,7 @@ export type AssembleInput = {
   readonly scope: TrustedScope;
   readonly from: number;
   readonly to: number;
+  readonly evidenceLookupWindow?: { readonly from: number; readonly to: number };
   readonly projectedAt: number;
   readonly sourceWatermark: string | null;
   readonly outcomes: readonly OutcomeEvidence[];
@@ -94,6 +95,17 @@ export function assembleObservationSamples(input: AssembleInput) {
   if (![input.from, input.to, input.projectedAt].every(Number.isFinite) || input.from >= input.to) {
     throw new Error("invalid_projection_window");
   }
+  const lookup = input.evidenceLookupWindow ?? { from: input.from, to: input.to };
+  if (
+    ![lookup.from, lookup.to].every(Number.isFinite) ||
+    lookup.from >= lookup.to ||
+    lookup.from > input.from ||
+    lookup.to < input.to ||
+    lookup.to > input.projectedAt ||
+    lookup.to - lookup.from > 30 * 86400000
+  ) {
+    throw new Error("invalid_evidence_lookup_window");
+  }
   const scope = scopeKey(input.scope);
   const groups = new Map<string, Candidate>();
   const get = (id: string): Candidate => {
@@ -143,16 +155,31 @@ export function assembleObservationSamples(input: AssembleInput) {
       c.outcome = o;
     }
   }
+  const supportKeys = new Set(
+    [...groups.values()].filter((c) => c.outcome && !c.invalid).map((c) => c.id),
+  );
   const seen = new Map<string, { event: ExecutionEvidence; candidate: Candidate }>();
   const events = input.executions
     .map(metadata)
     .toSorted((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   for (const e of events) {
     const time = Date.parse(e.occurredAt);
-    if (!included(time)) {
-      continue;
-    }
+    const outsideCohort = Number.isFinite(time) && !included(time);
     const linked = e.scope && e.taskId && e.outcomeVersion !== undefined;
+    if (outsideCohort) {
+      if (
+        !input.evidenceLookupWindow ||
+        time < lookup.from ||
+        time >= lookup.to ||
+        !linked ||
+        scopeKey(e.scope) !== scope
+      ) {
+        continue;
+      }
+      if (!supportKeys.has(key(["outcome", scopeKey(e.scope), e.taskId, e.outcomeVersion]))) {
+        continue;
+      }
+    }
     const id = linked
       ? key(["outcome", scopeKey(e.scope), e.taskId, e.outcomeVersion])
       : key([
@@ -167,6 +194,9 @@ export function assembleObservationSamples(input: AssembleInput) {
       continue;
     }
     const c = get(id);
+    if (outsideCohort) {
+      c.reasons.add("outside_cohort_window");
+    }
     c.provenance.add(e.provenance);
     if (prior) {
       fail(prior.candidate, "duplicate_conflict");
@@ -372,6 +402,7 @@ export function assembleObservationSamples(input: AssembleInput) {
     projectedAt: input.projectedAt,
     sourceWatermark: input.sourceWatermark,
     window: { from: input.from, to: input.to },
+    evidenceLookupWindow: { from: lookup.from, to: lookup.to },
     coverage: {
       attemptedCount: samples.length,
       fullyLinkedCount,

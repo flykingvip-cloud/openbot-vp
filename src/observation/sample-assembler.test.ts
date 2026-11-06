@@ -247,4 +247,123 @@ describe("pure sample assembler", () => {
       }
     }
   });
+  it("uses an explicit lookup window only for exact cohort outcome support", () => {
+    const at = Date.parse(time);
+    const before = {
+      ...event,
+      eventId: "a",
+      attemptId: "a",
+      occurredAt: new Date(at - 1).toISOString(),
+    };
+    const args = {
+      ...input({ executions: [event, before, before] }),
+      evidenceLookupWindow: { from: at - 10, to: at + 1000 },
+    };
+    const result = assembleObservationSamples(args);
+    expect(result.samples[0].qualification).toBe("fully_linked");
+    expect(result.samples[0].reasons).toContain("outside_cohort_window");
+    expect(result.samples[0].executionRefs).toHaveLength(2);
+    expect(result.coverage.attemptedCount).toBe(1);
+    expect(
+      assembleObservationSamples(input({ executions: [event, before] })).samples[0].qualification,
+    ).toBe("outcome_only");
+  });
+  it("keeps lookup boundaries half open and excludes unrelated outside-cohort candidates", () => {
+    const at = Date.parse(time);
+    const lookup = { from: at - 10, to: at + 1010 };
+    const outside = {
+      ...event,
+      eventId: "support",
+      attemptId: "a",
+      occurredAt: new Date(at - 10).toISOString(),
+    };
+    const r = assembleObservationSamples({
+      ...input({
+        executions: [
+          event,
+          outside,
+          { ...outside, eventId: "wrong-version", outcomeVersion: 2 },
+          { ...outside, eventId: "unlinked", taskId: undefined },
+          { ...outside, eventId: "wrong-scope", scope: { ...scope, subjectRef: "other" } },
+          { ...outside, eventId: "at-end", occurredAt: new Date(lookup.to).toISOString() },
+        ],
+      }),
+      evidenceLookupWindow: lookup,
+    });
+    expect(r.coverage.attemptedCount).toBe(1);
+    expect(r.samples[0].executionRefs).toHaveLength(2);
+    expect(
+      assembleObservationSamples({
+        ...input({ outcomes: [], executions: [outside] }),
+        evidenceLookupWindow: lookup,
+      }).samples,
+    ).toEqual([]);
+  });
+  it("rejects invalid lookup windows and preserves source and improvement gates", () => {
+    const at = Date.parse(time);
+    for (const evidenceLookupWindow of [
+      { from: at + 1, to: at + 1000 },
+      { from: at - 1, to: at + 999 },
+      { from: NaN, to: at + 1000 },
+      { from: at - 30 * 86400000, to: at + 1000 },
+    ]) {
+      expect(() => assembleObservationSamples({ ...input(), evidenceLookupWindow })).toThrow(
+        "invalid_evidence_lookup_window",
+      );
+    }
+    const r = assembleObservationSamples({
+      ...input({
+        executions: [
+          event,
+          {
+            ...event,
+            eventId: "a",
+            attemptId: "a",
+            provenance: "seed",
+            occurredAt: new Date(at - 1).toISOString(),
+          },
+        ],
+      }),
+      evidenceLookupWindow: { from: at - 1, to: at + 1000 },
+    });
+    expect(r.samples[0].qualification).toBe("invalid");
+    expect(r.samples[0].improvementEligible).toBe(false);
+    expect(r.samples[0].reasons).toContain("provenance_mixed");
+  });
+  it("keeps support conflict processing deterministic and excludes conflicted outcomes", () => {
+    const at = Date.parse(time);
+    const support = {
+      ...event,
+      eventId: "a",
+      attemptId: "a",
+      occurredAt: new Date(at - 1).toISOString(),
+    };
+    const conflicting = { ...support, runId: "other" };
+    const events = [event, support, conflicting];
+    const args = {
+      ...input({ executions: events }),
+      evidenceLookupWindow: { from: at - 10, to: at + 1000 },
+    };
+    const a = assembleObservationSamples(args);
+    const b = assembleObservationSamples({ ...args, executions: events.toReversed() });
+    expect(a).toEqual(b);
+    expect(a.samples[0].qualification).toBe("invalid");
+    expect(a.samples[0].reasons).toContain("duplicate_conflict");
+    const badOutcome = {
+      ...outcome,
+      record: { ...outcome.record, taskJudgement: "failure" as const },
+    };
+    const rejected = assembleObservationSamples({ ...args, outcomes: [outcome, badOutcome] });
+    expect(rejected.samples[0].executionRefs).toHaveLength(1);
+    expect(() =>
+      assembleObservationSamples({
+        ...input(),
+        evidenceLookupWindow: { from: at - 1, to: at + 2001 },
+      }),
+    ).toThrow("invalid_evidence_lookup_window");
+    expect(assembleObservationSamples(input()).evidenceLookupWindow).toEqual({
+      from: at,
+      to: at + 1000,
+    });
+  });
 });
