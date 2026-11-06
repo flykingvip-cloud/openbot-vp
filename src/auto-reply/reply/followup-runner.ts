@@ -1,5 +1,8 @@
 import crypto from "node:crypto";
-import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
+import path from "node:path";
+import { prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
+import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
+import { resolveAgentDir, resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
@@ -46,13 +49,20 @@ import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
+import { resolveTurnContractFromRunMeta } from "../../task-outcome/chat-entry.js";
+import {
+  resolveRequiredDeliveryConfirmStatus,
+  type RequiredDeliveryAttempt,
+} from "../../task-outcome/delivery-confirm.js";
 import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
+import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import {
   assertRunnerTurnBudgetAllowsModelCall,
   chargeModelCallAgainstTip,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
+  TASK_OUTCOME_STORE_DIRNAME,
 } from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
@@ -116,13 +126,14 @@ export function createFollowupRunner(params: {
    * where the message originated.
    */
   const sendFollowupPayloads = async (payloads: ReplyPayload[], queued: FollowupRun) => {
+    const attempts: RequiredDeliveryAttempt[] = [];
     // Check if we should route to originating channel.
     const { originatingChannel, originatingTo } = queued;
     const shouldRouteToOriginating = isRoutableChannel(originatingChannel) && originatingTo;
 
     if (!shouldRouteToOriginating && !opts?.onBlockReply) {
       logVerbose("followup queue: no onBlockReply handler; dropping payloads");
-      return;
+      return "none" as const;
     }
 
     for (const payload of payloads) {
@@ -166,12 +177,19 @@ export function createFollowupRunner(params: {
           });
           if (opts?.onBlockReply && origin && origin === provider) {
             await opts.onBlockReply(payload);
+            attempts.push({ source: "enqueue_only", ok: true });
+          } else {
+            attempts.push({ source: "deliver", ok: false, error: errorMsg });
           }
+        } else {
+          attempts.push({ source: "deliver", ok: true });
         }
       } else if (opts?.onBlockReply) {
         await opts.onBlockReply(payload);
+        attempts.push({ source: "enqueue_only", ok: true });
       }
     }
+    return resolveRequiredDeliveryConfirmStatus(attempts);
   };
 
   return async (queued: FollowupRun) => {
@@ -239,6 +257,9 @@ export function createFollowupRunner(params: {
       | undefined;
     let followupFailureDetail: string | undefined;
     let followupOutcomeCloseoutDone = false;
+    let preparedDelivery:
+      | { runId: string; deliveryId: string; taskId: string; agentId: string }
+      | undefined;
     /** Real usage-derived USD when the pre-call gate did not already charge this item. */
     let tipBudgetCostUsd: number | undefined;
     let followupBudgetCharged = false;
@@ -249,6 +270,7 @@ export function createFollowupRunner(params: {
       failureReason?: import("../../task-outcome/runtime-from-runner.js").RunnerTurnFailureReason;
       failureDetail?: string;
       force?: boolean;
+      outcome?: GrowthOutcomeCommitOpts;
     }) => {
       if (followupOutcomeCloseoutDone) {
         return;
@@ -278,6 +300,7 @@ export function createFollowupRunner(params: {
           taskId: followupOutcomeTaskId,
           scope: followupOutcomeScope,
           entrypoint: "chat",
+          ...overrides?.outcome,
           ...(followupBudgetCharged ? { skipBudgetCharge: true } : {}),
           ...(!followupBudgetCharged && tipBudgetCostUsd != null
             ? { costUsd: tipBudgetCostUsd }
@@ -804,8 +827,42 @@ export function createFollowupRunner(params: {
         }
       }
 
-      await sendFollowupPayloads(finalPayloads, queued);
+      if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
+        await prepareVisibleDelivery({
+          resolvePersistRoot: (agentId) =>
+            path.join(resolveAgentDir(queued.run.config, agentId), TASK_OUTCOME_STORE_DIRNAME),
+          agentId: queued.run.agentId,
+          runId,
+          outcomeTaskId: followupOutcomeTaskId,
+          sessionKey: queued.run.sessionKey ?? sessionKey,
+          sessionFile: queued.run.sessionFile,
+          completionBinding: queued.run.taskCompletionBinding,
+          contract: resolveTurnContractFromRunMeta(runResult.meta),
+          commitOutcome: (success, outcome) => submitFollowupOutcomeCloseout({ success, outcome }),
+          publishPending: (identity) => {
+            preparedDelivery = identity;
+          },
+        });
+      }
+      const delivered = await sendFollowupPayloads(finalPayloads, queued);
+      if (preparedDelivery) {
+        await confirmPendingTurnDelivery({
+          cfg: queued.run.config,
+          ...preparedDelivery,
+          sessionKey: queued.run.sessionKey ?? sessionKey,
+          status: delivered === "none" ? "failed" : delivered,
+        });
+      }
     } catch (err) {
+      if (preparedDelivery) {
+        await confirmPendingTurnDelivery({
+          cfg: queued.run.config,
+          ...preparedDelivery,
+          sessionKey: queued.run.sessionKey ?? sessionKey,
+          status: "failed",
+          error: String(err),
+        });
+      }
       followupRunSucceeded = false;
       followupFailureReason = "run_failed";
       followupFailureDetail = err instanceof Error ? err.message : String(err);

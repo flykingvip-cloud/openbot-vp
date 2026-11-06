@@ -668,6 +668,75 @@ describe("createFollowupRunner agentDir forwarding", () => {
 });
 
 describe("queued task binding claim", () => {
+  it.each(["delivered", "failed", "unknown", "unverified", "empty"] as const)(
+    "settles queued task only with verified acceptance and actual delivery: %s",
+    async (mode) => {
+      const board = await import("../../conversation-task/session-task-board.js");
+      const governance = await import("../../gateway/billing/agent-run-governance.js");
+      const root = await fs.mkdtemp(path.join(tmpdir(), "followup-delivery-"));
+      const sessionFile = path.join(root, "session.jsonl");
+      await fs.writeFile(sessionFile, "");
+      board.mutateSessionTaskBoard(sessionFile, () => ({
+        board: {
+          ...board.emptySessionTaskBoard(),
+          current: {
+            taskId: "a",
+            title: "report",
+            goalText: "write report",
+            unfinished: true,
+            createdAtMs: 1,
+            stop: { summary: "waiting", workspacePaths: [] },
+          },
+        },
+        value: undefined,
+      }));
+      const queued = createQueuedRun({
+        originatingChannel: mode === "unknown" ? undefined : "telegram",
+        originatingTo: "target",
+        followupItemId: "item",
+        run: {
+          agentId: "test",
+          sessionKey: "agent:test:main",
+          sessionFile,
+          config: { agents: { list: [{ id: "test", agentDir: root }] } },
+          taskCompletionBinding: board.captureTaskCompletionBinding(sessionFile),
+        },
+      });
+      const admission = vi
+        .spyOn(governance, "tryAcquireEnterpriseAgentRun")
+        .mockResolvedValue({ acquired: false, skipped: true });
+      runEmbeddedPiAgentMock.mockReset();
+      runEmbeddedPiAgentMock.mockResolvedValue({
+        payloads: mode === "empty" ? [] : [{ text: "report with verified sources" }],
+        meta: {
+          hookDelivery: {
+            validatorsRequired: true,
+            decisionCode: mode === "unverified" ? "delivery_blocked" : "delivery_receipt_verified",
+            validatorReceipts: [{ validatorId: "sources" }],
+            intentClass: "long_running",
+          },
+        },
+      });
+      routeReplyMock.mockResolvedValue(
+        mode === "failed" ? { ok: false, error: "offline" } : { ok: true },
+      );
+      try {
+        await createFollowupRunner({
+          opts: { onBlockReply: createAsyncReplySpy() },
+          typing: createMockTypingController(),
+          typingMode: "instant",
+          defaultModel: "anthropic/claude",
+        })(queued);
+        expect(runEmbeddedPiAgentMock).toHaveBeenCalledOnce();
+        expect(board.readSessionTaskBoard(sessionFile).current?.unfinished).toBe(
+          mode !== "delivered",
+        );
+      } finally {
+        admission.mockRestore();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    },
+  );
   it("rejects a queued A request after same-goal B becomes current without invoking the provider", async () => {
     const {
       mutateSessionTaskBoard,

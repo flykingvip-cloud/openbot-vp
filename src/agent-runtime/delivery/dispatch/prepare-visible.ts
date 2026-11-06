@@ -14,6 +14,7 @@ export async function prepareVisibleDelivery(params: {
   resolvePersistRoot: (agentId: string) => string;
   agentId?: string;
   runId: string;
+  outcomeTaskId?: string;
   sessionKey?: string;
   sessionFile?: string;
   completionBinding?: TaskCompletionBinding;
@@ -39,7 +40,9 @@ export async function prepareVisibleDelivery(params: {
     return;
   }
   const persistRoot = params.resolvePersistRoot(agentId);
-  const taskId = chatTurnTaskId({ agentId, runId: params.runId, sessionKey: params.sessionKey });
+  const taskId =
+    params.outcomeTaskId ??
+    chatTurnTaskId({ agentId, runId: params.runId, sessionKey: params.sessionKey });
   const identity = { runId: params.runId, deliveryId, taskId, agentId };
   const binding = params.completionBinding;
   const checkedTask =

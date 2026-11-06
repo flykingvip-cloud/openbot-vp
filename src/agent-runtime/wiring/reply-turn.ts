@@ -17,6 +17,7 @@ import {
   interruptInteractionTask,
   steerInteractionTask,
 } from "./command-adapters.js";
+import { confirmPendingTurnDelivery } from "./delivery-confirm.js";
 import type { runGatewayInteraction } from "./interaction-turn.js";
 
 /** Compose the original reply-turn dependencies. The reply host owns transport and cleanup. */
@@ -43,6 +44,7 @@ export const replyTurnRuntime = {
     },
   },
   delivery: {
+    confirmPendingTurnDelivery,
     buildReplyPayloads,
     completeReplyDelivery,
     prepareVisibleDelivery(

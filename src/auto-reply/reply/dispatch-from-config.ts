@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 import { isHumanInteractionIngress } from "../../agent-runtime/command/index.js";
-import { resolveAgentDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
+import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import {
   loadSessionStore,
@@ -11,11 +11,7 @@ import {
 } from "../../config/sessions.js";
 import { observeInboundTurnShadow } from "../../conversation-task/gateway-shadow-hook.js";
 import { observeConversationTaskReplyCompleted } from "../../conversation-task/reply-completion.js";
-import {
-  captureTaskCompletionBinding,
-  isTaskExecutionBindingCurrent,
-  recordCheckedTaskCompletion,
-} from "../../conversation-task/session-task-board.js";
+import { captureTaskCompletionBinding } from "../../conversation-task/session-task-board.js";
 import { resolveCronStorePath } from "../../cron/store.js";
 import { shouldSuppressLocalDiscordExecApprovalPrompt } from "../../discord/exec-approvals.js";
 import { resolveKnowledgeSourceContext } from "../../gateway/knowledge/context.js";
@@ -47,14 +43,6 @@ import {
   resolveRequiredDeliveryConfirmStatus,
   type RequiredDeliveryAttempt,
 } from "../../task-outcome/delivery-confirm.js";
-import {
-  peekAwaitingDelivery,
-  resolveAndTakeAwaitingDelivery,
-} from "../../task-outcome/pending-delivery.js";
-import {
-  confirmRunnerTurnDelivery,
-  TASK_OUTCOME_STORE_DIRNAME,
-} from "../../task-outcome/runtime-from-runner.js";
 import { maybeApplyTtsToPayload, normalizeTtsAutoMode, resolveTtsConfig } from "../../tts/tts.js";
 import { INTERNAL_MESSAGE_CHANNEL, normalizeMessageChannel } from "../../utils/message-channel.js";
 import { getReplyFromConfig } from "../reply.js";
@@ -70,108 +58,7 @@ import { resolveRunTypingPolicy } from "./typing-policy.js";
 
 const AUDIO_PLACEHOLDER_RE = /^<media:audio>(\s*\([^)]*\))?$/i;
 
-/** Production delivery confirm — exported so tests use this path, not a copy. */
-export async function confirmPendingTurnDelivery(params: {
-  cfg: OpenBotConfig;
-  runId?: string;
-  /** Stable ids from prepare — required when runId is omitted. */
-  deliveryId?: string;
-  taskId?: string;
-  /** Session key used to resolve agentDir when runId is missing after restart. */
-  sessionKey?: string;
-  /** Aggregated required-delivery status (AND). enqueue_only alone → delivery_unknown. */
-  status: "delivered" | "failed" | "delivery_unknown";
-  error?: string;
-}): Promise<void> {
-  const runId = params.runId?.trim() || undefined;
-  const deliveryId = params.deliveryId?.trim() || undefined;
-  const taskId = params.taskId?.trim() || undefined;
-  const sessionKey = params.sessionKey?.trim() || undefined;
-  let persistRoot: string | undefined;
-  if (sessionKey) {
-    const agentId = resolveSessionAgentId({ sessionKey, config: params.cfg });
-    persistRoot = path.join(resolveAgentDir(params.cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
-  }
-
-  // R85e: persistRoot alone cannot locate a record — need runId / deliveryId / taskId.
-  // askOutcome P1: observe missing locators; never guess session pending or clear.
-  if (!runId && !deliveryId && !taskId) {
-    logVerbose(
-      [
-        "event=confirm_skipped_no_locator_ids",
-        "source=confirmPendingTurnDelivery",
-        `hasRunId=0`,
-        `hasDeliveryId=0`,
-        `hasTaskId=0`,
-        `hasSessionKey=${sessionKey ? 1 : 0}`,
-        `persistScopeResolvable=${persistRoot ? 1 : 0}`,
-        `status=${params.status}`,
-      ].join(" "),
-    );
-    return;
-  }
-
-  const lookup = {
-    ...(runId ? { runId } : {}),
-    ...(deliveryId ? { deliveryId } : {}),
-    ...(taskId ? { taskId } : {}),
-    ...(persistRoot ? { persistRoot } : {}),
-  };
-  const pending = peekAwaitingDelivery(lookup);
-  if (
-    !pending ||
-    (runId && pending.runId !== runId) ||
-    (deliveryId && pending.deliveryId !== deliveryId) ||
-    (taskId && pending.taskId !== taskId)
-  ) {
-    return;
-  }
-  try {
-    const confirmed = await confirmRunnerTurnDelivery(params.cfg, pending.agentId, {
-      taskId: pending.taskId,
-      deliveryId: pending.deliveryId,
-      status: params.status,
-      ...(params.error ? { failureDetail: params.error } : {}),
-    });
-    if (
-      params.status === "delivered" &&
-      confirmed?.record.delivery.status === "delivered" &&
-      confirmed.record.taskId === pending.taskId &&
-      confirmed.record.decisiveRunId === pending.runId &&
-      confirmed.record.deliveryId === pending.deliveryId &&
-      confirmed.record.acceptance.status === "passed" &&
-      pending.checkedTask
-    ) {
-      const completed = recordCheckedTaskCompletion({
-        sessionFile: pending.checkedTask.sessionFile,
-        binding: pending.checkedTask.binding,
-        closed: true,
-        appendNotice: false,
-      });
-      if (
-        !completed.persisted &&
-        isTaskExecutionBindingCurrent(pending.checkedTask.sessionFile, pending.checkedTask.binding)
-      ) {
-        return; // Retain the durable association after transient lock failure.
-      }
-    }
-    // R85e: unknown is not terminal — keep durable association for later verify.
-    // Only clear after delivered / failed (or explicit abandon elsewhere).
-    if (params.status === "delivered" || params.status === "failed") {
-      resolveAndTakeAwaitingDelivery({
-        runId: pending.runId,
-        deliveryId: pending.deliveryId,
-        taskId: pending.taskId,
-        ...(persistRoot ? { persistRoot } : {}),
-      });
-    }
-  } catch (err) {
-    logVerbose(
-      `dispatch-from-config: delivery confirm failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-}
-
+export { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 const AUDIO_HEADER_RE = /^\[Audio\b/i;
 const normalizeMediaType = (value: string): string => value.split(";")[0]?.trim().toLowerCase();
 
