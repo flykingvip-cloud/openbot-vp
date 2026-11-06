@@ -17,4 +17,7 @@ export {
   type HonestEmptyReplyDecision,
 } from "./presentation/empty-reply.js";
 
-export { logNestedCommandOutput } from "./presentation/command-output.js";
+export {
+  logNestedCommandOutput,
+  createAcpVisibleTextAccumulator,
+} from "./presentation/command-output.js";
