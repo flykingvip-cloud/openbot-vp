@@ -21,3 +21,9 @@ export type {
   ContextWindowInfo,
   ContextWindowGuardResult,
 } from "./context-window.js";
+
+export {
+  OVERLOAD_FAILOVER_BACKOFF_POLICY,
+  MAX_OVERFLOW_COMPACTION_ATTEMPTS,
+  resolveMaxRunRetryIterations,
+} from "./run-limits.js";

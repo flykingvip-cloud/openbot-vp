@@ -694,3 +694,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Model resolution, BYOK synthesis, endpoint override and effective context-window preparation moved from legacy run.ts into model/prepare-embedded-model. Original provider resolution adapter and public context policy remain single-owned; old run-local preparation body removed. Credential application, hooks and model attempts retain their original order. — codex-runtime-manager
 - Component 2 PASS; overflow/usage regression 3 files / 26 PASS; configured authentication integration 25 PASS. Full tsgo PASS; architecture 51 PASS; typed lint clean; full build PASS with 209 existing dynamic-import warnings. No real-provider invocation, push, merge or deployment. — codex-runtime-manager
+
+## Shared run limit policy (2026-11-07)
+
+- Original overall attempt cap, overflow compaction cap and overload backoff parameters moved from legacy run.ts into policy/run-limits. Existing sole loop consumes fixed data and pure budget selection; no executable configuration or additional retry engine. Thresholds and cancellation behavior unchanged. — codex-runtime-manager
+- Policy/overflow regression 3 files / 22 PASS; full tsgo PASS; architecture 51 PASS; typed lint clean; full build PASS with 209 existing warnings. No push, merge or deployment. — codex-runtime-manager
