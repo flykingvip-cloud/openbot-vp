@@ -3,6 +3,7 @@ import { loadConfig, type OpenBotConfig } from "../config/config.js";
 import {
   resolveDiagnosisProductionAuth,
   type DiagnosisGatewayAuthDeps,
+  type DiagnosisGatewayAuthClient,
 } from "../diagnosis/report-query-gateway.js";
 import { ErrorCodes, errorShape } from "../gateway/protocol/index.js";
 import type { GatewayRequestHandlers } from "../gateway/server-methods/types.js";
@@ -25,7 +26,10 @@ export function createObservationQueryHandlers(
         deny("unauthorized");
         return;
       }
-      const auth = await resolveDiagnosisProductionAuth(client, options.authDeps);
+      const auth = await resolveDiagnosisProductionAuth(
+        client as unknown as DiagnosisGatewayAuthClient,
+        options.authDeps,
+      );
       if (!auth) {
         deny("unauthorized");
         return;

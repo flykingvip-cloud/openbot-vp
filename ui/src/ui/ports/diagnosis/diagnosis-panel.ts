@@ -215,7 +215,11 @@ export class OpenBotDiagnosisPanel extends LitElement {
           owners: this.deliverToOwners,
         },
         ...(target
-          ? { sessionKey: target.sessionKey, agentId: target.agentId, runId: focusedRunId }
+          ? {
+              sessionKey: target.sessionKey,
+              agentId: target.agentId,
+              runId: focusedRunId ?? undefined,
+            }
           : {}),
         ...(isAll
           ? {
