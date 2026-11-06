@@ -42,3 +42,15 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - P1 scope remains partial: no queryable trustworthy live execution history, live fully_linked sample, cost attribution or durable execution projection. P2 is not opened. — codex-observe-owner
 - Query rollback: revert 32a341d03 and 29ca914a2 for RPC/UI integration; projection modules require no data migration. — codex-observe-owner
 - Shared registry has concurrent command-budget task changes; subsequent observation registration increments remain uncommitted rather than landing another owner WIP. — codex-observe-owner
+
+## Continued P1 execution evidence
+- 198eec855: phantom attempt and conflicting outcome regressions fixed; improvementEligible remains false. — codex-observe-owner
+- 420426f1c: stale identity/method/tenant/version response protection; Chromium 13 PASS. — codex-observe-owner
+- 4f15a0745: independent actual CLI/embedded lifecycle facts plus explicit committed-version receipts; default flag off, 1000 facts, 15-minute process memory TTL. Not durable audit. — codex-observe-owner
+- cd294b774: trusted retained facts and exact-version receipts feed scoped query; outcome provenance stays unknown, mixed-source samples remain invalid and improvement blocked. — codex-observe-owner
+- c4019312b: UI shows execution references, retention, TTL, capacity, epoch and unknown continuity. — codex-observe-owner
+- Owner validation: observation 8 suites / 59 PASS; original admitted runner/outcome 3 suites / 13 PASS; changed-file lint/format PASS. UI contributor build PASS with pin sync skipped. — codex-observe-owner
+- Full tsgo: 54 diagnostics remain; no diagnostics in observation or modified admitted runner/outcome/diagnosis-panel paths. No full-green claim. — codex-observe-owner
+- No live gateway or production verification, no observation flag enabled, no push/PR/deploy. P2 remains blocked by unverified live provenance and no real improvement-qualified sample. — codex-observe-owner
+- Remaining: per-scope exact retention watermark, durable history, model-internal retries, command entrance coverage, reliable cost attribution, platform-role evidence rendering and original sixteen-material manifest. — codex-observe-owner
+- Rollback: revert cd294b774 and 4f15a0745 for query/runtime collection; flag remains default off. No database migration. — codex-observe-owner
