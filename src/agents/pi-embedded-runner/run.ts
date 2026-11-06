@@ -7,6 +7,7 @@ import {
   buildErrorAgentMeta,
 } from "../../agent-runtime/execution/index.js";
 import { recoverContextOverflow } from "../../agent-runtime/execution/index.js";
+import { resolveRunAuthProfileCandidates } from "../../agent-runtime/model/index.js";
 import {
   CONTEXT_WINDOW_HARD_MIN_TOKENS,
   CONTEXT_WINDOW_WARN_BELOW_TOKENS,
@@ -49,10 +50,8 @@ import { FailoverError, resolveFailoverStatus } from "../failover-error.js";
 import {
   ensureAuthProfileStore,
   getApiKeyForModel,
-  resolveAuthProfileOrder,
   type ResolvedProviderAuth,
 } from "../model-auth.js";
-import { normalizeProviderId } from "../model-selection.js";
 import { ensureOpenClawModelsJson } from "../models-config.js";
 import {
   formatBillingErrorMessage,
@@ -351,31 +350,13 @@ export async function runEmbeddedPiAgent(
       }
 
       const authStore = ensureAuthProfileStore(agentDir, { allowKeychainPrompt: false });
-      const preferredProfileId = params.authProfileId?.trim();
-      let lockedProfileId = params.authProfileIdSource === "user" ? preferredProfileId : undefined;
-      if (lockedProfileId) {
-        const lockedProfile = authStore.profiles[lockedProfileId];
-        if (
-          !lockedProfile ||
-          normalizeProviderId(lockedProfile.provider) !== normalizeProviderId(provider)
-        ) {
-          lockedProfileId = undefined;
-        }
-      }
-      const profileOrder = resolveAuthProfileOrder({
-        cfg: params.config,
+      const { lockedProfileId, profileCandidates } = resolveRunAuthProfileCandidates({
+        config: params.config,
         store: authStore,
         provider,
-        preferredProfile: preferredProfileId,
+        authProfileId: params.authProfileId,
+        authProfileIdSource: params.authProfileIdSource,
       });
-      if (lockedProfileId && !profileOrder.includes(lockedProfileId)) {
-        throw new Error(`Auth profile "${lockedProfileId}" is not configured for ${provider}.`);
-      }
-      const profileCandidates = lockedProfileId
-        ? [lockedProfileId]
-        : profileOrder.length > 0
-          ? profileOrder
-          : [undefined];
       let profileIndex = 0;
 
       const initialThinkLevel = params.thinkLevel ?? "off";

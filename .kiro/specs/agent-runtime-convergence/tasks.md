@@ -674,3 +674,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Pure context-window selection and limit classification now live in policy/context-window and are consumed through policy/index by run, compaction, extensions and onboarding. Old agents/context-window-guard implementation removed; all source consumers and test mocks migrated, without a compatibility execution path. Existing config priority, cap thresholds and warnings remain unchanged. — codex-runtime-manager
 - Baseline guard/onboarding 2 files / 29 PASS; candidate guard/onboarding/overflow/usage regression 5 files / 55 PASS. Full tsgo PASS; architecture 51 PASS; changed-file typed lint clean; build PASS with 209 existing dynamic-import warnings. No push, merge or deployment. — codex-runtime-manager
+
+## Authentication candidate ownership (2026-11-07)
+
+- User-pin validation, provider match, configured order and fallback candidate selection moved from legacy run.ts into model/auth-profile-candidates. Credential reads, cooldown rotation and token refresh stay at their original execution points. Old selection body removed; no new authentication or retry engine. — codex-runtime-manager
+- Original auth-rotation configured integration 25 PASS before and after; component/usage 2 files / 7 PASS. Full tsgo PASS; architecture 51 PASS; typed lint clean; build PASS with 209 existing warnings. No real-provider call, push, merge or deploy. — codex-runtime-manager

@@ -11,3 +11,5 @@ export {
 } from "./command-commercial-gate.js";
 
 export { createCommandAdmissionSession } from "./command-admission-session.js";
+
+export { resolveRunAuthProfileCandidates } from "./auth-profile-candidates.js";
