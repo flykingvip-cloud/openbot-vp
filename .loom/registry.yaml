@@ -11006,6 +11006,8 @@ tasks:
       - src/agents/execution-preflight/completion-attempt-lifecycle.test.ts
       - src/agents/execution-preflight/completion-context.test.ts
       - src/agents/execution-preflight/completion-receipt-matrix.test.ts
+      - src/agents/execution-preflight/constitutional-runtime-shadow-wiring.test.ts
+      - src/agents/execution-preflight/resolve.ts
     state: active
     sessions:
       - id: 6cce1901-02ad-4d31-aede-6013384aae12
@@ -11013,126 +11015,133 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-unified-interaction-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-mainline-retirement-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-inference-admission-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-interaction-contract-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-model-inference-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-interaction-production-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-one-shot-transport-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-candidate-resolution-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-execution-admission-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: codex-runtime-interaction-routing-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-ingress-cutover-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-final-closure-20261105
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-mention-retirement-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-background-binding-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-activation-retirement-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-validator-verdict-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
       - id: runtime-explicit-verdict-20261106
         taskId: agent-runtime-convergence
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-06T01:48:32.306Z
+        lastSignalAt: 2026-11-06T02:02:31.126Z
+        metadata: {}
+      - id: runtime-preflight-acceptance-20261106
+        taskId: agent-runtime-convergence
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-06T02:02:31.126Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-03
@@ -11178,6 +11187,8 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - src/agents/execution-preflight/constitutional-runtime-shadow-wiring.test.ts
+      - src/agents/execution-preflight/resolve.ts
       - src/agents/execution-preflight/completion-attempt-lifecycle.test.ts
       - src/agents/execution-preflight/completion-context.test.ts
       - src/agents/execution-preflight/completion-delayed-send.test.ts
