@@ -777,11 +777,15 @@ describe("agentCommand", () => {
           )
           .mockRejectedValue(new Error("retry failed"));
 
-        await expect(agentCommand({ message: "hi", sessionKey }, runtime)).rejects.toThrow(
-          "retry failed",
-        );
+        const controller = new AbortController();
+        await expect(
+          agentCommand({ message: "hi", sessionKey, abortSignal: controller.signal }, runtime),
+        ).rejects.toThrow("retry failed");
 
         expect(runCliAgentSpy).toHaveBeenCalledTimes(2);
+        for (const [call] of runCliAgentSpy.mock.calls) {
+          expect(call.abortSignal).toBe(controller.signal);
+        }
         const firstCall = runCliAgentSpy.mock.calls[0]?.[0] as
           | { cliSessionId?: string }
           | undefined;

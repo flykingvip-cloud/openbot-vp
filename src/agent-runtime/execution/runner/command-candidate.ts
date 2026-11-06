@@ -113,6 +113,7 @@ export function runCommandCandidate(params: {
           thinkLevel: params.resolvedThinkLevel,
           timeoutMs: params.timeoutMs,
           runId: params.runId,
+          abortSignal: params.opts.abortSignal,
           extraSystemPrompt: params.opts.extraSystemPrompt,
           cliSessionId: nextCliSessionId,
           bootstrapPromptWarningSignaturesSeen,
