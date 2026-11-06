@@ -107,7 +107,15 @@ export type RuntimeCapabilityBinding = {
   governanceState?: GovernanceState;
 };
 
+export type TelemetryProvenance = "live" | "seed" | "injected" | "unknown";
+
+function normalizeTelemetryProvenance(value: unknown): TelemetryProvenance {
+  return value === "live" || value === "seed" || value === "injected" ? value : "unknown";
+}
+
 export type RuntimeTelemetry = {
+  /** Missing on legacy snapshots; never implies live traffic. */
+  provenance?: TelemetryProvenance;
   runtimeAgentId: string;
   capabilityId: string | null;
   calls7d: number;
@@ -849,25 +857,42 @@ export type TelemetryWindow = "1h" | "6h" | "24h" | "7d" | "30d";
 export function listTelemetry(filter: {
   runtimeAgentId: string | null;
   capabilityId: string | null;
-  // window 当前作为提示参数；in-memory store 不区分窗口
+  // Filters snapshot timestamps; 7d aggregate fields are not recomputed.
   window: TelemetryWindow;
 }): RuntimeTelemetry[] {
   ensureLoaded();
-  return store.telemetry.filter((t) => {
-    if (filter.runtimeAgentId !== null && t.runtimeAgentId !== filter.runtimeAgentId) {
-      return false;
-    }
-    if (filter.capabilityId !== null && t.capabilityId !== filter.capabilityId) {
-      return false;
-    }
-    return true;
-  });
+  const now = Date.now();
+  const durations: Record<TelemetryWindow, number> = {
+    "1h": 3_600_000,
+    "6h": 21_600_000,
+    "24h": 86_400_000,
+    "7d": 604_800_000,
+    "30d": 2_592_000_000,
+  };
+  return store.telemetry
+    .filter((t) => {
+      if (
+        !Number.isFinite(t.lastSampleAt) ||
+        t.lastSampleAt < now - durations[filter.window] ||
+        t.lastSampleAt > now
+      ) {
+        return false;
+      }
+      if (filter.runtimeAgentId !== null && t.runtimeAgentId !== filter.runtimeAgentId) {
+        return false;
+      }
+      if (filter.capabilityId !== null && t.capabilityId !== filter.capabilityId) {
+        return false;
+      }
+      return true;
+    })
+    .map((sample) => ({ ...sample, provenance: normalizeTelemetryProvenance(sample.provenance) }));
 }
 
 /** 用于由 Runtime 探测器或测试注入采样数据。 */
 export function recordTelemetry(sample: RuntimeTelemetry): void {
   ensureLoaded();
-  store.telemetry.push(sample);
+  store.telemetry.push({ ...sample, provenance: normalizeTelemetryProvenance(sample.provenance) });
   // 限制总条数避免无限膨胀（保留最近 5000 条）
   if (store.telemetry.length > 5000) {
     store.telemetry = store.telemetry.slice(-5000);
