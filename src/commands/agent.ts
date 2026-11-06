@@ -1,5 +1,5 @@
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
-import { runCommandCandidate } from "../agent-runtime/execution/index.js";
+import { createCommandBudget, runCommandCandidate } from "../agent-runtime/execution/index.js";
 import fs from "node:fs/promises";
 import { observeAcpCliSteerPreflight } from "../acp/cli-steer-preflight-observe.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
@@ -112,8 +112,6 @@ import {
   ensureSubagentTurnTaskOutcome,
 } from "../task-outcome/entrypoint-ensure.js";
 import {
-  assertRunnerTurnBudgetAllowsModelCall,
-  chargeModelCallAgainstTip,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
@@ -564,7 +562,6 @@ async function agentCommandInternal(
   /** Real usage-derived USD for tip budget closeout when mid-run charge did not run. */
   let tipBudgetCostUsd: number | undefined;
   let tipBudgetChargedThisTurn = false;
-  let tipBudgetCallSeq = 0;
   let agentOutcomeSuccess: boolean | undefined;
   let agentOutcomeFailureReason: RunnerTurnFailureReason | undefined;
   let agentOutcomeFailureDetail: string | undefined;
@@ -613,6 +610,7 @@ async function agentCommandInternal(
     }
   }
 
+  const commandBudget = createCommandBudget({ config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, taskId: agentOutcomeTaskId, scope: agentOutcomeScope, parentTaskId: opts.parentTaskId, parentAgentId: opts.parentAgentId });
   const submitAgentOutcomeCloseout = async () => {
     if (agentOutcomeCloseoutDone || !agentOutcomeEntrypoint) {
       return;
@@ -1146,15 +1144,7 @@ async function agentCommandInternal(
         run: (providerOverride, modelOverride, runOptions) => {
           const isFallbackRetry = fallbackAttemptIndex > 0;
           fallbackAttemptIndex += 1;
-          if (agentOutcomeTaskId && agentOutcomeScope) {
-            assertRunnerTurnBudgetAllowsModelCall(cfg, sessionAgentId, {
-              taskId: agentOutcomeTaskId,
-              scope: agentOutcomeScope,
-              startedAtMs: agentOutcomeStartedAt,
-              ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
-              ...(opts.parentAgentId?.trim() ? { parentAgentId: opts.parentAgentId.trim() } : {}),
-            });
-          }
+          commandBudget.assertAllowed();
           return (async () => {
             try {
               const result = await runCommandCandidate({
@@ -1195,20 +1185,7 @@ async function agentCommandInternal(
             },
           });
               if (agentOutcomeTaskId && agentOutcomeScope) {
-                tipBudgetCallSeq += 1;
-                const charged = chargeModelCallAgainstTip(cfg, sessionAgentId, {
-                  taskId: agentOutcomeTaskId,
-                  scope: agentOutcomeScope,
-                  runId,
-                  callSeq: tipBudgetCallSeq,
-                  usage: result.meta?.agentMeta?.usage,
-                  provider: providerOverride,
-                  model: modelOverride,
-                  ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
-                  ...(opts.parentAgentId?.trim()
-                    ? { parentAgentId: opts.parentAgentId.trim() }
-                    : {}),
-                });
+                const charged = commandBudget.charge({ usage: result.meta?.agentMeta?.usage, provider: providerOverride, model: modelOverride })!;
                 tipBudgetChargedThisTurn = true;
                 if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
                   tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
@@ -1222,21 +1199,7 @@ async function agentCommandInternal(
                 !(err instanceof TaskBudgetExceededError)
               ) {
                 try {
-                  tipBudgetCallSeq += 1;
-                  chargeModelCallAgainstTip(cfg, sessionAgentId, {
-                    taskId: agentOutcomeTaskId,
-                    scope: agentOutcomeScope,
-                    runId,
-                    callSeq: tipBudgetCallSeq,
-                    provider: providerOverride,
-                    model: modelOverride,
-                    ...(opts.parentTaskId?.trim()
-                      ? { parentTaskId: opts.parentTaskId.trim() }
-                      : {}),
-                    ...(opts.parentAgentId?.trim()
-                      ? { parentAgentId: opts.parentAgentId.trim() }
-                      : {}),
-                  });
+                  commandBudget.charge({ provider: providerOverride, model: modelOverride });
                   tipBudgetChargedThisTurn = true;
                 } catch (chargeErr) {
                   if (chargeErr instanceof TaskBudgetExceededError) {
