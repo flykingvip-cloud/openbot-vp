@@ -1,14 +1,13 @@
+import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
 import { createAcpVisibleTextAccumulator } from "../agent-runtime/delivery/index.js";
 import { createRunAdmissionLease } from "../agent-runtime/model/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
 import { createCommandBudget, runCommandCandidate, runCommandFallback } from "../agent-runtime/execution/index.js";
-import fs from "node:fs/promises";
 import { observeAcpCliSteerPreflight } from "../acp/cli-steer-preflight-observe.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAcpAgentPolicyError, resolveAcpDispatchPolicyError } from "../acp/policy.js";
 import { toAcpRuntimeError } from "../acp/runtime/errors.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
-import { openSessionManager } from "../agents/pi-sdk/session.js";
 import { LEGACY_INTERNAL_EVENT_CONTEXT_PREFIXES } from "../compat/legacy-names.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 
@@ -43,7 +42,6 @@ import {
   resolveDefaultModelForAgent,
   resolveThinkingDefault,
 } from "../agents/model-selection.js";
-import { prepareSessionManagerForRun } from "../agents/pi-embedded-runner/session-manager-init.js";
 import type { EmbeddedPiRunResult } from "../agents/pi-embedded-runner/types.js";
 import { buildWorkspaceSkillSnapshot } from "../agents/skills.js";
 import { getSkillsSnapshotVersion } from "../agents/skills/refresh.js";
@@ -93,7 +91,6 @@ import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import { applyVerboseOverride } from "../sessions/level-overrides.js";
 import { applyModelOverrideToSessionEntry } from "../sessions/model-overrides.js";
 import { resolveSendPolicy } from "../sessions/send-policy.js";
-import { emitSessionTranscriptUpdate } from "../sessions/transcript-events.js";
 import { resolveMessageChannel } from "../utils/message-channel.js";
 import {
   acquireAgentCommandCommercialRun,
@@ -137,86 +134,6 @@ function prependInternalEventContext(
     return body;
   }
   return [renderedEvents, body].filter(Boolean).join("\n\n");
-}
-
-const ACP_TRANSCRIPT_USAGE = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  totalTokens: 0,
-  cost: {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    total: 0,
-  },
-} as const;
-
-async function persistAcpTurnTranscript(params: {
-  body: string;
-  finalText: string;
-  sessionId: string;
-  sessionKey: string;
-  sessionEntry: SessionEntry | undefined;
-  sessionStore?: Record<string, SessionEntry>;
-  storePath?: string;
-  sessionAgentId: string;
-  threadId?: string | number;
-  sessionCwd: string;
-}): Promise<SessionEntry | undefined> {
-  const promptText = params.body;
-  const replyText = params.finalText;
-  if (!promptText && !replyText) {
-    return params.sessionEntry;
-  }
-
-  const { sessionFile, sessionEntry } = await resolveSessionTranscriptFile({
-    sessionId: params.sessionId,
-    sessionKey: params.sessionKey,
-    sessionEntry: params.sessionEntry,
-    sessionStore: params.sessionStore,
-    storePath: params.storePath,
-    agentId: params.sessionAgentId,
-    threadId: params.threadId,
-  });
-  const hadSessionFile = await fs
-    .access(sessionFile)
-    .then(() => true)
-    .catch(() => false);
-  const sessionManager = openSessionManager(sessionFile);
-  await prepareSessionManagerForRun({
-    sessionManager,
-    sessionFile,
-    hadSessionFile,
-    sessionId: params.sessionId,
-    cwd: params.sessionCwd,
-  });
-
-  if (promptText) {
-    sessionManager.appendMessage({
-      role: "user",
-      content: promptText,
-      timestamp: Date.now(),
-    });
-  }
-
-  if (replyText) {
-    sessionManager.appendMessage({
-      role: "assistant",
-      content: [{ type: "text", text: replyText }],
-      api: "openai-responses",
-      provider: "openclaw",
-      model: "acp-runtime",
-      usage: ACP_TRANSCRIPT_USAGE,
-      stopReason: "stop",
-      timestamp: Date.now(),
-    });
-  }
-
-  emitSessionTranscriptUpdate(sessionFile);
-  return sessionEntry;
 }
 
 async function prepareAgentCommandExecution(

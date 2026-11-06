@@ -5,3 +5,5 @@ export { resetCorruptedSession, prepareReplacementSessionEntry } from "./session
 export type { CorruptedSessionResetInput, SessionRecoveryPorts } from "./session-recovery.js";
 
 export { persistCommandSessionEntry } from "./command-session.js";
+
+export { persistAcpTurnTranscript } from "./acp-transcript.js";
