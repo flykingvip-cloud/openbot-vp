@@ -1,5 +1,8 @@
 import {
   applyIncomingUserMessage,
+  captureTaskCompletionBinding,
+  isTaskExecutionBindingCurrent,
+  recordCheckedTaskCompletion,
   commitSameTaskConstraint,
   commitAdmittedSessionTask,
   commitInteractionTaskProposal,
@@ -13,6 +16,9 @@ import { resumePausedCurrentTask } from "../mutations/resume-current.js";
 export const sessionTaskState = {
   resumeCurrent: resumePausedCurrentTask,
   read: readSessionTaskBoard,
+  captureBinding: captureTaskCompletionBinding,
+  bindingCurrent: isTaskExecutionBindingCurrent,
+  completeChecked: recordCheckedTaskCompletion,
   admitExecution: commitAdmittedSessionTask,
   applyInteractionProposal: commitInteractionTaskProposal,
   startExecution: startBoundTaskExecution,

@@ -50,10 +50,7 @@ import {
 } from "../../config/sessions/ogui-decision-engine.js";
 import { buildActiveConversationTaskFocusPrompt } from "../../conversation-task/focus-prompt.js";
 import { buildFocusResumePromptFromSessionFile } from "../../conversation-task/focus-resume.js";
-import {
-  captureTaskCompletionBinding,
-  buildResumePrompt,
-} from "../../conversation-task/session-task-board.js";
+import { buildResumePrompt } from "../../conversation-task/session-task-board.js";
 import { buildCronReplySystemPrompt } from "../../cron/cron-reply-context.js";
 import { buildGrowthBirthSystemPrompt } from "../../gateway/agent-growth/birth-context.js";
 import {
@@ -1808,7 +1805,7 @@ export async function runPreparedReply(
       senderIsOwner: command.senderIsOwner,
       sessionFile,
       taskCompletionBinding:
-        admittedBinding ?? captureTaskCompletionBinding(sessionFile, inboundMessage),
+        admittedBinding ?? replyTurnRuntime.state.captureBinding(sessionFile, inboundMessage),
       ...(admittedBinding ? { executionAdmitted: true } : {}),
       skipUserTranscriptPersist: collaborationRoundInvoked || Boolean(interactionIngress),
       collaborationRoundInvoked,

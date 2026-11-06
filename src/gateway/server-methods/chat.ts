@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { stopTaskAtGateway } from "../../agent-runtime/command/index.js";
+import { sessionTaskState } from "../../agent-runtime/state/index.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
   extractEmployeeStewardUserIdFromSessionKey,
@@ -64,10 +65,6 @@ import {
   transcriptEntriesForInboundTurn,
 } from "../../conversation-task/focus-switch.js";
 import { observeConversationTaskCancelPathConsult } from "../../conversation-task/reply-completion.js";
-import {
-  readSessionTaskBoard,
-  captureTaskCompletionBinding,
-} from "../../conversation-task/session-task-board.js";
 import { shouldTaskParkAbortInFlight } from "../../conversation-task/turn-relation.js";
 import { resolveConversationFlags } from "../../conversations/flags.js";
 import { pageHistoryMessages } from "../../conversations/history-cursor.js";
@@ -3169,7 +3166,7 @@ async function abortChatRunsForSessionKeyWithPartials(params: {
       return "";
     }
     try {
-      return readSessionTaskBoard(file).current?.taskId?.trim() ?? "";
+      return sessionTaskState.read(file).current?.taskId?.trim() ?? "";
     } catch {
       return "";
     }
@@ -4622,7 +4619,7 @@ export const chatHandlers: GatewayRequestHandlers = {
     // Controller is already deleted by abortChatRunById — record durable task stop.
     if (res.aborted) {
       try {
-        const boardTaskId = readSessionTaskBoard(abortSessionFile).current?.taskId?.trim() ?? "";
+        const boardTaskId = sessionTaskState.read(abortSessionFile).current?.taskId?.trim() ?? "";
         if (boardTaskId) {
           const identity = authoritativeStopIdentityFromClient(client);
           if (mode === "undo") {
@@ -6566,7 +6563,7 @@ export const chatHandlers: GatewayRequestHandlers = {
             ? { interactionIngress: { userMessageId: clientRunId } }
             : {}),
           ...(taskTracking.action === "resume"
-            ? { resumedTaskBinding: captureTaskCompletionBinding(entry?.sessionFile) }
+            ? { resumedTaskBinding: sessionTaskState.captureBinding(entry?.sessionFile) }
             : {}),
           ...(p.growthBirthTurn ? { growthBirthTurn: true } : {}),
           ...(p.humanTakeoverObserved ? { humanTakeoverObserved: true } : {}),

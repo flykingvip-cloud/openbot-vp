@@ -5,7 +5,6 @@ import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { noteSkillSmokeClock } from "../../agents/turn-completion/contract.js";
 import { recordHonestCapabilityGap } from "../../auto-reply/reply/honest-empty-reply.js";
 import { resolveSessionTranscriptPath, updateSessionStore } from "../../config/sessions.js";
-import { isTaskExecutionBindingCurrent } from "../../conversation-task/session-task-board.js";
 import {
   tryAcquireEnterpriseAgentRun,
   releaseEnterpriseAgentRun,
@@ -35,13 +34,14 @@ import {
 } from "../../task-outcome/runtime-from-runner.js";
 import { normalizeTaskOutcomeSubjectRef } from "../../task-outcome/subject-ref.js";
 import type { AdmittedTurnHost } from "../execution/runner/admitted-turn-host.js";
+import { sessionTaskState } from "../state/index.js";
 
 export function bindAdmittedTurnHost(): AdmittedTurnHost {
   return {
     task: {
       ensureChatTurnTaskOutcome,
       normalizeTaskOutcomeSubjectRef,
-      isTaskExecutionBindingCurrent,
+      isTaskExecutionBindingCurrent: sessionTaskState.bindingCurrent,
     },
     budget: { assessRunnerTurnBudgetGate, chargeModelCallAgainstTip },
     admission: { tryAcquireEnterpriseAgentRun, releaseEnterpriseAgentRun },
