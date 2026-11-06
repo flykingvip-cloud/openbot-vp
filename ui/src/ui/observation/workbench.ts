@@ -280,6 +280,10 @@ export class OpenBotObservationWorkbench extends LitElement {
     const filter =
       this.filter === "个人任务" ? "personal" : this.filter === "协作任务" ? "collaboration" : null;
     const runs = view.runs.filter((row) => !filter || row.scope === filter);
+    // Re-resolve from the current authorized projection, never a stale drawer snapshot.
+    const selected = this.selected
+      ? runs.find((row) => row.id === this.selected?.id && row.sample === this.selected.sample)
+      : undefined;
     return html`<div class="obs-workbench" id="observation-workbench" data-observation-source=${view.source}>
       <div class="obs-header"><div><span class="obs-eyebrow">${this.role === "platform" ? "OBSERVABILITY" : "SELF-EVOLUTION / OBSERVABILITY"}</span><h2>${this.role === "platform" ? "跨租户运行证据" : "从任务证据到进化验证"}</h2><p>${this.role === "platform" ? "不混淆一次成功调用与一项被验收的工作。" : "观测 → 诊断 → 候选与实验 → 效果与治理"}</p></div>
         <div class="obs-source"><span class="obs-source-label">数据源</span><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select></div></div>
@@ -296,7 +300,7 @@ export class OpenBotObservationWorkbench extends LitElement {
       }
       ${this.renderTabs()}
       ${this.surface === "overview" ? html`${this.renderCoverage(view)}${this.renderSummary(view, runs)}<div class="obs-live-note">${this.role === "platform" && view.source === "live" ? "暂无跨租户历史聚合查询能力；本平台不构造跨租户 session 事件。企业工作台按 sessionKey 读取原事件投影。" : ""}</div>` : this.surface === "analysis" ? this.renderAnalysis(view, runs) : this.renderGovernance(view)}
-      ${this.selected ? this.renderEvidence(this.selected) : nothing}
+      ${selected ? this.renderEvidence(selected) : nothing}
     </div>`;
   }
 }

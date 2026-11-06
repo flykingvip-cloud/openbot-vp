@@ -95,6 +95,10 @@ describe("observation live projection", () => {
       "成本未知 · 未伪造为零或把周期账单摊到单任务",
     );
     expect(panel.querySelector(".obs-drawer-reasons")?.textContent).toContain("断序或乱序");
+    panel.sessionKey = "agent:other:main";
+    await panel.updateComplete;
+    expect(panel.querySelector(".obs-drawer")).toBeNull();
+    expect(panel.textContent).not.toContain("engine_A");
     container.remove();
   });
 });
