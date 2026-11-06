@@ -1,5 +1,30 @@
 import { expect, it } from "vitest";
 import { projectRuntimeObservation } from "./runtime-observation.ts";
+it("isolates retained evidence from consumer mutations", async () => {
+  const { recordRuntimeObservation, readRuntimeObservations } =
+    await import("./runtime-observation.ts");
+  const host = {};
+  recordRuntimeObservation(
+    host,
+    "own",
+    {
+      runId: "run",
+      seq: 1,
+      ts: 1,
+      stream: "lifecycle",
+      sessionKey: "own",
+    },
+    2,
+  );
+  const snapshot = readRuntimeObservations(host, "own");
+  snapshot.events[0].runId = "changed";
+  (snapshot.events[0].missing as string[]).push("invented");
+  (snapshot.reasons as string[]).push("invented");
+  const retained = readRuntimeObservations(host, "own");
+  expect(retained.events[0].runId).toBe("run");
+  expect(retained.events[0].missing).not.toContain("invented");
+  expect(retained.reasons).not.toContain("invented");
+});
 it("normalizes missing source identities consistently", () => {
   const base = { runId: "client", seq: 1, ts: 1, stream: "lifecycle" };
   const missing = projectRuntimeObservation(base, 2);
