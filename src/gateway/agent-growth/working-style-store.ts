@@ -12,6 +12,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
+import { withFileLock, SESSION_TASK_BOARD_LOCK_OPTIONS } from "../../infra/file-lock.js";
 import { createAsyncLock, readJsonFile, writeJsonAtomic } from "../../infra/json-files.js";
 import {
   applyWorkingStyleDelta,
@@ -74,7 +75,118 @@ export function resolveRobotWorkingStylePath(cfg: OpenBotConfig, agentId: string
   return path.join(resolveAgentDir(cfg, agentId), WORKING_STYLE_FILENAME);
 }
 
-const lock = createAsyncLock();
+const styleLocks = new Map<string, { gate: ReturnType<typeof createAsyncLock>; users: number }>();
+async function withStyleLock<T>(
+  cfg: OpenBotConfig,
+  agentId: string,
+  fn: (file: string) => Promise<T>,
+): Promise<T> {
+  const resolved = resolveRobotWorkingStylePath(cfg, agentId);
+  await fs.mkdir(path.dirname(resolved), { recursive: true });
+  const file = path.join(await fs.realpath(path.dirname(resolved)), path.basename(resolved));
+  let entry = styleLocks.get(file);
+  if (!entry) {
+    entry = { gate: createAsyncLock(), users: 0 };
+    styleLocks.set(file, entry);
+  }
+  entry.users++;
+  try {
+    return await entry.gate(() =>
+      withFileLock(file, SESSION_TASK_BOARD_LOCK_OPTIONS, () => fn(file)),
+    );
+  } finally {
+    entry.users--;
+    if (entry.users === 0 && styleLocks.get(file) === entry) {
+      styleLocks.delete(file);
+    }
+  }
+}
+/** Content version retains the existing format. ABA and multi-file transactions are out of scope. */
+export function workingStyleVersion(style: WorkingStyle): string {
+  return (
+    "style:" +
+    [
+      style.outputFormat,
+      style.reportingCadence,
+      style.decisionPreference,
+      style.riskPreference,
+      style.communicationTone,
+    ].join(":")
+  );
+}
+async function readStyleForWrite(file: string): Promise<WorkingStyle> {
+  let text: string;
+  try {
+    text = await fs.readFile(file, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return { ...DEFAULT_WORKING_STYLE };
+    }
+    throw error;
+  }
+  return validatedWorkingStyle(JSON.parse(text));
+}
+function validatedWorkingStyle(value: unknown): WorkingStyle {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("invalid_working_style");
+  }
+  const result = { ...DEFAULT_WORKING_STYLE, ...value } as WorkingStyle;
+  const allowed: Record<keyof WorkingStyle, readonly string[]> = {
+    outputFormat: ["concise", "detailed", "structured", "conversational"],
+    reportingCadence: ["on_completion", "milestone", "periodic", "on_request"],
+    decisionPreference: ["autonomous", "confirm_first", "escalate"],
+    riskPreference: ["conservative", "balanced", "aggressive"],
+    communicationTone: ["formal", "neutral", "friendly"],
+  };
+  for (const field of Object.keys(allowed) as (keyof WorkingStyle)[]) {
+    if (!allowed[field].includes(result[field])) {
+      throw new Error("invalid_working_style");
+    }
+  }
+  return {
+    outputFormat: result.outputFormat,
+    reportingCadence: result.reportingCadence,
+    decisionPreference: result.decisionPreference,
+    riskPreference: result.riskPreference,
+    communicationTone: result.communicationTone,
+  };
+}
+export async function compareAndSwapRobotWorkingStyle(
+  cfg: OpenBotConfig,
+  agentId: string,
+  expectedVersion: string,
+  updater: (current: WorkingStyle) => WorkingStyle,
+): Promise<
+  | {
+      ok: true;
+      before: WorkingStyle;
+      after: WorkingStyle;
+      beforeVersion: string;
+      afterVersion: string;
+    }
+  | { ok: false; code: "version_conflict"; actualVersion: string }
+> {
+  return withStyleLock(cfg, agentId, async (file) => {
+    const before = await readStyleForWrite(file);
+    const beforeVersion = workingStyleVersion(before);
+    if (beforeVersion !== expectedVersion) {
+      return {
+        ok: false as const,
+        code: "version_conflict" as const,
+        actualVersion: beforeVersion,
+      };
+    }
+    const after = validatedWorkingStyle(updater({ ...before }));
+    await writeJsonAtomic(file, after);
+    return {
+      ok: true as const,
+      before,
+      after,
+      beforeVersion,
+      afterVersion: workingStyleVersion(after),
+    };
+  });
+}
 
 /** 读取机器人 WorkingStyle；不存在返回 null。 */
 export async function readRobotWorkingStyle(
@@ -99,7 +211,10 @@ export async function writeRobotWorkingStyle(
   agentId: string,
   style: WorkingStyle,
 ): Promise<void> {
-  await writeJsonAtomic(resolveRobotWorkingStylePath(cfg, agentId), style);
+  await withStyleLock(cfg, agentId, async (file) => {
+    await readStyleForWrite(file);
+    await writeJsonAtomic(file, validatedWorkingStyle(style));
+  });
 }
 
 /** 在锁内对机器人 WorkingStyle 做读改写（updater 返回 null 表示不写）。 */
@@ -108,13 +223,13 @@ export async function updateRobotWorkingStyle(
   agentId: string,
   updater: (current: WorkingStyle) => WorkingStyle | null,
 ): Promise<WorkingStyle | null> {
-  return await lock(async () => {
-    const current = await readRobotWorkingStyleOrDefault(cfg, agentId);
+  return await withStyleLock(cfg, agentId, async (file) => {
+    const current = await readStyleForWrite(file);
     const next = updater(current);
     if (next === null) {
       return current;
     }
-    await writeRobotWorkingStyle(cfg, agentId, next);
+    await writeJsonAtomic(file, validatedWorkingStyle(next));
     return next;
   });
 }
