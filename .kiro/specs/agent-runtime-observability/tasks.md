@@ -65,3 +65,12 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - Correction to earlier acceptance: previous component-only tests did not prove real enterprise host wiring. This round adds the actual surface integration test and fixes missing props. — codex-observe-owner
 - Provenance remains unknown for outcomes; independent live execution does not relabel results live. P2 stays closed. No production/gateway verification, push, PR, deploy or observation flag enablement. — codex-observe-owner
 - Rollback: revert b0d84a543 for host wiring and 8220c43e2 for scope statistics; no database migration. — codex-observe-owner
+
+## Explicit supporting evidence windows
+
+- f8556e635: optional evidenceLookupWindow contains cohort, is bounded to 30 days and server projectedAt; exact-version supporting events outside cohort are marked without increasing candidate denominator. Default unchanged. — codex-observe-owner
+- f769c033a: UI distinguishes cohort and supporting evidence lookup windows; missing lookup does not imply expansion. — codex-observe-owner
+- 4ecaf87b5: test fixture aligned with UUID, unknown eviction, improvement gate and scope watermark DTO. — codex-observe-owner
+- Owner validation: 9 suites / 73 tests PASS; cross-window query contracts 35 PASS; evidence panel Chromium PASS; changed-file lint/format PASS. UI build PASS with pin sync skipped. — codex-observe-owner
+- Final tsgo remains nonzero for other paths, with no observation/evidence path diagnostics after fixture correction. No production/gateway validation or release actions. Outcome provenance and improvement gates unchanged; P2 unopened. — codex-observe-owner
+- Rollback: revert f8556e635 and f769c033a; no database migration. — codex-observe-owner
