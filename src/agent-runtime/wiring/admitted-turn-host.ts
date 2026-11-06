@@ -34,7 +34,7 @@ import {
 } from "../../task-outcome/runtime-from-runner.js";
 import { normalizeTaskOutcomeSubjectRef } from "../../task-outcome/subject-ref.js";
 import type { AdmittedTurnHost } from "../execution/runner/admitted-turn-host.js";
-import { sessionTaskState } from "../state/index.js";
+import { sessionTaskState, resetCorruptedSession } from "../state/index.js";
 
 export function bindAdmittedTurnHost(): AdmittedTurnHost {
   return {
@@ -65,37 +65,16 @@ export function bindAdmittedTurnHost(): AdmittedTurnHost {
       recordHonestCapabilityGap,
     },
     sessions: {
-      resetCorruptedSession: async (params) => {
-        const sessionKey = params.sessionKey;
-        const corruptedSessionId = params.getActiveSessionEntry()?.sessionId;
-        defaultRuntime.error(
-          `Session history corrupted (Gemini function call ordering). Resetting session: ${params.sessionKey}`,
-        );
-
-        try {
-          // Delete transcript file if it exists
-          if (corruptedSessionId) {
-            const transcriptPath = resolveSessionTranscriptPath(corruptedSessionId);
-            try {
-              fs.unlinkSync(transcriptPath);
-            } catch {
-              // Ignore if file doesn't exist
-            }
-          }
-
-          // Keep the in-memory snapshot consistent with the on-disk store reset.
-          delete params.activeSessionStore[sessionKey];
-
-          // Remove session entry from store using a fresh, locked snapshot.
-          await updateSessionStore(params.storePath, (store) => {
-            delete store[sessionKey];
-          });
-        } catch (cleanupErr) {
-          defaultRuntime.error(
-            `Failed to reset corrupted session ${params.sessionKey}: ${String(cleanupErr)}`,
-          );
-        }
-      },
+      resetCorruptedSession: (params) =>
+        resetCorruptedSession(params, {
+          removeTranscript: (sessionId) => fs.unlinkSync(resolveSessionTranscriptPath(sessionId)),
+          removeStoredSession: async (storePath, sessionKey) => {
+            await updateSessionStore(storePath, (store) => {
+              delete store[sessionKey];
+            });
+          },
+          reportError: (message) => defaultRuntime.error(message),
+        }),
     },
   };
 }
