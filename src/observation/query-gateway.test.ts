@@ -4,6 +4,10 @@ import type {
   GatewayClient,
 } from "../gateway/server-methods/types.js";
 import { createObservationQueryHandlers, OBSERVATION_QUERY_METHOD } from "./query-gateway.js";
+const { intents } = vi.hoisted(() => ({
+  intents: vi.fn(async () => ({ ok: true, state: "unknown", items: [], detail: null })),
+}));
+vi.mock("./action-intent-query.js", () => ({ queryActionIntents: intents }));
 const { query } = vi.hoisted(() => ({
   query: vi.fn(() => ({ ok: true, samples: [{ provenance: ["unknown"] }] })),
 }));
@@ -24,6 +28,66 @@ const invoke = async (
   return respond;
 };
 describe("observation query gateway", () => {
+  it("queries intents only on explicit request and rejects scope injection", async () => {
+    intents.mockClear();
+    const handler = createObservationQueryHandlers({
+      authDeps: { resolveMembership: async () => ({ tenantId: "tenant", userId: "alice" }) },
+      loadConfig: () => ({}),
+      now: () => 3,
+    })[OBSERVATION_QUERY_METHOD];
+    await invoke(handler, client());
+    expect(intents).not.toHaveBeenCalled();
+    const list = await invoke(handler, client(), {
+      ...params,
+      actionIntents: { limit: 10 },
+    } as typeof params);
+    expect(list.mock.calls[0][1].actionIntents.state).toBe("unknown");
+    expect(intents).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        caller: { subjectRef: "subject:alice", tenantId: "tenant" },
+        limit: 10,
+      }),
+      expect.anything(),
+    );
+    await invoke(handler, client(), {
+      ...params,
+      actionIntents: { intentId: "intent", revision: 0 },
+    } as typeof params);
+    expect(intents).toHaveBeenLastCalledWith(
+      expect.objectContaining({ intentId: "intent", revision: 0 }),
+      expect.anything(),
+    );
+    for (const actionIntents of [
+      null,
+      [],
+      { scope: "fake" },
+      { tenantId: "fake" },
+      { limit: 0 },
+      { revision: 1 },
+      { intentId: "intent", cursor: "x" },
+    ]) {
+      expect(
+        (await invoke(handler, client(), { ...params, actionIntents } as typeof params)).mock
+          .calls[0][0],
+      ).toBe(false);
+    }
+  });
+  it("rechecks membership after the asynchronous intent read", async () => {
+    const membership = vi
+      .fn()
+      .mockResolvedValueOnce({ tenantId: "tenant", userId: "alice" })
+      .mockRejectedValueOnce(new Error("revoked"));
+    const handler = createObservationQueryHandlers({
+      authDeps: { resolveMembership: membership },
+      loadConfig: () => ({}),
+      now: () => 3,
+    })[OBSERVATION_QUERY_METHOD];
+    expect(
+      (await invoke(handler, client(), { ...params, actionIntents: {} } as typeof params)).mock
+        .calls[0][0],
+    ).toBe(false);
+    expect(membership).toHaveBeenCalledTimes(2);
+  });
   it("uses trusted membership and preserves unknown provenance", async () => {
     const handler = createObservationQueryHandlers({
       authDeps: { resolveMembership: async () => ({ tenantId: "tenant", userId: "alice" }) },

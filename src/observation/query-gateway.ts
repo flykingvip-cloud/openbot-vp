@@ -1,3 +1,4 @@
+import path from "node:path";
 /** Thin read-only adapter; method registration belongs to the diagnosis pack. */
 import { loadConfig, type OpenBotConfig } from "../config/config.js";
 import {
@@ -8,6 +9,9 @@ import {
 import { ErrorCodes, errorShape } from "../gateway/protocol/index.js";
 import type { GatewayRequestHandlers } from "../gateway/server-methods/types.js";
 import { normalizeTaskOutcomeSubjectRef } from "../task-outcome/subject-ref.js";
+import { CONFIG_DIR } from "../utils.js";
+import { queryActionIntents } from "./action-intent-query.js";
+import { createActionIntentStore } from "./action-intent-store.js";
 import { queryObservation } from "./query.js";
 export const OBSERVATION_QUERY_METHOD = "diagnosis.observation.query";
 export function createObservationQueryHandlers(
@@ -15,6 +19,7 @@ export function createObservationQueryHandlers(
     authDeps?: DiagnosisGatewayAuthDeps;
     loadConfig?: () => OpenBotConfig;
     now?: () => number;
+    actionIntentStore?: Pick<ReturnType<typeof createActionIntentStore>, "list" | "detail">;
   } = {},
 ): GatewayRequestHandlers {
   return {
@@ -41,6 +46,7 @@ export function createObservationQueryHandlers(
         "from",
         "to",
         "evidenceLookupWindow",
+        "actionIntents",
       ]);
       if (
         Object.keys(params).some((k) => !allowed.has(k)) ||
@@ -88,8 +94,54 @@ export function createObservationQueryHandlers(
           }
           evidenceLookupWindow = { from: lookup.from, to: lookup.to };
         }
+        const rawIntents = params.actionIntents;
+        let actionIntents:
+          | { intentId?: string; revision?: number; limit?: number; cursor?: string }
+          | undefined;
+        if (rawIntents !== undefined) {
+          if (
+            !rawIntents ||
+            typeof rawIntents !== "object" ||
+            Array.isArray(rawIntents) ||
+            Object.keys(rawIntents).some(
+              (k) => !["intentId", "revision", "limit", "cursor"].includes(k),
+            )
+          ) {
+            deny("invalid_action_intents");
+            return;
+          }
+          const value = rawIntents as Record<string, unknown>;
+          if (
+            (value.intentId !== undefined &&
+              (typeof value.intentId !== "string" || !value.intentId.trim())) ||
+            (value.revision !== undefined &&
+              (typeof value.revision !== "number" ||
+                !Number.isSafeInteger(value.revision) ||
+                value.revision < 0 ||
+                !value.intentId)) ||
+            (value.limit !== undefined &&
+              (typeof value.limit !== "number" ||
+                !Number.isSafeInteger(value.limit) ||
+                value.limit < 1 ||
+                value.limit > 100)) ||
+            (value.cursor !== undefined &&
+              (typeof value.cursor !== "string" || !value.cursor || value.cursor.length > 4096)) ||
+            (value.intentId && (value.limit !== undefined || value.cursor !== undefined))
+          ) {
+            deny("invalid_action_intents");
+            return;
+          }
+          actionIntents = value as typeof actionIntents;
+        }
+        const cfg = (options.loadConfig ?? loadConfig)();
+        const caller = {
+          subjectRef: normalizeTaskOutcomeSubjectRef(
+            client.platformUserId?.trim() || auth.principal.principalId,
+          ),
+          tenantId: auth.trusted.tenantId,
+        };
         const result = queryObservation({
-          cfg: (options.loadConfig ?? loadConfig)(),
+          cfg,
           caller: {
             subjectRef: normalizeTaskOutcomeSubjectRef(
               client.platformUserId?.trim() || auth.principal.principalId,
@@ -106,6 +158,38 @@ export function createObservationQueryHandlers(
         });
         if (!result.ok) {
           deny(result.code);
+          return;
+        }
+        if (actionIntents) {
+          const intents = await queryActionIntents(
+            {
+              cfg,
+              caller,
+              agentId: params.agentId,
+              taskId: params.taskId,
+              outcomeVersion: params.outcomeVersion,
+              ...actionIntents,
+            },
+            options.actionIntentStore ??
+              createActionIntentStore(path.join(CONFIG_DIR, "observation", "action-intents")),
+          );
+          const fresh = await resolveDiagnosisProductionAuth(
+            client as unknown as DiagnosisGatewayAuthClient,
+            options.authDeps,
+          );
+          if (
+            !fresh ||
+            fresh.trusted.tenantId !== auth.trusted.tenantId ||
+            fresh.principal.principalId !== auth.principal.principalId
+          ) {
+            deny("unauthorized");
+            return;
+          }
+          if (!intents.ok) {
+            deny(intents.code);
+            return;
+          }
+          respond(true, { ...result, actionIntents: intents }, undefined);
           return;
         }
         respond(true, result, undefined);
