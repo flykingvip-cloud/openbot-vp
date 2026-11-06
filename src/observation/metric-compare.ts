@@ -28,17 +28,20 @@ export function compareObservationMetrics(input: {
 }) {
   const { baseline: b, candidate: c } = input;
   const reasons = new Set<string>();
-  const definitions = Object.values(OBSERVATION_METRIC_DICT);
+  const definition = OBSERVATION_METRIC_DICT.linkCoverage;
   if (
     b.metricDictVersion !== OBSERVATION_METRIC_DICT_VERSION ||
     c.metricDictVersion !== b.metricDictVersion
   ) {
     reasons.add("metric_dict_mismatch");
   }
-  if (b.metricId !== c.metricId || !definitions.some((d) => d.metricId === b.metricId)) {
+  if (b.metricId !== c.metricId || b.metricId !== definition.metricId) {
     reasons.add("metric_mismatch");
   }
-  if (!b.denominatorDefinition.trim() || b.denominatorDefinition !== c.denominatorDefinition) {
+  if (
+    b.denominatorDefinition !== definition.denominator ||
+    c.denominatorDefinition !== definition.denominator
+  ) {
     reasons.add("denominator_definition_mismatch");
   }
   if (!b.cohortRef.trim() || b.cohortRef !== c.cohortRef) {
@@ -97,6 +100,12 @@ export function compareObservationMetrics(input: {
       ) {
         reasons.add("provenance_gate");
       }
+    }
+    if (
+      side.numerator !==
+      side.samples.filter((sample) => sample.qualification === "fully_linked").length
+    ) {
+      reasons.add("numerator_evidence_mismatch");
     }
     // This minimum contract uses one unique sample per denominator unit.
     if (side.denominator !== side.samples.length) {

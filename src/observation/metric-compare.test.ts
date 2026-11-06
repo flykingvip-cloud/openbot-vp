@@ -1,13 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { compareObservationMetrics, type MetricCohort } from "./metric-compare.js";
+import { OBSERVATION_METRIC_DICT } from "./metric-dict.js";
 const cohort = (candidate = false): MetricCohort => ({
   metricDictVersion: 1,
   metricId: "eval.link_coverage",
-  denominatorDefinition: "unique attempted candidates including invalid",
+  denominatorDefinition: OBSERVATION_METRIC_DICT.linkCoverage.denominator,
   cohortRef: "test-cohort",
   window: { from: candidate ? 10 : 0, to: candidate ? 20 : 10 },
   windowDefinition: "half_open_source_window",
-  numerator: candidate ? 8 : 5,
+  numerator: 10,
   denominator: 10,
   environment: "test",
   samples: Array.from({ length: 10 }, (_, i) => ({
@@ -20,10 +21,35 @@ const cohort = (candidate = false): MetricCohort => ({
   })),
 });
 describe("read-only metric comparison", () => {
+  it("blocks a shared invented denominator even when both sides agree", () => {
+    expect(
+      compareObservationMetrics({
+        baseline: { ...cohort(), denominatorDefinition: "invented" },
+        candidate: { ...cohort(true), denominatorDefinition: "invented" },
+      }).status,
+    ).toBe("blocked");
+  });
+  it("blocks aggregate numerators contradicted by fully linked sample evidence", () => {
+    expect(
+      compareObservationMetrics({
+        baseline: { ...cohort(), numerator: 5 },
+        candidate: { ...cohort(true), numerator: 8 },
+      }).status,
+    ).toBe("blocked");
+  });
+  it("blocks other dictionary metrics without outcome numerator evidence", () => {
+    expect(
+      compareObservationMetrics({
+        baseline: { ...cohort(), metricId: "business.task_closed_success_rate" },
+        candidate: { ...cohort(true), metricId: "business.task_closed_success_rate" },
+      }).status,
+    ).toBe("blocked");
+  });
+
   it("returns a labelled injected comparison without authorizing promotion", () => {
     const r = compareObservationMetrics({ baseline: cohort(), candidate: cohort(true) });
     expect(r.status).toBe("comparable");
-    expect(r.delta).toBeCloseTo(0.3);
+    expect(r.delta).toBe(0);
     expect(r.productionValidated).toBe(false);
     expect(r.promotionAllowed).toBe(false);
     expect(r.interpretation).toContain("correlation");
