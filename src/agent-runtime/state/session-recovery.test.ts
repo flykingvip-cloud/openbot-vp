@@ -1,6 +1,42 @@
 import { expect, it, vi } from "vitest";
 import type { SessionEntry } from "../../config/sessions.js";
-import { resetCorruptedSession } from "./session-recovery.js";
+import { resetCorruptedSession, prepareReplacementSessionEntry } from "./session-recovery.js";
+
+it("retires transcript-bound model state without changing owner preferences or the old snapshot", () => {
+  const previous: SessionEntry = {
+    sessionId: "old",
+    updatedAt: 1,
+    systemSent: true,
+    abortedLastRun: true,
+    modelProvider: "provider",
+    model: "model",
+    contextTokens: 100,
+    fallbackNoticeSelectedModel: "old-model",
+    fallbackNoticeActiveModel: "fallback",
+    fallbackNoticeReason: "failed",
+    thinkingLevel: "high",
+  };
+  const replacement = prepareReplacementSessionEntry(previous, "next", 2);
+  expect(replacement).toMatchObject({
+    sessionId: "next",
+    updatedAt: 2,
+    systemSent: false,
+    abortedLastRun: false,
+    thinkingLevel: "high",
+  });
+  for (const field of [
+    "modelProvider",
+    "model",
+    "contextTokens",
+    "systemPromptReport",
+    "fallbackNoticeSelectedModel",
+    "fallbackNoticeActiveModel",
+    "fallbackNoticeReason",
+  ] as const) {
+    expect(replacement[field]).toBeUndefined();
+  }
+  expect(previous).toMatchObject({ sessionId: "old", model: "model", systemSent: true });
+});
 
 it.each([false, true])(
   "preserves cleanup order even when transcript removal fails: %s",

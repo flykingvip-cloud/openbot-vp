@@ -1,5 +1,27 @@
 import type { SessionEntry } from "../../config/sessions.js";
 
+/** Preserve identity/preferences while retiring model state bound to the damaged transcript. */
+export function prepareReplacementSessionEntry(
+  previous: SessionEntry,
+  sessionId: string,
+  updatedAt: number,
+): SessionEntry {
+  return {
+    ...previous,
+    sessionId,
+    updatedAt,
+    systemSent: false,
+    abortedLastRun: false,
+    modelProvider: undefined,
+    model: undefined,
+    contextTokens: undefined,
+    systemPromptReport: undefined,
+    fallbackNoticeSelectedModel: undefined,
+    fallbackNoticeActiveModel: undefined,
+    fallbackNoticeReason: undefined,
+  };
+}
+
 export type CorruptedSessionResetInput = {
   sessionKey: string;
   storePath: string;

@@ -430,20 +430,11 @@ export async function runReplyAgent(params: {
     }
     const prevSessionId = cleanupTranscripts ? prevEntry.sessionId : undefined;
     const nextSessionId = generateSecureUuid();
-    const nextEntry: SessionEntry = {
-      ...prevEntry,
-      sessionId: nextSessionId,
-      updatedAt: Date.now(),
-      systemSent: false,
-      abortedLastRun: false,
-      modelProvider: undefined,
-      model: undefined,
-      contextTokens: undefined,
-      systemPromptReport: undefined,
-      fallbackNoticeSelectedModel: undefined,
-      fallbackNoticeActiveModel: undefined,
-      fallbackNoticeReason: undefined,
-    };
+    const nextEntry = replyTurnRuntime.prepareReplacementSessionEntry(
+      prevEntry,
+      nextSessionId,
+      Date.now(),
+    );
     const agentId = resolveAgentIdFromSessionKey(sessionKey);
     const nextSessionFile = storePath
       ? resolveSessionTranscriptPathInDir(
