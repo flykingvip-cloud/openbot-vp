@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
 import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
+import { sessionTaskState } from "../../agent-runtime/state/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 import { resolveAgentDir, resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
@@ -17,12 +18,7 @@ import {
   runWithOguiDecisionResume,
 } from "../../config/sessions/ogui-decision-engine.js";
 import type { TypingMode } from "../../config/types.js";
-import {
-  readSessionTaskBoard,
-  activeConstraintTexts,
-  startBoundTaskExecution,
-  isTaskExecutionBindingCurrent,
-} from "../../conversation-task/session-task-board.js";
+import { activeConstraintTexts } from "../../conversation-task/session-task-board.js";
 import { claimTaskBoardContinue } from "../../conversation-task/task-board-continue.js";
 import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain.js";
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
@@ -205,9 +201,13 @@ export function createFollowupRunner(params: {
       const trackedIndividual =
         !queued.run.collaborationRoundInvoked &&
         !queued.run.privateRunBag &&
-        Boolean(readSessionTaskBoard(queued.run.sessionFile).current);
+        Boolean(sessionTaskState.read(queued.run.sessionFile).current);
       if (incomingBinding || trackedIndividual) {
-        const claimed = startBoundTaskExecution(queued.run.sessionFile, incomingBinding, runId);
+        const claimed = sessionTaskState.startExecution(
+          queued.run.sessionFile,
+          incomingBinding,
+          runId,
+        );
         if (!claimed) {
           try {
             await sendFollowupPayloads(
@@ -492,7 +492,7 @@ export function createFollowupRunner(params: {
               }
               if (
                 queued.run.taskCompletionBinding &&
-                !isTaskExecutionBindingCurrent(
+                !sessionTaskState.bindingCurrent(
                   queued.run.sessionFile,
                   queued.run.taskCompletionBinding,
                 )
