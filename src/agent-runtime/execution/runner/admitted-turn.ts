@@ -151,6 +151,7 @@ export async function runAdmittedTurn(
   let modelGate: EmployeeModelGateResult | undefined;
   let capabilityOutcomeForTurn: CapabilityOutcomeForTurn | undefined;
   const runtimeEvidence = createRuntimeEvidenceObserver({
+    agentId: growthAgentIdForEntry,
     source: { provenance: "live", collector: "runtime_execution" },
     taskId: chatOutcomeTaskId,
     scope: chatOutcomeScope,

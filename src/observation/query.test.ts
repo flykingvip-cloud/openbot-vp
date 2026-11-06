@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../config/config.js";
 import { createExecutionEvidenceStore } from "./execution-evidence-store.js";
-import { queryObservation } from "./query.js";
+import { createExecutionJournalRuntime } from "./execution-journal-runtime.js";
+import { createExecutionJournal } from "./execution-journal.js";
+import { queryObservation, queryObservationWithJournal } from "./query.js";
 let dir = "";
 let cfg: OpenBotConfig;
 const time = Date.parse("2026-11-06T00:00:00Z");
@@ -183,5 +185,225 @@ describe("internal observation query", () => {
     expect(r.samples[0].attributedCost).toBeNull();
     expect(r.executionSource.retention).toBe("process_memory");
     expect(JSON.stringify(r)).not.toContain("subject:alice");
+  });
+  it("reads actual persisted execution after restart without granting improvement authority", async () => {
+    const scope = row().scope as Parameters<
+      ReturnType<typeof createExecutionEvidenceStore>["query"]
+    >[0];
+    const record = {
+      ...row(),
+      runs: [{ runId: "run", attemptIds: ["a"], effectiveAttemptId: "a", status: "succeeded" }],
+      attempts: [
+        {
+          attemptId: "a",
+          runId: "run",
+          status: "succeeded",
+          observedAt: new Date(time).toISOString(),
+        },
+      ],
+    };
+    fs.writeFileSync(path.join(dir, "task-outcomes/tips/task.json"), JSON.stringify(record));
+    fs.writeFileSync(
+      path.join(dir, "task-outcomes/versions/task__v1.json"),
+      JSON.stringify(record),
+    );
+    const rootDir = path.join(dir, "journal");
+    const journal = createExecutionJournal({ rootDir, enabled: () => true, now: () => time + 1 });
+    for (const [eventId, stage] of [
+      ["s", "started"],
+      ["e", "completed"],
+    ] as const) {
+      await journal.appendFact({
+        agentId: "bot",
+        fact: { eventId, stage, occurredAt: time, taskId: "task", runId: "run", scope },
+      });
+    }
+    await journal.appendLink({
+      agentId: "bot",
+      receipt: {
+        receiptId: "l",
+        taskId: "task",
+        runId: "run",
+        scope,
+        outcomeVersion: 1,
+        attemptId: "a",
+        attemptGranularity: "turn",
+        eventIds: ["s", "e"],
+      },
+    });
+    const runtime = createExecutionJournalRuntime({
+      journal: createExecutionJournal({ rootDir, enabled: () => true, now: () => time + 1 }),
+      enabled: () => true,
+    });
+    const result = await queryObservationWithJournal(
+      {
+        cfg,
+        caller: { subjectRef: "subject:alice", tenantId: "tenant" },
+        agentId: "bot",
+        taskId: "task",
+        outcomeVersion: 1,
+        from: time,
+        to: time + 1,
+        projectedAt: time + 1,
+        executionStore: createExecutionEvidenceStore({ enabled: () => false }),
+      },
+      runtime,
+    );
+    if (!result.ok || !("executionJournal" in result)) {
+      throw new Error("query_failed");
+    }
+    expect(result.executionJournal.state).toBe("retained");
+    expect(result.samples[0].executionRefs).toHaveLength(2);
+    expect(result.samples[0].improvementEligible).toBe(false);
+    expect(result.samples[0].attributedCost).toBeNull();
+    expect(JSON.stringify(result)).not.toContain("authzScopeRef");
+  });
+  it("reports disabled and missing durable sources explicitly instead of claiming complete history", async () => {
+    const rootDir = path.join(dir, "never-created");
+    const journal = createExecutionJournal({ rootDir });
+    const request = {
+      cfg,
+      caller: { subjectRef: "subject:alice", tenantId: "tenant" },
+      agentId: "bot",
+      taskId: "task",
+      outcomeVersion: 1,
+      from: time,
+      to: time + 1,
+      projectedAt: time + 1,
+    };
+    const disabled = await queryObservationWithJournal(
+      request,
+      createExecutionJournalRuntime({ journal }),
+    );
+    expect(disabled).toMatchObject({
+      ok: true,
+      executionJournal: { state: "unknown", reasons: ["journal_disabled"] },
+    });
+    expect(fs.existsSync(rootDir)).toBe(false);
+    const missing = await queryObservationWithJournal(
+      request,
+      createExecutionJournalRuntime({
+        journal: createExecutionJournal({ rootDir, enabled: () => true }),
+        enabled: () => true,
+      }),
+    );
+    expect(missing).toMatchObject({
+      ok: true,
+      executionJournal: { state: "unknown", reasons: ["journal_missing"] },
+    });
+    expect(fs.existsSync(rootDir)).toBe(false);
+  });
+  it("rechecks scope after awaiting journal reads", async () => {
+    const journal = createExecutionJournal({
+      rootDir: path.join(dir, "journal"),
+      enabled: () => true,
+    });
+    const runtime = createExecutionJournalRuntime({ journal, enabled: () => true });
+    vi.spyOn(runtime, "query").mockImplementation(async () => {
+      const changed = { ...row(), scope: { ...row().scope, subjectRef: "subject:other" } };
+      fs.writeFileSync(path.join(dir, "task-outcomes/tips/task.json"), JSON.stringify(changed));
+      return { ok: false, state: "unknown", reason: "journal_missing" };
+    });
+    const r = await queryObservationWithJournal(
+      {
+        cfg,
+        caller: { subjectRef: "subject:alice", tenantId: "tenant" },
+        agentId: "bot",
+        taskId: "task",
+        outcomeVersion: 1,
+        from: time,
+        to: time + 1,
+        projectedAt: time + 1,
+      },
+      runtime,
+    );
+    expect(r).toMatchObject({ ok: false, code: "unauthorized" });
+  });
+  it("deduplicates stable persisted UUID facts and invalidates conflicting payload across sources", async () => {
+    const scope = row().scope as Parameters<
+      ReturnType<typeof createExecutionEvidenceStore>["query"]
+    >[0];
+    const record = {
+      ...row(),
+      runs: [{ runId: "run", attemptIds: ["a"], effectiveAttemptId: "a", status: "succeeded" }],
+      attempts: [
+        {
+          attemptId: "a",
+          runId: "run",
+          status: "succeeded",
+          observedAt: new Date(time).toISOString(),
+        },
+      ],
+    };
+    fs.writeFileSync(path.join(dir, "task-outcomes/tips/task.json"), JSON.stringify(record));
+    fs.writeFileSync(
+      path.join(dir, "task-outcomes/versions/task__v1.json"),
+      JSON.stringify(record),
+    );
+    const journal = createExecutionJournal({
+      rootDir: path.join(dir, "journal"),
+      enabled: () => true,
+      now: () => time + 1,
+    });
+    const memory = createExecutionEvidenceStore({ enabled: () => true, now: () => time + 1 });
+    const ids = ["00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"];
+    for (const [index, stage] of (["started", "completed"] as const).entries()) {
+      const fact = {
+        eventId: ids[index],
+        stage,
+        occurredAt: time,
+        taskId: "task",
+        runId: "run",
+        scope,
+      };
+      memory.recordFact(fact);
+      await journal.appendFact({
+        agentId: "bot",
+        fact: { ...fact, source: { provenance: "unknown", collector: "unknown" } },
+      });
+    }
+    const receipt = {
+      receiptId: "l",
+      taskId: "task",
+      runId: "run",
+      scope,
+      outcomeVersion: 1,
+      attemptId: "a",
+      attemptGranularity: "turn" as const,
+      eventIds: ids,
+    };
+    memory.recordLink(receipt);
+    await journal.appendLink({ agentId: "bot", receipt });
+    const runtime = createExecutionJournalRuntime({ journal, enabled: () => true });
+    const request = {
+      cfg,
+      caller: { subjectRef: "subject:alice", tenantId: "tenant" },
+      agentId: "bot",
+      taskId: "task",
+      outcomeVersion: 1,
+      from: time,
+      to: time + 1,
+      projectedAt: time + 1,
+      executionStore: memory,
+    };
+    const result = await queryObservationWithJournal(request, runtime);
+    if (!result.ok || !("samples" in result)) {
+      throw new Error("failed");
+    }
+    expect(result.samples[0].executionRefs).toHaveLength(2);
+    const snapshot = memory.query(scope);
+    const changed = {
+      ...snapshot,
+      facts: snapshot.facts.map((f) => ({ ...f, occurredAt: time + 1 })),
+    };
+    const conflict = await queryObservationWithJournal(
+      { ...request, to: time + 2, projectedAt: time + 2, executionStore: { query: () => changed } },
+      runtime,
+    );
+    if (!conflict.ok || !("samples" in conflict)) {
+      throw new Error("failed");
+    }
+    expect(conflict.samples[0].qualification).toBe("invalid");
+    expect(conflict.samples[0].reasons).toContain("duplicate_conflict");
   });
 });

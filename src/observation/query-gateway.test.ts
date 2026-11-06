@@ -27,7 +27,7 @@ vi.mock("./action-intent-query.js", () => ({ queryActionIntents: intents }));
 const { query } = vi.hoisted(() => ({
   query: vi.fn(() => ({ ok: true, samples: [{ provenance: ["unknown"] }] })),
 }));
-vi.mock("./query.js", () => ({ queryObservation: query }));
+vi.mock("./query.js", () => ({ queryObservationWithJournal: query }));
 const client = (scopes = ["operator.read"]): GatewayClient => ({
   platformUserId: "alice",
   sessionDomain: "enterprise",

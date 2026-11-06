@@ -14,7 +14,7 @@ import { queryActionIntents } from "./action-intent-query.js";
 import { createActionIntentStore } from "./action-intent-store.js";
 import { createCapacityReader } from "./capacity-reader.js";
 import { createMetricCompareGatewayHelper } from "./metric-compare-gateway.js";
-import { queryObservation } from "./query.js";
+import { queryObservationWithJournal } from "./query.js";
 export const OBSERVATION_QUERY_METHOD = "diagnosis.observation.query";
 export function createObservationQueryHandlers(
   options: {
@@ -146,7 +146,7 @@ export function createObservationQueryHandlers(
           ),
           tenantId: auth.trusted.tenantId,
         };
-        const result = queryObservation({
+        const result = await queryObservationWithJournal({
           cfg,
           caller: {
             subjectRef: normalizeTaskOutcomeSubjectRef(

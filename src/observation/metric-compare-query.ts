@@ -2,7 +2,7 @@
 import type { OpenBotConfig } from "../config/config.js";
 import { compareObservationMetrics, type MetricCohort } from "./metric-compare.js";
 import { OBSERVATION_METRIC_DICT, OBSERVATION_METRIC_DICT_VERSION } from "./metric-dict.js";
-import { queryObservation } from "./query.js";
+import { queryObservationWithJournal } from "./query.js";
 export type ComparisonCaller = { subjectRef: string; tenantId?: string | null };
 type Ref = { agentId: string; taskId: string; outcomeVersion: number };
 type Side = { refs: Ref[]; window: { from: number; to: number } };
@@ -100,12 +100,15 @@ export function createMetricCompareQuery(options: {
         return Boolean(current?.subjectRef.trim() && callerKey(current) === identity);
       };
       const read = async (input: Side) => {
-        const queries: { ref: Ref; result: ReturnType<typeof queryObservation> }[] = [];
+        const queries: {
+          ref: Ref;
+          result: Awaited<ReturnType<typeof queryObservationWithJournal>>;
+        }[] = [];
         for (const ref of uniqueRefs(input.refs)) {
           if (!(await stillAuthorized())) {
             throw new Error("unauthorized");
           }
-          const result = queryObservation({
+          const result = await queryObservationWithJournal({
             cfg: options.cfg,
             caller,
             ...ref,

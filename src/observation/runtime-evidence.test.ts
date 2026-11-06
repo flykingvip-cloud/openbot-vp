@@ -6,6 +6,8 @@ import { ChatTaskOutcomeAdapter } from "../task-outcome/entrypoints/chat.js";
 import { TaskOutcomeResultService } from "../task-outcome/result-service.js";
 import { DurableTaskOutcomeStore } from "../task-outcome/store.js";
 import { createExecutionEvidenceStore } from "./execution-evidence-store.js";
+import { createExecutionJournalRuntime } from "./execution-journal-runtime.js";
+import { createExecutionJournal } from "./execution-journal.js";
 import { createOutcomeSourceStore } from "./outcome-source.js";
 import { createRuntimeEvidenceObserver } from "./runtime-evidence.js";
 const scope = {
@@ -138,5 +140,30 @@ describe("actual execution to actual version receipt", () => {
       disabled,
     ).capture("started");
     expect(disabled.query(scope).facts).toEqual([]);
+  });
+  it("persists an unfinished independent start when agent identity is known", async () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-durable-start-"));
+    const journal = createExecutionJournal({ rootDir: root, enabled: () => true });
+    const runtime = createExecutionJournalRuntime({ journal, enabled: () => true });
+    const observer = createRuntimeEvidenceObserver(
+      {
+        taskId: "task",
+        agentId: "bot",
+        scope,
+        runId: "run",
+        source: { provenance: "injected", collector: "test" },
+      },
+      createExecutionEvidenceStore({ enabled: () => true }),
+      createOutcomeSourceStore({ enabled: () => true }),
+      runtime,
+    );
+    observer.capture("started");
+    await runtime.flush();
+    const result = await runtime.query({ agentId: "bot", scope });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.facts.map((f) => f.stage)).toEqual(["started"]);
+      expect(result.links).toEqual([]);
+    }
   });
 });

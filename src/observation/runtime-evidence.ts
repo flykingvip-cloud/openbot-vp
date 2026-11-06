@@ -6,16 +6,22 @@ import {
   type createExecutionEvidenceStore,
   type ExecutionSourceDeclaration,
 } from "./execution-evidence-store.js";
+import {
+  getExecutionJournalRuntime,
+  type createExecutionJournalRuntime,
+} from "./execution-journal-runtime.js";
 import { getOutcomeSourceStore, type createOutcomeSourceStore } from "./outcome-source.js";
 export function createRuntimeEvidenceObserver(
   context: {
     taskId?: string;
+    agentId?: string;
     scope?: TrustedScope;
     runId: string;
     source?: ExecutionSourceDeclaration;
   },
   store: ReturnType<typeof createExecutionEvidenceStore> = getExecutionEvidenceStore(),
   outcomeSources: ReturnType<typeof createOutcomeSourceStore> = getOutcomeSourceStore(),
+  journal: ReturnType<typeof createExecutionJournalRuntime> = getExecutionJournalRuntime(),
 ) {
   const ids: string[] = [];
   let overflow = false;
@@ -47,6 +53,12 @@ export function createRuntimeEvidenceObserver(
           })
         ) {
           ids.push(eventId);
+          if (context.agentId && journal.isEnabled()) {
+            const fact = store.query(context.scope).facts.find((item) => item.eventId === eventId);
+            if (fact) {
+              journal.recordFact({ agentId: context.agentId, fact });
+            }
+          }
         }
       } catch {
         /* observation cannot affect execution */
@@ -83,7 +95,7 @@ export function createRuntimeEvidenceObserver(
         if (!attempt) {
           return false;
         }
-        const linked = store.recordLink({
+        const receipt = {
           receiptId:
             "turn:" + context.runId + ":" + record.outcomeVersion + ":" + attempt.attemptId,
           taskId: record.taskId,
@@ -91,9 +103,21 @@ export function createRuntimeEvidenceObserver(
           runId: context.runId,
           outcomeVersion: record.outcomeVersion,
           attemptId: attempt.attemptId,
-          attemptGranularity: "turn",
+          attemptGranularity: "turn" as const,
           eventIds: [...ids],
-        });
+        };
+        const linked = store.recordLink(receipt);
+        if (
+          linked &&
+          submission &&
+          journal.isEnabled() &&
+          (!context.agentId || context.agentId === submission.agentId)
+        ) {
+          for (const fact of captured) {
+            journal.recordFact({ agentId: submission.agentId, fact });
+          }
+          journal.recordLink({ agentId: submission.agentId, receipt });
+        }
         if (linked && submission) {
           outcomeSources.record({
             agentId: submission.agentId,
