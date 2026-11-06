@@ -18,6 +18,7 @@ import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-id
 import { resolveAgentRunEntitlementScope } from "../../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
 import type { resolveMessageChannel } from "../../../utils/message-channel.js";
+import { persistCommandSessionEntry } from "../../state/index.js";
 const log = createSubsystemLogger("commands/agent");
 
 function resolveFallbackRetryPrompt(params: { body: string; isFallbackRetry: boolean }): string {
@@ -27,44 +28,34 @@ function resolveFallbackRetryPrompt(params: { body: string; isFallbackRetry: boo
   return "Continue where you left off. The previous model attempt failed or timed out.";
 }
 
-export function runCommandCandidate(
-  params: {
-    providerOverride: string;
-    modelOverride: string;
-    cfg: ReturnType<typeof loadConfig>;
-    sessionEntry: SessionEntry | undefined;
-    sessionId: string;
-    sessionKey: string | undefined;
-    sessionAgentId: string;
-    sessionFile: string;
-    workspaceDir: string;
-    body: string;
-    isFallbackRetry: boolean;
-    resolvedThinkLevel: ThinkLevel;
-    timeoutMs: number;
-    runId: string;
-    opts: AgentCommandOpts & { senderIsOwner: boolean };
-    runContext: ReturnType<typeof resolveAgentRunContext>;
-    spawnedBy: string | undefined;
-    messageChannel: ReturnType<typeof resolveMessageChannel>;
-    skillsSnapshot: ReturnType<typeof buildWorkspaceSkillSnapshot> | undefined;
-    resolvedVerboseLevel: VerboseLevel | undefined;
-    agentDir: string;
-    onAgentEvent: (evt: { stream: string; data?: Record<string, unknown> }) => void;
-    primaryProvider: string;
-    sessionStore?: Record<string, SessionEntry>;
-    storePath?: string;
-    allowTransientCooldownProbe?: boolean;
-  },
-  ports: {
-    persistSessionEntry: (params: {
-      sessionStore: Record<string, SessionEntry>;
-      sessionKey: string;
-      storePath: string;
-      entry: SessionEntry;
-    }) => Promise<void>;
-  },
-) {
+export function runCommandCandidate(params: {
+  providerOverride: string;
+  modelOverride: string;
+  cfg: ReturnType<typeof loadConfig>;
+  sessionEntry: SessionEntry | undefined;
+  sessionId: string;
+  sessionKey: string | undefined;
+  sessionAgentId: string;
+  sessionFile: string;
+  workspaceDir: string;
+  body: string;
+  isFallbackRetry: boolean;
+  resolvedThinkLevel: ThinkLevel;
+  timeoutMs: number;
+  runId: string;
+  opts: AgentCommandOpts & { senderIsOwner: boolean };
+  runContext: ReturnType<typeof resolveAgentRunContext>;
+  spawnedBy: string | undefined;
+  messageChannel: ReturnType<typeof resolveMessageChannel>;
+  skillsSnapshot: ReturnType<typeof buildWorkspaceSkillSnapshot> | undefined;
+  resolvedVerboseLevel: VerboseLevel | undefined;
+  agentDir: string;
+  onAgentEvent: (evt: { stream: string; data?: Record<string, unknown> }) => void;
+  primaryProvider: string;
+  sessionStore?: Record<string, SessionEntry>;
+  storePath?: string;
+  allowTransientCooldownProbe?: boolean;
+}) {
   const effectivePrompt = resolveFallbackRetryPrompt({
     body: params.body,
     isFallbackRetry: params.isFallbackRetry,
@@ -160,7 +151,7 @@ export function runCommandCandidate(
               }
               updatedEntry.updatedAt = Date.now();
 
-              await ports.persistSessionEntry({
+              await persistCommandSessionEntry({
                 sessionStore: params.sessionStore,
                 sessionKey: params.sessionKey,
                 storePath: params.storePath,
@@ -190,7 +181,7 @@ export function runCommandCandidate(
                   );
                   updatedEntry.updatedAt = Date.now();
 
-                  await ports.persistSessionEntry({
+                  await persistCommandSessionEntry({
                     sessionStore: params.sessionStore,
                     sessionKey: params.sessionKey,
                     storePath: params.storePath,

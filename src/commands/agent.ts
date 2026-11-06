@@ -1193,7 +1193,7 @@ async function agentCommandInternal(
                 lifecycleEnded = true;
               }
             },
-          }, { persistSessionEntry });
+          });
               if (agentOutcomeTaskId && agentOutcomeScope) {
                 tipBudgetCallSeq += 1;
                 const charged = chargeModelCallAgainstTip(cfg, sessionAgentId, {
