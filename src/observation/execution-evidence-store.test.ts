@@ -30,6 +30,75 @@ const link = () => ({
   eventIds: ["e"],
 });
 describe("disposable execution evidence", () => {
+  it("keeps disabled epochs stable until the flag changes", () => {
+    let on = false;
+    const store = createExecutionEvidenceStore({ enabled: () => on, now: () => 100 });
+    const first = store.query(scope);
+    expect(store.query(scope).epoch).toBe(first.epoch);
+    on = true;
+    const running = store.query(scope);
+    expect(running.epoch).not.toBe(first.epoch);
+    on = false;
+    const stopped = store.query(scope);
+    expect(stopped.epoch).not.toBe(running.epoch);
+    expect(store.query(scope).epoch).toBe(stopped.epoch);
+  });
+  it("reports only scope-local ingest and retention statistics", () => {
+    let at = 100;
+    const store = createExecutionEvidenceStore({
+      enabled: () => true,
+      now: () => at,
+      ttlMs: 10,
+      capacity: 2,
+    });
+    store.recordFact(fact("a1"));
+    store.recordFact({ ...fact("b1"), scope: { ...scope, tenantId: "other" } });
+    const before = store.query(scope).scopeWatermark;
+    expect(before).toMatchObject({
+      state: "tracked",
+      ingestSequence: 1,
+      expiredCount: 0,
+      capacityEvictedCount: 0,
+      retainedFromSequence: 1,
+      retainedToSequence: 1,
+    });
+    store.recordFact({ ...fact("b2"), scope: { ...scope, tenantId: "other" } });
+    expect(store.query(scope).scopeWatermark).toMatchObject({
+      ingestSequence: 1,
+      expiredCount: 0,
+      capacityEvictedCount: 1,
+      retainedFromSequence: null,
+      retainedToSequence: null,
+    });
+    at = 110;
+    expect(store.query({ ...scope, tenantId: "other" }).scopeWatermark).toMatchObject({
+      ingestSequence: 2,
+      expiredCount: 2,
+      capacityEvictedCount: 0,
+    });
+    expect(store.query(scope).scopeWatermark.expiredCount).toBe(0);
+  });
+  it("forgets bounded scope statistics without reporting false zero history", () => {
+    const store = createExecutionEvidenceStore({
+      enabled: () => true,
+      now: () => 100,
+      capacity: 1,
+    });
+    store.recordFact(fact("a"));
+    const first = store.query(scope).scopeWatermark;
+    store.recordFact({ ...fact("b"), scope: { ...scope, tenantId: "other" } });
+    expect(store.query(scope).scopeWatermark).toMatchObject({
+      state: "unknown",
+      ingestSequence: null,
+      expiredCount: null,
+      capacityEvictedCount: null,
+    });
+    store.recordFact(fact("a2"));
+    const resumed = store.query(scope).scopeWatermark;
+    expect(resumed.trackingEpoch).not.toBe(first.trackingEpoch);
+    expect(resumed.priorHistory).toBe("unknown");
+    expect(store.query(scope).evictedCount).toBeNull();
+  });
   it("defaults off and captures only whitelisted independent facts", () => {
     vi.stubEnv(EXECUTION_EVIDENCE_FLAG, "");
     expect(createExecutionEvidenceStore().recordFact(fact())).toBe(false);

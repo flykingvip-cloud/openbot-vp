@@ -73,6 +73,7 @@ export function projectExecutionEvidence(input: {
   return {
     executions,
     executionSource: {
+      scopeWatermark: { ...snapshot.scopeWatermark },
       processId: snapshot.processId,
       epoch: snapshot.epoch,
       retention: snapshot.retention,

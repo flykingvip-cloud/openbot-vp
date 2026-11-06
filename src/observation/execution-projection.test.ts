@@ -51,6 +51,47 @@ function setup(capacity = 10) {
   };
 }
 describe("execution evidence projection", () => {
+  it("projects scoped retention without claiming complete history", () => {
+    const x = setup();
+    const source = x.project().executionSource;
+    expect(source.sourceWatermark).toBeNull();
+    expect(source.scopeWatermark).toMatchObject({
+      state: "tracked",
+      ingestSequence: 2,
+      priorHistory: "unknown",
+    });
+    const snapshot = x.store.query(scope);
+    source.scopeWatermark.ingestSequence = 999;
+    expect(snapshot.scopeWatermark.ingestSequence).toBe(2);
+    x.disable();
+    expect(x.project().executionSource.scopeWatermark).toMatchObject({
+      state: "unknown",
+      ingestSequence: null,
+      priorHistory: "unknown",
+    });
+  });
+  it("preserves unknown scope statistics after bounded tracking eviction", () => {
+    const x = setup(1);
+    x.store.recordFact({
+      eventId: "other",
+      stage: "started",
+      occurredAt: 100,
+      scope: { ...scope, personalDomainId: "other" },
+      taskId: "other-task",
+      runId: "other-run",
+    });
+    const source = x.project().executionSource;
+    expect(source.scopeWatermark).toMatchObject({
+      state: "unknown",
+      trackingEpoch: null,
+      ingestSequence: null,
+      expiredCount: null,
+      capacityEvictedCount: null,
+      priorHistory: "unknown",
+    });
+    expect(source.sourceWatermark).toBeNull();
+    expect(JSON.stringify(source)).not.toContain("other-task");
+  });
   it("requires retained started and terminal facts plus exact version receipt", () => {
     const x = setup();
     expect(x.project().executions).toEqual([]);

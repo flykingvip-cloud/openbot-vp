@@ -67,12 +67,32 @@ export function createExecutionEvidenceStore(
   }
   const processId = randomUUID();
   let epoch = randomUUID();
-  const facts = new Map<string, { fact: ExecutionFact; receivedAt: number }>();
+  type ScopeStats = {
+    trackingEpoch: string;
+    trackingStartedAt: number;
+    ingestSequence: number;
+    expiredCount: number;
+    capacityEvictedCount: number;
+  };
+  const stats = new Map<string, ScopeStats>();
+  let enabledState = false;
+  const facts = new Map<
+    string,
+    { fact: ExecutionFact; receivedAt: number; sequence: number; trackingEpoch: string }
+  >();
   const receipts = new Map<string, VersionLinkReceipt>();
   const conflicts = new Set<string>();
-  const discard = (id: string) => {
+  const discard = (id: string, reason: "expired" | "capacity") => {
     const item = facts.get(id);
     if (item) {
+      const ownStats = stats.get(scopeKey(item.fact.scope));
+      if (ownStats?.trackingEpoch === item.trackingEpoch) {
+        if (reason === "expired") {
+          ownStats.expiredCount++;
+        } else {
+          ownStats.capacityEvictedCount++;
+        }
+      }
       facts.delete(id);
       conflicts.delete(id);
     }
@@ -81,7 +101,7 @@ export function createExecutionEvidenceStore(
     const at = now();
     for (const [id, item] of facts) {
       if (at - item.receivedAt >= ttlMs) {
-        discard(id);
+        discard(id, "expired");
       }
     }
     for (const [id, r] of receipts) {
@@ -90,19 +110,25 @@ export function createExecutionEvidenceStore(
       }
     }
   };
-  const active = () => {
-    try {
-      if (enabled()) {
-        return true;
-      }
-    } catch {
-      /* fail closed */
-    }
+  const reset = () => {
     facts.clear();
     receipts.clear();
     conflicts.clear();
+    stats.clear();
     epoch = randomUUID();
-    return false;
+  };
+  const active = () => {
+    let next = false;
+    try {
+      next = enabled();
+    } catch {
+      /* fail closed */
+    }
+    if (next !== enabledState) {
+      reset();
+      enabledState = next;
+    }
+    return next;
   };
   return {
     recordFact(input: ExecutionFact): boolean {
@@ -138,9 +164,31 @@ export function createExecutionEvidenceStore(
           }
           return !conflicts.has(fact.eventId);
         }
-        facts.set(fact.eventId, { fact, receivedAt: now() });
+        const receivedAt = now();
+        const ownKey = scopeKey(fact.scope);
+        let ownStats = stats.get(ownKey);
+        if (!ownStats) {
+          ownStats = {
+            trackingEpoch: randomUUID(),
+            trackingStartedAt: receivedAt,
+            ingestSequence: 0,
+            expiredCount: 0,
+            capacityEvictedCount: 0,
+          };
+          stats.set(ownKey, ownStats);
+          while (stats.size > capacity) {
+            stats.delete(stats.keys().next().value!);
+          }
+        }
+        ownStats.ingestSequence++;
+        facts.set(fact.eventId, {
+          fact,
+          receivedAt,
+          sequence: ownStats.ingestSequence,
+          trackingEpoch: ownStats.trackingEpoch,
+        });
         while (facts.size > capacity) {
-          discard(facts.keys().next().value!);
+          discard(facts.keys().next().value!, "capacity");
         }
         sweep();
         return true;
@@ -228,10 +276,11 @@ export function createExecutionEvidenceStore(
           sweep();
         }
       } catch {
-        facts.clear();
-        receipts.clear();
-        conflicts.clear();
-        epoch = randomUUID();
+        if (enabledState) {
+          reset();
+          enabledState = false;
+        }
+        visible = false;
       }
       const scopedFacts = visible
         ? [...facts.values()]
@@ -247,7 +296,34 @@ export function createExecutionEvidenceStore(
             )
             .map((r) => ({ ...r, scope: copyScope(r.scope), eventIds: [...r.eventIds] }))
         : [];
+      const ownStats = visible ? stats.get(scopeKey(scope)) : undefined;
+      const retained = ownStats
+        ? [...facts.values()].filter(
+            (i) =>
+              scopeKey(i.fact.scope) === scopeKey(scope) &&
+              i.trackingEpoch === ownStats.trackingEpoch,
+          )
+        : [];
+      const sequences = retained.map((i) => i.sequence);
+      const scopeWatermark = {
+        state: ownStats ? ("tracked" as const) : ("unknown" as const),
+        trackingEpoch: ownStats?.trackingEpoch ?? null,
+        trackingStartedAt: ownStats?.trackingStartedAt ?? null,
+        priorHistory: "unknown" as const,
+        ingestSequence: ownStats?.ingestSequence ?? null,
+        expiredCount: ownStats?.expiredCount ?? null,
+        capacityEvictedCount: ownStats?.capacityEvictedCount ?? null,
+        retainedFromSequence: sequences.length ? Math.min(...sequences) : null,
+        retainedToSequence: sequences.length ? Math.max(...sequences) : null,
+        retainedFromOccurredAt: retained.length
+          ? Math.min(...retained.map((i) => i.fact.occurredAt))
+          : null,
+        retainedToOccurredAt: retained.length
+          ? Math.max(...retained.map((i) => i.fact.occurredAt))
+          : null,
+      };
       return {
+        scopeWatermark,
         processId,
         epoch,
         retention: "process_memory" as const,
