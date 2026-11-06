@@ -7,7 +7,10 @@ import {
   buildErrorAgentMeta,
 } from "../../agent-runtime/execution/index.js";
 import { recoverContextOverflow } from "../../agent-runtime/execution/index.js";
-import { resolveRunAuthProfileCandidates } from "../../agent-runtime/model/index.js";
+import {
+  createAuthProfileRotation,
+  resolveRunAuthProfileCandidates,
+} from "../../agent-runtime/model/index.js";
 import {
   CONTEXT_WINDOW_HARD_MIN_TOKENS,
   CONTEXT_WINDOW_WARN_BELOW_TOKENS,
@@ -357,7 +360,6 @@ export async function runEmbeddedPiAgent(
         authProfileId: params.authProfileId,
         authProfileIdSource: params.authProfileIdSource,
       });
-      let profileIndex = 0;
 
       const initialThinkLevel = params.thinkLevel ?? "off";
       let thinkLevel = initialThinkLevel;
@@ -562,31 +564,19 @@ export async function runEmbeddedPiAgent(
         lastProfileId = apiKeyInfo.profileId;
       };
 
+      const authRotation = createAuthProfileRotation({
+        candidates: profileCandidates,
+        lockedProfileId,
+        inCooldown: (candidate) => isProfileInCooldown(authStore, candidate),
+        apply: applyApiKeyInfo,
+      });
       const advanceAuthProfile = async (): Promise<boolean> => {
-        if (lockedProfileId) {
-          return false;
+        const advanced = await authRotation.advance();
+        if (advanced) {
+          thinkLevel = initialThinkLevel;
+          attemptedThinking.clear();
         }
-        let nextIndex = profileIndex + 1;
-        while (nextIndex < profileCandidates.length) {
-          const candidate = profileCandidates[nextIndex];
-          if (candidate && isProfileInCooldown(authStore, candidate)) {
-            nextIndex += 1;
-            continue;
-          }
-          try {
-            await applyApiKeyInfo(candidate);
-            profileIndex = nextIndex;
-            thinkLevel = initialThinkLevel;
-            attemptedThinking.clear();
-            return true;
-          } catch (err) {
-            if (candidate && candidate === lockedProfileId) {
-              throw err;
-            }
-            nextIndex += 1;
-          }
-        }
-        return false;
+        return advanced;
       };
 
       try {
@@ -609,34 +599,27 @@ export async function runEmbeddedPiAgent(
           (unavailableReason === "rate_limit" ||
             unavailableReason === "overloaded" ||
             unavailableReason === "billing");
-        let didTransientCooldownProbe = false;
-
-        while (profileIndex < profileCandidates.length) {
-          const candidate = profileCandidates[profileIndex];
-          const inCooldown =
-            candidate && candidate !== lockedProfileId && isProfileInCooldown(authStore, candidate);
-          if (inCooldown) {
-            if (allowTransientCooldownProbe && !didTransientCooldownProbe) {
-              didTransientCooldownProbe = true;
-              log.warn(
-                `probing cooldowned auth profile for ${provider}/${modelId} due to ${unavailableReason ?? "transient"} unavailability`,
-              );
-            } else {
-              profileIndex += 1;
-              continue;
-            }
-          }
-          await applyApiKeyInfo(profileCandidates[profileIndex]);
-          break;
-        }
-        if (profileIndex >= profileCandidates.length) {
+        const initialized = await authRotation.initialize({
+          allowTransientCooldownProbe,
+          onProbe: () =>
+            log.warn(
+              "probing cooldowned auth profile for " +
+                provider +
+                "/" +
+                modelId +
+                " due to " +
+                (unavailableReason ?? "transient") +
+                " unavailability",
+            ),
+        });
+        if (!initialized) {
           throwAuthProfileFailover({ allInCooldown: true });
         }
       } catch (err) {
         if (err instanceof FailoverError) {
           throw err;
         }
-        if (profileCandidates[profileIndex] === lockedProfileId) {
+        if (authRotation.current === lockedProfileId) {
           throwAuthProfileFailover({ allInCooldown: false, error: err });
         }
         const advanced = await advanceAuthProfile();

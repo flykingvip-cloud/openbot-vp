@@ -679,3 +679,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - User-pin validation, provider match, configured order and fallback candidate selection moved from legacy run.ts into model/auth-profile-candidates. Credential reads, cooldown rotation and token refresh stay at their original execution points. Old selection body removed; no new authentication or retry engine. — codex-runtime-manager
 - Original auth-rotation configured integration 25 PASS before and after; component/usage 2 files / 7 PASS. Full tsgo PASS; architecture 51 PASS; typed lint clean; build PASS with 209 existing warnings. No real-provider call, push, merge or deploy. — codex-runtime-manager
+
+## Authentication rotation lifecycle (2026-11-07)
+
+- Request-local initial credential traversal and profile advancement moved from legacy run.ts into model/auth-profile-rotation. User pins, cooldown skipping, explicit transient probe, failed credential advancement and original thinking-reset timing preserved. Caller still owns the only model retry loop; no new scheduler or credential store. — codex-runtime-manager
+- Original configured auth rotation integration 25 PASS; component 3 PASS; full tsgo PASS; architecture 51 PASS; changed-file typed lint clean; full build PASS with 209 existing warnings. No real-provider invocation, push, merge or deploy. — codex-runtime-manager
