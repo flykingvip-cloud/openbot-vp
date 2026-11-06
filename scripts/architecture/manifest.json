@@ -366,6 +366,7 @@
     "from": "src/**",
     "denyImportsFrom": [
       "src/agent-runtime/command/active-turn",
+      "src/auto-reply/reply/composer-plugin-mention-execute",
       "src/auto-reply/reply/mid-task-aside",
       "src/auto-reply/reply/agent-runner-execution"
     ],
