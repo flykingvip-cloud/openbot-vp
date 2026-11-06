@@ -2,6 +2,8 @@
 
 ## Autonomous closure checkpoint
 
+- Observability/UX v2 included in current migration: observability-handoff-v2.md fixes source ownership, identity limits and phased acceptance; collapsible work detail is now migration acceptance support rather than a separate executor. Added frontend metadata-only projectRuntimeObservation adapter; no page integration, persistent event collection, fully-linked qualification or production rollout claimed. — codex-runtime-manager
+
 - Two-difference alignment: decisions and substantive gap ownership fixed in structure-alignment.md. Execution admission DTO moved to contracts/execution; state repository/resume mutation moved with old files removed; all existing repository consumers use state/index and three manifest rules prohibit deep imports. 39 files / 233 PASS; isolated cross-process 7 PASS; first joint race failure retained explicitly, not waived. Build PASS/209 warnings, manifest 44 PASS, tsgo 47 baseline. — codex-runtime-manager
 
 - Current paused-task semantic resume connected through original authenticated Gateway/state/admitted execution (ce8c74977, 259e36364). Two independent specified-path reviews found no confirmed blocker; process-local stop and parked-target selection limits remain explicit. Combined 122 files / 973 PASS; shared builder/source regression 8 files / 48 PASS. Build PASS/209 warnings, architecture 41 PASS, tsgo 47 baseline errors. Current evidence document updated; whole migration/live acceptance still not claimed. — codex-runtime-manager
