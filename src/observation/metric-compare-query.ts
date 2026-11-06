@@ -121,6 +121,15 @@ export function createMetricCompareQuery(options: {
               result.code === "unauthorized" ? "unauthorized" : "evidence_unavailable",
             );
           }
+          if (
+            !result.samples.some(
+              (sample) =>
+                sample.outcome?.taskId === ref.taskId &&
+                sample.outcome.outcomeVersion === ref.outcomeVersion,
+            )
+          ) {
+            throw new Error("evidence_unavailable");
+          }
           queries.push({ ref, result });
         }
         const samples: MetricCohort["samples"] = queries.flatMap(({ ref, result }) =>
@@ -155,9 +164,17 @@ export function createMetricCompareQuery(options: {
       if (!(await stillAuthorized())) {
         return deny("unauthorized");
       }
+      const comparison = compareObservationMetrics({ baseline: b.metric, candidate: c.metric });
       return {
         ok: true as const,
-        comparison: compareObservationMetrics({ baseline: b.metric, candidate: c.metric }),
+        comparison: {
+          ...comparison,
+          status: "blocked" as const,
+          reasons: [...new Set([...comparison.reasons, "cohort_identity_unknown"])].toSorted(),
+          baselineValue: null,
+          candidateValue: null,
+          delta: null,
+        },
         evidence: { baseline: b.queries, candidate: c.queries },
         selectionScope: "explicit_references_only" as const,
       };

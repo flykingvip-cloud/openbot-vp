@@ -90,7 +90,12 @@ const intentSchema = z.strictObject({
   evidence: z.strictObject({
     sampleRefs: z
       .array(
-        z.strictObject({ sampleId: str, taskId: str, outcomeVersion: z.number().int().positive() }),
+        z.strictObject({
+          sampleId: str,
+          agentId: str.optional(),
+          taskId: str,
+          outcomeVersion: z.number().int().positive(),
+        }),
       )
       .max(1000),
     metricDictVersion: z.number().int().positive(),
@@ -294,13 +299,20 @@ export function createActionIntentStore(rootDir: string) {
     },
     async list(
       scope: TrustedScope,
-      filter: { taskId: string; outcomeVersion: number; limit?: number; cursor?: string },
+      filter: {
+        agentId: string;
+        taskId: string;
+        outcomeVersion: number;
+        limit?: number;
+        cursor?: string;
+      },
     ) {
       const limit = filter.limit ?? 20;
       if (
         !Number.isSafeInteger(limit) ||
         limit < 1 ||
         limit > 100 ||
+        !filter.agentId ||
         !filter.taskId ||
         !Number.isSafeInteger(filter.outcomeVersion) ||
         filter.outcomeVersion < 1
@@ -335,13 +347,25 @@ export function createActionIntentStore(rootDir: string) {
         const row = journal?.entries.at(-1)?.intent;
         if (
           row?.evidence.sampleRefs.some(
-            (r) => r.taskId === filter.taskId && r.outcomeVersion === filter.outcomeVersion,
+            (r) =>
+              r.agentId === filter.agentId &&
+              r.taskId === filter.taskId &&
+              r.outcomeVersion === filter.outcomeVersion,
           )
         ) {
+          if (row.target.targetType === "agent" && row.target.targetId !== filter.agentId) {
+            continue;
+          }
           rows.push(row);
         }
       }
-      const snapshot = digest([scopeHash, filter.taskId, filter.outcomeVersion, rows]);
+      const snapshot = digest([
+        scopeHash,
+        filter.agentId,
+        filter.taskId,
+        filter.outcomeVersion,
+        rows,
+      ]);
       let offset = 0;
       if (filter.cursor) {
         const cursor = JSON.parse(Buffer.from(filter.cursor, "base64url").toString("utf8")) as {

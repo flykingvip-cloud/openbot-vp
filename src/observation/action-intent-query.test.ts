@@ -45,7 +45,7 @@ const fresh = (id: string) =>
         rollbackDiffDigest: "old",
       },
       evidence: {
-        sampleRefs: [{ sampleId: "sample", taskId: "task", outcomeVersion: 1 }],
+        sampleRefs: [{ sampleId: "sample", agentId: "bot", taskId: "task", outcomeVersion: 1 }],
         metricDictVersion: 1,
         metricId: "metric",
         denominatorDefinition: "tips",
@@ -83,6 +83,46 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true });
 });
 describe("scoped read-only intent query", () => {
+  it("does not expose legacy intent evidence to another agent sharing task and version", async () => {
+    const store = createActionIntentStore(path.join(root, "store"));
+    await store.commit({
+      scope,
+      intent: fresh("legacy"),
+      expectedRevision: -1,
+      commandId: "legacy",
+      requestDigest: "legacy",
+    });
+    const old = fresh("old-missing-agent");
+    delete old.evidence.sampleRefs[0].agentId;
+    await store.commit({
+      scope,
+      intent: old,
+      expectedRevision: -1,
+      commandId: "old",
+      requestDigest: "old",
+    });
+    const missingAgent = await queryActionIntents(
+      { ...args(), intentId: "old-missing-agent" },
+      store,
+    );
+    expect(missingAgent.ok && "state" in missingAgent && missingAgent.state).toBe("unknown");
+    const otherDir = path.join(root, "other-agent");
+    await fs.mkdir(path.join(otherDir, "task-outcomes/tips"), { recursive: true });
+    await fs.mkdir(path.join(otherDir, "task-outcomes/versions"));
+    for (const name of ["tips/task.json", "versions/task__v1.json"]) {
+      await fs.writeFile(path.join(otherDir, "task-outcomes", name), JSON.stringify(row));
+    }
+    const otherCfg = {
+      agents: { list: [...cfg.agents!.list!, { id: "other", agentDir: otherDir }] },
+    };
+    const result = await queryActionIntents(
+      { ...args(), cfg: otherCfg, agentId: "other", intentId: "legacy" },
+      store,
+    );
+    expect(result.ok && "state" in result && result.state).toBe("unknown");
+    const list = await queryActionIntents({ ...args(), cfg: otherCfg, agentId: "other" }, store);
+    expect(list.ok && "items" in list && list.items).toEqual([]);
+  });
   it("returns unknown without creating a store and rejects forged caller", async () => {
     const store = createActionIntentStore(path.join(root, "missing"));
     const result = await queryActionIntents(args(), store);

@@ -21,7 +21,9 @@ const target = {
   rollbackDiffDigest: "rollback-diff",
 };
 const evidence = {
-  sampleRefs: [{ sampleId: "injected-sample", taskId: "test-task", outcomeVersion: 1 }],
+  sampleRefs: [
+    { sampleId: "injected-sample", taskId: "test-task", outcomeVersion: 1, agentId: "bot" },
+  ],
   metricDictVersion: 1,
   metricId: "test.metric",
   denominatorDefinition: "eligible test samples",
@@ -320,6 +322,34 @@ describe("pure ActionIntent state machine (injected test environment)", () => {
       expect(step(e.intent, { type: "verify", verification: bad }, e.approval, 34)).toMatchObject({
         ok: false,
         reason: "verification_mismatch",
+      });
+    }
+  });
+  it("prevents owned intent mutation and refuses restored forged verified records", () => {
+    const intent = fresh();
+    expect(Reflect.set(intent, "state", "verified")).toBe(false);
+    expect(Reflect.set(intent.target, "diffDigest", "forged")).toBe(false);
+    const restored = JSON.parse(JSON.stringify({ ...intent, state: "verified" })) as ActionIntent;
+    expect(factory.owns(restored)).toBe(false);
+    expect(step(restored, { type: "preview" }).ok).toBe(false);
+  });
+  it("blocks legacy missing-agent and cross-agent sample references", () => {
+    for (const agentId of [undefined, "other"]) {
+      const intent = factory.create(
+        {
+          actionIntentId: "legacy",
+          findingRef: { findingId: "f", source: "rule_v1" },
+          target,
+          evidence: {
+            ...evidence,
+            sampleRefs: evidence.sampleRefs.map((ref) => ({ ...ref, agentId })),
+          },
+        },
+        10,
+      );
+      expect(step(intent, { type: "preview" })).toMatchObject({
+        ok: false,
+        reason: "needs_evidence",
       });
     }
   });

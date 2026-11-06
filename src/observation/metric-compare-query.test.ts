@@ -141,4 +141,21 @@ describe("server-owned metric comparison query", () => {
       }),
     ).toEqual({ ok: false, code: "agent_cohort_mismatch" });
   });
+  it("rejects requested versions outside their cohort window instead of shrinking denominator", async () => {
+    const { query, request } = setup();
+    expect(
+      await query({
+        ...request,
+        baseline: { ...request.baseline, window: { from: at - 10, to: at } },
+      }),
+    ).toEqual({ ok: false, code: "evidence_unavailable" });
+  });
+  it("reports cohort identity as unproven even for the same agent", async () => {
+    const { query, request } = setup();
+    const r = await query(request);
+    if (!r.ok) {
+      throw new Error("failed");
+    }
+    expect(r.comparison.reasons).toContain("cohort_identity_unknown");
+  });
 });

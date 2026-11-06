@@ -81,13 +81,20 @@ export async function queryActionIntents(
     let nextCursor: string | null = null;
     if (input.intentId) {
       const row = await store.detail(auth.outcome.scope, input.intentId, input.revision);
-      rows = row?.evidence.sampleRefs.some(
-        (r) => r.taskId === input.taskId && r.outcomeVersion === input.outcomeVersion,
-      )
-        ? [row]
-        : [];
+      rows =
+        row &&
+        (row.target.targetType !== "agent" || row.target.targetId === input.agentId) &&
+        row.evidence.sampleRefs.some(
+          (r) =>
+            r.agentId === input.agentId &&
+            r.taskId === input.taskId &&
+            r.outcomeVersion === input.outcomeVersion,
+        )
+          ? [row]
+          : [];
     } else {
       const page = await store.list(auth.outcome.scope, {
+        agentId: input.agentId,
         taskId: input.taskId,
         outcomeVersion: input.outcomeVersion,
         limit: input.limit,

@@ -26,7 +26,12 @@ export type IntentTarget = {
   rollbackDiffDigest: string;
 };
 export type IntentEvidence = {
-  sampleRefs: readonly { sampleId: string; taskId: string; outcomeVersion: number }[];
+  sampleRefs: readonly {
+    sampleId: string;
+    taskId: string;
+    outcomeVersion: number;
+    agentId?: string;
+  }[];
   metricDictVersion: number;
   metricId: string;
   denominatorDefinition: string;
@@ -196,7 +201,13 @@ function reduceActionIntent(
     if (!["draft", "needs_evidence"].includes(intent.state)) {
       return fail("illegal_transition");
     }
-    if (!trustedTest || !evidenceReady(intent.evidence)) {
+    if (
+      !trustedTest ||
+      !evidenceReady(intent.evidence) ||
+      intent.evidence.sampleRefs.some(
+        (ref) => !ref.agentId || ref.agentId !== intent.target.targetId,
+      )
+    ) {
       return fail("needs_evidence");
     }
     if (Object.values(intent.target).some((v) => !v.trim())) {
@@ -204,7 +215,11 @@ function reduceActionIntent(
     }
     return next({ state: "previewed" });
   }
-  if (!trustedTest || !evidenceReady(intent.evidence)) {
+  if (
+    !trustedTest ||
+    !evidenceReady(intent.evidence) ||
+    intent.evidence.sampleRefs.some((ref) => !ref.agentId || ref.agentId !== intent.target.targetId)
+  ) {
     return fail("needs_evidence");
   }
   const approval = event.type === "authorize" ? event.approval : context.approval;
@@ -376,6 +391,18 @@ export function transitionActionIntent(
 ): TransitionResult {
   return reduceActionIntent(intent, event, context, false);
 }
+function freezeIntent(intent: ActionIntent): ActionIntent {
+  const freeze = (value: unknown): void => {
+    if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+      for (const item of Object.values(value)) {
+        freeze(item);
+      }
+      Object.freeze(value);
+    }
+  };
+  freeze(intent);
+  return intent;
+}
 /** Internal test-environment port. Never expose this factory through RPC parameters. */
 export function createTestActionIntentFactory() {
   const owned = new WeakSet<ActionIntent>();
@@ -384,7 +411,7 @@ export function createTestActionIntentFactory() {
       if (input.evidence.environment !== "test" || input.evidence.provenance !== "injected") {
         throw new Error("test_evidence_required");
       }
-      const intent = createActionIntent(input, now);
+      const intent = freezeIntent(createActionIntent(input, now));
       owned.add(intent);
       return intent;
     },
@@ -398,6 +425,7 @@ export function createTestActionIntentFactory() {
     ): TransitionResult {
       const result = reduceActionIntent(intent, event, context, owned.has(intent));
       if (result.ok) {
+        freezeIntent(result.intent);
         owned.add(result.intent);
       }
       return result;
