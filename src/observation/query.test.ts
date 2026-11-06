@@ -177,8 +177,8 @@ describe("internal observation query", () => {
     expect(r.coverage.attemptedCount).toBe(1);
     expect(r.metrics[1].value).toBeNull();
     expect(r.window).toEqual({ from: time, to: time + 1 });
-    expect(r.samples[0].qualification).toBe("invalid");
-    expect(r.samples[0].provenance).toEqual(["live", "unknown"]);
+    expect(r.samples[0].qualification).toBe("fully_linked");
+    expect(r.samples[0].provenance).toEqual(["unknown"]);
     expect(r.samples[0].improvementEligible).toBe(false);
     expect(r.samples[0].attributedCost).toBeNull();
     expect(r.executionSource.retention).toBe("process_memory");

@@ -2,7 +2,12 @@
 import { randomUUID } from "node:crypto";
 import type { TrustedScope } from "../task-outcome/types.js";
 export const EXECUTION_EVIDENCE_FLAG = "OPENBOT_EXECUTION_ROUTER_OBSERVATION";
+export type ExecutionSourceDeclaration = {
+  provenance: "live" | "seed" | "injected" | "unknown";
+  collector: "runtime_execution" | "test" | "unknown";
+};
 export type ExecutionFact = {
+  source?: ExecutionSourceDeclaration;
   eventId: string;
   taskId: string;
   runId: string;
@@ -149,6 +154,15 @@ export function createExecutionEvidenceStore(
           return false;
         }
         const fact: ExecutionFact = {
+          source: {
+            provenance: ["live", "seed", "injected"].includes(input.source?.provenance ?? "")
+              ? input.source!.provenance
+              : "unknown",
+            collector:
+              input.source?.collector === "runtime_execution" || input.source?.collector === "test"
+                ? input.source.collector
+                : "unknown",
+          },
           eventId: input.eventId,
           taskId: input.taskId,
           runId: input.runId,
@@ -285,7 +299,11 @@ export function createExecutionEvidenceStore(
       const scopedFacts = visible
         ? [...facts.values()]
             .filter((i) => scopeKey(i.fact.scope) === scopeKey(scope))
-            .map((i) => ({ ...i.fact, scope: copyScope(i.fact.scope) }))
+            .map((i) => ({
+              ...i.fact,
+              source: i.fact.source ? { ...i.fact.source } : undefined,
+              scope: copyScope(i.fact.scope),
+            }))
         : [];
       const scopedLinks = visible
         ? [...receipts.values()]

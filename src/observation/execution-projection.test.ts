@@ -51,6 +51,11 @@ function setup(capacity = 10) {
   };
 }
 describe("execution evidence projection", () => {
+  it("does not upgrade default store facts into live provenance", () => {
+    const x = setup();
+    x.link();
+    expect(x.project().executions.every((e) => e.provenance === "unknown")).toBe(true);
+  });
   it("projects scoped retention without claiming complete history", () => {
     const x = setup();
     const source = x.project().executionSource;

@@ -26,7 +26,12 @@ describe("actual execution to actual version receipt", () => {
     (status) => {
       const evidence = createExecutionEvidenceStore({ enabled: () => true });
       const observer = createRuntimeEvidenceObserver(
-        { taskId: "task", scope, runId: "run" },
+        {
+          taskId: "task",
+          scope,
+          runId: "run",
+          source: { provenance: "injected", collector: "test" },
+        },
         evidence,
       );
       observer.capture("started");
@@ -66,7 +71,12 @@ describe("actual execution to actual version receipt", () => {
         false,
       );
       const startOnly = createRuntimeEvidenceObserver(
-        { taskId: "task", scope, runId: "run" },
+        {
+          taskId: "task",
+          scope,
+          runId: "run",
+          source: { provenance: "injected", collector: "test" },
+        },
         evidence,
       );
       startOnly.capture("started");
@@ -85,25 +95,42 @@ describe("actual execution to actual version receipt", () => {
         "started",
       ]);
       expect(
-        createRuntimeEvidenceObserver({ taskId: "task", scope, runId: "run" }, evidence).bind(
-          committed.record,
-        ),
+        createRuntimeEvidenceObserver(
+          {
+            taskId: "task",
+            scope,
+            runId: "run",
+            source: { provenance: "injected", collector: "test" },
+          },
+          evidence,
+        ).bind(committed.record),
       ).toBe(false);
     },
   );
   it("preserves failures and cancellation without fabricating facts when disabled", () => {
     const enabled = createExecutionEvidenceStore({ enabled: () => true });
     const observer = createRuntimeEvidenceObserver(
-      { taskId: "task", scope, runId: "run" },
+      {
+        taskId: "task",
+        scope,
+        runId: "run",
+        source: { provenance: "injected", collector: "test" },
+      },
       enabled,
     );
     observer.capture("failed");
     observer.capture("cancelled");
     expect(enabled.query(scope).facts.map((f) => f.stage)).toEqual(["failed", "cancelled"]);
     const disabled = createExecutionEvidenceStore({ enabled: () => false });
-    createRuntimeEvidenceObserver({ taskId: "task", scope, runId: "run" }, disabled).capture(
-      "started",
-    );
+    createRuntimeEvidenceObserver(
+      {
+        taskId: "task",
+        scope,
+        runId: "run",
+        source: { provenance: "injected", collector: "test" },
+      },
+      disabled,
+    ).capture("started");
     expect(disabled.query(scope).facts).toEqual([]);
   });
 });

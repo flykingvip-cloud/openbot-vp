@@ -30,6 +30,28 @@ const link = () => ({
   eventIds: ["e"],
 });
 describe("disposable execution evidence", () => {
+  it("defaults sources to unknown and retains explicit injected declarations without granting authority", () => {
+    const store = createExecutionEvidenceStore({ enabled: () => true, now: () => 100 });
+    store.recordFact(fact());
+    expect(store.query(scope).facts[0].source).toEqual({
+      provenance: "unknown",
+      collector: "unknown",
+    });
+    store.recordFact({
+      ...fact("injected"),
+      source: { provenance: "injected", collector: "test" },
+    });
+    const result = store.query(scope);
+    expect(result.facts[1].source).toEqual({ provenance: "injected", collector: "test" });
+    result.facts[1].source!.provenance = "live";
+    expect(store.query(scope).facts[1].source!.provenance).toBe("injected");
+    expect(
+      store.recordFact({
+        ...fact("injected"),
+        source: { provenance: "live", collector: "runtime_execution" },
+      }),
+    ).toBe(false);
+  });
   it("keeps disabled epochs stable until the flag changes", () => {
     let on = false;
     const store = createExecutionEvidenceStore({ enabled: () => on, now: () => 100 });

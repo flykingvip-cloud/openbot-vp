@@ -4,9 +4,15 @@ import type { TaskOutcomeRecord, TrustedScope } from "../task-outcome/types.js";
 import {
   getExecutionEvidenceStore,
   type createExecutionEvidenceStore,
+  type ExecutionSourceDeclaration,
 } from "./execution-evidence-store.js";
 export function createRuntimeEvidenceObserver(
-  context: { taskId?: string; scope?: TrustedScope; runId: string },
+  context: {
+    taskId?: string;
+    scope?: TrustedScope;
+    runId: string;
+    source?: ExecutionSourceDeclaration;
+  },
   store: ReturnType<typeof createExecutionEvidenceStore> = getExecutionEvidenceStore(),
 ) {
   const ids: string[] = [];
@@ -29,6 +35,7 @@ export function createRuntimeEvidenceObserver(
         const eventId = randomUUID();
         if (
           store.recordFact({
+            source: context.source,
             eventId,
             taskId: context.taskId,
             scope: context.scope,

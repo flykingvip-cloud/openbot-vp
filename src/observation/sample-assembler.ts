@@ -9,6 +9,7 @@ export type OutcomeEvidence = {
   readonly isCurrentTip: boolean;
 };
 export type ExecutionEvidence = {
+  readonly collector?: "runtime_execution" | "test" | "unknown";
   readonly sourceId: string;
   readonly eventId: string;
   readonly occurredAt: string;
@@ -52,6 +53,7 @@ function metadata(e: ExecutionEvidence): ExecutionEvidence {
     eventId: e.eventId,
     occurredAt: e.occurredAt,
     provenance: e.provenance,
+    collector: e.collector,
     runId: e.runId,
     scope: e.scope,
     taskId: e.taskId,
@@ -264,7 +266,7 @@ export function assembleObservationSamples(input: AssembleInput) {
         c.reasons.add("missing_execution");
       }
       if (c.provenance.size > 1) {
-        fail(c, "provenance_mixed");
+        c.reasons.add("provenance_mixed");
       }
       if (c.provenance.has("unknown")) {
         c.reasons.add("provenance_unknown");
@@ -343,7 +345,11 @@ export function assembleObservationSamples(input: AssembleInput) {
         // Linkage is not production validation; legacy events lack collector attestation.
         improvementEligible: false as const,
         improvementReasons: [
-          "trusted_execution_collector_unavailable",
+          "authoritative_source_eligibility_unavailable",
+          ...(c.events.length && c.events.every((e) => e.collector === "runtime_execution")
+            ? []
+            : ["trusted_execution_collector_unavailable"]),
+          ...(c.reasons.has("provenance_mixed") ? ["provenance_mixed"] : []),
           ...(c.provenance.size === 1 && c.provenance.has("live") ? [] : ["non_live_provenance"]),
           ...(qualification === "fully_linked" ? [] : ["incomplete_or_invalid_linkage"]),
         ],

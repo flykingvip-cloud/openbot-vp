@@ -54,6 +54,17 @@ const input = (overrides: Partial<AssembleInput> = {}): AssembleInput => ({
   ...overrides,
 });
 describe("pure sample assembler", () => {
+  it("separates unknown outcome provenance from live execution linkage", () => {
+    const r = assembleObservationSamples(
+      input({
+        outcomes: [{ ...outcome, provenance: "unknown" }],
+        executions: [event, { ...event, eventId: "a", attemptId: "a" }],
+      }),
+    );
+    expect(r.samples[0].qualification).toBe("fully_linked");
+    expect(r.samples[0].improvementEligible).toBe(false);
+    expect(r.samples[0].improvementReasons).toContain("provenance_mixed");
+  });
   it("links independent retries without changing cancellation, delivery or cost", () => {
     const r = assembleObservationSamples(
       input({ executions: [event, { ...event, eventId: "a", attemptId: "a" }] }),
@@ -180,9 +191,10 @@ describe("pure sample assembler", () => {
         executions: [event, { ...event, eventId: "a", attemptId: "a", provenance: "seed" }],
       }),
     );
-    expect(r.samples[0].qualification).toBe("invalid");
+    expect(r.samples[0].qualification).toBe("fully_linked");
     expect(r.samples[0].reasons).toContain("provenance_mixed");
-    expect(r.coverage.fullyLinkedCount).toBe(0);
+    expect(r.samples[0].improvementEligible).toBe(false);
+    expect(r.coverage.fullyLinkedCount).toBe(1);
   });
   it("returns unknown business on conflict regardless of input order", () => {
     const conflict = {
@@ -326,7 +338,7 @@ describe("pure sample assembler", () => {
       }),
       evidenceLookupWindow: { from: at - 1, to: at + 1000 },
     });
-    expect(r.samples[0].qualification).toBe("invalid");
+    expect(r.samples[0].qualification).toBe("fully_linked");
     expect(r.samples[0].improvementEligible).toBe(false);
     expect(r.samples[0].reasons).toContain("provenance_mixed");
   });
