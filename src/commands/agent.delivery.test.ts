@@ -299,7 +299,6 @@ describe("command transport receipts", () => {
       deps: {} as CliDeps,
       runtime: { log: vi.fn(), error: vi.fn() } as unknown as RuntimeEnv,
       opts: {
-        message: "hello",
         deliver,
         channel: "whatsapp",
         to: "+15551234567",

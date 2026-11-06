@@ -649,3 +649,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Routing context and trusted command entry ids now have a pure runtime contracts owner. Model admission/governance and execution candidates no longer import the old command host for these types; original adapter types re-export identical contracts. No runtime behavior changed. Full command request DTO and remaining host adapters are still explicit debt. — codex-runtime-manager
 - Command/admission/governance/credit regression 4 files / 58 PASS; full tsgo PASS at integration; architecture 48 PASS; typed lint clean; build PASS with 209 existing warnings. No push/merge/deploy. — codex-runtime-manager
+
+## Narrow delivery data boundary (2026-11-07)
+
+- Delivery now consumes CommandDeliveryOptions from runtime contracts rather than the complete old command-host options. Model governance and delivery cannot re-import commands under two new architecture guards. No routing, permission or transport behavior changed. — codex-runtime-manager
+- Command/ACP/delivery regression 3 files / 64 PASS; full tsgo PASS at integration; architecture 50 PASS; typed lint clean; build PASS with 209 existing warnings. Full request DTO and old backend retirement remain open. No push/merge/deploy. — codex-runtime-manager

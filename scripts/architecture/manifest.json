@@ -453,5 +453,17 @@
       "src/agent-runtime/execution/runner/**"
     ],
     "description": "Command orchestration invokes candidates through execution/index; direct provider execution and private runner imports cannot return."
+  },
+  {
+    "name": "runtime-model-no-command-host-contracts",
+    "from": "src/agent-runtime/model/**",
+    "denyImportsFrom": ["src/commands/**"],
+    "description": "Shared model governance consumes runtime-owned contracts, never old command-host types or implementations."
+  },
+  {
+    "name": "runtime-delivery-no-command-host-contracts",
+    "from": "src/agent-runtime/delivery/**",
+    "denyImportsFrom": ["src/commands/**"],
+    "description": "Delivery consumes its narrow runtime data contract and cannot depend on command execution options."
   }
 ]

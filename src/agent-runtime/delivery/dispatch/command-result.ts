@@ -1,7 +1,6 @@
 import type { ReplyPayload } from "../../../auto-reply/types.js";
 import { getChannelPlugin, normalizeChannelId } from "../../../channels/plugins/index.js";
 import { createOutboundSendDeps, type CliDeps } from "../../../cli/outbound-send-deps.js";
-import type { AgentCommandOpts } from "../../../commands/agent/types.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
 import {
@@ -21,7 +20,7 @@ import type { OutboundSessionContext } from "../../../infra/outbound/session-con
 import { CommandLane } from "../../../process/lanes.js";
 import type { RuntimeEnv } from "../../../runtime.js";
 import { isInternalMessageChannel } from "../../../utils/message-channel.js";
-import type { CommandDeliveryReceipt } from "../../contracts/delivery.js";
+import type { CommandDeliveryOptions, CommandDeliveryReceipt } from "../../contracts/delivery.js";
 import { logNestedCommandOutput } from "../presentation/command-output.js";
 
 export async function deliverAgentCommandResult<
@@ -30,7 +29,7 @@ export async function deliverAgentCommandResult<
   cfg: OpenBotConfig;
   deps: CliDeps;
   runtime: RuntimeEnv;
-  opts: AgentCommandOpts;
+  opts: CommandDeliveryOptions;
   outboundSession: OutboundSessionContext | undefined;
   sessionEntry: SessionEntry | undefined;
   result: { meta: TMeta };
