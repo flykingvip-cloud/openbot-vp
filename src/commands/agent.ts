@@ -1,5 +1,5 @@
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
-import { createCommandBudget, runCommandCandidate } from "../agent-runtime/execution/index.js";
+import { createCommandBudget, runCommandCandidate, runCommandFallback } from "../agent-runtime/execution/index.js";
 import fs from "node:fs/promises";
 import { observeAcpCliSteerPreflight } from "../acp/cli-steer-preflight-observe.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
@@ -25,7 +25,6 @@ import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { formatAgentInternalEventsForPrompt } from "../agents/internal-events.js";
 import { AGENT_LANE_SUBAGENT } from "../agents/lanes.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
-import { runWithModelFallback } from "../agents/model-fallback.js";
 import {
   buildRunModelSetSnapshot,
   forgetRunModelSet,
@@ -1108,7 +1107,6 @@ async function agentCommandInternal(
 
       // Track model fallback attempts so retries on an existing session don't
       // re-inject the original prompt as a duplicate user message.
-      let fallbackAttemptIndex = 0;
       recordSubagentModelShadow({
         isSubagentLane,
         snapshot: opts.spawnGovernanceSnapshot,
@@ -1122,7 +1120,7 @@ async function agentCommandInternal(
         opts.executionIdentity,
         opts.governanceEntry,
       );
-      const fallbackResult = await runWithModelFallback({
+      const fallbackResult = await runCommandFallback({
         cfg,
         provider,
         model,
@@ -1141,9 +1139,7 @@ async function agentCommandInternal(
         ...(commandExecutionRouting?.preferredModelOrder
           ? { preferredModelOrder: commandExecutionRouting.preferredModelOrder }
           : {}),
-        run: (providerOverride, modelOverride, runOptions) => {
-          const isFallbackRetry = fallbackAttemptIndex > 0;
-          fallbackAttemptIndex += 1;
+        run: (providerOverride, modelOverride, runOptions, isFallbackRetry) => {
           commandBudget.assertAllowed();
           return (async () => {
             try {

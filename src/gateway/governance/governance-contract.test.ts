@@ -70,7 +70,6 @@ const EXPECTED_REGISTERED_GAPS: string[] = [
 /** Enterprise-scope model paths that must pass `governanceMode` (plan §4 / P3-3). */
 const ENTERPRISE_MODEL_CALLER_IDS = [
   "auto-reply",
-  "followup",
   "cron-isolated",
   "memory-flush",
   "agent-command",
@@ -279,11 +278,15 @@ describe("§5 execution entry inventory", () => {
       const agent = SOURCE_TEXT.get("src/commands/agent.ts");
       expect(agent).toBeDefined();
       expect(agent).toContain("acquireAgentCommandCommercialRun");
-      expect(agent).toContain("runCliAgent");
-      expect(agent).toContain("recordCliBackendUsage");
+      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/command-candidate.ts")).toContain(
+        "runCliAgent",
+      );
+      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/command-candidate.ts")).toContain(
+        "recordCliBackendUsage",
+      );
       // Gate is acquired in agentCommandInternal before runWithModelFallback → runAgentAttempt → runCliAgent.
       const gateIdx = agent!.indexOf("commercialGate = await acquireAgentCommandCommercialRun");
-      const fallbackIdx = agent!.indexOf("await runWithModelFallback");
+      const fallbackIdx = agent!.indexOf("await runCommandFallback");
       expect(gateIdx).toBeGreaterThan(-1);
       expect(fallbackIdx).toBeGreaterThan(-1);
       expect(gateIdx).toBeLessThan(fallbackIdx);

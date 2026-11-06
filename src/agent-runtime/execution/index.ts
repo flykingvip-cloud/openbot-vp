@@ -11,3 +11,5 @@ export type { AgentTurnExecutionParams, AgentRunLoopResult } from "./runner/turn
 export { runCommandCandidate } from "./runner/command-candidate.js";
 
 export { createCommandBudget } from "./runner/command-budget.js";
+
+export { runCommandFallback } from "./runner/command-fallback.js";
