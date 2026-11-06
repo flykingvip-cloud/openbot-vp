@@ -18,6 +18,7 @@ describe("diagnosis-reports gateway method pack", () => {
     expect(DIAGNOSIS_REPORT_API_DEPLOYED).toBe(true);
     expect(diagnosisReportsPack.id).toBe("diagnosis-reports");
     expect(diagnosisReportsPack.methods).toEqual([
+      "diagnosis.observation.query",
       "diagnosis.reports.query",
       "diagnosis.reports.get",
       "diagnosis.diagnose",
@@ -42,6 +43,8 @@ describe("diagnosis-reports gateway method pack", () => {
     ).toBeDefined();
     const merged = mergePackHandlers(GATEWAY_METHOD_PACKS);
     const names = mergePackMethodNames(GATEWAY_METHOD_PACKS);
+    expect(names).toContain("diagnosis.observation.query");
+    expect(typeof merged["diagnosis.observation.query"]).toBe("function");
     expect(names).toContain("diagnosis.reports.query");
     expect(names).toContain("diagnosis.reports.get");
     expect(names).toContain("diagnosis.diagnose");
@@ -73,6 +76,7 @@ describe("diagnosis-reports gateway method pack", () => {
     expect(coreGatewayHandlers["diagnosis.job.cancel"]).toBeDefined();
     expect(typeof merged["chat.checkpoints.list"]).toBe("function");
     const packScopes = diagnosisReportsPack.scopes;
+    expect(packScopes["operator.read"]).toContain("diagnosis.observation.query");
     expect(packScopes["operator.read"]).not.toContain("diagnosis.action.dispatch");
     expect(packScopes["operator.write"]).toEqual([
       "diagnosis.schedule.apply",
