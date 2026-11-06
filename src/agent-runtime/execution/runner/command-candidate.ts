@@ -9,7 +9,6 @@ import { isCliProvider, normalizeProviderId } from "../../../agents/model-select
 import { runEmbeddedPiAgent } from "../../../agents/pi-embedded.js";
 import type { buildWorkspaceSkillSnapshot } from "../../../agents/skills.js";
 import type { ThinkLevel, VerboseLevel } from "../../../auto-reply/thinking.js";
-import type { resolveAgentRunContext } from "../../../commands/agent/run-context.js";
 import type { AgentCommandOpts } from "../../../commands/agent/types.js";
 import type { loadConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
@@ -18,6 +17,7 @@ import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-id
 import { resolveAgentRunEntitlementScope } from "../../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
 import type { resolveMessageChannel } from "../../../utils/message-channel.js";
+import type { AgentRunContext } from "../../contracts/command.js";
 import { persistCommandSessionEntry } from "../../state/index.js";
 const log = createSubsystemLogger("commands/agent");
 
@@ -44,7 +44,7 @@ export function runCommandCandidate(params: {
   timeoutMs: number;
   runId: string;
   opts: AgentCommandOpts & { senderIsOwner: boolean };
-  runContext: ReturnType<typeof resolveAgentRunContext>;
+  runContext: AgentRunContext;
   spawnedBy: string | undefined;
   messageChannel: ReturnType<typeof resolveMessageChannel>;
   skillsSnapshot: ReturnType<typeof buildWorkspaceSkillSnapshot> | undefined;

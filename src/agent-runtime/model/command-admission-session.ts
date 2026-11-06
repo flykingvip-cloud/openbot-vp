@@ -1,4 +1,3 @@
-import type { AgentCommandGovernanceEntry } from "../../commands/agent/types.js";
 import type { ExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
 import {
   buildRunModelSetSnapshot,
@@ -7,6 +6,7 @@ import {
   snapshotCreditReportingFromGate,
 } from "../../gateway/governance/spawn-snapshot-handoff.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
+import type { AgentCommandGovernanceEntry } from "../contracts/command.js";
 import { createRunAdmissionLease } from "./admission-lease.js";
 import {
   acquireAgentCommandCommercialRun,

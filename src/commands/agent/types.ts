@@ -1,3 +1,11 @@
+import type {
+  AgentRunContext,
+  AgentCommandGovernanceEntry,
+} from "../../agent-runtime/contracts/command.js";
+export type {
+  AgentRunContext,
+  AgentCommandGovernanceEntry,
+} from "../../agent-runtime/contracts/command.js";
 import type { AgentInternalEvent } from "../../agents/internal-events.js";
 import type { ClientToolDefinition } from "../../agents/pi-embedded-runner/run/params.js";
 import type { SpawnedRunMetadata } from "../../agents/spawned-context.js";
@@ -16,18 +24,6 @@ export type AgentStreamParams = {
   /** Provider stream params override (best-effort). */
   temperature?: number;
   maxTokens?: number;
-};
-
-export type AgentRunContext = {
-  messageChannel?: string;
-  accountId?: string;
-  groupId?: string | null;
-  groupChannel?: string | null;
-  groupSpace?: string | null;
-  currentChannelId?: string;
-  currentThreadTs?: string;
-  replyToMode?: "off" | "first" | "all";
-  hasRepliedRef?: { value: boolean };
 };
 
 export type AgentCommandOpts = {
@@ -113,7 +109,6 @@ export type AgentCommandOpts = {
 };
 
 /** Registry ids for the two agent command entries: gateway ingress and the local CLI. */
-export type AgentCommandGovernanceEntry = "E2" | "E3";
 
 /** Ingress never chooses its own entry; `agentCommandFromIngress` stamps `E2`. */
 export type AgentCommandIngressOpts = Omit<

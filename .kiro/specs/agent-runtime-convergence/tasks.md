@@ -644,3 +644,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Original accumulator, last-call cache projection and error usage metadata moved out of legacy run.ts into execution/outcomes/usage-summary. Old local implementations removed. Pure usage normalization moved to shared/usage; agents/usage is a same-function compatibility export for existing consumers, not a second implementation. Remaining consumers must migrate before that compatibility file is removed. — codex-runtime-manager
 - Baseline usage reporting 5 PASS; candidate component/normalizer/real runner overflow and usage regression 5 files / 47 PASS. Architecture 48 PASS; changed-file typed lint clean; build PASS with 209 existing warnings. Parallel observation WIP currently introduces type diagnostics outside these files; no full-tree green claim at this tip. No push/merge/deploy. — codex-runtime-manager
+
+## Runtime command routing contract boundary (2026-11-07)
+
+- Routing context and trusted command entry ids now have a pure runtime contracts owner. Model admission/governance and execution candidates no longer import the old command host for these types; original adapter types re-export identical contracts. No runtime behavior changed. Full command request DTO and remaining host adapters are still explicit debt. — codex-runtime-manager
+- Command/admission/governance/credit regression 4 files / 58 PASS; full tsgo PASS at integration; architecture 48 PASS; typed lint clean; build PASS with 209 existing warnings. No push/merge/deploy. — codex-runtime-manager

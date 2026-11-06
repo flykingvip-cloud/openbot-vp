@@ -15,13 +15,13 @@
  */
 
 import type { ModelGovernanceContext } from "../../agents/model-fallback-governance.js";
-import type { AgentCommandGovernanceEntry } from "../../commands/agent/types.js";
 import type { ExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
 import type { GovernanceMode } from "../../gateway/governance/decision.js";
 import {
   resolveGovernanceModeForCommercialGate,
   resolveGovernanceModeFromEnv,
 } from "../../gateway/governance/mode.js";
+import type { AgentCommandGovernanceEntry } from "../contracts/command.js";
 import type { AgentCommandCommercialGateResult } from "./command-commercial-gate.js";
 
 export const AGENT_COMMAND_MODEL_MODE_ENV = "OPENBOT_GOVERNANCE_AGENT_COMMAND_MODEL_MODE";
