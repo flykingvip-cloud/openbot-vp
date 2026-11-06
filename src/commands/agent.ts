@@ -1,3 +1,4 @@
+import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
 import { runCommandCandidate } from "../agent-runtime/execution/index.js";
 import fs from "node:fs/promises";
 import { observeAcpCliSteerPreflight } from "../acp/cli-steer-preflight-observe.js";
@@ -72,10 +73,8 @@ import {
   setRuntimeConfigSnapshot,
 } from "../config/config.js";
 import {
-  mergeSessionEntry,
   resolveAgentIdFromSessionKey,
   type SessionEntry,
-  updateSessionStore,
 } from "../config/sessions.js";
 import { resolveSessionTranscriptFile } from "../config/sessions/transcript.js";
 import { buildKnowledgeReplyGatewayClient } from "../gateway/knowledge/reply-gateway-client.js";
@@ -127,51 +126,6 @@ import { updateSessionStoreAfterAgentRun } from "./agent/session-store.js";
 import { resolveSession } from "./agent/session.js";
 import { recordSubagentRunUsage } from "./agent/subagent-credit-usage.js";
 import type { AgentCommandIngressOpts, AgentCommandOpts } from "./agent/types.js";
-
-type PersistSessionEntryParams = {
-  sessionStore: Record<string, SessionEntry>;
-  sessionKey: string;
-  storePath: string;
-  entry: SessionEntry;
-};
-
-type OverrideFieldClearedByDelete =
-  | "providerOverride"
-  | "modelOverride"
-  | "authProfileOverride"
-  | "authProfileOverrideSource"
-  | "authProfileOverrideCompactionCount"
-  | "fallbackNoticeSelectedModel"
-  | "fallbackNoticeActiveModel"
-  | "fallbackNoticeReason"
-  | "claudeCliSessionId";
-
-const OVERRIDE_FIELDS_CLEARED_BY_DELETE: OverrideFieldClearedByDelete[] = [
-  "providerOverride",
-  "modelOverride",
-  "authProfileOverride",
-  "authProfileOverrideSource",
-  "authProfileOverrideCompactionCount",
-  "fallbackNoticeSelectedModel",
-  "fallbackNoticeActiveModel",
-  "fallbackNoticeReason",
-  "claudeCliSessionId",
-];
-
-async function persistSessionEntry(params: PersistSessionEntryParams): Promise<void> {
-  const persisted = await updateSessionStore(params.storePath, (store) => {
-    const merged = mergeSessionEntry(store[params.sessionKey], params.entry);
-    // Preserve explicit `delete` clears done by session override helpers.
-    for (const field of OVERRIDE_FIELDS_CLEARED_BY_DELETE) {
-      if (!Object.hasOwn(params.entry, field)) {
-        Reflect.deleteProperty(merged, field);
-      }
-    }
-    store[params.sessionKey] = merged;
-    return merged;
-  });
-  params.sessionStore[params.sessionKey] = persisted;
-}
 
 function prependInternalEventContext(
   body: string,

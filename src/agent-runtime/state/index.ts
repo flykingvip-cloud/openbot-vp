@@ -3,3 +3,5 @@ export { sessionTaskState } from "./repository/session-task.js";
 
 export { resetCorruptedSession, prepareReplacementSessionEntry } from "./session-recovery.js";
 export type { CorruptedSessionResetInput, SessionRecoveryPorts } from "./session-recovery.js";
+
+export { persistCommandSessionEntry } from "./command-session.js";
