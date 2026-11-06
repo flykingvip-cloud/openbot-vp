@@ -9,7 +9,7 @@ import {
   sessionTaskBoardPath,
   startBoundTaskExecution,
   isTaskExecutionBindingCurrent,
-} from "../../conversation-task/session-task-board.js";
+} from "../../../conversation-task/session-task-board.js";
 import { resumePausedCurrentTask } from "./resume-current.js";
 const roots: string[] = [];
 afterEach(() => {

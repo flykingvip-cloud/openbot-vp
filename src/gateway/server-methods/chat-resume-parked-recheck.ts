@@ -2,7 +2,7 @@ import type {
   CurrentTaskResumeRequest,
   CurrentTaskResumeResult,
 } from "../../agent-runtime/contracts/task.js";
-import { sessionTaskState } from "../../agent-runtime/state/session-task.js";
+import { sessionTaskState } from "../../agent-runtime/state/index.js";
 /**
  * Live ResumeParkedRecheck for the chat.send entry path.
  *

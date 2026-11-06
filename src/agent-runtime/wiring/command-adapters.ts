@@ -21,7 +21,7 @@ import type {
   InteractionPorts,
   CurrentTaskControlPorts,
 } from "../command/index.js";
-import { sessionTaskState } from "../state/session-task.js";
+import { sessionTaskState } from "../state/index.js";
 
 export function interruptInteractionTask(sessionId: string, sessionKey?: string) {
   abortEmbeddedPiRun(sessionId);

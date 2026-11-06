@@ -9,8 +9,8 @@ import {
   prepareVisibleDelivery,
 } from "../delivery/index.js";
 import { runAdmittedTurn } from "../execution/index.js";
+import { sessionTaskState } from "../state/index.js";
 import { persistInteractionMessage } from "../state/interaction-transcript.js";
-import { sessionTaskState } from "../state/session-task.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 import {
   bindInteractionPorts,

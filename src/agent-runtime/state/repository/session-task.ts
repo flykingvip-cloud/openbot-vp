@@ -6,8 +6,8 @@ import {
   mutateSessionTaskBoard,
   readSessionTaskBoard,
   startBoundTaskExecution,
-} from "../../conversation-task/session-task-board.js";
-import { resumePausedCurrentTask } from "./resume-current.js";
+} from "../../../conversation-task/session-task-board.js";
+import { resumePausedCurrentTask } from "../mutations/resume-current.js";
 
 /** The existing board owns persistence, locking and identity validation. */
 export const sessionTaskState = {

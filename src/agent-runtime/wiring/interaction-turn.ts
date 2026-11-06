@@ -4,7 +4,7 @@ import type { ExecutionIdentityRunFields } from "../../gateway/execution-identit
 import { runAuthorizedInteraction } from "../command/index.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
 import { createAuthorizedModelSession } from "../model/index.js";
-import { sessionTaskState } from "../state/session-task.js";
+import { sessionTaskState } from "../state/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 import { bindInteractionCandidate } from "./interaction-candidate.js";
 

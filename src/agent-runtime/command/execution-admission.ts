@@ -1,19 +1,6 @@
-import type { InteractionExecutionRequest } from "../contracts/interaction.js";
-import type { TaskCompletionBinding } from "../contracts/task.js";
+import type { ExecutionAdmissionInput, ExecutionAdmissionResult } from "../contracts/execution.js";
+export type { ExecutionAdmissionInput, ExecutionAdmissionResult } from "../contracts/execution.js";
 
-/** Trusted ingress identity and revision; never accepted from model output. */
-export type ExecutionAdmissionInput = {
-  requestId: string;
-  expectedFocusRevision: number;
-  expectedWriteEpoch: number;
-  expectedTaskId?: string;
-  proposal: InteractionExecutionRequest;
-  abortSignal?: AbortSignal;
-};
-export type ExecutionAdmissionResult =
-  | { kind: "accepted"; binding: TaskCompletionBinding; acceptance: readonly string[] }
-  | { kind: "duplicate"; binding: TaskCompletionBinding }
-  | { kind: "rejected"; reason: string };
 export type ExecutionAdmissionPorts = {
   authorize: (input: ExecutionAdmissionInput) => Promise<boolean>;
   /** Must revalidate captured identity/version and persist under the existing state lock. */

@@ -392,5 +392,38 @@
     "from": "src/**",
     "denyImportsFrom": ["src/agent-runtime/execution/lifecycle/**"],
     "description": "Shared model admission has one owner; retired execution lifecycle paths cannot re-enter the runtime."
+  },
+  {
+    "name": "runtime-state-public-entry-wiring",
+    "from": "src/agent-runtime/wiring/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/state/repository/**",
+      "src/agent-runtime/state/mutations/**",
+      "src/agent-runtime/state/session-task",
+      "src/agent-runtime/state/resume-current"
+    ],
+    "description": "Task repository and mutations are private. Host consumers use state/index; narrow transcript/action adapters retain separate ownership."
+  },
+  {
+    "name": "runtime-state-public-entry-gateway",
+    "from": "src/gateway/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/state/repository/**",
+      "src/agent-runtime/state/mutations/**",
+      "src/agent-runtime/state/session-task",
+      "src/agent-runtime/state/resume-current"
+    ],
+    "description": "Task repository and mutations are private. Host consumers use state/index; narrow transcript/action adapters retain separate ownership."
+  },
+  {
+    "name": "runtime-state-public-entry-reply",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/state/repository/**",
+      "src/agent-runtime/state/mutations/**",
+      "src/agent-runtime/state/session-task",
+      "src/agent-runtime/state/resume-current"
+    ],
+    "description": "Task repository and mutations are private. Host consumers use state/index; narrow transcript/action adapters retain separate ownership."
   }
 ]

@@ -23,10 +23,14 @@ function gitLsFilesAll(): string[] {
     cwd: REPO_ROOT,
     encoding: "utf8",
   });
-  return stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.endsWith(".ts") || line.endsWith(".tsx"));
+  return (
+    stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.endsWith(".ts") || line.endsWith(".tsx"))
+      // git ls-files includes tracked deletions until staging; audit the current source tree.
+      .filter((line) => fs.existsSync(path.join(REPO_ROOT, line)))
+  );
 }
 
 function loadManifest(): ManifestRule[] {
