@@ -1,5 +1,6 @@
 import type { InteractionModelDecision } from "../agent-runtime/contracts/interaction.js";
 import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
+import { isLiveTaskBinding } from "../agent-runtime/policy/index.js";
 import { appendTaskCompletionNotice } from "../agent-runtime/state/completion-notice.js";
 export type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
 import { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
@@ -1075,21 +1076,8 @@ export function isTaskExecutionBindingCurrent(
   sessionFile: string,
   binding: TaskCompletionBinding,
 ): boolean {
-  return isLiveTaskBinding(readSessionTaskBoard(sessionFile), binding);
-}
-
-function isLiveTaskBinding(board: SessionTaskBoard, binding: TaskCompletionBinding): boolean {
-  const current = board.current;
-  return Boolean(
-    current?.unfinished &&
-    !current.wakeSuppress &&
-    !isTaskTombstoned(board, binding.taskId) &&
-    current.taskId === binding.taskId &&
-    current.executionAttempt === binding.executionAttempt &&
-    current.deliverableVersion === binding.deliverableVersion &&
-    (binding.constraints === undefined ||
-      JSON.stringify(binding.constraints) === JSON.stringify(activeConstraintTexts(current))),
-  );
+  const board = readSessionTaskBoard(sessionFile);
+  return isLiveTaskBinding(board, binding, activeConstraintTexts(board.current));
 }
 
 /** Real close only. A model claim with closed=false does not announce or rewrite the board. */
@@ -1117,7 +1105,7 @@ export function recordCheckedTaskCompletion(params: {
     finished = withSessionTaskBoardLock(file, () => {
       const board = readSessionTaskBoardUnlocked(file);
       const binding = params.binding!;
-      if (!isLiveTaskBinding(board, binding)) {
+      if (!isLiveTaskBinding(board, binding, activeConstraintTexts(board.current))) {
         return { board, rejected: true };
       }
       const result = finishCurrentTask({ board, deliverableChecked: true, ...binding });

@@ -7,3 +7,5 @@ export {
   isMainlineBlockNarrative,
 } from "./blocker.js";
 export type { BlockerGrade, EnvProbe } from "./blocker.js";
+
+export { isLiveTaskBinding } from "./task-binding.js";
