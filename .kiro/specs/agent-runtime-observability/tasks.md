@@ -44,6 +44,7 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - Shared registry has concurrent command-budget task changes; subsequent observation registration increments remain uncommitted rather than landing another owner WIP. — codex-observe-owner
 
 ## Continued P1 execution evidence
+
 - 198eec855: phantom attempt and conflicting outcome regressions fixed; improvementEligible remains false. — codex-observe-owner
 - 420426f1c: stale identity/method/tenant/version response protection; Chromium 13 PASS. — codex-observe-owner
 - 4f15a0745: independent actual CLI/embedded lifecycle facts plus explicit committed-version receipts; default flag off, 1000 facts, 15-minute process memory TTL. Not durable audit. — codex-observe-owner
