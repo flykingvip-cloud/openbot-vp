@@ -74,3 +74,13 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - Owner validation: 9 suites / 73 tests PASS; cross-window query contracts 35 PASS; evidence panel Chromium PASS; changed-file lint/format PASS. UI build PASS with pin sync skipped. — codex-observe-owner
 - Final tsgo remains nonzero for other paths, with no observation/evidence path diagnostics after fixture correction. No production/gateway validation or release actions. Outcome provenance and improvement gates unchanged; P2 unopened. — codex-observe-owner
 - Rollback: revert f8556e635 and f769c033a; no database migration. — codex-observe-owner
+
+## P2 isolated control handoff
+
+- User explicitly authorized entering P2 development; production writes, deployment and automatic experiments remain unauthorized. — codex-observe-owner
+- 77625a93e: correlation-only ActionIntent reducer with explicit revisions, approval scope/diff/version binding, receipts, readback, verification and rollback evidence. Ordinary production transition remains evidence-blocked; isolated injected tests use a construction-bound factory. — codex-observe-owner
+- e1937d8d7: isolated temporary-directory bridge reuses original Working DNA evolution apply/readback/rollback. No locally fabricated accepted receipt; applied-but-unrecorded retains application and doNotRetry after authorization withdrawal. Baseline checks are not atomic CAS. — codex-observe-owner
+- 829ad9fd4: independent read-only status component; no apply/approval/experiment controls, no write RPC. Host integration and persistent correlation record are not implemented. — codex-observe-owner
+- Owner validation: 11 suites / 100 tests PASS; P2 joint 30 PASS; Chromium component PASS; UI build PASS with pin sync skipped. Full tsgo 53 diagnostics remain, no action-intent path diagnostics. — codex-observe-owner
+- Residual: production evidence qualification, atomic expected-version protection in original control plane, durable intent association, governance host/query integration and full rollback UI validation. No production or real gateway validation. — codex-observe-owner
+- Rollback: remove three P2 module commits; no database migration, production configuration or task-result schema change. Shared registry P2 increments remain mixed with another task WIP and are not committed by this owner. — codex-observe-owner
