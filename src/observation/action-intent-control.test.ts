@@ -109,7 +109,14 @@ async function setup() {
       findingRef: { findingId: "finding", source: "rule_v1" },
       target,
       evidence: {
-        sampleRefs: [{ sampleId: "injected-sample", taskId: "injected-task", outcomeVersion: 1 }],
+        sampleRefs: [
+          {
+            sampleId: "injected-sample",
+            taskId: "injected-task",
+            outcomeVersion: 1,
+            agentId: "bot",
+          },
+        ],
         metricDictVersion: 1,
         metricId: "business.task_closed_success_rate",
         denominatorDefinition: "injected-current-tips",
@@ -328,5 +335,22 @@ describe("isolated injected Working DNA action intent control", () => {
       "approval_invalid",
     );
     expect((await readRobotWorkingStyle(x.cfg, "bot"))?.riskPreference).toBe("conservative");
+  });
+  it("binds intent expected version despite a same-candidate write after inspect", async () => {
+    const x = await setup();
+    const original = x.plane.applyWorkingDna.bind(x.plane);
+    const plane = {
+      ...x.plane,
+      applyWorkingDna: async (...args: Parameters<typeof original>) => {
+        await writeRobotWorkingStyle(x.cfg, "bot", {
+          ...DEFAULT_WORKING_STYLE,
+          riskPreference: "conservative",
+        });
+        return original(...args);
+      },
+    };
+    const control = createIsolatedWorkingDnaControl({ ...x.args, plane });
+    await expect(control.submit(x.intent, "race")).rejects.toThrow("version_conflict");
+    expect(x.plane.listApplications()).toHaveLength(0);
   });
 });

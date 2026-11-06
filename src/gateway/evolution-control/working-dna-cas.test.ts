@@ -8,6 +8,7 @@ import { DEFAULT_WORKING_STYLE } from "../agent-growth/genome.js";
 import {
   readRobotWorkingStyleOrDefault,
   writeRobotWorkingStyle,
+  workingStyleVersion,
 } from "../agent-growth/working-style-store.js";
 import { createWorkingDnaAdapter, type WorkingDnaCandidate } from "./adapters/working-dna.js";
 const roots: string[] = [];
@@ -64,5 +65,21 @@ describe("Working DNA apply/rollback content CAS", () => {
     });
     expect((await adapter.rollback(app)).status).toBe("failed");
     expect((await readRobotWorkingStyleOrDefault(cfg, "bot")).communicationTone).toBe("friendly");
+  });
+  it("enforces scoped expectedVersion even when current becomes the candidate", async () => {
+    const { cfg, adapter, input } = await setup();
+    const expected = workingStyleVersion(DEFAULT_WORKING_STYLE);
+    const validate = adapter.validate.bind(adapter);
+    vi.spyOn(adapter, "validate").mockImplementation(async (candidate, context) => {
+      const result = await validate(candidate, context);
+      await writeRobotWorkingStyle(cfg, "bot", {
+        ...DEFAULT_WORKING_STYLE,
+        riskPreference: "conservative",
+      });
+      return result;
+    });
+    await expect(
+      adapter.withExpectedVersion(input.idempotencyKey, expected, () => adapter.apply(input)),
+    ).rejects.toThrow("version_conflict");
   });
 });

@@ -1,4 +1,4 @@
-/** Isolated-test bridge to the existing control plane. Baseline checks are NOT atomic CAS. */
+/** Isolated-test bridge to the existing control plane. Intent expected versions are enforced by the original adapter content CAS. */
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -196,15 +196,20 @@ export function createIsolatedWorkingDnaControl(options: {
       try {
         application =
           prior ??
-          (await options.plane.applyWorkingDna({
+          (await options.adapter.withExpectedVersion(
             commandId,
-            proposalId: options.proposalId,
-            experimentId: options.experimentId,
-            principalRef: options.readApproval()!.actorRef,
-            trustedTenantId: options.tenantId,
-            scope,
-            unattended: false,
-          }));
+            intent.target.expectedConfigVersion,
+            () =>
+              options.plane.applyWorkingDna({
+                commandId,
+                proposalId: options.proposalId,
+                experimentId: options.experimentId,
+                principalRef: options.readApproval()!.actorRef,
+                trustedTenantId: options.tenantId,
+                scope,
+                unattended: false,
+              }),
+          ));
       } catch (error) {
         const observed = options.plane.getApplication("app:" + commandId);
         const failureReceipt = receipt(
@@ -246,14 +251,22 @@ export function createIsolatedWorkingDnaControl(options: {
           ),
           reason: succeeded.reason,
           doNotRetry: true as const,
-          limitations: ["baseline_check_not_atomic_cas", "isolated_injected_test_only"],
+          limitations: [
+            "content_cas_aba_possible",
+            "non_transactional_receipt_persistence",
+            "isolated_injected_test_only",
+          ],
         };
       }
       return {
         status: "recorded" as const,
         intent: succeeded.intent,
         application,
-        limitations: ["baseline_check_not_atomic_cas", "isolated_injected_test_only"],
+        limitations: [
+          "content_cas_aba_possible",
+          "non_transactional_receipt_persistence",
+          "isolated_injected_test_only",
+        ],
       };
     },
     async readback(intent: ActionIntent, application: EvolutionApplication) {

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   type ApplyEvolutionInput,
   type EvolutionAdapter,
@@ -128,7 +129,14 @@ function isAgentTarget(target: EvolutionTarget): target is { domain: "agent"; ag
 export function createWorkingDnaAdapter(
   cfg: OpenBotConfig,
   options?: { persistDir?: string; observationPort?: WorkingDnaObservationPort },
-): EvolutionAdapter<WorkingDnaCandidate> {
+): EvolutionAdapter<WorkingDnaCandidate> & {
+  withExpectedVersion<T>(
+    commandId: string,
+    expectedVersion: string,
+    execute: () => Promise<T>,
+  ): Promise<T>;
+} {
+  const expectedWrite = new AsyncLocalStorage<{ commandId: string; version: string }>();
   const observationPort = options?.observationPort ?? createFileWorkingDnaObservationPort(cfg);
   const loaded = loadAdapterSnapshots(options?.persistDir, "working-dna", {
     snapshots: {} as Record<string, WorkingStyle>,
@@ -148,6 +156,16 @@ export function createWorkingDnaAdapter(
   return {
     adapterId: "working-dna",
     domain: "agent",
+    withExpectedVersion<T>(
+      commandId: string,
+      expectedVersion: string,
+      execute: () => Promise<T>,
+    ): Promise<T> {
+      if (!commandId.trim() || !expectedVersion.trim()) {
+        throw new Error("invalid_expected_version");
+      }
+      return expectedWrite.run({ commandId, version: expectedVersion }, execute);
+    },
 
     async inspect(target): Promise<TargetSnapshot> {
       if (!isAgentTarget(target)) {
@@ -202,8 +220,15 @@ export function createWorkingDnaAdapter(
     },
 
     async apply(input: ApplyEvolutionInput<WorkingDnaCandidate>): Promise<EvolutionApplication> {
+      const expected = expectedWrite.getStore();
+      if (expected && expected.commandId !== input.idempotencyKey) {
+        throw new Error("expected_version_command_mismatch");
+      }
       const existing = applied.get(input.idempotencyKey);
       if (existing) {
+        if (expected && existing.targetVersionBefore !== expected.version) {
+          throw new Error("version_conflict");
+        }
         return existing;
       }
       const validation = await this.validate(input.candidate, input.context);
@@ -213,6 +238,9 @@ export function createWorkingDnaAdapter(
       const agentId = input.candidate.agentId;
       const current = await readRobotWorkingStyleOrDefault(cfg, agentId);
       const beforeVersion = styleVersion(current);
+      if (expected && beforeVersion !== expected.version) {
+        throw new Error("version_conflict");
+      }
       const frozen = { ...DEFAULT_WORKING_STYLE, ...input.candidate.baselineStyle };
       const candidateVersion = styleVersion(applyWorkingStyleDelta(frozen, input.candidate.delta));
       if (beforeVersion !== styleVersion(frozen) && beforeVersion !== candidateVersion) {
@@ -245,8 +273,11 @@ export function createWorkingDnaAdapter(
           Object.assign(previousValues, { [key]: current[key] });
         }
       }
-      const swapped = await compareAndSwapRobotWorkingStyle(cfg, agentId, beforeVersion, (locked) =>
-        applyWorkingStyleDelta(locked, input.candidate.delta),
+      const swapped = await compareAndSwapRobotWorkingStyle(
+        cfg,
+        agentId,
+        expected?.version ?? beforeVersion,
+        (locked) => applyWorkingStyleDelta(locked, input.candidate.delta),
       );
       if (!swapped.ok) {
         throw new Error("version_conflict");
