@@ -443,5 +443,15 @@
     "from": "src/agent-runtime/wiring/admitted-turn-host.ts",
     "denyImportsFrom": ["src/conversation-task/session-task-board"],
     "description": "Migrated task-state consumers use state/index; the original board remains the sole lock and persistence adapter."
+  },
+  {
+    "name": "runtime-command-candidate-public-entry",
+    "from": "src/commands/agent.ts",
+    "denyImportsFrom": [
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "Command orchestration invokes candidates through execution/index; direct provider execution and private runner imports cannot return."
   }
 ]

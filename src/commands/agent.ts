@@ -42,7 +42,7 @@ import {
   resolveThinkingDefault,
 } from "../agents/model-selection.js";
 import { prepareSessionManagerForRun } from "../agents/pi-embedded-runner/session-manager-init.js";
-import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
+import type { EmbeddedPiRunResult } from "../agents/pi-embedded-runner/types.js";
 import { buildWorkspaceSkillSnapshot } from "../agents/skills.js";
 import { getSkillsSnapshotVersion } from "../agents/skills/refresh.js";
 import { normalizeSpawnedRunMetadata } from "../agents/spawned-context.js";
@@ -1133,7 +1133,7 @@ async function agentCommandInternal(
     const startedAt = Date.now();
     let lifecycleEnded = false;
 
-    let result: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
+    let result: EmbeddedPiRunResult;
     let fallbackProvider = provider;
     let fallbackModel = model;
     try {
