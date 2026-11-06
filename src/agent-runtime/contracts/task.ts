@@ -129,3 +129,12 @@ export type TaskCompletionBinding = {
   executionAttempt?: string;
   deliverableVersion?: string;
 };
+
+export type CurrentTaskResumeRequest = {
+  taskId: string;
+  expectedFocusRevision: number;
+  expectedWriteEpoch: number;
+};
+export type CurrentTaskResumeResult =
+  | { kind: "accepted"; binding: TaskCompletionBinding; acceptance: readonly string[] }
+  | { kind: "rejected"; reason: string };

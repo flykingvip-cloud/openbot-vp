@@ -7,9 +7,11 @@ import {
   readSessionTaskBoard,
   startBoundTaskExecution,
 } from "../../conversation-task/session-task-board.js";
+import { resumePausedCurrentTask } from "./resume-current.js";
 
 /** The existing board owns persistence, locking and identity validation. */
 export const sessionTaskState = {
+  resumeCurrent: resumePausedCurrentTask,
   read: readSessionTaskBoard,
   admitExecution: commitAdmittedSessionTask,
   applyInteractionProposal: commitInteractionTaskProposal,
