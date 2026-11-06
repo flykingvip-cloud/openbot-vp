@@ -25,6 +25,13 @@ export type GetReplyOptions = {
   interactionIngress?: { userMessageId: string; persistOwnTranscript?: boolean };
   /** Explicit Gateway resume, after live authorization/stop recheck. */
   resumedTaskBinding?: import("../agent-runtime/contracts/task.js").TaskCompletionBinding;
+  /** Fixed authenticated host resumes an interpreted current-task target after live rechecks. */
+  onInteractionTaskResume?: (
+    request: import("../agent-runtime/contracts/task.js").CurrentTaskResumeRequest & {
+      sessionFile: string;
+      abortSignal?: AbortSignal;
+    },
+  ) => Promise<import("../agent-runtime/contracts/task.js").CurrentTaskResumeResult>;
   /** Trusted transport cleanup after an accepted task replacement or owner control. */
   onInteractionTaskEffect?: (effect: {
     kind: "replace" | "pause" | "cancel";

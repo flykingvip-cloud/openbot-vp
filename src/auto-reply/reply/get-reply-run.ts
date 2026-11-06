@@ -1555,49 +1555,77 @@ export async function runPreparedReply(
       typing.cleanup();
       return persistOwnReply(routed.text);
     }
+    let acceptedCriteria: readonly string[] = [];
     if (routed.kind === "task_proposal") {
       opts?.abortSignal?.throwIfAborted();
-      const applied =
-        commandAuthorized && command.isAuthorizedSender
-          ? replyTurnRuntime.state.applyInteractionProposal({
-              sessionFile,
-              ...captured,
-              decision:
-                routed.decision.kind === "task_change"
-                  ? { ...routed.decision, text: inboundMessage }
-                  : routed.decision,
-            })
-          : { kind: "rejected" as const, reason: "unauthorized" };
-      if (applied.kind === "applied" && applied.abort) {
-        replyTurnRuntime.interrupt(sessionIdFinal, sessionKey);
-        if (routed.decision.kind === "task_control" && routed.decision.action !== "resume") {
-          await opts?.onInteractionTaskEffect?.({
-            kind: routed.decision.action,
-            taskId: routed.decision.target.taskId,
-            previousRunId: board.current?.executionAttempt,
-          });
+      if (routed.decision.kind === "task_control" && routed.decision.action === "resume") {
+        const resumed =
+          commandAuthorized && command.isAuthorizedSender && opts?.onInteractionTaskResume
+            ? await opts.onInteractionTaskResume({
+                sessionFile,
+                taskId: routed.decision.target.taskId,
+                expectedFocusRevision: captured.expectedFocusRevision,
+                expectedWriteEpoch: captured.expectedWriteEpoch,
+                abortSignal: opts.abortSignal,
+              })
+            : { kind: "rejected" as const, reason: "resume_requires_live_recheck" };
+        opts?.abortSignal?.throwIfAborted();
+        if (resumed.kind !== "accepted") {
+          typing.cleanup();
+          return persistOwnReply(formatTaskProposalReply(routed.decision, resumed));
         }
+        admittedBinding = resumed.binding;
+        acceptedCriteria = resumed.acceptance;
+      } else {
+        const applied =
+          commandAuthorized && command.isAuthorizedSender
+            ? replyTurnRuntime.state.applyInteractionProposal({
+                sessionFile,
+                ...captured,
+                decision:
+                  routed.decision.kind === "task_change"
+                    ? { ...routed.decision, text: inboundMessage }
+                    : routed.decision,
+              })
+            : { kind: "rejected" as const, reason: "unauthorized" };
+        if (applied.kind === "applied" && applied.abort) {
+          replyTurnRuntime.interrupt(sessionIdFinal, sessionKey);
+          if (routed.decision.kind === "task_control" && routed.decision.action !== "resume") {
+            await opts?.onInteractionTaskEffect?.({
+              kind: routed.decision.action,
+              taskId: routed.decision.target.taskId,
+              previousRunId: board.current?.executionAttempt,
+            });
+          }
+        }
+        if (applied.kind === "applied" && routed.decision.kind === "task_change") {
+          replyTurnRuntime.steer(sessionIdFinal, inboundMessage);
+        }
+        typing.cleanup();
+        return persistOwnReply(formatTaskProposalReply(routed.decision, applied));
       }
-      if (applied.kind === "applied" && routed.decision.kind === "task_change") {
-        replyTurnRuntime.steer(sessionIdFinal, inboundMessage);
+    }
+    if (routed.kind === "execution_admission") {
+      if (routed.result.kind !== "accepted") {
+        typing.cleanup();
+        return persistOwnReply(
+          routed.result.kind === "duplicate"
+            ? "该执行请求已经接纳，未重复启动。"
+            : "任务状态已变化或执行未获准，本次未启动；请确认当前目标后重试。",
+        );
       }
-      typing.cleanup();
-      return persistOwnReply(formatTaskProposalReply(routed.decision, applied));
+      admittedBinding = routed.result.binding;
+      acceptedCriteria = routed.result.acceptance;
+      await opts?.onInteractionTaskEffect?.({
+        kind: "replace",
+        taskId: board.current?.taskId ?? "",
+        previousRunId: board.current?.executionAttempt,
+      });
     }
-    if (routed.result.kind !== "accepted") {
+    if (!admittedBinding) {
       typing.cleanup();
-      return persistOwnReply(
-        routed.result.kind === "duplicate"
-          ? "该执行请求已经接纳，未重复启动。"
-          : "任务状态已变化或执行未获准，本次未启动；请确认当前目标后重试。",
-      );
+      return persistOwnReply("执行请求缺少有效任务身份，本次未启动。");
     }
-    admittedBinding = routed.result.binding;
-    await opts?.onInteractionTaskEffect?.({
-      kind: "replace",
-      taskId: board.current?.taskId ?? "",
-      previousRunId: board.current?.executionAttempt,
-    });
     const acceptedTask = replyTurnRuntime.state.read(sessionFile).current;
     if (acceptedTask?.taskId !== admittedBinding.taskId) {
       typing.cleanup();
@@ -1613,7 +1641,7 @@ export async function runPreparedReply(
         buildResumePrompt(acceptedTask),
         `Goal: ${acceptedTask.goalText}`,
         "Acceptance criteria:",
-        ...routed.result.acceptance.map((criterion, index) => `${index + 1}. ${criterion}`),
+        ...acceptedCriteria.map((criterion, index) => `${index + 1}. ${criterion}`),
       ].join("\n"),
     );
     // New accepted focus supersedes the old active attempt, using the existing abort path.

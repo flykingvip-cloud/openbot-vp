@@ -336,7 +336,7 @@ function baseParams(
 }
 
 describe("runPreparedReply inbound depth router", () => {
-  it.each(["respond", "accepted", "duplicate", "rejected"] as const)(
+  it.each(["respond", "accepted", "duplicate", "rejected", "resumed", "resume_denied"] as const)(
     "Gateway interaction %s enters execution only after acceptance",
     async (kind) => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-ingress-reply-"));
@@ -353,24 +353,35 @@ describe("runPreparedReply inbound depth router", () => {
       );
       vi.mocked(resolveSessionFilePath).mockReturnValue(file);
       const binding = { taskId: "accepted-task" };
+      const isResume = kind === "resumed" || kind === "resume_denied";
+      const executes = kind === "accepted" || kind === "resumed";
       const interaction = vi.spyOn(replyTurnRuntime, "interaction").mockResolvedValue(
         kind === "respond"
           ? { kind: "respond", text: "你好", clarification: false }
-          : {
-              kind: "execution_admission",
-              result:
-                kind === "accepted"
-                  ? { kind, binding, acceptance: ["来源"] }
-                  : kind === "duplicate"
-                    ? { kind, binding }
-                    : { kind, reason: "revision_mismatch" },
-            },
+          : isResume
+            ? {
+                kind: "task_proposal",
+                decision: {
+                  kind: "task_control",
+                  target: { taskId: binding.taskId, revision: "0" },
+                  action: "resume",
+                },
+              }
+            : {
+                kind: "execution_admission",
+                result:
+                  kind === "accepted"
+                    ? { kind, binding, acceptance: ["来源"] }
+                    : kind === "duplicate"
+                      ? { kind, binding }
+                      : { kind, reason: "revision_mismatch" },
+              },
       );
       const read = vi.spyOn(replyTurnRuntime.state, "read").mockReturnValue({
         focusRevision: 0,
         parked: [],
         current:
-          kind === "accepted"
+          kind === "accepted" || isResume
             ? {
                 taskId: binding.taskId,
                 title: "报告",
@@ -402,6 +413,10 @@ describe("runPreparedReply inbound depth router", () => {
             opts: {
               runId: "ingress-message",
               interactionIngress: { userMessageId: "ingress-message", persistOwnTranscript: true },
+              onInteractionTaskResume: async () =>
+                kind === "resumed"
+                  ? { kind: "accepted", binding, acceptance: ["来源"] }
+                  : { kind: "rejected", reason: "resume_not_authorized" },
             },
           }),
         );
@@ -415,8 +430,8 @@ describe("runPreparedReply inbound depth router", () => {
             }),
           ]),
         );
-        expect(runReplyAgent).toHaveBeenCalledTimes(kind === "accepted" ? 1 : 0);
-        if (kind === "accepted") {
+        expect(runReplyAgent).toHaveBeenCalledTimes(executes ? 1 : 0);
+        if (executes) {
           const run = vi.mocked(runReplyAgent).mock.calls[0]?.[0].followupRun.run;
           expect(run).toMatchObject({
             taskCompletionBinding: binding,
@@ -431,7 +446,7 @@ describe("runPreparedReply inbound depth router", () => {
         if (kind === "respond") {
           expect(result).toEqual({ text: "你好" });
         }
-        if (kind !== "accepted") {
+        if (!executes) {
           const entries = fs
             .readFileSync(file, "utf8")
             .trim()

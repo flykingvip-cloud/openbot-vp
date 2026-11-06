@@ -1,3 +1,8 @@
+import type {
+  CurrentTaskResumeRequest,
+  CurrentTaskResumeResult,
+} from "../../agent-runtime/contracts/task.js";
+import { sessionTaskState } from "../../agent-runtime/state/session-task.js";
 /**
  * Live ResumeParkedRecheck for the chat.send entry path.
  *
@@ -152,6 +157,40 @@ export type AuthoritativeTaskStopQueryResult =
  * NOT durable across gateway restart / multi-host.
  */
 const authoritativeTaskStops = new Map<string, AuthoritativeTaskStopEntry>();
+
+/** Explicit owner resume lifts only its scoped paused task, after the original state CAS. */
+export function resumeInterpretedCurrentTask(
+  params: AuthoritativeTaskStopScopeInput & {
+    sessionFile: string;
+    request: CurrentTaskResumeRequest;
+    recheckInputs: ResolveResumeParkedRecheckParams;
+  },
+): CurrentTaskResumeResult {
+  const scope = resolveAuthoritativeTaskStopScope(params);
+  const recheck = resolveResumeParkedRecheck(params.recheckInputs);
+  if (
+    !scope ||
+    params.recheckInputs.accessAuthorized !== true ||
+    params.recheckInputs.clientIdentityOk !== true ||
+    params.recheckInputs.sendPolicy !== "allow" ||
+    recheck.authOk !== true ||
+    recheck.stopActive
+  ) {
+    return { kind: "rejected", reason: "resume_not_authorized" };
+  }
+  // This synchronous transaction cannot interleave with a newer same-process stop.
+  // Cancelled tasks remain tombstoned and a running task cannot be resumed twice.
+  const key = authoritativeStopRegistryKey(scope, params.request.taskId);
+  const capturedStop = authoritativeTaskStops.get(key);
+  const result = sessionTaskState.resumeCurrent(params.sessionFile, params.request, {
+    authOk: true,
+    stopActive: false,
+  });
+  if (result.kind === "accepted" && authoritativeTaskStops.get(key) === capturedStop) {
+    authoritativeTaskStops.delete(key);
+  }
+  return result;
+}
 
 function trimOrNull(value: string | null | undefined): string | null {
   if (typeof value !== "string") {

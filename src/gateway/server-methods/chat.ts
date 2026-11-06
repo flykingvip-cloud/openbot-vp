@@ -438,6 +438,7 @@ import {
   clearAuthoritativeTaskStop,
   clientIdentityOkForResume,
   recordAuthoritativeTaskStop,
+  resumeInterpretedCurrentTask,
   sessionStopBarrierActive,
 } from "./chat-resume-parked-recheck.js";
 import {
@@ -6476,6 +6477,53 @@ export const chatHandlers: GatewayRequestHandlers = {
         replyOptions: {
           runId: clientRunId,
           abortSignal: abortController.signal,
+          onInteractionTaskResume: async (request) => {
+            request.abortSignal?.throwIfAborted();
+            const accessDenial = await resolvePersonalWorkbenchSessionAccessDenial({
+              client,
+              sessionKey: resolvedSessionKey,
+              logGateway: context.logGateway,
+            });
+            const writeDenial = await resolveCollaborationGroupWriteDenial({
+              client,
+              rawSessionKey,
+              logGateway: context.logGateway,
+            });
+            if (accessDenial || writeDenial) {
+              return { kind: "rejected", reason: "resume_not_authorized" };
+            }
+            const live = await loadSessionEntryForClient(resolvedSessionKey, client);
+            request.abortSignal?.throwIfAborted();
+            const identity = authoritativeStopIdentityFromClient(client);
+            if (
+              live.canonicalKey !== sessionKey ||
+              live.entry?.sessionFile !== request.sessionFile
+            ) {
+              return { kind: "rejected", reason: "session_changed" };
+            }
+            return resumeInterpretedCurrentTask({
+              ...identity,
+              sessionKey: resolvedSessionKey,
+              sessionFile: request.sessionFile,
+              request,
+              recheckInputs: {
+                accessAuthorized: true,
+                clientIdentityOk: clientIdentityOkForResume(client),
+                sendPolicy: resolveSendPolicy({
+                  cfg: live.cfg,
+                  entry: live.entry,
+                  sessionKey: live.canonicalKey,
+                  channel: live.entry?.channel,
+                  chatType: live.entry?.chatType,
+                }),
+                stopActive: sessionStopBarrierActive({
+                  sessionKeys: [resolvedSessionKey, sessionKey],
+                  chatAbortControllers: context.chatAbortControllers,
+                  ...identity,
+                }),
+              },
+            });
+          },
           onInteractionTaskEffect: async (effect) => {
             // Stop the captured execution only. Never abort this interpreting turn
             // or a later task which took over while the model was answering.
