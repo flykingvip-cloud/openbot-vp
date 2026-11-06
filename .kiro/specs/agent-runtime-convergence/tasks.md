@@ -669,3 +669,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced recovery falsely acknowledging missing and placeholder transport receipts (2 FAIL / 65 PASS). Recovery now requires every returned message id to be confirmed; unknown receipt batches are preserved under failed/ for reconciliation and are not automatically replayed on another recovery pass. Original return API and retry owner remain. This does not provide exactly-once transport or complete task-binding recovery. — codex-runtime-manager
 - Candidate queue/shared-receipt regression 2 files / 69 PASS; architecture 51 PASS; typed lint clean; build PASS with 209 existing warnings. Parallel comparison UI fixture has an unrelated type error at the latest check; no global green claim for this checkpoint. No external send, push, merge or deploy. — codex-runtime-manager
+
+## Context window policy ownership (2026-11-07)
+
+- Pure context-window selection and limit classification now live in policy/context-window and are consumed through policy/index by run, compaction, extensions and onboarding. Old agents/context-window-guard implementation removed; all source consumers and test mocks migrated, without a compatibility execution path. Existing config priority, cap thresholds and warnings remain unchanged. — codex-runtime-manager
+- Baseline guard/onboarding 2 files / 29 PASS; candidate guard/onboarding/overflow/usage regression 5 files / 55 PASS. Full tsgo PASS; architecture 51 PASS; changed-file typed lint clean; build PASS with 209 existing dynamic-import warnings. No push, merge or deployment. — codex-runtime-manager

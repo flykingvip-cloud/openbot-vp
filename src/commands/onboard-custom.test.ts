@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../agents/context-window-guard.js";
+import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { defaultRuntime } from "../runtime.js";
 import {

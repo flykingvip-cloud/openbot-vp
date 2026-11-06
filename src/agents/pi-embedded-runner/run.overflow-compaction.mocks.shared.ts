@@ -122,7 +122,8 @@ vi.mock("../models-config.js", () => ({
   ensureOpenClawModelsJson: vi.fn(async () => {}),
 }));
 
-vi.mock("../context-window-guard.js", () => ({
+vi.mock("../../agent-runtime/policy/index.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agent-runtime/policy/index.js")>()),
   CONTEXT_WINDOW_HARD_MIN_TOKENS: 1000,
   CONTEXT_WINDOW_WARN_BELOW_TOKENS: 5000,
   evaluateContextWindowGuard: vi.fn(() => ({
