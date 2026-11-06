@@ -451,4 +451,55 @@ describe("explicit association recovery", () => {
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(x.plane.listApplications()).toHaveLength(1);
   });
+  it("isolates the authorization request from runtime mutation", async () => {
+    const x = await interrupted();
+    const r = await createAssociationRecoveryService({
+      ...x.ports,
+      authorize: async (input) => {
+        Reflect.set(input, "agentId", "forged");
+        return x.authorization;
+      },
+    })(x.request);
+    expect(r.ok).toBe(true);
+  });
+  it("persists the actual readback observation time", async () => {
+    const x = await interrupted();
+    const r = await createAssociationRecoveryService({ ...x.ports, now: () => now + 100 })(
+      x.request,
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.intent.readback?.observedAt).toBe(now);
+    }
+  });
+  it("blocks authorization revoked while commit waits for its lock", async () => {
+    const x = await interrupted();
+    const store = {
+      ...x.store,
+      commit: async (input: Parameters<typeof x.store.commit>[0]) => {
+        x.setAuthorization(null);
+        return x.store.commit(input);
+      },
+    };
+    const r = await createAssociationRecoveryService({ ...x.ports, store })(x.request);
+    expect(r.ok).toBe(false);
+    expect((await x.store.detail(x.scope, "intent"))?.revision).toBe(2);
+  });
+  it("rechecks authorization after the final replay detail await", async () => {
+    const x = await interrupted();
+    expect((await createAssociationRecoveryService(x.ports)(x.request)).ok).toBe(true);
+    let calls = 0;
+    const store = {
+      ...x.store,
+      detail: async (...args: Parameters<typeof x.store.detail>) => {
+        const row = await x.store.detail(...args);
+        if (++calls === 2) {
+          x.setAuthorization(null);
+        }
+        return row;
+      },
+    };
+    const replay = await createAssociationRecoveryService({ ...x.ports, store })(x.request);
+    expect(replay.ok).toBe(false);
+  });
 });

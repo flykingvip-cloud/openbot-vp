@@ -254,7 +254,10 @@ export function createActionIntentStore(rootDir: string) {
       expectedRevision: number;
       commandId: string;
       requestDigest: string;
+      /** Trusted server-only authorization gate, evaluated inside the commit lock. */
+      precondition?: () => Promise<boolean>;
     }) {
+      const precondition = input.precondition;
       const intent = structuredClone(input.intent);
       assertMetadata(intent);
       const expectedScopeRef =
@@ -284,6 +287,9 @@ export function createActionIntentStore(rootDir: string) {
             ) {
               throw new Error("command_rebind");
             }
+            if (precondition && !(await precondition())) {
+              throw new Error("commit_precondition_failed");
+            }
             return { replayed: true, revision: prior.intent.revision };
           }
           const latest = current?.entries.at(-1)?.intent;
@@ -310,6 +316,9 @@ export function createActionIntentStore(rootDir: string) {
           };
           if (Buffer.byteLength(JSON.stringify(journal)) > 16 * 1024 * 1024) {
             throw new Error("history_capacity_exceeded");
+          }
+          if (precondition && !(await precondition())) {
+            throw new Error("commit_precondition_failed");
           }
           await writeJsonAtomic(file, journal, { mode: 0o600, ensureDirMode: 0o700 });
           return { replayed: false, revision: intent.revision };

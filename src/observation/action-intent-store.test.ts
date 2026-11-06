@@ -161,4 +161,95 @@ describe("durable intent correlation history", () => {
       "corrupt_intent_history",
     );
   });
+  it("evaluates trusted preconditions after queued lock acquisition and on replay", async () => {
+    const store = createActionIntentStore(root);
+    let release: () => void = () => {};
+    let entered: () => void = () => {};
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const value = intent();
+    const holder = store.commit({
+      scope,
+      intent: value,
+      expectedRevision: -1,
+      commandId: "first",
+      requestDigest: "first",
+      precondition: async () => {
+        entered();
+        await barrier;
+        return true;
+      },
+    });
+    await started;
+    let authorized = true;
+    const secondValue = { ...value, actionIntentId: "second" };
+    const waiting = store.commit({
+      scope,
+      intent: secondValue,
+      expectedRevision: -1,
+      commandId: "second",
+      requestDigest: "second",
+      precondition: async () => authorized,
+    });
+    const rejection = expect(waiting).rejects.toThrow("commit_precondition_failed");
+    authorized = false;
+    release();
+    await holder;
+    await rejection;
+    expect(await store.detail(scope, "second")).toBeNull();
+    await expect(
+      store.commit({
+        scope,
+        intent: value,
+        expectedRevision: -1,
+        commandId: "first",
+        requestDigest: "first",
+        precondition: async () => false,
+      }),
+    ).rejects.toThrow("commit_precondition_failed");
+  });
+  it("snapshots the trusted precondition callback before queueing", async () => {
+    const store = createActionIntentStore(root);
+    let release: () => void = () => {};
+    let entered: () => void = () => {};
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const value = intent();
+    const holder = store.commit({
+      scope,
+      intent: value,
+      expectedRevision: -1,
+      commandId: "holder",
+      requestDigest: "holder",
+      precondition: async () => {
+        entered();
+        await barrier;
+        return true;
+      },
+    });
+    await started;
+    const args = {
+      scope,
+      intent: { ...value, actionIntentId: "queued" },
+      expectedRevision: -1,
+      commandId: "queued",
+      requestDigest: "queued",
+      precondition: async () => false,
+    };
+    const waiting = store.commit(args);
+    const rejected = expect(waiting).rejects.toThrow("commit_precondition_failed");
+    args.precondition = async () => true;
+    release();
+    await holder;
+    await rejected;
+    expect(await store.detail(scope, "queued")).toBeNull();
+  });
 });

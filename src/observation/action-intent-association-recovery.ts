@@ -54,7 +54,23 @@ export function createAssociationRecoveryService(ports: {
   now: () => number;
 }) {
   return async (request: AssociationRecoveryRequest) => {
-    const input = structuredClone(request);
+    const input: Readonly<AssociationRecoveryRequest> = Object.freeze({
+      intentId: request.intentId,
+      expectedRevision: request.expectedRevision,
+      originalCommandId: request.originalCommandId,
+      applicationId: request.applicationId,
+      proposalId: request.proposalId,
+      experimentId: request.experimentId,
+      agentId: request.agentId,
+      recoveryCommandId: request.recoveryCommandId,
+    });
+    const readAuthorization = async () => {
+      try {
+        return structuredClone(await ports.authorize(structuredClone(input)));
+      } catch {
+        return null;
+      }
+    };
     if (
       !Number.isSafeInteger(input.expectedRevision) ||
       input.expectedRevision < 0 ||
@@ -68,7 +84,7 @@ export function createAssociationRecoveryService(ports: {
         doNotRetryApply: true as const,
       };
     }
-    const approval = await ports.authorize(input);
+    const approval = await readAuthorization();
     const valid = (a: AssociationRecoveryAuthorization | null) =>
       Boolean(
         a &&
@@ -167,7 +183,7 @@ export function createAssociationRecoveryService(ports: {
       ) {
         return blocked("readback_mismatch");
       }
-      const fresh = await ports.authorize(input);
+      const fresh = await readAuthorization();
       if (!valid(fresh) || hash(fresh) !== requestDigest) {
         return blocked("recovery_authorization_changed");
       }
@@ -182,6 +198,16 @@ export function createAssociationRecoveryService(ports: {
         return blocked("application_binding_changed");
       }
       if (replay) {
+        const replayApproval = await readAuthorization();
+        if (!valid(replayApproval) || hash(replayApproval) !== requestDigest) {
+          return blocked("recovery_authorization_changed");
+        }
+        if (
+          hash(ports.plane.getApplication(input.applicationId)) !== hash(application) ||
+          hash(ports.plane.getProposal(input.proposalId)) !== hash(proposal)
+        ) {
+          return blocked("application_binding_changed");
+        }
         return {
           ok: true as const,
           status: "association_restored" as const,
@@ -246,7 +272,7 @@ export function createAssociationRecoveryService(ports: {
         scopeRef,
         actualVersion: read.actualVersion,
         actualDiffDigest: read.actualDiffDigest,
-        observedAt: now,
+        observedAt: read.observedAt,
       };
       const restored: ActionIntent = {
         ...structuredClone(intent),
@@ -284,6 +310,19 @@ export function createAssociationRecoveryService(ports: {
         expectedRevision: input.expectedRevision,
         commandId: input.recoveryCommandId,
         requestDigest,
+        precondition: async () => {
+          const at = ports.now();
+          const current = await readAuthorization();
+          // This lock-local gate prevents queued commits from using stale approval.
+          // It is not an atomic transaction with an external authorization system.
+          return (
+            Number.isFinite(at) &&
+            valid(current) &&
+            hash(current) === requestDigest &&
+            hash(ports.plane.getApplication(input.applicationId)) === hash(application) &&
+            hash(ports.plane.getProposal(input.proposalId)) === hash(proposal)
+          );
+        },
       });
       return {
         ok: true as const,
