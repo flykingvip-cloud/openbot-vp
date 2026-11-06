@@ -1,3 +1,4 @@
+import { createRunAdmissionLease } from "../agent-runtime/model/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
 import { createCommandBudget, runCommandCandidate, runCommandFallback } from "../agent-runtime/execution/index.js";
 import fs from "node:fs/promises";
@@ -543,7 +544,14 @@ async function agentCommandInternal(
   let sessionEntry = prepared.sessionEntry;
   const laneRaw = typeof opts.lane === "string" ? opts.lane.trim() : "";
   const isSubagentLane = laneRaw === String(AGENT_LANE_SUBAGENT);
-  let commercialRunSlotHeld = false;
+  const commercialLease = createRunAdmissionLease({
+    acquire: async (input: Parameters<typeof acquireAgentCommandCommercialRun>[0]) => {
+      const gate = await acquireAgentCommandCommercialRun(input);
+      return { acquired: gate.status === "acquired", gate };
+    },
+    release: () => { void releaseAgentCommandCommercialRun(runId); },
+    forgetSnapshot: () => forgetRunModelSet(runId),
+  });
   // Subagent runs take their own commercial slot (quota + concurrency).
   // Model allowlists for the child still come from the parent snapshot.
   let commercialGate: AgentCommandCommercialGateResult | undefined;
@@ -665,14 +673,14 @@ async function agentCommandInternal(
       }
     }
 
-    commercialGate = await acquireAgentCommandCommercialRun({
+    commercialGate = (await commercialLease.acquire({
       runId,
       sessionAgentId,
       gatewayClientUser: opts.gatewayClientUser,
       enterpriseId: opts.gatewayClientSessionTenantId,
       taskText: opts.message ?? body,
       ...(isSubagentLane ? { entry: "E6" as const } : opts.governanceEntry ? { entry: opts.governanceEntry } : {}),
-    });
+    })).gate;
     if (commercialGate.status === "denied") {
       agentOutcomeSuccess = false;
       agentOutcomeFailureReason = "authz_denied";
@@ -683,7 +691,6 @@ async function agentCommandInternal(
       | ReturnType<typeof resolveExecutionRoutingFromCapabilityPlan>
       | undefined;
     if (commercialGate.status === "acquired") {
-      commercialRunSlotHeld = true;
       if (!isSubagentLane) {
         const modelGovernance = resolveAgentCommandModelGovernance(
           commercialGate,
@@ -1334,10 +1341,7 @@ async function agentCommandInternal(
     }
     throw err;
   } finally {
-    if (commercialRunSlotHeld) {
-      void releaseAgentCommandCommercialRun(runId);
-      forgetRunModelSet(runId);
-    }
+    commercialLease.dispose();
     clearAgentRunContext(runId);
     await submitAgentOutcomeCloseout();
   }

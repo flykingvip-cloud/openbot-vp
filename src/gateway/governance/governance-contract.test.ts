@@ -285,7 +285,7 @@ describe("§5 execution entry inventory", () => {
         "recordCliBackendUsage",
       );
       // Gate is acquired in agentCommandInternal before runWithModelFallback → runAgentAttempt → runCliAgent.
-      const gateIdx = agent!.indexOf("commercialGate = await acquireAgentCommandCommercialRun");
+      const gateIdx = agent!.indexOf("await commercialLease.acquire");
       const fallbackIdx = agent!.indexOf("await runCommandFallback");
       expect(gateIdx).toBeGreaterThan(-1);
       expect(fallbackIdx).toBeGreaterThan(-1);
