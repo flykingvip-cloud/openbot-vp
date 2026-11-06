@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../config/config.js";
+import { boundedOutcomePathSegment } from "../task-outcome/store.js";
 import { readOutcomeMetadata } from "./outcome-reader.js";
 
 let dir = "";
@@ -53,6 +54,58 @@ afterEach(() => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 describe("read-only outcome metadata", () => {
+  it("supports owned personal scope", () => {
+    const personal = {
+      ...metadata(),
+      scope: {
+        kind: "personal",
+        subjectRef: "subject:alice",
+        authzScopeRef: "personal-auth",
+        personalDomainId: "personal-domain",
+      },
+    };
+    fs.writeFileSync(tipPath(), JSON.stringify(personal));
+    fs.writeFileSync(versionPath(), JSON.stringify(personal));
+    expect(read({ callerTenantId: null }).ok).toBe(true);
+    expect(read({ callerSubjectRef: "subject:other" })).toEqual({
+      ok: false,
+      code: "unauthorized",
+    });
+  });
+  it.each(["authzScopeRef", "enterpriseDomainId"])("rejects empty scope field %s", (key) => {
+    const invalid = { ...metadata(), scope: { ...metadata().scope, [key]: " " } };
+    fs.writeFileSync(tipPath(), JSON.stringify(invalid));
+    fs.writeFileSync(versionPath(), JSON.stringify(invalid));
+    expect(read()).toEqual({ ok: false, code: "invalid_record" });
+  });
+  it("rejects conflicting business metadata under the same immutable version", () => {
+    fs.writeFileSync(versionPath(), JSON.stringify({ ...metadata(), taskJudgement: "failure" }));
+    expect(read()).toEqual({ ok: false, code: "invalid_record" });
+  });
+  it("uses bounded hash paths for long task identities", () => {
+    const longId = "任务".repeat(300);
+    const segment = boundedOutcomePathSegment(longId);
+    expect(segment).toMatch(/^h-[a-f0-9]{64}$/);
+    const row = { ...metadata(), taskId: longId };
+    fs.writeFileSync(path.join(dir, "task-outcomes/tips", segment + ".json"), JSON.stringify(row));
+    fs.writeFileSync(
+      path.join(dir, "task-outcomes/versions", segment + "__v1.json"),
+      JSON.stringify(row),
+    );
+    expect(read({ taskId: longId }).ok).toBe(true);
+  });
+  it("does not create a missing store on read failure", () => {
+    fs.rmSync(path.join(dir, "task-outcomes"), { recursive: true });
+    expect(read()).toEqual({ ok: false, code: "not_found" });
+    expect(fs.readdirSync(dir)).toEqual([]);
+  });
+  it("rejects malformed consumed metadata", () => {
+    fs.writeFileSync(
+      versionPath(),
+      JSON.stringify({ ...metadata(), attempts: [{ attemptId: 7 }] }),
+    );
+    expect(read()).toEqual({ ok: false, code: "invalid_record" });
+  });
   it("reads encoded keys without writes and strips private fields", () => {
     const before = fs.readdirSync(path.join(dir, "task-outcomes"), { recursive: true });
     const tipBefore = fs.readFileSync(tipPath(), "utf8");

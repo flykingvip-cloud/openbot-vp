@@ -50,20 +50,16 @@ export type OutcomeReadResult =
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
+function nonempty(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
 function scope(value: unknown): value is TrustedScope {
-  if (
-    !object(value) ||
-    typeof value.subjectRef !== "string" ||
-    !value.subjectRef ||
-    typeof value.authzScopeRef !== "string"
-  ) {
+  if (!object(value) || !nonempty(value.subjectRef) || !nonempty(value.authzScopeRef)) {
     return false;
   }
   return value.kind === "personal"
-    ? typeof value.personalDomainId === "string"
-    : value.kind === "enterprise" &&
-        typeof value.tenantId === "string" &&
-        typeof value.enterpriseDomainId === "string";
+    ? nonempty(value.personalDomainId)
+    : value.kind === "enterprise" && nonempty(value.tenantId) && nonempty(value.enterpriseDomainId);
 }
 function record(value: unknown): value is OutcomeRecordMetadata {
   if (
@@ -138,6 +134,30 @@ function scopeKey(value: TrustedScope): string {
       : [value.kind, value.subjectRef, value.authzScopeRef, value.personalDomainId],
   );
 }
+/** Canonical whitelist comparison ignores body fields and collection order. */
+function metadataKey(row: OutcomeRecordMetadata): string {
+  const runs = row.runs
+    .map((r) => JSON.stringify([r.runId, r.attemptIds.toSorted(), r.effectiveAttemptId, r.status]))
+    .toSorted();
+  const attempts = row.attempts
+    .map((a) => JSON.stringify([a.attemptId, a.runId, a.status, a.observedAt]))
+    .toSorted();
+  return JSON.stringify([
+    scopeKey(row.scope),
+    row.taskId,
+    row.outcomeVersion,
+    row.taskJudgement,
+    row.lifecycle,
+    row.decidedAt,
+    row.acceptance.status,
+    row.delivery.status,
+    row.decisiveRunId,
+    row.decisiveAttemptId,
+    row.deliveryId,
+    runs,
+    attempts,
+  ]);
+}
 export function readOutcomeMetadata(input: {
   cfg: OpenBotConfig;
   agentId: string;
@@ -206,6 +226,9 @@ export function readOutcomeMetadata(input: {
       })
     ) {
       return { ok: false, code: "unauthorized" };
+    }
+    if (tip.outcomeVersion === snap.outcomeVersion && metadataKey(tip) !== metadataKey(snap)) {
+      return { ok: false, code: "invalid_record" };
     }
     // A changing tip is retried by the caller, never silently paired with a different version.
     if (fs.readFileSync(tipPath, "utf8") !== tipText) {
