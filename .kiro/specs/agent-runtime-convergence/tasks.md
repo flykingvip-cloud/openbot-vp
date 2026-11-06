@@ -689,3 +689,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Copilot credential refresh timing, bounded scheduled retry and timer cleanup moved from legacy run.ts into model/copilot-token-refresh. Initial credential exchange remains at its original location; run teardown invokes the lifecycle stop method. No task scheduling, new model loop or credential persistence introduced. — codex-runtime-manager
 - Original configured authentication integration 25 PASS; lifecycle component 2 PASS after waiting for the mocked dynamic import to settle. Full tsgo PASS; architecture 51 PASS; typed lint clean; full build PASS with 209 existing warnings. No real-provider invocation, push, merge or deploy. — codex-runtime-manager
+
+## Embedded model preparation ownership (2026-11-07)
+
+- Model resolution, BYOK synthesis, endpoint override and effective context-window preparation moved from legacy run.ts into model/prepare-embedded-model. Original provider resolution adapter and public context policy remain single-owned; old run-local preparation body removed. Credential application, hooks and model attempts retain their original order. — codex-runtime-manager
+- Component 2 PASS; overflow/usage regression 3 files / 26 PASS; configured authentication integration 25 PASS. Full tsgo PASS; architecture 51 PASS; typed lint clean; full build PASS with 209 existing dynamic-import warnings. No real-provider invocation, push, merge or deployment. — codex-runtime-manager

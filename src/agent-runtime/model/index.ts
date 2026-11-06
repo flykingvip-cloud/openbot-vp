@@ -17,3 +17,5 @@ export { resolveRunAuthProfileCandidates } from "./auth-profile-candidates.js";
 export { createAuthProfileRotation } from "./auth-profile-rotation.js";
 
 export { createCopilotTokenRefresh } from "./copilot-token-refresh.js";
+
+export { prepareEmbeddedModel } from "./prepare-embedded-model.js";

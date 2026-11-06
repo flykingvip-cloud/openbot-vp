@@ -7,17 +7,12 @@ import {
   buildErrorAgentMeta,
 } from "../../agent-runtime/execution/index.js";
 import { recoverContextOverflow } from "../../agent-runtime/execution/index.js";
+import { prepareEmbeddedModel } from "../../agent-runtime/model/index.js";
 import { createCopilotTokenRefresh } from "../../agent-runtime/model/index.js";
 import {
   createAuthProfileRotation,
   resolveRunAuthProfileCandidates,
 } from "../../agent-runtime/model/index.js";
-import {
-  CONTEXT_WINDOW_HARD_MIN_TOKENS,
-  CONTEXT_WINDOW_WARN_BELOW_TOKENS,
-  evaluateContextWindowGuard,
-  resolveContextWindowInfo,
-} from "../../agent-runtime/policy/index.js";
 import type { ThinkLevel } from "../../auto-reply/thinking.js";
 import {
   ensureContextEnginesInitialized,
@@ -40,7 +35,7 @@ import {
   markAuthProfileUsed,
   resolveProfilesUnavailableReason,
 } from "../auth-profiles.js";
-import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../defaults.js";
+import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../defaults.js";
 import {
   disarmCompletionHold,
   finalizeDeliveryContext,
@@ -79,7 +74,6 @@ import { derivePromptTokens, normalizeUsage, type UsageLike } from "../usage.js"
 import { redactRunIdentifier, resolveRunWorkspaceDir } from "../workspace-run.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
 import { log } from "./logger.js";
-import { resolveModel } from "./model.js";
 import { runEmbeddedAttempt } from "./run/attempt.js";
 import { createFailoverDecisionLogger } from "./run/failover-observation.js";
 import type { RunEmbeddedPiAgentParams } from "./run/params.js";
@@ -272,76 +266,15 @@ export async function runEmbeddedPiAgent(
         log.info(`[hooks] model overridden to ${modelId}`);
       }
 
-      const { model, error, authStorage, modelRegistry } = await resolveModel(
-        provider,
-        modelId,
-        agentDir,
-        params.config,
-      );
-      const authOverride = params.providerAuthOverride;
-      let resolvedModel = model;
-      if (!resolvedModel && authOverride?.apiKey) {
-        // BYOK openai-compatible / custom model not in global registry: synthesize.
-        const api = authOverride.protocol?.includes("anthropic")
-          ? ("anthropic-messages" as const)
-          : ("openai-completions" as const);
-        resolvedModel = {
-          id: modelId,
-          name: modelId,
-          api,
+      const { authStorage, modelRegistry, authOverride, ctxInfo, effectiveModel } =
+        await prepareEmbeddedModel({
+          config: params.config,
           provider,
-          baseUrl: authOverride.baseUrl,
-          reasoning: false,
-          input: ["text"],
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-          contextWindow: 128_000,
-          maxTokens: 8192,
-        } as typeof model;
-      }
-      if (!resolvedModel) {
-        throw new FailoverError(error ?? `Unknown model: ${provider}/${modelId}`, {
-          reason: "model_not_found",
-          provider,
-          model: modelId,
+          modelId,
+          agentDir,
+          providerAuthOverride: params.providerAuthOverride,
+          log,
         });
-      }
-      if (authOverride?.baseUrl?.trim()) {
-        resolvedModel = { ...resolvedModel, baseUrl: authOverride.baseUrl.trim() };
-      }
-      const modelForRun = resolvedModel;
-
-      const ctxInfo = resolveContextWindowInfo({
-        cfg: params.config,
-        provider,
-        modelId,
-        modelContextWindow: modelForRun.contextWindow,
-        defaultTokens: DEFAULT_CONTEXT_TOKENS,
-      });
-      // Apply contextTokens cap to model so pi-coding-agent's auto-compaction
-      // threshold uses the effective limit, not the native context window.
-      const effectiveModel =
-        ctxInfo.tokens < (modelForRun.contextWindow ?? Infinity)
-          ? { ...modelForRun, contextWindow: ctxInfo.tokens }
-          : modelForRun;
-      const ctxGuard = evaluateContextWindowGuard({
-        info: ctxInfo,
-        warnBelowTokens: CONTEXT_WINDOW_WARN_BELOW_TOKENS,
-        hardMinTokens: CONTEXT_WINDOW_HARD_MIN_TOKENS,
-      });
-      if (ctxGuard.shouldWarn) {
-        log.warn(
-          `low context window: ${provider}/${modelId} ctx=${ctxGuard.tokens} (warn<${CONTEXT_WINDOW_WARN_BELOW_TOKENS}) source=${ctxGuard.source}`,
-        );
-      }
-      if (ctxGuard.shouldBlock) {
-        log.error(
-          `blocked model (context window too small): ${provider}/${modelId} ctx=${ctxGuard.tokens} (min=${CONTEXT_WINDOW_HARD_MIN_TOKENS}) source=${ctxGuard.source}`,
-        );
-        throw new FailoverError(
-          `Model context window too small (${ctxGuard.tokens} tokens). Minimum is ${CONTEXT_WINDOW_HARD_MIN_TOKENS}.`,
-          { reason: "unknown", provider, model: modelId },
-        );
-      }
 
       const authStore = ensureAuthProfileStore(agentDir, { allowKeychainPrompt: false });
       const { lockedProfileId, profileCandidates } = resolveRunAuthProfileCandidates({
