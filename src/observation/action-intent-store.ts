@@ -68,6 +68,25 @@ const readbackSchema = z.strictObject({
   observedAt: num,
 });
 const intentSchema = z.strictObject({
+  associationRecovery: z
+    .strictObject({
+      authorizationId: str,
+      actorRef: str,
+      action: z.literal("restore_association"),
+      expectedRevision: revision,
+      originalCommandId: str,
+      applicationId: str,
+      proposalId: str,
+      experimentId: str,
+      agentId: str,
+      scopeDigest: str,
+      actualVersion: str,
+      actualDiffDigest: str,
+      recoveredAt: num,
+      recoveryCommandId: str,
+      requestDigest: str,
+    })
+    .optional(),
   schemaVersion: z.literal(1),
   actionIntentId: str,
   revision,

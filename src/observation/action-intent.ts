@@ -87,7 +87,25 @@ export type VerificationEvidence = {
   passed: boolean;
   observedAt: number;
 };
+export type AssociationRecoveryMetadata = {
+  authorizationId: string;
+  actorRef: string;
+  action: "restore_association";
+  expectedRevision: number;
+  originalCommandId: string;
+  applicationId: string;
+  proposalId: string;
+  experimentId: string;
+  agentId: string;
+  scopeDigest: string;
+  actualVersion: string;
+  actualDiffDigest: string;
+  recoveredAt: number;
+  recoveryCommandId: string;
+  requestDigest: string;
+};
 export type ActionIntent = {
+  associationRecovery?: AssociationRecoveryMetadata;
   schemaVersion: 1;
   actionIntentId: string;
   revision: number;
