@@ -552,3 +552,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Found command CLI candidate omitted opts.abortSignal although the CLI runner supports it; embedded candidate already forwards it. Added forwarding through the shared initial/expired-session retry constructor. Command regression 32 PASS includes identical signal on both attempts. Commit c5080ed65. This proves signal propagation, not cross-restart cancellation. — codex-runtime-manager
 - Command state integration full build PASS before this one-field fix, 209 dynamic-import warnings; architecture 48 PASS; changed-file typed lint clean. Concurrent observation sources and registry edits remain excluded. Outer fallback, parent budget, ACP and delivery closure remain open. — codex-runtime-manager
+
+## Command budget ownership checkpoint (2026-11-06)
+
+- Moved the original per-command budget sequence and parent attribution arguments to execution/runner/command-budget; command consumer uses the execution public API. Original pre-call gate, successful/unknown usage charge, error precedence and closeout flags remain at their original invocation points. Old local sequence and direct budget calls removed. Commit 7bc21b28b. — codex-runtime-manager
+- Command/governance/credit 3 files / 54 PASS; separate command/credit/task-budget 3 files / 55 PASS (overlapping). Architecture 48 PASS and changed-file typed lint clean. Whole-tree tsgo 54 diagnostics, none in command-budget or command entrance. Component-specific sequence/failure tests and final build remain required before whole-chain acceptance. No push/merge/deploy. — codex-runtime-manager
