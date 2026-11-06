@@ -684,3 +684,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Request-local initial credential traversal and profile advancement moved from legacy run.ts into model/auth-profile-rotation. User pins, cooldown skipping, explicit transient probe, failed credential advancement and original thinking-reset timing preserved. Caller still owns the only model retry loop; no new scheduler or credential store. — codex-runtime-manager
 - Original configured auth rotation integration 25 PASS; component 3 PASS; full tsgo PASS; architecture 51 PASS; changed-file typed lint clean; full build PASS with 209 existing warnings. No real-provider invocation, push, merge or deploy. — codex-runtime-manager
+
+## Provider credential refresh lifecycle (2026-11-07)
+
+- Copilot credential refresh timing, bounded scheduled retry and timer cleanup moved from legacy run.ts into model/copilot-token-refresh. Initial credential exchange remains at its original location; run teardown invokes the lifecycle stop method. No task scheduling, new model loop or credential persistence introduced. — codex-runtime-manager
+- Original configured authentication integration 25 PASS; lifecycle component 2 PASS after waiting for the mocked dynamic import to settle. Full tsgo PASS; architecture 51 PASS; typed lint clean; full build PASS with 209 existing warnings. No real-provider invocation, push, merge or deploy. — codex-runtime-manager

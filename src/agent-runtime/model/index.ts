@@ -15,3 +15,5 @@ export { createCommandAdmissionSession } from "./command-admission-session.js";
 export { resolveRunAuthProfileCandidates } from "./auth-profile-candidates.js";
 
 export { createAuthProfileRotation } from "./auth-profile-rotation.js";
+
+export { createCopilotTokenRefresh } from "./copilot-token-refresh.js";

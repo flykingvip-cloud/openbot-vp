@@ -7,6 +7,7 @@ import {
   buildErrorAgentMeta,
 } from "../../agent-runtime/execution/index.js";
 import { recoverContextOverflow } from "../../agent-runtime/execution/index.js";
+import { createCopilotTokenRefresh } from "../../agent-runtime/model/index.js";
 import {
   createAuthProfileRotation,
   resolveRunAuthProfileCandidates,
@@ -92,16 +93,6 @@ import { describeUnknownError } from "./utils.js";
 
 type ApiKeyInfo = ResolvedProviderAuth;
 
-type CopilotTokenState = {
-  githubToken: string;
-  expiresAt: number;
-  refreshTimer?: ReturnType<typeof setTimeout>;
-  refreshInFlight?: Promise<void>;
-};
-
-const COPILOT_REFRESH_MARGIN_MS = 5 * 60 * 1000;
-const COPILOT_REFRESH_RETRY_MS = 60 * 1000;
-const COPILOT_REFRESH_MIN_DELAY_MS = 5 * 1000;
 // Keep overload pacing noticeable enough to avoid tight retry bursts, but short
 // enough that fallback still feels responsive within a single turn.
 const OVERLOAD_FAILOVER_BACKOFF_POLICY: BackoffPolicy = {
@@ -366,105 +357,12 @@ export async function runEmbeddedPiAgent(
       const attemptedThinking = new Set<ThinkLevel>();
       let apiKeyInfo: ApiKeyInfo | null = null;
       let lastProfileId: string | undefined;
-      const copilotTokenState: CopilotTokenState | null =
-        effectiveModel.provider === "github-copilot" ? { githubToken: "", expiresAt: 0 } : null;
-      let copilotRefreshCancelled = false;
-      const hasCopilotGithubToken = () => Boolean(copilotTokenState?.githubToken.trim());
-
-      const clearCopilotRefreshTimer = () => {
-        if (!copilotTokenState?.refreshTimer) {
-          return;
-        }
-        clearTimeout(copilotTokenState.refreshTimer);
-        copilotTokenState.refreshTimer = undefined;
-      };
-
-      const stopCopilotRefreshTimer = () => {
-        if (!copilotTokenState) {
-          return;
-        }
-        copilotRefreshCancelled = true;
-        clearCopilotRefreshTimer();
-      };
-
-      const refreshCopilotToken = async (reason: string): Promise<void> => {
-        if (!copilotTokenState) {
-          return;
-        }
-        if (copilotTokenState.refreshInFlight) {
-          await copilotTokenState.refreshInFlight;
-          return;
-        }
-        const { resolveCopilotApiToken } = await import("../../providers/github-copilot-token.js");
-        copilotTokenState.refreshInFlight = (async () => {
-          const githubToken = copilotTokenState.githubToken.trim();
-          if (!githubToken) {
-            throw new Error("Copilot refresh requires a GitHub token.");
-          }
-          log.debug(`Refreshing GitHub Copilot token (${reason})...`);
-          const copilotToken = await resolveCopilotApiToken({
-            githubToken,
-          });
-          authStorage.setRuntimeApiKey(effectiveModel.provider, copilotToken.token);
-          copilotTokenState.expiresAt = copilotToken.expiresAt;
-          const remaining = copilotToken.expiresAt - Date.now();
-          log.debug(
-            `Copilot token refreshed; expires in ${Math.max(0, Math.floor(remaining / 1000))}s.`,
-          );
-        })()
-          .catch((err) => {
-            log.warn(`Copilot token refresh failed: ${describeUnknownError(err)}`);
-            throw err;
-          })
-          .finally(() => {
-            copilotTokenState.refreshInFlight = undefined;
-          });
-        await copilotTokenState.refreshInFlight;
-      };
-
-      const scheduleCopilotRefresh = (): void => {
-        if (!copilotTokenState || copilotRefreshCancelled) {
-          return;
-        }
-        if (!hasCopilotGithubToken()) {
-          log.warn("Skipping Copilot refresh scheduling; GitHub token missing.");
-          return;
-        }
-        clearCopilotRefreshTimer();
-        const now = Date.now();
-        const refreshAt = copilotTokenState.expiresAt - COPILOT_REFRESH_MARGIN_MS;
-        const delayMs = Math.max(COPILOT_REFRESH_MIN_DELAY_MS, refreshAt - now);
-        const timer = setTimeout(() => {
-          if (copilotRefreshCancelled) {
-            return;
-          }
-          refreshCopilotToken("scheduled")
-            .then(() => scheduleCopilotRefresh())
-            .catch(() => {
-              if (copilotRefreshCancelled) {
-                return;
-              }
-              const retryTimer = setTimeout(() => {
-                if (copilotRefreshCancelled) {
-                  return;
-                }
-                refreshCopilotToken("scheduled-retry")
-                  .then(() => scheduleCopilotRefresh())
-                  .catch(() => undefined);
-              }, COPILOT_REFRESH_RETRY_MS);
-              copilotTokenState.refreshTimer = retryTimer;
-              if (copilotRefreshCancelled) {
-                clearTimeout(retryTimer);
-                copilotTokenState.refreshTimer = undefined;
-              }
-            });
-        }, delayMs);
-        copilotTokenState.refreshTimer = timer;
-        if (copilotRefreshCancelled) {
-          clearTimeout(timer);
-          copilotTokenState.refreshTimer = undefined;
-        }
-      };
+      const copilotRefresh = createCopilotTokenRefresh({
+        enabled: effectiveModel.provider === "github-copilot",
+        setRuntimeApiKey: (token) => authStorage.setRuntimeApiKey(effectiveModel.provider, token),
+        describeError: describeUnknownError,
+        log,
+      });
 
       const resolveAuthProfileFailoverReason = (params: {
         allInCooldown: boolean;
@@ -553,10 +451,9 @@ export async function runEmbeddedPiAgent(
             githubToken: apiKeyInfo.apiKey,
           });
           authStorage.setRuntimeApiKey(effectiveModel.provider, copilotToken.token);
-          if (copilotTokenState) {
-            copilotTokenState.githubToken = apiKeyInfo.apiKey;
-            copilotTokenState.expiresAt = copilotToken.expiresAt;
-            scheduleCopilotRefresh();
+          if (copilotRefresh.enabled) {
+            copilotRefresh.remember(apiKeyInfo.apiKey, copilotToken.expiresAt);
+            copilotRefresh.schedule();
           }
         } else {
           authStorage.setRuntimeApiKey(effectiveModel.provider, apiKeyInfo.apiKey);
@@ -632,7 +529,7 @@ export async function runEmbeddedPiAgent(
         errorText: string,
         retried: boolean,
       ): Promise<boolean> => {
-        if (!copilotTokenState || retried) {
+        if (!copilotRefresh.enabled || retried) {
           return false;
         }
         if (!isFailoverErrorMessage(errorText)) {
@@ -642,8 +539,8 @@ export async function runEmbeddedPiAgent(
           return false;
         }
         try {
-          await refreshCopilotToken("auth-error");
-          scheduleCopilotRefresh();
+          await copilotRefresh.refresh("auth-error");
+          copilotRefresh.schedule();
           return true;
         } catch {
           return false;
@@ -1427,7 +1324,7 @@ export async function runEmbeddedPiAgent(
         }
       } finally {
         await contextEngine.dispose?.();
-        stopCopilotRefreshTimer();
+        copilotRefresh.stop();
         process.chdir(prevCwd);
       }
     }),
