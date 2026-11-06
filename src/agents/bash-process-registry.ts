@@ -1,4 +1,5 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import type { TaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import { createSessionSlug as createSessionSlugId } from "./session-slug.js";
 
 const DEFAULT_JOB_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -26,6 +27,7 @@ export type SessionStdin = {
 };
 
 export interface ProcessSession {
+  taskBoundary?: TaskActionBoundary;
   id: string;
   command: string;
   scopeKey?: string;

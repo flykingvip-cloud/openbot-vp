@@ -1,6 +1,10 @@
 import path from "node:path";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Type } from "@sinclair/typebox";
+import {
+  checkTaskActionBoundary,
+  type TaskActionBoundary,
+} from "../agent-runtime/state/task-action.js";
 import { type ExecHost } from "../infra/exec-approvals.js";
 import { requestHeartbeatNow } from "../infra/heartbeat-wake.js";
 import { isDangerousHostEnvVarName } from "../infra/host-env-security.js";
@@ -215,6 +219,10 @@ function maybeNotifyOnExit(session: ProcessSession, status: "completed" | "faile
     return;
   }
   session.exitNotified = true;
+  // A completed child is evidence, not permission to wake a cancelled or replaced task.
+  if (session.taskBoundary && checkTaskActionBoundary(session.taskBoundary)) {
+    return;
+  }
   const exitLabel = session.exitSignal
     ? `signal ${session.exitSignal}`
     : `code ${session.exitCode ?? 0}`;
@@ -319,6 +327,7 @@ export async function runExecProcess(opts: {
   maxOutput: number;
   pendingMaxOutput: number;
   notifyOnExit: boolean;
+  taskBoundary?: TaskActionBoundary;
   notifyOnExitEmptySuccess?: boolean;
   scopeKey?: string;
   sessionKey?: string;
@@ -336,6 +345,7 @@ export async function runExecProcess(opts: {
 
   const session: ProcessSession = {
     id: sessionId,
+    taskBoundary: opts.taskBoundary,
     command: opts.command,
     scopeKey: opts.scopeKey,
     sessionKey: opts.sessionKey,
