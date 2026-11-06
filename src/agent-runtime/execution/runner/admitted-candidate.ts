@@ -32,6 +32,7 @@ import { buildEmbeddedRunBaseParams } from "../preparation/index.js";
 /** Legacy single admitted candidate adapter. Outer admission/fallback/finalization remain with the caller. */
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
 export type AdmittedCandidateHost = {
+  observeExecution?: (stage: "started" | "completed" | "failed" | "cancelled") => void;
   assertOriginalTaskCurrent: () => void;
   assertTipBudgetAllowsModelCall: () => void;
 
@@ -125,6 +126,7 @@ export function createAdmittedCandidateInvoker(
         let lifecycleTerminalEmitted = false;
         try {
           host.assertOriginalTaskCurrent();
+          host.observeExecution?.("started");
           const result = await runCliAgent({
             sessionId: params.followupRun.run.sessionId,
             sessionKey: params.sessionKey,
@@ -148,6 +150,7 @@ export function createAdmittedCandidateInvoker(
             images: params.opts?.images,
             credentialEnv,
           });
+          host.observeExecution?.("completed");
           host.setBootstrapWarnings(
             resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport),
           );
@@ -207,6 +210,7 @@ export function createAdmittedCandidateInvoker(
 
           return result;
         } catch (err) {
+          host.observeExecution?.(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
           emitAgentEvent({
             runId,
             stream: "lifecycle",
@@ -388,6 +392,18 @@ export function createAdmittedCandidateInvoker(
               : undefined,
           onReasoningEnd: params.opts?.onReasoningEnd,
           onAgentEvent: async (evt) => {
+            if (evt.stream === "lifecycle") {
+              const phase = evt.data.phase;
+              if (phase === "start") {
+                host.observeExecution?.("started");
+              }
+              if (phase === "end") {
+                host.observeExecution?.("completed");
+              }
+              if (phase === "error") {
+                host.observeExecution?.(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
+              }
+            }
             // Tool stream only. Does not write assistant text into the ledger.
             conversationToolObserver?.(evt);
             // Signal run start only after the embedded agent emits real activity.

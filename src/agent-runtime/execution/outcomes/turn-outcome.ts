@@ -3,6 +3,7 @@ import type { OpenBotConfig } from "../../../config/config.js";
 import { syncRobotGrowthFromOperationalMetrics } from "../../../gateway/agent-growth/operational-growth.js";
 import { reportEvolutionOutcomeWriteFailure } from "../../../gateway/evolution-control/evolution-loop-log.js";
 import type { CapabilityOutcomeForTurn } from "../../../gateway/model-entitlement/capability-entry-consume.js";
+import type { createRuntimeEvidenceObserver } from "../../../observation/runtime-evidence.js";
 import type { ModalityExecutionArtifact } from "../../../task-outcome/modality-artifact-evidence.js";
 import {
   recordRunnerTurnOutcome,
@@ -12,6 +13,7 @@ import {
 import type { TrustedScope } from "../../../task-outcome/types.js";
 
 export function createTurnOutcomeRecorder(params: {
+  runtimeEvidence?: ReturnType<typeof createRuntimeEvidenceObserver>;
   config: OpenBotConfig;
   agentId?: string;
   isHeartbeat: boolean;
@@ -149,7 +151,10 @@ export function createTurnOutcomeRecorder(params: {
         : {}),
       ...(tipBudgetChargedThisTurn || opts?.skipBudgetCharge ? { skipBudgetCharge: true } : {}),
     })
-      .then(async () => {
+      .then(async (receipt) => {
+        if (receipt?.record) {
+          params.runtimeEvidence?.bind(receipt.record);
+        }
         await syncRobotGrowthFromOperationalMetrics(params.config, growthAgentId);
       })
       .catch((error: unknown) => {

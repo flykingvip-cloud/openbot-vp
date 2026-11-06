@@ -39,6 +39,7 @@ import {
   isPlatformAdmissionEmptyError,
 } from "../../../gateway/models/capability-admission/apply-runtime-admission.js";
 import { logVerbose } from "../../../globals.js";
+import { createRuntimeEvidenceObserver } from "../../../observation/runtime-evidence.js";
 import { defaultRuntime } from "../../../runtime.js";
 import { TaskBudgetExceededError } from "../../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../../utils/message-channel.js";
@@ -149,7 +150,13 @@ export async function runAdmittedTurn(
   };
   let modelGate: EmployeeModelGateResult | undefined;
   let capabilityOutcomeForTurn: CapabilityOutcomeForTurn | undefined;
+  const runtimeEvidence = createRuntimeEvidenceObserver({
+    taskId: chatOutcomeTaskId,
+    scope: chatOutcomeScope,
+    runId,
+  });
   const outcomeRecorder = createTurnOutcomeRecorder({
+    runtimeEvidence,
     config: params.followupRun.run.config,
     agentId: params.followupRun.run.agentId,
     isHeartbeat: params.isHeartbeat,
@@ -373,6 +380,7 @@ export async function runAdmittedTurn(
           assertTipBudgetAllowsModelCall,
           chargeTipBudgetAfterModelCall,
           notifyAgentRunStart,
+          observeExecution: (stage) => runtimeEvidence.capture(stage),
           handlePartialForTyping,
           normalizeStreamingText,
           normalizeReplyMediaPaths,
