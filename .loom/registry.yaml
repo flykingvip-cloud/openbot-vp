@@ -11438,6 +11438,10 @@ tasks:
       - src/agent-runtime/execution/runner/admitted-turn.ts
       - src/agent-runtime/execution/runner/admitted-candidate.ts
       - src/agent-runtime/execution/outcomes/turn-outcome.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-shell.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surface-types.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surfaces-core.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-diagnosis-observation.browser.test.ts
     state: active
     sessions:
       - id: observe-owner-20261106
@@ -11445,35 +11449,42 @@ tasks:
         ide: codex
         agent: codex-observe-owner
         status: active
-        lastSignalAt: 2026-11-06T11:09:23.587Z
+        lastSignalAt: 2026-11-06T11:49:41.431Z
         metadata: {}
       - id: observe-backend-20261106
         taskId: agent-runtime-observability:codex-observe-owner
         ide: codex
         agent: codex-observe-backend
         status: active
-        lastSignalAt: 2026-11-06T11:09:23.587Z
+        lastSignalAt: 2026-11-06T11:49:41.431Z
         metadata: {}
       - id: observe-contract-20261106
         taskId: agent-runtime-observability:codex-observe-owner
         ide: codex
         agent: codex-observe-contract
         status: active
-        lastSignalAt: 2026-11-06T11:09:23.587Z
+        lastSignalAt: 2026-11-06T11:49:41.431Z
         metadata: {}
       - id: observe-ui-20261106
         taskId: agent-runtime-observability:codex-observe-owner
         ide: codex
         agent: codex-observe-ui
         status: active
-        lastSignalAt: 2026-11-06T11:09:23.587Z
+        lastSignalAt: 2026-11-06T11:49:41.431Z
         metadata: {}
       - id: observe-owner-execution-20261106
         taskId: agent-runtime-observability:codex-observe-owner
         ide: codex
         agent: codex-observe-owner
         status: active
-        lastSignalAt: 2026-11-06T11:09:23.587Z
+        lastSignalAt: 2026-11-06T11:49:41.431Z
+        metadata: {}
+      - id: observe-enterprise-host-20261106
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-owner
+        status: active
+        lastSignalAt: 2026-11-06T11:49:41.431Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-06
@@ -11501,6 +11512,10 @@ landingStreams:
       - src/agent-runtime/execution/runner/admitted-turn.ts
       - src/agent-runtime/execution/runner/admitted-candidate.ts
       - src/agent-runtime/execution/outcomes/turn-outcome.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-shell.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surface-types.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surfaces-core.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-diagnosis-observation.browser.test.ts
     canLandWith: []
     metadata: {}
   - id: agent-runtime-observable-evolution-loop
@@ -24957,6 +24972,18 @@ landingStreams:
       purpose: Closeout doc, evidence logs, and isolated SDK probe. No product
         behavior change.
 sharedPaths:
+  - glob: ui/src/ui/ports/enterprise/views/enterprise-shell.ts
+    landerTask: agent-runtime-observability:codex-observe-owner
+    reason: Verified exact-path takeover for continued observation host integration; clean predecessor source reviewed and other task paths preserved.
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/ports/enterprise/views/enterprise-surface-types.ts
+    landerTask: agent-runtime-observability:codex-observe-owner
+    reason: Verified exact-path takeover for continued observation host integration; clean predecessor source reviewed and other task paths preserved.
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/ports/enterprise/views/enterprise-surfaces-core.ts
+    landerTask: agent-runtime-observability:codex-observe-owner
+    reason: Verified exact-path takeover for continued observation host integration; clean predecessor source reviewed and other task paths preserved.
+    reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/admitted-turn.ts
     landerTask: agent-runtime-observability:codex-observe-owner
     reason: Verified exact-path takeover for user-authorized continued P1

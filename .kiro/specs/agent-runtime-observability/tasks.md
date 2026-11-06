@@ -55,3 +55,13 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - No live gateway or production verification, no observation flag enabled, no push/PR/deploy. P2 remains blocked by unverified live provenance and no real improvement-qualified sample. — codex-observe-owner
 - Remaining: per-scope exact retention watermark, durable history, model-internal retries, command entrance coverage, reliable cost attribution, platform-role evidence rendering and original sixteen-material manifest. — codex-observe-owner
 - Rollback: revert cd294b774 and 4f15a0745 for query/runtime collection; flag remains default off. No database migration. — codex-observe-owner
+
+## Scope watermark and real host closure
+
+- 8220c43e2: bounded per-scope tracking epochs and retained sequence/time ranges; expiration and capacity counts only cover that tracking epoch; prior history remains unknown. Disabled queries keep a stable epoch until state transition. — codex-observe-owner
+- b0d84a543: enterprise shell forwards actual connection/auth scopes/session kind/method discovery; panel accepts only explicit complete safe-integer task references, clears partial drafts, and reuses evidence rendering on platform role without widening ACL. — codex-observe-owner
+- Owner tests: observation 8 suites / 64 PASS; enterprise surface + panel Chromium 13 PASS. Contributor full Chromium regression 16 PASS; final UI build PASS with pin sync skipped. Changed-file lint/format PASS. — codex-observe-owner
+- Full tsgo still reports 57 diagnostics; no diagnostics in this round observation/enterprise host/panel paths. No all-repository green claim. — codex-observe-owner
+- Correction to earlier acceptance: previous component-only tests did not prove real enterprise host wiring. This round adds the actual surface integration test and fixes missing props. — codex-observe-owner
+- Provenance remains unknown for outcomes; independent live execution does not relabel results live. P2 stays closed. No production/gateway verification, push, PR, deploy or observation flag enablement. — codex-observe-owner
+- Rollback: revert b0d84a543 for host wiring and 8220c43e2 for scope statistics; no database migration. — codex-observe-owner
