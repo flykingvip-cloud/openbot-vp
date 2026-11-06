@@ -1,40 +1,39 @@
-import { logNestedCommandOutput } from "../../agent-runtime/delivery/index.js";
-import { AGENT_LANE_NESTED } from "../../agents/lanes.js";
-import { getChannelPlugin, normalizeChannelId } from "../../channels/plugins/index.js";
-import { createOutboundSendDeps, type CliDeps } from "../../cli/outbound-send-deps.js";
-import type { OpenBotConfig } from "../../config/config.js";
-import type { SessionEntry } from "../../config/sessions.js";
+import type { ReplyPayload } from "../../../auto-reply/types.js";
+import { getChannelPlugin, normalizeChannelId } from "../../../channels/plugins/index.js";
+import { createOutboundSendDeps, type CliDeps } from "../../../cli/outbound-send-deps.js";
+import type { AgentCommandOpts } from "../../../commands/agent/types.js";
+import type { OpenBotConfig } from "../../../config/config.js";
+import type { SessionEntry } from "../../../config/sessions.js";
 import {
   resolveAgentDeliveryPlan,
   resolveAgentOutboundTarget,
-} from "../../infra/outbound/agent-delivery.js";
-import { resolveMessageChannelSelection } from "../../infra/outbound/channel-selection.js";
-import { deliverOutboundPayloads } from "../../infra/outbound/deliver.js";
-import { buildOutboundResultEnvelope } from "../../infra/outbound/envelope.js";
+} from "../../../infra/outbound/agent-delivery.js";
+import { resolveMessageChannelSelection } from "../../../infra/outbound/channel-selection.js";
+import { deliverOutboundPayloads } from "../../../infra/outbound/deliver.js";
+import { buildOutboundResultEnvelope } from "../../../infra/outbound/envelope.js";
 import {
   formatOutboundPayloadLog,
   type NormalizedOutboundPayload,
   normalizeOutboundPayloads,
   normalizeOutboundPayloadsForJson,
-} from "../../infra/outbound/payloads.js";
-import type { OutboundSessionContext } from "../../infra/outbound/session-context.js";
-import type { RuntimeEnv } from "../../runtime.js";
-import { isInternalMessageChannel } from "../../utils/message-channel.js";
-import type { AgentCommandOpts } from "./types.js";
+} from "../../../infra/outbound/payloads.js";
+import type { OutboundSessionContext } from "../../../infra/outbound/session-context.js";
+import { CommandLane } from "../../../process/lanes.js";
+import type { RuntimeEnv } from "../../../runtime.js";
+import { isInternalMessageChannel } from "../../../utils/message-channel.js";
+import { logNestedCommandOutput } from "../presentation/command-output.js";
 
-type RunResult = Awaited<
-  ReturnType<(typeof import("../../agents/pi-embedded.js"))["runEmbeddedPiAgent"]>
->;
-
-export async function deliverAgentCommandResult(params: {
+export async function deliverAgentCommandResult<
+  TMeta extends { durationMs: number; taskId?: string },
+>(params: {
   cfg: OpenBotConfig;
   deps: CliDeps;
   runtime: RuntimeEnv;
   opts: AgentCommandOpts;
   outboundSession: OutboundSessionContext | undefined;
   sessionEntry: SessionEntry | undefined;
-  result: RunResult;
-  payloads: RunResult["payloads"];
+  result: { meta: TMeta };
+  payloads: ReplyPayload[] | undefined;
 }) {
   const { cfg, deps, runtime, opts, outboundSession, sessionEntry, payloads, result } = params;
   const effectiveSessionKey = outboundSession?.key ?? opts.sessionKey;
@@ -168,7 +167,7 @@ export async function deliverAgentCommandResult(params: {
     if (!output) {
       return;
     }
-    if (opts.lane === AGENT_LANE_NESTED) {
+    if (opts.lane === CommandLane.Nested) {
       logNestedCommandOutput(runtime, opts, output, effectiveSessionKey);
       return;
     }

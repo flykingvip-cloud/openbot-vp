@@ -21,3 +21,5 @@ export {
   logNestedCommandOutput,
   createAcpVisibleTextAccumulator,
 } from "./presentation/command-output.js";
+
+export { deliverAgentCommandResult } from "./dispatch/command-result.js";

@@ -95,7 +95,7 @@ import {
 } from "./agent/commercial-run-gate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../gateway/model-entitlement/task-capability-plan.js";
 import { recordAgentCommandCreditUsage } from "./agent/credit-usage.js";
-import { deliverAgentCommandResult } from "./agent/delivery.js";
+import { deliverAgentCommandResult } from "../agent-runtime/delivery/index.js";
 import {
   ensureCliTurnTaskOutcome,
   ensureGatewayAgentTurnTaskOutcome,

@@ -3,6 +3,7 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
 import "../cron/isolated-agent.mocks.js";
+import * as agentDeliveryModule from "../agent-runtime/delivery/index.js";
 import * as cliRunnerModule from "../agents/cli-runner.js";
 import { FailoverError } from "../agents/failover-error.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
@@ -16,7 +17,6 @@ import { setActivePluginRegistry } from "../plugins/runtime.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createOutboundTestPlugin, createTestRegistry } from "../test-utils/channel-plugins.js";
 import { agentCommand, agentCommandFromIngress } from "./agent.js";
-import * as agentDeliveryModule from "./agent/delivery.js";
 
 vi.mock("../agents/auth-profiles.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../agents/auth-profiles.js")>();

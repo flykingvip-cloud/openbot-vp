@@ -29,7 +29,7 @@ vi.mock("../infra/outbound/targets.js", async () => {
   };
 });
 
-const { deliverAgentCommandResult } = await import("./agent/delivery.js");
+const { deliverAgentCommandResult } = await import("../agent-runtime/delivery/index.js");
 
 describe("deliverAgentCommandResult", () => {
   function createRuntime(): RuntimeEnv {
