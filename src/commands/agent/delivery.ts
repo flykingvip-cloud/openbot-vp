@@ -1,3 +1,4 @@
+import { logNestedCommandOutput } from "../../agent-runtime/delivery/index.js";
 import { AGENT_LANE_NESTED } from "../../agents/lanes.js";
 import { getChannelPlugin, normalizeChannelId } from "../../channels/plugins/index.js";
 import { createOutboundSendDeps, type CliDeps } from "../../cli/outbound-send-deps.js";
@@ -24,45 +25,6 @@ import type { AgentCommandOpts } from "./types.js";
 type RunResult = Awaited<
   ReturnType<(typeof import("../../agents/pi-embedded.js"))["runEmbeddedPiAgent"]>
 >;
-
-const NESTED_LOG_PREFIX = "[agent:nested]";
-
-function formatNestedLogPrefix(opts: AgentCommandOpts, sessionKey?: string): string {
-  const parts = [NESTED_LOG_PREFIX];
-  const session = sessionKey ?? opts.sessionKey ?? opts.sessionId;
-  if (session) {
-    parts.push(`session=${session}`);
-  }
-  if (opts.runId) {
-    parts.push(`run=${opts.runId}`);
-  }
-  const channel = opts.messageChannel ?? opts.channel;
-  if (channel) {
-    parts.push(`channel=${channel}`);
-  }
-  if (opts.to) {
-    parts.push(`to=${opts.to}`);
-  }
-  if (opts.accountId) {
-    parts.push(`account=${opts.accountId}`);
-  }
-  return parts.join(" ");
-}
-
-function logNestedOutput(
-  runtime: RuntimeEnv,
-  opts: AgentCommandOpts,
-  output: string,
-  sessionKey?: string,
-) {
-  const prefix = formatNestedLogPrefix(opts, sessionKey);
-  for (const line of output.split(/\r?\n/)) {
-    if (!line) {
-      continue;
-    }
-    runtime.log(`${prefix} ${line}`);
-  }
-}
 
 export async function deliverAgentCommandResult(params: {
   cfg: OpenBotConfig;
@@ -207,7 +169,7 @@ export async function deliverAgentCommandResult(params: {
       return;
     }
     if (opts.lane === AGENT_LANE_NESTED) {
-      logNestedOutput(runtime, opts, output, effectiveSessionKey);
+      logNestedCommandOutput(runtime, opts, output, effectiveSessionKey);
       return;
     }
     runtime.log(output);

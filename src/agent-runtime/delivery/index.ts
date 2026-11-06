@@ -16,3 +16,5 @@ export {
   type HonestEmptyReplySkipReason,
   type HonestEmptyReplyDecision,
 } from "./presentation/empty-reply.js";
+
+export { logNestedCommandOutput } from "./presentation/command-output.js";
