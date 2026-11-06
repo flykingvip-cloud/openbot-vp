@@ -23,3 +23,8 @@ export {
 } from "./presentation/command-output.js";
 
 export { deliverAgentCommandResult } from "./dispatch/command-result.js";
+
+export {
+  buildEmbeddedRunPayloads,
+  type EmbeddedPayloadFormatting,
+} from "./presentation/embedded-payloads.js";

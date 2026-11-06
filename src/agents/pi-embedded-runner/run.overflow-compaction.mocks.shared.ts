@@ -180,7 +180,14 @@ vi.mock("./logger.js", () => ({
   },
 }));
 
-vi.mock("./run/payloads.js", () => ({
+// Runner-only suites already stub payload projection. Keep its formatting dependencies
+// inert here; payload suites exercise the real production formatting adapter.
+vi.mock("../../agent-runtime/wiring/embedded-payloads.js", () => ({
+  embeddedPayloadFormatting: {},
+}));
+
+vi.mock("../../agent-runtime/delivery/index.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agent-runtime/delivery/index.js")>()),
   buildEmbeddedRunPayloads: vi.fn(() => []),
 }));
 

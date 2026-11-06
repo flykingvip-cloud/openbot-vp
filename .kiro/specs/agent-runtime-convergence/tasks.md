@@ -699,3 +699,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Original overall attempt cap, overflow compaction cap and overload backoff parameters moved from legacy run.ts into policy/run-limits. Existing sole loop consumes fixed data and pure budget selection; no executable configuration or additional retry engine. Thresholds and cancellation behavior unchanged. — codex-runtime-manager
 - Policy/overflow regression 3 files / 22 PASS; full tsgo PASS; architecture 51 PASS; typed lint clean; full build PASS with 209 existing warnings. No push, merge or deployment. — codex-runtime-manager
+
+## Embedded payload presentation ownership (2026-11-07)
+
+- Complete embedded payload shaping moved into delivery/presentation/embedded-payloads; old run/payloads implementation removed. Fixed wiring binds existing formatting helpers only. Error/raw-payload suppression, silence, reasoning, mutating-tool warnings and directive behavior retain their original implementation and order. No new delivery path or model loop. — codex-runtime-manager
+- Baseline payload suites 2 files / 40 PASS; candidate payload/overflow/usage joint 5 files / 66 PASS; configured authentication integration 25 PASS. Full tsgo PASS; architecture 51 PASS; typed lint clean; build PASS with 209 existing warnings. Full legacy-run retirement and real-model/channel acceptance remain open. No push, merge or deployment. — codex-runtime-manager

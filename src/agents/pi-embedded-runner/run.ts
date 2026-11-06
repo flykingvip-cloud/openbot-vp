@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
+import { buildEmbeddedRunPayloads } from "../../agent-runtime/delivery/index.js";
 import {
   createUsageAccumulator,
   mergeUsageIntoAccumulator,
@@ -18,6 +19,7 @@ import {
   MAX_OVERFLOW_COMPACTION_ATTEMPTS,
   resolveMaxRunRetryIterations,
 } from "../../agent-runtime/policy/index.js";
+import { embeddedPayloadFormatting } from "../../agent-runtime/wiring/embedded-payloads.js";
 import type { ThinkLevel } from "../../auto-reply/thinking.js";
 import {
   ensureContextEnginesInitialized,
@@ -82,7 +84,6 @@ import { log } from "./logger.js";
 import { runEmbeddedAttempt } from "./run/attempt.js";
 import { createFailoverDecisionLogger } from "./run/failover-observation.js";
 import type { RunEmbeddedPiAgentParams } from "./run/params.js";
-import { buildEmbeddedRunPayloads } from "./run/payloads.js";
 import {
   sessionLikelyHasOversizedToolResults,
   truncateOversizedToolResultsInSession,
@@ -1130,24 +1131,27 @@ export async function runEmbeddedPiAgent(
             compactionCount: autoCompactionCount > 0 ? autoCompactionCount : undefined,
           };
 
-          const payloads = buildEmbeddedRunPayloads({
-            assistantTexts: attempt.assistantTexts,
-            toolMetas: attempt.toolMetas,
-            lastAssistant: attempt.lastAssistant,
-            lastToolError: attempt.lastToolError,
-            config: params.config,
-            sessionKey: params.sessionKey ?? params.sessionId,
-            provider: activeErrorContext.provider,
-            model: activeErrorContext.model,
-            verboseLevel: params.verboseLevel,
-            reasoningLevel: params.reasoningLevel,
-            toolResultFormat: resolvedToolResultFormat,
-            suppressToolErrorWarnings: params.suppressToolErrorWarnings,
-            inlineToolResultsAllowed: false,
-            didSendViaMessagingTool: attempt.didSendViaMessagingTool,
-            didSendDeterministicApprovalPrompt: attempt.didSendDeterministicApprovalPrompt,
-            planSpeakContext: latestUserText(attempt.messagesSnapshot),
-          });
+          const payloads = buildEmbeddedRunPayloads(
+            {
+              assistantTexts: attempt.assistantTexts,
+              toolMetas: attempt.toolMetas,
+              lastAssistant: attempt.lastAssistant,
+              lastToolError: attempt.lastToolError,
+              config: params.config,
+              sessionKey: params.sessionKey ?? params.sessionId,
+              provider: activeErrorContext.provider,
+              model: activeErrorContext.model,
+              verboseLevel: params.verboseLevel,
+              reasoningLevel: params.reasoningLevel,
+              toolResultFormat: resolvedToolResultFormat,
+              suppressToolErrorWarnings: params.suppressToolErrorWarnings,
+              inlineToolResultsAllowed: false,
+              didSendViaMessagingTool: attempt.didSendViaMessagingTool,
+              didSendDeterministicApprovalPrompt: attempt.didSendDeterministicApprovalPrompt,
+              planSpeakContext: latestUserText(attempt.messagesSnapshot),
+            },
+            embeddedPayloadFormatting,
+          );
 
           // Timeout aborts can leave the run without any assistant payloads.
           // Emit an explicit timeout error instead of silently completing, so

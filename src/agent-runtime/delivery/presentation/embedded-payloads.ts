@@ -4,25 +4,24 @@ import type { ReasoningLevel, VerboseLevel } from "../../../auto-reply/thinking.
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../../../auto-reply/tokens.js";
 import { formatToolAggregate } from "../../../auto-reply/tool-meta.js";
 import type { OpenBotConfig } from "../../../config/config.js";
-import {
-  BILLING_ERROR_USER_MESSAGE,
-  formatAssistantErrorText,
-  formatRawAssistantErrorForUi,
-  getApiErrorPayloadFingerprint,
-  isRawApiErrorPayload,
-  normalizeTextForComparison,
-} from "../../pi-embedded-helpers.js";
-import type { ToolResultFormat } from "../../pi-embedded-subscribe.js";
-import {
-  extractAssistantText,
-  extractAssistantThinking,
-  formatReasoningMessage,
-} from "../../pi-embedded-utils.js";
-import {
-  extractSandboxInfraUserFacingDetail,
-  isSandboxInfraPreReplyError,
-} from "../../sandbox/docker-engine-client.js";
-import { isLikelyMutatingToolName } from "../../tool-mutation.js";
+/** Fixed formatting adapters supplied by production wiring, never executable configuration. */
+export type EmbeddedPayloadFormatting = {
+  billingErrorUserMessage: string;
+  formatAssistantErrorText: (
+    message: AssistantMessage,
+    options?: { cfg?: OpenBotConfig; sessionKey?: string; provider?: string; model?: string },
+  ) => string | undefined;
+  formatRawAssistantErrorForUi: (raw?: string) => string;
+  getApiErrorPayloadFingerprint: (raw?: string) => string | null;
+  isRawApiErrorPayload: (raw?: string) => boolean;
+  normalizeTextForComparison: (text: string) => string;
+  extractAssistantText: (message: AssistantMessage) => string;
+  extractAssistantThinking: (message: AssistantMessage) => string;
+  formatReasoningMessage: (text: string) => string;
+  extractSandboxInfraUserFacingDetail: (message: string) => string | null;
+  isSandboxInfraPreReplyError: (message: string) => boolean;
+  isLikelyMutatingToolName: (toolName: string) => boolean;
+};
 
 type ToolMetaEntry = { toolName: string; meta?: string };
 type LastToolError = {
@@ -73,6 +72,7 @@ function resolveToolErrorWarningPolicy(params: {
   suppressToolErrors: boolean;
   suppressToolErrorWarnings?: boolean;
   verboseLevel?: VerboseLevel;
+  isLikelyMutatingToolName: EmbeddedPayloadFormatting["isLikelyMutatingToolName"];
 }): ToolErrorWarningPolicy {
   const includeDetails = isVerboseToolDetailEnabled(params.verboseLevel);
   if (params.suppressToolErrorWarnings) {
@@ -89,7 +89,8 @@ function resolveToolErrorWarningPolicy(params: {
     return { showWarning: false, includeDetails };
   }
   const isMutatingToolError =
-    params.lastToolError.mutatingAction ?? isLikelyMutatingToolName(params.lastToolError.toolName);
+    params.lastToolError.mutatingAction ??
+    params.isLikelyMutatingToolName(params.lastToolError.toolName);
   if (isMutatingToolError) {
     return { showWarning: true, includeDetails };
   }
@@ -102,25 +103,28 @@ function resolveToolErrorWarningPolicy(params: {
   };
 }
 
-export function buildEmbeddedRunPayloads(params: {
-  assistantTexts: string[];
-  toolMetas: ToolMetaEntry[];
-  lastAssistant: AssistantMessage | undefined;
-  lastToolError?: LastToolError;
-  config?: OpenBotConfig;
-  sessionKey: string;
-  provider?: string;
-  model?: string;
-  verboseLevel?: VerboseLevel;
-  reasoningLevel?: ReasoningLevel;
-  toolResultFormat?: ToolResultFormat;
-  suppressToolErrorWarnings?: boolean;
-  inlineToolResultsAllowed: boolean;
-  didSendViaMessagingTool?: boolean;
-  didSendDeterministicApprovalPrompt?: boolean;
-  /** Latest user turn. Non-shopping plan-speak is not rewritten into a shopping pause. */
-  planSpeakContext?: string;
-}): Array<{
+export function buildEmbeddedRunPayloads(
+  params: {
+    assistantTexts: string[];
+    toolMetas: ToolMetaEntry[];
+    lastAssistant: AssistantMessage | undefined;
+    lastToolError?: LastToolError;
+    config?: OpenBotConfig;
+    sessionKey: string;
+    provider?: string;
+    model?: string;
+    verboseLevel?: VerboseLevel;
+    reasoningLevel?: ReasoningLevel;
+    toolResultFormat?: "markdown" | "plain";
+    suppressToolErrorWarnings?: boolean;
+    inlineToolResultsAllowed: boolean;
+    didSendViaMessagingTool?: boolean;
+    didSendDeterministicApprovalPrompt?: boolean;
+    /** Latest user turn. Non-shopping plan-speak is not rewritten into a shopping pause. */
+    planSpeakContext?: string;
+  },
+  formatting: EmbeddedPayloadFormatting,
+): Array<{
   text?: string;
   mediaUrl?: string;
   mediaUrls?: string[];
@@ -131,6 +135,20 @@ export function buildEmbeddedRunPayloads(params: {
   replyToTag?: boolean;
   replyToCurrent?: boolean;
 }> {
+  const {
+    billingErrorUserMessage: BILLING_ERROR_USER_MESSAGE,
+    formatAssistantErrorText,
+    formatRawAssistantErrorForUi,
+    getApiErrorPayloadFingerprint,
+    isRawApiErrorPayload,
+    normalizeTextForComparison,
+    extractAssistantText,
+    extractAssistantThinking,
+    formatReasoningMessage,
+    extractSandboxInfraUserFacingDetail,
+    isSandboxInfraPreReplyError,
+    isLikelyMutatingToolName,
+  } = formatting;
   const replyItems: Array<{
     text: string;
     media?: string[];
@@ -303,6 +321,7 @@ export function buildEmbeddedRunPayloads(params: {
       lastToolError: params.lastToolError,
       hasUserFacingReply: hasUserFacingAssistantReply,
       suppressToolErrors: Boolean(params.config?.messages?.suppressToolErrors),
+      isLikelyMutatingToolName,
       suppressToolErrorWarnings: params.suppressToolErrorWarnings,
       verboseLevel: params.verboseLevel,
     });
