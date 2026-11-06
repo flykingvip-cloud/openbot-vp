@@ -15,3 +15,5 @@ export { createCommandBudget } from "./runner/command-budget.js";
 export { runCommandFallback } from "./runner/command-fallback.js";
 
 export { runCommandAcpTurn } from "./runner/acp-turn.js";
+
+export { createCommandOutcomeCloseout } from "./outcomes/command-outcome.js";

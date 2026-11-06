@@ -1,7 +1,7 @@
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
 import { createRunAdmissionLease } from "../agent-runtime/model/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
-import { createCommandBudget, runCommandCandidate, runCommandFallback, runCommandAcpTurn } from "../agent-runtime/execution/index.js";
+import { createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, runCommandFallback, runCommandAcpTurn } from "../agent-runtime/execution/index.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
 import { LEGACY_INTERNAL_EVENT_CONTEXT_PREFIXES } from "../compat/legacy-names.js";
@@ -103,7 +103,6 @@ import {
 } from "../task-outcome/entrypoint-ensure.js";
 import {
   estimateTipBudgetCostUsdFromUsage,
-  recordRunnerTurnOutcome,
   TaskBudgetExceededError,
   type RunnerTurnFailureReason,
 } from "../task-outcome/runtime-from-runner.js";
@@ -398,7 +397,6 @@ async function agentCommandInternal(
       : "cli";
   let agentOutcomeTaskId: string | undefined;
   let agentOutcomeScope: TrustedScope | undefined;
-  let agentOutcomeCloseoutDone = false;
   /** Real usage-derived USD for tip budget closeout when mid-run charge did not run. */
   let tipBudgetCostUsd: number | undefined;
   let tipBudgetChargedThisTurn = false;
@@ -451,43 +449,10 @@ async function agentCommandInternal(
   }
 
   const commandBudget = createCommandBudget({ config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, taskId: agentOutcomeTaskId, scope: agentOutcomeScope, parentTaskId: opts.parentTaskId, parentAgentId: opts.parentAgentId });
-  const submitAgentOutcomeCloseout = async () => {
-    if (agentOutcomeCloseoutDone || !agentOutcomeEntrypoint) {
-      return;
-    }
-    if (!agentOutcomeTaskId || !agentOutcomeScope) {
-      return;
-    }
-    if (agentOutcomeSuccess === undefined && agentOutcomeFailureReason === undefined) {
-      return;
-    }
-    agentOutcomeCloseoutDone = true;
-    const success = agentOutcomeSuccess === true;
-    try {
-      await recordRunnerTurnOutcome(cfg, sessionAgentId, {
-        success,
-        runId,
-        taskId: agentOutcomeTaskId,
-        scope: agentOutcomeScope,
-        entrypoint: agentOutcomeEntrypoint,
-        latencyMs: Math.max(0, Date.now() - agentOutcomeStartedAt),
-        ...(tipBudgetChargedThisTurn ? { skipBudgetCharge: true } : {}),
-        ...(!tipBudgetChargedThisTurn && tipBudgetCostUsd != null
-          ? { costUsd: tipBudgetCostUsd }
-          : {}),
-        ...(success
-          ? {}
-          : {
-              failureReason: agentOutcomeFailureReason ?? ("run_failed" as const),
-              ...(agentOutcomeFailureDetail ? { failureDetail: agentOutcomeFailureDetail } : {}),
-            }),
-      });
-    } catch (err) {
-      console.error(
-        `[agent] unified recordRunnerTurnOutcome failed for ${agentOutcomeEntrypoint}: ${String(err)}`,
-      );
-    }
-  };
+  const submitAgentOutcomeCloseout = createCommandOutcomeCloseout({
+    config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, entrypoint: agentOutcomeEntrypoint,
+    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, costUsd: tipBudgetCostUsd}),
+  });
 
   try {
     if (opts.deliver === true) {
