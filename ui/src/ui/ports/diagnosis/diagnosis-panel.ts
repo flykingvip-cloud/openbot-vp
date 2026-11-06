@@ -2,6 +2,7 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createAuthorizationDecisionRefresh } from "../../../../../src/diagnosis/visualization.ts";
 import type { GatewayBrowserClient } from "../../gateway.ts";
+import { renderObservationWorkbench } from "../../observation/workbench.ts";
 import {
   diagnoseTaskOutcomeAttachNote,
   resolveDiagnoseTaskOutcome,
@@ -52,6 +53,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @property({ attribute: false }) sessionKind: string | null = null;
   @property({ attribute: false }) gatewayMethods: readonly string[] | null = null;
   @property({ type: Boolean }) connected = false;
+  @property({ attribute: false }) observationHost: object | null = null;
   /** Set only when the host already has taskId, agentId, and outcomeVersion. */
   @property({ attribute: false }) taskOutcomeRef: {
     taskId: string;
@@ -65,6 +67,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @state() private lastDiagnose: DiagnosisRunNote | null = null;
   @state() private evolutionProjections: DiagnosisEvolutionProjection[] = [];
   @state() private selectedTargetId: string | null = null;
+  @state() private observationSessionKey: string | null = null;
   @state() private observationWindow: "24h" | "7d" = "24h";
   @state() private diagnoseMode: "TARGETED" | "FULL" = "TARGETED";
   @state() private cadence: "off" | "daily" | "tick" = "off";
@@ -92,6 +95,10 @@ export class OpenBotDiagnosisPanel extends LitElement {
     if (changed.has("client") || changed.has("role") || changed.has("tenantId")) {
       void this.reload();
     }
+  }
+
+  private get selectedTarget() {
+    return this.targets.find((row) => row.sessionKey === this.observationSessionKey) ?? null;
   }
 
   private redactionProfile() {
@@ -480,6 +487,22 @@ export class OpenBotDiagnosisPanel extends LitElement {
     const model = this.model ?? diagnosisViewModelFromQuery(this.audience(), null, null);
     if (this.role === "enterprise") {
       return html`
+        ${renderObservationWorkbench({
+          role: "enterprise",
+          tenantId: this.tenantId,
+          sessionKey: this.observationSessionKey,
+          observationHost: this.observationHost,
+          basePath: "",
+          targets: this.targets,
+          onSessionKey: (sessionKey) => {
+            this.observationSessionKey = sessionKey || null;
+          },
+          connected: this.connected,
+        })}
+        <section class="enterprise-diagnosis__panel">
+          <h2>原诊断工作区</h2>
+          <p class="enterprise-diagnosis__sub">下面的数据来自真实诊断接口，不受上方样例模式影响。</p>
+        </section>
         ${this.renderEvolutionProjection()}
         ${renderEnterpriseDiagnosisSurface(model, {
           onDiagnoseNow: () => void this.onDiagnoseNow(),

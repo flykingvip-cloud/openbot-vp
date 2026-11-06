@@ -59,6 +59,7 @@ const surfaceLoaders: Record<LazyEnterpriseSurfaceTab, () => Promise<SurfaceBody
     await import("../../diagnosis/diagnosis-panel.ts");
     return ({ props }) => html`<openbot-diagnosis-panel
       .client=${props.client ?? null}
+      .observationHost=${document.querySelector("openbot-app")}
       role="enterprise"
       .tenantId=${props.readModel.currentTenantId}
       .targets=${diagnosisTargetsFromEnterpriseRoster({

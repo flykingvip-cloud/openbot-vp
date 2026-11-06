@@ -215,7 +215,16 @@ export const PLATFORM_NAV_SECTIONS: PlatformNavSection[] = [
     entries: [{ id: "agents", label: "资产管理", tab: "platformAgents", activeOnTab: true }],
   },
   {
+    id: "platform-observation",
+    label: "运行观测",
+    icon: "activity",
+    entries: [
+      { id: "observation", label: "运行观测", tab: "platformObservation", activeOnTab: true },
+    ],
+  },
+  {
     id: "platform-advanced",
+
     label: "高级治理",
     icon: "server",
     entries: [{ id: "advanced", label: "高级治理", tab: "platformAdvanced", activeOnTab: true }],

@@ -10824,10 +10824,30 @@ tasks:
   - id: agent-runtime-convergence
     owner: codex-runtime-manager
     intent:
+      - Read-only live runtime observation UI with explicit samples; no writes or acceptance synthesis
       - Unify runtime architecture and retire redundant control paths
       - Unify runtime architecture; M0 authority audit; M1 equivalent context
         assembly
     paths:
+      - .loom/registry.yaml
+      - ui/src/styles/observation-workbench.css
+      - ui/src/ui/app-render.helpers.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/navigation-observation.browser.test.ts
+      - ui/src/ui/navigation.ts
+      - ui/src/ui/observation/model.ts
+      - ui/src/ui/observation/model.node.test.ts
+      - ui/src/ui/observation/samples.ts
+      - ui/src/ui/observation/workbench.browser.test.ts
+      - ui/src/ui/observation/workbench.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surface-lazy.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surfaces-core.ts
+      - ui/src/ui/ports/platform/shared/surface.ts
+      - ui/src/ui/ports/platform/view-types.ts
+      - ui/src/ui/ports/platform/views/platform-observation-shell.browser.test.ts
+      - ui/src/ui/ports/platform/views/platform-shell.ts
+      - ui/src/ui/ports/platform/views/platform-surfaces.ts
       - src/agent-runtime/command/prepared-interaction.ts
       - src/agent-runtime/model/interaction-completion.ts
       - src/agent-runtime/model/interaction-completion.test.ts
@@ -11270,6 +11290,13 @@ tasks:
         status: active
         lastSignalAt: 2026-11-06T06:54:16.160Z
         metadata: {}
+      - id: agent-runtime-observation-ui-20261106
+        taskId: agent-runtime-convergence
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-06T07:10:00.000Z
+        metadata: {}
     ownerHistory: []
     since: 2026-11-03
     metadata: {}
@@ -11314,6 +11341,25 @@ landingStreams:
   - id: agent-runtime-convergence-m1
     landingPolicy: serial
     paths:
+      - .loom/registry.yaml
+      - ui/src/styles/observation-workbench.css
+      - ui/src/ui/app-render.helpers.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/navigation-observation.browser.test.ts
+      - ui/src/ui/navigation.ts
+      - ui/src/ui/observation/model.ts
+      - ui/src/ui/observation/model.node.test.ts
+      - ui/src/ui/observation/samples.ts
+      - ui/src/ui/observation/workbench.browser.test.ts
+      - ui/src/ui/observation/workbench.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surface-lazy.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surfaces-core.ts
+      - ui/src/ui/ports/platform/shared/surface.ts
+      - ui/src/ui/ports/platform/view-types.ts
+      - ui/src/ui/ports/platform/views/platform-observation-shell.browser.test.ts
+      - ui/src/ui/ports/platform/views/platform-shell.ts
+      - ui/src/ui/ports/platform/views/platform-surfaces.ts
       - src/gateway/server-chat.ts
       - ui/src/ui/runtime-observation.ts
       - ui/src/ui/runtime-observation.test.ts
