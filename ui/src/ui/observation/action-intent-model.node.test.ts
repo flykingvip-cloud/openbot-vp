@@ -107,3 +107,56 @@ describe("readonly action intent consistency", () => {
     expect(actionIntentModel(i, 50).state).toBe(state);
   });
 });
+
+describe("rollback evidence display", () => {
+  function rolled(): ActionIntent {
+    const intent = fixture();
+    intent.state = "rolled_back";
+    intent.rollback = {
+      receipt: {
+        ...intent.receipts[0],
+        receiptId: "rollback",
+        commandId: "rollback-command",
+        idempotencyKey: "rollback-key",
+        requestDigest: "rollback-request",
+        at: 25,
+        actualVersion: "v0",
+      },
+      readback: {
+        ...intent.readback!,
+        readbackId: "rollback-read",
+        actualVersion: "v0",
+        actualDiffDigest: "old",
+        observedAt: 26,
+      },
+    };
+    return intent;
+  }
+  it("preserves matching rollback history after later revocation", () => {
+    const intent = rolled();
+    intent.approval = { ...intent.approval!, revokedAt: 30 };
+    expect(actionIntentModel(intent, 50).state).toBe("rolled_back");
+  });
+  it("requires rollback receipt and readback", () => {
+    const intent = rolled();
+    intent.rollback = null;
+    expect(actionIntentModel(intent, 50).reason).toBe("rollback_evidence_missing");
+  });
+  it.each(["version", "digest", "scope", "order"])("rejects rollback %s mismatch", (kind) => {
+    const intent = rolled();
+    const back = intent.rollback!.readback;
+    if (kind === "version") {
+      back.actualVersion = "wrong";
+    }
+    if (kind === "digest") {
+      back.actualDiffDigest = "wrong";
+    }
+    if (kind === "scope") {
+      back.scopeRef = "other";
+    }
+    if (kind === "order") {
+      back.observedAt = 24;
+    }
+    expect(actionIntentModel(intent, 50).reason).toBe("rollback_readback_mismatch");
+  });
+});

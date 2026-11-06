@@ -1,5 +1,6 @@
 import { html, render } from "lit";
 import { describe, expect, it, vi } from "vitest";
+import { buildCapacitySnapshot } from "../../../../../src/observation/capacity-snapshot.js";
 import type { GatewayBrowserClient } from "../../gateway.ts";
 import { clearRuntimeObservations, recordRuntimeObservation } from "../../runtime-observation.ts";
 import "./diagnosis-panel.ts";
@@ -359,6 +360,280 @@ describe("explicit outcome draft observation", () => {
     });
     await set("diagnosis-task-version", "");
     expect(calls()).toHaveLength(before + 1);
+    panel.remove();
+  });
+});
+
+describe("governance intent query host", () => {
+  it("requests summary and exact detail, then clears both on permission withdrawal", async () => {
+    const summary = {
+      ok: true as const,
+      mode: "summary" as const,
+      state: "present" as const,
+      detail: null,
+      nextCursor: null,
+      reasons: [],
+      readOnly: true as const,
+      items: [
+        {
+          actionIntentId: "intent-host",
+          revision: 2,
+          state: "effective",
+          createdAt: 1,
+          updatedAt: 2,
+          target: { controlPlane: "test", targetType: "policy", targetId: "target" },
+          source: { environment: "test", provenance: "injected", nonProduction: true },
+          receipts: [],
+          readback: null,
+          verification: null,
+        },
+      ],
+    };
+    const request = vi.fn((method: string, params?: Record<string, unknown>) => {
+      if (method !== "diagnosis.observation.query") {
+        return Promise.resolve({
+          items: [],
+          authorization: { outcome: "allow" },
+          audit: { decision: "allow" },
+        });
+      }
+      const selection = params?.actionIntents as { intentId?: string };
+      return Promise.resolve({
+        schemaVersion: 1,
+        metricDictVersion: 1,
+        samples: [],
+        projectedAt: 1,
+        sourceWatermark: null,
+        window: { from: 0, to: 2 },
+        coverage: null,
+        actionIntents: selection.intentId ? { ...summary, mode: "detail", detail: null } : summary,
+      });
+    });
+    const panel = document.createElement("openbot-diagnosis-panel");
+    panel.role = "enterprise";
+    panel.client = { connected: true, request } as unknown as GatewayBrowserClient;
+    panel.scopes = ["operator.read"];
+    panel.gatewayMethods = ["diagnosis.observation.query"];
+    panel.connected = true;
+    panel.taskOutcomeRef = { taskId: "task", agentId: "main", outcomeVersion: 1 };
+    document.body.append(panel);
+    await waitFor(() =>
+      expect(panel.querySelector("openbot-observation-workbench")).not.toBeNull(),
+    );
+    const workbench = panel.querySelector("openbot-observation-workbench")!;
+    const tabs = workbench.querySelectorAll<HTMLButtonElement>(
+      '[role="tablist"][aria-label="观测视图"] button',
+    );
+    tabs[2].click();
+    await waitFor(() =>
+      expect(workbench.querySelector('[data-intent-id="intent-host"]')).not.toBeNull(),
+    );
+    expect(
+      request.mock.calls.find(([method]) => method === "diagnosis.observation.query")?.[1]
+        ?.actionIntents,
+    ).toEqual({});
+    expect(workbench.textContent).toContain("记录状态：effective");
+    workbench.querySelector<HTMLButtonElement>('[data-intent-id="intent-host"]')!.click();
+    await waitFor(() =>
+      expect(
+        request.mock.calls.some(
+          ([method, params]) =>
+            method === "diagnosis.observation.query" &&
+            (params?.actionIntents as { intentId?: string })?.intentId === "intent-host",
+        ),
+      ).toBe(true),
+    );
+    await waitFor(() =>
+      expect(workbench.querySelector('[aria-label="改善动作关联记录"]')).not.toBeNull(),
+    );
+    expect(workbench.textContent).toContain("状态未核验");
+    panel.scopes = [];
+    await panel.updateComplete;
+    await waitFor(() =>
+      expect(workbench.querySelector('[data-intent-id="intent-host"]')).toBeNull(),
+    );
+    expect(workbench.querySelector('[aria-label="改善动作关联记录"]')).toBeNull();
+    panel.remove();
+  });
+});
+
+describe("capacity and comparison host safety", () => {
+  it("requests capacity only with an exact authorized ref and clears results on revocation", async () => {
+    const request = vi.fn((method: string, params?: Record<string, unknown>) =>
+      Promise.resolve(
+        method === "diagnosis.observation.query"
+          ? {
+              schemaVersion: 1,
+              metricDictVersion: 1,
+              samples: [],
+              projectedAt: 1,
+              sourceWatermark: null,
+              window: { from: 0, to: 2 },
+              coverage: null,
+              ...(params?.comparison
+                ? {
+                    capacity: {
+                      ok: true,
+                      snapshot: buildCapacitySnapshot({
+                        scopeRef: "t1",
+                        projectedAt: 1,
+                        maxAgeMs: 10,
+                      }),
+                      sources: {
+                        registry: { state: "missing", provenance: "unknown" },
+                        entitlement: { state: "unknown", provenance: "unknown" },
+                        quota: { state: "unknown", reason: "authoritative_balance_not_collected" },
+                      },
+                      reasons: ["capacity-source-marker"],
+                    },
+                  }
+                : {}),
+            }
+          : { items: [], authorization: { outcome: "allow" }, audit: { decision: "allow" } },
+      ),
+    );
+    const panel = document.createElement("openbot-diagnosis-panel");
+    panel.role = "enterprise";
+    panel.client = { connected: true, request } as unknown as GatewayBrowserClient;
+    panel.scopes = ["operator.read"];
+    panel.gatewayMethods = ["diagnosis.observation.query"];
+    panel.connected = true;
+    document.body.append(panel);
+    await waitFor(() =>
+      expect(panel.querySelector("openbot-observation-workbench")).not.toBeNull(),
+    );
+    expect(request.mock.calls.some(([method]) => method === "diagnosis.observation.query")).toBe(
+      false,
+    );
+    panel.taskOutcomeRef = { taskId: "task", agentId: "main", outcomeVersion: 1 };
+    await waitFor(() =>
+      expect(request.mock.calls.some(([method]) => method === "diagnosis.observation.query")).toBe(
+        true,
+      ),
+    );
+    const first = request.mock.calls.find(
+      ([method]) => method === "diagnosis.observation.query",
+    )![1]!;
+    expect(first.capacity).toBe(true);
+    expect(first).not.toHaveProperty("comparison");
+    const workbench = panel.querySelector("openbot-observation-workbench")!;
+    workbench
+      .querySelectorAll<HTMLButtonElement>('[role="tablist"][aria-label="观测视图"] button')[1]
+      .click();
+    await waitFor(() => expect(workbench.querySelector('[aria-label="分析维度"]')).not.toBeNull());
+    workbench.querySelectorAll<HTMLButtonElement>('[aria-label="分析维度"] button')[3].click();
+    await waitFor(() => expect(workbench.textContent).toContain("source_unavailable"));
+    const explicit = {
+      baseline: {
+        refs: [{ agentId: "main", taskId: "baseline", outcomeVersion: 1 }],
+        window: { from: 0, to: 10 },
+      },
+      candidate: {
+        refs: [{ agentId: "main", taskId: "candidate", outcomeVersion: 2 }],
+        window: { from: 10, to: 20 },
+      },
+    };
+    panel.comparisonRefs = explicit;
+    await waitFor(() =>
+      expect(
+        request.mock.calls.some(
+          ([method, params]) =>
+            method === "diagnosis.observation.query" && params?.comparison === explicit,
+        ),
+      ).toBe(true),
+    );
+    await waitFor(() => expect(workbench.textContent).toContain("capacity-source-marker"));
+    panel.scopes = [];
+    await panel.updateComplete;
+    await waitFor(() => expect(workbench.textContent).not.toContain("capacity-source-marker"));
+    await waitFor(() => expect(workbench.textContent).toContain("缺少显式baseline/candidate"));
+    expect(workbench.textContent).toContain("登记快照不是在线率");
+    panel.remove();
+  });
+});
+
+describe("explicit comparison user entry host", () => {
+  it("uses only user-entered baseline anchor and submits no comparison while editing", async () => {
+    const request = vi.fn((method: string, _params?: Record<string, unknown>) =>
+      Promise.resolve(
+        method === "diagnosis.observation.query"
+          ? {
+              schemaVersion: 1,
+              metricDictVersion: 1,
+              samples: [],
+              projectedAt: 1,
+              sourceWatermark: null,
+              window: { from: 0, to: 2 },
+              coverage: null,
+            }
+          : { items: [], authorization: { outcome: "allow" }, audit: { decision: "allow" } },
+      ),
+    );
+    const panel = document.createElement("openbot-diagnosis-panel");
+    panel.role = "enterprise";
+    panel.client = { connected: true, request } as unknown as GatewayBrowserClient;
+    panel.scopes = ["operator.read"];
+    panel.gatewayMethods = ["diagnosis.observation.query"];
+    panel.connected = true;
+    document.body.append(panel);
+    await waitFor(() =>
+      expect(panel.querySelector("openbot-observation-workbench")).not.toBeNull(),
+    );
+    const workbench = panel.querySelector("openbot-observation-workbench")!;
+    workbench.querySelectorAll<HTMLButtonElement>('[aria-label="观测视图"] button')[1].click();
+    await waitFor(() => expect(workbench.querySelector('[aria-label="分析维度"]')).not.toBeNull());
+    workbench.querySelectorAll<HTMLButtonElement>('[aria-label="分析维度"] button')[3].click();
+    await waitFor(() =>
+      expect(workbench.querySelector('[aria-label="baseline 数字人"]')).not.toBeNull(),
+    );
+    const set = async (label: string, value: string) => {
+      const input = workbench.querySelector<HTMLInputElement>('[aria-label="' + label + '"]')!;
+      input.value = value;
+      input.dispatchEvent(new Event("input"));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+    for (const side of ["baseline", "candidate"]) {
+      await set(side + " 数字人", "explicit-agent");
+      await set(side + " 任务", side + "-task");
+      await set(side + " 结果版本", "1");
+      await set(
+        side + " 开始UTC",
+        side === "baseline" ? "2026-11-01T00:00:00Z" : "2026-11-02T00:00:00Z",
+      );
+      await set(
+        side + " 结束UTC",
+        side === "baseline" ? "2026-11-02T00:00:00Z" : "2026-11-03T00:00:00Z",
+      );
+    }
+    expect(request.mock.calls.some(([method]) => method === "diagnosis.observation.query")).toBe(
+      false,
+    );
+    [...workbench.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "读取对照")!
+      .click();
+    await waitFor(() =>
+      expect(
+        request.mock.calls.some(
+          ([method, params]) =>
+            method === "diagnosis.observation.query" && Boolean(params?.comparison),
+        ),
+      ).toBe(true),
+    );
+    const call = request.mock.calls.find(
+      ([method, params]) => method === "diagnosis.observation.query" && Boolean(params?.comparison),
+    )![1]!;
+    expect(call).toMatchObject({
+      taskId: "baseline-task",
+      agentId: "explicit-agent",
+      outcomeVersion: 1,
+      comparison: {
+        candidate: {
+          refs: [{ taskId: "candidate-task", agentId: "explicit-agent", outcomeVersion: 1 }],
+        },
+      },
+    });
+    await set("baseline 任务", "");
+    expect(panel.comparisonRefs).toBeNull();
     panel.remove();
   });
 });

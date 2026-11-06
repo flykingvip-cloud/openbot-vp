@@ -362,3 +362,137 @@ describe("platform tenant compare filters", () => {
     container.remove();
   });
 });
+
+describe("governance readonly intent integration", () => {
+  it("renders summary records, selects details and hides live records in sample mode", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const selected: string[] = [];
+    render(
+      renderObservationWorkbench({
+        role: "enterprise",
+        tenantId: "t1",
+        sessionKey: null,
+        connected: true,
+        observationHost: null,
+        onSelectActionIntent: (id) => selected.push(id),
+        actionIntents: {
+          ok: true,
+          mode: "summary",
+          state: "present",
+          detail: null,
+          nextCursor: null,
+          reasons: [],
+          readOnly: true,
+          items: [
+            {
+              actionIntentId: "intent-test",
+              revision: 2,
+              state: "effective",
+              createdAt: 1,
+              updatedAt: 2,
+              target: { controlPlane: "test", targetType: "policy", targetId: "target" },
+              source: { environment: "test", provenance: "injected", nonProduction: true },
+              receipts: [],
+              readback: null,
+              verification: null,
+            },
+          ],
+        },
+      }),
+      container,
+    );
+    const panel = container.querySelector(
+      "openbot-observation-workbench",
+    ) as OpenBotObservationWorkbench;
+    await panel.updateComplete;
+    const tabs = [
+      ...panel.querySelectorAll<HTMLButtonElement>(
+        '[role="tablist"][aria-label="观测视图"] button',
+      ),
+    ];
+    tabs[2].click();
+    await panel.updateComplete;
+    expect(panel.textContent).toContain("记录状态：effective");
+    panel.querySelector<HTMLButtonElement>('[data-intent-id="intent-test"]')!.click();
+    expect(selected).toEqual(["intent-test"]);
+    panel.source = "sample";
+    await panel.updateComplete;
+    expect(panel.querySelector('[data-intent-id="intent-test"]')).toBeNull();
+    expect(panel.textContent).toContain("样例模式不展示真实改善记录");
+    panel.source = "live";
+    panel.actionIntents = null;
+    await panel.updateComplete;
+    expect(panel.textContent).toContain("改善关联记录未供给");
+    container.remove();
+  });
+});
+
+describe("explicit comparison input", () => {
+  it("requires complete explicit UTC references and submits only on user request", async () => {
+    const selections: unknown[] = [];
+    const container = document.createElement("div");
+    document.body.append(container);
+    render(
+      renderObservationWorkbench({
+        role: "enterprise",
+        tenantId: "t1",
+        sessionKey: null,
+        connected: true,
+        observationHost: null,
+        onComparisonRefs: (refs) => selections.push(refs),
+      }),
+      container,
+    );
+    const panel = container.querySelector(
+      "openbot-observation-workbench",
+    ) as OpenBotObservationWorkbench;
+    await panel.updateComplete;
+    panel.querySelectorAll<HTMLButtonElement>('[aria-label="观测视图"] button')[1].click();
+    await panel.updateComplete;
+    panel.querySelectorAll<HTMLButtonElement>('[aria-label="分析维度"] button')[3].click();
+    await panel.updateComplete;
+    const submit = () =>
+      [...panel.querySelectorAll<HTMLButtonElement>("button")]
+        .find((b) => b.textContent === "读取对照")!
+        .click();
+    submit();
+    await panel.updateComplete;
+    expect(selections.filter(Boolean)).toHaveLength(0);
+    const set = async (label: string, value: string) => {
+      const input = panel.querySelector<HTMLInputElement>('[aria-label="' + label + '"]')!;
+      input.value = value;
+      input.dispatchEvent(new Event("input"));
+      await panel.updateComplete;
+    };
+    for (const side of ["baseline", "candidate"]) {
+      await set(side + " 数字人", "main");
+      await set(side + " 任务", side + "-task");
+      await set(side + " 结果版本", "1");
+      await set(
+        side + " 开始UTC",
+        side === "baseline" ? "2026-11-01T00:00:00Z" : "2026-11-02T00:00:00Z",
+      );
+      await set(
+        side + " 结束UTC",
+        side === "baseline" ? "2026-11-02T00:00:00Z" : "2026-11-03T00:00:00Z",
+      );
+    }
+    expect(selections.filter(Boolean)).toHaveLength(0);
+    await set("candidate 结果版本", "9007199254740993");
+    submit();
+    await panel.updateComplete;
+    expect(selections.filter(Boolean)).toHaveLength(0);
+    await set("candidate 结果版本", "2");
+    submit();
+    await panel.updateComplete;
+    expect(selections.filter(Boolean)).toHaveLength(1);
+    expect(selections.at(-1)).toMatchObject({
+      baseline: { refs: [{ taskId: "baseline-task", agentId: "main", outcomeVersion: 1 }] },
+      candidate: { refs: [{ taskId: "candidate-task", agentId: "main", outcomeVersion: 2 }] },
+    });
+    await set("baseline 任务", "");
+    expect(selections.at(-1)).toBeNull();
+    container.remove();
+  });
+});

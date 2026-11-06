@@ -120,7 +120,41 @@ export function actionIntentModel(intent: ActionIntent | null, now: number) {
     return result(null);
   }
   if (intent.state === "rolled_back") {
-    return result("rollback_requires_separate_validation");
+    const rollback = intent.rollback;
+    if (!rollback) {
+      return result("rollback_evidence_missing");
+    }
+    const r = rollback.receipt,
+      back = rollback.readback;
+    if (
+      r.status !== "succeeded" ||
+      !r.receiptId ||
+      !r.commandId ||
+      !r.idempotencyKey ||
+      !r.requestDigest ||
+      r.commandId === command.commandId ||
+      r.intentRevision !== intent.authorizedRevision ||
+      !sameTarget(r.target, intent.target) ||
+      !Number.isFinite(r.at) ||
+      r.at < read.observedAt ||
+      r.at > now ||
+      r.at < approval.issuedAt ||
+      r.at >= approval.expiresAt ||
+      (approval.revokedAt !== null && r.at >= approval.revokedAt) ||
+      r.actualVersion !== intent.target.rollbackExpectedVersion ||
+      !back.readbackId ||
+      back.controlPlane !== intent.target.controlPlane ||
+      back.targetId !== intent.target.targetId ||
+      back.scopeRef !== intent.target.scopeRef ||
+      back.actualVersion !== intent.target.rollbackExpectedVersion ||
+      back.actualDiffDigest !== intent.target.rollbackDiffDigest ||
+      !Number.isFinite(back.observedAt) ||
+      back.observedAt < r.at ||
+      back.observedAt > now
+    ) {
+      return result("rollback_readback_mismatch");
+    }
+    return result(null);
   }
   const v = intent.verification,
     e = intent.evidence;

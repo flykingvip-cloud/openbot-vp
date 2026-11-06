@@ -2,9 +2,18 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createAuthorizationDecisionRefresh } from "../../../../../src/diagnosis/visualization.ts";
 import type { GatewayBrowserClient } from "../../gateway.ts";
+import { hasComparisonRefs } from "../../observation/comparison-capacity-panel.ts";
+import type {
+  CapacityView,
+  ComparisonView,
+  ComparisonRefs,
+} from "../../observation/comparison-capacity-panel.ts";
 import type { EvidenceProjection } from "../../observation/evidence-model.ts";
 import { renderObservationEvidence } from "../../observation/evidence-panel.ts";
-import { renderObservationWorkbench } from "../../observation/workbench.ts";
+import {
+  renderObservationWorkbench,
+  type ObservationActionIntents,
+} from "../../observation/workbench.ts";
 import {
   diagnoseTaskOutcomeAttachNote,
   resolveDiagnoseTaskOutcome,
@@ -63,6 +72,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
     outcomeVersion: number;
   } | null = null;
 
+  @property({ attribute: false }) comparisonRefs: ComparisonRefs | null = null;
+  @state() private capacity: CapacityView | null = null;
+  @state() private comparison: ComparisonView | null = null;
   @state() private model: DiagnosisViewModel | null = null;
   @state() private loading = false;
   @state() private diagnosing = false;
@@ -103,6 +115,8 @@ export class OpenBotDiagnosisPanel extends LitElement {
 
   @state() private observationEvidence: EvidenceProjection | null = null;
   @state() private observationEvidenceNote = "业务结果未知 · 无可用证据";
+  @state() private actionIntents: ObservationActionIntents | null = null;
+  @state() private selectedIntent: { intentId: string; revision: number } | null = null;
   private evidenceGeneration = 0;
   private evidenceFingerprint() {
     return JSON.stringify([
@@ -119,6 +133,8 @@ export class OpenBotDiagnosisPanel extends LitElement {
       this.gatewayMethods,
       this.observationSessionKey,
       this.observationWindow,
+      this.selectedIntent,
+      this.comparisonRefs,
     ]);
   }
   willUpdate(changed: Map<string | number | symbol, unknown>) {
@@ -137,9 +153,17 @@ export class OpenBotDiagnosisPanel extends LitElement {
         "gatewayMethods",
         "observationSessionKey",
         "observationWindow",
+        "selectedIntent",
+        "comparisonRefs",
       ].some((key) => changed.has(key))
     ) {
       this.observationEvidence = null;
+      this.actionIntents = null;
+      this.capacity = null;
+      this.comparison = null;
+      if (!changed.has("selectedIntent")) {
+        this.selectedIntent = null;
+      }
       const generation = ++this.evidenceGeneration;
       this.observationEvidenceNote = "业务结果未知 · 缺少结果引用、读取权限或查询能力";
       const client = this.client;
@@ -149,7 +173,13 @@ export class OpenBotDiagnosisPanel extends LitElement {
           agentId: this.agentIdDraft,
           outcomeVersion: this.outcomeVersionDraft,
         },
-        this.taskOutcomeRef,
+        this.taskOutcomeRef ??
+          (!this.taskIdDraft.trim() &&
+          !this.agentIdDraft.trim() &&
+          !this.outcomeVersionDraft.trim() &&
+          hasComparisonRefs(this.comparisonRefs)
+            ? this.comparisonRefs.baseline.refs[0]
+            : null),
       );
       const ref = resolved && Number.isSafeInteger(resolved.outcomeVersion) ? resolved : null;
       const fingerprint = this.evidenceFingerprint();
@@ -166,7 +196,20 @@ export class OpenBotDiagnosisPanel extends LitElement {
       const from = to - (this.observationWindow === "7d" ? 7 : 1) * 86400000;
       this.observationEvidenceNote = "证据查询中 · 业务结果未知";
       void client
-        .request<EvidenceProjection>("diagnosis.observation.query", { ...ref, from, to })
+        .request<
+          EvidenceProjection & {
+            actionIntents?: ObservationActionIntents;
+            capacity?: CapacityView;
+            comparison?: ComparisonView;
+          }
+        >("diagnosis.observation.query", {
+          ...ref,
+          from,
+          to,
+          actionIntents: this.selectedIntent ?? {},
+          capacity: true,
+          ...(hasComparisonRefs(this.comparisonRefs) ? { comparison: this.comparisonRefs } : {}),
+        })
         .then((result) => {
           if (
             generation !== this.evidenceGeneration ||
@@ -177,6 +220,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
             return;
           }
           this.observationEvidence = result;
+          this.actionIntents = result.actionIntents ?? null;
+          this.capacity = result.capacity ?? null;
+          this.comparison = result.comparison ?? null;
           this.observationEvidenceNote = "只读结果证据；连接流仍为 execution_only";
         })
         .catch(() => {
@@ -188,12 +234,18 @@ export class OpenBotDiagnosisPanel extends LitElement {
             return;
           }
           this.observationEvidence = null;
+          this.actionIntents = null;
+          this.capacity = null;
+          this.comparison = null;
           this.observationEvidenceNote = "业务结果未知 · 查询失败或读取权限不可用";
         });
     }
   }
   disconnectedCallback() {
     ++this.evidenceGeneration;
+    this.capacity = null;
+    this.comparison = null;
+    this.actionIntents = null;
     this.observationEvidence = null;
     super.disconnectedCallback();
   }
@@ -622,6 +674,15 @@ export class OpenBotDiagnosisPanel extends LitElement {
             });
           },
           connected: this.connected,
+          actionIntents: this.actionIntents,
+          capacity: this.capacity,
+          comparison: this.comparison,
+          onComparisonRefs: (refs) => {
+            this.comparisonRefs = refs;
+          },
+          onSelectActionIntent: (intentId, revision) => {
+            this.selectedIntent = { intentId, revision };
+          },
         })}
         <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
         ${renderObservationEvidence(this.observationEvidence)}

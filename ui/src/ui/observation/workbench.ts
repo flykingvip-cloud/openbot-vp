@@ -1,3 +1,15 @@
+import type { queryActionIntents } from "../../../../src/observation/action-intent-query.js";
+import { renderActionIntent } from "./action-intent-panel.ts";
+import {
+  renderComparisonCapacity,
+  type CapacityView,
+  type ComparisonView,
+  type ComparisonRefs,
+} from "./comparison-capacity-panel.ts";
+export type ObservationActionIntents = Extract<
+  Awaited<ReturnType<typeof queryActionIntents>>,
+  { ok: true }
+>;
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import "../../styles/observation-workbench.css";
@@ -26,6 +38,11 @@ export type ObservationProps = {
   onDiagnoseRun?: (input: { runId: string; sessionKey: string; agentId: string }) => void;
   onSessionKey?: (sessionKey: string) => void;
   enterpriseDirectory?: readonly ObservationEnterpriseEntry[];
+  actionIntents?: ObservationActionIntents | null;
+  capacity?: CapacityView | null;
+  comparison?: ComparisonView | null;
+  onComparisonRefs?: (refs: ComparisonRefs | null) => void;
+  onSelectActionIntent?: (intentId: string, revision: number) => void;
 };
 export function renderObservationWorkbench(props: ObservationProps) {
   return html`<openbot-observation-workbench
@@ -33,6 +50,9 @@ export function renderObservationWorkbench(props: ObservationProps) {
     .observationHost=${props.observationHost ?? null}
     .connected=${props.connected} .onSessionKey=${props.onSessionKey ?? null} .basePath=${props.basePath ?? ""} .targets=${props.targets ?? []}
     .enterpriseDirectory=${props.enterpriseDirectory ?? []}
+    .onComparisonRefs=${props.onComparisonRefs ?? null}
+    .capacity=${props.capacity ?? null} .comparison=${props.comparison ?? null}
+    .actionIntents=${props.actionIntents ?? null} .onSelectActionIntent=${props.onSelectActionIntent ?? null}
     .onDiagnoseRun=${props.onDiagnoseRun ?? null}
   ></openbot-observation-workbench>`;
 }
@@ -50,6 +70,19 @@ export class OpenBotObservationWorkbench extends LitElement {
     | ((input: { runId: string; sessionKey: string; agentId: string }) => void)
     | null = null;
   @property({ attribute: false }) enterpriseDirectory: readonly ObservationEnterpriseEntry[] = [];
+  @property({ attribute: false }) actionIntents: ObservationActionIntents | null = null;
+  @property({ attribute: false }) onSelectActionIntent:
+    | ((intentId: string, revision: number) => void)
+    | null = null;
+  @property({ attribute: false }) capacity: CapacityView | null = null;
+  @property({ attribute: false }) comparison: ComparisonView | null = null;
+  @property({ attribute: false }) onComparisonRefs: ((refs: ComparisonRefs | null) => void) | null =
+    null;
+  @state() private comparisonDraft = {
+    baseline: { agentId: "", taskId: "", version: "", from: "", to: "" },
+    candidate: { agentId: "", taskId: "", version: "", from: "", to: "" },
+  };
+  @state() private comparisonInputNote = "";
   @state() private surface: "overview" | "analysis" | "governance" = "overview";
   @state() private analysis: "tasks" | "models" | "executors" | "capacity" = "tasks";
   @property({ type: String }) source: "live" | "sample" = "live";
@@ -551,9 +584,81 @@ export class OpenBotObservationWorkbench extends LitElement {
             `
       }</div>
     `
-        : this.renderUnavailableAnalysis()
+        : this.analysis === "capacity"
+          ? view.source === "sample"
+            ? html`
+                <p>样例模式 · 非生产验证；不混入真实容量或对照记录。</p>
+              `
+            : html`${this.renderComparisonInput()}${renderComparisonCapacity(this.capacity, this.comparison)}`
+          : this.renderUnavailableAnalysis()
     }
     ${this.surface !== "overview" ? this.renderCoverage(view) : nothing}`;
+  }
+  private renderComparisonInput() {
+    return html`<section aria-label="显式对照查询"><p>只读查询：请显式填写两个任务版本和 UTC 窗口，不自动选择任务。</p>
+    ${(["baseline", "candidate"] as const).map(
+      (side) =>
+        html`<fieldset><legend>${side}</legend>${(
+          [
+            ["agentId", "数字人"],
+            ["taskId", "任务"],
+            ["version", "结果版本"],
+            ["from", "开始UTC"],
+            ["to", "结束UTC"],
+          ] as const
+        ).map(
+          ([key, label]) =>
+            html`<label>${label}<input aria-label=${side + " " + label} .value=${this.comparisonDraft[side][key]} placeholder=${key === "from" || key === "to" ? "2026-11-01T00:00:00Z" : ""} @input=${(
+              event: Event,
+            ) => {
+              this.comparisonDraft = {
+                ...this.comparisonDraft,
+                [side]: {
+                  ...this.comparisonDraft[side],
+                  [key]: (event.target as HTMLInputElement).value,
+                },
+              };
+              this.comparisonInputNote = "输入已变更，需重新读取";
+              this.onComparisonRefs?.(null);
+            }}></label>`,
+        )}</fieldset>`,
+    )}
+    <button type="button" @click=${() => {
+      const parse = (side: "baseline" | "candidate") => {
+        const d = this.comparisonDraft[side];
+        const version = Number(d.version);
+        const from = Date.parse(d.from),
+          to = Date.parse(d.to);
+        if (
+          !d.agentId.trim() ||
+          !d.taskId.trim() ||
+          !/^[1-9]\d*$/.test(d.version) ||
+          !Number.isSafeInteger(version) ||
+          !d.from.endsWith("Z") ||
+          !d.to.endsWith("Z") ||
+          !Number.isFinite(from) ||
+          !Number.isFinite(to) ||
+          from >= to ||
+          to > Date.now() ||
+          to - from > 30 * 86400000
+        ) {
+          return null;
+        }
+        return {
+          refs: [{ agentId: d.agentId.trim(), taskId: d.taskId.trim(), outcomeVersion: version }],
+          window: { from, to },
+        };
+      };
+      const baseline = parse("baseline"),
+        candidate = parse("candidate");
+      if (!baseline || !candidate || baseline.refs[0].agentId !== candidate.refs[0].agentId) {
+        this.comparisonInputNote = "需要完整合法的同一数字人任务版本与UTC窗口";
+        this.onComparisonRefs?.(null);
+        return;
+      }
+      this.comparisonInputNote = "已提交只读对照查询";
+      this.onComparisonRefs?.({ baseline, candidate });
+    }}>读取对照</button><p>${this.comparisonInputNote}</p></section>`;
   }
   private renderUnavailableAnalysis() {
     const labels = {
@@ -581,7 +686,22 @@ export class OpenBotObservationWorkbench extends LitElement {
     return html`<section class="obs-panel obs-empty"><h3>${title}</h3><p>${detail}</p><span class="obs-status is-partial">待数据支撑</span><p>${this.role === "platform" ? html`<a href=${pathForTab(tab, this.basePath)}>${link} →</a>` : "企业自有效果可回到诊断与进化控制面继续分析。"}</p></section>`;
   }
   private renderGovernance(view: ObservationView) {
-    return html`<section class="obs-panel obs-process"><h3>从发现到验证，每一步都有回执</h3><p>这里是建议，不是已执行或已生效的配置。</p>
+    return html`<section class="obs-panel obs-process">${
+      view.source === "sample"
+        ? html`
+            <p>样例模式不展示真实改善记录。</p>
+          `
+        : html`<section aria-label="改善记录列表">${
+            this.actionIntents
+              ? this.actionIntents.items.map(
+                  (row) =>
+                    html`<button type="button" data-intent-id=${row.actionIntentId} @click=${() => this.onSelectActionIntent?.(row.actionIntentId, row.revision)}>${row.actionIntentId} · 记录状态：${row.state}</button>`,
+                )
+              : html`
+                  <p>改善关联记录未供给</p>
+                `
+          }${this.actionIntents?.reasons.join(", ")}${this.actionIntents?.mode === "detail" ? renderActionIntent(this.actionIntents.detail, Date.now()) : nothing}</section>`
+    }<h3>从发现到验证，每一步都有回执</h3><p>这里是建议，不是已执行或已生效的配置。</p>
       <ol>${[
         "任务证据",
         "诊断发现",
