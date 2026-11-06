@@ -14,6 +14,8 @@ import {
   gateAssistantTexts,
   hashArtifact,
   issueValidationReceipt,
+  noteConfirmationPassed,
+  resetConfirmationGatesForTest,
   readExecutionDecisionCount,
   readExecutionTraces,
   readSkillContract,
@@ -59,6 +61,7 @@ function build(taskId: string, skills = [alias, primary]) {
 beforeEach(() => {
   resetExecutionTraceForTest();
   resetValidationStateForTest();
+  resetConfirmationGatesForTest();
   resetDeliveryArtifactsForTest();
   registerTrustedValidator({ id: "sample-validator", version: "1" });
 });
@@ -133,6 +136,7 @@ describe("execution preflight integration", () => {
   it("invalidates a receipt when the artifact bytes change and blocks a completion claim", () => {
     registerTrustedValidator({ id: "sample-validator", version: "1" });
     const preflight = build("qa-task");
+    noteConfirmationPassed(preflight.taskId, preflight.attemptNumber, "stage-a");
     const artifactPath = "out/output.bin";
     const original = "version-1";
     const receipt = issueValidationReceipt({
@@ -206,6 +210,7 @@ describe("execution preflight integration", () => {
   it("records reconstructable traces without prompt text", () => {
     registerTrustedValidator({ id: "sample-validator", version: "1" });
     const success = build("trace-success");
+    noteConfirmationPassed(success.taskId, success.attemptNumber, "stage-a");
     const artifactPath = "out/output.bin";
     issueValidationReceipt({
       result: "passed",
@@ -373,6 +378,7 @@ describe("execution preflight integration", () => {
         },
       ]);
       const relativePath = "out/output.bin";
+      noteConfirmationPassed(preflight.taskId, preflight.attemptNumber, "stage-a");
       const absolutePath = path.join(workspace, relativePath);
       mkdirSync(path.dirname(absolutePath), { recursive: true });
       const tool = {
@@ -423,6 +429,8 @@ describe("execution preflight integration", () => {
         { path: relativePath, content: "version-2" },
         undefined,
       );
+      // Byte invalidation is independent of the confirmation required by this fixture.
+      noteConfirmationPassed(revised.taskId, revised.attemptNumber, "stage-a");
       const blocked = resolveAttemptDelivery({ preflight: revised, workspaceDir: workspace });
       expect(blocked.decisionCode).toBe("artifact_changed");
       expect(blocked.allowedToDeliver).toBe(false);

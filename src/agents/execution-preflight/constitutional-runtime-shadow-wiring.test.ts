@@ -33,6 +33,7 @@ const PARAMS_TS = `${P}/run/params.ts`;
 const ATTEMPT_TS = `${P}/run/attempt.ts`;
 const ATTEMPT_MODULE = `${P}/run/attempt`;
 const CALLER_TESTS = [
+  `${P}/run/attempt.context-assemble-pairing.runner.test.ts`,
   `${P}/run/attempt.spawn-workspace.test.ts`,
   `${P}/run/execution-router-shadow.test.ts`,
 ];
