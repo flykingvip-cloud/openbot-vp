@@ -1,8 +1,10 @@
 import "./run.overflow-compaction.mocks.shared.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isCompactionFailureError, isLikelyContextOverflowError } from "../pi-embedded-helpers.js";
+vi.mock("../runtime-plugins.js", () => ({ ensureRuntimePluginsLoaded: vi.fn() }));
 
-vi.mock("../../utils.js", () => ({
+vi.mock("../../utils.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../utils.js")>()),
   resolveUserPath: vi.fn((p: string) => p),
 }));
 

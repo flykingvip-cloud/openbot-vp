@@ -17,3 +17,5 @@ export { runCommandFallback } from "./runner/command-fallback.js";
 export { runCommandAcpTurn } from "./runner/acp-turn.js";
 
 export { createCommandOutcomeCloseout } from "./outcomes/command-outcome.js";
+
+export { recoverContextOverflow } from "./recovery/context-overflow.js";
