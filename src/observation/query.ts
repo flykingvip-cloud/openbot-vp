@@ -4,6 +4,7 @@ import { getExecutionEvidenceStore } from "./execution-evidence-store.js";
 import { projectExecutionEvidence, type ExecutionSource } from "./execution-projection.js";
 import { OBSERVATION_METRIC_DICT, OBSERVATION_METRIC_DICT_VERSION } from "./metric-dict.js";
 import { readOutcomeMetadata } from "./outcome-reader.js";
+import { getOutcomeSourceStore, type createOutcomeSourceStore } from "./outcome-source.js";
 import { assembleObservationSamples } from "./sample-assembler.js";
 
 export function queryObservation(input: {
@@ -16,6 +17,7 @@ export function queryObservation(input: {
   to: number;
   projectedAt: number;
   executionStore?: ExecutionSource;
+  outcomeSourceStore?: Pick<ReturnType<typeof createOutcomeSourceStore>, "query">;
   evidenceLookupWindow?: { from: number; to: number };
 }) {
   if (
@@ -49,6 +51,10 @@ export function queryObservation(input: {
     return result;
   }
   const { isCurrentTip, ...record } = result.outcome;
+  const outcomeSource = (input.outcomeSourceStore ?? getOutcomeSourceStore()).query(
+    input.agentId,
+    record,
+  );
   const execution = projectExecutionEvidence({
     snapshot: (input.executionStore ?? getExecutionEvidenceStore()).query(record.scope),
     scope: record.scope,
@@ -62,13 +68,21 @@ export function queryObservation(input: {
     projectedAt: input.projectedAt,
     sourceWatermark: null,
     evidenceLookupWindow: lookup,
-    outcomes: [{ record, sourceId: "task-outcome-version", provenance: "unknown", isCurrentTip }],
+    outcomes: [
+      {
+        record,
+        sourceId: "task-outcome-version",
+        provenance: outcomeSource.provenance,
+        isCurrentTip,
+      },
+    ],
     executions: execution.executions,
   });
   return {
     ok: true as const,
     ...projection,
     executionSource: execution.executionSource,
+    outcomeSource,
     metricDictVersion: OBSERVATION_METRIC_DICT_VERSION,
     metrics: [
       {
@@ -80,7 +94,9 @@ export function queryObservation(input: {
         metricId: OBSERVATION_METRIC_DICT.businessClosedSuccess.metricId,
         value: null,
         reasons: [
-          "provenance_unknown",
+          ...(outcomeSource.provenance === "unknown"
+            ? ["provenance_unknown"]
+            : ["submission_source_not_business_metric_eligibility"]),
           ...(!isCurrentTip ? ["historical_version_excluded"] : []),
           ...(!projection.samples.length ? ["no_eligible_current_tips"] : []),
         ],
@@ -93,7 +109,7 @@ export function queryObservation(input: {
     ],
     sourceReasons: [
       ...execution.executionSource.reasons,
-      "provenance_unknown",
+      ...outcomeSource.reasons,
       "source_watermark_unavailable",
     ],
   };

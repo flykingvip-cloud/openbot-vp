@@ -6,6 +6,7 @@ import { ChatTaskOutcomeAdapter } from "../task-outcome/entrypoints/chat.js";
 import { TaskOutcomeResultService } from "../task-outcome/result-service.js";
 import { DurableTaskOutcomeStore } from "../task-outcome/store.js";
 import { createExecutionEvidenceStore } from "./execution-evidence-store.js";
+import { createOutcomeSourceStore } from "./outcome-source.js";
 import { createRuntimeEvidenceObserver } from "./runtime-evidence.js";
 const scope = {
   kind: "personal",
@@ -25,6 +26,7 @@ describe("actual execution to actual version receipt", () => {
     "links captured %s execution only after the real ResultService commits its attempt",
     (status) => {
       const evidence = createExecutionEvidenceStore({ enabled: () => true });
+      const sources = createOutcomeSourceStore({ enabled: () => true });
       const observer = createRuntimeEvidenceObserver(
         {
           taskId: "task",
@@ -33,6 +35,7 @@ describe("actual execution to actual version receipt", () => {
           source: { provenance: "injected", collector: "test" },
         },
         evidence,
+        sources,
       );
       observer.capture("started");
       observer.capture(status === "succeeded" ? "completed" : status);
@@ -81,7 +84,10 @@ describe("actual execution to actual version receipt", () => {
       );
       startOnly.capture("started");
       expect(startOnly.bind(committed.record)).toBe(false);
-      expect(observer.bind(committed.record)).toBe(true);
+      expect(observer.bind(committed.record, { agentId: "bot", provenance: "injected" })).toBe(
+        true,
+      );
+      expect(sources.query("bot", committed.record).provenance).toBe("injected");
       expect(observer.bind(committed.record)).toBe(true);
       expect(evidence.query(scope).links).toHaveLength(1);
       expect(evidence.query(scope).links[0]).toMatchObject({

@@ -153,7 +153,10 @@ export function createTurnOutcomeRecorder(params: {
     })
       .then(async (receipt) => {
         if (receipt?.record) {
-          params.runtimeEvidence?.bind(receipt.record);
+          params.runtimeEvidence?.bind(receipt.record, {
+            agentId: growthAgentId,
+            provenance: "live",
+          });
         }
         await syncRobotGrowthFromOperationalMetrics(params.config, growthAgentId);
       })

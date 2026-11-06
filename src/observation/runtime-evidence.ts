@@ -6,6 +6,7 @@ import {
   type createExecutionEvidenceStore,
   type ExecutionSourceDeclaration,
 } from "./execution-evidence-store.js";
+import { getOutcomeSourceStore, type createOutcomeSourceStore } from "./outcome-source.js";
 export function createRuntimeEvidenceObserver(
   context: {
     taskId?: string;
@@ -14,6 +15,7 @@ export function createRuntimeEvidenceObserver(
     source?: ExecutionSourceDeclaration;
   },
   store: ReturnType<typeof createExecutionEvidenceStore> = getExecutionEvidenceStore(),
+  outcomeSources: ReturnType<typeof createOutcomeSourceStore> = getOutcomeSourceStore(),
 ) {
   const ids: string[] = [];
   let overflow = false;
@@ -50,7 +52,10 @@ export function createRuntimeEvidenceObserver(
         /* observation cannot affect execution */
       }
     },
-    bind(record: TaskOutcomeRecord) {
+    bind(
+      record: TaskOutcomeRecord,
+      submission?: { agentId: string; provenance: "live" | "injected" | "unknown" },
+    ) {
       try {
         if (
           !context.taskId ||
@@ -78,7 +83,7 @@ export function createRuntimeEvidenceObserver(
         if (!attempt) {
           return false;
         }
-        return store.recordLink({
+        const linked = store.recordLink({
           receiptId:
             "turn:" + context.runId + ":" + record.outcomeVersion + ":" + attempt.attemptId,
           taskId: record.taskId,
@@ -89,6 +94,18 @@ export function createRuntimeEvidenceObserver(
           attemptGranularity: "turn",
           eventIds: [...ids],
         });
+        if (linked && submission) {
+          outcomeSources.record({
+            agentId: submission.agentId,
+            record,
+            runId: context.runId,
+            attemptId: attempt.attemptId,
+            provenance: submission.provenance,
+            collector: "runner_outcome_commit",
+            observedAt: Date.now(),
+          });
+        }
+        return linked;
       } catch {
         return false;
       }
