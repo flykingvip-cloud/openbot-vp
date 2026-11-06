@@ -2,6 +2,8 @@
 
 ## Autonomous closure checkpoint
 
+- Current paused-task semantic resume connected through original authenticated Gateway/state/admitted execution (ce8c74977, 259e36364). Two independent specified-path reviews found no confirmed blocker; process-local stop and parked-target selection limits remain explicit. Combined 122 files / 973 PASS; shared builder/source regression 8 files / 48 PASS. Build PASS/209 warnings, architecture 41 PASS, tsgo 47 baseline errors. Current evidence document updated; whole migration/live acceptance still not claimed. — codex-runtime-manager
+
 - Current evidence and remaining gates are consolidated in current-mainline-review-2026-11-06.md. Normal/queued delivery now shares receipt preparation and confirmation (ae945403f), and queued inference uses the shared governed model session (d89442132). Final combined 119 files / 927 PASS; separate receipt tests 23 PASS; build PASS/209 warnings; architecture 41 PASS; tsgo remains 47 baseline diagnostics. Independent queued-delivery review PASS. Whole migration and live acceptance remain open; no deployment. — codex-runtime-manager
 
 - Additional verified checkpoints: mixed questions preserve bound amendments/controls; PPTX edits carry content hashes and reject stale writes; capability before-call implementation has one runtime owner; context compilation and learning projection moved without duplicate implementations; human channel dispatch consumes governed interaction/admission. These are component/source checkpoints, not final real-model acceptance. — codex-runtime-manager

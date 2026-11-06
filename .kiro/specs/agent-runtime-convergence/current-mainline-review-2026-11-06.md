@@ -1,6 +1,6 @@
 # Runtime closure evidence, 2026-11-06
 
-Owner: codex-runtime-manager. Source checkpoint: d894421322e552d5889a6dcd524cb374d2db948d. Production rollout remains deferred. This record supersedes earlier inventories for the components listed below; it does not declare whole-migration acceptance.
+Owner: codex-runtime-manager. Source checkpoints: d89442132, ce8c74977, 259e36364, 764c3b6dc. Production rollout remains deferred. This record supersedes earlier inventories for the components listed below; it does not declare whole-migration acceptance.
 
 ## Verified mainline
 
@@ -28,6 +28,10 @@ Visible normal and followup delivery share prepareVisibleDelivery and confirmPen
 | d89442132 | Followup uses the existing shared governed model session | Existing followup credit outbox and stable child budget are preserved |
 
 ## Reproducible evidence
+
+- Current paused-task semantic resume now uses a fixed authenticated Gateway callback, reloads access/session/config/send policy, checks cancellation, and invokes the original locked state mutation. Exact task/focus/writeEpoch, unfinished, pause and tombstone checks precede resume. Focus revision advances and old attempt/artifact versions are invalidated. It re-enters the existing admitted execution path; no separate resume engine is introduced.
+- Resume code review: two independent reviewers found no confirmed blocking authorization bypass, cancelled-task resurrection or duplicate resume in the specified paths. The registry remains process-local; this does not prove restart or every external stop-source policy. Parked-task natural-language selection is still not implemented; original explicit selection remains.
+- Updated combined regression with resume: 122 files / 973 PASS. Shared builder/source regression: 8 files / 48 PASS after fixing a missing test mock and replacing stale copy-only expectations with actual seeded source assertions. These are separate test runs, not a deduplicated total.
 
 - Final combined source suites: 119 files / 927 tests PASS. Includes task-board cross-process races, real local background children, interaction/admission, normal and queued delivery, OGUI and BYOK. Provider and channel transports are mocked; this is not a real-model/channel run.
 - Additional production-confirmation suites: 3 files / 23 PASS, including late/stale completion and missing receipt locators. Webhook mapping: 25 PASS. Counts are separate, not a claimed deduplicated total.
