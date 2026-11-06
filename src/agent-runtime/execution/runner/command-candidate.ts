@@ -6,13 +6,14 @@ import { runCliAgent } from "../../../agents/cli-runner.js";
 import { getCliSessionId, setCliSessionId } from "../../../agents/cli-session.js";
 import { FailoverError } from "../../../agents/failover-error.js";
 import { isCliProvider, normalizeProviderId } from "../../../agents/model-selection.js";
+import type { RunEmbeddedPiAgentParams } from "../../../agents/pi-embedded-runner/run/params.js";
 import { runEmbeddedPiAgent } from "../../../agents/pi-embedded.js";
 import type { buildWorkspaceSkillSnapshot } from "../../../agents/skills.js";
 import type { ThinkLevel, VerboseLevel } from "../../../auto-reply/thinking.js";
-import type { AgentCommandOpts } from "../../../commands/agent/types.js";
 import type { loadConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
 import { resolveEnterpriseEmbeddedTransport } from "../../../gateway/enterprise-model/embedded-transport.js";
+import type { ExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
 import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
 import { resolveAgentRunEntitlementScope } from "../../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
@@ -27,6 +28,25 @@ function resolveFallbackRetryPrompt(params: { body: string; isFallbackRetry: boo
   }
   return "Continue where you left off. The previous model attempt failed or timed out.";
 }
+
+/** Only execution inputs cross this boundary; command-host flags remain outside. */
+type CommandCandidateOptions = Pick<
+  RunEmbeddedPiAgentParams,
+  | "abortSignal"
+  | "extraSystemPrompt"
+  | "images"
+  | "streamParams"
+  | "clientTools"
+  | "lane"
+  | "inputProvenance"
+> &
+  ExecutionIdentityRunFields & {
+    senderIsOwner: boolean;
+    gatewayClientSessionTenantId?: string;
+    replyTo?: string;
+    to?: string;
+    threadId?: string | number;
+  };
 
 export function runCommandCandidate(params: {
   providerOverride: string;
@@ -43,7 +63,7 @@ export function runCommandCandidate(params: {
   resolvedThinkLevel: ThinkLevel;
   timeoutMs: number;
   runId: string;
-  opts: AgentCommandOpts & { senderIsOwner: boolean };
+  opts: CommandCandidateOptions;
   runContext: AgentRunContext;
   spawnedBy: string | undefined;
   messageChannel: ReturnType<typeof resolveMessageChannel>;

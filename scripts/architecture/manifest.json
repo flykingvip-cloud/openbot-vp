@@ -465,5 +465,11 @@
     "from": "src/agent-runtime/delivery/**",
     "denyImportsFrom": ["src/commands/**"],
     "description": "Delivery consumes its narrow runtime data contract and cannot depend on command execution options."
+  },
+  {
+    "name": "runtime-execution-no-command-host-contracts",
+    "from": "src/agent-runtime/execution/**",
+    "denyImportsFrom": ["src/commands/**"],
+    "description": "Execution consumes typed execution inputs, not command-host options or implementations."
   }
 ]
