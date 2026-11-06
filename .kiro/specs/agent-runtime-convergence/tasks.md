@@ -659,3 +659,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Candidate input now uses the exact execution fields and canonical trusted identity contract; the final runtime import of old command-host options is removed. Added an architecture guard prohibiting execution from importing commands. No invocation order, identity forwarding or provider behavior changed. — codex-runtime-manager
 - Command/governance/credit regression 3 files / 54 PASS; full tsgo PASS; architecture 51 PASS; typed lint clean. Type-only boundary change after the prior passing full build; no new runtime build claim. No push/merge/deploy. — codex-runtime-manager
+
+## Joint integration checkpoint (2026-11-07)
+
+- Combined current runtime components, command/ACP/delivery/governance/credit, real two-process pending delivery, local background child, embedded usage and overflow regressions: 58 files / 312 PASS. Provider/channel transports remain mocked except the explicitly local child-process evidence. No real external channel or model acceptance is claimed. — codex-runtime-manager
+- Full tsgo PASS and architecture 51 PASS at this integration checkpoint. Last full build passed with 209 existing warnings; subsequent candidate change was type-only. Original core loop, durable retry identity, complete builder/adapter contracts and final personal/group live acceptance remain open. No push, merge or deployment. — codex-runtime-manager
