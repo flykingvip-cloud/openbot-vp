@@ -12,10 +12,12 @@ function readRepo(relativePath: string): string {
 describe("CLI embedded run lifecycle attribution path", () => {
   it("routes openbot agent through runEmbeddedPiAgent into attempt attribution helper", () => {
     const agentSrc = readRepo("src/commands/agent.ts");
+    const candidateSrc = readRepo("src/agent-runtime/execution/runner/command-candidate.ts");
     const runSrc = readRepo("src/agents/pi-embedded-runner/run.ts");
     const attemptSrc = readRepo("src/agents/pi-embedded-runner/run/attempt.ts");
 
-    expect(agentSrc).toContain("runEmbeddedPiAgent");
+    expect(agentSrc).toContain("runCommandCandidate");
+    expect(candidateSrc).toContain("runEmbeddedPiAgent");
     expect(runSrc).toContain("runEmbeddedAttempt");
     expect(attemptSrc).toContain("createLifecycleSkillToolAttributionHandler");
     expect(attemptSrc).toContain("subscribeEmbeddedPiSession");

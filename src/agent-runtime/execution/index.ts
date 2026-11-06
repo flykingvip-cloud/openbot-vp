@@ -7,3 +7,5 @@ export type {
 
 export { runAdmittedTurn } from "./runner/admitted-turn.js";
 export type { AgentTurnExecutionParams, AgentRunLoopResult } from "./runner/turn-contract.js";
+
+export { runCommandCandidate } from "./runner/command-candidate.js";
