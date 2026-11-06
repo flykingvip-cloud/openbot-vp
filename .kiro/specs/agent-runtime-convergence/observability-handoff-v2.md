@@ -33,3 +33,11 @@ ui/src/ui/runtime-observation.ts 的 projectRuntimeObservation(value, receivedAt
 6. P3/P4：samples/coverage先于metrics；ActionIntent待原控制面具备授权、幂等、回读、回滚后实施。
 
 最小验收：同版本一个个人与一个协作案例，覆盖对话、准入、工具、等待、暂停恢复、交付；同时提供完整和partial样本。重复、乱序、迟到、重连、未知成本和来源不可伪造为零或成功。本轮没有新RPC、生产采集或指标控制动作。 — codex-runtime-manager
+
+## 接口收尾与前端集成复核（2026-11-06）
+
+- Gateway 已保留映射前 sourceRunId；事件身份按 client run、source run、sequence 组成。缺省、空串和纯空白 sourceRunId 统一为缺失，防止同一证据重复入缓存。接口不提供 attemptId 的猜测映射。
+- 本轮定向验证：runtime-observation 与 server-chat.agent-events 两文件共 36 项通过；包含来源身份归一化、会话隔离、断序、200 条保留上限、映射运行隔离及读取快照不可反写缓存。提交 263c8ae53、5153d38a4。
+- 工作树已出现 observation 工作台及 diagnosis 集成，仍为其他任务未提交 WIP，部分路径存在归属冲突。因此上文“尚未渲染页面”指本任务已验收交付边界，不代表工作树没有页面实现。未将这些页面改动纳入本任务提交或验收。
+- 给前端集成的审查要求：缺场景引用时 scope 必须 unknown，不默认 personal；没有来源证明时不得把 source=live 当数据资格；运行耗时必须匹配同一身份的 start/end，不能用任意阶段最大最小时差补齐；最后一条工具 end 不能概括整个运行全部工具完成；浏览器内缓存只代表当前连接观察范围，不代表平台跨任务查询。
+- 现阶段只能供给 execution_only/partial 元数据。fully_linked、成果验收、真实归属成本、跨重启回放与平台指标仍待服务端权威关联，不通过 UI 合成。下一验收应先补场景引用与准入身份的原始挂点，再做个人/协作同版本链路；不新增状态机或执行路径。 — codex-runtime-manager
