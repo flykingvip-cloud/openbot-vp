@@ -4,6 +4,31 @@ import { emptyObservation } from "./model.ts";
 import { observationSamples } from "./samples.ts";
 
 describe("observation read adapters", () => {
+  it("does not infer scenario or duration from incomplete lifecycle evidence", () => {
+    const snapshot = (phases: string[]) => ({
+      partial: true,
+      reasons: [],
+      events: phases.map((phase, index) => ({
+        eventId: String(index),
+        runId: "r",
+        sourceRunId: "engine",
+        sequence: index + 1,
+        occurredAt: index * 10,
+        receivedAt: index * 10,
+        stream: "lifecycle",
+        phase,
+        capabilityCallId: null,
+        coverage: "execution_only" as const,
+        missing: [],
+      })),
+    });
+    for (const phases of [["start", "start"], ["end", "end"], ["end", "start"], ["start"]]) {
+      const run = emptyObservation(true, snapshot(phases)).runs[0];
+      expect(run.scope).toBe("unknown");
+      expect(run.latencyMs).toBeNull();
+    }
+    expect(emptyObservation(true, snapshot(["start", "end"])).runs[0].latencyMs).toBe(10);
+  });
   it("retains both source runs without promoting tool completion to task acceptance", () => {
     const host = {};
     for (const sourceRunId of ["engine_A", "engine_B"]) {

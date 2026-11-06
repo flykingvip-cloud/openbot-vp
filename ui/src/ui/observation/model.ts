@@ -15,7 +15,7 @@ export type ObservationStage = {
 export type ObservationRun = {
   id: string;
   label: string;
-  scope: "personal" | "collaboration";
+  scope: "personal" | "collaboration" | "unknown";
   tenantLabel: string | null;
   clientRunId: string | null;
   sourceRunId: string | null;
@@ -100,15 +100,18 @@ function groupRuns(
     .map((rows): ObservationRun & { latestAt: number } => {
       const last = rows.at(-1)!;
       const tool = rows.toReversed().find((event) => event.stream === "tool");
-      const times = rows
-        .filter(
-          (row) => row.stream === "lifecycle" && (row.phase === "start" || row.phase === "end"),
-        )
-        .map((row) => row.occurredAt);
+      const starts = rows.filter((row) => row.stream === "lifecycle" && row.phase === "start");
+      const ends = rows.filter((row) => row.stream === "lifecycle" && row.phase === "end");
+      const start = starts.length === 1 ? starts[0] : undefined;
+      const end = ends.length === 1 ? ends[0] : undefined;
+      const latencyMs =
+        start && end && end.sequence > start.sequence && end.occurredAt >= start.occurredAt
+          ? end.occurredAt - start.occurredAt
+          : null;
       return {
         id: `${last.runId}@${last.sourceRunId ?? "unmapped"}`,
         label: `${last.runId}${last.sourceRunId ? ` → ${last.sourceRunId}` : ""}`,
-        scope: "personal",
+        scope: "unknown",
         tenantLabel: null,
         clientRunId: last.runId,
         sourceRunId: last.sourceRunId,
@@ -118,7 +121,7 @@ function groupRuns(
         toolState: tool?.phase === "end" ? "completed" : tool ? "running" : "unknown",
         // A terminal engine or tool event is explicitly not a task acceptance.
         outcomeState: "unavailable",
-        latencyMs: times.length > 1 ? Math.max(...times) - Math.min(...times) : null,
+        latencyMs,
         attributedCost: null,
         stages: [
           {

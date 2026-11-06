@@ -101,7 +101,7 @@ export class OpenBotObservationWorkbench extends LitElement {
   private renderCoverage(view: ObservationView) {
     return html`<div class="obs-coverage">
       <span class="obs-status ${view.partial ? "is-partial" : "is-ok"}">${view.partial ? "部分数据" : "证据齐备"}</span>
-      <span>${view.source === "sample" ? "交互验收样例 · 非生产数据" : "当前会话实时元数据 · execution_only"}</span>
+      <span>${view.source === "sample" ? "交互验收样例 · 非生产数据" : "当前连接观察片段 · execution_only"}</span>
       ${
         view.connected
           ? html`<span class="obs-live">${view.source === "live" ? "连接正常" : "样例已启用"}</span>`
@@ -170,7 +170,7 @@ export class OpenBotObservationWorkbench extends LitElement {
                 this.selected = row;
               }}>
         <span><strong>${row.label}</strong><code>${row.clientRunId ?? "clientRunId 未知"}${row.sourceRunId ? ` → ${row.sourceRunId}` : ""}</code></span>
-        <span class="obs-run__state"><span>${row.scope === "personal" ? "个人" : "协作"}</span><span class="obs-status ${row.reasons.length ? "is-partial" : "is-ok"}">${row.reasons.length ? "证据不完整" : "元数据已接收"}</span></span>
+        <span class="obs-run__state"><span>${row.scope === "personal" ? "个人" : row.scope === "collaboration" ? "协作" : "场景未知"}</span><span class="obs-status ${row.reasons.length ? "is-partial" : "is-ok"}">${row.reasons.length ? "证据不完整" : "元数据已接收"}</span></span>
       </button>`,
             )
           : html`
