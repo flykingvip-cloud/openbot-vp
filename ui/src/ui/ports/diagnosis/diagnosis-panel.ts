@@ -2,6 +2,8 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { createAuthorizationDecisionRefresh } from "../../../../../src/diagnosis/visualization.ts";
 import type { GatewayBrowserClient } from "../../gateway.ts";
+import type { EvidenceProjection } from "../../observation/evidence-model.ts";
+import { renderObservationEvidence } from "../../observation/evidence-panel.ts";
 import { renderObservationWorkbench } from "../../observation/workbench.ts";
 import {
   diagnoseTaskOutcomeAttachNote,
@@ -98,6 +100,64 @@ export class OpenBotDiagnosisPanel extends LitElement {
     }
   }
 
+  @state() private observationEvidence: EvidenceProjection | null = null;
+  @state() private observationEvidenceNote = "业务结果未知 · 无可用证据";
+  private evidenceGeneration = 0;
+  willUpdate(changed: Map<string | number | symbol, unknown>) {
+    if (
+      [
+        "client",
+        "role",
+        "tenantId",
+        "scopes",
+        "sessionKind",
+        "taskOutcomeRef",
+        "connected",
+        "gatewayMethods",
+        "observationSessionKey",
+        "observationWindow",
+      ].some((key) => changed.has(key))
+    ) {
+      this.observationEvidence = null;
+      const generation = ++this.evidenceGeneration;
+      this.observationEvidenceNote = "业务结果未知 · 缺少结果引用、读取权限或查询能力";
+      const client = this.client;
+      const ref = this.taskOutcomeRef;
+      if (
+        !this.connected ||
+        !client?.connected ||
+        !ref ||
+        !this.gatewayMethods?.includes("diagnosis.observation.query") ||
+        !this.scopes?.some((scope) => scope === "operator.read" || scope === "operator.admin")
+      ) {
+        return;
+      }
+      const to = Date.now();
+      const from = to - (this.observationWindow === "7d" ? 7 : 1) * 86400000;
+      this.observationEvidenceNote = "证据查询中 · 业务结果未知";
+      void client
+        .request<EvidenceProjection>("diagnosis.observation.query", { ...ref, from, to })
+        .then((result) => {
+          if (generation !== this.evidenceGeneration || !this.isConnected) {
+            return;
+          }
+          this.observationEvidence = result;
+          this.observationEvidenceNote = "只读结果证据；连接流仍为 execution_only";
+        })
+        .catch(() => {
+          if (generation !== this.evidenceGeneration) {
+            return;
+          }
+          this.observationEvidence = null;
+          this.observationEvidenceNote = "业务结果未知 · 查询失败或读取权限不可用";
+        });
+    }
+  }
+  disconnectedCallback() {
+    ++this.evidenceGeneration;
+    this.observationEvidence = null;
+    super.disconnectedCallback();
+  }
   private get selectedTarget() {
     return this.targets.find((row) => row.sessionKey === this.observationSessionKey) ?? null;
   }
@@ -520,6 +580,8 @@ export class OpenBotDiagnosisPanel extends LitElement {
           },
           connected: this.connected,
         })}
+        <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
+        ${renderObservationEvidence(this.observationEvidence)}
         <section class="enterprise-diagnosis__panel">
           <h2>原诊断工作区</h2>
           <p class="enterprise-diagnosis__sub">下面的数据来自真实诊断接口，不受上方样例模式影响。</p>

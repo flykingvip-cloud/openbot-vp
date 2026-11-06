@@ -138,3 +138,45 @@ describe("diagnosis panel observation origin", () => {
     container.remove();
   });
 });
+
+describe("observation evidence query", () => {
+  it("uses an exact result version and drops responses after permission revocation", async () => {
+    let resolveEvidence: ((value: unknown) => void) | undefined;
+    const request = vi.fn((method: string) => {
+      if (method === "diagnosis.observation.query") {
+        return new Promise((resolve) => {
+          resolveEvidence = resolve;
+        });
+      }
+      return Promise.resolve({
+        items: [],
+        nextCursor: null,
+        authorization: { outcome: "allow" },
+        audit: { decision: "allow" },
+      });
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    render(
+      html`<openbot-diagnosis-panel role="enterprise" tenant-id="t1" .client=${{ connected: true, request }} .scopes=${["operator.read"]} .gatewayMethods=${["diagnosis.observation.query"]} .taskOutcomeRef=${{ taskId: "task1", agentId: "main", outcomeVersion: 3 }} connected></openbot-diagnosis-panel>`,
+      container,
+    );
+    const panel = container.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
+    await waitFor(() => expect(resolveEvidence).toBeDefined());
+    const call = request.mock.calls.find(
+      ([method]) => method === "diagnosis.observation.query",
+    ) as unknown as [string, Record<string, unknown>];
+    expect(call[1]).toMatchObject({ taskId: "task1", agentId: "main", outcomeVersion: 3 });
+    expect(Number(call[1].from)).toBeLessThan(Number(call[1].to));
+    panel.scopes = [];
+    await panel.updateComplete;
+    resolveEvidence!({ schemaVersion: 1, metricDictVersion: 1, samples: [{ sampleId: "stale" }] });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(panel.querySelector('[aria-label="运行证据投影"] article')).toBeNull();
+    expect(panel.textContent).toContain("业务结果未知");
+    expect(
+      request.mock.calls.filter(([method]) => method === "diagnosis.observation.query"),
+    ).toHaveLength(1);
+    container.remove();
+  });
+});
