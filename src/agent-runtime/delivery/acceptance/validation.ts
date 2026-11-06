@@ -70,6 +70,8 @@ export function issueValidationReceipt(input: {
     timestamp: (input.now ?? new Date()).toISOString(),
     result: input.result ?? "passed",
   };
+  // Issued evidence is immutable even when exposed to observability callers.
+  Object.freeze(receipt);
   receipts.push(receipt);
   return receipt;
 }
@@ -100,20 +102,13 @@ export function matchRequiredValidators(params: {
     if (!registered) {
       return { validatorId, status: "missing" };
     }
-    const passed = samePath.find(
+    const verdict = samePath.findLast(
       (receipt) =>
-        receipt.result === "passed" &&
         receipt.artifactHash === params.artifactHash &&
         receipt.validatorVersion === registered.version,
     );
-    if (passed) {
-      return { validatorId, status: "passed", receipt: passed };
-    }
-    const failed = samePath.find(
-      (receipt) => receipt.result === "failed" && receipt.artifactHash === params.artifactHash,
-    );
-    if (failed) {
-      return { validatorId, status: "failed", receipt: failed };
+    if (verdict) {
+      return { validatorId, status: verdict.result, receipt: verdict };
     }
     const wrongVersion = samePath.find(
       (receipt) =>
