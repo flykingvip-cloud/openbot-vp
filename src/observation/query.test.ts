@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { OpenBotConfig } from "../config/config.js";
+import { createExecutionEvidenceStore } from "./execution-evidence-store.js";
 import { queryObservation } from "./query.js";
 let dir = "";
 let cfg: OpenBotConfig;
@@ -96,5 +97,69 @@ describe("internal observation query", () => {
     expect(query({ from: time - 31 * 86400000 })).toEqual({ ok: false, code: "invalid_window" });
     expect(query({ projectedAt: time })).toEqual({ ok: false, code: "invalid_window" });
     expect(query({ taskId: "missing" })).toEqual({ ok: false, code: "not_found" });
+  });
+  it("reads actual retained facts and receipts without promoting unknown outcome provenance", () => {
+    const record = {
+      ...row(),
+      runs: [
+        {
+          runId: "run",
+          attemptIds: ["attempt"],
+          effectiveAttemptId: "attempt",
+          status: "succeeded",
+        },
+      ],
+      attempts: [
+        {
+          attemptId: "attempt",
+          runId: "run",
+          status: "succeeded",
+          observedAt: new Date(time).toISOString(),
+        },
+      ],
+    };
+    fs.writeFileSync(path.join(dir, "task-outcomes/tips/task.json"), JSON.stringify(record));
+    fs.writeFileSync(
+      path.join(dir, "task-outcomes/versions/task__v1.json"),
+      JSON.stringify(record),
+    );
+    const executionStore = createExecutionEvidenceStore({
+      enabled: () => true,
+      now: () => time + 1,
+    });
+    for (const [eventId, stage] of [
+      ["s", "started"],
+      ["e", "completed"],
+    ] as const) {
+      executionStore.recordFact({
+        eventId,
+        stage,
+        occurredAt: time,
+        scope: record.scope as Parameters<typeof executionStore.query>[0],
+        taskId: "task",
+        runId: "run",
+      });
+    }
+    executionStore.recordLink({
+      receiptId: "l",
+      taskId: "task",
+      runId: "run",
+      scope: record.scope as Parameters<typeof executionStore.query>[0],
+      outcomeVersion: 1,
+      attemptId: "attempt",
+      attemptGranularity: "turn",
+      eventIds: ["s", "e"],
+    });
+    const r = query({ executionStore });
+    if (!r.ok || !("samples" in r)) {
+      throw new Error("failed");
+    }
+    expect(r.samples[0].executionRefs).toHaveLength(2);
+    expect(r.samples[0].qualification).toBe("invalid");
+    expect(r.samples[0].provenance).toEqual(["live", "unknown"]);
+    expect(r.samples[0].improvementEligible).toBe(false);
+    expect(r.samples[0].attributedCost).toBeNull();
+    expect(r.executionSource.retention).toBe("process_memory");
+    expect(JSON.stringify(r)).not.toContain("subject:alice");
   });
 });

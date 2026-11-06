@@ -1,5 +1,7 @@
 /** Internal read-only query. RPC adapters must authenticate caller before invocation. */
 import type { OpenBotConfig } from "../config/config.js";
+import { getExecutionEvidenceStore } from "./execution-evidence-store.js";
+import { projectExecutionEvidence, type ExecutionSource } from "./execution-projection.js";
 import { OBSERVATION_METRIC_DICT, OBSERVATION_METRIC_DICT_VERSION } from "./metric-dict.js";
 import { readOutcomeMetadata } from "./outcome-reader.js";
 import { assembleObservationSamples } from "./sample-assembler.js";
@@ -13,6 +15,7 @@ export function queryObservation(input: {
   from: number;
   to: number;
   projectedAt: number;
+  executionStore?: ExecutionSource;
 }) {
   if (
     ![input.from, input.to, input.projectedAt].every(Number.isFinite) ||
@@ -34,6 +37,12 @@ export function queryObservation(input: {
     return result;
   }
   const { isCurrentTip, ...record } = result.outcome;
+  const execution = projectExecutionEvidence({
+    snapshot: (input.executionStore ?? getExecutionEvidenceStore()).query(record.scope),
+    scope: record.scope,
+    taskId: record.taskId,
+    outcomeVersion: record.outcomeVersion,
+  });
   const projection = assembleObservationSamples({
     scope: record.scope,
     from: input.from,
@@ -41,11 +50,12 @@ export function queryObservation(input: {
     projectedAt: input.projectedAt,
     sourceWatermark: null,
     outcomes: [{ record, sourceId: "task-outcome-version", provenance: "unknown", isCurrentTip }],
-    executions: [],
+    executions: execution.executions,
   });
   return {
     ok: true as const,
     ...projection,
+    executionSource: execution.executionSource,
     metricDictVersion: OBSERVATION_METRIC_DICT_VERSION,
     metrics: [
       {
@@ -69,7 +79,7 @@ export function queryObservation(input: {
       },
     ],
     sourceReasons: [
-      "execution_source_unavailable",
+      ...execution.executionSource.reasons,
       "provenance_unknown",
       "source_watermark_unavailable",
     ],
