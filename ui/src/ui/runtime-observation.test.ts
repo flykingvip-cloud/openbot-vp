@@ -49,3 +49,26 @@ it("bounds observations and rejects foreign sessions while recording gaps", asyn
   clearRuntimeObservations(host);
   expect(readRuntimeObservations(host, "own").reasons).toEqual(["not_observed"]);
 });
+
+it("keeps engine runs distinct when Gateway maps them to the same client run", async () => {
+  const { recordRuntimeObservation, readRuntimeObservations } =
+    await import("./runtime-observation.ts");
+  const host = {};
+  for (const sourceRunId of ["engine-a", "engine-b"]) {
+    recordRuntimeObservation(
+      host,
+      "own",
+      {
+        runId: "client",
+        sourceRunId,
+        seq: 1,
+        ts: 1,
+        stream: "lifecycle",
+        sessionKey: "own",
+        data: { phase: "start" },
+      },
+      2,
+    );
+  }
+  expect(readRuntimeObservations(host, "own").events).toHaveLength(2);
+});

@@ -2,6 +2,7 @@
 export type RuntimeObservation = {
   eventId: string;
   runId: string;
+  sourceRunId: string | null;
   sequence: number;
   occurredAt: number;
   receivedAt: number;
@@ -51,7 +52,9 @@ export function recordRuntimeObservation(
   if (state.events.some((row) => row.eventId === event.eventId)) {
     return;
   }
-  const previous = state.events.filter((row) => row.runId === event.runId).at(-1);
+  const previous = state.events
+    .filter((row) => row.runId === event.runId && row.sourceRunId === event.sourceRunId)
+    .at(-1);
   if (previous && event.sequence !== previous.sequence + 1) {
     state.reasons.add("sequence_gap_or_reorder");
   }
@@ -105,8 +108,14 @@ export function projectRuntimeObservation(
   const data =
     row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {};
   return {
-    eventId: JSON.stringify([row.runId, row.seq]),
+    eventId: JSON.stringify([
+      row.runId,
+      typeof row.sourceRunId === "string" ? row.sourceRunId : null,
+      row.seq,
+    ]),
     runId: row.runId,
+    sourceRunId:
+      typeof row.sourceRunId === "string" && row.sourceRunId.trim() ? row.sourceRunId : null,
     sequence: row.seq,
     occurredAt: row.ts,
     receivedAt,
