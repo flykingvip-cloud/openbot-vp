@@ -1,3 +1,4 @@
+import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery.js";
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
 import { createRunAdmissionLease } from "../agent-runtime/model/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
@@ -400,6 +401,7 @@ async function agentCommandInternal(
   /** Real usage-derived USD for tip budget closeout when mid-run charge did not run. */
   let tipBudgetCostUsd: number | undefined;
   let tipBudgetChargedThisTurn = false;
+  let commandDeliveryReceipt: CommandDeliveryReceipt | undefined;
   let agentOutcomeSuccess: boolean | undefined;
   let agentOutcomeFailureReason: RunnerTurnFailureReason | undefined;
   let agentOutcomeFailureDetail: string | undefined;
@@ -451,7 +453,7 @@ async function agentCommandInternal(
   const commandBudget = createCommandBudget({ config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, taskId: agentOutcomeTaskId, scope: agentOutcomeScope, parentTaskId: opts.parentTaskId, parentAgentId: opts.parentAgentId });
   const submitAgentOutcomeCloseout = createCommandOutcomeCloseout({
     config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, entrypoint: agentOutcomeEntrypoint,
-    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, costUsd: tipBudgetCostUsd}),
+    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, costUsd: tipBudgetCostUsd, deliveryReceipt: commandDeliveryReceipt}),
   });
 
   try {
@@ -560,6 +562,7 @@ async function agentCommandInternal(
 
       agentOutcomeSuccess = true;
     return await deliverAgentCommandResult({
+        receipt: { deliveryId: `delivery:${runId}:command`, record: (receipt) => { commandDeliveryReceipt = receipt; } },
         cfg,
         deps,
         runtime,
@@ -1015,6 +1018,7 @@ async function agentCommandInternal(
     const payloads = result.payloads ?? [];
     agentOutcomeSuccess = true;
     return await deliverAgentCommandResult({
+        receipt: { deliveryId: `delivery:${runId}:command`, record: (receipt) => { commandDeliveryReceipt = receipt; } },
       cfg,
       deps,
       runtime,

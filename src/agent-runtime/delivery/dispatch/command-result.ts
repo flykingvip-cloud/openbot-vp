@@ -21,6 +21,7 @@ import type { OutboundSessionContext } from "../../../infra/outbound/session-con
 import { CommandLane } from "../../../process/lanes.js";
 import type { RuntimeEnv } from "../../../runtime.js";
 import { isInternalMessageChannel } from "../../../utils/message-channel.js";
+import type { CommandDeliveryReceipt } from "../../contracts/delivery.js";
 import { logNestedCommandOutput } from "../presentation/command-output.js";
 
 export async function deliverAgentCommandResult<
@@ -34,6 +35,7 @@ export async function deliverAgentCommandResult<
   sessionEntry: SessionEntry | undefined;
   result: { meta: TMeta };
   payloads: ReplyPayload[] | undefined;
+  receipt?: { deliveryId: string; record: (receipt: CommandDeliveryReceipt) => void };
 }) {
   const { cfg, deps, runtime, opts, outboundSession, sessionEntry, payloads, result } = params;
   const effectiveSessionKey = outboundSession?.key ?? opts.sessionKey;
@@ -105,7 +107,17 @@ export async function deliverAgentCommandResult<
     deliveryChannel === "slack" && resolvedThreadId != null ? String(resolvedThreadId) : undefined;
   const resolvedThreadTarget = deliveryChannel === "slack" ? undefined : resolvedThreadId;
 
+  let deliveryError: string | undefined;
+  const recordReceipt = (status: CommandDeliveryReceipt["status"], messageIds: string[] = []) => {
+    params.receipt?.record({
+      deliveryId: params.receipt.deliveryId,
+      status,
+      messageIds,
+      ...(deliveryError ? { error: deliveryError } : {}),
+    });
+  };
   const logDeliveryError = (err: unknown) => {
+    deliveryError = String(err);
     const message = `Delivery failed (${deliveryChannel}${deliveryTarget ? ` to ${deliveryTarget}` : ""}): ${String(err)}`;
     runtime.error?.(message);
     if (!runtime.error) {
@@ -118,21 +130,24 @@ export async function deliverAgentCommandResult<
       const err = new Error(
         "delivery channel is required: pass --channel/--reply-channel or use a main session with a previous channel",
       );
+      logDeliveryError(err);
       if (!bestEffortDeliver) {
+        recordReceipt("failed");
         throw err;
       }
-      logDeliveryError(err);
     } else if (!isDeliveryChannelKnown) {
       const err = new Error(`Unknown channel: ${deliveryChannel}`);
+      logDeliveryError(err);
       if (!bestEffortDeliver) {
+        recordReceipt("failed");
         throw err;
       }
-      logDeliveryError(err);
     } else if (resolvedTarget && !resolvedTarget.ok) {
+      logDeliveryError(resolvedTarget.error);
       if (!bestEffortDeliver) {
+        recordReceipt("failed");
         throw resolvedTarget.error;
       }
-      logDeliveryError(resolvedTarget.error);
     }
   }
 
@@ -155,6 +170,9 @@ export async function deliverAgentCommandResult<
 
   if (!payloads || payloads.length === 0) {
     runtime.log("No reply from agent.");
+    if (deliver) {
+      recordReceipt("delivery_unknown");
+    }
     return { payloads: [], meta: result.meta };
   }
 
@@ -180,23 +198,44 @@ export async function deliverAgentCommandResult<
   }
   if (deliver && deliveryChannel && !isInternalMessageChannel(deliveryChannel)) {
     if (deliveryTarget) {
-      await deliverOutboundPayloads({
-        cfg,
-        channel: deliveryChannel,
-        to: deliveryTarget,
-        accountId: resolvedAccountId,
-        payloads: deliveryPayloads,
-        session: outboundSession,
-        taskId: result.meta.taskId,
-        replyToId: resolvedReplyToId ?? null,
-        threadId: resolvedThreadTarget ?? null,
-        bestEffort: bestEffortDeliver,
-        onError: (err) => logDeliveryError(err),
-        onPayload: logPayload,
-        deps: createOutboundSendDeps(deps),
-      });
+      try {
+        const receipts = await deliverOutboundPayloads({
+          cfg,
+          channel: deliveryChannel,
+          to: deliveryTarget,
+          accountId: resolvedAccountId,
+          payloads: deliveryPayloads,
+          session: outboundSession,
+          taskId: result.meta.taskId,
+          replyToId: resolvedReplyToId ?? null,
+          threadId: resolvedThreadTarget ?? null,
+          bestEffort: bestEffortDeliver,
+          onError: (err) => logDeliveryError(err),
+          onPayload: logPayload,
+          deps: createOutboundSendDeps(deps),
+          abortSignal: opts.abortSignal,
+        });
+        const messageIds = receipts
+          .map((receipt) => receipt.messageId)
+          .filter((id) => id.trim() && id.trim().toLowerCase() !== "unknown");
+        recordReceipt(
+          deliveryError
+            ? "failed"
+            : receipts.length > 0 && messageIds.length === receipts.length
+              ? "delivered"
+              : "delivery_unknown",
+          messageIds,
+        );
+      } catch (error) {
+        deliveryError = String(error);
+        recordReceipt("failed");
+        throw error;
+      }
     }
   }
 
+  if (deliver && (!deliveryTarget || isInternalMessageChannel(deliveryChannel))) {
+    recordReceipt(deliveryError ? "failed" : "delivery_unknown");
+  }
   return { payloads: normalizedPayloads, meta: result.meta };
 }

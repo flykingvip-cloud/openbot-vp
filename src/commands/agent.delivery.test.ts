@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery.js";
 import type { CliDeps } from "../cli/deps.js";
 import type { OpenBotConfig } from "../config/config.js";
 import type { SessionEntry } from "../config/sessions.js";
+import type { OutboundDeliveryResult } from "../infra/outbound/deliver.js";
 import type { RuntimeEnv } from "../runtime.js";
 
 const mocks = vi.hoisted(() => ({
-  deliverOutboundPayloads: vi.fn(async () => []),
+  deliverOutboundPayloads: vi.fn<
+    (
+      params: Parameters<typeof import("../infra/outbound/deliver.js").deliverOutboundPayloads>[0],
+    ) => Promise<OutboundDeliveryResult[]>
+  >(async () => []),
   getChannelPlugin: vi.fn(() => ({})),
   resolveOutboundTarget: vi.fn(() => ({ ok: true as const, to: "+15551234567" })),
 }));
@@ -283,5 +289,84 @@ describe("deliverAgentCommandResult", () => {
     expect(line).toContain("run=run-announce");
     expect(line).toContain("channel=webchat");
     expect(line).toContain("ANNOUNCE_SKIP");
+  });
+});
+
+describe("command transport receipts", () => {
+  async function dispatch(record: (receipt: CommandDeliveryReceipt) => void, deliver = true) {
+    return deliverAgentCommandResult({
+      cfg: {},
+      deps: {} as CliDeps,
+      runtime: { log: vi.fn(), error: vi.fn() } as unknown as RuntimeEnv,
+      opts: {
+        message: "hello",
+        deliver,
+        channel: "whatsapp",
+        to: "+15551234567",
+        bestEffortDeliver: true,
+      },
+      outboundSession: undefined,
+      sessionEntry: undefined,
+      result: { meta: { durationMs: 1 } },
+      payloads: [{ text: "hello" }],
+      receipt: { deliveryId: "delivery:run:command", record },
+    });
+  }
+  it("requires an actual message id and keeps partial failure distinct", async () => {
+    const record = vi.fn();
+    mocks.deliverOutboundPayloads.mockResolvedValueOnce([
+      { channel: "whatsapp", messageId: "sent-1" },
+    ]);
+    await dispatch(record);
+    expect(record).toHaveBeenLastCalledWith({
+      deliveryId: "delivery:run:command",
+      status: "delivered",
+      messageIds: ["sent-1"],
+    });
+    mocks.deliverOutboundPayloads.mockImplementationOnce(async (params) => {
+      params.onError?.(new Error("second payload failed"), { text: "failed", mediaUrls: [] });
+      return [{ channel: "whatsapp", messageId: "sent-1" }];
+    });
+    await dispatch(record);
+    expect(record).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "failed", messageIds: ["sent-1"] }),
+    );
+  });
+  it("does not equate empty receipts or local output with delivery", async () => {
+    const record = vi.fn();
+    mocks.deliverOutboundPayloads.mockResolvedValueOnce([]);
+    await dispatch(record);
+    expect(record).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "delivery_unknown" }),
+    );
+    record.mockClear();
+    await dispatch(record, false);
+    expect(record).not.toHaveBeenCalled();
+  });
+  it("does not treat adapter placeholder ids as delivery confirmation", async () => {
+    const record = vi.fn();
+    mocks.deliverOutboundPayloads.mockResolvedValueOnce([
+      { channel: "whatsapp", messageId: "unknown" },
+    ]);
+    await dispatch(record);
+    expect(record).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "delivery_unknown", messageIds: [] }),
+    );
+    mocks.deliverOutboundPayloads.mockResolvedValueOnce([
+      { channel: "whatsapp", messageId: "sent-1" },
+      { channel: "whatsapp", messageId: "unknown" },
+    ]);
+    await dispatch(record);
+    expect(record).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "delivery_unknown", messageIds: ["sent-1"] }),
+    );
+  });
+  it("records hard transport failure before preserving the rejection", async () => {
+    const record = vi.fn();
+    mocks.deliverOutboundPayloads.mockRejectedValueOnce(new Error("transport offline"));
+    await expect(dispatch(record)).rejects.toThrow("transport offline");
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed", error: "Error: transport offline" }),
+    );
   });
 });

@@ -4,6 +4,7 @@ import {
   type RunnerTurnFailureReason,
 } from "../../../task-outcome/runtime-from-runner.js";
 import type { Entrypoint, TrustedScope } from "../../../task-outcome/types.js";
+import type { CommandDeliveryReceipt } from "../../contracts/delivery.js";
 /** Execution outcome only; acceptance and delivery need separate evidence. */
 export function createCommandOutcomeCloseout(params: {
   config: OpenBotConfig;
@@ -19,6 +20,7 @@ export function createCommandOutcomeCloseout(params: {
     failureDetail?: string;
     budgetCharged: boolean;
     costUsd?: number;
+    deliveryReceipt?: CommandDeliveryReceipt;
   };
 }) {
   let agentOutcomeCloseoutDone = false;
@@ -31,6 +33,7 @@ export function createCommandOutcomeCloseout(params: {
       failureDetail: agentOutcomeFailureDetail,
       budgetCharged: tipBudgetChargedThisTurn,
       costUsd: tipBudgetCostUsd,
+      deliveryReceipt,
     } = params.readContext();
     if (agentOutcomeCloseoutDone || !params.entrypoint) {
       return;
@@ -50,6 +53,9 @@ export function createCommandOutcomeCloseout(params: {
         taskId: agentOutcomeTaskId,
         scope: agentOutcomeScope,
         entrypoint: params.entrypoint,
+        ...(deliveryReceipt
+          ? { delivery: { status: deliveryReceipt.status }, deliveryId: deliveryReceipt.deliveryId }
+          : {}),
         latencyMs: Math.max(0, Date.now() - params.startedAtMs),
         ...(tipBudgetChargedThisTurn ? { skipBudgetCharge: true } : {}),
         ...(!tipBudgetChargedThisTurn && tipBudgetCostUsd != null

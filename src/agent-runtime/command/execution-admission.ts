@@ -31,3 +31,47 @@ export async function admitExecutionRequest(
   input.abortSignal?.throwIfAborted();
   return ports.commit(input);
 }
+
+/** Fixed mapping into the existing atomic task writer. No execution is started here. */
+export function bindExecutionAdmissionPorts(params: {
+  sessionFile: string;
+  authorize: ExecutionAdmissionPorts["authorize"];
+  commit: (input: {
+    sessionFile: string;
+    requestId: string;
+    goal: string;
+    acceptance: readonly string[];
+    expectedFocusRevision: number;
+    expectedWriteEpoch: number;
+    expectedTaskId?: string;
+  }) =>
+    | Exclude<ExecutionAdmissionResult, { kind: "accepted" }>
+    | {
+        kind: "accepted";
+        binding: Extract<ExecutionAdmissionResult, { kind: "accepted" }>["binding"];
+      };
+  copyAcceptance?: boolean;
+}): ExecutionAdmissionPorts {
+  return {
+    authorize: params.authorize,
+    commit: (request) => {
+      const result = params.commit({
+        sessionFile: params.sessionFile,
+        requestId: request.requestId,
+        goal: request.proposal.goal,
+        acceptance: request.proposal.acceptance,
+        expectedFocusRevision: request.expectedFocusRevision,
+        expectedWriteEpoch: request.expectedWriteEpoch,
+        expectedTaskId: request.expectedTaskId,
+      });
+      return result.kind === "accepted"
+        ? {
+            ...result,
+            acceptance: params.copyAcceptance
+              ? [...request.proposal.acceptance]
+              : request.proposal.acceptance,
+          }
+        : result;
+    },
+  };
+}

@@ -7,3 +7,5 @@ export type { CorruptedSessionResetInput, SessionRecoveryPorts } from "./session
 export { persistCommandSessionEntry } from "./command-session.js";
 
 export { persistAcpTurnTranscript } from "./acp-transcript.js";
+
+export { persistInteractionMessage } from "./interaction-transcript.js";

@@ -10,7 +10,7 @@ import {
 } from "../delivery/index.js";
 import { runAdmittedTurn } from "../execution/index.js";
 import { sessionTaskState, prepareReplacementSessionEntry } from "../state/index.js";
-import { persistInteractionMessage } from "../state/interaction-transcript.js";
+import { persistInteractionMessage } from "../state/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 import {
   bindInteractionPorts,

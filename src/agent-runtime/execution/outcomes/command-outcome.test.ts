@@ -72,3 +72,39 @@ it("reports persistence failure and retains the original at-most-once closeout",
   expect(log).toHaveBeenCalled();
   log.mockRestore();
 });
+it("persists failed delivery independently of successful execution", async () => {
+  const close = createCommandOutcomeCloseout({
+    config: {},
+    agentId: "agent",
+    runId: "run",
+    startedAtMs: Date.now(),
+    entrypoint: "cli",
+    readContext: () => ({
+      taskId: "task",
+      scope: {
+        kind: "personal",
+        personalDomainId: "domain",
+        subjectRef: "user",
+        authzScopeRef: "scope",
+      },
+      success: true,
+      budgetCharged: true,
+      deliveryReceipt: {
+        deliveryId: "delivery:run:command",
+        status: "failed",
+        messageIds: ["sent-part"],
+      },
+    }),
+  });
+  await close();
+  expect(recordRunnerTurnOutcome).toHaveBeenCalledWith(
+    {},
+    "agent",
+    expect.objectContaining({
+      success: true,
+      delivery: { status: "failed" },
+      deliveryId: "delivery:run:command",
+    }),
+  );
+  expect(vi.mocked(recordRunnerTurnOutcome).mock.calls[0][2]).not.toHaveProperty("acceptance");
+});

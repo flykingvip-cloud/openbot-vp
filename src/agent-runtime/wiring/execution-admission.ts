@@ -1,5 +1,6 @@
 import {
   admitExecutionRequest,
+  bindExecutionAdmissionPorts,
   type ExecutionAdmissionInput,
   type ExecutionAdmissionPorts,
 } from "../command/index.js";
@@ -11,21 +12,13 @@ export function admitSessionExecution(
   input: ExecutionAdmissionInput,
   authorize: ExecutionAdmissionPorts["authorize"],
 ) {
-  return admitExecutionRequest(input, {
-    authorize,
-    commit: (request) => {
-      const result = sessionTaskState.admitExecution({
-        sessionFile,
-        requestId: request.requestId,
-        goal: request.proposal.goal,
-        acceptance: request.proposal.acceptance,
-        expectedFocusRevision: request.expectedFocusRevision,
-        expectedWriteEpoch: request.expectedWriteEpoch,
-        expectedTaskId: request.expectedTaskId,
-      });
-      return result.kind === "accepted"
-        ? { ...result, acceptance: [...request.proposal.acceptance] }
-        : result;
-    },
-  });
+  return admitExecutionRequest(
+    input,
+    bindExecutionAdmissionPorts({
+      sessionFile,
+      authorize,
+      commit: sessionTaskState.admitExecution,
+      copyAcceptance: true,
+    }),
+  );
 }

@@ -1,7 +1,7 @@
 import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { ExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
-import { runAuthorizedInteraction } from "../command/index.js";
+import { bindExecutionAdmissionPorts, runAuthorizedInteraction } from "../command/index.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
 import { createAuthorizedModelSession } from "../model/index.js";
 import { sessionTaskState } from "../state/index.js";
@@ -96,23 +96,11 @@ export function runGatewayInteraction(params: {
         })(provider, model),
       admission: {
         captured: { requestId: params.requestId, ...params.captured },
-        ports: {
+        ports: bindExecutionAdmissionPorts({
+          sessionFile: params.sessionFile,
           authorize: async () => params.authorized && !params.input.abortSignal?.aborted,
-          commit: (request) => {
-            const result = sessionTaskState.admitExecution({
-              sessionFile: params.sessionFile,
-              requestId: request.requestId,
-              goal: request.proposal.goal,
-              acceptance: request.proposal.acceptance,
-              expectedFocusRevision: request.expectedFocusRevision,
-              expectedWriteEpoch: request.expectedWriteEpoch,
-              expectedTaskId: request.expectedTaskId,
-            });
-            return result.kind === "accepted"
-              ? { ...result, acceptance: request.proposal.acceptance }
-              : result;
-          },
-        },
+          commit: sessionTaskState.admitExecution,
+        }),
       },
     },
   );
