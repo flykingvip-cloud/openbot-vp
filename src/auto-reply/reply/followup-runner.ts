@@ -1,13 +1,13 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
+import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
+import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 import { resolveAgentDir, resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
-import { resolveEmbeddedModelGovernance } from "../../agents/embedded-model-governance.js";
-import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage, normalizeUsage } from "../../agents/usage.js";
 import type { SessionEntry } from "../../config/sessions.js";
@@ -24,20 +24,10 @@ import {
   isTaskExecutionBindingCurrent,
 } from "../../conversation-task/session-task-board.js";
 import { claimTaskBoardContinue } from "../../conversation-task/task-board-continue.js";
-import {
-  tryAcquireEnterpriseAgentRun,
-  releaseEnterpriseAgentRun,
-} from "../../gateway/billing/agent-run-governance.js";
 import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain.js";
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
 import { resolveEnterpriseEmbeddedTransport } from "../../gateway/enterprise-model/embedded-transport.js";
 import { inheritExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
-import {
-  buildRunModelSetSnapshot,
-  forgetRunModelSet,
-  rememberRunModelSet,
-  snapshotCreditReportingFromGate,
-} from "../../gateway/governance/spawn-snapshot-handoff.js";
 import {
   consumeCapabilityRoutingResult,
   formatCapabilityExecutionSurfaceLog,
@@ -45,7 +35,6 @@ import {
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
-import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
@@ -349,7 +338,7 @@ export function createFollowupRunner(params: {
         logVerbose(`followup task-outcome entry failed: ${opened.code} ${opened.message}`);
       }
     }
-    let followupSlotHeld = false;
+    const modelSession = createAuthorizedModelSession(runId, bindAdmittedTurnHost());
     let oguiResume:
       | { storePath: string; sessionKey: string; decisionId: string; resumeRef: string }
       | undefined;
@@ -425,9 +414,7 @@ export function createFollowupRunner(params: {
           taskText: queued.prompt,
           contextParts: runContextEstimate.contextParts,
         };
-        let followupAuthorizationId: string | undefined;
-        const runSlot = await tryAcquireEnterpriseAgentRun({
-          runId,
+        const runSlot = await modelSession.authorize({
           agentId: queued.run.agentId,
           ...(queued.run.groupId ? { groupId: queued.run.groupId } : {}),
           modelGateInput,
@@ -440,8 +427,6 @@ export function createFollowupRunner(params: {
           if (runSlot.modelGate) {
             modelGate = runSlot.modelGate;
           }
-          followupSlotHeld = true;
-          followupAuthorizationId = runSlot.authorizationDecisionId;
         }
         const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
           allowlist: modelGate?.allowlist,
@@ -470,43 +455,14 @@ export function createFollowupRunner(params: {
           logVerbose(`followup capability plan: ${executionRouting.planFailure.message}`);
           return;
         }
-        const embeddedModelGovernance = resolveEmbeddedModelGovernance({
-          gateStatus: followupSlotHeld ? "acquired" : "skipped",
-          allowlist: executionRouting.allowlist,
-          tenantId: modelGate?.tenantId,
-          commercialAuthorizationId: followupAuthorizationId,
-        });
-        const parentSnapshot = buildRunModelSetSnapshot({
-          runId,
-          allowlist: executionRouting.allowlist,
-          governanceMode: embeddedModelGovernance.governanceMode,
-          commercialAuthorizationId: followupAuthorizationId,
-          tenantId: modelGate?.tenantId,
-          preferredModelOrder: executionRouting.preferredModelOrder,
-          platformModelsMode:
-            modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(queued.run.config),
-          ...(modelGate?.effectiveRouting?.selectorStrategy
-            ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
-            : {}),
-          // P4-1: parent billing context for child runs (acquired gate only).
-          creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
-        });
-        if (parentSnapshot) {
-          rememberRunModelSet(runId, parentSnapshot);
-        }
+        modelSession.prepareModelSet({ config: queued.run.config, routing: executionRouting });
         const runFallback = () =>
-          runWithModelFallback({
+          modelSession.infer({
             cfg: queued.run.config,
             provider: queued.run.provider,
             model: queued.run.model,
-            ...embeddedModelGovernance,
-            ...(executionRouting.preferredModelOrder
-              ? { preferredModelOrder: executionRouting.preferredModelOrder }
-              : {}),
-            runtimeAdmission: {
-              taskText: queued.prompt,
-            },
-            runId,
+            taskText: queued.prompt,
+            signal: opts?.abortSignal,
             agentDir: queued.run.agentDir,
             fallbacksOverride: resolveRunModelFallbacksOverride({
               cfg: queued.run.config,
@@ -881,10 +837,7 @@ export function createFollowupRunner(params: {
           lifecycleEnabled: true,
         });
       }
-      if (followupSlotHeld) {
-        void releaseEnterpriseAgentRun(runId);
-        forgetRunModelSet(runId);
-      }
+      modelSession.dispose();
       // Both signals are required for the typing controller to clean up.
       // The main inbound dispatch path calls markDispatchIdle() from the
       // buffered dispatcher's finally block, but followup turns bypass the
