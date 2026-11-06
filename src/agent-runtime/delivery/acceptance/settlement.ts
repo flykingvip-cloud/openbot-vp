@@ -68,22 +68,22 @@ export function settleTurnCompletionWithPorts(
   }
   const trial = input.skillSmoke === true || ports.isSkillSmokeTurn(userText, assistantText);
   const trialApplies = trial && ports.isPreviewOkFormalBlocked(`${userText}\n${assistantText}`);
+  const sidePathFailure = input.sidePathFailure;
   if (
     !ports.turnCompletionApplies(input) &&
     !input.deliverable &&
-    !input.sidePathAttempt &&
+    !sidePathFailure &&
     !trialApplies
   ) {
     return unchanged();
   }
 
   let receipt: string | undefined;
-  if (input.sidePathAttempt) {
-    try {
-      input.sidePathAttempt();
-    } catch (err) {
-      receipt = ports.sidePathReceipt(input.sidePathLabel ?? "memory/task_ledger.json", err);
-    }
+  if (sidePathFailure) {
+    receipt = ports.sidePathReceipt(sidePathFailure.label, {
+      message: sidePathFailure.reason,
+      code: sidePathFailure.code,
+    });
   } else if (isSidePathLabel(assistantText)) {
     receipt = ports.sidePathReceipt(
       ports.extractNarratedPath(assistantText) ?? "memory/task_ledger.json",

@@ -39,9 +39,8 @@ export type TurnCompletionInput = {
   skillSmoke?: boolean;
   forkOptions?: readonly string[];
   openablePaths?: readonly string[];
-  /** Simulated side-path write. A throw is bypassed; it must not cancel the deliverable. */
-  sidePathAttempt?: () => void;
-  sidePathLabel?: string;
+  /** Evidence from an already attempted secondary write; settlement never executes it. */
+  sidePathFailure?: { label: string; reason: string; code?: string };
   deliverable?: TurnCompletionDeliverable;
   sessionKey?: string;
   /**

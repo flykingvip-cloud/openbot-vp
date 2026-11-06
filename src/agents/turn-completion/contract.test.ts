@@ -51,8 +51,9 @@ describe("turn completion contract", () => {
         get envProbes(): readonly EnvProbe[] {
           throw new Error("probes must stay lazy");
         },
-        sidePathAttempt: () => {
+        get sidePathFailure() {
           effects += 1;
+          return { label: "memory/task_ledger.json", reason: "unavailable" };
         },
         deliverable: { relativePath: "must-not-write.md", body: "body" },
       });
@@ -80,11 +81,11 @@ describe("turn completion contract", () => {
         sessionKey,
         envProbes: [],
         nowMs: 101,
-        sidePathAttempt: () => {
+        get sidePathFailure() {
           events.push("side-path");
           expect(fs.existsSync(target)).toBe(false);
           expect(readSkillSmokeClock(sessionKey)).toBe(100);
-          throw new Error("ledger unavailable");
+          return { label: "memory/task_ledger.json", reason: "ledger unavailable" };
         },
         deliverable: { relativePath: "deliverables/result.md", body: "verified body" },
       });
@@ -133,12 +134,7 @@ describe("turn completion contract", () => {
       assistantText:
         "memory/task_ledger.json 只读（-r----------），写操作被拒绝，所以我不能出稿，到此结束。",
       workspaceDir,
-      sidePathLabel: "memory/task_ledger.json",
-      sidePathAttempt: () => {
-        const err = new Error("EACCES");
-        (err as NodeJS.ErrnoException).code = "EACCES";
-        throw err;
-      },
+      sidePathFailure: { label: "memory/task_ledger.json", reason: "EACCES", code: "EACCES" },
       deliverable: {
         relativePath: "deliverables/smoke.md",
         body: "# smoke\n\nopenable body\n",
