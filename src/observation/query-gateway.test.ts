@@ -44,6 +44,21 @@ const invoke = async (
   return respond;
 };
 describe("observation query gateway", () => {
+  it("rechecks membership after an asynchronous base observation read", async () => {
+    const membership = vi
+      .fn()
+      .mockResolvedValueOnce({ tenantId: "tenant", userId: "alice" })
+      .mockRejectedValueOnce(new Error("revoked"));
+    const handler = createObservationQueryHandlers({
+      authDeps: { resolveMembership: membership },
+      loadConfig: () => ({}),
+      now: () => 3,
+    })[OBSERVATION_QUERY_METHOD];
+    const response = await invoke(handler, client());
+    expect(response.mock.calls[0][0]).toBe(false);
+    expect(membership).toHaveBeenCalledTimes(2);
+  });
+
   it("calls comparison only explicitly and rejects injected aggregates", async () => {
     compare.mockClear();
     const handler = createObservationQueryHandlers({
@@ -311,6 +326,7 @@ describe("observation query gateway", () => {
     const membership = vi
       .fn()
       .mockResolvedValueOnce({ tenantId: "tenant", userId: "alice" })
+      .mockResolvedValueOnce({ tenantId: "tenant", userId: "alice" })
       .mockRejectedValueOnce(new Error("revoked"));
     const handler = createObservationQueryHandlers({
       authDeps: { resolveMembership: membership },
@@ -318,6 +334,6 @@ describe("observation query gateway", () => {
     })[OBSERVATION_QUERY_METHOD];
     expect((await invoke(handler, client())).mock.calls[0][0]).toBe(true);
     expect((await invoke(handler, client())).mock.calls[0][0]).toBe(false);
-    expect(membership).toHaveBeenCalledTimes(2);
+    expect(membership).toHaveBeenCalledTimes(3);
   });
 });

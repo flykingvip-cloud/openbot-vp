@@ -267,7 +267,7 @@ export function createObservationQueryHandlers(
           );
           return;
         }
-        if ((capacity || comparison) && !(await finalAuth())) {
+        if (!(await finalAuth())) {
           deny("unauthorized");
           return;
         }

@@ -128,11 +128,30 @@ export async function queryObservationWithJournal(
   input: Parameters<typeof queryObservation>[0],
   journal: ReturnType<typeof createExecutionJournalRuntime> = getExecutionJournalRuntime(),
 ) {
-  const base = queryObservation(input);
+  const memoryPort = input.executionStore;
+  const sourcePort = input.outcomeSourceStore;
+  input = {
+    cfg: structuredClone(input.cfg),
+    caller: { subjectRef: input.caller.subjectRef, tenantId: input.caller.tenantId },
+    agentId: input.agentId,
+    taskId: input.taskId,
+    outcomeVersion: input.outcomeVersion,
+    from: input.from,
+    to: input.to,
+    projectedAt: input.projectedAt,
+    evidenceLookupWindow: input.evidenceLookupWindow
+      ? { from: input.evidenceLookupWindow.from, to: input.evidenceLookupWindow.to }
+      : undefined,
+    executionStore: memoryPort ? { query: memoryPort.query.bind(memoryPort) } : undefined,
+    outcomeSourceStore: sourcePort ? { query: sourcePort.query.bind(sourcePort) } : undefined,
+  };
+  const journalQuery = journal.query.bind(journal);
+  const journalEnabled = journal.isEnabled.bind(journal);
+  let base = queryObservation(input);
   if (!base.ok) {
     return base;
   }
-  if (!journal.isEnabled()) {
+  if (!journalEnabled()) {
     return {
       ...base,
       executionJournal: { state: "unknown" as const, reasons: ["journal_disabled"] },
@@ -151,12 +170,29 @@ export async function queryObservationWithJournal(
   if (!auth.ok) {
     return auth;
   }
-  const durable = await journal.query({ agentId: input.agentId, scope: auth.outcome.scope });
+  const durable = await journalQuery({ agentId: input.agentId, scope: auth.outcome.scope });
   const fresh = authorize();
   if (!fresh.ok) {
     return fresh;
   }
-  if (outcomeMetadataFingerprint(auth.outcome) !== outcomeMetadataFingerprint(fresh.outcome)) {
+  if (
+    auth.outcome.isCurrentTip !== fresh.outcome.isCurrentTip ||
+    outcomeMetadataFingerprint(auth.outcome) !== outcomeMetadataFingerprint(fresh.outcome)
+  ) {
+    return { ok: false as const, code: "scope_or_version_changed" as const };
+  }
+  base = queryObservation(input);
+  if (!base.ok) {
+    return base;
+  }
+  const final = authorize();
+  if (!final.ok) {
+    return final;
+  }
+  if (
+    final.outcome.isCurrentTip !== auth.outcome.isCurrentTip ||
+    outcomeMetadataFingerprint(final.outcome) !== outcomeMetadataFingerprint(auth.outcome)
+  ) {
     return { ok: false as const, code: "scope_or_version_changed" as const };
   }
   if (!durable.ok) {
@@ -218,28 +254,7 @@ export async function queryObservationWithJournal(
       conflictingIds.add(rows[0].eventId);
     }
   }
-  const mergedExecutions = executions.filter((event, index, all) => {
-    // Only a shared stable UUID plus identical payload proves the same persisted event.
-    // Non-UUID or different epoch identities remain separate when equivalence is unproven.
-    if (
-      conflictingIds.has(event.eventId) ||
-      !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(event.eventId)
-    ) {
-      return true;
-    }
-    const payload = (entry: typeof event) =>
-      JSON.stringify([
-        entry.eventId,
-        entry.occurredAt,
-        entry.runId,
-        entry.taskId,
-        entry.outcomeVersion,
-        entry.attemptId,
-        entry.provenance,
-        entry.collector,
-      ]);
-    return !all.slice(0, index).some((prior) => payload(prior) === payload(event));
-  });
+  // Preserve distinct source/epoch identities without an explicit common-origin proof.
   const assembled = assembleObservationSamples({
     scope: record.scope,
     from: input.from,
@@ -255,15 +270,45 @@ export async function queryObservationWithJournal(
         provenance: base.outcomeSource.provenance,
       },
     ],
-    executions: mergedExecutions.map((event) =>
-      conflictingIds.has(event.eventId)
-        ? { ...event, sourceId: "conflicting_execution_identity" }
-        : event,
-    ),
+    executions,
   });
+  const samples = assembled.samples.map((sample) =>
+    sample.executionRefs.some((ref) => conflictingIds.has(ref.eventId))
+      ? {
+          ...sample,
+          qualification: "invalid" as const,
+          reasons: [
+            ...new Set([
+              ...sample.reasons,
+              "duplicate_conflict",
+              "external_source_identity_conflict",
+            ]),
+          ].toSorted(),
+          evidence: { ...sample.evidence, execution: "partial" as const },
+        }
+      : sample,
+  );
+  const fullyLinkedCount = samples.filter(
+    (sample) => sample.qualification === "fully_linked",
+  ).length;
+  const coverage = {
+    ...assembled.coverage,
+    fullyLinkedCount,
+    invalidCount: samples.filter((sample) => sample.qualification === "invalid").length,
+    link: samples.length ? fullyLinkedCount / samples.length : null,
+  };
   return {
     ...base,
     ...assembled,
+    samples,
+    coverage,
+    executionConflicts: [...conflictingIds].toSorted().map((eventId) => ({
+      eventId,
+      refs: (byId.get(eventId) ?? []).map((event) => ({
+        sourceId: event.sourceId,
+        eventId: event.eventId,
+      })),
+    })),
     executionJournal: {
       state: "retained" as const,
       retention: durable.retention,
@@ -276,7 +321,7 @@ export async function queryObservationWithJournal(
     },
     metrics: base.metrics.map((metric) =>
       metric.metricId === OBSERVATION_METRIC_DICT.linkCoverage.metricId
-        ? { ...metric, value: assembled.coverage.link, reasons: assembled.coverage.reasons }
+        ? { ...metric, value: coverage.link, reasons: coverage.reasons }
         : metric,
     ),
     sourceReasons: [...base.sourceReasons, ...durable.reasons],

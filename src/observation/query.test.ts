@@ -319,7 +319,7 @@ describe("internal observation query", () => {
     );
     expect(r).toMatchObject({ ok: false, code: "unauthorized" });
   });
-  it("deduplicates stable persisted UUID facts and invalidates conflicting payload across sources", async () => {
+  it("preserves distinct source epochs and invalidates conflicting payload across sources", async () => {
     const scope = row().scope as Parameters<
       ReturnType<typeof createExecutionEvidenceStore>["query"]
     >[0];
@@ -390,7 +390,7 @@ describe("internal observation query", () => {
     if (!result.ok || !("samples" in result)) {
       throw new Error("failed");
     }
-    expect(result.samples[0].executionRefs).toHaveLength(2);
+    expect(result.samples[0].executionRefs).toHaveLength(4);
     const snapshot = memory.query(scope);
     const changed = {
       ...snapshot,
@@ -405,5 +405,74 @@ describe("internal observation query", () => {
     }
     expect(conflict.samples[0].qualification).toBe("invalid");
     expect(conflict.samples[0].reasons).toContain("duplicate_conflict");
+    expect(new Set(conflict.samples[0].executionRefs.map((ref) => ref.sourceId)).size).toBe(2);
+  });
+  it("freezes window and agent inputs across the durable await", async () => {
+    const journal = createExecutionJournal({
+      rootDir: path.join(dir, "journal"),
+      enabled: () => true,
+      now: () => time + 1,
+    });
+    const runtime = createExecutionJournalRuntime({ journal, enabled: () => true });
+    const request = {
+      cfg,
+      caller: { subjectRef: "subject:alice", tenantId: "tenant" },
+      agentId: "bot",
+      taskId: "task",
+      outcomeVersion: 1,
+      from: time,
+      to: time + 1,
+      projectedAt: time + 1,
+    };
+    vi.spyOn(runtime, "query").mockImplementation(async () => {
+      request.from = time + 100;
+      request.to = time + 101;
+      request.projectedAt = time + 101;
+      request.agentId = "other";
+      cfg.agents!.list!.push({ id: "other", agentDir: dir });
+      return {
+        ok: true,
+        state: "retained",
+        retention: "durable_bounded_journal",
+        epoch: "test",
+        capacity: 1000,
+        ttlMs: 1000,
+        facts: [],
+        links: [],
+        watermark: { lastSequence: 0, discardedThrough: 0 },
+        truncated: false,
+        reasons: [],
+      };
+    });
+    const result = await queryObservationWithJournal(request, runtime);
+    if (!result.ok || !("window" in result)) {
+      throw new Error("failed");
+    }
+    expect(result.window).toEqual({ from: time, to: time + 1 });
+    expect(result.samples).toHaveLength(1);
+  });
+  it("rejects a tip identity change even when durable history is missing", async () => {
+    const runtime = createExecutionJournalRuntime({
+      journal: createExecutionJournal({ rootDir: path.join(dir, "journal"), enabled: () => true }),
+      enabled: () => true,
+    });
+    vi.spyOn(runtime, "query").mockImplementation(async () => {
+      fs.writeFileSync(path.join(dir, "task-outcomes/tips/task.json"), JSON.stringify(row(2)));
+      return { ok: false, state: "unknown", reason: "journal_missing" };
+    });
+    const result = await queryObservationWithJournal(
+      {
+        cfg,
+        caller: { subjectRef: "subject:alice", tenantId: "tenant" },
+        agentId: "bot",
+        taskId: "task",
+        outcomeVersion: 1,
+        from: time,
+        to: time + 1,
+        projectedAt: time + 1,
+      },
+      runtime,
+    );
+    expect(result).toEqual({ ok: false, code: "scope_or_version_changed" });
   });
 });
