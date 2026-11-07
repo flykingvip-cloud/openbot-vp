@@ -1,15 +1,12 @@
 import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
-import {
-  compileModelContext,
-  normalizeCompiledMessages,
-} from "../../agent-runtime/context/index.js";
-import { createSubsystemLogger } from "../../logging/subsystem.js";
+import { createSubsystemLogger } from "../../../logging/subsystem.js";
+import { compileModelContext, normalizeCompiledMessages } from "../../context/index.js";
 import type {
   CollabCompileStrategyParams,
   ContextCandidates,
   ContextCompileTelemetry,
   ContextLane,
-} from "./types.js";
+} from "../../contracts/context.js";
 
 const log = createSubsystemLogger("context-compiler");
 

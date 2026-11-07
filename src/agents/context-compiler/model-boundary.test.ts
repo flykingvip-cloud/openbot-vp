@@ -1,12 +1,12 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { describe, expect, it } from "vitest";
-import { compileModelContext } from "./compile.js";
 import {
   createContextCompileState,
   installContextCompilerTransform,
   simulatePiModelBoundary,
   wrapContextCompilerModelBoundary,
-} from "./install.js";
+} from "../../agent-runtime/capabilities/index.js";
+import { compileModelContext } from "./compile.js";
 
 function user(text: string): AgentMessage {
   return { role: "user", content: text, timestamp: Date.now() } as AgentMessage;

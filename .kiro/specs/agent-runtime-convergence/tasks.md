@@ -876,3 +876,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved scheduled CLI/embedded backend selection, transport preparation and invocation into execution/runner/scheduled-candidate. Cron consumes execution/index; schedule/ledger and shared model admission/fallback retain existing ownership. Preserved fresh CLI watchdog behavior, tool-less non-qualifying jobs, trusted cron identity and charging model attribution. Original candidate body removed. — codex-runtime-manager
 - Cron credit/fallback/long-horizon regression 3 files / 22 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager
+
+## Context compiler adapter ownership (2026-11-07)
+
+- Moved the single compiler transform/model-boundary adapter into capabilities/adapters/context-compiler; removed old install implementation. Pure compilation remains in context; SDK mutation and restoration remain in the capability adapter. Production attempt and existing compatibility facade use the public capability API. No extra compilation or model loop. — codex-runtime-manager
+- Boundary/estimate/attempt/context regression 4 files / 69 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager

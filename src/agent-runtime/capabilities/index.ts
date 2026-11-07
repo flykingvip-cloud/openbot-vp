@@ -30,3 +30,11 @@ export { invokeContextAfterTurn } from "./adapters/context-after-turn.js";
 export { buildAfterTurnRuntimeContext } from "./adapters/after-turn-context.js";
 
 export { resolveAttemptFsWorkspaceOnly } from "./adapters/attempt-workspace-policy.js";
+
+export {
+  createContextCompileState,
+  installContextCompilerTransform,
+  simulatePiModelBoundary,
+  wrapContextCompilerModelBoundary,
+  wrapOutboundMessageEstimateGuard,
+} from "./adapters/context-compiler.js";

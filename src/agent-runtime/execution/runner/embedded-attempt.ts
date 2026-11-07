@@ -25,12 +25,6 @@ import {
 import { loadContextCandidates } from "../../../agents/context-compiler/candidates.js";
 import { shouldApplyCollabCompileStrategy } from "../../../agents/context-compiler/collab-compile-strategy.js";
 import { isContextCompilerEnabled } from "../../../agents/context-compiler/flag.js";
-import {
-  createContextCompileState,
-  installContextCompilerTransform,
-  wrapContextCompilerModelBoundary,
-  wrapOutboundMessageEstimateGuard,
-} from "../../../agents/context-compiler/install.js";
 import { resolveContextLane } from "../../../agents/context-compiler/lane-budget.js";
 import { contextCompileTelemetryExtra } from "../../../agents/context-compiler/telemetry.js";
 import { ensureCustomApiRegistered } from "../../../agents/custom-api-registry.js";
@@ -241,6 +235,12 @@ import { buildTtsSystemPromptHint } from "../../../tts/tts.js";
 import { resolveUserPath } from "../../../utils.js";
 import { normalizeMessageChannel } from "../../../utils/message-channel.js";
 import { isReasoningTagProvider } from "../../../utils/provider-utils.js";
+import {
+  createContextCompileState,
+  installContextCompilerTransform,
+  wrapContextCompilerModelBoundary,
+  wrapOutboundMessageEstimateGuard,
+} from "../../capabilities/index.js";
 import { resolveAttemptFsWorkspaceOnly } from "../../capabilities/index.js";
 import { buildAfterTurnRuntimeContext } from "../../capabilities/index.js";
 import { invokeContextAfterTurn } from "../../capabilities/index.js";
