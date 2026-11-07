@@ -62,6 +62,17 @@ export type UserOperationalIdentitySummary = {
   updatedAt: string;
   lastVerifiedAt?: string;
   expiresAt?: string;
+  enterpriseIm?: {
+    channel: "feishu";
+    authorizationLevel: "identity_only" | "authorized";
+    localCredentialsDeleted: boolean;
+    platformRevokeRecorded: boolean;
+    statusLabel: string;
+    userGrantedScopes: string[];
+    platformUserId: string;
+    platformEnterpriseId: string;
+    accountId: string;
+  };
 };
 
 export type UserOperationalIdentityProviderCatalogEntry = {
@@ -209,6 +220,14 @@ export type UserOperationalIdentitySnapshot = {
   platformSmtpConfigured?: boolean;
   /** True when xiaohongshu-mcp sidecar is reachable from the gateway. */
   xiaohongshuApiConfigured?: boolean;
+  feishuEmployeeChannel?: {
+    accountId: string;
+    employeeUiHint: "enterprise_not_open" | "waiting_admin_scopes" | "app_can_attempt";
+    loginEnabled: boolean;
+    statusLabel: string;
+    platformEnterpriseId: string | null;
+    childExecutionBlocked: boolean;
+  } | null;
   // 按 agentId 缓存的企业运营身份库可用条目（懒加载，展开机器人授权面板时填充）。
   enterpriseAccessByAgent?: Record<string, EnterpriseAgentIdentityEntry[]>;
 };
@@ -611,7 +630,10 @@ export async function bindUserOperationalIdentityViaOAuth(
       return false;
     }
     await loadUserOperationalIdentities(host);
-    host.userOperationalIdentityNotice = "运营身份已绑定，可在下方把使用权授给旗下数字人。";
+    host.userOperationalIdentityNotice =
+      input.provider === "feishu-personal"
+        ? "飞书身份已绑定。机器人授权需另行确认，本次不会自动授权。"
+        : "运营身份已绑定，可在下方把使用权授给旗下数字人。";
     host.userOperationalIdentityOAuthSessionId = null;
     host.userOperationalIdentityNav = buildUserOperationalIdentityAddNav(input.provider);
     closeUserOperationalIdentityEditor(host);

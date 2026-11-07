@@ -44,6 +44,21 @@ export type UserOperationalIdentity = {
   lastVerifiedAt?: string;
   expiresAt?: string;
   revokedAt?: string;
+  /**
+   * Child of an 企业通道 connection. Slice 1b Feishu only.
+   * Tokens stay in the credential secret store, not here.
+   */
+  enterpriseIm?: {
+    channel: "feishu";
+    accountId: string;
+    /** Feishu tenant_key copied from the token exchange. Not an employee-posted id. */
+    platformEnterpriseId: string;
+    platformUserId: string;
+    userGrantedScopes: string[];
+    authorizationLevel: "identity_only" | "authorized";
+    localCredentialsDeleted?: boolean;
+    platformRevokeRecorded?: boolean;
+  };
 };
 
 export type UserOperationalIdentityGrant = {

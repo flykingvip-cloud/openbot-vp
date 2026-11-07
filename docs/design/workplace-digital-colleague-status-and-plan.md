@@ -619,6 +619,8 @@ The new identity uses the aligned `identityId` from 「个人授权与运营授�
 
 Store tokens in the vault. Support refresh, employee disconnect, and status (identity only, authorized, needs reauth, revoked, 「企业尚未开通」, 「等待管理员开通权限」). Employee disconnect follows the rule above: it deletes that employee local credentials and does not claim a Feishu-side revoke unless one was performed. Login without the send or receive scopes stays identity-only on the status line.
 
+Implemented for Feishu on the existing user operational-identity store. `identityId` is `feishu-employee:<tenantId>:<ownerId>:<openId>`. The record's `enterpriseIm` points at the 企业通道 account and the token's `tenant_key`. Access and refresh tokens are `oauth_token` secrets in `openbot-user-operational-identity-secrets.json`, keyed by the credential handle. 个人设置「授权」 reads `feishuEmployeeChannel` from `user-operational-identity.list`, which is `readFeishuEnterpriseChannelContract`. Login stays disabled for 「企业尚未开通」 and 「等待管理员开通权限」. Bind does not write a robot grant and does not call the auto-create grant branch. A Feishu runtime execute returns before that branch. User-granted scope names are stored on the identity; that is not a Measured checklist pass.
+
 Audit each login, authorization, refresh, failure, and employee disconnect. A successful bind is not the closed loop.
 
 The validation deliverable is a filled checklist, owned by 1a for what the app can do and confirmed in 1b for what this user was actually granted. Generic "a user token reads what the user can read" does not fill it. The IM overview still lists history, reply, and forward as `tenant_access_token` only. That uncertainty stays until a row below is Measured.

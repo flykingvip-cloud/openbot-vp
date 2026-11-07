@@ -1,4 +1,5 @@
 import { resolveSessionAgentId } from "../agents/agent-scope.js";
+import { loadFeishuEmployeeChannelGate } from "./enterprise-im-employee-connection.js";
 import { resolveQueryScope } from "./scope-attribution.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { resolveUserOperationalIdentityStorePathForClient } from "./tenant-context.js";
@@ -387,6 +388,26 @@ export async function executeUserOperationalIdentityRuntimeAction(params: {
       needsGrantConfirmation?: boolean;
     }
 > {
+  if (params.provider === "feishu-personal") {
+    const scope = await resolveQueryScope(params.client);
+    const tenantId = scope.kind === "tenant" ? scope.tenantId : null;
+    const gate = await loadFeishuEmployeeChannelGate({ tenantId });
+    if (gate.childExecutionBlocked || !gate.loginEnabled) {
+      return {
+        ok: false,
+        scope: null,
+        code: "ENTERPRISE_CONNECTION_BLOCKED",
+        message: gate.statusLabel,
+      };
+    }
+    return {
+      ok: false,
+      scope: null,
+      code: "FEISHU_EMPLOYEE_EXECUTION_NOT_IN_SCOPE",
+      message: "飞书员工身份未确认给机器人，本次不会自动创建授权。",
+    };
+  }
+
   const enforcement = await enforceUserOperationalIdentityRuntimeAccess({
     client: params.client,
     provider: params.provider,

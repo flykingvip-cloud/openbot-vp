@@ -733,6 +733,66 @@ function renderUnsupportedProviderForm(providerLabel: string): TemplateResult {
   `;
 }
 
+function renderFeishuEmployeeForm(
+  settings: SettingsContract,
+  entry: CatalogEntry | null,
+): TemplateResult {
+  const gate = settings.userOperationalIdentitySnapshot?.feishuEmployeeChannel;
+  const busy = Boolean(settings.userOperationalIdentityBusy);
+  const identities = settings.userOperationalIdentitySnapshot?.identities ?? [];
+  const bound = identities.find(
+    (identity) => identity.provider === "feishu-personal" && identity.status !== "revoked",
+  );
+  const loginEnabled = gate?.loginEnabled === true;
+  const statusLabel = bound?.enterpriseIm?.statusLabel ?? gate?.statusLabel ?? "企业尚未开通";
+  return html`
+    <div class="employee-workbench__auth-pane-head" data-feishu-employee-auth>
+      <div class="employee-workbench__settings-section-title">${entry?.label ?? "飞书"}</div>
+      <div class="employee-workbench__settings-section-subtitle" data-feishu-employee-status>
+        ${statusLabel}
+      </div>
+    </div>
+    <p class="employee-workbench__settings-section-subtitle">
+      使用企业通道里已开通的飞书应用。员工不提交应用凭证。绑定不会自动授权给机器人。
+    </p>
+    ${
+      bound
+        ? html`
+            <div class="employee-workbench__settings-password-actions">
+              <button
+                type="button"
+                class="btn btn--sm"
+                ?disabled=${busy || !loginEnabled}
+                @click=${() =>
+                  void settings.onReauthorizeUserOperationalIdentity?.(bound.identityId)}
+              >
+                重新认证
+              </button>
+              <button
+                type="button"
+                class="btn btn--sm"
+                ?disabled=${busy}
+                @click=${() => void settings.onRevokeUserOperationalIdentity?.(bound.identityId)}
+              >
+                停用
+              </button>
+            </div>
+          `
+        : loginEnabled
+          ? html`
+              ${renderDisplayNameField(settings)}
+              ${renderFormActions({
+                submitLabel: "绑定",
+                busy,
+                onSubmit: () => settings.onSubmitUserOperationalIdentityEditor?.(),
+                onCancel: () => settings.onUserOperationalIdentityNavChange?.("bound"),
+              })}
+            `
+          : nothing
+    }
+  `;
+}
+
 /** Render the right-pane identity editor using provider-specific configuration UX. */
 export function renderProviderIdentityEditorForm(settings: SettingsContract): TemplateResult {
   const snapshot = settings.userOperationalIdentitySnapshot;
@@ -763,6 +823,9 @@ export function renderProviderIdentityEditorForm(settings: SettingsContract): Te
   }
   if (manualKind === "smtp" || selectedProvider === "personal-email") {
     return renderPersonalEmailForm(settings, entry);
+  }
+  if (selectedProvider === "feishu-personal") {
+    return renderFeishuEmployeeForm(settings, entry);
   }
   if (selectedProvider === "github-personal" || (authMode === "oauth" && !manualKind)) {
     if (selectedProvider === "github-personal" || selectedProvider === "x-twitter") {

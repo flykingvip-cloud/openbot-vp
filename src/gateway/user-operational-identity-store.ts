@@ -687,6 +687,23 @@ export function listUserOperationalIdentityLifecycleEvents(
     .slice(0, limit);
 }
 
+function feishuEnterpriseImStatusLabel(link: {
+  authorizationLevel: "identity_only" | "authorized";
+  localCredentialsDeleted?: boolean;
+  platformRevokeRecorded?: boolean;
+}): string {
+  if (link.platformRevokeRecorded) {
+    return "已停用";
+  }
+  if (link.localCredentialsDeleted) {
+    return "本地凭证已删除";
+  }
+  if (link.authorizationLevel === "identity_only") {
+    return "仅身份";
+  }
+  return "已授权";
+}
+
 export function summarizeUserOperationalIdentitySnapshot(params: {
   store: UserOperationalIdentityStore;
   ownerId: string;
@@ -710,6 +727,19 @@ export function summarizeUserOperationalIdentitySnapshot(params: {
       updatedAt: identity.updatedAt,
       lastVerifiedAt: identity.lastVerifiedAt,
       expiresAt: identity.expiresAt,
+      enterpriseIm: identity.enterpriseIm
+        ? {
+            channel: identity.enterpriseIm.channel,
+            accountId: identity.enterpriseIm.accountId,
+            platformEnterpriseId: identity.enterpriseIm.platformEnterpriseId,
+            platformUserId: identity.enterpriseIm.platformUserId,
+            userGrantedScopes: [...identity.enterpriseIm.userGrantedScopes],
+            authorizationLevel: identity.enterpriseIm.authorizationLevel,
+            localCredentialsDeleted: identity.enterpriseIm.localCredentialsDeleted === true,
+            platformRevokeRecorded: identity.enterpriseIm.platformRevokeRecorded === true,
+            statusLabel: feishuEnterpriseImStatusLabel(identity.enterpriseIm),
+          }
+        : undefined,
     };
   });
   const grants = listUserOperationalIdentityGrants(params.store, params.ownerId).map((grant) => ({
