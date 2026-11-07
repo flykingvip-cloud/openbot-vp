@@ -346,7 +346,9 @@ export async function runReplyAgent(params: {
         );
       }
       followupRun.run.taskCompletionBinding = completionBinding;
-      opts?.onTaskExecutionBound?.(completionBinding);
+      opts?.onTaskExecutionBound?.(completionBinding, {
+        sessionFile: followupRun.run.sessionFile,
+      });
     } catch (error) {
       typing.markRunComplete();
       typing.markDispatchIdle();

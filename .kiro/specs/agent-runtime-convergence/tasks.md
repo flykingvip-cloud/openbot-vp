@@ -891,3 +891,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Independent review found same-channel tool/block/final dispatch bypassed routed task fencing. Dispatcher now snapshots the host boundary per queued item and rechecks after queue/human delay before delivery; unbound control notices remain independent. Generic dispatch passes the execution boundary for task output. — codex-runtime-manager
 - Red tests reproduced all three late-send branches (3 FAIL). Dispatcher/dispatch regression 2 files / 56 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Transport-specific awaits and durable dispatcher metadata propagation remain under review; overall acceptance not claimed. — codex-runtime-manager
+
+## Explicit execution delivery identity (2026-11-07)
+
+- Delivery fencing now originates only from the execution-bound callback, including its actual sessionFile. This avoids assigning old task boundaries to control replies and covers newly created sessions absent from the ingress store snapshot. Original completion observation remains separate. — codex-runtime-manager
+- Dispatcher/dispatch regression 2 files / 56 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Full migration remains open. — codex-runtime-manager

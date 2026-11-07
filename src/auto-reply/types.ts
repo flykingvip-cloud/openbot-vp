@@ -49,6 +49,7 @@ export type GetReplyOptions = {
   /** Internal host callback; never derived from model output. */
   onTaskExecutionBound?: (
     binding: import("../agent-runtime/contracts/task.js").TaskCompletionBinding,
+    context?: { sessionFile: string },
   ) => void;
   onReplyStart?: () => Promise<void> | void;
   /** Called when the typing controller cleans up (e.g., run ended with NO_REPLY). */

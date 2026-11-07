@@ -498,24 +498,25 @@ export async function dispatchReplyFromConfig(params: {
               (value): value is string => typeof value === "string" && value.trim() !== "",
             ) ?? "",
           );
+    let executionDeliveryBoundary: TaskActionBoundary | undefined;
     const taskDeliveryContext = () =>
-      completionBinding && sessionStoreEntry.entry?.sessionFile
-        ? {
-            taskBoundary: {
-              sessionFile: sessionStoreEntry.entry.sessionFile,
-              binding: completionBinding,
-              constraints: completionBinding.constraints ?? [],
-            },
-          }
-        : undefined;
+      executionDeliveryBoundary ? { taskBoundary: executionDeliveryBoundary } : undefined;
     const replyResult = await (params.replyResolver ?? getReplyFromConfig)(
       ctx,
       {
         ...params.replyOptions,
         ...(interactionIngress ? { interactionIngress } : {}),
-        onTaskExecutionBound: (binding) => {
+        onTaskExecutionBound: (binding, context) => {
           completionBinding = binding;
-          params.replyOptions?.onTaskExecutionBound?.(binding);
+          const sessionFile = context?.sessionFile ?? sessionStoreEntry.entry?.sessionFile;
+          executionDeliveryBoundary = sessionFile
+            ? {
+                sessionFile,
+                binding: { ...binding },
+                constraints: [...(binding.constraints ?? [])],
+              }
+            : undefined;
+          params.replyOptions?.onTaskExecutionBound?.(binding, context);
         },
         pendingTurnDeliveryRef,
         typingPolicy: typing.typingPolicy,
@@ -611,14 +612,7 @@ export async function dispatchReplyFromConfig(params: {
       }
     }
 
-    const deliveryTaskBoundary: TaskActionBoundary | undefined =
-      completionBinding && sessionStoreEntry.entry?.sessionFile
-        ? {
-            sessionFile: sessionStoreEntry.entry.sessionFile,
-            binding: completionBinding,
-            constraints: completionBinding.constraints ?? [],
-          }
-        : undefined;
+    const deliveryTaskBoundary = executionDeliveryBoundary;
     const replies = replyResult ? (Array.isArray(replyResult) ? replyResult : [replyResult]) : [];
 
     let queuedFinal = false;
