@@ -96,6 +96,8 @@ export function createExecutionJournal(options: {
   capacity?: number;
   ttlMs?: number;
   maxBytes?: number;
+  maxPartitions?: number;
+  maxRootBytes?: number;
 }) {
   if (!path.isAbsolute(options.rootDir)) {
     throw new Error("explicit_absolute_directory_required");
@@ -112,6 +114,16 @@ export function createExecutionJournal(options: {
     maxBytes < 1024
   ) {
     throw new Error("invalid_retention");
+  }
+  const maxPartitions = options.maxPartitions ?? 1000;
+  const maxRootBytes = options.maxRootBytes ?? 256 * 1024 * 1024;
+  if (
+    !Number.isSafeInteger(maxPartitions) ||
+    maxPartitions < 1 ||
+    !Number.isSafeInteger(maxRootBytes) ||
+    maxRootBytes < 1024
+  ) {
+    throw new Error("invalid_root_budget");
   }
   const now = options.now ?? Date.now;
   const enabled = () => options.enabled?.() === true;
@@ -206,114 +218,163 @@ export function createExecutionJournal(options: {
       const located = location(agentId, value.scope);
       await fs.mkdir(options.rootDir, { recursive: true, mode: 0o700 });
       await fs.chmod(options.rootDir, 0o700);
-      const file = path.join(await fs.realpath(options.rootDir), path.basename(located.file));
-      let entry = gates.get(file);
-      if (!entry) {
-        entry = { gate: createAsyncLock(), users: 0 };
-        gates.set(file, entry);
+      const root = await fs.realpath(options.rootDir);
+      const file = path.join(root, path.basename(located.file));
+      const rootLock = path.join(root, ".root-budget");
+      let rootGate = gates.get(rootLock);
+      if (!rootGate) {
+        rootGate = { gate: createAsyncLock(), users: 0 };
+        gates.set(rootLock, rootGate);
       }
-      entry.users++;
+      rootGate.users++;
       try {
-        return await entry.gate(() =>
-          withFileLock(file, SESSION_TASK_BOARD_LOCK_OPTIONS, async () => {
-            const existing = await read(file, located.partition, value.scope);
-            const journal = retain(
-              existing ?? {
-                schemaVersion: 1,
-                partition: located.partition,
-                epoch: randomUUID(),
-                nextSequence: 1,
-                discardedThrough: 0,
-                entries: [],
-                identities: {},
-              },
-              at,
-            );
-            const id =
-              kind === "fact"
-                ? (value as ExecutionFact).eventId
-                : (value as VersionLinkReceipt).receiptId;
-            const identity = hash([kind, id]);
-            const fingerprint = hash(value);
-            if (journal.identities[identity]) {
-              return journal.identities[identity] === fingerprint
-                ? { ok: true as const, replayed: true }
-                : { ok: false as const, reason: "immutable_conflict" };
+        return await rootGate.gate(() =>
+          withFileLock(rootLock, SESSION_TASK_BOARD_LOCK_OPTIONS, async () => {
+            let entry = gates.get(file);
+            if (!entry) {
+              entry = { gate: createAsyncLock(), users: 0 };
+              gates.set(file, entry);
             }
-            // Bounded tombstones preserve immutable identity after payload TTL/eviction.
-            if (Object.keys(journal.identities).length >= Math.max(capacity, 10000)) {
-              return { ok: false as const, reason: "identity_capacity_exhausted" };
-            }
-            if (existing?.entries.some((e) => e.receivedAt > at)) {
-              throw new Error("clock_regression");
-            }
-            const prior = journal.entries.find(
-              (e) =>
-                e.kind === kind && (e.kind === "fact" ? e.value.eventId : e.value.receiptId) === id,
-            );
-            if (prior) {
-              return hash(prior.value) === hash(value)
-                ? { ok: true as const, replayed: true }
-                : { ok: false as const, reason: "immutable_conflict" };
-            }
-            if (kind === "link") {
-              const receipt = value as VersionLinkReceipt;
-              if (
-                journal.entries.some(
-                  (e) =>
-                    e.kind === "link" &&
-                    e.value.eventIds.some((id) => receipt.eventIds.includes(id)) &&
-                    (e.value.outcomeVersion !== receipt.outcomeVersion ||
-                      e.value.attemptId !== receipt.attemptId),
-                )
-              ) {
-                return { ok: false as const, reason: "link_version_conflict" };
+            entry.users++;
+            try {
+              return await entry.gate(() =>
+                withFileLock(file, SESSION_TASK_BOARD_LOCK_OPTIONS, async () => {
+                  const existing = await read(file, located.partition, value.scope);
+                  const journal = retain(
+                    existing ?? {
+                      schemaVersion: 1,
+                      partition: located.partition,
+                      epoch: randomUUID(),
+                      nextSequence: 1,
+                      discardedThrough: 0,
+                      entries: [],
+                      identities: {},
+                    },
+                    at,
+                  );
+                  const id =
+                    kind === "fact"
+                      ? (value as ExecutionFact).eventId
+                      : (value as VersionLinkReceipt).receiptId;
+                  const identity = hash([kind, id]);
+                  const fingerprint = hash(value);
+                  if (journal.identities[identity]) {
+                    return journal.identities[identity] === fingerprint
+                      ? { ok: true as const, replayed: true }
+                      : { ok: false as const, reason: "immutable_conflict" };
+                  }
+                  // Bounded tombstones preserve immutable identity after payload TTL/eviction.
+                  if (Object.keys(journal.identities).length >= Math.max(capacity, 10000)) {
+                    return { ok: false as const, reason: "identity_capacity_exhausted" };
+                  }
+                  if (existing?.entries.some((e) => e.receivedAt > at)) {
+                    throw new Error("clock_regression");
+                  }
+                  const prior = journal.entries.find(
+                    (e) =>
+                      e.kind === kind &&
+                      (e.kind === "fact" ? e.value.eventId : e.value.receiptId) === id,
+                  );
+                  if (prior) {
+                    return hash(prior.value) === hash(value)
+                      ? { ok: true as const, replayed: true }
+                      : { ok: false as const, reason: "immutable_conflict" };
+                  }
+                  if (kind === "link") {
+                    const receipt = value as VersionLinkReceipt;
+                    if (
+                      journal.entries.some(
+                        (e) =>
+                          e.kind === "link" &&
+                          e.value.eventIds.some((id) => receipt.eventIds.includes(id)) &&
+                          (e.value.outcomeVersion !== receipt.outcomeVersion ||
+                            e.value.attemptId !== receipt.attemptId),
+                      )
+                    ) {
+                      return { ok: false as const, reason: "link_version_conflict" };
+                    }
+                    if (
+                      new Set(receipt.eventIds).size !== receipt.eventIds.length ||
+                      receipt.eventIds.some(
+                        (id) =>
+                          !journal.entries.some(
+                            (e) =>
+                              e.kind === "fact" &&
+                              e.value.eventId === id &&
+                              e.value.taskId === receipt.taskId &&
+                              e.value.runId === receipt.runId &&
+                              hash(e.value.scope) === hash(receipt.scope),
+                          ),
+                      )
+                    ) {
+                      return { ok: false as const, reason: "link_facts_missing" };
+                    }
+                  }
+                  const next = retain(
+                    {
+                      ...journal,
+                      identities: { ...journal.identities, [identity]: fingerprint },
+                      nextSequence: journal.nextSequence + 1,
+                      entries: [
+                        ...journal.entries,
+                        entrySchema.parse({
+                          kind,
+                          sequence: journal.nextSequence,
+                          receivedAt: at,
+                          value,
+                        }),
+                      ],
+                    },
+                    at,
+                  );
+                  const serializedBytes = Buffer.byteLength(JSON.stringify(next, null, 2));
+                  if (serializedBytes > maxBytes) {
+                    return { ok: false as const, reason: "journal_capacity" };
+                  }
+                  let used = 0,
+                    partitions = 0,
+                    targetExists = false;
+                  try {
+                    const names = await fs.readdir(root);
+                    for (const name of names) {
+                      const item = await fs.lstat(path.join(root, name));
+                      if (!item.isFile() || item.isSymbolicLink()) {
+                        throw new Error("unsupported_root_entry");
+                      }
+                      used += item.size;
+                      if (/^[a-f0-9]{64}\.json$/.test(name)) {
+                        partitions++;
+                      }
+                      if (name === path.basename(file)) {
+                        targetExists = true;
+                      }
+                    }
+                  } catch {
+                    return { ok: false as const, reason: "root_budget_unknown" };
+                  }
+                  if (!targetExists && partitions >= maxPartitions) {
+                    return { ok: false as const, reason: "root_partition_capacity" };
+                  }
+                  // Existing target remains allocated until rename; reserve the full new temporary file.
+                  if (used + serializedBytes + 4096 > maxRootBytes) {
+                    return { ok: false as const, reason: "root_disk_capacity" };
+                  }
+                  await writeJsonAtomic(file, next, { mode: 0o600, ensureDirMode: 0o700 });
+                  return { ok: true as const, replayed: false };
+                }),
+              );
+            } finally {
+              entry.users--;
+              if (!entry.users) {
+                gates.delete(file);
               }
-              if (
-                new Set(receipt.eventIds).size !== receipt.eventIds.length ||
-                receipt.eventIds.some(
-                  (id) =>
-                    !journal.entries.some(
-                      (e) =>
-                        e.kind === "fact" &&
-                        e.value.eventId === id &&
-                        e.value.taskId === receipt.taskId &&
-                        e.value.runId === receipt.runId &&
-                        hash(e.value.scope) === hash(receipt.scope),
-                    ),
-                )
-              ) {
-                return { ok: false as const, reason: "link_facts_missing" };
-              }
             }
-            const next = retain(
-              {
-                ...journal,
-                identities: { ...journal.identities, [identity]: fingerprint },
-                nextSequence: journal.nextSequence + 1,
-                entries: [
-                  ...journal.entries,
-                  entrySchema.parse({
-                    kind,
-                    sequence: journal.nextSequence,
-                    receivedAt: at,
-                    value,
-                  }),
-                ],
-              },
-              at,
-            );
-            if (Buffer.byteLength(JSON.stringify(next)) > maxBytes) {
-              return { ok: false as const, reason: "journal_capacity" };
-            }
-            await writeJsonAtomic(file, next, { mode: 0o600, ensureDirMode: 0o700 });
-            return { ok: true as const, replayed: false };
           }),
         );
       } finally {
-        entry.users--;
-        if (!entry.users) {
-          gates.delete(file);
+        rootGate.users--;
+        if (!rootGate.users) {
+          gates.delete(rootLock);
         }
       }
     } catch {

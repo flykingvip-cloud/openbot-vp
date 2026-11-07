@@ -31,6 +31,109 @@ async function setup() {
   return root;
 }
 describe("bounded durable execution journal", () => {
+  it("serializes processes competing for the last disk slot while independent roots remain writable", async () => {
+    const root = await setup();
+    const worker = path.join(await setup(), "disk-race.mts");
+    const module = fileURLToPath(new URL("./execution-journal.ts", import.meta.url));
+    await fs.writeFile(
+      worker,
+      "import {createExecutionJournal} from " +
+        JSON.stringify(module) +
+        ";const input=JSON.parse(process.argv[2]);const j=createExecutionJournal({rootDir:input.root,enabled:()=>true,now:()=>100,maxRootBytes:5500});process.stdout.write(JSON.stringify(await j.appendFact(input.entry))); ",
+    );
+    const results = await Promise.all(
+      ["a", "b"].map((id) =>
+        run(process.execPath, [
+          "--import",
+          "tsx",
+          worker,
+          JSON.stringify({ root, entry: { agentId: id, fact: fact(id) } }),
+        ]),
+      ),
+    );
+    const parsed = results.map((r) => JSON.parse(r.stdout) as { ok: boolean; reason?: string });
+    expect(parsed.filter((r) => r.ok)).toHaveLength(1);
+    expect(parsed.find((r) => !r.ok)?.reason).toBe("root_disk_capacity");
+    const independent = createExecutionJournal({
+      rootDir: await setup(),
+      enabled: () => true,
+      now: () => 100,
+      maxRootBytes: 5500,
+    });
+    expect((await independent.appendFact({ agentId: "bot", fact: fact() })).ok).toBe(true);
+  });
+  it("counts leftover temporary bytes and rejects unknown root entries without deletion", async () => {
+    const root = await setup();
+    await fs.writeFile(path.join(root, "leftover.tmp"), "x".repeat(9000));
+    const j = createExecutionJournal({
+      rootDir: root,
+      enabled: () => true,
+      now: () => 100,
+      maxRootBytes: 10000,
+    });
+    expect(await j.appendFact({ agentId: "bot", fact: fact() })).toMatchObject({
+      ok: false,
+      reason: "root_disk_capacity",
+    });
+    expect((await fs.stat(path.join(root, "leftover.tmp"))).size).toBe(9000);
+    await fs.mkdir(path.join(root, "unknown"));
+    expect(await j.appendFact({ agentId: "bot", fact: fact() })).toMatchObject({
+      ok: false,
+      reason: "root_budget_unknown",
+    });
+  });
+  it("serializes independent processes competing for the last partition slot", async () => {
+    const root = await setup();
+    const worker = path.join(await setup(), "root-race.mts");
+    const module = fileURLToPath(new URL("./execution-journal.ts", import.meta.url));
+    await fs.writeFile(
+      worker,
+      "import {createExecutionJournal} from " +
+        JSON.stringify(module) +
+        ";const input=JSON.parse(process.argv[2]);const j=createExecutionJournal({rootDir:input.root,enabled:()=>true,now:()=>100,maxPartitions:1});process.stdout.write(JSON.stringify(await j.appendFact(input.entry))); ",
+    );
+    const results = await Promise.all(
+      ["a", "b"].map((id) =>
+        run(process.execPath, [
+          "--import",
+          "tsx",
+          worker,
+          JSON.stringify({ root, entry: { agentId: id, fact: fact(id) } }),
+        ]),
+      ),
+    );
+    const parsed = results.map((r) => JSON.parse(r.stdout) as { ok: boolean; reason?: string });
+    expect(parsed.filter((r) => r.ok)).toHaveLength(1);
+    expect(parsed.find((r) => !r.ok)?.reason).toBe("root_partition_capacity");
+  });
+  it("refuses extra partitions and reserves replacement temporary space", async () => {
+    const root = await setup();
+    const j = createExecutionJournal({
+      rootDir: root,
+      enabled: () => true,
+      now: () => 100,
+      maxPartitions: 1,
+      maxRootBytes: 100000,
+    });
+    expect((await j.appendFact({ agentId: "bot", fact: fact() })).ok).toBe(true);
+    expect(await j.appendFact({ agentId: "other", fact: fact() })).toMatchObject({
+      ok: false,
+      reason: "root_partition_capacity",
+    });
+    const file = path.join(root, (await fs.readdir(root)).find((n) => n.endsWith(".json"))!);
+    const before = await fs.readFile(file, "utf8");
+    const tight = createExecutionJournal({
+      rootDir: root,
+      enabled: () => true,
+      now: () => 100,
+      maxRootBytes: Buffer.byteLength(before) + 1000,
+    });
+    expect(await tight.appendFact({ agentId: "bot", fact: fact("next") })).toMatchObject({
+      ok: false,
+      reason: "root_disk_capacity",
+    });
+    expect(await fs.readFile(file, "utf8")).toBe(before);
+  });
   it("bounds payload reads even when a file grows after stat", async () => {
     const root = await setup();
     const journal = createExecutionJournal({
