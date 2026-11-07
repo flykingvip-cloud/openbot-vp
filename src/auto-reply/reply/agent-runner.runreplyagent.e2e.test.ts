@@ -323,7 +323,8 @@ describe("runReplyAgent heartbeat followup guard", () => {
   });
 
   it("drains followup queue when an unexpected exception escapes the run path", async () => {
-    const accounting = await import("./session-run-accounting.js");
+    const { replyTurnRuntime } = await import("../../agent-runtime/wiring/reply-turn.js");
+    const accounting = replyTurnRuntime.state;
     const persistSpy = vi
       .spyOn(accounting, "persistRunSessionUsage")
       .mockRejectedValueOnce(new Error("persist exploded"));
@@ -2147,3 +2148,10 @@ it("rejects a stale original task before memory flush or provider execution", as
     await fs.rm(dir, { recursive: true, force: true });
   }
 });
+
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => state.runEmbeddedPiAgentMock(params),
+}));
+vi.mock("../../agent-runtime/execution/runner/cli-run.js", () => ({
+  runCliAgent: (params: unknown) => state.runCliAgentMock(params),
+}));

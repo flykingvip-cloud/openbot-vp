@@ -998,3 +998,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced missing/mismatched/nonterminal confirmation clearing pending reconciliation identity (4 FAIL). Delivery now retains that association until the outcome writer confirms the exact task/run/delivery and requested status. Original board completion remains separately gated by passed acceptance and live binding. No new transport or executor. — codex-runtime-manager
 - Confirmation/restart/late-completion regression 4 files / 20 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
+
+## Session accounting state ownership (2026-11-07)
+
+- Moved unique session usage persistence and compaction accounting into state components. Normal reply consumes them through existing reply wiring; queued reply uses the state public API. Old accounting/usage modules are compatibility re-exports; skill snapshot and system event preparation remain with their existing owners. Original storage transactions, last-call token semantics and error behavior are preserved. — codex-runtime-manager
+- Session/followup regression 2 files / 83 PASS; reply execution integration 1 file / 47 PASS after updating stale provider mocks to the actual runtime boundary; full tsgo PASS; typed lint clean; architecture 52 PASS. Candidate 23abeed37 separately passed 67 files / 300 tests and full build with 209 existing dynamic-import warnings. Overall retirement remains open. — codex-runtime-manager

@@ -7,6 +7,10 @@ import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js
 import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
 import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { claimQueuedExecution } from "../../agent-runtime/state/index.js";
+import {
+  incrementRunCompactionCount,
+  persistRunSessionUsage,
+} from "../../agent-runtime/state/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 import { resolveAgentDir, resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
@@ -63,7 +67,6 @@ import {
 } from "./reply-payloads.js";
 import { resolveReplyToMode } from "./reply-threading.js";
 import { isRoutableChannel, routeReply } from "./route-reply.js";
-import { incrementRunCompactionCount, persistRunSessionUsage } from "./session-run-accounting.js";
 import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 

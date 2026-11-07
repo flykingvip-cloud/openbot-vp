@@ -10,7 +10,11 @@ import {
 } from "../delivery/index.js";
 import { runAdmittedTurn } from "../execution/index.js";
 import { sessionTaskState, prepareReplacementSessionEntry } from "../state/index.js";
-import { persistInteractionMessage } from "../state/index.js";
+import {
+  persistInteractionMessage,
+  persistRunSessionUsage,
+  incrementRunCompactionCount,
+} from "../state/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 import {
   bindInteractionPorts,
@@ -38,7 +42,7 @@ export const replyTurnRuntime = {
       return handleInteraction(input, bindInteractionPorts(host));
     },
   },
-  state: sessionTaskState,
+  state: { ...sessionTaskState, persistRunSessionUsage, incrementRunCompactionCount },
   execution: {
     runAdmittedTurn(request: Parameters<typeof runAdmittedTurn>[0]) {
       return runAdmittedTurn(request, bindAdmittedTurnHost());

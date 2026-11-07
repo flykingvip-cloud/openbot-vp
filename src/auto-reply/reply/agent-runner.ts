@@ -74,7 +74,6 @@ import { readPostCompactionContext } from "./post-compaction-context.js";
 import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queue.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
-import { incrementRunCompactionCount, persistRunSessionUsage } from "./session-run-accounting.js";
 import { sanitizeTurnVisibleReply } from "./turn-reply-language.js";
 import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
@@ -669,7 +668,7 @@ export async function runReplyAgent(params: {
       activeSessionEntry?.contextTokens ??
       DEFAULT_CONTEXT_TOKENS;
 
-    await persistRunSessionUsage({
+    await replyTurnRuntime.state.persistRunSessionUsage({
       storePath,
       sessionKey,
       usage,
@@ -1025,7 +1024,7 @@ export async function runReplyAgent(params: {
     }
 
     if (autoCompactionCompleted) {
-      const count = await incrementRunCompactionCount({
+      const count = await replyTurnRuntime.state.incrementRunCompactionCount({
         sessionEntry: activeSessionEntry,
         sessionStore: activeSessionStore,
         sessionKey,

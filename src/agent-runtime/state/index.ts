@@ -17,3 +17,7 @@ export { repairTrailingUserTurn, persistAttemptPromptError } from "./attempt-tra
 export { openAttemptSession, prepareAttemptSessionTranscript } from "./prepare-attempt-session.js";
 
 export { checkTaskActionBoundary } from "./task-action.js";
+
+export { persistSessionUsageUpdate } from "./session-usage.js";
+export { incrementCompactionCount } from "./session-compaction.js";
+export { persistRunSessionUsage, incrementRunCompactionCount } from "./session-run-accounting.js";
