@@ -23,12 +23,12 @@ vi.mock("../../agents/auth-profiles/session-override.js", () => ({
   resolveSessionAuthProfileOverride: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../agents/pi-embedded.js", () => ({
+vi.mock("../../agent-runtime/execution/index.js", async (original) => ({
+  ...(await original<typeof import("../../agent-runtime/execution/index.js")>()),
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
   queueEmbeddedPiMessage: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunActive: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunStreaming: vi.fn().mockReturnValue(false),
-  resolveEmbeddedSessionLane: vi.fn().mockReturnValue("session:session-key"),
 }));
 
 vi.mock("../../config/sessions.js", () => ({

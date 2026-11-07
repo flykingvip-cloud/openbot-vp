@@ -10,6 +10,11 @@ import { resolveContextLane } from "../../agent-runtime/context/index.js";
 import { buildResumePrompt, buildTaskBoardContext } from "../../agent-runtime/context/index.js";
 import { projectInteractionHistory } from "../../agent-runtime/context/interaction-history.js";
 import { appendUntrustedContext } from "../../agent-runtime/context/untrusted.js";
+import {
+  abortEmbeddedPiRun,
+  isEmbeddedPiRunActive,
+  isEmbeddedPiRunStreaming,
+} from "../../agent-runtime/execution/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
@@ -27,12 +32,7 @@ import {
   INBOUND_TOOL_POLICY_VERSION,
   listRetrieveReadOnlyCoreToolIds,
 } from "../../agents/inbound-tool-policy.js";
-import {
-  abortEmbeddedPiRun,
-  isEmbeddedPiRunActive,
-  isEmbeddedPiRunStreaming,
-  resolveEmbeddedSessionLane,
-} from "../../agents/pi-embedded.js";
+import { resolveEmbeddedSessionLane } from "../../agents/pi-embedded-runner/lanes.js";
 import { openSessionManager } from "../../agents/pi-sdk/session.js";
 import { applySkillPolicyToFilter } from "../../agents/skills/skill-policy.js";
 import { replyForTaskSurfaceUtterance } from "../../agents/task-surface/apply.js";
