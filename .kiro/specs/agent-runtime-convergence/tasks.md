@@ -1286,3 +1286,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Full collaboration audit found one source-isolation failure. Added an acknowledgement identity assertion: Bob's send was returning Alice's in_flight run because the fixture waited for any child final while the parent remained active. The fixture now waits for Alice's matching parent final and requires Bob's distinct started run. No production deduplication or authorization rule changed. — codex-runtime-manager
 - Full collaboration entry/delivery regression 3 files / 18 PASS; full tsgo PASS; typed lint clean. This uses a real WS Gateway with mocked model replies and selected identity boundaries; real-model collaboration acceptance remains separate. No deployment. — codex-runtime-manager
+
+## Unused active-task mutation adapters retired (2026-11-08)
+
+- Audited source/package/extension consumers of amendActiveTask and controlCurrentTask: only re-exports and historical tests remained. Preserved source and intent in the existing archive tag, removed both modules and exports, and extended the no-return architecture gate. Typed state transactions and fixed interaction effects retain required ordering and identity safeguards. — codex-runtime-manager
+- Current lifecycle/admission/routing/Gateway stop regression 4 files / 13 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. Whole-system replacement and production cutover remain separate gates. — codex-runtime-manager
