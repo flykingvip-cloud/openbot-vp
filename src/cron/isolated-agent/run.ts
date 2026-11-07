@@ -1083,55 +1083,55 @@ export async function runCronIsolatedAgentTurn(params: {
             runSlot.modelGate?.creditReporting ?? commercialCreditReporting;
         }
       }
-      const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-        allowlist: modelGate?.allowlist,
-        preferredModelOrder: modelGate?.preferredModelOrder,
-        capabilityPlan: modelGate?.capabilityPlan,
-      });
-      const consumedCapability = consumeCapabilityRoutingResult({
-        planFailure: executionRouting.planFailure,
-        outcomeClaim: executionRouting.outcomeClaim,
-        executionSurface: executionRouting.executionSurface,
-        capabilityPlan: executionRouting.capabilityPlan,
-      });
-      // Structured surface kept for TaskOutcome; do not void outcomeClaim.
-      if (consumedCapability.executionSurface.status !== "ok") {
-        logWarn(
-          `[cron:${params.job.id}] ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
-        );
-      }
-      // Defer TaskOutcome write to completeRun unified closeout (attach claim there).
-      if (consumedCapability.capabilityOutcome) {
-        cronCapabilityOutcome = consumedCapability.capabilityOutcome;
-      }
-      if (executionRouting.planFailure.kind === "no_executable_candidates") {
-        throw new Error(executionRouting.planFailure.message);
-      }
-      const embeddedModelGovernance = resolveEmbeddedModelGovernance({
-        gateStatus: cronSlotHeld ? "acquired" : "skipped",
-        allowlist: executionRouting.allowlist,
-        tenantId: modelGate?.tenantId,
-        commercialAuthorizationId: cronAuthorizationId,
-      });
-      const parentSnapshot = buildRunModelSetSnapshot({
-        runId: cronRunId,
-        allowlist: executionRouting.allowlist,
-        governanceMode: embeddedModelGovernance.governanceMode,
-        commercialAuthorizationId: cronAuthorizationId,
-        tenantId: modelGate?.tenantId,
-        preferredModelOrder: executionRouting.preferredModelOrder,
-        platformModelsMode:
-          modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(cfgWithAgentDefaults),
-        ...(modelGate?.effectiveRouting?.selectorStrategy
-          ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
-          : {}),
-        // P4-1: parent billing context for child runs (acquired gate only).
-        creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
-      });
-      if (parentSnapshot) {
-        rememberRunModelSet(cronRunId, parentSnapshot);
-      }
       try {
+        const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
+          allowlist: modelGate?.allowlist,
+          preferredModelOrder: modelGate?.preferredModelOrder,
+          capabilityPlan: modelGate?.capabilityPlan,
+        });
+        const consumedCapability = consumeCapabilityRoutingResult({
+          planFailure: executionRouting.planFailure,
+          outcomeClaim: executionRouting.outcomeClaim,
+          executionSurface: executionRouting.executionSurface,
+          capabilityPlan: executionRouting.capabilityPlan,
+        });
+        // Structured surface kept for TaskOutcome; do not void outcomeClaim.
+        if (consumedCapability.executionSurface.status !== "ok") {
+          logWarn(
+            `[cron:${params.job.id}] ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
+          );
+        }
+        // Defer TaskOutcome write to completeRun unified closeout (attach claim there).
+        if (consumedCapability.capabilityOutcome) {
+          cronCapabilityOutcome = consumedCapability.capabilityOutcome;
+        }
+        if (executionRouting.planFailure.kind === "no_executable_candidates") {
+          throw new Error(executionRouting.planFailure.message);
+        }
+        const embeddedModelGovernance = resolveEmbeddedModelGovernance({
+          gateStatus: cronSlotHeld ? "acquired" : "skipped",
+          allowlist: executionRouting.allowlist,
+          tenantId: modelGate?.tenantId,
+          commercialAuthorizationId: cronAuthorizationId,
+        });
+        const parentSnapshot = buildRunModelSetSnapshot({
+          runId: cronRunId,
+          allowlist: executionRouting.allowlist,
+          governanceMode: embeddedModelGovernance.governanceMode,
+          commercialAuthorizationId: cronAuthorizationId,
+          tenantId: modelGate?.tenantId,
+          preferredModelOrder: executionRouting.preferredModelOrder,
+          platformModelsMode:
+            modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(cfgWithAgentDefaults),
+          ...(modelGate?.effectiveRouting?.selectorStrategy
+            ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
+            : {}),
+          // P4-1: parent billing context for child runs (acquired gate only).
+          creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
+        });
+        if (parentSnapshot) {
+          rememberRunModelSet(cronRunId, parentSnapshot);
+        }
         const fallbackResult = await runWithModelFallback({
           cfg: cfgWithAgentDefaults,
           provider,
@@ -1325,8 +1325,11 @@ export async function runCronIsolatedAgentTurn(params: {
         runEndedAt = Date.now();
       } finally {
         if (cronSlotHeld) {
-          await releaseEnterpriseAgentRun(cronRunId);
-          forgetRunModelSet(cronRunId);
+          try {
+            await releaseEnterpriseAgentRun(cronRunId);
+          } finally {
+            forgetRunModelSet(cronRunId);
+          }
         }
       }
     };

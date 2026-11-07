@@ -6,6 +6,8 @@ import {
 } from "./run.suite-helpers.js";
 import {
   loadRunCronIsolatedAgentTurn,
+  tryAcquireEnterpriseAgentRunMock,
+  releaseEnterpriseAgentRunMock,
   resolveAgentModelFallbacksOverrideMock,
   runWithModelFallbackMock,
 } from "./run.test-harness.js";
@@ -16,6 +18,31 @@ const runCronIsolatedAgentTurn = await loadRunCronIsolatedAgentTurn();
 
 describe("runCronIsolatedAgentTurn — payload.fallbacks", () => {
   setupRunCronIsolatedAgentTurnSuite();
+
+  it("releases quota when routing rejects before model startup", async () => {
+    tryAcquireEnterpriseAgentRunMock.mockResolvedValue({
+      acquired: true,
+      skipped: false,
+      enterpriseId: "tenant-test",
+      modelGate: {
+        capabilityPlan: {
+          categoryId: "default",
+          executor: "chat_model",
+          authorizedModelIds: [],
+          executableModelIds: [],
+          fallbackModelIds: [],
+          preferredModelOrder: [],
+          reasons: [],
+          classificationSource: "task_text",
+          failure: { kind: "no_executable_candidates", message: "No executable candidates" },
+        },
+      },
+    });
+    const result = await runCronIsolatedAgentTurn(makeIsolatedAgentTurnParams());
+    expect(result.status).toBe("error");
+    expect(runWithModelFallbackMock).not.toHaveBeenCalled();
+    expect(releaseEnterpriseAgentRunMock).toHaveBeenCalledOnce();
+  });
 
   it.each([
     {

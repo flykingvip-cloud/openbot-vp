@@ -754,3 +754,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 ## Followup model cleanup integration (2026-11-07)
 
 - Queued followup now awaits the shared model lease disposal. Repaired stale embedded test mocks with the existing queue/abort exports required by command wiring. Followup/BYOK/OGUI regression 3 files / 35 PASS; full tsgo PASS; changed-file typed lint clean. Earlier joint runtime/command/attempt regression 61 files / 346 PASS. Full core-loop replacement and retirement remain open. — codex-runtime-manager
+
+## Cron admission cleanup boundary (2026-11-07)
+
+- Routing and snapshot preparation now sit inside the acquired-slot cleanup boundary. Previously no_executable_candidates could throw before finally and leak the slot. Snapshot forgetting also runs when release fails. Regression rejects before model startup and verifies exactly one release. — codex-runtime-manager
+- Cron model/fallback/owner regression 3 files / 10 PASS; added boundary suite 4 PASS; full tsgo PASS and changed-file typed lint clean. Full runtime replacement remains open. — codex-runtime-manager
