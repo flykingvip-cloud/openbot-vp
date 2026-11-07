@@ -1177,3 +1177,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Added a closed amendment scope enum to interaction decisions: supplement, revise, replace_all. Bound semantic changes now use that field; legacy keyword replacement rules remain only for legacy callers. Missing scope preserves existing constraints. Host target/epoch checks remain mandatory. — codex-runtime-manager
 - Parser cases reproduced three failures before support; parser/admission/lifecycle/legacy constraint regression 4 files / 31 PASS. Full tsgo PASS; typed lint clean; architecture 53 PASS. This does not complete general acceptance validation. — codex-runtime-manager
+
+## Typed constraint mutation ownership (2026-11-08)
+
+- Moved the unique constraint log mutation into state/mutations/task-constraints. Legacy keyword gating remains a compatibility adapter; the mutation consumes an explicit scope and has no legacy classifier dependency. — codex-runtime-manager
+- Legacy constraint/admission regression 2 files / 11 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager

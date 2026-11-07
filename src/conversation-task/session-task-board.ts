@@ -1,3 +1,4 @@
+import { appendTaskConstraint } from "../agent-runtime/state/mutations/task-constraints.js";
 export { commitAdmittedSessionTask } from "../agent-runtime/state/mutations/admit-task.js";
 import {
   bumpFocusRevision,
@@ -142,78 +143,31 @@ export type ResumeParkedRecheck = {
   workspaceOk?: boolean;
 };
 
-/** Display-only short constraint marker for stop.summary (not the persistence source). */
-function constraintDisplayMarker(fullText: string): string {
-  const short = fullText.length > 48 ? `${fullText.slice(0, 48)}…` : fullText;
-  return `约束：${short}`;
-}
-
-/**
- * Sole same-task constraint updater for the board.
- * Persists the *full* owner text on the constraint log; stop.summary gets a short display marker only.
- * - Bare continue / read queries are not persisted.
- * - Explicit *full replace* supersedes prior active rows (history kept with superseded=true).
- * - Local revision / supplement append without auto-discarding unrelated active rows.
- * Never deletes rows by keyword scan; never invents a second adjudicator.
- */
+/** Compatibility classifier; admitted changes already carry their scope. */
 export function appendSameTaskConstraint(params: {
   board: SessionTaskBoard;
   constraintText: string;
   nowMs?: number;
-  /** Only a host-authorized, target-bound semantic amendment may bypass legacy keyword gating. */
   admittedAmendment?: boolean;
   amendmentMode?: "supplement" | "revise" | "replace_all";
 }): SessionTaskBoard {
-  const board = cloneBoardShell(params.board);
-  const current = board.current;
-  if (!current?.unfinished) {
-    return board;
-  }
   const cleaned = stripStamp(params.constraintText).replace(/\s+/g, " ").trim();
-  if (!cleaned) {
-    return board;
-  }
   if (!params.admittedAmendment && !shouldPersistOwnerConstraint(cleaned)) {
-    return board;
+    return cloneBoardShell(params.board);
   }
-  const nowMs = params.nowMs ?? Date.now();
-  const priorList = normalizeConstraintEntries(current.effectiveConstraints);
-  if (priorList.some((row) => row.text === cleaned && !row.superseded)) {
-    return board;
-  }
-  const fullReplace = params.admittedAmendment
-    ? params.amendmentMode === "replace_all"
-    : isOwnerConstraintFullReplace(cleaned);
-  const revise =
-    fullReplace ||
-    (params.admittedAmendment
-      ? params.amendmentMode === "revise"
-      : isOwnerConstraintRevision(cleaned));
-  // Only wholesale replace marks prior active rows superseded. Local revise keeps them.
-  const nextList: ConstraintEntry[] = fullReplace
-    ? priorList.map((row) => (row.superseded ? row : { ...row, superseded: true }))
-    : [...priorList];
-  nextList.push({
-    text: cleaned,
-    atMs: nowMs,
-    kind: revise ? "revise" : "supplement",
+  const mode = params.admittedAmendment
+    ? params.amendmentMode
+    : isOwnerConstraintFullReplace(cleaned)
+      ? "replace_all"
+      : isOwnerConstraintRevision(cleaned)
+        ? "revise"
+        : "supplement";
+  return appendTaskConstraint({
+    board: params.board,
+    constraintText: cleaned,
+    nowMs: params.nowMs,
+    mode,
   });
-  const marker = constraintDisplayMarker(cleaned);
-  const priorSummary = current.stop.summary?.trim() || `未完成：${current.title}`;
-  const nextSummary = priorSummary.includes(marker) ? priorSummary : `${marker}｜${priorSummary}`;
-  return {
-    ...board,
-    current: {
-      ...current,
-      // Owner pause must survive concurrent constraint appends (cross-process).
-      ...(current.wakeSuppress ? { wakeSuppress: true } : {}),
-      effectiveConstraints: nextList,
-      stop: {
-        ...current.stop,
-        summary: nextSummary,
-      },
-    },
-  };
 }
 
 /**
