@@ -871,3 +871,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved session repair/open/guard/cache preparation into state/prepare-attempt-session. Runner consumes state/index and retains context-engine bootstrap between open and transcript initialization. Original session lock, policy, collaboration preservation and one SessionManager writer remain unchanged. — codex-runtime-manager
 - Workspace/context/attempt regression 3 files / 75 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager
+
+## Scheduled provider candidate ownership (2026-11-07)
+
+- Moved scheduled CLI/embedded backend selection, transport preparation and invocation into execution/runner/scheduled-candidate. Cron consumes execution/index; schedule/ledger and shared model admission/fallback retain existing ownership. Preserved fresh CLI watchdog behavior, tool-less non-qualifying jobs, trusted cron identity and charging model attribution. Original candidate body removed. — codex-runtime-manager
+- Cron credit/fallback/long-horizon regression 3 files / 22 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager

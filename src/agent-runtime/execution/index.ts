@@ -35,3 +35,5 @@ export { runEmbeddedPiAgent } from "./runner/embedded-run.js";
 export { cleanupEmbeddedAttempt } from "./runner/attempt-cleanup.js";
 
 export { runQueuedCandidate } from "./runner/queued-candidate.js";
+
+export { runScheduledCandidate } from "./runner/scheduled-candidate.js";
