@@ -805,3 +805,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved non-mutating context size/role/image summary from legacy attempt into context/session-summary; original body removed. Logging remains caller owned; no transcript authority, source reads or model invocation added. — codex-runtime-manager
 - Attempt/context runner regression 2 files / 61 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager
+
+## Context post-turn capability lifecycle (2026-11-07)
+
+- Moved existing context-engine afterTurn/ingest fallback invocation from legacy attempt into capabilities/adapters/context-after-turn. Preserves hook precedence, new-message slicing and contained errors; does not change transcript authority or add task control. Original body removed. — codex-runtime-manager
+- Workspace/shadow/context/attempt regression 3 files / 75 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration and retirement remain open. — codex-runtime-manager

@@ -24,3 +24,5 @@ export type {
 } from "./adapters/protocol-body-boundary.js";
 
 export { resolveAttemptSandbox } from "./adapters/attempt-sandbox.js";
+
+export { invokeContextAfterTurn } from "./adapters/context-after-turn.js";

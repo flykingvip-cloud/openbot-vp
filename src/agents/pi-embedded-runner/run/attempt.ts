@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { invokeContextAfterTurn } from "../../../agent-runtime/capabilities/index.js";
 import { resolveAttemptSandbox } from "../../../agent-runtime/capabilities/index.js";
 import { wrapStreamFnEnforceProtocolTextNonExecution } from "../../../agent-runtime/capabilities/index.js";
 import { resolvePromptBuildHookResult } from "../../../agent-runtime/capabilities/index.js";
@@ -2118,46 +2119,15 @@ export async function runEmbeddedAttempt(
             agentDir,
           });
 
-          if (typeof params.contextEngine.afterTurn === "function") {
-            try {
-              await params.contextEngine.afterTurn({
-                sessionId: sessionIdUsed,
-                sessionFile: params.sessionFile,
-                messages: messagesSnapshot,
-                prePromptMessageCount,
-                tokenBudget: params.contextTokenBudget,
-                runtimeContext: afterTurnRuntimeContext,
-              });
-            } catch (afterTurnErr) {
-              log.warn(`context engine afterTurn failed: ${String(afterTurnErr)}`);
-            }
-          } else {
-            // Fallback: ingest new messages individually
-            const newMessages = messagesSnapshot.slice(prePromptMessageCount);
-            if (newMessages.length > 0) {
-              if (typeof params.contextEngine.ingestBatch === "function") {
-                try {
-                  await params.contextEngine.ingestBatch({
-                    sessionId: sessionIdUsed,
-                    messages: newMessages,
-                  });
-                } catch (ingestErr) {
-                  log.warn(`context engine ingest failed: ${String(ingestErr)}`);
-                }
-              } else {
-                for (const msg of newMessages) {
-                  try {
-                    await params.contextEngine.ingest({
-                      sessionId: sessionIdUsed,
-                      message: msg,
-                    });
-                  } catch (ingestErr) {
-                    log.warn(`context engine ingest failed: ${String(ingestErr)}`);
-                  }
-                }
-              }
-            }
-          }
+          await invokeContextAfterTurn(params.contextEngine, {
+            sessionId: sessionIdUsed,
+            sessionFile: params.sessionFile,
+            messages: messagesSnapshot,
+            prePromptMessageCount,
+            tokenBudget: params.contextTokenBudget,
+            runtimeContext: afterTurnRuntimeContext,
+            warn: (message) => log.warn(message),
+          });
         }
 
         cacheTrace?.recordStage("session:after", {
