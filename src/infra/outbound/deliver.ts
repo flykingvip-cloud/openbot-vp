@@ -1,3 +1,5 @@
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/task-action.js";
 import {
   finalizeDeliveryContext,
   judgeSessionOutbound,
@@ -243,6 +245,8 @@ type DeliverOutboundPayloadsCoreParams = {
   session?: OutboundSessionContext;
   /** Execution preflight task id. Missing ids do not select another retained task. */
   taskId?: string;
+  /** Trusted task snapshot, retained by the write-ahead queue across restart. */
+  taskBoundary?: TaskActionBoundary;
   mirror?: {
     sessionKey: string;
     agentId?: string;
@@ -492,6 +496,7 @@ export async function deliverOutboundPayloads(
         gifPlayback: params.gifPlayback,
         silent: params.silent,
         mirror: params.mirror,
+        taskBoundary: params.taskBoundary,
       }).catch(() => null); // Best-effort — don't block delivery if queue write fails.
 
   // Wrap onError to detect partial failures under bestEffort mode.
@@ -547,6 +552,14 @@ async function deliverOutboundPayloadsCore(
     cfg,
     params.session?.agentId ?? params.mirror?.agentId,
   );
+  const assertTaskCurrent = () => {
+    if (params.taskBoundary) {
+      const refusal = checkTaskActionBoundary(params.taskBoundary);
+      if (refusal) {
+        throw new Error(refusal);
+      }
+    }
+  };
   const results: OutboundDeliveryResult[] = [];
   let completionTransportSucceeded = false;
   let transportFailed = false;
@@ -593,6 +606,7 @@ async function deliverOutboundPayloadsCore(
   ) => {
     throwIfAborted(abortSignal);
     if (!handler.chunker || textLimit === undefined) {
+      assertTaskCurrent();
       results.push(await handler.sendText(text, overrides));
       return;
     }
@@ -613,6 +627,7 @@ async function deliverOutboundPayloadsCore(
         }
         for (const chunk of chunks) {
           throwIfAborted(abortSignal);
+          assertTaskCurrent();
           results.push(await handler.sendText(chunk, overrides));
         }
       }
@@ -621,12 +636,14 @@ async function deliverOutboundPayloadsCore(
     const chunks = handler.chunker(text, textLimit);
     for (const chunk of chunks) {
       throwIfAborted(abortSignal);
+      assertTaskCurrent();
       results.push(await handler.sendText(chunk, overrides));
     }
   };
 
   const sendSignalText = async (text: string, styles: SignalTextStyleRange[]) => {
     throwIfAborted(abortSignal);
+    assertTaskCurrent();
     return {
       channel: "signal" as const,
       ...(await sendSignal(to, text, {
@@ -664,6 +681,7 @@ async function deliverOutboundPayloadsCore(
       text: caption,
       styles: [],
     };
+    assertTaskCurrent();
     return {
       channel: "signal" as const,
       ...(await sendSignal(to, formatted.text, {
@@ -726,6 +744,12 @@ async function deliverOutboundPayloadsCore(
       if (hookResult.cancelled) {
         continue;
       }
+      if (params.taskBoundary) {
+        const refusal = checkTaskActionBoundary(params.taskBoundary);
+        if (refusal) {
+          throw new Error(refusal);
+        }
+      }
       const effectivePayload = hookResult.payload;
       payloadSummary = hookResult.payloadSummary;
 
@@ -749,6 +773,7 @@ async function deliverOutboundPayloadsCore(
         threadId: params.threadId ?? undefined,
       };
       if (handler.sendPayload && effectivePayload.channelData) {
+        assertTaskCurrent();
         const delivery = await handler.sendPayload(effectivePayload, sendOverrides);
         results.push(delivery);
         emitMessageSent({
@@ -818,6 +843,7 @@ async function deliverOutboundPayloadsCore(
           results.push(delivery);
           lastMessageId = delivery.messageId;
         } else {
+          assertTaskCurrent();
           const delivery = await handler.sendMedia(caption, url, sendOverrides);
           results.push(delivery);
           lastMessageId = delivery.messageId;

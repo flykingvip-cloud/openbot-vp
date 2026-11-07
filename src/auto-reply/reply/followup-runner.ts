@@ -4,6 +4,7 @@ import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
 import { prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
 import { runQueuedCandidate } from "../../agent-runtime/execution/index.js";
 import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { claimQueuedExecution } from "../../agent-runtime/state/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
@@ -102,10 +103,22 @@ export function createFollowupRunner(params: {
    * session's current dispatcher. This ensures replies go back to
    * where the message originated.
    */
-  const sendFollowupPayloads = async (payloads: ReplyPayload[], queued: FollowupRun) => {
+  const sendFollowupPayloads = async (
+    payloads: ReplyPayload[],
+    queued: FollowupRun,
+    taskResult = false,
+  ) => {
     return deliverQueuedReply(
       {
         payloads,
+        taskBoundary:
+          taskResult && queued.run.taskCompletionBinding
+            ? {
+                sessionFile: queued.run.sessionFile,
+                binding: queued.run.taskCompletionBinding,
+                constraints: queued.run.taskCompletionBinding.constraints ?? [],
+              }
+            : undefined,
         originatingChannel: queued.originatingChannel,
         originatingTo: queued.originatingTo,
         originatingAccountId: queued.originatingAccountId,
@@ -122,6 +135,12 @@ export function createFollowupRunner(params: {
         onBlockReply: opts?.onBlockReply,
         signalTextDelta: (text) => typingSignals.signalTextDelta(text),
         log: logVerbose,
+        assertTaskCurrent: (boundary) => {
+          const refusal = checkTaskActionBoundary(boundary);
+          if (refusal) {
+            throw new Error(refusal);
+          }
+        },
       },
     );
   };
@@ -652,7 +671,7 @@ export function createFollowupRunner(params: {
           },
         });
       }
-      const delivered = await sendFollowupPayloads(finalPayloads, queued);
+      const delivered = await sendFollowupPayloads(finalPayloads, queued, true);
       if (preparedDelivery) {
         await confirmPendingTurnDelivery({
           cfg: queued.run.config,

@@ -364,6 +364,61 @@ describe("delivery-queue", () => {
       return { result, log };
     };
 
+    it.each(["paused", "replaced", "constraints"])(
+      "refuses stale task recovery before sending: %s",
+      async (mode) => {
+        const board = await import("../../conversation-task/session-task-board.js");
+        const sessionFile = path.join(tmpDir, "task-session.jsonl");
+        board.mutateSessionTaskBoard(sessionFile, () => ({
+          board: {
+            ...board.emptySessionTaskBoard(),
+            current: {
+              taskId: "a",
+              title: "A",
+              goalText: "A",
+              unfinished: true,
+              createdAtMs: 1,
+              stop: { summary: "", workspacePaths: [] },
+              executionAttempt: "run-a",
+              deliverableVersion: "v1",
+            },
+          },
+          value: undefined,
+        }));
+        const binding = board.captureTaskCompletionBinding(sessionFile)!;
+        const id = await enqueueDelivery(
+          {
+            channel: "whatsapp",
+            to: "+1",
+            payloads: [{ text: "old result" }],
+            taskBoundary: { sessionFile, binding, constraints: binding.constraints ?? [] },
+          },
+          tmpDir,
+        );
+        board.mutateSessionTaskBoard(sessionFile, (current) => ({
+          board: {
+            ...current,
+            current: {
+              ...current.current!,
+              ...(mode === "paused"
+                ? { wakeSuppress: true }
+                : mode === "replaced"
+                  ? { taskId: "b" }
+                  : { effectiveConstraints: ["do not send"] }),
+            },
+          },
+          value: undefined,
+        }));
+        const deliver = vi.fn().mockResolvedValue([{ messageId: "receipt" }]);
+        const { result } = await runRecovery({ deliver });
+        expect(deliver).not.toHaveBeenCalled();
+        expect(result.recovered).toBe(0);
+        expect(fs.existsSync(path.join(tmpDir, "delivery-queue", "failed", `${id}.json`))).toBe(
+          true,
+        );
+      },
+    );
+
     it("does not ack bestEffort recovery failure", async () => {
       await enqueueDelivery(
         { channel: "whatsapp", to: "+1", payloads: [{ text: "a" }], bestEffort: true },

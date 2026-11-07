@@ -6,11 +6,13 @@ import {
   resolveRequiredDeliveryConfirmStatus,
   type RequiredDeliveryAttempt,
 } from "../../../task-outcome/delivery-confirm.js";
+import type { TaskActionBoundary } from "../../contracts/task.js";
 
 /** Deliver to the original route; queue acceptance remains unconfirmed delivery. */
 export async function deliverQueuedReply(
   input: {
     payloads: ReplyPayload[];
+    taskBoundary?: TaskActionBoundary;
     originatingChannel?: RouteReplyParams["channel"];
     originatingTo?: string;
     originatingAccountId?: string;
@@ -25,6 +27,7 @@ export async function deliverQueuedReply(
     onBlockReply?: (payload: ReplyPayload) => void | Promise<void>;
     signalTextDelta: (text?: string) => Promise<void>;
     log: (message: string) => void;
+    assertTaskCurrent: (boundary: TaskActionBoundary) => void;
   },
 ) {
   const attempts: RequiredDeliveryAttempt[] = [];
@@ -49,6 +52,9 @@ export async function deliverQueuedReply(
       continue;
     }
     await ports.signalTextDelta(payload.text);
+    if (input.taskBoundary) {
+      ports.assertTaskCurrent(input.taskBoundary);
+    }
 
     // Route to originating channel if set, otherwise fall back to dispatcher.
     if (shouldRouteToOriginating) {
@@ -60,6 +66,7 @@ export async function deliverQueuedReply(
         accountId: input.originatingAccountId,
         threadId: input.originatingThreadId,
         cfg: input.run.cfg,
+        taskBoundary: input.taskBoundary,
       });
       if (!result.ok) {
         const errorMsg = result.error ?? "unknown error";
@@ -77,6 +84,9 @@ export async function deliverQueuedReply(
           originatingChannel,
         });
         if (ports.onBlockReply && origin && origin === provider) {
+          if (input.taskBoundary) {
+            ports.assertTaskCurrent(input.taskBoundary);
+          }
           await ports.onBlockReply(payload);
           attempts.push({ source: "enqueue_only", ok: true });
         } else {

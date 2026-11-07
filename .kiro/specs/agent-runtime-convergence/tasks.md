@@ -881,3 +881,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved the single compiler transform/model-boundary adapter into capabilities/adapters/context-compiler; removed old install implementation. Pure compilation remains in context; SDK mutation and restoration remain in the capability adapter. Production attempt and existing compatibility facade use the public capability API. No extra compilation or model loop. — codex-runtime-manager
 - Boundary/estimate/attempt/context regression 4 files / 69 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager
+
+## Routed task delivery recovery fence (2026-11-07)
+
+- Added host-captured task/action identity to routed final delivery and the existing write-ahead queue. Recovery checks the original task/attempt/version/constraints before sending; initial transport rechecks after asynchronous hooks and before each transport chunk. Stale entries move to existing reconciliation storage, never retarget to the new task. Queued task-result fallback rechecks identity; control/admission notices remain independent. — codex-runtime-manager
+- Red recovery cases: paused/replaced/restricted tasks all sent on the prior implementation (3 FAIL / 69 PASS). Candidate routing/dispatch/followup/transport regression 5 files / 218 PASS, including active send and pause during sending hook. Full tsgo PASS; typed lint clean; architecture 51 PASS. Coverage is routed individual task results with explicit bindings; legacy unbound entries, other dispatcher transports, collaboration-specific identity and reconciliation closeout still require completion. No overall retirement or deployment claimed. — codex-runtime-manager

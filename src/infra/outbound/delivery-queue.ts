@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/task-action.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { resolveStateDir } from "../../config/paths.js";
@@ -42,6 +44,8 @@ type QueuedDeliveryPayload = {
   gifPlayback?: boolean;
   silent?: boolean;
   mirror?: DeliveryMirrorPayload;
+  /** Original host-captured task identity; never recaptured during recovery. */
+  taskBoundary?: TaskActionBoundary;
 };
 
 export interface QueuedDelivery extends QueuedDeliveryPayload {
@@ -126,6 +130,7 @@ export async function enqueueDelivery(
     gifPlayback: params.gifPlayback,
     silent: params.silent,
     mirror: params.mirror,
+    taskBoundary: params.taskBoundary,
     retryCount: 0,
   };
   const filePath = path.join(queueDir, `${id}.json`);
@@ -377,6 +382,16 @@ export async function recoverPendingDeliveries(opts: {
     }
 
     try {
+      if (entry.taskBoundary) {
+        const refusal = checkTaskActionBoundary(entry.taskBoundary);
+        if (refusal) {
+          await failDelivery(entry.id, refusal, opts.stateDir);
+          await moveToFailed(entry.id, opts.stateDir);
+          failed += 1;
+          opts.log.warn(`Delivery ${entry.id} refused: original task binding is stale`);
+          continue;
+        }
+      }
       let payloadFailure: unknown;
       let hadPayloadFailure = false;
       const receipts = await opts.deliver({
@@ -391,6 +406,7 @@ export async function recoverPendingDeliveries(opts: {
         gifPlayback: entry.gifPlayback,
         silent: entry.silent,
         mirror: entry.mirror,
+        taskBoundary: entry.taskBoundary,
         onError: (error) => {
           hadPayloadFailure = true;
           payloadFailure = error;

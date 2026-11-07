@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isHumanInteractionIngress } from "../../agent-runtime/command/index.js";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
@@ -594,6 +595,14 @@ export async function dispatchReplyFromConfig(params: {
       }
     }
 
+    const deliveryTaskBoundary: TaskActionBoundary | undefined =
+      completionBinding && sessionStoreEntry.entry?.sessionFile
+        ? {
+            sessionFile: sessionStoreEntry.entry.sessionFile,
+            binding: completionBinding,
+            constraints: completionBinding.constraints ?? [],
+          }
+        : undefined;
     const replies = replyResult ? (Array.isArray(replyResult) ? replyResult : [replyResult]) : [];
 
     let queuedFinal = false;
@@ -622,6 +631,7 @@ export async function dispatchReplyFromConfig(params: {
           to: originatingTo,
           sessionKey: ctx.SessionKey,
           taskId: params.replyOptions?.runId,
+          taskBoundary: deliveryTaskBoundary,
           accountId: ctx.AccountId,
           threadId: ctx.MessageThreadId,
           cfg: effectiveCfg,
@@ -681,6 +691,7 @@ export async function dispatchReplyFromConfig(params: {
             to: originatingTo,
             sessionKey: ctx.SessionKey,
             taskId: params.replyOptions?.runId,
+            taskBoundary: deliveryTaskBoundary,
             accountId: ctx.AccountId,
             threadId: ctx.MessageThreadId,
             cfg: effectiveCfg,

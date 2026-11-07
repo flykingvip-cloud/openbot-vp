@@ -138,3 +138,10 @@ export type CurrentTaskResumeRequest = {
 export type CurrentTaskResumeResult =
   | { kind: "accepted"; binding: TaskCompletionBinding; acceptance: readonly string[] }
   | { kind: "rejected"; reason: string };
+
+/** Trusted snapshot captured by the host before task side effects. */
+export type TaskActionBoundary = {
+  sessionFile: string;
+  binding: TaskCompletionBinding;
+  constraints: readonly string[];
+};

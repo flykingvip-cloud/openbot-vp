@@ -2,14 +2,10 @@ import {
   activeConstraintTexts,
   readSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
-import type { TaskCompletionBinding } from "../contracts/task.js";
+import type { TaskCompletionBinding, TaskActionBoundary } from "../contracts/task.js";
 import { isLiveTaskBinding } from "../policy/index.js";
 
-export type TaskActionBoundary = {
-  sessionFile: string;
-  binding: TaskCompletionBinding;
-  constraints: readonly string[];
-};
+export type { TaskActionBoundary } from "../contracts/task.js";
 
 /** Capture the constraints the current model attempt actually received. */
 export function captureTaskActionBoundary(

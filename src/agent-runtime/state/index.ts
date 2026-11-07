@@ -15,3 +15,5 @@ export { claimQueuedExecution } from "./mutations/claim-queued-execution.js";
 export { repairTrailingUserTurn, persistAttemptPromptError } from "./attempt-transcript.js";
 
 export { openAttemptSession, prepareAttemptSessionTranscript } from "./prepare-attempt-session.js";
+
+export { checkTaskActionBoundary } from "./task-action.js";
