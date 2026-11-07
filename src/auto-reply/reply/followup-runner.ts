@@ -3,6 +3,7 @@ import path from "node:path";
 import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
 import { prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
 import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
+import { claimQueuedExecution } from "../../agent-runtime/state/index.js";
 import { sessionTaskState } from "../../agent-runtime/state/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
@@ -19,8 +20,6 @@ import {
   runWithOguiDecisionResume,
 } from "../../config/sessions/ogui-decision-engine.js";
 import type { TypingMode } from "../../config/types.js";
-import { activeConstraintTexts } from "../../conversation-task/session-task-board.js";
-import { claimTaskBoardContinue } from "../../conversation-task/task-board-continue.js";
 import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain.js";
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
 import { resolveEnterpriseEmbeddedTransport } from "../../gateway/enterprise-model/embedded-transport.js";
@@ -136,33 +135,18 @@ export function createFollowupRunner(params: {
     // Claim the original queued task before creating outcome/admission/provider side effects.
     // Collaboration plans retain their own admission when no session-task binding exists.
     try {
-      const ticket = queued.taskBoardContinueTicket;
-      if (ticket) {
-        const wake = claimTaskBoardContinue({ sessionFile: queued.run.sessionFile, ...ticket });
-        if (!wake.ok || queued.run.taskCompletionBinding?.taskId !== ticket.taskId) {
-          typing.markRunComplete();
-          typing.markDispatchIdle();
-          return;
-        }
-        queued.prompt = wake.prompt;
-        queued.run.taskCompletionBinding = {
-          ...queued.run.taskCompletionBinding,
-          constraints: activeConstraintTexts(wake.task),
-        };
-      }
-      const incomingBinding = queued.run.taskCompletionBinding;
-      const trackedIndividual =
-        !queued.run.collaborationRoundInvoked &&
-        !queued.run.privateRunBag &&
-        Boolean(sessionTaskState.read(queued.run.sessionFile).current);
-      if (incomingBinding || trackedIndividual) {
-        const claimed = sessionTaskState.startExecution(
-          queued.run.sessionFile,
-          incomingBinding,
-          runId,
-        );
-        if (!claimed) {
-          try {
+      const claimed = claimQueuedExecution({
+        sessionFile: queued.run.sessionFile,
+        runId,
+        prompt: queued.prompt,
+        binding: queued.run.taskCompletionBinding,
+        continuationTicket: queued.taskBoardContinueTicket,
+        collaboration: Boolean(queued.run.collaborationRoundInvoked),
+        privatePlan: Boolean(queued.run.privateRunBag),
+      });
+      if (claimed.kind === "rejected") {
+        try {
+          if (claimed.reason === "invalid_binding") {
             await sendFollowupPayloads(
               [
                 {
@@ -171,14 +155,15 @@ export function createFollowupRunner(params: {
               ],
               queued,
             );
-          } finally {
-            typing.markRunComplete();
-            typing.markDispatchIdle();
           }
-          return;
+        } finally {
+          typing.markRunComplete();
+          typing.markDispatchIdle();
         }
-        queued.run.taskCompletionBinding = claimed;
+        return;
       }
+      queued.prompt = claimed.prompt;
+      queued.run.taskCompletionBinding = claimed.binding;
     } catch (error) {
       logVerbose(`followup task binding claim failed: ${String(error)}`);
       typing.markRunComplete();

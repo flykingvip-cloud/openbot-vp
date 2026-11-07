@@ -836,3 +836,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved original queued payload routing into delivery/dispatch/queued-reply with explicit transport and typing ports. Removed run-local delivery body; preserves original destination, same-channel fallback, silence filtering and enqueue-only unknown receipts. No task mutation or execution dependency added. — codex-runtime-manager
 - Followup/BYOK/OGUI/closeout regression 4 files / 38 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Repaired stale closeout mock exports and made undefined origin non-routable; enqueue-only assertion now requires delivery_unknown instead of obsolete pending. Overall migration remains open. — codex-runtime-manager
+
+## Queued execution identity ownership (2026-11-07)
+
+- Moved queued continuation ticket validation, constraint refresh and original execution claim into state/mutations/claim-queued-execution. Followup consumes the controlled state API; original board locking, private/collaboration separation and rejection behavior remain unchanged. No new state store or scheduler. — codex-runtime-manager
+- Followup/BYOK/OGUI/closeout regression 4 files / 38 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager

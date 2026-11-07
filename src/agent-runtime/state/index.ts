@@ -9,3 +9,5 @@ export { persistCommandSessionEntry } from "./command-session.js";
 export { persistAcpTurnTranscript } from "./acp-transcript.js";
 
 export { persistInteractionMessage } from "./interaction-transcript.js";
+
+export { claimQueuedExecution } from "./mutations/claim-queued-execution.js";
