@@ -2,6 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  composeSystemPromptWithHookContext,
+  prependSystemPromptAddition,
+} from "../../../agent-runtime/context/index.js";
 import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
 import {
   isOllamaCompatProvider,
@@ -22,8 +26,6 @@ import {
 } from "../../protocol-violation.js";
 import {
   buildAfterTurnRuntimeContext,
-  composeSystemPromptWithHookContext,
-  prependSystemPromptAddition,
   resolveAttemptFsWorkspaceOnly,
   resolvePromptBuildHookResult,
   resolvePromptModeForSession,

@@ -730,3 +730,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved Ollama context-window payload adaptation and XAI native argument decoding from the legacy attempt into separate shared model components. Original bodies removed; caller ordering and protocol boundary preserved. No provider loop or task authority added. — codex-runtime-manager
 - Existing attempt regression 59 PASS; full tsgo PASS; changed-file typed lint clean; architecture 51 PASS. Full legacy execution replacement remains open. — codex-runtime-manager
+
+## Prompt composition ownership (2026-11-07)
+
+- Moved admitted system-context composition and context-engine prompt addition from legacy attempt into shared context/prompt-composition. Original implementations removed and tests consume the public context entry. Hook invocation and trust selection remain host responsibilities; composition introduces no model calls or task control. — codex-runtime-manager
+- Attempt and execution-order regression 2 files / 85 PASS; full tsgo PASS; changed-file typed lint clean; architecture 51 PASS. Complete legacy runner retirement remains open. — codex-runtime-manager

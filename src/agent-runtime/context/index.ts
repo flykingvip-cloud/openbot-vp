@@ -24,3 +24,8 @@ export type {
 } from "../contracts/context.js";
 
 export { renderRunSkillContext } from "./sources/run-skills.js";
+
+export {
+  composeSystemPromptWithHookContext,
+  prependSystemPromptAddition,
+} from "./prompt-composition.js";

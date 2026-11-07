@@ -4,6 +4,10 @@ import path from "node:path";
 import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import {
+  composeSystemPromptWithHookContext,
+  prependSystemPromptAddition,
+} from "../../../agent-runtime/context/index.js";
 import { renderRunSkillContext } from "../../../agent-runtime/context/index.js";
 import { resolveAttemptEndOfRunAttribution } from "../../../agent-runtime/execution/index.js";
 import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
@@ -500,22 +504,6 @@ export async function resolvePromptBuildHookResult(params: {
   };
 }
 
-export function composeSystemPromptWithHookContext(params: {
-  baseSystemPrompt?: string;
-  prependSystemContext?: string;
-  appendSystemContext?: string;
-}): string | undefined {
-  const prependSystem = params.prependSystemContext?.trim();
-  const appendSystem = params.appendSystemContext?.trim();
-  if (!prependSystem && !appendSystem) {
-    return undefined;
-  }
-  return joinPresentTextSegments(
-    [params.prependSystemContext, params.baseSystemPrompt, params.appendSystemContext],
-    { trim: true },
-  );
-}
-
 export function resolvePromptModeForSession(sessionKey?: string): "minimal" | "full" {
   if (!sessionKey) {
     return "full";
@@ -545,16 +533,6 @@ export function resolveAttemptFsWorkspaceOnly(params: {
     cfg: params.config,
     agentId: params.sessionAgentId,
   });
-}
-
-export function prependSystemPromptAddition(params: {
-  systemPrompt: string;
-  systemPromptAddition?: string;
-}): string {
-  if (!params.systemPromptAddition) {
-    return params.systemPrompt;
-  }
-  return `${params.systemPromptAddition}\n\n${params.systemPrompt}`;
 }
 
 /** Build runtime context passed into context-engine afterTurn hooks. */
