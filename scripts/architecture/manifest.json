@@ -499,14 +499,9 @@
     "from": "src/**",
     "denyImportsFrom": [
       "src/agent-runtime/command/interaction",
-      "src/agent-runtime/wiring/command-adapters"
+      "src/agent-runtime/wiring/command-adapters",
+      "src/agent-runtime/command/dialogue-intent"
     ],
-    "description": "Retired semantic routing is unreachable from production; historical comparison tests retain access pending archival.",
-    "exemptFiles": [
-      "src/agent-runtime/wiring/command-adapters.ts",
-      "src/agent-runtime/wiring/interaction.test.ts",
-      "src/agent-runtime/wiring/dialogue-intent.test.ts",
-      "src/conversation-task/session-task-board.slice3-context.test.ts"
-    ]
+    "description": "Archived semantic routing has no source consumers or public export; no legacy fallback may be restored."
   }
 ]
