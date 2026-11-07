@@ -113,3 +113,11 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - bbd1add76: heartbeat activity module committed, 9 tests PASS; no server lifecycle wiring or continuous denominator. Activity is not liveness. — codex-observe-contract
 - Owner final validation: 28 files/235 tests PASS including collector8 and heartbeat9. Earlier joint232 and targeted31 are separate runs, never added. UI Chromium21 PASS; tsgo/scoped lint/format/build PASS with pin sync skipped and existing warnings. Contributor did not rerun these during documentation-only update. — codex-observe-contract
 - No new production write RPC, TaskOutcome schema migration, production flag/config change, automatic experiment, push or deployment. Preserve unknown/improvement gates; revert optional entry points in dependency order. — codex-observe-contract
+
+## P4 passive host integration acceptance 2026-11-07
+
+- 2ffad48cd adds the authorized read-only platform activity adapter; 26cc71248 composes lifecycle observation; 05aa43053 wires default-off passive observation in server.impl under explicit user exact-path takeover. No active probe or runtime policy change. — codex-observe-contract
+- Owner latest validation: 30 files/241 tests PASS, P4 targeted15 PASS, project tsgo and five-file lint/format PASS. Previous UI Chromium21/build PASS remain separate scoped results with pin sync skipped and existing warnings; no test-count accumulation. — codex-observe-contract
+- Platform read adapter is not yet connected to a real read entry. Continuous expected denominator, normal and uptime remain unknown; passive activity does not establish liveness. P4 is not fully accepted. — codex-observe-contract
+- Compatibility/rollback: default-off optional host composition, no production write RPC or TaskOutcome schema migration. Disable/remove host wiring before dependent lifecycle/read adapters; retain unknown gates. No production flag/config changes, push, PR or deployment. — codex-observe-contract
+- Registry still contains mixed concurrent-task WIP and is not committed; preserve sessions, attribution and other owners' edits. This update changes only the two task acceptance documents. — codex-observe-contract
