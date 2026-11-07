@@ -24,6 +24,6 @@ export async function runAuthorizedInteraction(
     ports.prepare(ports.session);
     return await runPreparedInteraction(params, ports.session, ports.candidate, ports.admission);
   } finally {
-    ports.session.dispose();
+    await ports.session.dispose();
   }
 }

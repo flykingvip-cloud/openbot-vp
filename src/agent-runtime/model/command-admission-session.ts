@@ -28,9 +28,7 @@ export function createCommandAdmissionSession(params: {
       const result = await acquireAgentCommandCommercialRun(input);
       return { acquired: result.status === "acquired", gate: result };
     },
-    release: () => {
-      void releaseAgentCommandCommercialRun(params.runId);
-    },
+    release: () => releaseAgentCommandCommercialRun(params.runId),
     forgetSnapshot: () => forgetRunModelSet(params.runId),
   });
   return {

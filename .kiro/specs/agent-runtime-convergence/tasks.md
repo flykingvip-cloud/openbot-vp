@@ -735,3 +735,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved admitted system-context composition and context-engine prompt addition from legacy attempt into shared context/prompt-composition. Original implementations removed and tests consume the public context entry. Hook invocation and trust selection remain host responsibilities; composition introduces no model calls or task control. — codex-runtime-manager
 - Attempt and execution-order regression 2 files / 85 PASS; full tsgo PASS; changed-file typed lint clean; architecture 51 PASS. Complete legacy runner retirement remains open. — codex-runtime-manager
+
+## Awaited model admission cleanup (2026-11-07)
+
+- Shared model lease disposal now returns one awaitable Promise; command, interaction and admitted execution wait for release. Snapshot cleanup runs even on release failure. No additional execution path. — codex-runtime-manager
+- Joint command/governance/credit/model-session regression 8 files / 76 PASS; additional pending-release identity test brings focused lease suite to 6 PASS. Full tsgo PASS; changed-file typed lint clean; architecture 51 PASS. Pending scoped commit and final integration; no retirement or deployment claimed. — codex-runtime-manager

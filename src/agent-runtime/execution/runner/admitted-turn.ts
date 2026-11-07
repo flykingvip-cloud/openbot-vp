@@ -780,6 +780,6 @@ export async function runAdmittedTurn(
       commitGrowthOutcome: recordGrowthTaskOutcome,
     };
   } finally {
-    modelSession.dispose();
+    await modelSession.dispose();
   }
 }

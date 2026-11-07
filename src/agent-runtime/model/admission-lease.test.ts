@@ -19,6 +19,25 @@ function setup() {
   return { events, ports, lease: createRunAdmissionLease(ports) };
 }
 describe("single-turn admission lifetime", () => {
+  it("shares pending disposal and waits for asynchronous release", async () => {
+    const { ports, lease } = setup();
+    await lease.acquire({ runId: "run-a" });
+    let finish!: () => void;
+    vi.mocked(ports.release).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const first = lease.dispose();
+    expect(lease.dispose()).toBe(first);
+    expect(ports.forgetSnapshot).not.toHaveBeenCalled();
+    finish();
+    await first;
+    expect(ports.release).toHaveBeenCalledOnce();
+    expect(ports.forgetSnapshot).toHaveBeenCalledOnce();
+    expect(lease.held).toBe(false);
+  });
   it.each([false, true])(
     "releases and forgets once after acquired work (failure=%s)",
     async (failure) => {
@@ -32,9 +51,9 @@ describe("single-turn admission lifetime", () => {
       } catch {
         /* original owner handles candidate failure */
       } finally {
-        lease.dispose();
+        await lease.dispose();
       }
-      lease.dispose();
+      await lease.dispose();
       expect(events).toEqual(["release", "forget"]);
       expect(ports.release).toHaveBeenCalledTimes(1);
     },
@@ -46,7 +65,7 @@ describe("single-turn admission lifetime", () => {
     expect(lease.held).toBe(false);
     await lease.acquire({ runId: "run-a" });
     expect(lease.held).toBe(true);
-    lease.dispose();
+    await lease.dispose();
     expect(ports.release).toHaveBeenCalledTimes(1);
   });
   it("does not release a denied slot", async () => {
@@ -58,17 +77,17 @@ describe("single-turn admission lifetime", () => {
       message: "denied",
     });
     await lease.acquire({ runId: "run-a" });
-    lease.dispose();
+    await lease.dispose();
     expect(ports.release).not.toHaveBeenCalled();
     expect(ports.forgetSnapshot).not.toHaveBeenCalled();
   });
-  it("preserves release-before-forget exception ordering", async () => {
+  it("forgets the snapshot even when release fails", async () => {
     const { ports, lease } = setup();
     await lease.acquire({ runId: "run-a" });
     vi.mocked(ports.release).mockImplementation(() => {
       throw new Error("release error");
     });
-    expect(() => lease.dispose()).toThrow("release error");
-    expect(ports.forgetSnapshot).not.toHaveBeenCalled();
+    await expect(lease.dispose()).rejects.toThrow("release error");
+    expect(ports.forgetSnapshot).toHaveBeenCalledOnce();
   });
 });

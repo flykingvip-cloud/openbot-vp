@@ -939,7 +939,7 @@ async function agentCommandInternal(
     }
     throw err;
   } finally {
-    commercialLease.dispose();
+    await commercialLease.dispose();
     clearAgentRunContext(runId);
     await submitAgentOutcomeCloseout();
   }

@@ -35,8 +35,8 @@ it("acquired parent snapshots once and releases before forgetting", async () => 
   expect(s.fallbackGovernance()).toMatchObject({
     governanceContext: { entry: "E2", tenantId: "tenant" },
   });
-  s.dispose();
-  s.dispose();
+  await s.dispose();
+  await s.dispose();
   expect(m.release).toHaveBeenCalledTimes(1);
   expect(m.release.mock.invocationCallOrder[0]).toBeLessThan(m.forget.mock.invocationCallOrder[0]);
 });
@@ -47,13 +47,13 @@ it("child acquires E6 quota without replacing inherited model snapshot", async (
   expect(m.acquire).toHaveBeenCalledWith(expect.objectContaining({ entry: "E6" }));
   expect(m.build).not.toHaveBeenCalled();
   expect(s.fallbackGovernance()).toEqual({});
-  s.dispose();
+  await s.dispose();
 });
 it.each(["denied", "skipped"])("%s never releases an unheld slot", async (status) => {
   m.acquire.mockResolvedValue({ status });
   const s = createCommandAdmissionSession({ runId: "run", isSubagentLane: false });
   await s.acquire({ runId: "run", sessionAgentId: "main" });
-  s.dispose();
+  await s.dispose();
   expect(m.release).not.toHaveBeenCalled();
   expect(m.forget).not.toHaveBeenCalled();
 });

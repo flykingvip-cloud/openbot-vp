@@ -29,8 +29,8 @@ it("requires authorization before preparing model candidates, without creating a
   expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
   await session.authorize({ agentId: "bot" });
   expect(host.admission.tryAcquireEnterpriseAgentRun).toHaveBeenCalledOnce();
-  session.dispose();
-  session.dispose();
+  await session.dispose();
+  await session.dispose();
   expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
   expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();
   expect(() => session.prepareModelSet({ config: {}, routing })).toThrow(/authorized/);
@@ -46,7 +46,7 @@ it("denial never prepares candidates or releases an unheld slot", async () => {
   });
   expect((await session.authorize({})).acquired).toBe(false);
   expect(() => session.prepareModelSet({ config: {}, routing })).toThrow(/authorized/);
-  session.dispose();
+  await session.dispose();
   expect(host.model.buildRunModelSetSnapshot).not.toHaveBeenCalled();
   expect(host.admission.releaseEnterpriseAgentRun).not.toHaveBeenCalled();
 });
@@ -63,7 +63,7 @@ it("preserves skipped admission retry and does not invent billing", async () => 
   await session.authorize({});
   expect(session.held).toBe(true);
   expect(host.admission.tryAcquireEnterpriseAgentRun).toHaveBeenCalledTimes(2);
-  session.dispose();
+  await session.dispose();
 });
 
 it("runs inference only through the prepared governed session", async () => {
@@ -92,7 +92,7 @@ it("runs inference only through the prepared governed session", async () => {
     }),
   );
   expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
-  session.dispose();
+  await session.dispose();
   await expect(session.infer(request)).rejects.toThrow(/prepared/);
 });
 
@@ -123,7 +123,7 @@ it("rejects late inference after cancellation without scheduling execution", asy
   ).rejects.toThrow();
   expect(run).toHaveBeenCalledOnce();
   expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
-  session.dispose();
+  await session.dispose();
 });
 
 it("records model usage with admitted billing identity without a task write", async () => {
@@ -176,7 +176,7 @@ it("records model usage with admitted billing identity without a task write", as
     }),
   );
   expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
-  session.dispose();
+  await session.dispose();
   expect(() =>
     session.recordUsage({
       provider: "test",
@@ -203,5 +203,5 @@ it("does not invent platform usage reporting for skipped authorization", async (
     fallbackAttemptsRaw: [],
   });
   expect(host.accounting.recordCreditUsage).not.toHaveBeenCalled();
-  session.dispose();
+  await session.dispose();
 });

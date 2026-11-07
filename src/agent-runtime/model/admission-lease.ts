@@ -9,7 +9,7 @@ export type RunAdmissionLeasePorts<
   Result extends { acquired: boolean } = AdmissionResult,
 > = {
   acquire: (input: Input) => Promise<Result>;
-  release: () => void;
+  release: () => void | Promise<void>;
   forgetSnapshot: () => void;
 };
 
@@ -21,6 +21,7 @@ export function createRunAdmissionLease<
 >(ports: RunAdmissionLeasePorts<Input, Result>) {
   let held = false;
   let disposed = false;
+  let disposal: Promise<void> | undefined;
   return {
     get held() {
       return held;
@@ -35,15 +36,22 @@ export function createRunAdmissionLease<
       }
       return result;
     },
-    dispose(): void {
-      if (disposed) {
-        return;
+    dispose(): Promise<void> {
+      if (disposal) {
+        return disposal;
       }
       disposed = true;
-      if (held) {
-        ports.release();
-        ports.forgetSnapshot();
-      }
+      disposal = (async () => {
+        if (held) {
+          try {
+            await ports.release();
+          } finally {
+            held = false;
+            ports.forgetSnapshot();
+          }
+        }
+      })();
+      return disposal;
     },
   };
 }

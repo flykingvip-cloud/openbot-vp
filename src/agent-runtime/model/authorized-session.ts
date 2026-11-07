@@ -50,9 +50,7 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
     | undefined;
   const lease = createRunAdmissionLease({
     acquire: ports.admission.tryAcquireEnterpriseAgentRun,
-    release: () => {
-      void ports.admission.releaseEnterpriseAgentRun(runId);
-    },
+    release: () => ports.admission.releaseEnterpriseAgentRun(runId),
     forgetSnapshot: () => {
       ports.model.forgetRunModelSet(runId);
     },
@@ -216,7 +214,7 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
       disposed = true;
       admitted = false;
       prepared = undefined;
-      lease.dispose();
+      return lease.dispose();
     },
   };
 }

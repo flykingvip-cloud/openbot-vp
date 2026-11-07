@@ -98,6 +98,6 @@ it.each(["reply", "execution_request"] as const)(
     expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
     expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
     expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();
-    session.dispose();
+    await session.dispose();
   },
 );
