@@ -38,3 +38,5 @@ export {
   wrapContextCompilerModelBoundary,
   wrapOutboundMessageEstimateGuard,
 } from "./adapters/context-compiler.js";
+
+export { wrapToolWithAbortSignal } from "./invocation/abort.js";

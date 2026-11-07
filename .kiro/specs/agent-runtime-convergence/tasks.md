@@ -902,3 +902,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - Candidate f05c52f26: joint runtime/dispatch/cron/followup/transport/context regression 73 files / 560 PASS; configured embedded/auth/fallback integration 3 files / 34 PASS. Full tsgo PASS; architecture 51 PASS; full build PASS with 209 existing ineffective dynamic-import warnings and UI chunk warnings. — codex-runtime-manager
 - Isolated Deepseek Gateway prompt/read/exec suite exited 0 (1 PASS, 1 unrelated skipped); temporary state removed, channels and cron disabled. One exec allowlist rejection was logged before successful suite completion. This is not complete personal/collaboration asynchronous or real-channel acceptance. — codex-runtime-manager
 - Remaining gates: complete supply/adapter contracts and legacy consumer convergence; durable reconciliation closeout; dispatcher transport metadata propagation through channel-specific awaits; individual/group real asynchronous lifecycle on one integrated candidate. No merge, push or deployment. — codex-runtime-manager
+
+## Capability cancellation composition ownership (2026-11-07)
+
+- Moved the existing abort-signal composition implementation into capabilities/invocation/abort; old pi-tools.abort is a compatibility re-export through the capability public API. No second implementation, cancellation policy or hard-stop guarantee added. Corrected misleading structural-typing comment without changing behavior. — codex-runtime-manager
+- Capability cancellation 5 PASS; before-tool adapter integration E2E 9 PASS; full tsgo PASS; changed-file typed lint clean; architecture 51 PASS. Overall retirement and final lifecycle acceptance remain open. — codex-runtime-manager
