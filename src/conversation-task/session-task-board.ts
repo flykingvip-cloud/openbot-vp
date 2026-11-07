@@ -1,9 +1,9 @@
+import { createTask, parkTask } from "../agent-runtime/state/mutations/task-record.js";
 import { allocateTaskInstanceId } from "../agent-runtime/state/repository/task-identity.js";
 export {
   allocateTaskInstanceId,
   taskIdForText,
 } from "../agent-runtime/state/repository/task-identity.js";
-import { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
 import { stripInboundStamp as stripStamp } from "../agent-runtime/policy/index.js";
 import {
   findParked,
@@ -82,7 +82,6 @@ import type {
   SessionTaskBoard,
   IncomingTurnResult,
 } from "../agent-runtime/contracts/task.js";
-import { MAX_PARKED_TASKS } from "../agent-runtime/policy/task-board-limits.js";
 import { isTaskSurfaceUtterance } from "../agents/task-surface/surface.js";
 import { formatDroppedParkedTaskSentence, type FocusSnapshot } from "./focus-policy.js";
 import {
@@ -118,59 +117,6 @@ export function isSureDistinctWork(incoming: string, currentGoal: string): boole
     return false;
   }
   return classifyTurnRelation(text, current) === "new_work";
-}
-
-function createTask(
-  text: string,
-  nowMs: number,
-  workspacePaths: string[],
-  opts?: { inboundRequestId?: string; entropy?: string | number },
-): TrackedTask {
-  const title = titleFromGoal(text);
-  return {
-    taskId: allocateTaskInstanceId({
-      inboundRequestId: opts?.inboundRequestId,
-      entropy: opts?.entropy ?? `${nowMs}:${title}`,
-    }),
-    title,
-    goalText: text.trim(),
-    unfinished: true,
-    stop: {
-      summary: `未完成：${title}`,
-      workspacePaths: [...workspacePaths],
-    },
-    createdAtMs: nowMs,
-  };
-}
-
-function parkTask(
-  parked: readonly TrackedTask[],
-  task: TrackedTask,
-  nowMs: number,
-  parkReason?: string,
-): { parked: TrackedTask[]; archived?: ArchivedTask } {
-  const stamped: TrackedTask = {
-    ...task,
-    unfinished: true,
-    parkedAtMs: nowMs,
-    parkReason: parkReason ?? task.parkReason ?? "automatic_switch",
-    wakeSuppress: true,
-  };
-  const newestFirst = [stamped, ...parked.filter((row) => row.taskId !== stamped.taskId)];
-  if (newestFirst.length <= MAX_PARKED_TASKS) {
-    return { parked: newestFirst };
-  }
-  const overflow = newestFirst[newestFirst.length - 1];
-  return {
-    parked: newestFirst.slice(0, MAX_PARKED_TASKS),
-    archived: overflow
-      ? {
-          ...overflow,
-          archivedAtMs: nowMs,
-          archiveReason: "parked_capacity",
-        }
-      : undefined,
-  };
 }
 
 function dropSentence(archived: TrackedTask | undefined): string {

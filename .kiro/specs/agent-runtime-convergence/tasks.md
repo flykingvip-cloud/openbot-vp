@@ -1157,3 +1157,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved unchanged task instance allocation and legacy hash compatibility into the state repository. Legacy board exports reference the same functions; request idempotency and fresh-instance entropy remain unchanged. — codex-runtime-manager
 - Board/admission regression 2 files / 26 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
+
+## Task record construction ownership (2026-11-08)
+
+- Moved unchanged task record construction and parked-record capacity handling into state/mutations/task-record. Legacy consumers call that same implementation; no semantic classification or new scheduling was introduced. — codex-runtime-manager
+- Board/admission/cross-process regression 3 files / 33 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
