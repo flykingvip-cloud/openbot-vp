@@ -462,6 +462,7 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
     : messageChannelId;
   const draftStream = canStreamDraft
     ? createDiscordDraftStream({
+        abortSignal,
         rest: client.rest,
         channelId: deliverChannelId,
         maxChars: draftMaxChars,
@@ -731,6 +732,17 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
       replyOptions: {
         ...replyOptions,
         abortSignal,
+        onTaskExecutionBound: (binding, context) => {
+          draftStream?.bindTaskBoundary(
+            context?.sessionFile
+              ? {
+                  sessionFile: context.sessionFile,
+                  binding,
+                  constraints: [...(binding.constraints ?? [])],
+                }
+              : undefined,
+          );
+        },
         skillFilter: channelConfig?.skills,
         disableBlockStreaming:
           disableBlockStreamingForDraft ??

@@ -1,5 +1,7 @@
 import type { RequestClient } from "@buape/carbon";
 import { Routes } from "discord-api-types/v10";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { createFinalizableDraftLifecycle } from "../channels/draft-stream-controls.js";
 
 /** Discord messages cap at 2000 characters. */
@@ -7,6 +9,7 @@ const DISCORD_STREAM_MAX_CHARS = 2000;
 const DEFAULT_THROTTLE_MS = 1200;
 
 export type DiscordDraftStream = {
+  bindTaskBoundary: (boundary: TaskActionBoundary | undefined) => void;
   update: (text: string) => void;
   flush: () => Promise<void>;
   messageId: () => string | undefined;
@@ -17,6 +20,7 @@ export type DiscordDraftStream = {
 };
 
 export function createDiscordDraftStream(params: {
+  abortSignal?: AbortSignal;
   rest: RequestClient;
   channelId: string;
   maxChars?: number;
@@ -40,8 +44,13 @@ export function createDiscordDraftStream(params: {
   const streamState = { stopped: false, final: false };
   let streamMessageId: string | undefined;
   let lastSentText = "";
+  let taskBoundary: TaskActionBoundary | undefined;
 
   const sendOrEditStreamMessage = async (text: string): Promise<boolean> => {
+    if (params.abortSignal?.aborted || (taskBoundary && checkTaskActionBoundary(taskBoundary))) {
+      streamState.stopped = true;
+      return false;
+    }
     // Allow final flush even if stopped (e.g., after clear()).
     if (streamState.stopped && !streamState.final) {
       return false;
@@ -135,6 +144,21 @@ export function createDiscordDraftStream(params: {
   params.log?.(`discord stream preview ready (maxChars=${maxChars}, throttleMs=${throttleMs})`);
 
   return {
+    bindTaskBoundary: (boundary) => {
+      // A preview never retargets buffered text to a replacement attempt.
+      if (
+        !boundary ||
+        (taskBoundary && JSON.stringify(taskBoundary) !== JSON.stringify(boundary))
+      ) {
+        streamState.stopped = true;
+        loop.stop();
+        return;
+      }
+      if (!taskBoundary) {
+        taskBoundary = structuredClone(boundary);
+        loop.resetPending();
+      }
+    },
     update,
     flush: loop.flush,
     messageId: () => streamMessageId,

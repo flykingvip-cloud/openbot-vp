@@ -942,3 +942,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Direct monitor delivery now propagates original task identity to text/media/voice/webhook transports and final preview edits. Pre-resolved direct text requests recheck inside retries; remaining chunks stop after task invalidation. Existing fallback, chunk ordering and independent control replies remain unchanged. Draft partial streaming still needs separate lifecycle verification. — codex-runtime-manager
 - Discord regression 4 files / 52 PASS, including actual direct-chunk invalidation; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
+
+## Discord pending preview boundary (2026-11-07)
+
+- Draft preview binds the host-provided original execution identity and checks it plus cancellation before post/edit, including final flush. Replacement binding stops buffered preview rather than retargeting old text; final delivery retains its separate captured identity. Unbound dialogue previews retain existing behavior. — codex-runtime-manager
+- Draft/process regression 2 files / 24 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Integrated candidate 1ed678fda full build PASS. Complete retirement and real lifecycle acceptance remain open. — codex-runtime-manager
