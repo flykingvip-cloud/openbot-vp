@@ -73,6 +73,7 @@ import {
   MAX_OVERFLOW_COMPACTION_ATTEMPTS,
   resolveMaxRunRetryIterations,
 } from "../../policy/index.js";
+import { sessionTaskState } from "../../state/index.js";
 import { embeddedPayloadFormatting } from "../../wiring/embedded-payloads.js";
 import {
   createUsageAccumulator,
@@ -130,6 +131,17 @@ export async function runEmbeddedPiAgent(
     sink: NOOP_CONSTITUTIONAL_RUNTIME_SHADOW_SINK,
     now: performance.now.bind(performance),
   });
+  const assertExecutionCurrent = () => {
+    if (
+      params.taskExecutionBinding &&
+      !sessionTaskState.bindingCurrent(params.sessionFile, params.taskExecutionBinding)
+    ) {
+      throw new Error(
+        "Original task was paused, closed, revised or replaced before execution startup",
+      );
+    }
+  };
+  assertExecutionCurrent();
   const sessionLane = resolveSessionLane(params.sessionKey?.trim() || params.sessionId);
   const globalLane = resolveGlobalLane(params.lane);
   const enqueueGlobal =
@@ -148,6 +160,7 @@ export async function runEmbeddedPiAgent(
 
   return enqueueSession(() =>
     enqueueGlobal(async () => {
+      assertExecutionCurrent();
       const started = Date.now();
       const workspaceResolution = resolveRunWorkspaceDir({
         workspaceDir: params.workspaceDir,
@@ -491,6 +504,7 @@ export async function runEmbeddedPiAgent(
           finalizeDeliveryContext({ taskId, outcome });
         };
         while (true) {
+          assertExecutionCurrent();
           if (runLoopIterations >= MAX_RUN_LOOP_ITERATIONS) {
             const message =
               `Exceeded retry limit after ${runLoopIterations} attempts ` +
