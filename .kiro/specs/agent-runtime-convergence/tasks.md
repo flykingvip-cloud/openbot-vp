@@ -1162,3 +1162,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved unchanged task record construction and parked-record capacity handling into state/mutations/task-record. Legacy consumers call that same implementation; no semantic classification or new scheduling was introduced. — codex-runtime-manager
 - Board/admission/cross-process regression 3 files / 33 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
+
+## Task focus transition ownership (2026-11-08)
+
+- Moved unchanged explicit task insertion and focus revision into state/mutations/task-focus. Shared focus and archive wording now belongs to context; legacy exports reference the same implementation. Architecture gate rejected a reverse legacy dependency during extraction; moved the original formatter rather than exempting the dependency. — codex-runtime-manager
+- Board/focus/admission/context regression 4 files / 38 PASS; earlier cross-process group 34 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
