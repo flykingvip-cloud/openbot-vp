@@ -94,3 +94,83 @@ it("keeps one task across revision, pause and resume while rejecting obsolete re
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+it("preserves full constraints and rejects stale amendments and paused wake tickets", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-revision-"));
+  const file = path.join(root, "session.jsonl");
+  fs.writeFileSync(file, "");
+  try {
+    const admitted = await admitSessionExecution(
+      file,
+      {
+        requestId: "long-request",
+        expectedFocusRevision: 0,
+        expectedWriteEpoch: 0,
+        proposal: { goal: "Create report", acceptance: ["Verified sources"] },
+      },
+      async () => true,
+    );
+    if (admitted.kind !== "accepted") {
+      throw new Error("admission");
+    }
+    const before = sessionTaskState.read(file);
+    const longText = "Only public sources. ".repeat(80) + "CRITICAL_TAIL_NO_OUTBOUND";
+    const apply = (text: string, mode: "supplement" | "revise") => {
+      const board = sessionTaskState.read(file);
+      return sessionTaskState.applyInteractionProposal({
+        sessionFile: file,
+        expectedFocusRevision: board.focusRevision,
+        expectedWriteEpoch: board.writeEpoch ?? 0,
+        decision: {
+          kind: "task_change",
+          target: { taskId: admitted.binding.taskId, revision: String(board.writeEpoch ?? 0) },
+          text,
+          mode,
+        },
+      });
+    };
+    expect(apply(longText, "supplement").kind).toBe("applied");
+    expect(apply("Change only the report title", "revise").kind).toBe("applied");
+    const changed = sessionTaskState.read(file);
+    expect(buildTaskBoardContinuePrompt(changed.current!)).toContain("CRITICAL_TAIL_NO_OUTBOUND");
+    expect(buildTaskBoardContinuePrompt(changed.current!)).toContain(
+      "Change only the report title",
+    );
+    expect(
+      sessionTaskState.applyInteractionProposal({
+        sessionFile: file,
+        expectedFocusRevision: before.focusRevision,
+        expectedWriteEpoch: before.writeEpoch ?? 0,
+        decision: {
+          kind: "task_change",
+          target: { taskId: admitted.binding.taskId, revision: String(before.writeEpoch ?? 0) },
+          text: "stale constraint",
+          mode: "supplement",
+        },
+      }),
+    ).toEqual({ kind: "rejected", reason: "revision_mismatch" });
+    expect(sessionTaskState.read(file)).toEqual(changed);
+    const paused = sessionTaskState.applyInteractionProposal({
+      sessionFile: file,
+      expectedFocusRevision: changed.focusRevision,
+      expectedWriteEpoch: changed.writeEpoch ?? 0,
+      decision: {
+        kind: "task_control",
+        target: { taskId: admitted.binding.taskId, revision: String(changed.writeEpoch ?? 0) },
+        action: "pause",
+      },
+    });
+    expect(paused).toMatchObject({ kind: "applied", abort: true });
+    const { claimTaskBoardContinue } = await import("../state/index.js");
+    expect(
+      claimTaskBoardContinue({
+        sessionFile: file,
+        taskId: admitted.binding.taskId,
+        focusRevision: changed.focusRevision,
+      }),
+    ).toEqual({ ok: false, reason: "wake_suppress" });
+    expect(sessionTaskState.read(file).current?.taskId).toBe(admitted.binding.taskId);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
