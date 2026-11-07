@@ -1228,3 +1228,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Removed the main execution entrance's legacy query/aside/amend/control disposition branch and its secondary reply lane invocation. Prepared interaction owns those decisions; execution now selects only run/enqueue/drop using the unchanged resource occupancy rule moved to public policy. Removed the live composition's handleInteraction binding. Legacy helpers remain compatibility-only pending separate consumer/archive review. — codex-runtime-manager
 - Reply execution integration 48 PASS; queue and run identity 2 files / 12 PASS; full tsgo PASS; typed lint and format clean; architecture 53 PASS. This is retirement of a live duplicate routing branch, not complete legacy executor deletion. — codex-runtime-manager
+
+## Retired semantic routing quarantined from production (2026-11-08)
+
+- Separated fixed interrupt/steer effects from the old keyword-routing adapter. Removed handleInteraction from the command public facade; the live reply composition no longer loads that adapter. Architecture now forbids production imports of the retired routing modules, with exact historical-test exceptions only. Source retained pending immutable archival and final deletion. — codex-runtime-manager
+- Historical comparison and state lifecycle 3 files / 11 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. Prior candidate 4f996d952 full build PASS with 209 existing ineffective-dynamic-import warnings and UI chunk-size warnings. No gateway restart or deployment. — codex-runtime-manager

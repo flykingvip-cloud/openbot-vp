@@ -19,8 +19,6 @@ export {
 } from "./scenarios/collaboration-entry.js";
 export type { CollaborationSessionScope } from "./scenarios/collaboration-entry.js";
 
-export { handleInteraction, type InteractionPorts } from "./interaction.js";
-
 export {
   resolveDialogueIntent,
   formatTaskQueryReply,

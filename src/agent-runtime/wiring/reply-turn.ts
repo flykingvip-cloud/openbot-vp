@@ -20,8 +20,8 @@ import {
   incrementRunCompactionCount,
 } from "../state/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
-import { interruptInteractionTask, steerInteractionTask } from "./command-adapters.js";
 import { confirmPendingTurnDelivery } from "./delivery-confirm.js";
+import { interruptInteractionTask, steerInteractionTask } from "./interaction-effects.js";
 import type { runGatewayInteraction } from "./interaction-turn.js";
 import { evaluateBoundTaskAcceptance } from "./task-acceptance.js";
 

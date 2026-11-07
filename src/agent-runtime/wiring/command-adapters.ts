@@ -16,21 +16,11 @@ import {
   shouldPersistOwnerConstraint,
 } from "../../conversation-task/turn-relation.js";
 import { resolveDialogueIntent } from "../command/index.js";
-import type {
-  ActiveTaskAmendmentPorts,
-  InteractionPorts,
-  CurrentTaskControlPorts,
-} from "../command/index.js";
+import type { ActiveTaskAmendmentPorts, CurrentTaskControlPorts } from "../command/index.js";
+import type { InteractionPorts } from "../command/interaction.js";
 /** Bind existing host effects. No classification, routing, loops or task decisions live here. */
 import { abortEmbeddedPiRun, queueEmbeddedPiMessage } from "../execution/index.js";
 import { sessionTaskState } from "../state/index.js";
-
-export function interruptInteractionTask(sessionId: string, sessionKey?: string) {
-  abortEmbeddedPiRun(sessionId);
-  abortMidTaskAsideLanes(sessionId);
-  clearSessionQueues([sessionId, sessionKey]);
-}
-export const steerInteractionTask = queueEmbeddedPiMessage;
 
 function bindOwnerControlPorts(params: {
   sessionFile: string;

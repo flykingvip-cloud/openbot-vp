@@ -7,7 +7,7 @@ import {
   mutateSessionTaskBoard,
   readSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
-import { handleInteraction } from "../command/index.js";
+import { handleInteraction } from "../command/interaction.js";
 import { bindInteractionPorts } from "./command-adapters.js";
 it("does not interpret internal execution triggers as user conversation or amendments", () => {
   const ports = bindInteractionPorts({ prompt: "当前进度", sessionId: "internal", queueKeys: [] });
