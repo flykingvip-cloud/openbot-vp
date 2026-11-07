@@ -1,5 +1,9 @@
 import { resolveSessionAgentId } from "../agents/agent-scope.js";
 import { loadFeishuEmployeeChannelGate } from "./enterprise-im-employee-connection.js";
+import {
+  decideEnterpriseImEmployeeProxy,
+  type EnterpriseImSeatCheck,
+} from "./enterprise-im-employee-decision.js";
 import { resolveQueryScope } from "./scope-attribution.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { resolveUserOperationalIdentityStorePathForClient } from "./tenant-context.js";
@@ -370,6 +374,8 @@ export async function executeUserOperationalIdentityRuntimeAction(params: {
   sessionKey?: string | null;
   audit?: boolean;
   createBindingRequestOnDeny?: boolean;
+  enterpriseImIdentityId?: string;
+  enterpriseImSeat?: EnterpriseImSeatCheck;
 }): Promise<
   | {
       ok: true;
@@ -392,19 +398,38 @@ export async function executeUserOperationalIdentityRuntimeAction(params: {
     const scope = await resolveQueryScope(params.client);
     const tenantId = scope.kind === "tenant" ? scope.tenantId : null;
     const gate = await loadFeishuEmployeeChannelGate({ tenantId });
-    if (gate.childExecutionBlocked || !gate.loginEnabled) {
+    const seat: EnterpriseImSeatCheck = params.enterpriseImSeat ?? {
+      kind: "missing",
+      policyPresent: false,
+    };
+    const store = await loadUserOiRuntimeStore(params.client);
+    const grantCount = Object.keys(store.grants).length;
+    const decision = decideEnterpriseImEmployeeProxy({
+      store,
+      ownerId: (await resolveOperationalIdentityActorUserId({ client: params.client })) ?? "",
+      agentId: params.agentId?.trim() || "",
+      action: params.action,
+      identityId: params.enterpriseImIdentityId,
+      gate,
+      seat,
+      nowIso: new Date().toISOString(),
+    });
+    if (Object.keys(store.grants).length !== grantCount) {
+      throw new Error("enterprise IM execute must not write a grant");
+    }
+    if (decision.outcome === "allow") {
       return {
         ok: false,
         scope: null,
-        code: "ENTERPRISE_CONNECTION_BLOCKED",
-        message: gate.statusLabel,
+        code: "ENTERPRISE_IM_ALLOW_NO_PRODUCT_ACTION",
+        message: "授权已确认。读取和发送不在本切片。",
       };
     }
     return {
       ok: false,
       scope: null,
-      code: "FEISHU_EMPLOYEE_EXECUTION_NOT_IN_SCOPE",
-      message: "飞书员工身份未确认给机器人，本次不会自动创建授权。",
+      code: decision.code,
+      message: decision.message,
     };
   }
 

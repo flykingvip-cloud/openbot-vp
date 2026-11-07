@@ -723,18 +723,19 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
         });
         oauthScope = secret?.metadata?.scope ?? null;
       }
+      const workplace = identity?.provider === "feishu-personal";
       const updated = upsertUserOperationalIdentityGrant({
         store,
         ownerId,
         identityId,
         agentId,
         agentScope: trustedAgentScope,
-        grantMode,
+        grantMode: workplace ? "explicit" : grantMode,
         allowedActions: parseStringArray(params.allowedActions),
         oauthScope,
         tenantId: stringValue(params.tenantId) || enterpriseAuthz.tenantId || undefined,
         seatId: stringValue(params.seatId) || enterpriseAuthz.seatId || undefined,
-        confirmExplicit: params.confirmExplicit === true,
+        confirmExplicit: workplace || params.confirmExplicit === true,
         nowIso,
       });
       if (updated.ok) {

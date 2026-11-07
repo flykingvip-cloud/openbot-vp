@@ -10867,6 +10867,12 @@ landingStreams:
       - src/gateway/enterprise-im-employee-connection.ts
       - src/gateway/enterprise-im-employee-connection.test.ts
       - src/gateway/enterprise-im-employee-connection-oauth.ts
+      - src/gateway/enterprise-im-employee-decision.ts
+      - src/gateway/enterprise-im-employee-decision.test.ts
+      - src/gateway/user-operational-identity-access.ts
+      - src/gateway/user-operational-identity-providers.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - ui/src/ui/ports/employee/views/my-bot-feishu-auth.node.test.ts
       - src/gateway/user-operational-identity-types.ts
       - src/gateway/user-operational-identity-store.ts
       - src/gateway/user-operational-identity-oauth.ts

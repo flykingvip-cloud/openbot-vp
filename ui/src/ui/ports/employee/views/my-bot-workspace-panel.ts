@@ -734,7 +734,20 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
   const snapshot = props.userOperationalIdentitySnapshot;
   const busy = Boolean(props.userOperationalIdentityBusy);
   const allIdentities = snapshot?.identities ?? [];
-  const bindableIdentities = allIdentities.filter((identity) => identity.status === "active");
+  const feishuGate = snapshot?.feishuEmployeeChannel;
+  const feishuChannelOpen = Boolean(
+    feishuGate &&
+    !feishuGate.childExecutionBlocked &&
+    feishuGate.employeeUiHint !== "enterprise_not_open",
+  );
+  const feishuIdentities = feishuChannelOpen
+    ? allIdentities.filter(
+        (identity) => identity.provider === "feishu-personal" && identity.status === "active",
+      )
+    : [];
+  const bindableIdentities = allIdentities.filter(
+    (identity) => identity.status === "active" && identity.provider !== "feishu-personal",
+  );
   const catalog = snapshot?.providerCatalog ?? [];
   const grants = (snapshot?.grants ?? []).filter(
     (grant) => grant.agentId === agentId && grant.status === "active",
@@ -762,14 +775,24 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
       ) ?? [],
     );
     const personalDesired = checked
-      .filter((checkbox) => checkbox.dataset.kind === "personal")
+      .filter(
+        (checkbox) =>
+          checkbox.dataset.kind === "personal" || checkbox.dataset.provider === "feishu-personal",
+      )
       .map((checkbox) => {
         const identityId = checkbox.dataset.identityId ?? "";
-        const provider = providerByIdentity.get(identityId) ?? "";
-        return { identityId, allowedActions: actionsForProvider(provider) };
+        const provider = checkbox.dataset.provider || providerByIdentity.get(identityId) || "";
+        const listed = checkbox.dataset.actions?.split(",").filter(Boolean) ?? [];
+        return {
+          identityId,
+          allowedActions: listed.length > 0 ? listed : actionsForProvider(provider),
+        };
       });
     const enterpriseDesired = checked
-      .filter((checkbox) => checkbox.dataset.kind === "enterprise")
+      .filter(
+        (checkbox) =>
+          checkbox.dataset.kind === "enterprise" && checkbox.dataset.provider !== "feishu-personal",
+      )
       .map((checkbox) => checkbox.dataset.identityId ?? "")
       .filter(Boolean);
     props.onApplyRobotIdentityGrants?.({ agentId, agentScope: scope, desired: personalDesired });
@@ -792,11 +815,32 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
         "企业身份",
         enterpriseEntries === undefined
           ? renderEmpty("正在加载…")
-          : enterpriseEntries.length === 0
+          : enterpriseEntries.length === 0 && feishuIdentities.length === 0
             ? renderEmpty("企业暂未开放身份。")
             : html`
                 <ul class="wb-bots__check-list">
-                  ${enterpriseEntries.map(
+                  ${feishuIdentities.map(
+                    (identity) => html`
+                      <li>
+                        <label class="wb-bots__check-row">
+                          <input
+                            type="checkbox"
+                            data-kind="enterprise"
+                            data-provider="feishu-personal"
+                            data-actions="read,draft,send"
+                            data-identity-id=${identity.identityId}
+                            ?checked=${grantedIdentityIds.has(identity.identityId)}
+                            ?disabled=${busy}
+                          />
+                          <span class="wb-bots__check-copy">
+                            <span class="wb-bots__list-title">${identity.displayName}</span>
+                            <span class="wb-bots__list-sub">${identity.providerLabel}</span>
+                          </span>
+                        </label>
+                      </li>
+                    `,
+                  )}
+                  ${(enterpriseEntries ?? []).map(
                     (item) => html`
                       <li>
                         <label class="wb-bots__check-row">
@@ -860,7 +904,13 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
 
       <div class="wb-bots__footer">
         <span class="wb-bots__hint">
-          ${scope === "owned" ? "确认后立即生效" : "确认后需二次校验"}
+          ${
+            feishuIdentities.length > 0
+              ? "确认后只写入该机器人的明确授权"
+              : scope === "owned"
+                ? "确认后立即生效"
+                : "确认后需二次校验"
+          }
         </span>
         <button type="button" class="btn btn--primary" ?disabled=${busy} @click=${submit}>
           ${busy ? "提交中…" : "确认授权"}

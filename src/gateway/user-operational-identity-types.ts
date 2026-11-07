@@ -76,6 +76,9 @@ export type UserOperationalIdentityGrant = {
   updatedAt: string;
   confirmedAt?: string;
   revokedAt?: string;
+  /** Explicit confirm version for enterprise IM. Auto grants do not count. */
+  grantVersion?: number;
+  expiresAt?: string;
 };
 
 export type UserOperationalIdentityBindingRequestStatus =

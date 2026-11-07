@@ -1359,14 +1359,18 @@ export async function applyRobotOperationalIdentityGrants(
   host.userOperationalIdentityNotice = null;
   try {
     for (const entry of toAdd) {
+      const provider = host.userOperationalIdentities?.identities.find(
+        (identity) => identity.identityId === entry.identityId,
+      )?.provider;
+      const workplace = provider === "feishu-personal";
       await host.client.request("user-operational-identity.grants.upsert", {
         identityId: entry.identityId,
         agentId,
         agentScope: grantScope,
         allowedActions: entry.allowedActions,
         sessionKey: input.sessionKey,
-        grantMode: grantScope === "owned" ? "auto" : "explicit",
-        confirmExplicit: grantScope !== "owned",
+        grantMode: workplace || grantScope !== "owned" ? "explicit" : "auto",
+        confirmExplicit: workplace || grantScope !== "owned",
       });
     }
     for (const grant of toRevoke) {

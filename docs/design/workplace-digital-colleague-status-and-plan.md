@@ -654,6 +654,8 @@ For this workplace identity, both screens write the grant through one API. That 
 
 The same slice establishes the authorization decision entry from the joint-gate section. Callers in slices 3 and 4 use this entry. Distinct outcomes include allow, deny because the enterprise connection is disabled, deny because enterprise policy is missing, deny because the seat is missing, deny because the seat binding is ambiguous, and deny because the delegation is missing, expired, or does not include the action. There is no personal-use outcome. A missing grant is a deny that does not insert a row.
 
+Implemented as `decideEnterpriseImEmployeeProxy` / `executeEnterpriseImEmployeeProxy` in `src/gateway/enterprise-im-employee-decision.ts`. `resolveUserOperationalIdentity` returns that decision for `feishu-personal` before the owned-robot auto-create branch. An `grantMode: "auto"` row is not a confirm. `resolveEmployeeOperationalAuthorization`'s no-seat allow is not called. Confirm writes `grantMode: "explicit"` plus `grantVersion` through `user-operational-identity.grants.upsert`. The robot page lists the bound Feishu identity under 企业身份 only when the list projection says the enterprise channel is open. The browser does not import the decision or credential modules.
+
 Tests:
 
 1. An owned robot with no employee confirm: the first resolve and the first execute both refuse, and the grant count does not change.

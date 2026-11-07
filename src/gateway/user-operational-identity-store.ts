@@ -489,6 +489,7 @@ export function upsertUserOperationalIdentityGrant(params: {
   tenantId?: string;
   seatId?: string;
   confirmExplicit?: boolean;
+  expiresAt?: string;
   nowIso: string;
 }): { ok: true; grant: UserOperationalIdentityGrant } | { ok: false; code: string; error: string } {
   const identity = getUserOperationalIdentity(params.store, params.ownerId, params.identityId);
@@ -499,7 +500,9 @@ export function upsertUserOperationalIdentityGrant(params: {
   if (!agentId) {
     return { ok: false, code: "USER_IDENTITY_AGENT_REQUIRED", error: "agentId is required." };
   }
-  if (params.agentScope === "owned" && params.grantMode !== "auto") {
+  const workplaceConfirm =
+    identity.provider === "feishu-personal" && params.grantMode === "explicit";
+  if (!workplaceConfirm && params.agentScope === "owned" && params.grantMode !== "auto") {
     return {
       ok: false,
       code: "USER_IDENTITY_GRANT_MODE_INVALID",
@@ -513,7 +516,7 @@ export function upsertUserOperationalIdentityGrant(params: {
       error: "shared/group agents must use explicit grant mode.",
     };
   }
-  if (params.agentScope !== "owned" && !params.confirmExplicit) {
+  if ((workplaceConfirm || params.agentScope !== "owned") && !params.confirmExplicit) {
     return {
       ok: false,
       code: "USER_IDENTITY_GRANT_CONFIRMATION_REQUIRED",
@@ -553,6 +556,10 @@ export function upsertUserOperationalIdentityGrant(params: {
     existing.status = "active";
     existing.updatedAt = params.nowIso;
     existing.confirmedAt = params.nowIso;
+    existing.expiresAt = params.expiresAt;
+    if (workplaceConfirm) {
+      existing.grantVersion = (existing.grantVersion ?? 0) + 1;
+    }
     return { ok: true, grant: existing };
   }
   const grant: UserOperationalIdentityGrant = {
@@ -569,6 +576,8 @@ export function upsertUserOperationalIdentityGrant(params: {
     createdAt: params.nowIso,
     updatedAt: params.nowIso,
     confirmedAt: params.nowIso,
+    ...(workplaceConfirm ? { grantVersion: 1 } : {}),
+    ...(params.expiresAt ? { expiresAt: params.expiresAt } : {}),
   };
   params.store.grants[grant.grantId] = grant;
   return { ok: true, grant };

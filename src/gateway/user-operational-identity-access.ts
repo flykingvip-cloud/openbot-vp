@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 import {
+  decideEnterpriseImEmployeeProxy,
+  type EnterpriseImDecisionInput,
+} from "./enterprise-im-employee-decision.js";
+import {
   defaultGrantModeForAgentScope,
   isAgentScopeAllowedByDefault,
 } from "./user-operational-identity-agent-scope.js";
@@ -41,6 +45,10 @@ export type ResolveUserOperationalIdentityInput = {
    * decision hard-denies before owner/grant evaluation.
    */
   enterpriseAuthorization?: EmployeeOperationalAuthorization;
+  /** Feishu employee proxy only. Other providers ignore this. */
+  enterpriseImIdentityId?: string;
+  enterpriseImGate?: EnterpriseImDecisionInput["gate"];
+  enterpriseImSeat?: EnterpriseImDecisionInput["seat"];
   /** @deprecated Ignored for authorization; scope is derived server-side. */
   ownedAgentIds?: string[];
   /** @deprecated Ignored for authorization; scope is derived server-side. */
@@ -110,6 +118,44 @@ export function resolveUserOperationalIdentity(
       code: "USER_IDENTITY_CONTEXT_INVALID",
       message: "provider, action, currentUserId, and currentAgentId are required.",
     };
+  }
+  if (provider === "feishu-personal") {
+    const grantCount = Object.keys(params.store.grants).length;
+    const decision = decideEnterpriseImEmployeeProxy({
+      store: params.store,
+      ownerId: currentUserId,
+      agentId: currentAgentId,
+      action,
+      identityId: params.enterpriseImIdentityId,
+      gate: params.enterpriseImGate ?? {
+        childExecutionBlocked: true,
+        employeeUiHint: "enterprise_not_open",
+      },
+      seat: params.enterpriseImSeat ?? { kind: "missing", policyPresent: false },
+      nowIso: params.nowIso,
+    });
+    if (Object.keys(params.store.grants).length !== grantCount) {
+      throw new Error("enterprise IM resolve must not write a grant");
+    }
+    if (decision.outcome === "deny") {
+      return { allowed: false, code: decision.code, message: decision.message };
+    }
+    const identity = params.store.identities[decision.identityId];
+    const grant = Object.values(params.store.grants).find(
+      (item) =>
+        item.identityId === decision.identityId &&
+        item.agentId === decision.agentId &&
+        item.grantVersion === decision.grantVersion &&
+        item.status === "active",
+    );
+    if (!identity || !grant) {
+      return {
+        allowed: false,
+        code: "DELEGATION_MISSING",
+        message: "没有员工确认的机器人授权。",
+      };
+    }
+    return { allowed: true, identity, grant };
   }
   if (!isUserOperationalIdentityPolicyAction(provider, action)) {
     return {

@@ -186,7 +186,11 @@ const USER_OPERATIONAL_IDENTITY_PROVIDER_ADAPTERS: Array<{
     registrationReady: false,
     authMode: "oauth",
     manualKind: null,
-    operationalActions: [],
+    operationalActions: [
+      { action: "read", label: "读取" },
+      { action: "draft", label: "起草" },
+      { action: "send", label: "发送" },
+    ],
     reauthHint: "飞书个人账号暂未开放绑定。",
     degradedHint: "当前仅支持企业 Bot/App 连接，个人账号绑定将在后续版本开放。",
   },
