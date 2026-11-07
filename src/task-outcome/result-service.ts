@@ -79,6 +79,24 @@ function digestTransition(taskId: string, transition: SubmitTransition): string 
   return createHash("sha256").update(JSON.stringify({ taskId, transition })).digest("hex");
 }
 
+/** Idempotency digest. The same transition with a different call binding is not a replay. */
+function digestCommand(transitionDigest: string, callBinding?: BudgetCallBinding | null): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        transitionDigest,
+        callBinding: callBinding
+          ? {
+              callId: callBinding.callId,
+              evidenceId: callBinding.evidenceId,
+              usageFingerprint: callBinding.usageFingerprint,
+            }
+          : null,
+      }),
+    )
+    .digest("hex");
+}
+
 function attemptFingerprint(record: TaskOutcomeRecord): string {
   return createHash("sha256")
     .update(
@@ -161,7 +179,7 @@ export class TaskOutcomeResultService {
       requiredScope?: TrustedScope;
       /** Verified caller subject; corrections must use this as authorizedBy. */
       callerSubjectRef?: string;
-      /** Present only for a model-call budget charge. Stored on the command, not in the digest. */
+      /** Present only for a model-call budget charge. Included in the idempotency digest. */
       callBinding?: BudgetCallBinding;
     },
   ): SubmitResult {
@@ -197,15 +215,26 @@ export class TaskOutcomeResultService {
     }
 
     const commandId = opts?.commandId;
-    const requestDigest = commandId ? digestTransition(taskId, transition) : undefined;
-    if (commandId && requestDigest) {
+    const transitionDigest = commandId ? digestTransition(taskId, transition) : undefined;
+    const requestDigest =
+      commandId && transitionDigest
+        ? digestCommand(transitionDigest, opts?.callBinding ?? null)
+        : undefined;
+    if (commandId && requestDigest && transitionDigest) {
       const prior = this.store.loadCommand(commandId);
       if (prior) {
         if (prior.digest !== requestDigest) {
+          const sameTransition = prior.transitionDigest
+            ? prior.transitionDigest === transitionDigest
+            : prior.digest === transitionDigest;
+          const bindingConflict =
+            sameTransition && !sameCallBinding(prior.callBinding, opts?.callBinding ?? null);
           return {
             ok: false,
             code: "command_conflict",
-            message: `commandId ${commandId} reused with different payload`,
+            message: bindingConflict
+              ? "call_binding_conflict"
+              : `commandId ${commandId} reused with different payload`,
             current,
             commandConflict: {
               commandId,
@@ -215,6 +244,8 @@ export class TaskOutcomeResultService {
               storedOutcomeVersion: prior.outcomeVersion,
               storedCommitId: prior.commitId,
               storedSpend: prior.committedSpend,
+              reason: bindingConflict ? "call_binding_conflict" : "payload_conflict",
+              storedCallBinding: prior.callBinding,
             },
           };
         }
@@ -369,7 +400,8 @@ export class TaskOutcomeResultService {
         ? {
             commandLog: {
               commandId: opts.commandId,
-              digest: digestTransition(taskId, transition),
+              digest: requestDigest,
+              transitionDigest,
               taskId,
               outcomeVersion: record.outcomeVersion,
               snapshotFingerprint: snapshotIdentityFingerprint(record),

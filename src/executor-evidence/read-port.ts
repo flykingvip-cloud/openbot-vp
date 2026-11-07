@@ -53,7 +53,11 @@ export type EvidenceReadView = {
   completeness: "complete" | "partial" | "unknown" | "mismatch";
   /** Call set closure, independent of budget attribution. */
   callChainCompleteness: "complete" | "partial" | "unknown";
-  /** Budget command receipts. not_applicable when this view has no budget association. */
+  /**
+   * Budget command receipts.
+   * not_applicable only when association files were read and none carry a budget command.
+   * partial when those files cannot be read, even if no budget row was parsed.
+   */
   costAttributionCompleteness: "complete" | "partial" | "unknown" | "not_applicable";
   reasons: string[];
 };
@@ -115,6 +119,39 @@ function isScope(value: unknown): value is TrustedScope {
 
 function scopeMatches(candidate: { scope?: TrustedScope }, scope: TrustedScope): boolean {
   return isScope(candidate.scope) && fullScopeEqual(candidate.scope, scope);
+}
+
+function usageShapeOk(usage: unknown): boolean {
+  if (!usage || typeof usage !== "object") {
+    return false;
+  }
+  const row = usage as Record<string, unknown>;
+  return ["input", "output", "cacheRead", "cacheWrite"].every(
+    (key) => row[key] === null || typeof row[key] === "number",
+  );
+}
+
+/** Reader schema for a call. The snapshot fingerprint does not cover these fields. */
+function callRecordSchemaOk(call: ModelCallEvidence | undefined): call is ModelCallEvidence {
+  if (!call || typeof call.callId !== "string" || call.callId.length === 0) {
+    return false;
+  }
+  if (typeof call.evidenceId !== "string" || call.evidenceId.length === 0) {
+    return false;
+  }
+  if (typeof call.attemptId !== "string" || call.attemptId.length === 0) {
+    return false;
+  }
+  if (typeof call.provenance !== "string" || call.provenance.length === 0) {
+    return false;
+  }
+  if (typeof call.startedAt !== "number" || typeof call.observedAt !== "number") {
+    return false;
+  }
+  if (!isScope(call.scope) || !usageShapeOk(call.usage)) {
+    return false;
+  }
+  return true;
 }
 
 export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView {
@@ -256,7 +293,7 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
 
   const callReport = readCallFiles(query.storeRoot);
   const schemaCalls = callReport.rows.filter((call) => {
-    if (!call || typeof call.callId !== "string" || !isScope(call.scope)) {
+    if (!callRecordSchemaOk(call)) {
       gaps.push("call_schema_invalid");
       return false;
     }
@@ -392,7 +429,18 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   if (associationDir.gap) {
     gaps.push(associationDir.gap);
   }
-  const linkedIds = associations
+  const finalAssociations = associations.filter(
+    (row) => typeof row.finalOutcomeVersion === "number",
+  );
+  if (
+    associations.some((row) => row.finalOutcomeVersion == null && row.completeness === "complete")
+  ) {
+    gaps.push("association_final_version_absent");
+    reasons.push(
+      "a self-reported complete association without a final version is not in the closure set",
+    );
+  }
+  const linkedIds = finalAssociations
     .map((row) => row.callId)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
   const uniqueLinks = new Set(linkedIds);
@@ -414,13 +462,18 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     }
     return max;
   }, null);
-  const budgetRows = associations.filter((row) => row.budgetCommandId);
+  const budgetRows = finalAssociations.filter((row) => row.budgetCommandId);
   const callChainBlocked = gaps.some((gap) =>
     [
       "call_schema_invalid",
       "corrupt_call",
       "call_read_failed",
       "not_a_directory",
+      "directory_read_failed",
+      "corrupt_association",
+      "association_read_failed",
+      "association_field_invalid",
+      "association_final_version_absent",
       "association_fingerprint_mismatch",
       "association_fingerprint_absent",
       "association_usage_mismatch",
@@ -444,12 +497,21 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
       "version_snapshot_missing",
       "snapshot_fingerprint_absent",
       "legacy_commit_id_absent",
+      "corrupt_association",
+      "association_read_failed",
+      "association_field_invalid",
+      "directory_read_failed",
     ].includes(gap),
   );
+  const associationUnreadable =
+    associationReport.gaps.length > 0 ||
+    associationDir.gap != null ||
+    gaps.includes("association_field_invalid");
   const callChainCompleteness =
     !callChainBlocked && setClosed ? "complete" : calls.length > 0 ? "partial" : "unknown";
-  const costAttributionCompleteness =
-    budgetRows.length === 0
+  const costAttributionCompleteness = associationUnreadable
+    ? "partial"
+    : budgetRows.length === 0
       ? "not_applicable"
       : !costBlocked &&
           budgetRows.every((row) =>
@@ -470,7 +532,7 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     callChainCompleteness === "complete" &&
     (costAttributionCompleteness === "complete" ||
       costAttributionCompleteness === "not_applicable") &&
-    associations.every((row) => row.completeness === "complete")
+    finalAssociations.every((row) => row.completeness === "complete")
       ? "complete"
       : tip
         ? "partial"

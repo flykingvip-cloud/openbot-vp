@@ -180,10 +180,19 @@ export type GrowthOutcomeCommitOpts = {
  */
 export async function runModelCandidateWithSingleCharge<T>(params: {
   run: () => Promise<T>;
-  charge: (outcome: { ok: true; value: T } | { ok: false; error: unknown }) => void;
+  /** Runs as soon as the model result exists, before post-processing. */
+  noteResponse?: (value: T) => void;
+  /** Bootstrap or delivery. A throw here must not drop the result usage. */
+  afterResponse?: (value: T) => void;
+  charge: (
+    outcome: { ok: true; value: T } | { ok: false; error: unknown; notedUsage?: unknown },
+  ) => void;
 }): Promise<T> {
   let charged = false;
-  const chargeOnce = (outcome: { ok: true; value: T } | { ok: false; error: unknown }) => {
+  let notedUsage: unknown;
+  const chargeOnce = (
+    outcome: { ok: true; value: T } | { ok: false; error: unknown; notedUsage?: unknown },
+  ) => {
     if (charged) {
       return;
     }
@@ -192,12 +201,23 @@ export async function runModelCandidateWithSingleCharge<T>(params: {
   };
   try {
     const value = await params.run();
+    try {
+      notedUsage = params.noteResponse?.(value);
+    } catch {
+      // Noting the response must not hide the result or its usage.
+    }
+    try {
+      params.afterResponse?.(value);
+    } catch (postErr) {
+      chargeOnce({ ok: true, value });
+      throw postErr;
+    }
     chargeOnce({ ok: true, value });
     return value;
   } catch (err) {
     if (!(err instanceof TaskBudgetExceededError)) {
       try {
-        chargeOnce({ ok: false, error: err });
+        chargeOnce({ ok: false, error: err, notedUsage });
       } catch (chargeErr) {
         if (chargeErr instanceof TaskBudgetExceededError) {
           throw chargeErr;
@@ -206,6 +226,19 @@ export async function runModelCandidateWithSingleCharge<T>(params: {
     }
     throw err;
   }
+}
+
+/** Record provider usage at the moment the model result exists. */
+export function rememberModelResultUsage(usage: unknown): unknown {
+  const call = currentExecutorModelCall();
+  if (call && call.modelResponseStatus !== "observed") {
+    try {
+      noteModelResponse(call, { usage, usageSource: "model_result" });
+    } catch {
+      // The business result stays available even if the note fails.
+    }
+  }
+  return usage;
 }
 
 /** Usage attached by a candidate failure, when the transport recorded it before throwing. */

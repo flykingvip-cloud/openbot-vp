@@ -42,6 +42,7 @@ describe("DurableTaskOutcomeStore.commandLogPath", () => {
       committedSpend: null,
       commandDisposition: null,
       callBinding: null,
+      transitionDigest: null,
     });
   });
 

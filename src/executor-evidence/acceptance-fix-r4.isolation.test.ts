@@ -324,7 +324,10 @@ describe("R4 persistence protocol", () => {
     const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
     fs.mkdirSync(path.dirname(lockPath), { recursive: true });
     const token = processStartToken(process.pid);
-    fs.writeFileSync(lockPath, `${process.pid}\n${token ?? "unknown"}`);
+    fs.writeFileSync(
+      lockPath,
+      JSON.stringify({ pid: process.pid, startToken: token ?? "unknown", lockId: "live-owner" }),
+    );
     const stale = new Date(Date.now() - 10_000);
     fs.utimesSync(lockPath, stale, stale);
     const result = writeBoundedEvidenceFile(storeRoot, "late.json", { pad: "a" });
@@ -389,12 +392,12 @@ describe("R4 persistence protocol", () => {
       callId: "call_peak",
       status: "unknown",
       usage: { input: null, output: null, cacheRead: null, cacheWrite: null },
-      pad: "x".repeat(400),
+      providerResponseId: "x".repeat(400),
     };
     fs.writeFileSync(path.join(dir, "peak.json"), `${JSON.stringify(original)}\n`);
-    const smaller = { ...original, status: "failed", pad: "y" };
+    const smaller = { ...original, status: "failed", providerResponseId: "y" };
     expect(writeBoundedEvidenceFile(storeRoot, "peak.json", smaller, "calls")).toBe("capped");
-    expect(fs.readFileSync(path.join(dir, "peak.json"), "utf8")).toContain("x".repeat(400));
+    expect(fs.readFileSync(path.join(dir, "peak.json"), "utf8")).toContain("x".repeat(40));
   });
 });
 

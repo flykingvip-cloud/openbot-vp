@@ -399,6 +399,9 @@ export type CommandConflictDetail = {
   storedCommitId: string | null;
   /** Original committed spend, when the winning command was a budget charge. */
   storedSpend: CommittedSpend | null;
+  /** Set when the transition matches and only the model-call binding differs. */
+  reason?: "call_binding_conflict" | "payload_conflict";
+  storedCallBinding?: BudgetCallBinding | null;
 };
 
 /** The command log cannot be turned into an exact replay. */

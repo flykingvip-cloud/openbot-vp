@@ -128,6 +128,7 @@ import {
   runnerExecutorEvidenceContext,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  rememberModelResultUsage,
   TaskBudgetExceededError,
   usageCarriedByModelError,
   type RunnerTurnFailureReason,
@@ -1486,6 +1487,7 @@ async function agentCommandInternal(
           }
           return (async () => {
             let candidateCharged = false;
+            let notedUsage: unknown;
             const chargeAgentCandidate = (usage?: unknown) => {
               if (candidateCharged || !agentOutcomeTaskId || !agentOutcomeScope) {
                 return;
@@ -1549,12 +1551,13 @@ async function agentCommandInternal(
               }
             },
           });
-              chargeAgentCandidate(result.meta?.agentMeta?.usage);
+              notedUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
+              chargeAgentCandidate(notedUsage);
               return result;
             } catch (err) {
               if (!(err instanceof TaskBudgetExceededError)) {
                 try {
-                  chargeAgentCandidate(usageCarriedByModelError(err));
+                  chargeAgentCandidate(notedUsage ?? usageCarriedByModelError(err));
                 } catch (chargeErr) {
                   if (chargeErr instanceof TaskBudgetExceededError) {
                     throw chargeErr;

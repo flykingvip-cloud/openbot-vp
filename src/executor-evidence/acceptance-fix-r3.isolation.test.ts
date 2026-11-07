@@ -27,9 +27,11 @@ import {
   resetEvidenceAssociations,
 } from "./association.js";
 import { buildCostColumns } from "./cost-columns.js";
+import { snapshotIdentityFingerprint } from "./identity.js";
 import {
   evidenceDiskByteCap,
   resetModelCallsForTests,
+  usageFingerprint,
   writeBoundedEvidenceFile,
 } from "./model-call-evidence.js";
 import { readExecutorEvidence } from "./read-port.js";
@@ -483,10 +485,14 @@ describe("R3 read port and shared persistence", () => {
     const call = (callId: string) => ({
       schemaVersion: 1,
       callId,
+      evidenceId: `mce_${callId}`,
+      attemptId: `attempt-${callId}`,
+      provenance: "injected",
       agentId: "bot",
       taskId: "task-chain",
       runId: "run-chain",
       scope,
+      startedAt: 1,
       observedAt: 1,
       usage: fullUsage(1, 0),
     });
@@ -532,12 +538,46 @@ describe("R3 read port and shared persistence", () => {
       storeRoot: chainRoot,
     });
     expect(brokenClosure.gaps).toContain("call_schema_invalid");
+    expect(brokenClosure.gaps).toContain("association_final_version_absent");
     expect(brokenClosure.callChainCompleteness).toBe("partial");
-    expect(brokenClosure.costAttributionCompleteness).toBe("partial");
+    expect(brokenClosure.costAttributionCompleteness).toBe("not_applicable");
     expect(brokenClosure.completeness).not.toBe("complete");
     fs.rmSync(path.join(chainRoot, "executor-evidence", "associations", "a2.json"));
     fs.rmSync(path.join(chainRoot, "executor-evidence", "calls", "b.json"));
     fs.rmSync(path.join(chainRoot, "executor-evidence", "calls", "bad.json"));
+    const finalSnapshot = {
+      taskId: "task-chain",
+      outcomeVersion: 1,
+      scope,
+      lifecycle: "closed",
+      taskJudgement: "success",
+      acceptance: { status: "passed" },
+      delivery: { status: "delivered" },
+      deliveryId: null,
+      attempts: [{ attemptId: "att-task", runId: "run-chain", status: "succeeded" }],
+      runs: [{ runId: "run-chain", attemptIds: ["att-task"], status: "succeeded" }],
+    };
+    fs.mkdirSync(path.join(chainRoot, "versions"), { recursive: true });
+    fs.writeFileSync(
+      path.join(chainRoot, "versions", "task-chain__v1.json"),
+      JSON.stringify(finalSnapshot),
+    );
+    fs.writeFileSync(
+      path.join(chainRoot, "executor-evidence", "associations", "a1.json"),
+      JSON.stringify({
+        ...association("A"),
+        finalOutcomeVersion: 1,
+        finalSnapshotFingerprint: snapshotIdentityFingerprint(finalSnapshot),
+        usageFingerprint: usageFingerprint(fullUsage(1, 0)),
+        callEvidenceId: "mce_A",
+        candidateAttemptId: "attempt-A",
+        taskAttemptId: "att-task",
+        commitId: null,
+        requestDigest: null,
+        disposition: "applied",
+        chargeOutcomeVersion: null,
+      }),
+    );
     const missingReceipt = readExecutorEvidence({
       agentId: "bot",
       scope,
@@ -571,7 +611,7 @@ describe("R3 read port and shared persistence", () => {
 
   it("lets exactly one of two processes take the last disk slot", async () => {
     process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
-    process.env.OPENBOT_EXECUTOR_EVIDENCE_DISK_CAP = "360";
+    process.env.OPENBOT_EXECUTOR_EVIDENCE_DISK_CAP = "500";
     const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r3-race-"));
     roots.push(storeRoot);
     const dir = path.join(storeRoot, "executor-evidence", "associations");

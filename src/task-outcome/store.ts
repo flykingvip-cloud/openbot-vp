@@ -33,6 +33,8 @@ export type CommitBundle = {
     committedSpend?: CommittedSpend | null;
     commandDisposition?: "applied" | "replayed" | "no_effect";
     callBinding?: BudgetCallBinding | null;
+    /** Transition-only digest. The stored digest also includes callBinding. */
+    transitionDigest?: string;
   };
 };
 
@@ -225,6 +227,7 @@ export class DurableTaskOutcomeStore {
       committedSpend?: CommittedSpend | null;
       commandDisposition?: "applied" | "replayed" | "no_effect";
       callBinding?: BudgetCallBinding | null;
+      transitionDigest?: string;
     };
   }):
     | { ok: true; commitId: string }
@@ -306,6 +309,7 @@ export class DurableTaskOutcomeStore {
           committedSpend?: CommittedSpend | null;
           commandDisposition?: "applied" | "replayed" | "no_effect";
           callBinding?: BudgetCallBinding | null;
+          transitionDigest?: string;
         } = {
           commandId: log.commandId,
           digest: log.digest,
@@ -341,6 +345,9 @@ export class DurableTaskOutcomeStore {
             evidenceId: log.callBinding.evidenceId,
             usageFingerprint: log.callBinding.usageFingerprint,
           };
+        }
+        if (typeof log.transitionDigest === "string" && log.transitionDigest) {
+          persisted.transitionDigest = log.transitionDigest;
         }
         atomicWriteJson(cmdPath, persisted);
       }
@@ -519,6 +526,7 @@ export class DurableTaskOutcomeStore {
         committedSpend: CommittedSpend | null;
         commandDisposition: "applied" | "replayed" | "no_effect" | null;
         callBinding: BudgetCallBinding | null;
+        transitionDigest: string | null;
       }
     | undefined {
     const raw = readJson<{
@@ -530,6 +538,7 @@ export class DurableTaskOutcomeStore {
       committedSpend?: CommittedSpend | null;
       commandDisposition?: string;
       callBinding?: BudgetCallBinding | null;
+      transitionDigest?: string;
     }>(this.commandLogPath(commandId));
     if (
       !raw ||
@@ -561,6 +570,10 @@ export class DurableTaskOutcomeStore {
         typeof raw.callBinding.evidenceId === "string" &&
         typeof raw.callBinding.usageFingerprint === "string"
           ? raw.callBinding
+          : null,
+      transitionDigest:
+        typeof raw.transitionDigest === "string" && raw.transitionDigest
+          ? raw.transitionDigest
           : null,
     };
   }

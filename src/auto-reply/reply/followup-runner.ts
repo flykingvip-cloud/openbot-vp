@@ -46,6 +46,7 @@ import {
   runnerExecutorEvidenceContext,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  rememberModelResultUsage,
   runModelCandidateWithSingleCharge,
   TaskBudgetExceededError,
   usageCarriedByModelError,
@@ -495,6 +496,14 @@ export function createFollowupRunner(params: {
                 });
               }
               const result = await runModelCandidateWithSingleCharge({
+                noteResponse: (value) => {
+                  rememberModelResultUsage(value.meta?.agentMeta?.usage);
+                },
+                afterResponse: (value) => {
+                  bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
+                    value.meta?.systemPromptReport,
+                  );
+                },
                 run: () =>
                   runEmbeddedPiAgent({
                     sessionId: queued.run.sessionId,
@@ -588,15 +597,12 @@ export function createFollowupRunner(params: {
                   chargeFollowupModelCall({
                     usage: outcome.ok
                       ? outcome.value.meta?.agentMeta?.usage
-                      : usageCarriedByModelError(outcome.error),
+                      : (outcome.notedUsage ?? usageCarriedByModelError(outcome.error)),
                     provider,
                     model,
                   });
                 },
               });
-              bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
-                result.meta?.systemPromptReport,
-              );
               return result;
             },
           });

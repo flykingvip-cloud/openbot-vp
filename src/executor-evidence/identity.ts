@@ -23,6 +23,33 @@ export function fullScopeEqual(left: TrustedScope, right: TrustedScope): boolean
 
 export const SNAPSHOT_IDENTITY_SCHEMA_VERSION = 2 as const;
 
+/**
+ * Version 2 covers the final decision the reader trusts.
+ * It is not a digest of the budget ledger or of created/updated/decided timestamps.
+ */
+export const SNAPSHOT_IDENTITY_COVERS = [
+  "taskId",
+  "outcomeVersion",
+  "scope",
+  "lifecycle",
+  "taskJudgement",
+  "revisionKind",
+  "acceptance",
+  "delivery",
+  "deliveryId",
+  "runs",
+  "attempts",
+] as const;
+
+export const SNAPSHOT_IDENTITY_DOES_NOT_COVER = [
+  "budget",
+  "spentCostUsd",
+  "createdAt",
+  "updatedAt",
+  "decidedAt",
+  "fencingToken",
+] as const;
+
 function gateProjection(gate: unknown): { status: string; reason: string | null } | null {
   if (!gate || typeof gate !== "object") {
     return null;

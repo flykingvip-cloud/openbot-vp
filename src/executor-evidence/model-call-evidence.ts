@@ -442,35 +442,131 @@ function processAlive(pid: number): boolean {
   }
 }
 
+const LOCK_PUBLISH_GRACE_MS = 2_000;
+
+type EvidenceLockOwner = { pid: number; startToken: string; lockId: string };
+
+function parseLockOwner(text: string): EvidenceLockOwner | null {
+  try {
+    const parsed = JSON.parse(text) as Partial<EvidenceLockOwner>;
+    if (
+      typeof parsed.pid !== "number" ||
+      !Number.isInteger(parsed.pid) ||
+      parsed.pid <= 0 ||
+      typeof parsed.startToken !== "string" ||
+      parsed.startToken.length === 0 ||
+      typeof parsed.lockId !== "string" ||
+      parsed.lockId.length === 0
+    ) {
+      return null;
+    }
+    return { pid: parsed.pid, startToken: parsed.startToken, lockId: parsed.lockId };
+  } catch {
+    return null;
+  }
+}
+
+function sameLockFile(left: fs.Stats, right: fs.Stats): boolean {
+  return left.dev === right.dev && left.ino === right.ino;
+}
+
+function ownerStillLive(owner: EvidenceLockOwner): boolean {
+  const liveToken = processStartToken(owner.pid);
+  if (liveToken && liveToken === owner.startToken) {
+    return true;
+  }
+  if (liveToken && liveToken !== owner.startToken) {
+    return false;
+  }
+  return owner.startToken === "unknown" && processAlive(owner.pid);
+}
+
 /**
- * Recover only a lock whose owner is gone or whose pid was recycled.
- * A live owner keeps the lock no matter how old it is.
+ * Reclaim a lock only when the same file instance is still the stale one.
+ * An empty lock is the window before the owner record is published and is
+ * not reclaimed until the grace period has passed.
+ * A read error is not proof that the lock is abandoned.
  */
 function recoverStaleEvidenceLock(lockPath: string): void {
-  if (!fs.existsSync(lockPath)) {
+  let before: fs.Stats;
+  try {
+    before = fs.statSync(lockPath);
+  } catch {
+    return;
+  }
+  let text: string;
+  try {
+    text = fs.readFileSync(lockPath, "utf8");
+  } catch {
+    return;
+  }
+  const owner = parseLockOwner(text);
+  if (!owner) {
+    if (Date.now() - before.mtimeMs < LOCK_PUBLISH_GRACE_MS) {
+      return;
+    }
+    let after: fs.Stats;
+    let again: string;
+    try {
+      after = fs.statSync(lockPath);
+      again = fs.readFileSync(lockPath, "utf8");
+    } catch {
+      return;
+    }
+    if (!sameLockFile(before, after) || parseLockOwner(again)) {
+      return;
+    }
+    if (Date.now() - after.mtimeMs < LOCK_PUBLISH_GRACE_MS) {
+      return;
+    }
+    fs.rmSync(lockPath, { force: true });
+    return;
+  }
+  if (ownerStillLive(owner)) {
+    return;
+  }
+  let after: fs.Stats;
+  let again: string;
+  try {
+    after = fs.statSync(lockPath);
+    again = fs.readFileSync(lockPath, "utf8");
+  } catch {
+    return;
+  }
+  const current = parseLockOwner(again);
+  if (!sameLockFile(before, after) || current?.lockId !== owner.lockId) {
+    return;
+  }
+  fs.rmSync(lockPath, { force: true });
+}
+
+function releaseOwnedLock(fd: number, lockPath: string, lockId: string): void {
+  let held: fs.Stats;
+  try {
+    held = fs.fstatSync(fd);
+  } catch {
+    try {
+      fs.closeSync(fd);
+    } catch {
+      // The descriptor is already closed.
+    }
     return;
   }
   try {
-    const [pidText, token] = fs.readFileSync(lockPath, "utf8").split("\n");
-    const pid = Number(pidText?.trim());
-    if (!Number.isInteger(pid) || pid <= 0) {
-      fs.rmSync(lockPath, { force: true });
-      return;
+    const current = fs.statSync(lockPath);
+    if (sameLockFile(held, current)) {
+      const owner = parseLockOwner(fs.readFileSync(lockPath, "utf8"));
+      if (owner?.lockId === lockId) {
+        fs.rmSync(lockPath, { force: true });
+      }
     }
-    const liveToken = processStartToken(pid);
-    if (liveToken && token && liveToken === token.trim()) {
-      return;
-    }
-    if (liveToken && token && liveToken !== token.trim()) {
-      fs.rmSync(lockPath, { force: true });
-      return;
-    }
-    if (processAlive(pid)) {
-      return;
-    }
-    fs.rmSync(lockPath, { force: true });
   } catch {
-    fs.rmSync(lockPath, { force: true });
+    // The path no longer names this lock instance.
+  }
+  try {
+    fs.closeSync(fd);
+  } catch {
+    // Already closed.
   }
 }
 
@@ -492,25 +588,85 @@ function usageSame(left: ModelCallUsage | undefined, right: ModelCallUsage | und
   );
 }
 
+const CALL_MUTABLE_FIELDS = new Set([
+  "status",
+  "terminalCause",
+  "usage",
+  "usageSource",
+  "usageAggregation",
+  "modelResponseStatus",
+  "observedAt",
+  "completedAt",
+  "finished",
+  "persisted",
+  "durableAcrossRestart",
+  "providerRequestId",
+  "providerResponseId",
+  "timeOrderValid",
+]);
+
+function jsonSame(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+/**
+ * Identity and origin are frozen. Only response and terminal fields may advance.
+ */
 function legalCallAdvance(
-  previous: { evidenceId?: string; callId?: string; status?: string; usage?: ModelCallUsage },
-  next: { evidenceId?: string; callId?: string; status?: string; usage?: ModelCallUsage },
+  previous: Record<string, unknown>,
+  next: Record<string, unknown>,
 ): boolean {
   if (
-    !previous.evidenceId ||
+    typeof previous.evidenceId !== "string" ||
+    previous.evidenceId.length === 0 ||
     previous.evidenceId !== next.evidenceId ||
     previous.callId !== next.callId
   ) {
     return false;
   }
-  const rank = (status: string | undefined) => (status === "unknown" || !status ? 0 : 1);
+  const frozen = [
+    "agentId",
+    "scope",
+    "taskId",
+    "runId",
+    "attemptId",
+    "attemptKind",
+    "provider",
+    "model",
+    "startedAt",
+    "provenance",
+    "collector",
+    "parentCallId",
+  ];
+  for (const key of frozen) {
+    if (!jsonSame(previous[key], next[key])) {
+      return false;
+    }
+  }
+  const keys = new Set([...Object.keys(previous), ...Object.keys(next)]);
+  for (const key of keys) {
+    if (
+      key === "evidenceId" ||
+      key === "callId" ||
+      frozen.includes(key) ||
+      CALL_MUTABLE_FIELDS.has(key)
+    ) {
+      continue;
+    }
+    if (!jsonSame(previous[key], next[key])) {
+      return false;
+    }
+  }
+  const rank = (status: unknown) => (status === "unknown" || status == null ? 0 : 1);
   if (rank(next.status) < rank(previous.status)) {
     return false;
   }
   if (rank(previous.status) === 1 && next.status !== previous.status) {
     return false;
   }
-  if (usageDetermined(previous.usage) && !usageSame(previous.usage, next.usage)) {
+  const previousUsage = previous.usage as ModelCallUsage | undefined;
+  const nextUsage = next.usage as ModelCallUsage | undefined;
+  if (usageDetermined(previousUsage) && !usageSame(previousUsage, nextUsage)) {
     return false;
   }
   return true;
@@ -529,16 +685,31 @@ export function writeBoundedEvidenceFile(
   const dir = path.join(root, folder);
   const lockPath = path.join(root, "write.lock");
   let tmp: string | undefined;
+  let fd: number | undefined;
+  let lockId: string | undefined;
   try {
     fs.mkdirSync(root, { recursive: true });
     const started = Date.now();
-    let fd: number | undefined;
     while (fd === undefined) {
       try {
         fd = fs.openSync(lockPath, "wx");
-        const token = processStartToken(process.pid) ?? "unknown";
-        fs.writeFileSync(fd, `${process.pid}\n${token}`);
+        const pauseMs = Number(process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_AFTER_CREATE_MS);
+        if (Number.isFinite(pauseMs) && pauseMs > 0) {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pauseMs);
+        }
+        lockId = randomUUID();
+        const owner: EvidenceLockOwner = {
+          pid: process.pid,
+          startToken: processStartToken(process.pid) ?? "unknown",
+          lockId,
+        };
+        fs.writeFileSync(fd, JSON.stringify(owner));
+        fs.fsyncSync(fd);
       } catch {
+        if (fd !== undefined) {
+          releaseOwnedLock(fd, lockPath, lockId ?? "");
+          fd = undefined;
+        }
         recoverStaleEvidenceLock(lockPath);
         if (Date.now() - started > 1_000) {
           return "failed";
@@ -575,7 +746,7 @@ export function writeBoundedEvidenceFile(
         } catch {
           return "conflict";
         }
-        if (!legalCallAdvance(previous, body as typeof previous)) {
+        if (!legalCallAdvance(previous, body as Record<string, unknown>)) {
           return "conflict";
         }
         replacing = true;
@@ -599,8 +770,10 @@ export function writeBoundedEvidenceFile(
       if (tmp) {
         fs.rmSync(tmp, { force: true });
       }
-      fs.closeSync(fd);
-      fs.rmSync(lockPath, { force: true });
+      if (fd !== undefined && lockId) {
+        releaseOwnedLock(fd, lockPath, lockId);
+        fd = undefined;
+      }
     }
   } catch {
     if (tmp) {

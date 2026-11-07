@@ -82,6 +82,7 @@ import {
   chargeModelCallAgainstTip,
   runnerExecutorEvidenceContext,
   recordRunnerTurnOutcome,
+  rememberModelResultUsage,
   TaskBudgetExceededError,
   usageCarriedByModelError,
   type GrowthOutcomeCommitOpts,
@@ -700,6 +701,7 @@ export async function runAgentTurnWithFallback(params: {
               const cliSessionId = getCliSessionId(params.getActiveSessionEntry(), provider);
               return (async () => {
                 const cliCharge = { done: false };
+                let notedCliUsage: unknown;
                 // CLI 后端凭证桥（cli-backend-onboarding Task 6/9）：按 bot 归属席位解析企业作用域，
                 // 选取个人/企业凭证并解析其 SecretRef，作为 per-run env 注入子进程；同时捕获
                 // credentialId + tenant/user 供执行完成后写 UsageAttribution（chargeback 依据）。
@@ -765,6 +767,7 @@ export async function runAgentTurnWithFallback(params: {
                     images: params.opts?.images,
                     credentialEnv,
                   });
+                  notedCliUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
                   bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                     result.meta?.systemPromptReport,
                   );
@@ -811,7 +814,7 @@ export async function runAgentTurnWithFallback(params: {
                     chargeTipBudgetOnce(cliCharge, {
                       provider,
                       model,
-                      usage: result.meta?.agentMeta?.usage,
+                      usage: notedCliUsage,
                     });
                   } catch (chargeErr) {
                     if (chargeErr instanceof TaskBudgetExceededError) {
@@ -841,7 +844,7 @@ export async function runAgentTurnWithFallback(params: {
                       chargeTipBudgetOnce(cliCharge, {
                         provider,
                         model,
-                        usage: usageCarriedByModelError(err),
+                        usage: notedCliUsage ?? usageCarriedByModelError(err),
                       });
                     } catch (chargeErr) {
                       if (chargeErr instanceof TaskBudgetExceededError) {
@@ -885,6 +888,7 @@ export async function runAgentTurnWithFallback(params: {
             });
             return (async () => {
               const embeddedCharge = { done: false };
+              let notedEmbeddedUsage: unknown;
               // ent/<connection>/<upstream> is a tenant catalog id, not a registry provider.
               // Without this remap the runner throws Unknown model before any reply.
               const transport = await resolveEnterpriseEmbeddedTransport({
@@ -1129,6 +1133,7 @@ export async function runAgentTurnWithFallback(params: {
                       })()
                     : undefined,
                 });
+                notedEmbeddedUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
                 bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                   result.meta?.systemPromptReport,
                 );
@@ -1141,7 +1146,7 @@ export async function runAgentTurnWithFallback(params: {
                   chargeTipBudgetOnce(embeddedCharge, {
                     provider,
                     model,
-                    usage: result.meta?.agentMeta?.usage,
+                    usage: notedEmbeddedUsage,
                   });
                 } catch (chargeErr) {
                   if (chargeErr instanceof TaskBudgetExceededError) {
@@ -1162,7 +1167,7 @@ export async function runAgentTurnWithFallback(params: {
                     chargeTipBudgetOnce(embeddedCharge, {
                       provider,
                       model,
-                      usage: usageCarriedByModelError(err),
+                      usage: notedEmbeddedUsage ?? usageCarriedByModelError(err),
                     });
                   } catch (chargeErr) {
                     if (chargeErr instanceof TaskBudgetExceededError) {
