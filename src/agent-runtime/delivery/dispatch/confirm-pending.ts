@@ -112,6 +112,14 @@ export async function confirmPendingTurnDeliveryWithPorts(
         return; // Retain the durable association after transient lock failure.
       }
     }
+    // A transport receipt cannot discard an unresolved task-acceptance association.
+    if (
+      params.status === "delivered" &&
+      pending.checkedTask &&
+      confirmed.record.acceptance.status !== "passed"
+    ) {
+      return;
+    }
     // R85e: unknown is not terminal — keep durable association for later verify.
     // Only clear after delivered / failed (or explicit abandon elsewhere).
     if (params.status === "delivered" || params.status === "failed") {

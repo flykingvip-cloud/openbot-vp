@@ -13,6 +13,34 @@ afterEach(() => {
   clearAwaitingDeliveriesForTests();
   confirm.mockReset();
 });
+it("retains task reconciliation while delivered work still awaits acceptance", async () => {
+  registerAwaitingDelivery({
+    taskId: "t",
+    deliveryId: "d",
+    agentId: "a",
+    runId: "r",
+    checkedTask: {
+      sessionFile: "/tmp/a.jsonl",
+      binding: { taskId: "board-a", executionAttempt: "r", deliverableVersion: "v" },
+    },
+  });
+  confirm.mockResolvedValue({
+    record: {
+      taskId: "t",
+      decisiveRunId: "r",
+      deliveryId: "d",
+      delivery: { status: "delivered" },
+      acceptance: { status: "pending" },
+    },
+  });
+  const completeTask = vi.fn(() => ({ persisted: true }));
+  await confirmPendingTurnDeliveryWithPorts(
+    { cfg: {}, runId: "r", status: "delivered" },
+    { resolvePersistRoot: () => "/tmp/unused", completeTask, bindingCurrent: () => true },
+  );
+  expect(completeTask).not.toHaveBeenCalled();
+  expect(peekAwaitingDelivery("r")).toBeDefined();
+});
 it.each(["missing", "wrong-run", "wrong-delivery", "wrong-status"])(
   "retains pending association when confirmation is %s",
   async (mode) => {

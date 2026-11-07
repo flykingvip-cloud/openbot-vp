@@ -1053,3 +1053,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced verified visible work requesting business continuation before its delivery receipt (1 FAIL). Terminal delivery now skips business continuation when existing trusted acceptance is verified; it still presents the result and does not invent delivery or close the task. Unverified and process-placeholder paths retain existing behavior. This does not supply the missing general acceptance validator. — codex-runtime-manager
 - Delivery regression 3 files / 31 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. — codex-runtime-manager
+
+## Receipt and acceptance reconciliation (2026-11-07)
+
+- Reproduced a delivered receipt clearing a checked task association while acceptance remained pending (1 FAIL). Confirmation now preserves that association rather than treating transport success as task acceptance. No task is force-completed. — codex-runtime-manager
+- Receipt/restart regression 2 files / 8 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. General accepted-criteria validation remains unfinished. — codex-runtime-manager
