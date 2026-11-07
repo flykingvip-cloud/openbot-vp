@@ -1202,3 +1202,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced an explicit external_user request reaching legacy classification without admission (1 FAIL). Execution host now refuses that request before legacy routing, memory flush or provider execution. Properly admitted requests and existing internal triggers retain their paths. Unmarked compatibility entrances remain pending retirement. — codex-runtime-manager
 - Reply-runner integration 48 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. Latest real artifact probe failed exact-byte acceptance because the model added a newline; this remains a real acceptance gap, not a successful task closeout. — codex-runtime-manager
+
+## Unlabelled human ingress normalization (2026-11-08)
+
+- The public reply entrance now stamps otherwise unlabelled human input as external_user, using the existing ingress rule and preserving explicit internal, heartbeat, birth and collaboration provenance. The caller context is copied. Prepared interaction therefore cannot silently fall back to legacy routing solely because provenance was omitted. Updated stale workspace/media test seams without changing production authorization. — codex-runtime-manager
+- Message-hook regression 5 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. Full replacement and general task acceptance remain open. — codex-runtime-manager
