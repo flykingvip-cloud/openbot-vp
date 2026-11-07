@@ -1,7 +1,5 @@
 import crypto from "node:crypto";
-import path from "node:path";
 import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
-import { prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
 import { runQueuedCandidate } from "../../agent-runtime/execution/index.js";
 import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
 import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
@@ -13,7 +11,8 @@ import {
 } from "../../agent-runtime/state/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
-import { resolveAgentDir, resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
+import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
+import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
@@ -46,7 +45,6 @@ import {
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
-  TASK_OUTCOME_STORE_DIRNAME,
 } from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
@@ -658,9 +656,8 @@ export function createFollowupRunner(params: {
       }
 
       if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
-        await prepareVisibleDelivery({
-          resolvePersistRoot: (agentId) =>
-            path.join(resolveAgentDir(queued.run.config, agentId), TASK_OUTCOME_STORE_DIRNAME),
+        await replyTurnRuntime.delivery.prepareVisibleDelivery(queued.run.config, {
+          workspaceDir: queued.run.workspaceDir,
           agentId: queued.run.agentId,
           runId,
           outcomeTaskId: followupOutcomeTaskId,

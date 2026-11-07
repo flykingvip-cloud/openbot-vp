@@ -5,6 +5,7 @@ import {
 } from "../../../task-outcome/chat-entry.js";
 import { registerAwaitingDelivery } from "../../../task-outcome/pending-delivery.js";
 import type { GrowthOutcomeCommitOpts } from "../../../task-outcome/runtime-from-runner.js";
+import type { TaskAcceptanceEvaluation } from "../../contracts/quality.js";
 import type { TaskCompletionBinding } from "../../contracts/task.js";
 
 type PendingIdentity = { runId: string; deliveryId: string; taskId: string; agentId: string };
@@ -19,9 +20,16 @@ export async function prepareVisibleDelivery(params: {
   sessionFile?: string;
   completionBinding?: TaskCompletionBinding;
   contract: ResolvedTurnTaskContract & { acceptanceVerified?: boolean };
+  evaluateAcceptance?: () => Promise<
+    | {
+        evaluation: TaskAcceptanceEvaluation;
+        evidence: NonNullable<GrowthOutcomeCommitOpts["acceptanceEvidence"]>;
+      }
+    | undefined
+  >;
   commitOutcome: (success: boolean, opts: GrowthOutcomeCommitOpts) => unknown;
   publishPending: (identity: PendingIdentity) => void;
-}): Promise<void> {
+}): Promise<"passed" | "failed" | "pending" | "not_required"> {
   const deliveryId = `delivery:${params.runId}:visible`;
   const gates = resolveChatTurnCloseGates({
     deliveryId,
@@ -33,22 +41,35 @@ export async function prepareVisibleDelivery(params: {
     deliveryPhase: "awaiting",
     acceptanceVerified: params.contract.acceptanceVerified === true,
   });
+  const checked = params.evaluateAcceptance ? await params.evaluateAcceptance() : undefined;
+  const binding = params.completionBinding;
+  const matches = Boolean(
+    checked &&
+    binding?.taskId &&
+    checked.evaluation.taskId === binding.taskId &&
+    checked.evaluation.executionAttempt === params.runId &&
+    binding.executionAttempt === params.runId &&
+    checked.evaluation.deliverableVersion === binding.deliverableVersion,
+  );
+  if (checked) {
+    gates.acceptance = { status: matches ? checked.evaluation.status : "pending" };
+  }
   // Persist preparation before exposing the identity to a potentially immediate send receipt.
   await params.commitOutcome(true, {
     acceptance: gates.acceptance,
     delivery: gates.delivery,
     deliveryId: gates.deliveryId,
+    ...(checked ? { acceptanceEvidence: matches ? checked.evidence : [] } : {}),
   });
   const agentId = params.agentId?.trim();
   if (!agentId) {
-    return;
+    return gates.acceptance.status;
   }
   const persistRoot = params.resolvePersistRoot(agentId);
   const taskId =
     params.outcomeTaskId ??
     chatTurnTaskId({ agentId, runId: params.runId, sessionKey: params.sessionKey });
   const identity = { runId: params.runId, deliveryId, taskId, agentId };
-  const binding = params.completionBinding;
   const checkedTask =
     params.sessionFile &&
     binding?.taskId &&
@@ -58,4 +79,5 @@ export async function prepareVisibleDelivery(params: {
       : undefined;
   registerAwaitingDelivery({ ...identity, persistRoot, ...(checkedTask ? { checkedTask } : {}) });
   params.publishPending(identity);
+  return gates.acceptance.status;
 }

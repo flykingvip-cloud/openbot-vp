@@ -172,3 +172,74 @@ it("never waives acceptance for a bound execution through a legacy chat classifi
     }),
   );
 });
+
+it.each(["passed", "failed", "pending"] as const)(
+  "persists host evaluation %s separately from transport delivery",
+  async (status) => {
+    const commit = vi.fn();
+    const evidence = [
+      {
+        validatorId: "artifact.text.exact.v1",
+        validatorVersion: "1",
+        scope: "criterion:0",
+        artifactDigestOrReceiptRef: "digest",
+        taskContractVersion: "1",
+        executionVersion: "v1",
+      },
+    ];
+    await prepareVisibleDelivery({
+      resolvePersistRoot: mocks.root,
+      agentId: "agent-a",
+      runId: "run-a",
+      completionBinding: { taskId: "board-a", executionAttempt: "run-a", deliverableVersion: "v1" },
+      contract: { ...contract, acceptanceVerified: true },
+      evaluateAcceptance: async () => ({
+        evaluation: {
+          taskId: "board-a",
+          executionAttempt: "run-a",
+          deliverableVersion: "v1",
+          criteriaHash: "hash",
+          status,
+          verdicts: [],
+        },
+        evidence,
+      }),
+      commitOutcome: commit,
+      publishPending: vi.fn(),
+    });
+    expect(commit).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        acceptance: { status },
+        acceptanceEvidence: evidence,
+        delivery: { status: "pending" },
+      }),
+    );
+  },
+);
+it("never accepts evaluation evidence for a different task version", async () => {
+  const commit = vi.fn();
+  await prepareVisibleDelivery({
+    resolvePersistRoot: mocks.root,
+    runId: "run-a",
+    completionBinding: { taskId: "board-a", executionAttempt: "run-a", deliverableVersion: "v2" },
+    contract: { ...contract, acceptanceVerified: true },
+    evaluateAcceptance: async () => ({
+      evaluation: {
+        taskId: "board-a",
+        executionAttempt: "run-a",
+        deliverableVersion: "v1",
+        criteriaHash: "hash",
+        status: "passed",
+        verdicts: [],
+      },
+      evidence: [],
+    }),
+    commitOutcome: commit,
+    publishPending: vi.fn(),
+  });
+  expect(commit).toHaveBeenCalledWith(
+    true,
+    expect.objectContaining({ acceptance: { status: "pending" }, acceptanceEvidence: [] }),
+  );
+});

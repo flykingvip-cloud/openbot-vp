@@ -27,6 +27,7 @@ import {
 } from "./command-adapters.js";
 import { confirmPendingTurnDelivery } from "./delivery-confirm.js";
 import type { runGatewayInteraction } from "./interaction-turn.js";
+import { evaluateBoundTaskAcceptance } from "./task-acceptance.js";
 
 /** Compose the original reply-turn dependencies. The reply host owns transport and cleanup. */
 export const replyTurnRuntime = {
@@ -60,10 +61,14 @@ export const replyTurnRuntime = {
     completeReplyDelivery,
     prepareVisibleDelivery(
       config: OpenBotConfig,
-      request: Omit<Parameters<typeof prepareVisibleDelivery>[0], "resolvePersistRoot">,
+      request: Omit<
+        Parameters<typeof prepareVisibleDelivery>[0],
+        "resolvePersistRoot" | "evaluateAcceptance"
+      > & { workspaceDir?: string },
     ) {
       return prepareVisibleDelivery({
         ...request,
+        evaluateAcceptance: () => evaluateBoundTaskAcceptance(request),
         resolvePersistRoot: (agentId) =>
           path.join(resolveAgentDir(config, agentId), TASK_OUTCOME_STORE_DIRNAME),
       });

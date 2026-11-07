@@ -36,6 +36,27 @@ function probe(
 }
 
 describe("terminal reply delivery", () => {
+  it.each(["passed", "pending", "failed"] as const)(
+    "uses prepared host acceptance %s for continuation",
+    (acceptanceStatus) => {
+      const ports = fixture();
+      ports.readContract.mockReturnValue({
+        id: "code-v1",
+        version: "1",
+        kind: "code",
+        requiredValidators: ["tests"],
+        acceptanceVerified: true,
+      });
+      completeReplyDelivery(
+        { kind: "visible", payloads: [{ text: "result" }], acceptanceStatus },
+        ports,
+      );
+      expect(ports.considerContinuation).toHaveBeenCalledTimes(
+        acceptanceStatus === "passed" ? 0 : 1,
+      );
+    },
+  );
+
   it("waits for delivery instead of rerunning already verified work", () => {
     const ports = fixture();
     ports.readContract.mockReturnValue({

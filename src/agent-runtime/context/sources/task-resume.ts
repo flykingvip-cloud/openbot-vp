@@ -57,6 +57,12 @@ export function buildResumePrompt(task: TrackedTask): string {
           ...task.acceptanceCriteria.map((criterion, index) => `${index + 1}. ${criterion}`),
         ]
       : []),
+    ...(task.acceptanceChecks?.length
+      ? [
+          "已接纳的声明式验收检查（expected 为精确 UTF-8 内容，包括换行；不得自行修改）：",
+          JSON.stringify(task.acceptanceChecks),
+        ]
+      : []),
     constraintBlock,
   ]
     .filter(Boolean)

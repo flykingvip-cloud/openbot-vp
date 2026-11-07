@@ -878,20 +878,24 @@ export async function runReplyAgent(params: {
       return completeDelivery({ kind: "language_filtered", didUseTools });
     }
 
-    await replyTurnRuntime.delivery.prepareVisibleDelivery(followupRun.run.config, {
-      sessionFile: followupRun.run.sessionFile,
-      completionBinding,
-      agentId: followupRun.run.agentId,
-      runId: outcomeRunId,
-      sessionKey,
-      contract: resolveTurnContractFromRun(),
-      commitOutcome: commitGrowthOutcome,
-      publishPending: (identity) => {
-        if (opts?.pendingTurnDeliveryRef) {
-          opts.pendingTurnDeliveryRef.current = identity;
-        }
+    const acceptanceStatus = await replyTurnRuntime.delivery.prepareVisibleDelivery(
+      followupRun.run.config,
+      {
+        workspaceDir: followupRun.run.workspaceDir,
+        sessionFile: followupRun.run.sessionFile,
+        completionBinding,
+        agentId: followupRun.run.agentId,
+        runId: outcomeRunId,
+        sessionKey,
+        contract: resolveTurnContractFromRun(),
+        commitOutcome: commitGrowthOutcome,
+        publishPending: (identity) => {
+          if (opts?.pendingTurnDeliveryRef) {
+            opts.pendingTurnDeliveryRef.current = identity;
+          }
+        },
       },
-    });
+    );
     try {
       const usedIds = (runResult.toolMetas ?? [])
         .map((row) => row.toolName)
@@ -1094,7 +1098,7 @@ export async function runReplyAgent(params: {
       env: process.env,
     });
 
-    return completeDelivery({ kind: "visible", payloads: finalPayloads });
+    return completeDelivery({ kind: "visible", payloads: finalPayloads, acceptanceStatus });
   } catch (error) {
     // Keep the followup queue moving even when an unexpected exception escapes
     // the run path; the caller still receives the original error.

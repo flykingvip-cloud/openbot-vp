@@ -20,7 +20,11 @@ export type ReplyDeliveryResult =
   | { kind: "empty"; probe: HonestEmptyReplyDecisionInput }
   | { kind: "language_filtered"; didUseTools?: boolean }
   // Visible receipts have already been prepared before presentation/usage decoration.
-  | { kind: "visible"; payloads: ReplyPayload[] };
+  | {
+      kind: "visible";
+      payloads: ReplyPayload[];
+      acceptanceStatus?: "passed" | "failed" | "pending" | "not_required";
+    };
 
 /** Fixed host effects, supplied by the original turn owner, never executable configuration. */
 type ReplyDeliveryPorts<T> = {
@@ -47,7 +51,10 @@ export function completeReplyDelivery<T>(
   if (result.kind === "visible") {
     payloads = result.payloads;
     // Verified business work waits for its delivery receipt; do not repeat it.
-    considerContinuation = ports.readContract().acceptanceVerified !== true;
+    considerContinuation =
+      result.acceptanceStatus !== undefined
+        ? result.acceptanceStatus !== "passed" && result.acceptanceStatus !== "not_required"
+        : ports.readContract().acceptanceVerified !== true;
   } else if (result.kind === "language_filtered") {
     const text = result.didUseTools
       ? formatTurnProcessPlaceholder(ports.language, "lookup")

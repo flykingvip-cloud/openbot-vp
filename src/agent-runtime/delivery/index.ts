@@ -1,6 +1,7 @@
 /** Delivery public API: presentation, receipt preparation and terminal result settlement. */
 export { buildReplyPayloads } from "./presentation/reply-payloads.js";
 export { prepareVisibleDelivery } from "./dispatch/prepare-visible.js";
+export { evaluateTaskAcceptance } from "./acceptance/criteria.js";
 export { confirmPendingTurnDeliveryWithPorts } from "./dispatch/confirm-pending.js";
 export { completeReplyDelivery, type ReplyDeliveryResult } from "./dispatch/complete-reply.js";
 export { patchAuthorizedPptx, artifactContentHash } from "./artifacts/patch-pptx.js";
