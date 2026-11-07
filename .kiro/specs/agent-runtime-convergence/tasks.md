@@ -1063,3 +1063,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced pending acceptance discarding the original board binding at delivery preparation (1 FAIL). Preparation now durably retains the exact original task/run/version even before acceptance passes. Confirmation still requires passed acceptance and a live binding before completion; identity retention is not authorization. — codex-runtime-manager
 - Preparation/confirmation/restart regression 3 files / 15 PASS; full tsgo PASS; typed lint and formatting clean; architecture 52 PASS. General criterion validation and full replacement acceptance remain open. — codex-runtime-manager
+
+## Internal triggers leave legacy semantic routing (2026-11-08)
+
+- Reproduced internal execution text being interpreted as user progress/conversation before queue dispatch (1 FAIL). Trusted heartbeat, birth, collaboration round and internal provenance now use resource queue decisions without user semantic classification or amendment writes. Accepted user requests retain their admission bypass of legacy classification. Unmarked legacy user entrances remain pending retirement. — codex-runtime-manager
+- Interaction/queue regression 2 files / 14 PASS; reply-runner integration 1 file / 47 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall replacement remains open. — codex-runtime-manager

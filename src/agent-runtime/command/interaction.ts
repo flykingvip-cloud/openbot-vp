@@ -45,9 +45,13 @@ export type InteractionDisposition =
 
 /** Uniform interaction entry. Execution occupancy selects resources, not a special user-message category. */
 export function handleInteraction(
-  input: QueueInput & { prompt: string; sessionFile?: string },
+  input: QueueInput & { prompt: string; sessionFile?: string; internalExecution?: boolean },
   ports: InteractionPorts,
 ): InteractionDisposition {
+  if (input.internalExecution) {
+    const action = ports.queueAction(input);
+    return { kind: action === "run-now" ? "execute" : action };
+  }
   const { prompt, sessionFile } = input;
   if (ports.isOwnerControl(prompt) && sessionFile) {
     const result = controlCurrentTask(prompt, ports.control(sessionFile.trim()));

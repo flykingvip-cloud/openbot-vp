@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
   emptySessionTaskBoard,
   mutateSessionTaskBoard,
@@ -9,6 +9,32 @@ import {
 } from "../../conversation-task/session-task-board.js";
 import { handleInteraction } from "../command/index.js";
 import { bindInteractionPorts } from "./command-adapters.js";
+it("does not interpret internal execution triggers as user conversation or amendments", () => {
+  const ports = bindInteractionPorts({ prompt: "当前进度", sessionId: "internal", queueKeys: [] });
+  ports.isOwnerControl = vi.fn(() => false);
+  ports.readBoard = vi.fn(() => {
+    throw new Error("internal trigger must not classify user intent");
+  });
+  ports.queueAction = vi.fn(() => "enqueue-followup" as const);
+  expect(
+    handleInteraction(
+      {
+        prompt: "当前进度",
+        sessionFile: "internal.jsonl",
+        internalExecution: true,
+        isActive: true,
+        isHeartbeat: false,
+        isStreaming: true,
+        shouldSteer: false,
+        shouldFollowup: true,
+        queueMode: "collect",
+      },
+      ports,
+    ),
+  ).toEqual({ kind: "enqueue-followup" });
+  expect(ports.isOwnerControl).not.toHaveBeenCalled();
+  expect(ports.readBoard).not.toHaveBeenCalled();
+});
 it.each([false, true])(
   "answers task queries independently of executor occupancy: %s",
   (isActive) => {

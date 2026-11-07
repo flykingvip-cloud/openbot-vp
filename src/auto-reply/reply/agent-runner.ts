@@ -225,6 +225,14 @@ export async function runReplyAgent(params: {
         {
           prompt: followupRun.prompt,
           sessionFile: followupRun.run.sessionFile,
+          internalExecution:
+            isHeartbeat ||
+            opts?.growthBirthTurn === true ||
+            followupRun.run.collaborationRoundInvoked === true ||
+            Boolean(
+              followupRun.run.inputProvenance &&
+              followupRun.run.inputProvenance.kind !== "external_user",
+            ),
           isActive,
           isStreaming,
           isHeartbeat,
