@@ -1233,3 +1233,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Separated fixed interrupt/steer effects from the old keyword-routing adapter. Removed handleInteraction from the command public facade; the live reply composition no longer loads that adapter. Architecture now forbids production imports of the retired routing modules, with exact historical-test exceptions only. Source retained pending immutable archival and final deletion. — codex-runtime-manager
 - Historical comparison and state lifecycle 3 files / 11 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. Prior candidate 4f996d952 full build PASS with 209 existing ineffective-dynamic-import warnings and UI chunk-size warnings. No gateway restart or deployment. — codex-runtime-manager
+
+## Real admitted execution acceptance and delivery closeout (2026-11-08)
+
+- Isolated real-model probes exposed invented/redundant acceptance criteria despite a user-specified single criterion. Interaction protocol now preserves explicit acceptance scope and keeps execution-method restrictions in the goal. Unsupported semantic criteria remain pending; no acceptance bypass added. — codex-runtime-manager
+- Real Gateway/model probe now verifies exact artifact bytes, persisted acceptance=passed with artifact digest, delivery=delivered, board unfinished=false and deliverableChecked=true, with no continuation wake. Model completion agent.wait precedes delivery settlement; the earlier immediate pending snapshot was not terminal evidence. Probe waited for settlement before inspection and removed temporary state. This proves one individual deterministic-artifact scenario, not general document quality or full group acceptance. — codex-runtime-manager
+- Parser/model regression 2 files / 30 PASS; full tsgo PASS; typed lint clean. No merge, production restart or deployment. — codex-runtime-manager
