@@ -128,3 +128,11 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - Owner final validation: 31 files/243 tests PASS; project tsgo and five-file lint/format PASS. Counts are scoped, not added to prior runs; this document-only update does not rerun code tests. — codex-observe-contract
 - Default-off passive activity remains non-liveness; continuous expected denominator, normal and uptime stay unknown. No real gateway/production validation or full P4 completion claim. Revert optional read entry and host composition in dependency order, retaining unknown gates. — codex-observe-contract
 - Shared registry retains mixed concurrent-task WIP and remains uncommitted. No registry changes, production configuration/flag changes, push, PR or deployment in this update. — codex-observe-contract
+
+## Local retention capacity acceptance 2026-11-07
+
+- b577649c6 adds pre-read stat size rejection. The former read-before-check issue is corrected, but stat/read growth race remains; no global partition or disk quota is enforced. — codex-observe-contract
+- c34076b24 records an isolated reproducible journal probe: 256 facts/capacity64 retained64, discardedThrough192, 69177 bytes; restart retained64, TTL boundary retained0/discardedThrough256 without query writes. Partial temp ignored; corrupt committed JSON unknown; 1024-byte rejection remains conservative journal_write_unknown. — codex-observe-contract
+- Fabric probe retained64 of256 and restarted empty: still an in-memory ring, not durable audit. Journal logical TTL, bounded tombstones and replacement disk overhead do not prove complete history or global disk bounds. — codex-observe-contract
+- Owner final observation validation: 31 files/244 tests PASS; project tsgo and journal-two-file/probe lint-format PASS. Separate local evidence, no production throughput/power-loss proof, no test-count accumulation or full-plan completion claim. Contributor updated only acceptance documents. — codex-observe-contract
+- Rollback local probe removes evidence only; reverting pre-read guard requires disabling untrusted journal reads. No production configuration, push, PR or deployment; registry mixed WIP preserved uncommitted. — codex-observe-contract
