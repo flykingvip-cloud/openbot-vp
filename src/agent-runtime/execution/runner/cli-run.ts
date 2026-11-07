@@ -48,11 +48,14 @@ import { enqueueSystemEvent } from "../../../infra/system-events.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
 import { getProcessSupervisor } from "../../../process/supervisor/index.js";
 import { scopedHeartbeatWakeOptions } from "../../../routing/session-key.js";
+import type { TaskCompletionBinding } from "../../contracts/task.js";
+import { sessionTaskState } from "../../state/index.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
 
 const log = createSubsystemLogger("agent/claude-cli");
 
 export async function runCliAgent(params: {
+  taskExecutionBinding?: TaskCompletionBinding;
   sessionId: string;
   sessionKey?: string;
   agentId?: string;
@@ -86,6 +89,12 @@ export async function runCliAgent(params: {
   supervisedRun?: boolean;
 }): Promise<EmbeddedPiRunResult> {
   const assertNotAborted = () => {
+    if (
+      params.taskExecutionBinding &&
+      !sessionTaskState.bindingCurrent(params.sessionFile, params.taskExecutionBinding)
+    ) {
+      throw new Error("Original task was paused, closed, revised or replaced before CLI execution");
+    }
     if (params.abortSignal?.aborted) {
       const error = new Error("CLI execution cancelled");
       error.name = "AbortError";
@@ -273,6 +282,7 @@ export async function runCliAgent(params: {
 
     try {
       const output = await enqueueCliRun(queueKey, async () => {
+        assertNotAborted();
         log.info(
           `cli exec: provider=${params.provider} model=${normalizedModel} promptChars=${params.prompt.length}`,
         );

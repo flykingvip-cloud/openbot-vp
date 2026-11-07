@@ -43,6 +43,7 @@ export async function runScheduledCandidate(
       config: run.config,
     });
     const result = await runCliAgent({
+      taskExecutionBinding: run.taskExecutionBinding,
       sessionId: run.sessionId,
       sessionKey: run.sessionKey,
       agentId: run.agentId,

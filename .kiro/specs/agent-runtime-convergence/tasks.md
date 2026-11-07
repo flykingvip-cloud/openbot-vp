@@ -988,3 +988,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Queued execution, scheduled execution and command session closeout now consume the result type through execution/index. Removed their legacy execution facade imports used only for ReturnType; no model invocation or closeout behavior changed. — codex-runtime-manager
 - Consumer regression 3 files / 72 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
+
+## CLI original execution identity (2026-11-07)
+
+- Admitted and scheduled CLI candidates forward their original task execution binding into the unique CLI adapter. The adapter checks the existing state API before preparation, after its queue wait, before spawn and before adopting results or retrying an expired session. Unbound internal calls retain existing behavior. No new classifier, state store or executor. — codex-runtime-manager
+- CLI/candidate regression 4 files / 18 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager

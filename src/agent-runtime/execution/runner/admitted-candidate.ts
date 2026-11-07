@@ -102,6 +102,7 @@ export function createAdmittedCandidateInvoker(
           host.assertOriginalTaskCurrent();
           host.observeExecution?.("started");
           const result = await runCliAgent({
+            taskExecutionBinding: params.followupRun.run.taskCompletionBinding,
             sessionId: params.followupRun.run.sessionId,
             sessionKey: params.sessionKey,
             agentId: params.followupRun.run.agentId,
