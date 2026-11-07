@@ -1,15 +1,45 @@
 import fs from "node:fs";
+import fsPromises from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { acquireFileLock, acquireFileLockSync } from "./file-lock.js";
 const roots: string[] = [];
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const root of roots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+it("does not delete a replacement lock when stale inspection loses its snapshot", () => {
+  const { file, payload } = fixture();
+  fs.writeFileSync(`${file}.lock`, "");
+  const normalizedLock = path.join(
+    fs.realpathSync(path.dirname(file)),
+    `${path.basename(file)}.lock`,
+  );
+  const originalStat = fs.statSync;
+  vi.spyOn(fs, "statSync").mockImplementation((...args: Parameters<typeof fs.statSync>) => {
+    if (String(args[0]) === normalizedLock) {
+      fs.writeFileSync(`${file}.lock`, payload);
+      throw Object.assign(new Error("previous lock disappeared"), { code: "ENOENT" });
+    }
+    return originalStat(...args);
+  });
+  expect(() => acquireFileLockSync(file, options)).toThrow(/timeout/);
+  expect(fs.readFileSync(`${file}.lock`, "utf8")).toBe(payload);
+});
 const options = { retries: { retries: 0, factor: 1, minTimeout: 1, maxTimeout: 1 }, stale: 1 };
+it("async stale inspection cannot delete a replacement lock after ENOENT", async () => {
+  const { file, payload } = fixture();
+  fs.writeFileSync(`${file}.lock`, "");
+  vi.spyOn(fsPromises, "stat").mockImplementationOnce(async () => {
+    await fsPromises.writeFile(`${file}.lock`, payload);
+    throw Object.assign(new Error("previous lock disappeared"), { code: "ENOENT" });
+  });
+  await expect(acquireFileLock(file, options)).rejects.toThrow(/timeout/);
+  expect(fs.readFileSync(`${file}.lock`, "utf8")).toBe(payload);
+});
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "live-file-lock-"));
   roots.push(root);

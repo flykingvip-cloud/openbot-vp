@@ -1128,3 +1128,13 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Added a static dependency rule preventing migrated state components from importing the legacy task-board facade. Explicit exceptions retain the remaining business-transition adapter and compatibility test. Repository ownership comment now reflects actual runtime storage authority. — codex-runtime-manager
 - Architecture manifest 53 PASS; no runtime behavior changed in this checkpoint. General acceptance evidence and full replacement remain open. — codex-runtime-manager
+
+## Completion transaction extraction verification (2026-11-08)
+
+- Moved completion identity checks and locked writes into state/mutations; completion notice projection into context and the existing parked capacity into policy. Legacy exports refer to the same implementation. — codex-runtime-manager
+- First combined cross-process run had one pause/constraint race failure (wakeSuppress missing); preserve this failure as an unresolved concurrency gate. Isolated seven-case rerun and subsequent combined binding/restart/race run (16 tests) passed; this does not explain or close the first failure. Full tsgo PASS; typed lint clean; architecture 53 PASS. Completion extraction remains uncommitted pending race investigation. — codex-runtime-manager
+
+## Lock inspection replacement race (2026-11-08)
+
+- Deterministically reproduced stale inspection ENOENT deleting a replacement lock (1 FAIL before / PASS after). Sync and async inspection failures now refuse stale deletion; living-owner checks remain intact. This proves the specific lock defect, not the exact event sequence of the earlier pause race. — codex-runtime-manager
+- Lock liveness 4 PASS; combined lock/cross-process/restart regression previously 13 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager

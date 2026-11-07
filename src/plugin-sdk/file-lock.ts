@@ -79,7 +79,8 @@ async function isStaleLock(lockPath: string, staleMs: number): Promise<boolean> 
     const stat = await fs.stat(lockPath);
     return Date.now() - stat.mtimeMs > staleMs;
   } catch {
-    return true;
+    // Losing the inspection snapshot does not authorize deleting a replacement lock.
+    return false;
   }
 }
 
@@ -216,7 +217,8 @@ function isStaleLockSync(lockPath: string, staleMs: number): boolean {
     const stat = fsSync.statSync(lockPath);
     return Date.now() - stat.mtimeMs > staleMs;
   } catch {
-    return true;
+    // Losing the inspection snapshot does not authorize deleting a replacement lock.
+    return false;
   }
 }
 
