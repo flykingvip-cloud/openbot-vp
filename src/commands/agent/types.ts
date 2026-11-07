@@ -1,3 +1,5 @@
+import type { AgentStreamParams } from "../../agent-runtime/contracts/inference.js";
+export type { AgentStreamParams } from "../../agent-runtime/contracts/inference.js";
 import type {
   AgentRunContext,
   AgentCommandGovernanceEntry,
@@ -18,12 +20,6 @@ export type ImageContent = {
   type: "image";
   data: string;
   mimeType: string;
-};
-
-export type AgentStreamParams = {
-  /** Provider stream params override (best-effort). */
-  temperature?: number;
-  maxTokens?: number;
 };
 
 export type AgentCommandOpts = {

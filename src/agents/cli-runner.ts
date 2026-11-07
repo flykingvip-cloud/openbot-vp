@@ -64,7 +64,7 @@ export async function runCliAgent(params: {
   runId: string;
   abortSignal?: AbortSignal;
   extraSystemPrompt?: string;
-  streamParams?: import("../commands/agent/types.js").AgentStreamParams;
+  streamParams?: import("../agent-runtime/contracts/inference.js").AgentStreamParams;
   ownerNumbers?: string[];
   cliSessionId?: string;
   bootstrapPromptWarningSignaturesSeen?: string[];

@@ -1,7 +1,7 @@
 import type { ImageContent } from "@earendil-works/pi-ai/compat";
+import type { AgentStreamParams } from "../../../agent-runtime/contracts/inference.js";
 import type { ReasoningLevel, ThinkLevel, VerboseLevel } from "../../../auto-reply/thinking.js";
 import type { ReplyPayload } from "../../../auto-reply/types.js";
-import type { AgentStreamParams } from "../../../commands/agent/types.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
 import type { OguiDecisionRunBinding } from "../../../config/sessions/ogui-decision-engine.js";

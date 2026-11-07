@@ -740,3 +740,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Shared model lease disposal now returns one awaitable Promise; command, interaction and admitted execution wait for release. Snapshot cleanup runs even on release failure. No additional execution path. — codex-runtime-manager
 - Joint command/governance/credit/model-session regression 8 files / 76 PASS; additional pending-release identity test brings focused lease suite to 6 PASS. Full tsgo PASS; changed-file typed lint clean; architecture 51 PASS. Pending scoped commit and final integration; no retirement or deployment claimed. — codex-runtime-manager
+
+## Shared inference parameter contract (2026-11-07)
+
+- Provider stream parameters now belong to runtime contracts; embedded and CLI backends no longer import command-host options for this shared type. Original command export remains type-only compatibility. — codex-runtime-manager
+- CLI/command regression 2 files / 45 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Complete executor replacement remains open. — codex-runtime-manager
