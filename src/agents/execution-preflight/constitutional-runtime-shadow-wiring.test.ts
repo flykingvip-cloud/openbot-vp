@@ -27,7 +27,7 @@ const TEST_FILE = /\.test\.[cm]?tsx?$/;
 
 const P = "src/agents/pi-embedded-runner";
 const E = "src/agents/execution-preflight";
-const RUN_TS = `${P}/run.ts`;
+const RUN_TS = "src/agent-runtime/execution/runner/embedded-run.ts";
 const TYPES_TS = `${P}/run/types.ts`;
 const PARAMS_TS = `${P}/run/params.ts`;
 const ATTEMPT_TS = `${P}/run/attempt.ts`;

@@ -790,3 +790,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Attempt registration recheck and stall quota identity now consume state/index instead of direct task-board imports. Original lock/storage and binding semantics remain unchanged; no additional state writer. — codex-runtime-manager
 - Attempt/context runner regression 2 files / 61 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration and retirement remain open. — codex-runtime-manager
+
+## Shadow wiring scanner migration follow-up (2026-11-07)
+
+- Broader source-scanner regression found five stale-path failures after core-loop relocation. Updated the scanner's sole run owner to execution/runner/embedded-run, preserving all flag-reader, caller allowlist and injection assertions. — codex-runtime-manager
+- Scanner 9 PASS; no production behavior change. — codex-runtime-manager
