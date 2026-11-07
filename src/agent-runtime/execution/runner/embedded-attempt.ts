@@ -268,6 +268,7 @@ import {
 } from "../../model/index.js";
 import { wrapStreamFnTrimToolCallNames } from "../../model/index.js";
 import { resolvePromptModeForSession } from "../../policy/index.js";
+import { repairTrailingUserTurn, persistAttemptPromptError } from "../../state/index.js";
 import { sessionTaskState } from "../../state/index.js";
 import { captureTaskActionBoundary } from "../../state/task-action.js";
 import { resolveAttemptEndOfRunAttribution } from "../outcomes/attempt-attribution.js";
@@ -1663,22 +1664,14 @@ export async function runEmbeddedAttempt(
         // Repair orphaned trailing user messages so new prompts don't violate role ordering.
         // Collaboration rounds skip this: the gateway already persisted the shared user turn,
         // and SessionManager user writes are suppressed (skipUserTranscriptPersist).
-        const leafEntry = sessionManager.getLeafEntry();
-        if (
-          params.skipUserTranscriptPersist !== true &&
-          leafEntry?.type === "message" &&
-          leafEntry.message.role === "user"
-        ) {
-          if (leafEntry.parentId) {
-            sessionManager.branch(leafEntry.parentId);
-          } else {
-            sessionManager.resetLeaf();
-          }
-          const sessionContext = sessionManager.buildSessionContext();
-          activeSession.agent.state.messages = sessionContext.messages;
+        const repairedMessages = repairTrailingUserTurn(
+          sessionManager,
+          params.skipUserTranscriptPersist === true,
+        );
+        if (repairedMessages) {
+          activeSession.agent.state.messages = repairedMessages;
           log.warn(
-            `Removed orphaned user message to prevent consecutive user turns. ` +
-              `runId=${params.runId} sessionId=${params.sessionId}`,
+            `Removed orphaned user message to prevent consecutive user turns. runId=${params.runId} sessionId=${params.sessionId}`,
           );
         }
 
@@ -2043,19 +2036,18 @@ export async function runEmbeddedAttempt(
         sessionIdUsed = snapshotSelection.sessionIdUsed;
 
         if (promptError && promptErrorSource === "prompt" && !compactionOccurredThisAttempt) {
-          try {
-            sessionManager.appendCustomEntry("openclaw:prompt-error", {
-              timestamp: Date.now(),
+          persistAttemptPromptError(
+            sessionManager,
+            {
               runId: params.runId,
               sessionId: params.sessionId,
               provider: params.provider,
               model: params.modelId,
               api: params.model.api,
               error: describeUnknownError(promptError),
-            });
-          } catch (entryErr) {
-            log.warn(`failed to persist prompt error entry: ${String(entryErr)}`);
-          }
+            },
+            (message) => log.warn(message),
+          );
         }
 
         // Let the active context engine run its post-turn lifecycle.

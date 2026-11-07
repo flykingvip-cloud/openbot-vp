@@ -11,3 +11,5 @@ export { persistAcpTurnTranscript } from "./acp-transcript.js";
 export { persistInteractionMessage } from "./interaction-transcript.js";
 
 export { claimQueuedExecution } from "./mutations/claim-queued-execution.js";
+
+export { repairTrailingUserTurn, persistAttemptPromptError } from "./attempt-transcript.js";
