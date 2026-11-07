@@ -340,6 +340,19 @@ function feishuCardContract(params: {
   };
 }
 
+function feishuCapabilityStateLabel(status: string): string {
+  switch (status) {
+    case "granted":
+      return "已开通";
+    case "missing":
+      return "未开通";
+    case "unknown":
+      return "未知";
+    default:
+      return "未检查";
+  }
+}
+
 function renderFeishuEnterpriseContract(params: {
   channelId: string;
   form: Record<string, unknown> | null;
@@ -353,30 +366,51 @@ function renderFeishuEnterpriseContract(params: {
   const contract = feishuCardContract(params);
   const rows = contract.capabilityStatus;
   const capability = [
-    ["群消息读取", rows?.projectGroupRead ?? "not_checked"],
-    ["文档", rows?.projectDocs ?? "not_checked"],
-    ["以用户身份发送", rows?.sendAsUser ?? "not_checked"],
-    ["新消息", rows?.newMessageTrigger ?? "not_checked"],
+    ["projectGroupRead", "群消息读取", rows?.projectGroupRead ?? "not_checked"],
+    ["projectDocs", "文档", rows?.projectDocs ?? "not_checked"],
+    ["sendAsUser", "以用户身份发送", rows?.sendAsUser ?? "not_checked"],
+    ["newMessageTrigger", "新消息", rows?.newMessageTrigger ?? "not_checked"],
   ] as const;
   const probeTone = params.probe?.tone === "ok" ? "is-ok" : params.probe ? "is-warn" : "";
-  return html`<div class="enterprise-im-status" data-feishu-enterprise-contract>
+  return html`<section class="enterprise-im-status" data-feishu-enterprise-contract>
+    <div class="enterprise-im-status__head">状态</div>
     <div class="enterprise-im-status__chips">
       ${
         params.probe
           ? html`<span class="enterprise-im-status__chip ${probeTone}">${params.probe.summary}</span>`
           : nothing
       }
-      <span class="enterprise-im-status__chip">${formatFeishuEmployeeUiHint(contract.employeeUiHint)}</span>
-      <span class="enterprise-im-status__chip">
-        平台企业 ID ${contract.platformEnterpriseId ?? "未探测（不是账户 ID）"}
-      </span>
-      ${capability.map(
-        ([label, status]) =>
-          html`<span class="enterprise-im-status__chip">${label} ${status}</span>`,
-      )}
+      <span class="enterprise-im-status__chip"
+        >${formatFeishuEmployeeUiHint(contract.employeeUiHint)}</span
+      >
     </div>
+    <div class="enterprise-im-status__row" data-feishu-enterprise-id>
+      <span class="enterprise-im-status__label">平台企业 ID</span>
+      <span class="enterprise-im-status__value">
+        ${contract.platformEnterpriseId ?? "未探测"}
+        ${
+          contract.platformEnterpriseId
+            ? nothing
+            : html`
+                <span class="enterprise-im-status__aside">不是账户 ID</span>
+              `
+        }
+      </span>
+    </div>
+    <ul class="enterprise-im-status__caps">
+      ${capability.map(
+        ([key, label, status]) => html`
+          <li class="enterprise-im-status__cap" data-capability=${key} data-status=${status}>
+            <span>${label}</span>
+            <span class="enterprise-im-status__state ${status === "granted" ? "is-ok" : status === "missing" ? "is-missing" : ""}"
+              >${feishuCapabilityStateLabel(status)}</span
+            >
+          </li>
+        `,
+      )}
+    </ul>
     <p class="enterprise-im-status__note">连通正常不是员工授权。</p>
-  </div>`;
+  </section>`;
 }
 
 function isChannelEnabled(
@@ -629,6 +663,199 @@ function renderWorkspace(params: {
     }
   };
 
+  const formView =
+    state.configRaw && props.tenantId
+      ? renderEnterpriseImChannelForm({
+          channelId,
+          form,
+          tenantId: props.tenantId,
+          disabled,
+          onFieldChange: (field, value) => {
+            if (!state.configRaw || !props.tenantId) {
+              return;
+            }
+            const next = setEnterpriseImAccountFieldValue({
+              form: parseConfigRaw(state.configRaw),
+              channelId,
+              tenantId: props.tenantId,
+              field,
+              value,
+            });
+            state.configRaw = `${JSON.stringify(next, null, 2)}\n`;
+            state.configDirty = true;
+            state.error = null;
+            state.notice = null;
+            const { [channelId]: _cleared, ...rest } = state.lastProbeByChannel;
+            state.lastProbeByChannel = rest;
+            requestUpdate();
+          },
+        })
+      : html`
+          <div class="enterprise-channel-workspace__hint">配置未加载</div>
+        `;
+
+  const saveButton = html`
+    <div class="enterprise-form-actions">
+      <button
+        class="btn btn--primary"
+        type="button"
+        ?disabled=${disabled || !state.configDirty || !state.configRaw}
+        @click=${() =>
+          void run(
+            `save:${channelId}`,
+            async () => {
+              if (!props.client || !props.tenantId || !state.configRaw) {
+                throw new Error("配置未加载");
+              }
+              let formToSave = parseConfigRaw(state.configRaw);
+              formToSave = ensureImAccountWebhookPaths(formToSave);
+              const gap = describeTenantImCredentialGaps(formToSave, channelId, { accountId });
+              if (gap) {
+                throw new Error(`保存未通过：${gap}`);
+              }
+              const raw = `${JSON.stringify(formToSave, null, 2)}\n`;
+              const saved = await saveTenantConfigRaw(
+                props.client,
+                props.tenantId,
+                raw,
+                state.configHash,
+              );
+              state.configRaw = saved.raw;
+              state.configHash = saved.hash;
+              state.editorBaseRaw = saved.raw;
+              state.configDirty = false;
+            },
+            { skipSuccessNotice: false },
+          )}
+      >
+        ${state.busyId?.startsWith("save:") ? "保存中…" : "保存"}
+      </button>
+    </div>
+  `;
+
+  const orderHint = showCallback
+    ? "建议顺序：保存凭证 → 复制 Callback URL 回填开放平台 → 向机器人发「你好」→ 测试连通。"
+    : "建议顺序：保存凭证 → 在开放平台确认长连接/事件订阅 → 向机器人发「你好」→ 测试连通。";
+
+  const troubleshoot = html`
+    <details
+      class="enterprise-im-curated__disclosure"
+      data-testid=${channelId === "feishu" ? "enterprise-im-troubleshoot" : nothing}
+    >
+      <summary>排查</summary>
+      <p>${resolveTenantImPendingHint(channelId)}</p>
+      <p>${orderHint}</p>
+    </details>
+  `;
+
+  const callbackBlock = showCallback
+    ? html`
+        <div class="enterprise-channel-workspace__callbacks">
+          <div class="enterprise-channel-workspace__section-title">Callback URL（回填到开放平台）</div>
+          ${
+            entries.length === 0
+              ? html`
+                  <div class="enterprise-channel-workspace__hint">
+                    打开配置后会自动生成账户级回调地址；保存后复制到开放平台即可。
+                  </div>
+                `
+              : html`<ul class="enterprise-im-callback-list">
+                  ${entries.map(
+                    (entry) => html`
+                      <li class="enterprise-im-callback-list__item">
+                        <div class="enterprise-im-callback-list__meta">
+                          <strong>${entry.accountId}</strong>
+                          <code class="enterprise-im-callback-list__url">${entry.url}</code>
+                        </div>
+                        <button
+                          class="btn btn--sm"
+                          type="button"
+                          ?disabled=${disabled}
+                          @click=${() =>
+                            copyText(entry.copyText, (ok) => {
+                              state.notice = ok ? "已复制 Callback URL" : null;
+                              state.error = ok ? null : "复制失败，请手动选择地址。";
+                              requestUpdate();
+                            })}
+                        >
+                          复制
+                        </button>
+                      </li>
+                    `,
+                  )}
+                </ul>`
+          }
+        </div>
+      `
+    : nothing;
+
+  const probeButton = html`
+    <button
+      class=${channelId === "feishu" ? "btn" : "btn btn--sm"}
+      type="button"
+      data-testid="enterprise-channel-probe"
+      ?disabled=${disabled || state.probing}
+      @click=${() => {
+        void (async () => {
+          state.busyId = `probe:${channelId}`;
+          state.error = null;
+          state.notice = null;
+          requestUpdate();
+          try {
+            await runProbe();
+          } catch (error) {
+            state.notice = null;
+            state.error = localizeEnterpriseGatewayThrown(error, "测试连通失败，请重试。");
+          } finally {
+            state.busyId = null;
+            state.probing = false;
+            requestUpdate();
+          }
+        })();
+      }}
+    >
+      ${state.probing ? "测试中…" : "测试连通"}
+    </button>
+  `;
+
+  const syncButton = html`
+    <button
+      class=${channelId === "feishu" ? "btn btn--sm" : "btn btn--sm btn--primary"}
+      type="button"
+      ?disabled=${
+        disabled ||
+        props.syncBusy ||
+        state.configDirty ||
+        !credentialsReady ||
+        !props.onSyncOperationalIdentity
+      }
+      @click=${() => void props.onSyncOperationalIdentity?.(channelId)}
+    >
+      ${props.syncBusy ? "同步中…" : "同步为运营身份"}
+    </button>
+  `;
+
+  const identityButton = props.onNavigateToIdentities
+    ? html`
+        <button
+          class="btn btn--sm"
+          type="button"
+          ?disabled=${disabled}
+          @click=${props.onNavigateToIdentities}
+        >
+          打开企业身份
+        </button>
+      `
+    : nothing;
+
+  const statusCard = renderFeishuEnterpriseContract({
+    channelId,
+    form,
+    accountId,
+    snapshot: state.snapshot,
+    probe: lastProbe,
+  });
+
   return html`
     <section class="enterprise-channel-workspace enterprise-settings-panel enterprise-settings-panel--flat">
       <header class="enterprise-channel-workspace__head">
@@ -766,236 +993,63 @@ function renderWorkspace(params: {
           : nothing
       }
 
-      <div class="enterprise-channel-workspace__form">
-        ${
-          state.configRaw && props.tenantId
-            ? renderEnterpriseImChannelForm({
-                channelId,
-                form,
-                tenantId: props.tenantId,
-                disabled,
-                onFieldChange: (field, value) => {
-                  if (!state.configRaw || !props.tenantId) {
-                    return;
-                  }
-                  const next = setEnterpriseImAccountFieldValue({
-                    form: parseConfigRaw(state.configRaw),
-                    channelId,
-                    tenantId: props.tenantId,
-                    field,
-                    value,
-                  });
-                  state.configRaw = `${JSON.stringify(next, null, 2)}\n`;
-                  state.configDirty = true;
-                  state.error = null;
-                  state.notice = null;
-                  const { [channelId]: _cleared, ...rest } = state.lastProbeByChannel;
-                  state.lastProbeByChannel = rest;
-                  requestUpdate();
-                },
-              })
-            : html`
-                <div class="enterprise-channel-workspace__hint">配置未加载</div>
-              `
-        }
-      </div>
-
-      ${renderFeishuEnterpriseContract({
-        channelId,
-        form,
-        accountId,
-        snapshot: state.snapshot,
-        probe: lastProbe,
-      })}
-
-      <div class="enterprise-form-actions">
-        <button
-          class="btn btn--primary"
-          type="button"
-          ?disabled=${disabled || !state.configDirty || !state.configRaw}
-          @click=${() =>
-            void run(
-              `save:${channelId}`,
-              async () => {
-                if (!props.client || !props.tenantId || !state.configRaw) {
-                  throw new Error("配置未加载");
-                }
-                let formToSave = parseConfigRaw(state.configRaw);
-                formToSave = ensureImAccountWebhookPaths(formToSave);
-                const gap = describeTenantImCredentialGaps(formToSave, channelId, { accountId });
-                if (gap) {
-                  throw new Error(`保存未通过：${gap}`);
-                }
-                const raw = `${JSON.stringify(formToSave, null, 2)}\n`;
-                const saved = await saveTenantConfigRaw(
-                  props.client,
-                  props.tenantId,
-                  raw,
-                  state.configHash,
-                );
-                state.configRaw = saved.raw;
-                state.configHash = saved.hash;
-                state.editorBaseRaw = saved.raw;
-                state.configDirty = false;
-              },
-              { skipSuccessNotice: false },
-            )}
-        >
-          ${state.busyId?.startsWith("save:") ? "保存中…" : "保存"}
-        </button>
-      </div>
-
       ${
-        showCallback
+        channelId === "feishu"
           ? html`
-              <div class="enterprise-channel-workspace__callbacks">
-                <div class="enterprise-channel-workspace__section-title">
-                  Callback URL（回填到开放平台）
+              <div class="enterprise-im-workspace__columns">
+                <div class="enterprise-im-workspace__main">
+                  <div class="enterprise-channel-workspace__form">${formView}</div>
+                  ${saveButton}
+                  ${callbackBlock}
+                  ${troubleshoot}
                 </div>
-                ${
-                  entries.length === 0
-                    ? html`
-                        <div class="enterprise-channel-workspace__hint">
-                          打开配置后会自动生成账户级回调地址；保存后复制到开放平台即可。
-                        </div>
-                      `
-                    : html`
-                        <ul class="enterprise-im-callback-list">
-                          ${entries.map(
-                            (entry) => html`
-                              <li class="enterprise-im-callback-list__item">
-                                <div class="enterprise-im-callback-list__meta">
-                                  <strong>${entry.accountId}</strong>
-                                  <code class="enterprise-im-callback-list__url">${entry.url}</code>
-                                </div>
-                                <button
-                                  class="btn btn--sm"
-                                  type="button"
-                                  ?disabled=${disabled}
-                                  @click=${() =>
-                                    copyText(entry.copyText, (ok) => {
-                                      state.notice = ok ? "已复制 Callback URL" : null;
-                                      state.error = ok ? null : "复制失败，请手动选择地址。";
-                                      requestUpdate();
-                                    })}
-                                >
-                                  复制
-                                </button>
-                              </li>
-                            `,
-                          )}
-                        </ul>
-                      `
-                }
-                ${
-                  channelId === "feishu"
-                    ? html`<details class="enterprise-im-curated__disclosure">
-                        <summary>排查</summary>
-                        <p>${resolveTenantImPendingHint(channelId)}</p>
-                      </details>`
-                    : html`<p class="enterprise-channel-workspace__hint">
-                        ${resolveTenantImPendingHint(channelId)}
-                      </p>`
-                }
+                <aside class="enterprise-im-workspace__side">
+                  ${statusCard}
+                  <div class="enterprise-im-workspace__actions">
+                    ${probeButton} ${syncButton} ${identityButton}
+                  </div>
+                  ${
+                    props.identityLinkHint
+                      ? html`<div class="enterprise-im-status__note">${props.identityLinkHint}</div>`
+                      : nothing
+                  }
+                </aside>
               </div>
             `
-          : channelId === "feishu"
-            ? html`<details class="enterprise-im-curated__disclosure" data-testid="enterprise-im-troubleshoot">
-                <summary>排查</summary>
-                <p>${resolveTenantImPendingHint(channelId)}</p>
-              </details>`
-            : html`<p class="enterprise-channel-workspace__hint">
-                ${resolveTenantImPendingHint(channelId)}
-              </p>`
-      }
-
-      ${
-        channelId !== "feishu" && lastProbe
-          ? html`
-              <div
-                class="enterprise-channel-workspace__result ${
-                  lastProbe.tone === "ok"
-                    ? "enterprise-channel-workspace__result--ok"
-                    : lastProbe.tone === "fail"
-                      ? "enterprise-channel-workspace__result--danger"
-                      : "enterprise-channel-workspace__result--warn"
-                }"
-              >
-                ${lastProbe.summary}
-                ${lastProbe.hint ? html`<div>${lastProbe.hint}</div>` : nothing}
-              </div>
-            `
-          : nothing
-      }
-      ${
-        props.identityLinkHint
-          ? html`<div class="enterprise-channel-workspace__result">${props.identityLinkHint}</div>`
-          : nothing
-      }
-
-      <div class="enterprise-form-actions">
-        <button
-          class="btn btn--sm"
-          type="button"
-          data-testid="enterprise-channel-probe"
-          ?disabled=${disabled || state.probing}
-          @click=${() => {
-            void (async () => {
-              state.busyId = `probe:${channelId}`;
-              state.error = null;
-              state.notice = null;
-              requestUpdate();
-              try {
-                await runProbe();
-              } catch (error) {
-                state.notice = null;
-                state.error = localizeEnterpriseGatewayThrown(error, "测试连通失败，请重试。");
-              } finally {
-                state.busyId = null;
-                state.probing = false;
-                requestUpdate();
+          : html`
+              <div class="enterprise-channel-workspace__form">${formView}</div>
+              ${saveButton}
+              ${callbackBlock}
+              <p class="enterprise-channel-workspace__hint">${resolveTenantImPendingHint(channelId)}</p>
+              ${
+                lastProbe
+                  ? html`
+                      <div
+                        class="enterprise-channel-workspace__result ${
+                          lastProbe.tone === "ok"
+                            ? "enterprise-channel-workspace__result--ok"
+                            : lastProbe.tone === "fail"
+                              ? "enterprise-channel-workspace__result--danger"
+                              : "enterprise-channel-workspace__result--warn"
+                        }"
+                      >
+                        ${lastProbe.summary}
+                        ${lastProbe.hint ? html`<div>${lastProbe.hint}</div>` : nothing}
+                      </div>
+                    `
+                  : nothing
               }
-            })();
-          }}
-        >
-          ${state.probing ? "测试中…" : "测试连通"}
-        </button>
-        <button
-          class="btn btn--sm btn--primary"
-          type="button"
-          ?disabled=${
-            disabled ||
-            props.syncBusy ||
-            state.configDirty ||
-            !credentialsReady ||
-            !props.onSyncOperationalIdentity
-          }
-          @click=${() => void props.onSyncOperationalIdentity?.(channelId)}
-        >
-          ${props.syncBusy ? "同步中…" : "同步为运营身份"}
-        </button>
-        ${
-          props.onNavigateToIdentities
-            ? html`
-                <button
-                  class="btn btn--sm"
-                  type="button"
-                  ?disabled=${disabled}
-                  @click=${props.onNavigateToIdentities}
-                >
-                  打开企业身份
-                </button>
-              `
-            : nothing
-        }
-      </div>
-      <p class="enterprise-channel-workspace__hint">
-        ${
-          showCallback
-            ? "建议顺序：保存凭证 → 复制 Callback URL 回填开放平台 → 向机器人发「你好」→ 测试连通。"
-            : "建议顺序：保存凭证 → 在开放平台确认长连接/事件订阅 → 向机器人发「你好」→ 测试连通。"
-        }
-      </p>
+              ${
+                props.identityLinkHint
+                  ? html`<div class="enterprise-channel-workspace__result">${props.identityLinkHint}</div>`
+                  : nothing
+              }
+              <div class="enterprise-form-actions">
+                ${probeButton} ${syncButton} ${identityButton}
+              </div>
+              <p class="enterprise-channel-workspace__hint">${orderHint}</p>
+            `
+      }
     </section>
   `;
 }

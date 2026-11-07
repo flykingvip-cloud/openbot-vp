@@ -121,7 +121,21 @@ describe("enterprise Feishu channel capability (slice 1a)", () => {
       );
     });
     expect(container.textContent).toContain("不是员工授权");
-    expect(container.textContent).toContain("群消息读取 granted");
+    expect(container.querySelector(".enterprise-im-workspace__columns")).not.toBeNull();
+    const groupRead = container.querySelector("[data-capability='projectGroupRead']");
+    expect(groupRead?.getAttribute("data-status")).toBe("granted");
+    expect(groupRead?.textContent).toContain("群消息读取");
+    expect(groupRead?.textContent).toContain("已开通");
+    const docs = container.querySelector("[data-capability='projectDocs']");
+    expect(docs?.getAttribute("data-status")).toBe("missing");
+    expect(docs?.textContent).toContain("未开通");
+    expect(container.querySelector("[data-feishu-enterprise-id]")?.textContent).toContain(
+      "平台企业 ID",
+    );
+    const sync = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("同步为运营身份"),
+    );
+    expect(sync?.classList.contains("btn--primary")).toBe(false);
     expect(container.textContent).not.toContain("未探测");
     expect(container.textContent).not.toContain("凭证与基础信息");
     expect(container.textContent).not.toContain("长连接无需公网回调");
@@ -132,6 +146,11 @@ describe("enterprise Feishu channel capability (slice 1a)", () => {
     const troubleshoot = container.querySelector("[data-testid='enterprise-im-troubleshoot']");
     expect(troubleshoot?.tagName).toBe("DETAILS");
     expect((troubleshoot as HTMLDetailsElement).open).toBe(false);
+    expect(troubleshoot?.textContent).toContain("建议顺序");
+    expect(container.querySelectorAll(".enterprise-im-status__cap")).toHaveLength(4);
+    expect(
+      container.querySelector(".enterprise-im-workspace__side .enterprise-channel-workspace__hint"),
+    ).toBeNull();
     expect(container.querySelector("a[href*='feishu-install']")).toBeNull();
   });
 });
