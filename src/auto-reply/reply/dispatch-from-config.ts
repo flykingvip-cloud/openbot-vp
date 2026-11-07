@@ -498,6 +498,16 @@ export async function dispatchReplyFromConfig(params: {
               (value): value is string => typeof value === "string" && value.trim() !== "",
             ) ?? "",
           );
+    const taskDeliveryContext = () =>
+      completionBinding && sessionStoreEntry.entry?.sessionFile
+        ? {
+            taskBoundary: {
+              sessionFile: sessionStoreEntry.entry.sessionFile,
+              binding: completionBinding,
+              constraints: completionBinding.constraints ?? [],
+            },
+          }
+        : undefined;
     const replyResult = await (params.replyResolver ?? getReplyFromConfig)(
       ctx,
       {
@@ -530,7 +540,10 @@ export async function dispatchReplyFromConfig(params: {
             if (shouldRouteToOriginating) {
               await sendPayloadAsync(deliveryPayload, undefined, false);
             } else {
-              dispatcher.sendToolResult(deliveryPayload);
+              dispatcher.sendToolResult(
+                deliveryPayload,
+                ...(taskDeliveryContext() ? [taskDeliveryContext()] : []),
+              );
             }
           };
           return run();
@@ -560,7 +573,10 @@ export async function dispatchReplyFromConfig(params: {
               ttsAuto: sessionTtsAuto,
             });
             if (!shouldRouteToOriginating) {
-              dispatcher.sendBlockReply(ttsPayload);
+              dispatcher.sendBlockReply(
+                ttsPayload,
+                ...(taskDeliveryContext() ? [taskDeliveryContext()] : []),
+              );
             }
           };
           return run();
@@ -660,7 +676,10 @@ export async function dispatchReplyFromConfig(params: {
         }
       } else {
         // Dispatcher enqueue is NOT a send receipt.
-        const didQueue = dispatcher.sendFinalReply(ttsReply);
+        const didQueue = dispatcher.sendFinalReply(
+          ttsReply,
+          ...(taskDeliveryContext() ? [taskDeliveryContext()] : []),
+        );
         requiredDeliveryAttempts.push({
           source: "enqueue_only",
           ok: didQueue,
