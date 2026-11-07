@@ -122,6 +122,16 @@ describe("enterprise Feishu channel capability (slice 1a)", () => {
     });
     expect(container.textContent).toContain("不是员工授权");
     expect(container.textContent).toContain("群消息读取 granted");
+    expect(container.textContent).not.toContain("未探测");
+    expect(container.textContent).not.toContain("凭证与基础信息");
+    expect(container.textContent).not.toContain("长连接无需公网回调");
+    expect(container.textContent).not.toContain("当前为长连接模式（推荐）");
+    const help = container.querySelector("[data-testid='enterprise-im-setup-guide']");
+    expect(help?.tagName).toBe("DETAILS");
+    expect((help as HTMLDetailsElement).open).toBe(false);
+    const troubleshoot = container.querySelector("[data-testid='enterprise-im-troubleshoot']");
+    expect(troubleshoot?.tagName).toBe("DETAILS");
+    expect((troubleshoot as HTMLDetailsElement).open).toBe(false);
     expect(container.querySelector("a[href*='feishu-install']")).toBeNull();
   });
 });

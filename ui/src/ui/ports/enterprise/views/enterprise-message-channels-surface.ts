@@ -345,22 +345,37 @@ function renderFeishuEnterpriseContract(params: {
   form: Record<string, unknown> | null;
   accountId?: string;
   snapshot: ChannelsStatusSnapshot | null;
+  probe?: { tone: string; summary: string } | null;
 }): TemplateResult | typeof nothing {
   if (params.channelId !== "feishu") {
     return nothing;
   }
   const contract = feishuCardContract(params);
   const rows = contract.capabilityStatus;
-  return html`<div class="enterprise-channel-workspace__hint" data-feishu-enterprise-contract>
-    <div>${formatFeishuEmployeeUiHint(contract.employeeUiHint)}</div>
-    <div>平台企业 ID：${contract.platformEnterpriseId ?? "未探测（不是账户 ID）"}</div>
-    <div>
-      群消息读取 ${rows?.projectGroupRead ?? "not_checked"} · 文档
-      ${rows?.projectDocs ?? "not_checked"} · 以用户身份发送
-      ${rows?.sendAsUser ?? "not_checked"} · 新消息
-      ${rows?.newMessageTrigger ?? "not_checked"}
+  const capability = [
+    ["群消息读取", rows?.projectGroupRead ?? "not_checked"],
+    ["文档", rows?.projectDocs ?? "not_checked"],
+    ["以用户身份发送", rows?.sendAsUser ?? "not_checked"],
+    ["新消息", rows?.newMessageTrigger ?? "not_checked"],
+  ] as const;
+  const probeTone = params.probe?.tone === "ok" ? "is-ok" : params.probe ? "is-warn" : "";
+  return html`<div class="enterprise-im-status" data-feishu-enterprise-contract>
+    <div class="enterprise-im-status__chips">
+      ${
+        params.probe
+          ? html`<span class="enterprise-im-status__chip ${probeTone}">${params.probe.summary}</span>`
+          : nothing
+      }
+      <span class="enterprise-im-status__chip">${formatFeishuEmployeeUiHint(contract.employeeUiHint)}</span>
+      <span class="enterprise-im-status__chip">
+        平台企业 ID ${contract.platformEnterpriseId ?? "未探测（不是账户 ID）"}
+      </span>
+      ${capability.map(
+        ([label, status]) =>
+          html`<span class="enterprise-im-status__chip">${label} ${status}</span>`,
+      )}
     </div>
-    <div>连通正常只说明应用凭证可用，不是员工授权。</div>
+    <p class="enterprise-im-status__note">连通正常不是员工授权。</p>
   </div>`;
 }
 
@@ -553,9 +568,14 @@ function renderWorkspace(params: {
     : [];
   const lastProbe = state.lastProbeByChannel[channelId] ?? null;
   const credentialsReady = !describeTenantImCredentialGaps(form, channelId, { accountId });
-  const workspaceSub = showCallback
-    ? "当前为 URL 回调模式：保存后复制 Callback URL 回填开放平台；凭证仅写入当前企业租户。"
-    : "当前为长连接模式（推荐）：填写凭证并保存即可，无需公网回调；凭证仅写入当前企业租户。";
+  const workspaceSub =
+    channelId === "feishu"
+      ? showCallback
+        ? "保存后复制 Callback URL。"
+        : ""
+      : showCallback
+        ? "当前为 URL 回调模式：保存后复制 Callback URL 回填开放平台；凭证仅写入当前企业租户。"
+        : "当前为长连接模式（推荐）：填写凭证并保存即可，无需公网回调；凭证仅写入当前企业租户。";
 
   const runProbe = async () => {
     if (!props.client || !props.tenantId) {
@@ -602,7 +622,7 @@ function renderWorkspace(params: {
       state.snapshot = snapshot;
       const result = summarizeTenantImProbeFromSnapshot(channelId, snapshot);
       state.lastProbeByChannel = { ...state.lastProbeByChannel, [channelId]: result };
-      state.notice = result.tone === "ok" ? "连通测试通过" : null;
+      state.notice = result.tone === "ok" && channelId !== "feishu" ? "连通测试通过" : null;
       state.error = result.tone === "fail" ? result.summary : null;
     } finally {
       state.probing = false;
@@ -614,7 +634,7 @@ function renderWorkspace(params: {
       <header class="enterprise-channel-workspace__head">
         <div>
           <div class="enterprise-channel-workspace__title">配置 · ${label}</div>
-          <div class="enterprise-channel-workspace__sub">${workspaceSub}</div>
+          ${workspaceSub ? html`<div class="enterprise-channel-workspace__sub">${workspaceSub}</div>` : nothing}
         </div>
         <div class="enterprise-channel-workspace__head-actions">
           <button
@@ -785,6 +805,7 @@ function renderWorkspace(params: {
         form,
         accountId,
         snapshot: state.snapshot,
+        probe: lastProbe,
       })}
 
       <div class="enterprise-form-actions">
@@ -866,20 +887,30 @@ function renderWorkspace(params: {
                         </ul>
                       `
                 }
-                <p class="enterprise-channel-workspace__hint">
-                  ${resolveTenantImPendingHint(channelId)}
-                </p>
+                ${
+                  channelId === "feishu"
+                    ? html`<details class="enterprise-im-curated__disclosure">
+                        <summary>排查</summary>
+                        <p>${resolveTenantImPendingHint(channelId)}</p>
+                      </details>`
+                    : html`<p class="enterprise-channel-workspace__hint">
+                        ${resolveTenantImPendingHint(channelId)}
+                      </p>`
+                }
               </div>
             `
-          : html`
-              <p class="enterprise-channel-workspace__hint">
+          : channelId === "feishu"
+            ? html`<details class="enterprise-im-curated__disclosure" data-testid="enterprise-im-troubleshoot">
+                <summary>排查</summary>
+                <p>${resolveTenantImPendingHint(channelId)}</p>
+              </details>`
+            : html`<p class="enterprise-channel-workspace__hint">
                 ${resolveTenantImPendingHint(channelId)}
-              </p>
-            `
+              </p>`
       }
 
       ${
-        lastProbe
+        channelId !== "feishu" && lastProbe
           ? html`
               <div
                 class="enterprise-channel-workspace__result ${

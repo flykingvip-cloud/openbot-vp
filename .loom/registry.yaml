@@ -10907,6 +10907,8 @@ landingStreams:
       - src/gateway/session-tenant-derivation.test.ts
       - src/gateway/tenant-config-service.ts
       - ui/src/ui/navigation.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-im-channel-form.ts
+      - ui/src/styles/enterprise-im-channels.css
       - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.ts
       - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.browser.test.ts
       - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.capability.test.ts

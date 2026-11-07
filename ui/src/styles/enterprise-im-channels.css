@@ -82,3 +82,58 @@
   line-height: 1.45;
   color: var(--muted);
 }
+
+.enterprise-im-curated__disclosure {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.enterprise-im-curated__disclosure summary {
+  width: fit-content;
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.enterprise-im-curated__disclosure ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.enterprise-im-status {
+  display: grid;
+  gap: 6px;
+}
+
+.enterprise-im-status__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.enterprise-im-status__chip {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.enterprise-im-status__chip.is-ok {
+  color: var(--ok, #1b7f4a);
+  border-color: color-mix(in srgb, var(--ok, #1b7f4a) 35%, var(--border));
+}
+
+.enterprise-im-status__chip.is-warn {
+  color: var(--warn, #9a6700);
+  border-color: color-mix(in srgb, var(--warn, #9a6700) 35%, var(--border));
+}
+
+.enterprise-im-status__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
