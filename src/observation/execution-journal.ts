@@ -128,6 +128,10 @@ export function createExecutionJournal(options: {
   ): Promise<Journal | null> => {
     let raw: string;
     try {
+      const stat = await fs.stat(file);
+      if (!stat.isFile() || stat.size > maxBytes) {
+        throw new Error("journal_capacity");
+      }
       raw = await fs.readFile(file, "utf8");
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === "ENOENT") {

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { afterEach, describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { createExecutionJournal } from "./execution-journal.js";
 const roots: string[] = [];
 const run = promisify(execFile);
@@ -31,6 +31,26 @@ async function setup() {
   return root;
 }
 describe("bounded durable execution journal", () => {
+  it("rejects oversized files before reading their payload without repairing disk", async () => {
+    const root = await setup();
+    const journal = createExecutionJournal({
+      rootDir: root,
+      enabled: () => true,
+      now: () => 100,
+      maxBytes: 4096,
+    });
+    expect((await journal.appendFact({ agentId: "bot", fact: fact() })).ok).toBe(true);
+    const file = path.join(root, (await fs.readdir(root))[0]);
+    await fs.writeFile(file, "x".repeat(4097));
+    const read = vi.spyOn(fs, "readFile");
+    try {
+      expect((await journal.query({ agentId: "bot", scope })).ok).toBe(false);
+      expect(read).not.toHaveBeenCalled();
+      expect((await fs.stat(file)).size).toBe(4097);
+    } finally {
+      read.mockRestore();
+    }
+  });
   it("defaults disabled and query never creates directories", async () => {
     const root = path.join(await setup(), "missing");
     const journal = createExecutionJournal({ rootDir: root });
