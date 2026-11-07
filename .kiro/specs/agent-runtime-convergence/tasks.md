@@ -1008,3 +1008,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved the unique existing continuation timer and bounded wake ledger into execution; ticket identity validation belongs to state and data contracts are explicit. Reply mainline uses wiring; the old conversation-task module is a compatibility facade, with no second scheduler or executor. Original human gates, wake suppression, focus revision checks and queue revalidation remain intact. — codex-runtime-manager
 - Continuation/background-process/followup regression 3 files / 49 PASS; reply-runner integration 1 file / 47 PASS; full tsgo PASS; formatting and typed lint clean; architecture 52 PASS. Channel implementation remains owned by the separate channel agent. Complete retirement and final same-version lifecycle acceptance remain open. — codex-runtime-manager
+
+## Stop consumer convergence (2026-11-07)
+
+- Fast abort and session stop now use the execution public registry API directly, removing their legacy executor facade dependency. Existing queue cleanup, cutoff persistence, ACP and subagent stop semantics are preserved. Updated stale controller-list test mock to match the existing production API. — codex-runtime-manager
+- Abort/commands regression 2 files / 79 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
