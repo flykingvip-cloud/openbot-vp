@@ -63,8 +63,6 @@ import {
   recordHonestCapabilityGap,
   stripCapabilityGapMarkers,
 } from "./honest-empty-reply.js";
-import { runMidTaskAsideReplyLane } from "./mid-task-aside-reply-lane.js";
-import { formatAmendConstraintAck } from "./mid-task-dialogue.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
 import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queue.js";
@@ -112,10 +110,8 @@ export async function runReplyAgent(params: {
     followupRun,
     queueKey,
     resolvedQueue,
-    shouldSteer,
     shouldFollowup,
     isActive,
-    isStreaming,
     opts,
     typing,
     sessionEntry,
@@ -228,89 +224,22 @@ export async function runReplyAgent(params: {
     return { text: "该请求尚未通过交互层的执行准入，本次未启动任务执行。" };
   }
 
-  const disposition = followupRun.run.executionAdmitted
-    ? { kind: "execute" as const }
-    : replyTurnRuntime.command.handle(
-        {
-          prompt: followupRun.prompt,
-          sessionFile: followupRun.run.sessionFile,
-          internalExecution:
-            isHeartbeat ||
-            opts?.growthBirthTurn === true ||
-            followupRun.run.collaborationRoundInvoked === true ||
-            Boolean(
-              followupRun.run.inputProvenance &&
-              followupRun.run.inputProvenance.kind !== "external_user",
-            ),
-          isActive,
-          isStreaming,
-          isHeartbeat,
-          shouldSteer,
-          shouldFollowup,
-          queueMode: resolvedQueue.mode,
-        },
-        {
-          prompt: followupRun.prompt,
-          sessionId: followupRun.run.sessionId,
-          queueKeys: [queueKey, followupRun.run.sessionId, followupRun.run.sessionKey],
-        },
-      );
-  if (disposition.kind === "dialogue") {
-    const asideRunId = opts?.runId ?? crypto.randomUUID();
-    const lane = await runMidTaskAsideReplyLane({
-      parentSessionId: followupRun.run.sessionId,
-      parentSessionFile: followupRun.run.sessionFile,
-      board: disposition.board,
-      userPrompt: followupRun.prompt,
-      run: followupRun.run,
-      runId: asideRunId,
-      messageId: (() => {
-        const raw = sessionCtx.MessageSidFull ?? sessionCtx.MessageSid;
-        return typeof raw === "string" ? raw : undefined;
-      })(),
-    });
-    await touchActiveSessionEntry();
-    typing.cleanup();
-    return [{ text: lane.text }];
-  }
-  if (disposition.kind === "drop") {
-    typing.cleanup();
-    return undefined;
-  }
-  if (disposition.kind !== "execute") {
-    if (disposition.kind === "enqueue-followup") {
+  // Interaction has already answered queries and committed changes/controls.
+  // Execution selects resources only; never classify this text a second time.
+  const queueAction = followupRun.run.executionAdmitted
+    ? "run-now"
+    : replyTurnRuntime.execution.resolveQueueAction({
+        isActive,
+        isHeartbeat,
+        shouldFollowup,
+        queueMode: resolvedQueue.mode,
+      });
+  if (queueAction !== "run-now") {
+    if (queueAction === "enqueue-followup") {
       enqueueFollowupRun(queueKey, followupRun, resolvedQueue);
+      await touchActiveSessionEntry();
     }
-    await touchActiveSessionEntry();
     typing.cleanup();
-    if (disposition.kind === "reply") {
-      return [{ text: disposition.text }];
-    }
-    if (disposition.kind === "amended") {
-      const amendment = disposition.result;
-      if (amendment.kind === "barrier-rejected") {
-        return [
-          {
-            text: "限制未能写入原任务板（任务可能已切换或写入失败）。尚未视为生效；请重新发送该限制。",
-          },
-        ];
-      }
-      if (amendment.kind === "injected") {
-        if (!amendment.persisted) {
-          return [
-            {
-              text: "约束已尝试注入当前执行，但未能写入原任务板（任务可能已切换或写入失败）。请重新发送该补充约束；本次不视为完整成功。",
-            },
-          ];
-        }
-        return [{ text: formatAmendConstraintAck(followupRun.prompt) }];
-      }
-      return [
-        {
-          text: `限制已写入任务板并生效：${followupRun.prompt.replace(/\s+/g, " ").trim().slice(0, 60)}。注入当前执行未成功，后台仍应按板约束停止相关动作；如需确认请再发一次。`,
-        },
-      ];
-    }
     return undefined;
   }
 

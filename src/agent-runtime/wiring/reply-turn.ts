@@ -2,7 +2,6 @@ import path from "node:path";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { TASK_OUTCOME_STORE_DIRNAME } from "../../task-outcome/runtime-from-runner.js";
-import { handleInteraction } from "../command/index.js";
 import {
   buildReplyPayloads,
   completeReplyDelivery,
@@ -13,6 +12,7 @@ import {
   isTaskBoardContinueInternalPrompt,
   scheduleTaskBoardContinueWake,
 } from "../execution/index.js";
+import { resolveExecutionQueueAction } from "../policy/index.js";
 import { sessionTaskState, prepareReplacementSessionEntry } from "../state/index.js";
 import {
   persistInteractionMessage,
@@ -20,11 +20,7 @@ import {
   incrementRunCompactionCount,
 } from "../state/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
-import {
-  bindInteractionPorts,
-  interruptInteractionTask,
-  steerInteractionTask,
-} from "./command-adapters.js";
+import { interruptInteractionTask, steerInteractionTask } from "./command-adapters.js";
 import { confirmPendingTurnDelivery } from "./delivery-confirm.js";
 import type { runGatewayInteraction } from "./interaction-turn.js";
 import { evaluateBoundTaskAcceptance } from "./task-acceptance.js";
@@ -39,16 +35,9 @@ export const replyTurnRuntime = {
   },
   interrupt: interruptInteractionTask,
   steer: steerInteractionTask,
-  command: {
-    handle(
-      input: Parameters<typeof handleInteraction>[0],
-      host: Parameters<typeof bindInteractionPorts>[0],
-    ) {
-      return handleInteraction(input, bindInteractionPorts(host));
-    },
-  },
   state: { ...sessionTaskState, persistRunSessionUsage, incrementRunCompactionCount },
   execution: {
+    resolveQueueAction: resolveExecutionQueueAction,
     isTaskBoardContinueInternalPrompt,
     scheduleTaskBoardContinueWake,
     runAdmittedTurn(request: Parameters<typeof runAdmittedTurn>[0]) {

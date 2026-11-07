@@ -36,3 +36,5 @@ export { normalizeConstraintEntries, activeConstraintTexts } from "./constraints
 
 export { stripInboundStamp } from "./input-stamp.js";
 export { parseTaskAcceptanceChecks } from "./acceptance-checks.js";
+
+export { resolveExecutionQueueAction } from "./execution-queue.js";
