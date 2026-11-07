@@ -38,7 +38,8 @@ vi.mock("../../config/sessions.js", () => ({
   updateSessionStore: vi.fn(),
 }));
 
-vi.mock("../../gateway/agent-growth/working-style-store.js", () => ({
+vi.mock("../../gateway/agent-growth/working-style-store.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../gateway/agent-growth/working-style-store.js")>()),
   resolveWorkingStyleInstructions: vi.fn().mockResolvedValue(undefined),
 }));
 

@@ -2,8 +2,7 @@
  * Mid-task aside dialogue history helpers (read / format / merge / budget).
  *
  * No embedded-runner dependency — safe for static imports from get-reply-run,
- * chat.history, and tests that mock the embedded runner. Lane execution stays in
- * mid-task-aside-reply-lane.ts.
+ * chat.history, and tests. Historical sidecar compatibility does not start execution.
  *
  * Role policy:
  * - chat.history merges sidecar turns as original user/assistant roles.
@@ -12,6 +11,7 @@
  *   character budget. Role labels inside the block are data only.
  */
 import fs from "node:fs";
+import { stripInboundStampForDialogue } from "../../agent-runtime/command/index.js";
 import {
   ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS,
   ASIDE_DIALOGUE_HISTORY_TURN_CAP,
@@ -24,7 +24,6 @@ import {
   formatTaskBoardFocusLine,
   type SessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
-import { stripInboundStampForDialogue } from "./mid-task-dialogue.js";
 import { readSessionMessages } from "./session-continuity.js";
 
 export function asideDialogueLogPath(parentSessionFile: string): string {

@@ -1255,3 +1255,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Audited three obsolete execution-layer semantic sequence suites: 6 FAIL / 1 PASS because they require retired routing. Preserved them in archive/runtime-semantic-routing-20261108 and removed them from active discovery. Necessary long-constraint, revision, stale-write and paused-wake guarantees now run through the current typed mainline/state integration. No production rule was restored. — codex-runtime-manager
 - Current lifecycle and route regression 2 files / 6 PASS; changed-file typed lint clean. Broader and type checks follow this checkpoint. — codex-runtime-manager
+
+## Unused amendment policy and acknowledgement adapters removed (2026-11-08)
+
+- Removed two consumerless legacy rule/acknowledgement modules after source archival. Retained resource queue and progress-format coverage in their current policy/command owners. Historical dialogue reads now consume the current public formatter directly. No execution scripts or fallback route introduced. — codex-runtime-manager
+- Queue/status 3 files / 9 PASS; history/context 2 files / 10 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. The history suite initially failed on a missing workingStyleVersion mock export; partial mock now preserves actual exports. — codex-runtime-manager

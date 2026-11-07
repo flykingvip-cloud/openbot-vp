@@ -501,7 +501,9 @@
       "src/agent-runtime/command/interaction",
       "src/agent-runtime/wiring/command-adapters",
       "src/agent-runtime/command/dialogue-intent",
-      "src/auto-reply/reply/mid-task-aside-reply-lane"
+      "src/auto-reply/reply/mid-task-aside-reply-lane",
+      "src/auto-reply/reply/queue-policy",
+      "src/auto-reply/reply/mid-task-dialogue"
     ],
     "description": "Archived semantic routing has no source consumers or public export; no legacy fallback may be restored."
   }

@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  emptySessionTaskBoard,
-  type SessionTaskBoard,
-} from "../../conversation-task/session-task-board.js";
-import {
-  formatAmendConstraintAck,
-  formatTaskBoardProgressReply,
-  isProgressStatusQuery,
-} from "./mid-task-dialogue.js";
+import type { SessionTaskBoard } from "../contracts/task.js";
+import { formatTaskBoardProgressReply, isProgressStatusQuery } from "./task-status.js";
 
 describe("mid-task-dialogue helpers", () => {
   it("detects narrow progress status queries", () => {
@@ -21,7 +14,7 @@ describe("mid-task-dialogue helpers", () => {
 
   it("formats progress from board projection without internal fields", () => {
     const board: SessionTaskBoard = {
-      ...emptySessionTaskBoard(),
+      parked: [],
       current: {
         taskId: "task-a",
         title: "手机调研",
@@ -42,9 +35,5 @@ describe("mid-task-dialogue helpers", () => {
     expect(text).not.toContain("wakeSuppress");
     expect(text).not.toContain("进行中");
     expect(text).not.toContain("请确认");
-  });
-
-  it("acks amend once without inventing a second controller", () => {
-    expect(formatAmendConstraintAck("补充：只要国内安卓机型")).toContain("仅一次");
   });
 });

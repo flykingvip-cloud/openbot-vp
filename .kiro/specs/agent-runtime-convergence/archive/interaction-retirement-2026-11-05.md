@@ -41,3 +41,9 @@ Evidence: real isolated Gateway dialogue with an admitted task left the complete
 Archived agent-runner.collect-amend-steer.test.ts, slice2-mid-task-event-sequence.test.ts and slice3-context-event-sequence.test.ts in the same source tag. Their assertions required execution to classify user queries, persist amendments and interpret owner controls, which is intentionally superseded. An explicit audit reproduced 6 failures in those obsolete branches; no old route is restored to satisfy them.
 
 The current task-lifecycle integration now independently verifies long constraint tail preservation, local revision preserving unrelated requirements, stale epoch amendment rejection without a write, typed pause returning abort=true, and stale continuation rejection. Existing route-interaction and prepared-interaction tests verify direct replies bypass execution admission. Real-model active-task dialogue and revision evidence remains separately recorded.
+
+## Unused amendment queue rules and acknowledgement adapter
+
+Removed queue-policy.ts and mid-task-dialogue.ts after auditing all source/package/extension consumers. The unused shouldAttemptCollectAmendSteer rule and its unconditional one-time-injection acknowledgement belong to the retired execution-layer semantic route. Source and old tests remain in archive/runtime-semantic-routing-20261108. Resource queue cases now test policy/execution-queue directly; progress formatting cases now test command/task-status directly. Historical dialogue loading imports the existing command public formatter without the obsolete acknowledgement adapter. No historical sidecar data or trust boundary is changed.
+
+Regression: current queue/status suites 3 files / 9 PASS; historical normal-reply context and Gateway history 2 files / 10 PASS after repairing an incomplete working-style test mock. Full tsgo PASS; changed-file typed lint clean; architecture 54 PASS. Counts describe separate runs.
