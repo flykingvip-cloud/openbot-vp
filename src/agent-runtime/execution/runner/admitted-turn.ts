@@ -59,6 +59,9 @@ export async function runAdmittedTurn(
 ): Promise<AgentRunLoopResult> {
   const assertOriginalTaskCurrent = () => {
     const binding = params.followupRun.run.taskCompletionBinding;
+    if (params.followupRun.run.executionAdmitted && !binding) {
+      throw new Error("Admitted execution request requires its original task binding");
+    }
     if (
       binding &&
       !host.task.isTaskExecutionBindingCurrent(params.followupRun.run.sessionFile, binding)

@@ -102,3 +102,16 @@ it("retains slot and snapshot cleanup after a non-retryable provider error", asy
   expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
   expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();
 });
+
+it("rejects an admitted request without its task binding before any execution effects", async () => {
+  const { host, params } = setup();
+  params.isHeartbeat = false;
+  params.followupRun.run.agentId = "test";
+  params.followupRun.run.executionAdmitted = true;
+  host.task.ensureChatTurnTaskOutcome = vi.fn();
+  await expect(runAdmittedTurn(params, host)).rejects.toThrow(/binding/i);
+  expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
+  expect(host.admission.tryAcquireEnterpriseAgentRun).not.toHaveBeenCalled();
+  expect(mocks.create).not.toHaveBeenCalled();
+  expect(mocks.invoke).not.toHaveBeenCalled();
+});

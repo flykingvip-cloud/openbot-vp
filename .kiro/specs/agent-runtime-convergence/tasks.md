@@ -1013,3 +1013,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Fast abort and session stop now use the execution public registry API directly, removing their legacy executor facade dependency. Existing queue cleanup, cutoff persistence, ACP and subagent stop semantics are preserved. Updated stale controller-list test mock to match the existing production API. — codex-runtime-manager
 - Abort/commands regression 2 files / 79 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
+
+## Admitted execution identity requirement (2026-11-07)
+
+- Reproduced accepted-marker-only requests reaching outcome creation without a task binding (1 FAIL). The unique admitted execution entry now rejects missing bindings before outcome, billing, fallback or candidate construction. Existing internal unmarked entrances retain their current behavior; no new admission path. — codex-runtime-manager
+- Admitted entry/candidate regression 2 files / 8 PASS; full tsgo PASS; typed lint and formatting clean; architecture 52 PASS. Complete mainline and retirement acceptance remain open. — codex-runtime-manager
