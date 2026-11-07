@@ -80,6 +80,16 @@ export async function confirmPendingTurnDeliveryWithPorts(
       status: params.status,
       ...(params.error ? { failureDetail: params.error } : {}),
     });
+    // Keep reconciliation identity unless persistence confirms this exact receipt.
+    if (
+      !confirmed ||
+      confirmed.record.taskId !== pending.taskId ||
+      confirmed.record.decisiveRunId !== pending.runId ||
+      confirmed.record.deliveryId !== pending.deliveryId ||
+      confirmed.record.delivery.status !== params.status
+    ) {
+      return;
+    }
     if (
       params.status === "delivered" &&
       confirmed?.record.delivery.status === "delivered" &&

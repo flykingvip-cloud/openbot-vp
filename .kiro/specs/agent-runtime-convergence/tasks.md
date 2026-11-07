@@ -993,3 +993,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Admitted and scheduled CLI candidates forward their original task execution binding into the unique CLI adapter. The adapter checks the existing state API before preparation, after its queue wait, before spawn and before adopting results or retrying an expired session. Unbound internal calls retain existing behavior. No new classifier, state store or executor. — codex-runtime-manager
 - CLI/candidate regression 4 files / 18 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
+
+## Delivery confirmation identity retention (2026-11-07)
+
+- Reproduced missing/mismatched/nonterminal confirmation clearing pending reconciliation identity (4 FAIL). Delivery now retains that association until the outcome writer confirms the exact task/run/delivery and requested status. Original board completion remains separately gated by passed acceptance and live binding. No new transport or executor. — codex-runtime-manager
+- Confirmation/restart/late-completion regression 4 files / 20 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
