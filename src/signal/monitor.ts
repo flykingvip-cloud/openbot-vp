@@ -1,3 +1,4 @@
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
 import { chunkTextWithMode, resolveChunkMode, resolveTextChunkLimit } from "../auto-reply/chunk.js";
 import { DEFAULT_GROUP_HISTORY_LIMIT, type HistoryEntry } from "../auto-reply/reply/history.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
@@ -279,6 +280,7 @@ async function fetchAttachment(params: {
 }
 
 async function deliverReplies(params: {
+  taskBoundary?: TaskActionBoundary;
   replies: ReplyPayload[];
   target: string;
   baseUrl: string;
@@ -300,6 +302,7 @@ async function deliverReplies(params: {
     if (mediaList.length === 0) {
       for (const chunk of chunkTextWithMode(text, textLimit, chunkMode)) {
         await sendMessageSignal(target, chunk, {
+          taskBoundary: params.taskBoundary,
           baseUrl,
           account,
           maxBytes,
@@ -312,6 +315,7 @@ async function deliverReplies(params: {
         const caption = first ? text : "";
         first = false;
         await sendMessageSignal(target, caption, {
+          taskBoundary: params.taskBoundary,
           baseUrl,
           account,
           mediaUrl: url,

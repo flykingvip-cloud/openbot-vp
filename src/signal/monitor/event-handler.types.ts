@@ -1,3 +1,4 @@
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
 import type { HistoryEntry } from "../../auto-reply/reply/history.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import type { OpenBotConfig } from "../../config/config.js";
@@ -97,6 +98,7 @@ export type SignalEventHandlerDeps = {
     maxBytes: number;
   }) => Promise<{ path: string; contentType?: string } | null>;
   deliverReplies: (params: {
+    taskBoundary?: TaskActionBoundary;
     replies: ReplyPayload[];
     target: string;
     baseUrl: string;
