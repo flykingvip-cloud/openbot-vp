@@ -1275,3 +1275,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Updated internal-origin fixtures and migrated embedded/CLI mock boundaries without changing production behavior. Partial fallback mocks retain actual exports; cron/provider mocks reset queued responses between cases; English reminder cases explicitly declare English presentation. Original fallback, cancellation, compaction, streaming, reminder and usage assertions remain. — codex-runtime-manager
 - Comprehensive reply-entry regression 28 PASS; full tsgo PASS; typed lint clean. Earlier audit failures were preserved in temporary logs and resolved rather than weakening production admission or restoring retired semantic routes. — codex-runtime-manager
+
+## Artifact paths no longer count as English prose (2026-11-08)
+
+- Reproduced Chinese delivery with a long artifact path being rejected as wrong-language planning (2 FAIL before). Existing language counting now masks opaque paths while preserving the original output and raw planning-marker checks. No new classifier or execution route added. — codex-runtime-manager
+- Language regression 2 files / 37 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. English planning around paths remains rejected. — codex-runtime-manager
+- Isolated real Gateway/model long-path delivery now waits for actual board closeout: exact artifact bytes, acceptance=passed, delivery=delivered, unfinished=false and deliverableChecked=true. Earlier agent.wait snapshots could precede delivery settlement; this does not establish the full cause of every earlier intermittent sequence or general business-quality acceptance. No deployment. — codex-runtime-manager
