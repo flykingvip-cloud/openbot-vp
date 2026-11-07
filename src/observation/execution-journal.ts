@@ -132,7 +132,26 @@ export function createExecutionJournal(options: {
       if (!stat.isFile() || stat.size > maxBytes) {
         throw new Error("journal_capacity");
       }
-      raw = await fs.readFile(file, "utf8");
+      const handle = await fs.open(file, "r");
+      try {
+        const chunks: Buffer[] = [];
+        let total = 0;
+        while (total <= maxBytes) {
+          const chunk = Buffer.alloc(Math.min(65536, maxBytes + 1 - total));
+          const { bytesRead } = await handle.read(chunk, 0, chunk.length, null);
+          if (bytesRead === 0) {
+            break;
+          }
+          total += bytesRead;
+          if (total > maxBytes) {
+            throw new Error("journal_capacity");
+          }
+          chunks.push(chunk.subarray(0, bytesRead));
+        }
+        raw = Buffer.concat(chunks, total).toString("utf8");
+      } finally {
+        await handle.close();
+      }
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === "ENOENT") {
         return null;

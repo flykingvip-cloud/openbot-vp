@@ -31,6 +31,35 @@ async function setup() {
   return root;
 }
 describe("bounded durable execution journal", () => {
+  it("bounds payload reads even when a file grows after stat", async () => {
+    const root = await setup();
+    const journal = createExecutionJournal({
+      rootDir: root,
+      enabled: () => true,
+      now: () => 100,
+      maxBytes: 4096,
+    });
+    expect((await journal.appendFact({ agentId: "bot", fact: fact() })).ok).toBe(true);
+    const file = path.join(root, (await fs.readdir(root))[0]);
+    const originalStat = fs.stat.bind(fs);
+    const stat = vi
+      .spyOn(fs, "stat")
+      .mockImplementation(async (...args: Parameters<typeof fs.stat>) => {
+        const result = await originalStat(...args);
+        if (args[0] === file) {
+          await fs.writeFile(file, "x".repeat(20000));
+        }
+        return result;
+      });
+    const read = vi.spyOn(fs, "readFile");
+    try {
+      expect((await journal.query({ agentId: "bot", scope })).ok).toBe(false);
+      expect(read).not.toHaveBeenCalled();
+    } finally {
+      stat.mockRestore();
+      read.mockRestore();
+    }
+  });
   it("rejects oversized files before reading their payload without repairing disk", async () => {
     const root = await setup();
     const journal = createExecutionJournal({
