@@ -38,3 +38,5 @@ export {
 } from "./xai-arguments-stream.js";
 
 export { applyProviderCredential } from "./apply-provider-credential.js";
+
+export { resolveCliRunCredential } from "./cli-run-credential.js";

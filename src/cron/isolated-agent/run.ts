@@ -1,3 +1,4 @@
+import { resolveCliRunCredential } from "../../agent-runtime/model/index.js";
 import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import {
@@ -8,7 +9,6 @@ import {
 } from "../../agents/agent-scope.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
-import { resolveCredentialForRun } from "../../agents/cli-backend-credential-resolve.js";
 import { recordCliBackendUsage } from "../../agents/cli-backend-usage-attribution.js";
 import { runCliAgent } from "../../agents/cli-runner.js";
 import { getCliSessionId, setCliSessionId } from "../../agents/cli-session.js";
@@ -61,7 +61,6 @@ import {
   consumeCapabilityRoutingResult,
   formatCapabilityExecutionSurfaceLog,
 } from "../../gateway/model-entitlement/capability-entry-consume.js";
-import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
 import { resolveCronWriteRoot } from "../../gateway/workspace-resolver/write-roots.js";
@@ -1124,33 +1123,12 @@ export async function runCronIsolatedAgentTurn(params: {
                 : getCliSessionId(cronSession.sessionEntry, providerOverride);
               // CLI 后端凭证桥（Task 6/9）：cron 隔离运行同样按 bot 归属席位解析企业作用域，
               // 注入个人/企业凭证并在完成后写 UsageAttribution。fail-safe → 回退主机默认 env。
-              let credentialEnv: Record<string, string> | undefined;
-              let usageAttr: { tenantId: string; userId: string; credentialId: string } | undefined;
-              try {
-                const credScope = await resolveAgentRunEntitlementScope({ agentId });
-                if (credScope) {
-                  const resolved = await resolveCredentialForRun({
-                    backendId: providerOverride,
-                    model: modelOverride,
-                    scope: {
-                      tenantId: credScope.tenantId,
-                      subjectId: credScope.employeeId ?? credScope.seatId,
-                    },
-                    config: cfgWithAgentDefaults,
-                  });
-                  if (resolved) {
-                    credentialEnv = resolved.env;
-                    usageAttr = {
-                      tenantId: credScope.tenantId,
-                      userId: credScope.employeeId ?? credScope.seatId ?? "",
-                      credentialId: resolved.credentialId,
-                    };
-                  }
-                }
-              } catch {
-                credentialEnv = undefined;
-                usageAttr = undefined;
-              }
+              const { credentialEnv, usageAttr } = await resolveCliRunCredential({
+                agentId,
+                provider: providerOverride,
+                model: modelOverride,
+                config: cfgWithAgentDefaults,
+              });
               const result = await runCliAgent({
                 sessionId: cronSession.sessionEntry.sessionId,
                 sessionKey: agentSessionKey,

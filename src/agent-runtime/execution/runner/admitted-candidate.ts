@@ -1,5 +1,4 @@
 import { resolveBootstrapWarningSignaturesSeen } from "../../../agents/bootstrap-budget.js";
-import { resolveCredentialForRun } from "../../../agents/cli-backend-credential-resolve.js";
 import { recordCliBackendUsage } from "../../../agents/cli-backend-usage-attribution.js";
 import { runCliAgent } from "../../../agents/cli-runner.js";
 import { getCliSessionId } from "../../../agents/cli-session.js";
@@ -28,6 +27,7 @@ import {
   isMarkdownCapableMessageChannel,
   resolveMessageChannel,
 } from "../../../utils/message-channel.js";
+import { resolveCliRunCredential } from "../../model/index.js";
 import { buildEmbeddedRunBaseParams } from "../preparation/index.js";
 /** Legacy single admitted candidate adapter. Outer admission/fallback/finalization remain with the caller. */
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
@@ -90,39 +90,13 @@ export function createAdmittedCandidateInvoker(
         // 选取个人/企业凭证并解析其 SecretRef，作为 per-run env 注入子进程；同时捕获
         // credentialId + tenant/user 供执行完成后写 UsageAttribution（chargeback 依据）。
         // fail-safe：任一环节失败 → undefined → 回退主机默认 env（零回归）。值绝不记日志。
-        let credentialEnv: Record<string, string> | undefined;
-        let usageAttr: { tenantId: string; userId: string; credentialId: string } | undefined;
-        try {
-          const credScope = await resolveAgentRunEntitlementScope({
-            agentId: params.followupRun.run.agentId,
-          });
-          if (credScope) {
-            const resolved = await resolveCredentialForRun({
-              backendId: provider,
-              model,
-              scope: {
-                tenantId: credScope.tenantId,
-                subjectId: credScope.employeeId ?? credScope.seatId,
-              },
-              config: params.followupRun.run.config,
-            });
-            if (resolved) {
-              credentialEnv = resolved.env;
-              usageAttr = {
-                tenantId: credScope.tenantId,
-                userId:
-                  credScope.employeeId ??
-                  credScope.seatId ??
-                  params.sessionCtx.GatewayClientUser ??
-                  "",
-                credentialId: resolved.credentialId,
-              };
-            }
-          }
-        } catch {
-          credentialEnv = undefined;
-          usageAttr = undefined;
-        }
+        const { credentialEnv, usageAttr } = await resolveCliRunCredential({
+          agentId: params.followupRun.run.agentId,
+          provider,
+          model,
+          config: params.followupRun.run.config,
+          fallbackUserId: params.sessionCtx.GatewayClientUser,
+        });
         let lifecycleTerminalEmitted = false;
         try {
           host.assertOriginalTaskCurrent();

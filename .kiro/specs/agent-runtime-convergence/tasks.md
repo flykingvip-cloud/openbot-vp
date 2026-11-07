@@ -846,3 +846,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved queued provider preparation and embedded invocation into execution/runner/queued-candidate. Followup calls the execution public API; shared model session retains authorization and fallback. Preserved transport preparation, post-preparation task fence, trusted identity, private collaboration fields, warning dedupe and budget charging order. Original invocation body removed. — codex-runtime-manager
 - Followup/BYOK/OGUI/closeout regression 4 files / 38 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager
+
+## Shared CLI credential preparation (2026-11-07)
+
+- Consolidated repeated command, admitted-turn and cron CLI credential scope/environment preparation into model/cli-run-credential. Removed three duplicate bodies; preserves all-or-nothing host-default fallback, trusted scope and caller-specific attribution fallback. Usage recording remains after the original execution. No execution loop or credential store added. — codex-runtime-manager
+- Command/admitted/cron regression 5 files / 57 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager

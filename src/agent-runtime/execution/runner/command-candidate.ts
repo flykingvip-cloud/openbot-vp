@@ -1,6 +1,5 @@
 /** Original command candidate adapter; no task admission or outer fallback loop. */
 import { resolveBootstrapWarningSignaturesSeen } from "../../../agents/bootstrap-budget.js";
-import { resolveCredentialForRun } from "../../../agents/cli-backend-credential-resolve.js";
 import { recordCliBackendUsage } from "../../../agents/cli-backend-usage-attribution.js";
 import { runCliAgent } from "../../../agents/cli-runner.js";
 import { getCliSessionId, setCliSessionId } from "../../../agents/cli-session.js";
@@ -19,6 +18,7 @@ import { resolveAgentRunEntitlementScope } from "../../../gateway/model-entitlem
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
 import type { resolveMessageChannel } from "../../../utils/message-channel.js";
 import type { AgentRunContext } from "../../contracts/command.js";
+import { resolveCliRunCredential } from "../../model/index.js";
 import { persistCommandSessionEntry } from "../../state/index.js";
 const log = createSubsystemLogger("commands/agent");
 
@@ -90,35 +90,12 @@ export function runCommandCandidate(params: {
       const cliSessionId = getCliSessionId(params.sessionEntry, params.providerOverride);
       // CLI 后端凭证桥（Task 6/9）：本地 `openclaw agent` 运行同样按 bot 归属席位解析企业
       // 作用域，注入个人/企业凭证并在完成后写 UsageAttribution。fail-safe → 回退主机默认 env。
-      let credentialEnv: Record<string, string> | undefined;
-      let usageAttr: { tenantId: string; userId: string; credentialId: string } | undefined;
-      try {
-        const credScope = await resolveAgentRunEntitlementScope({
-          agentId: params.sessionAgentId,
-        });
-        if (credScope) {
-          const resolved = await resolveCredentialForRun({
-            backendId: params.providerOverride,
-            model: params.modelOverride,
-            scope: {
-              tenantId: credScope.tenantId,
-              subjectId: credScope.employeeId ?? credScope.seatId,
-            },
-            config: params.cfg,
-          });
-          if (resolved) {
-            credentialEnv = resolved.env;
-            usageAttr = {
-              tenantId: credScope.tenantId,
-              userId: credScope.employeeId ?? credScope.seatId ?? "",
-              credentialId: resolved.credentialId,
-            };
-          }
-        }
-      } catch {
-        credentialEnv = undefined;
-        usageAttr = undefined;
-      }
+      const { credentialEnv, usageAttr } = await resolveCliRunCredential({
+        agentId: params.sessionAgentId,
+        provider: params.providerOverride,
+        model: params.modelOverride,
+        config: params.cfg,
+      });
       const runCliWithSession = (nextCliSessionId: string | undefined) =>
         runCliAgent({
           sessionId: params.sessionId,
