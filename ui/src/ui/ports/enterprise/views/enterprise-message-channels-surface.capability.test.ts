@@ -109,7 +109,9 @@ describe("enterprise Feishu channel capability (slice 1a)", () => {
     renderSurface();
     await vi.waitFor(() => {
       expect(container.textContent).not.toContain("加载中…");
-      expect(container.querySelector("[data-testid='enterprise-im-switcher']")).not.toBeNull();
+      const switcher = container.querySelector("[data-testid='enterprise-im-switcher']");
+      expect(switcher?.getAttribute("data-layout")).toBe("horizontal");
+      expect(switcher?.querySelectorAll(".enterprise-im-switcher__item")).toHaveLength(3);
     });
     expect(container.querySelector(".enterprise-settings-section__title")).toBeNull();
     expect(container.querySelector(".enterprise-settings-section__subtitle")).toBeNull();

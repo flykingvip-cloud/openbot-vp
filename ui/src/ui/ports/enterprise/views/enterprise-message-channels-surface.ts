@@ -513,14 +513,16 @@ function renderGalleryCard(params: {
         ${renderChannelMark(channelId)}
         <span class="enterprise-im-switcher__dot" aria-hidden="true"></span>
       </span>
-      <span class="enterprise-im-switcher__label">${label}</span>
-      ${
-        !skeleton && fault
-          ? html`<span class="enterprise-im-switcher__status" data-channel-fault title=${fault}
-              >${fault}</span
-            >`
-          : html`<span class="enterprise-im-switcher__status">${statusLabel}</span>`
-      }
+      <span class="enterprise-im-switcher__copy">
+        <span class="enterprise-im-switcher__label">${label}</span>
+        ${
+          !skeleton && fault
+            ? html`<span class="enterprise-im-switcher__status" data-channel-fault title=${fault}
+                >${fault}</span
+              >`
+            : html`<span class="enterprise-im-switcher__status">${statusLabel}</span>`
+        }
+      </span>
     </button>
   `;
 }
@@ -1122,7 +1124,12 @@ export function renderEnterpriseMessageChannelsSurface(params: {
       }
 
       <div class="enterprise-im-switcher">
-        <div class="enterprise-im-switcher__row" role="list" data-testid="enterprise-im-switcher">
+        <div
+          class="enterprise-im-switcher__row"
+          role="list"
+          data-testid="enterprise-im-switcher"
+          data-layout="horizontal"
+        >
           ${ENTERPRISE_MESSAGE_CHANNELS.map((channelId) => {
             const present = channelPresentInForm(form, channelId);
             const channelEntry = asRecord(asRecord(form.channels)?.[channelId]);
