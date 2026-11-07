@@ -8,6 +8,7 @@ import {
   bindFeishuEmployeeConnection,
   type FeishuEmployeeChannelGate,
 } from "../enterprise-im-employee-connection.js";
+import { FEISHU_USER_DOCX_RAW_CONTENT_API } from "../enterprise-im-feishu-doc-reader.js";
 import { normalizeEnterpriseSeatAssetsStore } from "../enterprise-seat-assets-backend.js";
 import { saveEnterpriseSeatAssetsStore } from "../enterprise-seat-assets-store.js";
 import { saveTenantConfigStore, type TenantConfigStore } from "../tenant-config.js";
@@ -97,6 +98,51 @@ function gate(): FeishuEmployeeChannelGate {
   };
 }
 
+function tenantStore(projectDocs?: unknown): TenantConfigStore {
+  return {
+    version: 1,
+    tenants: {
+      "001": {
+        tenantId: "001",
+        updatedAt: "2026-11-07T00:00:00.000Z",
+        override: {
+          enterpriseImEmployeeProxy: {
+            policies: [
+              {
+                policyId: "policy-project",
+                employeeId: "emp-a",
+                seatId: "seat-1",
+                agentId: "project",
+                actions: ["read", "draft", "send"],
+              },
+            ],
+            ...(projectDocs === undefined ? {} : { measured: { projectDocs } }),
+          },
+          channels: {
+            feishu: {
+              enabled: true,
+              accounts: {
+                t_001_default: {
+                  appId: "cli_public",
+                  appSecret: APP_SECRET,
+                  platformEnterpriseId: "tenant-key-1",
+                  capabilityStatus: {
+                    checkedAt: "2026-11-07T00:00:00.000Z",
+                    projectGroupRead: "granted",
+                    projectDocs: "granted",
+                    sendAsUser: "granted",
+                    newMessageTrigger: "granted",
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
 describe("feishu employee read RPC (slice 3)", () => {
   const previousState = process.env.OPENBOT_STATE_DIR;
 
@@ -142,48 +188,7 @@ describe("feishu employee read RPC (slice 3)", () => {
       confirmMode: "draft_then_confirm",
       resourceScope: { groups: [], docs: ["docx_in"], calendars: [] },
     };
-    const tenant: TenantConfigStore = {
-      version: 1,
-      tenants: {
-        "001": {
-          tenantId: "001",
-          updatedAt: "2026-11-07T00:00:00.000Z",
-          override: {
-            enterpriseImEmployeeProxy: {
-              policies: [
-                {
-                  policyId: "policy-project",
-                  employeeId: "emp-a",
-                  seatId: "seat-1",
-                  agentId: "project",
-                  actions: ["read", "draft", "send"],
-                },
-              ],
-            },
-            channels: {
-              feishu: {
-                enabled: true,
-                accounts: {
-                  t_001_default: {
-                    appId: "cli_public",
-                    appSecret: APP_SECRET,
-                    platformEnterpriseId: "tenant-key-1",
-                    capabilityStatus: {
-                      checkedAt: "2026-11-07T00:00:00.000Z",
-                      projectGroupRead: "granted",
-                      projectDocs: "granted",
-                      sendAsUser: "granted",
-                      newMessageTrigger: "granted",
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    };
-    await saveTenantConfigStore(tenant, fixture.tenantPath);
+    await saveTenantConfigStore(tenantStore(), fixture.tenantPath);
     await saveEnterpriseSeatAssetsStore(
       fixture.seatPath,
       normalizeEnterpriseSeatAssetsStore(
@@ -213,6 +218,7 @@ describe("feishu employee read RPC (slice 3)", () => {
   afterEach(() => {
     process.env.OPENBOT_STATE_DIR = previousState;
     resetSharedDataGovernanceCatalogForTests();
+    vi.unstubAllGlobals();
     rmSync(fixture.dir, { recursive: true, force: true });
   });
 
@@ -274,5 +280,91 @@ describe("feishu employee read RPC (slice 3)", () => {
 
     const after = await loadUserOperationalIdentityStore(fixture.identityPath);
     expect(Object.keys(after.grants)).toHaveLength(1);
+  });
+
+  it("uses the wired user-token reader only after a measurement record", async () => {
+    const docId = "doxcnInScopeDocument0000001";
+    const fetchImpl = vi.fn(async () => {
+      throw new Error("feishu must not be called");
+    });
+    vi.stubGlobal("fetch", fetchImpl);
+    await saveTenantConfigStore(tenantStore(true), fixture.tenantPath);
+    const booleanTrue = await execute("read", { resourceKind: "doc", resourceId: "docx_in" });
+    expect(booleanTrue.payload).toMatchObject({ code: "ENTERPRISE_IM_NOT_MEASURED" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+
+    const stored = await loadUserOperationalIdentityStore(fixture.identityPath);
+    stored.grants["g-read"].resourceScope = { groups: [], docs: [docId], calendars: [] };
+    await saveUserOperationalIdentityStore(stored, fixture.identityPath, {
+      governanceStateDir: fixture.stateDir,
+      governanceOwnershipProof: ownershipProofFromTenantUser({ tenantId: "001", userId: "emp-a" }),
+    });
+    await saveTenantConfigStore(
+      tenantStore({
+        status: "measured",
+        api: FEISHU_USER_DOCX_RAW_CONTENT_API,
+        tokenType: "user_access_token",
+        scopes: ["docx:document:readonly"],
+        observedAt: "2026-11-07T03:00:00.000Z",
+      }),
+      fixture.tenantPath,
+    );
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        const href = typeof url === "string" ? url : url instanceof URL ? url.toString() : url.url;
+        calls.push(href);
+        const authorization = new Headers(init?.headers).get("Authorization");
+        expect(authorization).toBe(`Bearer ${ACCESS}`);
+        expect(authorization).not.toContain(APP_SECRET);
+        if (href.endsWith("/raw_content")) {
+          return new Response(
+            JSON.stringify({
+              code: 0,
+              data: {
+                content:
+                  "本周三完成接口联调，剩余风险是权限审批。详见 https://example.feishu.cn/docx/doxcnOutOfScopeLink00000001",
+              },
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            code: 0,
+            data: { document: { document_id: docId, revision_id: 4, title: "项目进度" } },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+    const read = await execute("draft", { resourceKind: "doc", resourceId: docId });
+    expect(read.payload).toMatchObject({ code: "ENTERPRISE_IM_DRAFT_READY" });
+    const draft = read.payload?.draft as { text?: string; inventory?: { unreadable?: string[] } };
+    expect(draft.text).toContain("本周三完成接口联调，剩余风险是权限审批。");
+    expect(draft.inventory?.unreadable).toEqual(["doxcnOutOfScopeLink00000001"]);
+    expect(calls.some((url) => url.includes("/raw_content"))).toBe(true);
+    expect(JSON.stringify(read.payload)).not.toContain(ACCESS);
+    expect(JSON.stringify(read.payload)).not.toContain(APP_SECRET);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ code: 99991663, msg: "invalid" }), { status: 401 }),
+      ),
+    );
+    const invalid = await execute("read", { resourceKind: "doc", resourceId: docId });
+    expect(invalid.payload).toMatchObject({ code: "USER_TOKEN_INVALID_NO_APP_FALLBACK" });
+    const afterInvalid = await loadUserOperationalIdentityStore(fixture.identityPath);
+    expect(Object.values(afterInvalid.identities)[0]?.status).toBe("reauth_required");
+    const denied = Object.values(afterInvalid.usageEvents).find(
+      (event) => event.denialCode === "USER_TOKEN_INVALID_NO_APP_FALLBACK",
+    );
+    expect(denied?.agentId).toBe("project");
+    expect(JSON.stringify(denied)).not.toContain(ACCESS);
+    const again = await execute("read", { resourceKind: "doc", resourceId: docId });
+    expect(again.payload?.code).not.toBe("ENTERPRISE_IM_DRAFT_READY");
   });
 });

@@ -8,6 +8,7 @@ import {
   type EnterpriseImDraft,
   type EnterpriseImReadResourceKind,
 } from "./enterprise-im-employee-read.js";
+import { readFeishuUserDocx } from "./enterprise-im-feishu-doc-reader.js";
 import { resolveQueryScope } from "./scope-attribution.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { resolveUserOperationalIdentityStorePathForClient } from "./tenant-context.js";
@@ -455,6 +456,7 @@ export async function executeUserOperationalIdentityRuntimeAction(params: {
             resourceId,
             messageText,
             measured,
+            readDoc: readFeishuUserDocx,
           }).then((result) => {
             if (Object.keys(locked.grants).length !== before) {
               throw new Error("enterprise IM read must not write a grant");

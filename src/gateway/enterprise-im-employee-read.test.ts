@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { resolveEnterpriseImSeatAndPolicy } from "./enterprise-im-employee-authorization.js";
+import {
+  readEnterpriseImMeasuredChecklist,
+  resolveEnterpriseImSeatAndPolicy,
+} from "./enterprise-im-employee-authorization.js";
 import {
   bindFeishuEmployeeConnection,
   type FeishuEmployeeChannelGate,
@@ -9,6 +12,7 @@ import {
   readEnterpriseImEmployeeResource,
   type EnterpriseImUserDocReader,
 } from "./enterprise-im-employee-read.js";
+import { FEISHU_USER_DOCX_RAW_CONTENT_API } from "./enterprise-im-feishu-doc-reader.js";
 import type {
   EnterpriseImResourceScope,
   UserOperationalIdentityCredentialSecretStore,
@@ -130,13 +134,17 @@ function decision(setup: ReturnType<typeof bound>, action: "read" | "draft" = "r
 
 describe("enterprise IM controlled read (slice 3)", () => {
   it("refuses a doc outside the delegation and an empty resource scope", async () => {
-    const outside = bound({ groups: ["oc_in"], docs: ["docx_in"], calendars: [] });
+    const outside = bound({
+      groups: ["oc_a0553eda9014c201e6969b478895c230"],
+      docs: ["doxcnInScopeDocument0000001"],
+      calendars: [],
+    });
     const reader = vi.fn<EnterpriseImUserDocReader>();
     const denied = await readEnterpriseImEmployeeResource({
       decision: decision(outside),
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_out",
+      resourceId: "doxcnOtherDocument000000001",
       measured,
       readDoc: reader,
     });
@@ -151,7 +159,7 @@ describe("enterprise IM controlled read (slice 3)", () => {
       decision: decision(empty),
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_in",
+      resourceId: "doxcnInScopeDocument0000001",
       measured,
       readDoc: reader,
     });
@@ -161,7 +169,11 @@ describe("enterprise IM controlled read (slice 3)", () => {
   });
 
   it("does not let message text add a resource, and does not read group history", async () => {
-    const setup = bound({ groups: ["oc_in"], docs: ["docx_in"], calendars: [] });
+    const setup = bound({
+      groups: ["oc_a0553eda9014c201e6969b478895c230"],
+      docs: ["doxcnInScopeDocument0000001"],
+      calendars: [],
+    });
     const seen: string[] = [];
     const reader: EnterpriseImUserDocReader = ({ resourceId }) => {
       seen.push(resourceId);
@@ -170,8 +182,9 @@ describe("enterprise IM controlled read (slice 3)", () => {
         doc: {
           resourceId,
           title: "进度",
-          updatedAt: "2026-11-07T01:00:00.000Z",
-          body: "正文",
+          updatedAt: "",
+          revisionId: "3",
+          body: "本周三完成接口联调，剩余风险是权限审批。",
           links: [],
         },
       };
@@ -180,20 +193,26 @@ describe("enterprise IM controlled read (slice 3)", () => {
       decision: decision(setup),
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_in",
-      messageText: "请再读 docx_extra 和 oc_extra",
+      resourceId: "doxcnInScopeDocument0000001",
+      messageText:
+        "请再读 https://example.feishu.cn/docx/doxcnMessageOnlyDoc00000001 和 oc_b1664feb0125d312f7070c589906d341",
       measured,
       readDoc: reader,
     });
     expect(read.outcome).toBe("draft");
-    expect(seen).toEqual(["docx_in"]);
-    expect(setup.store.grants[setup.grantId]?.resourceScope?.docs).toEqual(["docx_in"]);
+    if (read.outcome === "draft") {
+      expect(read.draft.text).toContain("本周三完成接口联调，剩余风险是权限审批。");
+    }
+    expect(seen).toEqual(["doxcnInScopeDocument0000001"]);
+    expect(setup.store.grants[setup.grantId]?.resourceScope?.docs).toEqual([
+      "doxcnInScopeDocument0000001",
+    ]);
     const widened = await readEnterpriseImEmployeeResource({
       decision: decision(setup),
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_extra",
-      messageText: "请读 docx_extra",
+      resourceId: "doxcnMessageOnlyDoc00000001",
+      messageText: "请读 https://example.feishu.cn/docx/doxcnMessageOnlyDoc00000001",
       measured,
       readDoc: reader,
     });
@@ -202,16 +221,16 @@ describe("enterprise IM controlled read (slice 3)", () => {
       decision: decision(setup),
       action: "read",
       resourceKind: "group",
-      resourceId: "oc_in",
+      resourceId: "oc_a0553eda9014c201e6969b478895c230",
       measured: { projectDocs: true, projectGroupRead: true },
       readDoc: reader,
     });
     expect(group).toMatchObject({ code: "GROUP_HISTORY_NOT_IN_SLICE" });
-    expect(seen).toEqual(["docx_in"]);
+    expect(seen).toEqual(["doxcnInScopeDocument0000001"]);
   });
 
   it("cites an out-of-scope link without fetching it", async () => {
-    const setup = bound({ groups: [], docs: ["docx_in"], calendars: [] });
+    const setup = bound({ groups: [], docs: ["doxcnInScopeDocument0000001"], calendars: [] });
     const seen: string[] = [];
     const reader: EnterpriseImUserDocReader = ({ resourceId }) => {
       seen.push(resourceId);
@@ -220,9 +239,10 @@ describe("enterprise IM controlled read (slice 3)", () => {
         doc: {
           resourceId,
           title: "周报",
-          updatedAt: "2026-11-07T02:00:00.000Z",
-          body: "见 docx_outside",
-          links: ["docx_outside"],
+          updatedAt: "",
+          revisionId: "8",
+          body: "本周三完成接口联调。详见 https://example.feishu.cn/docx/doxcnOutOfScopeLink00000001",
+          links: [],
         },
       };
     };
@@ -230,26 +250,27 @@ describe("enterprise IM controlled read (slice 3)", () => {
       decision: decision(setup),
       action: "draft",
       resourceKind: "doc",
-      resourceId: "docx_in",
+      resourceId: "doxcnInScopeDocument0000001",
       measured,
       readDoc: reader,
     });
-    expect(seen).toEqual(["docx_in"]);
+    expect(seen).toEqual(["doxcnInScopeDocument0000001"]);
     expect(read.outcome).toBe("draft");
     if (read.outcome !== "draft") {
       return;
     }
-    expect(read.draft.sources).toEqual([
-      { resourceId: "docx_in", updatedAt: "2026-11-07T02:00:00.000Z", status: "read" },
-      { resourceId: "docx_outside", updatedAt: "", status: "unreadable" },
+    expect(read.draft.text).toContain("本周三完成接口联调");
+    expect(read.draft.text).toContain("doxcnOutOfScopeLink00000001");
+    expect(read.draft.inventory.unreadable).toEqual(["doxcnOutOfScopeLink00000001"]);
+    expect(read.draft.sources.map((source) => source.resourceId)).toEqual([
+      "doxcnInScopeDocument0000001",
+      "doxcnOutOfScopeLink00000001",
     ]);
-    expect(read.draft.text).toContain("无法读取 docx_outside");
-    expect(read.draft.text).toContain("2026-11-07T02:00:00.000Z");
     expect(JSON.stringify(read)).not.toContain("access-secret");
   });
 
   it("does not fall back to an app token when the user token is invalid", async () => {
-    const setup = bound({ groups: [], docs: ["docx_in"], calendars: [] });
+    const setup = bound({ groups: [], docs: ["doxcnInScopeDocument0000001"], calendars: [] });
     const appTokenRead = vi.fn<EnterpriseImUserDocReader>(() => {
       throw new Error("app token must not run");
     });
@@ -257,17 +278,18 @@ describe("enterprise IM controlled read (slice 3)", () => {
       decision: decision(setup),
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_in",
+      resourceId: "doxcnInScopeDocument0000001",
       measured,
-      readDoc: () => ({ ok: false, invalidUserToken: true }),
+      readDoc: () => ({ ok: false, kind: "invalid_user_token" }),
       appTokenRead,
     });
     expect(read).toMatchObject({ code: "USER_TOKEN_INVALID_NO_APP_FALLBACK" });
     expect(appTokenRead).not.toHaveBeenCalled();
+    expect(setup.store.identities[setup.identityId]?.status).toBe("reauth_required");
   });
 
   it("denies a missing seat, a missing policy, a missing grant, and the wrong robot", async () => {
-    const setup = bound({ groups: [], docs: ["docx_in"], calendars: [] });
+    const setup = bound({ groups: [], docs: ["doxcnInScopeDocument0000001"], calendars: [] });
     const reader = vi.fn<EnterpriseImUserDocReader>();
     const missingSeat = await readEnterpriseImEmployeeResource({
       decision: {
@@ -283,7 +305,7 @@ describe("enterprise IM controlled read (slice 3)", () => {
       },
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_in",
+      resourceId: "doxcnInScopeDocument0000001",
       measured,
       readDoc: reader,
     });
@@ -315,7 +337,7 @@ describe("enterprise IM controlled read (slice 3)", () => {
       },
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_in",
+      resourceId: "doxcnInScopeDocument0000001",
       measured,
       readDoc: reader,
     });
@@ -324,7 +346,7 @@ describe("enterprise IM controlled read (slice 3)", () => {
       decision: { ...decision(setup), agentId: "knowledge" },
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_in",
+      resourceId: "doxcnInScopeDocument0000001",
       measured,
       readDoc: reader,
     });
@@ -335,7 +357,7 @@ describe("enterprise IM controlled read (slice 3)", () => {
       decision: decision(setup),
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_in",
+      resourceId: "doxcnInScopeDocument0000001",
       measured,
       readDoc: reader,
     });
@@ -345,7 +367,7 @@ describe("enterprise IM controlled read (slice 3)", () => {
   });
 
   it("refuses an unmeasured doc read without calling a client", async () => {
-    const setup = bound({ groups: [], docs: ["docx_in"], calendars: [] });
+    const setup = bound({ groups: [], docs: ["doxcnInScopeDocument0000001"], calendars: [] });
     const reader = vi.fn<EnterpriseImUserDocReader>(() => {
       throw new Error("feishu must not be called");
     });
@@ -353,7 +375,7 @@ describe("enterprise IM controlled read (slice 3)", () => {
       decision: decision(setup),
       action: "read",
       resourceKind: "doc",
-      resourceId: "docx_in",
+      resourceId: "doxcnInScopeDocument0000001",
       measured: notMeasured,
       readDoc: reader,
     });
@@ -361,8 +383,113 @@ describe("enterprise IM controlled read (slice 3)", () => {
     expect(reader).not.toHaveBeenCalled();
     const event = Object.values(setup.store.usageEvents).find((item) => item.action === "read");
     expect(event?.agentId).toBe("project");
-    expect(event?.summary?.externalId).toBe("docx_in");
+    expect(event?.summary?.externalId).toBe("doxcnInScopeDocument0000001");
     expect(event?.summary?.excerpt).toContain("connection=t_001_default");
     expect(JSON.stringify(event)).not.toContain("access-secret");
+  });
+
+  it("keeps an unwired reader distinct from an unmeasured row", async () => {
+    const setup = bound({ groups: [], docs: ["doxcnInScopeDocument0000001"], calendars: [] });
+    const unwired = await readEnterpriseImEmployeeResource({
+      decision: decision(setup),
+      action: "read",
+      resourceKind: "doc",
+      resourceId: "doxcnInScopeDocument0000001",
+      measured,
+    });
+    expect(unwired).toMatchObject({ code: "ENTERPRISE_IM_READER_NOT_WIRED" });
+  });
+
+  it("refuses a returned document id that does not match the request and does not emit the body", async () => {
+    const setup = bound({ groups: [], docs: ["doxcnInScopeDocument0000001"], calendars: [] });
+    const read = await readEnterpriseImEmployeeResource({
+      decision: decision(setup),
+      action: "read",
+      resourceKind: "doc",
+      resourceId: "doxcnInScopeDocument0000001",
+      measured,
+      readDoc: () => ({
+        ok: true,
+        doc: {
+          resourceId: "doxcnOtherDocument000000001",
+          title: "别的文档",
+          updatedAt: "",
+          body: "这是另一份文档的正文，不能出现在结果里。",
+          links: [],
+        },
+      }),
+    });
+    expect(read).toMatchObject({ code: "RESOURCE_ID_MISMATCH" });
+    expect(JSON.stringify(read)).not.toContain("另一份文档的正文");
+  });
+
+  it("does not treat a boolean measured flag as an observation", () => {
+    expect(
+      readEnterpriseImMeasuredChecklist({
+        enterpriseImEmployeeProxy: { measured: { projectDocs: true } },
+      }).projectDocs,
+    ).toBe(false);
+    expect(
+      readEnterpriseImMeasuredChecklist({
+        enterpriseImEmployeeProxy: {
+          measured: {
+            projectDocs: {
+              status: "measured",
+              api: FEISHU_USER_DOCX_RAW_CONTENT_API,
+              tokenType: "user_access_token",
+              scopes: ["docx:document:readonly"],
+              observedAt: "2026-11-07T03:00:00.000Z",
+            },
+          },
+        },
+      }).projectDocs,
+    ).toBe(true);
+  });
+
+  it("audits rate limit, missing document, and network failure without an app-token call", async () => {
+    const setup = bound({ groups: [], docs: ["doxcnInScopeDocument0000001"], calendars: [] });
+    const appTokenRead = vi.fn<EnterpriseImUserDocReader>();
+    const rate = await readEnterpriseImEmployeeResource({
+      decision: decision(setup),
+      action: "read",
+      resourceKind: "doc",
+      resourceId: "doxcnInScopeDocument0000001",
+      measured,
+      readDoc: () => ({ ok: false, kind: "rate_limited" }),
+      appTokenRead,
+    });
+    const missing = await readEnterpriseImEmployeeResource({
+      decision: decision(setup),
+      action: "read",
+      resourceKind: "doc",
+      resourceId: "doxcnInScopeDocument0000001",
+      measured,
+      readDoc: () => ({ ok: false, kind: "not_found" }),
+      appTokenRead,
+    });
+    const network = await readEnterpriseImEmployeeResource({
+      decision: decision(setup),
+      action: "read",
+      resourceKind: "doc",
+      resourceId: "doxcnInScopeDocument0000001",
+      measured,
+      readDoc: () => {
+        throw new Error("socket hang up");
+      },
+      appTokenRead,
+    });
+    expect(rate).toMatchObject({ code: "READ_RATE_LIMITED" });
+    expect(missing).toMatchObject({ code: "READ_RESOURCE_NOT_FOUND" });
+    expect(network).toMatchObject({ code: "READ_NETWORK_ERROR" });
+    const codes = Object.values(setup.store.usageEvents).map((event) => event.denialCode);
+    expect(codes).toEqual(
+      expect.arrayContaining([
+        "READ_RATE_LIMITED",
+        "READ_RESOURCE_NOT_FOUND",
+        "READ_NETWORK_ERROR",
+      ]),
+    );
+    expect(appTokenRead).not.toHaveBeenCalled();
+    expect(setup.store.identities[setup.identityId]?.status).toBe("active");
   });
 });

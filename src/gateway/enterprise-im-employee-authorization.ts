@@ -1,3 +1,5 @@
+import type { FeishuEmployeeChannelGate } from "./enterprise-im-employee-connection.js";
+import { loadFeishuEmployeeChannelGate } from "./enterprise-im-employee-connection.js";
 /**
  * Server-trusted seat and robot/action policy for the Feishu employee proxy.
  *
@@ -8,8 +10,7 @@
  * `enterpriseImEmployeeProxy.policies`. A missing config stays a deny.
  * Do not add a default allow for a pilot.
  */
-import type { FeishuEmployeeChannelGate } from "./enterprise-im-employee-connection.js";
-import { loadFeishuEmployeeChannelGate } from "./enterprise-im-employee-connection.js";
+import { FEISHU_USER_DOCX_RAW_CONTENT_API } from "./enterprise-im-feishu-doc-reader.js";
 import {
   loadEnterpriseSeatAssetsStore,
   type EnterpriseSeatAssetsStore,
@@ -126,7 +127,32 @@ function proxyRoot(override: unknown): Record<string, unknown> | null {
   return root as Record<string, unknown>;
 }
 
-/** Only a boolean true counts. Missing config stays not measured. */
+function isRecordedDocMeasurement(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const row = value as Record<string, unknown>;
+  if (row.status !== "measured") {
+    return false;
+  }
+  if (row.api !== FEISHU_USER_DOCX_RAW_CONTENT_API) {
+    return false;
+  }
+  if (row.tokenType !== "user_access_token") {
+    return false;
+  }
+  if (typeof row.observedAt !== "string" || !Number.isFinite(Date.parse(row.observedAt))) {
+    return false;
+  }
+  const scopes = Array.isArray(row.scopes) ? row.scopes : [];
+  return scopes.includes("docx:document:readonly") || scopes.includes("docx:document");
+}
+
+/**
+ * A boolean `true` is not a measurement. projectDocs counts only when the
+ * tenant stores an observation of the wired user-token docx API. This tree
+ * does not ship that observation. Group history stays unmeasured in this slice.
+ */
 export function readEnterpriseImMeasuredChecklist(
   override: unknown,
 ): EnterpriseImMeasuredChecklist {
@@ -136,8 +162,8 @@ export function readEnterpriseImMeasuredChecklist(
       ? (measured as Record<string, unknown>)
       : {};
   return {
-    projectDocs: record.projectDocs === true,
-    projectGroupRead: record.projectGroupRead === true,
+    projectDocs: isRecordedDocMeasurement(record.projectDocs),
+    projectGroupRead: false,
   };
 }
 

@@ -13,35 +13,56 @@ import {
   decideEnterpriseImEmployeeProxy,
   type EnterpriseImDecisionInput,
 } from "./enterprise-im-employee-decision.js";
+import { extractFeishuResourceIds } from "./enterprise-im-feishu-doc-reader.js";
 import { recordUserOperationalIdentityUsageEvent } from "./user-operational-identity-store.js";
 import type { EnterpriseImResourceScope } from "./user-operational-identity-types.js";
-
-const RESOURCE_ID = /\b(?:docx|oc|wiki)_[A-Za-z0-9_-]+\b/g;
 
 export type EnterpriseImReadResourceKind = "doc" | "group";
 
 export type EnterpriseImDraftSource = {
   resourceId: string;
+  /** Wall-clock time when the API returned one. Empty when it did not. */
   updatedAt: string;
+  /** Feishu document revision_id. Not a substitute for a measured timestamp. */
+  revisionId?: string;
   status: "read" | "unreadable";
 };
 
+/** Ids and times only. This is not the progress draft. */
+export type EnterpriseImReadInventory = {
+  resourceId: string;
+  title: string;
+  revisionId: string;
+  unreadable: string[];
+};
+
 export type EnterpriseImDraft = {
+  /** Progress text taken from the authorized document body. */
   text: string;
   sources: EnterpriseImDraftSource[];
+  inventory: EnterpriseImReadInventory;
 };
 
 export type EnterpriseImUserDoc = {
   resourceId: string;
   title: string;
   updatedAt: string;
+  revisionId?: string;
   body: string;
   links: string[];
 };
 
+export type EnterpriseImDocReadFailureKind =
+  | "invalid_user_token"
+  | "rate_limited"
+  | "not_found"
+  | "network"
+  | "resource_id_mismatch"
+  | "rejected";
+
 export type EnterpriseImUserDocReadResult =
   | { ok: true; doc: EnterpriseImUserDoc }
-  | { ok: false; invalidUserToken: true };
+  | { ok: false; kind: EnterpriseImDocReadFailureKind; message?: string; returnedId?: string };
 
 /** User-token document read. This slice does not pass an app token here. */
 export type EnterpriseImUserDocReader = (params: {
@@ -69,10 +90,7 @@ export type EnterpriseImReadResult =
     };
 
 function idsInText(value: string | undefined): string[] {
-  if (!value) {
-    return [];
-  }
-  return [...new Set(value.match(RESOURCE_ID) ?? [])];
+  return extractFeishuResourceIds(value ?? "");
 }
 
 function allowlist(
@@ -89,6 +107,42 @@ function allowlist(
 function kindForId(resourceId: string): EnterpriseImReadResourceKind {
   return resourceId.startsWith("oc_") ? "group" : "doc";
 }
+
+const READ_FAILURE: Record<
+  EnterpriseImDocReadFailureKind,
+  { code: string; message: string; reauth: boolean }
+> = {
+  invalid_user_token: {
+    code: "USER_TOKEN_INVALID_NO_APP_FALLBACK",
+    message: "用户令牌无效。不会改用应用令牌。身份已改为需重新认证。",
+    reauth: true,
+  },
+  rate_limited: {
+    code: "READ_RATE_LIMITED",
+    message: "飞书文档读取被限流。",
+    reauth: false,
+  },
+  not_found: {
+    code: "READ_RESOURCE_NOT_FOUND",
+    message: "飞书文档不存在或已删除。",
+    reauth: false,
+  },
+  network: {
+    code: "READ_NETWORK_ERROR",
+    message: "飞书文档读取没有完成。",
+    reauth: false,
+  },
+  resource_id_mismatch: {
+    code: "RESOURCE_ID_MISMATCH",
+    message: "返回的文档编号与授权请求不一致。",
+    reauth: false,
+  },
+  rejected: {
+    code: "READ_REJECTED",
+    message: "飞书拒绝了这次文档读取。",
+    reauth: false,
+  },
+};
 
 function audit(params: {
   input: EnterpriseImDecisionInput;
@@ -151,14 +205,31 @@ function deny(params: {
 }
 
 function assembleDraft(doc: EnterpriseImUserDoc, unreadable: string[]): EnterpriseImDraft {
+  const revision = doc.revisionId?.trim() || "";
+  const progress = doc.body.trim();
   const lines = [
-    `已读取 ${doc.title}（${doc.resourceId}），更新时间 ${doc.updatedAt}。`,
-    ...unreadable.map((id) => `无法读取 ${id}：不在该机器人的资源范围。`),
+    "进度草稿",
+    `来源：${doc.title}（${doc.resourceId}）${revision ? `，修订版本 ${revision}` : ""}。`,
+    "",
+    progress,
+    ...(unreadable.length > 0 ? ["", "以下链接不在授权范围，未抓取："] : []),
+    ...unreadable.map((id) => `- ${id}`),
   ];
   return {
     text: lines.join("\n"),
+    inventory: {
+      resourceId: doc.resourceId,
+      title: doc.title,
+      revisionId: revision,
+      unreadable,
+    },
     sources: [
-      { resourceId: doc.resourceId, updatedAt: doc.updatedAt, status: "read" },
+      {
+        resourceId: doc.resourceId,
+        updatedAt: doc.updatedAt,
+        revisionId: revision || undefined,
+        status: "read",
+      },
       ...unreadable.map((resourceId) => ({
         resourceId,
         updatedAt: "",
@@ -297,11 +368,13 @@ export async function readEnterpriseImEmployeeResource(params: {
     return result;
   }
   if (!params.measured.projectDocs) {
+    // Unmeasured. Distinct from ENTERPRISE_IM_READER_NOT_WIRED, which is only
+    // returned after a measurement record exists and no reader was passed.
     const result = deny({
       input: params.decision,
       action: params.action,
       code: "ENTERPRISE_IM_NOT_MEASURED",
-      message: "文档读取尚未在目标企业完成验证，不能调用飞书。",
+      message: "文档读取尚未在目标企业完成实测，不能调用飞书。",
       identityId: decision.identityId,
       grantId: grant.grantId,
       grantVersion: grant.grantVersion,
@@ -318,7 +391,7 @@ export async function readEnterpriseImEmployeeResource(params: {
       input: params.decision,
       action: params.action,
       code: "ENTERPRISE_IM_READER_NOT_WIRED",
-      message: "已验证的用户身份文档读取尚未接通。",
+      message: "实测记录已存在，但用户身份文档读取还没有接到执行路径。",
       identityId: decision.identityId,
       grantId: grant.grantId,
       grantVersion: grant.grantVersion,
@@ -334,20 +407,50 @@ export async function readEnterpriseImEmployeeResource(params: {
     params.decision.secretStore?.secrets[
       params.decision.store.identities[decision.identityId]?.credentialHandleId ?? ""
     ]?.accessToken ?? "";
-  const loaded = await params.readDoc({ resourceId: requested, accessToken });
+  let loaded: EnterpriseImUserDocReadResult;
+  try {
+    loaded = await params.readDoc({ resourceId: requested, accessToken });
+  } catch {
+    loaded = { ok: false, kind: "network", message: "fetch failed" };
+  }
   if (!loaded.ok) {
     if (appTokenFallback) {
-      // An invalid user token stops here. Do not call the app-token reader.
+      // Any reader failure stops here. Do not call the app-token reader.
+    }
+    const failure = READ_FAILURE[loaded.kind];
+    if (failure.reauth) {
+      const identity = params.decision.store.identities[decision.identityId];
+      if (identity && identity.ownerId === params.decision.ownerId) {
+        identity.status = "reauth_required";
+        identity.updatedAt = params.decision.nowIso;
+      }
     }
     const result = deny({
       input: params.decision,
       action: params.action,
-      code: "USER_TOKEN_INVALID_NO_APP_FALLBACK",
-      message: "用户令牌无效。不会改用应用令牌。",
+      code: failure.code,
+      message: failure.message,
       identityId: decision.identityId,
       grantId: grant.grantId,
       grantVersion: grant.grantVersion,
-      resourceIds: [requested],
+      resourceIds: [requested, loaded.returnedId ?? ""].filter(Boolean),
+      primaryResourceId: requested,
+    });
+    if (Object.keys(params.decision.store.grants).length !== grantCount) {
+      throw new Error("enterprise IM read must not write a grant");
+    }
+    return result;
+  }
+  if (loaded.doc.resourceId !== requested) {
+    const result = deny({
+      input: params.decision,
+      action: params.action,
+      code: "RESOURCE_ID_MISMATCH",
+      message: "返回的文档编号与授权请求不一致。",
+      identityId: decision.identityId,
+      grantId: grant.grantId,
+      grantVersion: grant.grantVersion,
+      resourceIds: [requested, loaded.doc.resourceId],
       primaryResourceId: requested,
     });
     if (Object.keys(params.decision.store.grants).length !== grantCount) {
@@ -381,7 +484,7 @@ export async function readEnterpriseImEmployeeResource(params: {
   return {
     outcome: "draft",
     code: "ENTERPRISE_IM_DRAFT_READY",
-    message: "已生成带来源和更新时间的草稿。未发送。",
+    message: "已根据授权文档正文生成进度草稿。未发送。",
     grantId: grant.grantId,
     grantVersion: grant.grantVersion ?? 1,
     identityId: decision.identityId,
