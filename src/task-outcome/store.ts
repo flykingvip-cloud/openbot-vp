@@ -14,12 +14,16 @@ export type CommitBundle = {
   record: TaskOutcomeRecord;
   events: OutcomeOutboxEvent[];
   createdAt: string;
-  /** Optional command idempotency record applied in the same materialization boundary. */
+  /**
+   * Optional command idempotency record applied in the same materialization boundary.
+   * commitId is omitted on logs written before command receipts. Do not backfill it.
+   */
   commandLog?: {
     commandId: string;
     digest: string;
     taskId: string;
     outcomeVersion: number;
+    commitId?: string | null;
   };
 };
 
@@ -226,7 +230,15 @@ export class DurableTaskOutcomeStore {
       record: input.record,
       events: input.events,
       createdAt: new Date().toISOString(),
-      ...(input.commandLog ? { commandLog: input.commandLog } : {}),
+      ...(input.commandLog
+        ? {
+            commandLog: {
+              ...input.commandLog,
+              // The id allocated for this commit. Never a guessed backfill.
+              commitId,
+            },
+          }
+        : {}),
     };
 
     const staging = path.join(this.rootDir, "commits", `${commitId}.staging.json`);
@@ -270,7 +282,25 @@ export class DurableTaskOutcomeStore {
     if (bundle.commandLog) {
       const cmdPath = this.commandLogPath(bundle.commandLog.commandId);
       if (!fs.existsSync(cmdPath)) {
-        atomicWriteJson(cmdPath, bundle.commandLog);
+        const log = bundle.commandLog;
+        const persisted: {
+          commandId: string;
+          digest: string;
+          taskId: string;
+          outcomeVersion: number;
+          commitId?: string | null;
+        } = {
+          commandId: log.commandId,
+          digest: log.digest,
+          taskId: log.taskId,
+          outcomeVersion: log.outcomeVersion,
+        };
+        // Only logs that recorded a commit id keep one. Missing means legacy null.
+        if (Object.prototype.hasOwnProperty.call(log, "commitId")) {
+          persisted.commitId =
+            typeof log.commitId === "string" && log.commitId ? log.commitId : null;
+        }
+        atomicWriteJson(cmdPath, persisted);
       }
     }
 
@@ -436,10 +466,35 @@ export class DurableTaskOutcomeStore {
     return path.join(this.rootDir, "command-log", `${boundedOutcomePathSegment(commandId)}.json`);
   }
 
-  loadCommand(
-    commandId: string,
-  ): { digest: string; taskId: string; outcomeVersion: number } | undefined {
-    return readJson(this.commandLogPath(commandId));
+  loadCommand(commandId: string):
+    | {
+        digest: string;
+        taskId: string;
+        outcomeVersion: number;
+        /** Null when the on-disk log has no commit id. Not inferred from the tip. */
+        commitId: string | null;
+      }
+    | undefined {
+    const raw = readJson<{
+      digest?: string;
+      taskId?: string;
+      outcomeVersion?: number;
+      commitId?: string | null;
+    }>(this.commandLogPath(commandId));
+    if (
+      !raw ||
+      typeof raw.digest !== "string" ||
+      typeof raw.taskId !== "string" ||
+      typeof raw.outcomeVersion !== "number"
+    ) {
+      return undefined;
+    }
+    return {
+      digest: raw.digest,
+      taskId: raw.taskId,
+      outcomeVersion: raw.outcomeVersion,
+      commitId: typeof raw.commitId === "string" && raw.commitId.length > 0 ? raw.commitId : null,
+    };
   }
 
   saveCommand(

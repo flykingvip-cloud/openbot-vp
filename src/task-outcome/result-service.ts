@@ -3,6 +3,7 @@ import { computeEvaluationEligibility } from "./eligibility.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { applyTransition, evidenceStillValid, scopeIdOf } from "./transitions.js";
 import type {
+  CommandReceipt,
   OutcomeOutboxEvent,
   OutcomeEventType,
   SubmitFailure,
@@ -160,24 +161,58 @@ export class TaskOutcomeResultService {
       }
     }
 
-    if (opts?.commandId) {
-      const digest = digestTransition(taskId, transition);
-      const prior = this.store.loadCommand(opts.commandId);
+    const commandId = opts?.commandId;
+    const requestDigest = commandId ? digestTransition(taskId, transition) : undefined;
+    if (commandId && requestDigest) {
+      const prior = this.store.loadCommand(commandId);
       if (prior) {
-        if (prior.digest !== digest) {
+        if (prior.digest !== requestDigest) {
           return {
             ok: false,
             code: "command_conflict",
-            message: `commandId ${opts.commandId} reused with different payload`,
+            message: `commandId ${commandId} reused with different payload`,
             current,
+            commandConflict: {
+              commandId,
+              taskId: prior.taskId,
+              storedDigest: prior.digest,
+              requestDigest,
+              storedOutcomeVersion: prior.outcomeVersion,
+              storedCommitId: prior.commitId,
+            },
           };
         }
-        const historical =
-          this.store.loadTaskVersion(prior.taskId, prior.outcomeVersion) ??
-          this.store.loadTask(prior.taskId);
-        if (historical) {
-          return { ok: true, record: historical, createdEvents: [] };
+        // Exact replay uses the command's own version. Never substitute the tip.
+        const historical = this.store.loadTaskVersion(prior.taskId, prior.outcomeVersion);
+        if (!historical) {
+          return {
+            ok: false,
+            code: "evidence_missing",
+            message: `command ${commandId} version ${prior.outcomeVersion} snapshot is missing`,
+            current,
+            evidenceGap: {
+              schemaVersion: 1,
+              commandId,
+              taskId: prior.taskId,
+              outcomeVersion: prior.outcomeVersion,
+              requestDigest: prior.digest,
+              reason: "version_snapshot_missing",
+            },
+          };
         }
+        return {
+          ok: true,
+          record: historical,
+          createdEvents: [],
+          commandReceipt: this.buildCommandReceipt({
+            commandId,
+            taskId: prior.taskId,
+            outcomeVersion: prior.outcomeVersion,
+            requestDigest: prior.digest,
+            disposition: "replayed",
+            commitId: prior.commitId,
+          }),
+        };
       }
     }
 
@@ -190,7 +225,7 @@ export class TaskOutcomeResultService {
           current.outcomeVersion > transition.expectedVersion &&
           isSameEffect(current, transition)
         ) {
-          return { ok: true, record: current, createdEvents: [] };
+          return this.noEffect(current, commandId, requestDigest);
         }
         return {
           ok: false,
@@ -286,7 +321,7 @@ export class TaskOutcomeResultService {
       transition.type !== "create" &&
       attemptFingerprint(current) === attemptFingerprint(record)
     ) {
-      return { ok: true, record: current, createdEvents: [] };
+      return this.noEffect(current, commandId, requestDigest);
     }
 
     const eventType: OutcomeEventType =
@@ -325,7 +360,58 @@ export class TaskOutcomeResultService {
       };
     }
 
-    return { ok: true, record, createdEvents: events };
+    return {
+      ok: true,
+      record,
+      createdEvents: events,
+      ...(commandId && requestDigest
+        ? {
+            commandReceipt: this.buildCommandReceipt({
+              commandId,
+              taskId,
+              outcomeVersion: record.outcomeVersion,
+              requestDigest,
+              disposition: "applied",
+              commitId: committed.commitId,
+            }),
+          }
+        : {}),
+    };
+  }
+
+  private buildCommandReceipt(args: {
+    commandId: string;
+    taskId: string;
+    outcomeVersion: number;
+    requestDigest: string;
+    disposition: CommandReceipt["disposition"];
+    commitId: string | null;
+  }): CommandReceipt {
+    return { schemaVersion: 1, ...args };
+  }
+
+  /** Same observable effect, no new commit and no forged command log. */
+  private noEffect(
+    current: TaskOutcomeRecord,
+    commandId: string | undefined,
+    requestDigest: string | undefined,
+  ): SubmitResult {
+    if (!commandId || !requestDigest) {
+      return { ok: true, record: current, createdEvents: [] };
+    }
+    return {
+      ok: true,
+      record: current,
+      createdEvents: [],
+      commandReceipt: this.buildCommandReceipt({
+        commandId,
+        taskId: current.taskId,
+        outcomeVersion: current.outcomeVersion,
+        requestDigest,
+        disposition: "no_effect",
+        commitId: null,
+      }),
+    };
   }
 
   assertScope(taskId: string, scope: TrustedScope): SubmitFailure | null {
@@ -377,7 +463,15 @@ export class TaskOutcomeResultService {
         opts,
       );
     }
-    return { ok: true, record: cur, createdEvents: [] };
+    const unchanged = {
+      type: "set_acceptance" as const,
+      acceptance: { status: "pending" as const },
+      evidence: [],
+      allowRetry: true,
+      expectedVersion,
+      fencingToken,
+    };
+    return this.noEffect(cur, opts?.commandId, digestTransition(taskId, unchanged));
   }
 
   eligibility(taskId: string) {

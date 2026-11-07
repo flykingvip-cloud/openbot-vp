@@ -363,6 +363,38 @@ export type SubmitTransition =
       };
     };
 
+/** Versioned command receipt from the original submit/idempotency boundary. */
+export type CommandReceipt = {
+  schemaVersion: 1;
+  commandId: string;
+  taskId: string;
+  outcomeVersion: number;
+  requestDigest: string;
+  disposition: "applied" | "replayed" | "no_effect";
+  /** Null when the durable log predates commit ids, or when nothing was committed. */
+  commitId: string | null;
+};
+
+/** Same command id, different payload. Not a successful charge. */
+export type CommandConflictDetail = {
+  commandId: string;
+  taskId: string;
+  storedDigest: string;
+  requestDigest: string;
+  storedOutcomeVersion: number;
+  storedCommitId: string | null;
+};
+
+/** The command log names a version whose immutable snapshot is gone. */
+export type CommandEvidenceGap = {
+  schemaVersion: 1;
+  commandId: string;
+  taskId: string;
+  outcomeVersion: number;
+  requestDigest: string;
+  reason: "version_snapshot_missing";
+};
+
 export type SubmitFailure = {
   ok: false;
   code:
@@ -374,13 +406,22 @@ export type SubmitFailure = {
     | "unauthorized_correction"
     | "evidence_stale"
     | "command_conflict"
+    | "evidence_missing"
     | "not_found";
   message: string;
   current?: TaskOutcomeRecord;
+  commandConflict?: CommandConflictDetail;
+  evidenceGap?: CommandEvidenceGap;
 };
 
 export type SubmitResult =
-  | { ok: true; record: TaskOutcomeRecord; createdEvents: OutcomeOutboxEvent[] }
+  | {
+      ok: true;
+      record: TaskOutcomeRecord;
+      createdEvents: OutcomeOutboxEvent[];
+      /** Set only when the caller passed commandId. Legacy submits omit it. */
+      commandReceipt?: CommandReceipt;
+    }
   | SubmitFailure;
 
 export type { TaskBudgetState, TaskBudgetLimits } from "./budget.js";
