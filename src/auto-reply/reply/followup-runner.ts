@@ -43,6 +43,7 @@ import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ens
 import {
   assertRunnerTurnBudgetAllowsModelCall,
   chargeModelCallAgainstTip,
+  runnerExecutorEvidenceContext,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
@@ -418,6 +419,11 @@ export function createFollowupRunner(params: {
         }
         const runFallback = () =>
           runWithModelFallback({
+            executorEvidence: runnerExecutorEvidenceContext(queued.run.config, queued.run.agentId, {
+              taskId: followupOutcomeTaskId,
+              scope: followupOutcomeScope,
+              runId,
+            }),
             cfg: queued.run.config,
             provider: queued.run.provider,
             model: queued.run.model,

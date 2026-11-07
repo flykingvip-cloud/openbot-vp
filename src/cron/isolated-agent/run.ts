@@ -91,6 +91,7 @@ import { ensureCronTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.
 import {
   assertRunnerTurnBudgetAllowsModelCall,
   chargeModelCallAgainstTip,
+  runnerExecutorEvidenceContext,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
@@ -1133,6 +1134,11 @@ export async function runCronIsolatedAgentTurn(params: {
       }
       try {
         const fallbackResult = await runWithModelFallback({
+          executorEvidence: runnerExecutorEvidenceContext(cfgWithAgentDefaults, agentId, {
+            taskId: cronOutcomeTaskId,
+            scope: cronOutcomeScope,
+            runId: `${cronSession.sessionEntry.sessionId}:${runStartedAt}`,
+          }),
           cfg: cfgWithAgentDefaults,
           provider,
           model,

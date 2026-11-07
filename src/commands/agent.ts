@@ -125,6 +125,7 @@ import {
 import {
   assertRunnerTurnBudgetAllowsModelCall,
   chargeModelCallAgainstTip,
+  runnerExecutorEvidenceContext,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
@@ -1444,6 +1445,11 @@ async function agentCommandInternal(
         opts.governanceEntry,
       );
       const fallbackResult = await runWithModelFallback({
+        executorEvidence: runnerExecutorEvidenceContext(cfg, sessionAgentId, {
+          taskId: agentOutcomeTaskId,
+          scope: agentOutcomeScope,
+          runId,
+        }),
         cfg,
         provider,
         model,

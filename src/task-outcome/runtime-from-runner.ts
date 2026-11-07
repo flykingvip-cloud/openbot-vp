@@ -2,6 +2,7 @@ import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import { normalizeUsage } from "../agents/usage.js";
 import type { OpenBotConfig } from "../config/config.js";
+import type { ExecutorEvidenceContext } from "../executor-evidence/model-call-evidence.js";
 import { recordToolOutcomes } from "../gateway/agent-growth/operational-metrics-store.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../utils/usage-format.js";
 import { applySpendAndAssess, assessTaskBudgetExhaustion, buildTaskBudgetState } from "./budget.js";
@@ -139,6 +140,28 @@ export type GrowthOutcomeCommitOpts = {
 
 function resolveStoreRoot(cfg: OpenBotConfig, agentId: string): string {
   return path.join(resolveAgentDir(cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
+}
+
+/** Optional model-fallback evidence context. Missing task identity collects nothing. */
+export function runnerExecutorEvidenceContext(
+  cfg: OpenBotConfig,
+  agentId: string,
+  params: { taskId?: string; scope?: TrustedScope; runId: string },
+): ExecutorEvidenceContext | undefined {
+  const taskId = params.taskId?.trim();
+  const agent = agentId.trim();
+  if (!taskId || !params.scope || !agent || !params.runId.trim()) {
+    return undefined;
+  }
+  return {
+    agentId: agent,
+    scope: params.scope,
+    taskId,
+    runId: params.runId,
+    storeRoot: resolveStoreRoot(cfg, agent),
+    provenance: "live",
+    collector: "model-fallback",
+  };
 }
 
 export class TaskBudgetExceededError extends Error {

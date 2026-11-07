@@ -80,6 +80,7 @@ import type { ModalityExecutionArtifact } from "../../task-outcome/modality-arti
 import {
   assessRunnerTurnBudgetGate,
   chargeModelCallAgainstTip,
+  runnerExecutorEvidenceContext,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
   type GrowthOutcomeCommitOpts,
@@ -639,6 +640,11 @@ export async function runAgentTurnWithFallback(params: {
           rememberRunModelSet(runId, parentSnapshot);
         }
         const fallbackResult = await runWithModelFallback({
+          executorEvidence: runnerExecutorEvidenceContext(
+            params.followupRun.run.config,
+            growthAgentIdForEntry ?? "",
+            { taskId: chatOutcomeTaskId, scope: chatOutcomeScope, runId },
+          ),
           ...resolveModelFallbackOptions(params.followupRun.run),
           ...embeddedModelGovernance,
           ...(executionRouting.preferredModelOrder
