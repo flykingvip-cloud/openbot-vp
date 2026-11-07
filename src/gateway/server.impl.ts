@@ -59,6 +59,7 @@ import {
 } from "../local-files/events.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
+import { createHeartbeatActivityLifecycle } from "../observation/heartbeat-activity-lifecycle.js";
 import { getGlobalHookRunner, runGlobalGatewayStopSafely } from "../plugins/hook-runner-global.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import { createPluginRuntime } from "../plugins/runtime/index.js";
@@ -706,11 +707,13 @@ export async function startGatewayServer(
   // The disabled handle does not subscribe and does not write.
   const conversationEvaluation = minimalTestGateway ? null : startConversationEvaluation();
 
-  const heartbeatUnsub = minimalTestGateway
-    ? null
-    : onHeartbeatEvent((evt) => {
+  const heartbeatUnsub = createHeartbeatActivityLifecycle({
+    minimalTestGateway,
+    subscribeBroadcast: () =>
+      onHeartbeatEvent((evt) => {
         broadcast("heartbeat", evt, { dropIfSlow: true });
-      });
+      }),
+  });
 
   let heartbeatRunner: HeartbeatRunner = minimalTestGateway
     ? {
