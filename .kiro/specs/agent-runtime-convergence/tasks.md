@@ -745,3 +745,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Provider stream parameters now belong to runtime contracts; embedded and CLI backends no longer import command-host options for this shared type. Original command export remains type-only compatibility. — codex-runtime-manager
 - CLI/command regression 2 files / 45 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Complete executor replacement remains open. — codex-runtime-manager
+
+## Prompt hook adapter ownership (2026-11-07)
+
+- Existing prompt hook invocation, cached legacy-result reuse and deterministic merge moved from the legacy attempt into capabilities/adapters/prompt-build-hooks. Original implementation removed; no additional hook invocation or execution authority added. — codex-runtime-manager
+- Attempt and ordering regression 2 files / 85 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Complete core-loop replacement and retirement remain open. — codex-runtime-manager

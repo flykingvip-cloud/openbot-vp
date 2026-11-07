@@ -9,3 +9,5 @@ export {
 export type { HookContext } from "./invocation/before-call.js";
 export { declareCapability } from "./catalog.js";
 export type { CapabilityDeclaration } from "../contracts/capability.js";
+
+export { resolvePromptBuildHookResult } from "./adapters/prompt-build-hooks.js";

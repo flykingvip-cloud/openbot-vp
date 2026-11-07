@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { resolvePromptBuildHookResult } from "../../../agent-runtime/capabilities/index.js";
 import {
   composeSystemPromptWithHookContext,
   prependSystemPromptAddition,
@@ -49,13 +50,7 @@ import {
 } from "../../../infra/operator-local-computer.js";
 import { MAX_IMAGE_BYTES } from "../../../media/constants.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
-import type {
-  PluginHookAgentContext,
-  PluginHookBeforeAgentStartResult,
-  PluginHookBeforePromptBuildResult,
-} from "../../../plugins/types.js";
 import { isCronSessionKey, isSubagentSessionKey } from "../../../routing/session-key.js";
-import { joinPresentTextSegments } from "../../../shared/text/join-segments.js";
 import {
   registerVisibleReplyRewriter,
   visibleReplyRewritePrompt,
@@ -263,18 +258,6 @@ import { resolveEmbeddedAttemptToolsRaw } from "./resolve-embedded-tools.js";
 import { rewriteAttemptVisibleReply } from "./rewrite-visible-reply.js";
 import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptResult } from "./types.js";
 
-type PromptBuildHookRunner = {
-  hasHooks: (hookName: "before_prompt_build" | "before_agent_start") => boolean;
-  runBeforePromptBuild: (
-    event: { prompt: string; messages: unknown[] },
-    ctx: PluginHookAgentContext,
-  ) => Promise<PluginHookBeforePromptBuildResult | undefined>;
-  runBeforeAgentStart: (
-    event: { prompt: string; messages: unknown[] },
-    ctx: PluginHookAgentContext,
-  ) => Promise<PluginHookBeforeAgentStartResult | undefined>;
-};
-
 export type ProtocolBodyBoundaryResult =
   | { status: "none" }
   | { status: "stripped-mixed" }
@@ -447,62 +430,6 @@ export function wrapStreamFnEnforceProtocolTextNonExecution(
 // ---------------------------------------------------------------------------
 // xAI / Grok: decode HTML entities in tool call arguments
 // ---------------------------------------------------------------------------
-
-export async function resolvePromptBuildHookResult(params: {
-  prompt: string;
-  messages: unknown[];
-  hookCtx: PluginHookAgentContext;
-  hookRunner?: PromptBuildHookRunner | null;
-  legacyBeforeAgentStartResult?: PluginHookBeforeAgentStartResult;
-}): Promise<PluginHookBeforePromptBuildResult> {
-  const promptBuildResult = params.hookRunner?.hasHooks("before_prompt_build")
-    ? await params.hookRunner
-        .runBeforePromptBuild(
-          {
-            prompt: params.prompt,
-            messages: params.messages,
-          },
-          params.hookCtx,
-        )
-        .catch((hookErr: unknown) => {
-          log.warn(`before_prompt_build hook failed: ${String(hookErr)}`);
-          return undefined;
-        })
-    : undefined;
-  const legacyResult =
-    params.legacyBeforeAgentStartResult ??
-    (params.hookRunner?.hasHooks("before_agent_start")
-      ? await params.hookRunner
-          .runBeforeAgentStart(
-            {
-              prompt: params.prompt,
-              messages: params.messages,
-            },
-            params.hookCtx,
-          )
-          .catch((hookErr: unknown) => {
-            log.warn(
-              `before_agent_start hook (legacy prompt build path) failed: ${String(hookErr)}`,
-            );
-            return undefined;
-          })
-      : undefined);
-  return {
-    systemPrompt: promptBuildResult?.systemPrompt ?? legacyResult?.systemPrompt,
-    prependContext: joinPresentTextSegments([
-      promptBuildResult?.prependContext,
-      legacyResult?.prependContext,
-    ]),
-    prependSystemContext: joinPresentTextSegments([
-      promptBuildResult?.prependSystemContext,
-      legacyResult?.prependSystemContext,
-    ]),
-    appendSystemContext: joinPresentTextSegments([
-      promptBuildResult?.appendSystemContext,
-      legacyResult?.appendSystemContext,
-    ]),
-  };
-}
 
 export function resolvePromptModeForSession(sessionKey?: string): "minimal" | "full" {
   if (!sessionKey) {

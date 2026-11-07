@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolvePromptBuildHookResult } from "../../../agent-runtime/capabilities/index.js";
 import {
   composeSystemPromptWithHookContext,
   prependSystemPromptAddition,
@@ -27,7 +28,6 @@ import {
 import {
   buildAfterTurnRuntimeContext,
   resolveAttemptFsWorkspaceOnly,
-  resolvePromptBuildHookResult,
   resolvePromptModeForSession,
   wrapStreamFnEnforceProtocolTextNonExecution,
   enforceProtocolTextNonExecutionInMessage,
