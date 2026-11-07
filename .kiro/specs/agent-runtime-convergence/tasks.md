@@ -856,3 +856,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced a recovery batch with one successful receipt plus one payload failure remaining pending for full replay (1 FAIL / 68 PASS). Recovery now moves that batch into existing failed reconciliation storage instead of replaying confirmed messages. Empty-result failures retain their original retry policy. No new queue or exactly-once claim. — codex-runtime-manager
 - Outbound queue regression 69 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Original task fencing and reconciliation completion remain separate blockers. — codex-runtime-manager
+
+## Initial partial-send replay fence (2026-11-07)
+
+- Reproduced initial bestEffort partial delivery leaving successful messages eligible for whole-batch replay (1 FAIL / 41 PASS). Initial send now moves batches with returned results and payload failures into existing reconciliation storage; empty-result failures retain retry policy. No exactly-once or reconciliation completion claim. — codex-runtime-manager
+- Delivery/queue regression 2 files / 111 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Original-task recovery fencing and final personal/group acceptance remain open. — codex-runtime-manager

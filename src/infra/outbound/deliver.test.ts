@@ -30,6 +30,7 @@ const queueMocks = vi.hoisted(() => ({
   enqueueDelivery: vi.fn(async () => "mock-queue-id"),
   ackDelivery: vi.fn(async () => {}),
   failDelivery: vi.fn(async () => {}),
+  moveToFailed: vi.fn(async () => {}),
 }));
 const logMocks = vi.hoisted(() => ({
   warn: vi.fn(),
@@ -55,6 +56,7 @@ vi.mock("./delivery-queue.js", () => ({
   enqueueDelivery: queueMocks.enqueueDelivery,
   ackDelivery: queueMocks.ackDelivery,
   failDelivery: queueMocks.failDelivery,
+  moveToFailed: queueMocks.moveToFailed,
 }));
 vi.mock("../../logging/subsystem.js", () => ({
   createSubsystemLogger: () => {
@@ -829,6 +831,11 @@ describe("deliverOutboundPayloads", () => {
       "mock-queue-id",
       "partial delivery failure (bestEffort)",
     );
+  });
+
+  it("holds a partially sent batch for reconciliation instead of automatic replay", async () => {
+    await runBestEffortPartialFailureDelivery();
+    expect(queueMocks.moveToFailed).toHaveBeenCalledWith("mock-queue-id");
   });
 
   it("acks the queue entry when delivery is aborted", async () => {
