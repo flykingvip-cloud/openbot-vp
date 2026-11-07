@@ -13,6 +13,8 @@ import { CONFIG_DIR } from "../utils.js";
 import { queryActionIntents } from "./action-intent-query.js";
 import { createActionIntentStore } from "./action-intent-store.js";
 import { createCapacityReader } from "./capacity-reader.js";
+import { createPlatformHeartbeatActivityQuery } from "./heartbeat-activity-query.js";
+import type { startHeartbeatActivity } from "./heartbeat-activity.js";
 import { createMetricCompareGatewayHelper } from "./metric-compare-gateway.js";
 import { queryObservationWithJournal } from "./query.js";
 import { createReasoningGatewayAdapter } from "./reasoning-gateway.js";
@@ -21,6 +23,7 @@ export const OBSERVATION_QUERY_METHOD = "diagnosis.observation.query";
 export function createObservationQueryHandlers(
   options: {
     authDeps?: DiagnosisGatewayAuthDeps;
+    platformActivityCollector?: Pick<ReturnType<typeof startHeartbeatActivity>, "query"> | null;
     loadConfig?: () => OpenBotConfig;
     now?: () => number;
     reasoning?: {
@@ -48,6 +51,40 @@ export function createObservationQueryHandlers(
       );
       if (!auth) {
         deny("unauthorized");
+        return;
+      }
+      if (params.platformActivity !== undefined) {
+        if (params.platformActivity !== true || Object.keys(params).length !== 1) {
+          deny("invalid_platform_activity_request");
+          return;
+        }
+        if (!options.platformActivityCollector) {
+          deny("platform_activity_unavailable");
+          return;
+        }
+        const read = createPlatformHeartbeatActivityQuery({
+          collector: options.platformActivityCollector,
+          authorize: async () => {
+            const fresh = await resolveDiagnosisProductionAuth(
+              client as unknown as DiagnosisGatewayAuthClient,
+              options.authDeps,
+            );
+            return fresh
+              ? {
+                  principalRef: fresh.principal.principalId,
+                  tenantId: fresh.trusted.tenantId,
+                  sessionDomain: client.sessionDomain ?? "employee",
+                  scopes: client.connect.scopes ?? [],
+                }
+              : null;
+          },
+        });
+        const activity = await read();
+        if (!activity.ok) {
+          deny(activity.code);
+          return;
+        }
+        respond(true, activity, undefined);
         return;
       }
       const allowed = new Set([

@@ -17,7 +17,7 @@ export function createHeartbeatActivityLifecycle(options: {
     throw error;
   }
   let stopped = false;
-  return () => {
+  const stop = () => {
     if (stopped) {
       return;
     }
@@ -28,4 +28,5 @@ export function createHeartbeatActivityLifecycle(options: {
       activity.stop();
     }
   };
+  return { stop, query: () => activity.query() };
 }

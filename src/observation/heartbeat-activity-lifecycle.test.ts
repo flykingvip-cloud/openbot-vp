@@ -25,8 +25,8 @@ describe("heartbeat activity gateway lifecycle composition", () => {
       startActivity: () => startHeartbeatActivity({ enabled: () => false, subscribe }),
     });
     expect(subscribe).not.toHaveBeenCalled();
-    stop?.();
-    stop?.();
+    stop?.stop();
+    stop?.stop();
     expect(broadcastStop).toHaveBeenCalledTimes(1);
   });
   it("passively captures enabled activity and disposes even if broadcast cleanup throws", () => {
@@ -40,8 +40,8 @@ describe("heartbeat activity gateway lifecycle composition", () => {
     });
     emitHeartbeatEvent({ status: "skipped" });
     expect(activity.query().events).toHaveLength(1);
-    expect(() => stop?.()).toThrow("cleanup");
+    expect(() => stop?.stop()).toThrow("cleanup");
     expect(activity.query().events).toEqual([]);
-    expect(() => stop?.()).not.toThrow();
+    expect(() => stop?.stop()).not.toThrow();
   });
 });
