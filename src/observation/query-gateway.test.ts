@@ -337,3 +337,112 @@ describe("observation query gateway", () => {
     expect(membership).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("explicit reasoning side pass on actual observation handler", () => {
+  const sample = {
+    sampleId: "sample",
+    provenance: ["unknown"],
+    evidence: {
+      resource: "unknown",
+      technical: "unknown",
+      execution: "partial",
+      business: "present",
+    },
+    evidenceReasons: {
+      resource: ["missing"],
+      technical: ["missing"],
+      execution: ["missing_attempt"],
+      business: [],
+    },
+    outcome: { taskId: "task", outcomeVersion: 1, taskJudgement: "incomplete" },
+    body: "secret",
+  };
+  it("defaults closed and leaves the ordinary query unchanged", async () => {
+    query.mockReturnValueOnce({ ok: true, samples: [sample] });
+    const model = vi.fn();
+    const handler = createObservationQueryHandlers({
+      loadConfig: () => ({}),
+      now: () => 3,
+      authDeps: { resolveMembership: async () => ({ tenantId: "tenant", userId: "alice" }) },
+      reasoning: { model, modelRef: "trusted" },
+    })[OBSERVATION_QUERY_METHOD];
+    const r = await invoke(handler, client(), {
+      ...params,
+      reasoning: { requested: true },
+    } as typeof params);
+    expect(r.mock.calls[0][1].reasoningPass.reason).toBe("reasoning_disabled");
+    expect(model).not.toHaveBeenCalled();
+  });
+  it("uses only authorized metadata and preserves business judgement", async () => {
+    query.mockReturnValueOnce({ ok: true, samples: [sample] });
+    const model = vi.fn(async () => ({
+      schemaVersion: 1,
+      items: [
+        {
+          id: "hyp",
+          kind: "hypothesis",
+          text: "Possible gap",
+          evidenceIds: ["sample:execution"],
+          source: "reasoning",
+          modelRef: "trusted",
+        },
+      ],
+    }));
+    const handler = createObservationQueryHandlers({
+      loadConfig: () => ({}),
+      now: () => 3,
+      authDeps: { resolveMembership: async () => ({ tenantId: "tenant", userId: "alice" }) },
+      reasoning: { enabled: true, model, modelRef: "trusted" },
+    })[OBSERVATION_QUERY_METHOD];
+    const r = await invoke(handler, client(), {
+      ...params,
+      reasoning: { requested: true },
+    } as typeof params);
+    expect(r.mock.calls[0][0]).toBe(true);
+    expect(r.mock.calls[0][1].reasoningPass.reason).toBe("hypotheses_only");
+    expect(r.mock.calls[0][1].samples[0].outcome.taskJudgement).toBe("incomplete");
+    expect(JSON.stringify(model.mock.calls)).not.toContain("secret");
+  });
+  it("falls back unconfigured and rejects client model selection", async () => {
+    query.mockReturnValueOnce({ ok: true, samples: [sample] });
+    const handler = createObservationQueryHandlers({
+      loadConfig: () => ({}),
+      now: () => 3,
+      authDeps: { resolveMembership: async () => ({ tenantId: "tenant", userId: "alice" }) },
+      reasoning: { enabled: true },
+    })[OBSERVATION_QUERY_METHOD];
+    const r = await invoke(handler, client(), {
+      ...params,
+      reasoning: { requested: true },
+    } as typeof params);
+    expect(r.mock.calls[0][1].reasoningPass.reason).toBe("reasoning_unconfigured");
+    const bad = await invoke(handler, client(), {
+      ...params,
+      reasoning: { requested: true, modelRef: "forged" },
+    } as typeof params);
+    expect(bad.mock.calls[0][0]).toBe(false);
+  });
+  it("discards combined response when scope is revoked during the model call", async () => {
+    query.mockReturnValueOnce({ ok: true, samples: [sample] });
+    const c = client();
+    const handler = createObservationQueryHandlers({
+      loadConfig: () => ({}),
+      now: () => 3,
+      authDeps: { resolveMembership: async () => ({ tenantId: "tenant", userId: "alice" }) },
+      reasoning: {
+        enabled: true,
+        modelRef: "trusted",
+        model: async () => {
+          c.connect.scopes = [];
+          return { schemaVersion: 1, items: [] };
+        },
+      },
+    })[OBSERVATION_QUERY_METHOD];
+    const r = await invoke(handler, c, {
+      ...params,
+      reasoning: { requested: true },
+    } as typeof params);
+    expect(r.mock.calls[0][0]).toBe(false);
+    expect(r.mock.calls[0][1]).toBeUndefined();
+  });
+});

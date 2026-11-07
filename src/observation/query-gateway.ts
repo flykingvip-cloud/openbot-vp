@@ -15,12 +15,20 @@ import { createActionIntentStore } from "./action-intent-store.js";
 import { createCapacityReader } from "./capacity-reader.js";
 import { createMetricCompareGatewayHelper } from "./metric-compare-gateway.js";
 import { queryObservationWithJournal } from "./query.js";
+import { createReasoningGatewayAdapter } from "./reasoning-gateway.js";
+import type { ReasoningInput, ReasoningModelPort } from "./reasoning-pass.js";
 export const OBSERVATION_QUERY_METHOD = "diagnosis.observation.query";
 export function createObservationQueryHandlers(
   options: {
     authDeps?: DiagnosisGatewayAuthDeps;
     loadConfig?: () => OpenBotConfig;
     now?: () => number;
+    reasoning?: {
+      enabled?: boolean;
+      modelRef?: string;
+      model?: ReasoningModelPort;
+      timeoutMs?: number;
+    };
     capacityReader?: ReturnType<typeof createCapacityReader>;
     actionIntentStore?: Pick<ReturnType<typeof createActionIntentStore>, "list" | "detail">;
   } = {},
@@ -52,6 +60,7 @@ export function createObservationQueryHandlers(
         "actionIntents",
         "capacity",
         "comparison",
+        "reasoning",
       ]);
       if (
         Object.keys(params).some((k) => !allowed.has(k)) ||
@@ -222,6 +231,41 @@ export function createObservationQueryHandlers(
             (finalScopes.includes("operator.read") || finalScopes.includes("operator.admin")),
           );
         };
+        let reasoningPass;
+        if (params.reasoning !== undefined) {
+          const reasoning = await createReasoningGatewayAdapter({
+            ...options.reasoning,
+            authorize: async () =>
+              (await finalAuth())
+                ? {
+                    identityRef: caller.subjectRef,
+                    scopeRef: caller.tenantId ?? "",
+                    grantVersion: JSON.stringify(client.connect.scopes ?? []),
+                  }
+                : null,
+            readEvidence: async (): Promise<ReasoningInput> => ({
+              evidence: result.samples.flatMap((sample) =>
+                (["resource", "technical", "execution", "business"] as const).map((layer) => ({
+                  evidenceId: sample.sampleId + ":" + layer,
+                  layer,
+                  status:
+                    sample.evidence[layer] === "present"
+                      ? "present"
+                      : sample.evidence[layer] === "partial"
+                        ? "partial"
+                        : "unknown",
+                  reasonCodes: sample.evidenceReasons[layer],
+                })),
+              ),
+              findings: [],
+            }),
+          })(params.reasoning);
+          if (!reasoning.ok) {
+            deny(reasoning.code);
+            return;
+          }
+          reasoningPass = reasoning.reasoningPass;
+        }
         if (actionIntents) {
           const intents = await queryActionIntents(
             {
@@ -262,6 +306,7 @@ export function createObservationQueryHandlers(
               ...(capacity ? { capacity } : {}),
               ...(comparison ? { comparison } : {}),
               actionIntents: intents,
+              ...(reasoningPass ? { reasoningPass } : {}),
             },
             undefined,
           );
@@ -273,7 +318,12 @@ export function createObservationQueryHandlers(
         }
         respond(
           true,
-          { ...result, ...(capacity ? { capacity } : {}), ...(comparison ? { comparison } : {}) },
+          {
+            ...result,
+            ...(capacity ? { capacity } : {}),
+            ...(comparison ? { comparison } : {}),
+            ...(reasoningPass ? { reasoningPass } : {}),
+          },
           undefined,
         );
       } catch {
