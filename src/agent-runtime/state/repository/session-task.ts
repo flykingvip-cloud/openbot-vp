@@ -1,13 +1,15 @@
 import {
   applyIncomingUserMessage,
-  captureTaskCompletionBinding,
-  isTaskExecutionBindingCurrent,
   recordCheckedTaskCompletion,
   commitSameTaskConstraint,
   commitAdmittedSessionTask,
   commitInteractionTaskProposal,
-  startBoundTaskExecution,
 } from "../../../conversation-task/session-task-board.js";
+import {
+  captureTaskCompletionBinding,
+  isTaskExecutionBindingCurrent,
+  startBoundTaskExecution,
+} from "../mutations/execution-binding.js";
 import { resumePausedCurrentTask } from "../mutations/resume-current.js";
 import { mutateSessionTaskBoard, readSessionTaskBoard } from "./task-board-file.js";
 

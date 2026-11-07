@@ -1,10 +1,8 @@
-import {
-  activeConstraintTexts,
-  readSessionTaskBoard,
-  startBoundTaskExecution,
-} from "../../../conversation-task/session-task-board.js";
 import type { TaskCompletionBinding } from "../../contracts/task.js";
+import { activeConstraintTexts } from "../../policy/index.js";
 import { claimTaskBoardContinue } from "../continuation-ticket.js";
+import { readSessionTaskBoard } from "../repository/task-board-file.js";
+import { startBoundTaskExecution } from "./execution-binding.js";
 
 /** Claim the original queued identity before commercial admission or provider work. */
 export function claimQueuedExecution(input: {
