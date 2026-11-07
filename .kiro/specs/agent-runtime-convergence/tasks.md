@@ -1023,3 +1023,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced an explicitly external-user request without transport interaction options bypassing governed interaction (1 FAIL / 37 PASS). Prepared reply now supplies the existing interaction entrance and transcript persistence for that trusted provenance; ordinary responses do not enter execution. No new classifier, runner or channel implementation. Unmarked legacy entrances remain pending review. — codex-runtime-manager
 - Interaction/admission/router/OGUI regression 4 files / 48 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Updated an incomplete working-style mock to retain actual exports. Overall onboarding and retirement remain open. — codex-runtime-manager
+
+## Rule classification inventory foundation (2026-11-07)
+
+- Added data-only rule classification contract and a detached public inventory of six verified implementations. Separates invariants, lifecycle, classification, operational policy and compatibility retirement candidates. Metadata does not load modules, change enforcement or expose disabling controls. This is a partial inventory, not a platform integration or complete rule audit. — codex-runtime-manager
+- Catalog isolation regression PASS; full tsgo PASS; typed lint and formatting clean; architecture 52 PASS. Platform projection, decision-version evidence and full inventory remain pending after mainline onboarding. — codex-runtime-manager

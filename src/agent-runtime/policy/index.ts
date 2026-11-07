@@ -29,3 +29,5 @@ export {
 } from "./run-limits.js";
 
 export { resolvePromptModeForSession } from "./prompt-mode.js";
+
+export { listRuntimeRuleDeclarations } from "./catalog.js";

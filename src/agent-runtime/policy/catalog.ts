@@ -1,0 +1,66 @@
+import type { RuntimeRuleDeclaration } from "../contracts/policy.js";
+
+/** Selected verified rules, not a complete runtime inventory or a switch engine.
+ * Paths identify implementations; they are never dynamically imported.
+ */
+const RULES: readonly RuntimeRuleDeclaration[] = [
+  {
+    id: "task.binding.current",
+    category: "invariant",
+    owner: "policy",
+    implementation: "src/agent-runtime/policy/task-binding.ts",
+    checkpoint: "before_execution_and_effect",
+    management: "code_required",
+    disposition: "retain",
+  },
+  {
+    id: "execution.admitted.binding",
+    category: "invariant",
+    owner: "execution",
+    implementation: "src/agent-runtime/execution/runner/admitted-turn.ts",
+    checkpoint: "before_outcome_and_admission",
+    management: "code_required",
+    disposition: "retain",
+  },
+  {
+    id: "interaction.semantic.decision",
+    category: "classification",
+    owner: "command",
+    implementation: "src/agent-runtime/command/interpret-interaction.ts",
+    checkpoint: "interaction",
+    management: "code_required",
+    disposition: "retain",
+  },
+  {
+    id: "execution.retry.bounds",
+    category: "operational",
+    owner: "policy",
+    implementation: "src/agent-runtime/policy/run-limits.ts",
+    checkpoint: "retry",
+    management: "reviewed_parameters",
+    disposition: "retain",
+  },
+  {
+    id: "delivery.receipt.identity",
+    category: "lifecycle",
+    owner: "delivery",
+    implementation: "src/agent-runtime/delivery/dispatch/confirm-pending.ts",
+    checkpoint: "delivery_confirmation",
+    management: "code_required",
+    disposition: "retain",
+  },
+  {
+    id: "interaction.legacy.occupancy",
+    category: "compatibility",
+    owner: "command",
+    implementation: "src/agent-runtime/command/interaction.ts",
+    checkpoint: "legacy_reply_dispatch",
+    management: "retirement_review",
+    disposition: "review_for_retirement",
+  },
+];
+
+/** Detached data view for management consumers; no mutable runtime authority. */
+export function listRuntimeRuleDeclarations(): RuntimeRuleDeclaration[] {
+  return RULES.map((rule) => ({ ...rule }));
+}
