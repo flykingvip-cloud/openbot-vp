@@ -764,3 +764,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Cron now uses createAuthorizedModelSession for authorization, governance snapshot, fallback and awaited disposal; removed its duplicate lifecycle implementation. Candidate execution and durable usage outbox remain unchanged. Updated commercial gate registry to the delegated owner. — codex-runtime-manager
 - Cron credit/fallback, long-horizon and commercial gate regression: 4 files / 24 PASS. Full tsgo PASS; typed lint 0 errors; architecture 51 PASS. Pi core loop still has production consumers; no complete retirement, merge or deployment claimed. — codex-runtime-manager
+
+## Model resolution hook ownership (2026-11-07)
+
+- Moved model-resolution hook ordering and legacy-result caching from the old runner into capabilities/adapters/model-resolve-hooks. Removed original body; preserves new-hook precedence per field, legacy prompt result reuse and nonfatal hook failures. No new execution authority. — codex-runtime-manager
+- Adapter and attempt regression 2 files / 63 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Old core loop still serves production consumers and remains pending replacement. — codex-runtime-manager
