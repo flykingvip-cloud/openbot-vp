@@ -1098,3 +1098,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced accepted criteria remaining in storage but missing from the automatic continuation prompt after revision/pause/resume (1 FAIL). Shared task context now projects the original criteria alongside active constraints. This restores execution context, not criterion validation or acceptance authorization. — codex-runtime-manager
 - Lifecycle/constraint/continuation regression 3 files / 24 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Post-extraction ingress/lifecycle/restart regression separately 3 files / 42 PASS. — codex-runtime-manager
+
+## Unique task-board repository migration (2026-11-08)
+
+- Moved existing board file storage, atomic rename, shared lock and epoch CAS into state/repository/task-board-file. Legacy board exports reference the same implementation; no alternate storage or lock was added. Business mutations still use the same locked transaction. — codex-runtime-manager
+- Board and true cross-process concurrency regression 2 files / 31 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Prior candidate full build PASS with 209 unchanged dynamic-import warnings; repository extraction still requires downstream integration verification. — codex-runtime-manager
