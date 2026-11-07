@@ -1,9 +1,9 @@
 import {
   applyIncomingUserMessage,
   commitSameTaskConstraint,
-  commitAdmittedSessionTask,
   commitInteractionTaskProposal,
 } from "../../../conversation-task/session-task-board.js";
+import { commitAdmittedSessionTask } from "../mutations/admit-task.js";
 import {
   captureTaskCompletionBinding,
   isTaskExecutionBindingCurrent,

@@ -1167,3 +1167,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved unchanged explicit task insertion and focus revision into state/mutations/task-focus. Shared focus and archive wording now belongs to context; legacy exports reference the same implementation. Architecture gate rejected a reverse legacy dependency during extraction; moved the original formatter rather than exempting the dependency. — codex-runtime-manager
 - Board/focus/admission/context regression 4 files / 38 PASS; earlier cross-process group 34 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
+
+## Explicit admission transaction ownership (2026-11-08)
+
+- Moved unchanged admission identity/version/idempotency transaction into state/mutations/admit-task. The new state repository consumes it directly; legacy board exports reference the same implementation. Admission has no reverse dependency on legacy board business logic. — codex-runtime-manager
+- Admission/lifecycle regression 2 files / 3 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. General acceptance evidence and full replacement remain open. — codex-runtime-manager
