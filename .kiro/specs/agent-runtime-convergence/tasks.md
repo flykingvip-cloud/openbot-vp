@@ -1068,3 +1068,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced internal execution text being interpreted as user progress/conversation before queue dispatch (1 FAIL). Trusted heartbeat, birth, collaboration round and internal provenance now use resource queue decisions without user semantic classification or amendment writes. Accepted user requests retain their admission bypass of legacy classification. Unmarked legacy user entrances remain pending retirement. — codex-runtime-manager
 - Interaction/queue regression 2 files / 14 PASS; reply-runner integration 1 file / 47 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall replacement remains open. — codex-runtime-manager
+
+## Verified acceptance contract continuity (2026-11-08)
+
+- Reproduced four execution-kind contracts losing explicit trusted acceptance when named validators are empty (4 FAIL). Preserve that trusted flag without waiving unverified acceptance or changing task kind. No model prose is treated as evidence. — codex-runtime-manager
+- Contract/delivery regression 2 files / 33 PASS; full tsgo PASS; changed-file typed lint clean; architecture 52 PASS. General admitted criteria validation and real individual/group closeout remain open; no full retirement or deployment claimed. — codex-runtime-manager
