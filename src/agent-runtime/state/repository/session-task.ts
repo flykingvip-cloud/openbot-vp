@@ -6,11 +6,10 @@ import {
   commitSameTaskConstraint,
   commitAdmittedSessionTask,
   commitInteractionTaskProposal,
-  mutateSessionTaskBoard,
-  readSessionTaskBoard,
   startBoundTaskExecution,
 } from "../../../conversation-task/session-task-board.js";
 import { resumePausedCurrentTask } from "../mutations/resume-current.js";
+import { mutateSessionTaskBoard, readSessionTaskBoard } from "./task-board-file.js";
 
 /** The existing board owns persistence, locking and identity validation. */
 export const sessionTaskState = {

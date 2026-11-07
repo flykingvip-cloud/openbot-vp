@@ -1108,3 +1108,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved unchanged tombstone checks and active constraint selection into policy; legacy exports reference those same functions. No new classifier or state mutation was added. — codex-runtime-manager
 - Policy/resume/lifecycle/continuation regression 4 files / 31 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. — codex-runtime-manager
+
+## State consumers bypass legacy storage facade (2026-11-08)
+
+- Task action checks, continuation claims, paused-task resume and state repository now consume the new repository and policy implementations directly. Remaining legacy imports are business mutations pending migration, not duplicate storage. — codex-runtime-manager
+- Lifecycle/resume/continuation regression 3 files / 23 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Repository downstream ingress/lifecycle/restart regression separately 3 files / 42 PASS. — codex-runtime-manager

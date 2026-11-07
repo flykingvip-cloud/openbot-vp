@@ -1,9 +1,6 @@
-import {
-  activeConstraintTexts,
-  readSessionTaskBoard,
-} from "../../conversation-task/session-task-board.js";
 import type { TaskCompletionBinding, TaskActionBoundary } from "../contracts/task.js";
-import { isLiveTaskBinding } from "../policy/index.js";
+import { isLiveTaskBinding, activeConstraintTexts } from "../policy/index.js";
+import { readSessionTaskBoard } from "./repository/task-board-file.js";
 
 export type { TaskActionBoundary } from "../contracts/task.js";
 

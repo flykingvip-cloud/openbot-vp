@@ -1,10 +1,8 @@
-import {
-  isTaskTombstoned,
-  readSessionTaskBoard,
-} from "../../conversation-task/session-task-board.js";
 import { buildResumePrompt } from "../context/index.js";
 import type { TaskBoardContinueSkipReason } from "../contracts/continuation.js";
 import type { SessionTaskBoard, TrackedTask } from "../contracts/task.js";
+import { isTaskTombstoned } from "../policy/index.js";
+import { readSessionTaskBoard } from "./repository/task-board-file.js";
 const INTERNAL_CONTINUE_PREFIX = "Internal task-board continue:";
 
 export function buildTaskBoardContinuePrompt(task: TrackedTask): string {
