@@ -24,7 +24,6 @@ import {
   type TenantImProbeResult,
 } from "../../../controllers/tenant-im-binding.ts";
 import type { GatewayBrowserClient } from "../../../gateway.ts";
-import { renderIcon } from "../../../icons.ts";
 import type { ChannelsStatusSnapshot } from "../../../types.ts";
 import { localizeEnterpriseGatewayThrown } from "../enterprise-connection-copy.ts";
 import {
@@ -452,30 +451,44 @@ function defaultRequestUpdate(): void {
 function renderChannelMark(channelId: EnterpriseMessageChannelId): TemplateResult {
   if (channelId === "wecom") {
     return html`
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <rect width="32" height="32" rx="8" fill="#07C160" />
         <path
-          fill="currentColor"
-          d="M7 5.5h7.2A3.8 3.8 0 0 1 18 9.3v3.4a3.8 3.8 0 0 1-3.8 3.8H11l-2.6 2v-2H7A3.8 3.8 0 0 1 3.2 12.7V9.3A3.8 3.8 0 0 1 7 5.5Z"
+          fill="#fff"
+          d="M16.8 7.4h6.4a2.5 2.5 0 0 1 2.5 2.5v3.1a2.5 2.5 0 0 1-2.5 2.5h-.7l-1.4 1.3v-1.3h-4.3a2.5 2.5 0 0 1-2.5-2.5V9.9a2.5 2.5 0 0 1 2.5-2.5z"
         />
-        <circle cx="8.2" cy="11" r="1" fill="#fff" />
-        <circle cx="12" cy="11" r="1" fill="#fff" />
+        <path
+          fill="#fff"
+          d="M6.2 12.6h9.6a2.9 2.9 0 0 1 2.9 2.9v3.8a2.9 2.9 0 0 1-2.9 2.9H12l-2.1 1.7v-1.7H6.2a2.9 2.9 0 0 1-2.9-2.9v-3.8a2.9 2.9 0 0 1 2.9-2.9z"
+        />
+        <circle cx="9.1" cy="17.4" r=".75" fill="#07C160" />
+        <circle cx="12.1" cy="17.4" r=".75" fill="#07C160" />
+        <circle cx="19.2" cy="11.5" r=".6" fill="#07C160" />
+        <circle cx="21.5" cy="11.5" r=".6" fill="#07C160" />
       </svg>
     `;
   }
   if (channelId === "feishu") {
     return html`
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path fill="currentColor" d="M3.5 12.2 20.5 4.5 14 20.2l-2.8-6.2L3.5 12.2Z" />
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path fill="#3370FF" d="M4.2 20.4 11.6 17l-1.6 6.2z" />
+        <path
+          fill="#3370FF"
+          d="M10.2 17.4c2.2-1.4 4.8-3.6 6.6-6.4 1-1.6 3.2-.9 3.1 1-.2 2.4-1.2 4.4-2.6 6 2.4.1 4.6-.7 6.4-2.1.8-.6 1.8.2 1.4 1.2-1.5 3.6-4.8 6.2-9.4 6.8-3.8.5-7.2-.5-9.2-2.2-.7-.6-.2-1.9.7-2.3z"
+        />
+        <path fill="#1456F0" d="M19.6 11.4 26.2 9.2 21.2 13.6z" />
+        <circle cx="17.8" cy="13.2" r=".7" fill="#fff" />
       </svg>
     `;
   }
   return html`
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <rect width="32" height="32" rx="8" fill="#3296FA" />
+      <circle cx="16" cy="10.4" r="3" fill="#fff" />
       <path
-        fill="currentColor"
-        d="M12 3.2a5.6 5.6 0 0 1 5.6 5.6v2.7l1.3 2.2H5.1l1.3-2.2V8.8A5.6 5.6 0 0 1 12 3.2Z"
+        fill="#fff"
+        d="M9.8 16.2c.5-1.3 1.8-2.1 3.2-2.1h6c1.4 0 2.7.8 3.2 2.1l1.5 5.8c.3 1.2-.6 2.3-1.8 2.3h-2.1l-1.1 3.1c-.3.8-1.4.6-1.5-.2l-.6-2.9h-2.2l-.6 2.9c-.1.8-1.2 1-1.5.2l-1.1-3.1H10c-1.2 0-2.1-1.1-1.8-2.3z"
       />
-      <circle cx="12" cy="18.6" r="1.5" fill="currentColor" />
     </svg>
   `;
 }
@@ -509,7 +522,10 @@ function renderGalleryCard(params: {
         }
       }}
     >
-      <span class="enterprise-im-switcher__mark enterprise-im-switcher__mark--${channelId}">
+      <span
+        class="enterprise-im-switcher__mark enterprise-im-switcher__mark--${channelId}"
+        data-brand=${channelId}
+      >
         ${renderChannelMark(channelId)}
         <span class="enterprise-im-switcher__dot" aria-hidden="true"></span>
       </span>
@@ -1157,14 +1173,6 @@ export function renderEnterpriseMessageChannelsSurface(params: {
             });
           })}
         </div>
-        <button
-          class="btn btn--sm enterprise-im-switcher__refresh"
-          type="button"
-          ?disabled=${controlsDisabled}
-          @click=${() => void run("refresh", async () => undefined, { successNotice: "已刷新" })}
-        >
-          ${renderIcon("refreshCw")} ${state.loading ? "刷新中…" : "刷新"}
-        </button>
       </div>
 
       ${

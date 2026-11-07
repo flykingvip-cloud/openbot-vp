@@ -553,16 +553,17 @@ describe("enterprise message channels surface (card gallery)", () => {
       await Promise.resolve();
 
       expect(container.textContent).toContain("channels.status 请求超时");
-      const refreshButton = Array.from(container.querySelectorAll("button")).find((button) =>
-        button.textContent?.includes("刷新"),
-      );
-      expect(refreshButton?.disabled).toBe(false);
+      expect(
+        Array.from(container.querySelectorAll("button")).some((button) =>
+          button.textContent?.includes("刷新"),
+        ),
+      ).toBe(false);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("labels refresh as a reload and asks before disabling a channel", async () => {
+  it("loads channel status on enter and asks before disabling a channel", async () => {
     const config = {
       channels: {
         wecom: {
@@ -615,13 +616,12 @@ describe("enterprise message channels surface (card gallery)", () => {
     expect(wecomBefore?.textContent ?? "").toContain("已保存");
     expect(wecomBefore?.querySelector(".enterprise-im-switcher__dot")).not.toBeNull();
     expect(wecomBefore?.querySelector(".enterprise-im-switcher__mark--wecom")).not.toBeNull();
-
-    const refreshButton = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("刷新"),
-    );
-    refreshButton?.click();
-    await vi.waitFor(() => expect(container.textContent).toContain("已刷新"));
-    expect(container.textContent).not.toContain("操作成功");
+    expect(wecomBefore?.querySelector("[data-brand='wecom']")?.innerHTML).toContain("#07C160");
+    expect(
+      Array.from(container.querySelectorAll("button")).some((button) =>
+        button.textContent?.includes("刷新"),
+      ),
+    ).toBe(false);
 
     const wecomCard = Array.from(
       container.querySelectorAll(".enterprise-channel-gallery__card"),

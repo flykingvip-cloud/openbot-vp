@@ -116,6 +116,15 @@ describe("enterprise Feishu channel capability (slice 1a)", () => {
     expect(container.querySelector(".enterprise-settings-section__title")).toBeNull();
     expect(container.querySelector(".enterprise-settings-section__subtitle")).toBeNull();
     expect(container.textContent).not.toContain("添加并配置");
+    expect(container.querySelector(".enterprise-im-switcher__refresh")).toBeNull();
+    expect(
+      Array.from(container.querySelectorAll("button")).some((button) =>
+        button.textContent?.includes("刷新"),
+      ),
+    ).toBe(false);
+    expect(container.querySelector("[data-brand='wecom'] svg")?.innerHTML).toContain("#07C160");
+    expect(container.querySelector("[data-brand='feishu'] svg")?.innerHTML).toContain("#3370FF");
+    expect(container.querySelector("[data-brand='dingtalk'] svg")?.innerHTML).toContain("#3296FA");
     const feishuCard = Array.from(container.querySelectorAll(".enterprise-im-switcher__item")).find(
       (card) => card.textContent?.includes("飞书"),
     );
