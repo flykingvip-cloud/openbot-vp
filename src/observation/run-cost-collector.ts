@@ -84,7 +84,11 @@ export function createRunCostStore(
           return false;
         }
         const parsed = runCostEvidenceSchema.safeParse(raw);
-        if (!parsed.success || parsed.data.occurredAt > now()) {
+        if (
+          !parsed.success ||
+          (parsed.data.occurredAt !== null && parsed.data.occurredAt > now()) ||
+          (parsed.success && parsed.data.observedAt !== undefined && parsed.data.observedAt > now())
+        ) {
           return false;
         }
         const fact = parsed.data;
@@ -422,7 +426,7 @@ export function createRunCostCollector(
           schemaVersion: 1,
           evidenceId,
           sourceId: "runner-budget-command-log",
-          collector: "model_call_usage",
+          collector: "budget_command_association",
           provenance: context.provenance,
           agentId: context.agentId,
           scope: context.scope,
@@ -430,7 +434,8 @@ export function createRunCostCollector(
           budgetOutcomeVersion: log.outcomeVersion,
           runId: context.runId,
           callSeq: input.callSeq,
-          occurredAt: input.nowMs,
+          occurredAt: null,
+          observedAt: input.nowMs,
           tokens: {
             input: null,
             output: null,

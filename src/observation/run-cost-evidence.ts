@@ -26,7 +26,7 @@ export const runCostEvidenceSchema = z.strictObject({
   schemaVersion: z.literal(1),
   evidenceId: ref,
   sourceId: ref,
-  collector: z.enum(["model_call_usage", "billing_receipt"]),
+  collector: z.enum(["model_call_usage", "billing_receipt", "budget_command_association"]),
   provenance: z.enum(["live", "seed", "injected", "unknown"]),
   agentId: ref,
   scope: scopeSchema,
@@ -34,7 +34,8 @@ export const runCostEvidenceSchema = z.strictObject({
   budgetOutcomeVersion: version,
   runId: ref,
   callSeq: version,
-  occurredAt: z.number().finite(),
+  occurredAt: z.number().finite().nullable(),
+  observedAt: z.number().finite().optional(),
   tokens: z.strictObject({ input: token, output: token, cacheRead: token, cacheWrite: token }),
   estimatedUsd: z.strictObject({
     amount: money,
@@ -97,6 +98,7 @@ export function projectRunCostEvidence(input: {
   const calls: RunCostEvidence[] = [];
   let complete = false;
   let structurallyLinked = false;
+  let budgetAssociationCount = 0;
   const finish = () => {
     const amount = (values: readonly (number | null)[]) => {
       const known = values.filter((v): v is number => v !== null);
@@ -119,11 +121,12 @@ export function projectRunCostEvidence(input: {
       attribution: structurallyLinked ? ("linked" as const) : ("unknown" as const),
       completeness: complete
         ? ("complete_declared_call_set" as const)
-        : calls.length
+        : calls.length || budgetAssociationCount
           ? ("partial" as const)
           : ("unknown" as const),
       projectedAt: input.projectedAt,
       observedCallCount: calls.length,
+      budgetAssociationCount,
       provenance,
       nonProduction: provenance.some((p) => p === "seed" || p === "injected"),
       productionValidated: false as const,
@@ -225,9 +228,19 @@ export function projectRunCostEvidence(input: {
       fact.runId !== link.runId ||
       fact.budgetOutcomeVersion !== reference.budgetOutcomeVersion ||
       fact.budgetOutcomeVersion > link.finalOutcomeVersion ||
-      fact.occurredAt > input.projectedAt
+      (fact.occurredAt !== null && fact.occurredAt > input.projectedAt) ||
+      (fact.observedAt !== undefined && fact.observedAt > input.projectedAt)
     ) {
       reasons.add("call_attribution_mismatch");
+      continue;
+    }
+    if (fact.collector === "budget_command_association") {
+      budgetAssociationCount++;
+      reasons.add("budget_association_not_usage");
+      continue;
+    }
+    if (fact.occurredAt === null) {
+      reasons.add("usage_occurrence_unknown");
       continue;
     }
     const prior = byCall.get(fact.callSeq);

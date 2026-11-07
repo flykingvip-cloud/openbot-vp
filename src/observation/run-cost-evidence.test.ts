@@ -180,4 +180,15 @@ describe("exact run cost evidence projection", () => {
     expect(result.estimatedUsd.total).toBeNull();
     expect(result.reasons).toContain("missing_or_conflicting_call_evidence");
   });
+  it("never counts budget command associations as measured model usage", () => {
+    const association = {
+      ...fact(),
+      collector: "budget_command_association",
+      observedAt: 100,
+      occurredAt: null,
+    };
+    const r = project([association]);
+    expect(r.observedCallCount).toBe(0);
+    expect(r.reasons).toContain("budget_association_not_usage");
+  });
 });

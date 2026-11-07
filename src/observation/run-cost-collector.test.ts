@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../config/config.js";
 import { ensureChatTurnTaskOutcome } from "../task-outcome/chat-entry.js";
 import {
@@ -224,5 +224,23 @@ describe("real post-call cost capture", () => {
       createRunCostStore({ enabled: () => true }).query("bot", x.opened.scope, final.record, x.at)
         .runCosts,
     ).toEqual([]);
+  });
+  it("labels budget callback observations without asserting model usage occurrence", async () => {
+    const x = await setup();
+    const saved = vi.spyOn(x.store, "recordFact");
+    expect(x.capture(x.charge(1))).toBe(true);
+    expect(saved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collector: "budget_command_association",
+        occurredAt: null,
+        observedAt: x.at,
+      }),
+    );
+    const final = await x.finish();
+    x.collector.bind(final.record);
+    const cost = x.store.query("bot", x.opened.scope, final.record, x.at).runCosts[0].cost;
+    expect(cost.observedCallCount).toBe(0);
+    expect(cost.budgetAssociationCount).toBe(1);
+    expect(cost.reasons).toContain("budget_association_not_usage");
   });
 });
