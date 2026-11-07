@@ -841,3 +841,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved queued continuation ticket validation, constraint refresh and original execution claim into state/mutations/claim-queued-execution. Followup consumes the controlled state API; original board locking, private/collaboration separation and rejection behavior remain unchanged. No new state store or scheduler. — codex-runtime-manager
 - Followup/BYOK/OGUI/closeout regression 4 files / 38 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager
+
+## Queued provider candidate ownership (2026-11-07)
+
+- Moved queued provider preparation and embedded invocation into execution/runner/queued-candidate. Followup calls the execution public API; shared model session retains authorization and fallback. Preserved transport preparation, post-preparation task fence, trusted identity, private collaboration fields, warning dedupe and budget charging order. Original invocation body removed. — codex-runtime-manager
+- Followup/BYOK/OGUI/closeout regression 4 files / 38 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager
