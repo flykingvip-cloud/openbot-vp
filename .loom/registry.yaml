@@ -10858,7 +10858,48 @@ tasks:
     ownerHistory: []
     since: 2026-11-05
     metadata: {}
+  - id: agent-runtime-observability-upstream-evidence:cursor-grok-executor
+    owner: cursor-grok-executor
+    intent:
+      - Upstream command
+      - model-call
+      - association
+      - and read-only evidence for agent-runtime observability
+    paths:
+      - src/executor-evidence/**
+    state: active
+    sessions:
+      - id: 7c2a9e14-0885-4b1e-9c3a-executor-evidence
+        taskId: agent-runtime-observability-upstream-evidence:cursor-grok-executor
+        ide: cursor
+        agent: cursor-grok-executor
+        status: active
+        lastSignalAt: 2026-11-07T12:33:56.171Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-07
+    metadata: {}
 landingStreams:
+  - id: agent-runtime-observability-upstream-evidence
+    landingPolicy: serial
+    paths:
+      - src/executor-evidence/**
+      - src/task-outcome/types.ts
+      - src/task-outcome/result-service.ts
+      - src/task-outcome/store.ts
+      - src/task-outcome/command-log-path.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/agents/model-fallback.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/commands/agent.ts
+      - src/cron/isolated-agent/run.ts
+    canLandWith: []
+    metadata:
+      task: agent-runtime-observability-upstream-evidence
+      owner: cursor-grok-executor
+      purpose: Upstream command receipts, model-call evidence, budget association, and
+        read-only evidence port. Does not include src/observation.
   - id: ensure-package-update-when-ready-20261105
     landingPolicy: serial
     paths:
