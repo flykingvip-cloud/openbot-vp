@@ -13,3 +13,12 @@ export type { CapabilityDeclaration } from "../contracts/capability.js";
 export { resolvePromptBuildHookResult } from "./adapters/prompt-build-hooks.js";
 
 export { resolveModelHookResult } from "./adapters/model-resolve-hooks.js";
+
+export {
+  enforceProtocolTextNonExecutionInMessage,
+  wrapStreamFnEnforceProtocolTextNonExecution,
+} from "./adapters/protocol-body-boundary.js";
+export type {
+  ProtocolBodyBoundaryResult,
+  EnforceProtocolTextContext,
+} from "./adapters/protocol-body-boundary.js";
