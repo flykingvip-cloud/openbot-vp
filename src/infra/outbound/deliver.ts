@@ -647,6 +647,7 @@ async function deliverOutboundPayloadsCore(
     return {
       channel: "signal" as const,
       ...(await sendSignal(to, text, {
+        taskBoundary: params.taskBoundary,
         cfg,
         maxBytes: signalMaxBytes,
         accountId: accountId ?? undefined,
@@ -685,6 +686,7 @@ async function deliverOutboundPayloadsCore(
     return {
       channel: "signal" as const,
       ...(await sendSignal(to, formatted.text, {
+        taskBoundary: params.taskBoundary,
         cfg,
         mediaUrl,
         maxBytes: signalMaxBytes,

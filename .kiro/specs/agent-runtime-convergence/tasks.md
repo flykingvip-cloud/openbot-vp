@@ -922,3 +922,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced task output surviving invalidation during asynchronous media resolution (1 FAIL / 1 PASS). Signal dispatcher now forwards captured task identity through monitor delivery into send options; send rechecks immediately before RPC after attachment resolution. Independent control notices remain unbound. Other channel transports remain pending. — codex-runtime-manager
 - Signal regression 4 files / 31 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Candidate b19618dfb full build PASS with 209 existing dynamic-import warnings. No production restart, merge, push or deployment. — codex-runtime-manager
+
+## Routed Signal boundary propagation (2026-11-07)
+
+- Routed outbound Signal text and media now forward the captured task boundary to the transport recheck, matching monitor delivery. No recapture or new task identity is introduced. — codex-runtime-manager
+- Outbound/Signal regression 2 files / 46 PASS; full tsgo PASS; changed-file typed lint clean. Other channels and complete retirement acceptance remain open. — codex-runtime-manager
