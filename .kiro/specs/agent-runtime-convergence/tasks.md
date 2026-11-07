@@ -1212,3 +1212,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Added a closed data-only artifact acceptance contract and evaluator. Exact UTF-8 bytes are checked independently of completion prose; uncovered criteria stay pending, unsafe paths are not read, and evaluation captures its input before asynchronous reads. No executable configuration, task mutation or scheduler is introduced. This component is not yet connected to production admission or delivery. — codex-runtime-manager
 - Component regression 5 PASS, including a reproduced input-mutation failure before snapshot capture; full tsgo PASS; typed lint clean; architecture 53 PASS. General acceptance integration and complete executor retirement remain open. — codex-runtime-manager
+
+## Declarative checks persist through admission (2026-11-08)
+
+- Interaction parsing and host admission now validate a closed declarative check contract through public policy. Accepted checks persist with the original task; idempotent replay cannot change expected bytes. Admission snapshots the proposal before asynchronous authorization. The evaluator consumes the same validation rule, eliminating its private duplicate. No executable fields are accepted. Production model prompting and delivery evaluation are not yet connected. — codex-runtime-manager
+- Parser/admission/state/evaluator regression 4 files / 33 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. General acceptance integration and complete retirement remain open. — codex-runtime-manager

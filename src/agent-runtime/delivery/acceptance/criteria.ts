@@ -4,29 +4,7 @@ import type {
   TaskAcceptanceEvaluation,
   TaskCriterionVerdict,
 } from "../../contracts/quality.js";
-
-/** Closed data contract. These values are never evaluated as code or shell input. */
-function validCheck(check: TaskAcceptanceCheck, criteriaCount: number): boolean {
-  return Boolean(
-    check &&
-    Object.keys(check).every((key) =>
-      ["criterion", "validator", "artifact", "expected"].includes(key),
-    ) &&
-    Number.isSafeInteger(check.criterion) &&
-    check.criterion >= 0 &&
-    check.criterion < criteriaCount &&
-    check.validator === "artifact.text.exact.v1" &&
-    typeof check.artifact === "string" &&
-    check.artifact.trim() &&
-    !check.artifact.includes("\0") &&
-    !check.artifact.startsWith("/") &&
-    !check.artifact.startsWith("~") &&
-    !/^[a-z]:/iu.test(check.artifact) &&
-    !check.artifact.split(/[\\/]/u).some((part) => part === "..") &&
-    typeof check.expected === "string" &&
-    Buffer.byteLength(check.expected, "utf8") <= 65536,
-  );
-}
+import { parseTaskAcceptanceChecks } from "../../policy/index.js";
 
 /** Pure acceptance evaluation over host-authorized artifact reads; no task writes or scheduling. */
 export async function evaluateTaskAcceptance(
@@ -40,7 +18,8 @@ export async function evaluateTaskAcceptance(
   ports: { readArtifact: (relativePath: string) => Promise<Buffer> },
 ): Promise<TaskAcceptanceEvaluation> {
   const criteria = [...input.criteria];
-  const checkPlan = input.checks.map((check) => ({ ...check }));
+  const parsedChecks = parseTaskAcceptanceChecks(input.checks, criteria.length);
+  const checkPlan = parsedChecks.ok ? parsedChecks.checks : [];
   const criteriaHash = createHash("sha256")
     .update(JSON.stringify({ criteria: criteria, checks: checkPlan }))
     .digest("hex");
@@ -55,8 +34,7 @@ export async function evaluateTaskAcceptance(
     !input.executionAttempt.trim() ||
     !input.deliverableVersion.trim() ||
     criteria.length === 0 ||
-    checkPlan.length > 16 ||
-    checkPlan.some((check) => !validCheck(check, criteria.length))
+    !parsedChecks.ok
   ) {
     return {
       ...identity,

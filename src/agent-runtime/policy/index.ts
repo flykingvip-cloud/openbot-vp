@@ -35,3 +35,4 @@ export { listRuntimeRuleDeclarations } from "./catalog.js";
 export { normalizeConstraintEntries, activeConstraintTexts } from "./constraints.js";
 
 export { stripInboundStamp } from "./input-stamp.js";
+export { parseTaskAcceptanceChecks } from "./acceptance-checks.js";

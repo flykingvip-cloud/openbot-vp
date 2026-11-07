@@ -1,7 +1,9 @@
+import type { TaskAcceptanceCheck } from "./quality.js";
 /** Model interpretation is a proposal. Execution admission remains a host decision. */
 export type InteractionExecutionRequest = {
   goal: string;
   acceptance: string[];
+  checks?: TaskAcceptanceCheck[];
 };
 export type InteractionTaskTarget = { taskId: string; revision: string };
 export type InteractionModelDecision =

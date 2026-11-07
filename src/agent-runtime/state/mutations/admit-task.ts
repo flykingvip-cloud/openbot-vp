@@ -1,5 +1,6 @@
+import type { TaskAcceptanceCheck } from "../../contracts/quality.js";
 import type { TaskCompletionBinding } from "../../contracts/task.js";
-import { isTaskTombstoned } from "../../policy/index.js";
+import { isTaskTombstoned, parseTaskAcceptanceChecks } from "../../policy/index.js";
 import {
   withSessionTaskBoardLock,
   readSessionTaskBoardUnlocked,
@@ -13,6 +14,7 @@ export function commitAdmittedSessionTask(params: {
   requestId: string;
   goal: string;
   acceptance: readonly string[];
+  checks?: readonly TaskAcceptanceCheck[];
   expectedFocusRevision: number;
   expectedWriteEpoch: number;
   expectedTaskId?: string;
@@ -21,6 +23,10 @@ export function commitAdmittedSessionTask(params: {
   | { kind: "duplicate"; binding: TaskCompletionBinding }
   | { kind: "rejected"; reason: string } {
   return withSessionTaskBoardLock(params.sessionFile, () => {
+    const parsedChecks = parseTaskAcceptanceChecks(params.checks, params.acceptance.length);
+    if (!parsedChecks.ok) {
+      return { kind: "rejected", reason: "invalid_acceptance_checks" };
+    }
     const board = readSessionTaskBoardUnlocked(params.sessionFile);
     const current = board.current;
     if (current?.admissionRequestId === params.requestId) {
@@ -29,7 +35,8 @@ export function commitAdmittedSessionTask(params: {
       }
       if (
         current.goalText !== params.goal ||
-        JSON.stringify(current.acceptanceCriteria) !== JSON.stringify(params.acceptance)
+        JSON.stringify(current.acceptanceCriteria) !== JSON.stringify(params.acceptance) ||
+        JSON.stringify(current.acceptanceChecks ?? []) !== JSON.stringify(parsedChecks.checks)
       ) {
         return { kind: "rejected", reason: "request_conflict" };
       }
@@ -73,6 +80,7 @@ export function commitAdmittedSessionTask(params: {
     result.board.current = {
       ...result.board.current,
       acceptanceCriteria: [...params.acceptance],
+      ...(params.checks !== undefined ? { acceptanceChecks: parsedChecks.checks } : {}),
       admissionRequestId: params.requestId,
     };
     writeSessionTaskBoardUnlocked(params.sessionFile, result.board);

@@ -1,6 +1,36 @@
 import { expect, it, vi } from "vitest";
 import { interpretInteraction } from "./interpret-interaction.js";
 
+it("preserves declarative checks and refuses executable acceptance fields", async () => {
+  const check = {
+    criterion: 0,
+    validator: "artifact.text.exact.v1",
+    artifact: "result.txt",
+    expected: "EXACT",
+  };
+  const proposal = {
+    kind: "execution_request",
+    request: { goal: "Create result.txt", acceptance: ["Exact bytes"], checks: [check] },
+  };
+  expect(
+    await interpretInteraction(
+      { message: "Create result.txt", context: [] },
+      { infer: async () => proposal },
+    ),
+  ).toEqual(proposal);
+  await expect(
+    interpretInteraction(
+      { message: "Create result.txt", context: [] },
+      {
+        infer: async () => ({
+          ...proposal,
+          request: { ...proposal.request, checks: [{ ...check, script: "execute()" }] },
+        }),
+      },
+    ),
+  ).rejects.toThrow(/Invalid interaction acceptance checks/);
+});
+
 it.each(["supplement", "revise", "replace_all"])(
   "preserves the explicit amendment scope %s",
   async (mode) => {

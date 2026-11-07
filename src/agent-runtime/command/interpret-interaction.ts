@@ -1,4 +1,5 @@
 import type { InteractionModelDecision, InteractionModelInput } from "../contracts/interaction.js";
+import { parseTaskAcceptanceChecks } from "../policy/index.js";
 
 export type InteractionInferencePort = {
   /** Fixed host supplies governed inference; no tools or task-state effects are exposed. */
@@ -75,16 +76,26 @@ function parseDecision(value: unknown): InteractionModelDecision {
     if (request && typeof request === "object" && !Array.isArray(request)) {
       const item = request as Record<string, unknown>;
       if (
-        Object.keys(item).every((key) => key === "goal" || key === "acceptance") &&
+        Object.keys(item).every(
+          (key) => key === "goal" || key === "acceptance" || key === "checks",
+        ) &&
         typeof item.goal === "string" &&
         item.goal.trim() &&
         Array.isArray(item.acceptance) &&
         item.acceptance.length > 0 &&
         item.acceptance.every((criterion) => typeof criterion === "string" && criterion.trim())
       ) {
+        const parsedChecks = parseTaskAcceptanceChecks(item.checks, item.acceptance.length);
+        if (!parsedChecks.ok) {
+          throw new Error("Invalid interaction acceptance checks");
+        }
         return {
           kind: "execution_request",
-          request: { goal: item.goal, acceptance: [...item.acceptance] as string[] },
+          request: {
+            goal: item.goal,
+            acceptance: [...item.acceptance] as string[],
+            ...(item.checks !== undefined ? { checks: parsedChecks.checks } : {}),
+          },
         };
       }
     }

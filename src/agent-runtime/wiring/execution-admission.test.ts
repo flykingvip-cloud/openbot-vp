@@ -12,6 +12,43 @@ import {
   activeConstraintTexts,
 } from "../../conversation-task/session-task-board.js";
 import { admitSessionExecution } from "./execution-admission.js";
+
+it("persists accepted checks and refuses changing their bytes on an idempotent replay", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "accepted-checks-"));
+  try {
+    const file = path.join(dir, "session.jsonl");
+    const check = {
+      criterion: 0,
+      validator: "artifact.text.exact.v1" as const,
+      artifact: "result.txt",
+      expected: "EXACT",
+    };
+    const request = {
+      requestId: "checks-a",
+      expectedFocusRevision: 0,
+      expectedWriteEpoch: 0,
+      proposal: { goal: "Create file", acceptance: ["Exact bytes"], checks: [check] },
+    };
+    expect((await admitSessionExecution(file, request, async () => true)).kind).toBe("accepted");
+    expect(readSessionTaskBoard(file).current?.acceptanceChecks).toEqual([check]);
+    const before = fs.readFileSync(sessionTaskBoardPath(file), "utf8");
+    expect(
+      (
+        await admitSessionExecution(
+          file,
+          {
+            ...request,
+            proposal: { ...request.proposal, checks: [{ ...check, expected: "CHANGED" }] },
+          },
+          async () => true,
+        )
+      ).kind,
+    ).toBe("rejected");
+    expect(fs.readFileSync(sessionTaskBoardPath(file), "utf8")).toBe(before);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 it("applies bound semantic amendments and refuses stale control writes", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "interaction-proposal-"));
   try {

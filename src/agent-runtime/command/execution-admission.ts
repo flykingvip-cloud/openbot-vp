@@ -1,4 +1,6 @@
 import type { ExecutionAdmissionInput, ExecutionAdmissionResult } from "../contracts/execution.js";
+import type { TaskAcceptanceCheck } from "../contracts/quality.js";
+import { parseTaskAcceptanceChecks } from "../policy/index.js";
 export type { ExecutionAdmissionInput, ExecutionAdmissionResult } from "../contracts/execution.js";
 
 export type ExecutionAdmissionPorts = {
@@ -13,6 +15,21 @@ export async function admitExecutionRequest(
   ports: ExecutionAdmissionPorts,
 ): Promise<ExecutionAdmissionResult> {
   input.abortSignal?.throwIfAborted();
+  const parsedChecks = parseTaskAcceptanceChecks(
+    input.proposal.checks,
+    input.proposal.acceptance.length,
+  );
+  if (!parsedChecks.ok) {
+    return { kind: "rejected", reason: "invalid_acceptance_checks" };
+  }
+  input = {
+    ...input,
+    proposal: {
+      ...input.proposal,
+      acceptance: [...input.proposal.acceptance],
+      ...(input.proposal.checks !== undefined ? { checks: parsedChecks.checks } : {}),
+    },
+  };
   if (
     !input.requestId.trim() ||
     !input.proposal.goal.trim() ||
@@ -41,6 +58,7 @@ export function bindExecutionAdmissionPorts(params: {
     requestId: string;
     goal: string;
     acceptance: readonly string[];
+    checks?: readonly TaskAcceptanceCheck[];
     expectedFocusRevision: number;
     expectedWriteEpoch: number;
     expectedTaskId?: string;
@@ -60,6 +78,7 @@ export function bindExecutionAdmissionPorts(params: {
         requestId: request.requestId,
         goal: request.proposal.goal,
         acceptance: request.proposal.acceptance,
+        ...(request.proposal.checks !== undefined ? { checks: request.proposal.checks } : {}),
         expectedFocusRevision: request.expectedFocusRevision,
         expectedWriteEpoch: request.expectedWriteEpoch,
         expectedTaskId: request.expectedTaskId,

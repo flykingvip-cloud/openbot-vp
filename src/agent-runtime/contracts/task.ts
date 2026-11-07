@@ -1,3 +1,4 @@
+import type { TaskAcceptanceCheck } from "./quality.js";
 /** Existing session-task contracts only; not a unified collaboration plan schema.
  * Type-only: runtime mutations and persistence remain with the original state owner.
  */
@@ -25,6 +26,7 @@ export type ConstraintEntryInput = string | ConstraintEntry;
 export type TrackedTask = {
   /** Criteria captured at explicit execution admission, not inferred from a finished reply. */
   acceptanceCriteria?: string[];
+  acceptanceChecks?: TaskAcceptanceCheck[];
   admissionRequestId?: string;
   taskId: string;
   title: string;
