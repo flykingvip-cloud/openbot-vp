@@ -3,8 +3,8 @@ import {
   readSessionTaskBoard,
   startBoundTaskExecution,
 } from "../../../conversation-task/session-task-board.js";
-import { claimTaskBoardContinue } from "../../../conversation-task/task-board-continue.js";
 import type { TaskCompletionBinding } from "../../contracts/task.js";
+import { claimTaskBoardContinue } from "../continuation-ticket.js";
 
 /** Claim the original queued identity before commercial admission or provider work. */
 export function claimQueuedExecution(input: {

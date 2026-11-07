@@ -49,3 +49,14 @@ export {
 } from "./runner/run-registry.js";
 
 export type { EmbeddedPiRunResult } from "./runner/embedded-result.js";
+
+export {
+  TASK_BOARD_CONTINUE_DELAY_MS,
+  TASK_BOARD_CONTINUE_MAX_PER_TASK,
+  TASK_BOARD_CONTINUE_COOLDOWN_MS,
+  resetTaskBoardContinueLedgerForTest,
+  isTaskBoardContinueInternalPrompt,
+  isExplicitHumanGateWait,
+  decideTaskBoardContinue,
+  scheduleTaskBoardContinueWake,
+} from "./runner/task-continuation.js";

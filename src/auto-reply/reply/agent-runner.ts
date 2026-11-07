@@ -19,10 +19,6 @@ import {
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
-import {
-  isTaskBoardContinueInternalPrompt,
-  scheduleTaskBoardContinueWake,
-} from "../../conversation-task/task-board-continue.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 import { tryResolveCapabilityGapsFromUsage } from "../../gateway/evolution-control/capability-gap-ingest.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
@@ -381,14 +377,14 @@ export async function runReplyAgent(params: {
     if (isHeartbeat) {
       return;
     }
-    if (isTaskBoardContinueInternalPrompt(commandBody)) {
+    if (replyTurnRuntime.execution.isTaskBoardContinueInternalPrompt(commandBody)) {
       return;
     }
     const assistantText = (payloads ?? [])
       .map((payload) => (typeof payload.text === "string" ? payload.text.trim() : ""))
       .filter(Boolean)
       .join("\n\n");
-    scheduleTaskBoardContinueWake({
+    replyTurnRuntime.execution.scheduleTaskBoardContinueWake({
       sessionFile: followupRun.run.sessionFile,
       assistantText,
       isHeartbeat,

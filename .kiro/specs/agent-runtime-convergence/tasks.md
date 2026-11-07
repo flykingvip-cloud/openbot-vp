@@ -1003,3 +1003,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved unique session usage persistence and compaction accounting into state components. Normal reply consumes them through existing reply wiring; queued reply uses the state public API. Old accounting/usage modules are compatibility re-exports; skill snapshot and system event preparation remain with their existing owners. Original storage transactions, last-call token semantics and error behavior are preserved. — codex-runtime-manager
 - Session/followup regression 2 files / 83 PASS; reply execution integration 1 file / 47 PASS after updating stale provider mocks to the actual runtime boundary; full tsgo PASS; typed lint clean; architecture 52 PASS. Candidate 23abeed37 separately passed 67 files / 300 tests and full build with 209 existing dynamic-import warnings. Overall retirement remains open. — codex-runtime-manager
+
+## Continuation authority migration (2026-11-07)
+
+- Moved the unique existing continuation timer and bounded wake ledger into execution; ticket identity validation belongs to state and data contracts are explicit. Reply mainline uses wiring; the old conversation-task module is a compatibility facade, with no second scheduler or executor. Original human gates, wake suppression, focus revision checks and queue revalidation remain intact. — codex-runtime-manager
+- Continuation/background-process/followup regression 3 files / 49 PASS; reply-runner integration 1 file / 47 PASS; full tsgo PASS; formatting and typed lint clean; architecture 52 PASS. Channel implementation remains owned by the separate channel agent. Complete retirement and final same-version lifecycle acceptance remain open. — codex-runtime-manager

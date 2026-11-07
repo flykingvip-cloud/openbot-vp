@@ -21,3 +21,9 @@ export { checkTaskActionBoundary } from "./task-action.js";
 export { persistSessionUsageUpdate } from "./session-usage.js";
 export { incrementCompactionCount } from "./session-compaction.js";
 export { persistRunSessionUsage, incrementRunCompactionCount } from "./session-run-accounting.js";
+
+export {
+  buildTaskBoardContinuePrompt,
+  claimTaskBoardContinue,
+  revalidateContinueTicket,
+} from "./continuation-ticket.js";

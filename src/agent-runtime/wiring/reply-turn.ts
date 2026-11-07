@@ -8,7 +8,11 @@ import {
   completeReplyDelivery,
   prepareVisibleDelivery,
 } from "../delivery/index.js";
-import { runAdmittedTurn } from "../execution/index.js";
+import {
+  runAdmittedTurn,
+  isTaskBoardContinueInternalPrompt,
+  scheduleTaskBoardContinueWake,
+} from "../execution/index.js";
 import { sessionTaskState, prepareReplacementSessionEntry } from "../state/index.js";
 import {
   persistInteractionMessage,
@@ -44,6 +48,8 @@ export const replyTurnRuntime = {
   },
   state: { ...sessionTaskState, persistRunSessionUsage, incrementRunCompactionCount },
   execution: {
+    isTaskBoardContinueInternalPrompt,
+    scheduleTaskBoardContinueWake,
     runAdmittedTurn(request: Parameters<typeof runAdmittedTurn>[0]) {
       return runAdmittedTurn(request, bindAdmittedTurnHost());
     },
