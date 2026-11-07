@@ -108,7 +108,7 @@ it("does not publish when pending registration fails", async () => {
   expect(publish).not.toHaveBeenCalled();
 });
 it.each([true, false])(
-  "registers task completion identity only for verified acceptance: %s",
+  "retains original task identity independently of acceptance: %s",
   async (verified) => {
     const binding = { taskId: "board-a", executionAttempt: "run-a", deliverableVersion: "v1" };
     await prepareVisibleDelivery({
@@ -122,9 +122,7 @@ it.each([true, false])(
       publishPending: vi.fn(),
     });
     const registration = mocks.register.mock.calls[0][0];
-    expect(registration.checkedTask).toEqual(
-      verified ? { sessionFile: "/tmp/test-session.jsonl", binding } : undefined,
-    );
+    expect(registration.checkedTask).toEqual({ sessionFile: "/tmp/test-session.jsonl", binding });
   },
 );
 it("does not register an identity from another execution run", async () => {

@@ -1058,3 +1058,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced a delivered receipt clearing a checked task association while acceptance remained pending (1 FAIL). Confirmation now preserves that association rather than treating transport success as task acceptance. No task is force-completed. — codex-runtime-manager
 - Receipt/restart regression 2 files / 8 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. General accepted-criteria validation remains unfinished. — codex-runtime-manager
+
+## Original identity survives pending acceptance (2026-11-08)
+
+- Reproduced pending acceptance discarding the original board binding at delivery preparation (1 FAIL). Preparation now durably retains the exact original task/run/version even before acceptance passes. Confirmation still requires passed acceptance and a live binding before completion; identity retention is not authorization. — codex-runtime-manager
+- Preparation/confirmation/restart regression 3 files / 15 PASS; full tsgo PASS; typed lint and formatting clean; architecture 52 PASS. General criterion validation and full replacement acceptance remain open. — codex-runtime-manager

@@ -46,7 +46,6 @@ export async function prepareVisibleDelivery(params: {
   const identity = { runId: params.runId, deliveryId, taskId, agentId };
   const binding = params.completionBinding;
   const checkedTask =
-    gates.acceptance.status === "passed" &&
     params.sessionFile &&
     binding?.taskId &&
     binding.executionAttempt === params.runId &&
