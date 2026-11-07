@@ -31,3 +31,5 @@ export {
 } from "./prompt-composition.js";
 
 export { summarizeSessionContext } from "./session-summary.js";
+
+export { buildResumePrompt, sanitizeTaskBoardPathForPrompt } from "./sources/task-resume.js";

@@ -31,3 +31,5 @@ export {
 export { resolvePromptModeForSession } from "./prompt-mode.js";
 
 export { listRuntimeRuleDeclarations } from "./catalog.js";
+
+export { normalizeConstraintEntries } from "./constraints.js";

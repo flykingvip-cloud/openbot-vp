@@ -1088,3 +1088,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Extended closeout regression exposed four stale mocks still intercepting the retired facade rather than the migrated embedded implementation, causing Unknown model anthropic/claude before delivery. Updated only the provider test seam; real outcome persistence, dispatch and confirmation remain exercised. — codex-runtime-manager
 - R85f integration 10 PASS, including four production-entry scenarios; state lifecycle 1 PASS separately. Full tsgo PASS; typed lint clean; architecture 52 PASS. These use mocked inference and are not real-model replacement acceptance. — codex-runtime-manager
+
+## Task resume context and constraint ownership (2026-11-08)
+
+- Moved unchanged task resume rendering and path redaction to shared context; moved unchanged ordered constraint normalization to policy. Original board exports are same-implementation compatibility adapters. Prepared reply and state continuation consume the context public API, retiring those legacy implementation bodies without introducing another planner. — codex-runtime-manager
+- Existing board/context/continuation regression 3 files / 47 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Earlier same-candidate runtime sweep: 66 files / 252 PASS before this extraction. General acceptance evidence remains open. — codex-runtime-manager

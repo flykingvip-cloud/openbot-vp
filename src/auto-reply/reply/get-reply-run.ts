@@ -7,6 +7,7 @@ import {
   selectSystemContextParts,
 } from "../../agent-runtime/context/assembly.js";
 import { resolveContextLane } from "../../agent-runtime/context/index.js";
+import { buildResumePrompt } from "../../agent-runtime/context/index.js";
 import { projectInteractionHistory } from "../../agent-runtime/context/interaction-history.js";
 import { appendUntrustedContext } from "../../agent-runtime/context/untrusted.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
@@ -50,7 +51,6 @@ import {
 } from "../../config/sessions/ogui-decision-engine.js";
 import { buildActiveConversationTaskFocusPrompt } from "../../conversation-task/focus-prompt.js";
 import { buildFocusResumePromptFromSessionFile } from "../../conversation-task/focus-resume.js";
-import { buildResumePrompt } from "../../conversation-task/session-task-board.js";
 import { buildCronReplySystemPrompt } from "../../cron/cron-reply-context.js";
 import { buildGrowthBirthSystemPrompt } from "../../gateway/agent-growth/birth-context.js";
 import {
