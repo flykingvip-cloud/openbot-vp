@@ -60,6 +60,7 @@ import {
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
 import { createHeartbeatActivityLifecycle } from "../observation/heartbeat-activity-lifecycle.js";
+import { createObservationQueryHandlers } from "../observation/query-gateway.js";
 import { getGlobalHookRunner, runGlobalGatewayStopSafely } from "../plugins/hook-runner-global.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import { createPluginRuntime } from "../plugins/runtime/index.js";
@@ -707,7 +708,7 @@ export async function startGatewayServer(
   // The disabled handle does not subscribe and does not write.
   const conversationEvaluation = minimalTestGateway ? null : startConversationEvaluation();
 
-  const heartbeatUnsub = createHeartbeatActivityLifecycle({
+  const heartbeatActivity = createHeartbeatActivityLifecycle({
     minimalTestGateway,
     subscribeBroadcast: () =>
       onHeartbeatEvent((evt) => {
@@ -1046,6 +1047,7 @@ export async function startGatewayServer(
       ...pluginRegistry.gatewayHandlers,
       ...execApprovalHandlers,
       ...secretsHandlers,
+      ...createObservationQueryHandlers({ platformActivityCollector: heartbeatActivity }),
     },
     broadcast,
     context: gatewayRequestContext,
@@ -1193,7 +1195,7 @@ export async function startGatewayServer(
     dedupeCleanup,
     mediaCleanup,
     agentUnsub,
-    heartbeatUnsub,
+    heartbeatUnsub: heartbeatActivity ? () => heartbeatActivity.stop() : null,
     chatRunState,
     clients,
     configReloader,
