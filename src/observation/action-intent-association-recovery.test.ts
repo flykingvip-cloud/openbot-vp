@@ -4,7 +4,10 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../config/config.js";
 import { DEFAULT_WORKING_STYLE } from "../gateway/agent-growth/genome.js";
-import { readRobotWorkingStyle } from "../gateway/agent-growth/working-style-store.js";
+import {
+  readRobotWorkingStyle,
+  writeRobotWorkingStyle,
+} from "../gateway/agent-growth/working-style-store.js";
 import { createWorkingDnaAdapter } from "../gateway/evolution-control/adapters/working-dna.js";
 import { createEvolutionControlPlane } from "../gateway/evolution-control/control-plane.js";
 import { testInspector, testObservation } from "../gateway/evolution-control/test-support.js";
@@ -561,5 +564,21 @@ describe("explicit association recovery", () => {
     expect(rollback).not.toHaveBeenCalled();
     expect(x.plane.listApplications()).toHaveLength(1);
     expect(await readRobotWorkingStyle(x.cfg, "bot")).toEqual(before);
+  });
+  it("blocks configuration drift while waiting to commit association", async () => {
+    const x = await interrupted();
+    const store = {
+      ...x.store,
+      commit: async (input: Parameters<typeof x.store.commit>[0]) => {
+        await writeRobotWorkingStyle(x.cfg, "bot", {
+          ...DEFAULT_WORKING_STYLE,
+          communicationTone: "friendly",
+        });
+        return x.store.commit(input);
+      },
+    };
+    const r = await createAssociationRecoveryService({ ...x.ports, store })(x.request);
+    expect(r.ok).toBe(false);
+    expect((await x.store.detail(x.scope, "intent"))?.revision).toBe(2);
   });
 });

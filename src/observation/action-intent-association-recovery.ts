@@ -313,6 +313,21 @@ export function createAssociationRecoveryService(ports: {
         precondition: async () => {
           const at = ports.now();
           const current = await readAuthorization();
+          const commitRead = await ports.readback(input.agentId);
+          if (
+            commitRead.actualVersion !== application.targetVersionAfter ||
+            commitRead.actualDiffDigest !== intent.target.diffDigest ||
+            !Number.isFinite(commitRead.observedAt) ||
+            commitRead.observedAt < read.observedAt ||
+            commitRead.observedAt > ports.now()
+          ) {
+            return false;
+          }
+          const finalAuthorization = await readAuthorization();
+          if (!valid(finalAuthorization) || hash(finalAuthorization) !== requestDigest) {
+            return false;
+          }
+          // Readback and journal are separate systems, not a cross-file transaction.
           // This lock-local gate prevents queued commits from using stale approval.
           // It is not an atomic transaction with an external authorization system.
           return (
