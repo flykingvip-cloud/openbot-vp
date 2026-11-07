@@ -270,16 +270,18 @@ function budgetIdentityMatches(params: {
   requestDigest?: string | null;
   chargeOutcomeVersion: number | null;
   finalOutcomeVersion: number | null;
+  callId?: string | null;
+  callEvidenceId?: string | null;
+  usageFingerprint?: string | null;
 }): boolean {
-  const supplied = params.budgetCommandId || params.chargeCommitId || params.requestDigest;
-  if (!supplied) {
-    return true;
-  }
   if (
     !params.storeRoot ||
     !params.budgetCommandId ||
     !params.chargeCommitId ||
     !params.requestDigest ||
+    !params.callId ||
+    !params.callEvidenceId ||
+    !params.usageFingerprint ||
     params.chargeOutcomeVersion == null ||
     params.finalOutcomeVersion == null ||
     params.chargeOutcomeVersion >= params.finalOutcomeVersion
@@ -297,6 +299,8 @@ function budgetIdentityMatches(params: {
       commitId?: string;
       outcomeVersion?: number;
       snapshotFingerprint?: string;
+      commandDisposition?: string;
+      callBinding?: { callId?: string; evidenceId?: string; usageFingerprint?: string };
     };
     const bundle = JSON.parse(
       fs.readFileSync(
@@ -305,8 +309,12 @@ function budgetIdentityMatches(params: {
       ),
     ) as {
       commitId?: string;
-      commandLog?: { digest?: string };
-      record?: { outcomeVersion?: number; taskId?: string; scope?: TrustedScope };
+      commandLog?: {
+        digest?: string;
+        commandId?: string;
+        callBinding?: { callId?: string; evidenceId?: string; usageFingerprint?: string };
+      };
+      record?: TaskOutcomeRecord;
     };
     const snapshot = JSON.parse(
       fs.readFileSync(
@@ -317,20 +325,16 @@ function budgetIdentityMatches(params: {
         ),
         "utf8",
       ),
-    ) as {
-      taskId?: string;
-      outcomeVersion?: number;
-      scope?: TrustedScope;
-      lifecycle?: string;
-      taskJudgement?: string;
-      revisionKind?: string;
-    };
+    ) as TaskOutcomeRecord;
+    const binding = log.callBinding;
     if (
       log.digest !== params.requestDigest ||
       log.commitId !== params.chargeCommitId ||
       log.outcomeVersion !== params.chargeOutcomeVersion ||
+      log.commandDisposition !== "applied" ||
       bundle.commitId !== params.chargeCommitId ||
       bundle.commandLog?.digest !== params.requestDigest ||
+      bundle.commandLog?.commandId !== params.budgetCommandId ||
       bundle.record?.outcomeVersion !== params.chargeOutcomeVersion ||
       bundle.record?.taskId !== params.taskId ||
       snapshot.taskId !== params.taskId ||
@@ -338,14 +342,14 @@ function budgetIdentityMatches(params: {
       !snapshot.scope ||
       !fullScopeEqual(snapshot.scope, params.scope) ||
       !log.snapshotFingerprint ||
-      snapshotIdentityFingerprint({
-        taskId: snapshot.taskId,
-        outcomeVersion: snapshot.outcomeVersion,
-        scope: snapshot.scope,
-        lifecycle: snapshot.lifecycle ?? "",
-        taskJudgement: snapshot.taskJudgement ?? "",
-        revisionKind: snapshot.revisionKind,
-      }) !== log.snapshotFingerprint
+      !binding ||
+      binding.callId !== params.callId ||
+      binding.evidenceId !== params.callEvidenceId ||
+      binding.usageFingerprint !== params.usageFingerprint ||
+      bundle.commandLog?.callBinding?.callId !== binding.callId ||
+      bundle.commandLog?.callBinding?.evidenceId !== binding.evidenceId ||
+      bundle.commandLog?.callBinding?.usageFingerprint !== binding.usageFingerprint ||
+      snapshotIdentityFingerprint(snapshot) !== log.snapshotFingerprint
     ) {
       return false;
     }
@@ -439,16 +443,23 @@ export function publishFinalEvidenceLink(params: {
   if (!params.receiptReturned || params.finalOutcomeVersion == null) {
     return null;
   }
-  const callOk =
+  const callIdentityOk =
     params.call != null &&
     params.call.agentId === params.agentId &&
     params.call.taskId === params.taskId &&
     params.call.runId === params.runId &&
     params.call.attemptId === params.candidateAttemptId &&
     params.call.callId.length > 0 &&
-    fullScopeEqual(params.call.scope, params.scope) &&
-    (params.usageFingerprint == null ||
-      usageFingerprint(params.call.usage) === params.usageFingerprint);
+    params.call.evidenceId.length > 0 &&
+    fullScopeEqual(params.call.scope, params.scope);
+  const usageBound =
+    typeof params.usageFingerprint === "string" && params.usageFingerprint.length > 0;
+  const usageOk =
+    params.call != null &&
+    (!usageBound || usageFingerprint(params.call.usage) === params.usageFingerprint);
+  const callOk = callIdentityOk && usageOk;
+  const snapshotBound =
+    typeof params.snapshotFingerprint === "string" && params.snapshotFingerprint.length > 0;
   const run = params.recordRuns.find((item) => item.runId === params.runId);
   const attemptOnRun = run?.attemptIds.includes(params.taskAttemptId ?? "") === true;
   const attemptOnRecord = params.recordAttempts.includes(params.taskAttemptId ?? "");
@@ -462,10 +473,22 @@ export function publishFinalEvidenceLink(params: {
     params.candidateAttemptId !== params.taskAttemptId &&
     params.chargeOutcomeVersion != null &&
     params.finalOutcomeVersion !== params.chargeOutcomeVersion;
-  const budgetOk = budgetIdentityMatches(params);
-  const mapped = membershipOk && callOk && budgetOk;
+  const budgetFieldsPresent = Boolean(
+    params.budgetCommandId || params.chargeCommitId || params.requestDigest,
+  );
+  const budgetOk = budgetIdentityMatches({
+    ...params,
+    callId: params.call?.callId ?? null,
+    callEvidenceId: params.call?.evidenceId ?? null,
+    usageFingerprint: usageBound ? params.usageFingerprint : null,
+  });
+  const mapped = membershipOk && callOk && usageBound && snapshotBound && budgetOk;
   const finalVersion =
-    membershipOk && (params.call == null || callOk) && budgetOk ? params.finalOutcomeVersion : null;
+    membershipOk &&
+    (params.call == null || (callIdentityOk && usageOk)) &&
+    (!budgetFieldsPresent || budgetOk)
+      ? params.finalOutcomeVersion
+      : null;
   const missing = mapped ? [] : ["task_attempt_membership"];
   if (!params.call) {
     missing.push("call_evidence");
@@ -475,9 +498,9 @@ export function publishFinalEvidenceLink(params: {
     callEvidenceId: params.call?.evidenceId ?? null,
     callId: params.call?.callId ?? null,
     budgetCommandId: params.budgetCommandId ?? null,
-    requestDigest: null,
-    disposition: "applied",
-    commitId: null,
+    requestDigest: params.requestDigest ?? null,
+    disposition: budgetOk ? "applied" : "absent",
+    commitId: params.chargeCommitId ?? null,
     chargeOutcomeVersion: params.chargeOutcomeVersion,
     closeOutcomeVersion: null,
     finalOutcomeVersion: finalVersion,
@@ -488,14 +511,16 @@ export function publishFinalEvidenceLink(params: {
     deliveryTruth: "unknown",
     finalMetadataFingerprint: null,
     finalMetadataFingerprintSchemaVersion: null,
-    usageFingerprint: usageFingerprint(
-      params.call?.usage ?? {
-        input: null,
-        output: null,
-        cacheRead: null,
-        cacheWrite: null,
-      },
-    ),
+    usageFingerprint: usageBound
+      ? (params.usageFingerprint ?? "")
+      : usageFingerprint(
+          params.call?.usage ?? {
+            input: null,
+            output: null,
+            cacheRead: null,
+            cacheWrite: null,
+          },
+        ),
     completeness: mapped && params.call ? "complete" : "partial",
     missing,
     coverage: mapped

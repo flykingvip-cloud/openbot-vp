@@ -1161,6 +1161,18 @@ export async function runCronIsolatedAgentTurn(params: {
           fallbacksOverride:
             payloadFallbacks ?? resolveAgentModelFallbacksOverride(params.cfg, agentId),
           run: async (providerOverride, modelOverride, runOptions) => {
+            const cronCharge = { done: false };
+            const chargeCronOnce = (opts: {
+              usage?: unknown;
+              provider?: string;
+              model?: string;
+            }) => {
+              if (cronCharge.done) {
+                return;
+              }
+              cronCharge.done = true;
+              chargeCronModelCall(opts);
+            };
             try {
               if (abortSignal?.aborted) {
                 throw new Error(abortReason());
@@ -1252,7 +1264,7 @@ export async function runCronIsolatedAgentTurn(params: {
                 bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                   result.meta?.systemPromptReport,
                 );
-                chargeCronModelCall({
+                chargeCronOnce({
                   usage: result.meta?.agentMeta?.usage,
                   provider: providerOverride,
                   model: modelOverride,
@@ -1325,7 +1337,7 @@ export async function runCronIsolatedAgentTurn(params: {
               bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                 result.meta?.systemPromptReport,
               );
-              chargeCronModelCall({
+              chargeCronOnce({
                 usage: result.meta?.agentMeta?.usage,
                 provider: embeddedProvider,
                 model: embeddedModel,
@@ -1334,7 +1346,7 @@ export async function runCronIsolatedAgentTurn(params: {
             } catch (err) {
               if (!(err instanceof TaskBudgetExceededError)) {
                 try {
-                  chargeCronModelCall({
+                  chargeCronOnce({
                     usage: usageCarriedByModelError(err),
                     provider: providerOverride,
                     model: modelOverride,

@@ -571,7 +571,7 @@ describe("R3 read port and shared persistence", () => {
 
   it("lets exactly one of two processes take the last disk slot", async () => {
     process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
-    process.env.OPENBOT_EXECUTOR_EVIDENCE_DISK_CAP = "450";
+    process.env.OPENBOT_EXECUTOR_EVIDENCE_DISK_CAP = "360";
     const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r3-race-"));
     roots.push(storeRoot);
     const dir = path.join(storeRoot, "executor-evidence", "associations");

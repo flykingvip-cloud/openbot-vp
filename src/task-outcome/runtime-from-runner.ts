@@ -174,6 +174,40 @@ export type GrowthOutcomeCommitOpts = {
   skipBudgetCharge?: boolean;
 };
 
+/**
+ * One budget charge per candidate. A later post-processing or charge error
+ * must not allocate another callSeq for the same candidate.
+ */
+export async function runModelCandidateWithSingleCharge<T>(params: {
+  run: () => Promise<T>;
+  charge: (outcome: { ok: true; value: T } | { ok: false; error: unknown }) => void;
+}): Promise<T> {
+  let charged = false;
+  const chargeOnce = (outcome: { ok: true; value: T } | { ok: false; error: unknown }) => {
+    if (charged) {
+      return;
+    }
+    charged = true;
+    params.charge(outcome);
+  };
+  try {
+    const value = await params.run();
+    chargeOnce({ ok: true, value });
+    return value;
+  } catch (err) {
+    if (!(err instanceof TaskBudgetExceededError)) {
+      try {
+        chargeOnce({ ok: false, error: err });
+      } catch (chargeErr) {
+        if (chargeErr instanceof TaskBudgetExceededError) {
+          throw chargeErr;
+        }
+      }
+    }
+    throw err;
+  }
+}
+
 /** Usage attached by a candidate failure, when the transport recorded it before throwing. */
 export function usageCarriedByModelError(err: unknown): unknown {
   if (!err || typeof err !== "object" || !("usage" in err)) {
@@ -520,6 +554,7 @@ export function chargeRunnerTurnBudgetSpend(
     parentTaskId?: string;
     parentAgentId?: string;
     budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
+    callBinding?: import("./types.js").BudgetCallBinding;
   },
 ): {
   record: TaskOutcomeRecord;
@@ -612,6 +647,7 @@ export function chargeRunnerTurnBudgetSpend(
     {
       requiredScope: params.scope,
       commandId,
+      ...(params.callBinding ? { callBinding: params.callBinding } : {}),
     },
   );
   if (!spent.ok && spent.code !== "command_conflict" && spent.code !== "evidence_missing") {
@@ -706,7 +742,8 @@ function verifyStoredSpend(
     logged.costEvidence !== spend.costEvidence ||
     bundle.taskId !== prior.taskId ||
     bundle.record.taskId !== prior.taskId ||
-    bundle.record.outcomeVersion !== prior.outcomeVersion
+    bundle.record.outcomeVersion !== prior.outcomeVersion ||
+    bundle.commitId !== prior.commitId
   ) {
     return null;
   }
@@ -815,6 +852,8 @@ export function chargeModelCallAgainstTip(
     model: params.model,
     config: cfg,
   });
+  const activeBeforeCharge = currentExecutorModelCall();
+  const boundUsage = usageFromUnknown(params.usage);
   const charged = chargeRunnerTurnBudgetSpend(cfg, agentId, {
     taskId: params.taskId,
     scope: params.scope,
@@ -829,6 +868,15 @@ export function chargeModelCallAgainstTip(
     ...(params.parentAgentId ? { parentAgentId: params.parentAgentId } : {}),
     ...(params.nowMs != null ? { nowMs: params.nowMs } : {}),
     ...(params.budgetLimits ? { budgetLimits: params.budgetLimits } : {}),
+    ...(activeBeforeCharge
+      ? {
+          callBinding: {
+            callId: activeBeforeCharge.callId,
+            evidenceId: activeBeforeCharge.evidenceId,
+            usageFingerprint: usageFingerprint(boundUsage),
+          },
+        }
+      : {}),
   });
   const active = currentExecutorModelCall();
   if (active && active.modelResponseStatus !== "observed") {

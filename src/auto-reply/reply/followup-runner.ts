@@ -46,6 +46,7 @@ import {
   runnerExecutorEvidenceContext,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  runModelCandidateWithSingleCharge,
   TaskBudgetExceededError,
   usageCarriedByModelError,
 } from "../../task-outcome/runtime-from-runner.js";
@@ -493,118 +494,109 @@ export function createFollowupRunner(params: {
                   ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
                 });
               }
-              let result: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
-              try {
-                result = await runEmbeddedPiAgent({
-                  sessionId: queued.run.sessionId,
-                  sessionKey: queued.run.sessionKey,
-                  agentId: queued.run.agentId,
-                  trigger: "user",
-                  messageChannel: queued.originatingChannel ?? undefined,
-                  messageProvider: queued.run.messageProvider,
-                  agentAccountId: queued.run.agentAccountId,
-                  messageTo: queued.originatingTo,
-                  messageThreadId: queued.originatingThreadId,
-                  currentChannelId: queued.originatingTo,
-                  currentThreadTs:
-                    queued.originatingThreadId != null
-                      ? String(queued.originatingThreadId)
-                      : undefined,
-                  groupId: queued.run.groupId,
-                  groupChannel: queued.run.groupChannel,
-                  groupSpace: queued.run.groupSpace,
-                  senderId: queued.run.senderId,
-                  senderName: queued.run.senderName,
-                  senderUsername: queued.run.senderUsername,
-                  senderE164: queued.run.senderE164,
-                  senderIsOwner: queued.run.senderIsOwner,
-                  ...inheritExecutionIdentityRunFields(queued.run),
-                  sessionFile: queued.run.sessionFile,
-                  agentDir: queued.run.agentDir,
-                  workspaceDir: queued.run.workspaceDir,
-                  config: queued.run.config,
-                  skillsSnapshot: queued.run.skillsSnapshot,
-                  prompt: oguiModelPrompt ?? queued.prompt,
-                  extraSystemPrompt: queued.run.extraSystemPrompt,
-                  ...(queued.run.disableTools ? { disableTools: true } : {}),
-                  ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
-                  ...(queued.run.inboundToolCeiling
-                    ? { inboundToolCeiling: queued.run.inboundToolCeiling }
-                    : {}),
-                  ...(queued.run.contextLane ? { contextLane: queued.run.contextLane } : {}),
-                  ...(queued.run.sessionEntry ? { sessionEntry: queued.run.sessionEntry } : {}),
-                  ...(queued.run.oguiDecisionRun
-                    ? { oguiDecisionRun: queued.run.oguiDecisionRun }
-                    : {}),
-                  ...(queued.run.knowledgeConsumeRefs?.length
-                    ? { knowledgeConsumeRefs: queued.run.knowledgeConsumeRefs }
-                    : {}),
-                  ...(queued.run.skipUserTranscriptPersist === true
-                    ? { skipUserTranscriptPersist: true }
-                    : {}),
-                  ...(queued.run.collaborationRoundInvoked === true
-                    ? { collaborationRoundInvoked: true }
-                    : {}),
-                  ...(queued.run.deliveryToolSideEffect
-                    ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
-                    : {}),
-                  ...(queued.run.privateRunBag ? { privateRunBag: queued.run.privateRunBag } : {}),
-                  ownerNumbers: queued.run.ownerNumbers,
-                  enforceFinalTag: queued.run.enforceFinalTag,
-                  provider: embeddedProvider,
-                  model: embeddedModel,
-                  ...(providerAuthOverride ? { providerAuthOverride } : {}),
-                  ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
-                  ...authProfile,
-                  thinkLevel: queued.run.thinkLevel,
-                  verboseLevel: queued.run.verboseLevel,
-                  reasoningLevel: queued.run.reasoningLevel,
-                  suppressToolErrorWarnings: opts?.suppressToolErrorWarnings,
-                  execOverrides: queued.run.execOverrides,
-                  bashElevated: queued.run.bashElevated,
-                  timeoutMs: queued.run.timeoutMs,
-                  runId,
-                  allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
-                  blockReplyBreak: queued.run.blockReplyBreak,
-                  bootstrapPromptWarningSignaturesSeen,
-                  bootstrapPromptWarningSignature:
-                    bootstrapPromptWarningSignaturesSeen[
-                      bootstrapPromptWarningSignaturesSeen.length - 1
-                    ],
-                  onAgentEvent: (evt) => {
-                    if (evt.stream !== "compaction") {
-                      return;
-                    }
-                    const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
-                    if (phase === "end") {
-                      autoCompactionCompleted = true;
-                    }
-                  },
-                });
-              } catch (err) {
-                if (!(err instanceof TaskBudgetExceededError)) {
-                  try {
-                    chargeFollowupModelCall({
-                      usage: usageCarriedByModelError(err),
-                      provider,
-                      model,
-                    });
-                  } catch (chargeErr) {
-                    if (chargeErr instanceof TaskBudgetExceededError) {
-                      throw chargeErr;
-                    }
-                  }
-                }
-                throw err;
-              }
+              const result = await runModelCandidateWithSingleCharge({
+                run: () =>
+                  runEmbeddedPiAgent({
+                    sessionId: queued.run.sessionId,
+                    sessionKey: queued.run.sessionKey,
+                    agentId: queued.run.agentId,
+                    trigger: "user",
+                    messageChannel: queued.originatingChannel ?? undefined,
+                    messageProvider: queued.run.messageProvider,
+                    agentAccountId: queued.run.agentAccountId,
+                    messageTo: queued.originatingTo,
+                    messageThreadId: queued.originatingThreadId,
+                    currentChannelId: queued.originatingTo,
+                    currentThreadTs:
+                      queued.originatingThreadId != null
+                        ? String(queued.originatingThreadId)
+                        : undefined,
+                    groupId: queued.run.groupId,
+                    groupChannel: queued.run.groupChannel,
+                    groupSpace: queued.run.groupSpace,
+                    senderId: queued.run.senderId,
+                    senderName: queued.run.senderName,
+                    senderUsername: queued.run.senderUsername,
+                    senderE164: queued.run.senderE164,
+                    senderIsOwner: queued.run.senderIsOwner,
+                    ...inheritExecutionIdentityRunFields(queued.run),
+                    sessionFile: queued.run.sessionFile,
+                    agentDir: queued.run.agentDir,
+                    workspaceDir: queued.run.workspaceDir,
+                    config: queued.run.config,
+                    skillsSnapshot: queued.run.skillsSnapshot,
+                    prompt: oguiModelPrompt ?? queued.prompt,
+                    extraSystemPrompt: queued.run.extraSystemPrompt,
+                    ...(queued.run.disableTools ? { disableTools: true } : {}),
+                    ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
+                    ...(queued.run.inboundToolCeiling
+                      ? { inboundToolCeiling: queued.run.inboundToolCeiling }
+                      : {}),
+                    ...(queued.run.contextLane ? { contextLane: queued.run.contextLane } : {}),
+                    ...(queued.run.sessionEntry ? { sessionEntry: queued.run.sessionEntry } : {}),
+                    ...(queued.run.oguiDecisionRun
+                      ? { oguiDecisionRun: queued.run.oguiDecisionRun }
+                      : {}),
+                    ...(queued.run.knowledgeConsumeRefs?.length
+                      ? { knowledgeConsumeRefs: queued.run.knowledgeConsumeRefs }
+                      : {}),
+                    ...(queued.run.skipUserTranscriptPersist === true
+                      ? { skipUserTranscriptPersist: true }
+                      : {}),
+                    ...(queued.run.collaborationRoundInvoked === true
+                      ? { collaborationRoundInvoked: true }
+                      : {}),
+                    ...(queued.run.deliveryToolSideEffect
+                      ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
+                      : {}),
+                    ...(queued.run.privateRunBag
+                      ? { privateRunBag: queued.run.privateRunBag }
+                      : {}),
+                    ownerNumbers: queued.run.ownerNumbers,
+                    enforceFinalTag: queued.run.enforceFinalTag,
+                    provider: embeddedProvider,
+                    model: embeddedModel,
+                    ...(providerAuthOverride ? { providerAuthOverride } : {}),
+                    ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
+                    ...authProfile,
+                    thinkLevel: queued.run.thinkLevel,
+                    verboseLevel: queued.run.verboseLevel,
+                    reasoningLevel: queued.run.reasoningLevel,
+                    suppressToolErrorWarnings: opts?.suppressToolErrorWarnings,
+                    execOverrides: queued.run.execOverrides,
+                    bashElevated: queued.run.bashElevated,
+                    timeoutMs: queued.run.timeoutMs,
+                    runId,
+                    allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
+                    blockReplyBreak: queued.run.blockReplyBreak,
+                    bootstrapPromptWarningSignaturesSeen,
+                    bootstrapPromptWarningSignature:
+                      bootstrapPromptWarningSignaturesSeen[
+                        bootstrapPromptWarningSignaturesSeen.length - 1
+                      ],
+                    onAgentEvent: (evt) => {
+                      if (evt.stream !== "compaction") {
+                        return;
+                      }
+                      const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
+                      if (phase === "end") {
+                        autoCompactionCompleted = true;
+                      }
+                    },
+                  }),
+                charge: (outcome) => {
+                  chargeFollowupModelCall({
+                    usage: outcome.ok
+                      ? outcome.value.meta?.agentMeta?.usage
+                      : usageCarriedByModelError(outcome.error),
+                    provider,
+                    model,
+                  });
+                },
+              });
               bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                 result.meta?.systemPromptReport,
               );
-              chargeFollowupModelCall({
-                usage: result.meta?.agentMeta?.usage,
-                provider,
-                model,
-              });
               return result;
             },
           });

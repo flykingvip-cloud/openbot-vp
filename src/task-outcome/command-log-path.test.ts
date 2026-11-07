@@ -40,6 +40,8 @@ describe("DurableTaskOutcomeStore.commandLogPath", () => {
       commitId: null,
       snapshotFingerprint: null,
       committedSpend: null,
+      commandDisposition: null,
+      callBinding: null,
     });
   });
 

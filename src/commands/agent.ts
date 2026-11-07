@@ -1485,6 +1485,32 @@ async function agentCommandInternal(
             });
           }
           return (async () => {
+            let candidateCharged = false;
+            const chargeAgentCandidate = (usage?: unknown) => {
+              if (candidateCharged || !agentOutcomeTaskId || !agentOutcomeScope) {
+                return;
+              }
+              candidateCharged = true;
+              tipBudgetCallSeq += 1;
+              const charged = chargeModelCallAgainstTip(cfg, sessionAgentId, {
+                taskId: agentOutcomeTaskId,
+                scope: agentOutcomeScope,
+                runId,
+                callSeq: tipBudgetCallSeq,
+                usage,
+                provider: providerOverride,
+                model: modelOverride,
+                ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
+                ...(opts.parentAgentId?.trim() ? { parentAgentId: opts.parentAgentId.trim() } : {}),
+              });
+              tipBudgetChargedThisTurn = true;
+              if (charged.modelCallLink) {
+                modelCallLinks.push(charged.modelCallLink);
+              }
+              if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
+                tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
+              }
+            };
             try {
               const result = await runAgentAttempt({
             providerOverride,
@@ -1523,57 +1549,12 @@ async function agentCommandInternal(
               }
             },
           });
-              if (agentOutcomeTaskId && agentOutcomeScope) {
-                tipBudgetCallSeq += 1;
-                const charged = chargeModelCallAgainstTip(cfg, sessionAgentId, {
-                  taskId: agentOutcomeTaskId,
-                  scope: agentOutcomeScope,
-                  runId,
-                  callSeq: tipBudgetCallSeq,
-                  usage: result.meta?.agentMeta?.usage,
-                  provider: providerOverride,
-                  model: modelOverride,
-                  ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
-                  ...(opts.parentAgentId?.trim()
-                    ? { parentAgentId: opts.parentAgentId.trim() }
-                    : {}),
-                });
-                tipBudgetChargedThisTurn = true;
-                if (charged.modelCallLink) {
-                  modelCallLinks.push(charged.modelCallLink);
-                }
-                if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
-                  tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
-                }
-              }
+              chargeAgentCandidate(result.meta?.agentMeta?.usage);
               return result;
             } catch (err) {
-              if (
-                agentOutcomeTaskId &&
-                agentOutcomeScope &&
-                !(err instanceof TaskBudgetExceededError)
-              ) {
+              if (!(err instanceof TaskBudgetExceededError)) {
                 try {
-                  tipBudgetCallSeq += 1;
-                  const charged = chargeModelCallAgainstTip(cfg, sessionAgentId, {
-                    taskId: agentOutcomeTaskId,
-                    scope: agentOutcomeScope,
-                    runId,
-                    callSeq: tipBudgetCallSeq,
-                    usage: usageCarriedByModelError(err),
-                    provider: providerOverride,
-                    model: modelOverride,
-                    ...(opts.parentTaskId?.trim()
-                      ? { parentTaskId: opts.parentTaskId.trim() }
-                      : {}),
-                    ...(opts.parentAgentId?.trim()
-                      ? { parentAgentId: opts.parentAgentId.trim() }
-                      : {}),
-                  });
-                  if (charged.modelCallLink) {
-                    modelCallLinks.push(charged.modelCallLink);
-                  }
-                  tipBudgetChargedThisTurn = true;
+                  chargeAgentCandidate(usageCarriedByModelError(err));
                 } catch (chargeErr) {
                   if (chargeErr instanceof TaskBudgetExceededError) {
                     throw chargeErr;

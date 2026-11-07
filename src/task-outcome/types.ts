@@ -382,6 +382,13 @@ export type CommittedSpend = {
   costEvidence: "known" | "unknown" | "not_applicable" | null;
 };
 
+/** Stable model-call identity bound to one budget command. Not interchangeable. */
+export type BudgetCallBinding = {
+  callId: string;
+  evidenceId: string;
+  usageFingerprint: string;
+};
+
 /** Same command id, different payload. Not a successful charge. */
 export type CommandConflictDetail = {
   commandId: string;

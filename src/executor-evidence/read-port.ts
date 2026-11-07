@@ -12,7 +12,7 @@ import {
   readAssociationFiles,
   type EvidenceAssociation,
 } from "./association.js";
-import { snapshotIdentityFingerprint, fullScopeEqual } from "./identity.js";
+import { snapshotIdentityFingerprint, snapshotStructureValid, fullScopeEqual } from "./identity.js";
 import {
   MODEL_CALL_FILE_CAP,
   listModelCalls,
@@ -64,6 +64,7 @@ type StoredCommand = {
   taskId?: string;
   outcomeVersion?: number;
   commitId?: string | null;
+  commandDisposition?: string;
 };
 
 function readJson(file: string): unknown {
@@ -197,9 +198,6 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
       gaps.push("command_log_field_invalid");
       continue;
     }
-    if (query.outcomeVersion != null && stored.outcomeVersion !== query.outcomeVersion) {
-      continue;
-    }
     const versionFile = path.join(
       query.storeRoot,
       "versions",
@@ -239,13 +237,19 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
       gaps.push("legacy_commit_id_absent");
       reasons.push(`command ${stored.commandId} predates commit ids and was not backfilled`);
     }
+    const disposition = stored.commandDisposition;
+    if (disposition !== "applied" && disposition !== "replayed" && disposition !== "no_effect") {
+      gaps.push("command_disposition_absent");
+      reasons.push(`command ${stored.commandId} has no stored disposition`);
+      continue;
+    }
     receipts.push({
       schemaVersion: 1,
       commandId: stored.commandId,
       taskId: stored.taskId,
       outcomeVersion: stored.outcomeVersion,
       requestDigest: stored.digest,
-      disposition: "replayed",
+      disposition,
       commitId,
     });
   }
@@ -300,8 +304,16 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   }
   const checkedAssociations: EvidenceAssociation[] = [];
   for (const row of associations) {
-    if (row.finalOutcomeVersion == null || !row.finalSnapshotFingerprint) {
+    if (row.finalOutcomeVersion == null) {
       checkedAssociations.push(row);
+      continue;
+    }
+    if (!row.finalSnapshotFingerprint) {
+      gaps.push("association_fingerprint_absent");
+      continue;
+    }
+    if (row.callId && !row.usageFingerprint) {
+      gaps.push("association_usage_fingerprint_absent");
       continue;
     }
     const versionFile = path.join(
@@ -314,26 +326,47 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
       gaps.push("association_snapshot_mismatch");
       continue;
     }
+    if (
+      !snapshotStructureValid(snapshot) ||
+      !Array.isArray(snapshot.attempts) ||
+      !Array.isArray(snapshot.runs)
+    ) {
+      gaps.push("association_structure_invalid");
+      continue;
+    }
     if (snapshotIdentityFingerprint(snapshot) !== row.finalSnapshotFingerprint) {
       gaps.push("association_fingerprint_mismatch");
       continue;
     }
-    const attemptIds = (snapshot.attempts ?? []).map((attempt) => attempt.attemptId);
-    const run = (snapshot.runs ?? []).find((item) => item.runId === row.runId);
-    if (
-      row.taskAttemptId &&
-      (!attemptIds.includes(row.taskAttemptId) || !run?.attemptIds.includes(row.taskAttemptId))
-    ) {
+    const attempt = snapshot.attempts.find((item) => item.attemptId === row.taskAttemptId);
+    const run = snapshot.runs.find((item) => item.runId === row.runId);
+    if (!attempt || attempt.runId !== row.runId || !row.taskAttemptId) {
       gaps.push("association_attempt_mismatch");
       continue;
     }
-    if (!run) {
+    if (!run || !run.attemptIds.includes(row.taskAttemptId)) {
       gaps.push("association_run_mismatch");
       continue;
     }
-    if (row.usageFingerprint && row.callId) {
+    if (run.effectiveAttemptId && run.effectiveAttemptId !== row.taskAttemptId) {
+      gaps.push("association_attempt_mismatch");
+      continue;
+    }
+    if (row.callId) {
       const call = calls.find((item) => item.callId === row.callId);
-      if (call && usageFingerprint(call.usage) !== row.usageFingerprint) {
+      if (!call || call.evidenceId !== row.callEvidenceId) {
+        gaps.push("association_call_mismatch");
+        continue;
+      }
+      if (call.runId !== row.runId) {
+        gaps.push("association_run_mismatch");
+        continue;
+      }
+      if (call.attemptId !== row.candidateAttemptId) {
+        gaps.push("association_attempt_mismatch");
+        continue;
+      }
+      if (usageFingerprint(call.usage) !== row.usageFingerprint) {
         gaps.push("association_usage_mismatch");
         continue;
       }
@@ -382,13 +415,52 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     return max;
   }, null);
   const budgetRows = associations.filter((row) => row.budgetCommandId);
-  const callChainCompleteness = setClosed ? "complete" : calls.length > 0 ? "partial" : "unknown";
+  const callChainBlocked = gaps.some((gap) =>
+    [
+      "call_schema_invalid",
+      "corrupt_call",
+      "call_read_failed",
+      "not_a_directory",
+      "association_fingerprint_mismatch",
+      "association_fingerprint_absent",
+      "association_usage_mismatch",
+      "association_usage_fingerprint_absent",
+      "association_attempt_mismatch",
+      "association_run_mismatch",
+      "association_call_mismatch",
+      "association_snapshot_mismatch",
+      "association_structure_invalid",
+      "call_capacity_reached",
+    ].includes(gap),
+  );
+  const costBlocked = gaps.some((gap) =>
+    [
+      "command_log_corrupt",
+      "command_log_absent",
+      "command_log_field_invalid",
+      "command_log_read_failed",
+      "command_disposition_absent",
+      "snapshot_identity_mismatch",
+      "version_snapshot_missing",
+      "snapshot_fingerprint_absent",
+      "legacy_commit_id_absent",
+    ].includes(gap),
+  );
+  const callChainCompleteness =
+    !callChainBlocked && setClosed ? "complete" : calls.length > 0 ? "partial" : "unknown";
   const costAttributionCompleteness =
     budgetRows.length === 0
       ? "not_applicable"
-      : budgetRows.every((row) =>
+      : !costBlocked &&
+          budgetRows.every((row) =>
             receipts.some(
-              (receipt) => receipt.commandId === row.budgetCommandId && receipt.commitId != null,
+              (receipt) =>
+                receipt.commandId === row.budgetCommandId &&
+                receipt.commitId != null &&
+                receipt.commitId === row.commitId &&
+                receipt.requestDigest === row.requestDigest &&
+                receipt.outcomeVersion === row.chargeOutcomeVersion &&
+                receipt.disposition === row.disposition,
             ),
           )
         ? "complete"

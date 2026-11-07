@@ -153,4 +153,87 @@ describe("R3 cron entry keeps failed and successful candidates", () => {
     expect(partial.completeness).not.toBe("complete");
     expect(partial.callChainCompleteness).not.toBe("complete");
   });
+
+  it("keeps a failed cron candidate unknown and does not open a second call sequence", async () => {
+    const actual = await vi.importActual<typeof import("../agents/model-fallback.js")>(
+      "../agents/model-fallback.js",
+    );
+    runWithModelFallbackMock.mockImplementation((params) => actual.runWithModelFallback(params));
+    const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r4-cron-unknown-"));
+    roots.push(agentDir);
+    resolveAgentDirMock.mockReturnValue(agentDir);
+    resolveAgentConfigMock.mockReturnValue({ agentDir });
+    resolveConfiguredModelRefMock.mockReturnValue({ provider: "local", model: "a" });
+    let calls = 0;
+    runEmbeddedPiAgentMock.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) {
+        throw new FailoverError("primary failed without usage", {
+          reason: "rate_limit",
+          provider: "local",
+          model: "a",
+        });
+      }
+      return {
+        payloads: [{ text: "fallback completed the cron task with a real summary" }],
+        meta: { agentMeta: { usage: { input: 1, output: 0, cacheRead: 0, cacheWrite: 0 } } },
+      };
+    });
+    const result = await runCronIsolatedAgentTurn(
+      makeIsolatedAgentParamsFixture({
+        cfg: {
+          agents: {
+            defaults: { workspace: agentDir },
+            list: [{ id: "default", agentDir, workspace: agentDir }],
+          },
+          models: {
+            providers: {
+              local: {
+                models: [
+                  {
+                    id: "a",
+                    cost: { input: 1_000_000, output: 1_000_000, cacheRead: 0, cacheWrite: 0 },
+                  },
+                  {
+                    id: "b",
+                    cost: { input: 1_000_000, output: 1_000_000, cacheRead: 0, cacheWrite: 0 },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        job: {
+          id: "r4-cron-unknown",
+          payload: {
+            kind: "agentTurn",
+            message: "finish the isolated evidence check",
+            fallbacks: ["local/b"],
+          },
+        },
+        message: "finish the isolated evidence check",
+        sessionKey: "cron:r4-cron-unknown",
+      }) as never,
+    );
+    expect(result.status).toBe("ok");
+    const spends = fs
+      .readdirSync(path.join(agentDir, "task-outcomes", "command-log"))
+      .map((name) =>
+        JSON.parse(
+          fs.readFileSync(path.join(agentDir, "task-outcomes", "command-log", name), "utf8"),
+        ),
+      )
+      .filter(
+        (row: {
+          commandId?: string;
+          committedSpend?: { costUsd: number | null; costEvidence?: string };
+        }) => typeof row.commandId === "string" && row.commandId.includes("budget-spend"),
+      );
+    expect(spends).toHaveLength(2);
+    const unknown = spends.find(
+      (row: { committedSpend?: { costUsd: number | null; costEvidence?: string } }) =>
+        row.committedSpend?.costUsd == null,
+    );
+    expect(unknown?.committedSpend?.costEvidence).not.toBe("known");
+  });
 });

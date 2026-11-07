@@ -415,28 +415,105 @@ export function evidenceDiskByteCap(): number {
   return Number.isFinite(raw) && raw > 0 ? raw : EVIDENCE_DISK_BYTE_CAP;
 }
 
+/** Linux starttime from /proc. Same pid after recycle has a different token. */
+export function processStartToken(pid: number): string | null {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+    const end = stat.lastIndexOf(")");
+    if (end < 0) {
+      return null;
+    }
+    const fields = stat
+      .slice(end + 2)
+      .trim()
+      .split(/\s+/);
+    return fields[19] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function processAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Recover only a lock whose owner is gone or whose pid was recycled.
+ * A live owner keeps the lock no matter how old it is.
+ */
 function recoverStaleEvidenceLock(lockPath: string): void {
   if (!fs.existsSync(lockPath)) {
     return;
   }
   try {
-    const pid = Number(fs.readFileSync(lockPath, "utf8").trim());
-    let alive = false;
-    if (pid > 0) {
-      try {
-        process.kill(pid, 0);
-        alive = true;
-      } catch {
-        alive = false;
-      }
-    }
-    const age = Date.now() - fs.statSync(lockPath).mtimeMs;
-    if (!alive || age > 2_000) {
+    const [pidText, token] = fs.readFileSync(lockPath, "utf8").split("\n");
+    const pid = Number(pidText?.trim());
+    if (!Number.isInteger(pid) || pid <= 0) {
       fs.rmSync(lockPath, { force: true });
+      return;
     }
+    const liveToken = processStartToken(pid);
+    if (liveToken && token && liveToken === token.trim()) {
+      return;
+    }
+    if (liveToken && token && liveToken !== token.trim()) {
+      fs.rmSync(lockPath, { force: true });
+      return;
+    }
+    if (processAlive(pid)) {
+      return;
+    }
+    fs.rmSync(lockPath, { force: true });
   } catch {
     fs.rmSync(lockPath, { force: true });
   }
+}
+
+function usageDetermined(usage: ModelCallUsage | undefined): boolean {
+  if (!usage) {
+    return false;
+  }
+  return [usage.input, usage.output, usage.cacheRead, usage.cacheWrite].some(
+    (value) => typeof value === "number",
+  );
+}
+
+function usageSame(left: ModelCallUsage | undefined, right: ModelCallUsage | undefined): boolean {
+  return (
+    left?.input === right?.input &&
+    left?.output === right?.output &&
+    left?.cacheRead === right?.cacheRead &&
+    left?.cacheWrite === right?.cacheWrite
+  );
+}
+
+function legalCallAdvance(
+  previous: { evidenceId?: string; callId?: string; status?: string; usage?: ModelCallUsage },
+  next: { evidenceId?: string; callId?: string; status?: string; usage?: ModelCallUsage },
+): boolean {
+  if (
+    !previous.evidenceId ||
+    previous.evidenceId !== next.evidenceId ||
+    previous.callId !== next.callId
+  ) {
+    return false;
+  }
+  const rank = (status: string | undefined) => (status === "unknown" || !status ? 0 : 1);
+  if (rank(next.status) < rank(previous.status)) {
+    return false;
+  }
+  if (rank(previous.status) === 1 && next.status !== previous.status) {
+    return false;
+  }
+  if (usageDetermined(previous.usage) && !usageSame(previous.usage, next.usage)) {
+    return false;
+  }
+  return true;
 }
 
 export function writeBoundedEvidenceFile(
@@ -459,7 +536,8 @@ export function writeBoundedEvidenceFile(
     while (fd === undefined) {
       try {
         fd = fs.openSync(lockPath, "wx");
-        fs.writeFileSync(fd, String(process.pid));
+        const token = processStartToken(process.pid) ?? "unknown";
+        fs.writeFileSync(fd, `${process.pid}\n${token}`);
       } catch {
         recoverStaleEvidenceLock(lockPath);
         if (Date.now() - started > 1_000) {
@@ -477,35 +555,39 @@ export function writeBoundedEvidenceFile(
       }
       const text = `${JSON.stringify(body, null, 2)}\n`;
       const file = path.join(dir, fileName);
-      let replacingBytes = 0;
+      let replacing = false;
       if (fs.existsSync(file)) {
         const current = fs.readFileSync(file, "utf8");
         if (current === text) {
           return "replayed";
         }
-        let previous: { evidenceId?: string; callId?: string };
+        if (folder === "associations") {
+          return "conflict";
+        }
+        let previous: {
+          evidenceId?: string;
+          callId?: string;
+          status?: string;
+          usage?: ModelCallUsage;
+        };
         try {
-          previous = JSON.parse(current) as { evidenceId?: string; callId?: string };
+          previous = JSON.parse(current) as typeof previous;
         } catch {
           return "conflict";
         }
-        const next = body as { evidenceId?: string; callId?: string };
-        const sameCall =
-          typeof previous.evidenceId === "string" &&
-          previous.evidenceId.length > 0 &&
-          previous.evidenceId === next.evidenceId &&
-          previous.callId === next.callId;
-        if (!sameCall) {
+        if (!legalCallAdvance(previous, body as typeof previous)) {
           return "conflict";
         }
-        replacingBytes = Buffer.byteLength(current);
+        replacing = true;
       }
-      const need = Buffer.byteLength(text) * 2 + 64;
-      if (directoryBytes(root) - replacingBytes + need > evidenceDiskByteCap()) {
+      // Peak is the bytes already on disk plus the new temp file and lock overhead.
+      // Do not subtract the file being replaced: both exist until rename.
+      const incoming = Buffer.byteLength(text) + 128;
+      if (directoryBytes(root) + incoming > evidenceDiskByteCap()) {
         return "capped";
       }
       const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
-      if (replacingBytes === 0 && names.length >= ASSOCIATION_FILE_CAP_LOCAL) {
+      if (!replacing && names.length >= ASSOCIATION_FILE_CAP_LOCAL) {
         return "capped";
       }
       tmp = `${file}.${process.pid}.${randomUUID()}.tmp`;

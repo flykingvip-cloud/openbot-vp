@@ -4,6 +4,7 @@ import { computeEvaluationEligibility } from "./eligibility.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { applyTransition, evidenceStillValid, scopeIdOf } from "./transitions.js";
 import type {
+  BudgetCallBinding,
   CommandEvidenceGap,
   CommandReceipt,
   CommittedSpend,
@@ -15,6 +16,34 @@ import type {
   TaskOutcomeRecord,
   TrustedScope,
 } from "./types.js";
+
+function sameCommittedSpend(left: CommittedSpend | null, right: CommittedSpend | null): boolean {
+  if (!left && !right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.iterations === right.iterations &&
+    left.costUsd === right.costUsd &&
+    left.costEvidence === right.costEvidence
+  );
+}
+
+function sameCallBinding(left: BudgetCallBinding | null, right: BudgetCallBinding | null): boolean {
+  if (!left && !right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.callId === right.callId &&
+    left.evidenceId === right.evidenceId &&
+    left.usageFingerprint === right.usageFingerprint
+  );
+}
 
 export type ResultServiceOptions = {
   store: DurableTaskOutcomeStore;
@@ -132,6 +161,8 @@ export class TaskOutcomeResultService {
       requiredScope?: TrustedScope;
       /** Verified caller subject; corrections must use this as authorizedBy. */
       callerSubjectRef?: string;
+      /** Present only for a model-call budget charge. Stored on the command, not in the digest. */
+      callBinding?: BudgetCallBinding;
     },
   ): SubmitResult {
     return this.store.withTaskLock(taskId, () => this.submitLocked(taskId, transition, opts));
@@ -144,6 +175,7 @@ export class TaskOutcomeResultService {
       commandId?: string;
       requiredScope?: TrustedScope;
       callerSubjectRef?: string;
+      callBinding?: BudgetCallBinding;
     },
   ): SubmitResult {
     const current = this.store.loadTask(taskId);
@@ -341,6 +373,8 @@ export class TaskOutcomeResultService {
               taskId,
               outcomeVersion: record.outcomeVersion,
               snapshotFingerprint: snapshotIdentityFingerprint(record),
+              commandDisposition: "applied" as const,
+              ...(opts?.callBinding ? { callBinding: opts.callBinding } : {}),
               ...(transition.type === "accumulate_budget_spend"
                 ? {
                     committedSpend: {
@@ -412,6 +446,8 @@ export class TaskOutcomeResultService {
       outcomeVersion: number;
       commitId: string | null;
       snapshotFingerprint: string | null;
+      committedSpend: CommittedSpend | null;
+      callBinding: BudgetCallBinding | null;
     },
     historical: TaskOutcomeRecord | undefined,
     current: TaskOutcomeRecord | undefined,
@@ -463,7 +499,9 @@ export class TaskOutcomeResultService {
         bundle.record.outcomeVersion !== prior.outcomeVersion ||
         logged?.commandId !== commandId ||
         logged?.digest !== prior.digest ||
-        snapshotIdentityFingerprint(bundle.record) !== prior.snapshotFingerprint
+        snapshotIdentityFingerprint(bundle.record) !== prior.snapshotFingerprint ||
+        !sameCommittedSpend(logged?.committedSpend ?? null, prior.committedSpend) ||
+        !sameCallBinding(logged?.callBinding ?? null, prior.callBinding)
       ) {
         return gap(
           "commit_identity_mismatch",

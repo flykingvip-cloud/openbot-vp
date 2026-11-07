@@ -1,7 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { CommittedSpend, OutcomeOutboxEvent, TaskOutcomeRecord } from "./types.js";
+import type {
+  BudgetCallBinding,
+  CommittedSpend,
+  OutcomeOutboxEvent,
+  TaskOutcomeRecord,
+} from "./types.js";
 
 export type TaskOutcomeStorePaths = {
   rootDir: string;
@@ -26,6 +31,8 @@ export type CommitBundle = {
     commitId?: string | null;
     snapshotFingerprint?: string;
     committedSpend?: CommittedSpend | null;
+    commandDisposition?: "applied" | "replayed" | "no_effect";
+    callBinding?: BudgetCallBinding | null;
   };
 };
 
@@ -216,6 +223,8 @@ export class DurableTaskOutcomeStore {
       outcomeVersion: number;
       snapshotFingerprint?: string;
       committedSpend?: CommittedSpend | null;
+      commandDisposition?: "applied" | "replayed" | "no_effect";
+      callBinding?: BudgetCallBinding | null;
     };
   }):
     | { ok: true; commitId: string }
@@ -295,6 +304,8 @@ export class DurableTaskOutcomeStore {
           commitId?: string | null;
           snapshotFingerprint?: string;
           committedSpend?: CommittedSpend | null;
+          commandDisposition?: "applied" | "replayed" | "no_effect";
+          callBinding?: BudgetCallBinding | null;
         } = {
           commandId: log.commandId,
           digest: log.digest,
@@ -311,6 +322,25 @@ export class DurableTaskOutcomeStore {
         }
         if (log.committedSpend) {
           persisted.committedSpend = log.committedSpend;
+        }
+        if (
+          log.commandDisposition === "applied" ||
+          log.commandDisposition === "replayed" ||
+          log.commandDisposition === "no_effect"
+        ) {
+          persisted.commandDisposition = log.commandDisposition;
+        }
+        if (
+          log.callBinding &&
+          log.callBinding.callId &&
+          log.callBinding.evidenceId &&
+          log.callBinding.usageFingerprint
+        ) {
+          persisted.callBinding = {
+            callId: log.callBinding.callId,
+            evidenceId: log.callBinding.evidenceId,
+            usageFingerprint: log.callBinding.usageFingerprint,
+          };
         }
         atomicWriteJson(cmdPath, persisted);
       }
@@ -487,6 +517,8 @@ export class DurableTaskOutcomeStore {
         commitId: string | null;
         snapshotFingerprint: string | null;
         committedSpend: CommittedSpend | null;
+        commandDisposition: "applied" | "replayed" | "no_effect" | null;
+        callBinding: BudgetCallBinding | null;
       }
     | undefined {
     const raw = readJson<{
@@ -496,6 +528,8 @@ export class DurableTaskOutcomeStore {
       commitId?: string | null;
       snapshotFingerprint?: string;
       committedSpend?: CommittedSpend | null;
+      commandDisposition?: string;
+      callBinding?: BudgetCallBinding | null;
     }>(this.commandLogPath(commandId));
     if (
       !raw ||
@@ -515,6 +549,19 @@ export class DurableTaskOutcomeStore {
           ? raw.snapshotFingerprint
           : null,
       committedSpend: raw.committedSpend ?? null,
+      commandDisposition:
+        raw.commandDisposition === "applied" ||
+        raw.commandDisposition === "replayed" ||
+        raw.commandDisposition === "no_effect"
+          ? raw.commandDisposition
+          : null,
+      callBinding:
+        raw.callBinding &&
+        typeof raw.callBinding.callId === "string" &&
+        typeof raw.callBinding.evidenceId === "string" &&
+        typeof raw.callBinding.usageFingerprint === "string"
+          ? raw.callBinding
+          : null,
     };
   }
 

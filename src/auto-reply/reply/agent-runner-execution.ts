@@ -269,6 +269,16 @@ export async function runAgentTurnWithFallback(params: {
     }
     tipBudgetChargedThisTurn = true;
   };
+  const chargeTipBudgetOnce = (
+    gate: { done: boolean },
+    opts: { provider: string; model: string; usage?: unknown },
+  ): void => {
+    if (gate.done) {
+      return;
+    }
+    gate.done = true;
+    chargeTipBudgetAfterModelCall(opts);
+  };
   let modelGate: EmployeeModelGateResult | undefined;
   let capabilityOutcomeForTurn: CapabilityOutcomeForTurn | undefined;
   const recordGrowthToolResult = (isError: boolean): void => {
@@ -689,6 +699,7 @@ export async function runAgentTurnWithFallback(params: {
               });
               const cliSessionId = getCliSessionId(params.getActiveSessionEntry(), provider);
               return (async () => {
+                const cliCharge = { done: false };
                 // CLI 后端凭证桥（cli-backend-onboarding Task 6/9）：按 bot 归属席位解析企业作用域，
                 // 选取个人/企业凭证并解析其 SecretRef，作为 per-run env 注入子进程；同时捕获
                 // credentialId + tenant/user 供执行完成后写 UsageAttribution（chargeback 依据）。
@@ -797,7 +808,7 @@ export async function runAgentTurnWithFallback(params: {
                   }
 
                   try {
-                    chargeTipBudgetAfterModelCall({
+                    chargeTipBudgetOnce(cliCharge, {
                       provider,
                       model,
                       usage: result.meta?.agentMeta?.usage,
@@ -827,7 +838,7 @@ export async function runAgentTurnWithFallback(params: {
                   lifecycleTerminalEmitted = true;
                   if (!(err instanceof TaskBudgetExceededError)) {
                     try {
-                      chargeTipBudgetAfterModelCall({
+                      chargeTipBudgetOnce(cliCharge, {
                         provider,
                         model,
                         usage: usageCarriedByModelError(err),
@@ -873,6 +884,7 @@ export async function runAgentTurnWithFallback(params: {
               allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
             });
             return (async () => {
+              const embeddedCharge = { done: false };
               // ent/<connection>/<upstream> is a tenant catalog id, not a registry provider.
               // Without this remap the runner throws Unknown model before any reply.
               const transport = await resolveEnterpriseEmbeddedTransport({
@@ -1126,7 +1138,7 @@ export async function runAgentTurnWithFallback(params: {
                 });
                 emitModelStage("assistant_persisted", { source: "session_manager" });
                 try {
-                  chargeTipBudgetAfterModelCall({
+                  chargeTipBudgetOnce(embeddedCharge, {
                     provider,
                     model,
                     usage: result.meta?.agentMeta?.usage,
@@ -1147,7 +1159,7 @@ export async function runAgentTurnWithFallback(params: {
                 });
                 if (!(err instanceof TaskBudgetExceededError)) {
                   try {
-                    chargeTipBudgetAfterModelCall({
+                    chargeTipBudgetOnce(embeddedCharge, {
                       provider,
                       model,
                       usage: usageCarriedByModelError(err),
