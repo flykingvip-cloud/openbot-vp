@@ -1,4 +1,3 @@
-import { isTaskTombstoned } from "../../../conversation-task/session-task-board.js";
 /**
  * Private-chat SessionTaskBoard auto-continue after a turn ends with stop.
  *
@@ -137,16 +136,6 @@ export function decideTaskBoardContinue(params: {
     return {
       action: "skip",
       reason: "continue_cap",
-      wakeRecorded: false,
-      taskId: current.taskId,
-      focusRevision: board.focusRevision ?? 0,
-    };
-  }
-
-  if (isTaskTombstoned(board, current.taskId)) {
-    return {
-      action: "skip",
-      reason: "tombstoned",
       wakeRecorded: false,
       taskId: current.taskId,
       focusRevision: board.focusRevision ?? 0,

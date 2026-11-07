@@ -1073,3 +1073,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced four execution-kind contracts losing explicit trusted acceptance when named validators are empty (4 FAIL). Preserve that trusted flag without waiving unverified acceptance or changing task kind. No model prose is treated as evidence. — codex-runtime-manager
 - Contract/delivery regression 2 files / 33 PASS; full tsgo PASS; changed-file typed lint clean; architecture 52 PASS. General admitted criteria validation and real individual/group closeout remain open; no full retirement or deployment claimed. — codex-runtime-manager
+
+## Continuation rule deduplication (2026-11-08)
+
+- Removed execution runner direct access to legacy board tombstone logic and its duplicate refusal branch. Existing state revalidateContinueTicket remains the single enqueue/claim validator; timer, cap, pause and identity semantics remain intact. — codex-runtime-manager
+- Existing continuation regression 15 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. This retires one duplicate rule branch, not the entire legacy state adapter. — codex-runtime-manager
