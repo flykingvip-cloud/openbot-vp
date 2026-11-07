@@ -1,3 +1,5 @@
+import { activeConstraintTexts, isTaskTombstoned } from "../agent-runtime/policy/index.js";
+export { activeConstraintTexts, isTaskTombstoned } from "../agent-runtime/policy/index.js";
 import {
   withSessionTaskBoardLock,
   readSessionTaskBoardUnlocked,
@@ -99,14 +101,6 @@ export function allocateTaskInstanceId(params?: {
   return `task-${digest}`;
 }
 
-export function isTaskTombstoned(board: SessionTaskBoard, taskId: string): boolean {
-  const id = taskId.trim();
-  if (!id) {
-    return false;
-  }
-  return (board.tombstones ?? []).some((row) => row.taskId === id);
-}
-
 function cloneBoardShell(board: SessionTaskBoard): SessionTaskBoard {
   return {
     current: board.current,
@@ -125,13 +119,6 @@ function bumpFocusRevision(board: SessionTaskBoard): number {
 
 function stripStamp(text: string): string {
   return text.replace(INBOUND_STAMP_RE, "").trim();
-}
-
-/** Currently binding constraint texts (history retained separately via superseded flag). */
-export function activeConstraintTexts(task: TrackedTask | undefined | null): string[] {
-  return normalizeConstraintEntries(task?.effectiveConstraints)
-    .filter((row) => !row.superseded)
-    .map((row) => row.text);
 }
 
 /** Sure means new_work. amend and aside stay on the current task. */

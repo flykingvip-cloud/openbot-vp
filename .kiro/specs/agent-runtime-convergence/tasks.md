@@ -1103,3 +1103,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved existing board file storage, atomic rename, shared lock and epoch CAS into state/repository/task-board-file. Legacy board exports reference the same implementation; no alternate storage or lock was added. Business mutations still use the same locked transaction. — codex-runtime-manager
 - Board and true cross-process concurrency regression 2 files / 31 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Prior candidate full build PASS with 209 unchanged dynamic-import warnings; repository extraction still requires downstream integration verification. — codex-runtime-manager
+
+## Pure task rules move to policy (2026-11-08)
+
+- Moved unchanged tombstone checks and active constraint selection into policy; legacy exports reference those same functions. No new classifier or state mutation was added. — codex-runtime-manager
+- Policy/resume/lifecycle/continuation regression 4 files / 31 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. — codex-runtime-manager

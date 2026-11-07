@@ -19,3 +19,11 @@ export function isLiveTaskBinding(
       JSON.stringify(binding.constraints) === JSON.stringify(activeConstraints)),
   );
 }
+
+export function isTaskTombstoned(board: SessionTaskBoard, taskId: string): boolean {
+  const id = taskId.trim();
+  if (!id) {
+    return false;
+  }
+  return (board.tombstones ?? []).some((row) => row.taskId === id);
+}

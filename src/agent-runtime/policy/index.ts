@@ -8,7 +8,7 @@ export {
 } from "./blocker.js";
 export type { BlockerGrade, EnvProbe } from "./blocker.js";
 
-export { isLiveTaskBinding } from "./task-binding.js";
+export { isLiveTaskBinding, isTaskTombstoned } from "./task-binding.js";
 
 export {
   CONTEXT_WINDOW_HARD_MIN_TOKENS,
@@ -32,4 +32,4 @@ export { resolvePromptModeForSession } from "./prompt-mode.js";
 
 export { listRuntimeRuleDeclarations } from "./catalog.js";
 
-export { normalizeConstraintEntries } from "./constraints.js";
+export { normalizeConstraintEntries, activeConstraintTexts } from "./constraints.js";

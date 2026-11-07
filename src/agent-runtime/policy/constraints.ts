@@ -1,4 +1,4 @@
-import type { ConstraintEntry, ConstraintEntryInput } from "../contracts/task.js";
+import type { ConstraintEntry, ConstraintEntryInput, TrackedTask } from "../contracts/task.js";
 
 export function normalizeConstraintEntries(
   raw: ConstraintEntryInput[] | undefined,
@@ -33,4 +33,11 @@ export function normalizeConstraintEntries(
     });
   }
   return out;
+}
+
+/** Currently binding constraint texts (history retained separately via superseded flag). */
+export function activeConstraintTexts(task: TrackedTask | undefined | null): string[] {
+  return normalizeConstraintEntries(task?.effectiveConstraints)
+    .filter((row) => !row.superseded)
+    .map((row) => row.text);
 }
