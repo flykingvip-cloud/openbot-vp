@@ -6,13 +6,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { boundedOutcomePathSegment } from "../task-outcome/store.js";
-import { scopeIdOf } from "../task-outcome/transitions.js";
 import type { CommandReceipt, TaskOutcomeRecord, TrustedScope } from "../task-outcome/types.js";
-import { loadPersistedAssociations, type EvidenceAssociation } from "./association.js";
+import {
+  listMemoryAssociations,
+  readAssociationFiles,
+  type EvidenceAssociation,
+} from "./association.js";
+import { snapshotIdentityFingerprint, fullScopeEqual } from "./identity.js";
 import {
   MODEL_CALL_FILE_CAP,
   listModelCalls,
-  loadPersistedModelCalls,
+  readCallFiles,
   type ModelCallEvidence,
 } from "./model-call-evidence.js";
 
@@ -73,11 +77,7 @@ function listJson(dir: string): string[] {
 }
 
 function scopeMatches(candidate: { scope: TrustedScope }, scope: TrustedScope): boolean {
-  return (
-    candidate.scope.kind === scope.kind &&
-    scopeIdOf(candidate.scope) === scopeIdOf(scope) &&
-    candidate.scope.subjectRef === scope.subjectRef
-  );
+  return fullScopeEqual(candidate.scope, scope);
 }
 
 export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView {
@@ -85,25 +85,7 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   const gaps: string[] = [];
   const reasons: string[] = [];
   if (query.memoryOnly) {
-    const calls = listModelCalls().filter(
-      (call) => call.agentId === query.agentId && call.taskId === query.taskId,
-    );
-    return {
-      schemaVersion: 1,
-      source: "task-outcome-store+executor-evidence",
-      projectedAt,
-      readOnly: true,
-      durableAcrossRestart: false,
-      completeHistory: false,
-      retention: { policy: "process_memory", maxCallFiles: 0 },
-      capacity: { callFiles: calls.length, associationFiles: 0, watermark: null },
-      receipts: [],
-      calls,
-      associations: [],
-      gaps: ["memory_is_not_durable_history"],
-      completeness: "partial",
-      reasons: ["in-memory calls disappear on restart and are not a historical record"],
-    };
+    return readMemory(query, projectedAt);
   }
 
   const tipFile = path.join(
@@ -117,6 +99,23 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     reasons.push("no task tip; the latest record was not invented");
   } else if (!scopeMatches(tip, query.scope) || tip.taskId !== query.taskId) {
     return emptyMismatch(projectedAt, "scope_mismatch");
+  } else if (query.outcomeVersion != null) {
+    const versionFile = path.join(
+      query.storeRoot,
+      "versions",
+      `${boundedOutcomePathSegment(query.taskId)}__v${query.outcomeVersion}.json`,
+    );
+    const snapshot = readJson(versionFile) as TaskOutcomeRecord | undefined;
+    if (!snapshot) {
+      gaps.push("version_snapshot_missing");
+    } else if (
+      snapshot.taskId !== query.taskId ||
+      snapshot.outcomeVersion !== query.outcomeVersion ||
+      !scopeMatches(snapshot, query.scope)
+    ) {
+      gaps.push("snapshot_identity_mismatch");
+      reasons.push("version file content does not match the requested task, version, and scope");
+    }
   }
 
   const receipts: CommandReceipt[] = [];
@@ -139,9 +138,32 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
       "versions",
       `${boundedOutcomePathSegment(query.taskId)}__v${stored.outcomeVersion}.json`,
     );
-    if (!fs.existsSync(versionFile)) {
+    const snapshot = readJson(versionFile) as
+      | (TaskOutcomeRecord & { snapshotFingerprint?: string })
+      | undefined;
+    if (!snapshot) {
       gaps.push("version_snapshot_missing");
       reasons.push(`command ${stored.commandId} has no immutable version ${stored.outcomeVersion}`);
+      continue;
+    }
+    const fingerprint = snapshotIdentityFingerprint(snapshot);
+    const loggedFingerprint =
+      typeof (stored as { snapshotFingerprint?: string }).snapshotFingerprint === "string"
+        ? (stored as { snapshotFingerprint?: string }).snapshotFingerprint
+        : undefined;
+    if (
+      snapshot.taskId !== stored.taskId ||
+      snapshot.outcomeVersion !== stored.outcomeVersion ||
+      !scopeMatches(snapshot, query.scope) ||
+      (loggedFingerprint != null && loggedFingerprint !== fingerprint)
+    ) {
+      gaps.push("snapshot_identity_mismatch");
+      reasons.push(`command ${stored.commandId} snapshot body does not match the log`);
+      continue;
+    }
+    if (!loggedFingerprint) {
+      gaps.push("snapshot_fingerprint_absent");
+      reasons.push(`command ${stored.commandId} has no snapshot fingerprint`);
       continue;
     }
     const commitId =
@@ -161,17 +183,21 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     });
   }
 
-  let calls = loadPersistedModelCalls(query.storeRoot).filter(
+  const callReport = readCallFiles(query.storeRoot);
+  const associationReport = readAssociationFiles(query.storeRoot);
+  gaps.push(...callReport.gaps, ...associationReport.gaps);
+  let calls = callReport.rows.filter(
     (call) =>
       call.agentId === query.agentId &&
       call.taskId === query.taskId &&
       scopeMatches(call, query.scope),
   );
-  let associations = loadPersistedAssociations(query.storeRoot).filter(
+  let associations = associationReport.rows.filter(
     (row) =>
       row.agentId === query.agentId &&
       row.chain.taskId === query.taskId &&
-      row.scopeId === scopeIdOf(query.scope),
+      row.trustedScope != null &&
+      fullScopeEqual(row.trustedScope, query.scope),
   );
   if (query.runId) {
     const before = calls.length + associations.length;
@@ -183,6 +209,14 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   }
   if (query.outcomeVersion != null) {
     associations = associations.filter((row) => row.finalOutcomeVersion === query.outcomeVersion);
+    const linked = new Set(
+      associations.map((row) => row.callId).filter((id): id is string => Boolean(id)),
+    );
+    calls = calls.filter((call) => linked.has(call.callId));
+  }
+  if (associations.length === 0) {
+    gaps.push("associations_absent");
+    reasons.push("an empty association set is not complete evidence");
   }
   const callFiles = listJson(path.join(query.storeRoot, "executor-evidence", "calls")).length;
   const associationFiles = listJson(
@@ -200,6 +234,7 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   }, null);
   const completeness =
     gaps.length === 0 &&
+    associations.length > 0 &&
     calls.length > 0 &&
     associations.every((row) => row.completeness === "complete")
       ? "complete"
@@ -221,6 +256,68 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     gaps,
     completeness,
     reasons,
+  };
+}
+
+function readMemory(query: EvidenceReadQuery, projectedAt: number): EvidenceReadView {
+  const taskCalls = listModelCalls().filter(
+    (call) => call.agentId === query.agentId && call.taskId === query.taskId,
+  );
+  const scoped = taskCalls.filter((call) => fullScopeEqual(call.scope, query.scope));
+  const scopedAssociations = listMemoryAssociations().filter(
+    (row) =>
+      row.agentId === query.agentId &&
+      row.chain.taskId === query.taskId &&
+      row.trustedScope != null &&
+      fullScopeEqual(row.trustedScope, query.scope),
+  );
+  if (
+    taskCalls.some((call) => !fullScopeEqual(call.scope, query.scope)) &&
+    scopedAssociations.length === 0
+  ) {
+    return emptyMismatch(projectedAt, "scope_mismatch");
+  }
+  if (taskCalls.length > 0 && scoped.length === 0) {
+    return emptyMismatch(projectedAt, "scope_mismatch");
+  }
+  let associations = scopedAssociations.filter(
+    (row) =>
+      row.agentId === query.agentId &&
+      row.chain.taskId === query.taskId &&
+      row.trustedScope != null &&
+      fullScopeEqual(row.trustedScope, query.scope) &&
+      (!query.runId || row.runId === query.runId) &&
+      (query.outcomeVersion == null || row.finalOutcomeVersion === query.outcomeVersion),
+  );
+  let calls = scoped;
+  if (query.runId) {
+    calls = calls.filter((call) => call.runId === query.runId);
+  }
+  if (query.outcomeVersion != null) {
+    const linked = new Set(
+      associations.map((row) => row.callId).filter((id): id is string => Boolean(id)),
+    );
+    calls = calls.filter((call) => linked.has(call.callId));
+  }
+  const gaps = ["memory_is_not_durable_history"];
+  if (associations.length === 0) {
+    gaps.push("associations_absent");
+  }
+  return {
+    schemaVersion: 1,
+    source: "task-outcome-store+executor-evidence",
+    projectedAt,
+    readOnly: true,
+    durableAcrossRestart: false,
+    completeHistory: false,
+    retention: { policy: "process_memory", maxCallFiles: 0 },
+    capacity: { callFiles: calls.length, associationFiles: associations.length, watermark: null },
+    receipts: [],
+    calls,
+    associations,
+    gaps,
+    completeness: "partial",
+    reasons: ["in-memory calls disappear on restart and are not a historical record"],
   };
 }
 

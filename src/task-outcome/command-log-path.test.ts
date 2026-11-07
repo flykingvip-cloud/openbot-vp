@@ -38,6 +38,8 @@ describe("DurableTaskOutcomeStore.commandLogPath", () => {
       outcomeVersion: 1,
       // saveCommand does not invent a commit id for logs that never had one.
       commitId: null,
+      snapshotFingerprint: null,
+      committedSpend: null,
     });
   });
 

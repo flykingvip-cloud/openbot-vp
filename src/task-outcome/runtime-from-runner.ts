@@ -6,10 +6,11 @@ import {
   associateBudgetCharge,
   type BudgetCommandReport,
 } from "../executor-evidence/association.js";
+import { publishFinalEvidenceLink } from "../executor-evidence/association.js";
 import { buildCostColumns } from "../executor-evidence/cost-columns.js";
 import {
   currentExecutorModelCall,
-  finishModelCall,
+  noteModelResponse,
   usageFromUnknown,
   type ExecutorEvidenceContext,
 } from "../executor-evidence/model-call-evidence.js";
@@ -34,7 +35,13 @@ import { createModeQualityHandler, createSkillQualityHandler } from "./quality-h
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { scopeIdOf } from "./transitions.js";
-import type { CloseReasonCode, SubmitResult, TaskOutcomeRecord, TrustedScope } from "./types.js";
+import type {
+  CloseReasonCode,
+  CommittedSpend,
+  SubmitResult,
+  TaskOutcomeRecord,
+  TrustedScope,
+} from "./types.js";
 export { assessTargetModalityAcceptance } from "./capability-modality.js";
 
 function scopeIdSafe(scope: TrustedScope): string {
@@ -555,28 +562,44 @@ export function chargeRunnerTurnBudgetSpend(
     known: knownSubmitted,
     costUsd,
   });
-  // Conflict and replay keep the stored command. The current callback cost is not committed.
+  // Replay and conflict keep the stored command. A new callback cost is not committed.
   let record = spent.ok ? spent.record : (ctx.store.loadTask(params.taskId) ?? ctx.record);
+  const storedSpend = spent.ok
+    ? (spent.committedSpend ?? null)
+    : (spent.commandConflict?.storedSpend ?? null);
+  const recovering =
+    budgetCommand.disposition === "replayed" || budgetCommand.disposition === "conflict";
+  const sideEffectSpend: CommittedSpend | null =
+    budgetCommand.disposition === "applied"
+      ? {
+          iterations,
+          costUsd: costUsd ?? null,
+          costEvidence: params.costEvidence ?? null,
+        }
+      : recovering
+        ? storedSpend
+        : null;
   const parentTaskId = params.parentTaskId?.trim();
-  if (parentTaskId && parentTaskId !== params.taskId && budgetCommand.disposition === "applied") {
+  if (parentTaskId && parentTaskId !== params.taskId && sideEffectSpend) {
     attributeChildSpendToParent(cfg, agentId, {
       childTaskId: params.taskId,
       parentTaskId,
       parentAgentId: params.parentAgentId,
       runId: params.runId,
       callSeq: params.callSeq,
-      iterations,
-      ...(costUsd != null ? { costUsd } : {}),
-      ...(params.costEvidence ? { costEvidence: params.costEvidence } : {}),
+      iterations: sideEffectSpend.iterations,
+      ...(sideEffectSpend.costUsd != null ? { costUsd: sideEffectSpend.costUsd } : {}),
+      ...(sideEffectSpend.costEvidence ? { costEvidence: sideEffectSpend.costEvidence } : {}),
       nowMs,
     });
   }
-  const exhaustion =
-    record.budget != null ? assessTaskBudgetExhaustion(record.budget, nowMs) : null;
-  if (exhaustion && record.lifecycle !== "closed" && budgetCommand.disposition === "applied") {
+  const tip = ctx.store.loadTask(params.taskId) ?? record;
+  record = tip;
+  const exhaustion = tip.budget != null ? assessTaskBudgetExhaustion(tip.budget, nowMs) : null;
+  if (exhaustion && tip.lifecycle !== "closed" && sideEffectSpend) {
     const closeCommandId = `budget-exceeded:${params.taskId}:${params.runId}:call:${params.callSeq}`;
-    const closed = ctx.chat.failClosed(params.taskId, record.outcomeVersion, "budget_exceeded", {
-      fencingToken: ctx.fencingToken,
+    const closed = ctx.chat.failClosed(params.taskId, tip.outcomeVersion, "budget_exceeded", {
+      fencingToken: tip.fencingToken || ctx.fencingToken,
       reasonDetail: exhaustion.detail,
       scope: params.scope,
       commandId: closeCommandId,
@@ -702,16 +725,11 @@ export function chargeModelCallAgainstTip(
     ...(params.budgetLimits ? { budgetLimits: params.budgetLimits } : {}),
   });
   const active = currentExecutorModelCall();
-  if (active && !active.finished) {
+  if (active && active.modelResponseStatus !== "observed") {
     try {
-      finishModelCall(active, {
-        status: "completed",
-        usage: params.usage,
-        usageSource: "charge_callback",
-        usageAggregation: "provider_aggregate_internal_retries_unknown",
-      });
+      noteModelResponse(active, { usage: params.usage, usageSource: "charge_callback" });
     } catch {
-      // Evidence finish must not change the committed budget result.
+      // Noting usage must not change the committed budget result.
     }
   }
   const usage = usageFromUnknown(params.usage);
@@ -1060,6 +1078,7 @@ export async function recordRunnerTurnOutcome(
         throw new Error(`task-outcome fail_closed budget_exceeded failed: ${closed.code}`);
       }
       const evolution = await drainGrowthEvolution(cfg, agentId, store);
+      linkRunnerFinalEvidence(cfg, agentId, scope, taskId, input.runId, attemptId, closed.record);
       return { record: closed.record, evolution };
     }
   }
@@ -1192,7 +1211,37 @@ export async function recordRunnerTurnOutcome(
   }
 
   const evolution = await drainGrowthEvolution(cfg, agentId, store);
+  linkRunnerFinalEvidence(cfg, agentId, scope, taskId, input.runId, attemptId, record);
   return { record, evolution };
+}
+
+function linkRunnerFinalEvidence(
+  cfg: OpenBotConfig,
+  agentId: string,
+  scope: TrustedScope,
+  taskId: string,
+  runId: string,
+  taskAttemptId: string,
+  record: TaskOutcomeRecord,
+): void {
+  try {
+    publishFinalEvidenceLink({
+      storeRoot: resolveStoreRoot(cfg, agentId),
+      scope,
+      agentId,
+      taskId,
+      runId,
+      candidateAttemptId: null,
+      taskAttemptId,
+      chargeOutcomeVersion: record.previousOutcomeVersion ?? null,
+      finalOutcomeVersion: record.outcomeVersion,
+      recordRuns: record.runs.map((run) => ({ runId: run.runId, attemptIds: run.attemptIds })),
+      recordAttempts: record.attempts.map((attempt) => attempt.attemptId),
+      receiptReturned: true,
+    });
+  } catch {
+    // Final evidence must not change the task receipt.
+  }
 }
 
 /**

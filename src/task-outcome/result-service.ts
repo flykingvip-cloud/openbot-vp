@@ -1,9 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
+import { snapshotIdentityFingerprint } from "../executor-evidence/identity.js";
 import { computeEvaluationEligibility } from "./eligibility.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { applyTransition, evidenceStillValid, scopeIdOf } from "./transitions.js";
 import type {
+  CommandEvidenceGap,
   CommandReceipt,
+  CommittedSpend,
   OutcomeOutboxEvent,
   OutcomeEventType,
   SubmitFailure,
@@ -179,31 +182,21 @@ export class TaskOutcomeResultService {
               requestDigest,
               storedOutcomeVersion: prior.outcomeVersion,
               storedCommitId: prior.commitId,
+              storedSpend: prior.committedSpend,
             },
           };
         }
         // Exact replay uses the command's own version. Never substitute the tip.
         const historical = this.store.loadTaskVersion(prior.taskId, prior.outcomeVersion);
-        if (!historical) {
-          return {
-            ok: false,
-            code: "evidence_missing",
-            message: `command ${commandId} version ${prior.outcomeVersion} snapshot is missing`,
-            current,
-            evidenceGap: {
-              schemaVersion: 1,
-              commandId,
-              taskId: prior.taskId,
-              outcomeVersion: prior.outcomeVersion,
-              requestDigest: prior.digest,
-              reason: "version_snapshot_missing",
-            },
-          };
+        const refused = this.refuseInconsistentReplay(commandId, prior, historical, current);
+        if (refused) {
+          return refused;
         }
         return {
           ok: true,
-          record: historical,
+          record: historical!,
           createdEvents: [],
+          committedSpend: prior.committedSpend,
           commandReceipt: this.buildCommandReceipt({
             commandId,
             taskId: prior.taskId,
@@ -347,6 +340,23 @@ export class TaskOutcomeResultService {
               digest: digestTransition(taskId, transition),
               taskId,
               outcomeVersion: record.outcomeVersion,
+              snapshotFingerprint: snapshotIdentityFingerprint(record),
+              ...(transition.type === "accumulate_budget_spend"
+                ? {
+                    committedSpend: {
+                      iterations:
+                        typeof transition.iterations === "number" && transition.iterations > 0
+                          ? Math.floor(transition.iterations)
+                          : 0,
+                      costUsd:
+                        typeof transition.costUsd === "number" &&
+                        Number.isFinite(transition.costUsd)
+                          ? transition.costUsd
+                          : null,
+                      costEvidence: transition.costEvidence ?? null,
+                    } satisfies CommittedSpend,
+                  }
+                : {}),
             },
           }
         : {}),
@@ -366,6 +376,20 @@ export class TaskOutcomeResultService {
       createdEvents: events,
       ...(commandId && requestDigest
         ? {
+            committedSpend:
+              transition.type === "accumulate_budget_spend"
+                ? {
+                    iterations:
+                      typeof transition.iterations === "number" && transition.iterations > 0
+                        ? Math.floor(transition.iterations)
+                        : 0,
+                    costUsd:
+                      typeof transition.costUsd === "number" && Number.isFinite(transition.costUsd)
+                        ? transition.costUsd
+                        : null,
+                    costEvidence: transition.costEvidence ?? null,
+                  }
+                : null,
             commandReceipt: this.buildCommandReceipt({
               commandId,
               taskId,
@@ -377,6 +401,77 @@ export class TaskOutcomeResultService {
           }
         : {}),
     };
+  }
+
+  /** Refuse a replay whose log, snapshot body, and commit bundle disagree. */
+  private refuseInconsistentReplay(
+    commandId: string,
+    prior: {
+      digest: string;
+      taskId: string;
+      outcomeVersion: number;
+      commitId: string | null;
+      snapshotFingerprint: string | null;
+    },
+    historical: TaskOutcomeRecord | undefined,
+    current: TaskOutcomeRecord | undefined,
+  ): SubmitResult | null {
+    const gap = (reason: CommandEvidenceGap["reason"], message: string): SubmitResult => ({
+      ok: false,
+      code: "evidence_missing",
+      message,
+      current,
+      evidenceGap: {
+        schemaVersion: 1,
+        commandId,
+        taskId: prior.taskId,
+        outcomeVersion: prior.outcomeVersion,
+        requestDigest: prior.digest,
+        reason,
+      },
+    });
+    if (!historical) {
+      return gap(
+        "version_snapshot_missing",
+        `command ${commandId} version ${prior.outcomeVersion} snapshot is missing`,
+      );
+    }
+    if (!prior.snapshotFingerprint) {
+      return gap(
+        "snapshot_fingerprint_absent",
+        `command ${commandId} has no snapshot fingerprint and cannot be an exact replay`,
+      );
+    }
+    if (
+      historical.taskId !== prior.taskId ||
+      historical.outcomeVersion !== prior.outcomeVersion ||
+      snapshotIdentityFingerprint(historical) !== prior.snapshotFingerprint
+    ) {
+      return gap(
+        "snapshot_identity_mismatch",
+        `command ${commandId} snapshot body does not match the committed identity`,
+      );
+    }
+    if (prior.commitId) {
+      const bundle = this.store.loadCommitBundle(prior.commitId);
+      const logged = bundle?.commandLog;
+      if (
+        !bundle ||
+        bundle.commitId !== prior.commitId ||
+        bundle.taskId !== prior.taskId ||
+        bundle.record.taskId !== prior.taskId ||
+        bundle.record.outcomeVersion !== prior.outcomeVersion ||
+        logged?.commandId !== commandId ||
+        logged?.digest !== prior.digest ||
+        snapshotIdentityFingerprint(bundle.record) !== prior.snapshotFingerprint
+      ) {
+        return gap(
+          "commit_identity_mismatch",
+          `command ${commandId} commit ${prior.commitId} does not match the log`,
+        );
+      }
+    }
+    return null;
   }
 
   private buildCommandReceipt(args: {

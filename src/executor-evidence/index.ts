@@ -1,11 +1,16 @@
 export {
   associateBudgetCharge,
-  finalMetadataFingerprint,
+  listMemoryAssociations,
   loadPersistedAssociations,
+  publishFinalEvidenceLink,
+  resetEvidenceAssociations,
+  finalMetadataFingerprint,
+  ASSOCIATION_FILE_CAP,
   FINAL_METADATA_FINGERPRINT_SCHEMA_VERSION,
   type BudgetCommandReport,
   type EvidenceAssociation,
 } from "./association.js";
+export { fullScopeEqual, snapshotIdentityFingerprint } from "./identity.js";
 export {
   buildCostColumns,
   familyRollup,
@@ -13,7 +18,11 @@ export {
   PRICING_FINGERPRINT_SCHEMA_VERSION,
   type CostColumns,
 } from "./cost-columns.js";
-export { GOVERNED_MODEL_ENTRY, runIsolatedGovernedModelCall } from "./governed-model-entry.js";
+export {
+  GOVERNED_MODEL_ENTRY,
+  ISOLATED_GOVERNED_DEFAULT_TIMEOUT_MS,
+  runIsolatedGovernedModelCall,
+} from "./governed-model-entry.js";
 export {
   beginModelCall,
   currentExecutorModelCall,
@@ -22,10 +31,13 @@ export {
   getModelCall,
   listModelCalls,
   loadPersistedModelCalls,
+  noteModelResponse,
   observeModelCandidate,
   usageFingerprint,
   usageFromUnknown,
+  EVIDENCE_DISK_BYTE_CAP,
   MODEL_CALL_FILE_CAP,
+  MODEL_CALL_MEMORY_CAP,
   type ExecutorEvidenceContext,
   type ModelCallEvidence,
   type ModelCallUsage,

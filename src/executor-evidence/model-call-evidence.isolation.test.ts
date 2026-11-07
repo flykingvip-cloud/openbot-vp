@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runWithModelFallback } from "../agents/model-fallback.js";
 import type { TrustedScope } from "../task-outcome/types.js";
 import { runIsolatedGovernedModelCall } from "./governed-model-entry.js";
@@ -42,6 +42,10 @@ function context(runId = "run-1"): ExecutorEvidenceContext {
     collector: "isolation",
   };
 }
+
+beforeEach(() => {
+  process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
+});
 
 afterEach(() => {
   resetModelCallsForTests();

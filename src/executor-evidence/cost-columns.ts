@@ -59,7 +59,16 @@ export function pricingFingerprint(params: {
     .digest("hex");
 }
 
+function ratesAreKnown(cost: ModelCostConfig): boolean {
+  return [cost.input, cost.output, cost.cacheRead, cost.cacheWrite].every(
+    (rate) => typeof rate === "number" && Number.isFinite(rate) && rate >= 0,
+  );
+}
+
 function estimateCompleteUsage(usage: ModelCallUsage, cost: ModelCostConfig): number | null {
+  if (!ratesAreKnown(cost)) {
+    return null;
+  }
   if (
     usage.input == null ||
     usage.output == null ||
@@ -97,7 +106,11 @@ export function buildCostColumns(params: {
   const completeness = tokenCompleteness(params.usage);
   const basis = params.basis ?? (params.cost ? "config_estimate" : "unknown");
   const estimated =
-    completeness === "complete" && params.cost && params.provider && params.model
+    completeness === "complete" &&
+    params.cost &&
+    ratesAreKnown(params.cost) &&
+    params.provider &&
+    params.model
       ? estimateCompleteUsage(params.usage, params.cost)
       : null;
   const estimatedStatus =

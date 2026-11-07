@@ -1,7 +1,8 @@
 /**
- * Locator for the existing governed model entry. Does not add a parallel
- * model config and does not treat high_quality_reasoning as a configured role.
- * Isolated transport only — this module never opens a network connection.
+ * Wiring reference and isolated adapter. This is not a live host call into
+ * resolveEmployeeModelGate, and it never opens a network connection.
+ * high_quality_reasoning is not a configured role. Synthesized candidate text
+ * is not a model-generated hypothesis.
  */
 import type { TrustedScope } from "../task-outcome/types.js";
 import {
@@ -11,7 +12,10 @@ import {
   type ModelCallEvidence,
 } from "./model-call-evidence.js";
 
+export const ISOLATED_GOVERNED_DEFAULT_TIMEOUT_MS = 1_000;
+
 export const GOVERNED_MODEL_ENTRY = {
+  kind: "wiring_reference_and_isolated_adapter" as const,
   roleToModelRef: [
     "src/gateway/model-entitlement/employee-model-gate.ts#resolveEmployeeModelGate",
     "src/gateway/model-entitlement/resolve-effective-model-set.ts#resolveEffectiveModelSet",
@@ -96,7 +100,7 @@ export async function runIsolatedGovernedModelCall(params: {
     model,
   });
   const abort = new AbortController();
-  const timeoutMs = params.timeoutMs ?? 0;
+  const timeoutMs = params.timeoutMs ?? ISOLATED_GOVERNED_DEFAULT_TIMEOUT_MS;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {
     if (timeoutMs > 0) {
@@ -150,10 +154,7 @@ export async function runIsolatedGovernedModelCall(params: {
       applied: false,
       taskResultWritten: false,
       fallback: null,
-      hypothesis: {
-        text: `candidate ${params.modelRef} for ${params.purpose}`,
-        source: params.resolutionSource,
-      },
+      hypothesis: null,
       evidence: call,
     };
   } catch (err) {

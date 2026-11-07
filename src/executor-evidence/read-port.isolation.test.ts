@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { chargeModelCallAgainstTip } from "../task-outcome/runtime-from-runner.js";
 import type { TrustedScope } from "../task-outcome/types.js";
 import { resetModelCallsForTests } from "./model-call-evidence.js";
@@ -44,6 +44,10 @@ function snapshot(root: string): string[] {
   walk(root);
   return rows.toSorted((a, b) => a.localeCompare(b));
 }
+
+beforeEach(() => {
+  process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
+});
 
 afterEach(() => {
   resetModelCallsForTests();

@@ -375,6 +375,13 @@ export type CommandReceipt = {
   commitId: string | null;
 };
 
+/** Spend that was actually committed with a budget command. Not a later callback. */
+export type CommittedSpend = {
+  iterations: number;
+  costUsd: number | null;
+  costEvidence: "known" | "unknown" | "not_applicable" | null;
+};
+
 /** Same command id, different payload. Not a successful charge. */
 export type CommandConflictDetail = {
   commandId: string;
@@ -383,16 +390,22 @@ export type CommandConflictDetail = {
   requestDigest: string;
   storedOutcomeVersion: number;
   storedCommitId: string | null;
+  /** Original committed spend, when the winning command was a budget charge. */
+  storedSpend: CommittedSpend | null;
 };
 
-/** The command log names a version whose immutable snapshot is gone. */
+/** The command log cannot be turned into an exact replay. */
 export type CommandEvidenceGap = {
   schemaVersion: 1;
   commandId: string;
   taskId: string;
   outcomeVersion: number;
   requestDigest: string;
-  reason: "version_snapshot_missing";
+  reason:
+    | "version_snapshot_missing"
+    | "snapshot_identity_mismatch"
+    | "commit_identity_mismatch"
+    | "snapshot_fingerprint_absent";
 };
 
 export type SubmitFailure = {
@@ -421,6 +434,8 @@ export type SubmitResult =
       createdEvents: OutcomeOutboxEvent[];
       /** Set only when the caller passed commandId. Legacy submits omit it. */
       commandReceipt?: CommandReceipt;
+      /** Present when this command committed or replayed a budget spend. */
+      committedSpend?: CommittedSpend | null;
     }
   | SubmitFailure;
 

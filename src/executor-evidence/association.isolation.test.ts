@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TaskOutcomeResultService } from "../task-outcome/result-service.js";
 import { chargeModelCallAgainstTip } from "../task-outcome/runtime-from-runner.js";
 import { DurableTaskOutcomeStore } from "../task-outcome/store.js";
@@ -44,6 +44,10 @@ function agentCfg(agentDir: string) {
 function fullUsage(input: number, output: number) {
   return { input, output, cacheRead: 0, cacheWrite: 0 };
 }
+
+beforeEach(() => {
+  process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
+});
 
 afterEach(() => {
   resetModelCallsForTests();
@@ -286,7 +290,12 @@ describe("budget command association", () => {
       }),
     });
     expect(linked?.correctionInherited).toBe(false);
-    expect(linked?.finalOutcomeVersion).toBe(correction.outcomeVersion);
+    expect(linked?.finalOutcomeVersion).toBeNull();
+    expect(
+      loadPersistedAssociations(storeRoot).some(
+        (row) => row.finalOutcomeVersion === correction.outcomeVersion,
+      ),
+    ).toBe(false);
     const versionOne = loadPersistedAssociations(storeRoot).filter(
       (row) => row.finalOutcomeVersion === left.budgetCommand.chargeOutcomeVersion,
     );

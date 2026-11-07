@@ -10,7 +10,9 @@ import path from "node:path";
 import type { TrustedScope } from "../task-outcome/types.js";
 
 export const MODEL_CALL_EVIDENCE_SCHEMA_VERSION = 1 as const;
-export const MODEL_CALL_FILE_CAP = 2000;
+export const MODEL_CALL_FILE_CAP = 64;
+export const MODEL_CALL_MEMORY_CAP = 64;
+export const EVIDENCE_DISK_BYTE_CAP = 512_000;
 
 export type ModelCallUsage = {
   input: number | null;
@@ -64,6 +66,10 @@ export type ModelCallEvidence = {
   };
   persisted: boolean;
   durableAcrossRestart: boolean;
+  /** Usage noted from a model response. This is not the candidate's terminal state. */
+  modelResponseStatus: "unobserved" | "observed" | "absent";
+  /** False when completedAt or observedAt precedes startedAt, or a timestamp is not finite. */
+  timeOrderValid: boolean;
 };
 
 export type ExecutorEvidenceContext = {
@@ -88,8 +94,9 @@ const EMPTY_USAGE: ModelCallUsage = {
   cacheWrite: null,
 };
 
+/** Collection is off unless the process explicitly opts in. */
 export function executorEvidenceCollectionEnabled(): boolean {
-  return process.env.OPENBOT_EXECUTOR_EVIDENCE !== "0";
+  return process.env.OPENBOT_EXECUTOR_EVIDENCE === "1";
 }
 
 export function currentExecutorModelCall(): ActiveModelCall | undefined {
@@ -108,8 +115,8 @@ export function resetModelCallsForTests(): void {
   calls.clear();
 }
 
-function finiteOrNull(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+function countOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
 /** Missing token fields stay null. They are not coerced to zero. */
@@ -121,34 +128,50 @@ export function usageFromUnknown(raw: unknown): ModelCallUsage {
   const details = record.prompt_tokens_details;
   const nestedCached =
     details && typeof details === "object"
-      ? finiteOrNull((details as { cached_tokens?: unknown }).cached_tokens)
+      ? countOrNull((details as { cached_tokens?: unknown }).cached_tokens)
       : null;
   return {
-    input: finiteOrNull(
+    input: countOrNull(
       record.input ??
         record.inputTokens ??
         record.promptTokens ??
         record.input_tokens ??
         record.prompt_tokens,
     ),
-    output: finiteOrNull(
+    output: countOrNull(
       record.output ??
         record.outputTokens ??
         record.completionTokens ??
         record.output_tokens ??
         record.completion_tokens,
     ),
-    cacheRead: finiteOrNull(
+    cacheRead: countOrNull(
       record.cacheRead ??
         record.cache_read ??
         record.cache_read_input_tokens ??
         record.cached_tokens ??
         nestedCached,
     ),
-    cacheWrite: finiteOrNull(
+    cacheWrite: countOrNull(
       record.cacheWrite ?? record.cache_write ?? record.cache_creation_input_tokens,
     ),
   };
+}
+
+export function directoryBytes(root: string): number {
+  if (!fs.existsSync(root)) {
+    return 0;
+  }
+  let total = 0;
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    const full = path.join(root, entry.name);
+    if (entry.isDirectory()) {
+      total += directoryBytes(full);
+    } else {
+      total += fs.statSync(full).size;
+    }
+  }
+  return total;
 }
 
 export function usageFingerprint(usage: ModelCallUsage): string {
@@ -172,6 +195,10 @@ function persist(evidence: ModelCallEvidence): void {
   try {
     const dir = callsDir(root);
     fs.mkdirSync(dir, { recursive: true });
+    const evidenceRoot = path.join(root, "executor-evidence");
+    if (directoryBytes(evidenceRoot) >= EVIDENCE_DISK_BYTE_CAP) {
+      return;
+    }
     const existing = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
     const file = path.join(dir, `${evidence.evidenceId}.json`);
     if (!fs.existsSync(file) && existing.length >= MODEL_CALL_FILE_CAP) {
@@ -238,12 +265,38 @@ export function beginModelCall(params: {
     },
     persisted: false,
     durableAcrossRestart: false,
+    modelResponseStatus: "unobserved",
+    timeOrderValid: true,
     finished: false,
     storeRoot: params.context.storeRoot,
   };
+  if (!executorEvidenceCollectionEnabled()) {
+    return evidence;
+  }
+  while (calls.size >= MODEL_CALL_MEMORY_CAP) {
+    const oldest = [...calls.values()].toSorted((a, b) => a.startedAt - b.startedAt)[0];
+    if (!oldest) {
+      break;
+    }
+    calls.delete(oldest.callId);
+  }
   calls.set(evidence.callId, evidence);
   persist(evidence);
   return evidence;
+}
+
+/** Record provider usage without sealing the candidate execution as completed. */
+export function noteModelResponse(
+  call: ActiveModelCall,
+  params: { usage?: unknown; usageSource: string },
+): void {
+  call.usage = params.usage === undefined ? { ...EMPTY_USAGE } : usageFromUnknown(params.usage);
+  call.usageSource = params.usageSource;
+  call.modelResponseStatus = "observed";
+  call.observedAt = Date.now();
+  if (executorEvidenceCollectionEnabled()) {
+    persist(call);
+  }
 }
 
 export function finishModelCall(
@@ -264,7 +317,16 @@ export function finishModelCall(
     return call;
   }
   const observedAt = params.observedAt ?? Date.now();
-  call.status = params.status;
+  const completedAt =
+    params.status === "unknown" ? (params.completedAt ?? null) : (params.completedAt ?? observedAt);
+  const timeOrderValid =
+    Number.isFinite(call.startedAt) &&
+    call.startedAt >= 0 &&
+    Number.isFinite(observedAt) &&
+    observedAt >= call.startedAt &&
+    (completedAt == null || (Number.isFinite(completedAt) && completedAt >= call.startedAt));
+  call.timeOrderValid = timeOrderValid;
+  call.status = timeOrderValid ? params.status : "unknown";
   call.terminalCause =
     params.terminalCause ??
     (params.status === "cancelled" ? "cancelled" : params.status === "failed" ? "error" : "none");
@@ -273,8 +335,7 @@ export function finishModelCall(
   call.usageAggregation = params.usageAggregation ?? "provider_aggregate_internal_retries_unknown";
   call.providerRequestId = params.providerRequestId ?? null;
   call.providerResponseId = params.providerResponseId ?? null;
-  call.completedAt =
-    params.status === "unknown" ? (params.completedAt ?? null) : (params.completedAt ?? observedAt);
+  call.completedAt = completedAt;
   call.observedAt = observedAt;
   call.finished = true;
   persist(call);
@@ -349,20 +410,31 @@ export async function observeModelCandidate<T>(params: {
 }
 
 export function loadPersistedModelCalls(storeRoot: string): ModelCallEvidence[] {
+  return readCallFiles(storeRoot).rows;
+}
+
+export function readCallFiles(storeRoot: string): { rows: ModelCallEvidence[]; gaps: string[] } {
   const dir = callsDir(storeRoot);
   if (!fs.existsSync(dir)) {
-    return [];
+    return { rows: [], gaps: [] };
   }
-  const loaded: ModelCallEvidence[] = [];
-  for (const name of fs.readdirSync(dir)) {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return { rows: [], gaps: ["call_read_failed"] };
+  }
+  const rows: ModelCallEvidence[] = [];
+  const gaps: string[] = [];
+  for (const name of names) {
     if (!name.endsWith(".json")) {
       continue;
     }
     try {
-      loaded.push(JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")) as ModelCallEvidence);
+      rows.push(JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")) as ModelCallEvidence);
     } catch {
-      // A corrupt file is a gap, not a fabricated call.
+      gaps.push("corrupt_call");
     }
   }
-  return loaded;
+  return { rows, gaps };
 }

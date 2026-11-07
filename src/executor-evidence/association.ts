@@ -9,11 +9,17 @@ import path from "node:path";
 import { scopeIdOf } from "../task-outcome/transitions.js";
 import type { TaskOutcomeRecord, TrustedScope } from "../task-outcome/types.js";
 import type { CostColumns } from "./cost-columns.js";
+import { fullScopeEqual } from "./identity.js";
 import {
+  EVIDENCE_DISK_BYTE_CAP,
+  directoryBytes,
+  executorEvidenceCollectionEnabled,
   type ModelCallEvidence,
   type ModelCallUsage,
   usageFingerprint,
 } from "./model-call-evidence.js";
+
+export const ASSOCIATION_FILE_CAP = 64;
 
 export const FINAL_METADATA_FINGERPRINT_SCHEMA_VERSION = 1 as const;
 
@@ -69,10 +75,30 @@ export type EvidenceAssociation = {
     deliveryId: string | null;
     source: "receipt" | "absent";
   };
+  /** This callback's estimate. It is not the committed budget attribution. */
+  callEstimate: CostColumns | null;
+  committedAttribution: {
+    status: "known" | "unknown" | "not_committed";
+    amount: number | null;
+    usageFingerprint: string | null;
+  };
+  candidateAttemptId: string | null;
+  taskAttemptId: string | null;
+  trustedScope: TrustedScope | null;
   cost: CostColumns;
   scopeId: string;
   agentId: string;
 };
+
+const memoryAssociations: EvidenceAssociation[] = [];
+
+export function listMemoryAssociations(): EvidenceAssociation[] {
+  return [...memoryAssociations];
+}
+
+export function resetEvidenceAssociations(): void {
+  memoryAssociations.length = 0;
+}
 
 function associationsDir(storeRoot: string): string {
   return path.join(storeRoot, "executor-evidence", "associations");
@@ -102,13 +128,7 @@ function sameScope(
   taskId: string,
   agentId: string,
 ): boolean {
-  return (
-    call.agentId === agentId &&
-    call.taskId === taskId &&
-    scopeIdOf(call.scope) === scopeIdOf(scope) &&
-    call.scope.kind === scope.kind &&
-    call.scope.subjectRef === scope.subjectRef
-  );
+  return call.agentId === agentId && call.taskId === taskId && fullScopeEqual(call.scope, scope);
 }
 
 export function associateBudgetCharge(params: {
@@ -125,6 +145,8 @@ export function associateBudgetCharge(params: {
   cost: CostColumns;
   capabilityCallId?: string | null;
   deliveryAttempts?: ReadonlyArray<{ source: string }>;
+  candidateAttemptId?: string | null;
+  taskAttemptId?: string | null;
 }): EvidenceAssociation | null {
   if (params.call && !sameScope(params.call, params.scope, params.taskId, params.agentId)) {
     return null;
@@ -160,7 +182,8 @@ export function associateBudgetCharge(params: {
     commitId: params.budget.commitId,
     chargeOutcomeVersion: params.budget.chargeOutcomeVersion,
     closeOutcomeVersion: params.budget.closeOutcomeVersion,
-    finalOutcomeVersion: params.record?.outcomeVersion ?? params.budget.chargeOutcomeVersion,
+    // The charge record is not the final business version.
+    finalOutcomeVersion: null,
     runId: params.runId,
     attemptId: params.attemptId ?? params.call?.attemptId ?? null,
     capabilityCallId: params.capabilityCallId ?? null,
@@ -171,8 +194,8 @@ export function associateBudgetCharge(params: {
       ? FINAL_METADATA_FINGERPRINT_SCHEMA_VERSION
       : null,
     usageFingerprint: usageFingerprint(params.usage),
-    completeness: missing.length === 0 ? "complete" : "partial",
-    missing,
+    completeness: "partial",
+    missing: [...missing, "final_receipt"],
     coverage: params.call
       ? `call ${params.call.callId} attempt ${params.call.attemptId}`
       : "budget command without a preceding model-call identity",
@@ -187,23 +210,56 @@ export function associateBudgetCharge(params: {
       deliveryId: enqueueOnly ? null : (params.record?.deliveryId ?? null),
       source: params.budget.disposition === "absent" || !params.record ? "absent" : "receipt",
     },
+    callEstimate: params.cost,
+    committedAttribution:
+      params.budget.disposition === "applied" && params.budget.costStatus === "known"
+        ? {
+            status: "known",
+            amount: params.budget.committedCostUsd,
+            usageFingerprint: usageFingerprint(params.usage),
+          }
+        : {
+            status: "not_committed",
+            amount: null,
+            usageFingerprint: null,
+          },
+    candidateAttemptId: params.candidateAttemptId ?? params.call?.attemptId ?? null,
+    taskAttemptId: params.taskAttemptId ?? null,
+    trustedScope: params.scope,
     cost: params.cost,
     scopeId: scopeIdOf(params.scope),
     agentId: params.agentId,
   };
-  if (!params.storeRoot || process.env.OPENBOT_EXECUTOR_EVIDENCE === "0") {
+  if (!missing.includes("final_receipt")) {
+    association.missing.push("final_receipt");
+  }
+  rememberAssociation(association);
+  if (!params.storeRoot || !executorEvidenceCollectionEnabled()) {
     return association;
   }
   try {
     const dir = associationsDir(params.storeRoot);
     fs.mkdirSync(dir, { recursive: true });
-    const key = association.callId ?? `budget-${association.budgetCommandId ?? "none"}`;
+    if (
+      directoryBytes(path.join(params.storeRoot, "executor-evidence")) >= EVIDENCE_DISK_BYTE_CAP
+    ) {
+      return association;
+    }
+    const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
+    const key =
+      association.disposition === "conflict"
+        ? `conflict-${association.budgetCommandId ?? "none"}-${association.usageFingerprint}`
+        : (association.callId ?? `budget-${association.budgetCommandId ?? "none"}`);
     const file = path.join(dir, `${encodeURIComponent(key)}.json`);
-    if (fs.existsSync(file)) {
+    if (!fs.existsSync(file) && names.length >= ASSOCIATION_FILE_CAP) {
+      return association;
+    }
+    if (
+      fs.existsSync(file) &&
+      (association.disposition === "conflict" || association.disposition === "replayed")
+    ) {
       const existing = JSON.parse(fs.readFileSync(file, "utf8")) as EvidenceAssociation;
-      if (association.disposition === "conflict" || association.disposition === "replayed") {
-        return existing;
-      }
+      return existing;
     }
     fs.writeFileSync(file, `${JSON.stringify(association, null, 2)}\n`);
   } catch {
@@ -212,21 +268,169 @@ export function associateBudgetCharge(params: {
   return association;
 }
 
-export function loadPersistedAssociations(storeRoot: string): EvidenceAssociation[] {
-  const dir = associationsDir(storeRoot);
-  if (!fs.existsSync(dir)) {
-    return [];
+function rememberAssociation(association: EvidenceAssociation): void {
+  if (!executorEvidenceCollectionEnabled()) {
+    return;
   }
-  const loaded: EvidenceAssociation[] = [];
-  for (const name of fs.readdirSync(dir)) {
+  memoryAssociations.push(association);
+  while (memoryAssociations.length > ASSOCIATION_FILE_CAP) {
+    memoryAssociations.shift();
+  }
+}
+
+export function loadPersistedAssociations(storeRoot: string): EvidenceAssociation[] {
+  return readAssociationFiles(storeRoot).rows;
+}
+
+export function readAssociationFiles(storeRoot: string): {
+  rows: EvidenceAssociation[];
+  gaps: string[];
+} {
+  const dir = associationsDir(storeRoot);
+  const gaps: string[] = [];
+  if (!fs.existsSync(dir)) {
+    return { rows: [], gaps };
+  }
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return { rows: [], gaps: ["association_read_failed"] };
+  }
+  const rows: EvidenceAssociation[] = [];
+  for (const name of names) {
     if (!name.endsWith(".json")) {
       continue;
     }
     try {
-      loaded.push(JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")) as EvidenceAssociation);
+      rows.push(JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")) as EvidenceAssociation);
     } catch {
-      // Corrupt association is a gap.
+      gaps.push("corrupt_association");
     }
   }
-  return loaded;
+  return { rows, gaps };
+}
+
+export function publishFinalEvidenceLink(params: {
+  storeRoot?: string;
+  call?: ModelCallEvidence | null;
+  scope: TrustedScope;
+  agentId: string;
+  taskId: string;
+  runId: string;
+  candidateAttemptId: string | null;
+  taskAttemptId: string | null;
+  chargeOutcomeVersion: number | null;
+  finalOutcomeVersion: number | null;
+  recordRuns: ReadonlyArray<{ runId: string; attemptIds: readonly string[] }>;
+  recordAttempts: readonly string[];
+  receiptReturned: boolean;
+}): EvidenceAssociation | null {
+  if (!params.receiptReturned || params.finalOutcomeVersion == null) {
+    return null;
+  }
+  const run = params.recordRuns.find((item) => item.runId === params.runId);
+  const attemptOnRun = run?.attemptIds.includes(params.taskAttemptId ?? "") === true;
+  const attemptOnRecord = params.recordAttempts.includes(params.taskAttemptId ?? "");
+  const mapped =
+    Boolean(params.runId) &&
+    Boolean(params.taskAttemptId) &&
+    Boolean(run) &&
+    attemptOnRun &&
+    attemptOnRecord &&
+    params.candidateAttemptId !== params.taskAttemptId &&
+    params.chargeOutcomeVersion != null &&
+    params.finalOutcomeVersion !== params.chargeOutcomeVersion;
+  const missing = mapped ? [] : ["task_attempt_membership"];
+  if (!params.call) {
+    missing.push("call_evidence");
+  }
+  const association: EvidenceAssociation = {
+    schemaVersion: 1,
+    callEvidenceId: params.call?.evidenceId ?? null,
+    callId: params.call?.callId ?? null,
+    budgetCommandId: null,
+    requestDigest: null,
+    disposition: "applied",
+    commitId: null,
+    chargeOutcomeVersion: params.chargeOutcomeVersion,
+    closeOutcomeVersion: null,
+    finalOutcomeVersion: mapped ? params.finalOutcomeVersion : null,
+    runId: params.runId,
+    attemptId: params.taskAttemptId,
+    capabilityCallId: null,
+    deliveryId: null,
+    deliveryTruth: "unknown",
+    finalMetadataFingerprint: null,
+    finalMetadataFingerprintSchemaVersion: null,
+    usageFingerprint: usageFingerprint(
+      params.call?.usage ?? {
+        input: null,
+        output: null,
+        cacheRead: null,
+        cacheWrite: null,
+      },
+    ),
+    completeness: mapped && params.call ? "complete" : "partial",
+    missing,
+    coverage: mapped
+      ? `final ${params.finalOutcomeVersion}`
+      : "final receipt without attempt membership",
+    correctionInherited: false,
+    taskJudgement: null,
+    chain: {
+      taskId: params.taskId,
+      outcomeVersion: mapped ? params.finalOutcomeVersion : null,
+      runId: params.runId,
+      attemptId: params.taskAttemptId,
+      capabilityCallId: null,
+      deliveryId: null,
+      source: mapped ? "receipt" : "absent",
+    },
+    callEstimate: null,
+    committedAttribution: { status: "not_committed", amount: null, usageFingerprint: null },
+    candidateAttemptId: params.candidateAttemptId,
+    taskAttemptId: params.taskAttemptId,
+    trustedScope: params.scope,
+    cost: {
+      schemaVersion: 1,
+      tokens: {
+        input: null,
+        output: null,
+        cacheRead: null,
+        cacheWrite: null,
+        completeness: "absent",
+      },
+      estimatedUsd: {
+        amount: null,
+        status: "unknown",
+        basis: "unknown",
+        pricingFingerprint: null,
+        pricingSchemaVersion: null,
+      },
+      providerProcurementCost: { amount: null, currency: null, status: "unknown" },
+      credits: { amount: null, status: "unknown" },
+      total: { amount: null, status: "unknown" },
+      billingCorrelation: { businessTaskId: params.taskId, runId: params.runId },
+      rollup: { role: "own", includeInFamilyTotal: true },
+    },
+    scopeId: scopeIdOf(params.scope),
+    agentId: params.agentId,
+  };
+  rememberAssociation(association);
+  if (!params.storeRoot || !executorEvidenceCollectionEnabled()) {
+    return association;
+  }
+  try {
+    const dir = associationsDir(params.storeRoot);
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(
+      dir,
+      `${encodeURIComponent(`final-${params.taskId}-${params.finalOutcomeVersion}-${params.runId}`)}.json`,
+    );
+    fs.writeFileSync(file, `${JSON.stringify(association, null, 2)}\n`);
+  } catch {
+    // Final-link persistence must not change the business receipt.
+  }
+  return association;
 }

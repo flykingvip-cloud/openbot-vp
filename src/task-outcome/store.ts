@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { OutcomeOutboxEvent, TaskOutcomeRecord } from "./types.js";
+import type { CommittedSpend, OutcomeOutboxEvent, TaskOutcomeRecord } from "./types.js";
 
 export type TaskOutcomeStorePaths = {
   rootDir: string;
@@ -24,6 +24,8 @@ export type CommitBundle = {
     taskId: string;
     outcomeVersion: number;
     commitId?: string | null;
+    snapshotFingerprint?: string;
+    committedSpend?: CommittedSpend | null;
   };
 };
 
@@ -212,6 +214,8 @@ export class DurableTaskOutcomeStore {
       digest: string;
       taskId: string;
       outcomeVersion: number;
+      snapshotFingerprint?: string;
+      committedSpend?: CommittedSpend | null;
     };
   }):
     | { ok: true; commitId: string }
@@ -289,6 +293,8 @@ export class DurableTaskOutcomeStore {
           taskId: string;
           outcomeVersion: number;
           commitId?: string | null;
+          snapshotFingerprint?: string;
+          committedSpend?: CommittedSpend | null;
         } = {
           commandId: log.commandId,
           digest: log.digest,
@@ -299,6 +305,12 @@ export class DurableTaskOutcomeStore {
         if (Object.prototype.hasOwnProperty.call(log, "commitId")) {
           persisted.commitId =
             typeof log.commitId === "string" && log.commitId ? log.commitId : null;
+        }
+        if (typeof log.snapshotFingerprint === "string" && log.snapshotFingerprint) {
+          persisted.snapshotFingerprint = log.snapshotFingerprint;
+        }
+        if (log.committedSpend) {
+          persisted.committedSpend = log.committedSpend;
         }
         atomicWriteJson(cmdPath, persisted);
       }
@@ -473,6 +485,8 @@ export class DurableTaskOutcomeStore {
         outcomeVersion: number;
         /** Null when the on-disk log has no commit id. Not inferred from the tip. */
         commitId: string | null;
+        snapshotFingerprint: string | null;
+        committedSpend: CommittedSpend | null;
       }
     | undefined {
     const raw = readJson<{
@@ -480,6 +494,8 @@ export class DurableTaskOutcomeStore {
       taskId?: string;
       outcomeVersion?: number;
       commitId?: string | null;
+      snapshotFingerprint?: string;
+      committedSpend?: CommittedSpend | null;
     }>(this.commandLogPath(commandId));
     if (
       !raw ||
@@ -494,7 +510,19 @@ export class DurableTaskOutcomeStore {
       taskId: raw.taskId,
       outcomeVersion: raw.outcomeVersion,
       commitId: typeof raw.commitId === "string" && raw.commitId.length > 0 ? raw.commitId : null,
+      snapshotFingerprint:
+        typeof raw.snapshotFingerprint === "string" && raw.snapshotFingerprint
+          ? raw.snapshotFingerprint
+          : null,
+      committedSpend: raw.committedSpend ?? null,
     };
+  }
+
+  loadCommitBundle(commitId: string): CommitBundle | undefined {
+    if (!commitId) {
+      return undefined;
+    }
+    return readJson<CommitBundle>(path.join(this.rootDir, "commits", `${commitId}.json`));
   }
 
   saveCommand(
