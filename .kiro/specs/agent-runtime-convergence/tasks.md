@@ -1301,3 +1301,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Removed the consumerless legacy focus-resume module and historical replay tests after verifying their source matches the existing archive tag. Recorded original continuity intent and current owners. Dialogue history remains dialogue; admitted task state remains the sole task authority. Extended the no-return dependency gate. — codex-runtime-manager
 - Current context/prepared-entry/lifecycle/resume regression 4 files / 17 PASS; full tsgo PASS; architecture 54 PASS. No deployment or transcript/task-data deletion. — codex-runtime-manager
+
+## Post-retirement candidate verification (2026-11-08)
+
+- Candidate 62099be2a: Runtime suites 67 files / 267 PASS; host memory/context/followup/cross-process board suites 5 files / 52 PASS; explicit e2e configuration 1 file / 48 PASS. The ordinary unit invocation excludes the e2e file, so it was run separately. Provider responses remain mocked in these suites. — codex-runtime-manager
+- Full tsgo and 54 architecture rules PASS. Full build PASS; 209 existing INEFFECTIVE_DYNAMIC_IMPORT warnings and UI chunk-size warnings remain. UI synchronization was skipped by the existing pin. No running Gateway restart, merge, push or deployment. — codex-runtime-manager
+- Remaining legacy facade consumers were audited: registry cancellation, compaction, memory flush, auxiliary filename generation and supervisor CLI calls delegate to migrated implementations. These are not evidence of a second executor body; auxiliary filename generation still invokes the tool-capable runner and requires a bounded shared-model migration before its compatibility dependency can be retired. Memory flush retains intentional file-writing capability and must not be replaced with text-only inference. — codex-runtime-manager
