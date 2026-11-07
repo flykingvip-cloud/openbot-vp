@@ -3,7 +3,7 @@
 **Scenario:** The enterprise tenant opens a platform connection. An employee then logs in and authorizes through that connection, and delegates selected robots to participate in existing work inside that grant. Methods that survive review can settle into the organization. Enterprise public bots are a separate mode.
 
 **Repo:** `flykingvip-cloud/openbot-vp` (`@upbeyond/openbot`)
-**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Clarified at `f7698602` and `07cf2b7f`. Enterprise-first spine is in this file. 「企业通道现状」 is the code inventory Slice 1a implements against. No application code in this change.
+**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Enterprise-first spine, 「企业通道现状」, and 「复用现有授权与运营授权」 are in this file. No application code in this change.
 **Nature:** Code-grounded inventory and an ordered implementation plan. This document does not change runtime behavior.
 **Date:** 2026-11-07
 
@@ -30,11 +30,11 @@ The enterprise entry already exists. Do not add a second install path. System se
 | Layer | Product entry | Records |
 | --- | --- | --- |
 | Enterprise | Existing 企业通道: configure or install the platform app, enterprise auth, scopes, connection check | OpenBot tenant bound to the platform enterprise, app config, available capabilities, connection status |
-| Employee | Platforms the enterprise has already enabled. The employee clicks login and completes the user authorization that platform allows | Trusted bind of this tenant employee to the platform user, user-granted scopes, status |
-| Robot delegation | The employee picks one or more of their robots and sets resources, actions, and confirm mode | Versioned delegation of a robot over that employee connection |
+| Employee | Existing settings tab 授权 (`已绑定账户`). No new settings page. The row appears only after 企业通道 has enabled that platform. Login and scope grant happen on that card. | Trusted bind of this tenant employee to the platform user, user-granted scopes, status, plus a row in the existing 使用记录 table |
+| Robot delegation | Existing 我的机器人 → 运营授权. Check the bound identity and press 确认授权. No new delegation screen. | The grant record that panel already writes: which robot may use which bound identity |
 | Execution | The call uses that enterprise app plus that employee grant. Auth is checked, then the platform is called | Identity, delegation basis, targets, results |
 
-If the enterprise has not enabled the platform, the employee UI says 「企业尚未开通」. If it is enabled but the required scopes are missing, the employee UI says 「等待管理员开通权限」.
+Those two strings appear on the existing 授权 catalog row for that platform. They are not a new page. If the enterprise has not enabled the platform, the row says 「企业尚未开通」. If it is enabled but the required scopes are missing, the row says 「等待管理员开通权限」. The employee does not get a separate Feishu, WeCom, or DingTalk settings screen.
 
 Three steps stay separate in data and auth even when the screens feel continuous:
 
@@ -345,7 +345,7 @@ Enterprise operational identity refuses feishu, wecom, and dingtalk (`enterprise
 
 Server truth the employee UI can use now:
 
-- 「企业尚未开通」 when the tenant override has no `channels.feishu` (or the channel `enabled` is false). That is the `not_added` card, or a disabled channel. The employee UI does not read it yet. Slice 1b should.
+- 「企业尚未开通」 when the tenant override has no `channels.feishu` (or the channel `enabled` is false). That is the `not_added` card, or a disabled channel. Slice 1b shows that string on the existing 授权 row. It does not add a page.
 
 Server truth the employee UI cannot use yet:
 
@@ -363,6 +363,28 @@ Unsafe to reuse as employee proxy:
 
 Safe to reuse: the page, the card list, the tenant-scoped secret store, `config.get` / `config.set` / tenant `channels.logout`, and the explicit probe as a bot-credential check. Employee login is a new record that points at this enterprise connection. It does not replace the card.
 
+## 复用现有授权与运营授权
+
+Employee digital-identity authorization already has two console surfaces. Do not add a third settings page for Feishu, WeCom, or DingTalk employee login, and do not add a second screen for robot delegation. The owner instruction is: 员工端当前已经在系统设置和个人设置都有数字身份授权，不需要单独设置.
+
+The screenshots match this code:
+
+| Owner name | Code | What it already does |
+| --- | --- | --- |
+| 系统设置 / 个人设置 → 授权 | Personal settings tab `authorization` in `workbench-personal-settings-page.ts`. The panel is `workbench-personal-authorization-panel.ts` plus `renderOperationalIdentitySection` in `workbench-operational-identity-section.ts`. | Left list is the provider catalog. Main pane title is 已绑定账户. A connected card has 编辑配置, 验证凭证 (WeChat official and personal email), 重新认证, and 停用. Status pills include 已连接, 已过期, 需重新认证, 已停用. The callout says 绑定后可在账号详情页把使用权授给旗下数字人. |
+| 使用记录 | `renderOperationalIdentityUsageRecords` in `workbench-operational-identity-usage.ts`. | Table columns are 时间, 数字人, 身份, 动作, 任务, 结果. Ranges are 7 天, 30 天, 90 天, 全部. This is the employee-visible audit of identity use. Proxy actions append rows here. They do not invent a second audit table. |
+| 我的机器人 → 运营授权 | System settings tab `robots`, detail tab `auth` labeled 运营授权 in `my-bot-workspace-panel.ts`. | Two checkbox groups: 企业身份 and 个人身份. Footer copy is 确认后立即生效 for an owned robot, otherwise 确认后需二次校验. The button is 确认授权. Submit calls `onApplyRobotIdentityGrants` for personal identities and `onApplyRobotEnterpriseIdentities` for enterprise identities. |
+
+企业通道 stays the enterprise gate in front of these lists. Feishu, WeCom, or DingTalk may appear as a usable enterprise identity only after that platform is enabled on 企业通道. A login that only identifies the user still does not grant send or receive.
+
+Honest gap, from the catalogs rather than from a missing page:
+
+- Personal bind catalog (`user-operational-identity-providers.ts`) includes 微信公众号, 微信个人号, 个人邮箱, GitHub, X, and others. `feishu-personal` is `registrationReady: false` and `rolloutTier: "deferred"`, with the hint 飞书个人账号暂未开放绑定. It does not show up as a connected card. WeCom and DingTalk are not personal providers there.
+- Enterprise identity checkboxes on 运营授权 come from `enterpriseAccessByAgent`. The enterprise operational-identity catalog test excludes `feishu`, `wecom`, and `dingtalk`. The screenshot therefore shows rows such as AI数字替身 / 微信公众号 and 腾讯会议（企业）. It does not show a Feishu, WeCom, or DingTalk employee identity.
+- The work is to extend those two catalogs and the records behind 已绑定账户 and 运营授权, after 企业通道 says the platform is on and the required app scopes exist. It is not to invent a third place.
+
+Slice 1a still extends 企业通道 only. Slice 1b and later employee-identity work land on 授权 and 运营授权. 连通正常, a saved app secret, and `t_<tenant>_default` remain not an employee authorization and not a platform enterprise id.
+
 ## Gap table
 
 Severity is for the employee-identity proxy. Public-bot ingress is listed so it is not mistaken for that proxy. P0 means the closed loop is false until this moves. P1 means the loop is visibly incomplete. P2 is hygiene that does not unblock the loop.
@@ -371,8 +393,8 @@ Severity is for the employee-identity proxy. Public-bot ingress is listed so it 
 | --- | --- | --- | --- | --- |
 | Enterprise public bot ingress | Partial, and it is a separate mode | P2 for the proxy. Do not treat it as P0 progress on the proxy. | Extensions monitor to `resolveAgentRoute` to `dispatchReplyFromConfig`. Console writes `t_<tenant>_default`. | A bot can reply. The platform identity is the app. `CHAT_CHANNEL_ORDER` and `@openclaw/*` package ids still present product IM as secondary. DingTalk uses the compat SDK. |
 | Enterprise platform connection | Partial | P0 for the proxy chain. The page exists. Employee authorization on top of it does not. | 企业通道 at `/enterprise/{tenant}/settings/channels` writes bot credentials to `t_<tenant>_default` (`enterprise-message-channels-surface.ts`). That is app config for the public bot, not a recorded OpenBot-tenant to platform-enterprise bind used by employee login. | Reuse this page. Do not add a parallel install wizard. Slice 1a must show capability status on the same cards. |
-| Employee login and authorization through that connection | Missing | P0 | `user-operational-identity-providers.ts` lists `feishu-personal` as `rolloutTier: "deferred"`, `registrationReady: false`. Enterprise operational-identity catalog test excludes `feishu`, `wecom`, and `dingtalk`. Feishu client is `appId` + `appSecret`. DingTalk token call is `POST /v1.0/oauth2/accessToken` with `appKey`/`appSecret`, the app token, not `userAccessToken`. | No employee UI that logs in only for platforms the tenant enabled. No trusted bind that points at the enterprise connection. No 「企业尚未开通」 or 「等待管理员开通权限」 state. |
-| Robot delegation | Missing | P0 | Seat asset bindings and `resolveAgentRunEntitlementScope` map an agent to a seat. They do not record which robot may use which employee connection, which actions, which resources, or when the grant expires. | Authorizing Project Assistant does not exist as data. A second robot can neither be granted a narrower scope nor be proven unable to borrow the first grant. |
+| Employee login and authorization through that connection | Partial UI, missing these three platforms | P0 | 授权 already lists 已绑定账户 and 使用记录 (`workbench-operational-identity-section.ts`). `feishu-personal` is `registrationReady: false`. Enterprise operational-identity catalog excludes `feishu`, `wecom`, and `dingtalk`. | Do not add a settings page. Add the platform to the existing catalog only after 企业通道 is enabled, with the row states 「企业尚未开通」 and 「等待管理员开通权限」. The bind must reference the enterprise connection. |
+| Robot delegation | Partial UI, missing these platforms | P0 | 我的机器人 → 运营授权 already checks 企业身份 and 个人身份 and saves with 确认授权 (`my-bot-workspace-panel.ts`). The lists do not include Feishu, WeCom, or DingTalk employee identities. Seat `resolveAgentRunEntitlementScope` is still not this grant. | Extend the existing checkboxes. Do not add a delegation screen. A second robot still cannot borrow a grant it was not given. |
 | Controlled read and send in an existing work scene | Missing for user identity. Public bot tools are a different identity. | P0 | `data_capability` invoke stays `knowledge-object-only`. Feishu doc/wiki/drive tools use the app client. WeCom and DingTalk monitors send the bot reply. | No server entry that loads a user credential, checks delegation, and calls the platform as that employee. Group text must not widen grants. |
 | Trail of a proxy action | Missing | P0 | `enterprise-data.audit.invocations.list` records data-gateway invokes for a signed-in console session. Public-bot turns do not write it. Fabric is default off. | A proxy action must trace employee, robot, connection, delegation version, trigger, target, confirm record, and external result. "Bind success" is not business complete. That trace does not exist. |
 | Settle a method into the org | Missing for this flow. Partial as a human skill lifecycle. | P1 | Skill visibility includes `enterprise` and defaults to `reviewing`. `pattern-detection.publish-draft-skill` is human-gated and not auto-installed. | A verified project follow-up can later become a reviewable method. Personal tokens, private conversation content, and personal delegations must not publish with it. Nothing extracts that method today. |
@@ -574,7 +596,9 @@ Audit admin enable, disable, scope change, and connection check. Disabling the e
 
 ### Slice 1b. Employee login and authorization
 
-Only after 1a shows the platform enabled. The employee UI lists platforms this OpenBot tenant has enabled. The employee clicks login and completes the user authorization Feishu allows (`user_access_token`, including `offline_access` when refresh is required). The server binds that platform user to the current tenant employee and stores the employee connection as a child of the enterprise connection. The platform enterprise on the token must match the enterprise connection. An enterprise id posted by the employee alone is rejected.
+Only after 1a shows the platform enabled. Do not add an employee-auth settings page. Put Feishu on the existing 授权 catalog (`workbench-personal-authorization-panel.ts` / 已绑定账户). If 企业通道 has not enabled Feishu, that row says 「企业尚未开通」 and login is disabled. If the app is on but the checklist scopes are missing, the row says 「等待管理员开通权限」. When both are true, the employee uses the existing card actions (bind, 重新认证, 停用) to complete Feishu user authorization (`user_access_token`, including `offline_access` when refresh is required).
+
+The server binds that platform user to the current tenant employee and stores the employee connection as a child of the enterprise connection. The platform enterprise on the token must match the enterprise connection. An enterprise id posted by the employee alone is rejected. Successful bind, reauth, and revoke append to the existing 使用记录 table. They do not create a second audit list.
 
 Store tokens in the vault. Support refresh, employee disconnect, and status (identity only, authorized, needs reauth, revoked, 「企业尚未开通」, 「等待管理员开通权限」). Employee disconnect follows the rule above: it deletes that employee local credentials and does not claim a Feishu-side revoke unless one was performed. Login without the send or receive scopes stays identity-only on the status line.
 
@@ -597,7 +621,7 @@ Out of scope: robot send, a second install wizard, DingTalk and WeCom user autho
 
 ### Slice 2. Robot delegation and the authorization entry
 
-The employee picks a robot, a conversation and resource scope, allowed actions, and a mode (read-only, draft-then-confirm, limited auto). The server stores a versioned delegation. Enforcement is on the server, not in the prompt.
+Do not add a delegation screen. On 我的机器人 → 运营授权, the Feishu employee identity from slice 1b appears in 企业身份 once 企业通道 has enabled Feishu and this employee has authorized it. The employee checks that identity for this robot, sets the allowed actions and confirm mode the panel can already store, and presses 确认授权. Owned robots keep the existing copy 确认后立即生效. The server stores a versioned delegation. Enforcement is on the server, not in the prompt. Checking the box does not widen platform scopes and does not skip the enterprise connection.
 
 The same slice establishes the authorization decision entry from the joint-gate section. Callers in slices 3 and 4 use this entry. Distinct outcomes include allow, deny because the enterprise connection is disabled, deny because enterprise policy is missing, deny because the seat is missing, deny because the seat binding is ambiguous, and deny because the delegation is missing, expired, or does not include the action. There is no personal-use outcome.
 
@@ -651,7 +675,7 @@ What the org does not keep: the employee access token, the refresh token, privat
 
 The loop is Feishu and Project Assistant, on the scene the slice 1a checklist allowed. All of these must hold before the loop is called done:
 
-- An admin enables Feishu on the existing 企业通道 page. A tenant employee logs in and authorizes their Feishu account in the employee UI, without typing the app secret. They authorize Project Assistant to read the designated resources. After confirm, send uses the employee identity the checklist Measured. Disabling Feishu for the tenant stops new execution for every employee under that connection. Revoking that employee stops only their grants. Revoking Project Assistant leaves Knowledge Assistant on the same employee connection. Each of those three switches is its own record.
+- An admin enables Feishu on the existing 企业通道 page. The same employee then sees Feishu on the existing 授权 tab, not on a new page, and authorizes without typing the app secret. On 我的机器人 → 运营授权 they check Project Assistant and press 确认授权. After a later content confirm, send uses the employee identity the checklist Measured. Disabling Feishu on 企业通道 stops new execution for every employee under that connection and removes it as a usable enterprise identity. Revoking that employee on 授权 stops only their grants. Unchecking one robot on 运营授权 leaves the other robot. Each of those three switches is its own record.
 - Employee A authorizes robot R1. R1 can work inside the scoped project. Robot R2, which was not delegated that connection, cannot borrow it.
 - The same account can authorize two robots with different read, write, and send limits. One inbound message never produces two external replies.
 - Employees A and B are both connected and both can see the same project group. Work does not run twice. A request from B does not use A identity. A private context does not appear in a reply sent for B. Records for the two tasks differ by connection and delegation, not only by chat id.
@@ -671,4 +695,4 @@ The loop is Feishu and Project Assistant, on the scene the slice 1a checklist al
 - Public-bot ingress stays the app identity. It is not rewritten into a fake employee session.
 - DingTalk and WeCom are not given a user-proxy send path in this plan.
 - Desktop automation is not a dependency.
-- This document does not implement any slice. Access order starts at the existing 企业通道 page. Further macro expansion is out of scope.
+- This document does not implement any slice. Access order starts at the existing 企业通道 page. Employee login and robot checks reuse 授权 and 运营授权. Further macro expansion is out of scope. No product code until the owner green-lights it.
