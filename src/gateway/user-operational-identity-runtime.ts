@@ -1,9 +1,5 @@
 import { resolveSessionAgentId } from "../agents/agent-scope.js";
-import { loadFeishuEmployeeChannelGate } from "./enterprise-im-employee-connection.js";
-import {
-  decideEnterpriseImEmployeeProxy,
-  type EnterpriseImSeatCheck,
-} from "./enterprise-im-employee-decision.js";
+import { loadFeishuEmployeeProxyContext } from "./enterprise-im-employee-authorization.js";
 import { resolveQueryScope } from "./scope-attribution.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { resolveUserOperationalIdentityStorePathForClient } from "./tenant-context.js";
@@ -374,8 +370,6 @@ export async function executeUserOperationalIdentityRuntimeAction(params: {
   sessionKey?: string | null;
   audit?: boolean;
   createBindingRequestOnDeny?: boolean;
-  enterpriseImIdentityId?: string;
-  enterpriseImSeat?: EnterpriseImSeatCheck;
 }): Promise<
   | {
       ok: true;
@@ -392,44 +386,46 @@ export async function executeUserOperationalIdentityRuntimeAction(params: {
       continuationToken?: string;
       needsBinding?: boolean;
       needsGrantConfirmation?: boolean;
+      grantId?: string;
     }
 > {
   if (params.provider === "feishu-personal") {
-    const scope = await resolveQueryScope(params.client);
-    const tenantId = scope.kind === "tenant" ? scope.tenantId : null;
-    const gate = await loadFeishuEmployeeChannelGate({ tenantId });
-    const seat: EnterpriseImSeatCheck = params.enterpriseImSeat ?? {
-      kind: "missing",
-      policyPresent: false,
-    };
+    const ownerId = (await resolveOperationalIdentityActorUserId({ client: params.client })) ?? "";
+    const agentId = params.agentId?.trim() || "";
+    const enterpriseIm = await loadFeishuEmployeeProxyContext({
+      client: params.client,
+      ownerId,
+      agentId,
+      action: params.action,
+    });
     const store = await loadUserOiRuntimeStore(params.client);
     const grantCount = Object.keys(store.grants).length;
-    const decision = decideEnterpriseImEmployeeProxy({
+    const resolved = resolveUserOperationalIdentity({
       store,
-      ownerId: (await resolveOperationalIdentityActorUserId({ client: params.client })) ?? "",
-      agentId: params.agentId?.trim() || "",
+      provider: "feishu-personal",
       action: params.action,
-      identityId: params.enterpriseImIdentityId,
-      gate,
-      seat,
+      currentUserId: ownerId,
+      currentAgentId: agentId,
       nowIso: new Date().toISOString(),
+      enterpriseIm,
     });
     if (Object.keys(store.grants).length !== grantCount) {
       throw new Error("enterprise IM execute must not write a grant");
     }
-    if (decision.outcome === "allow") {
+    if (resolved.allowed) {
       return {
         ok: false,
         scope: null,
         code: "ENTERPRISE_IM_ALLOW_NO_PRODUCT_ACTION",
         message: "授权已确认。读取和发送不在本切片。",
+        grantId: resolved.grant.grantId,
       };
     }
     return {
       ok: false,
       scope: null,
-      code: decision.code,
-      message: decision.message,
+      code: resolved.code,
+      message: resolved.message,
     };
   }
 

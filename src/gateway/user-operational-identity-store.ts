@@ -6,6 +6,8 @@ import {
   parseUserOperationalIdentityProvider,
 } from "./user-operational-identity-providers.js";
 import type {
+  EnterpriseImConfirmMode,
+  EnterpriseImResourceScope,
   UserOperationalIdentity,
   UserOperationalIdentityGrant,
   UserOperationalIdentityStore,
@@ -490,6 +492,8 @@ export function upsertUserOperationalIdentityGrant(params: {
   seatId?: string;
   confirmExplicit?: boolean;
   expiresAt?: string;
+  resourceScope?: EnterpriseImResourceScope;
+  confirmMode?: EnterpriseImConfirmMode;
   nowIso: string;
 }): { ok: true; grant: UserOperationalIdentityGrant } | { ok: false; code: string; error: string } {
   const identity = getUserOperationalIdentity(params.store, params.ownerId, params.identityId);
@@ -521,6 +525,13 @@ export function upsertUserOperationalIdentityGrant(params: {
       ok: false,
       code: "USER_IDENTITY_GRANT_CONFIRMATION_REQUIRED",
       error: "shared/group agent grants require explicit confirmation.",
+    };
+  }
+  if (workplaceConfirm && (!params.confirmMode || !params.resourceScope)) {
+    return {
+      ok: false,
+      code: "USER_IDENTITY_GRANT_FIELDS_REQUIRED",
+      error: "Feishu grants require a confirm mode and a resource scope.",
     };
   }
   let allowedActions = params.allowedActions
@@ -559,6 +570,8 @@ export function upsertUserOperationalIdentityGrant(params: {
     existing.expiresAt = params.expiresAt;
     if (workplaceConfirm) {
       existing.grantVersion = (existing.grantVersion ?? 0) + 1;
+      existing.resourceScope = params.resourceScope;
+      existing.confirmMode = params.confirmMode;
     }
     return { ok: true, grant: existing };
   }
@@ -578,6 +591,9 @@ export function upsertUserOperationalIdentityGrant(params: {
     confirmedAt: params.nowIso,
     ...(workplaceConfirm ? { grantVersion: 1 } : {}),
     ...(params.expiresAt ? { expiresAt: params.expiresAt } : {}),
+    ...(workplaceConfirm
+      ? { resourceScope: params.resourceScope, confirmMode: params.confirmMode }
+      : {}),
   };
   params.store.grants[grant.grantId] = grant;
   return { ok: true, grant };
@@ -775,6 +791,10 @@ export function summarizeUserOperationalIdentitySnapshot(params: {
     grantMode: grant.grantMode,
     status: grant.status,
     confirmedAt: grant.confirmedAt,
+    grantVersion: grant.grantVersion,
+    expiresAt: grant.expiresAt,
+    resourceScope: grant.resourceScope,
+    confirmMode: grant.confirmMode,
   }));
   // Keep a per-identity window so a busy mailbox cannot starve other hubs.
   const usageHistory = identities

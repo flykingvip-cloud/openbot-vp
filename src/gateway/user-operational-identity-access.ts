@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { EnterpriseImAuthorizationJudgment } from "./enterprise-im-employee-authorization.js";
 import {
   decideEnterpriseImEmployeeProxy,
   type EnterpriseImDecisionInput,
@@ -45,10 +46,17 @@ export type ResolveUserOperationalIdentityInput = {
    * decision hard-denies before owner/grant evaluation.
    */
   enterpriseAuthorization?: EmployeeOperationalAuthorization;
-  /** Feishu employee proxy only. Other providers ignore this. */
-  enterpriseImIdentityId?: string;
-  enterpriseImGate?: EnterpriseImDecisionInput["gate"];
-  enterpriseImSeat?: EnterpriseImDecisionInput["seat"];
+  /**
+   * Feishu employee proxy only. Loaded by the RPC/runtime from the session
+   * tenant, the seat store, and the tenant policy rows. Other providers ignore it.
+   */
+  enterpriseIm?: {
+    tenantId: string | null;
+    gate: EnterpriseImDecisionInput["gate"];
+    secretStore?: EnterpriseImDecisionInput["secretStore"];
+    authorization: EnterpriseImAuthorizationJudgment;
+    identityId?: string;
+  };
   /** @deprecated Ignored for authorization; scope is derived server-side. */
   ownedAgentIds?: string[];
   /** @deprecated Ignored for authorization; scope is derived server-side. */
@@ -121,17 +129,28 @@ export function resolveUserOperationalIdentity(
   }
   if (provider === "feishu-personal") {
     const grantCount = Object.keys(params.store.grants).length;
+    const loaded = params.enterpriseIm;
     const decision = decideEnterpriseImEmployeeProxy({
       store: params.store,
+      secretStore: loaded?.secretStore,
       ownerId: currentUserId,
       agentId: currentAgentId,
       action,
-      identityId: params.enterpriseImIdentityId,
-      gate: params.enterpriseImGate ?? {
-        childExecutionBlocked: true,
+      tenantId: loaded?.tenantId ?? null,
+      identityId: loaded?.identityId,
+      gate: loaded?.gate ?? {
+        accountId: "",
         employeeUiHint: "enterprise_not_open",
+        loginEnabled: false,
+        statusLabel: "企业尚未开通",
+        platformEnterpriseId: null,
+        childExecutionBlocked: true,
       },
-      seat: params.enterpriseImSeat ?? { kind: "missing", policyPresent: false },
+      authorization: loaded?.authorization ?? {
+        ok: false,
+        code: "SEAT_MISSING",
+        message: "缺少企业席位，不能放行。",
+      },
       nowIso: params.nowIso,
     });
     if (Object.keys(params.store.grants).length !== grantCount) {
@@ -141,14 +160,15 @@ export function resolveUserOperationalIdentity(
       return { allowed: false, code: decision.code, message: decision.message };
     }
     const identity = params.store.identities[decision.identityId];
-    const grant = Object.values(params.store.grants).find(
-      (item) =>
-        item.identityId === decision.identityId &&
-        item.agentId === decision.agentId &&
-        item.grantVersion === decision.grantVersion &&
-        item.status === "active",
-    );
-    if (!identity || !grant) {
+    const grant = params.store.grants[decision.grantId];
+    if (
+      !identity ||
+      identity.identityId !== decision.identityId ||
+      !grant ||
+      grant.grantId !== decision.grantId ||
+      grant.agentId !== decision.agentId ||
+      grant.status !== "active"
+    ) {
       return {
         allowed: false,
         code: "DELEGATION_MISSING",

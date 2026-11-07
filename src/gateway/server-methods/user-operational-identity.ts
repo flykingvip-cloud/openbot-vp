@@ -1,4 +1,5 @@
 import { loadConfig } from "../../config/config.js";
+import { loadFeishuEmployeeProxyContext } from "../enterprise-im-employee-authorization.js";
 import {
   renewPersistedFeishuEmployeeConnection,
   startFeishuEmployeeOAuth,
@@ -9,6 +10,7 @@ import {
   feishuEmployeeRowStatusLabel,
   loadFeishuEmployeeChannelGate,
 } from "../enterprise-im-employee-connection.js";
+import { confirmEnterpriseImRobotGrant } from "../enterprise-im-employee-decision.js";
 import { loadEnterpriseSeatAssetsStore } from "../enterprise-seat-assets-store.js";
 import { resolvePlatformAuthSmtpConfig } from "../platform-auth-email.js";
 import { loadPlatformAuthStore, resolvePlatformAuthConfig } from "../platform-auth.js";
@@ -84,7 +86,11 @@ import {
   upsertUserOperationalIdentityGrant,
 } from "../user-operational-identity-store.js";
 import { resolveTrustedUserOperationalIdentityAgentScope } from "../user-operational-identity-trusted-agent-scope.js";
-import type { UserOperationalIdentityStore } from "../user-operational-identity-types.js";
+import type {
+  EnterpriseImConfirmMode,
+  EnterpriseImResourceScope,
+  UserOperationalIdentityStore,
+} from "../user-operational-identity-types.js";
 import {
   bindExistingWechatPersonalNativeSession,
   bindWechatPersonalIdentityFromWxid,
@@ -144,6 +150,33 @@ function parseStringArray(value: unknown): string[] {
     return [];
   }
   return value.map((entry) => String(entry).trim()).filter(Boolean);
+}
+
+function parseResourceScope(value: unknown): EnterpriseImResourceScope | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const list = (entry: unknown) => parseStringArray(entry);
+  if (
+    !Array.isArray(record.groups) ||
+    !Array.isArray(record.docs) ||
+    !Array.isArray(record.calendars)
+  ) {
+    return null;
+  }
+  return {
+    groups: list(record.groups),
+    docs: list(record.docs),
+    calendars: list(record.calendars),
+  };
+}
+
+function parseConfirmMode(value: unknown): EnterpriseImConfirmMode | null {
+  if (value === "read_only" || value === "draft_then_confirm" || value === "limited_auto") {
+    return value;
+  }
+  return null;
 }
 
 async function withActorUserOiWriteLock<T>(
@@ -713,8 +746,45 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
       return;
     }
     const nowIso = new Date().toISOString();
+    const sessionTenantId = await resolveActorTenantId(client);
     const result = await withActorUserOiWriteLock(client, ownerId, async (store) => {
       const identity = getUserOperationalIdentity(store, ownerId, identityId);
+      if (identity?.provider === "feishu-personal") {
+        const resourceScope = parseResourceScope(params.resourceScope);
+        const confirmMode = parseConfirmMode(params.confirmMode);
+        if (!resourceScope || !confirmMode) {
+          return {
+            ok: false as const,
+            code: "GRANT_FIELDS_INVALID",
+            error: "飞书授权需要资源范围和确认方式。",
+          };
+        }
+        const secretStorePath =
+          await resolveUserOperationalIdentitySecretsStorePathForClient(client);
+        const secretStore = await loadUserOperationalIdentityCredentialSecretStore(secretStorePath);
+        const gate = await loadFeishuEmployeeChannelGate({ tenantId: sessionTenantId });
+        const written = confirmEnterpriseImRobotGrant({
+          store,
+          secretStore,
+          ownerId,
+          identityId,
+          agentId,
+          agentScope: trustedAgentScope,
+          allowedActions: parseStringArray(params.allowedActions),
+          gate,
+          tenantId: sessionTenantId,
+          confirmExplicit: grantMode === "explicit" && params.confirmExplicit === true,
+          resourceScope,
+          confirmMode,
+          expiresAt: stringValue(params.expiresAt) || undefined,
+          nowIso,
+        });
+        if (!("grant" in written)) {
+          return { ok: false as const, code: written.code, error: written.message };
+        }
+        refreshContinuationsInStore({ store, ownerId, nowIso, client });
+        return { ok: true as const, grant: written.grant };
+      }
       let oauthScope: string | null | undefined;
       if (identity?.provider === "x-twitter") {
         const secret = await loadUserOperationalIdentityCredentialSecretForHandle({
@@ -723,19 +793,18 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
         });
         oauthScope = secret?.metadata?.scope ?? null;
       }
-      const workplace = identity?.provider === "feishu-personal";
       const updated = upsertUserOperationalIdentityGrant({
         store,
         ownerId,
         identityId,
         agentId,
         agentScope: trustedAgentScope,
-        grantMode: workplace ? "explicit" : grantMode,
+        grantMode,
         allowedActions: parseStringArray(params.allowedActions),
         oauthScope,
         tenantId: stringValue(params.tenantId) || enterpriseAuthz.tenantId || undefined,
         seatId: stringValue(params.seatId) || enterpriseAuthz.seatId || undefined,
-        confirmExplicit: workplace || params.confirmExplicit === true,
+        confirmExplicit: params.confirmExplicit === true,
         nowIso,
       });
       if (updated.ok) {
@@ -794,7 +863,16 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
     const nowIso = new Date().toISOString();
     // Task 3.2: apply the enterprise authorization gate here too (advisory parity
     // with the execution path); authoritative tenant/seat override untrusted params.
-    const enterpriseAuthorization = await loadEmployeeOperationalAuthorization(ownerId);
+    // Feishu does not use that helper. A missing seat there is a deny, resolved
+    // from the seat store and the tenant robot policy, not from request params.
+    const enterpriseAuthorization =
+      provider === "feishu-personal"
+        ? undefined
+        : await loadEmployeeOperationalAuthorization(ownerId);
+    const enterpriseIm =
+      provider === "feishu-personal"
+        ? await loadFeishuEmployeeProxyContext({ client, ownerId, agentId, action })
+        : undefined;
     const result = await withActorUserOiWriteLock(client, ownerId, (store) =>
       resolveUserOperationalIdentity({
         store,
@@ -803,11 +881,14 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
         currentUserId: ownerId,
         currentUserEmail: client?.user,
         currentAgentId: agentId,
-        currentSeatId: stringValue(params.seatId) || undefined,
-        tenantId: stringValue(params.tenantId) || undefined,
+        currentSeatId:
+          provider === "feishu-personal" ? undefined : stringValue(params.seatId) || undefined,
+        tenantId:
+          provider === "feishu-personal" ? undefined : stringValue(params.tenantId) || undefined,
         sessionKey: stringValue(params.sessionKey) || null,
         nowIso,
         enterpriseAuthorization,
+        enterpriseIm,
       }),
     );
     respond(true, { ownerId, ...result });
@@ -844,6 +925,7 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
         needsBinding: result.needsBinding ?? false,
         needsGrantConfirmation: result.needsGrantConfirmation ?? false,
         bindingRequestId: result.bindingRequestId ?? null,
+        grantId: result.grantId ?? null,
       });
       return;
     }

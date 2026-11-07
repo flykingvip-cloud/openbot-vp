@@ -24,6 +24,14 @@ export type UserOperationalIdentityAgentScope = "owned" | "shared" | "group";
 
 export type UserOperationalIdentityGrantMode = "auto" | "explicit";
 
+export type EnterpriseImConfirmMode = "read_only" | "draft_then_confirm" | "limited_auto";
+
+export type EnterpriseImResourceScope = {
+  groups: string[];
+  docs: string[];
+  calendars: string[];
+};
+
 export type UserOperationalIdentity = {
   identityId: string;
   ownerType: "user";
@@ -79,6 +87,10 @@ export type UserOperationalIdentityGrant = {
   /** Explicit confirm version for enterprise IM. Auto grants do not count. */
   grantVersion?: number;
   expiresAt?: string;
+  /** Named groups, docs, and calendars this robot may touch. Empty means none. */
+  resourceScope?: EnterpriseImResourceScope;
+  /** How later slices may use the grant. Slice 2 only records it. */
+  confirmMode?: EnterpriseImConfirmMode;
 };
 
 export type UserOperationalIdentityBindingRequestStatus =

@@ -164,7 +164,16 @@ describe("robot operational auth Feishu checkbox", () => {
     expect(box).not.toBeNull();
     expect(box?.closest(".wb-bots__auth")?.textContent).toContain("企业身份");
     expect(container.querySelector("[data-kind='personal']")).toBeNull();
+    expect(box?.getAttribute("data-actions")).toBeNull();
     box!.checked = true;
+    const row = box!.closest("li");
+    row!.querySelector<HTMLInputElement>("[data-feishu-action='read']")!.checked = true;
+    row!.querySelector<HTMLInputElement>("[data-feishu-action='send']")!.checked = true;
+    row!.querySelector<HTMLSelectElement>("[data-feishu-confirm-mode]")!.value = "limited_auto";
+    row!.querySelector<HTMLInputElement>("[data-feishu-groups]")!.value = "oc_group";
+    row!.querySelector<HTMLInputElement>("[data-feishu-docs]")!.value = "docx_1";
+    row!.querySelector<HTMLInputElement>("[data-feishu-expires]")!.value =
+      "2026-12-01T00:00:00.000Z";
     container.querySelector<HTMLButtonElement>(".btn.btn--primary")?.click();
     expect(onApplyRobotIdentityGrants).toHaveBeenCalledWith({
       agentId: "bot-a",
@@ -172,7 +181,10 @@ describe("robot operational auth Feishu checkbox", () => {
       desired: [
         {
           identityId: bound.identityId,
-          allowedActions: ["read", "draft", "send"],
+          allowedActions: ["read", "send"],
+          resourceScope: { groups: ["oc_group"], docs: ["docx_1"], calendars: [] },
+          confirmMode: "limited_auto",
+          expiresAt: "2026-12-01T00:00:00.000Z",
         },
       ],
     });
@@ -180,5 +192,91 @@ describe("robot operational auth Feishu checkbox", () => {
       agentId: "bot-a",
       desiredIdentityIds: [],
     });
+  });
+
+  it("lets two robots submit different Feishu action sets", () => {
+    const project = vi.fn();
+    const knowledge = vi.fn();
+    const snapshot = {
+      identities: [bound],
+      grants: [],
+      usageHistory: [],
+      pendingBindingRequests: [],
+      providerCatalog: [],
+      enterpriseAccessByAgent: { project: [], knowledge: [] },
+      feishuEmployeeChannel: {
+        accountId: "t_001_default",
+        employeeUiHint: "app_can_attempt" as const,
+        loginEnabled: true,
+        statusLabel: "可绑定",
+        platformEnterpriseId: "tenant-key-1",
+        childExecutionBlocked: false,
+      },
+    };
+    const renderRobot = (agentId: string, onApply: (input: unknown) => void) => {
+      const container = document.createElement("div");
+      render(
+        renderMyBotWorkspacePanel({
+          entry: {
+            id: agentId,
+            sessionKey: "s",
+            name: agentId,
+            emoji: null,
+            source: "owned",
+            status: "running",
+          },
+          loading: false,
+          error: null,
+          saving: false,
+          bot: null,
+          identityDraft: null,
+          activeTab: "auth",
+          onTabChange: () => undefined,
+          onIdentityDraftChange: () => undefined,
+          onSaveIdentity: () => undefined,
+          onExploreCapabilities: () => undefined,
+          onOpenGroup: () => undefined,
+          onSelectSession: () => undefined,
+          onApplyRobotIdentityGrants: onApply,
+          onApplyRobotEnterpriseIdentities: () => undefined,
+          onLoadRobotEnterpriseIdentities: () => undefined,
+          userOperationalIdentitySnapshot: snapshot,
+        }),
+        container,
+      );
+      return container;
+    };
+    const projectView = renderRobot("project", project);
+    const projectBox = projectView.querySelector<HTMLInputElement>(
+      "[data-provider='feishu-personal']",
+    )!;
+    projectBox.checked = true;
+    projectBox
+      .closest("li")!
+      .querySelector<HTMLInputElement>("[data-feishu-action='send']")!.checked = true;
+    projectBox
+      .closest("li")!
+      .querySelector<HTMLSelectElement>("[data-feishu-confirm-mode]")!.value = "limited_auto";
+    projectView.querySelector<HTMLButtonElement>(".btn.btn--primary")?.click();
+
+    const knowledgeView = renderRobot("knowledge", knowledge);
+    const knowledgeBox = knowledgeView.querySelector<HTMLInputElement>(
+      "[data-provider='feishu-personal']",
+    )!;
+    knowledgeBox.checked = true;
+    knowledgeBox
+      .closest("li")!
+      .querySelector<HTMLInputElement>("[data-feishu-action='read']")!.checked = true;
+    knowledgeBox
+      .closest("li")!
+      .querySelector<HTMLInputElement>("[data-feishu-action='draft']")!.checked = true;
+    knowledgeView.querySelector<HTMLButtonElement>(".btn.btn--primary")?.click();
+
+    const projectActions = project.mock.calls[0]?.[0].desired[0].allowedActions;
+    const knowledgeActions = knowledge.mock.calls[0]?.[0].desired[0].allowedActions;
+    expect(projectActions).toEqual(["send"]);
+    expect(knowledgeActions).toEqual(["read", "draft"]);
+    expect(project.mock.calls[0]?.[0].agentId).toBe("project");
+    expect(knowledge.mock.calls[0]?.[0].agentId).toBe("knowledge");
   });
 });

@@ -97,6 +97,10 @@ export type UserOperationalIdentityGrantSummary = {
   grantMode: "auto" | "explicit";
   status: "active" | "revoked";
   confirmedAt?: string;
+  grantVersion?: number;
+  expiresAt?: string;
+  confirmMode?: "read_only" | "draft_then_confirm" | "limited_auto";
+  resourceScope?: { groups: string[]; docs: string[]; calendars: string[] };
 };
 
 export type UserOperationalIdentityUsageSummary = {
@@ -1282,21 +1286,28 @@ export async function applyIdentityOperationalRobotGrants(
     host.userOperationalIdentityNotice = "授权未变化。";
     return true;
   }
+  if (identity.provider === "feishu-personal" && toAdd.length > 0 && toRevoke.length === 0) {
+    host.userOperationalIdentityError =
+      "飞书的动作、资源范围、确认方式和有效期在机器人「运营授权」里确认。";
+    return false;
+  }
   host.userOperationalIdentityBusy = true;
   host.userOperationalIdentityError = null;
   host.userOperationalIdentityNotice = null;
   try {
-    for (const agentId of toAdd) {
-      const agentScope = resolvePersonalGrantAgentScope(agentId, input.agentScopesById);
-      await host.client.request("user-operational-identity.grants.upsert", {
-        identityId,
-        agentId,
-        agentScope,
-        allowedActions,
-        sessionKey: input.sessionKey,
-        grantMode: agentScope === "owned" ? "auto" : "explicit",
-        confirmExplicit: agentScope !== "owned",
-      });
+    if (identity.provider !== "feishu-personal") {
+      for (const agentId of toAdd) {
+        const agentScope = resolvePersonalGrantAgentScope(agentId, input.agentScopesById);
+        await host.client.request("user-operational-identity.grants.upsert", {
+          identityId,
+          agentId,
+          agentScope,
+          allowedActions,
+          sessionKey: input.sessionKey,
+          grantMode: agentScope === "owned" ? "auto" : "explicit",
+          confirmExplicit: agentScope !== "owned",
+        });
+      }
     }
     for (const grant of toRevoke) {
       await host.client.request("user-operational-identity.grants.revoke", {
@@ -1304,7 +1315,10 @@ export async function applyIdentityOperationalRobotGrants(
       });
     }
     await loadUserOperationalIdentities(host);
-    host.userOperationalIdentityNotice = `授权已更新（新增 ${toAdd.length}、取消 ${toRevoke.length}）。`;
+    host.userOperationalIdentityNotice =
+      identity.provider === "feishu-personal" && toAdd.length > 0
+        ? `已取消 ${toRevoke.length} 个机器人。新的飞书动作请在机器人「运营授权」里确认。`
+        : `授权已更新（新增 ${toAdd.length}、取消 ${toRevoke.length}）。`;
     return true;
   } catch (error) {
     host.userOperationalIdentityError =
@@ -1324,7 +1338,13 @@ export async function applyRobotOperationalIdentityGrants(
   input: {
     agentId: string;
     agentScope: "owned" | "shared" | "group";
-    desired: Array<{ identityId: string; allowedActions: string[] }>;
+    desired: Array<{
+      identityId: string;
+      allowedActions: string[];
+      resourceScope?: { groups: string[]; docs: string[]; calendars: string[] };
+      confirmMode?: "read_only" | "draft_then_confirm" | "limited_auto";
+      expiresAt?: string;
+    }>;
     sessionKey?: string | null;
   },
 ): Promise<boolean> {
@@ -1347,10 +1367,31 @@ export async function applyRobotOperationalIdentityGrants(
       PERSONAL_IDENTITY_GRANT_SCOPES.has(grant.agentScope as "owned" | "shared"),
   );
   const desiredIds = new Set(input.desired.map((entry) => entry.identityId));
-  const currentIds = new Set(currentGrants.map((grant) => grant.identityId));
-  const toAdd = input.desired.filter((entry) => !currentIds.has(entry.identityId));
+  const providerFor = (identityId: string) =>
+    host.userOperationalIdentities?.identities.find(
+      (identity) => identity.identityId === identityId,
+    )?.provider;
+  const sameList = (left: string[] | undefined, right: string[] | undefined) =>
+    [...(left ?? [])].toSorted().join("\0") === [...(right ?? [])].toSorted().join("\0");
+  const toWrite = input.desired.filter((entry) => {
+    const current = currentGrants.find((grant) => grant.identityId === entry.identityId);
+    if (!current) {
+      return true;
+    }
+    if (providerFor(entry.identityId) !== "feishu-personal") {
+      return false;
+    }
+    return !(
+      sameList(current.allowedActions, entry.allowedActions) &&
+      current.confirmMode === entry.confirmMode &&
+      (current.expiresAt ?? "") === (entry.expiresAt ?? "") &&
+      sameList(current.resourceScope?.groups, entry.resourceScope?.groups) &&
+      sameList(current.resourceScope?.docs, entry.resourceScope?.docs) &&
+      sameList(current.resourceScope?.calendars, entry.resourceScope?.calendars)
+    );
+  });
   const toRevoke = currentGrants.filter((grant) => !desiredIds.has(grant.identityId));
-  if (toAdd.length === 0 && toRevoke.length === 0) {
+  if (toWrite.length === 0 && toRevoke.length === 0) {
     host.userOperationalIdentityNotice = "授权未变化。";
     return true;
   }
@@ -1358,16 +1399,16 @@ export async function applyRobotOperationalIdentityGrants(
   host.userOperationalIdentityError = null;
   host.userOperationalIdentityNotice = null;
   try {
-    for (const entry of toAdd) {
-      const provider = host.userOperationalIdentities?.identities.find(
-        (identity) => identity.identityId === entry.identityId,
-      )?.provider;
-      const workplace = provider === "feishu-personal";
+    for (const entry of toWrite) {
+      const workplace = providerFor(entry.identityId) === "feishu-personal";
       await host.client.request("user-operational-identity.grants.upsert", {
         identityId: entry.identityId,
         agentId,
         agentScope: grantScope,
         allowedActions: entry.allowedActions,
+        resourceScope: entry.resourceScope,
+        confirmMode: entry.confirmMode,
+        expiresAt: entry.expiresAt,
         sessionKey: input.sessionKey,
         grantMode: workplace || grantScope !== "owned" ? "explicit" : "auto",
         confirmExplicit: workplace || grantScope !== "owned",
@@ -1379,7 +1420,7 @@ export async function applyRobotOperationalIdentityGrants(
       });
     }
     await loadUserOperationalIdentities(host);
-    host.userOperationalIdentityNotice = `授权已更新（新增 ${toAdd.length}、取消 ${toRevoke.length}）。`;
+    host.userOperationalIdentityNotice = `授权已更新（写入 ${toWrite.length}、取消 ${toRevoke.length}）。`;
     return true;
   } catch (error) {
     host.userOperationalIdentityError =
