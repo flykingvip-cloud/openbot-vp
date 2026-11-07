@@ -1,10 +1,10 @@
 # Workplace digital colleague: status and plan
 
-**Scenario:** The enterprise tenant opens a platform connection. An employee then logs in and authorizes through that connection, and delegates selected robots to participate in existing work inside that grant. Methods that survive review can settle into the organization. Enterprise public bots are a separate mode.
+**Scenario:** The enterprise tenant opens a platform connection. An employee then logs in and authorizes through that connection, and delegates selected robots to act inside that grant. Methods that survive review can settle into the organization. Instructing a colleague and acting as the employee are two faces. See 「路径裁决」.
 
 **Repo:** `flykingvip-cloud/openbot-vp` (`@upbeyond/openbot`)
-**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. They share one identity id. No application code in this change.
-**Nature:** Code-grounded inventory and an ordered implementation plan. This document does not change runtime behavior.
+**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. They share one identity id. Slices 1a, 1b, and 2 are implemented. The 2026-11-07 path ruling below does not start slice 3.
+**Nature:** Code-grounded inventory and an ordered implementation plan. This revision is the path ruling only. It does not change runtime behavior.
 **Date:** 2026-11-07
 
 ## Product experience to deliver
@@ -24,6 +24,48 @@ Enterprise tenant opens platform connection
   -> auditable trail
   -> settle verified methods as org capability
 ```
+
+## 路径裁决：Bot 进、身份出
+
+Owner ruling, 2026-11-07. This is the OpenBot workplace IM design from here on. Bot in, identity out. 指令从机器人进，办事从员工身份出. Humans instruct a digital colleague as a bot. The colleague acts as the employee only through the confirmed work-identity proxy. This section does not start slice 3.
+
+### 1. 指令面（Bot 进）
+
+Humans instruct digital colleagues through the enterprise-installed IM bot or through the OpenBot workspace. The IM side is Feishu, WeCom, or DingTalk @bot, a bot DM, or a group bot. The colleague does not take orders by occupying a human account.
+
+企业通道 is the gate for that bot presence. Enabling the channel, saving the app secret, and passing 测试连通 make the bot able to receive instructions. They do not authorize the colleague to act as an employee.
+
+### 2. 办事面（身份出）
+
+Acting as the employee (read or send with that employee's work identity) uses the employee work-identity proxy, in this order:
+
+1. 个人设置「授权」 binds the employee to the enterprise connection.
+2. 机器人「运营授权」 records an explicit confirm for one robot.
+3. The slice 2 decision entry allows or denies the call.
+
+A confirmed grant is required. Enterprise IM does not auto-grant an owned robot. 页面要求确认，不代表执行端不会自动生成授权.
+
+### 3. Do not merge the two faces
+
+Receiving an instruction as the bot is not acting as the employee. A public-bot reply stays on the instruction face. It is not a send-as-employee, and it is not evidence that a user token was used.
+
+「连通正常」, a saved app secret, and the account id `t_<tenant>_default` are still not employee authorization. `t_<tenant>_default` is not the platform enterprise id.
+
+### 4. 数字替身 and 运营身份 stay a separate line
+
+数字替身 and the operational identities already listed on 机器人「运营授权」 (for example AI数字替身 / 微信公众号, and 腾讯会议) are a separate product line from the Feishu, WeCom, and DingTalk employee proxy.
+
+The same confirm and audit UX patterns are allowed. The identity id space and the gates are not the same. Do not auto-bridge a 数字替身 or other 运营身份 grant into an employee IM proxy grant, and do not treat an employee IM grant as one of those identities.
+
+### 5. Platform order
+
+Feishu is the closed loop, in order: slice 1a, slice 1b, slice 2, slice 3, slice 4. WeCom and DingTalk reuse those four layers only after the same capabilities are Measured on that platform. They do not get a second install path, and they do not skip Feishu.
+
+Continuous follow (slice 5) and a high-autonomy mode that would replace a human 24/7 in a group stay later. Both default off. An @bot event is still the instruction face. It does not by itself authorize a user-token read or a send-as-employee.
+
+### 6. Near-term
+
+This revision writes the ruling only. Slice 3 and slice 4 code wait for an owner green-light after this section is on the plan. Do not start them from the wording below.
 
 The enterprise entry already exists. Do not add a second install path. System settings renders **企业通道** (`ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.ts`, nav label in `enterprise-access-control-surface.ts`, route `/enterprise/{tenant}/settings/channels`). The page shows WeCom, Feishu, and DingTalk cards and writes `channels.<id>.accounts.t_<tenant>_default`. A card may sit on Loading. Slice 1a reuses this page for app config, enterprise auth, scopes, and connection check. The employee never types App ID or App Secret.
 
@@ -62,7 +104,7 @@ enterprise connection still enabled
 | Enterprise public bot | The app or the bot. Recipients see the bot or the app. | WeCom, Feishu, and DingTalk ingress, enterprise console credential forms, `resolveAgentRoute`, agent reply. | No. |
 | Employee identity proxy | The employee, only where the platform API is called with that employee credential and the delegation allows the action. | Not implemented. `feishu-personal` is deferred and `registrationReady: false`. | This is the mode the closed loop must build. |
 
-The inventory in sections 1 through 5 is the public-bot mode. It stays because that code is real. It must not be read as "employee identity proxy is already done."
+The inventory in sections 1 through 5 is the public-bot mode. That mode is the instruction face in 「路径裁决」. It stays because that code is real. It must not be read as "employee identity proxy is already done." A message the bot receives is not a call made with the employee credential.
 
 ## How to read the evidence
 
@@ -398,7 +440,9 @@ What is allowed to differ by surface:
 - 机器人「运营授权」 only lists identities that are already bound, for one `agentId`, and writes the grant. It does not start OAuth and it does not collect an app secret.
 - 企业身份 versus 个人身份 is a kind on that same identity. 企业身份 additionally requires the matching 企业通道 connection to be enabled. It is not a second catalog.
 
-Feishu, WeCom, and DingTalk employee identities enter through that aligned model. `feishu-personal` is `registrationReady: false`. The enterprise catalog test excludes `feishu`, `wecom`, and `dingtalk`. That is why 运营授权 today shows AI数字替身 / 微信公众号 and 腾讯会议（企业）, and not those three platforms. Extending the shared identity list is the work. A parallel Feishu catalog is not.
+Feishu, WeCom, and DingTalk employee identities enter through that aligned model. `feishu-personal` is `registrationReady: false`. The enterprise catalog test excludes `feishu`, `wecom`, and `dingtalk`. That is why 运营授权 today shows AI数字替身 / 微信公众号 and 腾讯会议（企业）, and not those three platforms. Extending the employee-proxy identity list is the work. A parallel Feishu catalog is not.
+
+AI数字替身, 微信公众号, and the other 运营身份 rows already on that screen stay the separate product line in 「路径裁决」. They may share the confirm and audit controls. They do not share the employee-proxy identity id space, and a grant on one line does not create a grant on the other.
 
 ## Gap table
 
@@ -458,8 +502,8 @@ One connection can have many delegations. Pausing or revoking Project Assistant 
 
 Every controlled call carries one context, resolved on the server at the execution entry:
 
-- who triggered (employee action, inbound event, or queued task)
-- who authorized (OpenBot employee id)
+- who triggered: an instruction on the bot face (enterprise IM @bot, bot DM, or group bot), an action in the OpenBot workspace, or a queued task assigned in advance. The trigger does not choose the employee credential.
+- who authorized: the OpenBot employee who confirmed the robot grant. An inbound bot event is not that confirmation.
 - which robot
 - which connection and which platform identity
 - which resource and which targets
@@ -595,7 +639,9 @@ One employee with several robots is not the same problem as several OpenBot empl
 
 ## Implementation order
 
-Acceptance scene, once the slice 1a checklist has Measured both the chosen read API and the send API: an admin enables Feishu on the existing 企业通道 page, a tenant employee logs in and authorizes, and Project Assistant works inside the grant. If group history is not readable and named docs are, the scene shrinks to "draft and send progress from designated docs." Do not promise the group-progress loop before both measurements pass. Feishu is first. DingTalk and WeCom use the same four layers, adapted to what those platforms actually support. They do not get a second install page.
+Acceptance scene, once the slice 1a checklist has Measured both the chosen read API and the send API: an admin enables Feishu on the existing 企业通道 page, a tenant employee logs in and authorizes, and Project Assistant acts inside the grant. The instruction arrives on the bot face or in the OpenBot workspace. The read and the send are the identity-out face and still require the confirmed grant. If group history is not readable and named docs are, the scene shrinks to "draft and send progress from designated docs." Do not promise the group-progress loop before both measurements pass.
+
+Platform order follows 「路径裁决」. Feishu closes 1a, then 1b, then 2, then 3, then 4. DingTalk and WeCom reuse those four layers only after the same capabilities are Measured, adapted to what those platforms actually support. They do not get a second install page. Slice 5 and a 24/7 in-group presence stay later and default off. Slice 3 and slice 4 code wait for an owner green-light after the path ruling. This revision does not start them.
 
 The first development target inside that scene is one enterprise connection, one employee authorization on it, and one explicit robot delegation. The same model must be unable to borrow another employee authorization or another robot delegation.
 
@@ -668,15 +714,17 @@ Tests:
 
 Before the first read, call the slice 2 decision entry. The minimal enterprise gate must already pass. Do not wait for slice 6.
 
-The robot reads only the APIs and resource types the slice 1a checklist marked Measured, using the connection the triggering employee explicitly chose. It drafts progress with sources and update times. This slice is employee-triggered. Continuous acquisition is slice 5.
+The instruction may arrive on the bot face or in the OpenBot workspace. That arrival is not the employee credential and is not this slice's platform read. The robot reads only the APIs and resource types the slice 1a checklist marked Measured, on the connection that employee bound and the robot they confirmed. It drafts progress with sources and update times. The robot does not receive the order by sitting in the group as the employee's account. Continuous acquisition is slice 5 and stays off.
 
-If the checklist shrunk the scene to designated docs, this slice does not call a group-history API.
+If the checklist shrunk the scene to designated docs, this slice does not call a group-history API. A bot-visible group history is not a substitute for the Measured user-token read.
 
 Audit the read (employee, robot, connection, delegation version, resource ids, time). No send.
 
 Tests: a doc or group outside the delegation is refused. Text inside a group message does not add a resource. An out-of-scope link inside an in-scope doc is not fetched. App-token fallback does not run when the user token is invalid. A missing enterprise seat denies the read.
 
 ### Slice 4. Execute as the employee
+
+Send in this slice is the identity-out face. A reply the public bot already sends on the instruction face is not this send, and it must not be reported as the employee.
 
 Before send, call the slice 2 decision entry again. Do not reuse a decision cached when the draft was written.
 
@@ -690,11 +738,11 @@ Tests: recipient mismatch fails. Cross-tenant connection fails. Two deliveries o
 
 ### Slice 5. Continuous work and multi-employee coordination
 
-Continuous work starts only after slice 1a has verified a continuous message acquisition mechanism. That mechanism may be platform push, or an official incremental poll that meets the permission, rate limit, and latency written on the checklist. Do not bind this slice to push alone, and do not rule polling out before the checklist.
+Continuous follow stays later and defaults off, including a mode that would replace a human 24/7 in a group. It starts only after slice 1a has verified a continuous message acquisition mechanism. That mechanism may be platform push, or an official incremental poll that meets the permission, rate limit, and latency written on the checklist. Do not bind this slice to push alone, and do not rule polling out before the checklist.
 
-The event speaker is not the authorizer. The task uses the delegation assigned in advance to that conversation. If more than one delegation matches, stop automatic send until a person assigns one. Implement primary robot selection inside that chosen delegation, dedupe, claim, echo suppression, and human takeover. Draft-then-confirm stays the default until the employee explicitly chooses limited auto on that delegation.
+The event speaker is not the authorizer. An @bot or bot-DM event remains the instruction face. It does not select the employee credential and it does not skip the slice 2 decision. The task uses the delegation assigned in advance to that conversation. If more than one delegation matches, stop automatic send until a person assigns one. Implement primary robot selection inside that chosen delegation, dedupe, claim, echo suppression, and human takeover. Draft-then-confirm stays the default until the employee explicitly chooses limited auto on that delegation.
 
-If the verified mechanism only returns @bot messages, the status UI says that. It does not describe a full employee inbox.
+If the verified mechanism only returns @bot messages, the status UI says that. It does not describe a full employee inbox, and it does not describe the colleague occupying the employee's seat in the group.
 
 Tests from the acceptance list for two robots, two employees in one group, double reply, takeover, and revoke of pending work land here.
 
@@ -714,7 +762,7 @@ The loop is Feishu and Project Assistant, on the scene the slice 1a checklist al
 
 - An admin enables Feishu on the existing 企业通道 page. The same employee then sees Feishu on 个人设置「授权」, not on a new page and not under a label 系统设置「授权」, and authorizes without typing the app secret. On 机器人「运营授权」 they check that same identity id for Project Assistant and press 确认授权. After a later content confirm, send uses the employee identity the checklist Measured. Disabling Feishu on 企业通道 stops new execution for every employee under that connection and removes it as a usable 企业身份. Revoking that employee on 个人设置「授权」 stops only their grants. Unchecking one robot on 运营授权 leaves the other robot. The grant the robot screen wrote is the grant the execution entry reads.
 - Employee A authorizes robot R1. R1 can work inside the scoped project. Robot R2, which was not delegated that connection, cannot borrow it.
-- The same account can authorize two robots with different read, write, and send limits. One inbound message never produces two external replies.
+- The same account can authorize two robots with different read, write, and send limits. One instruction on the bot face never produces two external replies. A public-bot reply is not a send-as-employee.
 - Employees A and B are both connected and both can see the same project group. Work does not run twice. A request from B does not use A identity. A private context does not appear in a reply sent for B. Records for the two tasks differ by connection and delegation, not only by chat id.
 - The identity recipients see matches the product display. If send-as-self is refused by Feishu, the product says so and does not report success as the employee.
 - Groups, docs, and recipients outside the delegation are refused. A connection for another Feishu tenant is refused. Text inside a group message cannot widen the grant. The read uses only APIs the checklist marked Measured.
@@ -730,7 +778,8 @@ The loop is Feishu and Project Assistant, on the scene the slice 1a checklist al
 - Fabric stays off unless a deployment sets `OPENBOT_FABRIC_ENABLED` or `gateway.fabric.enabled`.
 - `data_capability` invoke stays knowledge-object-only. Agent runtime does not request `ConnectorAction`.
 - Sandbox default stays off. Managed Enterprise shared-process startup refusal stays fail-closed.
-- Public-bot ingress stays the app identity. It is not rewritten into a fake employee session.
-- DingTalk and WeCom are not given a user-proxy send path in this plan.
+- Public-bot ingress stays the instruction face. It is not rewritten into a fake employee session, and it is not the identity-out face.
+- DingTalk and WeCom are not given a user-proxy send path in this plan. They reuse the four layers only after Measured.
 - Desktop automation is not a dependency.
-- This document does not implement any slice. Access order starts at 企业通道. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. The new workplace identity has one grant. Historical providers are not all migrated first. The enterprise IM path does not auto-create grants. No product code until the owner green-lights it.
+- 数字替身 and other 运营身份 grants are not auto-bridged into the employee IM proxy.
+- Slices 1a, 1b, and 2 are implemented. Access order starts at 企业通道. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. The new workplace identity has one grant. Historical providers are not all migrated first. The enterprise IM path does not auto-create grants. Slice 3 and slice 4 wait for a later owner green-light. This path-ruling revision does not start them.
