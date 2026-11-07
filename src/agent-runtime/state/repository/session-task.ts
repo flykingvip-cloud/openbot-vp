@@ -1,7 +1,6 @@
 import {
   applyIncomingUserMessage,
   commitSameTaskConstraint,
-  commitInteractionTaskProposal,
 } from "../../../conversation-task/session-task-board.js";
 import { commitAdmittedSessionTask } from "../mutations/admit-task.js";
 import {
@@ -9,6 +8,7 @@ import {
   isTaskExecutionBindingCurrent,
   startBoundTaskExecution,
 } from "../mutations/execution-binding.js";
+import { commitInteractionTaskProposal } from "../mutations/interaction-proposal.js";
 import { resumePausedCurrentTask } from "../mutations/resume-current.js";
 import { recordCheckedTaskCompletion } from "../mutations/task-completion.js";
 import { mutateSessionTaskBoard, readSessionTaskBoard } from "./task-board-file.js";

@@ -1,3 +1,4 @@
+export { commitInteractionTaskProposal } from "../agent-runtime/state/mutations/interaction-proposal.js";
 import { appendTaskConstraint } from "../agent-runtime/state/mutations/task-constraints.js";
 export { commitAdmittedSessionTask } from "../agent-runtime/state/mutations/admit-task.js";
 import {
@@ -67,7 +68,6 @@ export {
   buildResumePrompt,
   sanitizeTaskBoardPathForPrompt,
 } from "../agent-runtime/context/index.js";
-import type { InteractionModelDecision } from "../agent-runtime/contracts/interaction.js";
 import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
 export type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
 import { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
@@ -577,53 +577,6 @@ export function commitBoardMutation(params: {
     const result = params.mutate(board);
     writeSessionTaskBoardUnlocked(params.sessionFile, result.board);
     return result;
-  });
-}
-
-/** Explicit execution admission; ordinary dialogue never calls this transaction. */
-export function commitInteractionTaskProposal(params: {
-  sessionFile: string;
-  expectedFocusRevision: number;
-  expectedWriteEpoch: number;
-  decision: Extract<InteractionModelDecision, { kind: "task_change" | "task_control" }>;
-}): { kind: "applied"; text: string; abort: boolean } | { kind: "rejected"; reason: string } {
-  return withSessionTaskBoardLock(params.sessionFile, () => {
-    const board = readSessionTaskBoardUnlocked(params.sessionFile);
-    const current = board.current;
-    if (
-      !current?.unfinished ||
-      current.taskId !== params.decision.target.taskId ||
-      board.focusRevision !== params.expectedFocusRevision ||
-      (board.writeEpoch ?? 0) !== params.expectedWriteEpoch ||
-      params.decision.target.revision !== String(params.expectedWriteEpoch) ||
-      isTaskTombstoned(board, current.taskId)
-    ) {
-      return { kind: "rejected", reason: "revision_mismatch" };
-    }
-    if (params.decision.kind === "task_change") {
-      const next = appendSameTaskConstraint({
-        board,
-        constraintText: params.decision.text,
-        admittedAmendment: true,
-        amendmentMode: params.decision.mode,
-      });
-      writeSessionTaskBoardUnlocked(params.sessionFile, next);
-      return {
-        kind: "applied",
-        text: "要求已写入原任务板；后续恢复将读取最新要求。",
-        abort: false,
-      };
-    }
-    if (params.decision.action === "resume") {
-      // Resume still requires Gateway's live authorization and stop recheck.
-      return { kind: "rejected", reason: "resume_requires_live_recheck" };
-    }
-    const result =
-      params.decision.action === "pause"
-        ? suppressCurrentTaskWake({ board })
-        : cancelCurrentTask({ board });
-    writeSessionTaskBoardUnlocked(params.sessionFile, result.board);
-    return { kind: "applied", text: result.statusLine ?? "已处理任务控制。", abort: true };
   });
 }
 

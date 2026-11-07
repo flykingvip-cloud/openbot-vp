@@ -1182,3 +1182,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved the unique constraint log mutation into state/mutations/task-constraints. Legacy keyword gating remains a compatibility adapter; the mutation consumes an explicit scope and has no legacy classifier dependency. — codex-runtime-manager
 - Legacy constraint/admission regression 2 files / 11 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
+
+## Bound interaction transaction ownership (2026-11-08)
+
+- Moved target-bound interaction amendment/control transactions into state/mutations/interaction-proposal. The new repository consumes them directly; legacy exports reference the same implementation. The transaction consumes explicit amendment scope and has no legacy board/classifier dependency. — codex-runtime-manager
+- Admission/lifecycle regression 2 files / 4 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
