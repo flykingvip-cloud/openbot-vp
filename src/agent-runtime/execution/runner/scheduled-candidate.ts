@@ -5,11 +5,11 @@ import { getCliSessionId } from "../../../agents/cli-session.js";
 import { isCliProvider } from "../../../agents/model-selection.js";
 import type { RunEmbeddedPiAgentParams } from "../../../agents/pi-embedded-runner/run/params.js";
 import type { EmbeddedPiRunResult } from "../../../agents/pi-embedded-runner/types.js";
-import { runEmbeddedPiAgent } from "../../../agents/pi-embedded.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
 import { resolveEnterpriseEmbeddedTransport } from "../../../gateway/enterprise-model/embedded-transport.js";
 import { resolveCliRunCredential } from "../../model/index.js";
+import { runEmbeddedPiAgent } from "./embedded-run.js";
 
 /** One scheduled candidate; admission, fallback and schedule ownership remain outside. */
 export async function runScheduledCandidate(

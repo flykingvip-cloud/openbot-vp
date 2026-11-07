@@ -473,5 +473,12 @@
     "from": "src/agent-runtime/execution/**",
     "denyImportsFrom": ["src/commands/**"],
     "description": "Execution consumes typed execution inputs, not command-host options or implementations."
+  },
+  {
+    "name": "runtime-no-legacy-execution-facades",
+    "from": "src/agent-runtime/**",
+    "denyImportsFrom": ["src/agents/pi-embedded", "src/agents/pi-embedded-runner/runs"],
+    "exemptFiles": ["src/agent-runtime/execution/runner/run-registry.test.ts"],
+    "description": "Runtime implementations and wiring cannot loop through legacy execution facades; the registry compatibility test alone verifies shared identity."
   }
 ]

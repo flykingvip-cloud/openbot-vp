@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({ cli: vi.fn(), embedded: vi.fn(), event: vi.fn(
 vi.mock("../../../agents/cli-runner.js", () => ({
   runCliAgent: (...args: unknown[]) => mocks.cli(...args),
 }));
-vi.mock("../../../agents/pi-embedded.js", () => ({
+vi.mock("./embedded-run.js", () => ({
   runEmbeddedPiAgent: (...args: unknown[]) => mocks.embedded(...args),
 }));
 vi.mock("../../../gateway/model-entitlement/resolve-agent-run-scope.js", () => ({

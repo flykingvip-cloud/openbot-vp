@@ -166,3 +166,7 @@ describe("askOutcome W1 followup unified closeout through createFollowupRunner",
     void taskFiles;
   });
 });
+
+vi.mock("../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
+}));

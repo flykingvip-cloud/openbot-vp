@@ -35,3 +35,8 @@ vi.mock("../gateway/call.js", () => ({
 
 export const makeIsolatedAgentJob = makeIsolatedAgentJobFixture;
 export const makeIsolatedAgentParams = makeIsolatedAgentParamsFixture;
+
+vi.mock("../agent-runtime/execution/runner/embedded-run.js", async () => {
+  const { runEmbeddedPiAgent } = await import("../agents/pi-embedded.js");
+  return { runEmbeddedPiAgent };
+});

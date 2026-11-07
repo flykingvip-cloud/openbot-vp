@@ -57,7 +57,8 @@ export const surfaceCronJobResultMock = createMock();
 export const resolveAgentDirMock = createMock();
 resolveAgentDirMock.mockReturnValue("/tmp/agent-dir");
 
-vi.mock("../../agents/agent-scope.js", () => ({
+vi.mock("../../agents/agent-scope.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agents/agent-scope.js")>()),
   resolveAgentConfig: resolveAgentConfigMock,
   resolveAgentDir: resolveAgentDirMock,
   resolveAgentModelFallbacksOverride: resolveAgentModelFallbacksOverrideMock,
@@ -381,3 +382,7 @@ export async function loadRunCronIsolatedAgentTurn() {
   const { runCronIsolatedAgentTurn } = await import("./run.js");
   return runCronIsolatedAgentTurn;
 }
+
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: runEmbeddedPiAgentMock,
+}));

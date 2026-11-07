@@ -960,3 +960,8 @@ it.each(["paused", "focus changed", "new attempt"] as const)(
     }
   },
 );
+
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", async () => {
+  const { runEmbeddedPiAgent } = await import("../../agents/pi-embedded.js");
+  return { runEmbeddedPiAgent };
+});

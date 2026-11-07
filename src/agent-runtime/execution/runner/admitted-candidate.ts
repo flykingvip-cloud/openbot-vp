@@ -3,7 +3,6 @@ import { recordCliBackendUsage } from "../../../agents/cli-backend-usage-attribu
 import { runCliAgent } from "../../../agents/cli-runner.js";
 import { getCliSessionId } from "../../../agents/cli-session.js";
 import { isCliProvider } from "../../../agents/model-selection.js";
-import { runEmbeddedPiAgent } from "../../../agents/pi-embedded.js";
 import { buildEmbeddedRunContexts } from "../../../auto-reply/reply/agent-runner-utils.js";
 import { createBlockReplyDeliveryHandler } from "../../../auto-reply/reply/reply-delivery.js";
 import type { ReplyPayload } from "../../../auto-reply/types.js";
@@ -29,6 +28,7 @@ import {
 } from "../../../utils/message-channel.js";
 import { resolveCliRunCredential } from "../../model/index.js";
 import { buildEmbeddedRunBaseParams } from "../preparation/index.js";
+import { runEmbeddedPiAgent } from "./embedded-run.js";
 /** Legacy single admitted candidate adapter. Outer admission/fallback/finalization remain with the caller. */
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
 export type AdmittedCandidateHost = {
