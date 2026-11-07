@@ -1,5 +1,5 @@
 /**
- * Enterprise message channels settings surface (card gallery + config workspace).
+ * Enterprise message channels settings surface (icon switcher + config workspace).
  *
  * Uses channels.status({ tenantId, probe }), tenant-scoped config.set, and
  * channels.logout({ tenantId }) to clear saved secrets without stopping the global runtime.
@@ -86,23 +86,6 @@ const CARD_STATUS_LABEL: Record<CardStatus, string> = {
   test_failed: "测试未通过",
 };
 
-/** Shape + text, so status is not carried by the color dot alone. */
-const CARD_STATUS_MARK: Record<CardStatus, string> = {
-  not_added: "○",
-  draft: "△",
-  ready: "●",
-  connected: "✓",
-  test_failed: "!",
-};
-
-const CARD_CTA_LABEL: Record<CardStatus, string> = {
-  not_added: "添加并配置",
-  draft: "继续配置",
-  ready: "管理",
-  connected: "管理",
-  test_failed: "管理",
-};
-
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 function getState(host: object, props: EnterpriseMessageChannelsSurfaceProps): SurfaceState {
@@ -160,22 +143,6 @@ function channelPresentInForm(
   return Boolean(asRecord(asRecord(form?.channels)?.[channelId]));
 }
 
-function countChannelAccounts(
-  form: Record<string, unknown> | null | undefined,
-  channelId: string,
-  snapshot: ChannelsStatusSnapshot | null,
-): number {
-  const fromSnap = snapshot?.channelAccounts?.[channelId]?.length ?? 0;
-  if (fromSnap > 0) {
-    return fromSnap;
-  }
-  const accounts = asRecord(asRecord(asRecord(form?.channels)?.[channelId])?.accounts);
-  if (accounts) {
-    return Object.keys(accounts).length;
-  }
-  return channelPresentInForm(form, channelId) ? 1 : 0;
-}
-
 function resolveCardStatus(params: {
   present: boolean;
   form: Record<string, unknown> | null;
@@ -200,25 +167,6 @@ function resolveCardStatus(params: {
     return "test_failed";
   }
   return "ready";
-}
-
-function resolveCardSummary(params: {
-  status: CardStatus;
-  accountCount: number;
-  enabled: boolean;
-}): string {
-  switch (params.status) {
-    case "not_added":
-      return "尚未接入";
-    case "draft":
-      return params.accountCount > 0 ? `${params.accountCount} 个账号 · 待填凭证` : "待填凭证";
-    case "ready":
-      return params.enabled ? "已保存 · 可测试连通" : "已停用 · 凭证已保存";
-    case "connected":
-      return params.enabled ? "已启用 · 最近测试通过" : "已停用 · 最近测试通过";
-    case "test_failed":
-      return "已保存 · 测试未通过";
-  }
 }
 
 function requestWithTimeout<T>(
@@ -501,76 +449,79 @@ function defaultRequestUpdate(): void {
   requestEnterpriseAppRerender();
 }
 
+function renderChannelMark(channelId: EnterpriseMessageChannelId): TemplateResult {
+  if (channelId === "wecom") {
+    return html`
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path
+          fill="currentColor"
+          d="M7 5.5h7.2A3.8 3.8 0 0 1 18 9.3v3.4a3.8 3.8 0 0 1-3.8 3.8H11l-2.6 2v-2H7A3.8 3.8 0 0 1 3.2 12.7V9.3A3.8 3.8 0 0 1 7 5.5Z"
+        />
+        <circle cx="8.2" cy="11" r="1" fill="#fff" />
+        <circle cx="12" cy="11" r="1" fill="#fff" />
+      </svg>
+    `;
+  }
+  if (channelId === "feishu") {
+    return html`
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M3.5 12.2 20.5 4.5 14 20.2l-2.8-6.2L3.5 12.2Z" />
+      </svg>
+    `;
+  }
+  return html`
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M12 3.2a5.6 5.6 0 0 1 5.6 5.6v2.7l1.3 2.2H5.1l1.3-2.2V8.8A5.6 5.6 0 0 1 12 3.2Z"
+      />
+      <circle cx="12" cy="18.6" r="1.5" fill="currentColor" />
+    </svg>
+  `;
+}
+
 function renderGalleryCard(params: {
   channelId: EnterpriseMessageChannelId;
   status: CardStatus;
-  summary: string;
   fault: string | null;
-  capabilityLine: string | null;
   selected: boolean;
   skeleton: boolean;
   disabled: boolean;
   onActivate: () => void;
 }): TemplateResult {
-  const {
-    channelId,
-    status,
-    summary,
-    fault,
-    capabilityLine,
-    selected,
-    skeleton,
-    disabled,
-    onActivate,
-  } = params;
+  const { channelId, status, fault, selected, skeleton, disabled, onActivate } = params;
   const label = ENTERPRISE_MESSAGE_CHANNEL_LABELS[channelId];
+  const statusLabel = skeleton ? "加载中…" : CARD_STATUS_LABEL[status];
+  const inactive = disabled || skeleton;
   return html`
-    <div
-      class="enterprise-channel-gallery__card enterprise-channel-gallery__card--${status} ${
+    <button
+      type="button"
+      class="enterprise-im-switcher__item enterprise-channel-gallery__card enterprise-channel-gallery__card--${status} enterprise-im-switcher__item--${status} ${
         selected ? "is-selected" : ""
       } ${skeleton ? "is-skeleton" : ""} ${disabled ? "is-disabled" : ""}"
       role="listitem"
+      aria-pressed=${selected ? "true" : "false"}
+      aria-label=${fault ? `${label}，${statusLabel}，${fault}` : `${label}，${statusLabel}`}
+      ?disabled=${inactive}
       @click=${() => {
-        if (!disabled && !skeleton) {
+        if (!inactive) {
           onActivate();
         }
       }}
     >
-      <div class="enterprise-channel-gallery__card-top">
-        <span class="enterprise-channel-gallery__brand enterprise-channel-gallery__brand--${channelId}"></span>
-        <strong class="enterprise-channel-gallery__name">${label}</strong>
-      </div>
-      <div class="enterprise-channel-gallery__badge">
-        <span class="enterprise-channel-gallery__dot" aria-hidden="true"></span>
-        ${skeleton ? "加载中…" : `${CARD_STATUS_MARK[status]} ${CARD_STATUS_LABEL[status]}`}
-      </div>
-      <p class="enterprise-channel-gallery__summary">${skeleton ? "…" : summary}</p>
-      ${
-        !skeleton && capabilityLine
-          ? html`<p class="enterprise-channel-gallery__summary" data-enterprise-im-capability>
-              ${capabilityLine}
-            </p>`
-          : nothing
-      }
+      <span class="enterprise-im-switcher__mark enterprise-im-switcher__mark--${channelId}">
+        ${renderChannelMark(channelId)}
+        <span class="enterprise-im-switcher__dot" aria-hidden="true"></span>
+      </span>
+      <span class="enterprise-im-switcher__label">${label}</span>
       ${
         !skeleton && fault
-          ? html`<p class="enterprise-channel-gallery__summary" data-channel-fault>${fault}</p>`
-          : nothing
+          ? html`<span class="enterprise-im-switcher__status" data-channel-fault title=${fault}
+              >${fault}</span
+            >`
+          : html`<span class="enterprise-im-switcher__status">${statusLabel}</span>`
       }
-      <button
-        type="button"
-        class="enterprise-channel-gallery__cta"
-        ?disabled=${disabled || skeleton}
-        @click=${(event: Event) => {
-          event.stopPropagation();
-          if (!disabled && !skeleton) {
-            onActivate();
-          }
-        }}
-      >
-        ${skeleton ? "…" : CARD_CTA_LABEL[status]}
-      </button>
-    </div>
+    </button>
   `;
 }
 
@@ -1159,25 +1110,6 @@ export function renderEnterpriseMessageChannelsSurface(params: {
 
   return html`
     <section class="enterprise-settings-section enterprise-settings-section--flat enterprise-message-channels">
-      <header class="enterprise-settings-section__header">
-        <div>
-          <div class="enterprise-settings-section__title">企业通道</div>
-          <div class="enterprise-settings-section__subtitle">
-            企业微信 / 飞书 / 钉钉 IM 通道接入与凭证配置
-          </div>
-        </div>
-        <div class="enterprise-settings-actionbar">
-          <button
-            class="btn btn--sm"
-            type="button"
-            ?disabled=${controlsDisabled}
-            @click=${() => void run("refresh", async () => undefined, { successNotice: "已刷新" })}
-          >
-            ${renderIcon("refreshCw")} ${state.loading ? "刷新中…" : "刷新"}
-          </button>
-        </div>
-      </header>
-
       ${
         state.error && !state.workspaceOpen
           ? html`<div class="enterprise-channel-workspace__result enterprise-channel-workspace__result--danger">${state.error}</div>`
@@ -1189,43 +1121,43 @@ export function renderEnterpriseMessageChannelsSurface(params: {
           : nothing
       }
 
-      <div class="enterprise-channel-gallery" role="list">
-        ${ENTERPRISE_MESSAGE_CHANNELS.map((channelId) => {
-          const present = channelPresentInForm(form, channelId);
-          const channelEntry = asRecord(asRecord(form.channels)?.[channelId]);
-          const accountId = props.tenantId
-            ? resolveEnterpriseImPrimaryAccountId(
-                asRecord(channelEntry?.accounts) ?? {},
-                props.tenantId,
-              )
-            : undefined;
-          const status = resolveCardStatus({
-            present,
-            form,
-            channelId,
-            accountId,
-            lastProbe: state.lastProbeByChannel[channelId],
-          });
-          const accountCount = countChannelAccounts(form, channelId, state.snapshot);
-          const enabled = isChannelEnabled(form, channelId, state.snapshot);
-          const capability =
-            channelId === "feishu"
-              ? feishuCardContract({ form, accountId, snapshot: state.snapshot })
-              : null;
-          return renderGalleryCard({
-            channelId,
-            status,
-            summary: resolveCardSummary({ status, accountCount, enabled }),
-            fault: channelFaultMessage(state.snapshot, channelId),
-            capabilityLine: capability
-              ? formatFeishuEmployeeUiHint(capability.employeeUiHint)
-              : null,
-            selected: state.workspaceOpen && state.selectedChannelId === channelId,
-            skeleton,
-            disabled: controlsDisabled && !skeleton,
-            onActivate: () => openWorkspace(channelId),
-          });
-        })}
+      <div class="enterprise-im-switcher">
+        <div class="enterprise-im-switcher__row" role="list" data-testid="enterprise-im-switcher">
+          ${ENTERPRISE_MESSAGE_CHANNELS.map((channelId) => {
+            const present = channelPresentInForm(form, channelId);
+            const channelEntry = asRecord(asRecord(form.channels)?.[channelId]);
+            const accountId = props.tenantId
+              ? resolveEnterpriseImPrimaryAccountId(
+                  asRecord(channelEntry?.accounts) ?? {},
+                  props.tenantId,
+                )
+              : undefined;
+            const status = resolveCardStatus({
+              present,
+              form,
+              channelId,
+              accountId,
+              lastProbe: state.lastProbeByChannel[channelId],
+            });
+            return renderGalleryCard({
+              channelId,
+              status,
+              fault: channelFaultMessage(state.snapshot, channelId),
+              selected: state.workspaceOpen && state.selectedChannelId === channelId,
+              skeleton,
+              disabled: controlsDisabled && !skeleton,
+              onActivate: () => openWorkspace(channelId),
+            });
+          })}
+        </div>
+        <button
+          class="btn btn--sm enterprise-im-switcher__refresh"
+          type="button"
+          ?disabled=${controlsDisabled}
+          @click=${() => void run("refresh", async () => undefined, { successNotice: "已刷新" })}
+        >
+          ${renderIcon("refreshCw")} ${state.loading ? "刷新中…" : "刷新"}
+        </button>
       </div>
 
       ${
@@ -1240,7 +1172,7 @@ export function renderEnterpriseMessageChannelsSurface(params: {
               run,
             })
           : html`
-              <p class="enterprise-channel-workspace-empty">点击上方通道卡片开始接入</p>
+              <p class="enterprise-channel-workspace-empty">选择一个通道开始配置</p>
             `
       }
     </section>

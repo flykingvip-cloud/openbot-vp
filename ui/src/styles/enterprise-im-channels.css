@@ -1,4 +1,133 @@
-/* Enterprise message-channels curated form (WeCom / Feishu / DingTalk). */
+/* Enterprise message-channels switcher + curated form (WeCom / Feishu / DingTalk). */
+
+.enterprise-im-switcher {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+
+.enterprise-im-switcher__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.enterprise-message-channels .enterprise-im-switcher__item.enterprise-channel-gallery__card {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+  width: auto;
+  min-width: 88px;
+  margin: 0;
+  padding: 8px 12px 10px;
+  text-align: center;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+}
+
+.enterprise-message-channels
+  .enterprise-im-switcher__item.enterprise-channel-gallery__card:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: transparent;
+}
+
+.enterprise-message-channels
+  .enterprise-im-switcher__item.enterprise-channel-gallery__card.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: none;
+}
+
+.enterprise-message-channels
+  .enterprise-im-switcher__item.enterprise-channel-gallery__card:disabled,
+.enterprise-message-channels
+  .enterprise-im-switcher__item.enterprise-channel-gallery__card.is-skeleton {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.enterprise-im-switcher__mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: #fff;
+}
+
+.enterprise-im-switcher__mark svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.enterprise-im-switcher__mark--wecom {
+  background: #2b7bb9;
+}
+
+.enterprise-im-switcher__mark--feishu {
+  background: #3370ff;
+}
+
+.enterprise-im-switcher__mark--dingtalk {
+  background: #0089ff;
+}
+
+.enterprise-im-switcher__dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--bg, #fff);
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.enterprise-im-switcher__item--draft .enterprise-im-switcher__dot {
+  background: var(--warn, #9a6700);
+}
+
+.enterprise-im-switcher__item--ready .enterprise-im-switcher__dot,
+.enterprise-im-switcher__item--connected .enterprise-im-switcher__dot {
+  background: var(--ok, #1b7f4a);
+}
+
+.enterprise-im-switcher__item--test_failed .enterprise-im-switcher__dot {
+  background: var(--danger, #c23b22);
+}
+
+.enterprise-im-switcher__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.2;
+}
+
+.enterprise-im-switcher__status {
+  max-width: 96px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enterprise-im-switcher__refresh {
+  flex: none;
+}
 
 .enterprise-im-curated {
   display: grid;

@@ -109,17 +109,24 @@ describe("enterprise Feishu channel capability (slice 1a)", () => {
     renderSurface();
     await vi.waitFor(() => {
       expect(container.textContent).not.toContain("加载中…");
-      expect(container.textContent).toContain("等待管理员开通权限");
+      expect(container.querySelector("[data-testid='enterprise-im-switcher']")).not.toBeNull();
     });
-    const feishuCard = Array.from(
-      container.querySelectorAll(".enterprise-channel-gallery__card"),
-    ).find((card) => card.textContent?.includes("飞书"));
+    expect(container.querySelector(".enterprise-settings-section__title")).toBeNull();
+    expect(container.querySelector(".enterprise-settings-section__subtitle")).toBeNull();
+    expect(container.textContent).not.toContain("添加并配置");
+    const feishuCard = Array.from(container.querySelectorAll(".enterprise-im-switcher__item")).find(
+      (card) => card.textContent?.includes("飞书"),
+    );
+    expect(feishuCard?.querySelector(".enterprise-channel-gallery__summary")).toBeNull();
+    expect(feishuCard?.querySelector(".enterprise-channel-gallery__cta")).toBeNull();
+    expect(feishuCard?.querySelector(".enterprise-im-switcher__mark--feishu")).not.toBeNull();
     (feishuCard as HTMLButtonElement).click();
     await vi.waitFor(() => {
       expect(container.querySelector("[data-feishu-enterprise-contract]")?.textContent).toContain(
         "tenant-key-1",
       );
     });
+    expect(container.textContent).toContain("等待管理员开通权限");
     expect(container.textContent).toContain("不是员工授权");
     expect(container.querySelector(".enterprise-im-workspace__columns")).not.toBeNull();
     const groupRead = container.querySelector("[data-capability='projectGroupRead']");

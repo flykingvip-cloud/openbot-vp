@@ -112,7 +112,8 @@ describe("enterprise message channels surface (card gallery)", () => {
     renderSurface();
     await waitLoaded(container);
 
-    expect(container.textContent).toContain("企业通道");
+    expect(container.querySelector(".enterprise-settings-section__title")).toBeNull();
+    expect(container.querySelector(".enterprise-settings-section__subtitle")).toBeNull();
     expect(container.textContent).toContain("企业微信");
     expect(container.textContent).toContain("飞书");
     expect(container.textContent).toContain("钉钉");
@@ -124,7 +125,7 @@ describe("enterprise message channels surface (card gallery)", () => {
         button.textContent?.includes("添加通道"),
       ),
     ).toBe(false);
-    expect(container.textContent).toContain("点击上方通道卡片开始接入");
+    expect(container.textContent).toContain("选择一个通道开始配置");
     expect(container.textContent).toContain("未添加");
     expect(container.textContent).toContain("已保存");
   });
@@ -611,7 +612,9 @@ describe("enterprise message channels surface (card gallery)", () => {
     const wecomBefore = Array.from(
       container.querySelectorAll(".enterprise-channel-gallery__card"),
     ).find((card) => card.textContent?.includes("企业微信"));
-    expect(wecomBefore?.textContent ?? "").toMatch(/[○△●✓!]/);
+    expect(wecomBefore?.textContent ?? "").toContain("已保存");
+    expect(wecomBefore?.querySelector(".enterprise-im-switcher__dot")).not.toBeNull();
+    expect(wecomBefore?.querySelector(".enterprise-im-switcher__mark--wecom")).not.toBeNull();
 
     const refreshButton = Array.from(container.querySelectorAll("button")).find((button) =>
       button.textContent?.includes("刷新"),
@@ -828,19 +831,22 @@ describe("enterprise message channels surface (card gallery)", () => {
     };
     renderSurface();
     await waitLoaded(container);
-    expect(container.textContent).toContain("等待管理员开通权限");
     expect(container.textContent).not.toContain("应用权限可尝试");
     const feishuCard = Array.from(
       container.querySelectorAll(".enterprise-channel-gallery__card"),
     ).find((card) => card.textContent?.includes("飞书"));
+    expect(feishuCard?.querySelector(".enterprise-channel-gallery__cta")).toBeNull();
     (feishuCard as HTMLButtonElement).click();
     await vi.waitFor(() => {
       expect(container.querySelector("[data-feishu-enterprise-contract]")?.textContent).toContain(
         "tenant-key-1",
       );
     });
+    expect(container.textContent).toContain("等待管理员开通权限");
     expect(container.textContent).toContain("不是员工授权");
-    expect(container.textContent).toContain("群消息读取 granted");
+    expect(container.querySelector("[data-capability='projectGroupRead']")?.textContent).toContain(
+      "已开通",
+    );
     expect(container.querySelector("a[href*='feishu-install']")).toBeNull();
     expect(container.querySelector("a[href*='workplace']")).toBeNull();
   });
