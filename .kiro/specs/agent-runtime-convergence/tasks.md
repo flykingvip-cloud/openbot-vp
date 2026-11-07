@@ -1083,3 +1083,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced a bound execution receiving not_required acceptance through legacy chat classification (1 FAIL). Delivery preparation now preserves execution acceptance requirements whenever the host supplies a task binding; it does not invent validation or delivery. Both immediate and queued preparation share this function. — codex-runtime-manager
 - Preparation/confirmation regression 2 files / 13 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. General criterion evaluation remains open. — codex-runtime-manager
+
+## Production-entry regression harness follows new runner (2026-11-08)
+
+- Extended closeout regression exposed four stale mocks still intercepting the retired facade rather than the migrated embedded implementation, causing Unknown model anthropic/claude before delivery. Updated only the provider test seam; real outcome persistence, dispatch and confirmation remain exercised. — codex-runtime-manager
+- R85f integration 10 PASS, including four production-entry scenarios; state lifecycle 1 PASS separately. Full tsgo PASS; typed lint clean; architecture 52 PASS. These use mocked inference and are not real-model replacement acceptance. — codex-runtime-manager
