@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { serializePayload, type MessagePayloadObject, type RequestClient } from "@buape/carbon";
 import { ChannelType, Routes } from "discord-api-types/v10";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
 import { resolveChunkMode } from "../auto-reply/chunk.js";
 import { loadConfig, type OpenBotConfig } from "../config/config.js";
 import { resolveMarkdownTableMode } from "../config/markdown-tables.js";
@@ -44,6 +45,7 @@ import {
 } from "./voice-message.js";
 
 type DiscordSendOpts = {
+  taskBoundary?: TaskActionBoundary;
   cfg?: OpenBotConfig;
   token?: string;
   accountId?: string;
@@ -472,6 +474,7 @@ export async function sendPollDiscord(
 }
 
 type VoiceMessageOpts = {
+  taskBoundary?: TaskActionBoundary;
   cfg?: OpenBotConfig;
   token?: string;
   accountId?: string;

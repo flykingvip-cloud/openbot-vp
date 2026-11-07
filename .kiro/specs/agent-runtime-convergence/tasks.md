@@ -927,3 +927,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Routed outbound Signal text and media now forward the captured task boundary to the transport recheck, matching monitor delivery. No recapture or new task identity is introduced. — codex-runtime-manager
 - Outbound/Signal regression 2 files / 46 PASS; full tsgo PASS; changed-file typed lint clean. Other channels and complete retirement acceptance remain open. — codex-runtime-manager
+
+## Discord request task boundary (2026-11-07)
+
+- Reproduced task output surviving invalidation during media loading (1 FAIL / 1 PASS). Discord client request now rechecks the supplied original task identity inside each retry attempt; normal and voice send options accept the boundary. No boundary is inferred for unbound control messages. Caller propagation, webhook and direct monitor paths remain pending. — codex-runtime-manager
+- Discord transport regression 2 files / 31 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement is not accepted. — codex-runtime-manager
