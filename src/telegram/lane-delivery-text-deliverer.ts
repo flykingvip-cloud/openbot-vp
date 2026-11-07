@@ -1,3 +1,5 @@
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
 import type { TelegramInlineButtons } from "./button-types.js";
 import type { TelegramDraftStream } from "./draft-stream.js";
@@ -69,10 +71,11 @@ type CreateLaneTextDelivererParams = {
   retainPreviewOnCleanupByLane: Record<LaneName, boolean>;
   draftMaxChars: number;
   applyTextToPayload: (payload: ReplyPayload, text: string) => ReplyPayload;
-  sendPayload: (payload: ReplyPayload) => Promise<boolean>;
+  sendPayload: (payload: ReplyPayload, taskBoundary?: TaskActionBoundary) => Promise<boolean>;
   flushDraftLane: (lane: DraftLaneState) => Promise<void>;
   stopDraftLane: (lane: DraftLaneState) => Promise<void>;
   editPreview: (params: {
+    taskBoundary?: TaskActionBoundary;
     laneName: LaneName;
     messageId: number;
     text: string;
@@ -85,6 +88,7 @@ type CreateLaneTextDelivererParams = {
 };
 
 type DeliverLaneTextParams = {
+  taskBoundary?: TaskActionBoundary;
   laneName: LaneName;
   text: string;
   payload: ReplyPayload;
@@ -94,6 +98,7 @@ type DeliverLaneTextParams = {
 };
 
 type TryUpdatePreviewParams = {
+  taskBoundary?: TaskActionBoundary;
   lane: DraftLaneState;
   laneName: LaneName;
   text: string;
@@ -109,6 +114,7 @@ type TryUpdatePreviewParams = {
 type PreviewEditResult = "edited" | "retained" | "fallback";
 
 type ConsumeArchivedAnswerPreviewParams = {
+  taskBoundary?: TaskActionBoundary;
   lane: DraftLaneState;
   text: string;
   payload: ReplyPayload;
@@ -166,6 +172,9 @@ function resolvePreviewTarget(params: ResolvePreviewTargetParams): PreviewTarget
 }
 
 export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
+  const sendPayload = (payload: ReplyPayload, boundary?: TaskActionBoundary) =>
+    boundary ? params.sendPayload(payload, boundary) : params.sendPayload(payload);
+
   const getLanePreviewText = (lane: DraftLaneState) => lane.lastPartialText;
   const markActivePreviewComplete = (laneName: LaneName) => {
     params.activePreviewLifecycleByLane[laneName] = "complete";
@@ -185,6 +194,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
   };
 
   const tryMaterializeDraftPreviewForFinal = async (args: {
+    taskBoundary?: TaskActionBoundary;
     lane: DraftLaneState;
     laneName: LaneName;
     text: string;
@@ -196,6 +206,12 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
     // Draft previews have no message_id to edit; materialize the final text
     // into a real message and treat that as the finalized delivery.
     stream.update(args.text);
+    if (args.taskBoundary) {
+      const refusal = checkTaskActionBoundary(args.taskBoundary);
+      if (refusal) {
+        throw new Error(refusal);
+      }
+    }
     const materializedMessageId = await stream.materialize?.();
     if (typeof materializedMessageId !== "number") {
       params.log(
@@ -209,6 +225,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
   };
 
   const tryEditPreviewMessage = async (args: {
+    taskBoundary?: TaskActionBoundary;
     laneName: LaneName;
     messageId: number;
     text: string;
@@ -219,8 +236,15 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
     finalTextAlreadyLanded: boolean;
     retainAlternatePreviewOnMissingTarget: boolean;
   }): Promise<PreviewEditResult> => {
+    if (args.taskBoundary) {
+      const refusal = checkTaskActionBoundary(args.taskBoundary);
+      if (refusal) {
+        throw new Error(refusal);
+      }
+    }
     try {
       await params.editPreview({
+        taskBoundary: args.taskBoundary,
         laneName: args.laneName,
         messageId: args.messageId,
         text: args.text,
@@ -233,6 +257,13 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
       params.markDelivered();
       return "edited";
     } catch (err) {
+      // A task refusal is not an ambiguous transport acknowledgement.
+      if (args.taskBoundary) {
+        const refusal = checkTaskActionBoundary(args.taskBoundary);
+        if (refusal) {
+          throw new Error(refusal, { cause: err });
+        }
+      }
       if (isMessageNotModifiedError(err)) {
         params.log(
           `telegram: ${args.laneName} preview ${args.context} edit returned "message is not modified"; treating as delivered`,
@@ -295,6 +326,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
   };
 
   const tryUpdatePreviewForLane = async ({
+    taskBoundary,
     lane,
     laneName,
     text,
@@ -312,6 +344,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
       retainAlternatePreviewOnMissingTarget: boolean,
     ) =>
       tryEditPreviewMessage({
+        taskBoundary,
         laneName,
         messageId,
         text,
@@ -403,6 +436,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
   };
 
   const consumeArchivedAnswerPreviewForFinal = async ({
+    taskBoundary,
     lane,
     text,
     payload,
@@ -415,6 +449,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
     }
     if (canEditViaPreview) {
       const finalized = await tryUpdatePreviewForLane({
+        taskBoundary,
         lane,
         laneName: "answer",
         text,
@@ -435,7 +470,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
     }
     // Send the replacement message first, then clean up the old preview.
     // This avoids the visual "disappear then reappear" flash.
-    const delivered = await params.sendPayload(params.applyTextToPayload(payload, text));
+    const delivered = await sendPayload(params.applyTextToPayload(payload, text), taskBoundary);
     // Once this archived preview is consumed by a fallback final send, delete it
     // regardless of deleteIfUnused. That flag only applies to unconsumed boundaries.
     if (delivered || archivedPreview.deleteIfUnused !== false) {
@@ -451,6 +486,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
   };
 
   return async ({
+    taskBoundary,
     laneName,
     text,
     payload,
@@ -458,6 +494,12 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
     previewButtons,
     allowPreviewUpdateForNonFinal = false,
   }: DeliverLaneTextParams): Promise<LaneDeliveryResult> => {
+    if (taskBoundary) {
+      const refusal = checkTaskActionBoundary(taskBoundary);
+      if (refusal) {
+        throw new Error(refusal);
+      }
+    }
     const lane = params.lanes[laneName];
     const hasMedia = Boolean(payload.mediaUrl) || (payload.mediaUrls?.length ?? 0) > 0;
     const canEditViaPreview =
@@ -466,6 +508,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
     if (infoKind === "final") {
       if (laneName === "answer") {
         const archivedResult = await consumeArchivedAnswerPreviewForFinal({
+          taskBoundary,
           lane,
           text,
           payload,
@@ -480,6 +523,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
         await params.flushDraftLane(lane);
         if (laneName === "answer") {
           const archivedResultAfterFlush = await consumeArchivedAnswerPreviewForFinal({
+            taskBoundary,
             lane,
             text,
             payload,
@@ -492,6 +536,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
         }
         if (canMaterializeDraftFinal(lane, previewButtons)) {
           const materialized = await tryMaterializeDraftPreviewForFinal({
+            taskBoundary,
             lane,
             laneName,
             text,
@@ -502,6 +547,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
           }
         }
         const finalized = await tryUpdatePreviewForLane({
+          taskBoundary,
           lane,
           laneName,
           text,
@@ -524,7 +570,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
         );
       }
       await params.stopDraftLane(lane);
-      const delivered = await params.sendPayload(params.applyTextToPayload(payload, text));
+      const delivered = await sendPayload(params.applyTextToPayload(payload, text), taskBoundary);
       return delivered ? "sent" : "skipped";
     }
 
@@ -540,7 +586,10 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
           params.log(
             `telegram: ${laneName} draft preview update not emitted; falling back to standard send`,
           );
-          const delivered = await params.sendPayload(params.applyTextToPayload(payload, text));
+          const delivered = await sendPayload(
+            params.applyTextToPayload(payload, text),
+            taskBoundary,
+          );
           return delivered ? "sent" : "skipped";
         }
         lane.lastPartialText = text;
@@ -548,6 +597,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
         return "preview-updated";
       }
       const updated = await tryUpdatePreviewForLane({
+        taskBoundary,
         lane,
         laneName,
         text,
@@ -562,7 +612,7 @@ export function createLaneTextDeliverer(params: CreateLaneTextDelivererParams) {
       }
     }
 
-    const delivered = await params.sendPayload(params.applyTextToPayload(payload, text));
+    const delivered = await sendPayload(params.applyTextToPayload(payload, text), taskBoundary);
     return delivered ? "sent" : "skipped";
   };
 }

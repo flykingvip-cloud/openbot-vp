@@ -957,3 +957,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Direct delivery helpers carry original task identity through text, media, voice fallback, follow-up text and pinning. Thread fallback rechecks before both original and threadless attempts, including after asynchronous media loading. Monitor caller propagation and draft lifecycle remain pending. — codex-runtime-manager
 - Direct Telegram regression 2 files / 30 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
+
+## Telegram buffered delivery identity (2026-11-07)
+
+- Monitor output and deferred final answers carry their original task boundary through lane delivery, fallback sends and preview edits. Task refusal during edit escapes ambiguous-ack handling instead of being recorded as delivered. Draft transport lifecycle remains a separate pending gate. — codex-runtime-manager
+- Lane/dispatch/reasoning regression 4 files / 94 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement and final same-version lifecycle acceptance remain open. — codex-runtime-manager
