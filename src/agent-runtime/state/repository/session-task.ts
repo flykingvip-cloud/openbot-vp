@@ -1,7 +1,3 @@
-import {
-  applyIncomingUserMessage,
-  commitSameTaskConstraint,
-} from "../../../conversation-task/session-task-board.js";
 import { commitAdmittedSessionTask } from "../mutations/admit-task.js";
 import {
   captureTaskCompletionBinding,
@@ -11,9 +7,9 @@ import {
 import { commitInteractionTaskProposal } from "../mutations/interaction-proposal.js";
 import { resumePausedCurrentTask } from "../mutations/resume-current.js";
 import { recordCheckedTaskCompletion } from "../mutations/task-completion.js";
-import { mutateSessionTaskBoard, readSessionTaskBoard } from "./task-board-file.js";
+import { readSessionTaskBoard } from "./task-board-file.js";
 
-/** Runtime owns storage and binding; remaining legacy business mutations share that same repository. */
+/** Typed runtime state authority; legacy text classification is outside this API. */
 export const sessionTaskState = {
   resumeCurrent: resumePausedCurrentTask,
   read: readSessionTaskBoard,
@@ -23,11 +19,4 @@ export const sessionTaskState = {
   admitExecution: commitAdmittedSessionTask,
   applyInteractionProposal: commitInteractionTaskProposal,
   startExecution: startBoundTaskExecution,
-  applyControl(sessionFile: string, prompt: string) {
-    return mutateSessionTaskBoard(sessionFile, (board) => {
-      const result = applyIncomingUserMessage({ board, incomingText: prompt });
-      return { board: result.board, value: result };
-    });
-  },
-  persistConstraint: commitSameTaskConstraint,
 };

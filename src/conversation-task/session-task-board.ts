@@ -235,6 +235,14 @@ export function commitSameTaskConstraint(params: {
   }
 }
 
+/** Compatibility-only text control adapter; typed interaction uses runtime mutations. */
+export function applyLegacyTaskControl(sessionFile: string, prompt: string): IncomingTurnResult {
+  return mutateSessionTaskBoard(sessionFile, (board) => {
+    const result = applyIncomingUserMessage({ board, incomingText: prompt });
+    return { board: result.board, value: result };
+  });
+}
+
 export function isOwnerCurrentTaskControlUtterance(text: string): boolean {
   const incoming = stripStamp(text);
   if (!incoming || incoming.startsWith("/")) {

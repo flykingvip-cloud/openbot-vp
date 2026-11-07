@@ -491,10 +491,7 @@
     "name": "runtime-state-no-legacy-board-facade",
     "from": "src/agent-runtime/state/**",
     "denyImportsFrom": ["src/conversation-task/session-task-board"],
-    "exemptFiles": [
-      "src/agent-runtime/state/repository/session-task.ts",
-      "src/agent-runtime/state/mutations/resume-current.test.ts"
-    ],
-    "description": "Migrated state storage, validity, recovery and execution binding cannot route back through the legacy board. Only the remaining business transition adapter and compatibility fixture are exempt."
+    "exemptFiles": ["src/agent-runtime/state/mutations/resume-current.test.ts"],
+    "description": "Runtime state authority cannot route through legacy task-board classification; only the compatibility fixture is exempt."
   }
 ]

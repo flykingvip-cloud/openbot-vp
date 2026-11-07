@@ -1187,3 +1187,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved target-bound interaction amendment/control transactions into state/mutations/interaction-proposal. The new repository consumes them directly; legacy exports reference the same implementation. The transaction consumes explicit amendment scope and has no legacy board/classifier dependency. — codex-runtime-manager
 - Admission/lifecycle regression 2 files / 4 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
+
+## Runtime state authority no longer imports legacy classification (2026-11-08)
+
+- Removed legacy text-control and keyword-constraint methods from the runtime state API. Existing compatibility consumers bind their original adapters explicitly; typed admission, amendment, control, execution binding and completion remain runtime-owned. Removed the repository exception from the no-legacy-state dependency gate. This isolates compatibility behavior; it does not claim all compatibility consumers retired. — codex-runtime-manager
+- Interaction/admission/lifecycle regression 3 files / 9 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS with no production state exception. — codex-runtime-manager

@@ -7,6 +7,8 @@ import { clearSessionQueues } from "../../auto-reply/reply/queue.js";
 import {
   activeConstraintTexts,
   isOwnerCurrentTaskControlUtterance,
+  applyLegacyTaskControl,
+  commitSameTaskConstraint,
 } from "../../conversation-task/session-task-board.js";
 import {
   classifyTurnRelation,
@@ -36,7 +38,7 @@ function bindOwnerControlPorts(params: {
   queueKeys: (string | undefined)[];
 }): CurrentTaskControlPorts {
   return {
-    applyControl: (prompt) => sessionTaskState.applyControl(params.sessionFile, prompt),
+    applyControl: (prompt) => applyLegacyTaskControl(params.sessionFile, prompt),
     abortMain: () => {
       abortEmbeddedPiRun(params.sessionId);
     },
@@ -61,7 +63,7 @@ function bindAmendmentPorts(params: {
         : "",
     persist: (expectedTaskId) =>
       Boolean(params.sessionFile) &&
-      sessionTaskState.persistConstraint({
+      commitSameTaskConstraint({
         sessionFile: params.sessionFile,
         constraintText: params.prompt,
         expectedTaskId,
