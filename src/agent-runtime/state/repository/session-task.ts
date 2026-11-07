@@ -1,6 +1,5 @@
 import {
   applyIncomingUserMessage,
-  recordCheckedTaskCompletion,
   commitSameTaskConstraint,
   commitAdmittedSessionTask,
   commitInteractionTaskProposal,
@@ -11,6 +10,7 @@ import {
   startBoundTaskExecution,
 } from "../mutations/execution-binding.js";
 import { resumePausedCurrentTask } from "../mutations/resume-current.js";
+import { recordCheckedTaskCompletion } from "../mutations/task-completion.js";
 import { mutateSessionTaskBoard, readSessionTaskBoard } from "./task-board-file.js";
 
 /** Runtime owns storage and binding; remaining legacy business mutations share that same repository. */

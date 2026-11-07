@@ -1,3 +1,11 @@
+export {
+  formatParkedAt,
+  PARKED_TASK_REMINDER_SENTINEL,
+} from "../agent-runtime/context/sources/task-completion-notice.js";
+export {
+  recordCheckedTaskCompletion,
+  finishCurrentTask,
+} from "../agent-runtime/state/mutations/task-completion.js";
 import { cloneBoardShell } from "../agent-runtime/state/repository/task-board-file.js";
 export {
   captureTaskCompletionBinding,
@@ -32,8 +40,6 @@ export {
 } from "../agent-runtime/context/index.js";
 import type { InteractionModelDecision } from "../agent-runtime/contracts/interaction.js";
 import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
-import { isLiveTaskBinding } from "../agent-runtime/policy/index.js";
-import { appendTaskCompletionNotice } from "../agent-runtime/state/completion-notice.js";
 export type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
 import { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
 export { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
@@ -55,6 +61,7 @@ import type {
   SessionTaskBoard,
   IncomingTurnResult,
 } from "../agent-runtime/contracts/task.js";
+import { MAX_PARKED_TASKS } from "../agent-runtime/policy/task-board-limits.js";
 import { isTaskSurfaceUtterance } from "../agents/task-surface/surface.js";
 import { formatDroppedParkedTaskSentence, type FocusSnapshot } from "./focus-policy.js";
 import {
@@ -64,8 +71,7 @@ import {
   shouldPersistOwnerConstraint,
   titleFromGoal,
 } from "./turn-relation.js";
-
-export const MAX_PARKED_TASKS = 3;
+export { MAX_PARKED_TASKS } from "../agent-runtime/policy/task-board-limits.js";
 
 const INBOUND_STAMP_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} [0-9:]{4,8} GMT[+-]\d+\]\s*/;
 
@@ -200,21 +206,6 @@ function switchStatus(
   const count = typeof parkedCount === "number" ? parkedCount : 1;
   const line = `已挂起「${currentTitle}」，开始「${incomingTitle}」。当前任务：「${incomingTitle}」；已挂起 ${count} 项。`;
   return archivedText ? `${line}${archivedText}` : line;
-}
-
-export function formatParkedAt(ms?: number): string {
-  if (typeof ms !== "number" || !Number.isFinite(ms)) {
-    return "未知时间";
-  }
-  return new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(new Date(ms));
 }
 
 function findParked(board: SessionTaskBoard, token: string): TrackedTask | undefined {
@@ -860,112 +851,6 @@ export function cancelParkedTask(params: {
 /** Owner CLOSE — same as cancelParkedTask: item leaves the board and is not a continue target. */
 export const closeParkedTask = cancelParkedTask;
 
-/** Transcript / UI marker: current focus finished; remind about parked prior tasks. */
-export const PARKED_TASK_REMINDER_SENTINEL = "[PARKED_TASK_REMINDER]";
-
-function renderCompletionNotice(parked: readonly TrackedTask[]): string {
-  if (parked.length === 0) {
-    return "当前任务已完成，交付已核对。";
-  }
-  // newest-first board: slot 0 is the prior task the user most recently left.
-  const primary = parked[0];
-  if (!primary) {
-    return "当前任务已完成，交付已核对。";
-  }
-  const where = primary.stop.summary || "未记录停点";
-  const files = primary.stop.workspacePaths.filter(Boolean);
-  const lines = [
-    "**挂起提醒** · 还有未结束的任务",
-    "",
-    PARKED_TASK_REMINDER_SENTINEL,
-    "",
-    `当前任务已完成，交付已核对。已挂起 ${parked.length} 项；可 CONTINUE 继续一项，或 CLOSE 关闭并移出任务板。`,
-    "",
-    `前任务：「${primary.title}」`,
-    `任务 ID：\`${primary.taskId}\``,
-    `停在：${where}`,
-  ];
-  if (files.length > 0) {
-    lines.push(`文件：${files.join("、")}`);
-  }
-  lines.push(`挂起于：${formatParkedAt(primary.parkedAtMs)}`);
-  if (parked.length > 1) {
-    const others = parked
-      .slice(1, MAX_PARKED_TASKS)
-      .map((task) => `「${task.title}」`)
-      .join("、");
-    lines.push("", `另有 ${parked.length - 1} 个挂起任务：${others}。`);
-  }
-  // Text fallbacks for non-UI / copy-paste clients (CONTINUE / CLOSE aliases accepted).
-  lines.push(
-    "",
-    `继续挂起 ${primary.taskId}`,
-    `取消挂起 ${primary.taskId}`,
-    `CONTINUE ${primary.taskId}`,
-    `CLOSE ${primary.taskId}`,
-  );
-  return lines.join("\n");
-}
-
-/** Real close only. A model claim with closed=false does not announce or rewrite the board. */
-export function recordCheckedTaskCompletion(params: {
-  sessionFile?: string;
-  closed: boolean;
-  binding?: TaskCompletionBinding;
-  /** Delivered result needs no extra transcript bubble. */
-  appendNotice?: boolean;
-}): {
-  notice?: string;
-  persisted: boolean;
-} {
-  if (!params.closed || !params.binding?.taskId?.trim()) {
-    return { persisted: false };
-  }
-  const file = params.sessionFile?.trim();
-  if (!file) {
-    return { persisted: false };
-  }
-  // Lock contention / stale CAS must not crash the caller (cross-process completer
-  // busy-loops). Surface persisted:false so the peer can retry.
-  let finished: { board: SessionTaskBoard; notice?: string; rejected?: boolean };
-  try {
-    finished = withSessionTaskBoardLock(file, () => {
-      const board = readSessionTaskBoardUnlocked(file);
-      const binding = params.binding!;
-      if (!isLiveTaskBinding(board, binding, activeConstraintTexts(board.current))) {
-        return { board, rejected: true };
-      }
-      const result = finishCurrentTask({ board, deliverableChecked: true, ...binding });
-      if (!result.rejected) {
-        writeSessionTaskBoardUnlocked(file, result.board);
-      }
-      return result;
-    });
-  } catch (err) {
-    const name = err instanceof Error ? err.name : "";
-    const message = err instanceof Error ? err.message : String(err);
-    if (
-      name === "StaleSessionTaskBoardWriteError" ||
-      /lock|ELOCKED|timed out|timeout/i.test(message)
-    ) {
-      return { persisted: false };
-    }
-    throw err;
-  }
-  if (finished.rejected) {
-    return { persisted: false };
-  }
-  if (params.appendNotice === false) {
-    return { persisted: true };
-  }
-  const notice = finished.notice ?? renderCompletionNotice(finished.board.parked);
-  let persisted = false;
-  if (fs.existsSync(file)) {
-    persisted = appendTaskCompletionNotice(file, params.binding, notice);
-  }
-  return { notice, persisted };
-}
-
 /** Oldest-first parked slots from the session board, when that file is known. */
 export function enrichFocusSnapshotWithBoard(
   snapshot: FocusSnapshot,
@@ -1031,77 +916,6 @@ export function commitAutomaticPark(params: {
       value: parked.archived,
     };
   });
-}
-
-export function finishCurrentTask(params: {
-  board: SessionTaskBoard;
-  deliverableChecked: boolean;
-  /** C4: complete must bind this taskId; mismatch → reject, board unchanged. */
-  taskId?: string;
-  /** C4: deliverable version stamp. */
-  deliverableVersion?: string;
-  /** C4: execution attempt stamp. */
-  executionAttempt?: string;
-}): {
-  board: SessionTaskBoard;
-  notice?: string;
-  rejected?: boolean;
-  reason?: string;
-} {
-  const board = cloneBoardShell(params.board);
-  const current = board.current;
-  if (!current) {
-    return { board };
-  }
-  const expectedTaskId = params.taskId?.trim();
-  if (expectedTaskId && expectedTaskId !== current.taskId) {
-    return {
-      board: params.board,
-      rejected: true,
-      reason: "task_id_mismatch",
-    };
-  }
-  if (isTaskTombstoned(board, current.taskId)) {
-    return {
-      board: params.board,
-      rejected: true,
-      reason: "tombstoned",
-    };
-  }
-  if (
-    params.deliverableVersion &&
-    current.deliverableVersion &&
-    params.deliverableVersion !== current.deliverableVersion
-  ) {
-    return {
-      board: params.board,
-      rejected: true,
-      reason: "deliverable_version_mismatch",
-    };
-  }
-  if (
-    params.executionAttempt &&
-    current.executionAttempt &&
-    params.executionAttempt !== current.executionAttempt
-  ) {
-    return {
-      board: params.board,
-      rejected: true,
-      reason: "execution_attempt_mismatch",
-    };
-  }
-  const nextCurrent: TrackedTask = {
-    ...current,
-    unfinished: false,
-    deliverableChecked: params.deliverableChecked,
-    ...(params.deliverableVersion ? { deliverableVersion: params.deliverableVersion } : {}),
-    ...(params.executionAttempt ? { executionAttempt: params.executionAttempt } : {}),
-  };
-  const nextBoard: SessionTaskBoard = { ...board, current: nextCurrent };
-  if (!params.deliverableChecked) {
-    return { board: nextBoard };
-  }
-  return { board: nextBoard, notice: renderCompletionNotice(nextBoard.parked) };
 }
 
 /**

@@ -1138,3 +1138,7 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Deterministically reproduced stale inspection ENOENT deleting a replacement lock (1 FAIL before / PASS after). Sync and async inspection failures now refuse stale deletion; living-owner checks remain intact. This proves the specific lock defect, not the exact event sequence of the earlier pause race. — codex-runtime-manager
 - Lock liveness 4 PASS; combined lock/cross-process/restart regression previously 13 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
+
+## Completion transaction checkpoint (2026-11-08)
+
+- Completion transaction and notice extraction passed final targeted regression after the lock inspection repair: 5 files / 38 PASS. Full tsgo, typed lint and architecture 53 PASS. Earlier intermittent pause-race evidence remains recorded; the deterministic lock repair does not prove its exact cause. Legacy completion exports now refer to runtime state implementation. — codex-runtime-manager
