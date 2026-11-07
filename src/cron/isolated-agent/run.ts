@@ -95,6 +95,7 @@ import {
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
+  usageCarriedByModelError,
 } from "../../task-outcome/runtime-from-runner.js";
 import { classifyCronCompletion } from "../completion-contract.js";
 import { isCronDeliveryOnlyFailure, isCronDeliveryToolError } from "../delivery-only-failure.js";
@@ -887,9 +888,8 @@ export async function runCronIsolatedAgentTurn(params: {
   let cronOutcomeCloseoutDone = false;
   /** Real usage-derived USD when the pre-call gate did not already charge this fire. */
   let tipBudgetCostUsd: number | undefined;
-  let lastModelCallLink:
-    | import("../../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink
-    | null = null;
+  const modelCallLinks: import("../../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink[] =
+    [];
   let cronBudgetCharged = false;
   let cronBudgetCallSeq = 0;
   let cronForcedFailureReason: "budget_exceeded" | undefined;
@@ -909,7 +909,7 @@ export async function runCronIsolatedAgentTurn(params: {
     });
     cronBudgetCharged = true;
     if (charged.modelCallLink) {
-      lastModelCallLink = charged.modelCallLink;
+      modelCallLinks.push(charged.modelCallLink);
     }
     if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
       tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
@@ -1012,7 +1012,7 @@ export async function runCronIsolatedAgentTurn(params: {
           latencyMs: Math.max(0, runEndedAt - runStartedAt),
           ...(cronBudgetCharged ? { skipBudgetCharge: true } : {}),
           ...(!cronBudgetCharged && tipBudgetCostUsd != null ? { costUsd: tipBudgetCostUsd } : {}),
-          ...(lastModelCallLink ? { modelCallLink: lastModelCallLink } : {}),
+          ...(modelCallLinks.length > 0 ? { modelCallLinks } : {}),
           ...(failureReason
             ? {
                 failureReason,
@@ -1161,171 +1161,192 @@ export async function runCronIsolatedAgentTurn(params: {
           fallbacksOverride:
             payloadFallbacks ?? resolveAgentModelFallbacksOverride(params.cfg, agentId),
           run: async (providerOverride, modelOverride, runOptions) => {
-            if (abortSignal?.aborted) {
-              throw new Error(abortReason());
-            }
-            if (cronOutcomeTaskId && cronOutcomeScope) {
-              assertRunnerTurnBudgetAllowsModelCall(cfgWithAgentDefaults, agentId, {
-                taskId: cronOutcomeTaskId,
-                scope: cronOutcomeScope,
-                startedAtMs: runStartedAt,
-              });
-            }
-            const bootstrapPromptWarningSignature =
-              bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1];
-            // Ledger ticks need the embedded tool loop. runCliAgent disables tools.
-            // A non-qualifying cron has no goal and no acceptance, so it stays tool-less
-            // even when the model is an API provider. CLI backends keep runCliAgent;
-            // other providers use the embedded runner with an empty tool set.
-            if (!ledgerSession && isCliProvider(providerOverride, cfgWithAgentDefaults)) {
-              // Fresh isolated cron sessions must not reuse a stored CLI session ID.
-              // Passing an existing ID activates the resume watchdog profile
-              // (noOutputTimeoutRatio 0.3, maxMs 180 s) instead of the fresh profile
-              // (ratio 0.8, maxMs 600 s), causing jobs to time out at roughly 1/3 of
-              // the configured timeoutSeconds. See: https://github.com/openclaw/openclaw/issues/29774
-              const cliSessionId = cronSession.isNewSession
-                ? undefined
-                : getCliSessionId(cronSession.sessionEntry, providerOverride);
-              // CLI 后端凭证桥（Task 6/9）：cron 隔离运行同样按 bot 归属席位解析企业作用域，
-              // 注入个人/企业凭证并在完成后写 UsageAttribution。fail-safe → 回退主机默认 env。
-              let credentialEnv: Record<string, string> | undefined;
-              let usageAttr: { tenantId: string; userId: string; credentialId: string } | undefined;
-              try {
-                const credScope = await resolveAgentRunEntitlementScope({ agentId });
-                if (credScope) {
-                  const resolved = await resolveCredentialForRun({
-                    backendId: providerOverride,
-                    model: modelOverride,
-                    scope: {
-                      tenantId: credScope.tenantId,
-                      subjectId: credScope.employeeId ?? credScope.seatId,
-                    },
-                    config: cfgWithAgentDefaults,
-                  });
-                  if (resolved) {
-                    credentialEnv = resolved.env;
-                    usageAttr = {
-                      tenantId: credScope.tenantId,
-                      userId: credScope.employeeId ?? credScope.seatId ?? "",
-                      credentialId: resolved.credentialId,
-                    };
-                  }
-                }
-              } catch {
-                credentialEnv = undefined;
-                usageAttr = undefined;
+            try {
+              if (abortSignal?.aborted) {
+                throw new Error(abortReason());
               }
-              const result = await runCliAgent({
+              if (cronOutcomeTaskId && cronOutcomeScope) {
+                assertRunnerTurnBudgetAllowsModelCall(cfgWithAgentDefaults, agentId, {
+                  taskId: cronOutcomeTaskId,
+                  scope: cronOutcomeScope,
+                  startedAtMs: runStartedAt,
+                });
+              }
+              const bootstrapPromptWarningSignature =
+                bootstrapPromptWarningSignaturesSeen[
+                  bootstrapPromptWarningSignaturesSeen.length - 1
+                ];
+              // Ledger ticks need the embedded tool loop. runCliAgent disables tools.
+              // A non-qualifying cron has no goal and no acceptance, so it stays tool-less
+              // even when the model is an API provider. CLI backends keep runCliAgent;
+              // other providers use the embedded runner with an empty tool set.
+              if (!ledgerSession && isCliProvider(providerOverride, cfgWithAgentDefaults)) {
+                // Fresh isolated cron sessions must not reuse a stored CLI session ID.
+                // Passing an existing ID activates the resume watchdog profile
+                // (noOutputTimeoutRatio 0.3, maxMs 180 s) instead of the fresh profile
+                // (ratio 0.8, maxMs 600 s), causing jobs to time out at roughly 1/3 of
+                // the configured timeoutSeconds. See: https://github.com/openclaw/openclaw/issues/29774
+                const cliSessionId = cronSession.isNewSession
+                  ? undefined
+                  : getCliSessionId(cronSession.sessionEntry, providerOverride);
+                // CLI 后端凭证桥（Task 6/9）：cron 隔离运行同样按 bot 归属席位解析企业作用域，
+                // 注入个人/企业凭证并在完成后写 UsageAttribution。fail-safe → 回退主机默认 env。
+                let credentialEnv: Record<string, string> | undefined;
+                let usageAttr:
+                  | { tenantId: string; userId: string; credentialId: string }
+                  | undefined;
+                try {
+                  const credScope = await resolveAgentRunEntitlementScope({ agentId });
+                  if (credScope) {
+                    const resolved = await resolveCredentialForRun({
+                      backendId: providerOverride,
+                      model: modelOverride,
+                      scope: {
+                        tenantId: credScope.tenantId,
+                        subjectId: credScope.employeeId ?? credScope.seatId,
+                      },
+                      config: cfgWithAgentDefaults,
+                    });
+                    if (resolved) {
+                      credentialEnv = resolved.env;
+                      usageAttr = {
+                        tenantId: credScope.tenantId,
+                        userId: credScope.employeeId ?? credScope.seatId ?? "",
+                        credentialId: resolved.credentialId,
+                      };
+                    }
+                  }
+                } catch {
+                  credentialEnv = undefined;
+                  usageAttr = undefined;
+                }
+                const result = await runCliAgent({
+                  sessionId: cronSession.sessionEntry.sessionId,
+                  sessionKey: agentSessionKey,
+                  agentId,
+                  sessionFile,
+                  workspaceDir,
+                  config: cfgWithAgentDefaults,
+                  prompt: promptText,
+                  provider: providerOverride,
+                  model: modelOverride,
+                  thinkLevel,
+                  timeoutMs,
+                  runId: cronSession.sessionEntry.sessionId,
+                  cliSessionId,
+                  bootstrapPromptWarningSignaturesSeen,
+                  bootstrapPromptWarningSignature,
+                  ...(cronExtraSystemPrompt ? { extraSystemPrompt: cronExtraSystemPrompt } : {}),
+                  ...(credentialEnv ? { credentialEnv } : {}),
+                });
+                if (usageAttr) {
+                  void recordCliBackendUsage({
+                    tenantId: usageAttr.tenantId,
+                    userId: usageAttr.userId,
+                    backendId: providerOverride,
+                    credentialId: usageAttr.credentialId,
+                    model: modelOverride,
+                    executionId: cronSession.sessionEntry.sessionId,
+                  });
+                }
+                bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
+                  result.meta?.systemPromptReport,
+                );
+                chargeCronModelCall({
+                  usage: result.meta?.agentMeta?.usage,
+                  provider: providerOverride,
+                  model: modelOverride,
+                });
+                return result;
+              }
+              const transport = await resolveEnterpriseEmbeddedTransport({
+                provider: providerOverride,
+                model: modelOverride,
+                tenantId:
+                  modelGate?.tenantId?.trim() ||
+                  modelGate?.creditReporting?.enterpriseId?.trim() ||
+                  "",
+              });
+              const embeddedProvider = transport.provider;
+              const embeddedModel = transport.model;
+              const providerAuthOverride = transport.providerAuthOverride;
+              const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
+              const result = await runEmbeddedPiAgent({
                 sessionId: cronSession.sessionEntry.sessionId,
                 sessionKey: agentSessionKey,
                 agentId,
+                trigger: "cron",
+                // Cron jobs are trusted local automation, so isolated runs should
+                // inherit owner-only tooling like local `openclaw agent` runs.
+                senderIsOwner: true,
+                // Ownership-resolved executionIdentity + trusted scalars for nested hops.
+                ...cronSandboxRunIdentity,
+                messageChannel,
+                agentAccountId: resolvedDelivery.accountId,
                 sessionFile,
+                agentDir,
                 workspaceDir,
                 config: cfgWithAgentDefaults,
+                skillsSnapshot,
                 prompt: promptText,
-                provider: providerOverride,
-                model: modelOverride,
+                lane: resolveNestedAgentLane(params.lane),
+                provider: embeddedProvider,
+                model: embeddedModel,
+                ...(providerAuthOverride ? { providerAuthOverride } : {}),
+                ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
+                authProfileId,
+                authProfileIdSource,
                 thinkLevel,
+                verboseLevel: resolvedVerboseLevel,
                 timeoutMs,
+                bootstrapContextMode: agentPayload?.lightContext ? "lightweight" : undefined,
+                bootstrapContextRunKind: "cron",
                 runId: cronSession.sessionEntry.sessionId,
-                cliSessionId,
+                requireExplicitMessageTarget: toolPolicy.requireExplicitMessageTarget,
+                disableMessageTool: toolPolicy.disableMessageTool,
+                allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
+                abortSignal,
                 bootstrapPromptWarningSignaturesSeen,
                 bootstrapPromptWarningSignature,
                 ...(cronExtraSystemPrompt ? { extraSystemPrompt: cronExtraSystemPrompt } : {}),
-                ...(credentialEnv ? { credentialEnv } : {}),
+                // Heartbeat/no-op bodies may still answer HEARTBEAT_OK. Reminders must not
+                // see the heartbeat prompt that tells the model to emit that token.
+                ...(!isCronHeartbeatNoOpBody(params.message) ? { omitHeartbeatPrompt: true } : {}),
+                // Vague reminders and other non-qualifying jobs must not receive tools.
+                ...(!ledgerSession ? { disableTools: true } : {}),
+                ...(ledgerSession
+                  ? {
+                      onAgentEvent: (evt: { stream: string; data: Record<string, unknown> }) => {
+                        void ledgerSession.observeAgentEvent(evt);
+                      },
+                    }
+                  : {}),
               });
-              if (usageAttr) {
-                void recordCliBackendUsage({
-                  tenantId: usageAttr.tenantId,
-                  userId: usageAttr.userId,
-                  backendId: providerOverride,
-                  credentialId: usageAttr.credentialId,
-                  model: modelOverride,
-                  executionId: cronSession.sessionEntry.sessionId,
-                });
-              }
               bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                 result.meta?.systemPromptReport,
               );
               chargeCronModelCall({
                 usage: result.meta?.agentMeta?.usage,
-                provider: providerOverride,
-                model: modelOverride,
+                provider: embeddedProvider,
+                model: embeddedModel,
               });
               return result;
-            }
-            const transport = await resolveEnterpriseEmbeddedTransport({
-              provider: providerOverride,
-              model: modelOverride,
-              tenantId:
-                modelGate?.tenantId?.trim() ||
-                modelGate?.creditReporting?.enterpriseId?.trim() ||
-                "",
-            });
-            const embeddedProvider = transport.provider;
-            const embeddedModel = transport.model;
-            const providerAuthOverride = transport.providerAuthOverride;
-            const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
-            const result = await runEmbeddedPiAgent({
-              sessionId: cronSession.sessionEntry.sessionId,
-              sessionKey: agentSessionKey,
-              agentId,
-              trigger: "cron",
-              // Cron jobs are trusted local automation, so isolated runs should
-              // inherit owner-only tooling like local `openclaw agent` runs.
-              senderIsOwner: true,
-              // Ownership-resolved executionIdentity + trusted scalars for nested hops.
-              ...cronSandboxRunIdentity,
-              messageChannel,
-              agentAccountId: resolvedDelivery.accountId,
-              sessionFile,
-              agentDir,
-              workspaceDir,
-              config: cfgWithAgentDefaults,
-              skillsSnapshot,
-              prompt: promptText,
-              lane: resolveNestedAgentLane(params.lane),
-              provider: embeddedProvider,
-              model: embeddedModel,
-              ...(providerAuthOverride ? { providerAuthOverride } : {}),
-              ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
-              authProfileId,
-              authProfileIdSource,
-              thinkLevel,
-              verboseLevel: resolvedVerboseLevel,
-              timeoutMs,
-              bootstrapContextMode: agentPayload?.lightContext ? "lightweight" : undefined,
-              bootstrapContextRunKind: "cron",
-              runId: cronSession.sessionEntry.sessionId,
-              requireExplicitMessageTarget: toolPolicy.requireExplicitMessageTarget,
-              disableMessageTool: toolPolicy.disableMessageTool,
-              allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
-              abortSignal,
-              bootstrapPromptWarningSignaturesSeen,
-              bootstrapPromptWarningSignature,
-              ...(cronExtraSystemPrompt ? { extraSystemPrompt: cronExtraSystemPrompt } : {}),
-              // Heartbeat/no-op bodies may still answer HEARTBEAT_OK. Reminders must not
-              // see the heartbeat prompt that tells the model to emit that token.
-              ...(!isCronHeartbeatNoOpBody(params.message) ? { omitHeartbeatPrompt: true } : {}),
-              // Vague reminders and other non-qualifying jobs must not receive tools.
-              ...(!ledgerSession ? { disableTools: true } : {}),
-              ...(ledgerSession
-                ? {
-                    onAgentEvent: (evt: { stream: string; data: Record<string, unknown> }) => {
-                      void ledgerSession.observeAgentEvent(evt);
-                    },
+            } catch (err) {
+              if (!(err instanceof TaskBudgetExceededError)) {
+                try {
+                  chargeCronModelCall({
+                    usage: usageCarriedByModelError(err),
+                    provider: providerOverride,
+                    model: modelOverride,
+                  });
+                } catch (chargeErr) {
+                  if (chargeErr instanceof TaskBudgetExceededError) {
+                    throw chargeErr;
                   }
-                : {}),
-            });
-            bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
-              result.meta?.systemPromptReport,
-            );
-            chargeCronModelCall({
-              usage: result.meta?.agentMeta?.usage,
-              provider: embeddedProvider,
-              model: embeddedModel,
-            });
-            return result;
+                }
+              }
+              throw err;
+            }
           },
         });
         runResult = fallbackResult.result;

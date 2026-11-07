@@ -8,7 +8,7 @@ import {
 } from "../executor-evidence/association.js";
 import { publishFinalEvidenceLink } from "../executor-evidence/association.js";
 import { buildCostColumns } from "../executor-evidence/cost-columns.js";
-import { snapshotIdentityFingerprint } from "../executor-evidence/identity.js";
+import { fullScopeEqual, snapshotIdentityFingerprint } from "../executor-evidence/identity.js";
 import {
   currentExecutorModelCall,
   getModelCall,
@@ -144,6 +144,8 @@ export type RunnerTurnOutcomeInput = {
   skipBudgetCharge?: boolean;
   /** Captured from chargeModelCallAgainstTip. Closeout does not invent a call. */
   modelCallLink?: ModelCallCloseoutLink | null;
+  /** Every candidate in the turn, including failed and cancelled calls. */
+  modelCallLinks?: ModelCallCloseoutLink[];
 };
 
 export type ModelCallCloseoutLink = {
@@ -154,6 +156,7 @@ export type ModelCallCloseoutLink = {
   chargeCommitId: string | null;
   requestDigest: string | null;
   usageFingerprint: string;
+  commandId: string;
 };
 
 export type GrowthOutcomeCommitOpts = {
@@ -170,6 +173,14 @@ export type GrowthOutcomeCommitOpts = {
   /** Mid-run budget already charged — skip closeout accumulate. */
   skipBudgetCharge?: boolean;
 };
+
+/** Usage attached by a candidate failure, when the transport recorded it before throwing. */
+export function usageCarriedByModelError(err: unknown): unknown {
+  if (!err || typeof err !== "object" || !("usage" in err)) {
+    return undefined;
+  }
+  return (err as { usage?: unknown }).usage;
+}
 
 function resolveStoreRoot(cfg: OpenBotConfig, agentId: string): string {
   return path.join(resolveAgentDir(cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
@@ -540,7 +551,7 @@ export function chargeRunnerTurnBudgetSpend(
   }
   if (ctx.record.lifecycle === "closed") {
     const commandId = `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`;
-    const verified = verifyStoredSpend(ctx.store, commandId);
+    const verified = verifyStoredSpend(ctx.store, commandId, params.scope);
     const parentTaskId = params.parentTaskId?.trim();
     if (parentTaskId && parentTaskId !== params.taskId && verified) {
       attributeChildSpendToParent(cfg, agentId, {
@@ -613,9 +624,7 @@ export function chargeRunnerTurnBudgetSpend(
   });
   // Replay and conflict keep the stored command. A new callback cost is not committed.
   let record = spent.ok ? spent.record : (ctx.store.loadTask(params.taskId) ?? ctx.record);
-  const storedSpend = spent.ok
-    ? (spent.committedSpend ?? null)
-    : verifyStoredSpend(ctx.store, commandId);
+  const storedSpend = verifyStoredSpend(ctx.store, commandId, params.scope);
   const recovering =
     budgetCommand.disposition === "replayed" || budgetCommand.disposition === "conflict";
   const sideEffectSpend: CommittedSpend | null =
@@ -672,6 +681,7 @@ export function chargeRunnerTurnBudgetSpend(
 function verifyStoredSpend(
   store: DurableTaskOutcomeStore,
   commandId: string,
+  scope: TrustedScope,
 ): CommittedSpend | null {
   const prior = store.loadCommand(commandId);
   const spend = prior?.committedSpend;
@@ -693,7 +703,22 @@ function verifyStoredSpend(
     bundle.commandLog?.digest !== prior.digest ||
     logged.iterations !== spend.iterations ||
     logged.costUsd !== spend.costUsd ||
-    logged.costEvidence !== spend.costEvidence
+    logged.costEvidence !== spend.costEvidence ||
+    bundle.taskId !== prior.taskId ||
+    bundle.record.taskId !== prior.taskId ||
+    bundle.record.outcomeVersion !== prior.outcomeVersion
+  ) {
+    return null;
+  }
+  const snapshot = store.loadTaskVersion(prior.taskId, prior.outcomeVersion);
+  if (
+    !snapshot ||
+    snapshot.taskId !== prior.taskId ||
+    snapshot.outcomeVersion !== prior.outcomeVersion ||
+    !fullScopeEqual(snapshot.scope, scope) ||
+    !prior.snapshotFingerprint ||
+    snapshotIdentityFingerprint(snapshot) !== prior.snapshotFingerprint ||
+    snapshotIdentityFingerprint(bundle.record) !== prior.snapshotFingerprint
   ) {
     return null;
   }
@@ -871,6 +896,7 @@ export function chargeModelCallAgainstTip(
             chargeCommitId: charged.budgetCommand.commitId,
             requestDigest: charged.budgetCommand.requestDigest,
             usageFingerprint: usageFingerprint(active.usage),
+            commandId: charged.budgetCommand.commandId,
           }
         : null,
   };
@@ -1183,6 +1209,7 @@ export async function recordRunnerTurnOutcome(
         attemptId,
         closed.record,
         input.modelCallLink,
+        input.modelCallLinks,
       );
       return { record: closed.record, evolution };
     }
@@ -1325,6 +1352,7 @@ export async function recordRunnerTurnOutcome(
     attemptId,
     record,
     input.modelCallLink,
+    input.modelCallLinks,
   );
   return { record, evolution };
 }
@@ -1338,34 +1366,72 @@ function linkRunnerFinalEvidence(
   taskAttemptId: string,
   record: TaskOutcomeRecord,
   link: ModelCallCloseoutLink | null | undefined,
+  links: ModelCallCloseoutLink[] | undefined,
 ): void {
+  const all = dedupeLinks([...(links ?? []), ...(link ? [link] : [])]);
   try {
     const storeRoot = resolveStoreRoot(cfg, agentId);
-    const call = link
-      ? (getModelCall(link.callId) ??
-        readCallFiles(storeRoot).rows.find((row) => row.callId === link.callId) ??
-        null)
-      : null;
-    publishFinalEvidenceLink({
-      storeRoot,
-      call,
-      scope,
-      agentId,
-      taskId,
-      runId,
-      candidateAttemptId: link?.candidateAttemptId ?? null,
-      taskAttemptId,
-      chargeOutcomeVersion: link?.chargeOutcomeVersion ?? null,
-      finalOutcomeVersion: record.outcomeVersion,
-      recordRuns: record.runs.map((run) => ({ runId: run.runId, attemptIds: run.attemptIds })),
-      recordAttempts: record.attempts.map((attempt) => attempt.attemptId),
-      receiptReturned: true,
-      usageFingerprint: link?.usageFingerprint ?? null,
-      snapshotFingerprint: snapshotIdentityFingerprint(record),
-    });
+    if (all.length === 0) {
+      publishFinalEvidenceLink({
+        storeRoot,
+        call: null,
+        scope,
+        agentId,
+        taskId,
+        runId,
+        candidateAttemptId: null,
+        taskAttemptId,
+        chargeOutcomeVersion: null,
+        finalOutcomeVersion: record.outcomeVersion,
+        recordRuns: record.runs.map((run) => ({ runId: run.runId, attemptIds: run.attemptIds })),
+        recordAttempts: record.attempts.map((attempt) => attempt.attemptId),
+        receiptReturned: true,
+        snapshotFingerprint: snapshotIdentityFingerprint(record),
+      });
+      return;
+    }
+    for (const item of all) {
+      const call =
+        getModelCall(item.callId) ??
+        readCallFiles(storeRoot).rows.find((row) => row.callId === item.callId) ??
+        null;
+      publishFinalEvidenceLink({
+        storeRoot,
+        call,
+        scope,
+        agentId,
+        taskId,
+        runId,
+        candidateAttemptId: item.candidateAttemptId,
+        taskAttemptId,
+        chargeOutcomeVersion: item.chargeOutcomeVersion,
+        finalOutcomeVersion: record.outcomeVersion,
+        recordRuns: record.runs.map((run) => ({ runId: run.runId, attemptIds: run.attemptIds })),
+        recordAttempts: record.attempts.map((attempt) => attempt.attemptId),
+        receiptReturned: true,
+        usageFingerprint: item.usageFingerprint,
+        snapshotFingerprint: snapshotIdentityFingerprint(record),
+        budgetCommandId: item.commandId,
+        chargeCommitId: item.chargeCommitId,
+        requestDigest: item.requestDigest,
+      });
+    }
   } catch {
     // Final evidence must not change the task receipt.
   }
+}
+
+function dedupeLinks(links: ModelCallCloseoutLink[]): ModelCallCloseoutLink[] {
+  const seen = new Set<string>();
+  const out: ModelCallCloseoutLink[] = [];
+  for (const link of links) {
+    if (!link.callId || seen.has(link.callId)) {
+      continue;
+    }
+    seen.add(link.callId);
+    out.push(link);
+  }
+  return out;
 }
 
 /**

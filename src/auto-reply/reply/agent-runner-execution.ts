@@ -83,6 +83,7 @@ import {
   runnerExecutorEvidenceContext,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
+  usageCarriedByModelError,
   type GrowthOutcomeCommitOpts,
   type RunnerTurnFailureReason,
 } from "../../task-outcome/runtime-from-runner.js";
@@ -225,9 +226,8 @@ export async function runAgentTurnWithFallback(params: {
   /** Tip budget wall-clock start = task entry time (not first closeout spend). */
   const tipBudgetStartedAtMs = growthStartedAt;
   let tipBudgetChargedThisTurn = false;
-  let lastModelCallLink:
-    | import("../../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink
-    | null = null;
+  const modelCallLinks: import("../../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink[] =
+    [];
   let tipBudgetModelCallSeq = 0;
   const assertTipBudgetAllowsModelCall = (): void => {
     if (!chatOutcomeTaskId || !chatOutcomeScope || params.isHeartbeat || !growthAgentIdForEntry) {
@@ -265,7 +265,7 @@ export async function runAgentTurnWithFallback(params: {
       },
     );
     if (charged.modelCallLink) {
-      lastModelCallLink = charged.modelCallLink;
+      modelCallLinks.push(charged.modelCallLink);
     }
     tipBudgetChargedThisTurn = true;
   };
@@ -377,7 +377,7 @@ export async function runAgentTurnWithFallback(params: {
       ...(opts?.delivery ? { delivery: opts.delivery } : {}),
       ...(opts?.deliveryId ? { deliveryId: opts.deliveryId } : {}),
       ...(opts?.acceptanceEvidence ? { acceptanceEvidence: opts.acceptanceEvidence } : {}),
-      ...(lastModelCallLink ? { modelCallLink: lastModelCallLink } : {}),
+      ...(modelCallLinks.length > 0 ? { modelCallLinks } : {}),
       ...(opts?.processPlaceholder ? { processPlaceholder: true } : {}),
       ...(opts?.allowRetry !== undefined ? { allowRetry: opts.allowRetry } : {}),
       ...(opts?.adoptedAssetIds && opts.adoptedAssetIds.length > 0
@@ -825,6 +825,19 @@ export async function runAgentTurnWithFallback(params: {
                     },
                   });
                   lifecycleTerminalEmitted = true;
+                  if (!(err instanceof TaskBudgetExceededError)) {
+                    try {
+                      chargeTipBudgetAfterModelCall({
+                        provider,
+                        model,
+                        usage: usageCarriedByModelError(err),
+                      });
+                    } catch (chargeErr) {
+                      if (chargeErr instanceof TaskBudgetExceededError) {
+                        throw chargeErr;
+                      }
+                    }
+                  }
                   throw err;
                 } finally {
                   // Defensive backstop: never let a CLI run complete without a terminal
@@ -1132,6 +1145,19 @@ export async function runAgentTurnWithFallback(params: {
                   modelMs: Date.now() - modelStartedAtMs,
                   ok: false,
                 });
+                if (!(err instanceof TaskBudgetExceededError)) {
+                  try {
+                    chargeTipBudgetAfterModelCall({
+                      provider,
+                      model,
+                      usage: usageCarriedByModelError(err),
+                    });
+                  } catch (chargeErr) {
+                    if (chargeErr instanceof TaskBudgetExceededError) {
+                      throw chargeErr;
+                    }
+                  }
+                }
                 throw err;
               }
             })();

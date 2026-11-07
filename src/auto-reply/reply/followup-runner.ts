@@ -47,6 +47,7 @@ import {
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
+  usageCarriedByModelError,
 } from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
@@ -187,12 +188,38 @@ export function createFollowupRunner(params: {
     let followupOutcomeCloseoutDone = false;
     /** Real usage-derived USD when the pre-call gate did not already charge this item. */
     let tipBudgetCostUsd: number | undefined;
-    let lastModelCallLink:
-      | import("../../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink
-      | null = null;
+    const modelCallLinks: import("../../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink[] =
+      [];
     let followupBudgetCharged = false;
     let followupBudgetCallSeq = 0;
     let parentTaskId: string | undefined;
+    const chargeFollowupModelCall = (params: {
+      usage?: unknown;
+      provider?: string;
+      model?: string;
+    }) => {
+      if (!followupOutcomeTaskId || !followupOutcomeScope || !queued.run.agentId) {
+        return;
+      }
+      followupBudgetCallSeq += 1;
+      const charged = chargeModelCallAgainstTip(queued.run.config, queued.run.agentId, {
+        taskId: followupOutcomeTaskId,
+        scope: followupOutcomeScope,
+        runId,
+        callSeq: followupBudgetCallSeq,
+        usage: params.usage,
+        provider: params.provider,
+        model: params.model,
+        ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
+      });
+      followupBudgetCharged = true;
+      if (charged.modelCallLink) {
+        modelCallLinks.push(charged.modelCallLink);
+      }
+      if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
+        tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
+      }
+    };
     const submitFollowupOutcomeCloseout = async (overrides?: {
       success?: boolean;
       failureReason?: import("../../task-outcome/runtime-from-runner.js").RunnerTurnFailureReason;
@@ -235,7 +262,7 @@ export function createFollowupRunner(params: {
             ? { failureReason, ...(failureDetail ? { failureDetail } : {}) }
             : {}),
           ...(followupCapabilityOutcome ? { capabilityOutcome: followupCapabilityOutcome } : {}),
-          ...(lastModelCallLink ? { modelCallLink: lastModelCallLink } : {}),
+          ...(modelCallLinks.length > 0 ? { modelCallLinks } : {}),
         });
       } catch (err) {
         logVerbose(`followup unified recordRunnerTurnOutcome failed: ${String(err)}`);
@@ -466,115 +493,118 @@ export function createFollowupRunner(params: {
                   ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
                 });
               }
-              const result = await runEmbeddedPiAgent({
-                sessionId: queued.run.sessionId,
-                sessionKey: queued.run.sessionKey,
-                agentId: queued.run.agentId,
-                trigger: "user",
-                messageChannel: queued.originatingChannel ?? undefined,
-                messageProvider: queued.run.messageProvider,
-                agentAccountId: queued.run.agentAccountId,
-                messageTo: queued.originatingTo,
-                messageThreadId: queued.originatingThreadId,
-                currentChannelId: queued.originatingTo,
-                currentThreadTs:
-                  queued.originatingThreadId != null
-                    ? String(queued.originatingThreadId)
-                    : undefined,
-                groupId: queued.run.groupId,
-                groupChannel: queued.run.groupChannel,
-                groupSpace: queued.run.groupSpace,
-                senderId: queued.run.senderId,
-                senderName: queued.run.senderName,
-                senderUsername: queued.run.senderUsername,
-                senderE164: queued.run.senderE164,
-                senderIsOwner: queued.run.senderIsOwner,
-                ...inheritExecutionIdentityRunFields(queued.run),
-                sessionFile: queued.run.sessionFile,
-                agentDir: queued.run.agentDir,
-                workspaceDir: queued.run.workspaceDir,
-                config: queued.run.config,
-                skillsSnapshot: queued.run.skillsSnapshot,
-                prompt: oguiModelPrompt ?? queued.prompt,
-                extraSystemPrompt: queued.run.extraSystemPrompt,
-                ...(queued.run.disableTools ? { disableTools: true } : {}),
-                ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
-                ...(queued.run.inboundToolCeiling
-                  ? { inboundToolCeiling: queued.run.inboundToolCeiling }
-                  : {}),
-                ...(queued.run.contextLane ? { contextLane: queued.run.contextLane } : {}),
-                ...(queued.run.sessionEntry ? { sessionEntry: queued.run.sessionEntry } : {}),
-                ...(queued.run.oguiDecisionRun
-                  ? { oguiDecisionRun: queued.run.oguiDecisionRun }
-                  : {}),
-                ...(queued.run.knowledgeConsumeRefs?.length
-                  ? { knowledgeConsumeRefs: queued.run.knowledgeConsumeRefs }
-                  : {}),
-                ...(queued.run.skipUserTranscriptPersist === true
-                  ? { skipUserTranscriptPersist: true }
-                  : {}),
-                ...(queued.run.collaborationRoundInvoked === true
-                  ? { collaborationRoundInvoked: true }
-                  : {}),
-                ...(queued.run.deliveryToolSideEffect
-                  ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
-                  : {}),
-                ...(queued.run.privateRunBag ? { privateRunBag: queued.run.privateRunBag } : {}),
-                ownerNumbers: queued.run.ownerNumbers,
-                enforceFinalTag: queued.run.enforceFinalTag,
-                provider: embeddedProvider,
-                model: embeddedModel,
-                ...(providerAuthOverride ? { providerAuthOverride } : {}),
-                ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
-                ...authProfile,
-                thinkLevel: queued.run.thinkLevel,
-                verboseLevel: queued.run.verboseLevel,
-                reasoningLevel: queued.run.reasoningLevel,
-                suppressToolErrorWarnings: opts?.suppressToolErrorWarnings,
-                execOverrides: queued.run.execOverrides,
-                bashElevated: queued.run.bashElevated,
-                timeoutMs: queued.run.timeoutMs,
-                runId,
-                allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
-                blockReplyBreak: queued.run.blockReplyBreak,
-                bootstrapPromptWarningSignaturesSeen,
-                bootstrapPromptWarningSignature:
-                  bootstrapPromptWarningSignaturesSeen[
-                    bootstrapPromptWarningSignaturesSeen.length - 1
-                  ],
-                onAgentEvent: (evt) => {
-                  if (evt.stream !== "compaction") {
-                    return;
+              let result: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
+              try {
+                result = await runEmbeddedPiAgent({
+                  sessionId: queued.run.sessionId,
+                  sessionKey: queued.run.sessionKey,
+                  agentId: queued.run.agentId,
+                  trigger: "user",
+                  messageChannel: queued.originatingChannel ?? undefined,
+                  messageProvider: queued.run.messageProvider,
+                  agentAccountId: queued.run.agentAccountId,
+                  messageTo: queued.originatingTo,
+                  messageThreadId: queued.originatingThreadId,
+                  currentChannelId: queued.originatingTo,
+                  currentThreadTs:
+                    queued.originatingThreadId != null
+                      ? String(queued.originatingThreadId)
+                      : undefined,
+                  groupId: queued.run.groupId,
+                  groupChannel: queued.run.groupChannel,
+                  groupSpace: queued.run.groupSpace,
+                  senderId: queued.run.senderId,
+                  senderName: queued.run.senderName,
+                  senderUsername: queued.run.senderUsername,
+                  senderE164: queued.run.senderE164,
+                  senderIsOwner: queued.run.senderIsOwner,
+                  ...inheritExecutionIdentityRunFields(queued.run),
+                  sessionFile: queued.run.sessionFile,
+                  agentDir: queued.run.agentDir,
+                  workspaceDir: queued.run.workspaceDir,
+                  config: queued.run.config,
+                  skillsSnapshot: queued.run.skillsSnapshot,
+                  prompt: oguiModelPrompt ?? queued.prompt,
+                  extraSystemPrompt: queued.run.extraSystemPrompt,
+                  ...(queued.run.disableTools ? { disableTools: true } : {}),
+                  ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
+                  ...(queued.run.inboundToolCeiling
+                    ? { inboundToolCeiling: queued.run.inboundToolCeiling }
+                    : {}),
+                  ...(queued.run.contextLane ? { contextLane: queued.run.contextLane } : {}),
+                  ...(queued.run.sessionEntry ? { sessionEntry: queued.run.sessionEntry } : {}),
+                  ...(queued.run.oguiDecisionRun
+                    ? { oguiDecisionRun: queued.run.oguiDecisionRun }
+                    : {}),
+                  ...(queued.run.knowledgeConsumeRefs?.length
+                    ? { knowledgeConsumeRefs: queued.run.knowledgeConsumeRefs }
+                    : {}),
+                  ...(queued.run.skipUserTranscriptPersist === true
+                    ? { skipUserTranscriptPersist: true }
+                    : {}),
+                  ...(queued.run.collaborationRoundInvoked === true
+                    ? { collaborationRoundInvoked: true }
+                    : {}),
+                  ...(queued.run.deliveryToolSideEffect
+                    ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
+                    : {}),
+                  ...(queued.run.privateRunBag ? { privateRunBag: queued.run.privateRunBag } : {}),
+                  ownerNumbers: queued.run.ownerNumbers,
+                  enforceFinalTag: queued.run.enforceFinalTag,
+                  provider: embeddedProvider,
+                  model: embeddedModel,
+                  ...(providerAuthOverride ? { providerAuthOverride } : {}),
+                  ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
+                  ...authProfile,
+                  thinkLevel: queued.run.thinkLevel,
+                  verboseLevel: queued.run.verboseLevel,
+                  reasoningLevel: queued.run.reasoningLevel,
+                  suppressToolErrorWarnings: opts?.suppressToolErrorWarnings,
+                  execOverrides: queued.run.execOverrides,
+                  bashElevated: queued.run.bashElevated,
+                  timeoutMs: queued.run.timeoutMs,
+                  runId,
+                  allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
+                  blockReplyBreak: queued.run.blockReplyBreak,
+                  bootstrapPromptWarningSignaturesSeen,
+                  bootstrapPromptWarningSignature:
+                    bootstrapPromptWarningSignaturesSeen[
+                      bootstrapPromptWarningSignaturesSeen.length - 1
+                    ],
+                  onAgentEvent: (evt) => {
+                    if (evt.stream !== "compaction") {
+                      return;
+                    }
+                    const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
+                    if (phase === "end") {
+                      autoCompactionCompleted = true;
+                    }
+                  },
+                });
+              } catch (err) {
+                if (!(err instanceof TaskBudgetExceededError)) {
+                  try {
+                    chargeFollowupModelCall({
+                      usage: usageCarriedByModelError(err),
+                      provider,
+                      model,
+                    });
+                  } catch (chargeErr) {
+                    if (chargeErr instanceof TaskBudgetExceededError) {
+                      throw chargeErr;
+                    }
                   }
-                  const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
-                  if (phase === "end") {
-                    autoCompactionCompleted = true;
-                  }
-                },
-              });
+                }
+                throw err;
+              }
               bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                 result.meta?.systemPromptReport,
               );
-              if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
-                followupBudgetCallSeq += 1;
-                const charged = chargeModelCallAgainstTip(queued.run.config, queued.run.agentId, {
-                  taskId: followupOutcomeTaskId,
-                  scope: followupOutcomeScope,
-                  runId,
-                  callSeq: followupBudgetCallSeq,
-                  usage: result.meta?.agentMeta?.usage,
-                  provider,
-                  model,
-                  ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
-                });
-                followupBudgetCharged = true;
-                if (charged.modelCallLink) {
-                  lastModelCallLink = charged.modelCallLink;
-                }
-                if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
-                  tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
-                }
-              }
+              chargeFollowupModelCall({
+                usage: result.meta?.agentMeta?.usage,
+                provider,
+                model,
+              });
               return result;
             },
           });

@@ -410,7 +410,7 @@ describe("P1-4 candidate attempt is not a task attempt", () => {
       candidateAttemptId: call.attemptId,
       taskAttemptId: "not-on-the-record",
       chargeOutcomeVersion: 3,
-      finalOutcomeVersion: 6,
+      finalOutcomeVersion: 7,
       recordRuns: [{ runId: "run-real", attemptIds: ["attempt-real"] }],
       recordAttempts: ["attempt-real"],
       receiptReturned: true,

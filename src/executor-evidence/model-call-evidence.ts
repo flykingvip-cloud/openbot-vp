@@ -193,17 +193,6 @@ function persist(evidence: ModelCallEvidence): void {
     return;
   }
   try {
-    const dir = callsDir(root);
-    fs.mkdirSync(dir, { recursive: true });
-    const evidenceRoot = path.join(root, "executor-evidence");
-    if (directoryBytes(evidenceRoot) >= EVIDENCE_DISK_BYTE_CAP) {
-      return;
-    }
-    const existing = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
-    const file = path.join(dir, `${evidence.evidenceId}.json`);
-    if (!fs.existsSync(file) && existing.length >= MODEL_CALL_FILE_CAP) {
-      return;
-    }
     const {
       finished: _finished,
       storeRoot: _root,
@@ -211,12 +200,16 @@ function persist(evidence: ModelCallEvidence): void {
     } = evidence as ActiveModelCall & {
       storeRoot?: string;
     };
-    fs.writeFileSync(
-      file,
-      `${JSON.stringify({ ...body, persisted: true, durableAcrossRestart: true }, null, 2)}\n`,
+    const wrote = writeBoundedEvidenceFile(
+      root,
+      `${evidence.evidenceId}.json`,
+      { ...body, persisted: true, durableAcrossRestart: true },
+      "calls",
     );
-    evidence.persisted = true;
-    evidence.durableAcrossRestart = true;
+    if (wrote === "written" || wrote === "replayed") {
+      evidence.persisted = true;
+      evidence.durableAcrossRestart = true;
+    }
   } catch {
     // Evidence persistence must not change the model call's business result.
     evidence.persisted = false;
@@ -417,25 +410,59 @@ export async function observeModelCandidate<T>(params: {
   }
 }
 
+export function evidenceDiskByteCap(): number {
+  const raw = Number(process.env.OPENBOT_EXECUTOR_EVIDENCE_DISK_CAP);
+  return Number.isFinite(raw) && raw > 0 ? raw : EVIDENCE_DISK_BYTE_CAP;
+}
+
+function recoverStaleEvidenceLock(lockPath: string): void {
+  if (!fs.existsSync(lockPath)) {
+    return;
+  }
+  try {
+    const pid = Number(fs.readFileSync(lockPath, "utf8").trim());
+    let alive = false;
+    if (pid > 0) {
+      try {
+        process.kill(pid, 0);
+        alive = true;
+      } catch {
+        alive = false;
+      }
+    }
+    const age = Date.now() - fs.statSync(lockPath).mtimeMs;
+    if (!alive || age > 2_000) {
+      fs.rmSync(lockPath, { force: true });
+    }
+  } catch {
+    fs.rmSync(lockPath, { force: true });
+  }
+}
+
 export function writeBoundedEvidenceFile(
   storeRoot: string,
   fileName: string,
   body: unknown,
-): "written" | "exists" | "capped" | "failed" {
+  folder: "associations" | "calls" = "associations",
+): "written" | "replayed" | "conflict" | "capped" | "failed" {
   if (!executorEvidenceCollectionEnabled()) {
     return "failed";
   }
-  const dir = path.join(storeRoot, "executor-evidence", "associations");
-  const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
+  const root = path.join(storeRoot, "executor-evidence");
+  const dir = path.join(root, folder);
+  const lockPath = path.join(root, "write.lock");
+  let tmp: string | undefined;
   try {
-    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    fs.mkdirSync(root, { recursive: true });
     const started = Date.now();
     let fd: number | undefined;
     while (fd === undefined) {
       try {
         fd = fs.openSync(lockPath, "wx");
+        fs.writeFileSync(fd, String(process.pid));
       } catch {
-        if (Date.now() - started > 500) {
+        recoverStaleEvidenceLock(lockPath);
+        if (Date.now() - started > 1_000) {
           return "failed";
         }
         Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
@@ -443,26 +470,60 @@ export function writeBoundedEvidenceFile(
     }
     try {
       fs.mkdirSync(dir, { recursive: true });
-      if (directoryBytes(path.join(storeRoot, "executor-evidence")) >= EVIDENCE_DISK_BYTE_CAP) {
-        return "capped";
+      for (const name of fs.readdirSync(dir)) {
+        if (name.endsWith(".tmp")) {
+          fs.rmSync(path.join(dir, name), { force: true });
+        }
       }
+      const text = `${JSON.stringify(body, null, 2)}\n`;
       const file = path.join(dir, fileName);
+      let replacingBytes = 0;
       if (fs.existsSync(file)) {
-        return "exists";
+        const current = fs.readFileSync(file, "utf8");
+        if (current === text) {
+          return "replayed";
+        }
+        let previous: { evidenceId?: string; callId?: string };
+        try {
+          previous = JSON.parse(current) as { evidenceId?: string; callId?: string };
+        } catch {
+          return "conflict";
+        }
+        const next = body as { evidenceId?: string; callId?: string };
+        const sameCall =
+          typeof previous.evidenceId === "string" &&
+          previous.evidenceId.length > 0 &&
+          previous.evidenceId === next.evidenceId &&
+          previous.callId === next.callId;
+        if (!sameCall) {
+          return "conflict";
+        }
+        replacingBytes = Buffer.byteLength(current);
+      }
+      const need = Buffer.byteLength(text) * 2 + 64;
+      if (directoryBytes(root) - replacingBytes + need > evidenceDiskByteCap()) {
+        return "capped";
       }
       const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
-      if (names.length >= ASSOCIATION_FILE_CAP_LOCAL) {
+      if (replacingBytes === 0 && names.length >= ASSOCIATION_FILE_CAP_LOCAL) {
         return "capped";
       }
-      const tmp = `${file}.${process.pid}.${randomUUID()}.tmp`;
-      fs.writeFileSync(tmp, `${JSON.stringify(body, null, 2)}\n`);
+      tmp = `${file}.${process.pid}.${randomUUID()}.tmp`;
+      fs.writeFileSync(tmp, text);
       fs.renameSync(tmp, file);
+      tmp = undefined;
       return "written";
     } finally {
+      if (tmp) {
+        fs.rmSync(tmp, { force: true });
+      }
       fs.closeSync(fd);
       fs.rmSync(lockPath, { force: true });
     }
   } catch {
+    if (tmp) {
+      fs.rmSync(tmp, { force: true });
+    }
     return "failed";
   }
 }

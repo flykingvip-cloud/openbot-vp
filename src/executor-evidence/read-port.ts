@@ -17,6 +17,7 @@ import {
   MODEL_CALL_FILE_CAP,
   listModelCalls,
   readCallFiles,
+  usageFingerprint,
   type ModelCallEvidence,
 } from "./model-call-evidence.js";
 
@@ -50,6 +51,10 @@ export type EvidenceReadView = {
   associations: EvidenceAssociation[];
   gaps: string[];
   completeness: "complete" | "partial" | "unknown" | "mismatch";
+  /** Call set closure, independent of budget attribution. */
+  callChainCompleteness: "complete" | "partial" | "unknown";
+  /** Budget command receipts. not_applicable when this view has no budget association. */
+  costAttributionCompleteness: "complete" | "partial" | "unknown" | "not_applicable";
   reasons: string[];
 };
 
@@ -69,15 +74,46 @@ function readJson(file: string): unknown {
   }
 }
 
-function listJson(dir: string): string[] {
+function listJson(dir: string): { names: string[]; gap?: string } {
   if (!fs.existsSync(dir)) {
-    return [];
+    return { names: [] };
   }
-  return fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
+  try {
+    const stat = fs.lstatSync(dir);
+    if (!stat.isDirectory()) {
+      return { names: [], gap: "not_a_directory" };
+    }
+    return { names: fs.readdirSync(dir).filter((name) => name.endsWith(".json")) };
+  } catch {
+    return { names: [], gap: "directory_read_failed" };
+  }
 }
 
-function scopeMatches(candidate: { scope: TrustedScope }, scope: TrustedScope): boolean {
-  return fullScopeEqual(candidate.scope, scope);
+function isScope(value: unknown): value is TrustedScope {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const scope = value as TrustedScope;
+  if (scope.kind === "personal") {
+    return (
+      typeof scope.personalDomainId === "string" &&
+      typeof scope.subjectRef === "string" &&
+      typeof scope.authzScopeRef === "string"
+    );
+  }
+  if (scope.kind === "enterprise") {
+    return (
+      typeof scope.enterpriseDomainId === "string" &&
+      typeof scope.tenantId === "string" &&
+      typeof scope.subjectRef === "string" &&
+      typeof scope.authzScopeRef === "string"
+    );
+  }
+  return false;
+}
+
+function scopeMatches(candidate: { scope?: TrustedScope }, scope: TrustedScope): boolean {
+  return isScope(candidate.scope) && fullScopeEqual(candidate.scope, scope);
 }
 
 export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView {
@@ -93,13 +129,21 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     "tips",
     `${boundedOutcomePathSegment(query.taskId)}.json`,
   );
-  const tip = readJson(tipFile) as TaskOutcomeRecord | undefined;
-  if (!tip) {
+  const tipRaw = readJson(tipFile);
+  const tip =
+    tipRaw && typeof tipRaw === "object" && isScope((tipRaw as TaskOutcomeRecord).scope)
+      ? (tipRaw as TaskOutcomeRecord)
+      : undefined;
+  if (fs.existsSync(tipFile) && !tip) {
+    gaps.push("tip_schema_invalid");
+    reasons.push("tip JSON is missing a trusted scope");
+  } else if (!tip) {
     gaps.push("tip_absent");
     reasons.push("no task tip; the latest record was not invented");
   } else if (!scopeMatches(tip, query.scope) || tip.taskId !== query.taskId) {
     return emptyMismatch(projectedAt, "scope_mismatch");
-  } else if (query.outcomeVersion != null) {
+  }
+  if (query.outcomeVersion != null) {
     const versionFile = path.join(
       query.storeRoot,
       "versions",
@@ -109,6 +153,7 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     if (!snapshot) {
       gaps.push("version_snapshot_missing");
     } else if (
+      !isScope(snapshot.scope) ||
       snapshot.taskId !== query.taskId ||
       snapshot.outcomeVersion !== query.outcomeVersion ||
       !scopeMatches(snapshot, query.scope)
@@ -136,7 +181,7 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   for (const name of commandNames) {
     const file = path.join(commandDir, name);
     const parsed = readJson(file);
-    if (parsed === undefined) {
+    if (parsed == null || typeof parsed !== "object") {
       gaps.push("command_log_corrupt");
       continue;
     }
@@ -206,9 +251,16 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   }
 
   const callReport = readCallFiles(query.storeRoot);
+  const schemaCalls = callReport.rows.filter((call) => {
+    if (!call || typeof call.callId !== "string" || !isScope(call.scope)) {
+      gaps.push("call_schema_invalid");
+      return false;
+    }
+    return true;
+  });
   const associationReport = readAssociationFiles(query.storeRoot);
   gaps.push(...callReport.gaps, ...associationReport.gaps);
-  let calls = callReport.rows.filter(
+  let calls = schemaCalls.filter(
     (call) =>
       call.agentId === query.agentId &&
       call.taskId === query.taskId &&
@@ -245,11 +297,50 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   }
   if (query.outcomeVersion != null) {
     associations = associations.filter((row) => row.finalOutcomeVersion === query.outcomeVersion);
-    const linked = new Set(
-      associations.map((row) => row.callId).filter((id): id is string => Boolean(id)),
-    );
-    calls = calls.filter((call) => linked.has(call.callId));
   }
+  const checkedAssociations: EvidenceAssociation[] = [];
+  for (const row of associations) {
+    if (row.finalOutcomeVersion == null || !row.finalSnapshotFingerprint) {
+      checkedAssociations.push(row);
+      continue;
+    }
+    const versionFile = path.join(
+      query.storeRoot,
+      "versions",
+      `${boundedOutcomePathSegment(query.taskId)}__v${row.finalOutcomeVersion}.json`,
+    );
+    const snapshot = readJson(versionFile) as TaskOutcomeRecord | undefined;
+    if (!snapshot || !isScope(snapshot.scope)) {
+      gaps.push("association_snapshot_mismatch");
+      continue;
+    }
+    if (snapshotIdentityFingerprint(snapshot) !== row.finalSnapshotFingerprint) {
+      gaps.push("association_fingerprint_mismatch");
+      continue;
+    }
+    const attemptIds = (snapshot.attempts ?? []).map((attempt) => attempt.attemptId);
+    const run = (snapshot.runs ?? []).find((item) => item.runId === row.runId);
+    if (
+      row.taskAttemptId &&
+      (!attemptIds.includes(row.taskAttemptId) || !run?.attemptIds.includes(row.taskAttemptId))
+    ) {
+      gaps.push("association_attempt_mismatch");
+      continue;
+    }
+    if (!run) {
+      gaps.push("association_run_mismatch");
+      continue;
+    }
+    if (row.usageFingerprint && row.callId) {
+      const call = calls.find((item) => item.callId === row.callId);
+      if (call && usageFingerprint(call.usage) !== row.usageFingerprint) {
+        gaps.push("association_usage_mismatch");
+        continue;
+      }
+    }
+    checkedAssociations.push(row);
+  }
+  associations = checkedAssociations;
   if (gaps.includes("snapshot_identity_mismatch") || gaps.includes("version_snapshot_missing")) {
     receipts.length = 0;
     calls = [];
@@ -260,18 +351,26 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     gaps.push("associations_absent");
     reasons.push("an empty association set is not complete evidence");
   }
+  const callDir = listJson(path.join(query.storeRoot, "executor-evidence", "calls"));
+  const associationDir = listJson(path.join(query.storeRoot, "executor-evidence", "associations"));
+  if (callDir.gap) {
+    gaps.push(callDir.gap);
+  }
+  if (associationDir.gap) {
+    gaps.push(associationDir.gap);
+  }
   const linkedIds = associations
     .map((row) => row.callId)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
+  const uniqueLinks = new Set(linkedIds);
   const callIds = new Set(calls.map((call) => call.callId));
   const setClosed =
-    linkedIds.length > 0 &&
-    linkedIds.length === callIds.size &&
-    linkedIds.every((id) => callIds.has(id));
-  const callFiles = listJson(path.join(query.storeRoot, "executor-evidence", "calls")).length;
-  const associationFiles = listJson(
-    path.join(query.storeRoot, "executor-evidence", "associations"),
-  ).length;
+    uniqueLinks.size > 0 &&
+    uniqueLinks.size === linkedIds.length &&
+    uniqueLinks.size === callIds.size &&
+    [...callIds].every((id) => uniqueLinks.has(id));
+  const callFiles = callDir.names.length;
+  const associationFiles = associationDir.names.length;
   if (callFiles >= MODEL_CALL_FILE_CAP) {
     gaps.push("call_capacity_reached");
     reasons.push("the call log is capped and is not a complete history");
@@ -282,8 +381,24 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     }
     return max;
   }, null);
+  const budgetRows = associations.filter((row) => row.budgetCommandId);
+  const callChainCompleteness = setClosed ? "complete" : calls.length > 0 ? "partial" : "unknown";
+  const costAttributionCompleteness =
+    budgetRows.length === 0
+      ? "not_applicable"
+      : budgetRows.every((row) =>
+            receipts.some(
+              (receipt) => receipt.commandId === row.budgetCommandId && receipt.commitId != null,
+            ),
+          )
+        ? "complete"
+        : "partial";
   const completeness =
-    gaps.length === 0 && setClosed && associations.every((row) => row.completeness === "complete")
+    gaps.length === 0 &&
+    callChainCompleteness === "complete" &&
+    (costAttributionCompleteness === "complete" ||
+      costAttributionCompleteness === "not_applicable") &&
+    associations.every((row) => row.completeness === "complete")
       ? "complete"
       : tip
         ? "partial"
@@ -302,6 +417,8 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     associations,
     gaps,
     completeness,
+    callChainCompleteness,
+    costAttributionCompleteness,
     reasons,
   };
 }
@@ -364,6 +481,8 @@ function readMemory(query: EvidenceReadQuery, projectedAt: number): EvidenceRead
     associations,
     gaps,
     completeness: "partial",
+    callChainCompleteness: "partial",
+    costAttributionCompleteness: "unknown",
     reasons: ["in-memory calls disappear on restart and are not a historical record"],
   };
 }
@@ -383,6 +502,8 @@ function emptyMismatch(projectedAt: number, reason: string): EvidenceReadView {
     associations: [],
     gaps: [reason],
     completeness: "mismatch",
+    callChainCompleteness: "unknown",
+    costAttributionCompleteness: "unknown",
     reasons: [reason],
   };
 }

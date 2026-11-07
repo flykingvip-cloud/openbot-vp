@@ -129,6 +129,7 @@ import {
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
+  usageCarriedByModelError,
   type RunnerTurnFailureReason,
 } from "../task-outcome/runtime-from-runner.js";
 import type { Entrypoint, TrustedScope } from "../task-outcome/types.js";
@@ -883,8 +884,8 @@ async function agentCommandInternal(
   let agentOutcomeCloseoutDone = false;
   /** Real usage-derived USD for tip budget closeout when mid-run charge did not run. */
   let tipBudgetCostUsd: number | undefined;
-  let lastModelCallLink: import("../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink | null =
-    null;
+  const modelCallLinks: import("../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink[] =
+    [];
   let tipBudgetChargedThisTurn = false;
   let tipBudgetCallSeq = 0;
   let agentOutcomeSuccess: boolean | undefined;
@@ -959,7 +960,7 @@ async function agentCommandInternal(
         ...(!tipBudgetChargedThisTurn && tipBudgetCostUsd != null
           ? { costUsd: tipBudgetCostUsd }
           : {}),
-        ...(lastModelCallLink ? { modelCallLink: lastModelCallLink } : {}),
+        ...(modelCallLinks.length > 0 ? { modelCallLinks } : {}),
         ...(success
           ? {}
           : {
@@ -1539,7 +1540,7 @@ async function agentCommandInternal(
                 });
                 tipBudgetChargedThisTurn = true;
                 if (charged.modelCallLink) {
-                  lastModelCallLink = charged.modelCallLink;
+                  modelCallLinks.push(charged.modelCallLink);
                 }
                 if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
                   tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
@@ -1559,6 +1560,7 @@ async function agentCommandInternal(
                     scope: agentOutcomeScope,
                     runId,
                     callSeq: tipBudgetCallSeq,
+                    usage: usageCarriedByModelError(err),
                     provider: providerOverride,
                     model: modelOverride,
                     ...(opts.parentTaskId?.trim()
@@ -1569,7 +1571,7 @@ async function agentCommandInternal(
                       : {}),
                   });
                   if (charged.modelCallLink) {
-                    lastModelCallLink = charged.modelCallLink;
+                    modelCallLinks.push(charged.modelCallLink);
                   }
                   tipBudgetChargedThisTurn = true;
                 } catch (chargeErr) {

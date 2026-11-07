@@ -6,13 +6,12 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { boundedOutcomePathSegment } from "../task-outcome/store.js";
 import { scopeIdOf } from "../task-outcome/transitions.js";
 import type { TaskOutcomeRecord, TrustedScope } from "../task-outcome/types.js";
 import type { CostColumns } from "./cost-columns.js";
-import { fullScopeEqual } from "./identity.js";
+import { fullScopeEqual, snapshotIdentityFingerprint } from "./identity.js";
 import {
-  EVIDENCE_DISK_BYTE_CAP,
-  directoryBytes,
   executorEvidenceCollectionEnabled,
   writeBoundedEvidenceFile,
   type ModelCallEvidence,
@@ -240,39 +239,124 @@ export function associateBudgetCharge(params: {
   if (!params.storeRoot || !executorEvidenceCollectionEnabled()) {
     return association;
   }
-  try {
-    const dir = associationsDir(params.storeRoot);
-    fs.mkdirSync(dir, { recursive: true });
-    if (
-      directoryBytes(path.join(params.storeRoot, "executor-evidence")) >= EVIDENCE_DISK_BYTE_CAP
-    ) {
-      return association;
+  const key =
+    association.disposition === "conflict"
+      ? `conflict-${association.budgetCommandId ?? "none"}-${association.usageFingerprint}`
+      : (association.callId ?? `budget-${association.budgetCommandId ?? "none"}`);
+  const wrote = writeBoundedEvidenceFile(
+    params.storeRoot,
+    `${encodeURIComponent(key)}.json`,
+    association,
+    "associations",
+  );
+  if (wrote === "replayed" || wrote === "conflict") {
+    const idx = memoryAssociations.lastIndexOf(association);
+    if (idx >= 0) {
+      memoryAssociations.splice(idx, 1);
     }
-    const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
-    const key =
-      association.disposition === "conflict"
-        ? `conflict-${association.budgetCommandId ?? "none"}-${association.usageFingerprint}`
-        : (association.callId ?? `budget-${association.budgetCommandId ?? "none"}`);
-    const file = path.join(dir, `${encodeURIComponent(key)}.json`);
-    if (!fs.existsSync(file) && names.length >= ASSOCIATION_FILE_CAP) {
-      return association;
-    }
-    if (
-      fs.existsSync(file) &&
-      (association.disposition === "conflict" || association.disposition === "replayed")
-    ) {
-      const existing = JSON.parse(fs.readFileSync(file, "utf8")) as EvidenceAssociation;
-      return existing;
-    }
-    fs.writeFileSync(file, `${JSON.stringify(association, null, 2)}\n`);
-  } catch {
-    // Association persistence must not change the budget or reply result.
+  }
+  if (wrote === "conflict") {
+    return null;
   }
   return association;
 }
 
+function budgetIdentityMatches(params: {
+  storeRoot?: string;
+  taskId: string;
+  scope: TrustedScope;
+  budgetCommandId?: string | null;
+  chargeCommitId?: string | null;
+  requestDigest?: string | null;
+  chargeOutcomeVersion: number | null;
+  finalOutcomeVersion: number | null;
+}): boolean {
+  const supplied = params.budgetCommandId || params.chargeCommitId || params.requestDigest;
+  if (!supplied) {
+    return true;
+  }
+  if (
+    !params.storeRoot ||
+    !params.budgetCommandId ||
+    !params.chargeCommitId ||
+    !params.requestDigest ||
+    params.chargeOutcomeVersion == null ||
+    params.finalOutcomeVersion == null ||
+    params.chargeOutcomeVersion >= params.finalOutcomeVersion
+  ) {
+    return false;
+  }
+  try {
+    const logPath = path.join(
+      params.storeRoot,
+      "command-log",
+      `${boundedOutcomePathSegment(params.budgetCommandId)}.json`,
+    );
+    const log = JSON.parse(fs.readFileSync(logPath, "utf8")) as {
+      digest?: string;
+      commitId?: string;
+      outcomeVersion?: number;
+      snapshotFingerprint?: string;
+    };
+    const bundle = JSON.parse(
+      fs.readFileSync(
+        path.join(params.storeRoot, "commits", `${params.chargeCommitId}.json`),
+        "utf8",
+      ),
+    ) as {
+      commitId?: string;
+      commandLog?: { digest?: string };
+      record?: { outcomeVersion?: number; taskId?: string; scope?: TrustedScope };
+    };
+    const snapshot = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          params.storeRoot,
+          "versions",
+          `${boundedOutcomePathSegment(params.taskId)}__v${params.chargeOutcomeVersion}.json`,
+        ),
+        "utf8",
+      ),
+    ) as {
+      taskId?: string;
+      outcomeVersion?: number;
+      scope?: TrustedScope;
+      lifecycle?: string;
+      taskJudgement?: string;
+      revisionKind?: string;
+    };
+    if (
+      log.digest !== params.requestDigest ||
+      log.commitId !== params.chargeCommitId ||
+      log.outcomeVersion !== params.chargeOutcomeVersion ||
+      bundle.commitId !== params.chargeCommitId ||
+      bundle.commandLog?.digest !== params.requestDigest ||
+      bundle.record?.outcomeVersion !== params.chargeOutcomeVersion ||
+      bundle.record?.taskId !== params.taskId ||
+      snapshot.taskId !== params.taskId ||
+      snapshot.outcomeVersion !== params.chargeOutcomeVersion ||
+      !snapshot.scope ||
+      !fullScopeEqual(snapshot.scope, params.scope) ||
+      !log.snapshotFingerprint ||
+      snapshotIdentityFingerprint({
+        taskId: snapshot.taskId,
+        outcomeVersion: snapshot.outcomeVersion,
+        scope: snapshot.scope,
+        lifecycle: snapshot.lifecycle ?? "",
+        taskJudgement: snapshot.taskJudgement ?? "",
+        revisionKind: snapshot.revisionKind,
+      }) !== log.snapshotFingerprint
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function unattributable(disposition: BudgetCommandDisposition): boolean {
-  return disposition === "conflict" || disposition === "replayed" || disposition === "no_effect";
+  return disposition !== "applied";
 }
 
 function scrubKnownTotal(cost: CostColumns): CostColumns {
@@ -348,6 +432,9 @@ export function publishFinalEvidenceLink(params: {
   receiptReturned: boolean;
   usageFingerprint?: string | null;
   snapshotFingerprint?: string | null;
+  budgetCommandId?: string | null;
+  chargeCommitId?: string | null;
+  requestDigest?: string | null;
 }): EvidenceAssociation | null {
   if (!params.receiptReturned || params.finalOutcomeVersion == null) {
     return null;
@@ -375,9 +462,10 @@ export function publishFinalEvidenceLink(params: {
     params.candidateAttemptId !== params.taskAttemptId &&
     params.chargeOutcomeVersion != null &&
     params.finalOutcomeVersion !== params.chargeOutcomeVersion;
-  const mapped = membershipOk && callOk;
+  const budgetOk = budgetIdentityMatches(params);
+  const mapped = membershipOk && callOk && budgetOk;
   const finalVersion =
-    membershipOk && (params.call == null || callOk) ? params.finalOutcomeVersion : null;
+    membershipOk && (params.call == null || callOk) && budgetOk ? params.finalOutcomeVersion : null;
   const missing = mapped ? [] : ["task_attempt_membership"];
   if (!params.call) {
     missing.push("call_evidence");
@@ -386,7 +474,7 @@ export function publishFinalEvidenceLink(params: {
     schemaVersion: 1,
     callEvidenceId: params.call?.evidenceId ?? null,
     callId: params.call?.callId ?? null,
-    budgetCommandId: null,
+    budgetCommandId: params.budgetCommandId ?? null,
     requestDigest: null,
     disposition: "applied",
     commitId: null,
@@ -460,6 +548,15 @@ export function publishFinalEvidenceLink(params: {
     return association;
   }
   const fileName = `${encodeURIComponent(`final-${params.taskId}-${params.finalOutcomeVersion}-${params.runId}-${params.call?.callId ?? "none"}`)}.json`;
-  writeBoundedEvidenceFile(params.storeRoot, fileName, association);
+  const wrote = writeBoundedEvidenceFile(params.storeRoot, fileName, association);
+  if (wrote === "replayed" || wrote === "conflict") {
+    const index = memoryAssociations.lastIndexOf(association);
+    if (index >= 0) {
+      memoryAssociations.splice(index, 1);
+    }
+  }
+  if (wrote === "conflict") {
+    return null;
+  }
   return association;
 }
