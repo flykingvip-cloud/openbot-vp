@@ -219,6 +219,15 @@ export async function runReplyAgent(params: {
     }
   };
 
+  // Explicit human provenance must pass interaction admission before any legacy routing.
+  if (
+    followupRun.run.inputProvenance?.kind === "external_user" &&
+    !followupRun.run.executionAdmitted
+  ) {
+    typing.cleanup();
+    return { text: "该请求尚未通过交互层的执行准入，本次未启动任务执行。" };
+  }
+
   const disposition = followupRun.run.executionAdmitted
     ? { kind: "execute" as const }
     : replyTurnRuntime.command.handle(

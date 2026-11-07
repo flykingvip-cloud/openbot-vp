@@ -1197,3 +1197,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Real isolated Gateway greeting succeeded, but subsequent amendments failed workspace authorization after bootstrap automatically initialized Git. Preseeded workspace isolated the cause. Conversation bootstrap now explicitly disables Git initialization; the checkout authorization rule remains unchanged and existing callers retain the default. — codex-runtime-manager
 - Workspace regression reproduced 1 FAIL before / 16 PASS after. Fresh empty-workspace real-model Gateway greeting plus supplement/local revision/full replacement now PASS with stable task identity, active constraints 1/2/1, normal probe exit and temporary state removed. Explicit temporary Skill watcher cleanup remains part of the probe. Full tsgo PASS; typed lint clean; architecture 53 PASS. This is not full execution acceptance or production deployment. — codex-runtime-manager
+
+## Explicit external requests cannot bypass admission (2026-11-08)
+
+- Reproduced an explicit external_user request reaching legacy classification without admission (1 FAIL). Execution host now refuses that request before legacy routing, memory flush or provider execution. Properly admitted requests and existing internal triggers retain their paths. Unmarked compatibility entrances remain pending retirement. — codex-runtime-manager
+- Reply-runner integration 48 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. Latest real artifact probe failed exact-byte acceptance because the model added a newline; this remains a real acceptance gap, not a successful task closeout. — codex-runtime-manager

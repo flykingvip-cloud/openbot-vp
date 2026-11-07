@@ -198,6 +198,24 @@ async function seedSessionStore(params: {
   );
 }
 
+it("rejects an explicit external user request before legacy classification or execution when not admitted", async () => {
+  const { replyTurnRuntime } = await import("../../agent-runtime/wiring/reply-turn.js");
+  const legacy = vi.spyOn(replyTurnRuntime.command, "handle").mockImplementation(() => {
+    throw new Error("unadmitted user reached legacy classification");
+  });
+  try {
+    const result = await createMinimalRun({
+      runOverrides: { inputProvenance: { kind: "external_user" } },
+    }).run();
+    expect(JSON.stringify(result)).toContain("尚未通过交互层的执行准入");
+    expect(legacy).not.toHaveBeenCalled();
+    expect(state.runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+    expect(state.runCliAgentMock).not.toHaveBeenCalled();
+  } finally {
+    legacy.mockRestore();
+  }
+});
+
 function createBaseRun(params: {
   storePath: string;
   sessionEntry: Record<string, unknown>;
