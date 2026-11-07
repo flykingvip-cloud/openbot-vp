@@ -1142,3 +1142,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 ## Completion transaction checkpoint (2026-11-08)
 
 - Completion transaction and notice extraction passed final targeted regression after the lock inspection repair: 5 files / 38 PASS. Full tsgo, typed lint and architecture 53 PASS. Earlier intermittent pause-race evidence remains recorded; the deterministic lock repair does not prove its exact cause. Legacy completion exports now refer to runtime state implementation. — codex-runtime-manager
+
+## Typed task controls migrate to state (2026-11-08)
+
+- Moved unchanged current/parked pause and cancellation transitions into state/mutations/task-control. Legacy text classification remains outside this component; existing exports point to the unique typed transition implementation. — codex-runtime-manager
+- Board/cross-process/lifecycle regression 3 files / 32 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
