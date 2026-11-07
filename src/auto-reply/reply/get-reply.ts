@@ -318,6 +318,7 @@ export async function getReplyFromConfig(
   const workspace = await ensureAgentWorkspace({
     dir: workspaceDirRaw,
     ensureBootstrapFiles: !agentCfg?.skipBootstrap && !isFastTestEnv,
+    initializeGit: false,
   });
   const workspaceDir = workspace.dir;
   // Employee steward FS is workspaceOnly — copy mark-required bundled skills

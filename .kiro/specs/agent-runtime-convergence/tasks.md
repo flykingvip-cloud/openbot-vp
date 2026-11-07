@@ -1192,3 +1192,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Removed legacy text-control and keyword-constraint methods from the runtime state API. Existing compatibility consumers bind their original adapters explicitly; typed admission, amendment, control, execution binding and completion remain runtime-owned. Removed the repository exception from the no-legacy-state dependency gate. This isolates compatibility behavior; it does not claim all compatibility consumers retired. — codex-runtime-manager
 - Interaction/admission/lifecycle regression 3 files / 9 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS with no production state exception. — codex-runtime-manager
+
+## Fresh workspace continuous interaction repair (2026-11-08)
+
+- Real isolated Gateway greeting succeeded, but subsequent amendments failed workspace authorization after bootstrap automatically initialized Git. Preseeded workspace isolated the cause. Conversation bootstrap now explicitly disables Git initialization; the checkout authorization rule remains unchanged and existing callers retain the default. — codex-runtime-manager
+- Workspace regression reproduced 1 FAIL before / 16 PASS after. Fresh empty-workspace real-model Gateway greeting plus supplement/local revision/full replacement now PASS with stable task identity, active constraints 1/2/1, normal probe exit and temporary state removed. Explicit temporary Skill watcher cleanup remains part of the probe. Full tsgo PASS; typed lint clean; architecture 53 PASS. This is not full execution acceptance or production deployment. — codex-runtime-manager
