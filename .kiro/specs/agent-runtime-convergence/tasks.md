@@ -1207,3 +1207,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - The public reply entrance now stamps otherwise unlabelled human input as external_user, using the existing ingress rule and preserving explicit internal, heartbeat, birth and collaboration provenance. The caller context is copied. Prepared interaction therefore cannot silently fall back to legacy routing solely because provenance was omitted. Updated stale workspace/media test seams without changing production authorization. — codex-runtime-manager
 - Message-hook regression 5 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. Full replacement and general task acceptance remain open. — codex-runtime-manager
+
+## Declarative acceptance component foundation (2026-11-08)
+
+- Added a closed data-only artifact acceptance contract and evaluator. Exact UTF-8 bytes are checked independently of completion prose; uncovered criteria stay pending, unsafe paths are not read, and evaluation captures its input before asynchronous reads. No executable configuration, task mutation or scheduler is introduced. This component is not yet connected to production admission or delivery. — codex-runtime-manager
+- Component regression 5 PASS, including a reproduced input-mutation failure before snapshot capture; full tsgo PASS; typed lint clean; architecture 53 PASS. General acceptance integration and complete executor retirement remain open. — codex-runtime-manager
