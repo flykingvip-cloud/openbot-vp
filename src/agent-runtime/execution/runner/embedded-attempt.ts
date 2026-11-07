@@ -4,30 +4,215 @@ import path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
-import { resolveAttemptFsWorkspaceOnly } from "../../../agent-runtime/capabilities/index.js";
-import { buildAfterTurnRuntimeContext } from "../../../agent-runtime/capabilities/index.js";
-import { invokeContextAfterTurn } from "../../../agent-runtime/capabilities/index.js";
-import { resolveAttemptSandbox } from "../../../agent-runtime/capabilities/index.js";
-import { wrapStreamFnEnforceProtocolTextNonExecution } from "../../../agent-runtime/capabilities/index.js";
-import { resolvePromptBuildHookResult } from "../../../agent-runtime/capabilities/index.js";
-import { summarizeSessionContext } from "../../../agent-runtime/context/index.js";
+import { resolveOpenClawAgentDir } from "../../../agents/agent-paths.js";
+import { resolveSessionAgentIds } from "../../../agents/agent-scope.js";
+import { createAnthropicPayloadLogger } from "../../../agents/anthropic-payload-log.js";
 import {
-  composeSystemPromptWithHookContext,
-  prependSystemPromptAddition,
-} from "../../../agent-runtime/context/index.js";
-import { renderRunSkillContext } from "../../../agent-runtime/context/index.js";
-import { cleanupEmbeddedAttempt } from "../../../agent-runtime/execution/index.js";
-import { resolveAttemptEndOfRunAttribution } from "../../../agent-runtime/execution/index.js";
-import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
+  analyzeBootstrapBudget,
+  buildBootstrapPromptWarning,
+  buildBootstrapTruncationReportMeta,
+  buildBootstrapInjectionStats,
+} from "../../../agents/bootstrap-budget.js";
 import {
-  shouldInjectOllamaCompatNumCtx,
-  wrapOllamaCompatNumCtx,
-  wrapStreamFnDecodeXaiToolCallArguments,
-} from "../../../agent-runtime/model/index.js";
-import { wrapStreamFnTrimToolCallNames } from "../../../agent-runtime/model/index.js";
-import { resolvePromptModeForSession } from "../../../agent-runtime/policy/index.js";
-import { sessionTaskState } from "../../../agent-runtime/state/index.js";
-import { captureTaskActionBoundary } from "../../../agent-runtime/state/task-action.js";
+  makeBootstrapWarn,
+  resolveBootstrapContextForRun,
+} from "../../../agents/bootstrap-files.js";
+import { createCacheTrace } from "../../../agents/cache-trace.js";
+import {
+  listChannelSupportedActions,
+  resolveChannelMessageToolHints,
+} from "../../../agents/channel-tools.js";
+import { loadContextCandidates } from "../../../agents/context-compiler/candidates.js";
+import { shouldApplyCollabCompileStrategy } from "../../../agents/context-compiler/collab-compile-strategy.js";
+import { isContextCompilerEnabled } from "../../../agents/context-compiler/flag.js";
+import {
+  createContextCompileState,
+  installContextCompilerTransform,
+  wrapContextCompilerModelBoundary,
+  wrapOutboundMessageEstimateGuard,
+} from "../../../agents/context-compiler/install.js";
+import { resolveContextLane } from "../../../agents/context-compiler/lane-budget.js";
+import { contextCompileTelemetryExtra } from "../../../agents/context-compiler/telemetry.js";
+import { ensureCustomApiRegistered } from "../../../agents/custom-api-registry.js";
+import { DEFAULT_CONTEXT_TOKENS } from "../../../agents/defaults.js";
+import { resolveOpenClawDocsPath } from "../../../agents/docs-path.js";
+import { isConstitutionalRuntimeShadowEnabled } from "../../../agents/execution-preflight/constitutional-runtime-shadow-gate.js";
+import { observeConstitutionalRuntimeShadow } from "../../../agents/execution-preflight/constitutional-runtime-shadow-observe.js";
+import {
+  applyPreflightToTools,
+  buildExecutionPreflight,
+  armCompletionHold,
+  bindGatedReply,
+  disarmCompletionHold,
+  filterLaneTools,
+  gateAssistantTexts,
+  gateReplyText,
+  preflightEvents,
+  recordExecutionTrace,
+  resolveAttemptDelivery,
+  runProductionValidatorsForAttempt,
+  resolveExecutionTaskId,
+  toHookDeliveryResult,
+  resolveSkillFrontmatter,
+} from "../../../agents/execution-preflight/index.js";
+import {
+  dropSupersededStallTexts,
+  EMPTY_AFTER_TOOLS_CONTINUE_LIMIT,
+  EMPTY_AFTER_TOOLS_CONTINUE_PROMPT,
+  EXECUTION_STALL_CONTINUE_LIMIT,
+  EXECUTION_STALL_CONTINUE_PROMPT,
+  executionContinueKind,
+  FALSE_CONFIRM_CONTINUE_LIMIT,
+  FALSE_CONFIRM_CONTINUE_PROMPT,
+  SILENT_EXEC_CONTINUE_LIMIT,
+  RECOVERABLE_TOOL_FAILURE_CONTINUE_LIMIT,
+  RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT,
+  SILENT_EXEC_CONTINUE_PROMPT,
+  lastAssistantStopKind,
+  lastAssistantStopText,
+  latestUserText,
+  shouldContinueAfterEmptyToolFinal,
+  claimStallContinue,
+} from "../../../agents/execution-stall-continue.js";
+import { isTimeoutError } from "../../../agents/failover-error.js";
+import { resolveImageSanitizationLimits } from "../../../agents/image-sanitization.js";
+import { filterClientToolDefinitionsForInboundCeiling } from "../../../agents/inbound-tool-policy.js";
+import { resolveModelAuthMode } from "../../../agents/model-auth.js";
+import { resolveDefaultModelForAgent } from "../../../agents/model-selection.js";
+import { supportsModelTools } from "../../../agents/model-tool-support.js";
+import { createConfiguredOllamaStreamFn } from "../../../agents/ollama-stream.js";
+import {
+  createOpenAIWebSocketStreamFn,
+  releaseWsSession,
+} from "../../../agents/openai-ws-stream.js";
+import { resolveOwnerDisplaySetting } from "../../../agents/owner-display.js";
+import {
+  downgradeOpenAIFunctionCallReasoningPairs,
+  isCloudCodeAssistFormatError,
+  resolveBootstrapMaxChars,
+  resolveBootstrapPromptTruncationWarningMode,
+  resolveBootstrapTotalMaxChars,
+  validateAnthropicTurns,
+  validateGeminiTurns,
+} from "../../../agents/pi-embedded-helpers.js";
+import { isRunnerAbortError } from "../../../agents/pi-embedded-runner/abort.js";
+import {
+  appendCacheTtlTimestamp,
+  isCacheTtlEligibleProvider,
+} from "../../../agents/pi-embedded-runner/cache-ttl.js";
+import { buildEmbeddedExtensionFactories } from "../../../agents/pi-embedded-runner/extensions.js";
+import { applyExtraParamsToAgent } from "../../../agents/pi-embedded-runner/extra-params.js";
+import {
+  logToolSchemasForGoogle,
+  sanitizeSessionHistory,
+  sanitizeToolsForGoogle,
+} from "../../../agents/pi-embedded-runner/google.js";
+import {
+  getDmHistoryLimitFromSessionKey,
+  limitHistoryTurns,
+} from "../../../agents/pi-embedded-runner/history.js";
+import { log } from "../../../agents/pi-embedded-runner/logger.js";
+import { buildModelAliasLines } from "../../../agents/pi-embedded-runner/model.js";
+import { installReplyLanguageReminder } from "../../../agents/pi-embedded-runner/reply-language-reminder.js";
+import { waitForCompactionRetryWithAggregateTimeout } from "../../../agents/pi-embedded-runner/run/compaction-retry-aggregate-timeout.js";
+import {
+  selectCompactionTimeoutSnapshot,
+  shouldFlagCompactionTimeout,
+} from "../../../agents/pi-embedded-runner/run/compaction-timeout.js";
+import { buildExecutionPreferenceHint } from "../../../agents/pi-embedded-runner/run/execution-preference-hint.js";
+import {
+  observeAttemptSkillPreparation,
+  observeAttemptSystemPromptReady,
+  observeAttemptToolPreparation,
+  wrapCreateToolsForObservation,
+} from "../../../agents/pi-embedded-runner/run/execution-router-baselines.js";
+import { pruneProcessedHistoryImages } from "../../../agents/pi-embedded-runner/run/history-image-prune.js";
+import {
+  buildTextOnlyImagePromptGuard,
+  detectAndLoadPromptImages,
+} from "../../../agents/pi-embedded-runner/run/images.js";
+import { resolveEmbeddedAttemptToolsRaw } from "../../../agents/pi-embedded-runner/run/resolve-embedded-tools.js";
+import { rewriteAttemptVisibleReply } from "../../../agents/pi-embedded-runner/run/rewrite-visible-reply.js";
+import type {
+  EmbeddedRunAttemptParams,
+  EmbeddedRunAttemptResult,
+} from "../../../agents/pi-embedded-runner/run/types.js";
+import {
+  clearActiveEmbeddedRun,
+  type EmbeddedPiQueueHandle,
+  setActiveEmbeddedRun,
+} from "../../../agents/pi-embedded-runner/runs.js";
+import { buildEmbeddedSandboxInfo } from "../../../agents/pi-embedded-runner/sandbox-info.js";
+import {
+  prewarmSessionFile,
+  trackSessionManagerAccess,
+} from "../../../agents/pi-embedded-runner/session-manager-cache.js";
+import { prepareSessionManagerForRun } from "../../../agents/pi-embedded-runner/session-manager-init.js";
+import { resolveEmbeddedRunSkillEntries } from "../../../agents/pi-embedded-runner/skills-runtime.js";
+import {
+  resolveStreamApiKey,
+  wrapStreamFnWithResolvedApiKey,
+} from "../../../agents/pi-embedded-runner/stream-api-key.js";
+import {
+  applySystemPromptOverrideToSession,
+  buildEmbeddedSystemPrompt,
+  createSystemPromptOverride,
+} from "../../../agents/pi-embedded-runner/system-prompt.js";
+import { dropThinkingBlocks } from "../../../agents/pi-embedded-runner/thinking.js";
+import { collectAllowedToolNames } from "../../../agents/pi-embedded-runner/tool-name-allowlist.js";
+import { installToolResultContextGuard } from "../../../agents/pi-embedded-runner/tool-result-context-guard.js";
+import {
+  applyEmbeddedCustomToolPolicy,
+  splitSdkTools,
+} from "../../../agents/pi-embedded-runner/tool-split.js";
+import {
+  describeUnknownError,
+  mapThinkingLevel,
+} from "../../../agents/pi-embedded-runner/utils.js";
+import { flushPendingToolResultsAfterIdle } from "../../../agents/pi-embedded-runner/wait-for-idle-before-flush.js";
+import { subscribeEmbeddedPiSession } from "../../../agents/pi-embedded-subscribe.js";
+import { createPreparedEmbeddedPiSettingsManager } from "../../../agents/pi-project-settings.js";
+import { createPiModelRuntime } from "../../../agents/pi-sdk/model-runtime.js";
+import { openSessionManager } from "../../../agents/pi-sdk/session.js";
+import { applyPiAutoCompactionGuard } from "../../../agents/pi-settings.js";
+import { toClientToolDefinitions } from "../../../agents/pi-tool-definition-adapter.js";
+import {
+  createOpenClawCodingTools,
+  resolveToolLoopDetectionConfig,
+} from "../../../agents/pi-tools.js";
+import { normalizeClientToolNamesForProvider } from "../../../agents/pi-tools.schema.js";
+import {
+  createProtocolBoundaryState,
+  isProtocolViolationContinueBlocked,
+  linkNativeOutcomesForViolation,
+} from "../../../agents/protocol-violation.js";
+import { wrapStreamFnSanitizeProviderToolNames } from "../../../agents/provider-tool-name-stream.js";
+import {
+  accountComputerTurnPrompt,
+  resolveAccountComputerWebRoute,
+} from "../../../agents/sandbox/account-computer-browser-routing.js";
+import { resolveEffectiveSandboxWorkspaceDir } from "../../../agents/sandbox/effective-workspace.js";
+import { resolveSandboxRuntimeStatus } from "../../../agents/sandbox/runtime-status.js";
+import { isXaiProvider } from "../../../agents/schema/clean-for-xai.js";
+import { repairSessionFileIfNeeded } from "../../../agents/session-file-repair.js";
+import { guardSessionManager } from "../../../agents/session-tool-result-guard-wrapper.js";
+import { sanitizeToolUseResultPairing } from "../../../agents/session-transcript-repair.js";
+import {
+  acquireSessionWriteLock,
+  resolveSessionLockMaxHoldFromTimeout,
+} from "../../../agents/session-write-lock.js";
+import { detectRuntimeShell } from "../../../agents/shell-utils.js";
+import {
+  applySkillEnvOverrides,
+  applySkillEnvOverridesFromSnapshot,
+  resolveSkillsPromptForRun,
+} from "../../../agents/skills.js";
+import { buildSystemPromptParams } from "../../../agents/system-prompt-params.js";
+import { buildSystemPromptReport } from "../../../agents/system-prompt-report.js";
+import { sanitizeToolCallIdsForCloudCodeAssist } from "../../../agents/tool-call-id.js";
+import { listNodes } from "../../../agents/tools/nodes-utils.js";
+import { resolveTranscriptPolicy } from "../../../agents/transcript-policy.js";
+import { DEFAULT_BOOTSTRAP_FILENAME } from "../../../agents/workspace.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import { emitChatInboundStage } from "../../../gateway/chat-inbound-stage-events.js";
@@ -64,182 +249,30 @@ import { buildTtsSystemPromptHint } from "../../../tts/tts.js";
 import { resolveUserPath } from "../../../utils.js";
 import { normalizeMessageChannel } from "../../../utils/message-channel.js";
 import { isReasoningTagProvider } from "../../../utils/provider-utils.js";
-import { resolveOpenClawAgentDir } from "../../agent-paths.js";
-import { resolveSessionAgentIds } from "../../agent-scope.js";
-import { createAnthropicPayloadLogger } from "../../anthropic-payload-log.js";
+import { resolveAttemptFsWorkspaceOnly } from "../../capabilities/index.js";
+import { buildAfterTurnRuntimeContext } from "../../capabilities/index.js";
+import { invokeContextAfterTurn } from "../../capabilities/index.js";
+import { resolveAttemptSandbox } from "../../capabilities/index.js";
+import { wrapStreamFnEnforceProtocolTextNonExecution } from "../../capabilities/index.js";
+import { resolvePromptBuildHookResult } from "../../capabilities/index.js";
+import { summarizeSessionContext } from "../../context/index.js";
 import {
-  analyzeBootstrapBudget,
-  buildBootstrapPromptWarning,
-  buildBootstrapTruncationReportMeta,
-  buildBootstrapInjectionStats,
-} from "../../bootstrap-budget.js";
-import { makeBootstrapWarn, resolveBootstrapContextForRun } from "../../bootstrap-files.js";
-import { createCacheTrace } from "../../cache-trace.js";
+  composeSystemPromptWithHookContext,
+  prependSystemPromptAddition,
+} from "../../context/index.js";
+import { renderRunSkillContext } from "../../context/index.js";
 import {
-  listChannelSupportedActions,
-  resolveChannelMessageToolHints,
-} from "../../channel-tools.js";
-import { loadContextCandidates } from "../../context-compiler/candidates.js";
-import { shouldApplyCollabCompileStrategy } from "../../context-compiler/collab-compile-strategy.js";
-import { isContextCompilerEnabled } from "../../context-compiler/flag.js";
-import {
-  createContextCompileState,
-  installContextCompilerTransform,
-  wrapContextCompilerModelBoundary,
-  wrapOutboundMessageEstimateGuard,
-} from "../../context-compiler/install.js";
-import { resolveContextLane } from "../../context-compiler/lane-budget.js";
-import { contextCompileTelemetryExtra } from "../../context-compiler/telemetry.js";
-import { ensureCustomApiRegistered } from "../../custom-api-registry.js";
-import { DEFAULT_CONTEXT_TOKENS } from "../../defaults.js";
-import { resolveOpenClawDocsPath } from "../../docs-path.js";
-import { isConstitutionalRuntimeShadowEnabled } from "../../execution-preflight/constitutional-runtime-shadow-gate.js";
-import { observeConstitutionalRuntimeShadow } from "../../execution-preflight/constitutional-runtime-shadow-observe.js";
-import {
-  applyPreflightToTools,
-  buildExecutionPreflight,
-  armCompletionHold,
-  bindGatedReply,
-  disarmCompletionHold,
-  filterLaneTools,
-  gateAssistantTexts,
-  gateReplyText,
-  preflightEvents,
-  recordExecutionTrace,
-  resolveAttemptDelivery,
-  runProductionValidatorsForAttempt,
-  resolveExecutionTaskId,
-  toHookDeliveryResult,
-  resolveSkillFrontmatter,
-} from "../../execution-preflight/index.js";
-import {
-  dropSupersededStallTexts,
-  EMPTY_AFTER_TOOLS_CONTINUE_LIMIT,
-  EMPTY_AFTER_TOOLS_CONTINUE_PROMPT,
-  EXECUTION_STALL_CONTINUE_LIMIT,
-  EXECUTION_STALL_CONTINUE_PROMPT,
-  executionContinueKind,
-  FALSE_CONFIRM_CONTINUE_LIMIT,
-  FALSE_CONFIRM_CONTINUE_PROMPT,
-  SILENT_EXEC_CONTINUE_LIMIT,
-  RECOVERABLE_TOOL_FAILURE_CONTINUE_LIMIT,
-  RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT,
-  SILENT_EXEC_CONTINUE_PROMPT,
-  lastAssistantStopKind,
-  lastAssistantStopText,
-  latestUserText,
-  shouldContinueAfterEmptyToolFinal,
-  claimStallContinue,
-} from "../../execution-stall-continue.js";
-import { isTimeoutError } from "../../failover-error.js";
-import { resolveImageSanitizationLimits } from "../../image-sanitization.js";
-import { filterClientToolDefinitionsForInboundCeiling } from "../../inbound-tool-policy.js";
-import { resolveModelAuthMode } from "../../model-auth.js";
-import { resolveDefaultModelForAgent } from "../../model-selection.js";
-import { supportsModelTools } from "../../model-tool-support.js";
-import { createConfiguredOllamaStreamFn } from "../../ollama-stream.js";
-import { createOpenAIWebSocketStreamFn, releaseWsSession } from "../../openai-ws-stream.js";
-import { resolveOwnerDisplaySetting } from "../../owner-display.js";
-import {
-  downgradeOpenAIFunctionCallReasoningPairs,
-  isCloudCodeAssistFormatError,
-  resolveBootstrapMaxChars,
-  resolveBootstrapPromptTruncationWarningMode,
-  resolveBootstrapTotalMaxChars,
-  validateAnthropicTurns,
-  validateGeminiTurns,
-} from "../../pi-embedded-helpers.js";
-import { subscribeEmbeddedPiSession } from "../../pi-embedded-subscribe.js";
-import { createPreparedEmbeddedPiSettingsManager } from "../../pi-project-settings.js";
-import { createPiModelRuntime } from "../../pi-sdk/model-runtime.js";
-import { openSessionManager } from "../../pi-sdk/session.js";
-import { applyPiAutoCompactionGuard } from "../../pi-settings.js";
-import { toClientToolDefinitions } from "../../pi-tool-definition-adapter.js";
-import { createOpenClawCodingTools, resolveToolLoopDetectionConfig } from "../../pi-tools.js";
-import { normalizeClientToolNamesForProvider } from "../../pi-tools.schema.js";
-import {
-  createProtocolBoundaryState,
-  isProtocolViolationContinueBlocked,
-  linkNativeOutcomesForViolation,
-} from "../../protocol-violation.js";
-import { wrapStreamFnSanitizeProviderToolNames } from "../../provider-tool-name-stream.js";
-import {
-  accountComputerTurnPrompt,
-  resolveAccountComputerWebRoute,
-} from "../../sandbox/account-computer-browser-routing.js";
-import { resolveEffectiveSandboxWorkspaceDir } from "../../sandbox/effective-workspace.js";
-import { resolveSandboxRuntimeStatus } from "../../sandbox/runtime-status.js";
-import { isXaiProvider } from "../../schema/clean-for-xai.js";
-import { repairSessionFileIfNeeded } from "../../session-file-repair.js";
-import { guardSessionManager } from "../../session-tool-result-guard-wrapper.js";
-import { sanitizeToolUseResultPairing } from "../../session-transcript-repair.js";
-import {
-  acquireSessionWriteLock,
-  resolveSessionLockMaxHoldFromTimeout,
-} from "../../session-write-lock.js";
-import { detectRuntimeShell } from "../../shell-utils.js";
-import {
-  applySkillEnvOverrides,
-  applySkillEnvOverridesFromSnapshot,
-  resolveSkillsPromptForRun,
-} from "../../skills.js";
-import { buildSystemPromptParams } from "../../system-prompt-params.js";
-import { buildSystemPromptReport } from "../../system-prompt-report.js";
-import { sanitizeToolCallIdsForCloudCodeAssist } from "../../tool-call-id.js";
-import { listNodes } from "../../tools/nodes-utils.js";
-import { resolveTranscriptPolicy } from "../../transcript-policy.js";
-import { DEFAULT_BOOTSTRAP_FILENAME } from "../../workspace.js";
-import { isRunnerAbortError } from "../abort.js";
-import { appendCacheTtlTimestamp, isCacheTtlEligibleProvider } from "../cache-ttl.js";
-import { buildEmbeddedExtensionFactories } from "../extensions.js";
-import { applyExtraParamsToAgent } from "../extra-params.js";
-import {
-  logToolSchemasForGoogle,
-  sanitizeSessionHistory,
-  sanitizeToolsForGoogle,
-} from "../google.js";
-import { getDmHistoryLimitFromSessionKey, limitHistoryTurns } from "../history.js";
-import { log } from "../logger.js";
-import { buildModelAliasLines } from "../model.js";
-import { installReplyLanguageReminder } from "../reply-language-reminder.js";
-import {
-  clearActiveEmbeddedRun,
-  type EmbeddedPiQueueHandle,
-  setActiveEmbeddedRun,
-} from "../runs.js";
-import { buildEmbeddedSandboxInfo } from "../sandbox-info.js";
-import { prewarmSessionFile, trackSessionManagerAccess } from "../session-manager-cache.js";
-import { prepareSessionManagerForRun } from "../session-manager-init.js";
-import { resolveEmbeddedRunSkillEntries } from "../skills-runtime.js";
-import { resolveStreamApiKey, wrapStreamFnWithResolvedApiKey } from "../stream-api-key.js";
-import {
-  applySystemPromptOverrideToSession,
-  buildEmbeddedSystemPrompt,
-  createSystemPromptOverride,
-} from "../system-prompt.js";
-import { dropThinkingBlocks } from "../thinking.js";
-import { collectAllowedToolNames } from "../tool-name-allowlist.js";
-import { installToolResultContextGuard } from "../tool-result-context-guard.js";
-import { applyEmbeddedCustomToolPolicy, splitSdkTools } from "../tool-split.js";
-import { describeUnknownError, mapThinkingLevel } from "../utils.js";
-import { flushPendingToolResultsAfterIdle } from "../wait-for-idle-before-flush.js";
-import { waitForCompactionRetryWithAggregateTimeout } from "./compaction-retry-aggregate-timeout.js";
-import {
-  selectCompactionTimeoutSnapshot,
-  shouldFlagCompactionTimeout,
-} from "./compaction-timeout.js";
-import { buildExecutionPreferenceHint } from "./execution-preference-hint.js";
-import {
-  observeAttemptSkillPreparation,
-  observeAttemptSystemPromptReady,
-  observeAttemptToolPreparation,
-  wrapCreateToolsForObservation,
-} from "./execution-router-baselines.js";
-import { pruneProcessedHistoryImages } from "./history-image-prune.js";
-import { buildTextOnlyImagePromptGuard, detectAndLoadPromptImages } from "./images.js";
-import { resolveEmbeddedAttemptToolsRaw } from "./resolve-embedded-tools.js";
-import { rewriteAttemptVisibleReply } from "./rewrite-visible-reply.js";
-import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptResult } from "./types.js";
+  shouldInjectOllamaCompatNumCtx,
+  wrapOllamaCompatNumCtx,
+  wrapStreamFnDecodeXaiToolCallArguments,
+} from "../../model/index.js";
+import { wrapStreamFnTrimToolCallNames } from "../../model/index.js";
+import { resolvePromptModeForSession } from "../../policy/index.js";
+import { sessionTaskState } from "../../state/index.js";
+import { captureTaskActionBoundary } from "../../state/task-action.js";
+import { resolveAttemptEndOfRunAttribution } from "../outcomes/attempt-attribution.js";
+import { runExecutionStallContinueLoop } from "../recovery/stall-continuation.js";
+import { cleanupEmbeddedAttempt } from "./attempt-cleanup.js";
 
 export async function runEmbeddedAttempt(
   params: EmbeddedRunAttemptParams,

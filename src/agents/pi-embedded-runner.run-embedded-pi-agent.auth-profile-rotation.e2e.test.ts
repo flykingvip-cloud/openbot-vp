@@ -21,7 +21,7 @@ const { computeBackoffMock, sleepWithAbortMock } = vi.hoisted(() => ({
   sleepWithAbortMock: vi.fn(async (_ms: number, _abortSignal?: AbortSignal) => undefined),
 }));
 
-vi.mock("./pi-embedded-runner/run/attempt.js", () => ({
+vi.mock("../agent-runtime/execution/runner/embedded-attempt.js", () => ({
   runEmbeddedAttempt: (params: unknown) => runEmbeddedAttemptMock(params),
 }));
 

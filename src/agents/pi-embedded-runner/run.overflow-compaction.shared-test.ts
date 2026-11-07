@@ -1,6 +1,6 @@
 import { vi } from "vitest";
+import { runEmbeddedAttempt } from "../../agent-runtime/execution/runner/embedded-attempt.js";
 import { compactEmbeddedPiSessionDirect } from "./compact.js";
-import { runEmbeddedAttempt } from "./run/attempt.js";
 import {
   sessionLikelyHasOversizedToolResults,
   truncateOversizedToolResultsInSession,

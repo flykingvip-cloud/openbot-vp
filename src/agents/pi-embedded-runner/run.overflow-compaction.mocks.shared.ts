@@ -84,7 +84,7 @@ vi.mock("../pi-embedded-helpers.js", () => ({
   pickFallbackThinkingLevel: vi.fn(() => null),
 }));
 
-vi.mock("./run/attempt.js", () => ({
+vi.mock("../../agent-runtime/execution/runner/embedded-attempt.js", () => ({
   runEmbeddedAttempt: vi.fn(),
 }));
 

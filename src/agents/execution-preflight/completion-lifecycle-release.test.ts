@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runEmbeddedAttempt } from "../../agent-runtime/execution/runner/embedded-attempt.js";
 import { runEmbeddedPiAgent } from "../../agent-runtime/execution/runner/embedded-run.js";
 import { surfaceCronJobResult } from "../../cron/isolated-agent/result-surfacing.js";
 import type { CronJob } from "../../cron/types.js";
@@ -10,7 +11,6 @@ import { createGatewayCloseHandler } from "../../gateway/server-close.js";
 import { deliverOutboundPayloads } from "../../infra/outbound/deliver.js";
 import { resolveAuthProfileOrder } from "../model-auth.js";
 import { classifyFailoverReason, isFailoverErrorMessage } from "../pi-embedded-helpers.js";
-import { runEmbeddedAttempt } from "../pi-embedded-runner/run/attempt.js";
 import { runSubagentAnnounceDispatch } from "../subagent-announce-dispatch.js";
 import { deliverSubagentAnnouncement } from "../subagent-announce.js";
 import {

@@ -9,9 +9,9 @@ vi.mock("../runtime-plugins.js", () => ({
   ensureRuntimePluginsLoaded: runtimePluginMocks.ensureRuntimePluginsLoaded,
 }));
 
+import { runEmbeddedAttempt } from "../../agent-runtime/execution/runner/embedded-attempt.js";
 import { runEmbeddedPiAgent } from "../../agent-runtime/execution/runner/embedded-run.js";
 import { createExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
-import { runEmbeddedAttempt } from "./run/attempt.js";
 
 const mockedRunEmbeddedAttempt = vi.mocked(runEmbeddedAttempt);
 

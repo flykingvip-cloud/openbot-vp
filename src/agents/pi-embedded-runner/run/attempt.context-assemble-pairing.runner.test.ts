@@ -204,7 +204,8 @@ vi.mock("../../model-selection.js", async (importOriginal) => {
   };
 });
 
-const { runEmbeddedAttempt } = await import("./attempt.js");
+const { runEmbeddedAttempt } =
+  await import("../../../agent-runtime/execution/runner/embedded-attempt.js");
 
 const constitutionalRuntimeShadowDeps: ConstitutionalRuntimeShadowDeps = Object.freeze({
   runtimeShadowEnabled: false,

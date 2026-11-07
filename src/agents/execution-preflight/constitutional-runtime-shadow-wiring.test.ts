@@ -30,8 +30,8 @@ const E = "src/agents/execution-preflight";
 const RUN_TS = "src/agent-runtime/execution/runner/embedded-run.ts";
 const TYPES_TS = `${P}/run/types.ts`;
 const PARAMS_TS = `${P}/run/params.ts`;
-const ATTEMPT_TS = `${P}/run/attempt.ts`;
-const ATTEMPT_MODULE = `${P}/run/attempt`;
+const ATTEMPT_TS = "src/agent-runtime/execution/runner/embedded-attempt.ts";
+const ATTEMPT_MODULE = "src/agent-runtime/execution/runner/embedded-attempt";
 const CALLER_TESTS = [
   `${P}/run/attempt.context-assemble-pairing.runner.test.ts`,
   `${P}/run/attempt.spawn-workspace.test.ts`,
@@ -47,8 +47,9 @@ const SHADOW_TESTS = ["gate", "projection", "sink", "observe", "wiring"].map(
 const FACADE_TS = `${E}/constitutional-runtime-facade.ts`;
 const GATE_FN = "isConstitutionalRuntimeShadowEnabled";
 const OBSERVE_FN = "observeConstitutionalRuntimeShadow";
-const GATE_SPECIFIER = "../../execution-preflight/constitutional-runtime-shadow-gate.js";
-const OBSERVE_SPECIFIER = "../../execution-preflight/constitutional-runtime-shadow-observe.js";
+const GATE_SPECIFIER = "../../../agents/execution-preflight/constitutional-runtime-shadow-gate.js";
+const OBSERVE_SPECIFIER =
+  "../../../agents/execution-preflight/constitutional-runtime-shadow-observe.js";
 /** B-18: everything a shadow module may import. */
 const SHADOW_IMPORT_ALLOWLIST = new Set([
   "./constitutional-runtime-facade.js",
@@ -618,17 +619,17 @@ describe("Constitutional runtime shadow wiring locks", () => {
 
   it("self-check: the indirection, environment and test-double detectors flag known-bad sources", () => {
     const indirect = parse(
-      `${P}/synthetic-indirect.ts`,
+      "src/agent-runtime/execution/runner/synthetic-indirect.ts",
       [
         `${RUNNER}.call(null, {});`,
         `${RUNNER}.apply(null, [{}]);`,
         `const bound = ${RUNNER}.bind(null);`,
         `${RUNNER}["call"](null, {});`,
         `Reflect.apply(${RUNNER}, null, [{}]);`,
-        `export { ${RUNNER} } from "./run/attempt.js";`,
-        `export * from "./run/attempt.js";`,
-        `export * as attemptModule from "./run/attempt.js";`,
-        `import { ${RUNNER} as go } from "./run/attempt.js";`,
+        `export { ${RUNNER} } from "./embedded-attempt.js";`,
+        `export * from "./embedded-attempt.js";`,
+        `export * as attemptModule from "./embedded-attempt.js";`,
+        `import { ${RUNNER} as go } from "./embedded-attempt.js";`,
         `const { ${RUNNER}: viaDestructure } = mod;`,
         `const alias = ${RUNNER};`,
         `later = mod.${RUNNER};`,

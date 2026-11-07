@@ -308,7 +308,7 @@ describe("execution preflight integration", () => {
       "utf8",
     );
     const attempt = readFileSync(
-      new URL("../pi-embedded-runner/run/attempt.ts", import.meta.url),
+      new URL("../../agent-runtime/execution/runner/embedded-attempt.ts", import.meta.url),
       "utf8",
     );
     const chat = readFileSync(

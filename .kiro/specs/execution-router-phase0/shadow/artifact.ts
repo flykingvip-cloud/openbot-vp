@@ -6,7 +6,7 @@ import { sha256Hex } from "./ids.ts";
 export const PRODUCTION_OBSERVATION_PATHS = [
   "src/gateway/execution-router-observation.ts",
   "src/gateway/chat-inbound-stage-events.ts",
-  "src/agents/pi-embedded-runner/run/attempt.ts",
+  "src/agent-runtime/execution/runner/embedded-attempt.ts",
   "src/agents/pi-embedded-runner/run/execution-router-baselines.ts",
 ] as const;
 

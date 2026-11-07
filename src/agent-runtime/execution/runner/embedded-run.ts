@@ -42,7 +42,6 @@ import {
 } from "../../../agents/pi-embedded-helpers.js";
 import { resolveGlobalLane, resolveSessionLane } from "../../../agents/pi-embedded-runner/lanes.js";
 import { log } from "../../../agents/pi-embedded-runner/logger.js";
-import { runEmbeddedAttempt } from "../../../agents/pi-embedded-runner/run/attempt.js";
 import { createFailoverDecisionLogger } from "../../../agents/pi-embedded-runner/run/failover-observation.js";
 import type { RunEmbeddedPiAgentParams } from "../../../agents/pi-embedded-runner/run/params.js";
 import {
@@ -87,6 +86,7 @@ import {
   buildErrorAgentMeta,
 } from "../outcomes/usage-summary.js";
 import { recoverContextOverflow } from "../recovery/context-overflow.js";
+import { runEmbeddedAttempt } from "./embedded-attempt.js";
 import { cleanupEmbeddedRun } from "./embedded-cleanup.js";
 
 // Avoid Anthropic's refusal test token poisoning session transcripts.

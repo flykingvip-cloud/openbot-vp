@@ -825,3 +825,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved prompt-mode classification into policy/prompt-mode and existing workspace restriction resolution into capabilities/adapters/attempt-workspace-policy. Original bodies removed; collaboration workspace restriction and steward isolation retain their precedence. No additional model call or execution path. — codex-runtime-manager
 - Workspace/context/attempt regression 3 files / 75 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration and retirement remain open. — codex-runtime-manager
+
+## Unique embedded attempt implementation migration (2026-11-07)
+
+- Moved the sole embedded attempt into execution/runner/embedded-attempt after extracting model, policy, context, sandbox, protocol and cleanup components. Deleted old implementation path; migrated production caller, test mocks, identity scans and observation source catalog. Archive tag archive/runtime-embedded-attempt-bb944cfbb preserves the original. No duplicate loop or fallback implementation. — codex-runtime-manager
+- Runtime/workspace/context/shadow wiring regression 4 files / 84 PASS; lifecycle/overflow/identity/collaboration regression 10 files / 70 PASS; configured auth/fallback/embedded integration 3 files / 34 PASS. Full tsgo PASS; typed lint clean; architecture 51 PASS; full build PASS with existing warnings. — codex-runtime-manager
+- Operational shadow collector remains fail-closed against origin/main production blobs. Exact pre-relocation files were temporarily restored and its original failure reproduced: source attempt blob 5652a477 differs from HEAD/worktree f2f24c8f. Pending relocation files were restored afterward. Canonical observation path updated, identity enforcement unchanged; this collector needs revalidation on the integrated main baseline. No whole-runtime completion, merge or deployment claimed. — codex-runtime-manager
