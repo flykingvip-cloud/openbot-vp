@@ -27,3 +27,5 @@ export {
   toNormalizedUsage,
   buildErrorAgentMeta,
 } from "./outcomes/usage-summary.js";
+
+export { resolveAttemptEndOfRunAttribution } from "./outcomes/attempt-attribution.js";

@@ -5,6 +5,7 @@ import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { renderRunSkillContext } from "../../../agent-runtime/context/index.js";
+import { resolveAttemptEndOfRunAttribution } from "../../../agent-runtime/execution/index.js";
 import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
 import { captureTaskActionBoundary } from "../../../agent-runtime/state/task-action.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
@@ -260,30 +261,6 @@ type PromptBuildHookRunner = {
     ctx: PluginHookAgentContext,
   ) => Promise<PluginHookBeforeAgentStartResult | undefined>;
 };
-
-/**
- * askOutcome P1: map embedded-run terminal signals to honest skill/pattern attribution.
- * Unknown (no abort/timeout/prompt error) → skip run-level success; do not invent failure.
- */
-export function resolveAttemptEndOfRunAttribution(params: {
-  aborted: boolean;
-  timedOut: boolean;
-  promptError: unknown;
-  lastAssistantErrorMessage?: string | null;
-}): {
-  runFailed: boolean;
-  skillOutcome: "failure" | null;
-  patternSuccess: boolean | null;
-} {
-  const runFailed = Boolean(
-    params.aborted || params.timedOut || params.promptError || params.lastAssistantErrorMessage,
-  );
-  return {
-    runFailed,
-    skillOutcome: runFailed ? "failure" : null,
-    patternSuccess: runFailed ? false : null,
-  };
-}
 
 export function isOllamaCompatProvider(model: {
   provider?: string;

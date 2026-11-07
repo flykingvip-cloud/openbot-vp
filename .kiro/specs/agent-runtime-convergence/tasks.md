@@ -714,3 +714,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved fixed context disposal, credential timer shutdown and working-directory restoration from the legacy runner into execution/runner/embedded-cleanup. Nested finally guarantees later cleanup even when context disposal or timer shutdown fails; errors remain observable. No configurable script, scheduling or additional execution loop. — codex-runtime-manager
 - Cleanup/overflow/usage regression 4 files / 29 PASS; full tsgo PASS; changed-file typed lint clean; architecture 51 PASS; full build PASS. Existing dynamic-import and UI chunk warnings remain. No gateway restart, push, merge or deployment; full old-runner retirement remains open. — codex-runtime-manager
+
+## Attempt terminal attribution ownership (2026-11-07)
+
+- Moved terminal failure/unknown attribution from the legacy attempt into execution/outcomes; removed the original implementation and migrated its regression consumer to the public execution entry. A normal turn still does not invent task success or accepted delivery. — codex-runtime-manager
+- Original and migrated attribution/attempt suites both 2 files / 66 PASS. Full tsgo PASS, changed-file typed lint clean, architecture 51 PASS. Core runner and attempt remain active; this checkpoint does not establish complete replacement or retirement. — codex-runtime-manager
