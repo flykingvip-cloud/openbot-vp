@@ -937,3 +937,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Existing outbound adapter context now carries the original optional task boundary. Routed Discord text/media pass it into guarded client requests; webhook checks it before HTTP. No task identity is inferred from the current session and no second delivery engine is added. Direct monitor/preview paths still require convergence. — codex-runtime-manager
 - Outbound/Discord regression 4 files / 64 PASS, including stale webhook refusal; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement and same-version lifecycle acceptance remain open. — codex-runtime-manager
+
+## Discord monitor and preview boundary (2026-11-07)
+
+- Direct monitor delivery now propagates original task identity to text/media/voice/webhook transports and final preview edits. Pre-resolved direct text requests recheck inside retries; remaining chunks stop after task invalidation. Existing fallback, chunk ordering and independent control replies remain unchanged. Draft partial streaming still needs separate lifecycle verification. — codex-runtime-manager
+- Discord regression 4 files / 52 PASS, including actual direct-chunk invalidation; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
