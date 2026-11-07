@@ -381,6 +381,30 @@ describe("delivery-queue", () => {
       expect(pending[0].retryCount).toBe(1);
     });
 
+    it("holds partially delivered batches instead of replaying confirmed payloads", async () => {
+      const id = await enqueueDelivery(
+        {
+          channel: "whatsapp",
+          to: "+1",
+          payloads: [{ text: "a" }, { text: "b" }],
+          bestEffort: true,
+        },
+        tmpDir,
+      );
+      const deliver = vi.fn(async (params: { onError?: (error: unknown) => void }) => {
+        params.onError?.(new Error("second payload failed"));
+        return [{ messageId: "confirmed-first-payload" }];
+      });
+      const { result } = await runRecovery({ deliver });
+      expect(result.recovered).toBe(0);
+      expect(result.failed).toBe(1);
+      expect(await loadPendingDeliveries(tmpDir)).toHaveLength(0);
+      expect(fs.existsSync(path.join(tmpDir, "delivery-queue", "failed", `${id}.json`))).toBe(true);
+      const replay = vi.fn();
+      await runRecovery({ deliver: replay });
+      expect(replay).not.toHaveBeenCalled();
+    });
+
     it.each([
       { receipts: [] },
       { receipts: [{ messageId: "unknown" }] },

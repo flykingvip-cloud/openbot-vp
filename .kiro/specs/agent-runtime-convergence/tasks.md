@@ -851,3 +851,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Consolidated repeated command, admitted-turn and cron CLI credential scope/environment preparation into model/cli-run-credential. Removed three duplicate bodies; preserves all-or-nothing host-default fallback, trusted scope and caller-specific attribution fallback. Usage recording remains after the original execution. No execution loop or credential store added. — codex-runtime-manager
 - Command/admitted/cron regression 5 files / 57 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager
+
+## Partial recovery replay fence (2026-11-07)
+
+- Reproduced a recovery batch with one successful receipt plus one payload failure remaining pending for full replay (1 FAIL / 68 PASS). Recovery now moves that batch into existing failed reconciliation storage instead of replaying confirmed messages. Empty-result failures retain their original retry policy. No new queue or exactly-once claim. — codex-runtime-manager
+- Outbound queue regression 69 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Original task fencing and reconciliation completion remain separate blockers. — codex-runtime-manager

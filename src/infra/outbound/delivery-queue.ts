@@ -398,6 +398,15 @@ export async function recoverPendingDeliveries(opts: {
         skipQueue: true, // Prevent re-enqueueing during recovery
       });
       if (hadPayloadFailure) {
+        if (Array.isArray(receipts) && receipts.length > 0) {
+          // Some payloads may already be visible. Without per-item replay identity,
+          // retrying the original batch could duplicate those messages.
+          await failDelivery(entry.id, "partial_delivery: held for reconciliation", opts.stateDir);
+          await moveToFailed(entry.id, opts.stateDir);
+          failed += 1;
+          opts.log.warn(`Delivery ${entry.id} partially sent — held for reconciliation`);
+          continue;
+        }
         throw payloadFailure instanceof Error ? payloadFailure : new Error(String(payloadFailure));
       }
       if (!confirmedDeliveryMessageIds(receipts)) {
