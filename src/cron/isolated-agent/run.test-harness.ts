@@ -152,7 +152,7 @@ vi.mock("../../agents/subagent-registry.js", () => ({
   listDescendantRunsForRequester: listDescendantRunsForRequesterMock,
 }));
 
-vi.mock("../../agents/cli-runner.js", () => ({
+vi.mock("../../agent-runtime/execution/runner/cli-run.js", () => ({
   runCliAgent: runCliAgentMock,
 }));
 

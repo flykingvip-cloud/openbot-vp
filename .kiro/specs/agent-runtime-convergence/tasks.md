@@ -973,3 +973,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced paused and queue-invalidated accepted requests reaching model preparation (2 FAIL). The unique embedded mainline now checks its original execution binding before enqueue, after dequeue and before each retry iteration, using the existing state API. Existing abort lifecycle remains unchanged; no new classifier or execution path. — codex-runtime-manager
 - Startup/admitted regression 2 files / 6 PASS; embedded/auth/fallback integration 3 files / 34 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Channel implementation remains delegated; overall replacement and retirement acceptance remain open. — codex-runtime-manager
+
+## Unique CLI execution adapter ownership (2026-11-07)
+
+- Moved the unique CLI provider implementation into execution/runner/cli-run. Legacy cli-runner is a compatibility re-export; admitted, command and scheduled candidates invoke the runtime implementation directly. Preserved supervisor, credentials, timeout, cancellation, session fallback and usage behavior. Runtime architecture prohibits returning through the legacy facade. — codex-runtime-manager
+- CLI/command/billing/cron regression 6 files / 85 PASS with independent forks and polling watchers. Initial runs hit host EMFILE watcher exhaustion; passing rerun changes test environment only. Full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement and final lifecycle acceptance remain open. — codex-runtime-manager

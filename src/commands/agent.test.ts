@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest"
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
 import "../cron/isolated-agent.mocks.js";
 import * as agentDeliveryModule from "../agent-runtime/delivery/index.js";
-import * as cliRunnerModule from "../agents/cli-runner.js";
+import * as cliRunnerModule from "../agent-runtime/execution/runner/cli-run.js";
 import { FailoverError } from "../agents/failover-error.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import * as modelSelectionModule from "../agents/model-selection.js";

@@ -481,7 +481,8 @@
       "src/agents/pi-embedded",
       "src/agents/pi-embedded-runner/runs",
       "src/agents/pi-embedded-runner/run/params",
-      "src/agents/pi-embedded-runner/types"
+      "src/agents/pi-embedded-runner/types",
+      "src/agents/cli-runner"
     ],
     "exemptFiles": ["src/agent-runtime/execution/runner/run-registry.test.ts"],
     "description": "Runtime implementations and wiring cannot loop through legacy execution facades; the registry compatibility test alone verifies shared identity."

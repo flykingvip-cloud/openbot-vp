@@ -1,7 +1,6 @@
 /** Original command candidate adapter; no task admission or outer fallback loop. */
 import { resolveBootstrapWarningSignaturesSeen } from "../../../agents/bootstrap-budget.js";
 import { recordCliBackendUsage } from "../../../agents/cli-backend-usage-attribution.js";
-import { runCliAgent } from "../../../agents/cli-runner.js";
 import { getCliSessionId, setCliSessionId } from "../../../agents/cli-session.js";
 import { FailoverError } from "../../../agents/failover-error.js";
 import { isCliProvider, normalizeProviderId } from "../../../agents/model-selection.js";
@@ -18,6 +17,7 @@ import type { resolveMessageChannel } from "../../../utils/message-channel.js";
 import type { AgentRunContext } from "../../contracts/command.js";
 import { resolveCliRunCredential } from "../../model/index.js";
 import { persistCommandSessionEntry } from "../../state/index.js";
+import { runCliAgent } from "./cli-run.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";
 const log = createSubsystemLogger("commands/agent");

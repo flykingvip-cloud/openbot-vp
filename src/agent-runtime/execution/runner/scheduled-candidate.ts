@@ -1,12 +1,12 @@
 import { resolveBootstrapWarningSignaturesSeen } from "../../../agents/bootstrap-budget.js";
 import { recordCliBackendUsage } from "../../../agents/cli-backend-usage-attribution.js";
-import { runCliAgent } from "../../../agents/cli-runner.js";
 import { getCliSessionId } from "../../../agents/cli-session.js";
 import { isCliProvider } from "../../../agents/model-selection.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
 import { resolveEnterpriseEmbeddedTransport } from "../../../gateway/enterprise-model/embedded-transport.js";
 import { resolveCliRunCredential } from "../../model/index.js";
+import { runCliAgent } from "./cli-run.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";

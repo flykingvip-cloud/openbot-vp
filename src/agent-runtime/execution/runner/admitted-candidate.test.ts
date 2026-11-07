@@ -5,7 +5,7 @@ import {
 } from "./admitted-candidate.js";
 
 const mocks = vi.hoisted(() => ({ cli: vi.fn(), embedded: vi.fn(), event: vi.fn() }));
-vi.mock("../../../agents/cli-runner.js", () => ({
+vi.mock("./cli-run.js", () => ({
   runCliAgent: (...args: unknown[]) => mocks.cli(...args),
 }));
 vi.mock("./embedded-run.js", () => ({
