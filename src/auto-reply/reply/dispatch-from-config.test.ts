@@ -2193,3 +2193,34 @@ describe("task completion requires channel delivery evidence", () => {
     },
   );
 });
+
+it("carries the admitted execution session path into block and final delivery", async () => {
+  setNoAbort();
+  const dispatcher = createDispatcher();
+  const binding = {
+    taskId: "task-new-session",
+    executionAttempt: "run-new-session",
+    deliverableVersion: "version-new-session",
+    constraints: ["keep sources"],
+  };
+  const sessionFile = "/tmp/openbot-test-new-session/transcript.jsonl";
+  await dispatchReplyFromConfig({
+    ctx: buildTestCtx({ Provider: "slack", Surface: "slack" }),
+    cfg: emptyConfig,
+    dispatcher,
+    replyResolver: async (_ctx: MsgContext, options?: GetReplyOptions) => {
+      options?.onTaskExecutionBound?.(binding, { sessionFile });
+      await options?.onBlockReply?.({ text: "task stage" });
+      return { text: "task result" };
+    },
+  });
+  const context = { taskBoundary: { sessionFile, binding, constraints: binding.constraints } };
+  expect(dispatcher.sendBlockReply).toHaveBeenCalledWith(
+    expect.objectContaining({ text: "task stage" }),
+    context,
+  );
+  expect(dispatcher.sendFinalReply).toHaveBeenCalledWith(
+    expect.objectContaining({ text: "task result" }),
+    context,
+  );
+});
