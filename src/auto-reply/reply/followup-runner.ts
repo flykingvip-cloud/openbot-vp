@@ -3,6 +3,7 @@ import path from "node:path";
 import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
 import { prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
 import { runQueuedCandidate } from "../../agent-runtime/execution/index.js";
+import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
 import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
 import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { claimQueuedExecution } from "../../agent-runtime/state/index.js";
@@ -12,7 +13,6 @@ import { resolveAgentDir, resolveRunModelFallbacksOverride } from "../../agents/
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
-import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage, normalizeUsage } from "../../agents/usage.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import {
@@ -342,7 +342,7 @@ export function createFollowupRunner(params: {
         });
       }
       let autoCompactionCompleted = false;
-      let runResult: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
+      let runResult: EmbeddedPiRunResult;
       let fallbackProvider = queued.run.provider;
       let fallbackModel = queued.run.model;
       let modelGate: EmployeeModelGateResult | undefined;

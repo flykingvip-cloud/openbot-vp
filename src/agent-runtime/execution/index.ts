@@ -47,3 +47,5 @@ export {
   waitForActiveEmbeddedRuns,
   getActiveEmbeddedRunCount,
 } from "./runner/run-registry.js";
+
+export type { EmbeddedPiRunResult } from "./runner/embedded-result.js";

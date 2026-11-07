@@ -983,3 +983,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced scheduled CLI candidate dropping the original abortSignal (1 FAIL). Candidate now forwards the same signal into the unique CLI adapter; supervisor cancellation remains the existing owner. No new stop path. — codex-runtime-manager
 - Scheduled/CLI regression 2 files / 14 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Integrated candidate 5aa1d7fa1 full build PASS with 209 existing dynamic-import warnings. Overall retirement remains open. — codex-runtime-manager
+
+## Mainline result consumer convergence (2026-11-07)
+
+- Queued execution, scheduled execution and command session closeout now consume the result type through execution/index. Removed their legacy execution facade imports used only for ReturnType; no model invocation or closeout behavior changed. — codex-runtime-manager
+- Consumer regression 3 files / 72 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager

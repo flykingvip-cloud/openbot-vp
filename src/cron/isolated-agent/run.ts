@@ -1,4 +1,5 @@
 import { runScheduledCandidate } from "../../agent-runtime/execution/index.js";
+import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
 import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import {
@@ -25,7 +26,6 @@ import {
   resolveHooksGmailModel,
   resolveThinkingDefault,
 } from "../../agents/model-selection.js";
-import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
 import { accountComputerObserverUserId } from "../../agents/sandbox/account-scope.js";
 import {
   countActiveDescendantRuns,
@@ -805,13 +805,11 @@ export async function runCronIsolatedAgentTurn(params: {
     .filter((part) => typeof part === "string" && part.trim())
     .join("\n\n");
 
-  let runResult: Awaited<ReturnType<typeof runEmbeddedPiAgent>> | undefined;
+  let runResult: EmbeddedPiRunResult | undefined;
   let lastHookDelivery: HookDeliveryResult | undefined;
   let hookValidatorsRequired = false;
   let frozenAttemptTaskId = "";
-  const adoptHookDelivery = (
-    result: Awaited<ReturnType<typeof runEmbeddedPiAgent>> | undefined,
-  ) => {
+  const adoptHookDelivery = (result: EmbeddedPiRunResult | undefined) => {
     if (!result) {
       return;
     }
