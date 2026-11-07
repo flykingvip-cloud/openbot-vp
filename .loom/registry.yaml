@@ -10872,6 +10872,9 @@ landingStreams:
       - src/gateway/user-operational-identity-oauth.ts
       - src/gateway/user-operational-identity-runtime.ts
       - src/gateway/server-methods/user-operational-identity.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/platform-auth/session-domain.ts
       - ui/src/ui/controllers/user-operational-identity.ts
       - ui/src/ui/ports/employee/views/workbench-operational-identity-forms.ts
       - ui/src/ui/ports/employee/views/workbench-operational-identity-section.ts

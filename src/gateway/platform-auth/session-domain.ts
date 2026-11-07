@@ -194,6 +194,8 @@ const METHOD_REQUIRED_DOMAIN: Record<string, RequiredDomain> = {
   "user-operational-identity.oauth.status": SELF_SCOPED_IDENTITY_DOMAINS,
   "user-operational-identity.oauth.simulate-complete": SELF_SCOPED_IDENTITY_DOMAINS,
   "user-operational-identity.oauth.cancel": SELF_SCOPED_IDENTITY_DOMAINS,
+  "user-operational-identity.feishu-employee.refresh": SELF_SCOPED_IDENTITY_DOMAINS,
+  "user-operational-identity.feishu-employee.use": SELF_SCOPED_IDENTITY_DOMAINS,
   "user-operational-identity.wechat-personal.status": SELF_SCOPED_IDENTITY_DOMAINS,
   "user-operational-identity.wechat-personal.bind-existing": SELF_SCOPED_IDENTITY_DOMAINS,
   "user-operational-identity.wechat-personal.qr.start": SELF_SCOPED_IDENTITY_DOMAINS,

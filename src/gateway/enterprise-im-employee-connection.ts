@@ -6,17 +6,11 @@
  * Bind does not create a robot grant.
  */
 import { randomUUID } from "node:crypto";
-import { loadConfig } from "../config/config.js";
-import type { OpenBotConfig } from "../config/config.js";
 import {
   readFeishuEnterpriseChannelContract,
   type EnterpriseImEmployeeUiHint,
 } from "./enterprise-im-channel-contract.js";
-import {
-  getTenantConfigOverride,
-  loadTenantConfigStore,
-  resolveConfigForTenant,
-} from "./tenant-config.js";
+import { getTenantConfigOverride, loadTenantConfigStore } from "./tenant-config.js";
 import { recordUserOperationalIdentityUsageEvent } from "./user-operational-identity-store.js";
 import type {
   UserOperationalIdentity,
@@ -74,8 +68,8 @@ export function feishuEmployeeIdentityId(params: {
   ownerId: string;
   openId: string;
 }): string {
-  const part = (value: string) => value.trim().replace(/[^a-zA-Z0-9._:-]/g, "_");
-  return `feishu-employee:${part(params.tenantId)}:${part(params.ownerId)}:${part(params.openId)}`;
+  const part = (value: string) => value.trim().replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `feishu-employee.${part(params.tenantId)}.${part(params.ownerId)}.${part(params.openId)}`;
 }
 
 export function defaultEnterpriseImAccountId(tenantId: string): string {
@@ -87,28 +81,29 @@ export function defaultEnterpriseImAccountId(tenantId: string): string {
   return `t_${normalized || "tenant"}_default`;
 }
 
+/**
+ * Only the tenant's own `t_<tenant>_default` account counts as an opened connection.
+ * A platform-default account, or any other account id, is not selected.
+ */
 export function resolveFeishuEnterpriseAccountId(
   config: Record<string, unknown>,
   tenantId: string,
-): string {
+): string | null {
   const preferred = defaultEnterpriseImAccountId(tenantId);
   const channels = config.channels;
   const feishu =
     channels && typeof channels === "object" && !Array.isArray(channels)
       ? (channels as { feishu?: { accounts?: Record<string, unknown> } }).feishu
       : undefined;
-  const accounts = feishu?.accounts ?? {};
-  if (accounts[preferred]) {
-    return preferred;
+  const accounts = feishu?.accounts;
+  if (!accounts || typeof accounts !== "object" || Array.isArray(accounts)) {
+    return null;
   }
-  const observed = Object.entries(accounts).find(([, account]) => {
-    if (!account || typeof account !== "object") {
-      return false;
-    }
-    const id = (account as { platformEnterpriseId?: unknown }).platformEnterpriseId;
-    return typeof id === "string" && id.trim().length > 0;
-  });
-  return observed?.[0] ?? preferred;
+  const account = accounts[preferred];
+  if (!account || typeof account !== "object" || Array.isArray(account)) {
+    return null;
+  }
+  return preferred;
 }
 
 export function feishuEmployeeChannelGate(params: {
@@ -116,6 +111,16 @@ export function feishuEmployeeChannelGate(params: {
   tenantId: string;
 }): FeishuEmployeeChannelGate {
   const accountId = resolveFeishuEnterpriseAccountId(params.config ?? {}, params.tenantId);
+  if (!accountId) {
+    return {
+      accountId: defaultEnterpriseImAccountId(params.tenantId),
+      employeeUiHint: "enterprise_not_open",
+      loginEnabled: false,
+      statusLabel: "企业尚未开通",
+      platformEnterpriseId: null,
+      childExecutionBlocked: true,
+    };
+  }
   const contract = readFeishuEnterpriseChannelContract({
     config: params.config,
     accountId,
@@ -143,22 +148,30 @@ export function feishuEmployeeChannelGate(params: {
 export async function loadFeishuEmployeeChannelGate(params: {
   tenantId: string | null | undefined;
   storePath?: string;
-  platformDefault?: OpenBotConfig;
 }): Promise<FeishuEmployeeChannelGate> {
   const tenantId = params.tenantId?.trim() || "";
   if (!tenantId) {
     return feishuEmployeeChannelGate({ config: {}, tenantId: "tenant" });
   }
-  const platformDefault = params.platformDefault ?? loadConfig();
   const store = await loadTenantConfigStore(params.storePath);
-  const view = resolveConfigForTenant({
-    platformDefault,
-    override: getTenantConfigOverride(store, tenantId),
-  });
+  const override = getTenantConfigOverride(store, tenantId) ?? {};
   return feishuEmployeeChannelGate({
-    config: view as unknown as Record<string, unknown>,
+    config: override,
     tenantId,
   });
+}
+
+export async function loadFeishuEmployeeAppCredentials(params: {
+  tenantId: string;
+  storePath?: string;
+  accountId: string;
+}): Promise<{ appId: string; appSecret: string } | null> {
+  const store = await loadTenantConfigStore(params.storePath);
+  const override = (getTenantConfigOverride(store, params.tenantId) ?? {}) as Record<
+    string,
+    unknown
+  >;
+  return readFeishuAppCredentials(override, params.accountId);
 }
 
 function classifyUserScopes(scopeNames: string[]): "identity_only" | "authorized" {
@@ -219,7 +232,7 @@ export function bindFeishuEmployeeConnection(params: {
         ownerId: params.ownerId,
         openId,
       })
-    : `feishu-employee:${params.tenantId}:${params.ownerId}:rejected`;
+    : `feishu-employee.${params.tenantId}.${params.ownerId}.rejected`;
   const grantsBefore = Object.keys(params.store.grants).length;
   const fail = (code: string, message: string): FeishuEmployeePublicResult => {
     audit({
@@ -394,18 +407,110 @@ export function disconnectFeishuEmployeeConnection(params: {
   };
 }
 
-export function readFeishuEmployeeConnection(params: {
+export function feishuEmployeeRowStatusLabel(params: {
+  gate?: Pick<
+    FeishuEmployeeChannelGate,
+    "employeeUiHint" | "childExecutionBlocked" | "statusLabel"
+  > | null;
+  status?: string | null;
+  expiresAt?: string | null;
+  enterpriseIm?: {
+    authorizationLevel?: "identity_only" | "authorized";
+    localCredentialsDeleted?: boolean;
+    platformRevokeRecorded?: boolean;
+  } | null;
+  nowIso?: string;
+}): string {
+  const gate = params.gate;
+  if (!gate || gate.childExecutionBlocked || gate.employeeUiHint === "enterprise_not_open") {
+    return "企业尚未开通";
+  }
+  if (gate.employeeUiHint === "waiting_admin_scopes") {
+    return "等待管理员开通权限";
+  }
+  const link = params.enterpriseIm;
+  if (!link) {
+    return gate.statusLabel;
+  }
+  if (link.platformRevokeRecorded) {
+    return "已停用";
+  }
+  if (link.localCredentialsDeleted) {
+    return "本地凭证已删除";
+  }
+  if (params.status === "reauth_required") {
+    return "需重新认证";
+  }
+  if (params.status === "expired" || credentialExpired(params.expiresAt, params.nowIso)) {
+    return "已过期";
+  }
+  if (params.status === "revoked") {
+    return "已停用";
+  }
+  if (link.authorizationLevel === "identity_only") {
+    return "仅身份";
+  }
+  return "已授权";
+}
+
+function credentialExpired(expiresAt: string | null | undefined, nowIso?: string): boolean {
+  if (!expiresAt?.trim()) {
+    return false;
+  }
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresMs)) {
+    return true;
+  }
+  const nowMs = Date.parse(nowIso ?? new Date().toISOString());
+  return expiresMs <= nowMs;
+}
+
+/** Connection metadata. This does not authorize use of the access token. */
+export function describeFeishuEmployeeConnection(params: {
   store: UserOperationalIdentityStore;
-  secretStore?: UserOperationalIdentityCredentialSecretStore;
+  ownerId: string;
+  identityId: string;
+}): {
+  found: boolean;
+  status?: UserOperationalIdentity["status"];
+  authorizationLevel?: "identity_only" | "authorized";
+  expiresAt?: string;
+  localCredentialsDeleted?: boolean;
+  platformRevokeRecorded?: boolean;
+} {
+  const identity = params.store.identities[params.identityId];
+  if (!identity || identity.ownerId !== params.ownerId || !identity.enterpriseIm) {
+    return { found: false };
+  }
+  return {
+    found: true,
+    status: identity.status,
+    authorizationLevel: identity.enterpriseIm.authorizationLevel,
+    expiresAt: identity.expiresAt,
+    localCredentialsDeleted: identity.enterpriseIm.localCredentialsDeleted === true,
+    platformRevokeRecorded: identity.enterpriseIm.platformRevokeRecorded === true,
+  };
+}
+
+function refuseFeishuEmployeeBase(params: {
+  store: UserOperationalIdentityStore;
   ownerId: string;
   identityId: string;
   gate: FeishuEmployeeChannelGate;
-}): FeishuEmployeePublicResult {
-  if (params.gate.childExecutionBlocked) {
+}): FeishuEmployeePublicResult | { identity: UserOperationalIdentity } {
+  if (params.gate.childExecutionBlocked || params.gate.employeeUiHint === "enterprise_not_open") {
     return {
       ok: false,
       code: "ENTERPRISE_CONNECTION_BLOCKED",
       message: "企业尚未开通",
+      identityId: params.identityId,
+    };
+  }
+  if (params.gate.employeeUiHint !== "app_can_attempt") {
+    return {
+      ok: false,
+      code: "WAITING_ADMIN_SCOPES",
+      message: "等待管理员开通权限",
       identityId: params.identityId,
     };
   }
@@ -421,7 +526,7 @@ export function readFeishuEmployeeConnection(params: {
       identityId: identity.identityId,
     };
   }
-  if (identity.enterpriseIm.platformRevokeRecorded) {
+  if (identity.enterpriseIm.platformRevokeRecorded || identity.status === "revoked") {
     return {
       ok: false,
       code: "PLATFORM_REVOKED",
@@ -430,8 +535,59 @@ export function readFeishuEmployeeConnection(params: {
       platformRevokeRecorded: true,
     };
   }
+  if (identity.enterpriseIm.localCredentialsDeleted) {
+    return {
+      ok: false,
+      code: "LOCAL_CREDENTIALS_DELETED",
+      message: "本地凭证已删除",
+      identityId: identity.identityId,
+      localCredentialsDeleted: true,
+      platformRevokeRecorded: false,
+    };
+  }
+  return { identity };
+}
+
+/** Whether a caller may use the access token. Refresh uses a separate check. */
+export function allowFeishuEmployeeCredentialUse(params: {
+  store: UserOperationalIdentityStore;
+  secretStore?: UserOperationalIdentityCredentialSecretStore;
+  ownerId: string;
+  identityId: string;
+  gate: FeishuEmployeeChannelGate;
+  nowIso?: string;
+}): FeishuEmployeePublicResult {
+  const base = refuseFeishuEmployeeBase(params);
+  if (!("identity" in base)) {
+    return base;
+  }
+  const identity = base.identity;
+  if (identity.status === "reauth_required") {
+    return {
+      ok: false,
+      code: "REAUTH_REQUIRED",
+      message: "需重新认证",
+      identityId: identity.identityId,
+    };
+  }
+  if (identity.status === "expired" || credentialExpired(identity.expiresAt, params.nowIso)) {
+    return {
+      ok: false,
+      code: "TOKEN_EXPIRED",
+      message: "已过期",
+      identityId: identity.identityId,
+    };
+  }
   const secret = params.secretStore?.secrets[identity.credentialHandleId];
-  if (identity.enterpriseIm.localCredentialsDeleted || !secret?.accessToken) {
+  if (credentialExpired(secret?.expiresAt, params.nowIso)) {
+    return {
+      ok: false,
+      code: "TOKEN_EXPIRED",
+      message: "已过期",
+      identityId: identity.identityId,
+    };
+  }
+  if (!secret?.accessToken) {
     return {
       ok: false,
       code: "LOCAL_CREDENTIALS_DELETED",
@@ -444,13 +600,48 @@ export function readFeishuEmployeeConnection(params: {
   return {
     ok: true,
     code: "READ_ALLOWED",
-    message: identity.enterpriseIm.authorizationLevel === "authorized" ? "已授权" : "仅身份",
+    message: identity.enterpriseIm?.authorizationLevel === "authorized" ? "已授权" : "仅身份",
     identityId: identity.identityId,
-    authorizationLevel: identity.enterpriseIm.authorizationLevel,
-    userGrantedScopes: [...identity.enterpriseIm.userGrantedScopes],
+    authorizationLevel: identity.enterpriseIm?.authorizationLevel,
+    userGrantedScopes: [...(identity.enterpriseIm?.userGrantedScopes ?? [])],
     localCredentialsDeleted: false,
     platformRevokeRecorded: false,
   };
+}
+
+export function readFeishuEmployeeConnection(params: {
+  store: UserOperationalIdentityStore;
+  secretStore?: UserOperationalIdentityCredentialSecretStore;
+  ownerId: string;
+  identityId: string;
+  gate: FeishuEmployeeChannelGate;
+  nowIso?: string;
+}): FeishuEmployeePublicResult {
+  return allowFeishuEmployeeCredentialUse(params);
+}
+
+function readFeishuEmployeeRefreshCredential(params: {
+  store: UserOperationalIdentityStore;
+  secretStore?: UserOperationalIdentityCredentialSecretStore;
+  ownerId: string;
+  identityId: string;
+  gate: FeishuEmployeeChannelGate;
+}): { ok: true; refreshToken: string } | FeishuEmployeePublicResult {
+  const base = refuseFeishuEmployeeBase(params);
+  if (!("identity" in base)) {
+    return base;
+  }
+  const secret = params.secretStore?.secrets[base.identity.credentialHandleId];
+  const refreshToken = secret?.refreshToken?.trim() || "";
+  if (!refreshToken) {
+    return {
+      ok: false,
+      code: "REFRESH_TOKEN_MISSING",
+      message: "需重新认证",
+      identityId: base.identity.identityId,
+    };
+  }
+  return { ok: true, refreshToken };
 }
 
 export async function refreshFeishuEmployeeConnection(params: {
@@ -484,32 +675,17 @@ async function refreshFeishuEmployeeConnectionOnce(params: {
   nowIso: string;
   exchange: (refreshToken: string) => Promise<FeishuUserTokenObservation>;
 }): Promise<FeishuEmployeePublicResult> {
-  if (params.gate.childExecutionBlocked) {
-    return {
-      ok: false,
-      code: "ENTERPRISE_CONNECTION_BLOCKED",
-      message: "企业尚未开通",
-      identityId: params.identityId,
-    };
-  }
-  const current = readFeishuEmployeeConnection(params);
-  if (!current.ok) {
-    return current;
+  const refreshCredential = readFeishuEmployeeRefreshCredential(params);
+  if (!refreshCredential.ok) {
+    return refreshCredential;
   }
   const identity = params.store.identities[params.identityId];
-  const secret = identity ? params.secretStore.secrets[identity.credentialHandleId] : undefined;
-  const refreshToken = secret?.refreshToken?.trim() || "";
-  if (!identity || !refreshToken) {
-    return {
-      ok: false,
-      code: "REFRESH_TOKEN_MISSING",
-      message: "需重新认证",
-      identityId: params.identityId,
-    };
+  if (!identity) {
+    return { ok: false, code: "USER_IDENTITY_NOT_FOUND", message: "Identity not found." };
   }
   let observation: FeishuUserTokenObservation;
   try {
-    observation = await params.exchange(refreshToken);
+    observation = await params.exchange(refreshCredential.refreshToken);
   } catch {
     identity.status = "reauth_required";
     identity.updatedAt = params.nowIso;
@@ -531,6 +707,12 @@ async function refreshFeishuEmployeeConnectionOnce(params: {
       identityId: identity.identityId,
     };
   }
+  if (!observation.openId.trim()) {
+    observation = {
+      ...observation,
+      openId: identity.enterpriseIm?.platformUserId || identity.externalAccountId || "",
+    };
+  }
   const rebound = bindFeishuEmployeeConnection({
     store: params.store,
     secretStore: params.secretStore,
@@ -543,6 +725,8 @@ async function refreshFeishuEmployeeConnectionOnce(params: {
     auditAction: "refresh",
   });
   if (!rebound.ok) {
+    identity.status = "reauth_required";
+    identity.updatedAt = params.nowIso;
     return rebound;
   }
   const stored = params.secretStore.secrets[identity.credentialHandleId];

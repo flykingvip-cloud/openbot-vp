@@ -687,16 +687,27 @@ export function listUserOperationalIdentityLifecycleEvents(
     .slice(0, limit);
 }
 
-function feishuEnterpriseImStatusLabel(link: {
-  authorizationLevel: "identity_only" | "authorized";
-  localCredentialsDeleted?: boolean;
-  platformRevokeRecorded?: boolean;
-}): string {
-  if (link.platformRevokeRecorded) {
+function feishuEnterpriseImStatusLabel(
+  link: {
+    authorizationLevel: "identity_only" | "authorized";
+    localCredentialsDeleted?: boolean;
+    platformRevokeRecorded?: boolean;
+  },
+  status: string,
+  expiresAt?: string,
+): string {
+  if (link.platformRevokeRecorded || status === "revoked") {
     return "已停用";
   }
   if (link.localCredentialsDeleted) {
     return "本地凭证已删除";
+  }
+  if (status === "reauth_required") {
+    return "需重新认证";
+  }
+  const expiresMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  if (status === "expired" || (Number.isFinite(expiresMs) && expiresMs <= Date.now())) {
+    return "已过期";
   }
   if (link.authorizationLevel === "identity_only") {
     return "仅身份";
@@ -737,7 +748,11 @@ export function summarizeUserOperationalIdentitySnapshot(params: {
             authorizationLevel: identity.enterpriseIm.authorizationLevel,
             localCredentialsDeleted: identity.enterpriseIm.localCredentialsDeleted === true,
             platformRevokeRecorded: identity.enterpriseIm.platformRevokeRecorded === true,
-            statusLabel: feishuEnterpriseImStatusLabel(identity.enterpriseIm),
+            statusLabel: feishuEnterpriseImStatusLabel(
+              identity.enterpriseIm,
+              identity.status,
+              identity.expiresAt,
+            ),
           }
         : undefined,
     };

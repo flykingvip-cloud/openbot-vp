@@ -2,19 +2,15 @@
  * Feishu user-authorization code exchange for an existing OAuth session.
  * App id and app secret come from the 企业通道 account, never from the employee.
  */
-import { loadConfig } from "../config/config.js";
 import {
   beginFeishuEmployeeOAuthSession,
   bindFeishuEmployeeConnection,
+  loadFeishuEmployeeAppCredentials,
   loadFeishuEmployeeChannelGate,
-  readFeishuAppCredentials,
+  refreshFeishuEmployeeConnection,
   type FeishuUserTokenObservation,
 } from "./enterprise-im-employee-connection.js";
-import {
-  getTenantConfigOverride,
-  loadTenantConfigStore,
-  resolveConfigForTenant,
-} from "./tenant-config.js";
+import { withUserOperationalIdentityStoreWriteLockForOwner } from "./user-operational-identity-persistence.js";
 import { withUserOperationalIdentityCredentialSecretStoreWriteLock } from "./user-operational-identity-secrets-persistence.js";
 import type {
   UserOperationalIdentityOAuthSession,
@@ -81,13 +77,10 @@ export async function startFeishuEmployeeOAuth(params: {
       error: gate.statusLabel,
     };
   }
-  const platformDefault = loadConfig();
-  const tenantStore = await loadTenantConfigStore();
-  const view = resolveConfigForTenant({
-    platformDefault,
-    override: getTenantConfigOverride(tenantStore, tenantId),
-  }) as unknown as Record<string, unknown>;
-  const credentials = readFeishuAppCredentials(view, gate.accountId);
+  const credentials = await loadFeishuEmployeeAppCredentials({
+    tenantId,
+    accountId: gate.accountId,
+  });
   if (!credentials) {
     return {
       ok: false,
@@ -128,13 +121,10 @@ export async function completeFeishuEmployeeOAuthFromSession(params: {
     return { ok: false, code: "ENTERPRISE_NOT_OPEN", error: "企业尚未开通" };
   }
   const gate = await loadFeishuEmployeeChannelGate({ tenantId });
-  const platformDefault = loadConfig();
-  const tenantStore = await loadTenantConfigStore();
-  const view = resolveConfigForTenant({
-    platformDefault,
-    override: getTenantConfigOverride(tenantStore, tenantId),
-  }) as unknown as Record<string, unknown>;
-  const credentials = readFeishuAppCredentials(view, gate.accountId);
+  const credentials = await loadFeishuEmployeeAppCredentials({
+    tenantId,
+    accountId: gate.accountId,
+  });
   if (!credentials) {
     return {
       ok: false,
@@ -176,8 +166,103 @@ export async function completeFeishuEmployeeOAuthFromSession(params: {
   return { ok: true, session: params.session, returnPath: params.session.returnPath };
 }
 
-async function feishuTokenRequest(payload: Record<string, string>): Promise<unknown> {
-  const response = await fetch("https://open.feishu.cn/open-apis/authen/v2/oauth/token", {
+export async function exchangeFeishuUserRefreshToken(params: {
+  appId: string;
+  appSecret: string;
+  refreshToken: string;
+  fetchImpl?: typeof fetch;
+}): Promise<FeishuUserTokenObservation> {
+  const body = await feishuTokenRequest(
+    {
+      grant_type: "refresh_token",
+      client_id: params.appId,
+      client_secret: params.appSecret,
+      refresh_token: params.refreshToken,
+    },
+    params.fetchImpl,
+  );
+  const code = numericCode(body);
+  if (code !== null && code !== 0) {
+    throw new Error("Feishu refresh was rejected.");
+  }
+  const accessToken = stringField(body, "access_token");
+  const tenantKey = stringField(body, "tenant_key");
+  if (!accessToken || !tenantKey) {
+    throw new Error("Feishu refresh did not include an access token and platform enterprise id.");
+  }
+  return {
+    accessToken,
+    refreshToken: stringField(body, "refresh_token"),
+    expiresAt: expiresAtFrom(body),
+    openId: stringField(body, "open_id") ?? "",
+    tenantKey,
+    scopeNames: scopeNamesFrom(body),
+  };
+}
+
+export async function renewPersistedFeishuEmployeeConnection(params: {
+  ownerId: string;
+  tenantId: string;
+  identityId: string;
+  nowIso: string;
+  identityStorePath?: string;
+  secretStorePath?: string;
+  tenantConfigPath?: string;
+  governanceStateDir?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<import("./enterprise-im-employee-connection.js").FeishuEmployeePublicResult> {
+  const gate = await loadFeishuEmployeeChannelGate({
+    tenantId: params.tenantId,
+    storePath: params.tenantConfigPath,
+  });
+  const credentials = await loadFeishuEmployeeAppCredentials({
+    tenantId: params.tenantId,
+    storePath: params.tenantConfigPath,
+    accountId: gate.accountId,
+  });
+  if (!credentials) {
+    return {
+      ok: false,
+      code: "ENTERPRISE_APP_CREDENTIALS_MISSING",
+      message: "企业通道飞书应用凭证不完整。",
+      identityId: params.identityId,
+    };
+  }
+  return withUserOperationalIdentityStoreWriteLockForOwner(
+    {
+      ownerId: params.ownerId,
+      tenantId: params.tenantId,
+      storePath: params.identityStorePath,
+      governanceStateDir: params.governanceStateDir,
+    },
+    (store) =>
+      withUserOperationalIdentityCredentialSecretStoreWriteLock(
+        (secretStore) =>
+          refreshFeishuEmployeeConnection({
+            store,
+            secretStore,
+            ownerId: params.ownerId,
+            identityId: params.identityId,
+            gate,
+            nowIso: params.nowIso,
+            exchange: (refreshToken) =>
+              exchangeFeishuUserRefreshToken({
+                appId: credentials.appId,
+                appSecret: credentials.appSecret,
+                refreshToken,
+                fetchImpl: params.fetchImpl,
+              }),
+          }),
+        params.secretStorePath,
+      ),
+  );
+}
+
+async function feishuTokenRequest(
+  payload: Record<string, string>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<unknown> {
+  const response = await fetchImpl("https://open.feishu.cn/open-apis/authen/v2/oauth/token", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload),
@@ -190,6 +275,14 @@ async function feishuUserInfo(accessToken: string): Promise<unknown> {
     headers: { authorization: `Bearer ${accessToken}` },
   });
   return response.json() as Promise<unknown>;
+}
+
+function numericCode(body: unknown): number | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+  const value = (body as { code?: unknown }).code;
+  return typeof value === "number" ? value : null;
 }
 
 function stringField(body: unknown, key: string): string | null {

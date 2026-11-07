@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit";
+import { feishuEmployeeRowStatusLabel } from "../../../../../../src/gateway/enterprise-im-employee-connection.ts";
 import { resolvePersonalEmailBrowserGuide } from "../../../wiring/personal-email-browser-guide.ts";
 import {
   findPersonalEmailPreset,
@@ -743,8 +744,13 @@ function renderFeishuEmployeeForm(
   const bound = identities.find(
     (identity) => identity.provider === "feishu-personal" && identity.status !== "revoked",
   );
-  const loginEnabled = gate?.loginEnabled === true;
-  const statusLabel = bound?.enterpriseIm?.statusLabel ?? gate?.statusLabel ?? "企业尚未开通";
+  const loginEnabled = gate?.loginEnabled === true && !gate?.childExecutionBlocked;
+  const statusLabel = feishuEmployeeRowStatusLabel({
+    gate,
+    status: bound?.status,
+    expiresAt: bound?.expiresAt,
+    enterpriseIm: bound?.enterpriseIm,
+  });
   return html`
     <div class="employee-workbench__auth-pane-head" data-feishu-employee-auth>
       <div class="employee-workbench__settings-section-title">${entry?.label ?? "飞书"}</div>

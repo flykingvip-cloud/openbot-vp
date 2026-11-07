@@ -1,17 +1,35 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { ownershipProofFromTenantUser } from "./data-governance/ownership-proof.js";
+import { resetSharedDataGovernanceCatalogForTests } from "./data-governance/runtime-catalog.js";
+import { renewPersistedFeishuEmployeeConnection } from "./enterprise-im-employee-connection-oauth.js";
 import {
+  allowFeishuEmployeeCredentialUse,
   beginFeishuEmployeeOAuthSession,
   bindFeishuEmployeeConnection,
   buildFeishuEmployeePromptContext,
   disconnectFeishuEmployeeConnection,
   feishuEmployeeChannelGate,
   feishuEmployeeIdentityId,
+  loadFeishuEmployeeChannelGate,
   projectFeishuEmployeeToolResult,
   readFeishuEmployeeConnection,
   refreshFeishuEmployeeConnection,
+  resolveFeishuEnterpriseAccountId,
   type FeishuEmployeeChannelGate,
 } from "./enterprise-im-employee-connection.js";
+import { saveTenantConfigStore, type TenantConfigStore } from "./tenant-config.js";
+import {
+  loadUserOperationalIdentityStore,
+  saveUserOperationalIdentityStore,
+} from "./user-operational-identity-persistence.js";
 import { formatUserOperationalIdentityRuntimePrompt } from "./user-operational-identity-runtime.js";
+import {
+  loadUserOperationalIdentityCredentialSecretStore,
+  saveUserOperationalIdentityCredentialSecretStore,
+} from "./user-operational-identity-secrets-persistence.js";
 import type {
   UserOperationalIdentityCredentialSecretStore,
   UserOperationalIdentityStore,
@@ -319,5 +337,211 @@ describe("feishu employee connection (slice 1b)", () => {
       expect(started.authorizeUrl).toContain("offline_access");
       expect(started.authorizeUrl).not.toContain("app-secret-value");
     }
+  });
+
+  it("does not treat another account on the merged config as this tenant's connection", async () => {
+    const foreign = {
+      channels: {
+        feishu: {
+          enabled: true,
+          accounts: {
+            other: {
+              platformEnterpriseId: "platform-key",
+              appId: "cli_platform",
+              appSecret: "platform-secret",
+            },
+          },
+        },
+      },
+    };
+    expect(resolveFeishuEnterpriseAccountId(foreign, "001")).toBeNull();
+    const gate = feishuEmployeeChannelGate({ config: foreign, tenantId: "001" });
+    expect(gate.loginEnabled).toBe(false);
+    expect(gate.childExecutionBlocked).toBe(true);
+    expect(gate.statusLabel).toBe("企业尚未开通");
+
+    const dir = mkdtempSync(path.join(tmpdir(), "feishu-tenant-"));
+    const tenantPath = path.join(dir, "tenant-config.json");
+    const tenantStore: TenantConfigStore = {
+      version: 1,
+      tenants: {
+        "001": { tenantId: "001", override: {}, updatedAt: "2026-11-07T00:00:00.000Z" },
+      },
+    };
+    await saveTenantConfigStore(tenantStore, tenantPath);
+    const loaded = await loadFeishuEmployeeChannelGate({ tenantId: "001", storePath: tenantPath });
+    expect(loaded.childExecutionBlocked).toBe(true);
+    expect(loaded.loginEnabled).toBe(false);
+    const store = emptyStore();
+    const secrets = emptySecrets();
+    const bound = bindEmployee({ store, secrets, ownerId: "emp-a", openId: "ou_a" });
+    expect(
+      allowFeishuEmployeeCredentialUse({
+        store,
+        secretStore: secrets,
+        ownerId: "emp-a",
+        identityId: bound.identityId!,
+        gate: loaded,
+      }).code,
+    ).toBe("ENTERPRISE_CONNECTION_BLOCKED");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("refuses credential use after refresh failure and after the access token expires", async () => {
+    const store = emptyStore();
+    const secrets = emptySecrets();
+    const gate = openGate();
+    const bound = bindEmployee({ store, secrets, ownerId: "emp-a", openId: "ou_a" });
+    const failed = await refreshFeishuEmployeeConnection({
+      store,
+      secretStore: secrets,
+      ownerId: "emp-a",
+      identityId: bound.identityId!,
+      gate,
+      nowIso: "2026-11-07T00:03:00.000Z",
+      exchange: async () => {
+        throw new Error("refresh rejected");
+      },
+    });
+    expect(failed.code).toBe("REFRESH_FAILED");
+    expect(store.identities[bound.identityId!]?.status).toBe("reauth_required");
+    expect(Object.values(secrets.secrets)[0]?.accessToken).toBe(SECRET);
+    expect(
+      allowFeishuEmployeeCredentialUse({
+        store,
+        secretStore: secrets,
+        ownerId: "emp-a",
+        identityId: bound.identityId!,
+        gate,
+      }).code,
+    ).toBe("REAUTH_REQUIRED");
+
+    const fresh = emptyStore();
+    const freshSecrets = emptySecrets();
+    const expired = bindEmployee({
+      store: fresh,
+      secrets: freshSecrets,
+      ownerId: "emp-a",
+      openId: "ou_a",
+    });
+    fresh.identities[expired.identityId!].expiresAt = "2026-11-07T00:00:00.000Z";
+    freshSecrets.secrets[fresh.identities[expired.identityId!].credentialHandleId].expiresAt =
+      "2026-11-07T00:00:00.000Z";
+    expect(
+      allowFeishuEmployeeCredentialUse({
+        store: fresh,
+        secretStore: freshSecrets,
+        ownerId: "emp-a",
+        identityId: expired.identityId!,
+        gate,
+        nowIso: "2026-11-07T00:05:00.000Z",
+      }).code,
+    ).toBe("TOKEN_EXPIRED");
+  });
+
+  it("persists a real refresh-token request and the rotated token still works after reload", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "feishu-refresh-"));
+    const stateDir = path.join(dir, "state");
+    const tenantPath = path.join(dir, "tenant-config.json");
+    const identityPath = path.join(dir, "identity.json");
+    const secretPath = path.join(dir, "secrets.json");
+    const capability = {
+      checkedAt: "2026-11-07T00:00:00.000Z",
+      projectGroupRead: "granted",
+      projectDocs: "granted",
+      sendAsUser: "granted",
+      newMessageTrigger: "granted",
+    };
+    await saveTenantConfigStore(
+      {
+        version: 1,
+        tenants: {
+          "001": {
+            tenantId: "001",
+            updatedAt: "2026-11-07T00:00:00.000Z",
+            override: {
+              channels: {
+                feishu: {
+                  enabled: true,
+                  accounts: {
+                    t_001_default: {
+                      appId: "cli_public",
+                      appSecret: "app-secret-value",
+                      platformEnterpriseId: "tenant-key-1",
+                      capabilityStatus: capability,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      tenantPath,
+    );
+    const store = emptyStore();
+    const secrets = emptySecrets();
+    const bound = bindEmployee({ store, secrets, ownerId: "emp-a", openId: "ou_a" });
+    await saveUserOperationalIdentityStore(store, identityPath, {
+      governanceStateDir: stateDir,
+      governanceOwnershipProof: ownershipProofFromTenantUser({ tenantId: "001", userId: "emp-a" }),
+    });
+    await saveUserOperationalIdentityCredentialSecretStore(secrets, secretPath);
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      expect(url).toContain("/open-apis/authen/v2/oauth/token");
+      const rawBody = init?.body;
+      const body = JSON.parse(typeof rawBody === "string" ? rawBody : "{}") as {
+        grant_type?: string;
+        refresh_token?: string;
+      };
+      expect(body.grant_type).toBe("refresh_token");
+      expect(body.refresh_token).toBe(REFRESH);
+      return {
+        json: async () => ({
+          code: 0,
+          access_token: "rotated-access",
+          refresh_token: "rotated-refresh",
+          expires_in: 3600,
+          tenant_key: "tenant-key-1",
+          open_id: "ou_a",
+          scope: "offline_access im:message",
+        }),
+      } as Response;
+    });
+    const renewed = await renewPersistedFeishuEmployeeConnection({
+      ownerId: "emp-a",
+      tenantId: "001",
+      identityId: bound.identityId!,
+      nowIso: "2026-11-07T00:04:00.000Z",
+      identityStorePath: identityPath,
+      secretStorePath: secretPath,
+      tenantConfigPath: tenantPath,
+      governanceStateDir: stateDir,
+      fetchImpl,
+    });
+    expect(renewed.ok).toBe(true);
+    expect(JSON.stringify(renewed)).not.toContain("rotated-access");
+    expect(JSON.stringify(renewed)).not.toContain("rotated-refresh");
+    expect(JSON.stringify(renewed)).not.toContain(REFRESH);
+    const reloadedStore = await loadUserOperationalIdentityStore(identityPath);
+    const reloadedSecrets = await loadUserOperationalIdentityCredentialSecretStore(secretPath);
+    const stored = Object.values(reloadedSecrets.secrets)[0];
+    expect(stored?.accessToken).toBe("rotated-access");
+    expect(stored?.refreshToken).toBe("rotated-refresh");
+    expect(JSON.stringify(reloadedSecrets)).not.toContain(REFRESH);
+    const gate = await loadFeishuEmployeeChannelGate({ tenantId: "001", storePath: tenantPath });
+    const used = allowFeishuEmployeeCredentialUse({
+      store: reloadedStore,
+      secretStore: reloadedSecrets,
+      ownerId: "emp-a",
+      identityId: bound.identityId!,
+      gate,
+      nowIso: "2026-11-07T00:04:00.000Z",
+    });
+    expect(used.ok).toBe(true);
+    expect(JSON.stringify(used)).not.toContain("rotated-access");
+    resetSharedDataGovernanceCatalogForTests();
+    rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -56,6 +56,53 @@ describe("feishu employee authorization row", () => {
     },
   );
 
+  it("shows enterprise closed and reauth on an already-bound row", () => {
+    const bound = {
+      identityId: "feishu-employee:001:emp-a:ou_a",
+      provider: "feishu-personal",
+      providerLabel: "飞书",
+      displayName: "飞书 ou_a",
+      status: "active" as const,
+      grantCount: 0,
+      createdAt: "2026-11-07T00:00:00.000Z",
+      updatedAt: "2026-11-07T00:00:00.000Z",
+      enterpriseIm: {
+        channel: "feishu" as const,
+        accountId: "t_001_default",
+        platformEnterpriseId: "tenant-key-1",
+        platformUserId: "ou_a",
+        userGrantedScopes: ["im:message"],
+        authorizationLevel: "authorized" as const,
+        localCredentialsDeleted: false,
+        platformRevokeRecorded: false,
+        statusLabel: "已授权",
+      },
+    };
+    const closed = settings("企业尚未开通", false);
+    closed.userOperationalIdentitySnapshot = {
+      ...closed.userOperationalIdentitySnapshot!,
+      identities: [bound],
+    };
+    const closedView = document.createElement("div");
+    render(renderProviderIdentityEditorForm(closed), closedView);
+    expect(closedView.querySelector("[data-feishu-employee-status]")?.textContent).toContain(
+      "企业尚未开通",
+    );
+    expect(closedView.textContent).not.toContain("已授权");
+
+    const failed = settings("可绑定", true);
+    failed.userOperationalIdentitySnapshot = {
+      ...failed.userOperationalIdentitySnapshot!,
+      identities: [{ ...bound, status: "reauth_required" }],
+    };
+    const failedView = document.createElement("div");
+    render(renderProviderIdentityEditorForm(failed), failedView);
+    expect(failedView.querySelector("[data-feishu-employee-status]")?.textContent).toContain(
+      "需重新认证",
+    );
+    expect(failedView.textContent).not.toContain("已授权");
+  });
+
   it("offers bind without app credentials when the enterprise app can attempt the checklist", () => {
     const container = document.createElement("div");
     render(renderPersonalAuthorizationPanel(settings("可绑定", true)), container);
