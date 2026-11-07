@@ -978,3 +978,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved the unique CLI provider implementation into execution/runner/cli-run. Legacy cli-runner is a compatibility re-export; admitted, command and scheduled candidates invoke the runtime implementation directly. Preserved supervisor, credentials, timeout, cancellation, session fallback and usage behavior. Runtime architecture prohibits returning through the legacy facade. — codex-runtime-manager
 - CLI/command/billing/cron regression 6 files / 85 PASS with independent forks and polling watchers. Initial runs hit host EMFILE watcher exhaustion; passing rerun changes test environment only. Full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement and final lifecycle acceptance remain open. — codex-runtime-manager
+
+## Scheduled CLI cancellation propagation (2026-11-07)
+
+- Reproduced scheduled CLI candidate dropping the original abortSignal (1 FAIL). Candidate now forwards the same signal into the unique CLI adapter; supervisor cancellation remains the existing owner. No new stop path. — codex-runtime-manager
+- Scheduled/CLI regression 2 files / 14 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Integrated candidate 5aa1d7fa1 full build PASS with 209 existing dynamic-import warnings. Overall retirement remains open. — codex-runtime-manager

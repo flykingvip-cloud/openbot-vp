@@ -55,6 +55,7 @@ export async function runScheduledCandidate(
       thinkLevel: run.thinkLevel,
       timeoutMs: run.timeoutMs,
       runId: run.runId,
+      abortSignal: run.abortSignal,
       cliSessionId,
       bootstrapPromptWarningSignaturesSeen: run.bootstrapPromptWarningSignaturesSeen,
       bootstrapPromptWarningSignature: run.bootstrapPromptWarningSignature,
