@@ -866,3 +866,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved trailing-user recovery and prompt-error persistence into state/attempt-transcript. Runner consumes state/index; SessionManager remains the sole writer under the original lock. Collaboration user-transcript preservation and existing nonfatal persistence errors remain unchanged. — codex-runtime-manager
 - Workspace/context/attempt regression 3 files / 75 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Full session preparation and overall migration remain open. — codex-runtime-manager
+
+## Attempt session preparation ownership (2026-11-07)
+
+- Moved session repair/open/guard/cache preparation into state/prepare-attempt-session. Runner consumes state/index and retains context-engine bootstrap between open and transcript initialization. Original session lock, policy, collaboration preservation and one SessionManager writer remain unchanged. — codex-runtime-manager
+- Workspace/context/attempt regression 3 files / 75 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager

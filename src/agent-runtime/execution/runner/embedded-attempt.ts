@@ -143,11 +143,6 @@ import {
   setActiveEmbeddedRun,
 } from "../../../agents/pi-embedded-runner/runs.js";
 import { buildEmbeddedSandboxInfo } from "../../../agents/pi-embedded-runner/sandbox-info.js";
-import {
-  prewarmSessionFile,
-  trackSessionManagerAccess,
-} from "../../../agents/pi-embedded-runner/session-manager-cache.js";
-import { prepareSessionManagerForRun } from "../../../agents/pi-embedded-runner/session-manager-init.js";
 import { resolveEmbeddedRunSkillEntries } from "../../../agents/pi-embedded-runner/skills-runtime.js";
 import {
   resolveStreamApiKey,
@@ -173,7 +168,6 @@ import { flushPendingToolResultsAfterIdle } from "../../../agents/pi-embedded-ru
 import { subscribeEmbeddedPiSession } from "../../../agents/pi-embedded-subscribe.js";
 import { createPreparedEmbeddedPiSettingsManager } from "../../../agents/pi-project-settings.js";
 import { createPiModelRuntime } from "../../../agents/pi-sdk/model-runtime.js";
-import { openSessionManager } from "../../../agents/pi-sdk/session.js";
 import { applyPiAutoCompactionGuard } from "../../../agents/pi-settings.js";
 import { toClientToolDefinitions } from "../../../agents/pi-tool-definition-adapter.js";
 import {
@@ -194,8 +188,7 @@ import {
 import { resolveEffectiveSandboxWorkspaceDir } from "../../../agents/sandbox/effective-workspace.js";
 import { resolveSandboxRuntimeStatus } from "../../../agents/sandbox/runtime-status.js";
 import { isXaiProvider } from "../../../agents/schema/clean-for-xai.js";
-import { repairSessionFileIfNeeded } from "../../../agents/session-file-repair.js";
-import { guardSessionManager } from "../../../agents/session-tool-result-guard-wrapper.js";
+import type { guardSessionManager } from "../../../agents/session-tool-result-guard-wrapper.js";
 import { sanitizeToolUseResultPairing } from "../../../agents/session-transcript-repair.js";
 import {
   acquireSessionWriteLock,
@@ -211,7 +204,6 @@ import { buildSystemPromptParams } from "../../../agents/system-prompt-params.js
 import { buildSystemPromptReport } from "../../../agents/system-prompt-report.js";
 import { sanitizeToolCallIdsForCloudCodeAssist } from "../../../agents/tool-call-id.js";
 import { listNodes } from "../../../agents/tools/nodes-utils.js";
-import { resolveTranscriptPolicy } from "../../../agents/transcript-policy.js";
 import { DEFAULT_BOOTSTRAP_FILENAME } from "../../../agents/workspace.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
@@ -268,6 +260,7 @@ import {
 } from "../../model/index.js";
 import { wrapStreamFnTrimToolCallNames } from "../../model/index.js";
 import { resolvePromptModeForSession } from "../../policy/index.js";
+import { openAttemptSession, prepareAttemptSessionTranscript } from "../../state/index.js";
 import { repairTrailingUserTurn, persistAttemptPromptError } from "../../state/index.js";
 import { sessionTaskState } from "../../state/index.js";
 import { captureTaskActionBoundary } from "../../state/task-action.js";
@@ -777,33 +770,22 @@ export async function runEmbeddedAttempt(
     let removeVisibleReplyRewriter: (() => void) | undefined;
     const protocolBoundaryState = createProtocolBoundaryState(`${params.runId}:attempt`);
     try {
-      await repairSessionFileIfNeeded({
+      const preparedSession = await openAttemptSession({
         sessionFile: params.sessionFile,
+        model: { modelApi: params.model?.api, provider: params.provider, modelId: params.modelId },
+        guard: {
+          agentId: sessionAgentId,
+          sessionKey: params.sessionKey,
+          inputProvenance: params.inputProvenance,
+          allowedToolNames,
+          skipUserTranscriptPersist: params.skipUserTranscriptPersist === true,
+          refreshBeforeAppend:
+            params.skipUserTranscriptPersist === true && Boolean(params.taskExecutionBinding),
+        },
         warn: (message) => log.warn(message),
       });
-      const hadSessionFile = await fs
-        .stat(params.sessionFile)
-        .then(() => true)
-        .catch(() => false);
-
-      const transcriptPolicy = resolveTranscriptPolicy({
-        modelApi: params.model?.api,
-        provider: params.provider,
-        modelId: params.modelId,
-      });
-
-      await prewarmSessionFile(params.sessionFile);
-      sessionManager = guardSessionManager(openSessionManager(params.sessionFile), {
-        agentId: sessionAgentId,
-        sessionKey: params.sessionKey,
-        inputProvenance: params.inputProvenance,
-        allowSyntheticToolResults: transcriptPolicy.allowSyntheticToolResults,
-        allowedToolNames,
-        skipUserTranscriptPersist: params.skipUserTranscriptPersist === true,
-        refreshBeforeAppend:
-          params.skipUserTranscriptPersist === true && Boolean(params.taskExecutionBinding),
-      });
-      trackSessionManagerAccess(params.sessionFile);
+      sessionManager = preparedSession.manager;
+      const { transcriptPolicy, hadSessionFile } = preparedSession;
 
       if (hadSessionFile && params.contextEngine?.bootstrap) {
         try {
@@ -816,7 +798,7 @@ export async function runEmbeddedAttempt(
         }
       }
 
-      await prepareSessionManagerForRun({
+      await prepareAttemptSessionTranscript({
         preserveUserTranscript: params.skipUserTranscriptPersist === true,
         sessionManager,
         sessionFile: params.sessionFile,

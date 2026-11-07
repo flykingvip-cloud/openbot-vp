@@ -13,3 +13,5 @@ export { persistInteractionMessage } from "./interaction-transcript.js";
 export { claimQueuedExecution } from "./mutations/claim-queued-execution.js";
 
 export { repairTrailingUserTurn, persistAttemptPromptError } from "./attempt-transcript.js";
+
+export { openAttemptSession, prepareAttemptSessionTranscript } from "./prepare-attempt-session.js";
