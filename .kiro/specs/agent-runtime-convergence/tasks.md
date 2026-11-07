@@ -800,3 +800,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved sandbox resolution and attachment to an already running account browser from legacy attempt into capabilities/adapters/attempt-sandbox. Preserved trusted account scope, existing sandbox policy and browser capability grant; no new scheduler or browser startup path. Caller retains its session identity and workspace lifecycle. — codex-runtime-manager
 - Workspace/shadow/context/attempt regression 3 files / 75 PASS after retaining the caller's shared sandboxSessionKey. Full tsgo PASS; typed lint clean; architecture 51 PASS. Overall executor retirement remains open. — codex-runtime-manager
+
+## Session context diagnostics ownership (2026-11-07)
+
+- Moved non-mutating context size/role/image summary from legacy attempt into context/session-summary; original body removed. Logging remains caller owned; no transcript authority, source reads or model invocation added. — codex-runtime-manager
+- Attempt/context runner regression 2 files / 61 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration remains open. — codex-runtime-manager

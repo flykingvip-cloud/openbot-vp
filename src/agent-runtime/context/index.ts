@@ -29,3 +29,5 @@ export {
   composeSystemPromptWithHookContext,
   prependSystemPromptAddition,
 } from "./prompt-composition.js";
+
+export { summarizeSessionContext } from "./session-summary.js";
