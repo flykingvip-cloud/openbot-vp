@@ -136,3 +136,10 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - Fabric probe retained64 of256 and restarted empty: still an in-memory ring, not durable audit. Journal logical TTL, bounded tombstones and replacement disk overhead do not prove complete history or global disk bounds. — codex-observe-contract
 - Owner final observation validation: 31 files/244 tests PASS; project tsgo and journal-two-file/probe lint-format PASS. Separate local evidence, no production throughput/power-loss proof, no test-count accumulation or full-plan completion claim. Contributor updated only acceptance documents. — codex-observe-contract
 - Rollback local probe removes evidence only; reverting pre-read guard requires disabling untrusted journal reads. No production configuration, push, PR or deployment; registry mixed WIP preserved uncommitted. — codex-observe-contract
+
+## Bounded reads and root budget acceptance 2026-11-07
+
+- 433ddf16e adds maxBytes+1 bounded handle reads, superseding the earlier stat/read growth-allocation gap. JSON parsing memory remains a separate bound. — codex-observe-contract
+- e326397b8 adds root cooperative logical budgets: default1000 partitions/256MiB, root→partition locks, old-file plus replacement-temp accounting, rejection without deletion. Root budgeting is implemented, but is not an OS quota and cannot constrain external bypass writers. — codex-observe-contract
+- Owner final31 files/249 tests PASS; journal targeted14 PASS; project tsgo and related lint/format PASS. Counts are separate scopes, not cumulative; documentation contributor did not rerun code tests. — codex-observe-contract
+- No power-loss guarantee, production validation or full-plan completion claim. Disable journal IO before reverting these safety gates; preserve data and other task WIP. No commit, production change, push or deployment in this update. — codex-observe-contract
