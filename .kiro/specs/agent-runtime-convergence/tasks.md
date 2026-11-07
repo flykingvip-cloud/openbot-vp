@@ -1093,3 +1093,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved unchanged task resume rendering and path redaction to shared context; moved unchanged ordered constraint normalization to policy. Original board exports are same-implementation compatibility adapters. Prepared reply and state continuation consume the context public API, retiring those legacy implementation bodies without introducing another planner. — codex-runtime-manager
 - Existing board/context/continuation regression 3 files / 47 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Earlier same-candidate runtime sweep: 66 files / 252 PASS before this extraction. General acceptance evidence remains open. — codex-runtime-manager
+
+## Accepted criteria survive automatic recovery (2026-11-08)
+
+- Reproduced accepted criteria remaining in storage but missing from the automatic continuation prompt after revision/pause/resume (1 FAIL). Shared task context now projects the original criteria alongside active constraints. This restores execution context, not criterion validation or acceptance authorization. — codex-runtime-manager
+- Lifecycle/constraint/continuation regression 3 files / 24 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Post-extraction ingress/lifecycle/restart regression separately 3 files / 42 PASS. — codex-runtime-manager

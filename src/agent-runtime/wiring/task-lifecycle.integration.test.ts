@@ -3,7 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { expect, it } from "vitest";
-import { sessionTaskState, checkTaskActionBoundary } from "../state/index.js";
+import {
+  sessionTaskState,
+  checkTaskActionBoundary,
+  buildTaskBoardContinuePrompt,
+} from "../state/index.js";
 import { admitSessionExecution } from "./execution-admission.js";
 
 it("keeps one task across revision, pause and resume while rejecting obsolete results", async () => {
@@ -68,6 +72,8 @@ it("keeps one task across revision, pause and resume while rejecting obsolete re
       throw new Error("Resume failed");
     }
     expect(resumed.acceptance).toEqual(["Verified sources"]);
+    const resumedTask = sessionTaskState.read(file).current!;
+    expect(buildTaskBoardContinuePrompt(resumedTask)).toContain("Verified sources");
     const next = sessionTaskState.startExecution(file, resumed.binding, "attempt-b");
     if (!next) {
       throw new Error("Resumed claim failed");

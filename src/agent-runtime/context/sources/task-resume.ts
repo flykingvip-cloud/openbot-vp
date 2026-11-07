@@ -51,6 +51,12 @@ export function buildResumePrompt(task: TrackedTask): string {
     `task_id: ${task.taskId}`,
     `继续任务「${task.title}」。`,
     `停在：${task.stop.summary}${pathLine}`,
+    ...(task.acceptanceCriteria?.length
+      ? [
+          "验收标准：",
+          ...task.acceptanceCriteria.map((criterion, index) => `${index + 1}. ${criterion}`),
+        ]
+      : []),
     constraintBlock,
   ]
     .filter(Boolean)
