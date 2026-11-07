@@ -939,9 +939,12 @@ async function agentCommandInternal(
     }
     throw err;
   } finally {
-    await commercialLease.dispose();
-    clearAgentRunContext(runId);
-    await submitAgentOutcomeCloseout();
+    try {
+      await commercialLease.dispose();
+    } finally {
+      clearAgentRunContext(runId);
+      await submitAgentOutcomeCloseout();
+    }
   }
 }
 
