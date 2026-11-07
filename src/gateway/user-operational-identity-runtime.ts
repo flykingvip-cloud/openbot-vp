@@ -1,5 +1,13 @@
 import { resolveSessionAgentId } from "../agents/agent-scope.js";
-import { loadFeishuEmployeeProxyContext } from "./enterprise-im-employee-authorization.js";
+import {
+  loadEnterpriseImMeasuredChecklist,
+  loadFeishuEmployeeProxyContext,
+} from "./enterprise-im-employee-authorization.js";
+import {
+  readEnterpriseImEmployeeResource,
+  type EnterpriseImDraft,
+  type EnterpriseImReadResourceKind,
+} from "./enterprise-im-employee-read.js";
 import { resolveQueryScope } from "./scope-attribution.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import { resolveUserOperationalIdentityStorePathForClient } from "./tenant-context.js";
@@ -177,6 +185,10 @@ async function withUserOiRuntimeStoreWriteLock<T>(
   const scope = await resolveQueryScope(client);
   const tenantId = scope.kind === "tenant" ? scope.tenantId : null;
   return withUserOperationalIdentityStoreWriteLockForOwner({ ownerId, tenantId, storePath }, fn);
+}
+
+function readResourceKind(value: unknown): EnterpriseImReadResourceKind | undefined {
+  return value === "doc" || value === "group" ? value : undefined;
 }
 
 async function loadUserOiRuntimeStore(client: GatewayClient | null) {
@@ -387,6 +399,8 @@ export async function executeUserOperationalIdentityRuntimeAction(params: {
       needsBinding?: boolean;
       needsGrantConfirmation?: boolean;
       grantId?: string;
+      draft?: EnterpriseImDraft;
+      auditEventId?: string;
     }
 > {
   if (params.provider === "feishu-personal") {
@@ -412,12 +426,70 @@ export async function executeUserOperationalIdentityRuntimeAction(params: {
     if (Object.keys(store.grants).length !== grantCount) {
       throw new Error("enterprise IM execute must not write a grant");
     }
+    if (params.action === "read" || params.action === "draft") {
+      const readAction = params.action;
+      const measured = await loadEnterpriseImMeasuredChecklist(enterpriseIm.tenantId);
+      const resourceKind = readResourceKind(params.payload?.resourceKind);
+      const resourceId =
+        typeof params.payload?.resourceId === "string" ? params.payload.resourceId : undefined;
+      const messageText =
+        typeof params.payload?.messageText === "string" ? params.payload.messageText : undefined;
+      const read = await withUserOiRuntimeStoreWriteLock(
+        params.client,
+        (locked) => {
+          const before = Object.keys(locked.grants).length;
+          return readEnterpriseImEmployeeResource({
+            decision: {
+              store: locked,
+              secretStore: enterpriseIm.secretStore,
+              ownerId,
+              agentId,
+              action: readAction,
+              tenantId: enterpriseIm.tenantId,
+              gate: enterpriseIm.gate,
+              authorization: enterpriseIm.authorization,
+              nowIso: new Date().toISOString(),
+            },
+            action: readAction,
+            resourceKind,
+            resourceId,
+            messageText,
+            measured,
+          }).then((result) => {
+            if (Object.keys(locked.grants).length !== before) {
+              throw new Error("enterprise IM read must not write a grant");
+            }
+            return result;
+          });
+        },
+        ownerId,
+      );
+      if (read.outcome === "draft") {
+        return {
+          ok: false,
+          scope: null,
+          code: read.code,
+          message: read.message,
+          grantId: read.grantId,
+          draft: read.draft,
+          auditEventId: read.auditEventId,
+        };
+      }
+      return {
+        ok: false,
+        scope: null,
+        code: read.code,
+        message: read.message,
+        grantId: read.grantId,
+        auditEventId: read.auditEventId,
+      };
+    }
     if (resolved.allowed) {
       return {
         ok: false,
         scope: null,
         code: "ENTERPRISE_IM_ALLOW_NO_PRODUCT_ACTION",
-        message: "授权已确认。读取和发送不在本切片。",
+        message: "发送不在本切片。",
         grantId: resolved.grant.grantId,
       };
     }

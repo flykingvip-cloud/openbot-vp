@@ -10870,6 +10870,9 @@ landingStreams:
       - src/gateway/enterprise-im-employee-decision.ts
       - src/gateway/enterprise-im-employee-decision.test.ts
       - src/gateway/enterprise-im-employee-authorization.ts
+      - src/gateway/enterprise-im-employee-read.ts
+      - src/gateway/enterprise-im-employee-read.test.ts
+      - src/gateway/server-methods/feishu-employee-read.rpc.test.ts
       - src/gateway/server-methods/feishu-employee-grant.rpc.test.ts
       - src/gateway/user-operational-identity-access.ts
       - src/gateway/user-operational-identity-providers.ts

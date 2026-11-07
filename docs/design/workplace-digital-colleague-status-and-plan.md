@@ -3,8 +3,8 @@
 **Scenario:** The enterprise tenant opens a platform connection. An employee then logs in and authorizes through that connection, and delegates selected robots to act inside that grant. Methods that survive review can settle into the organization. Instructing a colleague and acting as the employee are two faces. See 「路径裁决」.
 
 **Repo:** `flykingvip-cloud/openbot-vp` (`@upbeyond/openbot`)
-**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. They share one identity id. Slices 1a, 1b, and 2 are implemented. The 2026-11-07 path ruling below does not start slice 3.
-**Nature:** Code-grounded inventory and an ordered implementation plan. This revision is the path ruling only. It does not change runtime behavior.
+**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. They share one identity id. Slices 1a, 1b, 2, and the slice 3 read gate are implemented. Slice 4 is not started.
+**Nature:** Code-grounded inventory and an ordered implementation plan. Slice 4 is not part of the current slice.
 **Date:** 2026-11-07
 
 ## Product experience to deliver
@@ -724,6 +724,8 @@ Audit the read (employee, robot, connection, delegation version, resource ids, t
 
 Tests: a doc or group outside the delegation is refused. Text inside a group message does not add a resource. An out-of-scope link inside an in-scope doc is not fetched. App-token fallback does not run when the user token is invalid. A missing enterprise seat denies the read.
 
+Implemented as `readEnterpriseImEmployeeResource` in `src/gateway/enterprise-im-employee-read.ts`. `user-operational-identity.execute` for `read` and `draft` calls the slice 2 decision, then the grant's resource scope. An empty scope is a deny, not allow-all. Message text does not add ids. Group history is not called. `capabilityStatus: "granted"` is not Measured. A doc read calls Feishu only when `enterpriseImEmployeeProxy.measured.projectDocs` is true and a user-token reader is wired. Neither is true in this tree, so the execute path returns `ENTERPRISE_IM_NOT_MEASURED` and does not call Feishu. An invalid user token does not fall back to an app token. Send still returns `ENTERPRISE_IM_ALLOW_NO_PRODUCT_ACTION` and does not send. Slice 4 remains blocked. The usage event records the employee, robot, connection account, grant version, resource id, and time. The product line is: the Feishu enterprise connection, employee authorization, and explicit robot grant exist, and the next step is to verify and connect a concrete resource read. This is not yet a robot participating in Feishu work as the employee.
+
 ### Slice 4. Execute as the employee
 
 Send in this slice is the identity-out face. A reply the public bot already sends on the instruction face is not this send, and it must not be reported as the employee.
@@ -784,4 +786,4 @@ The loop is Feishu and Project Assistant, on the scene the slice 1a checklist al
 - DingTalk and WeCom are not given a user-proxy send path in this plan. They reuse the four layers only after Measured.
 - Desktop automation is not a dependency.
 - 数字替身 and other 运营身份 grants are not auto-bridged into the employee IM proxy.
-- Slices 1a, 1b, and 2 are implemented. Access order starts at 企业通道. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. The new workplace identity has one grant. Historical providers are not all migrated first. The enterprise IM path does not auto-create grants. Slice 3 and slice 4 wait for a later owner green-light. This path-ruling revision does not start them.
+- Slices 1a, 1b, 2, and the slice 3 read gate are implemented. Access order starts at 企业通道. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. The new workplace identity has one grant. Historical providers are not all migrated first. The enterprise IM path does not auto-create grants. Slice 3 does not send and does not treat an unmeasured checklist row as a live Feishu read. Slice 4 stays blocked until the owner accepts slice 3.

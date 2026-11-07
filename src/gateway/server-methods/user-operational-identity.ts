@@ -926,6 +926,8 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
         needsGrantConfirmation: result.needsGrantConfirmation ?? false,
         bindingRequestId: result.bindingRequestId ?? null,
         grantId: result.grantId ?? null,
+        draft: result.draft ?? null,
+        auditEventId: result.auditEventId ?? null,
       });
       return;
     }

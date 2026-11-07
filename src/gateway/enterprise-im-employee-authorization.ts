@@ -109,6 +109,53 @@ export function readEnterpriseImRobotPolicies(override: unknown): EnterpriseImRo
   return policies;
 }
 
+export type EnterpriseImMeasuredChecklist = {
+  /** Explicit admin record. App capabilityStatus "granted" is not Measured. */
+  projectDocs: boolean;
+  projectGroupRead: boolean;
+};
+
+function proxyRoot(override: unknown): Record<string, unknown> | null {
+  if (!override || typeof override !== "object" || Array.isArray(override)) {
+    return null;
+  }
+  const root = (override as { enterpriseImEmployeeProxy?: unknown }).enterpriseImEmployeeProxy;
+  if (!root || typeof root !== "object" || Array.isArray(root)) {
+    return null;
+  }
+  return root as Record<string, unknown>;
+}
+
+/** Only a boolean true counts. Missing config stays not measured. */
+export function readEnterpriseImMeasuredChecklist(
+  override: unknown,
+): EnterpriseImMeasuredChecklist {
+  const measured = proxyRoot(override)?.measured;
+  const record =
+    measured && typeof measured === "object" && !Array.isArray(measured)
+      ? (measured as Record<string, unknown>)
+      : {};
+  return {
+    projectDocs: record.projectDocs === true,
+    projectGroupRead: record.projectGroupRead === true,
+  };
+}
+
+export async function loadEnterpriseImMeasuredChecklist(
+  tenantId: string | null,
+): Promise<EnterpriseImMeasuredChecklist> {
+  const id = tenantId?.trim() || "";
+  if (!id) {
+    return { projectDocs: false, projectGroupRead: false };
+  }
+  try {
+    const configStore = await loadTenantConfigStore();
+    return readEnterpriseImMeasuredChecklist(getTenantConfigOverride(configStore, id));
+  } catch {
+    return { projectDocs: false, projectGroupRead: false };
+  }
+}
+
 type SeatBindingView = {
   tenantId?: string;
   employeeId?: string;
