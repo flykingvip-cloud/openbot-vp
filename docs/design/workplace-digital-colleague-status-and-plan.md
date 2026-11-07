@@ -30,11 +30,11 @@ The enterprise entry already exists. Do not add a second install path. System se
 | Layer | Product entry | Records |
 | --- | --- | --- |
 | Enterprise | Existing 企业通道: configure or install the platform app, enterprise auth, scopes, connection check | OpenBot tenant bound to the platform enterprise, app config, available capabilities, connection status |
-| Employee | 个人设置「授权」 (`已绑定账户`). Not a system-settings page, and not a new page. The row appears only after 企业通道 has enabled that platform. Login and scope grant happen on that card. | One identity id: this tenant employee, the platform user, user-granted scopes, status. 使用记录 is the same identity's audit. |
+| Employee | 个人设置「授权」 (`已绑定账户`). Not a system-settings page, and not a new page. An unopened platform may still appear here as 「企业尚未开通」, with login unavailable. Login and scope grant happen on that card only after 企业通道 has enabled the platform and the required scopes exist. | One identity id: this tenant employee, the platform user, user-granted scopes, status. 使用记录 is the same identity's audit. |
 | Robot delegation | 机器人「运营授权」. Check that same identity and press 确认授权. No second catalog and no new screen. | A grant of that identity id to this robot. The checkbox does not create another identity. |
 | Execution | The call uses that enterprise app plus that employee grant. Auth is checked, then the platform is called | Identity, delegation basis, targets, results |
 
-Those two strings appear on the 个人设置「授权」 row for that platform. They are not a new page. If the enterprise has not enabled the platform, the row says 「企业尚未开通」. If it is enabled but the required scopes are missing, the row says 「等待管理员开通权限」. The employee does not get a separate Feishu, WeCom, or DingTalk settings screen. 机器人「运营授权」 only lists identities that 个人设置「授权」 has already bound.
+The existing 个人设置「授权」 list may show a platform that 企业通道 has not opened, as 「企业尚未开通」, with login unavailable. If the platform is enabled but the required scopes are missing, that same row says 「等待管理员开通权限」. Those strings are states on this list. They are not a new page. Only identities that are already bound enter the robot’s 运营授权 selectable list. An unopened or not-yet-bound platform does not appear there as a checkbox.
 
 Three steps stay separate in data and auth even when the screens feel continuous:
 
@@ -373,13 +373,15 @@ Employee digital-identity authorization already has two surfaces of one system. 
 | 使用记录 | Same 个人设置「授权」 page. `renderOperationalIdentityUsageRecords` in `workbench-operational-identity-usage.ts`. | Columns 时间, 数字人, 身份, 动作, 任务, 结果. This is the audit of the same identities. Proxy actions append here. |
 | 机器人「运营授权」 | Per-robot detail tab `auth` in `my-bot-workspace-panel.ts`. The robot list itself is the 我的机器人 workspace. | Which of those bound identities this digital colleague may act as. Checkboxes are 企业身份 and 个人身份. 确认授权. Owned robots show 确认后立即生效. |
 
-企业通道 stays the enterprise gate. Feishu, WeCom, or DingTalk may show up as a usable 企业身份 only after that platform is enabled there. A login that only identifies the user still does not grant send or receive. 连通正常, a saved app secret, and `t_<tenant>_default` are still not an employee authorization and not a platform enterprise id.
+企业通道 stays the enterprise gate. The 个人设置「授权」 list may show Feishu, WeCom, or DingTalk before that gate is open, as 「企业尚未开通」, with login unavailable. A bound 企业身份, and therefore a checkbox on 机器人「运营授权」, exists only after the platform is enabled and the employee has bound it. A login that only identifies the user still does not grant send or receive. 连通正常, a saved app secret, and `t_<tenant>_default` are still not an employee authorization and not a platform enterprise id.
 
 ### 个人授权与运营授权：统一接口
 
 The two screens are two ends of one authorization model. They are not two stacks.
 
-Today the code is not yet one store. 个人身份 grants go through `onApplyRobotIdentityGrants` into the user operational-identity store (`user-operational-identity-types.ts`, its own `identityId`). 企业身份 checks go through `onApplyRobotEnterpriseIdentities` into `enterpriseAccessByAgent` and the enterprise operational-identity store (`enterprise-operational-identity-types.ts`, a separate `identityId`). Slice 1b must not add a third store for Feishu. It must compare these two and align them before a Feishu row is shown on both screens.
+「统一接口」 means one authoritative record for the new workplace identity, and both UIs plus execution read the same grant. It does not mean merging every historical identity store before Feishu can onboard. v1 may adapt the existing stores behind one API and typed ownership refs. Full migration of every historical provider is not a prerequisite.
+
+Today personal grants go through `onApplyRobotIdentityGrants` into the user operational-identity store (`user-operational-identity-types.ts`, its own `identityId`). Enterprise checks go through `onApplyRobotEnterpriseIdentities` into `enterpriseAccessByAgent` and the enterprise operational-identity store (`enterprise-operational-identity-types.ts`, a separate `identityId`). Slice 1b must not add a third store for Feishu. The new Feishu identity has one `identityId`. Both screens and the execution entry use the grant for that id. Older providers keep their current stores until a separate change says otherwise.
 
 What both surfaces and the execution entry must share:
 
@@ -406,7 +408,7 @@ Severity is for the employee-identity proxy. Public-bot ingress is listed so it 
 | --- | --- | --- | --- | --- |
 | Enterprise public bot ingress | Partial, and it is a separate mode | P2 for the proxy. Do not treat it as P0 progress on the proxy. | Extensions monitor to `resolveAgentRoute` to `dispatchReplyFromConfig`. Console writes `t_<tenant>_default`. | A bot can reply. The platform identity is the app. `CHAT_CHANNEL_ORDER` and `@openclaw/*` package ids still present product IM as secondary. DingTalk uses the compat SDK. |
 | Enterprise platform connection | Partial | P0 for the proxy chain. The page exists. Employee authorization on top of it does not. | 企业通道 at `/enterprise/{tenant}/settings/channels` writes bot credentials to `t_<tenant>_default` (`enterprise-message-channels-surface.ts`). That is app config for the public bot, not a recorded OpenBot-tenant to platform-enterprise bind used by employee login. | Reuse this page. Do not add a parallel install wizard. Slice 1a must show capability status on the same cards. |
-| Employee login and authorization through that connection | Partial UI, missing these three platforms | P0 | 个人设置「授权」 already lists 已绑定账户 and 使用记录. `feishu-personal` is `registrationReady: false`. The enterprise identity store is a second `identityId` space and excludes `feishu`, `wecom`, and `dingtalk`. | Do not add a settings page or a third store. Bind Feishu on 个人设置「授权」 only after 企业通道 is enabled, with 「企业尚未开通」 and 「等待管理员开通权限」. The identity id is the one 运营授权 will check. |
+| Employee login and authorization through that connection | Partial UI, missing these three platforms | P0 | 个人设置「授权」 already lists 已绑定账户 and 使用记录. `feishu-personal` is `registrationReady: false`. The enterprise identity store is a second `identityId` space and excludes `feishu`, `wecom`, and `dingtalk`. | Do not add a settings page or a third store. The 授权 list may show the platform as 「企业尚未开通」 with login unavailable. Bind is allowed only after 企业通道 is enabled and required scopes exist. 运营授权 lists only that bound identity id. |
 | Robot delegation | Partial UI, missing these platforms | P0 | 机器人「运营授权」 already checks 企业身份 and 个人身份 and saves with 确认授权, through two apply calls. The lists do not include Feishu, WeCom, or DingTalk employee identities. | Same identity id as 个人设置「授权」. Do not add a delegation screen or a Feishu-only grant table. A second robot still cannot borrow a grant it was not given. |
 | Controlled read and send in an existing work scene | Missing for user identity. Public bot tools are a different identity. | P0 | `data_capability` invoke stays `knowledge-object-only`. Feishu doc/wiki/drive tools use the app client. WeCom and DingTalk monitors send the bot reply. | No server entry that loads a user credential, checks delegation, and calls the platform as that employee. Group text must not widen grants. |
 | Trail of a proxy action | Missing | P0 | `enterprise-data.audit.invocations.list` records data-gateway invokes for a signed-in console session. Public-bot turns do not write it. Fabric is default off. | A proxy action must trace employee, robot, connection, delegation version, trigger, target, confirm record, and external result. "Bind success" is not business complete. That trace does not exist. |
@@ -634,11 +636,27 @@ Out of scope: robot send, a second install wizard, DingTalk and WeCom user autho
 
 ### Slice 2. Robot delegation and the authorization entry
 
-Do not add a delegation screen. On 机器人「运营授权」, the Feishu identity from slice 1b appears under 企业身份 only when 企业通道 has enabled Feishu and 个人设置「授权」 has bound that same `identityId`. The employee checks it for this robot and presses 确认授权. Owned robots keep 确认后立即生效. The grant is the shared shape (`identityId` + `agentId` + actions + version). It is not a second row that only this screen can see. Checking the box does not widen platform scopes and does not skip the enterprise connection. Personal and enterprise checks on this screen must call the same grant API. Today's split between `onApplyRobotIdentityGrants` and `onApplyRobotEnterpriseIdentities` is the split to close, not a pattern to copy for Feishu.
+Do not add a delegation screen. On 机器人「运营授权」, the Feishu identity from slice 1b appears under 企业身份 only when 企业通道 has enabled Feishu and 个人设置「授权」 has bound that same `identityId`. An unbound or unopened platform is not a checkbox on this screen. The employee checks it for this robot and presses 确认授权. The grant is the shared shape (`identityId` + `agentId` + actions + version). Checking the box does not widen platform scopes and does not skip the enterprise connection.
 
-The same slice establishes the authorization decision entry from the joint-gate section. Callers in slices 3 and 4 use this entry. Distinct outcomes include allow, deny because the enterprise connection is disabled, deny because enterprise policy is missing, deny because the seat is missing, deny because the seat binding is ambiguous, and deny because the delegation is missing, expired, or does not include the action. There is no personal-use outcome.
+页面要求确认，不代表执行端不会自动生成授权. A confirm control on the screen is not enough. The execution path must refuse when that confirmed grant is absent, and it must not write a grant while refusing.
 
-Tests: Project Assistant and Knowledge Assistant can hold different action sets on one connection. Revoking one does not revoke the other. A robot with no delegation cannot read through a sibling grant. Expired delegations fail. Missing seat, missing policy, and two seat bindings each produce their own denial. Two delegations that match one conversation do not resolve by first match.
+企业 IM 员工身份代理仅接受员工明确确认的有效机器人授权。自有机器人不因所有权自动获得授权；访问解析不得调用既有自动创建 grant 的分支，也不得把旧的自动授权视作本场景的确认授权。首次 resolve／execute 在授权缺失时返回拒绝，不写入新 grant。企业严格检查不得沿用既有缺少席位或策略时的兼容放行结果。其他身份提供方维持既有行为，除非另行评估修改。
+
+The auto-create branch is `resolveUserOperationalIdentity` in `src/gateway/user-operational-identity-access.ts`. When no grant matches and `isAgentScopeAllowedByDefault` is true, it writes a new active grant with `grantMode: "auto"`. `isAgentScopeAllowedByDefault` in `user-operational-identity-agent-scope.ts` is true only for `agentScope === "owned"`. The enterprise IM proxy path must not enter that branch. An older auto grant is not a confirm for this scenario.
+
+The compatibility allow is `resolveEmployeeOperationalAuthorization` in `user-operational-identity-enterprise-authorization.ts`. Its header says an employee with no seat binding is left on owner-plus-grant behavior, and the test "allows an enterprise employee with no seat binding (no false deny)" expects `decision: "allow"` with no `seatId`. The enterprise IM proxy path must not reuse that allow. Missing seat or missing enterprise policy is a deny.
+
+For this workplace identity, both screens write the grant through one API. That does not require migrating every historical provider onto one store in the same change. Other providers keep their current resolve behavior until a separate evaluation changes them.
+
+The same slice establishes the authorization decision entry from the joint-gate section. Callers in slices 3 and 4 use this entry. Distinct outcomes include allow, deny because the enterprise connection is disabled, deny because enterprise policy is missing, deny because the seat is missing, deny because the seat binding is ambiguous, and deny because the delegation is missing, expired, or does not include the action. There is no personal-use outcome. A missing grant is a deny that does not insert a row.
+
+Tests:
+
+1. An owned robot with no employee confirm: the first resolve and the first execute both refuse, and the grant count does not change.
+2. After the employee confirms that robot: only that robot may perform the allowed actions.
+3. After revoke: a later resolve does not auto-create a grant.
+4. Missing seat or missing enterprise policy: the call does not pass through the legacy compatibility allow.
+5. Project Assistant and Knowledge Assistant can hold different action sets on one connection. Revoking one does not revoke the other. A robot with no delegation cannot read through a sibling grant. Expired delegations fail. Two delegations that match one conversation do not resolve by first match.
 
 ### Slice 3. Controlled read and draft
 
@@ -694,7 +712,8 @@ The loop is Feishu and Project Assistant, on the scene the slice 1a checklist al
 - Employees A and B are both connected and both can see the same project group. Work does not run twice. A request from B does not use A identity. A private context does not appear in a reply sent for B. Records for the two tasks differ by connection and delegation, not only by chat id.
 - The identity recipients see matches the product display. If send-as-self is refused by Feishu, the product says so and does not report success as the employee.
 - Groups, docs, and recipients outside the delegation are refused. A connection for another Feishu tenant is refused. Text inside a group message cannot widen the grant. The read uses only APIs the checklist marked Measured.
-- A missing enterprise connection, a missing seat, a missing enterprise policy, or an ambiguous seat binding denies the read and the send. There is no personal-use bypass.
+- A missing enterprise connection, a missing seat, a missing enterprise policy, or an ambiguous seat binding denies the read and the send. There is no personal-use bypass, and there is no compatibility allow for a missing seat or a missing policy.
+- An owned robot with no confirm is refused on the first resolve and the first execute, and no grant row is written. After revoke, the next resolve does not auto-create a grant. Pressing 确认授权 on the screen is not a substitute for that execution check. Other identity providers keep their current auto-grant behavior until a separate evaluation changes them.
 - Actions in draft-then-confirm mode wait for the employee confirm of that content and those targets. Retries, timeouts, and duplicate callbacks do not double-send. A timeout stays `outcome unknown` until reconciliation or human handling. The confirm record is still there after a process restart.
 - Two robots refreshing one connection do not overwrite each other token.
 - After revoke, an invalid token, or loss of membership, the execution entry accepts no new call. A request the platform already accepted is recorded and reconciled, not recalled by promise. OpenBot disconnect deletes local credentials and does not claim Feishu revoked the grant unless a platform revoke happened. Restore is a new connect or a new delegation, not a replay of the cancelled queue.
@@ -708,4 +727,4 @@ The loop is Feishu and Project Assistant, on the scene the slice 1a checklist al
 - Public-bot ingress stays the app identity. It is not rewritten into a fake employee session.
 - DingTalk and WeCom are not given a user-proxy send path in this plan.
 - Desktop automation is not a dependency.
-- This document does not implement any slice. Access order starts at 企业通道. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. Those two surfaces share one identity id and one grant. Further macro expansion is out of scope. No product code until the owner green-lights it.
+- This document does not implement any slice. Access order starts at 企业通道. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. The new workplace identity has one grant. Historical providers are not all migrated first. The enterprise IM path does not auto-create grants. No product code until the owner green-lights it.
