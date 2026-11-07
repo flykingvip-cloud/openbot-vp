@@ -2,6 +2,7 @@ import path from "node:path";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { TASK_OUTCOME_STORE_DIRNAME } from "../../task-outcome/runtime-from-runner.js";
+import { isHumanInteractionIngress } from "../command/index.js";
 import {
   buildReplyPayloads,
   completeReplyDelivery,
@@ -27,6 +28,7 @@ import { evaluateBoundTaskAcceptance } from "./task-acceptance.js";
 
 /** Compose the original reply-turn dependencies. The reply host owns transport and cleanup. */
 export const replyTurnRuntime = {
+  isHumanInteractionIngress,
   prepareReplacementSessionEntry,
   persistInteractionMessage,
   async interaction(...params: Parameters<typeof runGatewayInteraction>) {

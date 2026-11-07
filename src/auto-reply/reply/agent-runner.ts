@@ -215,9 +215,14 @@ export async function runReplyAgent(params: {
     }
   };
 
-  // Explicit human provenance must pass interaction admission before any legacy routing.
+  // Missing provenance is human ingress, as at the public interaction entrance.
   if (
-    followupRun.run.inputProvenance?.kind === "external_user" &&
+    replyTurnRuntime.isHumanInteractionIngress({
+      provenanceKind: followupRun.run.inputProvenance?.kind,
+      heartbeat: isHeartbeat,
+      birthTurn: opts?.growthBirthTurn === true,
+      collaborationRound: followupRun.run.collaborationRoundInvoked === true,
+    }) &&
     !followupRun.run.executionAdmitted
   ) {
     typing.cleanup();

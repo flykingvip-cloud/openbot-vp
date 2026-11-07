@@ -129,6 +129,7 @@ function createMinimalRun(params?: {
     summaryLine: "hello",
     enqueuedAt: Date.now(),
     run: {
+      inputProvenance: { kind: "internal_system" },
       sessionId: "session",
       sessionKey,
       messageProvider: "whatsapp",
@@ -226,6 +227,7 @@ function createBaseRun(params: {
     summaryLine: "hello",
     enqueuedAt: Date.now(),
     run: {
+      inputProvenance: { kind: "internal_system" },
       agentId: "main",
       agentDir: "/tmp/agent",
       sessionId: "session",

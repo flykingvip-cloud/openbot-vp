@@ -1260,3 +1260,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Removed two consumerless legacy rule/acknowledgement modules after source archival. Retained resource queue and progress-format coverage in their current policy/command owners. Historical dialogue reads now consume the current public formatter directly. No execution scripts or fallback route introduced. — codex-runtime-manager
 - Queue/status 3 files / 9 PASS; history/context 2 files / 10 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. The history suite initially failed on a missing workingStyleVersion mock export; partial mock now preserves actual exports. — codex-runtime-manager
+
+## Unmarked human input cannot bypass interaction admission (2026-11-08)
+
+- Reproduced an unmarked human request reaching the model without admission (1 FAIL before). Execution now consumes the same ingress rule as the public interaction entrance: missing provenance is human input; explicit internal, heartbeat, birth and collaboration triggers retain their existing entrances. No second classifier added. Provider-loop test fixtures now identify their internal origin explicitly. — codex-runtime-manager
+- Run identity/ingress regression 2 files / 5 PASS; reply execution integration 48 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. Broader downstream fixture audit remains separate. No deployment. — codex-runtime-manager

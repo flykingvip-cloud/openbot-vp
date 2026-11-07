@@ -68,6 +68,7 @@ function buildParams(opts?: { runId?: string }): Parameters<typeof runReplyAgent
       prompt: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         agentId: "main",
         agentDir: "/tmp/agent",
         sessionId: "session",
@@ -125,6 +126,14 @@ function flushCall(): Parameters<FlushFn>[0] {
 }
 
 describe("runReplyAgent outer runId (P3-2 rework)", () => {
+  it("refuses unmarked human input without interaction admission", async () => {
+    const params = buildParams({ runId: "unmarked-human" });
+    params.followupRun.run.inputProvenance = undefined;
+    const result = await runReplyAgent(params);
+    expect(result).toMatchObject({ text: expect.stringContaining("尚未通过交互层的执行准入") });
+    expect(mocks.runEmbeddedPiAgent).not.toHaveBeenCalled();
+    expect(mocks.runMemoryFlushIfNeeded).not.toHaveBeenCalled();
+  });
   it("refuses an admitted marker without its captured task binding", async () => {
     const params = buildParams({ runId: "missing-binding" });
     params.followupRun.run.executionAdmitted = true;
