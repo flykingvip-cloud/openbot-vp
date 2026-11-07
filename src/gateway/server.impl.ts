@@ -665,6 +665,10 @@ export async function startGatewayServer(
     broadcastToConnIds,
   });
   if (!minimalTestGateway) {
+    // These placeholders are replaced below; release them before losing their handles.
+    clearInterval(tickInterval);
+    clearInterval(healthInterval);
+    clearInterval(dedupeCleanup);
     ({ tickInterval, healthInterval, dedupeCleanup, mediaCleanup } = startGatewayMaintenanceTimers({
       broadcast,
       broadcastChat,
