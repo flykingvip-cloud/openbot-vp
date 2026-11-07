@@ -505,7 +505,8 @@
       "src/auto-reply/reply/queue-policy",
       "src/auto-reply/reply/mid-task-dialogue",
       "src/agent-runtime/command/amend-active-task",
-      "src/agent-runtime/command/current-task-control"
+      "src/agent-runtime/command/current-task-control",
+      "src/conversation-task/focus-resume"
     ],
     "description": "Archived semantic routing has no source consumers or public export; no legacy fallback may be restored."
   }

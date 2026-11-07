@@ -1296,3 +1296,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced historical unadmitted conversation being promoted into a current-task system prompt (1 FAIL before). Prepared reply now reads the sole task-state repository and uses a pure shared-context projection; it does not replay conversation text to infer task ownership. Current and parked facts preserve full active constraints, acceptance checks and pause state; completed work is not rendered as active execution. — codex-runtime-manager
 - Context/real prepared entrance/lifecycle regression 3 files / 10 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. Legacy focus-resume helper has no remaining mainline consumer and awaits its separate archival/deletion checkpoint. No deployment. — codex-runtime-manager
+
+## Transcript task-focus replay module retired (2026-11-08)
+
+- Removed the consumerless legacy focus-resume module and historical replay tests after verifying their source matches the existing archive tag. Recorded original continuity intent and current owners. Dialogue history remains dialogue; admitted task state remains the sole task authority. Extended the no-return dependency gate. — codex-runtime-manager
+- Current context/prepared-entry/lifecycle/resume regression 4 files / 17 PASS; full tsgo PASS; architecture 54 PASS. No deployment or transcript/task-data deletion. — codex-runtime-manager
