@@ -121,3 +121,10 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - Platform read adapter is not yet connected to a real read entry. Continuous expected denominator, normal and uptime remain unknown; passive activity does not establish liveness. P4 is not fully accepted. — codex-observe-contract
 - Compatibility/rollback: default-off optional host composition, no production write RPC or TaskOutcome schema migration. Disable/remove host wiring before dependent lifecycle/read adapters; retain unknown gates. No production flag/config changes, push, PR or deployment. — codex-observe-contract
 - Registry still contains mixed concurrent-task WIP and is not committed; preserve sessions, attribution and other owners' edits. This update changes only the two task acceptance documents. — codex-observe-contract
+
+## P4 strict platform activity read acceptance 2026-11-07
+
+- a50cf8778 and ed0fdcb23 connect the same server collector to strict platformActivity mode in the existing observation RPC. Real auth decision ports and event bus are tested in isolation: platform identity requires tenant=null and operator.platform, enterprise callers are denied, and permission revocation is rechecked after reads. The platform read entry is now wired. — codex-observe-contract
+- Owner final validation: 31 files/243 tests PASS; project tsgo and five-file lint/format PASS. Counts are scoped, not added to prior runs; this document-only update does not rerun code tests. — codex-observe-contract
+- Default-off passive activity remains non-liveness; continuous expected denominator, normal and uptime stay unknown. No real gateway/production validation or full P4 completion claim. Revert optional read entry and host composition in dependency order, retaining unknown gates. — codex-observe-contract
+- Shared registry retains mixed concurrent-task WIP and remains uncommitted. No registry changes, production configuration/flag changes, push, PR or deployment in this update. — codex-observe-contract
