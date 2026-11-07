@@ -8,6 +8,12 @@
  */
 
 import { html, nothing, type TemplateResult } from "lit";
+import {
+  formatFeishuEmployeeUiHint,
+  readFeishuEnterpriseChannelContract,
+  type EnterpriseImCapabilityStatus,
+  type EnterpriseImEmployeeUiHint,
+} from "../../../../../../src/gateway/enterprise-im-channel-contract.js";
 import { channelFaultMessage } from "../../../channel-fault-scope.ts";
 import { ensureImAccountWebhookPaths } from "../../../controllers/tenant-channel-config.ts";
 import {
@@ -302,6 +308,62 @@ function removeChannelEntry(raw: string, channelId: string): string {
   return `${JSON.stringify(parsed, null, 2)}\n`;
 }
 
+function feishuCardContract(params: {
+  form: Record<string, unknown> | null;
+  accountId?: string;
+  snapshot: ChannelsStatusSnapshot | null;
+}): {
+  childExecutionBlocked: boolean;
+  employeeUiHint: EnterpriseImEmployeeUiHint;
+  platformEnterpriseId: string | null;
+  capabilityStatus: EnterpriseImCapabilityStatus | null;
+} {
+  const stored = readFeishuEnterpriseChannelContract({
+    config: params.form,
+    accountId: params.accountId,
+  });
+  const accounts = params.snapshot?.channelAccounts?.feishu ?? [];
+  const live =
+    accounts.find((account) => account.accountId === params.accountId) ??
+    (accounts.length === 1 ? accounts[0] : undefined);
+  if (!live?.enterpriseImEmployeeUiHint && !live?.enterpriseImCapability) {
+    return stored;
+  }
+  return {
+    childExecutionBlocked: live.enterpriseImChildExecutionBlocked ?? stored.childExecutionBlocked,
+    employeeUiHint: live.enterpriseImEmployeeUiHint ?? stored.employeeUiHint,
+    platformEnterpriseId:
+      typeof live.platformEnterpriseId === "string"
+        ? live.platformEnterpriseId
+        : stored.platformEnterpriseId,
+    capabilityStatus: live.enterpriseImCapability ?? stored.capabilityStatus,
+  };
+}
+
+function renderFeishuEnterpriseContract(params: {
+  channelId: string;
+  form: Record<string, unknown> | null;
+  accountId?: string;
+  snapshot: ChannelsStatusSnapshot | null;
+}): TemplateResult | typeof nothing {
+  if (params.channelId !== "feishu") {
+    return nothing;
+  }
+  const contract = feishuCardContract(params);
+  const rows = contract.capabilityStatus;
+  return html`<div class="enterprise-channel-workspace__hint" data-feishu-enterprise-contract>
+    <div>${formatFeishuEmployeeUiHint(contract.employeeUiHint)}</div>
+    <div>平台企业 ID：${contract.platformEnterpriseId ?? "未探测（不是账户 ID）"}</div>
+    <div>
+      群消息读取 ${rows?.projectGroupRead ?? "not_checked"} · 文档
+      ${rows?.projectDocs ?? "not_checked"} · 以用户身份发送
+      ${rows?.sendAsUser ?? "not_checked"} · 新消息
+      ${rows?.newMessageTrigger ?? "not_checked"}
+    </div>
+    <div>连通正常只说明应用凭证可用，不是员工授权。</div>
+  </div>`;
+}
+
 function isChannelEnabled(
   form: Record<string, unknown> | null,
   channelId: string,
@@ -345,21 +407,34 @@ async function reload(
   state.probing = probe;
   state.error = null;
   try {
-    const [snapshot, cfg] = await Promise.all([
-      requestWithTimeout<ChannelsStatusSnapshot>(
-        props.client,
-        "channels.status",
-        {
-          tenantId: props.tenantId,
-          probe,
-          timeoutMs: probe ? 12_000 : 8_000,
-        },
-        probe ? 14_000 : 10_000,
-      ),
-      loadTenantConfig(props.client, props.tenantId),
-    ]);
+    const statusPromise = requestWithTimeout<ChannelsStatusSnapshot>(
+      props.client,
+      "channels.status",
+      {
+        tenantId: props.tenantId,
+        probe,
+        timeoutMs: probe ? 12_000 : 8_000,
+      },
+      probe ? 14_000 : 10_000,
+    );
+    // A probe writes tenant_key onto the tenant config. Read that config after
+    // the status call so the card does not keep a pre-probe view.
+    let snapshot: ChannelsStatusSnapshot;
+    let cfg: { raw: string; hash: string };
+    if (probe) {
+      snapshot = await statusPromise;
+      cfg = await loadTenantConfig(props.client, props.tenantId);
+    } else {
+      [snapshot, cfg] = await Promise.all([
+        statusPromise,
+        loadTenantConfig(props.client, props.tenantId),
+      ]);
+    }
     state.snapshot = snapshot;
     state.configRaw = cfg.raw;
+    if (!snapshot) {
+      state.error = state.error ?? "通道状态加载失败，请重试。";
+    }
     state.configHash = cfg.hash;
     state.editorBaseRaw = cfg.raw;
     state.configDirty = false;
@@ -382,12 +457,23 @@ function renderGalleryCard(params: {
   status: CardStatus;
   summary: string;
   fault: string | null;
+  capabilityLine: string | null;
   selected: boolean;
   skeleton: boolean;
   disabled: boolean;
   onActivate: () => void;
 }): TemplateResult {
-  const { channelId, status, summary, fault, selected, skeleton, disabled, onActivate } = params;
+  const {
+    channelId,
+    status,
+    summary,
+    fault,
+    capabilityLine,
+    selected,
+    skeleton,
+    disabled,
+    onActivate,
+  } = params;
   const label = ENTERPRISE_MESSAGE_CHANNEL_LABELS[channelId];
   return html`
     <div
@@ -410,6 +496,13 @@ function renderGalleryCard(params: {
         ${skeleton ? "加载中…" : `${CARD_STATUS_MARK[status]} ${CARD_STATUS_LABEL[status]}`}
       </div>
       <p class="enterprise-channel-gallery__summary">${skeleton ? "…" : summary}</p>
+      ${
+        !skeleton && capabilityLine
+          ? html`<p class="enterprise-channel-gallery__summary" data-enterprise-im-capability>
+              ${capabilityLine}
+            </p>`
+          : nothing
+      }
       ${
         !skeleton && fault
           ? html`<p class="enterprise-channel-gallery__summary" data-channel-fault>${fault}</p>`
@@ -687,6 +780,13 @@ function renderWorkspace(params: {
         }
       </div>
 
+      ${renderFeishuEnterpriseContract({
+        channelId,
+        form,
+        accountId,
+        snapshot: state.snapshot,
+      })}
+
       <div class="enterprise-form-actions">
         <button
           class="btn btn--primary"
@@ -887,7 +987,20 @@ export function renderEnterpriseMessageChannelsSurface(params: {
     props.tenantId
   ) {
     state.loading = true;
-    void reload(host, props, false).then(requestUpdate);
+    void reload(host, props, false)
+      .catch((error: unknown) => {
+        state.loading = false;
+        state.error = localizeEnterpriseGatewayThrown(error, "通道状态加载失败，请重试。");
+      })
+      .finally(() => {
+        if (state.loading) {
+          state.loading = false;
+        }
+        if (!state.snapshot && !state.error) {
+          state.error = "通道状态加载失败，请重试。";
+        }
+        requestUpdate();
+      });
   }
 
   const form = parseConfigRaw(state.configRaw);
@@ -1010,11 +1123,18 @@ export function renderEnterpriseMessageChannelsSurface(params: {
           });
           const accountCount = countChannelAccounts(form, channelId, state.snapshot);
           const enabled = isChannelEnabled(form, channelId, state.snapshot);
+          const capability =
+            channelId === "feishu"
+              ? feishuCardContract({ form, accountId, snapshot: state.snapshot })
+              : null;
           return renderGalleryCard({
             channelId,
             status,
             summary: resolveCardSummary({ status, accountCount, enabled }),
             fault: channelFaultMessage(state.snapshot, channelId),
+            capabilityLine: capability
+              ? formatFeishuEmployeeUiHint(capability.employeeUiHint)
+              : null,
             selected: state.workspaceOpen && state.selectedChannelId === channelId,
             skeleton,
             disabled: controlsDisabled && !skeleton,

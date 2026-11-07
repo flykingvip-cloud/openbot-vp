@@ -10859,6 +10859,33 @@ tasks:
     since: 2026-11-05
     metadata: {}
 landingStreams:
+  - id: workplace-digital-colleague-slice-1a
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/design/workplace-digital-colleague-status-and-plan.md
+      - extensions/feishu/src/config-schema.ts
+      - extensions/feishu/src/probe.test.ts
+      - extensions/feishu/src/probe.ts
+      - extensions/feishu/src/types.ts
+      - src/channels/plugins/types.core.ts
+      - src/gateway/enterprise-im-channel-contract.ts
+      - src/gateway/enterprise-im-channel-contract.test.ts
+      - src/gateway/enterprise-im-channel-persist.ts
+      - src/gateway/server-methods/channels.ts
+      - src/gateway/session-tenant-derivation.ts
+      - src/gateway/session-tenant-derivation.test.ts
+      - src/gateway/tenant-config-service.ts
+      - ui/src/ui/navigation.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.browser.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.capability.test.ts
+      - ui/src/ui/types.ts
+    canLandWith: []
+    metadata:
+      task: workplace-digital-colleague-inventory
+      owner: cursor-cloud
+      purpose: Slice 1a Feishu enterprise channel tenant_key, capability status, and child-execution gate.
   - id: ensure-package-update-when-ready-20261105
     landingPolicy: serial
     paths:

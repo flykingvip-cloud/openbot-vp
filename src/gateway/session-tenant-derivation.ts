@@ -12,13 +12,35 @@ import type { TenantConfigStore } from "./tenant-config.js";
  * channel account configured under tenant T (in the tenant-config store) belongs
  * to T. Sessions whose account is not owned by any tenant are platform-global.
  *
- * Note: until Phase 3 populates tenant channel-account credentials, the index is
- * empty and every session resolves to platform-global (tenant scope returns
- * none) — honest rather than false isolation.
+ * Account maps written by 企业通道 (`accounts.<id>`) are indexed the same way as
+ * the older array form (`accounts: [{ id }]`). A Feishu `platformEnterpriseId`
+ * (tenant_key) is indexed separately so later employee login can match the
+ * platform enterprise. The account id `t_<tenant>_default` is not that id.
  */
+
+function rememberPlatformEnterprise(
+  index: Map<string, string>,
+  channelId: string,
+  account: unknown,
+  tenantId: string,
+): void {
+  if (!isPlainObject(account)) {
+    return;
+  }
+  const platformEnterpriseId = (account as { platformEnterpriseId?: unknown }).platformEnterpriseId;
+  if (typeof platformEnterpriseId !== "string" || !platformEnterpriseId.trim()) {
+    return;
+  }
+  index.set(platformEnterpriseKey(channelId, platformEnterpriseId), tenantId);
+}
 
 function accountKey(channel: string, accountId: string): string {
   return `${channel.trim().toLowerCase()}:${normalizeAccountId(accountId)}`;
+}
+
+/** Lookup key for the platform enterprise id observed on a 企业通道 account. */
+export function platformEnterpriseKey(channel: string, platformEnterpriseId: string): string {
+  return `${channel.trim().toLowerCase()}:enterprise:${platformEnterpriseId.trim()}`;
 }
 
 /** Build a `(channel:accountId) -> tenantId` index from the tenant-config store. */
@@ -35,18 +57,42 @@ export function buildAccountTenantIndex(store: TenantConfigStore): Map<string, s
         continue;
       }
       const accounts = (channelCfg as { accounts?: unknown }).accounts;
-      if (!Array.isArray(accounts)) {
+      if (Array.isArray(accounts)) {
+        for (const account of accounts) {
+          const id = isPlainObject(account) ? (account as { id?: unknown }).id : undefined;
+          if (typeof id === "string" && id.trim()) {
+            index.set(accountKey(channelId, id), tenantId);
+            rememberPlatformEnterprise(index, channelId, account, tenantId);
+          }
+        }
         continue;
       }
-      for (const account of accounts) {
-        const id = isPlainObject(account) ? (account as { id?: unknown }).id : undefined;
-        if (typeof id === "string" && id.trim()) {
-          index.set(accountKey(channelId, id), tenantId);
+      if (!isPlainObject(accounts)) {
+        continue;
+      }
+      for (const [id, account] of Object.entries(accounts)) {
+        if (!id.trim()) {
+          continue;
         }
+        index.set(accountKey(channelId, id), tenantId);
+        rememberPlatformEnterprise(index, channelId, account, tenantId);
       }
     }
   }
   return index;
+}
+
+/** Resolve the OpenBot tenant that observed this platform enterprise id. */
+export function deriveOpenBotTenantForPlatformEnterprise(
+  index: Map<string, string>,
+  channel: string,
+  platformEnterpriseId: string,
+): string | undefined {
+  const id = platformEnterpriseId.trim();
+  if (!channel.trim() || !id) {
+    return undefined;
+  }
+  return index.get(platformEnterpriseKey(channel, id));
 }
 
 /**

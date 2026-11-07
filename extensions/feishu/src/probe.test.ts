@@ -55,8 +55,9 @@ describe("probeFeishu", () => {
       appId: "cli_123",
       botName: "TestBot",
       botOpenId: "ou_abc123",
+      grantedScopeNames: null,
     });
-    expect(requestFn).toHaveBeenCalledTimes(1);
+    expect(requestFn).toHaveBeenCalledTimes(3);
   });
 
   it("passes the probe timeout to the Feishu request", async () => {
@@ -116,8 +117,8 @@ describe("probeFeishu", () => {
     const second = await probeFeishu(creds);
 
     expect(first).toEqual(second);
-    // Only one API call should have been made
-    expect(requestFn).toHaveBeenCalledTimes(1);
+    // One bot info call plus tenant and scope reads, then cache.
+    expect(requestFn).toHaveBeenCalledTimes(3);
   });
 
   it("makes a fresh API call after cache expires", async () => {
@@ -130,13 +131,13 @@ describe("probeFeishu", () => {
 
       const creds = { appId: "cli_123", appSecret: "secret" }; // pragma: allowlist secret
       await probeFeishu(creds);
-      expect(requestFn).toHaveBeenCalledTimes(1);
+      expect(requestFn).toHaveBeenCalledTimes(3);
 
       // Advance time past the success TTL
       vi.advanceTimersByTime(10 * 60 * 1000 + 1);
 
       await probeFeishu(creds);
-      expect(requestFn).toHaveBeenCalledTimes(2);
+      expect(requestFn).toHaveBeenCalledTimes(6);
     } finally {
       vi.useRealTimers();
     }
@@ -193,15 +194,15 @@ describe("probeFeishu", () => {
     });
 
     await probeFeishu({ appId: "cli_aaa", appSecret: "s1" }); // pragma: allowlist secret
-    expect(requestFn).toHaveBeenCalledTimes(1);
+    expect(requestFn).toHaveBeenCalledTimes(3);
 
     // Different appId should trigger a new API call
     await probeFeishu({ appId: "cli_bbb", appSecret: "s2" }); // pragma: allowlist secret
-    expect(requestFn).toHaveBeenCalledTimes(2);
+    expect(requestFn).toHaveBeenCalledTimes(6);
 
     // Same appId + appSecret as first call should return cached
     await probeFeishu({ appId: "cli_aaa", appSecret: "s1" }); // pragma: allowlist secret
-    expect(requestFn).toHaveBeenCalledTimes(2);
+    expect(requestFn).toHaveBeenCalledTimes(6);
   });
 
   it("does not share cache between accounts with same appId but different appSecret", async () => {
@@ -212,12 +213,12 @@ describe("probeFeishu", () => {
 
     // First account with appId + secret A
     await probeFeishu({ appId: "cli_shared", appSecret: "secret_aaa" }); // pragma: allowlist secret
-    expect(requestFn).toHaveBeenCalledTimes(1);
+    expect(requestFn).toHaveBeenCalledTimes(3);
 
     // Second account with same appId but different secret (e.g. after rotation)
     // must NOT reuse the cached result
     await probeFeishu({ appId: "cli_shared", appSecret: "secret_bbb" }); // pragma: allowlist secret
-    expect(requestFn).toHaveBeenCalledTimes(2);
+    expect(requestFn).toHaveBeenCalledTimes(6);
   });
 
   it("uses accountId for cache key when available", async () => {
@@ -228,14 +229,14 @@ describe("probeFeishu", () => {
 
     // Two accounts with same appId+appSecret but different accountIds are cached separately
     await probeFeishu({ accountId: "acct-1", appId: "cli_123", appSecret: "secret" }); // pragma: allowlist secret
-    expect(requestFn).toHaveBeenCalledTimes(1);
+    expect(requestFn).toHaveBeenCalledTimes(3);
 
     await probeFeishu({ accountId: "acct-2", appId: "cli_123", appSecret: "secret" }); // pragma: allowlist secret
-    expect(requestFn).toHaveBeenCalledTimes(2);
+    expect(requestFn).toHaveBeenCalledTimes(6);
 
     // Same accountId should return cached
     await probeFeishu({ accountId: "acct-1", appId: "cli_123", appSecret: "secret" }); // pragma: allowlist secret
-    expect(requestFn).toHaveBeenCalledTimes(2);
+    expect(requestFn).toHaveBeenCalledTimes(6);
   });
 
   it("clearProbeCache forces fresh API call", async () => {
@@ -246,12 +247,12 @@ describe("probeFeishu", () => {
 
     const creds = { appId: "cli_123", appSecret: "secret" }; // pragma: allowlist secret
     await probeFeishu(creds);
-    expect(requestFn).toHaveBeenCalledTimes(1);
+    expect(requestFn).toHaveBeenCalledTimes(3);
 
     clearProbeCache();
 
     await probeFeishu(creds);
-    expect(requestFn).toHaveBeenCalledTimes(2);
+    expect(requestFn).toHaveBeenCalledTimes(6);
   });
 
   it("handles response.data.bot fallback path", async () => {
@@ -261,11 +262,48 @@ describe("probeFeishu", () => {
     });
 
     const result = await probeFeishu({ appId: "cli_123", appSecret: "secret" }); // pragma: allowlist secret
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       appId: "cli_123",
       botName: "DataBot",
       botOpenId: "ou_data",
+      grantedScopeNames: null,
     });
+  });
+
+  it("records tenant_key and granted scopes without returning the app secret", async () => {
+    clearProbeCache();
+    const requestFn = vi.fn().mockImplementation((args: { url: string }) => {
+      if (args.url === "/open-apis/tenant/v2/tenant/query") {
+        return { code: 0, data: { tenant: { tenant_key: "tenant-key-1" } } };
+      }
+      if (args.url === "/open-apis/application/v6/scopes") {
+        return {
+          code: 0,
+          data: {
+            scopes: [
+              { scope_name: "im:message", grant_status: 1 },
+              { scope_name: "im:message.send_as_user", grant_status: 1 },
+              { scope_name: "docx:document:readonly", grant_status: 1 },
+              { scope_name: "im:message.group_at_msg:readonly", grant_status: 1 },
+              { scope_name: "contact:user.base:readonly", grant_status: 0 },
+            ],
+          },
+        };
+      }
+      return { code: 0, bot: { bot_name: "TestBot", open_id: "ou_abc123" } };
+    });
+    createFeishuClientMock.mockReturnValue({ request: requestFn });
+
+    const result = await probeFeishu({ appId: "cli_123", appSecret: "secret_value" }); // pragma: allowlist secret
+    expect(result.ok).toBe(true);
+    expect(result.tenantKey).toBe("tenant-key-1");
+    expect(result.grantedScopeNames).toEqual([
+      "im:message",
+      "im:message.send_as_user",
+      "docx:document:readonly",
+      "im:message.group_at_msg:readonly",
+    ]);
+    expect(JSON.stringify(result)).not.toContain("secret_value");
   });
 });

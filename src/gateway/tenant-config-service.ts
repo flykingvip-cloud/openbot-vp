@@ -6,6 +6,7 @@ import {
 } from "../config/config.js";
 import { redactConfigObject, restoreRedactedValues } from "../config/redact-snapshot.js";
 import type { ConfigValidationIssue, OpenBotConfig } from "../config/types.openbot.js";
+import { appendFeishuEnterpriseConfigAudit } from "./enterprise-im-channel-contract.js";
 import { loadSchemaWithPlugins } from "./server-methods/config-schema.js";
 import {
   diffTenantOverride,
@@ -140,6 +141,12 @@ export async function writeTenantConfigFromRaw(params: {
     // that do not introduce or alter any validation issue.
     configForWrite = restored.result as OpenBotConfig;
   }
+
+  appendFeishuEnterpriseConfigAudit({
+    previous: currentView as Record<string, unknown>,
+    next: configForWrite as Record<string, unknown>,
+    nowIso: (params.now ?? (() => new Date()))().toISOString(),
+  });
 
   // Diff against a normalized platform baseline so applied schema defaults
   // cancel out and the stored override captures only the tenant's real changes.
