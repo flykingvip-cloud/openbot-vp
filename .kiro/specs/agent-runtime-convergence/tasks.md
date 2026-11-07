@@ -719,3 +719,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved terminal failure/unknown attribution from the legacy attempt into execution/outcomes; removed the original implementation and migrated its regression consumer to the public execution entry. A normal turn still does not invent task success or accepted delivery. — codex-runtime-manager
 - Original and migrated attribution/attempt suites both 2 files / 66 PASS. Full tsgo PASS, changed-file typed lint clean, architecture 51 PASS. Core runner and attempt remain active; this checkpoint does not establish complete replacement or retirement. — codex-runtime-manager
+
+## Native tool stream adapter migration checkpoint (2026-11-07)
+
+- Native tool-name/id stream normalization moved out of the legacy attempt into shared model/native-tool-stream, with the original implementation removed and the regression consumer migrated. Protocol-body non-execution checks remain at their original boundary and use the same normalization functions. No new tool invocation or retry path. — codex-runtime-manager
+- Attempt regression 59 PASS; changed-file typed lint clean; architecture 51 PASS. Full tsgo currently fails only in concurrent observation/query-gateway and reasoning-gateway test work; no global green or final retirement claim. Migration remains uncommitted pending integration checks. — codex-runtime-manager
+- Integration follow-up: combined attempt/overflow/attribution 4 files / 87 PASS; latest full tsgo PASS after concurrent observation corrections. Native adapter migration is now eligible for scoped commit; foreign staged changes must remain untouched. — codex-runtime-manager

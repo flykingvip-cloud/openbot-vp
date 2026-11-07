@@ -19,3 +19,9 @@ export { createAuthProfileRotation } from "./auth-profile-rotation.js";
 export { createCopilotTokenRefresh } from "./copilot-token-refresh.js";
 
 export { prepareEmbeddedModel } from "./prepare-embedded-model.js";
+
+export {
+  normalizeToolCallNameForDispatch,
+  isToolCallBlockType,
+  wrapStreamFnTrimToolCallNames,
+} from "./native-tool-stream.js";
