@@ -129,6 +129,7 @@ type ChannelHandler = {
 };
 
 type ChannelHandlerParams = {
+  taskBoundary?: TaskActionBoundary;
   cfg: OpenBotConfig;
   channel: Exclude<OutboundChannel, "none">;
   to: string;
@@ -211,6 +212,7 @@ function createChannelOutboundContextBase(
   params: ChannelHandlerParams,
 ): Omit<ChannelOutboundContext, "text" | "mediaUrl"> {
   return {
+    taskBoundary: params.taskBoundary,
     cfg: params.cfg,
     to: params.to,
     accountId: params.accountId,
@@ -564,6 +566,7 @@ async function deliverOutboundPayloadsCore(
   let completionTransportSucceeded = false;
   let transportFailed = false;
   const handler = await createChannelHandler({
+    taskBoundary: params.taskBoundary,
     cfg,
     channel,
     to,

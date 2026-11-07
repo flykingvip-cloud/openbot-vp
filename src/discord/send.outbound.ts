@@ -4,6 +4,7 @@ import path from "node:path";
 import { serializePayload, type MessagePayloadObject, type RequestClient } from "@buape/carbon";
 import { ChannelType, Routes } from "discord-api-types/v10";
 import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { resolveChunkMode } from "../auto-reply/chunk.js";
 import { loadConfig, type OpenBotConfig } from "../config/config.js";
 import { resolveMarkdownTableMode } from "../config/markdown-tables.js";
@@ -319,6 +320,7 @@ export async function sendMessageDiscord(
 }
 
 type DiscordWebhookSendOpts = {
+  taskBoundary?: TaskActionBoundary;
   cfg?: OpenBotConfig;
   webhookId: string;
   webhookToken: string;
@@ -362,6 +364,12 @@ export async function sendWebhookMessageDiscord(
   const replyTo = typeof opts.replyTo === "string" ? opts.replyTo.trim() : "";
   const messageReference = replyTo ? { message_id: replyTo, fail_if_not_exists: false } : undefined;
 
+  if (opts.taskBoundary) {
+    const refusal = checkTaskActionBoundary(opts.taskBoundary);
+    if (refusal) {
+      throw new Error(refusal);
+    }
+  }
   const response = await fetch(
     resolveWebhookExecutionUrl({
       webhookId,

@@ -1,3 +1,4 @@
+import type { TaskActionBoundary } from "../../../agent-runtime/contracts/task.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import {
   getThreadBindingManager,
@@ -39,6 +40,7 @@ function resolveDiscordWebhookIdentity(params: {
 }
 
 async function maybeSendDiscordWebhookText(params: {
+  taskBoundary?: TaskActionBoundary;
   cfg?: OpenBotConfig;
   text: string;
   threadId?: string | number | null;
@@ -66,6 +68,7 @@ async function maybeSendDiscordWebhookText(params: {
     binding,
   });
   const result = await sendWebhookMessageDiscord(params.text, {
+    taskBoundary: params.taskBoundary,
     webhookId: binding.webhookId,
     webhookToken: binding.webhookToken,
     accountId: binding.accountId,
@@ -86,9 +89,21 @@ export const discordOutbound: ChannelOutboundAdapter = {
   resolveTarget: ({ to }) => normalizeDiscordOutboundTarget(to),
   sendPayload: async (ctx) =>
     await sendTextMediaPayload({ channel: "discord", ctx, adapter: discordOutbound }),
-  sendText: async ({ cfg, to, text, accountId, deps, replyToId, threadId, identity, silent }) => {
+  sendText: async ({
+    cfg,
+    to,
+    text,
+    accountId,
+    deps,
+    replyToId,
+    threadId,
+    identity,
+    silent,
+    taskBoundary,
+  }) => {
     if (!silent) {
       const webhookResult = await maybeSendDiscordWebhookText({
+        taskBoundary,
         cfg,
         text,
         threadId,
@@ -103,6 +118,7 @@ export const discordOutbound: ChannelOutboundAdapter = {
     const send = deps?.sendDiscord ?? sendMessageDiscord;
     const target = resolveDiscordOutboundTarget({ to, threadId });
     const result = await send(target, text, {
+      taskBoundary,
       verbose: false,
       replyTo: replyToId ?? undefined,
       accountId: accountId ?? undefined,
@@ -117,6 +133,7 @@ export const discordOutbound: ChannelOutboundAdapter = {
     text,
     mediaUrl,
     mediaLocalRoots,
+    taskBoundary,
     accountId,
     deps,
     replyToId,
@@ -126,6 +143,7 @@ export const discordOutbound: ChannelOutboundAdapter = {
     const send = deps?.sendDiscord ?? sendMessageDiscord;
     const target = resolveDiscordOutboundTarget({ to, threadId });
     const result = await send(target, text, {
+      taskBoundary,
       verbose: false,
       mediaUrl,
       mediaLocalRoots,

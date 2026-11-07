@@ -2,7 +2,7 @@ import { ChannelType } from "discord-api-types/v10";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
 import { loadWebMedia } from "../web/media.js";
-import { sendMessageDiscord } from "./send.js";
+import { sendMessageDiscord, sendWebhookMessageDiscord } from "./send.js";
 import { makeDiscordRest } from "./send.test-harness.js";
 const check = vi.hoisted(() => vi.fn());
 vi.mock("../agent-runtime/state/index.js", () => ({ checkTaskActionBoundary: check }));
@@ -15,6 +15,23 @@ const taskBoundary: TaskActionBoundary = {
   binding: { taskId: "a", executionAttempt: "r", deliverableVersion: "v" },
   constraints: [],
 };
+it("refuses stale webhook delivery before HTTP", async () => {
+  const fetchMock = vi.fn();
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    check.mockReturnValue("Task action refused: paused");
+    await expect(
+      sendWebhookMessageDiscord("result", {
+        webhookId: "test",
+        webhookToken: "test",
+        taskBoundary,
+      }),
+    ).rejects.toThrow("Task action refused");
+    expect(fetchMock).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
 beforeEach(() => {
   vi.clearAllMocks();
   check.mockReturnValue(undefined);
