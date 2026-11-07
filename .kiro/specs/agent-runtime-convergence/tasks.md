@@ -1078,3 +1078,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Removed execution runner direct access to legacy board tombstone logic and its duplicate refusal branch. Existing state revalidateContinueTicket remains the single enqueue/claim validator; timer, cap, pause and identity semantics remain intact. — codex-runtime-manager
 - Existing continuation regression 15 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. This retires one duplicate rule branch, not the entire legacy state adapter. — codex-runtime-manager
+
+## Bound execution cannot inherit chat waiver (2026-11-08)
+
+- Reproduced a bound execution receiving not_required acceptance through legacy chat classification (1 FAIL). Delivery preparation now preserves execution acceptance requirements whenever the host supplies a task binding; it does not invent validation or delivery. Both immediate and queued preparation share this function. — codex-runtime-manager
+- Preparation/confirmation regression 2 files / 13 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. General criterion evaluation remains open. — codex-runtime-manager

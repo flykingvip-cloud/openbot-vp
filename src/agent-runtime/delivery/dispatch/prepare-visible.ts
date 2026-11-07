@@ -25,7 +25,11 @@ export async function prepareVisibleDelivery(params: {
   const deliveryId = `delivery:${params.runId}:visible`;
   const gates = resolveChatTurnCloseGates({
     deliveryId,
-    contract: params.contract,
+    // A host-bound execution cannot inherit the legacy ordinary-chat waiver.
+    contract:
+      params.completionBinding?.taskId && params.contract.kind === "chat_turn"
+        ? { ...params.contract, id: "execution_task_contract", kind: "execution" }
+        : params.contract,
     deliveryPhase: "awaiting",
     acceptanceVerified: params.contract.acceptanceVerified === true,
   });

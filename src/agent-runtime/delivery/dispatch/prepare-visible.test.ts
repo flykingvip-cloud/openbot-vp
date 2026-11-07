@@ -142,3 +142,33 @@ it("does not register an identity from another execution run", async () => {
   });
   expect(mocks.register.mock.calls[0][0].checkedTask).toBeUndefined();
 });
+
+it("never waives acceptance for a bound execution through a legacy chat classification", async () => {
+  const commit = vi.fn();
+  await prepareVisibleDelivery({
+    resolvePersistRoot: mocks.root,
+    agentId: "agent-a",
+    runId: "run-a",
+    sessionFile: "/tmp/test-session.jsonl",
+    completionBinding: {
+      taskId: "admitted-a",
+      executionAttempt: "run-a",
+      deliverableVersion: "run-a",
+    },
+    contract: {
+      id: "chat_turn_contract_v1",
+      version: "1",
+      kind: "chat_turn",
+      requiredValidators: [],
+    },
+    commitOutcome: commit,
+    publishPending: vi.fn(),
+  });
+  expect(commit).toHaveBeenCalledWith(
+    true,
+    expect.objectContaining({
+      acceptance: { status: "pending" },
+      delivery: { status: "pending" },
+    }),
+  );
+});
