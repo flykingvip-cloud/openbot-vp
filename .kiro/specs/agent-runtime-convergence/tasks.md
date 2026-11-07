@@ -952,3 +952,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced media send and preview edit surviving task invalidation (2 FAIL). Telegram send/edit requests now recheck supplied task identity inside each retry attempt; routed outbound text/media/payload forwards the original boundary. Direct monitor and draft paths remain pending. — codex-runtime-manager
 - Scoped transport/adapter regression 2 files / 6 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Broader send suite retains 2 pre-existing retry expectation failures (59 PASS), reproduced using exact HEAD send.ts before this change; no retry policy weakened. Overall retirement remains open. — codex-runtime-manager
+
+## Telegram direct delivery boundary (2026-11-07)
+
+- Direct delivery helpers carry original task identity through text, media, voice fallback, follow-up text and pinning. Thread fallback rechecks before both original and threadless attempts, including after asynchronous media loading. Monitor caller propagation and draft lifecycle remain pending. — codex-runtime-manager
+- Direct Telegram regression 2 files / 30 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement remains open. — codex-runtime-manager
