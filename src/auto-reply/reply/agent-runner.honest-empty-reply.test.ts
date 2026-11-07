@@ -41,6 +41,10 @@ vi.mock("../../agents/pi-embedded.js", async () => {
   };
 });
 
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
+}));
+
 vi.mock("./queue.js", async () => {
   const actual = await vi.importActual<typeof import("./queue.js")>("./queue.js");
   return { ...actual, enqueueFollowupRun: vi.fn(), scheduleFollowupDrain: vi.fn() };
@@ -55,6 +59,7 @@ function followupRun(): FollowupRun {
     prompt: "hi",
     enqueuedAt: Date.now(),
     run: {
+      inputProvenance: { kind: "internal_system" },
       agentId: "bot-2",
       agentDir: "/tmp/agent",
       sessionId: "session",
