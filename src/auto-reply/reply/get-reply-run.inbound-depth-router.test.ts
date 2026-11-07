@@ -65,7 +65,8 @@ vi.mock("../../agents/workspace.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../gateway/agent-growth/working-style-store.js", () => ({
+vi.mock("../../gateway/agent-growth/working-style-store.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../gateway/agent-growth/working-style-store.js")>()),
   resolveWorkingStyleInstructions: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -336,136 +337,151 @@ function baseParams(
 }
 
 describe("runPreparedReply inbound depth router", () => {
-  it.each(["respond", "accepted", "duplicate", "rejected", "resumed", "resume_denied"] as const)(
-    "Gateway interaction %s enters execution only after acceptance",
-    async (kind) => {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-ingress-reply-"));
-      const file = path.join(dir, "session.jsonl");
-      fs.writeFileSync(
-        file,
-        JSON.stringify({
-          type: "session",
-          version: CURRENT_SESSION_VERSION,
-          id: "ingress",
-          cwd: dir,
-          timestamp: new Date().toISOString(),
-        }) + "\n",
-      );
-      vi.mocked(resolveSessionFilePath).mockReturnValue(file);
-      const binding = { taskId: "accepted-task" };
-      const isResume = kind === "resumed" || kind === "resume_denied";
-      const executes = kind === "accepted" || kind === "resumed";
-      const interaction = vi.spyOn(replyTurnRuntime, "interaction").mockResolvedValue(
-        kind === "respond"
-          ? { kind: "respond", text: "你好", clarification: false }
-          : isResume
-            ? {
-                kind: "task_proposal",
-                decision: {
-                  kind: "task_control",
-                  target: { taskId: binding.taskId, revision: "0" },
-                  action: "resume",
-                },
-              }
-            : {
-                kind: "execution_admission",
-                result:
-                  kind === "accepted"
-                    ? { kind, binding, acceptance: ["来源"] }
-                    : kind === "duplicate"
-                      ? { kind, binding }
-                      : { kind, reason: "revision_mismatch" },
+  it.each([
+    "respond",
+    "accepted",
+    "duplicate",
+    "rejected",
+    "resumed",
+    "resume_denied",
+    "direct_respond",
+  ] as const)("Gateway interaction %s enters execution only after acceptance", async (kind) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-ingress-reply-"));
+    const file = path.join(dir, "session.jsonl");
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        type: "session",
+        version: CURRENT_SESSION_VERSION,
+        id: "ingress",
+        cwd: dir,
+        timestamp: new Date().toISOString(),
+      }) + "\n",
+    );
+    vi.mocked(resolveSessionFilePath).mockReturnValue(file);
+    const binding = { taskId: "accepted-task" };
+    const isResume = kind === "resumed" || kind === "resume_denied";
+    const executes = kind === "accepted" || kind === "resumed";
+    const interaction = vi.spyOn(replyTurnRuntime, "interaction").mockResolvedValue(
+      kind === "respond" || kind === "direct_respond"
+        ? { kind: "respond", text: "你好", clarification: false }
+        : isResume
+          ? {
+              kind: "task_proposal",
+              decision: {
+                kind: "task_control",
+                target: { taskId: binding.taskId, revision: "0" },
+                action: "resume",
               },
+            }
+          : {
+              kind: "execution_admission",
+              result:
+                kind === "accepted"
+                  ? { kind, binding, acceptance: ["来源"] }
+                  : kind === "duplicate"
+                    ? { kind, binding }
+                    : { kind, reason: "revision_mismatch" },
+            },
+    );
+    const read = vi.spyOn(replyTurnRuntime.state, "read").mockReturnValue({
+      focusRevision: 0,
+      parked: [],
+      current:
+        kind === "accepted" || isResume
+          ? {
+              taskId: binding.taskId,
+              title: "报告",
+              goalText: "生成报告",
+              unfinished: true,
+              createdAtMs: 1,
+              stop: { summary: "已接纳", workspacePaths: [] },
+            }
+          : undefined,
+    });
+    try {
+      vi.mocked(runReplyAgent).mockClear();
+      const result = await runPreparedReply(
+        baseParams({
+          ctx: {
+            ...baseParams().ctx,
+            ...(kind === "direct_respond"
+              ? { InputProvenance: { kind: "external_user" as const } }
+              : {}),
+            ComposerMentions: [
+              {
+                mention_id: "plugin-mention",
+                displayName: "Origin",
+                offset: 0,
+                length: 7,
+                target: { kind: "plugin", pluginId: "plugin:ext:origin" },
+              },
+            ],
+          },
+          sessionId: "ingress",
+          sessionEntry: { sessionId: "ingress", sessionFile: file, updatedAt: 1 },
+          opts: {
+            runId: "ingress-message",
+            ...(kind === "direct_respond"
+              ? {}
+              : {
+                  interactionIngress: {
+                    userMessageId: "ingress-message",
+                    persistOwnTranscript: true,
+                  },
+                }),
+            onInteractionTaskResume: async () =>
+              kind === "resumed"
+                ? { kind: "accepted", binding, acceptance: ["来源"] }
+                : { kind: "rejected", reason: "resume_not_authorized" },
+          },
+        }),
       );
-      const read = vi.spyOn(replyTurnRuntime.state, "read").mockReturnValue({
-        focusRevision: 0,
-        parked: [],
-        current:
-          kind === "accepted" || isResume
-            ? {
-                taskId: binding.taskId,
-                title: "报告",
-                goalText: "生成报告",
-                unfinished: true,
-                createdAtMs: 1,
-                stop: { summary: "已接纳", workspacePaths: [] },
-              }
-            : undefined,
-      });
-      try {
-        vi.mocked(runReplyAgent).mockClear();
-        const result = await runPreparedReply(
-          baseParams({
-            ctx: {
-              ...baseParams().ctx,
-              ComposerMentions: [
-                {
-                  mention_id: "plugin-mention",
-                  displayName: "Origin",
-                  offset: 0,
-                  length: 7,
-                  target: { kind: "plugin", pluginId: "plugin:ext:origin" },
-                },
-              ],
-            },
-            sessionId: "ingress",
-            sessionEntry: { sessionId: "ingress", sessionFile: file, updatedAt: 1 },
-            opts: {
-              runId: "ingress-message",
-              interactionIngress: { userMessageId: "ingress-message", persistOwnTranscript: true },
-              onInteractionTaskResume: async () =>
-                kind === "resumed"
-                  ? { kind: "accepted", binding, acceptance: ["来源"] }
-                  : { kind: "rejected", reason: "resume_not_authorized" },
-            },
+      expect(interaction).toHaveBeenCalledOnce();
+      expect(resolveBootstrapContextForRun).toHaveBeenCalled();
+      expect(interaction.mock.calls[0]?.[0].input.context).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: "system",
+            content: expect.stringContaining("shared identity"),
           }),
-        );
-        expect(interaction).toHaveBeenCalledOnce();
-        expect(resolveBootstrapContextForRun).toHaveBeenCalled();
-        expect(interaction.mock.calls[0]?.[0].input.context).toEqual(
+        ]),
+      );
+      expect(runReplyAgent).toHaveBeenCalledTimes(executes ? 1 : 0);
+      if (executes) {
+        const run = vi.mocked(runReplyAgent).mock.calls[0]?.[0].followupRun.run;
+        expect(run).toMatchObject({
+          taskCompletionBinding: binding,
+          executionAdmitted: true,
+          skipUserTranscriptPersist: true,
+        });
+        expect(run?.extraSystemPrompt).toContain("Acceptance criteria:");
+        expect(run?.mentionedPluginToolAllowlist).toEqual(["origin"]);
+        expect(run?.extraSystemPrompt).toContain("pluginId=origin");
+        expect(run?.extraSystemPrompt).not.toContain("host-executed");
+      }
+      if (kind === "respond" || kind === "direct_respond") {
+        expect(result).toEqual({ text: "你好" });
+      }
+      if (!executes) {
+        const entries = fs
+          .readFileSync(file, "utf8")
+          .trim()
+          .split("\n")
+          .map((line) => JSON.parse(line) as unknown);
+        expect(entries).toEqual(
           expect.arrayContaining([
-            expect.objectContaining({
-              role: "system",
-              content: expect.stringContaining("shared identity"),
-            }),
+            expect.objectContaining({ message: expect.objectContaining({ role: "assistant" }) }),
           ]),
         );
-        expect(runReplyAgent).toHaveBeenCalledTimes(executes ? 1 : 0);
-        if (executes) {
-          const run = vi.mocked(runReplyAgent).mock.calls[0]?.[0].followupRun.run;
-          expect(run).toMatchObject({
-            taskCompletionBinding: binding,
-            executionAdmitted: true,
-            skipUserTranscriptPersist: true,
-          });
-          expect(run?.extraSystemPrompt).toContain("Acceptance criteria:");
-          expect(run?.mentionedPluginToolAllowlist).toEqual(["origin"]);
-          expect(run?.extraSystemPrompt).toContain("pluginId=origin");
-          expect(run?.extraSystemPrompt).not.toContain("host-executed");
-        }
-        if (kind === "respond") {
-          expect(result).toEqual({ text: "你好" });
-        }
-        if (!executes) {
-          const entries = fs
-            .readFileSync(file, "utf8")
-            .trim()
-            .split("\n")
-            .map((line) => JSON.parse(line) as unknown);
-          expect(entries).toEqual(
-            expect.arrayContaining([
-              expect.objectContaining({ message: expect.objectContaining({ role: "assistant" }) }),
-            ]),
-          );
-        }
-      } finally {
-        interaction.mockRestore();
-        read.mockRestore();
-        vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
-        fs.rmSync(dir, { recursive: true, force: true });
       }
-    },
-  );
+    } finally {
+      interaction.mockRestore();
+      read.mockRestore();
+      vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
   let previousShadow: string | undefined;
   let previousRouter: string | undefined;
   let previousKnowledgePolicy: string | undefined;

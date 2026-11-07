@@ -1018,3 +1018,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced accepted-marker-only requests reaching outcome creation without a task binding (1 FAIL). The unique admitted execution entry now rejects missing bindings before outcome, billing, fallback or candidate construction. Existing internal unmarked entrances retain their current behavior; no new admission path. — codex-runtime-manager
 - Admitted entry/candidate regression 2 files / 8 PASS; full tsgo PASS; typed lint and formatting clean; architecture 52 PASS. Complete mainline and retirement acceptance remain open. — codex-runtime-manager
+
+## New-mainline onboarding: explicit human ingress (2026-11-07)
+
+- Reproduced an explicitly external-user request without transport interaction options bypassing governed interaction (1 FAIL / 37 PASS). Prepared reply now supplies the existing interaction entrance and transcript persistence for that trusted provenance; ordinary responses do not enter execution. No new classifier, runner or channel implementation. Unmarked legacy entrances remain pending review. — codex-runtime-manager
+- Interaction/admission/router/OGUI regression 4 files / 48 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Updated an incomplete working-style mock to retain actual exports. Overall onboarding and retirement remain open. — codex-runtime-manager

@@ -443,7 +443,14 @@ export async function runPreparedReply(
   const isHeartbeat = opts?.isHeartbeat === true;
   const interactionIngress =
     !isHeartbeat && !opts?.growthBirthTurn && sessionCtx.CollaborationRoundInvoked !== true
-      ? opts?.interactionIngress
+      ? (opts?.interactionIngress ??
+        (ctx.InputProvenance?.kind === "external_user"
+          ? {
+              userMessageId:
+                ctx.MessageSidFull ?? ctx.MessageSid ?? opts?.runId ?? crypto.randomUUID(),
+              persistOwnTranscript: true,
+            }
+          : undefined))
       : undefined;
   const { typingPolicy, suppressTyping } = resolveRunTypingPolicy({
     requestedPolicy: opts?.typingPolicy,
