@@ -34,6 +34,15 @@ it("forwards sanitized images only to vision candidates and discloses unseen pix
 beforeEach(() => {
   mocks.complete.mockReset();
 });
+it("keeps the host decision protocol after shared response guidance", () => {
+  const context = buildInteractionCompletionContext(
+    { message: "hello", context: [{ role: "system", content: "Reply naturally in plain text." }] },
+    model,
+  );
+  expect(context.systemPrompt?.indexOf("Return one JSON object only")).toBeGreaterThan(
+    context.systemPrompt?.indexOf("Reply naturally") ?? -1,
+  );
+});
 it("preserves conversation roles and refuses to reorder late system content", () => {
   const context = buildInteractionCompletionContext(
     {

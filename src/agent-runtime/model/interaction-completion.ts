@@ -18,7 +18,7 @@ export function buildInteractionCompletionContext(
   input: InteractionModelInput,
   model: Model<Api>,
 ): Context {
-  const system = [PROTOCOL];
+  const system: string[] = [];
   const messages: Context["messages"] = [];
   let historyStarted = false;
   for (const part of input.context) {
@@ -45,6 +45,8 @@ export function buildInteractionCompletionContext(
       }
     }
   }
+  // Shared identity/skill guidance must not override the host's wire protocol.
+  system.push(PROTOCOL);
   system.push(`Host-bound task target: ${JSON.stringify(input.taskTarget ?? null)}`);
   const images = input.images ?? [];
   const canSeeImages = model.input?.includes("image");
