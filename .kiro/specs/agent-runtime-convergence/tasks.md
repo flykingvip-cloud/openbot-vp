@@ -725,3 +725,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - Native tool-name/id stream normalization moved out of the legacy attempt into shared model/native-tool-stream, with the original implementation removed and the regression consumer migrated. Protocol-body non-execution checks remain at their original boundary and use the same normalization functions. No new tool invocation or retry path. — codex-runtime-manager
 - Attempt regression 59 PASS; changed-file typed lint clean; architecture 51 PASS. Full tsgo currently fails only in concurrent observation/query-gateway and reasoning-gateway test work; no global green or final retirement claim. Migration remains uncommitted pending integration checks. — codex-runtime-manager
 - Integration follow-up: combined attempt/overflow/attribution 4 files / 87 PASS; latest full tsgo PASS after concurrent observation corrections. Native adapter migration is now eligible for scoped commit; foreign staged changes must remain untouched. — codex-runtime-manager
+
+## Provider stream adapter ownership (2026-11-07)
+
+- Moved Ollama context-window payload adaptation and XAI native argument decoding from the legacy attempt into separate shared model components. Original bodies removed; caller ordering and protocol boundary preserved. No provider loop or task authority added. — codex-runtime-manager
+- Existing attempt regression 59 PASS; full tsgo PASS; changed-file typed lint clean; architecture 51 PASS. Full legacy execution replacement remains open. — codex-runtime-manager

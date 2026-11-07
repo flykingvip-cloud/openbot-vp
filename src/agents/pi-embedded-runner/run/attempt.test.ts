@@ -3,6 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
+import {
+  isOllamaCompatProvider,
+  resolveOllamaCompatNumCtxEnabled,
+  shouldInjectOllamaCompatNumCtx,
+  wrapOllamaCompatNumCtx,
+  decodeHtmlEntitiesInObject,
+} from "../../../agent-runtime/model/index.js";
 import { wrapStreamFnTrimToolCallNames } from "../../../agent-runtime/model/index.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { PROTOCOL_FAILURE_USER_TEXT } from "../../model-output-boundary.js";
@@ -16,15 +23,10 @@ import {
 import {
   buildAfterTurnRuntimeContext,
   composeSystemPromptWithHookContext,
-  isOllamaCompatProvider,
   prependSystemPromptAddition,
   resolveAttemptFsWorkspaceOnly,
-  resolveOllamaCompatNumCtxEnabled,
   resolvePromptBuildHookResult,
   resolvePromptModeForSession,
-  shouldInjectOllamaCompatNumCtx,
-  decodeHtmlEntitiesInObject,
-  wrapOllamaCompatNumCtx,
   wrapStreamFnEnforceProtocolTextNonExecution,
   enforceProtocolTextNonExecutionInMessage,
 } from "./attempt.js";

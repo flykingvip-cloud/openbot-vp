@@ -25,3 +25,14 @@ export {
   isToolCallBlockType,
   wrapStreamFnTrimToolCallNames,
 } from "./native-tool-stream.js";
+
+export {
+  isOllamaCompatProvider,
+  resolveOllamaCompatNumCtxEnabled,
+  shouldInjectOllamaCompatNumCtx,
+  wrapOllamaCompatNumCtx,
+} from "./ollama-context-stream.js";
+export {
+  decodeHtmlEntitiesInObject,
+  wrapStreamFnDecodeXaiToolCallArguments,
+} from "./xai-arguments-stream.js";
