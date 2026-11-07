@@ -3,7 +3,7 @@
 **Scenario:** The enterprise tenant opens a platform connection. An employee then logs in and authorizes through that connection, and delegates selected robots to act inside that grant. Methods that survive review can settle into the organization. Instructing a colleague and acting as the employee are two faces. See 「路径裁决」.
 
 **Repo:** `flykingvip-cloud/openbot-vp` (`@upbeyond/openbot`)
-**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. They share one identity id. Slices 1a, 1b, and 2 are implemented. Slice 3a (resource gate) is in review as kept. The user-token doc reader is wired and is not a Measured pass. Slice 3 is not business-accepted. Slice 4 is not started.
+**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. They share one identity id. Slices 1a, 1b, and 2 are implemented. Slice 3 code is complete at `22a6e481`. Target-enterprise Measured acceptance is still open. Slice 4 is not started.
 **Nature:** Code-grounded inventory and an ordered implementation plan. Slice 4 is not part of the current slice.
 **Date:** 2026-11-07
 
@@ -641,7 +641,7 @@ One employee with several robots is not the same problem as several OpenBot empl
 
 Acceptance scene, once the slice 1a checklist has Measured both the chosen read API and the send API: an admin enables Feishu on the existing 企业通道 page, a tenant employee logs in and authorizes, and Project Assistant acts inside the grant. The instruction arrives on the bot face or in the OpenBot workspace. The read and the send are the identity-out face and still require the confirmed grant. If group history is not readable and named docs are, the scene shrinks to "draft and send progress from designated docs." Do not promise the group-progress loop before both measurements pass.
 
-Platform order follows 「路径裁决」. Feishu closes 1a, then 1b, then 2, then 3, then 4. DingTalk and WeCom reuse those four layers only after the same capabilities are Measured, adapted to what those platforms actually support. They do not get a second install page. Slice 5 and a 24/7 in-group presence stay later and default off. Slice 3 and slice 4 code wait for an owner green-light after the path ruling. This revision does not start them.
+Platform order follows 「路径裁决」. Feishu closes 1a, then 1b, then 2, then 3, then 4. DingTalk and WeCom reuse those four layers only after the same capabilities are Measured, adapted to what those platforms actually support. They do not get a second install page. Slice 5 and a 24/7 in-group presence stay later and default off. Slice 3 code is complete. Its Measured acceptance is still open. Slice 4 code stays blocked until that acceptance closes Slice 3.
 
 The first development target inside that scene is one enterprise connection, one employee authorization on it, and one explicit robot delegation. The same model must be unable to borrow another employee authorization or another robot delegation.
 
@@ -724,9 +724,23 @@ Audit the read (employee, robot, connection, delegation version, resource ids, t
 
 Tests: a doc or group outside the delegation is refused. Text inside a group message does not add a resource. An out-of-scope link inside an in-scope doc is not fetched. App-token fallback does not run when the user token is invalid. A missing enterprise seat denies the read.
 
-Slice 3a is the resource gate and the unverified refusal path. It is in `readEnterpriseImEmployeeResource`. `user-operational-identity.execute` for `read` and `draft` calls the slice 2 decision, then the grant's resource scope. An empty scope is a deny, not allow-all. Message text does not add ids. Group history is not called. `capabilityStatus: "granted"` is not Measured. An unmeasured row returns `ENTERPRISE_IM_NOT_MEASURED` and does not call Feishu. That code is not `ENTERPRISE_IM_READER_NOT_WIRED`. The second code means a measurement record exists and the execute path was not given a reader. Send still returns `ENTERPRISE_IM_ALLOW_NO_PRODUCT_ACTION` and does not send. The usage event records the employee, robot, connection account, grant version, resource id, and time.
+**Status: implementation complete. Target-enterprise Measured acceptance is still open.** Code through `22a6e481` is accepted. Slice 3a is the resource gate and stays. Slice 4 is not started. Send stays closed. This is not yet a robot participating in Feishu work as the employee.
 
-Slice 3 is not business-accepted. The execute path now passes `readFeishuUserDocx`, which calls the documented user-token APIs `GET /open-apis/docx/v1/documents/:document_id` and `GET /open-apis/docx/v1/documents/:document_id/raw_content` ([plain text content](https://open.feishu.cn/document/server-docs/docs/docs/docx-v1/document/raw_content)). The cited scopes are `docx:document` or `docx:document:readonly`. That citation is Docs, not a Measured pass in a target enterprise. Setting `measured.projectDocs` to boolean `true` does not open the call. The call runs only when the tenant stores `status: "measured"`, that exact API, `tokenType: "user_access_token"`, one of those scopes, and an `observedAt` time. This tree does not contain such an observation. A returned document id that does not match the request is refused and the body is not returned. Network failure, rate limit (`99991400`), not found (`1770002`), and an invalid user token (`99991663` or HTTP 401) are separate audited outcomes. An invalid user token sets the identity to `reauth_required`. Links use Feishu docx, wiki, and docs URL tokens and are not fetched. The progress draft includes the authorized document body, separate from the source inventory. Slice 4 stays blocked until a target enterprise has measured this read and the owner accepts Slice 3. This is not yet a robot participating in Feishu work as the employee.
+`readEnterpriseImEmployeeResource` is what `user-operational-identity.execute` calls for `read` and `draft`. It calls the slice 2 decision, then the grant's resource scope. An empty scope is a deny, not allow-all. Message text does not add ids. Group history is not called. `capabilityStatus: "granted"` is not Measured. No measurement record returns `ENTERPRISE_IM_NOT_MEASURED` and does not call Feishu. That code is not `ENTERPRISE_IM_READER_NOT_WIRED`. The second code means a measurement record exists and the execute path was not given a reader. The execute path passes `readFeishuUserDocx`. Send still returns `ENTERPRISE_IM_ALLOW_NO_PRODUCT_ACTION` and does not send.
+
+The reader calls the documented user-token APIs `GET /open-apis/docx/v1/documents/:document_id` and `GET /open-apis/docx/v1/documents/:document_id/raw_content` ([plain text content](https://open.feishu.cn/document/server-docs/docs/docs/docx-v1/document/raw_content)). The cited scopes are `docx:document` or `docx:document:readonly`. That citation is Docs. It is not a Measured pass. The document metadata call returns `document_id`, `title`, and `revision_id`. It does not return an update time. The reader leaves `updatedAt` empty and the draft shows the revision. Read time is not written as the document update time.
+
+A Measured record is written only after the observation below is in hand. The record names the enterprise connection, the app, and where the evidence is kept, plus `status: "measured"`, the exact API, `tokenType: "user_access_token"`, one of the cited scopes, and `observedAt`. A complete set of fields with no observation behind it is not Measured. Boolean `true` is not Measured. This tree does not contain a Measured record, and one must not be added ahead of the observation.
+
+Owner observation, still open, in one controlled enterprise:
+
+1. Enterprise connection is on, the employee authorization is usable, and the robot grant names that real document.
+2. An in-scope user-token read matches the Feishu body, document id, title, and revision.
+3. An out-of-scope document, an empty scope, and an out-of-scope link inside an in-scope doc are refused, and the link is not fetched.
+4. Revoke, enterprise connection off, and an invalid user token each stop the next read. Invalid token persists `reauth_required` and an audit event.
+5. The return and the audit contain neither the user token nor the app secret. Send does not run.
+
+After those five pass, ask to close Slice 3 and only then start Slice 4. Until then send stays closed.
 
 ### Slice 4. Execute as the employee
 
@@ -788,4 +802,4 @@ The loop is Feishu and Project Assistant, on the scene the slice 1a checklist al
 - DingTalk and WeCom are not given a user-proxy send path in this plan. They reuse the four layers only after Measured.
 - Desktop automation is not a dependency.
 - 数字替身 and other 运营身份 grants are not auto-bridged into the employee IM proxy.
-- Slices 1a, 1b, and 2 are implemented. Slice 3a keeps the resource gate. The docx user-token reader is wired behind an observation record and is Docs-cited, not Measured. Access order starts at 企业通道. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. The new workplace identity has one grant. Historical providers are not all migrated first. The enterprise IM path does not auto-create grants. Send stays closed. Slice 4 stays blocked until the owner accepts Slice 3.
+- Slices 1a, 1b, and 2 are implemented. Slice 3 code is complete and its Measured acceptance is open. Access order starts at 企业通道. Employee binding is 个人设置「授权」. Per-robot use is 机器人「运营授权」. The new workplace identity has one grant. Historical providers are not all migrated first. The enterprise IM path does not auto-create grants. Send stays closed. Slice 4 stays blocked until the five Slice 3 observations pass and the owner closes Slice 3.
