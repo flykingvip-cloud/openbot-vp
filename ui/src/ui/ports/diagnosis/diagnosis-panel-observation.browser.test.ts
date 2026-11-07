@@ -637,3 +637,143 @@ describe("explicit comparison user entry host", () => {
     panel.remove();
   });
 });
+
+describe("explicit reasoning hypothesis UI", () => {
+  const base = {
+    schemaVersion: 1,
+    metricDictVersion: 1,
+    samples: [],
+    projectedAt: 1,
+    sourceWatermark: null,
+    window: { from: 0, to: 2 },
+    coverage: null,
+  };
+  async function mount(
+    request: (method: string, params?: Record<string, unknown>) => Promise<unknown>,
+  ) {
+    const panel = document.createElement("openbot-diagnosis-panel");
+    panel.role = "enterprise";
+    panel.client = { connected: true, request } as unknown as GatewayBrowserClient;
+    panel.scopes = ["operator.read"];
+    panel.gatewayMethods = ["diagnosis.observation.query"];
+    panel.connected = true;
+    panel.taskOutcomeRef = { taskId: "task", agentId: "main", outcomeVersion: 1 };
+    document.body.append(panel);
+    await waitFor(() =>
+      expect(panel.querySelector('[data-testid="observation-read-reasoning"]')).not.toBeNull(),
+    );
+    return panel;
+  }
+  it("requests only after explicit click and labels hypotheses separately", async () => {
+    const request = vi.fn(async (method: string, params?: Record<string, unknown>) =>
+      method === "diagnosis.observation.query"
+        ? {
+            ...base,
+            ...(params?.reasoning
+              ? {
+                  reasoningPass: {
+                    scoringMethod: "rule_v1_with_hypotheses",
+                    reason: "hypotheses_only",
+                    items: [
+                      {
+                        id: "h",
+                        kind: "hypothesis",
+                        text: "Possible evidence gap",
+                        source: "reasoning",
+                        modelRef: "trusted-role",
+                        evidenceIds: ["e"],
+                      },
+                    ],
+                  },
+                }
+              : {}),
+          }
+        : { items: [], authorization: { outcome: "allow" }, audit: { decision: "allow" } },
+    );
+    const panel = await mount(request);
+    expect(request.mock.calls.some(([, params]) => Boolean(params?.reasoning))).toBe(false);
+    panel.querySelector<HTMLButtonElement>('[data-testid="observation-read-reasoning"]')!.click();
+    await waitFor(() =>
+      expect(panel.querySelector('[aria-label="推理假设旁路"]')?.textContent).toContain(
+        "Possible evidence gap",
+      ),
+    );
+    const call = request.mock.calls.find(([, params]) => Boolean(params?.reasoning))![1]!;
+    expect(call).toMatchObject({
+      taskId: "task",
+      agentId: "main",
+      outcomeVersion: 1,
+      reasoning: { requested: true },
+    });
+    expect(panel.textContent).toContain("trusted-role");
+    expect(panel.textContent).toContain("不代表确诊");
+    panel.remove();
+  });
+  it.each([
+    "reasoning_disabled",
+    "reasoning_unconfigured",
+    "reasoning_timeout",
+    "reasoning_schema_invalid",
+    "legacy",
+  ])("renders %s fallback without inventing hypotheses", async (reason) => {
+    const panel = await mount(async (method, params) =>
+      method === "diagnosis.observation.query"
+        ? {
+            ...base,
+            ...(params?.reasoning && reason !== "legacy"
+              ? { reasoningPass: { scoringMethod: "rule_v1", reason, items: [] } }
+              : {}),
+          }
+        : { items: [], authorization: { outcome: "allow" }, audit: { decision: "allow" } },
+    );
+    panel.querySelector<HTMLButtonElement>('[data-testid="observation-read-reasoning"]')!.click();
+    await waitFor(() =>
+      expect(panel.querySelector('[aria-label="推理假设旁路"]')?.textContent).toContain(
+        reason === "legacy" ? "推理旁路未供给" : reason,
+      ),
+    );
+    expect(panel.querySelector('[aria-label="推理假设旁路"] article')).toBeNull();
+    panel.remove();
+  });
+  it.each(["permission", "version"])("drops stale hypotheses after %s changes", async (change) => {
+    let resolve: ((value: unknown) => void) | undefined;
+    const panel = await mount(async (method, params) =>
+      method === "diagnosis.observation.query"
+        ? params?.reasoning
+          ? new Promise((done) => {
+              resolve = done;
+            })
+          : base
+        : { items: [], authorization: { outcome: "allow" }, audit: { decision: "allow" } },
+    );
+    panel.querySelector<HTMLButtonElement>('[data-testid="observation-read-reasoning"]')!.click();
+    await waitFor(() => expect(resolve).toBeDefined());
+    if (change === "permission") {
+      panel.scopes = [];
+    } else {
+      panel.taskOutcomeRef = { taskId: "task", agentId: "main", outcomeVersion: 2 };
+    }
+    resolve!({
+      ...base,
+      reasoningPass: {
+        scoringMethod: "rule_v1_with_hypotheses",
+        reason: "hypotheses_only",
+        items: [
+          {
+            id: "stale",
+            kind: "hypothesis",
+            text: "stale-secret",
+            source: "reasoning",
+            modelRef: "trusted",
+            evidenceIds: ["e"],
+          },
+        ],
+      },
+    });
+    await panel.updateComplete;
+    await new Promise((done) => setTimeout(done, 20));
+    expect(panel.textContent).not.toContain("stale-secret");
+    expect(panel.querySelector('[aria-label="推理假设旁路"] article')).toBeNull();
+    panel.remove();
+  });
+});

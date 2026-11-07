@@ -1,5 +1,10 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { createReasoningGatewayAdapter } from "../../../../../src/observation/reasoning-gateway.js";
+type ReasoningView = Extract<
+  Awaited<ReturnType<ReturnType<typeof createReasoningGatewayAdapter>>>,
+  { ok: true }
+>["reasoningPass"];
 import { createAuthorizationDecisionRefresh } from "../../../../../src/diagnosis/visualization.ts";
 import type { GatewayBrowserClient } from "../../gateway.ts";
 import { hasComparisonRefs } from "../../observation/comparison-capacity-panel.ts";
@@ -117,6 +122,102 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @state() private observationEvidenceNote = "业务结果未知 · 无可用证据";
   @state() private actionIntents: ObservationActionIntents | null = null;
   @state() private selectedIntent: { intentId: string; revision: number } | null = null;
+  @state() private reasoningResult: ReasoningView | null = null;
+  @state() private reasoningLoading = false;
+  @state() private reasoningNotice = "未请求推理假设；普通查询仅使用原规则与证据。";
+  private reasoningGeneration = 0;
+  private resolveReasoningRef() {
+    const ref = resolveDiagnoseTaskOutcome(
+      {
+        taskId: this.taskIdDraft,
+        agentId: this.agentIdDraft,
+        outcomeVersion: this.outcomeVersionDraft,
+      },
+      this.taskOutcomeRef,
+    );
+    return ref && Number.isSafeInteger(ref.outcomeVersion) ? ref : null;
+  }
+  private canReadReasoning() {
+    return (
+      this.connected &&
+      this.client?.connected &&
+      this.gatewayMethods?.includes("diagnosis.observation.query") &&
+      this.scopes?.some((scope) => scope === "operator.read" || scope === "operator.admin") &&
+      Boolean(this.resolveReasoningRef())
+    );
+  }
+  private clearReasoning() {
+    ++this.reasoningGeneration;
+    this.reasoningResult = null;
+    this.reasoningLoading = false;
+    this.reasoningNotice = "未请求推理假设；普通查询仅使用原规则与证据。";
+  }
+  private async readReasoning() {
+    const client = this.client;
+    const ref = this.resolveReasoningRef();
+    if (!client || !ref || !this.canReadReasoning()) {
+      this.clearReasoning();
+      return;
+    }
+    const generation = ++this.reasoningGeneration;
+    const evidenceGeneration = this.evidenceGeneration;
+    const fingerprint = this.evidenceFingerprint();
+    this.reasoningResult = null;
+    this.reasoningLoading = true;
+    this.reasoningNotice = "正在读取推理假设；规则结果保持不变。";
+    const current = () =>
+      this.isConnected &&
+      generation === this.reasoningGeneration &&
+      evidenceGeneration === this.evidenceGeneration &&
+      client === this.client &&
+      fingerprint === this.evidenceFingerprint() &&
+      this.canReadReasoning();
+    const to = Date.now();
+    try {
+      const response = await client.request<{ reasoningPass?: ReasoningView }>(
+        "diagnosis.observation.query",
+        {
+          ...ref,
+          from: to - (this.observationWindow === "7d" ? 7 : 1) * 86400000,
+          to,
+          reasoning: { requested: true },
+        },
+      );
+      if (!current()) {
+        return;
+      }
+      this.reasoningResult = response.reasoningPass ?? null;
+      this.reasoningNotice = response.reasoningPass
+        ? "旁路结果不改写规则发现、业务裁决或配置。"
+        : "推理旁路未供给；继续使用原 rule_v1 结果。";
+    } catch {
+      if (!current()) {
+        return;
+      }
+      this.reasoningNotice = "推理旁路不可用或未授权；继续使用原 rule_v1 结果。";
+    } finally {
+      if (current()) {
+        this.reasoningLoading = false;
+      }
+    }
+  }
+  private renderReasoning() {
+    const result = this.reasoningResult;
+    return html`<section aria-label="推理假设旁路"><h3>推理假设 · 只读旁路</h3><p>默认关闭，仅本次显式请求；可能产生模型用量，不代表确诊或改善验证。</p><button type="button" data-testid="observation-read-reasoning" ?disabled=${this.reasoningLoading || !this.canReadReasoning()} @click=${() => void this.readReasoning()}>读取推理假设</button><p>${this.reasoningNotice}</p>${
+      result
+        ? html`<p>来源：${result.scoringMethod} · ${result.reason}</p>${
+            result.items.length
+              ? result.items.map(
+                  (item) =>
+                    html`<article><strong>${item.kind === "hypothesis" ? "假设" : "候选建议"}</strong><p>${item.text}</p><p>来源：${item.source} · 模型：${item.modelRef} · 证据：${item.evidenceIds.join(", ")}</p></article>`,
+                )
+              : html`
+                  <p>未生成推理假设，保留原 rule_v1 结果。</p>
+                `
+          }`
+        : nothing
+    }</section>`;
+  }
   private evidenceGeneration = 0;
   private evidenceFingerprint() {
     return JSON.stringify([
@@ -157,6 +258,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
         "comparisonRefs",
       ].some((key) => changed.has(key))
     ) {
+      this.clearReasoning();
       this.observationEvidence = null;
       this.actionIntents = null;
       this.capacity = null;
@@ -242,6 +344,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
     }
   }
   disconnectedCallback() {
+    this.clearReasoning();
     ++this.evidenceGeneration;
     this.capacity = null;
     this.comparison = null;
@@ -685,7 +788,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
           },
         })}
         <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
-        ${renderObservationEvidence(this.observationEvidence)}
+        ${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
         <section class="enterprise-diagnosis__panel">
           <h2>原诊断工作区</h2>
           <p class="enterprise-diagnosis__sub">下面的数据来自真实诊断接口，不受上方样例模式影响。</p>
@@ -766,7 +869,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
     }
     return html`
       <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
-      ${renderObservationEvidence(this.observationEvidence)}
+      ${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
       <div class="toolbar">
         <button
           type="button"
