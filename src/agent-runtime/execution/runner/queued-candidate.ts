@@ -1,11 +1,11 @@
 import { resolveBootstrapWarningSignaturesSeen } from "../../../agents/bootstrap-budget.js";
-import type { EmbeddedPiRunResult } from "../../../agents/pi-embedded-runner/types.js";
 import { resolveRunAuthProfile } from "../../../auto-reply/reply/agent-runner-utils.js";
 import type { FollowupRun } from "../../../auto-reply/reply/queue.js";
 import { resolveEnterpriseEmbeddedTransport } from "../../../gateway/enterprise-model/embedded-transport.js";
 import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
 import type { EmployeeModelGateResult } from "../../../gateway/model-entitlement/employee-model-gate.js";
 import { sessionTaskState } from "../../state/index.js";
+import type { EmbeddedPiRunResult } from "./embedded-result.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";
 
 /** One queued provider candidate. The shared model session owns fallback and admission. */

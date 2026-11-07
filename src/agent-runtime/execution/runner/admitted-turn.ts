@@ -17,7 +17,6 @@ import {
   isTransientHttpError,
   sanitizeUserFacingText,
 } from "../../../agents/pi-embedded-helpers.js";
-import type { EmbeddedPiRunResult } from "../../../agents/pi-embedded-runner/types.js";
 import { userFacingPreReplyFailure } from "../../../agents/sandbox/docker-engine-client.js";
 import { isSoftRecoverableEntitlementFailure } from "../../../agents/sandbox/user-facing-entitlement-failure.js";
 import { stripHeartbeatToken } from "../../../auto-reply/heartbeat.js";
@@ -51,6 +50,7 @@ import { createAuthorizedModelSession } from "../../model/index.js";
 import { createTurnOutcomeRecorder } from "../outcomes/index.js";
 import { createAdmittedCandidateInvoker } from "./admitted-candidate.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
+import type { EmbeddedPiRunResult } from "./embedded-result.js";
 import type { AgentRunLoopResult, AgentTurnExecutionParams } from "./turn-contract.js";
 
 export async function runAdmittedTurn(

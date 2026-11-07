@@ -43,15 +43,10 @@ import {
 import { resolveGlobalLane, resolveSessionLane } from "../../../agents/pi-embedded-runner/lanes.js";
 import { log } from "../../../agents/pi-embedded-runner/logger.js";
 import { createFailoverDecisionLogger } from "../../../agents/pi-embedded-runner/run/failover-observation.js";
-import type { RunEmbeddedPiAgentParams } from "../../../agents/pi-embedded-runner/run/params.js";
 import {
   sessionLikelyHasOversizedToolResults,
   truncateOversizedToolResultsInSession,
 } from "../../../agents/pi-embedded-runner/tool-result-truncation.js";
-import type {
-  EmbeddedPiAgentMeta,
-  EmbeddedPiRunResult,
-} from "../../../agents/pi-embedded-runner/types.js";
 import { describeUnknownError } from "../../../agents/pi-embedded-runner/utils.js";
 import { ensureRuntimePluginsLoaded } from "../../../agents/runtime-plugins.js";
 import { derivePromptTokens, normalizeUsage, type UsageLike } from "../../../agents/usage.js";
@@ -88,6 +83,8 @@ import {
 import { recoverContextOverflow } from "../recovery/context-overflow.js";
 import { runEmbeddedAttempt } from "./embedded-attempt.js";
 import { cleanupEmbeddedRun } from "./embedded-cleanup.js";
+import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
+import type { EmbeddedPiAgentMeta, EmbeddedPiRunResult } from "./embedded-result.js";
 
 // Avoid Anthropic's refusal test token poisoning session transcripts.
 const ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL = "ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL";

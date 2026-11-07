@@ -1,5 +1,3 @@
-/** Internal legacy turn boundary. Typed references preserve existing adapters, not an external plugin SDK. */
-import type { EmbeddedPiRunResult } from "../../../agents/pi-embedded-runner/types.js";
 import type { RuntimeFallbackAttempt } from "../../../auto-reply/reply/agent-run-credit-usage.js";
 import type { BlockReplyPipeline } from "../../../auto-reply/reply/block-reply-pipeline.js";
 import type { FollowupRun } from "../../../auto-reply/reply/queue.js";
@@ -9,6 +7,8 @@ import type { VerboseLevel } from "../../../auto-reply/thinking.js";
 import type { GetReplyOptions, ReplyPayload } from "../../../auto-reply/types.js";
 import type { SessionEntry } from "../../../config/sessions.js";
 import type { GrowthOutcomeCommitOpts } from "../../../task-outcome/runtime-from-runner.js";
+/** Internal legacy turn boundary. Typed references preserve existing adapters, not an external plugin SDK. */
+import type { EmbeddedPiRunResult } from "./embedded-result.js";
 
 export type AgentRunLoopResult =
   | {

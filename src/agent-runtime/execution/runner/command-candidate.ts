@@ -5,7 +5,6 @@ import { runCliAgent } from "../../../agents/cli-runner.js";
 import { getCliSessionId, setCliSessionId } from "../../../agents/cli-session.js";
 import { FailoverError } from "../../../agents/failover-error.js";
 import { isCliProvider, normalizeProviderId } from "../../../agents/model-selection.js";
-import type { RunEmbeddedPiAgentParams } from "../../../agents/pi-embedded-runner/run/params.js";
 import type { buildWorkspaceSkillSnapshot } from "../../../agents/skills.js";
 import type { ThinkLevel, VerboseLevel } from "../../../auto-reply/thinking.js";
 import type { loadConfig } from "../../../config/config.js";
@@ -19,6 +18,7 @@ import type { resolveMessageChannel } from "../../../utils/message-channel.js";
 import type { AgentRunContext } from "../../contracts/command.js";
 import { resolveCliRunCredential } from "../../model/index.js";
 import { persistCommandSessionEntry } from "../../state/index.js";
+import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";
 const log = createSubsystemLogger("commands/agent");
 

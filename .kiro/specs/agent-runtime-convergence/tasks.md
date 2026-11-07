@@ -962,3 +962,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Monitor output and deferred final answers carry their original task boundary through lane delivery, fallback sends and preview edits. Task refusal during edit escapes ambiguous-ack handling instead of being recorded as delivered. Draft transport lifecycle remains a separate pending gate. — codex-runtime-manager
 - Lane/dispatch/reasoning regression 4 files / 94 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Overall retirement and final same-version lifecycle acceptance remain open. — codex-runtime-manager
+
+## Scope correction and internal execution contracts (2026-11-07)
+
+- Owner clarified retained external channels are Feishu, WeCom and DingTalk, with channel convergence owned by another agent. This task stops channel implementation work and resumes only runtime mainline convergence and legacy executor retirement. Previously committed channel evidence is preserved for handoff; no further channel implementation is included here. — codex-runtime-manager
+- Moved the unique embedded request/result definitions into execution/runner internal adapter contracts; legacy files are type-only facades. Runtime consumers no longer depend on old executor type locations. Existing host-specific fields are preserved explicitly, not misrepresented as pure public contracts or a stable SDK. The pure-contract architecture gate remains unchanged and legacy facade imports are prohibited for runtime sources. — codex-runtime-manager
+- Runtime regression 60 files / 236 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Complete executor replacement and retirement remain subject to mainline/lifecycle acceptance. — codex-runtime-manager
