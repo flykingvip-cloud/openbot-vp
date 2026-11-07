@@ -3,7 +3,7 @@
 **Scenario:** The enterprise tenant opens a platform connection. An employee then logs in and authorizes through that connection, and delegates selected robots to participate in existing work inside that grant. Methods that survive review can settle into the organization. Enterprise public bots are a separate mode.
 
 **Repo:** `flykingvip-cloud/openbot-vp` (`@upbeyond/openbot`)
-**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Clarified at `f7698602` and `07cf2b7f`. This pass starts the chain at the existing enterprise channel and removes the personal-use branch. No new architecture.
+**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Clarified at `f7698602` and `07cf2b7f`. Enterprise-first spine is in this file. 「企业通道现状」 is the code inventory Slice 1a implements against. No application code in this change.
 **Nature:** Code-grounded inventory and an ordered implementation plan. This document does not change runtime behavior.
 **Date:** 2026-11-07
 
@@ -265,6 +265,104 @@ Collaboration learning (`src/gateway/collaboration-learning/`) persists group op
 
 Session transcripts and seat-rule guidance live with the session or the seat record. They do not become an enterprise-visible skill or a new data capability.
 
+## 企业通道现状
+
+This is the current enterprise-console channel page. Slice 1a extends this page. It does not replace it. Evidence is from the tree at the baseline SHA.
+
+### 1. UI surface
+
+Navigation is System settings, section id `channels`, label **企业通道**, hint "企业微信 / 飞书 / 钉钉 IM 通道接入" (`ui/src/ui/ports/enterprise/views/enterprise-access-control-surface.ts`). The route used in tests is `/enterprise/{tenant}/settings/channels`. The legacy path `settings/message-channels` resolves to the same section. The surface is `renderEnterpriseMessageChannelsSurface` in `enterprise-message-channels-surface.ts`. The form is `enterprise-im-channel-form.ts`. Cards render in order wecom, feishu, dingtalk.
+
+Each card loads from two calls in parallel: `channels.status({ tenantId, probe })` and `config.get({ tenantId })`. Save calls `config.set({ tenantId, raw, baseHash })`. Clear-credentials calls `channels.logout({ channel, tenantId, accountId })`.
+
+Card status is computed in `resolveCardStatus`:
+
+| State | Label | When |
+| --- | --- | --- |
+| Page load | 加载中… | `state.loading` is true. The card is a skeleton. This is the Loading state on the screenshot. |
+| No login | error text | `需要企业登录上下文` when client or tenantId is missing. |
+| Load failure | error text | `state.error` from a thrown gateway call. Default copy: 通道状态加载失败，请重试。 |
+| not_added | 未添加 | The channel key is absent from the tenant config form. CTA: 添加并配置. |
+| draft | 待完善 | Channel is present and `describeTenantImCredentialGaps` reports missing fields. CTA: 继续配置. |
+| ready | 已保存 | Credentials are complete and there is no explicit probe result yet. Probe is not run on load (`lastProbeByChannel` starts empty). |
+| connected | 连通正常 | The last explicit 测试连通 returned `tone: "ok"`. |
+| test_failed | 测试未通过 | The last explicit probe returned `tone: "fail"`, including unsaved edits and missing fields. |
+
+Workspace actions, all against the tenant config view:
+
+- 保存 writes the form after gap check and webhook-path fill.
+- 启用 / 停用 flips `channels.<id>.enabled`. The confirm copy says this does not stop the global channel runtime. Saved secrets stay.
+- 清除凭证 calls tenant `channels.logout`. The handler must return `scope: "tenant"` and `runtimeStopped: false` or the UI throws. It deletes secret fields, not the channel entry.
+- 移除 deletes the channel key from the tenant override. It does not stop the global runtime.
+- 测试连通 calls `channels.status` with `probe: true`.
+- 同步为运营身份 calls `syncChannelToOperationalIdentity`, which creates a connector credential binding and opens the enterprise-identity register editor (`ui/src/ui/app.ts`). It is not employee OAuth.
+
+### 2. Config write shape
+
+Account id is `t_<slug>_default` from `defaultEnterpriseImAccountId`. The slug is the OpenBot tenant id lowercased, with non-alphanumeric runs turned into `_`. The write is an object map, not an array:
+
+```
+channels.<id>.enabled
+channels.<id>.accounts.t_<tenant>_default.connectionMode
+channels.<id>.accounts.t_<tenant>_default.<credential fields>
+```
+
+`config.set` stores that as a merge-patch in `openbot-tenant-config.json` (`src/gateway/tenant-config.ts`). It does not write the global `openbot.json`.
+
+Fields the form and `missingFieldsForImAccount` actually require (`ui/src/ui/controllers/tenant-im-binding.ts`):
+
+| Platform | Default mode | Required fields | Also stored in the other mode |
+| --- | --- | --- | --- |
+| WeCom | `connectionMode: "websocket"` | `botId`, `secret` | Callback: `corpId`, `agentId`, `secret`, `token`, `encodingAesKey` |
+| Feishu | `connectionMode: "websocket"` | `appId`, `appSecret` | Webhook adds `verificationToken`. `encryptKey` is in the form and is not in the gap check. |
+| DingTalk | `connectionMode: "stream"` | `clientId` or `appKey`, `clientSecret` or `appSecret` | Webhook uses the same credential fields. |
+
+Callback modes also get `webhookPath` from `ensureImAccountWebhookPaths`, shaped `/{channel}/a/{accountId}`.
+
+### 3. Runtime
+
+`src/gateway/tenant-config.ts` states the runtime is still one global `channels` instance. Tenant overrides are a config merge only. Per-tenant channel processes are Phase 8 and are not built. `config.set` for a tenant does not restart the gateway (`tenant-config-service.ts`).
+
+`channels.status` with `tenantId` (`src/gateway/server-methods/channels.ts`) loads `resolveConfigForTenant(platformDefault, tenantOverride)` so the account list and `probeAccount` use that tenant's credentials. The running flag, last inbound, and last outbound still come from `context.getRuntimeSnapshot()`, which is the global process. The comment in that handler says an account with no global instance reports not running, and that this is intentional so the platform runtime is not shown as the tenant's. The UI notice after a probed reload says the same: 租户配置视图；运行时仍为全局实例.
+
+Plugins (WeCom AIBot websocket, Feishu websocket, DingTalk Stream) start from the global config the gateway process loaded. Saving 企业通道 does not by itself start that tenant's long connection.
+
+### 4. Tenant bind
+
+What is stored: the OpenBot `tenantId` on the config record, plus the account id slug derived from it. WeCom `corpId` is stored only in callback mode. Feishu has no `tenant_key` field. DingTalk has no `corpId` field. `tenant_key` appears on inbound Feishu event objects in `extensions/feishu/src/bot.ts`. It is not written back to the enterprise channel account.
+
+What is missing: a checked bind from this OpenBot tenant to the platform enterprise (Feishu `tenant_key`, DingTalk `corpId`, WeCom `corpid`) that employee login can match. `session-tenant-derivation.ts` looks for `channels.*.accounts` as an array of `{ id }` inside the tenant-config store. 企业通道 writes an object map. That derivation index stays empty, so sessions stay platform-global. Do not treat `t_<tenant>_default` as the platform enterprise id.
+
+### 5. Capability and status
+
+The card does not report app scopes. 已保存 means the secret fields are non-empty. 连通正常 means the last bot credential probe succeeded. Neither says `im:message.send_as_user` or a user token exists.
+
+`listAppScopes` in `extensions/feishu/src/docx.ts` calls `client.application.scope.list` with the app Lark client and returns granted versus pending scope names. It is a document tool for a configured Feishu account. It is not called by 企业通道, and it is not a user-granted scope list.
+
+Enterprise operational identity refuses feishu, wecom, and dingtalk (`enterprise-operational-identity-providers.test.ts`, `ENTERPRISE_IDENTITY_PROVIDER_UNSUPPORTED` in `enterprise-operational-identity-store.ts`). 同步为运营身份 therefore cannot become the employee-authorization record.
+
+### 6. Gaps for the approved spine
+
+Server truth the employee UI can use now:
+
+- 「企业尚未开通」 when the tenant override has no `channels.feishu` (or the channel `enabled` is false). That is the `not_added` card, or a disabled channel. The employee UI does not read it yet. Slice 1b should.
+
+Server truth the employee UI cannot use yet:
+
+- 「等待管理员开通权限」 needs the scopes the published app actually has, compared with the scopes user proxy needs. That list is not on the channel account. A successful 测试连通 must not be shown as those scopes. Slice 1a has to record the checklist result on this page before 1b may show the second string.
+
+Unsafe to reuse as employee proxy:
+
+- 连通正常, 已保存, or a present `appSecret` as proof the employee may log in or send as themselves.
+- 同步为运营身份 as employee OAuth. The provider is unsupported, and the flow registers an enterprise connector, not a user token.
+- Tenant `config.set` as "the bot is now running for this tenant." The long connection still follows the global process.
+- Global runtime health as this tenant's health.
+- WeCom websocket mode as a stored `corpid`. It is not in that field set.
+- Account id `t_<tenant>_default` as Feishu `tenant_key` or DingTalk `corpId`.
+- App `tenant_access_token` as a fallback when a later user token is missing.
+
+Safe to reuse: the page, the card list, the tenant-scoped secret store, `config.get` / `config.set` / tenant `channels.logout`, and the explicit probe as a bot-credential check. Employee login is a new record that points at this enterprise connection. It does not replace the card.
+
 ## Gap table
 
 Severity is for the employee-identity proxy. Public-bot ingress is listed so it is not mistaken for that proxy. P0 means the closed loop is false until this moves. P1 means the loop is visibly incomplete. P2 is hygiene that does not unblock the loop.
@@ -468,7 +566,7 @@ Each slice is its own change. Basic audit is part of slices 1 through 5, not a f
 
 ### Slice 1a. Enterprise channel
 
-Reuse 企业通道. Do not add a parallel enterprise install path. On that page, for Feishu first, verify or complete the app config the card already edits, record the platform enterprise the connection check observed, and show capability status (which of the checklist rows the installed app can attempt). Employee UI reads this status. It does not collect App ID or App Secret.
+Reuse 企业通道 as inventoried in 「企业通道现状」. Do not add a parallel enterprise install path. Do not treat 连通正常, a saved app secret, or 同步为运营身份 as employee authorization. On that page, for Feishu first, verify or complete the app config the card already edits, record the platform enterprise the connection check observed, and show capability status (which of the checklist rows the installed app can attempt). Employee UI reads this status. It does not collect App ID or App Secret.
 
 If the card is still Loading, fix that loading state on this surface rather than starting a new screen.
 
