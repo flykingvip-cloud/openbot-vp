@@ -33,3 +33,5 @@ export { resolvePromptModeForSession } from "./prompt-mode.js";
 export { listRuntimeRuleDeclarations } from "./catalog.js";
 
 export { normalizeConstraintEntries, activeConstraintTexts } from "./constraints.js";
+
+export { stripInboundStamp } from "./input-stamp.js";

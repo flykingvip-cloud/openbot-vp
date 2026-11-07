@@ -1,3 +1,7 @@
+import { stripInboundStamp } from "../agent-runtime/policy/index.js";
+export { stripInboundStamp } from "../agent-runtime/policy/index.js";
+import { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
+export { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
 /**
  * Relation of an incoming user turn to the current session task.
  * Only `new_work` may park, cut context, and abort the in-flight run.
@@ -6,10 +10,6 @@
 import { isWeakNewWorkCueOnly } from "./qualification.js";
 
 export type TurnRelation = "amend" | "conversation" | "new_work";
-
-const INBOUND_STAMP_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} [0-9:]{4,8} GMT[+-]\d+\]\s*/;
-
-const DECORATIVE_TITLE_LINE = /^(?:[「」『』【】（）()[\]"'“”‘’*#\-_—…·`\s])+$/u;
 
 /** Language follow-up. One-to-one turns are aside; groups route them to the last speaker. */
 export const LANGUAGE_ASIDE_RE =
@@ -52,36 +52,6 @@ const ADDRESS_ASIDE_RE = /叫我|怎么称呼|称呼我/u;
 
 function compact(text: string): string {
   return text.replace(/\s+/g, "").trim();
-}
-
-export function stripInboundStamp(text: string): string {
-  return text.replace(INBOUND_STAMP_RE, "").trim();
-}
-
-function normalizeTitleLine(line: string): string {
-  return line
-    .replace(/^#+\s*/, "")
-    .replace(/^\*+\s*|\s*\*+$/g, "")
-    .replace(/^[「『【]\s*|\s*[」』】]$/g, "")
-    .trim();
-}
-
-export function titleFromGoal(text: string): string {
-  const cleaned = stripInboundStamp(text);
-  const first = cleaned
-    .split(/\r?\n/)
-    .map((line) => normalizeTitleLine(line))
-    .find(
-      (line) =>
-        line &&
-        !line.startsWith("[") &&
-        !DECORATIVE_TITLE_LINE.test(line) &&
-        !line.startsWith("任务目标"),
-    );
-  const compactTitle = (first ?? normalizeTitleLine(cleaned.replace(/\s+/g, " ")))
-    .replace(/\s+/g, " ")
-    .trim();
-  return compactTitle.length > 36 ? `${compactTitle.slice(0, 36)}…` : compactTitle;
 }
 
 function withoutRejections(text: string): string {

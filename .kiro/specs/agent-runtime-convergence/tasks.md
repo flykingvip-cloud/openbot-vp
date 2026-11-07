@@ -1147,3 +1147,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved unchanged current/parked pause and cancellation transitions into state/mutations/task-control. Legacy text classification remains outside this component; existing exports point to the unique typed transition implementation. — codex-runtime-manager
 - Board/cross-process/lifecycle regression 3 files / 32 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager
+
+## Task title and input normalization ownership (2026-11-08)
+
+- Moved unchanged title projection into context and consolidated the duplicated inbound timestamp normalization in policy. Legacy relation and board consumers use those same implementations; no semantic classifier was added. — codex-runtime-manager
+- Relation/board regression 2 files / 40 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. — codex-runtime-manager

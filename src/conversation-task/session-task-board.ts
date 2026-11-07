@@ -1,3 +1,5 @@
+import { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
+import { stripInboundStamp as stripStamp } from "../agent-runtime/policy/index.js";
 import {
   findParked,
   continueResult,
@@ -84,11 +86,8 @@ import {
   isOwnerConstraintFullReplace,
   isOwnerConstraintRevision,
   shouldPersistOwnerConstraint,
-  titleFromGoal,
 } from "./turn-relation.js";
 export { MAX_PARKED_TASKS } from "../agent-runtime/policy/task-board-limits.js";
-
-const INBOUND_STAMP_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} [0-9:]{4,8} GMT[+-]\d+\]\s*/;
 
 // Compatibility type exports; definitions have a single owner in runtime contracts.
 export type {
@@ -131,10 +130,6 @@ export function allocateTaskInstanceId(params?: {
 
 function bumpFocusRevision(board: SessionTaskBoard): number {
   return (board.focusRevision ?? 0) + 1;
-}
-
-function stripStamp(text: string): string {
-  return text.replace(INBOUND_STAMP_RE, "").trim();
 }
 
 /** Sure means new_work. amend and aside stay on the current task. */
