@@ -795,3 +795,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Broader source-scanner regression found five stale-path failures after core-loop relocation. Updated the scanner's sole run owner to execution/runner/embedded-run, preserving all flag-reader, caller allowlist and injection assertions. — codex-runtime-manager
 - Scanner 9 PASS; no production behavior change. — codex-runtime-manager
+
+## Attempt sandbox adapter ownership (2026-11-07)
+
+- Moved sandbox resolution and attachment to an already running account browser from legacy attempt into capabilities/adapters/attempt-sandbox. Preserved trusted account scope, existing sandbox policy and browser capability grant; no new scheduler or browser startup path. Caller retains its session identity and workspace lifecycle. — codex-runtime-manager
+- Workspace/shadow/context/attempt regression 3 files / 75 PASS after retaining the caller's shared sandboxSessionKey. Full tsgo PASS; typed lint clean; architecture 51 PASS. Overall executor retirement remains open. — codex-runtime-manager

@@ -22,3 +22,5 @@ export type {
   ProtocolBodyBoundaryResult,
   EnforceProtocolTextContext,
 } from "./adapters/protocol-body-boundary.js";
+
+export { resolveAttemptSandbox } from "./adapters/attempt-sandbox.js";

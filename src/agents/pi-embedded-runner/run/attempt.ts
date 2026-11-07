@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { resolveAttemptSandbox } from "../../../agent-runtime/capabilities/index.js";
 import { wrapStreamFnEnforceProtocolTextNonExecution } from "../../../agent-runtime/capabilities/index.js";
 import { resolvePromptBuildHookResult } from "../../../agent-runtime/capabilities/index.js";
 import {
@@ -158,16 +159,10 @@ import {
   linkNativeOutcomesForViolation,
 } from "../../protocol-violation.js";
 import { wrapStreamFnSanitizeProviderToolNames } from "../../provider-tool-name-stream.js";
-import { resolveSandboxContext } from "../../sandbox.js";
 import {
   accountComputerTurnPrompt,
-  grantAccountComputerBrowserTool,
   resolveAccountComputerWebRoute,
 } from "../../sandbox/account-computer-browser-routing.js";
-import { tryAttachRunningAccountComputerBrowser } from "../../sandbox/account-computer-running-attach.js";
-import { resolveEmbeddedSandboxAccount } from "../../sandbox/account-scope.js";
-import { resolveEmbeddedRunSandboxContextParams } from "../../sandbox/account-worker-embedded.js";
-import { resolveSandboxConfigForAgent } from "../../sandbox/config.js";
 import { resolveEffectiveSandboxWorkspaceDir } from "../../sandbox/effective-workspace.js";
 import { resolveSandboxRuntimeStatus } from "../../sandbox/runtime-status.js";
 import { isXaiProvider } from "../../schema/clean-for-xai.js";
@@ -408,58 +403,7 @@ export async function runEmbeddedAttempt(
   await fs.mkdir(resolvedWorkspace, { recursive: true });
 
   const sandboxSessionKey = params.sessionKey?.trim() || params.sessionId;
-  let sandbox = await resolveSandboxContext(
-    await resolveEmbeddedRunSandboxContextParams({
-      config: params.config,
-      sessionKey: sandboxSessionKey,
-      workspaceDir: resolvedWorkspace,
-      agentId: params.agentId,
-      gatewayClientUser: params.gatewayClientUser,
-      gatewayClientPlatformUserId: params.gatewayClientPlatformUserId,
-      gatewayClientSessionEnterpriseId: params.gatewayClientSessionEnterpriseId,
-      executionIdentity: params.executionIdentity,
-    }),
-  );
-  // personal_local + sandbox.mode=off: still attach browser to RUNNING 云电脑
-  // so 电脑 tab and agent browser are the same shared Chromium (#423).
-  if (!sandbox?.accountComputerBrowser) {
-    const account = resolveEmbeddedSandboxAccount({
-      agentId: params.agentId,
-      gatewayClientUser: params.gatewayClientUser,
-      gatewayClientPlatformUserId: params.gatewayClientPlatformUserId,
-      gatewayClientSessionEnterpriseId: params.gatewayClientSessionEnterpriseId,
-      executionIdentity: params.executionIdentity,
-    });
-    const platformUserId =
-      account?.userId ||
-      params.gatewayClientPlatformUserId?.trim() ||
-      params.executionIdentity?.platformUserId?.trim() ||
-      "";
-    if (platformUserId && !platformUserId.includes("@")) {
-      const attached = await tryAttachRunningAccountComputerBrowser({
-        tenantId: account?.tenantId,
-        userId: platformUserId,
-        config: params.config,
-      });
-      if (attached) {
-        const sandboxCfg = resolveSandboxConfigForAgent(params.config, params.agentId);
-        sandbox = {
-          enabled: false,
-          sessionKey: sandboxSessionKey,
-          workspaceDir: resolvedWorkspace,
-          agentWorkspaceDir: resolvedWorkspace,
-          workspaceAccess: "rw",
-          containerName: attached.containerName,
-          containerWorkdir: resolvedWorkspace,
-          docker: sandboxCfg.docker,
-          tools: grantAccountComputerBrowserTool(sandboxCfg.tools),
-          browserAllowHostControl: false,
-          browser: attached,
-          accountComputerBrowser: true,
-        };
-      }
-    }
-  }
+  const sandbox = await resolveAttemptSandbox(params, resolvedWorkspace);
   const accountComputerRoute =
     sandbox?.accountComputerBrowser === true
       ? resolveAccountComputerWebRoute(params.prompt)
