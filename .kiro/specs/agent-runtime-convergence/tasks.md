@@ -1281,3 +1281,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - Reproduced Chinese delivery with a long artifact path being rejected as wrong-language planning (2 FAIL before). Existing language counting now masks opaque paths while preserving the original output and raw planning-marker checks. No new classifier or execution route added. — codex-runtime-manager
 - Language regression 2 files / 37 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. English planning around paths remains rejected. — codex-runtime-manager
 - Isolated real Gateway/model long-path delivery now waits for actual board closeout: exact artifact bytes, acceptance=passed, delivery=delivered, unfinished=false and deliverableChecked=true. Earlier agent.wait snapshots could precede delivery settlement; this does not establish the full cause of every earlier intermittent sequence or general business-quality acceptance. No deployment. — codex-runtime-manager
+
+## Collaboration acceptance waits for the matching parent final (2026-11-08)
+
+- Full collaboration audit found one source-isolation failure. Added an acknowledgement identity assertion: Bob's send was returning Alice's in_flight run because the fixture waited for any child final while the parent remained active. The fixture now waits for Alice's matching parent final and requires Bob's distinct started run. No production deduplication or authorization rule changed. — codex-runtime-manager
+- Full collaboration entry/delivery regression 3 files / 18 PASS; full tsgo PASS; typed lint clean. This uses a real WS Gateway with mocked model replies and selected identity boundaries; real-model collaboration acceptance remains separate. No deployment. — codex-runtime-manager
