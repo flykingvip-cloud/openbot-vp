@@ -324,14 +324,22 @@ export function finishModelCall(
     call.startedAt >= 0 &&
     Number.isFinite(observedAt) &&
     observedAt >= call.startedAt &&
-    (completedAt == null || (Number.isFinite(completedAt) && completedAt >= call.startedAt));
+    (completedAt == null ||
+      (Number.isFinite(completedAt) && completedAt >= call.startedAt && completedAt <= observedAt));
   call.timeOrderValid = timeOrderValid;
   call.status = timeOrderValid ? params.status : "unknown";
   call.terminalCause =
     params.terminalCause ??
     (params.status === "cancelled" ? "cancelled" : params.status === "failed" ? "error" : "none");
-  call.usage = params.usage === undefined ? { ...EMPTY_USAGE } : usageFromUnknown(params.usage);
-  call.usageSource = params.usageSource;
+  if (params.usage !== undefined) {
+    call.usage = usageFromUnknown(params.usage);
+  } else if (call.modelResponseStatus !== "observed") {
+    call.usage = { ...EMPTY_USAGE };
+  }
+  call.usageSource =
+    call.modelResponseStatus === "observed" && params.usage === undefined
+      ? call.usageSource
+      : params.usageSource;
   call.usageAggregation = params.usageAggregation ?? "provider_aggregate_internal_retries_unknown";
   call.providerRequestId = params.providerRequestId ?? null;
   call.providerResponseId = params.providerResponseId ?? null;
@@ -408,6 +416,58 @@ export async function observeModelCandidate<T>(params: {
     throw err;
   }
 }
+
+export function writeBoundedEvidenceFile(
+  storeRoot: string,
+  fileName: string,
+  body: unknown,
+): "written" | "exists" | "capped" | "failed" {
+  if (!executorEvidenceCollectionEnabled()) {
+    return "failed";
+  }
+  const dir = path.join(storeRoot, "executor-evidence", "associations");
+  const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
+  try {
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    const started = Date.now();
+    let fd: number | undefined;
+    while (fd === undefined) {
+      try {
+        fd = fs.openSync(lockPath, "wx");
+      } catch {
+        if (Date.now() - started > 500) {
+          return "failed";
+        }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+      }
+    }
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      if (directoryBytes(path.join(storeRoot, "executor-evidence")) >= EVIDENCE_DISK_BYTE_CAP) {
+        return "capped";
+      }
+      const file = path.join(dir, fileName);
+      if (fs.existsSync(file)) {
+        return "exists";
+      }
+      const names = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
+      if (names.length >= ASSOCIATION_FILE_CAP_LOCAL) {
+        return "capped";
+      }
+      const tmp = `${file}.${process.pid}.${randomUUID()}.tmp`;
+      fs.writeFileSync(tmp, `${JSON.stringify(body, null, 2)}\n`);
+      fs.renameSync(tmp, file);
+      return "written";
+    } finally {
+      fs.closeSync(fd);
+      fs.rmSync(lockPath, { force: true });
+    }
+  } catch {
+    return "failed";
+  }
+}
+
+const ASSOCIATION_FILE_CAP_LOCAL = 64;
 
 export function loadPersistedModelCalls(storeRoot: string): ModelCallEvidence[] {
   return readCallFiles(storeRoot).rows;

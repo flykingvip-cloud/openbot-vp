@@ -31,6 +31,16 @@ export type CostColumns = {
   rollup: { role: "own" | "child" | "parent"; includeInFamilyTotal: boolean };
 };
 
+function legalToken(value: number | null): number | null {
+  if (value == null) {
+    return null;
+  }
+  if (!Number.isInteger(value) || value < 0) {
+    return null;
+  }
+  return value;
+}
+
 function tokenCompleteness(usage: ModelCallUsage): "complete" | "partial" | "absent" {
   const values = [usage.input, usage.output, usage.cacheRead, usage.cacheWrite];
   if (values.every((value) => value == null)) {
@@ -103,7 +113,19 @@ export function buildCostColumns(params: {
   runId: string;
   rollupRole?: "own" | "child" | "parent";
 }): CostColumns {
-  const completeness = tokenCompleteness(params.usage);
+  const illegalToken = [
+    params.usage.input,
+    params.usage.output,
+    params.usage.cacheRead,
+    params.usage.cacheWrite,
+  ].some((value) => value != null && (!Number.isInteger(value) || value < 0));
+  const usage: ModelCallUsage = {
+    input: legalToken(params.usage.input),
+    output: legalToken(params.usage.output),
+    cacheRead: legalToken(params.usage.cacheRead),
+    cacheWrite: legalToken(params.usage.cacheWrite),
+  };
+  const completeness = illegalToken ? "partial" : tokenCompleteness(usage);
   const basis = params.basis ?? (params.cost ? "config_estimate" : "unknown");
   const estimated =
     completeness === "complete" &&
@@ -111,10 +133,11 @@ export function buildCostColumns(params: {
     ratesAreKnown(params.cost) &&
     params.provider &&
     params.model
-      ? estimateCompleteUsage(params.usage, params.cost)
+      ? estimateCompleteUsage(usage, params.cost)
       : null;
-  const estimatedStatus =
-    completeness === "absent"
+  const estimatedStatus = illegalToken
+    ? "unknown"
+    : completeness === "absent"
       ? "unknown"
       : completeness === "partial" || !params.cost
         ? completeness === "partial"
@@ -134,7 +157,7 @@ export function buildCostColumns(params: {
   const role = params.rollupRole ?? "own";
   return {
     schemaVersion: 1,
-    tokens: { ...params.usage, completeness },
+    tokens: { ...usage, completeness },
     estimatedUsd: {
       amount: estimatedStatus === "known" ? estimated : null,
       status: estimatedStatus,

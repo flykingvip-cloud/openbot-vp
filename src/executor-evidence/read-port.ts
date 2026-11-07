@@ -119,15 +119,37 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   }
 
   const receipts: CommandReceipt[] = [];
-  for (const name of listJson(path.join(query.storeRoot, "command-log"))) {
-    const stored = readJson(path.join(query.storeRoot, "command-log", name)) as
-      | StoredCommand
-      | undefined;
-    if (!stored || stored.taskId !== query.taskId || typeof stored.outcomeVersion !== "number") {
+  const commandDir = path.join(query.storeRoot, "command-log");
+  if (tip && !fs.existsSync(commandDir)) {
+    gaps.push("command_log_absent");
+    reasons.push("a tip without a command log is not a complete chain");
+  }
+  let commandNames: string[] = [];
+  if (fs.existsSync(commandDir)) {
+    try {
+      commandNames = fs.readdirSync(commandDir).filter((name) => name.endsWith(".json"));
+    } catch {
+      gaps.push("command_log_read_failed");
+      commandNames = [];
+    }
+  }
+  for (const name of commandNames) {
+    const file = path.join(commandDir, name);
+    const parsed = readJson(file);
+    if (parsed === undefined) {
+      gaps.push("command_log_corrupt");
       continue;
     }
-    if (typeof stored.commandId !== "string" || typeof stored.digest !== "string") {
-      gaps.push("legacy_command_identity_absent");
+    const stored = parsed as StoredCommand;
+    if (stored.taskId !== query.taskId) {
+      continue;
+    }
+    if (
+      typeof stored.outcomeVersion !== "number" ||
+      typeof stored.commandId !== "string" ||
+      typeof stored.digest !== "string"
+    ) {
+      gaps.push("command_log_field_invalid");
       continue;
     }
     if (query.outcomeVersion != null && stored.outcomeVersion !== query.outcomeVersion) {
@@ -192,10 +214,24 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
       call.taskId === query.taskId &&
       scopeMatches(call, query.scope),
   );
-  let associations = associationReport.rows.filter(
+  const validAssociations: EvidenceAssociation[] = [];
+  for (const row of associationReport.rows) {
+    if (
+      row?.schemaVersion !== 1 ||
+      typeof row.agentId !== "string" ||
+      !row.trustedScope ||
+      (row.trustedScope.kind !== "personal" && row.trustedScope.kind !== "enterprise") ||
+      typeof row.runId !== "string"
+    ) {
+      gaps.push("association_field_invalid");
+      continue;
+    }
+    validAssociations.push(row);
+  }
+  let associations = validAssociations.filter(
     (row) =>
       row.agentId === query.agentId &&
-      row.chain.taskId === query.taskId &&
+      row.chain?.taskId === query.taskId &&
       row.trustedScope != null &&
       fullScopeEqual(row.trustedScope, query.scope),
   );
@@ -214,10 +250,24 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     );
     calls = calls.filter((call) => linked.has(call.callId));
   }
+  if (gaps.includes("snapshot_identity_mismatch") || gaps.includes("version_snapshot_missing")) {
+    receipts.length = 0;
+    calls = [];
+    associations = [];
+    reasons.push("untrusted snapshot facts were withheld");
+  }
   if (associations.length === 0) {
     gaps.push("associations_absent");
     reasons.push("an empty association set is not complete evidence");
   }
+  const linkedIds = associations
+    .map((row) => row.callId)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  const callIds = new Set(calls.map((call) => call.callId));
+  const setClosed =
+    linkedIds.length > 0 &&
+    linkedIds.length === callIds.size &&
+    linkedIds.every((id) => callIds.has(id));
   const callFiles = listJson(path.join(query.storeRoot, "executor-evidence", "calls")).length;
   const associationFiles = listJson(
     path.join(query.storeRoot, "executor-evidence", "associations"),
@@ -233,10 +283,7 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     return max;
   }, null);
   const completeness =
-    gaps.length === 0 &&
-    associations.length > 0 &&
-    calls.length > 0 &&
-    associations.every((row) => row.completeness === "complete")
+    gaps.length === 0 && setClosed && associations.every((row) => row.completeness === "complete")
       ? "complete"
       : tip
         ? "partial"

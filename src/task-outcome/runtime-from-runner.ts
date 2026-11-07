@@ -8,9 +8,13 @@ import {
 } from "../executor-evidence/association.js";
 import { publishFinalEvidenceLink } from "../executor-evidence/association.js";
 import { buildCostColumns } from "../executor-evidence/cost-columns.js";
+import { snapshotIdentityFingerprint } from "../executor-evidence/identity.js";
 import {
   currentExecutorModelCall,
+  getModelCall,
   noteModelResponse,
+  readCallFiles,
+  usageFingerprint,
   usageFromUnknown,
   type ExecutorEvidenceContext,
 } from "../executor-evidence/model-call-evidence.js";
@@ -138,6 +142,18 @@ export type RunnerTurnOutcomeInput = {
    * Closeout still assesses exhaustion and may fail_closed.
    */
   skipBudgetCharge?: boolean;
+  /** Captured from chargeModelCallAgainstTip. Closeout does not invent a call. */
+  modelCallLink?: ModelCallCloseoutLink | null;
+};
+
+export type ModelCallCloseoutLink = {
+  callId: string;
+  evidenceId: string;
+  candidateAttemptId: string;
+  chargeOutcomeVersion: number;
+  chargeCommitId: string | null;
+  requestDigest: string | null;
+  usageFingerprint: string;
 };
 
 export type GrowthOutcomeCommitOpts = {
@@ -505,7 +521,40 @@ export function chargeRunnerTurnBudgetSpend(
     scope: params.scope,
     ...(params.budgetLimits ? { budgetLimits: params.budgetLimits } : {}),
   });
-  if (!ctx.record.budget || ctx.record.lifecycle === "closed") {
+  if (!ctx.record.budget) {
+    return {
+      record: ctx.record,
+      exhaustion: null,
+      closedForBudget: false,
+      budgetCommand: {
+        commandId: `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`,
+        requestDigest: null,
+        disposition: "absent",
+        commitId: null,
+        chargeOutcomeVersion: ctx.record.outcomeVersion,
+        closeOutcomeVersion: null,
+        committedCostUsd: null,
+        costStatus: "not_committed",
+      },
+    };
+  }
+  if (ctx.record.lifecycle === "closed") {
+    const commandId = `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`;
+    const verified = verifyStoredSpend(ctx.store, commandId);
+    const parentTaskId = params.parentTaskId?.trim();
+    if (parentTaskId && parentTaskId !== params.taskId && verified) {
+      attributeChildSpendToParent(cfg, agentId, {
+        childTaskId: params.taskId,
+        parentTaskId,
+        parentAgentId: params.parentAgentId,
+        runId: params.runId,
+        callSeq: params.callSeq,
+        iterations: verified.iterations,
+        ...(verified.costUsd != null ? { costUsd: verified.costUsd } : {}),
+        ...(verified.costEvidence ? { costEvidence: verified.costEvidence } : {}),
+        nowMs: params.nowMs ?? Date.now(),
+      });
+    }
     return {
       record: ctx.record,
       exhaustion: null,
@@ -566,7 +615,7 @@ export function chargeRunnerTurnBudgetSpend(
   let record = spent.ok ? spent.record : (ctx.store.loadTask(params.taskId) ?? ctx.record);
   const storedSpend = spent.ok
     ? (spent.committedSpend ?? null)
-    : (spent.commandConflict?.storedSpend ?? null);
+    : verifyStoredSpend(ctx.store, commandId);
   const recovering =
     budgetCommand.disposition === "replayed" || budgetCommand.disposition === "conflict";
   const sideEffectSpend: CommittedSpend | null =
@@ -618,6 +667,37 @@ export function chargeRunnerTurnBudgetSpend(
     return { record, exhaustion, closedForBudget: closed.ok, budgetCommand };
   }
   return { record, exhaustion, closedForBudget: false, budgetCommand };
+}
+
+function verifyStoredSpend(
+  store: DurableTaskOutcomeStore,
+  commandId: string,
+): CommittedSpend | null {
+  const prior = store.loadCommand(commandId);
+  const spend = prior?.committedSpend;
+  if (!prior?.commitId || !spend) {
+    return null;
+  }
+  if (!Number.isInteger(spend.iterations) || spend.iterations < 0) {
+    return null;
+  }
+  if (spend.costUsd != null && (!Number.isFinite(spend.costUsd) || spend.costUsd < 0)) {
+    return null;
+  }
+  const bundle = store.loadCommitBundle(prior.commitId);
+  const logged = bundle?.commandLog?.committedSpend;
+  if (
+    !bundle ||
+    !logged ||
+    bundle.commandLog?.commandId !== commandId ||
+    bundle.commandLog?.digest !== prior.digest ||
+    logged.iterations !== spend.iterations ||
+    logged.costUsd !== spend.costUsd ||
+    logged.costEvidence !== spend.costEvidence
+  ) {
+    return null;
+  }
+  return spend;
 }
 
 function budgetReportFromSubmit(
@@ -702,6 +782,7 @@ export function chargeModelCallAgainstTip(
   budgetCommand: BudgetCommandReport;
   callId: string | null;
   associationCompleteness: "complete" | "partial" | "unlinked";
+  modelCallLink: ModelCallCloseoutLink | null;
 } {
   const classified = classifyTipBudgetCostFromUsage({
     usage: params.usage,
@@ -777,6 +858,21 @@ export function chargeModelCallAgainstTip(
     budgetCommand: charged.budgetCommand,
     callId: active?.callId ?? null,
     associationCompleteness,
+    modelCallLink:
+      active &&
+      (charged.budgetCommand.disposition === "applied" ||
+        charged.budgetCommand.disposition === "replayed") &&
+      typeof charged.budgetCommand.chargeOutcomeVersion === "number"
+        ? {
+            callId: active.callId,
+            evidenceId: active.evidenceId,
+            candidateAttemptId: active.attemptId,
+            chargeOutcomeVersion: charged.budgetCommand.chargeOutcomeVersion,
+            chargeCommitId: charged.budgetCommand.commitId,
+            requestDigest: charged.budgetCommand.requestDigest,
+            usageFingerprint: usageFingerprint(active.usage),
+          }
+        : null,
   };
 }
 
@@ -1078,7 +1174,16 @@ export async function recordRunnerTurnOutcome(
         throw new Error(`task-outcome fail_closed budget_exceeded failed: ${closed.code}`);
       }
       const evolution = await drainGrowthEvolution(cfg, agentId, store);
-      linkRunnerFinalEvidence(cfg, agentId, scope, taskId, input.runId, attemptId, closed.record);
+      linkRunnerFinalEvidence(
+        cfg,
+        agentId,
+        scope,
+        taskId,
+        input.runId,
+        attemptId,
+        closed.record,
+        input.modelCallLink,
+      );
       return { record: closed.record, evolution };
     }
   }
@@ -1211,7 +1316,16 @@ export async function recordRunnerTurnOutcome(
   }
 
   const evolution = await drainGrowthEvolution(cfg, agentId, store);
-  linkRunnerFinalEvidence(cfg, agentId, scope, taskId, input.runId, attemptId, record);
+  linkRunnerFinalEvidence(
+    cfg,
+    agentId,
+    scope,
+    taskId,
+    input.runId,
+    attemptId,
+    record,
+    input.modelCallLink,
+  );
   return { record, evolution };
 }
 
@@ -1223,21 +1337,31 @@ function linkRunnerFinalEvidence(
   runId: string,
   taskAttemptId: string,
   record: TaskOutcomeRecord,
+  link: ModelCallCloseoutLink | null | undefined,
 ): void {
   try {
+    const storeRoot = resolveStoreRoot(cfg, agentId);
+    const call = link
+      ? (getModelCall(link.callId) ??
+        readCallFiles(storeRoot).rows.find((row) => row.callId === link.callId) ??
+        null)
+      : null;
     publishFinalEvidenceLink({
-      storeRoot: resolveStoreRoot(cfg, agentId),
+      storeRoot,
+      call,
       scope,
       agentId,
       taskId,
       runId,
-      candidateAttemptId: null,
+      candidateAttemptId: link?.candidateAttemptId ?? null,
       taskAttemptId,
-      chargeOutcomeVersion: record.previousOutcomeVersion ?? null,
+      chargeOutcomeVersion: link?.chargeOutcomeVersion ?? null,
       finalOutcomeVersion: record.outcomeVersion,
       recordRuns: record.runs.map((run) => ({ runId: run.runId, attemptIds: run.attemptIds })),
       recordAttempts: record.attempts.map((attempt) => attempt.attemptId),
       receiptReturned: true,
+      usageFingerprint: link?.usageFingerprint ?? null,
+      snapshotFingerprint: snapshotIdentityFingerprint(record),
     });
   } catch {
     // Final evidence must not change the task receipt.

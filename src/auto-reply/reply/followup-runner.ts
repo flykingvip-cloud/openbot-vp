@@ -187,6 +187,9 @@ export function createFollowupRunner(params: {
     let followupOutcomeCloseoutDone = false;
     /** Real usage-derived USD when the pre-call gate did not already charge this item. */
     let tipBudgetCostUsd: number | undefined;
+    let lastModelCallLink:
+      | import("../../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink
+      | null = null;
     let followupBudgetCharged = false;
     let followupBudgetCallSeq = 0;
     let parentTaskId: string | undefined;
@@ -232,6 +235,7 @@ export function createFollowupRunner(params: {
             ? { failureReason, ...(failureDetail ? { failureDetail } : {}) }
             : {}),
           ...(followupCapabilityOutcome ? { capabilityOutcome: followupCapabilityOutcome } : {}),
+          ...(lastModelCallLink ? { modelCallLink: lastModelCallLink } : {}),
         });
       } catch (err) {
         logVerbose(`followup unified recordRunnerTurnOutcome failed: ${String(err)}`);
@@ -564,6 +568,9 @@ export function createFollowupRunner(params: {
                   ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
                 });
                 followupBudgetCharged = true;
+                if (charged.modelCallLink) {
+                  lastModelCallLink = charged.modelCallLink;
+                }
                 if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
                   tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
                 }

@@ -225,6 +225,9 @@ export async function runAgentTurnWithFallback(params: {
   /** Tip budget wall-clock start = task entry time (not first closeout spend). */
   const tipBudgetStartedAtMs = growthStartedAt;
   let tipBudgetChargedThisTurn = false;
+  let lastModelCallLink:
+    | import("../../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink
+    | null = null;
   let tipBudgetModelCallSeq = 0;
   const assertTipBudgetAllowsModelCall = (): void => {
     if (!chatOutcomeTaskId || !chatOutcomeScope || params.isHeartbeat || !growthAgentIdForEntry) {
@@ -248,15 +251,22 @@ export async function runAgentTurnWithFallback(params: {
       return;
     }
     tipBudgetModelCallSeq += 1;
-    chargeModelCallAgainstTip(params.followupRun.run.config, growthAgentIdForEntry, {
-      taskId: chatOutcomeTaskId,
-      scope: chatOutcomeScope,
-      runId,
-      callSeq: tipBudgetModelCallSeq,
-      usage: opts.usage,
-      provider: opts.provider,
-      model: opts.model,
-    });
+    const charged = chargeModelCallAgainstTip(
+      params.followupRun.run.config,
+      growthAgentIdForEntry,
+      {
+        taskId: chatOutcomeTaskId,
+        scope: chatOutcomeScope,
+        runId,
+        callSeq: tipBudgetModelCallSeq,
+        usage: opts.usage,
+        provider: opts.provider,
+        model: opts.model,
+      },
+    );
+    if (charged.modelCallLink) {
+      lastModelCallLink = charged.modelCallLink;
+    }
     tipBudgetChargedThisTurn = true;
   };
   let modelGate: EmployeeModelGateResult | undefined;
@@ -367,6 +377,7 @@ export async function runAgentTurnWithFallback(params: {
       ...(opts?.delivery ? { delivery: opts.delivery } : {}),
       ...(opts?.deliveryId ? { deliveryId: opts.deliveryId } : {}),
       ...(opts?.acceptanceEvidence ? { acceptanceEvidence: opts.acceptanceEvidence } : {}),
+      ...(lastModelCallLink ? { modelCallLink: lastModelCallLink } : {}),
       ...(opts?.processPlaceholder ? { processPlaceholder: true } : {}),
       ...(opts?.allowRetry !== undefined ? { allowRetry: opts.allowRetry } : {}),
       ...(opts?.adoptedAssetIds && opts.adoptedAssetIds.length > 0

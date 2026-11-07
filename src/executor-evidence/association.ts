@@ -14,6 +14,7 @@ import {
   EVIDENCE_DISK_BYTE_CAP,
   directoryBytes,
   executorEvidenceCollectionEnabled,
+  writeBoundedEvidenceFile,
   type ModelCallEvidence,
   type ModelCallUsage,
   usageFingerprint,
@@ -85,6 +86,7 @@ export type EvidenceAssociation = {
   candidateAttemptId: string | null;
   taskAttemptId: string | null;
   trustedScope: TrustedScope | null;
+  finalSnapshotFingerprint: string | null;
   cost: CostColumns;
   scopeId: string;
   agentId: string;
@@ -226,7 +228,8 @@ export function associateBudgetCharge(params: {
     candidateAttemptId: params.candidateAttemptId ?? params.call?.attemptId ?? null,
     taskAttemptId: params.taskAttemptId ?? null,
     trustedScope: params.scope,
-    cost: params.cost,
+    finalSnapshotFingerprint: null,
+    cost: unattributable(params.budget.disposition) ? scrubKnownTotal(params.cost) : params.cost,
     scopeId: scopeIdOf(params.scope),
     agentId: params.agentId,
   };
@@ -266,6 +269,24 @@ export function associateBudgetCharge(params: {
     // Association persistence must not change the budget or reply result.
   }
   return association;
+}
+
+function unattributable(disposition: BudgetCommandDisposition): boolean {
+  return disposition === "conflict" || disposition === "replayed" || disposition === "no_effect";
+}
+
+function scrubKnownTotal(cost: CostColumns): CostColumns {
+  return {
+    ...cost,
+    estimatedUsd: {
+      amount: null,
+      status: "unknown",
+      basis: "unknown",
+      pricingFingerprint: null,
+      pricingSchemaVersion: null,
+    },
+    total: { amount: null, status: "unknown" },
+  };
 }
 
 function rememberAssociation(association: EvidenceAssociation): void {
@@ -325,22 +346,38 @@ export function publishFinalEvidenceLink(params: {
   recordRuns: ReadonlyArray<{ runId: string; attemptIds: readonly string[] }>;
   recordAttempts: readonly string[];
   receiptReturned: boolean;
+  usageFingerprint?: string | null;
+  snapshotFingerprint?: string | null;
 }): EvidenceAssociation | null {
   if (!params.receiptReturned || params.finalOutcomeVersion == null) {
     return null;
   }
+  const callOk =
+    params.call != null &&
+    params.call.agentId === params.agentId &&
+    params.call.taskId === params.taskId &&
+    params.call.runId === params.runId &&
+    params.call.attemptId === params.candidateAttemptId &&
+    params.call.callId.length > 0 &&
+    fullScopeEqual(params.call.scope, params.scope) &&
+    (params.usageFingerprint == null ||
+      usageFingerprint(params.call.usage) === params.usageFingerprint);
   const run = params.recordRuns.find((item) => item.runId === params.runId);
   const attemptOnRun = run?.attemptIds.includes(params.taskAttemptId ?? "") === true;
   const attemptOnRecord = params.recordAttempts.includes(params.taskAttemptId ?? "");
-  const mapped =
+  const membershipOk =
     Boolean(params.runId) &&
     Boolean(params.taskAttemptId) &&
+    Boolean(params.candidateAttemptId) &&
     Boolean(run) &&
     attemptOnRun &&
     attemptOnRecord &&
     params.candidateAttemptId !== params.taskAttemptId &&
     params.chargeOutcomeVersion != null &&
     params.finalOutcomeVersion !== params.chargeOutcomeVersion;
+  const mapped = membershipOk && callOk;
+  const finalVersion =
+    membershipOk && (params.call == null || callOk) ? params.finalOutcomeVersion : null;
   const missing = mapped ? [] : ["task_attempt_membership"];
   if (!params.call) {
     missing.push("call_evidence");
@@ -355,7 +392,7 @@ export function publishFinalEvidenceLink(params: {
     commitId: null,
     chargeOutcomeVersion: params.chargeOutcomeVersion,
     closeOutcomeVersion: null,
-    finalOutcomeVersion: mapped ? params.finalOutcomeVersion : null,
+    finalOutcomeVersion: finalVersion,
     runId: params.runId,
     attemptId: params.taskAttemptId,
     capabilityCallId: null,
@@ -380,7 +417,7 @@ export function publishFinalEvidenceLink(params: {
     taskJudgement: null,
     chain: {
       taskId: params.taskId,
-      outcomeVersion: mapped ? params.finalOutcomeVersion : null,
+      outcomeVersion: finalVersion,
       runId: params.runId,
       attemptId: params.taskAttemptId,
       capabilityCallId: null,
@@ -392,6 +429,7 @@ export function publishFinalEvidenceLink(params: {
     candidateAttemptId: params.candidateAttemptId,
     taskAttemptId: params.taskAttemptId,
     trustedScope: params.scope,
+    finalSnapshotFingerprint: params.snapshotFingerprint ?? null,
     cost: {
       schemaVersion: 1,
       tokens: {
@@ -421,16 +459,7 @@ export function publishFinalEvidenceLink(params: {
   if (!params.storeRoot || !executorEvidenceCollectionEnabled()) {
     return association;
   }
-  try {
-    const dir = associationsDir(params.storeRoot);
-    fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(
-      dir,
-      `${encodeURIComponent(`final-${params.taskId}-${params.finalOutcomeVersion}-${params.runId}`)}.json`,
-    );
-    fs.writeFileSync(file, `${JSON.stringify(association, null, 2)}\n`);
-  } catch {
-    // Final-link persistence must not change the business receipt.
-  }
+  const fileName = `${encodeURIComponent(`final-${params.taskId}-${params.finalOutcomeVersion}-${params.runId}-${params.call?.callId ?? "none"}`)}.json`;
+  writeBoundedEvidenceFile(params.storeRoot, fileName, association);
   return association;
 }

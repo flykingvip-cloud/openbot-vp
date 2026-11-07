@@ -333,7 +333,7 @@ describe("P1-3 final version is not the charge version", () => {
       agentId: "bot",
       taskId: "task-final",
       runId: "run-final",
-      candidateAttemptId: "run-final:fallback:0:local/fake",
+      candidateAttemptId: "run-final:correction",
       taskAttemptId: "attempt-real",
       chargeOutcomeVersion: 3,
       finalOutcomeVersion: finalReceipt.outcomeVersion,

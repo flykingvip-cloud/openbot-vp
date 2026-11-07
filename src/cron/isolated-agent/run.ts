@@ -887,6 +887,9 @@ export async function runCronIsolatedAgentTurn(params: {
   let cronOutcomeCloseoutDone = false;
   /** Real usage-derived USD when the pre-call gate did not already charge this fire. */
   let tipBudgetCostUsd: number | undefined;
+  let lastModelCallLink:
+    | import("../../task-outcome/runtime-from-runner.js").ModelCallCloseoutLink
+    | null = null;
   let cronBudgetCharged = false;
   let cronBudgetCallSeq = 0;
   let cronForcedFailureReason: "budget_exceeded" | undefined;
@@ -905,6 +908,9 @@ export async function runCronIsolatedAgentTurn(params: {
       model: params.model,
     });
     cronBudgetCharged = true;
+    if (charged.modelCallLink) {
+      lastModelCallLink = charged.modelCallLink;
+    }
     if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
       tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
     }
@@ -1006,6 +1012,7 @@ export async function runCronIsolatedAgentTurn(params: {
           latencyMs: Math.max(0, runEndedAt - runStartedAt),
           ...(cronBudgetCharged ? { skipBudgetCharge: true } : {}),
           ...(!cronBudgetCharged && tipBudgetCostUsd != null ? { costUsd: tipBudgetCostUsd } : {}),
+          ...(lastModelCallLink ? { modelCallLink: lastModelCallLink } : {}),
           ...(failureReason
             ? {
                 failureReason,
