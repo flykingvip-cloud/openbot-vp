@@ -31,3 +31,5 @@ export {
 export { resolveAttemptEndOfRunAttribution } from "./outcomes/attempt-attribution.js";
 
 export { runEmbeddedPiAgent } from "./runner/embedded-run.js";
+
+export { cleanupEmbeddedAttempt } from "./runner/attempt-cleanup.js";

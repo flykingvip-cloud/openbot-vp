@@ -810,3 +810,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved existing context-engine afterTurn/ingest fallback invocation from legacy attempt into capabilities/adapters/context-after-turn. Preserves hook precedence, new-message slicing and contained errors; does not change transcript authority or add task control. Original body removed. — codex-runtime-manager
 - Workspace/shadow/context/attempt regression 3 files / 75 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration and retirement remain open. — codex-runtime-manager
+
+## Attempt resource cleanup ownership (2026-11-07)
+
+- Moved fixed attempt teardown into execution/runner/attempt-cleanup. Original sequential cleanup could skip session, websocket and lock release if an earlier remover or flush threw. The fixed component attempts every owned release in the original order and propagates collected failures; no scheduling or configurable execution added. — codex-runtime-manager
+- Failure injection across all eight cleanup positions and original workspace/context/attempt regression: 4 files / 84 PASS; final focused rerun 11 PASS. Full tsgo PASS; typed lint clean; architecture 51 PASS. Earlier combined runtime regression 64 files / 326 PASS. Complete attempt migration and overall retirement remain open. — codex-runtime-manager
