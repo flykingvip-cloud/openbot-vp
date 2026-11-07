@@ -1113,3 +1113,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Task action checks, continuation claims, paused-task resume and state repository now consume the new repository and policy implementations directly. Remaining legacy imports are business mutations pending migration, not duplicate storage. — codex-runtime-manager
 - Lifecycle/resume/continuation regression 3 files / 23 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Repository downstream ingress/lifecycle/restart regression separately 3 files / 42 PASS. — codex-runtime-manager
+
+## Execution identity mutations move to state (2026-11-08)
+
+- Moved unchanged binding capture, attempt claim, startup validity check and version stamping into state/mutations/execution-binding. Shared board snapshot cloning now belongs to the unique repository. Legacy exports are references to the same implementation; no parallel state writer. — codex-runtime-manager
+- Binding/resume/lifecycle and cross-process regression 4 files / 21 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. — codex-runtime-manager

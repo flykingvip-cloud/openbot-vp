@@ -137,3 +137,15 @@ export function writeSessionTaskBoard(sessionFile: string, board: SessionTaskBoa
     writeSessionTaskBoardUnlocked(sessionFile, board);
   });
 }
+
+export function cloneBoardShell(board: SessionTaskBoard): SessionTaskBoard {
+  return {
+    current: board.current,
+    parked: [...board.parked],
+    focusRevision: board.focusRevision ?? 0,
+    ...(typeof board.writeEpoch === "number" ? { writeEpoch: board.writeEpoch } : {}),
+    ...(board.tombstones ? { tombstones: [...board.tombstones] } : {}),
+    ...(board.archived ? { archived: [...board.archived] } : {}),
+    ...(board.scope ? { scope: { ...board.scope } } : {}),
+  };
+}
