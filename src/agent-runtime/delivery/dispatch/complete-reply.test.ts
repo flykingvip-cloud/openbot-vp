@@ -36,6 +36,21 @@ function probe(
 }
 
 describe("terminal reply delivery", () => {
+  it("waits for delivery instead of rerunning already verified work", () => {
+    const ports = fixture();
+    ports.readContract.mockReturnValue({
+      id: "code-v1",
+      version: "1",
+      kind: "code",
+      requiredValidators: ["tests"],
+      acceptanceVerified: true,
+    });
+    expect(
+      completeReplyDelivery({ kind: "visible", payloads: [{ text: "verified result" }] }, ports),
+    ).toEqual({ text: "verified result" });
+    expect(ports.considerContinuation).not.toHaveBeenCalled();
+    expect(ports.commitOutcome).not.toHaveBeenCalled();
+  });
   it("keeps an empty private turn a failure even while emitting an honest fallback", () => {
     const ports = fixture();
     expect(completeReplyDelivery({ kind: "empty", probe: probe() }, ports)).toEqual({
@@ -202,7 +217,7 @@ describe("terminal reply delivery", () => {
       const result = completeReplyDelivery({ kind: "visible", payloads }, ports);
       expect(result).toEqual(payloads.length === 1 ? payloads[0] : payloads);
       expect(ports.commitOutcome).not.toHaveBeenCalled();
-      expect(ports.readContract).not.toHaveBeenCalled();
+      expect(ports.readContract).toHaveBeenCalledOnce();
       expect(ports.considerContinuation).toHaveBeenCalledWith(payloads);
       expect(ports.finalize).toHaveBeenCalledOnce();
     },

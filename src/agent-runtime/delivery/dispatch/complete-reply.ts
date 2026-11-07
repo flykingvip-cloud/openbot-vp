@@ -46,7 +46,8 @@ export function completeReplyDelivery<T>(
   let considerContinuation = false;
   if (result.kind === "visible") {
     payloads = result.payloads;
-    considerContinuation = true;
+    // Verified business work waits for its delivery receipt; do not repeat it.
+    considerContinuation = ports.readContract().acceptanceVerified !== true;
   } else if (result.kind === "language_filtered") {
     const text = result.didUseTools
       ? formatTurnProcessPlaceholder(ports.language, "lookup")

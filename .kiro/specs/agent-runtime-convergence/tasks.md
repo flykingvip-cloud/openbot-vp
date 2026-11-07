@@ -1048,3 +1048,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Isolated chat.send file task reached tools and produced result.txt; independent host byte comparison verified MAINLINE_ARTIFACT_OK exactly. agent.wait returned ok, visible result persisted, temporary state cleaned and probe exited normally with explicit temporary Skill watcher cleanup. — codex-runtime-manager
 - Gate remains FAIL: after the visible result, task-board continue recorded and dispatched another wake. Accepted natural-language acceptanceCriteria are stored but not consumed by a general criterion validator; prepareVisibleDelivery relies on legacy preflight receipt classification. Host probe verification is not a runtime acceptance receipt and must not be used to force-close the task. Full individual/group lifecycle and delivery closeout remain unaccepted; no legacy deletion or deployment. — codex-runtime-manager
+
+## Verified work waits for delivery (2026-11-07)
+
+- Reproduced verified visible work requesting business continuation before its delivery receipt (1 FAIL). Terminal delivery now skips business continuation when existing trusted acceptance is verified; it still presents the result and does not invent delivery or close the task. Unverified and process-placeholder paths retain existing behavior. This does not supply the missing general acceptance validator. — codex-runtime-manager
+- Delivery regression 3 files / 31 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. — codex-runtime-manager
