@@ -385,7 +385,10 @@ describe("unified completion send", () => {
       "transient_transport",
     );
     expect(classifyExecutionFailure({ message: "approval denied" }).retryable).toBe(false);
-    const run = readFileSync(new URL("../pi-embedded-runner/run.ts", import.meta.url), "utf8");
+    const run = readFileSync(
+      new URL("../../agent-runtime/execution/runner/embedded-run.ts", import.meta.url),
+      "utf8",
+    );
     expect(run).toContain("MAX_RUN_LOOP_ITERATIONS");
   });
 

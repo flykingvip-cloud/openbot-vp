@@ -368,7 +368,8 @@
       "src/agent-runtime/command/active-turn",
       "src/auto-reply/reply/composer-plugin-mention-execute",
       "src/auto-reply/reply/mid-task-aside",
-      "src/auto-reply/reply/agent-runner-execution"
+      "src/auto-reply/reply/agent-runner-execution",
+      "src/agents/pi-embedded-runner/run"
     ],
     "description": "Retired reply and execution adapters cannot be imported by runtime sources; callers use the current command/execution entry."
   },

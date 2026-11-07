@@ -16,7 +16,7 @@ function readRepo(relativePath: string): string {
 }
 
 const RECONSTRUCT_HOPS = [
-  "src/agents/pi-embedded-runner/run.ts",
+  "src/agent-runtime/execution/runner/embedded-run.ts",
   "src/agents/pi-embedded-runner/run/attempt.ts",
   "src/agents/pi-embedded-runner/compact.ts",
   "src/agent-runtime/execution/preparation/embedded-parameters.ts",

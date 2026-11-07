@@ -13,7 +13,7 @@ describe("CLI embedded run lifecycle attribution path", () => {
   it("routes openbot agent through runEmbeddedPiAgent into attempt attribution helper", () => {
     const agentSrc = readRepo("src/commands/agent.ts");
     const candidateSrc = readRepo("src/agent-runtime/execution/runner/command-candidate.ts");
-    const runSrc = readRepo("src/agents/pi-embedded-runner/run.ts");
+    const runSrc = readRepo("src/agent-runtime/execution/runner/embedded-run.ts");
     const attemptSrc = readRepo("src/agents/pi-embedded-runner/run/attempt.ts");
 
     expect(agentSrc).toContain("runCommandCandidate");

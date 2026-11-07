@@ -29,3 +29,5 @@ export {
 } from "./outcomes/usage-summary.js";
 
 export { resolveAttemptEndOfRunAttribution } from "./outcomes/attempt-attribution.js";
+
+export { runEmbeddedPiAgent } from "./runner/embedded-run.js";

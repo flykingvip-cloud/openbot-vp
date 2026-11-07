@@ -774,3 +774,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved resolved credential application from legacy run.ts into model/apply-provider-credential. Preserves AWS SDK identity, missing-key rejection, Copilot token exchange and refresh ordering. Original body removed; no credential store or retry loop added. — codex-runtime-manager
 - Credential/refresh regression 2 files / 6 PASS; auth rotation integration 25 PASS. Full tsgo PASS; typed lint clean; architecture 51 PASS. Prior checkpoint full build PASS with dynamic-import and UI chunk warnings; complete retirement remains open. — codex-runtime-manager
+
+## Unique embedded run implementation migration (2026-11-07)
+
+- Moved the sole embedded run implementation to execution/runner/embedded-run; deleted old agents/pi-embedded-runner/run.ts and migrated every source consumer and source-inspection test. Existing agents facade delegates to execution/index. No parallel implementation or implicit fallback remains at the removed path. Archive tag archive/runtime-embedded-run-754681919 preserves the original. — codex-runtime-manager
+- Preserves original lane ordering, attempt loop, profile rotation, overflow recovery, cancellation, accounting evidence and cleanup. Shared model/policy/delivery components retain their existing ownership. Added old-path import prohibition to retirement gate. — codex-runtime-manager
+- Regression 10 files / 70 PASS; configured embedded/auth/fallback integration 3 files / 34 PASS; full tsgo PASS; architecture 51 PASS; full build PASS with existing dynamic-import and UI chunk warnings. Corrected stale command source assertion to follow command candidate delegation. Remaining attempt implementation and cron/followup orchestration still require migration and real personal/group asynchronous acceptance; this is not overall retirement. — codex-runtime-manager

@@ -316,7 +316,12 @@ describe("execution preflight integration", () => {
       "utf8",
     );
     expect(cron).toContain("runEmbeddedPiAgent");
-    expect(agent).toContain("runEmbeddedPiAgent");
+    expect(agent).toContain("runCommandCandidate");
+    const candidate = readFileSync(
+      new URL("../../agent-runtime/execution/runner/command-candidate.ts", import.meta.url),
+      "utf8",
+    );
+    expect(candidate).toContain("runEmbeddedPiAgent");
     expect(gatewayAgent).toContain("agentCommandFromIngress");
     expect(ledger).not.toContain("runEmbeddedPiAgent");
     expect(attempt).toContain("filterLaneTools");
@@ -339,7 +344,7 @@ describe("execution preflight integration", () => {
     expect(attempt.split("buildExecutionPreflight(").length - 1).toBe(1);
     expect(attempt).toContain("passedToSession: customToolAllowlist");
     const embeddedRun = readFileSync(
-      new URL("../pi-embedded-runner/run.ts", import.meta.url),
+      new URL("../../agent-runtime/execution/runner/embedded-run.ts", import.meta.url),
       "utf8",
     );
     expect(embeddedRun).toContain("assistantTexts: attempt.assistantTexts");

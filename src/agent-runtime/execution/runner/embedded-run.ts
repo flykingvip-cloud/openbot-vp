@@ -1,41 +1,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
-import { resolveModelHookResult } from "../../agent-runtime/capabilities/index.js";
-import { buildEmbeddedRunPayloads } from "../../agent-runtime/delivery/index.js";
-import {
-  createUsageAccumulator,
-  mergeUsageIntoAccumulator,
-  toNormalizedUsage,
-  buildErrorAgentMeta,
-  cleanupEmbeddedRun,
-} from "../../agent-runtime/execution/index.js";
-import { recoverContextOverflow } from "../../agent-runtime/execution/index.js";
-import { applyProviderCredential } from "../../agent-runtime/model/index.js";
-import { prepareEmbeddedModel } from "../../agent-runtime/model/index.js";
-import { createCopilotTokenRefresh } from "../../agent-runtime/model/index.js";
-import {
-  createAuthProfileRotation,
-  resolveRunAuthProfileCandidates,
-} from "../../agent-runtime/model/index.js";
-import {
-  OVERLOAD_FAILOVER_BACKOFF_POLICY,
-  MAX_OVERFLOW_COMPACTION_ATTEMPTS,
-  resolveMaxRunRetryIterations,
-} from "../../agent-runtime/policy/index.js";
-import { embeddedPayloadFormatting } from "../../agent-runtime/wiring/embedded-payloads.js";
-import type { ThinkLevel } from "../../auto-reply/thinking.js";
-import {
-  ensureContextEnginesInitialized,
-  resolveContextEngine,
-} from "../../context-engine/index.js";
-import { inheritExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
-import { computeBackoff, sleepWithAbort } from "../../infra/backoff.js";
-import { generateSecureToken } from "../../infra/secure-random.js";
-import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
-import { enqueueCommandInLane } from "../../process/command-queue.js";
-import { isMarkdownCapableMessageChannel } from "../../utils/message-channel.js";
-import { resolveOpenClawAgentDir } from "../agent-paths.js";
-import { hasConfiguredModelFallbacks } from "../agent-scope.js";
+import { resolveOpenClawAgentDir } from "../../../agents/agent-paths.js";
+import { hasConfiguredModelFallbacks } from "../../../agents/agent-scope.js";
 import {
   isProfileInCooldown,
   type AuthProfileFailureReason,
@@ -43,20 +9,20 @@ import {
   markAuthProfileGood,
   markAuthProfileUsed,
   resolveProfilesUnavailableReason,
-} from "../auth-profiles.js";
-import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../defaults.js";
+} from "../../../agents/auth-profiles.js";
+import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../../agents/defaults.js";
 import {
   disarmCompletionHold,
   finalizeDeliveryContext,
-} from "../execution-preflight/completion-hold.js";
-import type { ConstitutionalRuntimeShadowDeps } from "../execution-preflight/constitutional-runtime-shadow-deps.js";
-import { parseConstitutionalRuntimeShadowFlag } from "../execution-preflight/constitutional-runtime-shadow-gate.js";
-import { NOOP_CONSTITUTIONAL_RUNTIME_SHADOW_SINK } from "../execution-preflight/constitutional-runtime-shadow-sink.js";
-import type { HookDeliveryResult } from "../execution-preflight/hook-delivery.js";
-import { latestUserText } from "../execution-stall-continue.js";
-import { FailoverError, resolveFailoverStatus } from "../failover-error.js";
-import { ensureAuthProfileStore, getApiKeyForModel } from "../model-auth.js";
-import { ensureOpenClawModelsJson } from "../models-config.js";
+} from "../../../agents/execution-preflight/completion-hold.js";
+import type { ConstitutionalRuntimeShadowDeps } from "../../../agents/execution-preflight/constitutional-runtime-shadow-deps.js";
+import { parseConstitutionalRuntimeShadowFlag } from "../../../agents/execution-preflight/constitutional-runtime-shadow-gate.js";
+import { NOOP_CONSTITUTIONAL_RUNTIME_SHADOW_SINK } from "../../../agents/execution-preflight/constitutional-runtime-shadow-sink.js";
+import type { HookDeliveryResult } from "../../../agents/execution-preflight/hook-delivery.js";
+import { latestUserText } from "../../../agents/execution-stall-continue.js";
+import { FailoverError, resolveFailoverStatus } from "../../../agents/failover-error.js";
+import { ensureAuthProfileStore, getApiKeyForModel } from "../../../agents/model-auth.js";
+import { ensureOpenClawModelsJson } from "../../../agents/models-config.js";
 import {
   formatBillingErrorMessage,
   classifyFailoverReason,
@@ -73,21 +39,55 @@ import {
   isTimeoutErrorMessage,
   pickFallbackThinkingLevel,
   type FailoverReason,
-} from "../pi-embedded-helpers.js";
-import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
-import { derivePromptTokens, normalizeUsage, type UsageLike } from "../usage.js";
-import { redactRunIdentifier, resolveRunWorkspaceDir } from "../workspace-run.js";
-import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
-import { log } from "./logger.js";
-import { runEmbeddedAttempt } from "./run/attempt.js";
-import { createFailoverDecisionLogger } from "./run/failover-observation.js";
-import type { RunEmbeddedPiAgentParams } from "./run/params.js";
+} from "../../../agents/pi-embedded-helpers.js";
+import { resolveGlobalLane, resolveSessionLane } from "../../../agents/pi-embedded-runner/lanes.js";
+import { log } from "../../../agents/pi-embedded-runner/logger.js";
+import { runEmbeddedAttempt } from "../../../agents/pi-embedded-runner/run/attempt.js";
+import { createFailoverDecisionLogger } from "../../../agents/pi-embedded-runner/run/failover-observation.js";
+import type { RunEmbeddedPiAgentParams } from "../../../agents/pi-embedded-runner/run/params.js";
 import {
   sessionLikelyHasOversizedToolResults,
   truncateOversizedToolResultsInSession,
-} from "./tool-result-truncation.js";
-import type { EmbeddedPiAgentMeta, EmbeddedPiRunResult } from "./types.js";
-import { describeUnknownError } from "./utils.js";
+} from "../../../agents/pi-embedded-runner/tool-result-truncation.js";
+import type {
+  EmbeddedPiAgentMeta,
+  EmbeddedPiRunResult,
+} from "../../../agents/pi-embedded-runner/types.js";
+import { describeUnknownError } from "../../../agents/pi-embedded-runner/utils.js";
+import { ensureRuntimePluginsLoaded } from "../../../agents/runtime-plugins.js";
+import { derivePromptTokens, normalizeUsage, type UsageLike } from "../../../agents/usage.js";
+import { redactRunIdentifier, resolveRunWorkspaceDir } from "../../../agents/workspace-run.js";
+import type { ThinkLevel } from "../../../auto-reply/thinking.js";
+import {
+  ensureContextEnginesInitialized,
+  resolveContextEngine,
+} from "../../../context-engine/index.js";
+import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
+import { computeBackoff, sleepWithAbort } from "../../../infra/backoff.js";
+import { generateSecureToken } from "../../../infra/secure-random.js";
+import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
+import { enqueueCommandInLane } from "../../../process/command-queue.js";
+import { isMarkdownCapableMessageChannel } from "../../../utils/message-channel.js";
+import { resolveModelHookResult } from "../../capabilities/index.js";
+import { buildEmbeddedRunPayloads } from "../../delivery/index.js";
+import { applyProviderCredential } from "../../model/index.js";
+import { prepareEmbeddedModel } from "../../model/index.js";
+import { createCopilotTokenRefresh } from "../../model/index.js";
+import { createAuthProfileRotation, resolveRunAuthProfileCandidates } from "../../model/index.js";
+import {
+  OVERLOAD_FAILOVER_BACKOFF_POLICY,
+  MAX_OVERFLOW_COMPACTION_ATTEMPTS,
+  resolveMaxRunRetryIterations,
+} from "../../policy/index.js";
+import { embeddedPayloadFormatting } from "../../wiring/embedded-payloads.js";
+import {
+  createUsageAccumulator,
+  mergeUsageIntoAccumulator,
+  toNormalizedUsage,
+  buildErrorAgentMeta,
+} from "../outcomes/usage-summary.js";
+import { recoverContextOverflow } from "../recovery/context-overflow.js";
+import { cleanupEmbeddedRun } from "./embedded-cleanup.js";
 
 // Avoid Anthropic's refusal test token poisoning session transcripts.
 const ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL = "ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL";

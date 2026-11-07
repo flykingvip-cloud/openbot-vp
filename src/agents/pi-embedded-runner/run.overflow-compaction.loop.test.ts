@@ -8,8 +8,8 @@ vi.mock("../../utils.js", async (importOriginal) => ({
   resolveUserPath: vi.fn((p: string) => p),
 }));
 
+import { runEmbeddedPiAgent } from "../../agent-runtime/execution/runner/embedded-run.js";
 import { log } from "./logger.js";
-import { runEmbeddedPiAgent } from "./run.js";
 import {
   makeAttemptResult,
   makeCompactionSuccess,
