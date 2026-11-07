@@ -1172,3 +1172,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved unchanged admission identity/version/idempotency transaction into state/mutations/admit-task. The new state repository consumes it directly; legacy board exports reference the same implementation. Admission has no reverse dependency on legacy board business logic. — codex-runtime-manager
 - Admission/lifecycle regression 2 files / 3 PASS; full tsgo PASS; typed lint clean; architecture 53 PASS. General acceptance evidence and full replacement remain open. — codex-runtime-manager
+
+## Explicit amendment classification (2026-11-08)
+
+- Added a closed amendment scope enum to interaction decisions: supplement, revise, replace_all. Bound semantic changes now use that field; legacy keyword replacement rules remain only for legacy callers. Missing scope preserves existing constraints. Host target/epoch checks remain mandatory. — codex-runtime-manager
+- Parser cases reproduced three failures before support; parser/admission/lifecycle/legacy constraint regression 4 files / 31 PASS. Full tsgo PASS; typed lint clean; architecture 53 PASS. This does not complete general acceptance validation. — codex-runtime-manager

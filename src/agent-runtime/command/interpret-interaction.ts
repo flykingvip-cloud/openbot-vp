@@ -34,9 +34,19 @@ function parseDecision(value: unknown): InteractionModelDecision {
       row.kind === "task_change" &&
       typeof row.text === "string" &&
       row.text.trim() &&
-      Object.keys(row).every((key) => ["kind", "target", "text", "answer"].includes(key))
+      (row.mode === undefined ||
+        row.mode === "supplement" ||
+        row.mode === "revise" ||
+        row.mode === "replace_all") &&
+      Object.keys(row).every((key) => ["kind", "target", "text", "mode", "answer"].includes(key))
     ) {
-      return { kind: "task_change", target: checkedTarget, text: row.text, ...answer };
+      return {
+        kind: "task_change",
+        target: checkedTarget,
+        text: row.text,
+        ...(row.mode ? { mode: row.mode } : {}),
+        ...answer,
+      };
     }
     if (
       row.kind === "task_control" &&

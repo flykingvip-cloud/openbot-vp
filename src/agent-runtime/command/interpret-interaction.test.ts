@@ -1,6 +1,20 @@
 import { expect, it, vi } from "vitest";
 import { interpretInteraction } from "./interpret-interaction.js";
 
+it.each(["supplement", "revise", "replace_all"])(
+  "preserves the explicit amendment scope %s",
+  async (mode) => {
+    const target = { taskId: "a", revision: "2" };
+    const decision = { kind: "task_change", target, text: "要求更新", mode };
+    expect(
+      await interpretInteraction(
+        { message: "要求更新", context: [], taskTarget: target },
+        { infer: async () => decision },
+      ),
+    ).toEqual(decision);
+  },
+);
+
 it.each(["task_change", "task_control"] as const)(
   "preserves a mixed question and bound %s in one inference",
   async (kind) => {

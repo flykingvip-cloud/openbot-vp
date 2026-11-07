@@ -7,7 +7,13 @@ export type InteractionTaskTarget = { taskId: string; revision: string };
 export type InteractionModelDecision =
   | { kind: "reply"; text: string }
   | { kind: "clarify"; text: string }
-  | { kind: "task_change"; target: InteractionTaskTarget; text: string; answer?: string }
+  | {
+      kind: "task_change";
+      target: InteractionTaskTarget;
+      text: string;
+      mode?: "supplement" | "revise" | "replace_all";
+      answer?: string;
+    }
   | {
       kind: "task_control";
       target: InteractionTaskTarget;

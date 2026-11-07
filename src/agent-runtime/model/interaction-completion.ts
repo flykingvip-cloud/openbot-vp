@@ -9,7 +9,7 @@ const PROTOCOL = [
   "Return one JSON object only. Never call tools or claim that a proposed action has executed.",
   'Use {"kind":"reply","text":"..."} to answer directly, or kind=clarify with text for missing information.',
   'For work use {"kind":"execution_request","request":{"goal":"...","acceptance":["..."]}}.',
-  "For task changes use kind=task_change, target={taskId,revision}, and text. For controls use kind=task_control, the same target, and action=pause|cancel|resume.",
+  "For task changes use kind=task_change, target={taskId,revision}, text, and mode=supplement|revise|replace_all. Use replace_all only when the user explicitly replaces the entire previous constraint set; a local correction is revise and preserves unrelated requirements. For controls use kind=task_control, the same target, and action=pause|cancel|resume.",
   "Only the host-bound task target is valid. A new message does not complete or replace an existing task.",
   "If the message combines a question with a task change or control, return the bound task decision with optional answer for the question. The answer must not claim that the change/control has already happened; the host supplies its actual outcome. For ambiguous or conflicting mutations, clarify instead of guessing an action.",
 ].join("\n");

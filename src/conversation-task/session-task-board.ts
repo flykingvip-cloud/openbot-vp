@@ -162,6 +162,7 @@ export function appendSameTaskConstraint(params: {
   nowMs?: number;
   /** Only a host-authorized, target-bound semantic amendment may bypass legacy keyword gating. */
   admittedAmendment?: boolean;
+  amendmentMode?: "supplement" | "revise" | "replace_all";
 }): SessionTaskBoard {
   const board = cloneBoardShell(params.board);
   const current = board.current;
@@ -180,8 +181,14 @@ export function appendSameTaskConstraint(params: {
   if (priorList.some((row) => row.text === cleaned && !row.superseded)) {
     return board;
   }
-  const fullReplace = isOwnerConstraintFullReplace(cleaned);
-  const revise = fullReplace || isOwnerConstraintRevision(cleaned);
+  const fullReplace = params.admittedAmendment
+    ? params.amendmentMode === "replace_all"
+    : isOwnerConstraintFullReplace(cleaned);
+  const revise =
+    fullReplace ||
+    (params.admittedAmendment
+      ? params.amendmentMode === "revise"
+      : isOwnerConstraintRevision(cleaned));
   // Only wholesale replace marks prior active rows superseded. Local revise keeps them.
   const nextList: ConstraintEntry[] = fullReplace
     ? priorList.map((row) => (row.superseded ? row : { ...row, superseded: true }))
@@ -644,6 +651,7 @@ export function commitInteractionTaskProposal(params: {
         board,
         constraintText: params.decision.text,
         admittedAmendment: true,
+        amendmentMode: params.decision.mode,
       });
       writeSessionTaskBoardUnlocked(params.sessionFile, next);
       return {

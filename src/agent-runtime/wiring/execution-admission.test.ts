@@ -116,3 +116,45 @@ it("admits once, persists acceptance, and rejects stale or conflicting requests 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it("uses explicit amendment scope instead of legacy wording to supersede constraints", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "amendment-scope-"));
+  try {
+    const file = path.join(dir, "session.jsonl");
+    await admitSessionExecution(
+      file,
+      {
+        requestId: "scope-a",
+        expectedFocusRevision: 0,
+        expectedWriteEpoch: 0,
+        proposal: { goal: "Report", acceptance: ["Sources"] },
+      },
+      async () => true,
+    );
+    const apply = (text: string, mode: "supplement" | "revise" | "replace_all") => {
+      const board = readSessionTaskBoard(file);
+      return commitInteractionTaskProposal({
+        sessionFile: file,
+        expectedFocusRevision: board.focusRevision,
+        expectedWriteEpoch: board.writeEpoch ?? 0,
+        decision: {
+          kind: "task_change",
+          target: { taskId: board.current!.taskId, revision: String(board.writeEpoch ?? 0) },
+          text,
+          mode,
+        },
+      });
+    };
+    expect(apply("Keep source links", "supplement").kind).toBe("applied");
+    expect(apply("以本条为准：仅调整标题", "revise").kind).toBe("applied");
+    expect(activeConstraintTexts(readSessionTaskBoard(file).current)).toContain(
+      "Keep source links",
+    );
+    expect(apply("New complete requirements", "replace_all").kind).toBe("applied");
+    expect(activeConstraintTexts(readSessionTaskBoard(file).current)).toEqual([
+      "New complete requirements",
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
