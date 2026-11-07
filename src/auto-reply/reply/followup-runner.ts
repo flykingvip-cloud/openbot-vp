@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
+import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
 import { prepareVisibleDelivery } from "../../agent-runtime/delivery/index.js";
 import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
 import { sessionTaskState } from "../../agent-runtime/state/index.js";
@@ -35,10 +36,6 @@ import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { resolveTurnContractFromRunMeta } from "../../task-outcome/chat-entry.js";
-import {
-  resolveRequiredDeliveryConfirmStatus,
-  type RequiredDeliveryAttempt,
-} from "../../task-outcome/delivery-confirm.js";
 import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
 import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import {
@@ -52,7 +49,6 @@ import {
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
 import type { OriginatingChannelType } from "../templating.js";
-import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import { buildCommercialRunCreditUsageInput } from "./agent-run-credit-usage.js";
 import { resolveRunAuthProfile } from "./agent-runner-utils.js";
@@ -111,70 +107,27 @@ export function createFollowupRunner(params: {
    * where the message originated.
    */
   const sendFollowupPayloads = async (payloads: ReplyPayload[], queued: FollowupRun) => {
-    const attempts: RequiredDeliveryAttempt[] = [];
-    // Check if we should route to originating channel.
-    const { originatingChannel, originatingTo } = queued;
-    const shouldRouteToOriginating = isRoutableChannel(originatingChannel) && originatingTo;
-
-    if (!shouldRouteToOriginating && !opts?.onBlockReply) {
-      logVerbose("followup queue: no onBlockReply handler; dropping payloads");
-      return "none" as const;
-    }
-
-    for (const payload of payloads) {
-      if (!payload?.text && !payload?.mediaUrl && !payload?.mediaUrls?.length) {
-        continue;
-      }
-      if (
-        isSilentReplyText(payload.text, SILENT_REPLY_TOKEN) &&
-        !payload.mediaUrl &&
-        !payload.mediaUrls?.length
-      ) {
-        continue;
-      }
-      await typingSignals.signalTextDelta(payload.text);
-
-      // Route to originating channel if set, otherwise fall back to dispatcher.
-      if (shouldRouteToOriginating) {
-        const result = await routeReply({
-          payload,
-          channel: originatingChannel,
-          to: originatingTo,
+    return deliverQueuedReply(
+      {
+        payloads,
+        originatingChannel: queued.originatingChannel,
+        originatingTo: queued.originatingTo,
+        originatingAccountId: queued.originatingAccountId,
+        originatingThreadId: queued.originatingThreadId,
+        run: {
           sessionKey: queued.run.sessionKey,
-          accountId: queued.originatingAccountId,
-          threadId: queued.originatingThreadId,
           cfg: queued.run.config,
-        });
-        if (!result.ok) {
-          const errorMsg = result.error ?? "unknown error";
-          logVerbose(`followup queue: route-reply failed: ${errorMsg}`);
-          // Fall back to the caller-provided dispatcher only when the
-          // originating channel matches the session's message provider.
-          // In that case onBlockReply was created by the same channel's
-          // handler and delivers to the correct destination.  For true
-          // cross-channel routing (origin !== provider), falling back
-          // would send to the wrong channel, so we drop the payload.
-          const provider = resolveOriginMessageProvider({
-            provider: queued.run.messageProvider,
-          });
-          const origin = resolveOriginMessageProvider({
-            originatingChannel,
-          });
-          if (opts?.onBlockReply && origin && origin === provider) {
-            await opts.onBlockReply(payload);
-            attempts.push({ source: "enqueue_only", ok: true });
-          } else {
-            attempts.push({ source: "deliver", ok: false, error: errorMsg });
-          }
-        } else {
-          attempts.push({ source: "deliver", ok: true });
-        }
-      } else if (opts?.onBlockReply) {
-        await opts.onBlockReply(payload);
-        attempts.push({ source: "enqueue_only", ok: true });
-      }
-    }
-    return resolveRequiredDeliveryConfirmStatus(attempts);
+          messageProvider: queued.run.messageProvider,
+        },
+      },
+      {
+        routeReply,
+        isRoutableChannel,
+        onBlockReply: opts?.onBlockReply,
+        signalTextDelta: (text) => typingSignals.signalTextDelta(text),
+        log: logVerbose,
+      },
+    );
   };
 
   return async (queued: FollowupRun) => {

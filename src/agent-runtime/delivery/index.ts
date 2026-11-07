@@ -28,3 +28,5 @@ export {
   buildEmbeddedRunPayloads,
   type EmbeddedPayloadFormatting,
 } from "./presentation/embedded-payloads.js";
+
+export { deliverQueuedReply } from "./dispatch/queued-reply.js";
