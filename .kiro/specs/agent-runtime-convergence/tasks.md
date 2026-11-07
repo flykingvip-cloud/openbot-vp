@@ -750,3 +750,7 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Existing prompt hook invocation, cached legacy-result reuse and deterministic merge moved from the legacy attempt into capabilities/adapters/prompt-build-hooks. Original implementation removed; no additional hook invocation or execution authority added. — codex-runtime-manager
 - Attempt and ordering regression 2 files / 85 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Complete core-loop replacement and retirement remain open. — codex-runtime-manager
+
+## Followup model cleanup integration (2026-11-07)
+
+- Queued followup now awaits the shared model lease disposal. Repaired stale embedded test mocks with the existing queue/abort exports required by command wiring. Followup/BYOK/OGUI regression 3 files / 35 PASS; full tsgo PASS; changed-file typed lint clean. Earlier joint runtime/command/attempt regression 61 files / 346 PASS. Full core-loop replacement and retirement remain open. — codex-runtime-manager

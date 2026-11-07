@@ -17,6 +17,8 @@ vi.mock(
 );
 
 vi.mock("../../agents/pi-embedded.js", () => ({
+  queueEmbeddedPiMessage: vi.fn(),
+  abortEmbeddedPiRun: vi.fn(),
   runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
 }));
 
