@@ -19,12 +19,11 @@ import {
   wrapStreamFnDecodeXaiToolCallArguments,
 } from "../../../agent-runtime/model/index.js";
 import { wrapStreamFnTrimToolCallNames } from "../../../agent-runtime/model/index.js";
+import { sessionTaskState } from "../../../agent-runtime/state/index.js";
 import { captureTaskActionBoundary } from "../../../agent-runtime/state/task-action.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { OpenBotConfig } from "../../../config/config.js";
-import { isTaskExecutionBindingCurrent } from "../../../conversation-task/session-task-board.js";
-import { readSessionTaskBoard } from "../../../conversation-task/session-task-board.js";
 import { emitChatInboundStage } from "../../../gateway/chat-inbound-stage-events.js";
 import {
   compilerTelemetryToFaultRoundSnapshot,
@@ -1757,7 +1756,7 @@ export async function runEmbeddedAttempt(
         // task board; later stops can now reach this existing active-run abort handle.
         if (
           params.taskExecutionBinding &&
-          !isTaskExecutionBindingCurrent(params.sessionFile, params.taskExecutionBinding)
+          !sessionTaskState.bindingCurrent(params.sessionFile, params.taskExecutionBinding)
         ) {
           abortRun(false, new Error("Original task stopped before active-run registration"));
         }
@@ -1979,7 +1978,7 @@ export async function runEmbeddedAttempt(
           ).trim();
           let stallQuotaCycleId = "";
           try {
-            const boardTaskId = readSessionTaskBoard(params.sessionFile).current?.taskId?.trim();
+            const boardTaskId = sessionTaskState.read(params.sessionFile).current?.taskId?.trim();
             if (boardTaskId) {
               stallQuotaCycleId = boardTaskId;
             }

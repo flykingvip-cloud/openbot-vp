@@ -785,3 +785,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved protocol body non-execution and stream wrapping from legacy attempt into capabilities/adapters/protocol-body-boundary. Original body removed; native calls remain distinct from text markup. Preserved violation identity, persistence, mixed-message stripping and terminal behavior. No synthesized tools or extra model turn. — codex-runtime-manager
 - Attempt/overflow/usage regression 3 files / 74 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Attempt session/tool orchestration remains active and overall retirement remains open. — codex-runtime-manager
+
+## Attempt authoritative state access (2026-11-07)
+
+- Attempt registration recheck and stall quota identity now consume state/index instead of direct task-board imports. Original lock/storage and binding semantics remain unchanged; no additional state writer. — codex-runtime-manager
+- Attempt/context runner regression 2 files / 61 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration and retirement remain open. — codex-runtime-manager
