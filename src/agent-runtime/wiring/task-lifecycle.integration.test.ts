@@ -1,0 +1,90 @@
+/** Real state integration, not real-model or group-plan acceptance. */
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { expect, it } from "vitest";
+import { sessionTaskState, checkTaskActionBoundary } from "../state/index.js";
+import { admitSessionExecution } from "./execution-admission.js";
+
+it("keeps one task across revision, pause and resume while rejecting obsolete results", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-lifecycle-"));
+  const file = path.join(root, "session.jsonl");
+  fs.writeFileSync(file, "");
+  try {
+    const admitted = await admitSessionExecution(
+      file,
+      {
+        requestId: "request-a",
+        expectedFocusRevision: 0,
+        expectedWriteEpoch: 0,
+        proposal: { goal: "Create report", acceptance: ["Verified sources"] },
+      },
+      async () => true,
+    );
+    if (admitted.kind !== "accepted") {
+      throw new Error("Admission failed");
+    }
+    const first = sessionTaskState.startExecution(file, admitted.binding, "attempt-a");
+    if (!first) {
+      throw new Error("Claim failed");
+    }
+    const boundary = { sessionFile: file, binding: first, constraints: first.constraints ?? [] };
+    expect(checkTaskActionBoundary(boundary)).toBeUndefined();
+    const propose = (kind: "task_change" | "task_control") => {
+      const board = sessionTaskState.read(file);
+      const target = { taskId: first.taskId, revision: String(board.writeEpoch ?? 0) };
+      return sessionTaskState.applyInteractionProposal({
+        sessionFile: file,
+        expectedFocusRevision: board.focusRevision,
+        expectedWriteEpoch: board.writeEpoch ?? 0,
+        decision:
+          kind === "task_change"
+            ? { kind, target, text: "Include source links" }
+            : { kind, target, action: "pause" },
+      });
+    };
+    expect(propose("task_change").kind).toBe("applied");
+    expect(checkTaskActionBoundary(boundary)).toBeDefined();
+    expect(propose("task_control").kind).toBe("applied");
+    expect(
+      sessionTaskState.completeChecked({
+        sessionFile: file,
+        binding: first,
+        closed: true,
+        appendNotice: false,
+      }).persisted,
+    ).toBe(false);
+    const paused = sessionTaskState.read(file);
+    const resumed = sessionTaskState.resumeCurrent(
+      file,
+      {
+        taskId: first.taskId,
+        expectedFocusRevision: paused.focusRevision,
+        expectedWriteEpoch: paused.writeEpoch ?? 0,
+      },
+      { authOk: true, stopActive: false },
+    );
+    if (resumed.kind !== "accepted") {
+      throw new Error("Resume failed");
+    }
+    expect(resumed.acceptance).toEqual(["Verified sources"]);
+    const next = sessionTaskState.startExecution(file, resumed.binding, "attempt-b");
+    if (!next) {
+      throw new Error("Resumed claim failed");
+    }
+    expect(next.taskId).toBe(first.taskId);
+    expect(next.constraints).toContain("Include source links");
+    expect(checkTaskActionBoundary(boundary)).toBeDefined();
+    expect(
+      sessionTaskState.completeChecked({
+        sessionFile: file,
+        binding: first,
+        closed: true,
+        appendNotice: false,
+      }).persisted,
+    ).toBe(false);
+    expect(sessionTaskState.read(file).current?.unfinished).toBe(true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

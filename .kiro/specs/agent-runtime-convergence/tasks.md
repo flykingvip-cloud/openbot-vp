@@ -1028,3 +1028,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Added data-only rule classification contract and a detached public inventory of six verified implementations. Separates invariants, lifecycle, classification, operational policy and compatibility retirement candidates. Metadata does not load modules, change enforcement or expose disabling controls. This is a partial inventory, not a platform integration or complete rule audit. — codex-runtime-manager
 - Catalog isolation regression PASS; full tsgo PASS; typed lint and formatting clean; architecture 52 PASS. Platform projection, decision-version evidence and full inventory remain pending after mainline onboarding. — codex-runtime-manager
+
+## Same-candidate lifecycle evidence (2026-11-07)
+
+- Candidate c68d88b46 isolated Gateway real-model prompt/read/exec probe PASS using api-proxy-deepseek/deepseek-v4-flash; one unrelated fallback test skipped. Initial sandbox loopback EPERM resolved by approved isolated execution. Channels and cron disabled; temporary state removed. This exercises agent RPC, not complete chat.send interaction or group lifecycle. — codex-runtime-manager
+- Async child/semantic admission/resume/collaboration abort/durable delivery restart/receipt identity suites: 6 files / 20 PASS. Collaboration runner uses a test double. Added actual state integration across admission, execution binding, revision, pause, resume and stale completion refusal: 1 PASS. Full tsgo PASS; typed lint clean; architecture 52 PASS. These separate proofs do not constitute a full end-to-end personal/group/channel acceptance; retirement remains blocked on that evidence. — codex-runtime-manager
