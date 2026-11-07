@@ -13,7 +13,7 @@ import {
 import { resumePausedCurrentTask } from "../mutations/resume-current.js";
 import { mutateSessionTaskBoard, readSessionTaskBoard } from "./task-board-file.js";
 
-/** The existing board owns persistence, locking and identity validation. */
+/** Runtime owns storage and binding; remaining legacy business mutations share that same repository. */
 export const sessionTaskState = {
   resumeCurrent: resumePausedCurrentTask,
   read: readSessionTaskBoard,

@@ -1123,3 +1123,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - State repository and queued execution now consume the owned execution-binding mutation directly; queued constraint selection uses public policy. Removed their legacy board facade dependencies without changing claim semantics. — codex-runtime-manager
 - Binding/lifecycle/continuation regression 3 files / 22 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. — codex-runtime-manager
+
+## State retirement dependency gate (2026-11-08)
+
+- Added a static dependency rule preventing migrated state components from importing the legacy task-board facade. Explicit exceptions retain the remaining business-transition adapter and compatibility test. Repository ownership comment now reflects actual runtime storage authority. — codex-runtime-manager
+- Architecture manifest 53 PASS; no runtime behavior changed in this checkpoint. General acceptance evidence and full replacement remain open. — codex-runtime-manager
