@@ -56,9 +56,9 @@ describe("feishu employee authorization row", () => {
     },
   );
 
-  it("shows enterprise closed and reauth on an already-bound row", () => {
+  it("displays the list projection for a bound row", () => {
     const bound = {
-      identityId: "feishu-employee:001:emp-a:ou_a",
+      identityId: "feishu-employee.001.emp-a.ou_a",
       provider: "feishu-personal",
       providerLabel: "飞书",
       displayName: "飞书 ou_a",
@@ -78,29 +78,31 @@ describe("feishu employee authorization row", () => {
         statusLabel: "已授权",
       },
     };
-    const closed = settings("企业尚未开通", false);
-    closed.userOperationalIdentitySnapshot = {
-      ...closed.userOperationalIdentitySnapshot!,
-      identities: [bound],
+    const show = (statusLabel: string, loginEnabled: boolean) => {
+      const view = settings(loginEnabled ? "可绑定" : statusLabel, loginEnabled);
+      view.userOperationalIdentitySnapshot = {
+        ...view.userOperationalIdentitySnapshot!,
+        identities: [
+          {
+            ...bound,
+            status: statusLabel === "需重新认证" ? "reauth_required" : "active",
+            enterpriseIm: { ...bound.enterpriseIm, statusLabel },
+          },
+        ],
+      };
+      const container = document.createElement("div");
+      render(renderProviderIdentityEditorForm(view), container);
+      expect(container.querySelector("[data-feishu-employee-status]")?.textContent).toContain(
+        statusLabel,
+      );
+      expect(container.querySelector("input[type='password']")).toBeNull();
+      return container;
     };
-    const closedView = document.createElement("div");
-    render(renderProviderIdentityEditorForm(closed), closedView);
-    expect(closedView.querySelector("[data-feishu-employee-status]")?.textContent).toContain(
-      "企业尚未开通",
-    );
-    expect(closedView.textContent).not.toContain("已授权");
-
-    const failed = settings("可绑定", true);
-    failed.userOperationalIdentitySnapshot = {
-      ...failed.userOperationalIdentitySnapshot!,
-      identities: [{ ...bound, status: "reauth_required" }],
-    };
-    const failedView = document.createElement("div");
-    render(renderProviderIdentityEditorForm(failed), failedView);
-    expect(failedView.querySelector("[data-feishu-employee-status]")?.textContent).toContain(
-      "需重新认证",
-    );
-    expect(failedView.textContent).not.toContain("已授权");
+    expect(show("企业尚未开通", false).textContent).not.toContain("已授权");
+    expect(show("等待管理员开通权限", false).textContent).not.toContain("已授权");
+    const reauth = show("需重新认证", true);
+    expect(reauth.textContent).toContain("重新认证");
+    expect(reauth.textContent).not.toContain("已授权");
   });
 
   it("offers bind without app credentials when the enterprise app can attempt the checklist", () => {

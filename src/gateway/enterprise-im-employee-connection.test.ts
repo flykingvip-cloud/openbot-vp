@@ -13,6 +13,7 @@ import {
   disconnectFeishuEmployeeConnection,
   feishuEmployeeChannelGate,
   feishuEmployeeIdentityId,
+  feishuEmployeeRowStatusLabel,
   loadFeishuEmployeeChannelGate,
   projectFeishuEmployeeToolResult,
   readFeishuEmployeeConnection,
@@ -543,5 +544,46 @@ describe("feishu employee connection (slice 1b)", () => {
     expect(JSON.stringify(used)).not.toContain("rotated-access");
     resetSharedDataGovernanceCatalogForTests();
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("projects bound-row labels with enterprise gate before auth status", () => {
+    const link = {
+      authorizationLevel: "authorized" as const,
+      localCredentialsDeleted: false,
+      platformRevokeRecorded: false,
+    };
+    expect(
+      feishuEmployeeRowStatusLabel({
+        gate: {
+          employeeUiHint: "enterprise_not_open",
+          childExecutionBlocked: true,
+          statusLabel: "企业尚未开通",
+        },
+        status: "active",
+        enterpriseIm: link,
+      }),
+    ).toBe("企业尚未开通");
+    expect(
+      feishuEmployeeRowStatusLabel({
+        gate: {
+          employeeUiHint: "waiting_admin_scopes",
+          childExecutionBlocked: false,
+          statusLabel: "等待管理员开通权限",
+        },
+        status: "active",
+        enterpriseIm: link,
+      }),
+    ).toBe("等待管理员开通权限");
+    expect(
+      feishuEmployeeRowStatusLabel({
+        gate: {
+          employeeUiHint: "app_can_attempt",
+          childExecutionBlocked: false,
+          statusLabel: "可绑定",
+        },
+        status: "reauth_required",
+        enterpriseIm: link,
+      }),
+    ).toBe("需重新认证");
   });
 });

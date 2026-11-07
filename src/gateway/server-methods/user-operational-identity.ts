@@ -1532,6 +1532,18 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
       resolveUserOperationalIdentityStorePathForClient(client),
       resolveUserOperationalIdentitySecretsStorePathForClient(client),
     ]);
+    const preview = await loadUserOperationalIdentityStore(identityStorePath);
+    const existing = preview.identities[identityId];
+    if (!existing || existing.ownerId !== ownerId || existing.provider !== "feishu-personal") {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "Identity not found.", {
+          details: { code: "USER_IDENTITY_NOT_FOUND" },
+        }),
+      );
+      return;
+    }
     const result = await renewPersistedFeishuEmployeeConnection({
       ownerId,
       tenantId,
