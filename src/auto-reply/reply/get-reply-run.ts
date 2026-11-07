@@ -7,7 +7,7 @@ import {
   selectSystemContextParts,
 } from "../../agent-runtime/context/assembly.js";
 import { resolveContextLane } from "../../agent-runtime/context/index.js";
-import { buildResumePrompt } from "../../agent-runtime/context/index.js";
+import { buildResumePrompt, buildTaskBoardContext } from "../../agent-runtime/context/index.js";
 import { projectInteractionHistory } from "../../agent-runtime/context/interaction-history.js";
 import { appendUntrustedContext } from "../../agent-runtime/context/untrusted.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
@@ -50,7 +50,6 @@ import {
   runWithOguiDecisionResume,
 } from "../../config/sessions/ogui-decision-engine.js";
 import { buildActiveConversationTaskFocusPrompt } from "../../conversation-task/focus-prompt.js";
-import { buildFocusResumePromptFromSessionFile } from "../../conversation-task/focus-resume.js";
 import { buildCronReplySystemPrompt } from "../../cron/cron-reply-context.js";
 import { buildGrowthBirthSystemPrompt } from "../../gateway/agent-growth/birth-context.js";
 import {
@@ -1094,7 +1093,7 @@ export async function runPreparedReply(
 
   const sessionFocusResumePrompt =
     !isHeartbeat && inboundMessage
-      ? buildFocusResumePromptFromSessionFile(sessionEntry?.sessionFile)
+      ? buildTaskBoardContext(replyTurnRuntime.state.read(sessionEntry?.sessionFile))
       : undefined;
   // A ended / ordinary turns: sidecar Q&A must remain visible to the normal reply
   // path (chat.history restores bubbles; model context uses untrusted user-body

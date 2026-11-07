@@ -1291,3 +1291,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Audited source/package/extension consumers of amendActiveTask and controlCurrentTask: only re-exports and historical tests remained. Preserved source and intent in the existing archive tag, removed both modules and exports, and extended the no-return architecture gate. Typed state transactions and fixed interaction effects retain required ordering and identity safeguards. — codex-runtime-manager
 - Current lifecycle/admission/routing/Gateway stop regression 4 files / 13 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. Whole-system replacement and production cutover remain separate gates. — codex-runtime-manager
+
+## Task context consumes authoritative board facts only (2026-11-08)
+
+- Reproduced historical unadmitted conversation being promoted into a current-task system prompt (1 FAIL before). Prepared reply now reads the sole task-state repository and uses a pure shared-context projection; it does not replay conversation text to infer task ownership. Current and parked facts preserve full active constraints, acceptance checks and pause state; completed work is not rendered as active execution. — codex-runtime-manager
+- Context/real prepared entrance/lifecycle regression 3 files / 10 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. Legacy focus-resume helper has no remaining mainline consumer and awaits its separate archival/deletion checkpoint. No deployment. — codex-runtime-manager

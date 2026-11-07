@@ -238,6 +238,35 @@ function baseParams(
 }
 
 describe("runPreparedReply aside dialogue context (A-ended normal path)", () => {
+  it("does not promote historical conversation into an admitted task focus", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "unadmitted-focus-"));
+    tempDirs.push(dir);
+    const sessionFile = path.join(dir, "session.jsonl");
+    const historicalRequest = "UNADMITTED_FOCUS 请整理市场报告";
+    fs.writeFileSync(
+      sessionFile,
+      JSON.stringify({
+        type: "message",
+        message: { role: "user", content: [{ type: "text", text: historicalRequest }] },
+      }) + "\n",
+      "utf8",
+    );
+    vi.mocked(resolveSessionFilePath).mockReturnValue(sessionFile);
+    await runPreparedReply(
+      baseParams({
+        sessionEntry: {
+          sessionId: "no-admitted-task",
+          sessionFile,
+          updatedAt: Date.now(),
+        } as never,
+      }),
+    );
+    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    expect(call).toBeDefined();
+    expect(call?.followupRun.run.extraSystemPrompt ?? "").not.toContain("UNADMITTED_FOCUS");
+    expect(call?.followupRun.run.taskCompletionBinding).toBeUndefined();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
