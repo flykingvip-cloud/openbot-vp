@@ -131,11 +131,6 @@ import type {
   EmbeddedRunAttemptParams,
   EmbeddedRunAttemptResult,
 } from "../../../agents/pi-embedded-runner/run/types.js";
-import {
-  clearActiveEmbeddedRun,
-  type EmbeddedPiQueueHandle,
-  setActiveEmbeddedRun,
-} from "../../../agents/pi-embedded-runner/runs.js";
 import { buildEmbeddedSandboxInfo } from "../../../agents/pi-embedded-runner/sandbox-info.js";
 import { resolveEmbeddedRunSkillEntries } from "../../../agents/pi-embedded-runner/skills-runtime.js";
 import {
@@ -267,6 +262,11 @@ import { captureTaskActionBoundary } from "../../state/task-action.js";
 import { resolveAttemptEndOfRunAttribution } from "../outcomes/attempt-attribution.js";
 import { runExecutionStallContinueLoop } from "../recovery/stall-continuation.js";
 import { cleanupEmbeddedAttempt } from "./attempt-cleanup.js";
+import {
+  clearActiveEmbeddedRun,
+  type EmbeddedPiQueueHandle,
+  setActiveEmbeddedRun,
+} from "./run-registry.js";
 
 export async function runEmbeddedAttempt(
   params: EmbeddedRunAttemptParams,

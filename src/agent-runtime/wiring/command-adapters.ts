@@ -1,5 +1,3 @@
-/** Bind existing host effects. No classification, routing, loops or task decisions live here. */
-import { abortEmbeddedPiRun, queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
 import { abortMidTaskAsideLanes } from "../../auto-reply/reply/mid-task-aside-reply-lane.js";
 import {
   resolveActiveRunQueueAction,
@@ -21,6 +19,8 @@ import type {
   InteractionPorts,
   CurrentTaskControlPorts,
 } from "../command/index.js";
+/** Bind existing host effects. No classification, routing, loops or task decisions live here. */
+import { abortEmbeddedPiRun, queueEmbeddedPiMessage } from "../execution/index.js";
 import { sessionTaskState } from "../state/index.js";
 
 export function interruptInteractionTask(sessionId: string, sessionKey?: string) {

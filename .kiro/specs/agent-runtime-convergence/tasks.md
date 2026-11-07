@@ -907,3 +907,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved the existing abort-signal composition implementation into capabilities/invocation/abort; old pi-tools.abort is a compatibility re-export through the capability public API. No second implementation, cancellation policy or hard-stop guarantee added. Corrected misleading structural-typing comment without changing behavior. — codex-runtime-manager
 - Capability cancellation 5 PASS; before-tool adapter integration E2E 9 PASS; full tsgo PASS; changed-file typed lint clean; architecture 51 PASS. Overall retirement and final lifecycle acceptance remain open. — codex-runtime-manager
+
+## Active execution registry ownership (2026-11-07)
+
+- Moved the unique process-local active-run registry into execution/runner/run-registry. Old runs module is a compatibility re-export, embedded attempt uses the runtime registry directly, and command wiring consumes the execution public API for abort/steer. Preserves waiter, compaction and handle-identity cleanup behavior; no second scheduler or persistent resume guarantee. — codex-runtime-manager
+- Registry/interaction regression 4 files / 15 PASS, including cross-facade identity and obsolete-cleanup refusal; full tsgo PASS; changed-file typed lint clean; architecture 51 PASS. Overall retirement and final lifecycle acceptance remain open. — codex-runtime-manager

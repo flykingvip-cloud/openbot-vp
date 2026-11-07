@@ -37,3 +37,13 @@ export { cleanupEmbeddedAttempt } from "./runner/attempt-cleanup.js";
 export { runQueuedCandidate } from "./runner/queued-candidate.js";
 
 export { runScheduledCandidate } from "./runner/scheduled-candidate.js";
+
+export {
+  abortEmbeddedPiRun,
+  isEmbeddedPiRunActive,
+  isEmbeddedPiRunStreaming,
+  queueEmbeddedPiMessage,
+  waitForEmbeddedPiRunEnd,
+  waitForActiveEmbeddedRuns,
+  getActiveEmbeddedRunCount,
+} from "./runner/run-registry.js";
