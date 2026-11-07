@@ -1,17 +1,59 @@
 # Workplace digital colleague: status and plan
 
-**Scenario:** 岗位上有可协作的数字同事：进企微/飞书/钉钉，按职责拿数、办事、留痕，能力可随组织沉淀。
+**Scenario:** An employee connects a work account they already have in Feishu, DingTalk, or WeCom, then authorizes one or more selected robots to participate in existing work inside that grant, using the employee work identity. Methods that survive review can settle into the organization. Enterprise public bots are a separate mode.
 
 **Repo:** `flykingvip-cloud/openbot-vp` (`@upbeyond/openbot`)
-**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05)
+**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07 on the same evidence plus official platform docs cited below.
 **Nature:** Code-grounded inventory and an ordered implementation plan. This document does not change runtime behavior.
 **Date:** 2026-11-07
 
-A digital coworker, in this scenario, is a seat-bound agent that shows up in WeCom, Feishu, or DingTalk, reads data inside its duty grants, acts through the governed enterprise-data bridge, leaves an operator-visible trail, and leaves a durable org-level capability behind. The five legs below are judged only against that path.
+## Product experience to deliver
+
+Employees already have work identity, contacts, groups, and work resources in Feishu, DingTalk, and WeCom. OpenBot lets an employee connect that work account, then authorize specific robots to act inside the grant.
+
+Example. An employee connects Feishu. They allow Project Assistant to handle one named project group, read related docs, draft progress, and send on their behalf. They allow Knowledge Assistant to organize docs and not to send messages. Each grant can be paused or revoked on its own.
+
+Spine:
+
+```
+Connect employee work account
+  -> grant proxy authority to specific robot(s)
+  -> controlled execution in existing work scenes
+  -> auditable trail
+  -> settle verified methods as org capability
+```
+
+Effective permission is the intersection of four gates:
+
+```
+platform grant
+  ∩ employee active delegation
+  ∩ enterprise duty policy
+  ∩ resource and target constraints
+```
+
+Connecting an account does not open every scope to every robot. An enterprise job grant does not substitute for the employee proxy of their own work identity. Platform OAuth typically grants the app. OpenBot then delegates that connection to specific robots. A new robot does not require a fresh platform OAuth.
+
+### Two product modes
+
+| Mode | Who the platform sees | What exists in this tree | Counts as employee identity proxy |
+| --- | --- | --- | --- |
+| Enterprise public bot | The app or the bot. Recipients see the bot or the app. | WeCom, Feishu, and DingTalk ingress, enterprise console credential forms, `resolveAgentRoute`, agent reply. | No. |
+| Employee identity proxy | The employee, only where the platform API is called with that employee credential and the delegation allows the action. | Not implemented. `feishu-personal` is deferred and `registrationReady: false`. | This is the mode the closed loop must build. |
+
+The inventory in sections 1 through 5 is the public-bot mode. It stays because that code is real. It must not be read as "employee identity proxy is already done."
 
 ## How to read the evidence
 
-Quotes are from the tree at the baseline SHA. Paths are repo-root relative. "Product IM" means WeCom, Feishu, and DingTalk. WebChat and the enterprise console are adjacent control surfaces, not substitutes for those three channels. Inherited consumer adapters (Telegram, Discord, Slack, WhatsApp, and the rest of `CHAT_CHANNEL_ORDER`) are noted only where they still shape product routing.
+Quotes from this repo are from the tree at the baseline SHA. Paths are repo-root relative. "Product IM" in the inventory means the three public-bot plugins. WebChat and the enterprise console are adjacent control surfaces. Inherited consumer adapters (Telegram, Discord, Slack, WhatsApp, and the rest of `CHAT_CHANNEL_ORDER`) are noted only where they still shape product routing.
+
+Platform cells use one status, and only when it is true:
+
+- **Docs.** Official documentation describes the capability. That is not code, and it is not a measured pass in a target enterprise.
+- **Code.** This repo already calls that capability. Bot ingress is not user OAuth, not user-identity read, and not send-as-self.
+- **Measured.** A target enterprise has been observed to pass. None of the four user-proxy capabilities below have a measured pass. Prior Feishu user-permission notes and DingTalk Workspace CLI notes are investigation entry points only.
+
+User OAuth login, user-identity read, send-as-self, and continuous inbound are four independent capabilities. Do not infer one from another. Do not claim that one QR scan gives full custody on all three platforms. WeCom full user-identity proxy is unconfirmed. Desktop automation and session takeover are not a default dependency. Prefer official auth and APIs.
 
 ## End-to-end path today
 
@@ -38,9 +80,11 @@ extensions/{wecom,feishu,dingtalk}
 
 The message path works. The duty, governed-act, audit, and sedimentation path does not start from that message.
 
-## 1. Enter WeCom, Feishu, and DingTalk
+## 1. Public bot mode: enter WeCom, Feishu, and DingTalk
 
-**Status: Partial.** Ingress, enterprise credential forms, and route-to-agent dispatch exist. The inbound turn is still a channel session, not a digital-employee seat. Package identity and the core channel order still treat product IM as an add-on beside leftover consumer adapters.
+**Status for public bots: Partial.** Ingress, enterprise credential forms, and route-to-agent dispatch exist. The inbound turn is a channel session for the app bot. It is not an employee work-account connection and it is not a robot delegation.
+
+**Status for employee identity proxy: Missing.** Do not count this section as the proxy.
 
 ### What is wired
 
@@ -90,7 +134,7 @@ Feishu dynamic agent creation, when enabled, makes a workspace per DM sender. Th
 
 ## 2. Fetch data according to duty
 
-**Status: Partial.** Seat grants, semantic objects, and an authorization-aware planner exist for a signed-in employee session. An IM turn does not enter that session, so duty does not scope what the coworker reads.
+**Status: Partial for console data grants. Missing for employee work-identity proxy.** Seat grants, semantic objects, and an authorization-aware planner exist for a signed-in employee session. A public-bot turn does not enter that session. `resolveAgentRunEntitlementScope` is a first-match seat lookup for model entitlement. It is not a uniqueness proof, not an employee login, and not authorization to call Feishu, DingTalk, or WeCom as that employee. Sections 2 through 5 describe current code. They are not the proxy design.
 
 ### Seat, grant, and catalog
 
@@ -202,79 +246,233 @@ Session transcripts and seat-rule guidance live with the session or the seat rec
 
 ## Gap table
 
-Severity is for this scenario only. P0 means the scenario sentence is false until this moves. P1 means the scenario is visibly incomplete. P2 means identity or hygiene that misleads operators but does not by itself block a later slice.
+Severity is for the employee-identity proxy. Public-bot ingress is listed so it is not mistaken for that proxy. P0 means the closed loop is false until this moves. P1 means the loop is visibly incomplete. P2 is hygiene that does not unblock the loop.
 
 | Leg | Status | Severity | Evidence | Gap |
 | --- | --- | --- | --- | --- |
-| Enter WeCom / Feishu / DingTalk | Partial | P1 | Extensions monitor to `resolveAgentRoute` to `dispatchReplyFromConfig`. Console writes `t_<tenant>_default`. | Message arrives and an agent replies. The turn has no seat. `CHAT_CHANNEL_ORDER` and `@openclaw/*` package ids still present product IM as secondary. DingTalk uses the compat SDK. No ownership check in `scripts/`. |
-| Fetch by duty | Missing on the IM path. Partial as a console RPC. | P0 | Planner and `isCapabilityGrantedForSeat` require `resolveTrustedEnterpriseDataExecutionContext`. `get-reply-run.ts` only calls `resolveSeatTurnContext` with gateway employee ids. IM context has none. `resolveAgentRunEntitlementScope` is not called there. | No server-derived duty scope on the coworker turn. IM sender is not an employee. Preflight text points at knowledge search, not grants. |
-| Do the work on the governed bridge | Missing for IM. Working for signed-in `enterprise-data.invoke`. | P0 | Data gateway applies grant, scope, approval, masking, audit. Agent tool invoke returns `knowledge-object-only`. Feishu tools call Feishu APIs directly. Sandbox mode defaults to `"off"`. Fabric default off does not change tool execution. | IM work is either a chat reply, an ungated Feishu API tool, or a normal agent tool. It is not a seat-scoped governed action. Opening connector invoke from the model would weaken the red line and is not the fix. |
-| Leave a trail an operator can open | Missing for IM. Partial for console invoke. | P0 | `enterprise-data.audit.invocations.list` and `audit.trace.get` read data-gateway audits. IM dispatch never writes them. Fabric trace is opt-in. | After a WeCom/Feishu/DingTalk message, the operator can see channel connectivity and the chat transcript. They cannot open a governed action trace for that message. |
-| Settle a capability into the org | Missing for this flow. Partial as a human lifecycle. | P1 | Skill visibility includes `enterprise`, defaulting to `reviewing`. Publish-draft-skill is human-gated and not auto-installed. Capability governance store is a view. | A successful coworker run leaves a session. It does not leave an org skill or a new granted capability. |
+| Enterprise public bot ingress | Partial, and it is a separate mode | P2 for the proxy. Do not treat it as P0 progress on the proxy. | Extensions monitor to `resolveAgentRoute` to `dispatchReplyFromConfig`. Console writes `t_<tenant>_default`. | A bot can reply. The platform identity is the app. `CHAT_CHANNEL_ORDER` and `@openclaw/*` package ids still present product IM as secondary. DingTalk uses the compat SDK. |
+| Connect employee work account | Missing | P0 | `user-operational-identity-providers.ts` lists `feishu-personal` as `rolloutTier: "deferred"`, `registrationReady: false`, empty actions, hint "当前仅支持企业 Bot/App 连接". Enterprise operational-identity catalog test excludes `feishu`, `wecom`, and `dingtalk`. Feishu client is `appId` + `appSecret` (`extensions/feishu/src/client.ts`). DingTalk token call is `POST /v1.0/oauth2/accessToken` with `appKey`/`appSecret` (`extensions/dingtalk/src/api.ts`), which is the app token, not `userAccessToken`. | No trusted bind of platform enterprise + platform user + OpenBot employee + granted scopes. No status UI for connect, renew, or disconnect of a user credential. |
+| Robot delegation | Missing | P0 | Seat asset bindings and `resolveAgentRunEntitlementScope` map an agent to a seat. They do not record which robot may use which employee connection, which actions, which resources, or when the grant expires. | Authorizing Project Assistant does not exist as data. A second robot can neither be granted a narrower scope nor be proven unable to borrow the first grant. |
+| Controlled read and send in an existing work scene | Missing for user identity. Public bot tools are a different identity. | P0 | `data_capability` invoke stays `knowledge-object-only`. Feishu doc/wiki/drive tools use the app client. WeCom and DingTalk monitors send the bot reply. | No server entry that loads a user credential, checks delegation, and calls the platform as that employee. Group text must not widen grants. |
+| Trail of a proxy action | Missing | P0 | `enterprise-data.audit.invocations.list` records data-gateway invokes for a signed-in console session. Public-bot turns do not write it. Fabric is default off. | A proxy action must trace employee, robot, connection, delegation version, trigger, target, confirm record, and external result. "Bind success" is not business complete. That trace does not exist. |
+| Settle a method into the org | Missing for this flow. Partial as a human skill lifecycle. | P1 | Skill visibility includes `enterprise` and defaults to `reviewing`. `pattern-detection.publish-draft-skill` is human-gated and not auto-installed. | A verified project follow-up can later become a reviewable method. Personal tokens, private conversation content, and personal delegations must not publish with it. Nothing extracts that method today. |
+| Duty policy as a joint gate | Partial as console policy. Missing as a proxy gate. | P1 | Seat action grants and department/role policies exist for `enterprise-data.invoke`. Seat rules are guidance and do not enter Fabric decide. | Enterprise duty and employee delegation must both pass. Duty alone must not authorize use of the employee work identity. |
 
-## Implementation plan
+## Identity and authorization
 
-Do these in order. Each slice should be its own reviewable change. Do not start slice 2 until slice 1 has tests that fail when the IM turn is unbound or when a client tries to supply the seat.
+Keep account connection and robot delegation as two records. Do not collapse them into `GatewayClientPlatformUserId`.
 
-### Slice 1 (do this first): stamp a server-derived seat on the product-IM turn, and audit that stamp
+### Work account connection
 
-**Why this one.** Legs 2, 3, and 4 all stop at the same missing subject. The planner, the grant resolver, and the audit list already know what to do with a trusted seat. The IM monitors never produce one. `resolveAgentRunEntitlementScope` already implements the lookup the entitlement design reserved for external channel inbound, and it fail-closes to null. The reply path does not use it.
+A connection is a trusted bind among:
 
-**Behavior.** After `resolveAgentRoute` for `wecom`, `feishu`, or `dingtalk` only:
+- the platform (Feishu, DingTalk, or WeCom)
+- the platform enterprise (Feishu tenant, DingTalk `corpId`, WeCom `corpid`)
+- the platform user (Feishu `open_id` / `user_id`, DingTalk `unionId` / `userId`, WeCom `userid`)
+- the OpenBot employee (platform-auth user already bound to a membership)
+- the platform-granted app scopes actually returned on the token (`scope` on Feishu refresh; the scopes the admin published plus the scopes the user consented)
 
-1. Load the seat scope with `resolveAgentRunEntitlementScope({ agentId: route.agentId })`. Use the tenant-scoped seat store when the channel account id is the enterprise form `t_<tenant>_default` and shared tenant addressing is already enabled. Do not parse the IM sender id into an employee id.
-2. If the lookup is null, or more than one active agent binding matches, leave the turn unbound. Reply still works. Write an audit row `seatBinding: "unresolved"` so the operator can see the miss.
-3. If exactly one seat matches, attach server-derived `tenantId`, `seatId`, and `employeeId` (when the seat has `currentEmployeeId`) onto the reply context through the existing gateway-client fields `get-reply-run.ts` already reads. Do not accept those fields from the channel payload.
-4. Write one enterprise-data invocation-audit-shaped row, or a sibling event the existing `enterprise-data.audit.invocations.list` can return, with channel, account id, agent id, seat id, and `seatBinding: "bound" | "unresolved"`. No payload from the user message beyond a hash or length. Fabric stays off.
+The employee confirms this bind through the platform OAuth or the platform equivalent. An admin install or publish of the OpenBot app is a prerequisite on these platforms. It is not the employee consent, and employee consent is not admin install.
 
-**Files likely touched.**
+Access and refresh tokens live in the server credential vault. They do not go into the model context, prompts, skill files, or ordinary logs. The existing split between operational-identity metadata and a secrets file (`docs/design/openbot-saas-tenant-data-architecture.md` describes `openbot-user-operational-identity.json` versus `openbot-user-operational-identity-secrets.json`) is the pattern to reuse. `feishu-personal` is not that implementation. It is a deferred catalog row.
 
-- A small helper next to `src/gateway/model-entitlement/resolve-agent-run-scope.ts` or `src/plugin-sdk/inbound-reply-dispatch.ts` that product monitors call. Prefer one helper over three copies in the extensions.
-- `extensions/wecom/src/monitor.ts`, `extensions/dingtalk/src/monitor.ts`, `extensions/feishu/src/bot.ts` to call it before dispatch. Keep Feishu dynamic-agent creation from inventing a seat.
-- `src/auto-reply/reply/get-reply-run.ts` only if the helper's output is not already visible as `GatewayClientPlatformUserId` / tenant. Prefer feeding the existing `resolveSeatTurnContext` inputs over a second resolver.
-- `src/gateway/enterprise-data/audit-runtime.ts` only if the current invocation event cannot represent a non-action binding record. Do not invent a second store if `recordInvocationAudit` can carry a distinct action key such as `product-im.seat.bind`.
+### Robot delegation
 
-**Tests.**
+A delegation names:
 
-- Unit: unique agent binding stamps tenant and seat; missing binding leaves fields empty; two bindings leave fields empty.
-- Unit: WeCom, Feishu, and DingTalk context builders include the stamp only from the helper, and a forged `seatId` on the inbound payload is ignored.
-- Unit: the audit writer is called once per inbound with `bound` or `unresolved`, and `enterprise-data.audit.invocations.list` returns it for an enterprise admin.
-- Regression: `data_capability` invoke still returns `knowledge-object-only`. `enterprise-data.invoke` still requires the trusted employee session and still rejects client identity fields.
+- which connection
+- which robot (`agentId`)
+- which actions (read, draft, send, and any narrower verb)
+- which resources (named group, doc, calendar)
+- the mode: read-only, draft-then-confirm, or limited auto
+- when employee confirm is required
+- when the delegation expires, and the delegation version
 
-**Risks.**
+One connection can have many delegations. Pausing or revoking Project Assistant leaves Knowledge Assistant intact. Adding a robot does not start a new platform OAuth.
 
-- A stamp that later slices treat as "the IM sender is this employee" would let any person who can message the bot act as the seat occupant. Slice 1 must record attribution for the agent that is already bound to the seat. It must not authorize connector actions, and it must not copy `SenderId` into `employeeId`.
-- Ambiguous `defaultAgentAssetIds` across seats. Fail closed on more than one match.
-- Using the global seat store in a multi-tenant process would attach the wrong tenant. Use the tenant from the enterprise account id only when that account id was produced by the console helper, and otherwise leave the turn unresolved rather than guessing.
+### Single execution context
 
-**Out of scope for slice 1.** Opening `data_capability` invoke. Calling `enterprise-data.invoke` from the model. Enabling Fabric. Changing sandbox defaults. Reordering `CHAT_CHANNEL_ORDER`. Renaming `@openclaw/*` packages. Adding a DingTalk plugin-sdk slice. Editing `docs/zh-CN/**`. Telegram, Discord, and other inherited channels.
+Every controlled call carries one context, resolved on the server at the execution entry:
 
-### Slice 2: duty-scoped read on that stamped turn
+- who triggered (employee action, inbound event, or queued task)
+- who authorized (OpenBot employee id)
+- which robot
+- which connection and which platform identity
+- which resource and which targets
+- where the result goes (draft back to the employee, or a platform message id)
 
-Call `planDataAccess` / `buildAgentContextPack` with the slice-1 seat context inside the product-IM reply, and pass the pack to the model as data the seat is allowed to know. Keep `executeDataPlan` and `data_capability` invoke on `knowledge-object-only`. Add a test that a capability the seat is not granted does not appear as readable, and that a granted capability still does not return connector rows.
+This context is not a forged gateway login. Do not copy `seat.currentEmployeeId` into `GatewayClientPlatformUserId` or `GatewayClientUser`. A robot that belongs to a seat is not an employee login and is not an employee authorization. `get-reply-run.ts` treats those fields as the signed-in employee. Stuffing them would make later code believe a user session exists.
 
-Do this only after slice 1. Without the stamp, the planner returns `no-seat`.
+`resolveAgentRunEntitlementScope` uses `Array.find` on agent asset bindings, then falls back to the first seat whose `defaultAgentAssetIds` contains the agent. That first match is not a uniqueness proof and it is not action authorization. The function returns null when nothing matches, and its comment says callers must not kill the bot on null. If a later slice reuses it for duty lookup, it must add a tenant constraint, reject more than one match, and check expiry. It still does not authorize a platform call.
 
-### Slice 3: operator-visible trail for later governed acts
+`assertNoClientExecutionIdentity` in `enterprise-data-seat-context.ts` already rejects client-supplied `tenantId`, `seatId`, and `employeeId`. Proxy execution keeps that rule. The server builds the context from the connection and the delegation. The model does not pass the token or the employee id.
 
-Point the enterprise data UI at the slice-1 binding events and, once any future act exists, at `enterprise-data.audit.trace.get`. Do not turn Fabric on to get this. The enterprise-data audit store is already the operator surface (`invocations.list`, admin `trace.get`).
+### Joint gate
 
-### Slice 4: one sanctioned act, still not a free tool
+A call is allowed only when all of these hold at call time, not only when the task was created:
 
-If product requires the coworker to change an external system, add a single gateway entry that runs `invokeEnterpriseDataAction` under the slice-1 seat context, with the existing grant, scope, masking, and approval checks, and with a new trust attestation distinct from a raw tool argument. Keep `assertNoClientExecutionIdentity`. Do not flip `data_capability` invoke to call connectors in the same change. Feishu doc/drive tools stay out of this slice until they are either classified as channel delivery or routed through the same grant check.
+1. The platform grant is still valid (token, scopes, user still in the app availability range, admin has not removed the app).
+2. The employee delegation for this robot, action, and resource is active and unexpired.
+3. Enterprise seat and duty policy allow this robot to perform this class of work for this employee.
+4. The concrete target is inside the delegation (this group, these docs, these recipients). Message text cannot add a group, a doc, or a recipient.
 
-### Slice 5: org sedimentation, human-gated
+Enterprise job grants do not replace (1) or (2). Employee delegation does not replace (3).
 
-After a governed act succeeds, offer a draft skill or capability candidate through the existing `pattern-detection.publish-draft-skill` / skill lifecycle path. Enterprise visibility stays `reviewing` until a person approves. Do not auto-install on the robot. Do not write the candidate from the chat model.
+### Rejected first slice
 
-### Parallel, not blocking
+Do not implement the earlier recommendation that stamped `resolveAgentRunEntitlementScope(...).employeeId` into `GatewayClientPlatformUserId` after `resolveAgentRoute`. That fabricated a trusted user session from a seat occupant. It is withdrawn.
 
-A channel-ownership check (product ids `wecom|feishu|dingtalk` versus `CHAT_CHANNEL_ORDER`, DingTalk SDK slice, freeze inherited `src/<channel>` feature adds) is the architecture P0 for product identity. It does not make the coworker duty-scoped. Schedule it beside slices 1-3, not instead of them.
+## Platform capability matrix
+
+Checked 2026-11-07 against the cited official pages. No target-enterprise measurement was run for this revision. "Docs" means the cited page describes the capability. It does not mean OpenBot calls it, and it does not mean a customer tenant has passed.
+
+First closed loop is Feishu, self-built app. DingTalk and WeCom stay in the matrix so the gap is explicit. If Feishu send-as-user is unavailable in the target tenant (scope not approved, bot not in the group, or the API rejects user token), the product must say the send will appear as the bot, or must stop at employee confirm-to-send. It must not report success as the employee.
+
+### Feishu
+
+| Question | Status | What the citation actually says |
+| --- | --- | --- |
+| Employee authorization, and account to enterprise to employee | Docs | [获取访问凭证](https://open.feishu.cn/document/server-docs/api-call-guide/calling-process/get-access-token) distinguishes `tenant_access_token` (app, no user consent) from `user_access_token` (user consent; data range is the user). Obtaining a user token is the OAuth code flow for both self-built and store apps: configure redirect URL, take `code`, exchange, optionally refresh. The user must be allowed to use the app. Admin publish is required before new scopes and event subscriptions take effect ([添加事件](https://open.feishu.cn/document/server-docs/event-subscription-guide/event-subscription-configure-/subscription-event-case)). |
+| Work resources as the user | Docs | The same access-token page: a user token reads and writes what that user can read and write (example: a bitable created with a user token is owned by that user). App token is a different data range. Doc and calendar event subscription can be user-identity; calendar events are user-identity only ([事件概述](https://open.feishu.cn/document/server-docs/event-subscription-guide/overview)). This is not a measurement that every doc, task, and chat is available. |
+| Send as self | Docs | [发送消息](https://open.feishu.cn/document/server-docs/im-v1/message/create) (updated 2026-04-10) accepts `user_access_token` for user identity and `tenant_access_token` for app identity. User identity requires both `im:message` and `im:message.send_as_user`. The same page still requires the app to have bot capability, the recipient to be inside the bot availability range, and, for a group, the bot to be in the group with permission to speak. Those prerequisites apply before identity is chosen. The IM overview table still lists several sibling APIs (reply, history, forward) as `tenant_access_token` only ([消息概述](https://open.feishu.cn/document/server-docs/im-v1/introduction)). v1 send is `messages.create` as the user. Do not assume reply-as-user. `uuid` dedupes identical sends for one hour. |
+| Continuous inbound on approved conversations | Code for bot-addressed events only. Docs for a different user-event mechanism. Not the employee mailbox. | This repo already runs the Feishu bot websocket and dispatches those events (`extensions/feishu/src/bot.ts`). That stream is messages the bot receives. [使用长连接接收事件](https://open.feishu.cn/document/server-docs/event-subscription-guide/event-subscription-configure-/request-url-configuration-case) is self-built apps only, cluster delivery to one of up to 50 connections, 3 second handling, at-least-once retry. It does not mean every new message in the employee chats is delivered. User-identity subscriptions cover resources such as docs and calendar, not a proven full chat mirror. |
+| Renew, revoke, disable | Docs | [刷新 user_access_token](https://open.feishu.cn/document/authentication-management/access-token/refresh-user-access-token): user token lifetime is on the order of two hours (`expires_in`, do not hard-code). `refresh_token` needs `offline_access` in the authorize `scope`, is single use, and must be stored again. After 365 days of authorization, refresh fails with 20037 and the user must authorize again. Error 20010 means the user no longer has permission to use the app. [撤销用户授权事件](https://open.feishu.cn/document/authentication-management/auth-v4/revoked) pushes `auth.user_access_token.revoked_v4` when the user token or refresh token is revoked (Webhook in that page). OpenBot must treat revoke, refresh failure, and loss of app availability as "stop new calls". |
+| Deploy fit | Docs, aligned with current bot deploy, not with user proxy | Self-built app fits a gateway that can reach the public internet: long connection needs no public callback URL. Store apps cannot use that long-connection mode. Admin must approve the published version. Current code is the bot half only. |
+
+Feishu user OAuth, user-identity read, send-as-self, and continuous inbound of the employee mailbox are not four checked boxes. OAuth, user-scoped read, and send-as-user are Docs. Bot inbound is Code. None are Measured.
+
+### DingTalk
+
+| Question | Status | What the citation actually says |
+| --- | --- | --- |
+| Employee authorization, and account to enterprise to employee | Docs | [授权概述](https://open.dingtalk.com/document/development/authorization-overview) separates user access tokens (delegated, user must consent) from app access tokens (admin grant at install, no user login). [获取用户token](https://open.dingtalk.com/document/development/obtain-user-token) supports internal, third-party org, and third-party personal apps. The response includes `corpId`, `accessToken` (about 7200 seconds), and `refreshToken` (30 days). Third-party org apps need the org authorization suite to obtain `authCode`. Internal apps are created under the org. That is admin possession of the app, plus a separate user consent for a user token. |
+| Work resources as the user | Docs for some APIs. Not a general user-identity workspace. | The authorization overview gives personal calendar and mobile as examples of user-token data. [创建日程](https://open.dingtalk.com/document/personalapp-server/create-schedule) says an internal app and a third-party org app pass the app `accessToken`, while a third-party personal app passes the user token. Do not treat "DingTalk has a user token" as "an internal app can read the employee docs and calendar as that user." No target measurement. |
+| Send as self | Gap in the cited current APIs | [企业机器人发送单聊消息](https://open.dingtalk.com/document/development/the-application-robot-in-the-enterprise-sends-a-single-chat) sends with the app token and `robotCode`. Recipients see the robot. Group receive is @bot or a message to the robot ([机器人接收消息](https://open.dingtalk.com/document/dingstart/robot-receive-message)). [发送普通消息](https://open.dingtalk.com/document/orgapp/send-normal-messages) describes an employee-looking send via a one-time `cid` from a JSAPI picker, uses the app `access_token`, and says new apps could no longer onboard after 2022-09-23. That is not a supported send-as-self for this product. If the closed loop ever runs on DingTalk before a cited user-send API exists, the UI must say the message will appear as the robot. |
+| Continuous inbound on approved conversations | Code for robot callbacks only | `extensions/dingtalk/src/monitor.ts` is the bot stream path. Official Stream topic is `/v1.0/im/bot/messages/get`. That is not the employee conversation stream. |
+| Renew, revoke, disable | Docs for token lifetime only | User `refreshToken` is documented at 30 days. This pass did not find a cited DingTalk equivalent of Feishu `auth.user_access_token.revoked_v4` and does not claim one. Loss of org authorization or a failed refresh must still stop calls. Behavior after employee leave is not measured. |
+| Deploy fit | Docs plus Code for the robot | Internal app plus Stream matches the current plugin (`clientId` / `clientSecret`, no public callback). Third-party org apps need the authorization suite. Neither is a measured user-proxy deploy. DingTalk is not the first closed loop. |
+
+### WeCom
+
+| Question | Status | What the citation actually says |
+| --- | --- | --- |
+| Employee authorization, and account to enterprise to employee | Docs for identity lookup. Not a user API token. | [开始开发](https://developer.work.weixin.qq.com/document/path/91335) and [构造网页授权链接](https://developer.work.weixin.qq.com/document/path/91120): OAuth `snsapi_base` silently returns the member `userid` inside the corp; `snsapi_privateinfo` asks the member before sensitive profile fields. Redirect domain must be the app trusted domain. This binds "which employee opened the page." It does not issue a token that calls arbitrary APIs as that employee. |
+| Work resources as the user | Gap for interactive proxy | [会话存档](https://developer.work.weixin.qq.com/document/path/91361) and [获取会话记录](https://developer.work.weixin.qq.com/document/path/99824) let an enterprise pull archived chats after an admin turns the feature on, employees are informed, and a key pair is configured. The sync API cited here returns at most 5 days and requires the data-zone permission. That is compliance archive, not the employee granting a robot to act as them. Do not use it as the proxy. |
+| Send as self | Gap | [发送应用消息](https://developer.work.weixin.qq.com/document/path/96458) sends with the corp `access_token` and `agentid`. Recipients see the application. `msgid` is returned. `enable_duplicate_check` can suppress identical payloads inside an interval. [智能机器人长连接](https://developer.work.weixin.qq.com/document/path/101463) replies with `aibot_respond_msg` or pushes with `aibot_send_msg` as the bot. No cited API sends a group message as the employee. |
+| Continuous inbound on approved conversations | Code for the intelligent robot only | `extensions/wecom/src/monitor.ts` is the AIBot websocket. Official callbacks are `aibot_msg_callback` when the user @mentions the bot in a group or DMs the bot (`msgid` is the dedupe key). One bot, one live connection; a new subscribe kicks the old one. That is not the employee mailbox. |
+| Renew, revoke, disable | Not a user-token lifecycle | App secret and bot secret are admin credentials. Member disable removes the user from app visibility (app messages then report `invaliduser`). There is no cited per-employee refresh token to revoke. Full user-identity proxy remains unconfirmed. |
+| Deploy fit | Code for the public bot | Self-built corp app plus AIBot long connection matches the enterprise console (Bot ID + Secret, no public URL). It is the right deploy for public-bot mode. It is not evidence of employee proxy. WeCom is not the first closed loop. |
+
+### What OpenBot calls today
+
+| Capability | Feishu | DingTalk | WeCom |
+| --- | --- | --- | --- |
+| User OAuth login | Not in code. Catalog row is deferred. | Not in code. Plugin uses app `accessToken`. | Not in code. Webpage userid OAuth is not implemented here. |
+| User-identity read | Not in code. Doc/wiki/drive tools use `getClient` from app id and app secret. | Not in code. | Not in code. |
+| Send as self | Not in code. Bot reply and `tenant_access_token` (`extensions/feishu/src/streaming-card.ts` calls `/auth/v3/tenant_access_token/internal`). | Not in code. `sendDingtalkMessage` uses the app token. | Not in code. Monitor sends as the bot. |
+| Continuous inbound | Code for events the Feishu bot receives. | Code for the robot Stream callback. | Code for AIBot `aibot_msg_callback`. |
+
+If a Feishu tool is later pointed at a user credential and that credential is missing, expired, or revoked, the tool must fail. It must not silently retry with the app `tenant_access_token`. The app token is a broader identity. The current tools have no user credential to fall back from. The rule applies the moment user auth is added.
+
+## Credentials and checks on every call
+
+- Resolve connection plus delegation at the execution entry of each read, write, and send. Checking only when the task is created is not enough.
+- Revoking one robot delegation does not revoke another robot on the same connection.
+- Revoking or disconnecting the account blocks new calls and cancels or revalidates queued work for every robot on that connection. Calls already accepted by Feishu, DingTalk, or WeCom need a final-status read (`message_id`, `msgid`, or an error callback). Do not promise that in-flight platform operations can be recalled.
+- Employee leave, loss of OpenBot membership, platform scope removal, and Feishu errors 20010 and 20037 invalidate execution that depended on that connection.
+- Tokens stay in the server vault. Logs may store connection id, delegation version, and platform result id. They do not store access tokens, refresh tokens, or app secrets.
+
+## Multi-robot coordination in v1
+
+The employee can authorize one robot or several. The design is not a single-robot path with extra robots bolted on later.
+
+Default for one inbound platform event: one primary handling robot, chosen by the employee session division or by an explicit task assignment. Other authorized robots may contribute drafts into that task. Only the primary calls the platform send.
+
+Also required in the design, and in tests once the loop exists:
+
+- Dedupe platform deliveries. Feishu events can repeat (`event_id` on v2, `uuid` on v1). WeCom AIBot repeats on `msgid`. DingTalk Stream can redeliver. A duplicate callback is not a second task.
+- Claim. The primary claim is single-winner. A second robot that sees the same event attaches as a contributor or stops.
+- Send idempotency. Feishu `uuid` is necessary and not sufficient. OpenBot also stores the confirm id and refuses a second external send for that confirm.
+- Echo. A message the proxy just sent must not be ingested as a new employee request. Match platform message id and sender identity (employee versus app versus this robot).
+- Human takeover. The employee can mark the task taken. Further automatic send on that task stops.
+- Revoke while work is pending. Pending tasks for the revoked robot or the revoked connection do not send. Another robot delegation stays in force only for its own scope.
+
+The same external message must not produce two external replies. An employee-authored message and a proxy-sent message stay distinct in the trail and in the echo check.
+
+## Implementation order
+
+Acceptance scene: "Project Assistant handles a named project group." Platform for this loop: Feishu self-built app. DingTalk and WeCom wait until their matrix row for the needed capability is Docs or better, and the product copy tells the truth about identity.
+
+Each slice is its own change. Basic audit is part of slices 1 through 5, not a final UI project. `data_capability` action `invoke` stays `knowledge-object-only`. New platform actions go through an explicit server entry that holds the proxy execution context. They do not go through `enterprise-data.invoke` by opening generic connector calls, and they do not go through the current Feishu app-credential tools.
+
+### Slice 1. Capability validation and connection
+
+Confirm, in a target Feishu enterprise, the scopes the published self-built app can actually receive. Implement employee OAuth for `user_access_token`, including `offline_access` when refresh is required. Bind platform tenant, platform user, and OpenBot employee. Store tokens in the vault. Support refresh, disconnect, and a status UI (connected, needs reauth, revoked, admin publish missing).
+
+Audit each connect, refresh, failure, and disconnect. Binding success is not the closed loop.
+
+Tests: token values never appear in tool results or prompt builders. Refresh replaces the stored refresh token. Disconnect makes the next read fail. A second employee cannot attach their OpenBot user to someone else token.
+
+Out of scope: robot send, DingTalk, WeCom user proxy, Fabric flag, sandbox default, `CHAT_CHANNEL_ORDER`.
+
+### Slice 2. Robot delegation
+
+The employee picks a robot, a conversation and resource scope, allowed actions, and a mode (read-only, draft-then-confirm, limited auto). The server stores a versioned delegation. Enforcement is on the server, not in the prompt.
+
+Tests: Project Assistant and Knowledge Assistant can hold different action sets on one connection. Revoking one does not revoke the other. A robot with no delegation cannot read through a sibling grant. Expired delegations fail.
+
+### Slice 3. Controlled read and draft
+
+The authorized robot reads the approved project context with the user credential and produces a progress draft that cites sources and update times. v1 of this slice is employee-triggered. Continuous inbound is slice 5, and only after a measured answer to which Feishu events arrive for that named group.
+
+Audit the read (employee, robot, connection, delegation version, resource ids, time). No send.
+
+Tests: a doc or group outside the delegation is refused. Text inside a group message does not add a resource. App-token fallback does not run when the user token is invalid.
+
+### Slice 4. Execute as the employee
+
+The employee confirms the exact content and the exact recipients. The robot then calls Feishu `messages.create` with the user token when `im:message.send_as_user` is granted and the bot-in-group prerequisites on that page are met. The call returns the platform message id, or a visible error. The confirm record is bound to that content and those targets. A retry, a timeout, or a duplicate callback must not send a second message. Changing content or targets after confirm requires a new confirm.
+
+If the target tenant cannot send as the user, stop and tell the employee the message would go out as the bot, or require them to send it themselves. Do not report a bot send as send-as-self.
+
+Audit the confirm and the platform result id.
+
+Tests: recipient mismatch fails. Cross-tenant connection fails. Two deliveries of the same confirm produce one platform send. Knowledge Assistant with send disabled cannot call this entry.
+
+### Slice 5. Continuous work and multi-robot coordination
+
+Only if the slice 1 measurement shows Feishu will keep delivering events for the approved project group. Implement primary selection, dedupe, claim, echo suppression, human takeover, and limited auto inside the delegation. Send remains the primary robot, and draft-then-confirm stays the default mode until the employee explicitly chooses limited auto for that delegation.
+
+If the measurement says only @bot messages arrive, the status UI says that. It does not describe a full employee inbox.
+
+Tests from the acceptance list below that cover two robots, double reply, takeover, and revoke of pending work land here.
+
+### Slice 6. Duty and org sedimentation
+
+Wire the proxy entry so enterprise seat and duty policy is a joint gate with the employee delegation. From tasks that completed with a platform result, a person may extract a reviewable, versioned process candidate (steps, template, verification case) through the existing human-gated skill path (`pattern-detection.publish-draft-skill` and skill lifecycle `reviewing`).
+
+What the org may keep: the method, the template, the steps, and the verification cases for project follow-up.
+
+What the org does not keep: the employee access token, the refresh token, private conversation content, and the personal delegation. Another employee who installs the same skill still connects their own work account and creates their own grants. Publish does not copy those.
+
+## Acceptance criteria for the first closed loop
+
+The loop is Feishu, named project group, Project Assistant. All of these must hold before the loop is called done:
+
+- Employee A connects their Feishu account and authorizes robot R1. R1 can work inside the scoped project. Robot R2, which was not delegated that connection, cannot borrow it.
+- The same account can authorize two robots with different read, write, and send limits. One inbound message never produces two external replies.
+- The identity recipients see matches the product display. If send-as-self is refused by Feishu, the product says so and does not report success as the employee.
+- Groups, docs, and recipients outside the delegation are refused. A connection for another Feishu tenant is refused. Text inside a group message cannot widen the grant.
+- Actions in draft-then-confirm mode wait for the employee confirm of that content and those targets. Retries, timeouts, and duplicate callbacks do not double-send.
+- After revoke, an invalid token, or loss of membership, further execution stops. Restore is a new connect or a new delegation, not a replay of the cancelled queue.
+- Every action traces to the employee, the robot, the connection, the delegation version, the trigger message, the target, the confirm record, and the external result. A successful bind screen is not a completed business action.
 
 ## What remains intentionally unchanged
 
-- Fabric default stays off until a deployment sets `OPENBOT_FABRIC_ENABLED` or `gateway.fabric.enabled`.
-- Agent runtime does not request `ConnectorAction`.
+- Fabric stays off unless a deployment sets `OPENBOT_FABRIC_ENABLED` or `gateway.fabric.enabled`.
+- `data_capability` invoke stays knowledge-object-only. Agent runtime does not request `ConnectorAction`.
 - Sandbox default stays off. Managed Enterprise shared-process startup refusal stays fail-closed.
-- IM sender ids are not employee ids.
-- This document is the inventory and the plan. It does not implement any slice.
+- Public-bot ingress stays the app identity. It is not rewritten into a fake employee session.
+- DingTalk and WeCom are not given a user-proxy send path in this plan.
+- Desktop automation is not a dependency.
+- This document does not implement any slice.
