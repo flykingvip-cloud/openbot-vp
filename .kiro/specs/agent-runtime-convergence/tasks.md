@@ -815,3 +815,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved fixed attempt teardown into execution/runner/attempt-cleanup. Original sequential cleanup could skip session, websocket and lock release if an earlier remover or flush threw. The fixed component attempts every owned release in the original order and propagates collected failures; no scheduling or configurable execution added. — codex-runtime-manager
 - Failure injection across all eight cleanup positions and original workspace/context/attempt regression: 4 files / 84 PASS; final focused rerun 11 PASS. Full tsgo PASS; typed lint clean; architecture 51 PASS. Earlier combined runtime regression 64 files / 326 PASS. Complete attempt migration and overall retirement remain open. — codex-runtime-manager
+
+## After-turn context projection ownership (2026-11-07)
+
+- Moved after-turn runtime context projection from legacy attempt into capabilities/adapters/after-turn-context. Preserved identity inheritance, auth profile, tool ceiling, skill policy and original compact context shape; original body removed. No source reads or execution control added. — codex-runtime-manager
+- Attempt/context runner regression 2 files / 61 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration and retirement remain open. — codex-runtime-manager

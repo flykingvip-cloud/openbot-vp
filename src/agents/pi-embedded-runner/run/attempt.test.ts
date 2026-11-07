@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildAfterTurnRuntimeContext } from "../../../agent-runtime/capabilities/index.js";
 import {
   wrapStreamFnEnforceProtocolTextNonExecution,
   enforceProtocolTextNonExecutionInMessage,
@@ -29,11 +30,7 @@ import {
   lastAssistantHasProtocolViolation,
   resetProtocolViolationPersistForTest,
 } from "../../protocol-violation.js";
-import {
-  buildAfterTurnRuntimeContext,
-  resolveAttemptFsWorkspaceOnly,
-  resolvePromptModeForSession,
-} from "./attempt.js";
+import { resolveAttemptFsWorkspaceOnly, resolvePromptModeForSession } from "./attempt.js";
 
 function createOllamaProviderConfig(injectNumCtxForOpenAICompat: boolean): OpenBotConfig {
   return {

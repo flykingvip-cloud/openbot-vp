@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { buildAfterTurnRuntimeContext } from "../../../agent-runtime/capabilities/index.js";
 import { invokeContextAfterTurn } from "../../../agent-runtime/capabilities/index.js";
 import { resolveAttemptSandbox } from "../../../agent-runtime/capabilities/index.js";
 import { wrapStreamFnEnforceProtocolTextNonExecution } from "../../../agent-runtime/capabilities/index.js";
@@ -191,7 +192,6 @@ import { resolveTranscriptPolicy } from "../../transcript-policy.js";
 import { DEFAULT_BOOTSTRAP_FILENAME } from "../../workspace.js";
 import { isRunnerAbortError } from "../abort.js";
 import { appendCacheTtlTimestamp, isCacheTtlEligibleProvider } from "../cache-ttl.js";
-import type { CompactEmbeddedPiSessionParams } from "../compact.js";
 import { buildEmbeddedExtensionFactories } from "../extensions.js";
 import { applyExtraParamsToAgent } from "../extra-params.js";
 import {
@@ -271,61 +271,6 @@ export function resolveAttemptFsWorkspaceOnly(params: {
     cfg: params.config,
     agentId: params.sessionAgentId,
   });
-}
-
-/** Build runtime context passed into context-engine afterTurn hooks. */
-export function buildAfterTurnRuntimeContext(params: {
-  attempt: Pick<
-    EmbeddedRunAttemptParams,
-    | "sessionKey"
-    | "messageChannel"
-    | "messageProvider"
-    | "agentAccountId"
-    | "config"
-    | "skillsSnapshot"
-    | "senderIsOwner"
-    | "provider"
-    | "modelId"
-    | "thinkLevel"
-    | "reasoningLevel"
-    | "bashElevated"
-    | "extraSystemPrompt"
-    | "ownerNumbers"
-    | "authProfileId"
-    | "inboundToolCeiling"
-    | "skillPolicy"
-    | "executionIdentity"
-    | "gatewayClientUser"
-    | "gatewayClientSessionDomain"
-    | "gatewayClientPlatformUserId"
-    | "gatewayClientSessionEnterpriseId"
-    | "gatewayClientSessionMembershipId"
-  >;
-  workspaceDir: string;
-  agentDir: string;
-}): Partial<CompactEmbeddedPiSessionParams> {
-  return {
-    sessionKey: params.attempt.sessionKey,
-    messageChannel: params.attempt.messageChannel,
-    messageProvider: params.attempt.messageProvider,
-    agentAccountId: params.attempt.agentAccountId,
-    authProfileId: params.attempt.authProfileId,
-    workspaceDir: params.workspaceDir,
-    agentDir: params.agentDir,
-    config: params.attempt.config,
-    skillsSnapshot: params.attempt.skillsSnapshot,
-    senderIsOwner: params.attempt.senderIsOwner,
-    provider: params.attempt.provider,
-    model: params.attempt.modelId,
-    thinkLevel: params.attempt.thinkLevel,
-    reasoningLevel: params.attempt.reasoningLevel,
-    bashElevated: params.attempt.bashElevated,
-    extraSystemPrompt: params.attempt.extraSystemPrompt,
-    ownerNumbers: params.attempt.ownerNumbers,
-    inboundToolCeiling: params.attempt.inboundToolCeiling,
-    skillPolicy: params.attempt.skillPolicy,
-    ...inheritExecutionIdentityRunFields(params.attempt),
-  };
 }
 
 export async function runEmbeddedAttempt(
