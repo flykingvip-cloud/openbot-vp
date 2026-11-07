@@ -947,3 +947,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Draft preview binds the host-provided original execution identity and checks it plus cancellation before post/edit, including final flush. Replacement binding stops buffered preview rather than retargeting old text; final delivery retains its separate captured identity. Unbound dialogue previews retain existing behavior. — codex-runtime-manager
 - Draft/process regression 2 files / 24 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Integrated candidate 1ed678fda full build PASS. Complete retirement and real lifecycle acceptance remain open. — codex-runtime-manager
+
+## Telegram request task boundary (2026-11-07)
+
+- Reproduced media send and preview edit surviving task invalidation (2 FAIL). Telegram send/edit requests now recheck supplied task identity inside each retry attempt; routed outbound text/media/payload forwards the original boundary. Direct monitor and draft paths remain pending. — codex-runtime-manager
+- Scoped transport/adapter regression 2 files / 6 PASS; full tsgo PASS; typed lint clean; architecture 52 PASS. Broader send suite retains 2 pre-existing retry expectation failures (59 PASS), reproduced using exact HEAD send.ts before this change; no retry policy weakened. Overall retirement remains open. — codex-runtime-manager

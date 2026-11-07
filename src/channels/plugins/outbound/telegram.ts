@@ -1,3 +1,4 @@
+import type { TaskActionBoundary } from "../../../agent-runtime/contracts/task.js";
 import type { ReplyPayload } from "../../../auto-reply/types.js";
 import type { OutboundSendDeps } from "../../../infra/outbound/deliver.js";
 import type { TelegramInlineButtons } from "../../../telegram/button-types.js";
@@ -13,6 +14,7 @@ type TelegramSendFn = typeof sendMessageTelegram;
 type TelegramSendOpts = Parameters<TelegramSendFn>[2];
 
 function resolveTelegramSendContext(params: {
+  taskBoundary?: TaskActionBoundary;
   cfg: NonNullable<TelegramSendOpts>["cfg"];
   deps?: OutboundSendDeps;
   accountId?: string | null;
@@ -21,6 +23,7 @@ function resolveTelegramSendContext(params: {
 }): {
   send: TelegramSendFn;
   baseOpts: {
+    taskBoundary?: TaskActionBoundary;
     cfg: NonNullable<TelegramSendOpts>["cfg"];
     verbose: false;
     textMode: "html";
@@ -33,6 +36,7 @@ function resolveTelegramSendContext(params: {
   return {
     send,
     baseOpts: {
+      taskBoundary: params.taskBoundary,
       verbose: false,
       textMode: "html",
       cfg: params.cfg,
@@ -91,8 +95,9 @@ export const telegramOutbound: ChannelOutboundAdapter = {
   chunker: markdownToTelegramHtmlChunks,
   chunkerMode: "markdown",
   textChunkLimit: 4000,
-  sendText: async ({ cfg, to, text, accountId, deps, replyToId, threadId }) => {
+  sendText: async ({ cfg, to, text, accountId, deps, replyToId, threadId, taskBoundary }) => {
     const { send, baseOpts } = resolveTelegramSendContext({
+      taskBoundary,
       cfg,
       deps,
       accountId,
@@ -110,12 +115,14 @@ export const telegramOutbound: ChannelOutboundAdapter = {
     text,
     mediaUrl,
     mediaLocalRoots,
+    taskBoundary,
     accountId,
     deps,
     replyToId,
     threadId,
   }) => {
     const { send, baseOpts } = resolveTelegramSendContext({
+      taskBoundary,
       cfg,
       deps,
       accountId,
@@ -126,6 +133,7 @@ export const telegramOutbound: ChannelOutboundAdapter = {
       ...baseOpts,
       mediaUrl,
       mediaLocalRoots,
+      taskBoundary,
     });
     return { channel: "telegram", ...result };
   },
@@ -134,12 +142,14 @@ export const telegramOutbound: ChannelOutboundAdapter = {
     to,
     payload,
     mediaLocalRoots,
+    taskBoundary,
     accountId,
     deps,
     replyToId,
     threadId,
   }) => {
     const { send, baseOpts } = resolveTelegramSendContext({
+      taskBoundary,
       cfg,
       deps,
       accountId,
@@ -153,6 +163,7 @@ export const telegramOutbound: ChannelOutboundAdapter = {
       baseOpts: {
         ...baseOpts,
         mediaLocalRoots,
+        taskBoundary,
       },
     });
     return { channel: "telegram", ...result };

@@ -5,6 +5,8 @@ import type {
   ReactionTypeEmoji,
 } from "@grammyjs/types";
 import { type ApiClientOptions, Bot, HttpError, InputFile } from "grammy";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { loadConfig } from "../config/config.js";
 import { resolveMarkdownTableMode } from "../config/markdown-tables.js";
 import { logVerbose } from "../globals.js";
@@ -46,6 +48,7 @@ type TelegramApi = Bot["api"];
 type TelegramApiOverride = Partial<TelegramApi>;
 
 type TelegramSendOpts = {
+  taskBoundary?: TaskActionBoundary;
   cfg?: ReturnType<typeof loadConfig>;
   token?: string;
   accountId?: string;
@@ -450,6 +453,7 @@ type TelegramRequestWithDiag = <T>(
 ) => Promise<T>;
 
 function createTelegramRequestWithDiag(params: {
+  taskBoundary?: TaskActionBoundary;
   cfg: ReturnType<typeof loadConfig>;
   account: ResolvedTelegramAccount;
   retry?: RetryConfig;
@@ -472,7 +476,16 @@ function createTelegramRequestWithDiag(params: {
     label?: string,
     options?: { shouldLog?: (err: unknown) => boolean },
   ) => {
-    const runRequest = () => request(fn, label);
+    const runRequest = () =>
+      request(() => {
+        if (params.taskBoundary) {
+          const refusal = checkTaskActionBoundary(params.taskBoundary);
+          if (refusal) {
+            throw new Error(refusal);
+          }
+        }
+        return fn();
+      }, label);
     const call =
       params.useApiErrorLogging === false
         ? runRequest()
@@ -543,6 +556,7 @@ function createRequestWithChatNotFound(params: {
 }
 
 function createTelegramNonIdempotentRequestWithDiag(params: {
+  taskBoundary?: TaskActionBoundary;
   cfg: ReturnType<typeof loadConfig>;
   account: ResolvedTelegramAccount;
   retry?: RetryConfig;
@@ -550,6 +564,7 @@ function createTelegramNonIdempotentRequestWithDiag(params: {
   useApiErrorLogging?: boolean;
 }): TelegramRequestWithDiag {
   return createTelegramRequestWithDiag({
+    taskBoundary: params.taskBoundary,
     cfg: params.cfg,
     account: params.account,
     retry: params.retry,
@@ -614,6 +629,7 @@ export async function sendMessageTelegram(
   });
   const hasThreadParams = Object.keys(threadParams).length > 0;
   const requestWithDiag = createTelegramNonIdempotentRequestWithDiag({
+    taskBoundary: opts.taskBoundary,
     cfg,
     account,
     retry: opts.retry,
@@ -1061,6 +1077,7 @@ export async function deleteMessageTelegram(
 }
 
 type TelegramEditOpts = {
+  taskBoundary?: TaskActionBoundary;
   token?: string;
   accountId?: string;
   verbose?: boolean;
@@ -1150,6 +1167,7 @@ export async function editMessageTelegram(
   });
   const messageId = normalizeMessageId(messageIdInput);
   const requestWithDiag = createTelegramRequestWithDiag({
+    taskBoundary: opts.taskBoundary,
     cfg,
     account,
     retry: opts.retry,
