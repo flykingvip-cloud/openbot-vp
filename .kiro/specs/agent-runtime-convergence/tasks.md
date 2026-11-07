@@ -896,3 +896,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Delivery fencing now originates only from the execution-bound callback, including its actual sessionFile. This avoids assigning old task boundaries to control replies and covers newly created sessions absent from the ingress store snapshot. Original completion observation remains separate. — codex-runtime-manager
 - Dispatcher/dispatch regression 2 files / 56 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Full migration remains open. — codex-runtime-manager
+
+## Integrated candidate verification (2026-11-07)
+
+- Candidate f05c52f26: joint runtime/dispatch/cron/followup/transport/context regression 73 files / 560 PASS; configured embedded/auth/fallback integration 3 files / 34 PASS. Full tsgo PASS; architecture 51 PASS; full build PASS with 209 existing ineffective dynamic-import warnings and UI chunk warnings. — codex-runtime-manager
+- Isolated Deepseek Gateway prompt/read/exec suite exited 0 (1 PASS, 1 unrelated skipped); temporary state removed, channels and cron disabled. One exec allowlist rejection was logged before successful suite completion. This is not complete personal/collaboration asynchronous or real-channel acceptance. — codex-runtime-manager
+- Remaining gates: complete supply/adapter contracts and legacy consumer convergence; durable reconciliation closeout; dispatcher transport metadata propagation through channel-specific awaits; individual/group real asynchronous lifecycle on one integrated candidate. No merge, push or deployment. — codex-runtime-manager
