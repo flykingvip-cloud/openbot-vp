@@ -1270,3 +1270,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Downstream audit reproduced 22 failures because provider/billing/delivery fixtures supplied unmarked input directly to execution. Fixtures now explicitly identify internal origin and intercept the migrated embedded implementation; original BYOK remapping, credit snapshot, empty/filtered replies and media assertions remain unchanged. No production admission bypass added. — codex-runtime-manager
 - Four files / 22 PASS; full tsgo PASS; typed lint clean. These targeted results do not constitute the full repository suite or production acceptance. — codex-runtime-manager
+
+## Comprehensive execution-entry fixtures updated (2026-11-08)
+
+- Updated internal-origin fixtures and migrated embedded/CLI mock boundaries without changing production behavior. Partial fallback mocks retain actual exports; cron/provider mocks reset queued responses between cases; English reminder cases explicitly declare English presentation. Original fallback, cancellation, compaction, streaming, reminder and usage assertions remain. — codex-runtime-manager
+- Comprehensive reply-entry regression 28 PASS; full tsgo PASS; typed lint clean. Earlier audit failures were preserved in temporary logs and resolved rather than weakening production admission or restoring retired semantic routes. — codex-runtime-manager

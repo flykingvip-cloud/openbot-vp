@@ -16,7 +16,8 @@ const runCliAgentMock = vi.fn();
 const runWithModelFallbackMock = vi.fn();
 const runtimeErrorMock = vi.fn();
 
-vi.mock("../../agents/model-fallback.js", () => ({
+vi.mock("../../agents/model-fallback.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agents/model-fallback.js")>()),
   runWithModelFallback: (params: {
     provider: string;
     model: string;
@@ -58,6 +59,13 @@ vi.mock("../../runtime.js", async () => {
   };
 });
 
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
+}));
+vi.mock("../../agent-runtime/execution/runner/cli-run.js", () => ({
+  runCliAgent: (params: unknown) => runCliAgentMock(params),
+}));
+
 vi.mock("./queue.js", async () => {
   const actual = await vi.importActual<typeof import("./queue.js")>("./queue.js");
   return {
@@ -85,11 +93,11 @@ type RunWithModelFallbackParams = {
 };
 
 beforeEach(() => {
-  runEmbeddedPiAgentMock.mockClear();
-  runCliAgentMock.mockClear();
+  runEmbeddedPiAgentMock.mockReset();
+  runCliAgentMock.mockReset();
   runWithModelFallbackMock.mockClear();
   runtimeErrorMock.mockClear();
-  loadCronStoreMock.mockClear();
+  loadCronStoreMock.mockReset();
   // Default: no cron jobs in store.
   loadCronStoreMock.mockResolvedValue({ version: 1, jobs: [] });
   resetSystemEventsForTest();
@@ -133,6 +141,7 @@ describe("runReplyAgent onAgentRunStart", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         sessionId: "session",
         sessionKey: "main",
         messageProvider: "webchat",
@@ -244,6 +253,7 @@ describe("runReplyAgent authProfileId fallback scoping", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         agentId: "main",
         agentDir: "/tmp/agent",
         sessionId: "session",
@@ -359,6 +369,7 @@ describe("runReplyAgent auto-compaction token update", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         agentId: "main",
         agentDir: "/tmp/agent",
         sessionId: "session",
@@ -618,6 +629,7 @@ describe("runReplyAgent block streaming", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         sessionId: "session",
         sessionKey: "main",
         messageProvider: "discord",
@@ -720,6 +732,7 @@ describe("runReplyAgent block streaming", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         sessionId: "session",
         sessionKey: "main",
         messageProvider: "discord",
@@ -801,6 +814,7 @@ describe("runReplyAgent claude-cli routing", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         sessionId: "session",
         sessionKey: "main",
         messageProvider: "webchat",
@@ -900,6 +914,7 @@ describe("runReplyAgent messaging tool suppression", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         sessionId: "session",
         sessionKey,
         messageProvider,
@@ -1123,6 +1138,7 @@ describe("runReplyAgent reminder commitment guard", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         sessionId: "session",
         sessionKey: "main",
         messageProvider: "telegram",
@@ -1147,6 +1163,7 @@ describe("runReplyAgent reminder commitment guard", () => {
 
     return runReplyAgent({
       commandBody: "hello",
+      opts: { expectedReplyLanguage: "en" },
       followupRun,
       queueKey: "main",
       resolvedQueue,
@@ -1342,6 +1359,7 @@ describe("runReplyAgent fallback reasoning tags", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         agentId: "main",
         agentDir: "/tmp/agent",
         sessionId: "session",
@@ -1463,6 +1481,7 @@ describe("runReplyAgent response usage footer", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         agentId: "main",
         agentDir: "/tmp/agent",
         sessionId: "session",
@@ -1574,6 +1593,7 @@ describe("runReplyAgent transient HTTP retry", () => {
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         sessionId: "session",
         sessionKey: "main",
         messageProvider: "telegram",
