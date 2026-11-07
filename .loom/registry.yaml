@@ -10909,6 +10909,8 @@ landingStreams:
       - ui/src/ui/navigation.test.ts
       - ui/src/ui/ports/enterprise/views/enterprise-im-channel-form.ts
       - ui/src/styles/enterprise-im-channels.css
+      - ui/src/ui/ports/enterprise/views/enterprise-shell.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-shell-archive-css.node.test.ts
       - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.ts
       - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.browser.test.ts
       - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.capability.test.ts
