@@ -21,8 +21,6 @@ import {
   saveUserOperationalIdentityCredentialSecretStore,
   type UserOperationalIdentityCredentialSecretStore,
 } from "../user-operational-identity-secrets-persistence.js";
-import type { GatewayRequestHandler } from "./types.js";
-
 const fixture = vi.hoisted(() => ({
   tenantPath: "",
   identityPath: "",
@@ -499,5 +497,32 @@ describe("feishu employee grant RPC", () => {
     });
     expect(mismatch.payload).toMatchObject({ code: "ENTERPRISE_CONNECTION_MISMATCH" });
     expect(await grantCount()).toBe(1);
+  });
+
+  it("saves send with draft_then_confirm and refuses read_only plus send", async () => {
+    const saved = await invoke(
+      "user-operational-identity.grants.upsert",
+      grantParams("project", ["read", "draft", "send"], { confirmMode: "draft_then_confirm" }),
+    );
+    expect(saved.ok).toBe(true);
+    const grant = (
+      saved.payload as {
+        grant?: { allowedActions?: string[]; confirmMode?: string };
+      }
+    ).grant;
+    expect(grant?.allowedActions).toEqual(["read", "draft", "send"]);
+    expect(grant?.confirmMode).toBe("draft_then_confirm");
+    expect(await grantCount()).toBe(1);
+
+    const before = await grantCount();
+    const refused = await invoke(
+      "user-operational-identity.grants.upsert",
+      grantParams("knowledge", ["send"], { confirmMode: "read_only" }),
+    );
+    expect(refused.ok).toBe(false);
+    expect(refused.error?.details?.code).toBe("GRANT_FIELDS_INVALID");
+    expect(await grantCount()).toBe(before);
+    assertRedacted(saved);
+    assertRedacted(refused);
   });
 });

@@ -85,9 +85,16 @@ const DENY_MESSAGE: Record<EnterpriseImDenyCode, string> = {
   DELEGATION_AMBIGUOUS: "多个授权同时匹配，不能按第一条放行。",
 };
 
+/**
+ * Confirm mode is when a later send must wait for a human. It is not a ban on
+ * storing send. `read_only` cannot include send. `draft_then_confirm` may include
+ * send; the content, target, and grant-version confirmation record is Slice 4.
+ * `limited_auto` may include send and is still limited by resource scope and
+ * enterprise policy. Slice 2 only persists this delegation.
+ */
 const MODE_ACTIONS: Record<EnterpriseImConfirmMode, ReadonlySet<string>> = {
   read_only: new Set(["read"]),
-  draft_then_confirm: new Set(["read", "draft"]),
+  draft_then_confirm: new Set(["read", "draft", "send"]),
   limited_auto: new Set(["read", "draft", "send"]),
 };
 
@@ -225,6 +232,10 @@ export function decideEnterpriseImEmployeeProxy(
   if (!grant?.grantId) {
     return deny("DELEGATION_MISSING");
   }
+  // Allow means this action is on a valid delegation. It does not clear a
+  // specific document, recipient, or content-confirmation record. Slice 3
+  // checks the resource. Slice 4 checks recipients and the confirm record.
+  // A missing enterpriseImEmployeeProxy policy stays a deny. Do not default-allow.
   return {
     outcome: "allow",
     identityId: identity.identityId,

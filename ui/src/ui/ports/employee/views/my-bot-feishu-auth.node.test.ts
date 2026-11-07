@@ -279,4 +279,114 @@ describe("robot operational auth Feishu checkbox", () => {
     expect(project.mock.calls[0]?.[0].agentId).toBe("project");
     expect(knowledge.mock.calls[0]?.[0].agentId).toBe("knowledge");
   });
+
+  it("submits and redisplays send with draft_then_confirm", () => {
+    const onApplyRobotIdentityGrants = vi.fn();
+    const container = document.createElement("div");
+    const base = {
+      entry: {
+        id: "bot-a",
+        sessionKey: "s",
+        name: "项目助手",
+        emoji: null,
+        source: "owned" as const,
+        status: "running" as const,
+      },
+      loading: false,
+      error: null,
+      saving: false,
+      bot: null,
+      identityDraft: null,
+      activeTab: "auth" as const,
+      onTabChange: () => undefined,
+      onIdentityDraftChange: () => undefined,
+      onSaveIdentity: () => undefined,
+      onExploreCapabilities: () => undefined,
+      onOpenGroup: () => undefined,
+      onSelectSession: () => undefined,
+      onApplyRobotIdentityGrants,
+      onApplyRobotEnterpriseIdentities: () => undefined,
+      onLoadRobotEnterpriseIdentities: () => undefined,
+    };
+    render(
+      renderMyBotWorkspacePanel({
+        ...base,
+        userOperationalIdentitySnapshot: {
+          identities: [bound],
+          grants: [],
+          usageHistory: [],
+          pendingBindingRequests: [],
+          providerCatalog: [],
+          enterpriseAccessByAgent: { "bot-a": [] },
+          feishuEmployeeChannel: {
+            accountId: "t_001_default",
+            employeeUiHint: "app_can_attempt",
+            loginEnabled: true,
+            statusLabel: "可绑定",
+            platformEnterpriseId: "tenant-key-1",
+            childExecutionBlocked: false,
+          },
+        },
+      }),
+      container,
+    );
+    const box = container.querySelector<HTMLInputElement>("[data-provider='feishu-personal']")!;
+    box.checked = true;
+    const row = box.closest("li")!;
+    row.querySelector<HTMLInputElement>("[data-feishu-action='draft']")!.checked = true;
+    row.querySelector<HTMLInputElement>("[data-feishu-action='send']")!.checked = true;
+    const mode = row.querySelector<HTMLSelectElement>("[data-feishu-confirm-mode]")!;
+    expect(mode.value).toBe("draft_then_confirm");
+    container.querySelector<HTMLButtonElement>(".btn.btn--primary")?.click();
+    expect(onApplyRobotIdentityGrants).toHaveBeenCalledWith(
+      expect.objectContaining({
+        desired: [
+          expect.objectContaining({
+            allowedActions: ["draft", "send"],
+            confirmMode: "draft_then_confirm",
+          }),
+        ],
+      }),
+    );
+
+    render(
+      renderMyBotWorkspacePanel({
+        ...base,
+        userOperationalIdentitySnapshot: {
+          identities: [bound],
+          grants: [
+            {
+              grantId: "g-send-confirm",
+              identityId: bound.identityId,
+              agentId: "bot-a",
+              agentScope: "owned",
+              allowedActions: ["draft", "send"],
+              grantMode: "explicit",
+              status: "active",
+              confirmMode: "draft_then_confirm",
+            },
+          ],
+          usageHistory: [],
+          pendingBindingRequests: [],
+          providerCatalog: [],
+          enterpriseAccessByAgent: { "bot-a": [] },
+          feishuEmployeeChannel: {
+            accountId: "t_001_default",
+            employeeUiHint: "app_can_attempt",
+            loginEnabled: true,
+            statusLabel: "可绑定",
+            platformEnterpriseId: "tenant-key-1",
+            childExecutionBlocked: false,
+          },
+        },
+      }),
+      container,
+    );
+    const shown = container.querySelector<HTMLInputElement>("[data-feishu-action='send']")!;
+    const shownMode = container.querySelector<HTMLSelectElement>("[data-feishu-confirm-mode]")!;
+    expect(shown.checked).toBe(true);
+    expect(shownMode.value).toBe("draft_then_confirm");
+    expect(shownMode.value).not.toBe("limited_auto");
+    expect(container.textContent).toContain("起草后确认");
+  });
 });

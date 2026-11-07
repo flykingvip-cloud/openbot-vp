@@ -4,7 +4,9 @@
  * This is not `resolveEmployeeOperationalAuthorization`. That helper allows an
  * enterprise employee who has no seat. Enterprise IM must not reuse that allow.
  * A policy row must name this employee, this seat, this robot, and this action.
- * "A policy exists" is not enough.
+ * "A policy exists" is not enough. Rows come from the tenant override
+ * `enterpriseImEmployeeProxy.policies`. A missing config stays a deny.
+ * Do not add a default allow for a pilot.
  */
 import type { FeishuEmployeeChannelGate } from "./enterprise-im-employee-connection.js";
 import { loadFeishuEmployeeChannelGate } from "./enterprise-im-employee-connection.js";

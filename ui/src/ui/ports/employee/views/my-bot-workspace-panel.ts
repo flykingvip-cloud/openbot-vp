@@ -930,7 +930,11 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
                           /></label>
                           <label
                             >确认方式
-                            <select data-feishu-confirm-mode ?disabled=${busy}>
+                            <select
+                              data-feishu-confirm-mode
+                              .value=${grant?.confirmMode ?? "draft_then_confirm"}
+                              ?disabled=${busy}
+                            >
                               <option
                                 value="read_only"
                                 ?selected=${grant?.confirmMode === "read_only"}

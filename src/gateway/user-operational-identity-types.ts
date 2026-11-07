@@ -24,6 +24,11 @@ export type UserOperationalIdentityAgentScope = "owned" | "shared" | "group";
 
 export type UserOperationalIdentityGrantMode = "auto" | "explicit";
 
+/**
+ * When a later send waits for a person. `read_only` cannot include send.
+ * `draft_then_confirm` may include send; the content confirm is Slice 4.
+ * `limited_auto` may include send and stays inside resource scope and policy.
+ */
 export type EnterpriseImConfirmMode = "read_only" | "draft_then_confirm" | "limited_auto";
 
 export type EnterpriseImResourceScope = {
