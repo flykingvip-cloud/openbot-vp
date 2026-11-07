@@ -8,6 +8,7 @@ import {
   enforceProtocolTextNonExecutionInMessage,
 } from "../../../agent-runtime/capabilities/index.js";
 import { resolvePromptBuildHookResult } from "../../../agent-runtime/capabilities/index.js";
+import { resolveAttemptFsWorkspaceOnly } from "../../../agent-runtime/capabilities/index.js";
 import {
   composeSystemPromptWithHookContext,
   prependSystemPromptAddition,
@@ -21,6 +22,7 @@ import {
   decodeHtmlEntitiesInObject,
 } from "../../../agent-runtime/model/index.js";
 import { wrapStreamFnTrimToolCallNames } from "../../../agent-runtime/model/index.js";
+import { resolvePromptModeForSession } from "../../../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { PROTOCOL_FAILURE_USER_TEXT } from "../../model-output-boundary.js";
 import { resolveOllamaBaseUrlForRun } from "../../ollama-stream.js";
@@ -30,7 +32,6 @@ import {
   lastAssistantHasProtocolViolation,
   resetProtocolViolationPersistForTest,
 } from "../../protocol-violation.js";
-import { resolveAttemptFsWorkspaceOnly, resolvePromptModeForSession } from "./attempt.js";
 
 function createOllamaProviderConfig(injectNumCtxForOpenAICompat: boolean): OpenBotConfig {
   return {

@@ -820,3 +820,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved after-turn runtime context projection from legacy attempt into capabilities/adapters/after-turn-context. Preserved identity inheritance, auth profile, tool ceiling, skill policy and original compact context shape; original body removed. No source reads or execution control added. — codex-runtime-manager
 - Attempt/context runner regression 2 files / 61 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration and retirement remain open. — codex-runtime-manager
+
+## Attempt policy ownership (2026-11-07)
+
+- Moved prompt-mode classification into policy/prompt-mode and existing workspace restriction resolution into capabilities/adapters/attempt-workspace-policy. Original bodies removed; collaboration workspace restriction and steward isolation retain their precedence. No additional model call or execution path. — codex-runtime-manager
+- Workspace/context/attempt regression 3 files / 75 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Overall migration and retirement remain open. — codex-runtime-manager

@@ -28,3 +28,5 @@ export { resolveAttemptSandbox } from "./adapters/attempt-sandbox.js";
 export { invokeContextAfterTurn } from "./adapters/context-after-turn.js";
 
 export { buildAfterTurnRuntimeContext } from "./adapters/after-turn-context.js";
+
+export { resolveAttemptFsWorkspaceOnly } from "./adapters/attempt-workspace-policy.js";

@@ -27,3 +27,5 @@ export {
   MAX_OVERFLOW_COMPACTION_ATTEMPTS,
   resolveMaxRunRetryIterations,
 } from "./run-limits.js";
+
+export { resolvePromptModeForSession } from "./prompt-mode.js";

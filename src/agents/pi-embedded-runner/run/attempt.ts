@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
+import { resolveAttemptFsWorkspaceOnly } from "../../../agent-runtime/capabilities/index.js";
 import { buildAfterTurnRuntimeContext } from "../../../agent-runtime/capabilities/index.js";
 import { invokeContextAfterTurn } from "../../../agent-runtime/capabilities/index.js";
 import { resolveAttemptSandbox } from "../../../agent-runtime/capabilities/index.js";
@@ -24,11 +25,11 @@ import {
   wrapStreamFnDecodeXaiToolCallArguments,
 } from "../../../agent-runtime/model/index.js";
 import { wrapStreamFnTrimToolCallNames } from "../../../agent-runtime/model/index.js";
+import { resolvePromptModeForSession } from "../../../agent-runtime/policy/index.js";
 import { sessionTaskState } from "../../../agent-runtime/state/index.js";
 import { captureTaskActionBoundary } from "../../../agent-runtime/state/task-action.js";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
-import type { OpenBotConfig } from "../../../config/config.js";
 import { emitChatInboundStage } from "../../../gateway/chat-inbound-stage-events.js";
 import {
   compilerTelemetryToFaultRoundSnapshot,
@@ -51,7 +52,7 @@ import {
 } from "../../../infra/operator-local-computer.js";
 import { MAX_IMAGE_BYTES } from "../../../media/constants.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
-import { isCronSessionKey, isSubagentSessionKey } from "../../../routing/session-key.js";
+import { isSubagentSessionKey } from "../../../routing/session-key.js";
 import {
   registerVisibleReplyRewriter,
   visibleReplyRewritePrompt,
@@ -73,7 +74,6 @@ import {
   buildBootstrapInjectionStats,
 } from "../../bootstrap-budget.js";
 import { makeBootstrapWarn, resolveBootstrapContextForRun } from "../../bootstrap-files.js";
-import { shouldForceEmployeeStewardToolFsWorkspaceOnly } from "../../builtin-steward/employee-isolation.js";
 import { createCacheTrace } from "../../cache-trace.js";
 import {
   listChannelSupportedActions,
@@ -186,7 +186,6 @@ import {
 import { buildSystemPromptParams } from "../../system-prompt-params.js";
 import { buildSystemPromptReport } from "../../system-prompt-report.js";
 import { sanitizeToolCallIdsForCloudCodeAssist } from "../../tool-call-id.js";
-import { resolveEffectiveToolFsWorkspaceOnly } from "../../tool-fs-policy.js";
 import { listNodes } from "../../tools/nodes-utils.js";
 import { resolveTranscriptPolicy } from "../../transcript-policy.js";
 import { DEFAULT_BOOTSTRAP_FILENAME } from "../../workspace.js";
@@ -241,37 +240,6 @@ import { buildTextOnlyImagePromptGuard, detectAndLoadPromptImages } from "./imag
 import { resolveEmbeddedAttemptToolsRaw } from "./resolve-embedded-tools.js";
 import { rewriteAttemptVisibleReply } from "./rewrite-visible-reply.js";
 import type { EmbeddedRunAttemptParams, EmbeddedRunAttemptResult } from "./types.js";
-
-export function resolvePromptModeForSession(sessionKey?: string): "minimal" | "full" {
-  if (!sessionKey) {
-    return "full";
-  }
-  return isSubagentSessionKey(sessionKey) || isCronSessionKey(sessionKey) ? "minimal" : "full";
-}
-
-export function resolveAttemptFsWorkspaceOnly(params: {
-  config?: OpenBotConfig;
-  sessionAgentId: string;
-  sessionKey?: string;
-  /** Collaboration rounds must keep exec/tool cwd inside the group workspace root. */
-  collaborationRoundInvoked?: boolean;
-}): boolean {
-  if (params.collaborationRoundInvoked) {
-    return true;
-  }
-  if (
-    shouldForceEmployeeStewardToolFsWorkspaceOnly({
-      sessionKey: params.sessionKey,
-      agentId: params.sessionAgentId,
-    })
-  ) {
-    return true;
-  }
-  return resolveEffectiveToolFsWorkspaceOnly({
-    cfg: params.config,
-    agentId: params.sessionAgentId,
-  });
-}
 
 export async function runEmbeddedAttempt(
   params: EmbeddedRunAttemptParams,
