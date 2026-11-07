@@ -1244,3 +1244,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Preserved original source/tests in local annotated archive/runtime-semantic-routing-20261108 at 07352de77 before removing the three unused semantic routing modules and two historical comparison suites. Recorded original intent, retained owners, public consumer audit and rollback reference. State query non-mutation coverage remains; architecture has no exceptions for removed modules. — codex-runtime-manager
 - Current interaction/state/constraint regression 4 files / 15 PASS; full tsgo PASS; changed-file typed lint clean; architecture 54 PASS. Archive tag is local only. Whole executor replacement and same-version group/asynchronous acceptance remain open; no deployment. — codex-runtime-manager
+
+## Standalone aside executor retired (2026-11-08)
+
+- Removed the unused ephemeral aside executor and private registry after consumer/SDK audit and source archival. Ordinary dialogue uses shared governed interaction; historical sidecar reads and Gateway run identity isolation remain. Task cancellation no longer loads an unused secondary embedded executor solely to cancel an empty legacy registry. — codex-runtime-manager
+- New late-provider cancellation regression plus current interaction/state/Gateway identity 4 files / 17 PASS; full tsgo PASS; typed lint clean; architecture 54 PASS. Real isolated active-task dialogue leaves board unchanged; supplement/local revision/full replacement maintain task identity and active constraint counts 1/2/1. — codex-runtime-manager
+- Earlier candidate 4c119c1cc: runtime regression 69 files / 308 PASS; separate collaboration delivery/real background-process/durable restart 4 files / 17 PASS; full build PASS with 209 existing dynamic-import warnings. These are separate evidence sets, not a combined total or whole-system acceptance. No deployment. — codex-runtime-manager

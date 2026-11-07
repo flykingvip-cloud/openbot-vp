@@ -110,3 +110,27 @@ it("bounds a provider that does not settle or honor cancellation", async () => {
   await expect(invokeInteractionCompletion({ ...request, timeoutMs: 10 })).rejects.toThrow();
   expect(mocks.complete).toHaveBeenCalledOnce();
 });
+
+it("rejects a late provider answer after cancellation during inference", async () => {
+  const controller = new AbortController();
+  let release!: () => void;
+  mocks.complete.mockImplementation(async (_model, _context, options) => {
+    expect(options.signal.aborted).toBe(false);
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return {
+      content: [{ type: "text", text: '{"kind":"reply","text":"late"}' }],
+      stopReason: "stop",
+      usage: makeZeroUsageSnapshot(),
+    };
+  });
+  const pending = invokeInteractionCompletion({
+    ...request,
+    input: { ...request.input, abortSignal: controller.signal },
+  });
+  controller.abort();
+  release();
+  await expect(pending).rejects.toThrow();
+  expect(mocks.complete).toHaveBeenCalledOnce();
+});
