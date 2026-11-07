@@ -1,3 +1,5 @@
+import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
+import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import {
   resolveAgentConfig,
   resolveAgentDir,
@@ -13,11 +15,9 @@ import { getCliSessionId, setCliSessionId } from "../../agents/cli-session.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { resolveCronStyleNow } from "../../agents/current-time.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../agents/defaults.js";
-import { resolveEmbeddedModelGovernance } from "../../agents/embedded-model-governance.js";
 import type { HookDeliveryResult } from "../../agents/execution-preflight/hook-delivery.js";
 import { resolveNestedAgentLane } from "../../agents/lanes.js";
 import { loadModelCatalog } from "../../agents/model-catalog.js";
-import { runWithModelFallback } from "../../agents/model-fallback.js";
 import {
   getModelRefStatus,
   isCliProvider,
@@ -52,30 +52,18 @@ import {
   updateSessionStore,
 } from "../../config/sessions.js";
 import type { AgentDefaultsConfig } from "../../config/types.js";
-import {
-  releaseEnterpriseAgentRun,
-  tryAcquireEnterpriseAgentRun,
-} from "../../gateway/billing/agent-run-governance.js";
 import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain.js";
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
 import { resolveEnterpriseEmbeddedTransport } from "../../gateway/enterprise-model/embedded-transport.js";
-import {
-  buildRunModelSetSnapshot,
-  forgetRunModelSet,
-  rememberRunModelSet,
-  snapshotCreditReportingFromGate,
-} from "../../gateway/governance/spawn-snapshot-handoff.js";
 import { isHookDispatchSessionKey } from "../../gateway/hook-surface-session.js";
 import { resolveKnowledgeGatewayClientForAgentRun } from "../../gateway/knowledge/agent-run-gateway-client.js";
 import {
   consumeCapabilityRoutingResult,
   formatCapabilityExecutionSurfaceLog,
 } from "../../gateway/model-entitlement/capability-entry-consume.js";
-import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
-import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { resolveCronWriteRoot } from "../../gateway/workspace-resolver/write-roots.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { logWarn } from "../../logger.js";
@@ -1054,15 +1042,12 @@ export async function runCronIsolatedAgentTurn(params: {
 
     const runPrompt = async (promptText: string) => {
       const cronRunId = cronSession.sessionEntry.sessionId;
-      let cronSlotHeld = false;
-      let modelGate: EmployeeModelGateResult | undefined;
-      let cronAuthorizationId: string | undefined;
+      const modelSession = createAuthorizedModelSession(cronRunId, bindAdmittedTurnHost());
       const runContextEstimate = buildRunContextEstimateParts({
         taskText: promptText,
         sessionEntry: cronSession.sessionEntry,
       });
-      const runSlot = await tryAcquireEnterpriseAgentRun({
-        runId: cronRunId,
+      const runSlot = await modelSession.authorize({
         agentId,
         modelGateInput: {
           cfg: cfgWithAgentDefaults,
@@ -1074,15 +1059,8 @@ export async function runCronIsolatedAgentTurn(params: {
       if (!runSlot.skipped && !runSlot.acquired) {
         throw new Error(runSlot.message);
       }
-      if (runSlot.acquired) {
-        cronSlotHeld = true;
-        cronAuthorizationId = runSlot.authorizationDecisionId;
-        if (runSlot.modelGate) {
-          modelGate = runSlot.modelGate;
-          commercialCreditReporting =
-            runSlot.modelGate?.creditReporting ?? commercialCreditReporting;
-        }
-      }
+      const modelGate = modelSession.gate;
+      commercialCreditReporting = modelGate?.creditReporting ?? commercialCreditReporting;
       try {
         const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
           allowlist: modelGate?.allowlist,
@@ -1108,42 +1086,13 @@ export async function runCronIsolatedAgentTurn(params: {
         if (executionRouting.planFailure.kind === "no_executable_candidates") {
           throw new Error(executionRouting.planFailure.message);
         }
-        const embeddedModelGovernance = resolveEmbeddedModelGovernance({
-          gateStatus: cronSlotHeld ? "acquired" : "skipped",
-          allowlist: executionRouting.allowlist,
-          tenantId: modelGate?.tenantId,
-          commercialAuthorizationId: cronAuthorizationId,
-        });
-        const parentSnapshot = buildRunModelSetSnapshot({
-          runId: cronRunId,
-          allowlist: executionRouting.allowlist,
-          governanceMode: embeddedModelGovernance.governanceMode,
-          commercialAuthorizationId: cronAuthorizationId,
-          tenantId: modelGate?.tenantId,
-          preferredModelOrder: executionRouting.preferredModelOrder,
-          platformModelsMode:
-            modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(cfgWithAgentDefaults),
-          ...(modelGate?.effectiveRouting?.selectorStrategy
-            ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
-            : {}),
-          // P4-1: parent billing context for child runs (acquired gate only).
-          creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
-        });
-        if (parentSnapshot) {
-          rememberRunModelSet(cronRunId, parentSnapshot);
-        }
-        const fallbackResult = await runWithModelFallback({
+        modelSession.prepareModelSet({ config: cfgWithAgentDefaults, routing: executionRouting });
+        const fallbackResult = await modelSession.infer({
           cfg: cfgWithAgentDefaults,
           provider,
           model,
-          ...embeddedModelGovernance,
-          ...(executionRouting.preferredModelOrder
-            ? { preferredModelOrder: executionRouting.preferredModelOrder }
-            : {}),
-          runtimeAdmission: {
-            taskText: promptText,
-          },
-          runId: cronSession.sessionEntry.sessionId,
+          taskText: promptText,
+          signal: abortSignal,
           agentDir,
           fallbacksOverride:
             payloadFallbacks ?? resolveAgentModelFallbacksOverride(params.cfg, agentId),
@@ -1324,13 +1273,7 @@ export async function runCronIsolatedAgentTurn(params: {
         commercialFallbackAttempts = fallbackResult.attempts;
         runEndedAt = Date.now();
       } finally {
-        if (cronSlotHeld) {
-          try {
-            await releaseEnterpriseAgentRun(cronRunId);
-          } finally {
-            forgetRunModelSet(cronRunId);
-          }
-        }
+        await modelSession.dispose();
       }
     };
 

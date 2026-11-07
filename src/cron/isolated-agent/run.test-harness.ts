@@ -104,6 +104,8 @@ vi.mock("../../agents/model-fallback.js", () => ({
 }));
 
 vi.mock("../../agents/pi-embedded.js", () => ({
+  queueEmbeddedPiMessage: vi.fn(),
+  abortEmbeddedPiRun: vi.fn(),
   runEmbeddedPiAgent: runEmbeddedPiAgentMock,
 }));
 
@@ -122,6 +124,7 @@ vi.mock("../../agents/timeout.js", () => ({
 }));
 
 vi.mock("../../agents/usage.js", () => ({
+  normalizeUsage: vi.fn((usage) => usage),
   deriveSessionTotalTokens: vi.fn().mockReturnValue(30),
   hasNonzeroUsage: hasNonzeroUsageMock,
 }));

@@ -57,7 +57,8 @@ export const COMMERCIAL_RUN_ENTRYPOINTS: readonly CommercialRunEntrypoint[] = [
     id: "cron_isolated_agent",
     label: "Cron / Automation isolated agent",
     paths: ["src/cron/isolated-agent/run.ts"],
-    requiredGateSymbols: ["tryAcquireEnterpriseAgentRun"],
+    gateOwnerPaths: ["src/agent-runtime/model/authorized-session.ts"],
+    requiredGateSymbols: ["createAuthorizedModelSession", "tryAcquireEnterpriseAgentRun"],
   },
   {
     id: "resources_high_tier",

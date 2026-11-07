@@ -759,3 +759,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Routing and snapshot preparation now sit inside the acquired-slot cleanup boundary. Previously no_executable_candidates could throw before finally and leak the slot. Snapshot forgetting also runs when release fails. Regression rejects before model startup and verifies exactly one release. — codex-runtime-manager
 - Cron model/fallback/owner regression 3 files / 10 PASS; added boundary suite 4 PASS; full tsgo PASS and changed-file typed lint clean. Full runtime replacement remains open. — codex-runtime-manager
+
+## Cron shared model lifecycle (2026-11-07)
+
+- Cron now uses createAuthorizedModelSession for authorization, governance snapshot, fallback and awaited disposal; removed its duplicate lifecycle implementation. Candidate execution and durable usage outbox remain unchanged. Updated commercial gate registry to the delegated owner. — codex-runtime-manager
+- Cron credit/fallback, long-horizon and commercial gate regression: 4 files / 24 PASS. Full tsgo PASS; typed lint 0 errors; architecture 51 PASS. Pi core loop still has production consumers; no complete retirement, merge or deployment claimed. — codex-runtime-manager
