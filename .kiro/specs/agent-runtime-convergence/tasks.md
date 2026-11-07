@@ -769,3 +769,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved model-resolution hook ordering and legacy-result caching from the old runner into capabilities/adapters/model-resolve-hooks. Removed original body; preserves new-hook precedence per field, legacy prompt result reuse and nonfatal hook failures. No new execution authority. — codex-runtime-manager
 - Adapter and attempt regression 2 files / 63 PASS; full tsgo PASS; typed lint clean; architecture 51 PASS. Old core loop still serves production consumers and remains pending replacement. — codex-runtime-manager
+
+## Provider credential application ownership (2026-11-07)
+
+- Moved resolved credential application from legacy run.ts into model/apply-provider-credential. Preserves AWS SDK identity, missing-key rejection, Copilot token exchange and refresh ordering. Original body removed; no credential store or retry loop added. — codex-runtime-manager
+- Credential/refresh regression 2 files / 6 PASS; auth rotation integration 25 PASS. Full tsgo PASS; typed lint clean; architecture 51 PASS. Prior checkpoint full build PASS with dynamic-import and UI chunk warnings; complete retirement remains open. — codex-runtime-manager

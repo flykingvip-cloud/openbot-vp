@@ -10,6 +10,7 @@ import {
   cleanupEmbeddedRun,
 } from "../../agent-runtime/execution/index.js";
 import { recoverContextOverflow } from "../../agent-runtime/execution/index.js";
+import { applyProviderCredential } from "../../agent-runtime/model/index.js";
 import { prepareEmbeddedModel } from "../../agent-runtime/model/index.js";
 import { createCopilotTokenRefresh } from "../../agent-runtime/model/index.js";
 import {
@@ -54,11 +55,7 @@ import { NOOP_CONSTITUTIONAL_RUNTIME_SHADOW_SINK } from "../execution-preflight/
 import type { HookDeliveryResult } from "../execution-preflight/hook-delivery.js";
 import { latestUserText } from "../execution-stall-continue.js";
 import { FailoverError, resolveFailoverStatus } from "../failover-error.js";
-import {
-  ensureAuthProfileStore,
-  getApiKeyForModel,
-  type ResolvedProviderAuth,
-} from "../model-auth.js";
+import { ensureAuthProfileStore, getApiKeyForModel } from "../model-auth.js";
 import { ensureOpenClawModelsJson } from "../models-config.js";
 import {
   formatBillingErrorMessage,
@@ -91,8 +88,6 @@ import {
 } from "./tool-result-truncation.js";
 import type { EmbeddedPiAgentMeta, EmbeddedPiRunResult } from "./types.js";
 import { describeUnknownError } from "./utils.js";
-
-type ApiKeyInfo = ResolvedProviderAuth;
 
 // Avoid Anthropic's refusal test token poisoning session transcripts.
 const ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL = "ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL";
@@ -248,7 +243,6 @@ export async function runEmbeddedPiAgent(
       const initialThinkLevel = params.thinkLevel ?? "off";
       let thinkLevel = initialThinkLevel;
       const attemptedThinking = new Set<ThinkLevel>();
-      let apiKeyInfo: ApiKeyInfo | null = null;
       let lastProfileId: string | undefined;
       const copilotRefresh = createCopilotTokenRefresh({
         enabled: effectiveModel.provider === "github-copilot",
@@ -326,32 +320,14 @@ export async function runEmbeddedPiAgent(
       };
 
       const applyApiKeyInfo = async (candidate?: string): Promise<void> => {
-        apiKeyInfo = await resolveApiKeyForCandidate(candidate);
-        const resolvedProfileId = apiKeyInfo.profileId ?? candidate;
-        if (!apiKeyInfo.apiKey) {
-          if (apiKeyInfo.mode !== "aws-sdk") {
-            throw new Error(
-              `No API key resolved for provider "${effectiveModel.provider}" (auth mode: ${apiKeyInfo.mode}).`,
-            );
-          }
-          lastProfileId = resolvedProfileId;
-          return;
-        }
-        if (effectiveModel.provider === "github-copilot") {
-          const { resolveCopilotApiToken } =
-            await import("../../providers/github-copilot-token.js");
-          const copilotToken = await resolveCopilotApiToken({
-            githubToken: apiKeyInfo.apiKey,
-          });
-          authStorage.setRuntimeApiKey(effectiveModel.provider, copilotToken.token);
-          if (copilotRefresh.enabled) {
-            copilotRefresh.remember(apiKeyInfo.apiKey, copilotToken.expiresAt);
-            copilotRefresh.schedule();
-          }
-        } else {
-          authStorage.setRuntimeApiKey(effectiveModel.provider, apiKeyInfo.apiKey);
-        }
-        lastProfileId = apiKeyInfo.profileId;
+        const credential = await resolveApiKeyForCandidate(candidate);
+        lastProfileId = await applyProviderCredential({
+          provider: effectiveModel.provider,
+          candidate,
+          credential,
+          setRuntimeApiKey: (provider, token) => authStorage.setRuntimeApiKey(provider, token),
+          copilotRefresh,
+        });
       };
 
       const authRotation = createAuthProfileRotation({

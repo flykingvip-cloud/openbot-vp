@@ -36,3 +36,5 @@ export {
   decodeHtmlEntitiesInObject,
   wrapStreamFnDecodeXaiToolCallArguments,
 } from "./xai-arguments-stream.js";
+
+export { applyProviderCredential } from "./apply-provider-credential.js";
