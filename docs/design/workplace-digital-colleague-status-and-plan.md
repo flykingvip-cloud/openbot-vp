@@ -1,38 +1,59 @@
 # Workplace digital colleague: status and plan
 
-**Scenario:** An employee connects a work account they already have in Feishu, DingTalk, or WeCom, then authorizes one or more selected robots to participate in existing work inside that grant, using the employee work identity. Methods that survive review can settle into the organization. Enterprise public bots are a separate mode.
+**Scenario:** The enterprise tenant opens a platform connection. An employee then logs in and authorizes through that connection, and delegates selected robots to participate in existing work inside that grant. Methods that survive review can settle into the organization. Enterprise public bots are a separate mode.
 
 **Repo:** `flykingvip-cloud/openbot-vp` (`@upbeyond/openbot`)
-**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Clarified again at `f7698602` for gate order, multi-employee selection, Feishu read APIs, and send/revoke races. No macro expansion.
+**Baseline:** `main` at `658bb327` (merge of #247, 2026-11-05). Plan revised 2026-11-07. Clarified at `f7698602` and `07cf2b7f`. This pass starts the chain at the existing enterprise channel and removes the personal-use branch. No new architecture.
 **Nature:** Code-grounded inventory and an ordered implementation plan. This document does not change runtime behavior.
 **Date:** 2026-11-07
 
 ## Product experience to deliver
 
-Employees already have work identity, contacts, groups, and work resources in Feishu, DingTalk, and WeCom. OpenBot lets an employee connect that work account, then authorize specific robots to act inside the grant.
+Employees already have work identity, contacts, groups, and work resources in Feishu, DingTalk, and WeCom. The enterprise opens the platform first. The employee then logs in through that connection and delegates specific robots.
 
-Example. An employee connects Feishu. They allow Project Assistant to handle one named project group, read related docs, draft progress, and send on their behalf. They allow Knowledge Assistant to organize docs and not to send messages. Each grant can be paused or revoked on its own.
+Example. An admin enables Feishu on the existing enterprise channel page. A tenant employee logs in and authorizes their Feishu account. They allow Project Assistant to handle one named project group, read related docs, draft progress, and send on their behalf. They allow Knowledge Assistant to organize docs and not to send messages. Each robot grant can be paused or revoked on its own. Disabling Feishu for the tenant stops every employee grant under that connection.
 
 Spine:
 
 ```
-Connect employee work account
-  -> grant proxy authority to specific robot(s)
-  -> controlled execution in existing work scenes
+Enterprise tenant opens platform connection
+  -> employee logs in and authorizes through that enterprise connection
+  -> bind to the employee identity inside the current OpenBot tenant
+  -> employee delegates selected robot(s)
+  -> robot participates within the grant
   -> auditable trail
   -> settle verified methods as org capability
 ```
 
-Effective permission is the intersection of four gates:
+The enterprise entry already exists. Do not add a second install path. System settings renders **企业通道** (`ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.ts`, nav label in `enterprise-access-control-surface.ts`, route `/enterprise/{tenant}/settings/channels`). The page shows WeCom, Feishu, and DingTalk cards and writes `channels.<id>.accounts.t_<tenant>_default`. A card may sit on Loading. Slice 1a reuses this page for app config, enterprise auth, scopes, and connection check. The employee never types App ID or App Secret.
+
+| Layer | Product entry | Records |
+| --- | --- | --- |
+| Enterprise | Existing 企业通道: configure or install the platform app, enterprise auth, scopes, connection check | OpenBot tenant bound to the platform enterprise, app config, available capabilities, connection status |
+| Employee | Platforms the enterprise has already enabled. The employee clicks login and completes the user authorization that platform allows | Trusted bind of this tenant employee to the platform user, user-granted scopes, status |
+| Robot delegation | The employee picks one or more of their robots and sets resources, actions, and confirm mode | Versioned delegation of a robot over that employee connection |
+| Execution | The call uses that enterprise app plus that employee grant. Auth is checked, then the platform is called | Identity, delegation basis, targets, results |
+
+If the enterprise has not enabled the platform, the employee UI says 「企业尚未开通」. If it is enabled but the required scopes are missing, the employee UI says 「等待管理员开通权限」.
+
+Three steps stay separate in data and auth even when the screens feel continuous:
+
+1. Employee login says who they are.
+2. Employee authorization says what the app may do on their behalf.
+3. Robot delegation says which robot may use those capabilities.
+
+A platform login that only identifies the user is not a grant of personal message send or receive. Connecting an account does not open every scope to every robot. An enterprise job grant does not substitute for the employee authorization of their own work identity. The platform grant is on the enterprise app. OpenBot then delegates that employee connection to specific robots. A new robot does not require a fresh platform OAuth, and it does not require the employee to re-enter the app secret.
+
+Effective permission is the intersection of:
 
 ```
-platform grant
-  ∩ employee active delegation
+enterprise connection still enabled
+  ∩ platform scopes on that app
+  ∩ employee authorization still active
+  ∩ employee robot delegation
   ∩ enterprise duty policy
   ∩ resource and target constraints
 ```
-
-Connecting an account does not open every scope to every robot. An enterprise job grant does not substitute for the employee proxy of their own work identity. Platform OAuth typically grants the app. OpenBot then delegates that connection to specific robots. A new robot does not require a fresh platform OAuth.
 
 ### Two product modes
 
@@ -251,7 +272,8 @@ Severity is for the employee-identity proxy. Public-bot ingress is listed so it 
 | Leg | Status | Severity | Evidence | Gap |
 | --- | --- | --- | --- | --- |
 | Enterprise public bot ingress | Partial, and it is a separate mode | P2 for the proxy. Do not treat it as P0 progress on the proxy. | Extensions monitor to `resolveAgentRoute` to `dispatchReplyFromConfig`. Console writes `t_<tenant>_default`. | A bot can reply. The platform identity is the app. `CHAT_CHANNEL_ORDER` and `@openclaw/*` package ids still present product IM as secondary. DingTalk uses the compat SDK. |
-| Connect employee work account | Missing | P0 | `user-operational-identity-providers.ts` lists `feishu-personal` as `rolloutTier: "deferred"`, `registrationReady: false`, empty actions, hint "当前仅支持企业 Bot/App 连接". Enterprise operational-identity catalog test excludes `feishu`, `wecom`, and `dingtalk`. Feishu client is `appId` + `appSecret` (`extensions/feishu/src/client.ts`). DingTalk token call is `POST /v1.0/oauth2/accessToken` with `appKey`/`appSecret` (`extensions/dingtalk/src/api.ts`), which is the app token, not `userAccessToken`. | No trusted bind of platform enterprise + platform user + OpenBot employee + granted scopes. No status UI for connect, renew, or disconnect of a user credential. |
+| Enterprise platform connection | Partial | P0 for the proxy chain. The page exists. Employee authorization on top of it does not. | 企业通道 at `/enterprise/{tenant}/settings/channels` writes bot credentials to `t_<tenant>_default` (`enterprise-message-channels-surface.ts`). That is app config for the public bot, not a recorded OpenBot-tenant to platform-enterprise bind used by employee login. | Reuse this page. Do not add a parallel install wizard. Slice 1a must show capability status on the same cards. |
+| Employee login and authorization through that connection | Missing | P0 | `user-operational-identity-providers.ts` lists `feishu-personal` as `rolloutTier: "deferred"`, `registrationReady: false`. Enterprise operational-identity catalog test excludes `feishu`, `wecom`, and `dingtalk`. Feishu client is `appId` + `appSecret`. DingTalk token call is `POST /v1.0/oauth2/accessToken` with `appKey`/`appSecret`, the app token, not `userAccessToken`. | No employee UI that logs in only for platforms the tenant enabled. No trusted bind that points at the enterprise connection. No 「企业尚未开通」 or 「等待管理员开通权限」 state. |
 | Robot delegation | Missing | P0 | Seat asset bindings and `resolveAgentRunEntitlementScope` map an agent to a seat. They do not record which robot may use which employee connection, which actions, which resources, or when the grant expires. | Authorizing Project Assistant does not exist as data. A second robot can neither be granted a narrower scope nor be proven unable to borrow the first grant. |
 | Controlled read and send in an existing work scene | Missing for user identity. Public bot tools are a different identity. | P0 | `data_capability` invoke stays `knowledge-object-only`. Feishu doc/wiki/drive tools use the app client. WeCom and DingTalk monitors send the bot reply. | No server entry that loads a user credential, checks delegation, and calls the platform as that employee. Group text must not widen grants. |
 | Trail of a proxy action | Missing | P0 | `enterprise-data.audit.invocations.list` records data-gateway invokes for a signed-in console session. Public-bot turns do not write it. Fabric is default off. | A proxy action must trace employee, robot, connection, delegation version, trigger, target, confirm record, and external result. "Bind success" is not business complete. That trace does not exist. |
@@ -260,19 +282,26 @@ Severity is for the employee-identity proxy. Public-bot ingress is listed so it 
 
 ## Identity and authorization
 
-Keep account connection and robot delegation as two records. Do not collapse them into `GatewayClientPlatformUserId`.
+Keep the enterprise connection, the employee authorization, and the robot delegation as separate records. Do not collapse them into `GatewayClientPlatformUserId`. Login is not scopes. Scopes are not a robot delegation.
 
-### Work account connection
+### Enterprise connection
 
-A connection is a trusted bind among:
+The enterprise record is the 企业通道 configuration for one OpenBot tenant and one platform: app config, the platform enterprise id the admin connection check observed, the scopes the app actually has, and connection status. Employees do not submit that enterprise id and do not submit the app secret.
 
-- the platform (Feishu, DingTalk, or WeCom)
-- the platform enterprise (Feishu tenant, DingTalk `corpId`, WeCom `corpid`)
+### Employee authorization
+
+An employee connection always references one enterprise connection. The server checks that the platform enterprise on the token matches the enterprise connection already stored for this OpenBot tenant. A platform enterprise id supplied only by the employee is not enough to create the bind.
+
+The employee record is a trusted bind among:
+
+- that enterprise connection
 - the platform user (Feishu `open_id` / `user_id`, DingTalk `unionId` / `userId`, WeCom `userid`)
-- the OpenBot employee (platform-auth user already bound to a membership)
-- the platform-granted app scopes actually returned on the token (`scope` on Feishu refresh; the scopes the admin published plus the scopes the user consented)
+- the OpenBot employee (platform-auth user already bound to a membership in this tenant)
+- the user-granted scopes actually returned (`scope` on Feishu refresh; admin-published scopes plus what this user consented)
 
-The employee confirms this bind through the platform OAuth or the platform equivalent. An admin install or publish of the OpenBot app is a prerequisite on these platforms. It is not the employee consent, and employee consent is not admin install.
+Login and authorization stay two steps. A completed login without the scopes for send or receive is shown as identity only. It is not shown as permission to send or read personal messages.
+
+The employee confirms authorization through the platform OAuth or the platform equivalent, started from OpenBot after the enterprise connection is enabled. Admin install or publish of the app is the enterprise step. It is not the employee consent.
 
 Access and refresh tokens live in the server credential vault. They do not go into the model context, prompts, skill files, or ordinary logs. The existing split between operational-identity metadata and a secrets file (`docs/design/openbot-saas-tenant-data-architecture.md` describes `openbot-user-operational-identity.json` versus `openbot-user-operational-identity-secrets.json`) is the pattern to reuse. `feishu-personal` is not that implementation. It is a deferred catalog row.
 
@@ -324,7 +353,7 @@ Enterprise job grants do not replace (1) or (2). Employee delegation does not re
 - Slices 3 and 4 call that entry before the first real read or write. The gate there is minimal: in enterprise mode the OpenBot employee resolves to exactly one seat in the tenant, and a minimal enterprise policy allows this robot to do this class of work for that employee. A full duty ontology is not required yet. The enterprise door is not skipped.
 - Slice 6 enriches that same entry with duty detail and adds org sedimentation. It is not the first attachment of enterprise authorization.
 
-**Standalone personal-use mode**, if a pilot needs it, is a named mode with a written boundary: one OpenBot user, no tenant seat, no enterprise data objects, and no enterprise group. The product states that enterprise policy was not evaluated. Enterprise mode never falls through into personal-use mode. A missing seat, a missing policy, or an ambiguous binding inside enterprise mode is a deny. It is not treated as passed.
+This scope is the enterprise tenant only. There is no standalone personal-use mode and no second path that skips the enterprise connection. A missing seat, a missing policy, or an ambiguous binding is a deny. It is not treated as passed.
 
 ### Rejected first slice
 
@@ -385,8 +414,10 @@ If a Feishu tool is later pointed at a user credential and that credential is mi
 ## Credentials and checks on every call
 
 - Resolve connection plus delegation at the execution entry of each read, write, and send. Checking only when the task is created is not enough.
-- Revoking one robot delegation does not revoke another robot on the same connection.
-- Revoking or disconnecting the account blocks new calls and cancels or revalidates queued work for every robot on that connection. Calls already accepted by Feishu, DingTalk, or WeCom need a final-status read (`message_id`, `msgid`, or an error callback). Do not promise that in-flight platform operations can be recalled.
+- Revoking one robot delegation does not revoke another robot on the same employee connection.
+- The enterprise disabling the platform connection blocks new execution for every employee connection under it, and for every robot that depended on those grants.
+- An employee disconnect or revoke stops only that employee and the robots that depend on that employee grant. Other employees on the same enterprise connection keep working.
+- Calls already accepted by Feishu, DingTalk, or WeCom need a final-status read (`message_id`, `msgid`, or an error callback). Do not promise that in-flight platform operations can be recalled.
 - Employee leave, loss of OpenBot membership, platform scope removal, and Feishu errors 20010 and 20037 invalidate execution that depended on that connection.
 - Tokens stay in the server vault. Logs may store connection id, delegation version, and platform result id. They do not store access tokens, refresh tokens, or app secrets.
 
@@ -398,7 +429,7 @@ If a Feishu tool is later pointed at a user credential and that credential is mi
 
 **Revoke versus send.** The final checkpoint is the server execution entry immediately before the platform call. Once revoke is recorded, that entry accepts no new execution. A request the platform has already accepted is stored as accepted and reconciled. Revoke does not promise recall of that request.
 
-**Disconnect is not platform revoke.** OpenBot disconnect disables the connection inside OpenBot: new calls stop, queued work is cancelled or revalidated, and local access and refresh tokens are deleted after in-flight reconciliations finish or time out. That action does not by itself revoke the authorization on Feishu. Platform revoke is a separate employee or admin action on Feishu, or an explicit control added later that calls Feishu. The event `auth.user_access_token.revoked_v4` also disables the connection and deletes local tokens. The status UI names which of the two happened.
+**Disconnect is not platform revoke.** Employee disconnect disables that employee connection inside OpenBot: new calls for that employee stop, their queued work is cancelled or revalidated, and their local access and refresh tokens are deleted after in-flight reconciliations finish or time out. That action does not by itself revoke the authorization on Feishu, and it does not disable the enterprise app. Platform revoke is a separate employee or admin action on Feishu, or an explicit control added later that calls Feishu. The event `auth.user_access_token.revoked_v4` disables that employee connection and deletes that employee local tokens. The status UI names which of the two happened. Disabling the enterprise connection is a third switch: it blocks every employee under that platform, and it is not the same record as one employee disconnect.
 
 ## Multi-robot coordination in v1
 
@@ -429,19 +460,29 @@ One employee with several robots is not the same problem as several OpenBot empl
 
 ## Implementation order
 
-Acceptance scene, once the slice 1 checklist has Measured both the chosen read API and the send API: "Project Assistant handles a named project group." If group history is not readable and named docs are, the scene shrinks to "draft and send progress from designated docs." Do not promise the group-progress loop before both measurements pass. Platform for this loop: Feishu self-built app. DingTalk and WeCom wait until their matrix row for the needed capability is Docs or better, and the product copy tells the truth about identity.
+Acceptance scene, once the slice 1a checklist has Measured both the chosen read API and the send API: an admin enables Feishu on the existing 企业通道 page, a tenant employee logs in and authorizes, and Project Assistant works inside the grant. If group history is not readable and named docs are, the scene shrinks to "draft and send progress from designated docs." Do not promise the group-progress loop before both measurements pass. Feishu is first. DingTalk and WeCom use the same four layers, adapted to what those platforms actually support. They do not get a second install page.
 
-The first development target inside that scene is one employee, one connection, and one explicit delegation. The same model must be unable to borrow another employee connection or another robot delegation.
+The first development target inside that scene is one enterprise connection, one employee authorization on it, and one explicit robot delegation. The same model must be unable to borrow another employee authorization or another robot delegation.
 
 Each slice is its own change. Basic audit is part of slices 1 through 5, not a final UI project. `data_capability` action `invoke` stays `knowledge-object-only`. New platform actions go through an explicit server entry that holds the proxy execution context. They do not go through `enterprise-data.invoke` by opening generic connector calls, and they do not go through the current Feishu app-credential tools.
 
-### Slice 1. Capability validation and connection
+### Slice 1a. Enterprise channel
 
-Confirm, in a target Feishu enterprise, the scopes the published self-built app can actually receive. Implement employee OAuth for `user_access_token`, including `offline_access` when refresh is required. Bind platform tenant, platform user, and OpenBot employee. Store tokens in the vault. Support refresh, disconnect, and a status UI (connected, needs reauth, revoked, admin publish missing). Disconnect follows the rule above: it deletes local credentials and does not claim a Feishu-side revoke unless one was performed.
+Reuse 企业通道. Do not add a parallel enterprise install path. On that page, for Feishu first, verify or complete the app config the card already edits, record the platform enterprise the connection check observed, and show capability status (which of the checklist rows the installed app can attempt). Employee UI reads this status. It does not collect App ID or App Secret.
 
-Audit each connect, refresh, failure, and disconnect. Binding success is not the closed loop.
+If the card is still Loading, fix that loading state on this surface rather than starting a new screen.
 
-The validation deliverable is a filled checklist. Generic "a user token reads what the user can read" does not fill it. The IM overview still lists history, reply, and forward as `tenant_access_token` only. That uncertainty stays until a row below is Measured.
+Audit admin enable, disable, scope change, and connection check. Disabling the enterprise connection blocks new execution for every employee connection under it.
+
+### Slice 1b. Employee login and authorization
+
+Only after 1a shows the platform enabled. The employee UI lists platforms this OpenBot tenant has enabled. The employee clicks login and completes the user authorization Feishu allows (`user_access_token`, including `offline_access` when refresh is required). The server binds that platform user to the current tenant employee and stores the employee connection as a child of the enterprise connection. The platform enterprise on the token must match the enterprise connection. An enterprise id posted by the employee alone is rejected.
+
+Store tokens in the vault. Support refresh, employee disconnect, and status (identity only, authorized, needs reauth, revoked, 「企业尚未开通」, 「等待管理员开通权限」). Employee disconnect follows the rule above: it deletes that employee local credentials and does not claim a Feishu-side revoke unless one was performed. Login without the send or receive scopes stays identity-only on the status line.
+
+Audit each login, authorization, refresh, failure, and employee disconnect. A successful bind is not the closed loop.
+
+The validation deliverable is a filled checklist, owned by 1a for what the app can do and confirmed in 1b for what this user was actually granted. Generic "a user token reads what the user can read" does not fill it. The IM overview still lists history, reply, and forward as `tenant_access_token` only. That uncertainty stays until a row below is Measured.
 
 | Checklist row | What must be recorded |
 | --- | --- |
@@ -452,17 +493,15 @@ The validation deliverable is a filled checklist. Generic "a user token reads wh
 
 Only when the chosen read row and the send row are both Measured may the product promise a project-group progress closed loop. If the group-history row fails and the docs row passes, the scene is "draft and send progress from designated docs."
 
-Tests: token values never appear in tool results or prompt builders. Refresh replaces the stored refresh token and is safe under the concurrent-refresh rule. Disconnect makes the next read fail and the status says local credentials were deleted, not that Feishu revoked the grant, unless a platform revoke was recorded. A second employee cannot attach their OpenBot user to someone else token.
+Tests: token values never appear in tool results or prompt builders. Refresh replaces the stored refresh token and is safe under the concurrent-refresh rule. Employee disconnect makes that employee next read fail, leaves another employee on the same enterprise connection able to read, and the status says local credentials were deleted, not that Feishu revoked the grant, unless a platform revoke was recorded. Disabling the enterprise connection makes every child employee connection fail new calls. A token whose platform enterprise does not match the stored enterprise connection is rejected. The employee form has no App ID or App Secret fields.
 
-Out of scope: robot send, DingTalk, WeCom user proxy, Fabric flag, sandbox default, `CHAT_CHANNEL_ORDER`.
+Out of scope: robot send, a second install wizard, DingTalk and WeCom user authorization until Feishu 1a and 1b are in place (they reuse the same layers later), Fabric flag, sandbox default, `CHAT_CHANNEL_ORDER`.
 
 ### Slice 2. Robot delegation and the authorization entry
 
 The employee picks a robot, a conversation and resource scope, allowed actions, and a mode (read-only, draft-then-confirm, limited auto). The server stores a versioned delegation. Enforcement is on the server, not in the prompt.
 
-The same slice establishes the authorization decision entry from the joint-gate section. Callers in slices 3 and 4 use this entry. Distinct outcomes include allow, deny because enterprise policy is missing, deny because the seat is missing, deny because the seat binding is ambiguous, and deny because the delegation is missing, expired, or does not include the action. Enterprise mode does not map a missing policy onto personal-use mode.
-
-Personal-use mode, if a pilot turns it on, is an explicit flag with the boundary in the joint-gate section. It is off for this Feishu enterprise loop.
+The same slice establishes the authorization decision entry from the joint-gate section. Callers in slices 3 and 4 use this entry. Distinct outcomes include allow, deny because the enterprise connection is disabled, deny because enterprise policy is missing, deny because the seat is missing, deny because the seat binding is ambiguous, and deny because the delegation is missing, expired, or does not include the action. There is no personal-use outcome.
 
 Tests: Project Assistant and Knowledge Assistant can hold different action sets on one connection. Revoking one does not revoke the other. A robot with no delegation cannot read through a sibling grant. Expired delegations fail. Missing seat, missing policy, and two seat bindings each produce their own denial. Two delegations that match one conversation do not resolve by first match.
 
@@ -470,7 +509,7 @@ Tests: Project Assistant and Knowledge Assistant can hold different action sets 
 
 Before the first read, call the slice 2 decision entry. The minimal enterprise gate must already pass. Do not wait for slice 6.
 
-The robot reads only the APIs and resource types the slice 1 checklist marked Measured, using the connection the triggering employee explicitly chose. It drafts progress with sources and update times. This slice is employee-triggered. Continuous acquisition is slice 5.
+The robot reads only the APIs and resource types the slice 1a checklist marked Measured, using the connection the triggering employee explicitly chose. It drafts progress with sources and update times. This slice is employee-triggered. Continuous acquisition is slice 5.
 
 If the checklist shrunk the scene to designated docs, this slice does not call a group-history API.
 
@@ -482,7 +521,7 @@ Tests: a doc or group outside the delegation is refused. Text inside a group mes
 
 Before send, call the slice 2 decision entry again. Do not reuse a decision cached when the draft was written.
 
-The employee confirms the exact content and the exact recipients. The robot then calls the send API the slice 1 checklist Measured, with the user token, only when that checklist recorded `im:message.send_as_user` on the token and the recipient-observed identity was the employee. The call returns the platform message id, or a visible error. The confirm record is bound to that content and those targets and is stored as in the durable-confirm rule. A retry, a timeout, or a duplicate callback must not send a second message. Timeout becomes `outcome unknown` until reconciliation or human handling. Changing content or targets after confirm requires a new confirm.
+The employee confirms the exact content and the exact recipients. The robot then calls the send API the slice 1a checklist Measured, with the user token, only when that checklist recorded `im:message.send_as_user` on the token and the recipient-observed identity was the employee. The call returns the platform message id, or a visible error. The confirm record is bound to that content and those targets and is stored as in the durable-confirm rule. A retry, a timeout, or a duplicate callback must not send a second message. Timeout becomes `outcome unknown` until reconciliation or human handling. Changing content or targets after confirm requires a new confirm.
 
 If the checklist did not Measure send-as-self, stop and tell the employee the message would go out as the bot, or require them to send it themselves. Do not report a bot send as send-as-self.
 
@@ -492,7 +531,7 @@ Tests: recipient mismatch fails. Cross-tenant connection fails. Two deliveries o
 
 ### Slice 5. Continuous work and multi-employee coordination
 
-Continuous work starts only after slice 1 has verified a continuous message acquisition mechanism. That mechanism may be platform push, or an official incremental poll that meets the permission, rate limit, and latency written on the checklist. Do not bind this slice to push alone, and do not rule polling out before the checklist.
+Continuous work starts only after slice 1a has verified a continuous message acquisition mechanism. That mechanism may be platform push, or an official incremental poll that meets the permission, rate limit, and latency written on the checklist. Do not bind this slice to push alone, and do not rule polling out before the checklist.
 
 The event speaker is not the authorizer. The task uses the delegation assigned in advance to that conversation. If more than one delegation matches, stop automatic send until a person assigns one. Implement primary robot selection inside that chosen delegation, dedupe, claim, echo suppression, and human takeover. Draft-then-confirm stays the default until the employee explicitly chooses limited auto on that delegation.
 
@@ -512,14 +551,15 @@ What the org does not keep: the employee access token, the refresh token, privat
 
 ## Acceptance criteria for the first closed loop
 
-The loop is Feishu and Project Assistant, on the scene the slice 1 checklist allowed. All of these must hold before the loop is called done:
+The loop is Feishu and Project Assistant, on the scene the slice 1a checklist allowed. All of these must hold before the loop is called done:
 
-- Employee A connects their Feishu account and authorizes robot R1. R1 can work inside the scoped project. Robot R2, which was not delegated that connection, cannot borrow it.
+- An admin enables Feishu on the existing 企业通道 page. A tenant employee logs in and authorizes their Feishu account in the employee UI, without typing the app secret. They authorize Project Assistant to read the designated resources. After confirm, send uses the employee identity the checklist Measured. Disabling Feishu for the tenant stops new execution for every employee under that connection. Revoking that employee stops only their grants. Revoking Project Assistant leaves Knowledge Assistant on the same employee connection. Each of those three switches is its own record.
+- Employee A authorizes robot R1. R1 can work inside the scoped project. Robot R2, which was not delegated that connection, cannot borrow it.
 - The same account can authorize two robots with different read, write, and send limits. One inbound message never produces two external replies.
 - Employees A and B are both connected and both can see the same project group. Work does not run twice. A request from B does not use A identity. A private context does not appear in a reply sent for B. Records for the two tasks differ by connection and delegation, not only by chat id.
 - The identity recipients see matches the product display. If send-as-self is refused by Feishu, the product says so and does not report success as the employee.
 - Groups, docs, and recipients outside the delegation are refused. A connection for another Feishu tenant is refused. Text inside a group message cannot widen the grant. The read uses only APIs the checklist marked Measured.
-- In enterprise mode, a missing seat, a missing enterprise policy, or an ambiguous seat binding denies the read and the send. Personal-use mode is not treated as a pass.
+- A missing enterprise connection, a missing seat, a missing enterprise policy, or an ambiguous seat binding denies the read and the send. There is no personal-use bypass.
 - Actions in draft-then-confirm mode wait for the employee confirm of that content and those targets. Retries, timeouts, and duplicate callbacks do not double-send. A timeout stays `outcome unknown` until reconciliation or human handling. The confirm record is still there after a process restart.
 - Two robots refreshing one connection do not overwrite each other token.
 - After revoke, an invalid token, or loss of membership, the execution entry accepts no new call. A request the platform already accepted is recorded and reconciled, not recalled by promise. OpenBot disconnect deletes local credentials and does not claim Feishu revoked the grant unless a platform revoke happened. Restore is a new connect or a new delegation, not a replay of the cancelled queue.
@@ -533,4 +573,4 @@ The loop is Feishu and Project Assistant, on the scene the slice 1 checklist all
 - Public-bot ingress stays the app identity. It is not rewritten into a fake employee session.
 - DingTalk and WeCom are not given a user-proxy send path in this plan.
 - Desktop automation is not a dependency.
-- This document does not implement any slice. These four clarifications are the last plan edit before slice implementation. Further macro expansion is out of scope.
+- This document does not implement any slice. Access order starts at the existing 企业通道 page. Further macro expansion is out of scope.
