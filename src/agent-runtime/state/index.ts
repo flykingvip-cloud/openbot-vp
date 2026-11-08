@@ -7,10 +7,19 @@ export {
   listAsyncWaitJobIntents,
   listWaitingAsyncWaitJobIntents,
   markAsyncWaitJobExited,
+  markAsyncWaitJobRecoveryWakeIssued,
   clearAsyncWaitJobIntent,
   clearAsyncWaitJobsForTask,
   type AsyncWaitJobIntent,
 } from "./repository/async-wait-job.js";
+export {
+  recoverAsyncWaitJobsAtGatewayBoot,
+  claimAsyncWaitJobIntent,
+  collectRecoverableAsyncWaitIntents,
+  startAsyncWaitJobRecoveryRecheck,
+  stopAsyncWaitJobRecoveryRecheckForTests,
+  type AsyncWaitRecoveryResult,
+} from "./repository/async-wait-job-recovery.js";
 export type { ResumeParkedRecheck } from "./mutations/resume-parked.js";
 
 export { resetCorruptedSession, prepareReplacementSessionEntry } from "./session-recovery.js";

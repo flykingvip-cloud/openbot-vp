@@ -25,6 +25,8 @@ export type AsyncWaitJobIntent = {
   exitStatus?: "completed" | "failed" | "killed";
   exitedAtMs?: number;
   clearedAtMs?: number;
+  /** Set when boot/recheck issued the one bounded wake for this intent. */
+  recoveryWakeIssuedAtMs?: number;
 };
 
 const DIRNAME = "async-wait-jobs";
@@ -227,6 +229,27 @@ export function clearAsyncWaitJobsForTask(sessionFile: string, taskId: string): 
     }
   }
   return n;
+}
+
+/** Record that recovery already issued the one bounded wake (idempotent). */
+export function markAsyncWaitJobRecoveryWakeIssued(
+  sessionFile: string,
+  jobId: string,
+  atMs: number = Date.now(),
+): AsyncWaitJobIntent | undefined {
+  const current = readAsyncWaitJobIntent(sessionFile, jobId);
+  if (!current || current.status === "cleared") {
+    return current;
+  }
+  if (typeof current.recoveryWakeIssuedAtMs === "number") {
+    return current;
+  }
+  const next: AsyncWaitJobIntent = {
+    ...current,
+    recoveryWakeIssuedAtMs: atMs,
+  };
+  writeIntent(sessionFile, next);
+  return next;
 }
 
 /** Test helper: wipe jobs dir for a session file. */

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { recoverAsyncWaitJobsAtGatewayBoot } from "../agent-runtime/state/index.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { maybeProvisionBuiltinStewardAtStartup } from "../agents/builtin-steward/provision.js";
 import { getActiveEmbeddedRunCount } from "../agents/pi-embedded-runner/runs.js";
@@ -800,6 +801,21 @@ export async function startGatewayServer(
         },
       });
     })().catch((err) => log.error(`TaskOutcome consumer recovery failed: ${String(err)}`));
+  }
+
+  // Package2: recover durable async-wait intents (pid alive → wait; exited → one bounded wake).
+  if (!minimalTestGateway) {
+    void (async () => {
+      const logRecovery = log.child("async-wait-recovery");
+      recoverAsyncWaitJobsAtGatewayBoot({
+        cfg: cfgAtStart,
+        startRecheck: true,
+        log: {
+          info: (message) => logRecovery.info(message),
+          warn: (message) => logRecovery.warn(message),
+        },
+      });
+    })().catch((err) => log.error(`Async-wait recovery failed: ${String(err)}`));
   }
 
   const execApprovalManager = new ExecApprovalManager({
