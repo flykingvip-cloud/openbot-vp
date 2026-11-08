@@ -1640,3 +1640,26 @@ OPENBOT_TEST_PROFILE=low — **5 files / 20 PASS**:
 4. Package 3+ not in scope.
 
 **Ready for independent Package 2 acceptance:** yes (implementer view). **Stop here. Package 3 not started.** — grok-bot
+
+## Package 2 acceptance remediation (2026-11-08)
+
+**Failed tip:** `919c86ac151ef896b0972e468cf2552cfb59c7f9`. Package 3 still NOT started.
+
+### Fixes (in-scope only; no new scheduler)
+
+1. **Continuation mainline, not heartbeat silent drain** — Recovery no longer treats `enqueueSystemEvent` + `requestHeartbeatNow` + pending register as `delivered`. Boot/recheck **claims** under lock then **arms** existing task-board continue via `setAsyncWaitRecoveryContinueEnqueue` → `enqueueFollowupRun` with `taskBoardContinueTicket`. Delivery is only `confirmPendingTurnDelivery` after a real `claimQueuedExecution` run id.
+2. **Atomic claim** — `transitionAsyncWaitJobIntent` / `claimAsyncWaitJobForRecovery` read+decide+write under per-job file lock. Dual-process contention → one `claimToken`; owner clear cannot be overwritten by stale snapshots.
+3. **Retryable stages** — Stages `claimed → continue_armed → turn_bound → delivery_pending → delivered`. Unconfirmed stages retry; v1 `issued` maps to retryable `continue_armed`, not permanent skip.
+4. **Real ids** — `bindAsyncWaitRecoveryTurn` on `claimQueuedExecution` accept; `markAsyncWaitRecoveryDelivered` on exact confirm receipt. No synthetic completion forge.
+5. **PID ≠ success** — Alive pid → still waiting. Missing pid → `process_missing_unconfirmed` evidence; continue prompt warns not to treat as success. Live `markExited` records `process_exit_observed` with exitCode/summary.
+
+### Evidence (isolated)
+
+| Kind | Suite | Result |
+| --- | --- | --- |
+| Unit / same-process | async-wait-job 6, recovery 6, stale-callback 3 | PASS |
+| Mock heartbeat/events | removed as delivery proof; continue enqueue mocked in unit recovery | PASS |
+| Real two-process | async-wait-recovery.cross-process 4 (A write→B execute+receipt; dual claim; crash-retry; stop concurrent) | PASS |
+| Related retain | exec.task-binding 5, async-process-lifecycle 2, confirm-pending 5 | PASS |
+
+Registry sharedPaths remain uncommitted for kiro-loom. Protected files preserved. No push/merge/deploy. Ready for Package 2 re-acceptance. — grok-bot
