@@ -1499,3 +1499,60 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - `GatewayWorkerExecutor` / `NodeAgentWorkerExecutor` now admit via controlled lifecycle **before** starting workers or node dispatch; billing `executionId` keeps the commercial admission run id. Preserves permissions, identity, cancel registry, embedded/CLI backends; no second executor. — grok-bot
 - Architecture: strengthened `runtime-supervisor-cli-public-entry` against private scope/lifecycle/session/fallback assembly. Manifest 65 PASS. — grok-bot
 - Tests: supervisor-lifecycle 5 PASS (stages; deny-no-backend; cancel releases without CLI; dispose once; skipped no release). worker-executor 5 PASS; commercial-hint 2 PASS. Full tsgo PASS; typed oxlint clean. No push/merge/deploy. — grok-bot
+
+## Package 1 D7 re-acceptance evidence pack (2026-11-08)
+
+**Final HEAD for Package 1 independent acceptance:** `2dfcb9c80055b54b0fa28301d5d5883572c48a20`  
+**Baseline retained:** `f9b6c4edcf8faede64affc596737c3dc877f121f` (公开 API 消费者收敛子切片). Package 2 **not started**.
+
+### SHA chain (D1→D6)
+
+| Slice | SHA | Summary |
+| --- | --- | --- |
+| D1 | `46583726e5fc927a7bb77761759210bf2898f862` | Freeze `createControlledExecutionUseCase` / stage order; lifecycle factories implement it |
+| D2 | `05d38f2106d61f66b885f07349459c21c5d7c3f3` | Chat `runAdmittedTurn` scene adapter + stage assert; success≠delivery |
+| D3 | `2233b3cd3019d2f38c92931244d2174fdb2a65ce` | Command host → same use-case; E2/E3/E6 ports retained; deny before ACP/candidate |
+| D4 | `d9410d90d6ef699d8cb7e817152ea1d5adb2533a` | Cron/Followup `controlledExecution` + shared `assertControlledExecutionStages` |
+| D5 | `c11635004a53d03a0f4f271eb5990cef01d6545c` | Memory flush + slug → `resolveAuxiliaryModelGovernance` (no task creation) |
+| D6 | `2dfcb9c80055b54b0fa28301d5d5883572c48a20` | Supervisor work-item admit via `createSupervisorWorkItemLifecycle` before CLI/node |
+
+### Duty / production call sites
+
+| Host | Owner of stage order | Production entry | Scene retains |
+| --- | --- | --- | --- |
+| Chat | `createExecutionLifecycle` → controlled use-case | `execution/index.runAdmittedTurn` | task binding, tip budget, recovery, deferred `commitGrowthOutcome` |
+| Command | `createCommandExecutionLifecycle` | `commands/agent.ts` | E2/E3/E6, ACP, command budget/outcome |
+| Cron | `createExecutionLifecycle` | `cron/isolated-agent/run.ts` | ledger, schedule, delivery |
+| Followup | `createExecutionLifecycle` | `auto-reply/reply/followup-runner.ts` | queue/OGUI/typing/delivery |
+| Memory/slug | auxiliary model contract (not work-item lifecycle) | `agent-runner-memory.ts`, `hooks/llm-slug-generator.ts` | file write (flush), filename only (slug) |
+| Supervisor | `createSupervisorWorkItemLifecycle` | `gateway/supervisor/worker-executor.ts` | placement, node invoke, CLI worker, cancel registry |
+
+### Order regressions (D7 suite on HEAD)
+
+OPENBOT_TEST_PROFILE=low — **12 files / 63 PASS**. No environment failures in this run (stderr lines are expected agent-error logs inside PASS cases, not env FAIL).
+
+| Requirement | Evidence |
+| --- | --- |
+| Refuse admission → no backend | controlled-execution deny; admitted-turn deny; command-lifecycle deny; supervisor-lifecycle deny; cron ledger “does not prefetch…when admission is denied” |
+| Cancel → no next candidate / no CLI start | controlled-execution cancel; admitted-turn cancel; command-lifecycle cancel; supervisor cancel-after-prepare |
+| Fail/fallback billing identity | admitted-turn cleanup order release-before-forget; supervisor billing `executionId` uses commercial admission run id; command/admission-session release-before-forget |
+| Dispose exactly once | controlled/command/supervisor dispose-once tests; chat finally dispose |
+| Execution success ≠ delivery | admitted-turn deferred `commitGrowthOutcome`; command outcome closeout separate from infer |
+
+Also: auxiliary governance 3 PASS; slug wiring 1 PASS; memory governance 8 PASS; worker-executor 5 PASS; commercial-hint 2 PASS.
+
+### Gates on evidence HEAD
+
+- Full `pnpm tsgo` PASS
+- Architecture manifest **65** PASS
+- Typed oxlint on D6 changed sources PASS (prior slices likewise at land time)
+- No push / merge / deploy / production restart
+
+### Remaining Package 1 risks (for acceptor)
+
+1. Supervisor gateway commercial run id is allocated before `worker.start` (worker still mints its own handle.runId for cancel/logs); billing uses commercial id — confirm acceptor accepts this split.
+2. Followup/cron scene adapters still hand-assemble prepare input (context estimate / gate input); stage loop is shared, not a second executor.
+3. Interaction/mid-task paths (`governed-interaction`) still use `createAuthorizedModelSession` directly — outside D1–D6 chat/command/cron/followup/supervisor/aux scope; flag if acceptor expands Package 1.
+4. Real-model / restart-safe async recovery / collaboration real-model remain Package 2+ and are **not** claimed here.
+
+**Ready for independent Package 1 acceptance:** yes (implementer view). Package 2 not started. — grok-bot
