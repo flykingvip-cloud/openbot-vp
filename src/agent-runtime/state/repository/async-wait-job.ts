@@ -1,16 +1,58 @@
 /**
  * Durable async-wait job intent for background exec with notifyOnExit.
  * Survives gateway restart so recovery can claim without a second scheduler.
- * Not an executor: only facts for wait / exited / cleared.
+ * Facts only: wait / exited / cleared + recovery stages. Not an executor.
+ *
+ * All status transitions read+decide+write under the per-job file lock so two
+ * processes cannot dual-claim, and owner clear cannot be overwritten by a stale
+ * snapshot from outside the lock.
  */
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { withFileLockSync, SESSION_TASK_BOARD_LOCK_OPTIONS } from "../../../infra/file-lock.js";
 
 export type AsyncWaitJobStatus = "waiting" | "exited" | "cleared";
 
+/** Separate from status: claim ≠ execute ≠ delivery. Unconfirmed stages retry. */
+export type AsyncWaitRecoveryStage =
+  | "none"
+  | "claimed"
+  | "continue_armed"
+  | "turn_bound"
+  | "delivery_pending"
+  | "delivered";
+
+export type AsyncWaitResultEvidence = {
+  /**
+   * process_exit_observed = live child reported exit (credible).
+   * process_missing_unconfirmed = pid gone at recovery; NOT success proof.
+   * owner_marked_exited = explicit markExited without live observation fields.
+   */
+  kind: "process_exit_observed" | "process_missing_unconfirmed" | "owner_marked_exited";
+  exitStatus?: "completed" | "failed" | "killed";
+  exitCode?: number | null;
+  summary?: string;
+  observedAtMs: number;
+};
+
+export type AsyncWaitRecoveryState = {
+  stage: AsyncWaitRecoveryStage;
+  claimGeneration: number;
+  claimToken?: string;
+  claimedAtMs?: number;
+  continueFocusRevision?: number;
+  continueMessageId?: string;
+  /** Real agent/followup run id once claimQueuedExecution accepts — never synthetic. */
+  boundRunId?: string;
+  boundDeliveryId?: string;
+  boundOutcomeTaskId?: string;
+  lastAttemptAtMs?: number;
+  deliveredAtMs?: number;
+};
+
 export type AsyncWaitJobIntent = {
-  version: 1;
+  version: 2;
   jobId: string;
   sessionKey: string;
   sessionFile: string;
@@ -25,14 +67,8 @@ export type AsyncWaitJobIntent = {
   exitStatus?: "completed" | "failed" | "killed";
   exitedAtMs?: number;
   clearedAtMs?: number;
-  /** Set when boot/recheck issued the one bounded wake for this intent. */
-  recoveryWakeIssuedAtMs?: number;
-  /** Stable pending-delivery run id for recovered completion (idempotent). */
-  proactiveDeliveryRunId?: string;
-  /** Set when recovered completion was proactively enqueued for delivery. */
-  proactiveDeliveryIssuedAtMs?: number;
-  /** Human-readable completion summary persisted for recovery delivery. */
-  completionSummary?: string;
+  resultEvidence?: AsyncWaitResultEvidence;
+  recovery?: AsyncWaitRecoveryState;
 };
 
 const DIRNAME = "async-wait-jobs";
@@ -50,8 +86,9 @@ function validIntent(value: unknown): value is AsyncWaitJobIntent {
     return false;
   }
   const row = value as Partial<AsyncWaitJobIntent>;
+  const versionOk = row.version === 2 || row.version === 1;
   return (
-    row.version === 1 &&
+    versionOk &&
     typeof row.jobId === "string" &&
     row.jobId.trim().length > 0 &&
     typeof row.sessionKey === "string" &&
@@ -71,10 +108,66 @@ function validIntent(value: unknown): value is AsyncWaitJobIntent {
   );
 }
 
-function readFile(filePath: string): AsyncWaitJobIntent | undefined {
+/** Migrate v1 rows (issued marks) into v2 recovery stages — unconfirmed stays retryable. */
+function normalizeIntent(row: AsyncWaitJobIntent): AsyncWaitJobIntent {
+  if (row.version === 2 && row.recovery) {
+    return row;
+  }
+  const legacy = row as AsyncWaitJobIntent & {
+    recoveryWakeIssuedAtMs?: number;
+    proactiveDeliveryIssuedAtMs?: number;
+    proactiveDeliveryRunId?: string;
+    completionSummary?: string;
+  };
+  let recovery: AsyncWaitRecoveryState = {
+    stage: "none",
+    claimGeneration: 0,
+  };
+  // v1 treated issued as terminal — that permanently skipped unfinished recovery.
+  // Map issued → continue_armed (retryable) so crash windows can resume.
+  if (typeof legacy.proactiveDeliveryIssuedAtMs === "number") {
+    recovery = {
+      stage: "continue_armed",
+      claimGeneration: 1,
+      claimToken: legacy.proactiveDeliveryRunId,
+      claimedAtMs: legacy.proactiveDeliveryIssuedAtMs,
+      lastAttemptAtMs: legacy.proactiveDeliveryIssuedAtMs,
+    };
+  } else if (typeof legacy.recoveryWakeIssuedAtMs === "number") {
+    recovery = {
+      stage: "continue_armed",
+      claimGeneration: 1,
+      claimedAtMs: legacy.recoveryWakeIssuedAtMs,
+      lastAttemptAtMs: legacy.recoveryWakeIssuedAtMs,
+    };
+  }
+  const evidence: AsyncWaitResultEvidence | undefined = row.resultEvidence
+    ? row.resultEvidence
+    : row.status === "exited"
+      ? {
+          kind: "owner_marked_exited",
+          ...(row.exitStatus ? { exitStatus: row.exitStatus } : {}),
+          ...(legacy.completionSummary?.trim()
+            ? { summary: legacy.completionSummary.trim().slice(0, 2000) }
+            : {}),
+          observedAtMs: row.exitedAtMs ?? row.startedAt,
+        }
+      : undefined;
+  return {
+    ...row,
+    version: 2,
+    ...(evidence ? { resultEvidence: evidence } : {}),
+    recovery,
+  };
+}
+
+function readFileUnlocked(filePath: string): AsyncWaitJobIntent | undefined {
   try {
     const row = JSON.parse(fs.readFileSync(filePath, "utf8")) as unknown;
-    return validIntent(row) ? row : undefined;
+    if (!validIntent(row)) {
+      return undefined;
+    }
+    return normalizeIntent(row);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return undefined;
@@ -83,17 +176,45 @@ function readFile(filePath: string): AsyncWaitJobIntent | undefined {
   }
 }
 
-function writeIntent(sessionFile: string, intent: AsyncWaitJobIntent): void {
+function writeFileUnlocked(sessionFile: string, intent: AsyncWaitJobIntent): void {
   const dir = jobsDir(sessionFile);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const target = fileFor(sessionFile, intent.jobId);
   const temporary = `${target}.${process.pid}.${Date.now()}.tmp`;
-  withFileLockSync(target, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
-    fs.writeFileSync(temporary, `${JSON.stringify(intent, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-    fs.renameSync(temporary, target);
+  fs.writeFileSync(temporary, `${JSON.stringify(intent, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  fs.renameSync(temporary, target);
+}
+
+/**
+ * Atomic read → decide → write under the per-job lock.
+ * Decide must not perform nested locks on the same job file.
+ */
+export function transitionAsyncWaitJobIntent(
+  sessionFile: string,
+  jobId: string,
+  decide: (current: AsyncWaitJobIntent | undefined) => AsyncWaitJobIntent | undefined | "keep",
+): AsyncWaitJobIntent | undefined {
+  const file = sessionFile.trim();
+  const id = jobId.trim();
+  if (!file || !id) {
+    return undefined;
+  }
+  const target = fileFor(file, id);
+  return withFileLockSync(target, SESSION_TASK_BOARD_LOCK_OPTIONS, () => {
+    const current = readFileUnlocked(target);
+    const decided = decide(current);
+    if (decided === "keep") {
+      return current;
+    }
+    if (!decided) {
+      return undefined;
+    }
+    const next = normalizeIntent({ ...decided, version: 2 });
+    writeFileUnlocked(file, next);
+    return next;
   });
 }
 
@@ -126,8 +247,8 @@ export function recordAsyncWaitJobIntent(input: {
   ) {
     return undefined;
   }
-  const intent: AsyncWaitJobIntent = {
-    version: 1,
+  return transitionAsyncWaitJobIntent(sessionFile, jobId, () => ({
+    version: 2,
     jobId,
     sessionKey,
     sessionFile,
@@ -137,11 +258,10 @@ export function recordAsyncWaitJobIntent(input: {
     constraints: [...(input.constraints ?? [])],
     startedAt: input.startedAt,
     status: "waiting",
+    recovery: { stage: "none", claimGeneration: 0 },
     ...(typeof input.pid === "number" && Number.isFinite(input.pid) ? { pid: input.pid } : {}),
     ...(input.command?.trim() ? { command: input.command.trim().slice(0, 500) } : {}),
-  };
-  writeIntent(sessionFile, intent);
-  return intent;
+  }));
 }
 
 export function readAsyncWaitJobIntent(
@@ -153,10 +273,9 @@ export function readAsyncWaitJobIntent(
   if (!file || !id) {
     return undefined;
   }
-  return readFile(fileFor(file, id));
+  return readFileUnlocked(fileFor(file, id));
 }
 
-/** List durable intents for a session board directory (including exited/cleared). */
 export function listAsyncWaitJobIntents(sessionFile: string): AsyncWaitJobIntent[] {
   const file = sessionFile.trim();
   if (!file) {
@@ -171,7 +290,7 @@ export function listAsyncWaitJobIntents(sessionFile: string): AsyncWaitJobIntent
     if (!name.endsWith(".json")) {
       continue;
     }
-    const intent = readFile(path.join(dir, name));
+    const intent = readFileUnlocked(path.join(dir, name));
     if (intent) {
       out.push(intent);
     }
@@ -183,42 +302,58 @@ export function listWaitingAsyncWaitJobIntents(sessionFile: string): AsyncWaitJo
   return listAsyncWaitJobIntents(sessionFile).filter((row) => row.status === "waiting");
 }
 
-/** Mark job exited (still durable for recovery claim / delivery). */
+/** Live process exit observation — credible result evidence. */
 export function markAsyncWaitJobExited(input: {
   sessionFile: string;
   jobId: string;
   exitStatus: "completed" | "failed" | "killed";
+  exitCode?: number | null;
+  summary?: string;
   exitedAtMs?: number;
 }): AsyncWaitJobIntent | undefined {
-  const current = readAsyncWaitJobIntent(input.sessionFile, input.jobId);
-  if (!current || current.status === "cleared") {
-    return current;
-  }
-  const next: AsyncWaitJobIntent = {
-    ...current,
-    status: "exited",
-    exitStatus: input.exitStatus,
-    exitedAtMs: input.exitedAtMs ?? Date.now(),
-  };
-  writeIntent(input.sessionFile, next);
-  return next;
+  const at = input.exitedAtMs ?? Date.now();
+  return transitionAsyncWaitJobIntent(input.sessionFile, input.jobId, (current) => {
+    if (!current || current.status === "cleared") {
+      return current;
+    }
+    return {
+      ...current,
+      status: "exited",
+      exitStatus: input.exitStatus,
+      exitedAtMs: at,
+      resultEvidence: {
+        kind: "process_exit_observed",
+        exitStatus: input.exitStatus,
+        ...(input.exitCode !== undefined ? { exitCode: input.exitCode } : {}),
+        ...(input.summary?.trim() ? { summary: input.summary.trim().slice(0, 2000) } : {}),
+        observedAtMs: at,
+      },
+      recovery: current.recovery ?? { stage: "none", claimGeneration: 0 },
+    };
+  });
 }
 
-/** Owner stop / pause / cancel: job must not wake after restart. */
+/** Owner stop / pause / cancel under lock — wins over in-flight claim writers. */
 export function clearAsyncWaitJobIntent(sessionFile: string, jobId: string): boolean {
-  const current = readAsyncWaitJobIntent(sessionFile, jobId);
-  if (!current) {
-    return false;
-  }
-  if (current.status === "cleared") {
-    return true;
-  }
-  writeIntent(sessionFile, {
-    ...current,
-    status: "cleared",
-    clearedAtMs: Date.now(),
+  const next = transitionAsyncWaitJobIntent(sessionFile, jobId, (current) => {
+    if (!current) {
+      return undefined;
+    }
+    if (current.status === "cleared") {
+      return "keep";
+    }
+    return {
+      ...current,
+      status: "cleared",
+      clearedAtMs: Date.now(),
+      recovery: {
+        ...(current.recovery ?? { stage: "none", claimGeneration: 0 }),
+        stage: "none",
+        claimToken: undefined,
+      },
+    };
   });
-  return true;
+  return Boolean(next);
 }
 
 export function clearAsyncWaitJobsForTask(sessionFile: string, taskId: string): number {
@@ -237,53 +372,278 @@ export function clearAsyncWaitJobsForTask(sessionFile: string, taskId: string): 
   return n;
 }
 
-/** Record proactive recovered-completion delivery issuance (idempotent). */
-export function markAsyncWaitJobProactiveDeliveryIssued(input: {
+export type AsyncWaitClaimResult =
+  | {
+      ok: true;
+      intent: AsyncWaitJobIntent;
+      claimToken: string;
+      /** True when this call newly acquired the claim (vs retrying an open stage). */
+      freshClaim: boolean;
+    }
+  | {
+      ok: false;
+      reason: "missing" | "cleared" | "still_waiting_pid" | "delivered" | "no_session";
+      intent?: AsyncWaitJobIntent;
+    };
+
+/**
+ * Atomic recovery claim. PID alive → leave waiting (not success proof).
+ * PID gone → exited with process_missing_unconfirmed (not success packaging).
+ * Unconfirmed stages (claimed..delivery_pending) are returned for retry — never
+ * skipped as "already issued".
+ */
+export function claimAsyncWaitJobForRecovery(input: {
   sessionFile: string;
   jobId: string;
-  runId: string;
-  summary?: string;
-  atMs?: number;
+  /** Injected for tests: override pid liveness. */
+  isPidAlive?: (pid: number) => boolean;
+}): AsyncWaitClaimResult {
+  const file = input.sessionFile.trim();
+  const id = input.jobId.trim();
+  if (!file || !id) {
+    return { ok: false, reason: "no_session" };
+  }
+  const pidAlive =
+    input.isPidAlive ??
+    ((pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+  let result: AsyncWaitClaimResult = { ok: false, reason: "missing" };
+  transitionAsyncWaitJobIntent(file, id, (current) => {
+    if (!current) {
+      result = { ok: false, reason: "missing" };
+      return undefined;
+    }
+    if (current.status === "cleared") {
+      result = { ok: false, reason: "cleared", intent: current };
+      return "keep";
+    }
+    const recovery = current.recovery ?? { stage: "none" as const, claimGeneration: 0 };
+    if (recovery.stage === "delivered") {
+      result = { ok: false, reason: "delivered", intent: current };
+      return "keep";
+    }
+    // Open stages stay claimable for retry (same claimToken if present).
+    if (recovery.stage !== "none" && recovery.claimToken) {
+      result = {
+        ok: true,
+        intent: current,
+        claimToken: recovery.claimToken,
+        freshClaim: false,
+      };
+      return {
+        ...current,
+        recovery: {
+          ...recovery,
+          lastAttemptAtMs: Date.now(),
+        },
+      };
+    }
+    if (current.status === "waiting") {
+      if (typeof current.pid === "number" && pidAlive(current.pid)) {
+        result = { ok: false, reason: "still_waiting_pid", intent: current };
+        return "keep";
+      }
+      // PID gone ≠ success. Record unconfirmed missing evidence.
+      const at = Date.now();
+      const claimToken = randomUUID();
+      const next: AsyncWaitJobIntent = {
+        ...current,
+        status: "exited",
+        exitStatus: "failed",
+        exitedAtMs: at,
+        resultEvidence: {
+          kind: "process_missing_unconfirmed",
+          exitStatus: "failed",
+          observedAtMs: at,
+          summary:
+            "Background job pid is not alive after restart; exit outcome is unconfirmed — do not treat as success.",
+        },
+        recovery: {
+          stage: "claimed",
+          claimGeneration: recovery.claimGeneration + 1,
+          claimToken,
+          claimedAtMs: at,
+          lastAttemptAtMs: at,
+        },
+      };
+      result = { ok: true, intent: next, claimToken, freshClaim: true };
+      return next;
+    }
+    // status === exited
+    const at = Date.now();
+    const claimToken = randomUUID();
+    const evidence =
+      current.resultEvidence ??
+      ({
+        kind: "owner_marked_exited",
+        ...(current.exitStatus ? { exitStatus: current.exitStatus } : {}),
+        observedAtMs: current.exitedAtMs ?? at,
+      } satisfies AsyncWaitResultEvidence);
+    const next: AsyncWaitJobIntent = {
+      ...current,
+      resultEvidence: evidence,
+      recovery: {
+        stage: "claimed",
+        claimGeneration: recovery.claimGeneration + 1,
+        claimToken,
+        claimedAtMs: at,
+        lastAttemptAtMs: at,
+      },
+    };
+    result = { ok: true, intent: next, claimToken, freshClaim: true };
+    return next;
+  });
+  return result;
+}
+
+export function markAsyncWaitRecoveryContinueArmed(input: {
+  sessionFile: string;
+  jobId: string;
+  claimToken: string;
+  focusRevision: number;
+  messageId: string;
 }): AsyncWaitJobIntent | undefined {
-  const current = readAsyncWaitJobIntent(input.sessionFile, input.jobId);
-  if (!current || current.status === "cleared") {
-    return current;
-  }
-  if (typeof current.proactiveDeliveryIssuedAtMs === "number") {
-    return current;
-  }
-  const next: AsyncWaitJobIntent = {
-    ...current,
-    proactiveDeliveryRunId: input.runId,
-    proactiveDeliveryIssuedAtMs: input.atMs ?? Date.now(),
-    ...(input.summary?.trim() ? { completionSummary: input.summary.trim().slice(0, 2000) } : {}),
-  };
-  writeIntent(input.sessionFile, next);
-  return next;
+  return transitionAsyncWaitJobIntent(input.sessionFile, input.jobId, (current) => {
+    if (!current || current.status === "cleared") {
+      return current;
+    }
+    const recovery = current.recovery;
+    if (!recovery || recovery.claimToken !== input.claimToken) {
+      return "keep";
+    }
+    if (recovery.stage === "delivered") {
+      return "keep";
+    }
+    return {
+      ...current,
+      recovery: {
+        ...recovery,
+        stage: "continue_armed",
+        continueFocusRevision: input.focusRevision,
+        continueMessageId: input.messageId,
+        lastAttemptAtMs: Date.now(),
+      },
+    };
+  });
 }
 
-/** Record that recovery already issued the one bounded wake (idempotent). */
-export function markAsyncWaitJobRecoveryWakeIssued(
-  sessionFile: string,
-  jobId: string,
-  atMs: number = Date.now(),
-): AsyncWaitJobIntent | undefined {
-  const current = readAsyncWaitJobIntent(sessionFile, jobId);
-  if (!current || current.status === "cleared") {
-    return current;
+/** Bind a real followup/agent run id after claimQueuedExecution accepts. */
+export function bindAsyncWaitRecoveryTurn(input: {
+  sessionFile: string;
+  taskId: string;
+  runId: string;
+  deliveryId?: string;
+  outcomeTaskId?: string;
+}): AsyncWaitJobIntent | undefined {
+  const tid = input.taskId.trim();
+  const runId = input.runId.trim();
+  if (!tid || !runId) {
+    return undefined;
   }
-  if (typeof current.recoveryWakeIssuedAtMs === "number") {
-    return current;
+  for (const intent of listAsyncWaitJobIntents(input.sessionFile)) {
+    if (intent.taskId !== tid || intent.status === "cleared") {
+      continue;
+    }
+    const stage = intent.recovery?.stage;
+    if (
+      stage !== "claimed" &&
+      stage !== "continue_armed" &&
+      stage !== "turn_bound" &&
+      stage !== "delivery_pending"
+    ) {
+      continue;
+    }
+    return transitionAsyncWaitJobIntent(input.sessionFile, intent.jobId, (current) => {
+      if (!current?.recovery?.claimToken) {
+        return "keep";
+      }
+      return {
+        ...current,
+        recovery: {
+          ...current.recovery,
+          stage: input.deliveryId ? "delivery_pending" : "turn_bound",
+          boundRunId: runId,
+          ...(input.deliveryId ? { boundDeliveryId: input.deliveryId } : {}),
+          ...(input.outcomeTaskId ? { boundOutcomeTaskId: input.outcomeTaskId } : {}),
+          lastAttemptAtMs: Date.now(),
+        },
+      };
+    });
   }
-  const next: AsyncWaitJobIntent = {
-    ...current,
-    recoveryWakeIssuedAtMs: atMs,
-  };
-  writeIntent(sessionFile, next);
-  return next;
+  return undefined;
 }
 
-/** Test helper: wipe jobs dir for a session file. */
+export function markAsyncWaitRecoveryDelivered(input: {
+  sessionFile: string;
+  runId: string;
+}): AsyncWaitJobIntent | undefined {
+  const runId = input.runId.trim();
+  if (!runId) {
+    return undefined;
+  }
+  for (const intent of listAsyncWaitJobIntents(input.sessionFile)) {
+    if (intent.recovery?.boundRunId !== runId) {
+      continue;
+    }
+    return transitionAsyncWaitJobIntent(input.sessionFile, intent.jobId, (current) => {
+      if (!current?.recovery || current.recovery.boundRunId !== runId) {
+        return "keep";
+      }
+      if (current.recovery.stage === "delivered") {
+        return "keep";
+      }
+      return {
+        ...current,
+        recovery: {
+          ...current.recovery,
+          stage: "delivered",
+          deliveredAtMs: Date.now(),
+          lastAttemptAtMs: Date.now(),
+        },
+      };
+    });
+  }
+  return undefined;
+}
+
+/** Build continue prompt evidence — never packages unconfirmed missing as success. */
+export function buildAsyncWaitRecoveryPromptAppendix(intent: AsyncWaitJobIntent): string {
+  const evidence = intent.resultEvidence;
+  const lines = [
+    "Async-wait job recovery context (Package2):",
+    `jobId=${intent.jobId}`,
+    `taskId=${intent.taskId}`,
+    `priorExecutionAttempt=${intent.executionAttempt}`,
+  ];
+  if (!evidence) {
+    lines.push("resultEvidence=absent — treat outcome as unconfirmed; do not claim success.");
+    return lines.join("\n");
+  }
+  lines.push(`evidenceKind=${evidence.kind}`);
+  if (evidence.exitStatus) {
+    lines.push(`observedExitStatus=${evidence.exitStatus}`);
+  }
+  if (evidence.exitCode !== undefined) {
+    lines.push(`exitCode=${evidence.exitCode}`);
+  }
+  if (evidence.summary?.trim()) {
+    lines.push(`summary=${evidence.summary.trim().slice(0, 500)}`);
+  }
+  if (evidence.kind === "process_missing_unconfirmed") {
+    lines.push(
+      "WARNING: pid was gone after restart; this is NOT proof the original job completed successfully. Investigate or re-run if the deliverable is missing.",
+    );
+  }
+  return lines.join("\n");
+}
+
 export function clearAsyncWaitJobsForTests(sessionFile: string): void {
   const dir = jobsDir(sessionFile);
   try {
@@ -291,4 +651,46 @@ export function clearAsyncWaitJobsForTests(sessionFile: string): void {
   } catch {
     // ignore
   }
+}
+
+/** @deprecated v1 API — maps to continue_armed retryable stage; prefer claim + continue. */
+export function markAsyncWaitJobRecoveryWakeIssued(
+  sessionFile: string,
+  jobId: string,
+  atMs: number = Date.now(),
+): AsyncWaitJobIntent | undefined {
+  return transitionAsyncWaitJobIntent(sessionFile, jobId, (current) => {
+    if (!current || current.status === "cleared") {
+      return current;
+    }
+    const recovery = current.recovery ?? { stage: "none" as const, claimGeneration: 0 };
+    if (recovery.stage === "delivered") {
+      return "keep";
+    }
+    return {
+      ...current,
+      recovery: {
+        ...recovery,
+        stage: recovery.stage === "none" ? "continue_armed" : recovery.stage,
+        claimGeneration: Math.max(1, recovery.claimGeneration),
+        claimedAtMs: recovery.claimedAtMs ?? atMs,
+        lastAttemptAtMs: atMs,
+      },
+    };
+  });
+}
+
+/** @deprecated v1 API — do not treat as delivery proof. */
+export function markAsyncWaitJobProactiveDeliveryIssued(input: {
+  sessionFile: string;
+  jobId: string;
+  runId: string;
+  summary?: string;
+  atMs?: number;
+}): AsyncWaitJobIntent | undefined {
+  return markAsyncWaitJobRecoveryWakeIssued(
+    input.sessionFile,
+    input.jobId,
+    input.atMs ?? Date.now(),
+  );
 }

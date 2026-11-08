@@ -164,6 +164,8 @@ export function markExited(
       sessionFile: session.taskBoundary.sessionFile,
       jobId: session.id,
       exitStatus,
+      exitCode: session.exitCode,
+      summary: session.tail ? session.tail.slice(0, 500) : undefined,
     });
   }
   moveToFinished(session, status);

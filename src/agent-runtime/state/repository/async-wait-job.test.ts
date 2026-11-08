@@ -3,12 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
 import {
+  claimAsyncWaitJobForRecovery,
   clearAsyncWaitJobIntent,
   clearAsyncWaitJobsForTask,
   listWaitingAsyncWaitJobIntents,
   markAsyncWaitJobExited,
   readAsyncWaitJobIntent,
   recordAsyncWaitJobIntent,
+  transitionAsyncWaitJobIntent,
 } from "./async-wait-job.js";
 
 const roots: string[] = [];
@@ -144,4 +146,58 @@ it("markBackgrounded with notify+boundary writes durable intent; markExited mark
   expect(clearAsyncWaitJobsForTask(file, "task-a")).toBe(1);
   expect(readAsyncWaitJobIntent(file, "bg-job-1")?.status).toBe("cleared");
   resetProcessRegistryForTests();
+});
+
+it("atomic claim: only one generation wins under lock (sequential contention)", () => {
+  const file = sessionFile();
+  recordAsyncWaitJobIntent({
+    jobId: "job-race",
+    sessionKey: "agent:main:main",
+    sessionFile: file,
+    taskId: "task-a",
+    executionAttempt: "a",
+    deliverableVersion: "a",
+    pid: 999_999_900,
+    startedAt: 1,
+  });
+  markAsyncWaitJobExited({
+    sessionFile: file,
+    jobId: "job-race",
+    exitStatus: "completed",
+    exitCode: 0,
+  });
+  const first = claimAsyncWaitJobForRecovery({ sessionFile: file, jobId: "job-race" });
+  const second = claimAsyncWaitJobForRecovery({ sessionFile: file, jobId: "job-race" });
+  expect(first.ok).toBe(true);
+  expect(second.ok).toBe(true);
+  if (first.ok && second.ok) {
+    // Second returns same claimToken (retry open stage), not a new dual claim.
+    expect(second.claimToken).toBe(first.claimToken);
+    expect(second.freshClaim).toBe(false);
+    expect(first.freshClaim).toBe(true);
+  }
+});
+
+it("owner clear under lock wins over stale exited snapshot rewrite", () => {
+  const file = sessionFile();
+  recordAsyncWaitJobIntent({
+    jobId: "job-clear-race",
+    sessionKey: "agent:main:main",
+    sessionFile: file,
+    taskId: "task-a",
+    executionAttempt: "a",
+    deliverableVersion: "a",
+    startedAt: 1,
+  });
+  const before = readAsyncWaitJobIntent(file, "job-clear-race")!;
+  clearAsyncWaitJobIntent(file, "job-clear-race");
+  // Stale writer attempting to mark exited must not un-clear under transition API
+  // (transition reads fresh under lock).
+  transitionAsyncWaitJobIntent(file, "job-clear-race", (current) => {
+    if (!current || current.status === "cleared") {
+      return "keep";
+    }
+    return { ...before, status: "exited", exitStatus: "completed" };
+  });
+  expect(readAsyncWaitJobIntent(file, "job-clear-race")?.status).toBe("cleared");
 });
