@@ -1793,3 +1793,62 @@ Preserved: original payload remelt, delivery_unknown, accepted/rejected bind, de
 Typed oxlint on changed sources: 0 warnings / 0 errors.
 
 **Remelt tip for re-acceptance:** `d5aadec7b` (3-defect close). Prior failed tip `72c478de3` retained above. — grok-bot
+
+## Package 3 — context Builder / capability boundary gap verification (2026-11-08)
+
+**Baseline (Package 2 PASSED):** `4509f11b9d158b3578a8465ff6e2797ddf4fd5c1`  
+**Package 3 status:** verified against CURRENT tip — **zero migration blockers**. No source change required.  
+**Package 4+ not started.** No push / merge / deploy / production restart.
+
+Charter applied: only fix (1) new main-chain takeover, (2) duty mix, or (3) old path still holding control. Do not rebuild completed material catalogs / shared assembly. No new features, capability types, SDK, or second control system. Items without real breakpoints → follow-up list only.
+
+### Gap matrix (verified at Package2 tip)
+
+#### Already done (evidence — do not rebuild)
+
+| Item | Production owner / consumer | Evidence |
+| --- | --- | --- |
+| Individual material catalog + `assembleIndividual` | `context/catalog/individual.ts` → `get-reply-run` individual branch | tasks 2026-11-08 individual catalog; assembly rejects group ids; aside-dialogue non-collab must not contain `GROUP_MIDDLE` (4 PASS this turn) |
+| Collaboration material catalog + `assembleCollaborationMember` | `runtime-context-assembly` → catalog order | tasks collab catalog; host reads + delivery side-effect stay in host; collab capability context 4 PASS |
+| Shared late-context ordering | `appendSharedTurnContext` on both branches | tasks late-context; assembly.test shared-order + reject unknown |
+| Capability declaration inventory (data-only) | `capabilities/catalog.declareCapability` attached in `before-call` wrap | contract: metadata never grants permission; catalog.test 3 PASS; tool policy / task boundary / hooks remain real gates |
+| Cron pre-admission tool prefetch retired | scheduled host no longer prefeches before denied admission | prior Package work; not reopened |
+| Composer mention pre-admission execute suppressed | mention → hints only; admitted runner owns tools | get-reply-run comments + prior remelt |
+
+#### Package3 blockers (would fix now)
+
+| Item | Verdict |
+| --- | --- |
+| *(none)* | No dual context assembly path controlling the reply mainline outside catalogs. No capability metadata authorizing execution. No old individual path still injecting group materials. loadTransform / full Builder lifecycle / per-adapter contracts do **not** meet the three-criteria breakpoint test without rebuilding catalogs or inventing a new control surface. |
+
+#### Follow-up (no breakpoint — must not block this package)
+
+1. **Full Builder resolve/read/render/audit acceptance** — catalogs + assembly + compilation already separated; unified Builder lifecycle acceptance remains open completeness, not a second controlling assembly path.
+2. **Per-adapter capability contracts beyond central `declareCapability`** — expand inventory only with evidence; metadata must stay non-authorizing; do not invent new capability types/SDK.
+3. **`gateway/hooks-mapping.loadTransform` executable modules** — config still `import`s transform functions (retirement-gates tracked). Needs effective-consumer + persisted-asset audit before any change; webhook mapping is not the chat mainline takeover seam. Do not disable without replacement evidence.
+4. **Move `groups.ts` group context/intro pure render into `context/sources/`** — host→assemble pattern already correct; pure-render relocation is cleanup, not dual control.
+5. **`buildAgentSystemPrompt` chapter table into context** — explicitly deferred in context-component-plan; embedded/CLI continue to embed `extraSystemPrompt`.
+6. **Collab catalog vs plan ideal (individual-then-group in one catalog)** — production preserves pre-catalog append order after `assembleCollaborationMember`; changing order would rebuild completed catalog semantics — out of Package3 charter.
+7. Extension/hook/workflow effective-consumer disposition; quality/artifact chains; same-version individual/collab/model/channel acceptance — later packages.
+
+### Call-chain (current — unchanged this package)
+
+```
+Host reads (get-reply-run / runtime-context-assembly)
+  → assembleIndividual | assembleCollaborationMember (catalog order)
+  → appendSharedTurnContext (late materials)
+  → finalizeSystemContext → followupRun.extraSystemPrompt
+  → execution attempt embeds via buildEmbeddedSystemPrompt / CLI buildSystemPrompt
+  → compileModelContext (messages only, via capability adapter context-compiler)
+Tool path: wrapToolWithBeforeToolCallHook → existing policy/hooks/boundary; declareCapability is annotation only
+```
+
+### Verification this turn (read-only)
+
+| Suite | Result |
+| --- | --- |
+| `context/assembly` + `capabilities/catalog` + `model-resolve-hooks` | 3 files / 14 PASS |
+| `get-reply-run.aside-dialogue-context` + `collaboration-capability-context` | 2 files / 8 PASS |
+| Source edits for Package3 blockers | **none** (zero blockers) |
+
+**Remelt tip for Package3 acceptance:** *(filled after tip SHA commit)*. — grok-bot
