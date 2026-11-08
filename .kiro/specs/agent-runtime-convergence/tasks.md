@@ -1410,3 +1410,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved common late-material ordering (task surface, clarification, learning recall, runtime events and skill guidance) into shared context assembly. Existing hosts retain source reads, exposure accounting and one-time event consumption. Sender-derived material remains untrusted user-body context. Preserved truthy-only append behavior and original bytes/order; no new scenario or model call. — codex-runtime-manager
 - Assembly/production-context regression 3 files / 23 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. Complete Builder read/render/audit and full executor lifecycle acceptance remain open. — codex-runtime-manager
+
+## Durable continuation cap (2026-11-08)
+
+- Reproduced automatic continuation cap disappearing after runtime-local reset (one failing regression). Continuation reservations now persist on the scoped task under the existing board lock; policy owns the unchanged three-per-15-minute limit. Removed process-local continuation authority; existing timer and queue remain the only dispatch path. Concurrent reservation revalidates task/focus/pause/tombstone before writing. — codex-runtime-manager
+- Continuation/followup regression 2 files / 48 PASS, including a separate Node process reading and enforcing the persisted cap; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. This proves durable limiting, not restart rescheduling, background process reattachment or complete asynchronous recovery. — codex-runtime-manager

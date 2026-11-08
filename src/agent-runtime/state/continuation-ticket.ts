@@ -2,7 +2,51 @@ import { buildResumePrompt } from "../context/index.js";
 import type { TaskBoardContinueSkipReason } from "../contracts/continuation.js";
 import type { SessionTaskBoard, TrackedTask } from "../contracts/task.js";
 import { isTaskTombstoned } from "../policy/index.js";
-import { readSessionTaskBoard } from "./repository/task-board-file.js";
+import {
+  TASK_BOARD_CONTINUE_MAX_PER_TASK,
+  TASK_BOARD_CONTINUE_COOLDOWN_MS,
+} from "../policy/task-board-limits.js";
+import {
+  readSessionTaskBoard,
+  withSessionTaskBoardLock,
+  readSessionTaskBoardUnlocked,
+  writeSessionTaskBoardUnlocked,
+} from "./repository/task-board-file.js";
+
+export function countRecentTaskContinuations(task: TrackedTask, nowMs: number): number {
+  return (task.continuationWakeAtMs ?? []).filter(
+    (at) => Number.isFinite(at) && at >= nowMs - TASK_BOARD_CONTINUE_COOLDOWN_MS,
+  ).length;
+}
+
+/** Reserve under the existing board lock; concurrent processes share the same cap. */
+export function reserveTaskContinuation(params: {
+  sessionFile: string;
+  taskId: string;
+  focusRevision: number;
+  nowMs: number;
+}): { ok: true } | { ok: false; reason: TaskBoardContinueSkipReason } {
+  return withSessionTaskBoardLock(params.sessionFile, () => {
+    const board = readSessionTaskBoardUnlocked(params.sessionFile);
+    const checked = revalidateContinueTicket({ board, ...params });
+    if (!checked.ok) {
+      return checked;
+    }
+    if (
+      countRecentTaskContinuations(checked.task, params.nowMs) >= TASK_BOARD_CONTINUE_MAX_PER_TASK
+    ) {
+      return { ok: false, reason: "continue_cap" };
+    }
+    const recent = (checked.task.continuationWakeAtMs ?? []).filter(
+      (at) => Number.isFinite(at) && at >= params.nowMs - TASK_BOARD_CONTINUE_COOLDOWN_MS,
+    );
+    writeSessionTaskBoardUnlocked(params.sessionFile, {
+      ...board,
+      current: { ...checked.task, continuationWakeAtMs: [...recent, params.nowMs] },
+    });
+    return { ok: true };
+  });
+}
 const INTERNAL_CONTINUE_PREFIX = "Internal task-board continue:";
 
 export function buildTaskBoardContinuePrompt(task: TrackedTask): string {

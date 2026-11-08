@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { seedSessionTaskBoard, type SessionTaskBoard } from "./session-task-board.js";
 import {
@@ -64,6 +66,45 @@ describe("isExplicitHumanGateWait", () => {
 });
 
 describe("decideTaskBoardContinue", () => {
+  it("retains the continuation cap after runtime-local state is reset", async () => {
+    const sessionFile = tempSessionFile();
+    seedSessionTaskBoard(sessionFile, unfinishedBoard("task-durable-cap"));
+    const nowMs = 2_000_000;
+    try {
+      for (let i = 0; i < TASK_BOARD_CONTINUE_MAX_PER_TASK; i += 1) {
+        expect(
+          scheduleTaskBoardContinueWake({
+            sessionFile,
+            assistantText: "still working",
+            nowMs: nowMs + i,
+            armTimer: false,
+            enqueue: () => true,
+          }).action,
+        ).toBe("schedule");
+      }
+      resetTaskBoardContinueLedgerForTest();
+      expect(
+        decideTaskBoardContinue({ sessionFile, assistantText: "still working", nowMs: nowMs + 10 }),
+      ).toMatchObject({ action: "skip", reason: "continue_cap" });
+      const moduleUrl = new URL(
+        "../agent-runtime/execution/runner/task-continuation.ts",
+        import.meta.url,
+      ).href;
+      const code = `import { decideTaskBoardContinue } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(decideTaskBoardContinue(${JSON.stringify({ sessionFile, assistantText: "still working", nowMs: nowMs + 10 })})));`;
+      const { stdout } = await promisify(execFile)(
+        process.execPath,
+        ["--import", "tsx", "--input-type=module", "--eval", code],
+        { timeout: 30000 },
+      );
+      expect(JSON.parse(stdout.trim().split("\n").at(-1)!)).toMatchObject({
+        action: "skip",
+        reason: "continue_cap",
+      });
+    } finally {
+      fs.rmSync(`${sessionFile}.task-board.json`, { force: true });
+    }
+  });
+
   it("schedules when unfinished and not a human gate", () => {
     const sessionFile = tempSessionFile();
     seedSessionTaskBoard(sessionFile, unfinishedBoard());

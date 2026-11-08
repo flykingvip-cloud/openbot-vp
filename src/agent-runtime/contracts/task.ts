@@ -50,6 +50,8 @@ export type TrackedTask = {
   deliverableVersion?: string;
   /** Execution attempt stamp for late-complete isolation (C4). */
   executionAttempt?: string;
+  /** Durable automatic-continuation reservations; scoped to this task and session. */
+  continuationWakeAtMs?: number[];
 };
 
 /** CLOSE tombstone — blocks wake / late results / resume resurrection (C5). */

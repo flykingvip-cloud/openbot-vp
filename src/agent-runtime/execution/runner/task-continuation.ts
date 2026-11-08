@@ -16,6 +16,8 @@ import {
   buildTaskBoardContinuePrompt,
   claimTaskBoardContinue,
   revalidateContinueTicket,
+  countRecentTaskContinuations,
+  reserveTaskContinuation,
 } from "../../state/index.js";
 const readSessionTaskBoard = sessionTaskState.read;
 
@@ -25,10 +27,13 @@ const log = createSubsystemLogger("conversation-task/task-board-continue");
 export const TASK_BOARD_CONTINUE_DELAY_MS = 1_500;
 
 /** Cap chained auto-continues per taskId within the cooldown window. */
-export const TASK_BOARD_CONTINUE_MAX_PER_TASK = 3;
+import { TASK_BOARD_CONTINUE_MAX_PER_TASK } from "../../policy/task-board-limits.js";
+export {
+  TASK_BOARD_CONTINUE_MAX_PER_TASK,
+  TASK_BOARD_CONTINUE_COOLDOWN_MS,
+} from "../../policy/task-board-limits.js";
 
 /** Cooldown window for the per-task continue cap (ms). */
-export const TASK_BOARD_CONTINUE_COOLDOWN_MS = 15 * 60 * 1000;
 
 const INTERNAL_CONTINUE_PREFIX = "Internal task-board continue:";
 
@@ -38,13 +43,8 @@ const HUMAN_GATE_RE =
 
 /** Soft 「要不要…」 alone is NOT a human gate for P0 (narrowed in P1 prompts). */
 
-type ContinueLedgerEntry = { taskId: string; atMs: number };
-
-const continueLedger: ContinueLedgerEntry[] = [];
-
-export function resetTaskBoardContinueLedgerForTest(): void {
-  continueLedger.length = 0;
-}
+/** Compatibility test hook: authority now lives on the persisted task. */
+export function resetTaskBoardContinueLedgerForTest(): void {}
 
 export function isTaskBoardContinueInternalPrompt(text: string): boolean {
   return text.trimStart().startsWith(INTERNAL_CONTINUE_PREFIX);
@@ -62,23 +62,6 @@ export function isExplicitHumanGateWait(assistantText: string): boolean {
     return false;
   }
   return HUMAN_GATE_RE.test(text);
-}
-
-function pruneLedger(nowMs: number): void {
-  const cutoff = nowMs - TASK_BOARD_CONTINUE_COOLDOWN_MS;
-  while (continueLedger.length > 0 && continueLedger[0].atMs < cutoff) {
-    continueLedger.shift();
-  }
-}
-
-function continuesForTask(taskId: string, nowMs: number): number {
-  pruneLedger(nowMs);
-  return continueLedger.filter((row) => row.taskId === taskId).length;
-}
-
-function rememberContinue(taskId: string, nowMs: number): void {
-  pruneLedger(nowMs);
-  continueLedger.push({ taskId, atMs: nowMs });
 }
 
 export function decideTaskBoardContinue(params: {
@@ -132,7 +115,7 @@ export function decideTaskBoardContinue(params: {
   }
 
   const nowMs = params.nowMs ?? Date.now();
-  if (continuesForTask(current.taskId, nowMs) >= TASK_BOARD_CONTINUE_MAX_PER_TASK) {
+  if (countRecentTaskContinuations(current, nowMs) >= TASK_BOARD_CONTINUE_MAX_PER_TASK) {
     return {
       action: "skip",
       reason: "continue_cap",
@@ -206,7 +189,22 @@ export function scheduleTaskBoardContinueWake(params: {
   }
 
   const nowMs = params.nowMs ?? Date.now();
-  rememberContinue(decision.taskId, nowMs);
+  const reservation = reserveTaskContinuation({
+    sessionFile: params.sessionFile?.trim() ?? "",
+    taskId: decision.taskId,
+    focusRevision: decision.focusRevision,
+    nowMs,
+  });
+  if (!reservation.ok) {
+    return {
+      action: "skip",
+      reason: reservation.reason,
+      wakeRecorded: false,
+      taskId: decision.taskId,
+      focusRevision: decision.focusRevision,
+      dispatched: false,
+    };
+  }
   const messageId = `task-board-continue:${decision.taskId}:r${decision.focusRevision}:${nowMs}`;
   log.info("task_board_continue wakeRecorded", {
     reason: decision.reason,

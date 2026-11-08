@@ -28,4 +28,6 @@ export {
   buildTaskBoardContinuePrompt,
   claimTaskBoardContinue,
   revalidateContinueTicket,
+  countRecentTaskContinuations,
+  reserveTaskContinuation,
 } from "./continuation-ticket.js";
