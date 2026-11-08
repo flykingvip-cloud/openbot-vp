@@ -1130,6 +1130,33 @@ export async function recordRunnerTurnOutcome(
     throw new Error(`task-outcome open failed: ${"code" in opened ? opened.code : "unknown"}`);
   }
 
+  if (opened.record.lifecycle === "closed") {
+    const member =
+      opened.record.runs.some(
+        (run) => run.runId === input.runId && run.attemptIds.includes(`att:${input.runId}`),
+      ) &&
+      opened.record.attempts.some(
+        (attempt) => attempt.attemptId === `att:${input.runId}` && attempt.runId === input.runId,
+      );
+    linkRunnerFinalEvidence(
+      cfg,
+      agentId,
+      scope,
+      taskId,
+      input.runId,
+      `att:${input.runId}`,
+      opened.record,
+      input.modelCallLink,
+      input.modelCallLinks,
+      [
+        ...(input.budgetChargeReasons ?? []),
+        "terminal_protected",
+        ...(member ? [] : ["final_membership_missing"]),
+      ],
+    );
+    return { record: opened.record, evolution: { written: false, reason: "terminal_protected" } };
+  }
+
   const fencingToken = opened.fencingToken || newFencingToken();
 
   // W3 wrap-up: one production path — ensure tip budget, charge this attempt, stop on exhaust.
