@@ -22,9 +22,11 @@ import type { TrustedScope } from "../task-outcome/types.js";
 import { resetEvidenceAssociations } from "./association.js";
 import { SNAPSHOT_IDENTITY_COVERS, SNAPSHOT_IDENTITY_DOES_NOT_COVER } from "./identity.js";
 import {
+  classifyLockProbeError,
   observeModelCandidate,
   processStartToken,
   resetModelCallsForTests,
+  setEmptyLockHolderProbeForTests,
   writeBoundedEvidenceFile,
 } from "./model-call-evidence.js";
 import { readExecutorEvidence } from "./read-port.js";
@@ -51,6 +53,7 @@ function fullUsage(input: number, output: number) {
 }
 
 afterEach(() => {
+  setEmptyLockHolderProbeForTests(null);
   resetModelCallsForTests();
   resetEvidenceAssociations();
   delete process.env.OPENBOT_EXECUTOR_EVIDENCE;
@@ -269,19 +272,154 @@ describe("R5 lock and call identity", () => {
     const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
     expect(code).toBe(0);
     const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
-    expect(fs.readFileSync(lockPath, "utf8")).toBe("");
+    expect(fs.existsSync(lockPath)).toBe(false);
     const recovered = writeBoundedEvidenceFile(storeRoot, "after-empty.json", { pad: "recovered" });
     expect(recovered).toBe("written");
     expect(
       fs.existsSync(path.join(storeRoot, "executor-evidence", "associations", "after-empty.json")),
     ).toBe(true);
+  });
+
+  it("does not delete an empty public lock when the platform probe is uncertain", () => {
+    process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
+    const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r10-platform-"));
+    roots.push(storeRoot);
+    fs.mkdirSync(path.join(storeRoot, "executor-evidence"), { recursive: true });
+    const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
+    fs.writeFileSync(lockPath, "");
+    let uncertain = false;
+    try {
+      const pids = fs.readdirSync("/proc").filter((name) => /^\d+$/.test(name));
+      for (const pid of pids) {
+        try {
+          fs.readdirSync(`/proc/${pid}/fd`);
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+            uncertain = true;
+          }
+        }
+      }
+    } catch {
+      uncertain = true;
+    }
+    const result = writeBoundedEvidenceFile(storeRoot, "platform.json", { pad: "probe" });
+    if (uncertain) {
+      expect(result).toBe("failed");
+      expect(fs.readFileSync(lockPath, "utf8")).toBe("");
+    } else {
+      expect(result).toBe("written");
+    }
+  });
+
+  it("does not delete an empty public lock when the holder probe is unknown", () => {
+    process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
+    const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r10-unknown-"));
+    roots.push(storeRoot);
+    fs.mkdirSync(path.join(storeRoot, "executor-evidence"), { recursive: true });
+    const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
     const held = fs.openSync(lockPath, "wx");
-    const blocked = writeBoundedEvidenceFile(storeRoot, "while-held.json", { pad: "no" });
-    expect(blocked).toBe("failed");
-    expect(fs.readFileSync(lockPath, "utf8")).toBe("");
     fs.closeSync(held);
-    const afterRelease = writeBoundedEvidenceFile(storeRoot, "after-release.json", { pad: "yes" });
-    expect(afterRelease).toBe("written");
+    setEmptyLockHolderProbeForTests(() => "unknown");
+    expect(writeBoundedEvidenceFile(storeRoot, "blocked.json", { pad: "no" })).toBe("failed");
+    expect(fs.readFileSync(lockPath, "utf8")).toBe("");
+    setEmptyLockHolderProbeForTests(() => "clear");
+    expect(writeBoundedEvidenceFile(storeRoot, "cleared.json", { pad: "yes" })).toBe("written");
+  });
+
+  it("separates a gone pid from an unreadable holder probe", () => {
+    expect(classifyLockProbeError("ENOENT")).toBe("gone");
+    expect(classifyLockProbeError("EACCES")).toBe("unknown");
+    expect(classifyLockProbeError("EPERM")).toBe("unknown");
+    expect(classifyLockProbeError("EIO")).toBe("unknown");
+    expect(classifyLockProbeError(undefined)).toBe("unknown");
+  });
+
+  it("reclaims a dead owner and refuses a live owner or an unproven pid reuse", () => {
+    process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
+    const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r10-owner-"));
+    roots.push(storeRoot);
+    const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+    const liveToken = processStartToken(process.pid) ?? "unknown";
+    fs.writeFileSync(
+      lockPath,
+      JSON.stringify({ pid: process.pid, startToken: liveToken, lockId: "live-owner" }),
+    );
+    expect(writeBoundedEvidenceFile(storeRoot, "live.json", { pad: "no" })).toBe("failed");
+    expect(fs.existsSync(lockPath)).toBe(true);
+    fs.writeFileSync(
+      lockPath,
+      JSON.stringify({ pid: 2_147_483_647, startToken: "gone", lockId: "dead-owner" }),
+    );
+    expect(writeBoundedEvidenceFile(storeRoot, "dead.json", { pad: "yes" })).toBe("written");
+    const reuseRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r10-reuse-"));
+    roots.push(reuseRoot);
+    const reuseLock = path.join(reuseRoot, "executor-evidence", "write.lock");
+    fs.mkdirSync(path.dirname(reuseLock), { recursive: true });
+    fs.writeFileSync(
+      reuseLock,
+      JSON.stringify({ pid: process.pid, startToken: "not-this-process", lockId: "reused" }),
+    );
+    const reuse = writeBoundedEvidenceFile(reuseRoot, "reuse.json", { pad: "maybe" });
+    if (processStartToken(process.pid)) {
+      expect(reuse).toBe("written");
+    } else {
+      expect(reuse).toBe("failed");
+      expect(fs.existsSync(reuseLock)).toBe(true);
+    }
+  });
+
+  it("does not let two competitors enter the evidence lock together", async () => {
+    const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r10-race-"));
+    roots.push(storeRoot);
+    const childPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "evidence-write-child.ts",
+    );
+    const entryLog = path.join(storeRoot, "entry.log");
+    const spawnWriter = (fileName: string) =>
+      spawn(
+        process.execPath,
+        [
+          "--import",
+          "tsx",
+          childPath,
+          storeRoot,
+          fileName,
+          "4",
+          path.join(storeRoot, `${fileName}.out`),
+        ],
+        {
+          cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."),
+          env: {
+            ...process.env,
+            OPENBOT_EXECUTOR_EVIDENCE: "1",
+            OPENBOT_EXECUTOR_EVIDENCE_LOCK_ENTRY_LOG: entryLog,
+          },
+        },
+      );
+    const first = spawnWriter("one.json");
+    const second = spawnWriter("two.json");
+    const codes = await Promise.all(
+      [first, second].map(
+        (child) => new Promise<number | null>((resolve) => child.on("close", resolve)),
+      ),
+    );
+    expect(codes).toEqual([0, 0]);
+    const lines = fs.readFileSync(entryLog, "utf8").trim().split("\n");
+    expect(lines).toHaveLength(4);
+    expect(lines[0]?.endsWith(" enter")).toBe(true);
+    expect(lines[1]?.endsWith(" leave")).toBe(true);
+    expect(lines[2]?.endsWith(" enter")).toBe(true);
+    expect(lines[3]?.endsWith(" leave")).toBe(true);
+    expect(lines[0]?.split(" ")[0]).toBe(lines[1]?.split(" ")[0]);
+    expect(lines[2]?.split(" ")[0]).toBe(lines[3]?.split(" ")[0]);
+    expect(JSON.parse(fs.readFileSync(path.join(storeRoot, "one.json.out"), "utf8")).result).toBe(
+      "written",
+    );
+    expect(JSON.parse(fs.readFileSync(path.join(storeRoot, "two.json.out"), "utf8")).result).toBe(
+      "written",
+    );
   });
 
   it("rejects a changed scope, run, provider, or startedAt as an immutable conflict", () => {

@@ -164,6 +164,9 @@ export function directoryBytes(root: string): number {
   }
   let total = 0;
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (entry.name.includes(".owner.")) {
+      continue;
+    }
     const full = path.join(root, entry.name);
     if (entry.isDirectory()) {
       total += directoryBytes(full);
@@ -433,15 +436,6 @@ export function processStartToken(pid: number): string | null {
   }
 }
 
-function processAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 type EvidenceLockOwner = { pid: number; startToken: string; lockId: string };
 
 function parseLockOwner(text: string): EvidenceLockOwner | null {
@@ -468,53 +462,107 @@ function sameLockFile(left: fs.Stats, right: fs.Stats): boolean {
   return left.dev === right.dev && left.ino === right.ino;
 }
 
-function ownerStillLive(owner: EvidenceLockOwner): boolean {
-  const liveToken = processStartToken(owner.pid);
-  if (liveToken && liveToken === owner.startToken) {
-    return true;
+/**
+ * ENOENT means that pid or fd is gone. Permission and I/O errors do not.
+ * Callers must not treat "unknown" as "nobody holds the lock".
+ */
+export function classifyLockProbeError(code: string | undefined): "gone" | "unknown" {
+  if (code === "ENOENT") {
+    return "gone";
   }
-  if (liveToken && liveToken !== owner.startToken) {
-    return false;
-  }
-  return owner.startToken === "unknown" && processAlive(owner.pid);
+  return "unknown";
+}
+
+export type EmptyLockHolderVerdict = "held" | "clear" | "unknown";
+
+/** Test seam. Production uses the platform probe below. */
+let emptyLockHolderProbe: ((stat: fs.Stats) => EmptyLockHolderVerdict) | null = null;
+
+export function setEmptyLockHolderProbeForTests(
+  probe: ((stat: fs.Stats) => EmptyLockHolderVerdict) | null,
+): void {
+  emptyLockHolderProbe = probe;
 }
 
 /**
- * True when any live process still has this inode open.
- * An unreadable /proc entry is treated as a holder: we cannot prove the creator died.
+ * Linux procfs can see open inodes. Missing procfs (macOS) is "unknown",
+ * not "clear": an empty public lock is then left for a person to remove.
+ * EACCES, EPERM, and other I/O errors are also "unknown".
  */
-function lockInodeHeldByLiveProcess(stat: fs.Stats): boolean {
+function emptyLockHolderVerdict(stat: fs.Stats): EmptyLockHolderVerdict {
+  if (emptyLockHolderProbe) {
+    return emptyLockHolderProbe(stat);
+  }
   let pids: string[];
   try {
     pids = fs.readdirSync("/proc").filter((name) => /^\d+$/.test(name));
   } catch {
-    return true;
+    return "unknown";
   }
   for (const pid of pids) {
     let fds: string[];
     try {
       fds = fs.readdirSync(`/proc/${pid}/fd`);
-    } catch {
-      continue;
+    } catch (err) {
+      if (classifyLockProbeError((err as NodeJS.ErrnoException).code) === "gone") {
+        continue;
+      }
+      return "unknown";
     }
     for (const fdName of fds) {
       try {
         const held = fs.statSync(`/proc/${pid}/fd/${fdName}`);
         if (held.dev === stat.dev && held.ino === stat.ino) {
-          return true;
+          return "held";
         }
-      } catch {
-        // The fd closed while we looked. It is not a proven holder.
+      } catch (err) {
+        if (classifyLockProbeError((err as NodeJS.ErrnoException).code) === "gone") {
+          continue;
+        }
+        return "unknown";
       }
     }
   }
-  return false;
+  return "clear";
+}
+
+function pidLiveness(pid: number): "alive" | "dead" | "unknown" {
+  try {
+    process.kill(pid, 0);
+    return "alive";
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ESRCH") {
+      return "dead";
+    }
+    return "unknown";
+  }
+}
+
+/** Dead only when the pid is gone, or Linux proves the pid was reused. */
+function ownerIsDead(owner: EvidenceLockOwner): boolean {
+  const life = pidLiveness(owner.pid);
+  if (life !== "alive") {
+    return life === "dead";
+  }
+  if (!owner.startToken || owner.startToken === "unknown") {
+    return false;
+  }
+  let live: string | null;
+  try {
+    live = processStartToken(owner.pid);
+  } catch {
+    return false;
+  }
+  if (live === null) {
+    return false;
+  }
+  return live !== owner.startToken;
 }
 
 /**
- * Reclaim a lock whose owner is proven dead, or an ownerless file whose
- * creator no longer holds the inode. A live fd on an empty lock is not deleted.
- * Age alone never reclaims a lock.
+ * Reclaim a lock whose owner is proven dead. An empty public lock is removed
+ * only when the holder probe returns clear. Unknown (missing procfs, EACCES,
+ * EPERM, I/O) leaves the file. Age alone never reclaims a lock.
  */
 function recoverStaleEvidenceLock(lockPath: string): void {
   let before: fs.Stats;
@@ -531,7 +579,7 @@ function recoverStaleEvidenceLock(lockPath: string): void {
   }
   const owner = parseLockOwner(text);
   if (owner) {
-    if (ownerStillLive(owner)) {
+    if (!ownerIsDead(owner)) {
       return;
     }
     let after: fs.Stats;
@@ -545,15 +593,18 @@ function recoverStaleEvidenceLock(lockPath: string): void {
     const current = parseLockOwner(again);
     if (
       !sameLockFile(before, after) ||
-      current?.lockId !== owner.lockId ||
-      ownerStillLive(current)
+      !current ||
+      current.lockId !== owner.lockId ||
+      !ownerIsDead(current)
     ) {
       return;
     }
     fs.rmSync(lockPath, { force: true });
+    const companion = `${lockPath}.owner.${owner.lockId}`;
+    fs.rmSync(companion, { force: true });
     return;
   }
-  if (lockInodeHeldByLiveProcess(before)) {
+  if (emptyLockHolderVerdict(before) !== "clear") {
     return;
   }
   let after: fs.Stats;
@@ -564,7 +615,11 @@ function recoverStaleEvidenceLock(lockPath: string): void {
   } catch {
     return;
   }
-  if (!sameLockFile(before, after) || parseLockOwner(again) || lockInodeHeldByLiveProcess(after)) {
+  if (
+    !sameLockFile(before, after) ||
+    parseLockOwner(again) ||
+    emptyLockHolderVerdict(after) !== "clear"
+  ) {
     return;
   }
   fs.rmSync(lockPath, { force: true });
@@ -617,6 +672,7 @@ function releaseOwnedLock(fd: number, lockPath: string, lockId: string): void {
         owner.startToken === (processStartToken(process.pid) ?? "unknown")
       ) {
         fs.rmSync(lockPath, { force: true });
+        fs.rmSync(`${lockPath}.owner.${lockId}`, { force: true });
       }
     }
   } catch {
@@ -792,20 +848,31 @@ export function writeBoundedEvidenceFile(
     const started = Date.now();
     while (fd === undefined) {
       try {
-        fd = fs.openSync(lockPath, "wx");
+        lockId = randomUUID();
+        const companion = `${lockPath}.owner.${lockId}`;
+        fd = fs.openSync(companion, "wx");
         if (process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_AFTER_CREATE === "1") {
           process.exit(0);
         }
-        lockId = randomUUID();
         const owner: EvidenceLockOwner = {
           pid: process.pid,
           startToken: processStartToken(process.pid) ?? "unknown",
           lockId,
         };
-        // Provisional owner is durable before any pause. A crash after this
-        // write can be reclaimed because the pid and start token prove death.
-        // A live pid is never reclaimed, including during the pause below.
         writeLockRecord(fd, { ...owner, phase: "publishing" });
+        fs.closeSync(fd);
+        fd = undefined;
+        try {
+          fs.linkSync(companion, lockPath);
+        } catch (err) {
+          fs.rmSync(companion, { force: true });
+          if ((err as NodeJS.ErrnoException).code !== "EEXIST") {
+            throw err;
+          }
+          throw Object.assign(new Error("evidence lock busy"), { code: "EEXIST" });
+        }
+        fs.rmSync(companion, { force: true });
+        fd = fs.openSync(lockPath, "r+");
         if (process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_BEFORE_PUBLISH === "1") {
           fs.closeSync(fd);
           process.exit(0);
@@ -814,7 +881,6 @@ export function writeBoundedEvidenceFile(
         if (Number.isFinite(pauseMs) && pauseMs > 0) {
           Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pauseMs);
         }
-        writeLockRecord(fd, { ...owner, phase: "published" });
         if (!lockOwnershipHolds(fd, lockPath, lockId)) {
           fs.closeSync(fd);
           fd = undefined;
@@ -836,6 +902,12 @@ export function writeBoundedEvidenceFile(
     try {
       if (fd === undefined || !lockId || !lockOwnershipHolds(fd, lockPath, lockId)) {
         return "failed";
+      }
+      const entryLog = process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_ENTRY_LOG;
+      if (entryLog) {
+        fs.appendFileSync(entryLog, `${process.pid} enter\n`);
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 40);
+        fs.appendFileSync(entryLog, `${process.pid} leave\n`);
       }
       fs.mkdirSync(dir, { recursive: true });
       for (const name of fs.readdirSync(dir)) {
