@@ -33,12 +33,14 @@ export function createSupervisorWorkItemLifecycle(ports: {
         agentId: input.agentId,
         enterpriseId: input.enterpriseId,
       });
+      // Register release identity before the post-acquire cancel check so a
+      // cancel that races the wait still lets dispose() free an acquired lease.
+      if (admission.status === "acquired") {
+        heldRunId = input.runId;
+      }
       input.signal?.throwIfAborted();
       if (admission.status === "denied") {
         return { kind: "denied" as const, message: admission.message, admission };
-      }
-      if (admission.status === "acquired") {
-        heldRunId = input.runId;
       }
       return { kind: "ready" as const, admission };
     },

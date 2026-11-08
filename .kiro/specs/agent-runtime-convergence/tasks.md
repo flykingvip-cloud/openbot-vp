@@ -1556,3 +1556,9 @@ Also: auxiliary governance 3 PASS; slug wiring 1 PASS; memory governance 8 PASS;
 4. Real-model / restart-safe async recovery / collaboration real-model remain Package 2+ and are **not** claimed here.
 
 **Ready for independent Package 1 acceptance:** yes (implementer view). Package 2 not started. — grok-bot
+
+## Package 1 Supervisor admission-wait cancel lease fix (2026-11-08)
+
+- Bug: `createSupervisorWorkItemLifecycle` checked abort after acquire but before saving `heldRunId`, so cancel-during-acquire-wait leaked an acquired commercial lease (`dispose` saw nothing to release). — grok-bot
+- Fix: register release identity immediately when acquire returns `acquired`, then run the cancel check. Denied/skipped still never hold a lease. — grok-bot
+- Regressions (supervisor-lifecycle 7 PASS): cancel during admission wait → no backend + dispose releases once; denied-with-cancel-race → no release; prior deny/dispose/skip/cancel-after-prepare retained. tsgo PASS; typed oxlint clean. No architecture expansion; Package 2 not started; no push/merge/deploy. — grok-bot

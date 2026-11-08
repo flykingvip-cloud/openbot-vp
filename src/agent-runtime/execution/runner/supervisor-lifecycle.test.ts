@@ -102,3 +102,63 @@ it("skipped admission stays ready without a releaseable slot", async () => {
   await lifecycle.dispose();
   expect(ports.release).not.toHaveBeenCalled();
 });
+
+it("cancel during admission wait releases the acquired lease exactly once and never starts a backend", async () => {
+  const controller = new AbortController();
+  const backend = vi.fn(async () => "ran");
+  ports.acquire.mockImplementation(async () => {
+    controller.abort();
+    return { status: "acquired" as const };
+  });
+  const lifecycle = createSupervisorWorkItemLifecycle(ports);
+  let prepareError: unknown;
+  try {
+    await lifecycle.prepare({
+      runId: "sup-wait-cancel",
+      agentId: "main",
+      enterpriseId: "ent-1",
+      signal: controller.signal,
+    });
+  } catch (err) {
+    prepareError = err;
+  }
+  expect(prepareError).toBeTruthy();
+  expect(() =>
+    lifecycle.infer({
+      cfg: {},
+      provider: "codex-cli",
+      model: "default",
+      taskText: "work",
+      signal: controller.signal,
+      run: async () => backend(),
+    }),
+  ).toThrow(/not prepared/);
+  expect(backend).not.toHaveBeenCalled();
+  await lifecycle.dispose();
+  await lifecycle.dispose();
+  expect(ports.release).toHaveBeenCalledOnce();
+  expect(ports.release).toHaveBeenCalledWith("sup-wait-cancel");
+});
+
+it("denied admission after a cancel race still never releases a lease that was not acquired", async () => {
+  const controller = new AbortController();
+  ports.acquire.mockImplementation(async () => {
+    controller.abort();
+    return { status: "denied" as const, message: "quota denied" };
+  });
+  const lifecycle = createSupervisorWorkItemLifecycle(ports);
+  let prepareError: unknown;
+  try {
+    await lifecycle.prepare({
+      runId: "sup-deny-cancel",
+      agentId: "main",
+      signal: controller.signal,
+    });
+  } catch (err) {
+    prepareError = err;
+  }
+  // Abort wins after acquire resolves denied; no lease was held.
+  expect(prepareError).toBeTruthy();
+  await lifecycle.dispose();
+  expect(ports.release).not.toHaveBeenCalled();
+});
