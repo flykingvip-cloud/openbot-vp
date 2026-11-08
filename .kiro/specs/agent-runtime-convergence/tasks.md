@@ -1428,3 +1428,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 ## Retired cron path prevention (2026-11-08)
 
 - Added a source dependency gate preventing the scheduled host from importing legacy task-orchestration prefetch again. Added the persisted continuation-limit policy to the detached rule inventory; inventory remains metadata only and cannot disable enforcement or execute configuration. Catalog 2 PASS; architecture 56 PASS; full tsgo PASS; changed-file typed lint clean. No whole-runtime retirement or deployment claimed. — codex-runtime-manager
+
+## Current closure candidate combined verification (2026-11-08)
+
+- Candidate 6bdb1c4f7 combined regression 88 files / 493 PASS across runtime, command credits, queued execution, continuation persistence/concurrency, cron admission/ledger, collaboration contracts/plans/abort and durable stop/delivery restart. Local full build PASS; 209 existing ineffective dynamic-import warnings and UI-size warnings remain; pinned Control UI sync skipped. — codex-runtime-manager
+- Same candidate isolated real-model personal file task PASS: task-86bde518b45a; run/attempt a66cc6c6-9cb8-4f5d-ac79-84020b7dd615; exact bytes, acceptance passed with digest, delivery delivered, deliverableChecked=true and unfinished=false. Temporary Gateway exited normally and state was removed. No production restart, merge, push or deployment. Complete collaboration real-model sequence and asynchronous restart rescheduling remain open; whole executor retirement is not accepted. — codex-runtime-manager
