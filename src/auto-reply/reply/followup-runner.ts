@@ -10,6 +10,7 @@ import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import {
   bindAsyncWaitRecoveryTurn,
   claimQueuedExecution,
+  readAsyncWaitJobIntent,
 } from "../../agent-runtime/state/index.js";
 import {
   incrementRunCompactionCount,
@@ -155,7 +156,7 @@ export function createFollowupRunner(params: {
   return async (queued: FollowupRun) => {
     // Agent run correlation id (may differ across retries of the same queue item).
     const runId = crypto.randomUUID();
-    // Package2 delivery-only retry: skip business claim/model; only transport + receipt.
+    // Package2 delivery-only retry: skip business claim/model; resend ORIGINAL payloads.
     if (queued.asyncWaitDeliveryOnly) {
       try {
         const lookupRunId =
@@ -171,22 +172,54 @@ export function createFollowupRunner(params: {
             })
           : undefined;
         const deliveryRunId = pending?.runId || lookupRunId || runId;
-        const deliveryId = pending?.deliveryId || `delivery:${deliveryRunId}:visible`;
+        const deliveryId =
+          queued.asyncWaitRecoveryBind?.boundDeliveryId?.trim() ||
+          pending?.deliveryId ||
+          `delivery:${deliveryRunId}:visible`;
         const taskId = pending?.taskId;
-        const retryPayloads = [
-          {
-            text: "Delivery retry for a completed async-wait recovery turn. Prior business execution is not re-run.",
-          },
-        ];
-        const delivered = await sendFollowupPayloads(retryPayloads, queued, true);
-        await confirmPendingTurnDelivery({
-          cfg: queued.run.config,
-          runId: deliveryRunId,
-          deliveryId,
-          ...(taskId ? { taskId } : {}),
-          sessionKey: queued.run.sessionKey ?? sessionKey,
-          status: delivered === "none" ? "failed" : delivered,
-        });
+        // Prefer queued payloads (from durable recovery intent); never a placeholder.
+        let retryPayloads = (queued.asyncWaitDeliveryPayloads ?? []).filter(
+          (p) => p && (p.text || p.mediaUrl || (p.mediaUrls && p.mediaUrls.length > 0)),
+        );
+        if (retryPayloads.length === 0 && queued.asyncWaitRecoveryBind?.jobId) {
+          const intent = readAsyncWaitJobIntent(
+            queued.run.sessionFile,
+            queued.asyncWaitRecoveryBind.jobId,
+          );
+          retryPayloads = (intent?.recovery?.boundPayloads ?? []).filter(
+            (p) => p && (p.text || p.mediaUrl || (p.mediaUrls && p.mediaUrls.length > 0)),
+          );
+        }
+        if (retryPayloads.length === 0) {
+          logVerbose(
+            "async-wait delivery-only retry refused: original payloads missing — not confirming delivered",
+          );
+          await confirmPendingTurnDelivery({
+            cfg: queued.run.config,
+            runId: deliveryRunId,
+            deliveryId,
+            ...(taskId ? { taskId } : {}),
+            sessionKey: queued.run.sessionKey ?? sessionKey,
+            status: "failed",
+            error: "original_payloads_missing",
+          });
+        } else {
+          const delivered = await sendFollowupPayloads(retryPayloads, queued, true);
+          let confirmStatus: "delivered" | "failed" | "delivery_unknown" =
+            delivered === "none" ? "failed" : delivered;
+          if (confirmStatus === "failed" || delivered === "none") {
+            // Keep retryable for another delivery-only attempt.
+            confirmStatus = "delivery_unknown";
+          }
+          await confirmPendingTurnDelivery({
+            cfg: queued.run.config,
+            runId: deliveryRunId,
+            deliveryId,
+            ...(taskId ? { taskId } : {}),
+            sessionKey: queued.run.sessionKey ?? sessionKey,
+            status: confirmStatus,
+          });
+        }
       } catch (err) {
         logVerbose(`async-wait delivery-only retry failed: ${String(err)}`);
       } finally {
@@ -711,7 +744,7 @@ export function createFollowupRunner(params: {
               queued.asyncWaitRecoveryBind?.claimToken &&
               queued.run.taskCompletionBinding?.taskId
             ) {
-              bindAsyncWaitRecoveryTurn({
+              const bound = bindAsyncWaitRecoveryTurn({
                 sessionFile: queued.run.sessionFile,
                 taskId: queued.run.taskCompletionBinding.taskId,
                 jobId: queued.asyncWaitRecoveryBind.jobId,
@@ -723,18 +756,32 @@ export function createFollowupRunner(params: {
                 executionAttempt: identity.runId,
                 deliverableVersion:
                   queued.run.taskCompletionBinding.deliverableVersion ?? identity.runId,
+                // Persist original visible payloads for delivery-only retry.
+                payloads: finalPayloads,
               });
+              if (!bound.accepted) {
+                logVerbose(
+                  `async-wait delivery bind rejected: ${bound.reason} — payloads not recorded on intent`,
+                );
+              }
             }
           },
         });
       }
       const delivered = await sendFollowupPayloads(finalPayloads, queued, true);
       if (preparedDelivery) {
+        // Package2 recovery: transport failure must stay retryable (delivery_unknown),
+        // not terminal "failed" — otherwise delivery-only cannot upgrade the receipt.
+        let confirmStatus: "delivered" | "failed" | "delivery_unknown" =
+          delivered === "none" ? "failed" : delivered;
+        if (queued.asyncWaitRecoveryBind && (confirmStatus === "failed" || delivered === "none")) {
+          confirmStatus = "delivery_unknown";
+        }
         await confirmPendingTurnDelivery({
           cfg: queued.run.config,
           ...preparedDelivery,
           sessionKey: queued.run.sessionKey ?? sessionKey,
-          status: delivered === "none" ? "failed" : delivered,
+          status: confirmStatus,
         });
       }
     } catch (err) {

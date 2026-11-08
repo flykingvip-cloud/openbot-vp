@@ -104,10 +104,15 @@ it("live turn_bound exec is not re-claimable; dead claim reopens for recovery", 
   });
   expect(dead.ok).toBe(true);
   if (dead.ok) {
-    expect(dead.freshClaim).toBe(false);
+    // Dead re-claim fences old holders with a new generation/token.
+    expect(dead.freshClaim).toBe(true);
     expect(dead.deliveryOnly).not.toBe(true);
+    expect(dead.claimToken).not.toBe(claimed.claimToken);
   }
-  expect(readAsyncWaitJobIntent(sessionFile, "job-a")?.recovery?.stage).toBe("continue_armed");
+  const afterDead = readAsyncWaitJobIntent(sessionFile, "job-a");
+  expect(afterDead?.recovery?.stage).toBe("continue_armed");
+  expect(afterDead?.recovery?.claimGeneration).toBeGreaterThan(1);
+  expect(afterDead?.recovery?.holderPid).toBeUndefined();
 });
 
 it("continue_armed cannot regress from turn_bound with old claimToken", () => {
@@ -166,7 +171,7 @@ it("bind refuses multiple open jobs for same taskId without jobId", () => {
     taskId: "task-a",
     runId: "run-x",
   });
-  expect(bound).toBeUndefined();
+  expect(bound.accepted).toBe(false);
   // Explicit jobId + token binds only that job.
   const intentA = readAsyncWaitJobIntent(sessionFile, "job-a")!;
   const ok = bindAsyncWaitRecoveryTurn({
@@ -178,8 +183,12 @@ it("bind refuses multiple open jobs for same taskId without jobId", () => {
     executionAttempt: "run-a",
     deliverableVersion: "run-a",
   });
-  expect(ok?.jobId).toBe("job-a");
-  expect(ok?.executionAttempt).toBe("run-a");
+  expect(ok.accepted).toBe(true);
+  if (ok.accepted) {
+    expect(ok.intent.jobId).toBe("job-a");
+    expect(ok.intent.executionAttempt).toBe("run-a");
+    expect(ok.intent.recovery?.holderPid).toBe(process.pid);
+  }
   expect(readAsyncWaitJobIntent(sessionFile, "job-b")?.recovery?.stage).not.toBe("turn_bound");
 });
 

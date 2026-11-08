@@ -193,6 +193,16 @@ export function createAsyncWaitRecoveryContinueEnqueue(
           : {}),
       },
       ...(params.deliveryOnly ? { asyncWaitDeliveryOnly: true } : {}),
+      ...(params.deliveryOnly && params.intent.recovery?.boundPayloads?.length
+        ? { asyncWaitDeliveryPayloads: params.intent.recovery.boundPayloads }
+        : {}),
+      ...(params.deliveryOnly &&
+      (params.intent.recovery?.boundDeliverableVersion || params.intent.deliverableVersion)
+        ? {
+            asyncWaitDeliverableVersion:
+              params.intent.recovery?.boundDeliverableVersion || params.intent.deliverableVersion,
+          }
+        : {}),
       ...(originatingChannel ? { originatingChannel } : {}),
       ...(trusted?.lastTo ? { originatingTo: trusted.lastTo } : {}),
       ...(trusted?.lastAccountId ? { originatingAccountId: trusted.lastAccountId } : {}),

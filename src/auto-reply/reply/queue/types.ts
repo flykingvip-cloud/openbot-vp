@@ -50,6 +50,20 @@ export type FollowupRun = {
    */
   asyncWaitDeliveryOnly?: boolean;
   /**
+   * Package2: original visible payloads (+ version) for delivery-only resend.
+   * Must match the prepared delivery — never a placeholder string.
+   */
+  asyncWaitDeliveryPayloads?: Array<{
+    text?: string;
+    mediaUrl?: string;
+    mediaUrls?: string[];
+    replyToId?: string;
+    audioAsVoice?: boolean;
+    isError?: boolean;
+    channelData?: Record<string, unknown>;
+  }>;
+  asyncWaitDeliverableVersion?: string;
+  /**
    * askOutcome W1: optional parent TaskOutcome taskId when this followup is
    * an independent child of a prior user/chat/collab task.
    */

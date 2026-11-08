@@ -290,46 +290,57 @@ it("channel fail ≠ delivered; later delivery-only retry can complete without r
   // First transport fails.
   routeReplyMock.mockResolvedValueOnce({ ok: false, error: "offline" });
 
+  // No onBlockReply fallback — routeReply failure must remain a real delivery fail.
   setAsyncWaitRecoveryFollowupConsumerEnsure(({ cfg: c, sessionKey }) => {
-    ensureAsyncWaitRecoveryFollowupConsumer({
-      cfg: c,
-      sessionKey,
-      opts: { onBlockReply: vi.fn(async () => {}) },
-    });
+    ensureAsyncWaitRecoveryFollowupConsumer({ cfg: c, sessionKey });
   });
   setAsyncWaitRecoveryContinueEnqueue(createAsyncWaitRecoveryContinueEnqueue(cfg));
 
   recoverAsyncWaitJobsAtGatewayBoot({ cfg, startRecheck: false });
 
-  // Wait until model ran and stage is not delivered.
+  // Wait until model ran AND delivery was prepared (delivery_pending) — do not
+  // stop at turn_bound which precedes publishPending.
   const start = Date.now();
   while (Date.now() - start < 15000) {
     if (runEmbeddedPiAgentMock.mock.calls.length > 0) {
       const stage = readAsyncWaitJobIntent(sessionFile, "job-prod")?.recovery?.stage;
-      if (stage && stage !== "continue_armed" && stage !== "claimed") {
+      if (stage === "delivery_pending" || stage === "delivered") {
         break;
       }
     }
     await new Promise((r) => setTimeout(r, 50));
   }
   expect(runEmbeddedPiAgentMock).toHaveBeenCalled();
-  expect(readAsyncWaitJobIntent(sessionFile, "job-prod")?.recovery?.stage).not.toBe("delivered");
+  const afterFail = readAsyncWaitJobIntent(sessionFile, "job-prod");
+  expect(afterFail?.recovery?.stage).not.toBe("delivered");
+  // Channel fail must not close the task.
+  expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
+  // Original payloads must be retained for retry (not a placeholder).
+  expect(afterFail?.recovery?.stage).toBe("delivery_pending");
+  expect(afterFail?.recovery?.boundPayloads?.some((p) => p.text?.includes("recovery report"))).toBe(
+    true,
+  );
+  const blob = JSON.stringify(afterFail?.recovery?.boundPayloads ?? []);
+  expect(blob).not.toMatch(/Delivery retry for a completed/);
 
   const modelCallsAfterExec = runEmbeddedPiAgentMock.mock.calls.length;
+  const routeCallsAfterFail = routeReplyMock.mock.calls.length;
 
-  // Delivery-only retry: channel recovers.
+  // Delivery-only retry: channel recovers — must resend ORIGINAL payload text.
   routeReplyMock.mockResolvedValue({ ok: true });
   const intent = readAsyncWaitJobIntent(sessionFile, "job-prod")!;
   const { armAsyncWaitRecoveryContinuation } = await import("./async-wait-job-recovery.js");
   const again = armAsyncWaitRecoveryContinuation({ intent, isPidAlive: () => false });
-  // If still turn_bound without delivery id (prepare didn't bind), may re-arm business;
-  // if delivery_pending, must be delivery_only.
-  if (intent.recovery?.stage === "delivery_pending" || again.outcome === "delivery_only") {
-    expect(again.outcome).toBe("delivery_only");
-    await waitForStage(sessionFile, "delivered");
-    // Model must NOT be called again for delivery-only.
-    expect(runEmbeddedPiAgentMock.mock.calls.length).toBe(modelCallsAfterExec);
-  }
+  expect(again.outcome).toBe("delivery_only");
+  await waitForStage(sessionFile, "delivered");
+  // Model must NOT be called again for delivery-only.
+  expect(runEmbeddedPiAgentMock.mock.calls.length).toBe(modelCallsAfterExec);
+  // Retry transport must carry original report text (not placeholder).
+  const retryArgs = routeReplyMock.mock.calls
+    .slice(routeCallsAfterFail)
+    .map((c) => JSON.stringify(c[0] ?? {}));
+  expect(retryArgs.some((s) => s.includes("recovery report with verified sources"))).toBe(true);
+  expect(retryArgs.join("\n")).not.toMatch(/Delivery retry for a completed/);
 }, 30000);
 
 it("missing trusted identity refuses enqueue — no unscoped exec", () => {

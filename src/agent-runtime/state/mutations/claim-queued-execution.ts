@@ -32,28 +32,41 @@ export function mergeContinuePromptWithRecoveryAppendix(
   return [wakePrompt.trimEnd(), "", appendix].join("\n");
 }
 
-/** Restore board attempt after a failed exclusive recovery bind. */
-function restoreBoardExecutionAttempt(
+/**
+ * CAS board rollback after a failed exclusive recovery bind.
+ * Only restores when the board attempt is still THIS write's runId —
+ * never overwrite a concurrent newer attempt. Empty original attempt is restored.
+ */
+export function restoreBoardExecutionAttemptAfterFailedBind(
   sessionFile: string,
   taskId: string,
+  writtenRunId: string,
   previous: { executionAttempt?: string; deliverableVersion?: string },
-): void {
-  mutateSessionTaskBoard(sessionFile, (board) => {
+): boolean {
+  const tid = taskId.trim();
+  const written = writtenRunId.trim();
+  if (!tid || !written) {
+    return false;
+  }
+  return mutateSessionTaskBoard(sessionFile, (board) => {
     const current = board.current;
-    if (!current || current.taskId !== taskId) {
-      return { board, value: undefined };
+    if (!current || current.taskId !== tid) {
+      return { board, value: false };
     }
-    if (!previous.executionAttempt || !previous.deliverableVersion) {
-      return { board, value: undefined };
+    // CAS: concurrent new attempt must not be overwritten by this old rollback.
+    if (current.executionAttempt !== written) {
+      return { board, value: false };
     }
+    const prevAttempt = previous.executionAttempt?.trim() ?? "";
+    const prevDeliverable = previous.deliverableVersion?.trim() ?? prevAttempt;
     return {
       board: bindCurrentExecution({
         board,
-        taskId,
-        executionAttempt: previous.executionAttempt,
-        deliverableVersion: previous.deliverableVersion,
+        taskId: tid,
+        executionAttempt: prevAttempt,
+        deliverableVersion: prevDeliverable,
       }),
-      value: undefined,
+      value: true,
     };
   });
 }
@@ -115,9 +128,9 @@ export function claimQueuedExecution(input: {
       executionAttempt: binding.executionAttempt,
       deliverableVersion: binding.deliverableVersion,
     });
-    if (!bound) {
-      // Bind failure MUST refuse execution and must not leave the wrong board attempt.
-      restoreBoardExecutionAttempt(input.sessionFile, binding.taskId, {
+    // Record existence / "keep" is NOT success — only explicit accepted.
+    if (!bound.accepted) {
+      restoreBoardExecutionAttemptAfterFailedBind(input.sessionFile, binding.taskId, input.runId, {
         executionAttempt: previousAttempt,
         deliverableVersion: previousDeliverable,
       });
@@ -125,7 +138,7 @@ export function claimQueuedExecution(input: {
     }
   } else if (binding?.taskId && input.asyncWaitRecovery) {
     // Partial recovery bind params → refuse rather than first-open-by-taskId.
-    restoreBoardExecutionAttempt(input.sessionFile, binding.taskId, {
+    restoreBoardExecutionAttemptAfterFailedBind(input.sessionFile, binding.taskId, input.runId, {
       executionAttempt: previousAttempt,
       deliverableVersion: previousDeliverable,
     });

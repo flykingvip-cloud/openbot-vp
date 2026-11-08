@@ -1741,3 +1741,30 @@ Registry sharedPaths / protected plans left uncommitted for kiro-loom. Package 3
 
 **Remelt tip for re-acceptance:** `1c98ff7ee` (4-gap close). Prior failed tip `8743811fa` retained above. — grok-bot
 
+## Package 2 remelt — close 4 acceptance defects (2026-11-08)
+
+**Failed tip:** `efe0e2ce9b0f0c9fa07a269f7b3b3df0a92ffbe4`. Package 3 still NOT started.
+
+Preserved: production `ensureAsyncWaitRecoveryFollowupConsumer` → `createFollowupRunner` chain; delivery_pending bind; trusted identity refuse; claimed prompt WARNING. No architecture expansion. No push/merge/deploy.
+
+### Defects closed
+
+1. **Original payload delivery-only retry** — `boundPayloads` (+ `boundDeliverableVersion`) persisted at publishPending bind; delivery-only resends those payloads/media (never “Delivery retry…” placeholder). Transport fail on recovery confirms as `delivery_unknown` (retryable), not terminal failed.
+2. **Failed-claim board rollback CAS** — `restoreBoardExecutionAttemptAfterFailedBind` only restores when board.executionAttempt still equals this write’s runId; concurrent newer attempt untouched; empty prior attempt restored to "".
+3. **Bind accepted/rejected** — `bindAsyncWaitRecoveryTurn` returns `{accepted:true|false, reason}`; transition `"keep"` / record existence ≠ success. `claimQueuedExecution` refuses business exec on `!accepted`.
+4. **Liveness prepare + cross-process** — `holderPid` + embedded active + legacy prepare grace; dead re-claim bumps `claimGeneration` + new `claimToken` (freshClaim) so old holders are fenced (no dual exec).
+
+### Regression evidence
+
+| Case | Suite | Result |
+| --- | --- | --- |
+| Original payload retry match + channel fail no close/no re-model | production-path 3 | PASS |
+| Payload retain / token reject / CAS rollback / prepare holder / no double claim | four-defects 6 | PASS |
+| Live/dead fence + exclusive bind + delivery_only | claim-fence 5 | PASS |
+| Real process crash/dual/stop | cross-process 4 | PASS |
+| Related Package2 | 8 files / 36 tests | PASS |
+
+Typed oxlint on changed sources: 0 warnings / 0 errors.
+
+**Remelt tip for re-acceptance:** `TIP_PLACEHOLDER` (4-defect close). Prior failed tip `efe0e2ce9` retained above. — grok-bot
+

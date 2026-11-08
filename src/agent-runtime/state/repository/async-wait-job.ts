@@ -38,6 +38,17 @@ export type AsyncWaitResultEvidence = {
   observedAtMs: number;
 };
 
+/** Serializable visible payloads retained for delivery-only retry (original result). */
+export type AsyncWaitBoundPayload = {
+  text?: string;
+  mediaUrl?: string;
+  mediaUrls?: string[];
+  replyToId?: string;
+  audioAsVoice?: boolean;
+  isError?: boolean;
+  channelData?: Record<string, unknown>;
+};
+
 export type AsyncWaitRecoveryState = {
   stage: AsyncWaitRecoveryStage;
   claimGeneration: number;
@@ -51,6 +62,11 @@ export type AsyncWaitRecoveryState = {
   boundSessionId?: string;
   boundDeliveryId?: string;
   boundOutcomeTaskId?: string;
+  /** Process that holds turn_bound through auth/prepare/exec (cross-process liveness). */
+  holderPid?: number;
+  /** Original visible payloads + version for delivery-only resend (never a placeholder). */
+  boundPayloads?: AsyncWaitBoundPayload[];
+  boundDeliverableVersion?: string;
   lastAttemptAtMs?: number;
   deliveredAtMs?: number;
 };
@@ -428,14 +444,32 @@ export function asyncWaitRecoveryStageRank(stage: AsyncWaitRecoveryStage): numbe
   return STAGE_RANK[stage] ?? 0;
 }
 
+/** Prepare-phase grace when holderPid was not stamped (legacy rows only). */
+const PREPARE_HOLDER_GRACE_MS = 120_000;
+
+function defaultPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Trusted run-liveness: board still bound to this attempt AND embedded run active
- * for the bound session id. Missing session id or inactive registry ⇒ dead claim
- * (recoverable). Never treats turn_bound as permanently unreclaimable.
+ * Trusted run-liveness for turn_bound without delivery:
+ * - board still bound to this attempt/runId
+ * - AND holder still valid: embedded active (exec), OR holderPid alive
+ *   (auth/prepare + cross-process), OR short legacy prepare grace
+ * Missing/expired holder ⇒ dead (recoverable). Never permanent active_exec.
  */
 export function isBoundAsyncWaitRunLive(
   intent: AsyncWaitJobIntent,
-  opts?: { isEmbeddedPiRunActive?: (sessionId: string) => boolean },
+  opts?: {
+    isEmbeddedPiRunActive?: (sessionId: string) => boolean;
+    isPidAlive?: (pid: number) => boolean;
+    nowMs?: number;
+  },
 ): boolean {
   const recovery = intent.recovery;
   if (!recovery || recovery.stage !== "turn_bound" || !recovery.boundRunId) {
@@ -448,12 +482,59 @@ export function isBoundAsyncWaitRunLive(
   if (board.current?.executionAttempt !== recovery.boundRunId) {
     return false;
   }
-  const sessionId = recovery.boundSessionId?.trim();
-  if (!sessionId) {
-    return false;
-  }
   const active = opts?.isEmbeddedPiRunActive ?? isEmbeddedPiRunActive;
-  return active(sessionId);
+  const pidAlive = opts?.isPidAlive ?? defaultPidAlive;
+  const sessionId = recovery.boundSessionId?.trim();
+  if (sessionId && active(sessionId)) {
+    return true;
+  }
+  if (typeof recovery.holderPid === "number" && Number.isFinite(recovery.holderPid)) {
+    return pidAlive(recovery.holderPid);
+  }
+  // Legacy rows without holderPid: brief prepare-window only.
+  const last = recovery.lastAttemptAtMs ?? recovery.claimedAtMs ?? 0;
+  const now = opts?.nowMs ?? Date.now();
+  return last > 0 && now - last < PREPARE_HOLDER_GRACE_MS;
+}
+
+export function sanitizeAsyncWaitBoundPayloads(
+  payloads: readonly AsyncWaitBoundPayload[] | undefined,
+): AsyncWaitBoundPayload[] | undefined {
+  if (!payloads?.length) {
+    return undefined;
+  }
+  const out: AsyncWaitBoundPayload[] = [];
+  for (const payload of payloads) {
+    if (!payload || typeof payload !== "object") {
+      continue;
+    }
+    const next: AsyncWaitBoundPayload = {};
+    if (typeof payload.text === "string") {
+      next.text = payload.text;
+    }
+    if (typeof payload.mediaUrl === "string" && payload.mediaUrl.trim()) {
+      next.mediaUrl = payload.mediaUrl;
+    }
+    if (Array.isArray(payload.mediaUrls) && payload.mediaUrls.length > 0) {
+      next.mediaUrls = payload.mediaUrls.filter((u) => typeof u === "string" && u.trim());
+    }
+    if (typeof payload.replyToId === "string") {
+      next.replyToId = payload.replyToId;
+    }
+    if (payload.audioAsVoice === true) {
+      next.audioAsVoice = true;
+    }
+    if (payload.isError === true) {
+      next.isError = true;
+    }
+    if (payload.channelData && typeof payload.channelData === "object") {
+      next.channelData = { ...payload.channelData };
+    }
+    if (next.text || next.mediaUrl || (next.mediaUrls && next.mediaUrls.length > 0)) {
+      out.push(next);
+    }
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 /**
@@ -504,28 +585,38 @@ export function claimAsyncWaitJobForRecovery(input: {
     // turn_bound without delivery: live run ⇒ active_exec; dead claim ⇒ reopen for recovery.
     if (recovery.stage === "turn_bound" && recovery.boundRunId && !recovery.boundDeliveryId) {
       if (
-        isBoundAsyncWaitRunLive(current, { isEmbeddedPiRunActive: input.isEmbeddedPiRunActive })
+        isBoundAsyncWaitRunLive(current, {
+          isEmbeddedPiRunActive: input.isEmbeddedPiRunActive,
+          isPidAlive: input.isPidAlive,
+        })
       ) {
         result = { ok: false, reason: "active_exec", intent: current };
         return "keep";
       }
-      // Dead claim: allow existing recovery continue path (not delivery-only, not permanent).
-      if (recovery.claimToken) {
-        result = {
-          ok: true,
-          intent: current,
-          claimToken: recovery.claimToken,
-          freshClaim: false,
-        };
-        return {
+      // Dead claim: fence old holders with a new generation/token (no dual exec).
+      {
+        const claimToken = randomUUID();
+        const nextGen = (recovery.claimGeneration ?? 0) + 1;
+        const next = {
           ...current,
           recovery: {
             ...recovery,
-            // Re-open to continue_armed fence so arm can re-enqueue without stage regression refusal.
-            stage: "continue_armed",
+            stage: "continue_armed" as const,
+            claimGeneration: nextGen,
+            claimToken,
+            boundRunId: undefined,
+            boundSessionId: undefined,
+            holderPid: undefined,
             lastAttemptAtMs: Date.now(),
           },
         };
+        result = {
+          ok: true,
+          intent: next,
+          claimToken,
+          freshClaim: true,
+        };
+        return next;
       }
     }
     // Executed-not-delivered: delivery-only recovery (do not re-run business).
@@ -677,6 +768,21 @@ export function markAsyncWaitRecoveryContinueArmed(input: {
 }
 
 /** Bind a real followup/agent run id after claimQueuedExecution accepts. */
+export type BindAsyncWaitRecoveryTurnResult =
+  | { accepted: true; intent: AsyncWaitJobIntent }
+  | {
+      accepted: false;
+      reason:
+        | "missing_params"
+        | "run_conflict"
+        | "no_candidate"
+        | "token_mismatch"
+        | "cleared"
+        | "stage_regression"
+        | "unchanged";
+      intent?: AsyncWaitJobIntent;
+    };
+
 export function bindAsyncWaitRecoveryTurn(input: {
   sessionFile: string;
   taskId: string;
@@ -691,17 +797,21 @@ export function bindAsyncWaitRecoveryTurn(input: {
   /** Sync recovery intent to the live bound attempt so recheck cannot clear with a stale attempt. */
   executionAttempt?: string;
   deliverableVersion?: string;
-}): AsyncWaitJobIntent | undefined {
+  /** Original visible payloads for delivery-only retry (required when deliveryId set). */
+  payloads?: readonly AsyncWaitBoundPayload[];
+  /** Holder pid for prepare/cross-process liveness; defaults to process.pid on turn_bound. */
+  holderPid?: number;
+}): BindAsyncWaitRecoveryTurnResult {
   const tid = input.taskId.trim();
   const runId = input.runId.trim();
   if (!tid || !runId) {
-    return undefined;
+    return { accepted: false, reason: "missing_params" };
   }
   const jobIdFilter = input.jobId?.trim() || undefined;
   const tokenFilter = input.claimToken?.trim() || undefined;
   // Exclusive bind requires jobId + claimToken under lock — never first-open-by-taskId.
   if (!jobIdFilter || !tokenFilter) {
-    return undefined;
+    return { accepted: false, reason: "missing_params" };
   }
   // Refuse if another job already owns this runId.
   for (const other of listAsyncWaitJobIntents(input.sessionFile)) {
@@ -711,17 +821,15 @@ export function bindAsyncWaitRecoveryTurn(input: {
       other.recovery.stage !== "delivered" &&
       other.status !== "cleared"
     ) {
-      return undefined;
+      return { accepted: false, reason: "run_conflict", intent: other };
     }
   }
+  // Resolve by jobId+taskId first; token is verified under lock (explicit token_mismatch).
   const candidates = listAsyncWaitJobIntents(input.sessionFile).filter((intent) => {
     if (intent.taskId !== tid || intent.status === "cleared") {
       return false;
     }
     if (intent.jobId !== jobIdFilter) {
-      return false;
-    }
-    if (intent.recovery?.claimToken !== tokenFilter) {
       return false;
     }
     const stage = intent.recovery?.stage;
@@ -734,16 +842,28 @@ export function bindAsyncWaitRecoveryTurn(input: {
   });
   const target = candidates[0];
   if (!target) {
-    return undefined;
+    return { accepted: false, reason: "no_candidate" };
   }
-  return transitionAsyncWaitJobIntent(input.sessionFile, target.jobId, (current) => {
+  if (target.recovery?.claimToken !== tokenFilter) {
+    return { accepted: false, reason: "token_mismatch", intent: target };
+  }
+  let rejectReason: Extract<BindAsyncWaitRecoveryTurnResult, { accepted: false }> = {
+    accepted: false,
+    reason: "unchanged",
+  };
+  // Track mutation explicitly — transition "keep" returns the existing record (≠ success).
+  let mutated = false;
+  const intent = transitionAsyncWaitJobIntent(input.sessionFile, target.jobId, (current) => {
     if (!current?.recovery?.claimToken) {
+      rejectReason = { accepted: false, reason: "no_candidate", intent: current };
       return "keep";
     }
     if (tokenFilter && current.recovery.claimToken !== tokenFilter) {
+      rejectReason = { accepted: false, reason: "token_mismatch", intent: current };
       return "keep";
     }
     if (current.status === "cleared") {
+      rejectReason = { accepted: false, reason: "cleared", intent: current };
       return "keep";
     }
     const nextStage = input.deliveryId ? "delivery_pending" : "turn_bound";
@@ -751,10 +871,20 @@ export function bindAsyncWaitRecoveryTurn(input: {
     if (
       asyncWaitRecoveryStageRank(nextStage) < asyncWaitRecoveryStageRank(current.recovery.stage)
     ) {
+      rejectReason = { accepted: false, reason: "stage_regression", intent: current };
       return "keep";
     }
     const syncedAttempt = input.executionAttempt?.trim();
     const syncedDeliverable = input.deliverableVersion?.trim();
+    const boundPayloads = input.deliveryId
+      ? (sanitizeAsyncWaitBoundPayloads(input.payloads) ?? current.recovery.boundPayloads)
+      : current.recovery.boundPayloads;
+    const holderPid = input.deliveryId
+      ? undefined
+      : typeof input.holderPid === "number" && Number.isFinite(input.holderPid)
+        ? input.holderPid
+        : process.pid;
+    mutated = true;
     return {
       ...current,
       ...(syncedAttempt ? { executionAttempt: syncedAttempt } : {}),
@@ -766,10 +896,25 @@ export function bindAsyncWaitRecoveryTurn(input: {
         ...(input.sessionId?.trim() ? { boundSessionId: input.sessionId.trim() } : {}),
         ...(input.deliveryId ? { boundDeliveryId: input.deliveryId } : {}),
         ...(input.outcomeTaskId ? { boundOutcomeTaskId: input.outcomeTaskId } : {}),
+        ...(boundPayloads ? { boundPayloads } : {}),
+        ...(syncedDeliverable || input.deliverableVersion
+          ? {
+              boundDeliverableVersion:
+                syncedDeliverable || input.deliverableVersion?.trim() || runId,
+            }
+          : {}),
+        ...(holderPid !== undefined ? { holderPid } : { holderPid: undefined }),
         lastAttemptAtMs: Date.now(),
       },
     };
   });
+  if (mutated && intent) {
+    return { accepted: true, intent };
+  }
+  if (rejectReason.reason !== "unchanged") {
+    return rejectReason;
+  }
+  return { accepted: false, reason: "unchanged", intent: intent ?? target };
 }
 
 export function markAsyncWaitRecoveryDelivered(input: {
