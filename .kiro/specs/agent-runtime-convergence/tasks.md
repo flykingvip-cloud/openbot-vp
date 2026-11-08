@@ -1969,3 +1969,52 @@ Deprecated aliases: removed (no callers).
 | oxlint changed sources | 0/0 |
 
 **Remelt tip for Package5 acceptance:** `8d596ac185cca586f060ff45e80c8cf3987bb62f` (alias retire + audit). Prior Package4 tip `8d60206fb` retained. — grok-bot
+
+## Package 6 — final same-SHA acceptance & new-main takeover proof (2026-11-08)
+
+**Baseline (Package 5 PASSED tip):** `a1b14f80c0de6483ab3a9659c090eb6881912ffe`  
+**Package 6 status:** same-SHA matrices + entry call graph + retired/kept ledger recorded; **zero continuity/state/delivery source fixes**.  
+**Full evidence:** `package6-same-sha-acceptance.md`  
+No push / merge / deploy / production restart. Foreign concurrent WIP left untouched.
+
+Charter: freeze one reproducible candidate; prove personal + collab applicable main chains, async/recovery/cancel/claim/delivery-only, artifacts/PPT (honest runtime GAPs), entry call graph, retired unreachable + kept façades. No new features / architecture expansion. Do not splice PASS across SHAs. Do not send external messages or restart production.
+
+### Freeze
+
+| Field | Value |
+| --- | --- |
+| Freeze source (clean tests) | `a1b14f80c0de6483ab3a9659c090eb6881912ffe` |
+| `origin/main` ancestor | `658bb327ef7470433f092b50dd122d8d6bc5262b` — PASS |
+| Clean worktree | `/tmp/openbot-p6-freeze-a1b14f80c` detached + clean |
+| Src fixes this package | **none** |
+
+### Matrix summary (all on freeze source SHA)
+
+| Window | Verdict |
+| --- | --- |
+| Personal main chain (interpret → admit → runAdmittedTurn → prepare/confirm) | **PASS** (unit) |
+| Collab main chain (claim → member exec → submit → review → integrate / group delivery; member turn ≠ close group) | **PASS** (integration P1/P3 + org dispatch + static ownership) |
+| Async / restart / stale cancel / claim race / delivery-only original payload | **PASS** (unit + stub-channel + real-process) |
+| Artifacts preview/download/save-edit consistency | **PASS** (unit); PPT physical render **runtime GAP** |
+| Retired aliases unreachable; kept façades/backends/triggers listed | **PASS** (static + package5-retire) |
+
+### Verification this turn (freeze SHA)
+
+| Suite group | Result |
+| --- | --- |
+| delivery/async/context (batch A) | 14 files / 90 PASS |
+| admission/restart/cross-process (batch B) | 14 files / 56 PASS |
+| interpret/PPT wiring/org dispatch (+ UI sidebar) | 11 files / 129 PASS |
+| collab board/dialogue/continuity (batch D) | 63 PASS / 3 FAIL (unit mock drift → follow-up) |
+| controlled collab + PPT stubs (batch E) | 29 PASS / 1 FAIL (P4 assert polish → follow-up) |
+| package5-retire | 3 PASS |
+| Source edits for Package6 blockers | **none** |
+
+### Follow-up (not blockers)
+
+1. Board-tool unit mocks → `{ item, eventRelay }` shape.  
+2. P4 allow `human_todo` after escalate exhaustion.  
+3. Real-model / real-channel / PPT physical renderer acceptance.  
+4. Foreign WIP stays out of convergence commits.
+
+**Remelt tip for Package6 acceptance:** *(filled after tip SHA commit)*. — grok-bot
