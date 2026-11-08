@@ -1662,4 +1662,15 @@ OPENBOT_TEST_PROFILE=low — **5 files / 20 PASS**:
 | Real two-process | async-wait-recovery.cross-process 4 (A write→B execute+receipt; dual claim; crash-retry; stop concurrent) | PASS |
 | Related retain | exec.task-binding 5, async-process-lifecycle 2, confirm-pending 5 | PASS |
 
-Registry sharedPaths remain uncommitted for kiro-loom. Protected files preserved. No push/merge/deploy. Ready for Package 2 re-acceptance. — grok-bot
+Registry sharedPaths remain uncommitted for kiro-loom. Protected files preserved. No push/merge/deploy. ### Remediation SHA chain
+
+| Commit | SHA | Focus |
+| --- | --- | --- |
+| Atomic claim + evidence | `0255a06bc3e7cab4a5a142dffe86dc36f9eb75e2` | lock transitions; PID unconfirmed ≠ success |
+| Continue mainline | `62cc6114cf25c512d13b46f6ec6523ee6988ecfd` | arm task-board continue; bind real runId; confirm→delivered |
+| Evidence note | `5c9c5cc6d378f41301f4aea87966caa8e96cfee9` | tasks.md remediations |
+| Cross-process coverage | `d2bafcb14b47153e83cafc22d3daebf8ded8a7c3` | A→B execute+receipt; dual claim; crash retry; stop |
+
+**Re-acceptance tip:** `d2bafcb14b47153e83cafc22d3daebf8ded8a7c3`
+
+Ready for Package 2 re-acceptance. — grok-bot
