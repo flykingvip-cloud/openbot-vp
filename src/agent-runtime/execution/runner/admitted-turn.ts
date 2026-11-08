@@ -46,11 +46,11 @@ import { createRuntimeEvidenceObserver } from "../../../observation/runtime-evid
 import { defaultRuntime } from "../../../runtime.js";
 import { TaskBudgetExceededError } from "../../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../../utils/message-channel.js";
-import { createAuthorizedModelSession } from "../../model/index.js";
 import { createTurnOutcomeRecorder } from "../outcomes/index.js";
 import { createAdmittedCandidateInvoker } from "./admitted-candidate.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
+import { createExecutionLifecycle } from "./execution-lifecycle.js";
 import type { AgentRunLoopResult, AgentTurnExecutionParams } from "./turn-contract.js";
 
 export async function runAdmittedTurn(
@@ -261,7 +261,7 @@ export async function runAdmittedTurn(
     params.getActiveSessionEntry()?.systemPromptReport,
   );
 
-  const modelSession = createAuthorizedModelSession(runId, host);
+  const modelSession = createExecutionLifecycle(runId, host);
   try {
     while (true) {
       commercialToolCallCount = 0;
@@ -350,59 +350,34 @@ export async function runAdmittedTurn(
               }
             : {}),
         };
-        if (!modelSession.held) {
-          const collaborationGroupId = params.sessionCtx.CollaborationGroupId?.trim();
-          const runSlot = await modelSession.authorize({
+        const collaborationGroupId = params.sessionCtx.CollaborationGroupId?.trim();
+        const prepared = await modelSession.prepare({
+          config: params.followupRun.run.config,
+          authorization: {
             agentId: params.followupRun.run.agentId,
             ...(collaborationGroupId ? { groupId: collaborationGroupId } : {}),
             modelGateInput,
+          },
+          actorId: runGatewayClientPlatformUserId?.trim()
+            ? `platform-user:${runGatewayClientPlatformUserId.trim()}`
+            : undefined,
+          signal: params.opts?.abortSignal,
+        });
+        if (prepared.kind === "denied") {
+          void recordGrowthTaskOutcome(false, {
+            authzDenied: true,
+            failureDetail: "enterprise_run_slot_denied",
           });
-          if (!runSlot.skipped && !runSlot.acquired) {
-            void recordGrowthTaskOutcome(false, {
-              authzDenied: true,
-              failureDetail: "enterprise_run_slot_denied",
-            });
-            return {
-              kind: "final",
-              payload: {
-                text: runSlot.message,
-              },
-            };
-          }
-          modelGate = modelSession.gate;
+          return { kind: "final", payload: { text: prepared.message } };
         }
-        const actorId = runGatewayClientPlatformUserId?.trim()
-          ? `platform-user:${runGatewayClientPlatformUserId.trim()}`
-          : undefined;
-        // P3-1: explicit mode (default shadow) + preexisting hard-filter when allowlist is an array.
-        const executionRouting = host.model.resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGate?.allowlist,
-          preferredModelOrder: modelGate?.preferredModelOrder,
-          capabilityPlan: modelGate?.capabilityPlan,
-        });
-        const consumedCapability = host.model.consumeCapabilityRoutingResult({
-          planFailure: executionRouting.planFailure,
-          outcomeClaim: executionRouting.outcomeClaim,
-          executionSurface: executionRouting.executionSurface,
-          capabilityPlan: executionRouting.capabilityPlan,
-        });
-        if (consumedCapability.capabilityOutcome) {
-          capabilityOutcomeForTurn = consumedCapability.capabilityOutcome;
+        modelGate = prepared.gate;
+        if (prepared.capability.capabilityOutcome) {
+          capabilityOutcomeForTurn = prepared.capability.capabilityOutcome;
         }
-        if (executionRouting.planFailure.kind === "no_executable_candidates") {
+        if (prepared.kind === "unavailable") {
           void recordGrowthTaskOutcome(false);
-          return {
-            kind: "final",
-            payload: {
-              text: executionRouting.planFailure.message,
-            },
-          };
+          return { kind: "final", payload: { text: prepared.message } };
         }
-        modelSession.prepareModelSet({
-          config: params.followupRun.run.config,
-          actorId,
-          routing: executionRouting,
-        });
         const invokeCandidate = createAdmittedCandidateInvoker(params, runId, {
           assertOriginalTaskCurrent,
           directlySentBlockKeys,

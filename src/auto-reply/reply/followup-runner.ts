@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
 import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
-import { runQueuedCandidate } from "../../agent-runtime/execution/index.js";
+import {
+  runQueuedCandidate,
+  createExecutionLifecycle,
+} from "../../agent-runtime/execution/index.js";
 import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
-import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
 import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { claimQueuedExecution } from "../../agent-runtime/state/index.js";
 import {
@@ -32,7 +34,6 @@ import {
 } from "../../gateway/model-entitlement/capability-entry-consume.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
-import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
@@ -293,7 +294,7 @@ export function createFollowupRunner(params: {
         logVerbose(`followup task-outcome entry failed: ${opened.code} ${opened.message}`);
       }
     }
-    const modelSession = createAuthorizedModelSession(runId, bindAdmittedTurnHost());
+    const modelSession = createExecutionLifecycle(runId, bindAdmittedTurnHost());
     let oguiResume:
       | { storePath: string; sessionKey: string; decisionId: string; resumeRef: string }
       | undefined;
@@ -369,48 +370,36 @@ export function createFollowupRunner(params: {
           taskText: queued.prompt,
           contextParts: runContextEstimate.contextParts,
         };
-        const runSlot = await modelSession.authorize({
-          agentId: queued.run.agentId,
-          ...(queued.run.groupId ? { groupId: queued.run.groupId } : {}),
-          modelGateInput,
+        const prepared = await modelSession.prepare({
+          config: queued.run.config,
+          authorization: {
+            agentId: queued.run.agentId,
+            ...(queued.run.groupId ? { groupId: queued.run.groupId } : {}),
+            modelGateInput,
+          },
+          signal: opts?.abortSignal,
         });
-        if (!runSlot.skipped && !runSlot.acquired) {
-          logVerbose(`followup commercial gate blocked: ${runSlot.message}`);
+        if (prepared.kind === "denied") {
+          logVerbose(`followup commercial gate blocked: ${prepared.message}`);
           return;
         }
-        if (runSlot.acquired) {
-          if (runSlot.modelGate) {
-            modelGate = runSlot.modelGate;
-          }
-        }
-        const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGate?.allowlist,
-          preferredModelOrder: modelGate?.preferredModelOrder,
-          capabilityPlan: modelGate?.capabilityPlan,
-        });
-        // Structured surface: do not void outcomeClaim. Text may return; image/music stay incomplete.
-        consumedCapability = consumeCapabilityRoutingResult({
-          planFailure: executionRouting.planFailure,
-          outcomeClaim: executionRouting.outcomeClaim,
-          executionSurface: executionRouting.executionSurface,
-          capabilityPlan: executionRouting.capabilityPlan,
-        });
+        modelGate = prepared.gate;
+        consumedCapability = prepared.capability;
         logVerbose(
           `followup ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
         );
-        if (executionRouting.planFailure.kind === "no_executable_candidates") {
+        if (prepared.kind === "unavailable") {
           if (consumedCapability.capabilityOutcome) {
             followupCapabilityOutcome = consumedCapability.capabilityOutcome;
           }
           await submitFollowupOutcomeCloseout({
             success: false,
             failureReason: "prepare_failed",
-            failureDetail: executionRouting.planFailure.message,
+            failureDetail: prepared.message,
           });
-          logVerbose(`followup capability plan: ${executionRouting.planFailure.message}`);
+          logVerbose(`followup capability plan: ${prepared.message}`);
           return;
         }
-        modelSession.prepareModelSet({ config: queued.run.config, routing: executionRouting });
         const runFallback = () =>
           modelSession.infer({
             cfg: queued.run.config,

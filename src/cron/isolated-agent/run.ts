@@ -1,6 +1,8 @@
-import { runScheduledCandidate } from "../../agent-runtime/execution/index.js";
+import {
+  runScheduledCandidate,
+  createExecutionLifecycle,
+} from "../../agent-runtime/execution/index.js";
 import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
-import { createAuthorizedModelSession } from "../../agent-runtime/model/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import {
   resolveAgentConfig,
@@ -54,12 +56,8 @@ import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
 import { isHookDispatchSessionKey } from "../../gateway/hook-surface-session.js";
 import { resolveKnowledgeGatewayClientForAgentRun } from "../../gateway/knowledge/agent-run-gateway-client.js";
-import {
-  consumeCapabilityRoutingResult,
-  formatCapabilityExecutionSurfaceLog,
-} from "../../gateway/model-entitlement/capability-entry-consume.js";
+import { formatCapabilityExecutionSurfaceLog } from "../../gateway/model-entitlement/capability-entry-consume.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
-import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
 import { resolveCronWriteRoot } from "../../gateway/workspace-resolver/write-roots.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { logWarn } from "../../logger.js";
@@ -1036,51 +1034,42 @@ export async function runCronIsolatedAgentTurn(params: {
 
     const runPrompt = async (promptText: string) => {
       const cronRunId = cronSession.sessionEntry.sessionId;
-      const modelSession = createAuthorizedModelSession(cronRunId, bindAdmittedTurnHost());
+      const modelSession = createExecutionLifecycle(cronRunId, bindAdmittedTurnHost());
       const runContextEstimate = buildRunContextEstimateParts({
         taskText: promptText,
         sessionEntry: cronSession.sessionEntry,
       });
-      const runSlot = await modelSession.authorize({
-        agentId,
-        modelGateInput: {
-          cfg: cfgWithAgentDefaults,
-          agentId,
-          taskText: promptText,
-          contextParts: runContextEstimate.contextParts,
-        },
-      });
-      if (!runSlot.skipped && !runSlot.acquired) {
-        throw new Error(runSlot.message);
-      }
-      const modelGate = modelSession.gate;
-      commercialCreditReporting = modelGate?.creditReporting ?? commercialCreditReporting;
       try {
-        const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGate?.allowlist,
-          preferredModelOrder: modelGate?.preferredModelOrder,
-          capabilityPlan: modelGate?.capabilityPlan,
+        const prepared = await modelSession.prepare({
+          config: cfgWithAgentDefaults,
+          authorization: {
+            agentId,
+            modelGateInput: {
+              cfg: cfgWithAgentDefaults,
+              agentId,
+              taskText: promptText,
+              contextParts: runContextEstimate.contextParts,
+            },
+          },
+          signal: abortSignal,
         });
-        const consumedCapability = consumeCapabilityRoutingResult({
-          planFailure: executionRouting.planFailure,
-          outcomeClaim: executionRouting.outcomeClaim,
-          executionSurface: executionRouting.executionSurface,
-          capabilityPlan: executionRouting.capabilityPlan,
-        });
-        // Structured surface kept for TaskOutcome; do not void outcomeClaim.
+        if (prepared.kind === "denied") {
+          throw new Error(prepared.message);
+        }
+        const modelGate = prepared.gate;
+        commercialCreditReporting = modelGate?.creditReporting ?? commercialCreditReporting;
+        const consumedCapability = prepared.capability;
         if (consumedCapability.executionSurface.status !== "ok") {
           logWarn(
             `[cron:${params.job.id}] ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
           );
         }
-        // Defer TaskOutcome write to completeRun unified closeout (attach claim there).
         if (consumedCapability.capabilityOutcome) {
           cronCapabilityOutcome = consumedCapability.capabilityOutcome;
         }
-        if (executionRouting.planFailure.kind === "no_executable_candidates") {
-          throw new Error(executionRouting.planFailure.message);
+        if (prepared.kind === "unavailable") {
+          throw new Error(prepared.message);
         }
-        modelSession.prepareModelSet({ config: cfgWithAgentDefaults, routing: executionRouting });
         const fallbackResult = await modelSession.infer({
           cfg: cfgWithAgentDefaults,
           provider,

@@ -6,6 +6,7 @@ export type {
 } from "./recovery/stall-continuation.js";
 
 export { runAdmittedTurn } from "./runner/admitted-turn.js";
+export { createExecutionLifecycle } from "./runner/execution-lifecycle.js";
 export type { AgentTurnExecutionParams, AgentRunLoopResult } from "./runner/turn-contract.js";
 
 export { runCommandCandidate } from "./runner/command-candidate.js";

@@ -95,8 +95,12 @@ it("runs through original fallback once and releases slot before forgetting its 
 });
 it("retains slot and snapshot cleanup after a non-retryable provider error", async () => {
   const { host, params } = setup();
-  mocks.invoke.mockRejectedValue(new Error("permission denied"));
-  params.opts!.abortSignal = AbortSignal.abort();
+  const controller = new AbortController();
+  params.opts!.abortSignal = controller.signal;
+  mocks.invoke.mockImplementation(async () => {
+    controller.abort();
+    throw new Error("permission denied");
+  });
   expect((await runAdmittedTurn(params, host)).kind).toBe("final");
   expect(host.model.runWithModelFallback).toHaveBeenCalledOnce();
   expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
