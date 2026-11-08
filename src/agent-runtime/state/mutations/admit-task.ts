@@ -1,5 +1,5 @@
 import type { TaskAcceptanceCheck } from "../../contracts/quality.js";
-import type { TaskCompletionBinding } from "../../contracts/task.js";
+import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
 import { isTaskTombstoned, parseTaskAcceptanceChecks } from "../../policy/index.js";
 import {
   withSessionTaskBoardLock,

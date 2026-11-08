@@ -1,5 +1,5 @@
 import { readFileWithinRoot } from "../../infra/fs-safe.js";
-import type { TaskCompletionBinding } from "../contracts/task.js";
+import type { TaskCompletionBinding } from "../contracts/task-binding.js";
 import { evaluateTaskAcceptance } from "../delivery/index.js";
 import { sessionTaskState } from "../state/index.js";
 

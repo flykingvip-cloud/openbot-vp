@@ -1,5 +1,5 @@
 import type { RequestClient } from "@buape/carbon";
-import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
 import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { resolveAgentAvatar } from "../../agents/identity-avatar.js";
 import type { ChunkMode } from "../../auto-reply/chunk.js";

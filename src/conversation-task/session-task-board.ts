@@ -71,8 +71,8 @@ export {
   buildResumePrompt,
   sanitizeTaskBoardPathForPrompt,
 } from "../agent-runtime/context/index.js";
-import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
-export type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
+import type { TaskCompletionBinding } from "../agent-runtime/contracts/task-binding.js";
+export type { TaskCompletionBinding } from "../agent-runtime/contracts/task-binding.js";
 import { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
 export { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js";
 /**
@@ -90,8 +90,8 @@ import type {
   ArchivedTask,
   TaskBoardScope,
   SessionTaskBoard,
-  IncomingTurnResult,
 } from "../agent-runtime/contracts/task.js";
+import type { IncomingTurnResult } from "../agent-runtime/contracts/turn-result.js";
 import { isTaskSurfaceUtterance } from "../agents/task-surface/surface.js";
 import type { FocusSnapshot } from "./focus-policy.js";
 import {
@@ -112,9 +112,8 @@ export type {
   ArchivedTask,
   TaskBoardScope,
   SessionTaskBoard,
-  IncomingTurnResult,
 } from "../agent-runtime/contracts/task.js";
-
+export type { IncomingTurnResult } from "../agent-runtime/contracts/turn-result.js";
 /** Sure means new_work. amend and aside stay on the current task. */
 export function isSureDistinctWork(incoming: string, currentGoal: string): boolean {
   const text = stripStamp(incoming);

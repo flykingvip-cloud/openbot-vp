@@ -48,7 +48,7 @@ import { enqueueSystemEvent } from "../../../infra/system-events.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
 import { getProcessSupervisor } from "../../../process/supervisor/index.js";
 import { scopedHeartbeatWakeOptions } from "../../../routing/session-key.js";
-import type { TaskCompletionBinding } from "../../contracts/task.js";
+import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
 import { sessionTaskState } from "../../state/index.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
 

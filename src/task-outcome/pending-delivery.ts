@@ -7,8 +7,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
-
+import type { TaskCompletionBinding } from "../agent-runtime/contracts/task-binding.js";
 export type AwaitingDeliveryRegistration = {
   taskId: string;
   deliveryId: string;

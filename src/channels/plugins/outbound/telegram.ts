@@ -1,4 +1,4 @@
-import type { TaskActionBoundary } from "../../../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../../../agent-runtime/contracts/task-binding.js";
 import type { ReplyPayload } from "../../../auto-reply/types.js";
 import type { OutboundSendDeps } from "../../../infra/outbound/deliver.js";
 import type { TelegramInlineButtons } from "../../../telegram/button-types.js";

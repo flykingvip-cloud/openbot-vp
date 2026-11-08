@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
 import { checkTaskActionBoundary } from "../../agent-runtime/state/task-action.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import type { OpenBotConfig } from "../../config/config.js";

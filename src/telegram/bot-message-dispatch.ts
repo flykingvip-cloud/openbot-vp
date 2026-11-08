@@ -1,5 +1,5 @@
 import type { Bot } from "grammy";
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import {
   findModelInCatalog,

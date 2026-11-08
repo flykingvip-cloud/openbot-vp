@@ -24,14 +24,14 @@ export type GetReplyOptions = {
   /** Trusted Gateway user ingress: user transcript already persisted, execution not admitted. */
   interactionIngress?: { userMessageId: string; persistOwnTranscript?: boolean };
   /** Explicit Gateway resume, after live authorization/stop recheck. */
-  resumedTaskBinding?: import("../agent-runtime/contracts/task.js").TaskCompletionBinding;
+  resumedTaskBinding?: import("../agent-runtime/contracts/task-binding.js").TaskCompletionBinding;
   /** Fixed authenticated host resumes an interpreted current-task target after live rechecks. */
   onInteractionTaskResume?: (
-    request: import("../agent-runtime/contracts/task.js").CurrentTaskResumeRequest & {
+    request: import("../agent-runtime/contracts/task-binding.js").CurrentTaskResumeRequest & {
       sessionFile: string;
       abortSignal?: AbortSignal;
     },
-  ) => Promise<import("../agent-runtime/contracts/task.js").CurrentTaskResumeResult>;
+  ) => Promise<import("../agent-runtime/contracts/task-binding.js").CurrentTaskResumeResult>;
   /** Trusted transport cleanup after an accepted task replacement or owner control. */
   onInteractionTaskEffect?: (effect: {
     kind: "replace" | "pause" | "cancel";
@@ -48,7 +48,7 @@ export type GetReplyOptions = {
   onAgentRunStart?: (runId: string) => void;
   /** Internal host callback; never derived from model output. */
   onTaskExecutionBound?: (
-    binding: import("../agent-runtime/contracts/task.js").TaskCompletionBinding,
+    binding: import("../agent-runtime/contracts/task-binding.js").TaskCompletionBinding,
     context?: { sessionFile: string },
   ) => void;
   onReplyStart?: () => Promise<void> | void;

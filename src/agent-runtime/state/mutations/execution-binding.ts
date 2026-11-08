@@ -1,4 +1,5 @@
-import type { SessionTaskBoard, TaskCompletionBinding } from "../../contracts/task.js";
+import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
+import type { SessionTaskBoard } from "../../contracts/task.js";
 import { activeConstraintTexts, isTaskTombstoned, isLiveTaskBinding } from "../../policy/index.js";
 import {
   cloneBoardShell,

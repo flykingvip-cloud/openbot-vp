@@ -1,6 +1,6 @@
 import type { Bot } from "grammy";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
 import { deliverReplies } from "./delivery.js";
 const mocks = vi.hoisted(() => ({ check: vi.fn(), media: vi.fn() }));
 vi.mock("../../agent-runtime/state/index.js", () => ({ checkTaskActionBoundary: mocks.check }));

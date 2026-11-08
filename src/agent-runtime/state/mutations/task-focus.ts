@@ -1,5 +1,6 @@
 import { switchStatus } from "../../context/task-focus.js";
-import type { SessionTaskBoard, TrackedTask, IncomingTurnResult } from "../../contracts/task.js";
+import type { SessionTaskBoard, TrackedTask } from "../../contracts/task.js";
+import type { IncomingTurnResult } from "../../contracts/turn-result.js";
 import { stripInboundStamp as stripStamp } from "../../policy/index.js";
 import { cloneBoardShell } from "../repository/task-board-file.js";
 import { allocateTaskInstanceId } from "../repository/task-identity.js";

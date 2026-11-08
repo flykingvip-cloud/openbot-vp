@@ -1,6 +1,6 @@
 import type { RequestClient } from "@buape/carbon";
 import { Routes } from "discord-api-types/v10";
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { createFinalizableDraftLifecycle } from "../channels/draft-stream-controls.js";
 

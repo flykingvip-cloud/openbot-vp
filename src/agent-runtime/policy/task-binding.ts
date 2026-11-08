@@ -1,5 +1,5 @@
-import type { SessionTaskBoard, TaskCompletionBinding } from "../contracts/task.js";
-
+import type { TaskCompletionBinding } from "../contracts/task-binding.js";
+import type { SessionTaskBoard } from "../contracts/task.js";
 /** Pure validity rule. Storage supplies one snapshot and its normalized active constraints. */
 export function isLiveTaskBinding(
   board: SessionTaskBoard,

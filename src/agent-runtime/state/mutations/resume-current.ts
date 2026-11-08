@@ -1,4 +1,7 @@
-import type { CurrentTaskResumeRequest, CurrentTaskResumeResult } from "../../contracts/task.js";
+import type {
+  CurrentTaskResumeRequest,
+  CurrentTaskResumeResult,
+} from "../../contracts/task-binding.js";
 import { activeConstraintTexts, isTaskTombstoned } from "../../policy/index.js";
 import { mutateSessionTaskBoard } from "../repository/task-board-file.js";
 class RejectedResume extends Error {}

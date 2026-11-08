@@ -1,4 +1,4 @@
-import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
 /**
  * Provider-agnostic reply router.
  *

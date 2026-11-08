@@ -1,5 +1,5 @@
 import type { InteractionExecutionRequest } from "./interaction.js";
-import type { TaskCompletionBinding } from "./task.js";
+import type { TaskCompletionBinding } from "./task-binding.js";
 
 /** Trusted ingress identity and revision; never accepted from model output. */
 export type ExecutionAdmissionInput = {

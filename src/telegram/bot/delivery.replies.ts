@@ -1,5 +1,5 @@
 import { type Bot, GrammyError, InputFile } from "grammy";
-import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
 import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { chunkMarkdownTextWithMode, type ChunkMode } from "../../auto-reply/chunk.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";

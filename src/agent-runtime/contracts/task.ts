@@ -1,6 +1,7 @@
 import type { TaskAcceptanceCheck } from "./quality.js";
 /** Existing session-task contracts only; not a unified collaboration plan schema.
  * Type-only: runtime mutations and persistence remain with the original state owner.
+ * Board aggregate only — binding / explicit control / turn-result live in sibling files.
  */
 export type TaskStop = {
   summary: string;
@@ -97,60 +98,3 @@ export type SessionTaskBoard = {
   /** Optional tenant+user+session scope (C1 / AC18). */
   scope?: TaskBoardScope;
 };
-
-export type IncomingTurnResult = {
-  board: SessionTaskBoard;
-  action: "continue" | "switch" | "resume" | "cancel_parked";
-  taskId: string;
-  cutContext: boolean;
-  statusLine?: string;
-  restoredPrompt?: string;
-  currentTitle?: string;
-  incomingTitle?: string;
-  droppedTitle?: string;
-  droppedPaths?: string[];
-  /** Focus revision after this mutation (C1). */
-  focusRevision?: number;
-  /**
-   * Resume success does NOT imply immediate auto-execute (C6).
-   * Callers must not schedule continue solely because action==="resume".
-   */
-  scheduleContinue?: boolean;
-  rejectedReason?: string;
-  /**
-   * Owner pause/cancel of the *current* unfinished task: callers must abort the
-   * in-flight run via the existing abort path (same as task-park cutContext).
-   * Does not by itself bump focusRevision.
-   */
-  abortInFlight?: boolean;
-};
-
-/** Binding captured at request admission and carried across queue/execution/completion. */
-export type TaskCompletionBinding = {
-  /** Accepted constraints captured when this attempt is claimed; never model supplied. */
-  constraints?: readonly string[];
-  taskId: string;
-  executionAttempt?: string;
-  deliverableVersion?: string;
-};
-
-export type CurrentTaskResumeRequest = {
-  taskId: string;
-  expectedFocusRevision: number;
-  expectedWriteEpoch: number;
-};
-export type CurrentTaskResumeResult =
-  | { kind: "accepted"; binding: TaskCompletionBinding; acceptance: readonly string[] }
-  | { kind: "rejected"; reason: string };
-
-/** Trusted snapshot captured by the host before task side effects. */
-export type TaskActionBoundary = {
-  sessionFile: string;
-  binding: TaskCompletionBinding;
-  constraints: readonly string[];
-};
-
-/** Explicit owner controls; ordinary conversation cannot create a control request here. */
-export type ExplicitTaskControl =
-  | { scope: "current"; action: "pause" | "cancel" }
-  | { scope: "parked"; action: "resume" | "pause" | "cancel"; taskId: string };

@@ -1,8 +1,7 @@
 import { openSessionManager } from "../../agents/pi-sdk/session.js";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
 import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLockSync } from "../../infra/file-lock.js";
-import type { TaskCompletionBinding } from "../contracts/task.js";
-
+import type { TaskCompletionBinding } from "../contracts/task-binding.js";
 /** SessionManager owns the message DAG; the notice never creates a model turn. */
 export function appendTaskCompletionNotice(
   sessionFile: string,

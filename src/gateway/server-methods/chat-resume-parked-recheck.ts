@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { TaskStopScope, TaskStopRecord } from "../../agent-runtime/contracts/task-stop.js";
 import type {
   CurrentTaskResumeRequest,
   CurrentTaskResumeResult,
-} from "../../agent-runtime/contracts/task.js";
+} from "../../agent-runtime/contracts/task-binding.js";
+import type { TaskStopScope, TaskStopRecord } from "../../agent-runtime/contracts/task-stop.js";
 import { parseExplicitTaskControl } from "../../agent-runtime/policy/index.js";
 import {
   sessionTaskState,

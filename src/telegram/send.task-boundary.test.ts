@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import {
   getTelegramSendTestMocks,
   importTelegramSendModule,

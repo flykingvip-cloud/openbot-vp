@@ -1,6 +1,6 @@
 import { ChannelType } from "discord-api-types/v10";
 import { beforeEach, expect, it, vi } from "vitest";
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { loadWebMedia } from "../web/media.js";
 import { sendMessageDiscord, sendWebhookMessageDiscord } from "./send.js";
 import { makeDiscordRest } from "./send.test-harness.js";

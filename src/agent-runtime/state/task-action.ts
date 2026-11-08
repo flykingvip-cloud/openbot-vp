@@ -1,9 +1,8 @@
-import type { TaskCompletionBinding, TaskActionBoundary } from "../contracts/task.js";
+import type { TaskCompletionBinding, TaskActionBoundary } from "../contracts/task-binding.js";
 import { isLiveTaskBinding, activeConstraintTexts } from "../policy/index.js";
 import { readSessionTaskBoard } from "./repository/task-board-file.js";
 
-export type { TaskActionBoundary } from "../contracts/task.js";
-
+export type { TaskActionBoundary } from "../contracts/task-binding.js";
 /** Capture the constraints the current model attempt actually received. */
 export function captureTaskActionBoundary(
   sessionFile: string,

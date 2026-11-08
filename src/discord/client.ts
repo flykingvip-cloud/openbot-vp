@@ -1,5 +1,5 @@
 import { RequestClient } from "@buape/carbon";
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { loadConfig } from "../config/config.js";
 import { createDiscordRetryRunner, type RetryRunner } from "../infra/retry-policy.js";

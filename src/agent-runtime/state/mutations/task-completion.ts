@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { renderCompletionNotice } from "../../context/sources/task-completion-notice.js";
-import type { SessionTaskBoard, TaskCompletionBinding, TrackedTask } from "../../contracts/task.js";
+import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
+import type { SessionTaskBoard, TrackedTask } from "../../contracts/task.js";
 import { activeConstraintTexts, isLiveTaskBinding, isTaskTombstoned } from "../../policy/index.js";
 import { appendTaskCompletionNotice } from "../completion-notice.js";
 import {

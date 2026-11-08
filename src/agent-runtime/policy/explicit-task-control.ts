@@ -1,4 +1,4 @@
-import type { ExplicitTaskControl } from "../contracts/task.js";
+import type { ExplicitTaskControl } from "../contracts/task-control.js";
 import { stripInboundStamp } from "./input-stamp.js";
 
 /** Fixed syntax only; no inferred new work, task switching or side effects. */

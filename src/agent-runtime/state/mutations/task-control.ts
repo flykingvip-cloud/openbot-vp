@@ -1,4 +1,5 @@
-import type { SessionTaskBoard, TrackedTask, IncomingTurnResult } from "../../contracts/task.js";
+import type { SessionTaskBoard, TrackedTask } from "../../contracts/task.js";
+import type { IncomingTurnResult } from "../../contracts/turn-result.js";
 import { clearAsyncWaitJobsForTask } from "../repository/async-wait-job.js";
 import { cloneBoardShell } from "../repository/task-board-file.js";
 

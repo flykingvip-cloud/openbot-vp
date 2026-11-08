@@ -1,11 +1,7 @@
 import { buildResumePrompt } from "../../context/index.js";
 import { dropSentence } from "../../context/task-focus.js";
-import type {
-  SessionTaskBoard,
-  IncomingTurnResult,
-  ArchivedTask,
-  TrackedTask,
-} from "../../contracts/task.js";
+import type { SessionTaskBoard, ArchivedTask, TrackedTask } from "../../contracts/task.js";
+import type { IncomingTurnResult } from "../../contracts/turn-result.js";
 import { isTaskTombstoned } from "../../policy/index.js";
 import { cloneBoardShell } from "../repository/task-board-file.js";
 import { findParked, continueResult } from "./task-control.js";

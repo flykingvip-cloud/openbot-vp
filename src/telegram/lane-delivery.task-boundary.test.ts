@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { createTestDraftStream } from "./draft-stream.test-helpers.js";
 import { createLaneTextDeliverer } from "./lane-delivery.js";
 const check = vi.hoisted(() => vi.fn());

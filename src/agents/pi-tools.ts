@@ -1,6 +1,6 @@
 import { createReadTool } from "@earendil-works/pi-coding-agent";
 import { wrapToolWithBeforeToolCallHook } from "../agent-runtime/capabilities/index.js";
-import type { TaskCompletionBinding } from "../agent-runtime/contracts/task.js";
+import type { TaskCompletionBinding } from "../agent-runtime/contracts/task-binding.js";
 import { captureTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
 import type { ToolLoopDetectionConfig } from "../config/types.tools.js";

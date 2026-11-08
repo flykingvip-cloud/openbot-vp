@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isHumanInteractionIngress } from "../../agent-runtime/command/index.js";
-import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";

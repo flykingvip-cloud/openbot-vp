@@ -1,5 +1,5 @@
 import type { RequestClient } from "@buape/carbon";
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import type { OpenBotConfig } from "../config/config.js";
 import type { RetryConfig } from "../infra/retry.js";
 

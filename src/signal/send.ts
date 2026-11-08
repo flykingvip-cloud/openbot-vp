@@ -1,4 +1,4 @@
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { loadConfig, type OpenBotConfig } from "../config/config.js";
 import { resolveMarkdownTableMode } from "../config/markdown-tables.js";

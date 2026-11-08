@@ -6,8 +6,7 @@ import {
 import { registerAwaitingDelivery } from "../../../task-outcome/pending-delivery.js";
 import type { GrowthOutcomeCommitOpts } from "../../../task-outcome/runtime-from-runner.js";
 import type { TaskAcceptanceEvaluation } from "../../contracts/quality.js";
-import type { TaskCompletionBinding } from "../../contracts/task.js";
-
+import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
 type PendingIdentity = { runId: string; deliveryId: string; taskId: string; agentId: string };
 
 /** Prepare a visible turn receipt; only the transport confirmation can mark it delivered. */

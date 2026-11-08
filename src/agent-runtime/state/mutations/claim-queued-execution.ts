@@ -1,4 +1,4 @@
-import type { TaskCompletionBinding } from "../../contracts/task.js";
+import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
 import { activeConstraintTexts } from "../../policy/index.js";
 import { claimTaskBoardContinue } from "../continuation-ticket.js";
 import { bindAsyncWaitRecoveryTurn } from "../repository/async-wait-job.js";

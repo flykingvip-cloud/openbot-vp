@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { serializePayload, type MessagePayloadObject, type RequestClient } from "@buape/carbon";
 import { ChannelType, Routes } from "discord-api-types/v10";
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { resolveChunkMode } from "../auto-reply/chunk.js";
 import { loadConfig, type OpenBotConfig } from "../config/config.js";

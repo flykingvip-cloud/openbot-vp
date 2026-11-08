@@ -5,7 +5,7 @@ import {
   resolveAndTakeAwaitingDelivery,
 } from "../../../task-outcome/pending-delivery.js";
 import { confirmRunnerTurnDelivery } from "../../../task-outcome/runtime-from-runner.js";
-import type { TaskCompletionBinding } from "../../contracts/task.js";
+import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
 import { markAsyncWaitRecoveryDelivered } from "../../state/repository/async-wait-job.js";
 /** Production delivery confirm — exported so tests use this path, not a copy. */
 export async function confirmPendingTurnDeliveryWithPorts(

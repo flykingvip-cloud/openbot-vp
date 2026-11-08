@@ -6,8 +6,7 @@ import {
   resolveRequiredDeliveryConfirmStatus,
   type RequiredDeliveryAttempt,
 } from "../../../task-outcome/delivery-confirm.js";
-import type { TaskActionBoundary } from "../../contracts/task.js";
-
+import type { TaskActionBoundary } from "../../contracts/task-binding.js";
 /** Deliver to the original route; queue acceptance remains unconfirmed delivery. */
 export async function deliverQueuedReply(
   input: {

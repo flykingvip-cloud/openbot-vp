@@ -34,7 +34,7 @@ export type ClientToolDefinition = {
 export type RunEmbeddedPiAgentParams = {
   sessionId: string;
   /** Trusted host binding; never accepted from model or tool arguments. */
-  taskExecutionBinding?: import("../../contracts/task.js").TaskCompletionBinding;
+  taskExecutionBinding?: import("../../contracts/task-binding.js").TaskCompletionBinding;
   sessionKey?: string;
   agentId?: string;
   messageChannel?: string;

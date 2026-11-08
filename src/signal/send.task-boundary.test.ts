@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import type { TaskActionBoundary } from "../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { sendMessageSignal } from "./send.js";
 
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), attachment: vi.fn(), check: vi.fn() }));

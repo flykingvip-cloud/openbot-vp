@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
-import type { SessionTaskBoard, TaskCompletionBinding } from "../contracts/task.js";
+import type { TaskCompletionBinding } from "../contracts/task-binding.js";
+import type { SessionTaskBoard } from "../contracts/task.js";
 import { isLiveTaskBinding } from "./task-binding.js";
 
 function fixture() {

@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import type { ExplicitTaskControl } from "../../contracts/task.js";
+import type { ExplicitTaskControl } from "../../contracts/task-control.js";
 import { mutateSessionTaskBoard } from "../repository/task-board-file.js";
 import { resumeParkedTask, type ResumeParkedRecheck } from "./resume-parked.js";
 import {

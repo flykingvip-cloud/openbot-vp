@@ -1,5 +1,5 @@
 import { type Bot, GrammyError } from "grammy";
-import type { TaskActionBoundary } from "../../agent-runtime/contracts/task.js";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
 import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { formatErrorMessage } from "../../infra/errors.js";
 import type { RuntimeEnv } from "../../runtime.js";
