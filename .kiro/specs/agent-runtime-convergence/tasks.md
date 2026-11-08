@@ -1312,3 +1312,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Prepared reply reads active/streaming status and aborts through execution/index instead of the legacy executor facade. Lane naming remains the existing pure utility; registry identity and control behavior are unchanged. Context and OGUI wait regression 2 files / 9 PASS; full tsgo, changed-file typed lint and 54 architecture rules PASS. — codex-runtime-manager
 - Broader media regression found two collaboration capability projection failures, reproduced unchanged on HEAD before this import change: participation overlay and promoted capabilities are absent from their expected prompt. This remains an explicit baseline issue to investigate; no production policy was weakened or test expectation removed. — codex-runtime-manager
+
+## Collaboration media fixtures aligned (2026-11-08)
+
+- Resolved the two preceding baseline failures: fixture executed as default while expecting bot-1 overlay, and wrote learning assets under the retired workspace-local path rather than the configured shared group store. Set the intended executor explicitly and configured the existing shared store in the fixture. Production capability isolation and lookup are unchanged; expected capabilities remain asserted. Updated registry test seam to the public execution API. — codex-runtime-manager
+- Media/context suite 17 PASS; changed-file typed lint and format checks PASS. This verifies mocked prepared-reply context, not real-model collaboration or production cutover. — codex-runtime-manager
