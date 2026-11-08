@@ -252,6 +252,32 @@
     "description": "Reply host consumes context projections through the public context/index facade, not assembly/history/untrusted/aside/learning internals."
   },
   {
+    "name": "runtime-capabilities-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/capabilities/!(index).ts",
+      "src/agent-runtime/capabilities/*/**"
+    ],
+    "exemptFiles": [
+      "src/agent-runtime/capabilities/index.ts",
+      "src/agent-runtime/capabilities/catalog.ts",
+      "src/agent-runtime/capabilities/catalog.test.ts",
+      "src/agent-runtime/capabilities/invocation/abort.ts",
+      "src/agent-runtime/capabilities/invocation/abort.test.ts",
+      "src/agent-runtime/capabilities/invocation/before-call.ts",
+      "src/agent-runtime/capabilities/adapters/after-turn-context.ts",
+      "src/agent-runtime/capabilities/adapters/attempt-sandbox.ts",
+      "src/agent-runtime/capabilities/adapters/attempt-workspace-policy.ts",
+      "src/agent-runtime/capabilities/adapters/context-after-turn.ts",
+      "src/agent-runtime/capabilities/adapters/context-compiler.ts",
+      "src/agent-runtime/capabilities/adapters/model-resolve-hooks.ts",
+      "src/agent-runtime/capabilities/adapters/model-resolve-hooks.test.ts",
+      "src/agent-runtime/capabilities/adapters/prompt-build-hooks.ts",
+      "src/agent-runtime/capabilities/adapters/protocol-body-boundary.ts"
+    ],
+    "description": "Production code consumes capabilities through the public capabilities/index facade. Capabilities internals may cross-import; listed capabilities sources/tests are exempt."
+  },
+  {
     "name": "runtime-acceptance-no-platform-effects",
     "from": "src/agent-runtime/delivery/acceptance/**",
     "denyImportsFrom": [
