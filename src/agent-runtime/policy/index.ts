@@ -31,6 +31,7 @@ export {
 export { resolvePromptModeForSession } from "./prompt-mode.js";
 
 export { listRuntimeRuleDeclarations } from "./catalog.js";
+export { parseExplicitTaskControl } from "./explicit-task-control.js";
 
 export { normalizeConstraintEntries, activeConstraintTexts } from "./constraints.js";
 

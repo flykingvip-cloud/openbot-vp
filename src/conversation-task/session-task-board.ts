@@ -1,12 +1,16 @@
+import {
+  resumeParkedTask,
+  type ResumeParkedRecheck,
+} from "../agent-runtime/state/mutations/resume-parked.js";
+export {
+  resumeParkedTask,
+  type ResumeParkedRecheck,
+} from "../agent-runtime/state/mutations/resume-parked.js";
 export { commitInteractionTaskProposal } from "../agent-runtime/state/mutations/interaction-proposal.js";
 import { appendTaskConstraint } from "../agent-runtime/state/mutations/task-constraints.js";
 export { commitAdmittedSessionTask } from "../agent-runtime/state/mutations/admit-task.js";
-import {
-  bumpFocusRevision,
-  insertLatestTaskDeferringCurrent,
-} from "../agent-runtime/state/mutations/task-focus.js";
+import { insertLatestTaskDeferringCurrent } from "../agent-runtime/state/mutations/task-focus.js";
 export { insertLatestTaskDeferringCurrent } from "../agent-runtime/state/mutations/task-focus.js";
-import { dropSentence } from "../agent-runtime/context/task-focus.js";
 import { createTask, parkTask } from "../agent-runtime/state/mutations/task-record.js";
 export {
   allocateTaskInstanceId,
@@ -14,7 +18,6 @@ export {
 } from "../agent-runtime/state/repository/task-identity.js";
 import { stripInboundStamp as stripStamp } from "../agent-runtime/policy/index.js";
 import {
-  findParked,
   continueResult,
   suppressCurrentTaskWake,
   cancelCurrentTask,
@@ -121,27 +124,6 @@ export function isSureDistinctWork(incoming: string, currentGoal: string): boole
   }
   return classifyTurnRelation(text, current) === "new_work";
 }
-
-export type ResumeParkedRecheck = {
-  /** False when current auth/ownership no longer allows this session. */
-  authOk?: boolean;
-  /**
-   * Broad session-level stop barrier. Used when `isTaskStopActive` is absent.
-   * Prefer `isTaskStopActive` so resume checks the original taskId.
-   */
-  stopActive?: boolean;
-  /**
-   * Authoritative per-taskId stop lookup. When set, resume of task T is denied
-   * iff this returns true for T — even after AbortController records are deleted.
-   */
-  isTaskStopActive?: (taskId: string) => boolean;
-  /** False when budget / quota no longer allows resume (C6). */
-  budgetOk?: boolean;
-  /** False when plan / policy no longer allows resume (C6). */
-  planOk?: boolean;
-  /** False when workspace binding is invalid for resume (C6). */
-  workspaceOk?: boolean;
-};
 
 /** Compatibility classifier; admitted changes already carry their scope. */
 export function appendSameTaskConstraint(params: {
@@ -362,143 +344,6 @@ export function applyIncomingUserMessage(params: {
     parkReason: "user_switch",
     inboundRequestId: params.inboundRequestId,
   });
-}
-
-export function resumeParkedTask(params: {
-  board: SessionTaskBoard;
-  taskId: string;
-  nowMs?: number;
-  workspacePaths?: string[];
-  /** Optional live auth + stop re-check at resume time (fail-closed when set). */
-  recheck?: ResumeParkedRecheck;
-}): IncomingTurnResult {
-  const nowMs = params.nowMs ?? Date.now();
-  const paths = params.workspacePaths?.filter(Boolean) ?? [];
-  const board = cloneBoardShell(params.board);
-  const needle = params.taskId.trim();
-  if (needle && isTaskTombstoned(board, needle)) {
-    return {
-      ...continueResult(board, board.current?.taskId ?? ""),
-      focusRevision: board.focusRevision,
-      scheduleContinue: false,
-      rejectedReason: "tombstoned",
-      statusLine: `恢复被拒绝：任务已关闭（墓碑）。`,
-    };
-  }
-  const parked = findParked(board, params.taskId);
-  if (!parked) {
-    return {
-      ...continueResult(board, board.current?.taskId ?? ""),
-      focusRevision: board.focusRevision,
-      scheduleContinue: false,
-    };
-  }
-  if (params.recheck?.authOk === false) {
-    return {
-      ...continueResult(board, board.current?.taskId ?? ""),
-      focusRevision: board.focusRevision,
-      scheduleContinue: false,
-      rejectedReason: "auth",
-      statusLine: `恢复「${parked.title}」被拒绝：当前授权无效。`,
-    };
-  }
-  const stopBlocked =
-    typeof params.recheck?.isTaskStopActive === "function"
-      ? params.recheck.isTaskStopActive(parked.taskId)
-      : params.recheck?.stopActive === true;
-  if (stopBlocked) {
-    return {
-      ...continueResult(board, board.current?.taskId ?? ""),
-      focusRevision: board.focusRevision,
-      scheduleContinue: false,
-      rejectedReason: "stop",
-      statusLine: `恢复「${parked.title}」被拒绝：任务已停止。`,
-    };
-  }
-  if (params.recheck?.budgetOk === false) {
-    return {
-      ...continueResult(board, board.current?.taskId ?? ""),
-      focusRevision: board.focusRevision,
-      scheduleContinue: false,
-      rejectedReason: "budget",
-      statusLine: `恢复「${parked.title}」被拒绝：预算不足。`,
-    };
-  }
-  if (params.recheck?.planOk === false) {
-    return {
-      ...continueResult(board, board.current?.taskId ?? ""),
-      focusRevision: board.focusRevision,
-      scheduleContinue: false,
-      rejectedReason: "plan",
-      statusLine: `恢复「${parked.title}」被拒绝：计划不允许。`,
-    };
-  }
-  if (params.recheck?.workspaceOk === false) {
-    return {
-      ...continueResult(board, board.current?.taskId ?? ""),
-      focusRevision: board.focusRevision,
-      scheduleContinue: false,
-      rejectedReason: "workspace",
-      statusLine: `恢复「${parked.title}」被拒绝：工作区无效。`,
-    };
-  }
-  let nextParked = board.parked.filter((row) => row.taskId !== parked.taskId);
-  let archived: ArchivedTask | undefined;
-  const current = board.current;
-  if (current?.unfinished) {
-    const parkedCurrent: TrackedTask = {
-      ...current,
-      stop: {
-        summary: current.stop.summary || `未完成：${current.title}`,
-        workspacePaths:
-          current.stop.workspacePaths.length > 0 ? current.stop.workspacePaths : paths,
-      },
-    };
-    const parkedResult = parkTask(nextParked, parkedCurrent, nowMs, "resume_swap");
-    nextParked = parkedResult.parked;
-    archived = parkedResult.archived;
-  }
-  const restored: TrackedTask = {
-    ...parked,
-    unfinished: true,
-    parkedAtMs: undefined,
-    parkReason: undefined,
-    wakeSuppress: false,
-  };
-  const restoredPrompt = buildResumePrompt(restored);
-  const archivedText = dropSentence(archived);
-  const nextRevision = bumpFocusRevision(board);
-  const archivedList = [...(board.archived ?? [])];
-  if (archived) {
-    archivedList.unshift(archived);
-  }
-  const nextBoard: SessionTaskBoard = {
-    ...board,
-    current: restored,
-    parked: nextParked,
-    focusRevision: nextRevision,
-    ...(archivedList.length > 0 ? { archived: archivedList } : {}),
-  };
-  return {
-    board: nextBoard,
-    action: "resume",
-    taskId: restored.taskId,
-    cutContext: true,
-    currentTitle: current?.title,
-    incomingTitle: restored.title,
-    restoredPrompt,
-    focusRevision: nextRevision,
-    // C6: resume success ≠ immediate auto-execute
-    scheduleContinue: false,
-    statusLine: `继续「${restored.title}」。停在：${restored.stop.summary}${
-      restored.stop.workspacePaths.length > 0
-        ? `。文件：${restored.stop.workspacePaths.join("、")}`
-        : ""
-    }。${archivedText}`,
-    ...(archived
-      ? { droppedTitle: archived.title, droppedPaths: archived.stop.workspacePaths }
-      : {}),
-  };
 }
 
 /** Oldest-first parked slots from the session board, when that file is known. */

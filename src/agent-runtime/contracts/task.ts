@@ -147,3 +147,8 @@ export type TaskActionBoundary = {
   binding: TaskCompletionBinding;
   constraints: readonly string[];
 };
+
+/** Explicit owner controls; ordinary conversation cannot create a control request here. */
+export type ExplicitTaskControl =
+  | { scope: "current"; action: "pause" | "cancel" }
+  | { scope: "parked"; action: "resume" | "pause" | "cancel"; taskId: string };

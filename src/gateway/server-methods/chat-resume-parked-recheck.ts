@@ -2,11 +2,12 @@ import type {
   CurrentTaskResumeRequest,
   CurrentTaskResumeResult,
 } from "../../agent-runtime/contracts/task.js";
-import { sessionTaskState } from "../../agent-runtime/state/index.js";
+import { parseExplicitTaskControl } from "../../agent-runtime/policy/index.js";
+import { sessionTaskState, type ResumeParkedRecheck } from "../../agent-runtime/state/index.js";
 /**
  * Live ResumeParkedRecheck for the chat.send entry path.
  *
- * applyFocusSwitchGate already fail-closes when authOk===false or stopActive===true.
+ * Typed state resume fail-closes when authOk===false or stopActive===true.
  * chat.send must resolve those flags from real send-time signals before resume
  * proceeds — never call the gate without a recheck on the user resume path.
  *
@@ -49,11 +50,8 @@ import { sessionTaskState } from "../../agent-runtime/state/index.js";
  */
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
-import type { ResumeParkedRecheck } from "../../conversation-task/session-task-board.js";
 import {
-  applyFocusSwitchGate,
-  isOwnerCurrentTaskControlUtterance,
-  readSessionTaskBoard,
+  recordFocusSwitchDecision,
   type FocusSwitchGateDecision,
 } from "../../conversation-task/session-task-board.js";
 import { resolveSecurityProfile } from "../security-profile.js";
@@ -82,7 +80,7 @@ export type ResolveResumeParkedRecheckParams = {
 };
 
 /**
- * Build the recheck object chat.send passes into applyFocusSwitchGate.
+ * Build the recheck facts chat.send supplies to the typed state control transaction.
  * Missing optional flags stay permissive only when not explicitly false/deny;
  * stopActive is fail-closed when true.
  */
@@ -579,24 +577,71 @@ export function applyChatFocusSwitchGateWithResumeRecheck(params: {
 }): FocusSwitchGateDecision {
   // Ingress may apply explicit controls, never infer/create/switch work from chat.
   // New work is admitted only after interaction understanding and authorization.
-  const text = params.incomingText.trim();
-  if (
-    !isOwnerCurrentTaskControlUtterance(text) &&
-    !/^(?:继续挂起|CONTINUE|暂停挂起|取消挂起|关闭挂起|CLOSE)\s+\S+/iu.test(text)
-  ) {
+  const control = parseExplicitTaskControl(params.incomingText);
+  if (!control) {
     return {
       action: "continue",
       decisionCode: "focus_clear",
       cutContext: false,
-      taskId: readSessionTaskBoard(params.sessionFile).current?.taskId ?? "",
+      taskId: sessionTaskState.read(params.sessionFile).current?.taskId ?? "",
     };
   }
-  return applyFocusSwitchGate({
-    sessionFile: params.sessionFile,
-    incomingText: params.incomingText,
-    nowMs: params.nowMs,
-    workspacePaths: params.workspacePaths,
-    proceed: params.proceed,
-    recheck: resolveResumeParkedRecheck(params.recheckInputs),
-  });
+  const record = (decision: FocusSwitchGateDecision) => {
+    recordFocusSwitchDecision(decision.decisionCode);
+    return decision;
+  };
+  if (params.proceed) {
+    return record({
+      action: "continue",
+      decisionCode: "focus_proceed",
+      cutContext: false,
+      taskId: sessionTaskState.read(params.sessionFile).current?.taskId ?? "",
+    });
+  }
+  try {
+    const result = sessionTaskState.applyExplicitControl({
+      sessionFile: params.sessionFile,
+      control,
+      nowMs: params.nowMs,
+      workspacePaths: params.workspacePaths,
+      recheck: resolveResumeParkedRecheck(params.recheckInputs),
+    });
+    if (!result) {
+      return record({
+        action: "continue",
+        decisionCode: "focus_state_unavailable",
+        cutContext: false,
+        taskId: "",
+      });
+    }
+    if (result.action === "resume") {
+      return record({
+        action: "resume",
+        decisionCode: "focus_switched",
+        cutContext: true,
+        taskId: result.taskId,
+        currentTitle: result.currentTitle ?? "",
+        incomingTitle: result.incomingTitle ?? "",
+        statusLine: result.statusLine ?? "",
+        ...(result.restoredPrompt ? { restoredPrompt: result.restoredPrompt } : {}),
+        ...(result.droppedTitle ? { droppedTitle: result.droppedTitle } : {}),
+        ...(result.droppedPaths ? { droppedPaths: result.droppedPaths } : {}),
+      });
+    }
+    return record({
+      action: result.action === "cancel_parked" ? "cancel_parked" : "continue",
+      decisionCode: "focus_clear",
+      cutContext: false,
+      taskId: result.taskId,
+      ...(result.statusLine ? { statusLine: result.statusLine } : {}),
+      ...(result.abortInFlight ? { abortInFlight: true } : {}),
+    });
+  } catch {
+    return record({
+      action: "continue",
+      decisionCode: "focus_state_unavailable",
+      cutContext: false,
+      taskId: "",
+    });
+  }
 }
