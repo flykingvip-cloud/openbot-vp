@@ -1973,11 +1973,11 @@ Deprecated aliases: removed (no callers).
 ## Package 6 — final same-SHA acceptance & new-main takeover proof (2026-11-08)
 
 **Baseline (Package 5 PASSED tip):** `a1b14f80c0de6483ab3a9659c090eb6881912ffe`  
-**Package 6 status:** same-SHA matrices + entry call graph + retired/kept ledger recorded; **zero continuity/state/delivery source fixes**.  
-**Full evidence:** `package6-same-sha-acceptance.md`  
+**Package 6 status:** **conditional PASS** (independent review). Same-SHA matrices + by-scenario call graph + retired/kept ledger; **zero continuity/state/delivery source fixes**. **Not all-green** — 4 pending test-contract failures kept visible.  
+**Full evidence:** `package6-same-sha-acceptance.md` (doc corrections after independent review).  
 No push / merge / deploy / production restart. Foreign concurrent WIP left untouched.
 
-Charter: freeze one reproducible candidate; prove personal + collab applicable main chains, async/recovery/cancel/claim/delivery-only, artifacts/PPT (honest runtime GAPs), entry call graph, retired unreachable + kept façades. No new features / architecture expansion. Do not splice PASS across SHAs. Do not send external messages or restart production.
+Charter: freeze one reproducible candidate; prove personal + collab applicable main chains, async/recovery/cancel/claim/delivery-only, artifacts/PPT (honest runtime GAPs), entry call graph **by scenario**, retired unreachable + kept façades. No new features / architecture expansion. Do not splice PASS across SHAs. Do not send external messages or restart production.
 
 ### Freeze
 
@@ -1986,35 +1986,59 @@ Charter: freeze one reproducible candidate; prove personal + collab applicable m
 | Freeze source (clean tests) | `a1b14f80c0de6483ab3a9659c090eb6881912ffe` |
 | `origin/main` ancestor | `658bb327ef7470433f092b50dd122d8d6bc5262b` — PASS |
 | Clean worktree | `/tmp/openbot-p6-freeze-a1b14f80c` detached + clean |
-| Src fixes this package | **none** |
+| Src fixes this package | **none** (docs-only remelt / corrections) |
+
+### Call graph (by scenario — corrected)
+
+- **Chat:** interpret → admit → `runAdmittedTurn` → prepare/confirm.
+- **Followup / queued (async-wait continue & delivery-only):** `claimQueuedExecution` → controlled execution lifecycle → `runQueuedCandidate` → acceptance/delivery confirm. **Does not** call chat `runAdmittedTurn`.
+- Cron/command: own scene adapters on the same controlled lifecycle, not chat `runAdmittedTurn`.
+- Do not use one diagram to imply all entries share one function.
 
 ### Matrix summary (all on freeze source SHA)
 
 | Window | Verdict |
 | --- | --- |
-| Personal main chain (interpret → admit → runAdmittedTurn → prepare/confirm) | **PASS** (unit) |
+| Personal main chain (chat `runAdmittedTurn` path) | **PASS** (unit) |
 | Collab main chain (claim → member exec → submit → review → integrate / group delivery; member turn ≠ close group) | **PASS** (integration P1/P3 + org dispatch + static ownership) |
 | Async / restart / stale cancel / claim race / delivery-only original payload | **PASS** (unit + stub-channel + real-process) |
 | Artifacts preview/download/save-edit consistency | **PASS** (unit); PPT physical render **runtime GAP** |
-| Retired aliases unreachable; kept façades/backends/triggers listed | **PASS** (static + package5-retire) |
+| Two recovery aliases unreachable; delete no break | **PASS** (static + package5-retire) |
+| Kept CLI/embedded backends, needed façades, triggers, independent collab contracts | Recorded — duties retained |
+| Lobster/OpenProse + unknown external recovery assets | Kept for **insufficient evidence** — **not** “full config audit complete” |
+| All old executors retired? | **No — do not claim** |
 
-### Verification this turn (freeze SHA)
+### Verification this turn (freeze SHA) — not all green
 
 | Suite group | Result |
 | --- | --- |
 | delivery/async/context (batch A) | 14 files / 90 PASS |
 | admission/restart/cross-process (batch B) | 14 files / 56 PASS |
 | interpret/PPT wiring/org dispatch (+ UI sidebar) | 11 files / 129 PASS |
-| collab board/dialogue/continuity (batch D) | 63 PASS / 3 FAIL (unit mock drift → follow-up) |
-| controlled collab + PPT stubs (batch E) | 29 PASS / 1 FAIL (P4 assert polish → follow-up) |
+| collab board/dialogue/continuity (batch D) | 63 PASS / **3 FAIL** — **pending test-contract** (board-tool mock `{item,eventRelay}` shape) |
+| controlled collab + PPT stubs (batch E) | 29 PASS / **1 FAIL** — **pending test-contract** (P4 `human_todo` assert) |
 | package5-retire | 3 PASS |
 | Source edits for Package6 blockers | **none** |
+| Visible failures kept in pack | **4** (not continuity blockers; must not be described as all green) |
 
-### Follow-up (not blockers)
+### Evidence archive boundary
+
+Local `/tmp/p6-batch-*.log` and freeze dir matched `a1b14f80c…` for this run. Docs record tallies/verdicts only — **not** a self-contained durable archive of per-batch commands + log digests for long-term standalone re-verification.
+
+### Runtime final acceptance (separate checklist — not closed)
+
+1. Same-candidate real-model personal + collab loops.  
+2. Authorized-env real channel outbound + receipts.  
+3. Real PPT render image + physical preview + original download.  
+
+Do **not** expand architecture to close these. Stub/unit ≠ runtime final pass.
+
+### Pending test-contract (not blockers) / other follow-up
 
 1. Board-tool unit mocks → `{ item, eventRelay }` shape.  
 2. P4 allow `human_todo` after escalate exhaustion.  
-3. Real-model / real-channel / PPT physical renderer acceptance.  
-4. Foreign WIP stays out of convergence commits.
+3. Foreign WIP stays out of convergence commits.
 
-**Remelt tip for Package6 acceptance:** `1dcc5ba7e7e091012f44cde7774f95bd3a9f607f` (same-SHA acceptance pack; zero src fixes). Prior Package5 tip `a1b14f80c` retained. — grok-bot
+**Closure:** source-code migration phase (Packages 1–6) **closable** after these doc corrections. Runtime final acceptance remains separate — **no merge/deploy/restart** and **no claim** of full executor retirement or deploy readiness until that checklist closes.
+
+**Remelt tip for Package6 acceptance:** `1dcc5ba7e7e091012f44cde7774f95bd3a9f607f` (same-SHA acceptance pack; zero src fixes). Prior Package5 tip `a1b14f80c` retained. Independent-review doc corrections tip filled after commit. — grok-bot
