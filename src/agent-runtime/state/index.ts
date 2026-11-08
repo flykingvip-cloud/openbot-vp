@@ -33,13 +33,13 @@ export {
 export {
   recoverAsyncWaitJobsAtGatewayBoot,
   armAsyncWaitRecoveryContinuation,
-  collectRecoverableAsyncWaitIntents,
   setAsyncWaitRecoveryContinueEnqueue,
   startAsyncWaitJobRecoveryRecheck,
   stopAsyncWaitJobRecoveryRecheckForTests,
   type AsyncWaitRecoveryResult,
   type AsyncWaitRecoveryContinueEnqueue,
 } from "./repository/async-wait-job-recovery.js";
+export { collectRecoverableAsyncWaitIntents } from "./repository/async-wait-recovery-scan.js";
 export type { ResumeParkedRecheck } from "./mutations/resume-parked.js";
 
 export { resetCorruptedSession, prepareReplacementSessionEntry } from "./session-recovery.js";

@@ -1,27 +1,25 @@
 /**
- * Package2 recovery: claim durable async-wait intents at gateway boot / recheck
- * and arm the existing task-board continue mainline. enqueueSystemEvent /
+ * Package2 recovery orchestration: claim durable async-wait intents at gateway boot / recheck
+ * and arm the existing task-board continue mainline. Directory scan lives in async-wait-recovery-scan.ts. enqueueSystemEvent /
  * requestHeartbeatNow / pending register are NOT delivery.
  *
  * Stages: claimed → continue_armed → turn_bound → delivery_pending → delivered.
  * Unconfirmed stages retry. Dual-claim prevented by per-job file lock.
  */
-import fs from "node:fs";
-import path from "node:path";
 import { listAgentIds } from "../../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../../config/config.js";
-import { resolveSessionTranscriptsDirForAgent } from "../../../config/sessions/paths.js";
 import { isPidAlive } from "../../../shared/pid-alive.js";
 import { buildTaskBoardContinuePrompt, reserveTaskContinuation } from "../continuation-ticket.js";
 import { checkTaskActionBoundary } from "../task-action.js";
 import { type AsyncWaitJobIntent } from "./async-wait-job-store.js";
-import { clearAsyncWaitJobIntent, readAsyncWaitJobIntent } from "./async-wait-job.js";
+import { clearAsyncWaitJobIntent } from "./async-wait-job.js";
 import {
   buildAsyncWaitRecoveryPromptAppendix,
   claimAsyncWaitJobForRecovery,
   markAsyncWaitRecoveryContinueArmed,
 } from "./async-wait-recovery-claim.js";
 import { setAsyncWaitRecoveryFollowupConsumerEnsure } from "./async-wait-recovery-enqueue.js";
+import { collectRecoverableAsyncWaitIntents } from "./async-wait-recovery-scan.js";
 import { readSessionTaskBoard } from "./task-board-file.js";
 
 export type AsyncWaitRecoveryLog = {
@@ -42,7 +40,6 @@ export type AsyncWaitRecoveryResult = {
   retried: number;
 };
 
-const JOBS_DIRNAME = "async-wait-jobs";
 const RECHECK_INTERVAL_MS = 15_000;
 
 let recheckTimer: ReturnType<typeof setInterval> | undefined;
@@ -78,88 +75,6 @@ export function getAsyncWaitRecoveryContinueEnqueue():
   | AsyncWaitRecoveryContinueEnqueue
   | undefined {
   return continueEnqueuePort;
-}
-
-function readIntentFile(filePath: string): AsyncWaitJobIntent | undefined {
-  try {
-    const row = JSON.parse(fs.readFileSync(filePath, "utf8")) as AsyncWaitJobIntent;
-    if (
-      row &&
-      (row.version === 2 || (row as { version?: number }).version === 1) &&
-      typeof row.jobId === "string" &&
-      typeof row.sessionFile === "string"
-    ) {
-      return readAsyncWaitJobIntent(row.sessionFile, row.jobId) ?? row;
-    }
-  } catch {
-    // ignore
-  }
-  return undefined;
-}
-
-export function findAsyncWaitJobsDirs(sessionsRoot: string, maxDepth = 3): string[] {
-  const root = sessionsRoot.trim();
-  if (!root || !fs.existsSync(root)) {
-    return [];
-  }
-  const out: string[] = [];
-  const walk = (dir: string, depth: number) => {
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) {
-        continue;
-      }
-      const full = path.join(dir, entry.name);
-      if (entry.name === JOBS_DIRNAME) {
-        out.push(full);
-        continue;
-      }
-      if (depth < maxDepth) {
-        walk(full, depth + 1);
-      }
-    }
-  };
-  walk(root, 0);
-  return out;
-}
-
-export function collectRecoverableAsyncWaitIntents(cfg: OpenBotConfig): AsyncWaitJobIntent[] {
-  const byKey = new Map<string, AsyncWaitJobIntent>();
-  for (const agentId of listAgentIds(cfg)) {
-    let sessionsRoot: string;
-    try {
-      sessionsRoot = resolveSessionTranscriptsDirForAgent(agentId);
-    } catch {
-      continue;
-    }
-    for (const jobsDir of findAsyncWaitJobsDirs(sessionsRoot)) {
-      let names: string[];
-      try {
-        names = fs.readdirSync(jobsDir);
-      } catch {
-        continue;
-      }
-      for (const name of names) {
-        if (!name.endsWith(".json")) {
-          continue;
-        }
-        const intent = readIntentFile(path.join(jobsDir, name));
-        if (!intent || intent.status === "cleared") {
-          continue;
-        }
-        if (intent.recovery?.stage === "delivered") {
-          continue;
-        }
-        byKey.set(`${intent.sessionFile}::${intent.jobId}`, intent);
-      }
-    }
-  }
-  return [...byKey.values()];
 }
 
 function boundaryFor(intent: AsyncWaitJobIntent) {
