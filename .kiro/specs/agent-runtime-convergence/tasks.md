@@ -1915,4 +1915,4 @@ PPTX: original bytes retained → HTML preview derivative; download/save use ori
 | async-wait production-path (delivery-only) | 1 file / 3 PASS |
 | Source edits for Package4 blockers | **none** |
 
-**Remelt tip for Package4 acceptance:** *(filled after tip SHA commit)*. — grok-bot
+**Remelt tip for Package4 acceptance:** `6fc0bf08c1efd190fde3dc3cbb56fe0ed694f364` (gap verification only; zero blockers). Prior Package3 tip `5b2af981a` retained. — grok-bot
