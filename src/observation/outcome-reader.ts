@@ -186,15 +186,26 @@ export function readOutcomeMetadata(input: {
     return located;
   }
   const segment = boundedOutcomePathSegment(input.taskId);
-  const tipPath = path.join(located.root, "tips", segment + ".json");
-  const versionPath = path.join(
+  let tipPath = path.join(located.root, "tips", segment + ".json");
+  let versionPath = path.join(
     located.root,
     "versions",
     segment + "__v" + input.outcomeVersion + ".json",
   );
   try {
     if (!fs.existsSync(tipPath)) {
-      return { ok: false, code: "not_found" };
+      // Old writers used URL encoding without the newer hash cap. Read the
+      // complete legacy pair only when no modern tip exists; never migrate it.
+      const legacy = encodeURIComponent(input.taskId);
+      const suffix = "__v" + input.outcomeVersion + ".json";
+      if (legacy === segment || legacy.length + suffix.length > 255) {
+        return { ok: false, code: "not_found" };
+      }
+      tipPath = path.join(located.root, "tips", legacy + ".json");
+      versionPath = path.join(located.root, "versions", legacy + suffix);
+      if (!fs.existsSync(tipPath)) {
+        return { ok: false, code: "not_found" };
+      }
     }
     const tipText = fs.readFileSync(tipPath, "utf8");
     const tip: unknown = JSON.parse(tipText);

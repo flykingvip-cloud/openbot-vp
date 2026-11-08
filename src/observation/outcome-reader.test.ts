@@ -95,6 +95,27 @@ describe("read-only outcome metadata", () => {
     );
     expect(read({ taskId: longId }).ok).toBe(true);
   });
+  it("reads legacy encoded long keys without migrating and enforces scope", () => {
+    const legacyId = "legacy:" + "x".repeat(160);
+    const encoded = encodeURIComponent(legacyId);
+    const row = { ...metadata(), taskId: legacyId };
+    const tip = path.join(dir, "task-outcomes/tips", encoded + ".json");
+    const version = path.join(dir, "task-outcomes/versions", encoded + "__v1.json");
+    fs.writeFileSync(tip, JSON.stringify(row));
+    fs.writeFileSync(version, JSON.stringify(row));
+    const files = fs.readdirSync(path.join(dir, "task-outcomes"), { recursive: true });
+    expect(read({ taskId: legacyId }).ok).toBe(true);
+    expect(read({ taskId: legacyId, callerTenantId: "foreign" })).toEqual({
+      ok: false,
+      code: "unauthorized",
+    });
+    expect(fs.readdirSync(path.join(dir, "task-outcomes"), { recursive: true })).toEqual(files);
+    expect(fs.readFileSync(tip, "utf8")).toBe(JSON.stringify(row));
+    expect(fs.readFileSync(version, "utf8")).toBe(JSON.stringify(row));
+    const modern = boundedOutcomePathSegment(legacyId);
+    fs.writeFileSync(path.join(dir, "task-outcomes/tips", modern + ".json"), JSON.stringify(row));
+    expect(read({ taskId: legacyId })).toEqual({ ok: false, code: "version_missing" });
+  });
   it("does not create a missing store on read failure", () => {
     fs.rmSync(path.join(dir, "task-outcomes"), { recursive: true });
     expect(read()).toEqual({ ok: false, code: "not_found" });
