@@ -1,5 +1,6 @@
 import { disarmCompletionHold } from "../../../agents/execution-preflight/completion-hold.js";
 import type { ConstitutionalRuntimeShadowDeps } from "../../../agents/execution-preflight/constitutional-runtime-shadow-deps.js";
+import type { HookDeliveryResult } from "../../../agents/execution-preflight/hook-delivery.js";
 import {
   formatAssistantErrorText,
   isCompactionFailureError,
@@ -15,15 +16,29 @@ import { normalizeUsage, type UsageLike } from "../../../agents/usage.js";
 import type { resolveContextEngine } from "../../../context-engine/index.js";
 import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
 import { MAX_OVERFLOW_COMPACTION_ATTEMPTS } from "../../policy/index.js";
-import { buildErrorAgentMeta, mergeUsageIntoAccumulator } from "../outcomes/usage-summary.js";
+import {
+  buildErrorAgentMeta,
+  createUsageAccumulator,
+  mergeUsageIntoAccumulator,
+} from "../outcomes/usage-summary.js";
 import { recoverContextOverflow } from "../recovery/context-overflow.js";
 import { runEmbeddedAttempt } from "./embedded-attempt.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
-import type {
-  EmbeddedRunLoopOutcome,
-  EmbeddedRunLoopState,
-  EmbeddedRunSession,
-} from "./embedded-run-auth.js";
+import type { EmbeddedRunLoopOutcome, EmbeddedRunSession } from "./embedded-run-auth.js";
+
+export type EmbeddedRunLoopState = {
+  overflowCompactionAttempts: number;
+  toolResultTruncationAttempted: boolean;
+  bootstrapPromptWarningSignaturesSeen: string[];
+  usageAccumulator: ReturnType<typeof createUsageAccumulator>;
+  lastRunPromptUsage: ReturnType<typeof normalizeUsage> | undefined;
+  autoCompactionCount: number;
+  runLoopIterations: number;
+  authRetryPending: boolean;
+  lastTurnTotal: number | undefined;
+  lastAttemptTaskId: string;
+  lastHookDelivery: HookDeliveryResult | undefined;
+};
 
 export type EmbeddedRunAttemptCarry = {
   attempt: Awaited<ReturnType<typeof runEmbeddedAttempt>>;
@@ -41,50 +56,6 @@ export type EmbeddedRunAttemptCarry = {
 export type EmbeddedRunAttemptIterationResult =
   | EmbeddedRunLoopOutcome
   | ({ action: "next" } & EmbeddedRunAttemptCarry);
-
-export function buildEmbeddedRunRetryLimitResult(args: {
-  session: EmbeddedRunSession;
-  loop: EmbeddedRunLoopState;
-  params: RunEmbeddedPiAgentParams;
-  started: number;
-  releaseRunTask: (outcome: "failed" | "cancelled") => void;
-}): EmbeddedRunLoopOutcome {
-  const { session, loop, params, started, releaseRunTask } = args;
-  const message =
-    `Exceeded retry limit after ${loop.runLoopIterations} attempts ` +
-    `(max=${session.MAX_RUN_LOOP_ITERATIONS}).`;
-  log.error(
-    `[run-retry-limit] sessionKey=${params.sessionKey ?? params.sessionId} ` +
-      `provider=${session.provider}/${session.modelId} attempts=${loop.runLoopIterations} ` +
-      `maxAttempts=${session.MAX_RUN_LOOP_ITERATIONS}`,
-  );
-  releaseRunTask("failed");
-  return {
-    action: "return",
-    result: {
-      payloads: [
-        {
-          text:
-            "Request failed after repeated internal retries. " +
-            "Please try again, or use /new to start a fresh session.",
-          isError: true,
-        },
-      ],
-      meta: {
-        durationMs: Date.now() - started,
-        agentMeta: buildErrorAgentMeta({
-          sessionId: params.sessionId,
-          provider: session.provider,
-          model: session.effectiveModel.id,
-          usageAccumulator: loop.usageAccumulator,
-          lastRunPromptUsage: loop.lastRunPromptUsage,
-          lastTurnTotal: loop.lastTurnTotal,
-        }),
-        error: { kind: "retry_limit", message },
-      },
-    },
-  };
-}
 
 export async function runEmbeddedRunAttemptIteration(args: {
   session: EmbeddedRunSession;

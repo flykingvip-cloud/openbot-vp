@@ -11,11 +11,8 @@ import { describeUnknownError } from "../../../agents/pi-embedded-runner/utils.j
 import { buildErrorAgentMeta } from "../outcomes/usage-summary.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 import type { EmbeddedRunAttemptCarry } from "./embedded-run-attempt.js";
-import type {
-  EmbeddedRunLoopOutcome,
-  EmbeddedRunLoopState,
-  EmbeddedRunSession,
-} from "./embedded-run-auth.js";
+import type { EmbeddedRunLoopState } from "./embedded-run-attempt.js";
+import type { EmbeddedRunLoopOutcome, EmbeddedRunSession } from "./embedded-run-auth.js";
 
 export async function runEmbeddedRunFailover(args: {
   session: EmbeddedRunSession;

@@ -19,15 +19,19 @@ import { generateSecureToken } from "../../../infra/secure-random.js";
 import { enqueueCommandInLane } from "../../../process/command-queue.js";
 import { isMarkdownCapableMessageChannel } from "../../../utils/message-channel.js";
 import { sessionTaskState } from "../../state/index.js";
-import { createUsageAccumulator } from "../outcomes/usage-summary.js";
+import { buildErrorAgentMeta, createUsageAccumulator } from "../outcomes/usage-summary.js";
 import { cleanupEmbeddedRun } from "./embedded-cleanup.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
 import {
-  buildEmbeddedRunRetryLimitResult,
   runEmbeddedRunAttemptIteration,
+  type EmbeddedRunLoopState,
 } from "./embedded-run-attempt.js";
-import { prepareEmbeddedRunAuth, type EmbeddedRunLoopState } from "./embedded-run-auth.js";
+import {
+  prepareEmbeddedRunAuth,
+  type EmbeddedRunLoopOutcome,
+  type EmbeddedRunSession,
+} from "./embedded-run-auth.js";
 import { runEmbeddedRunFailover } from "./embedded-run-failover.js";
 import { runEmbeddedRunResult } from "./embedded-run-result.js";
 
@@ -57,6 +61,50 @@ function resolveActiveErrorContext(params: {
   return {
     provider: params.lastAssistant?.provider ?? params.provider,
     model: params.lastAssistant?.model ?? params.model,
+  };
+}
+
+function buildEmbeddedRunRetryLimitResult(args: {
+  session: EmbeddedRunSession;
+  loop: EmbeddedRunLoopState;
+  params: RunEmbeddedPiAgentParams;
+  started: number;
+  releaseRunTask: (outcome: "failed" | "cancelled") => void;
+}): EmbeddedRunLoopOutcome {
+  const { session, loop, params, started, releaseRunTask } = args;
+  const message =
+    `Exceeded retry limit after ${loop.runLoopIterations} attempts ` +
+    `(max=${session.MAX_RUN_LOOP_ITERATIONS}).`;
+  log.error(
+    `[run-retry-limit] sessionKey=${params.sessionKey ?? params.sessionId} ` +
+      `provider=${session.provider}/${session.modelId} attempts=${loop.runLoopIterations} ` +
+      `maxAttempts=${session.MAX_RUN_LOOP_ITERATIONS}`,
+  );
+  releaseRunTask("failed");
+  return {
+    action: "return",
+    result: {
+      payloads: [
+        {
+          text:
+            "Request failed after repeated internal retries. " +
+            "Please try again, or use /new to start a fresh session.",
+          isError: true,
+        },
+      ],
+      meta: {
+        durationMs: Date.now() - started,
+        agentMeta: buildErrorAgentMeta({
+          sessionId: params.sessionId,
+          provider: session.provider,
+          model: session.effectiveModel.id,
+          usageAccumulator: loop.usageAccumulator,
+          lastRunPromptUsage: loop.lastRunPromptUsage,
+          lastTurnTotal: loop.lastTurnTotal,
+        }),
+        error: { kind: "retry_limit", message },
+      },
+    },
   };
 }
 

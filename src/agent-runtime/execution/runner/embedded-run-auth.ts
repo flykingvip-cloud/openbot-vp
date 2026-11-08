@@ -30,6 +30,8 @@ import {
 } from "../../policy/index.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 
+type EmbeddedModelPrep = Awaited<ReturnType<typeof prepareEmbeddedModel>>;
+
 export type EmbeddedRunSession = {
   provider: string;
   modelId: string;
@@ -39,11 +41,11 @@ export type EmbeddedRunSession = {
   lastProfileId: string | undefined;
   agentDir: string;
   fallbackConfigured: boolean;
-  authStorage: Awaited<ReturnType<typeof prepareEmbeddedModel>>["authStorage"];
-  modelRegistry: Awaited<ReturnType<typeof prepareEmbeddedModel>>["modelRegistry"];
-  authOverride: Awaited<ReturnType<typeof prepareEmbeddedModel>>["authOverride"];
-  ctxInfo: Awaited<ReturnType<typeof prepareEmbeddedModel>>["ctxInfo"];
-  effectiveModel: Awaited<ReturnType<typeof prepareEmbeddedModel>>["effectiveModel"];
+  authStorage: EmbeddedModelPrep["authStorage"];
+  modelRegistry: EmbeddedModelPrep["modelRegistry"];
+  authOverride: EmbeddedModelPrep["authOverride"];
+  ctxInfo: EmbeddedModelPrep["ctxInfo"];
+  effectiveModel: EmbeddedModelPrep["effectiveModel"];
   authStore: ReturnType<typeof ensureAuthProfileStore>;
   lockedProfileId: string | undefined;
   profileCandidates: string[];
@@ -59,7 +61,7 @@ export type EmbeddedRunSession = {
   }) => Promise<void>;
   maybeBackoffBeforeOverloadFailover: (reason: FailoverReason | null) => Promise<void>;
   resolveAuthProfileFailureReason: (
-    failoverReason: FailoverReason | null,
+    reason: FailoverReason | null,
   ) => AuthProfileFailureReason | null;
   MAX_RUN_LOOP_ITERATIONS: number;
 };
@@ -387,23 +389,3 @@ export async function prepareEmbeddedRunAuth(args: {
   session.initialThinkLevel = initialThinkLevel;
   return session;
 }
-
-export type EmbeddedRunLoopState = {
-  overflowCompactionAttempts: number;
-  toolResultTruncationAttempted: boolean;
-  bootstrapPromptWarningSignaturesSeen: string[];
-  usageAccumulator: ReturnType<
-    typeof import("../outcomes/usage-summary.js").createUsageAccumulator
-  >;
-  lastRunPromptUsage:
-    | ReturnType<typeof import("../../../agents/usage.js").normalizeUsage>
-    | undefined;
-  autoCompactionCount: number;
-  runLoopIterations: number;
-  authRetryPending: boolean;
-  lastTurnTotal: number | undefined;
-  lastAttemptTaskId: string;
-  lastHookDelivery:
-    | import("../../../agents/execution-preflight/hook-delivery.js").HookDeliveryResult
-    | undefined;
-};
