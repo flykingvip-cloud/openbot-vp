@@ -12,8 +12,13 @@ import {
 import { requestHeartbeatNow } from "../../../infra/heartbeat-wake.js";
 import { enqueueSystemEvent } from "../../../infra/system-events.js";
 import {
+  peekAwaitingDelivery,
+  clearAwaitingDeliveriesForTests,
+} from "../../../task-outcome/pending-delivery.js";
+import {
   claimAsyncWaitJobIntent,
   collectRecoverableAsyncWaitIntents,
+  deliverRecoveredAsyncWaitCompletion,
   findAsyncWaitJobsDirs,
   recoverAsyncWaitJobsAtGatewayBoot,
   stopAsyncWaitJobRecoveryRecheckForTests,
@@ -34,6 +39,7 @@ const prevOperator = process.env.OPENBOT_OPERATOR_ID;
 
 afterEach(() => {
   stopAsyncWaitJobRecoveryRecheckForTests();
+  clearAwaitingDeliveriesForTests();
   vi.clearAllMocks();
   for (const root of roots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
@@ -201,4 +207,43 @@ it("boot recovery scans agent sessions and wakes exited intents once", () => {
   expect(second.woke).toBe(0);
   expect(enqueueSystemEvent).toHaveBeenCalledTimes(1);
   clearAsyncWaitJobsForTests(sessionFile);
+});
+
+it("proactive recovered delivery is idempotent (event+pending once)", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-p2d4-"));
+  roots.push(root);
+  const agentDir = path.join(root, "agent");
+  fs.mkdirSync(agentDir, { recursive: true });
+  const sessionFile = path.join(root, "session.jsonl");
+  fs.writeFileSync(sessionFile, "");
+  const binding = liveBoard(sessionFile);
+  recordAsyncWaitJobIntent({
+    jobId: "job-p2d4",
+    sessionKey: "agent:bot:main",
+    sessionFile,
+    taskId: binding.taskId,
+    executionAttempt: binding.executionAttempt,
+    deliverableVersion: binding.deliverableVersion,
+    pid: 999_999_990,
+    startedAt: Date.now(),
+  });
+  markAsyncWaitJobExited({
+    sessionFile,
+    jobId: "job-p2d4",
+    exitStatus: "completed",
+  });
+  const intent = readAsyncWaitJobIntent(sessionFile, "job-p2d4")!;
+  const cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
+  const first = deliverRecoveredAsyncWaitCompletion({ intent, cfg });
+  expect(first).toEqual({ delivered: true, reason: "issued" });
+  expect(enqueueSystemEvent).toHaveBeenCalledTimes(1);
+  expect(requestHeartbeatNow).toHaveBeenCalledTimes(1);
+  expect(peekAwaitingDelivery("async-wait-recovery:job-p2d4")?.taskId).toBe(binding.taskId);
+  const second = deliverRecoveredAsyncWaitCompletion({ intent, cfg });
+  expect(second.reason).toBe("already");
+  expect(enqueueSystemEvent).toHaveBeenCalledTimes(1);
+  expect(requestHeartbeatNow).toHaveBeenCalledTimes(1);
+  expect(readAsyncWaitJobIntent(sessionFile, "job-p2d4")?.proactiveDeliveryIssuedAtMs).toEqual(
+    expect.any(Number),
+  );
 });

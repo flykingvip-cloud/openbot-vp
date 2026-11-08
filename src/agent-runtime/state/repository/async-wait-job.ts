@@ -27,6 +27,12 @@ export type AsyncWaitJobIntent = {
   clearedAtMs?: number;
   /** Set when boot/recheck issued the one bounded wake for this intent. */
   recoveryWakeIssuedAtMs?: number;
+  /** Stable pending-delivery run id for recovered completion (idempotent). */
+  proactiveDeliveryRunId?: string;
+  /** Set when recovered completion was proactively enqueued for delivery. */
+  proactiveDeliveryIssuedAtMs?: number;
+  /** Human-readable completion summary persisted for recovery delivery. */
+  completionSummary?: string;
 };
 
 const DIRNAME = "async-wait-jobs";
@@ -229,6 +235,31 @@ export function clearAsyncWaitJobsForTask(sessionFile: string, taskId: string): 
     }
   }
   return n;
+}
+
+/** Record proactive recovered-completion delivery issuance (idempotent). */
+export function markAsyncWaitJobProactiveDeliveryIssued(input: {
+  sessionFile: string;
+  jobId: string;
+  runId: string;
+  summary?: string;
+  atMs?: number;
+}): AsyncWaitJobIntent | undefined {
+  const current = readAsyncWaitJobIntent(input.sessionFile, input.jobId);
+  if (!current || current.status === "cleared") {
+    return current;
+  }
+  if (typeof current.proactiveDeliveryIssuedAtMs === "number") {
+    return current;
+  }
+  const next: AsyncWaitJobIntent = {
+    ...current,
+    proactiveDeliveryRunId: input.runId,
+    proactiveDeliveryIssuedAtMs: input.atMs ?? Date.now(),
+    ...(input.summary?.trim() ? { completionSummary: input.summary.trim().slice(0, 2000) } : {}),
+  };
+  writeIntent(input.sessionFile, next);
+  return next;
 }
 
 /** Record that recovery already issued the one bounded wake (idempotent). */

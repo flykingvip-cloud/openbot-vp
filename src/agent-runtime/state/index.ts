@@ -8,12 +8,14 @@ export {
   listWaitingAsyncWaitJobIntents,
   markAsyncWaitJobExited,
   markAsyncWaitJobRecoveryWakeIssued,
+  markAsyncWaitJobProactiveDeliveryIssued,
   clearAsyncWaitJobIntent,
   clearAsyncWaitJobsForTask,
   type AsyncWaitJobIntent,
 } from "./repository/async-wait-job.js";
 export {
   recoverAsyncWaitJobsAtGatewayBoot,
+  deliverRecoveredAsyncWaitCompletion,
   claimAsyncWaitJobIntent,
   collectRecoverableAsyncWaitIntents,
   startAsyncWaitJobRecoveryRecheck,

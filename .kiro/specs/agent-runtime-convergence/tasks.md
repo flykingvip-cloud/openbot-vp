@@ -1581,3 +1581,8 @@ Also: auxiliary governance 3 PASS; slug wiring 1 PASS; memory governance 8 PASS;
 
 - Strengthens exit notify: after TaskActionBoundary refuse, clear durable intent; if intent already `cleared` (owner pause/cancel), do not enqueue system-event or heartbeat wake. — grok-bot
 - Regressions: exec.task-binding matrix adds `cancelled` (5 PASS: current wakes; paused/replaced/constraints/cancelled do not). New async-wait-stale-callback 3 PASS (pause→recovery no wake; cancel→claimQueuedExecution rejected; replace→boundary refuse). Delivery/followup retain existing boundary checks. Full tsgo PASS; typed oxlint clean. No new scheduler. — grok-bot
+
+## Package 2 P2-D4 proactive recovered-completion delivery (2026-11-08)
+
+- `deliverRecoveredAsyncWaitCompletion`: after recovery claim marks exited, registers stable pending-delivery (`async-wait-recovery:<jobId>`), enqueues system-event, requests scoped heartbeat wake, and stamps `proactiveDeliveryIssuedAtMs` + `recoveryWakeIssuedAtMs`. Second call / peek hit → `already` (no duplicate event/wake). Boundary refuse → clear, no delivery. — grok-bot
+- Boot/recheck claim path uses the same helper with cfg so TaskOutcome persistRoot is available. Reuses pending-delivery + heartbeat/followup; no new scheduler/executor. Tests: recovery suite 6 PASS incl. idempotent proactive delivery. Full tsgo PASS; typed oxlint clean. — grok-bot
