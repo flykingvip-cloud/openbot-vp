@@ -1852,3 +1852,67 @@ Tool path: wrapToolWithBeforeToolCallHook → existing policy/hooks/boundary; de
 | Source edits for Package3 blockers | **none** (zero blockers) |
 
 **Remelt tip for Package3 acceptance:** `17101ca9eca4010b0765720c81d47d684f14ad67` (gap verification only; zero blockers). Prior Package2 tip `4509f11b9` retained. — grok-bot
+
+## Package 4 — deliverable / delivery lifecycle gap verification (2026-11-08)
+
+**Baseline (Package 3 PASSED):** `5b2af981a1bfcba4d1a6ab252eb7dd66aa88f2c4`  
+**Package 4 status:** verified against CURRENT tip — **zero migration blockers**. No source change required.  
+**Package 5+ not started.** No push / merge / deploy / production restart.
+
+Charter: takeover/consistency of the **existing** deliverable/delivery chain only. Fix only real breakpoints among result → acceptance → delivery and preview/download/save/edit. Do not build a general quality platform; do not expand aesthetic scoring, provenance certification, or artifact-management features. Polish without blockers → follow-up.
+
+Focus checks verified on committed tip (worktree also carries unrelated concurrent WIP under execution/task-outcome/executor-evidence — left untouched, not staged).
+
+### Gap matrix
+
+#### Already done (evidence — reuse)
+
+| Focus | Current production behavior | Evidence this turn |
+| --- | --- | --- |
+| Silent ≠ delivered without send | `completeReplyDelivery` sets `deliveryPhase: sent ? "delivered" : "awaiting"`; legitimate silence (group/heartbeat/internal/filtered) commits `delivery: { status: "pending" }` unless reaction/messaging-tool send observed | `complete-reply.test` 23 PASS (silence→pending; messaging-tool→delivered) |
+| Placeholder ≠ close | Language-filtered process placeholder commits `processPlaceholder: true` and keeps continuation; TaskOutcome keeps acceptance/delivery pending | complete-reply placeholder case + runtime-from-runner comments |
+| Visible prepare ≠ delivered | `prepareVisibleDelivery` always `deliveryPhase: "awaiting"`; only transport `confirmPendingTurnDelivery` may mark delivered | prepare-visible 12 PASS; confirm-pending 5 PASS |
+| Delivery fail ≠ re-run business | Async-wait recovery: channel fail → `delivery_unknown`; retry is delivery-only with original `boundPayloads` (no model) | production-path 3 PASS incl. channel-fail delivery-only |
+| Verified work ≠ business continue before receipt | Visible `acceptanceStatus===passed` skips `considerContinuation` | complete-reply.ts + prior tasks checkpoint |
+| Artifact version bind / stale edit | Acceptance criteria bind task+`deliverableVersion`+hash; validator match detects stale/version_mismatch; PPTX patch CAS one-writer | criteria 5 + validation 3 + patch-pptx 1 PASS |
+| PPT preview vs download isolation | HTML preview lane keeps separate original-byte download URL; sidebar refuses Office HTML as `.pptx` download; save refuses preview text as Office original | download-lane 9 + html-preview 6 + deliverable-save 24 + workspace-file-preview 21 + pptx-preview-edit 4 PASS |
+| Cron presentation ≠ board mutate | Prior Package work; presentation-only notices | tasks cron presentation checkpoint |
+
+#### Package4 blockers (would fix now)
+
+| Item | Verdict |
+| --- | --- |
+| *(none)* | All four focus checks already have production owners and green regressions. Historical “silent mapped to delivered” was corrected to awaiting/pending without send evidence. PPT text-only preview / HTML-as-.pptx download defects remain fixed in tree with tests. No new quality platform required. |
+
+#### Follow-up (no breakpoint — must not block)
+
+1. **DQ1** full PPTX lifecycle concurrency/permissions beyond existing CAS unit (cross-entry archive/reload matrix).
+2. **DQ0b / DQ2–DQ4** versioned quality profiles, aesthetic/source rubrics — explicitly out of Package4 charter (no general quality platform).
+3. **Declarative acceptance generalization** beyond existing criteria/validators — acceptance completeness, not a dual delivery path.
+4. **November 3 Panda incident unique identification** — pptx-preview-download-fix.md: not proven; do not claim every historical bad download repaired.
+5. **Production renderer image deploy** (`openbot-pptx-renderer`) — ops prerequisite; missing capability already falls back to labelled text-only.
+6. Collaboration real-model / same-SHA full-chain — Package6 territory per prior matrix.
+7. Unrelated concurrent WIP on this worktree (`executor-evidence/`, task-outcome/model-call closeout edits) — not Package4; do not bag.
+
+### Call-chain (current — unchanged this package)
+
+```
+model/tool result
+  → completeReplyDelivery (empty | language_filtered | visible)
+      empty silence → delivery pending/awaiting unless reaction/messaging send
+      visible → prepareVisibleDelivery (awaiting) → channel send → confirmPendingTurnDelivery
+  → acceptance stays unfinished until validators/criteria pass (model “done” alone does not close)
+delivery retry (async-wait): delivery_only + boundPayloads → confirm delivery_unknown|delivered (no claimQueued business re-exec)
+PPTX: original bytes retained → HTML preview derivative; download/save use original package; patch CAS on contentHash
+```
+
+### Verification this turn (read-only)
+
+| Suite | Result |
+| --- | --- |
+| delivery dispatch/acceptance/artifacts | 6 files / 49 PASS |
+| PPT UI download/preview/save/edit wiring | 5 files / 64 PASS |
+| async-wait production-path (delivery-only) | 1 file / 3 PASS |
+| Source edits for Package4 blockers | **none** |
+
+**Remelt tip for Package4 acceptance:** *(filled after tip SHA commit)*. — grok-bot
