@@ -40,6 +40,11 @@ export {
   type AsyncWaitRecoveryContinueEnqueue,
 } from "./repository/async-wait-job-recovery.js";
 export { collectRecoverableAsyncWaitIntents } from "./repository/async-wait-recovery-scan.js";
+export {
+  createAsyncWaitRecoveryContinueEnqueue,
+  setAsyncWaitRecoveryFollowupConsumerEnsure,
+} from "./repository/async-wait-recovery-enqueue.js";
+export { ensureAsyncWaitRecoveryFollowupConsumer } from "./repository/async-wait-recovery-followup-consumer.js";
 export type { ResumeParkedRecheck } from "./mutations/resume-parked.js";
 
 export { resetCorruptedSession, prepareReplacementSessionEntry } from "./session-recovery.js";

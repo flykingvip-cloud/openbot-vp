@@ -1,13 +1,11 @@
 import path from "node:path";
 import {
   recoverAsyncWaitJobsAtGatewayBoot,
-  setAsyncWaitRecoveryContinueEnqueue,
-} from "../agent-runtime/state/index.js";
-import {
   createAsyncWaitRecoveryContinueEnqueue,
   setAsyncWaitRecoveryFollowupConsumerEnsure,
-} from "../agent-runtime/state/repository/async-wait-recovery-enqueue.js";
-import { ensureAsyncWaitRecoveryFollowupConsumer } from "../agent-runtime/state/repository/async-wait-recovery-followup-consumer.js";
+  ensureAsyncWaitRecoveryFollowupConsumer,
+  setAsyncWaitRecoveryContinueEnqueue,
+} from "../agent-runtime/state/index.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { maybeProvisionBuiltinStewardAtStartup } from "../agents/builtin-steward/provision.js";
 import { getActiveEmbeddedRunCount } from "../agents/pi-embedded-runner/runs.js";
@@ -70,6 +68,7 @@ import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/di
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
 import { createHeartbeatActivityLifecycle } from "../observation/heartbeat-activity-lifecycle.js";
 import { createObservationQueryHandlers } from "../observation/query-gateway.js";
+import { createObservationReasoningOptions } from "../observation/reasoning-model-resolver.js";
 import { getGlobalHookRunner, runGlobalGatewayStopSafely } from "../plugins/hook-runner-global.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import { createPluginRuntime } from "../plugins/runtime/index.js";
@@ -1079,7 +1078,10 @@ export async function startGatewayServer(
       ...pluginRegistry.gatewayHandlers,
       ...execApprovalHandlers,
       ...secretsHandlers,
-      ...createObservationQueryHandlers({ platformActivityCollector: heartbeatActivity }),
+      ...createObservationQueryHandlers({
+        platformActivityCollector: heartbeatActivity,
+        ...createObservationReasoningOptions(process.env.OPENBOT_OBSERVATION_REASONING === "1"),
+      }),
     },
     broadcast,
     context: gatewayRequestContext,
