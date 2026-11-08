@@ -1,7 +1,7 @@
 import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery.js";
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
-import { createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createCommandExecutionLifecycle, runCommandAcpTurn, type EmbeddedPiRunResult } from "../agent-runtime/execution/index.js";
+import { CONTROLLED_EXECUTION_STAGE_ORDER, createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createCommandExecutionLifecycle, runCommandAcpTurn, type EmbeddedPiRunResult } from "../agent-runtime/execution/index.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
 import { LEGACY_INTERNAL_EVENT_CONTEXT_PREFIXES } from "../compat/legacy-names.js";
@@ -362,7 +362,14 @@ async function agentCommandInternal(
   let sessionEntry = prepared.sessionEntry;
   const laneRaw = typeof opts.lane === "string" ? opts.lane.trim() : "";
   const isSubagentLane = laneRaw === String(AGENT_LANE_SUBAGENT);
-  const commercialLease = createCommandExecutionLifecycle({runId, isSubagentLane, identity: opts.executionIdentity, entry: opts.governanceEntry});
+  // Command scene adapter: commercial admission + E2/E3/E6 ports stay on the
+  // authority adapter; stage order comes only from the controlled use-case.
+  const controlledExecution = createCommandExecutionLifecycle({runId, isSubagentLane, identity: opts.executionIdentity, entry: opts.governanceEntry});
+  if (controlledExecution.stages !== CONTROLLED_EXECUTION_STAGE_ORDER) {
+    throw new Error(
+      "Command host must consume the frozen controlled execution stage order",
+    );
+  }
   // Subagent runs take their own commercial slot (quota + concurrency).
   // Model allowlists for the child still come from the parent snapshot.
   let commercialGate: AgentCommandCommercialGateResult | undefined;
@@ -406,7 +413,7 @@ async function agentCommandInternal(
       }
     }
 
-    const executionPreparation = await commercialLease.prepare({ signal: opts.abortSignal, authorization: {
+    const executionPreparation = await controlledExecution.prepare({ signal: opts.abortSignal, authorization: {
       runId,
       sessionAgentId,
       gatewayClientUser: opts.gatewayClientUser,
@@ -414,14 +421,15 @@ async function agentCommandInternal(
       taskText: opts.message ?? body,
       ...(isSubagentLane ? { entry: "E6" as const } : opts.governanceEntry ? { entry: opts.governanceEntry } : {}),
     } });
-    commercialGate = executionPreparation.authorization;
-
-    if (commercialGate.status === "denied") {
+    if (executionPreparation.kind === "denied") {
+      commercialGate = executionPreparation.authorization;
       agentOutcomeSuccess = false;
       agentOutcomeFailureReason = "authz_denied";
-      agentOutcomeFailureDetail = commercialGate.message;
-      throw new Error(commercialGate.message);
+      agentOutcomeFailureDetail = executionPreparation.message;
+      // Denied preparation must not reach ACP/candidate backends.
+      throw new Error(executionPreparation.message);
     }
+    commercialGate = executionPreparation.authorization;
     if (acpResolution?.kind === "stale") {
       throw acpResolution.error;
     }
@@ -730,7 +738,7 @@ async function agentCommandInternal(
         model,
         runId,
       });
-      const fallbackResult = await commercialLease.infer({
+      const fallbackResult = await controlledExecution.infer({
         cfg,
         provider,
         model,
@@ -912,7 +920,7 @@ async function agentCommandInternal(
     throw err;
   } finally {
     try {
-      await commercialLease.dispose();
+      await controlledExecution.dispose();
     } finally {
       clearAgentRunContext(runId);
       await submitAgentOutcomeCloseout();
