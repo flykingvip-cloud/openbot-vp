@@ -724,7 +724,7 @@ describe("replay identity, numeric bounds, and governed adapter claim", () => {
     );
     expect(replay.ok).toBe(false);
     if (!replay.ok) {
-      expect(replay.commandReceipt).toBeUndefined();
+      expect(replay).not.toHaveProperty("commandReceipt");
       expect(replay.evidenceGap?.reason).toMatch(/mismatch|identity/);
     }
     store.close();

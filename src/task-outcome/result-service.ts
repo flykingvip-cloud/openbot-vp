@@ -401,7 +401,7 @@ export class TaskOutcomeResultService {
       expectedVersion,
       record,
       events,
-      ...(opts?.commandId
+      ...(opts?.commandId && requestDigest
         ? {
             commandLog: {
               commandId: opts.commandId,

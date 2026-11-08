@@ -82,7 +82,11 @@ export type ExecutorEvidenceContext = {
   collector?: string;
 };
 
-export type ActiveModelCall = ModelCallEvidence & { finished: boolean };
+export type ActiveModelCall = ModelCallEvidence & {
+  finished: boolean;
+  /** In-memory only. Stripped before the call file is published. */
+  storeRoot?: string;
+};
 
 const calls = new Map<string, ActiveModelCall>();
 const callStorage = new AsyncLocalStorage<ActiveModelCall>();

@@ -130,7 +130,7 @@ describe("CommandReceipt at the ResultService commit boundary", () => {
       storedOutcomeVersion: 1,
     });
     expect(second.commandConflict?.requestDigest).not.toBe(second.commandConflict?.storedDigest);
-    expect(second.commandReceipt).toBeUndefined();
+    expect(second).not.toHaveProperty("commandReceipt");
     expect(store.loadTask("task-conflict")?.outcomeVersion).toBe(1);
     const versions = fs
       .readdirSync(path.join(store.rootDir, "versions"))
@@ -211,7 +211,7 @@ describe("CommandReceipt at the ResultService commit boundary", () => {
       outcomeVersion: 1,
       commandId: "cmd-gap",
     });
-    expect(replay.commandReceipt).toBeUndefined();
+    expect(replay).not.toHaveProperty("commandReceipt");
     expect(store.loadTask("task-gap")?.outcomeVersion).not.toBe(1);
   });
 

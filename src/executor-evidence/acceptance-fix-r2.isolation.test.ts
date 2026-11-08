@@ -66,8 +66,7 @@ describe("R2 final receipt uses the real call from the four entries", () => {
     const cfg = agentCfg(agentDir);
     const taskId = "task-r2-final";
     const runId = "run-r2-final";
-    let link: Awaited<ReturnType<typeof chargeModelCallAgainstTip>>["modelCallLink"] = null;
-    await observeModelCandidate({
+    const link = await observeModelCandidate({
       context: {
         agentId: "bot",
         scope,
@@ -91,11 +90,13 @@ describe("R2 final receipt uses the real call from the four entries", () => {
           usage: fullUsage(1, 0),
           budgetLimits: { maxIterations: 8, maxCostUsd: 20, maxDurationMinutes: 30 },
         });
-        link = charged.modelCallLink;
-        return { meta: { agentMeta: { usage: fullUsage(1, 0) } } };
+        return charged.modelCallLink;
       },
     });
-    expect(link?.callId).toMatch(/^call_/);
+    if (!link) {
+      throw new Error("missing model call link");
+    }
+    expect(link.callId).toMatch(/^call_/);
     const closed = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId,
@@ -119,7 +120,7 @@ describe("R2 final receipt uses the real call from the four entries", () => {
         row.finalOutcomeVersion === closed.record.outcomeVersion && row.callId === link?.callId,
     );
     expect(rows.some((row) => row.completeness === "complete")).toBe(true);
-    expect(rows[0]?.chargeOutcomeVersion).toBe(link?.chargeOutcomeVersion);
+    expect(rows[0]?.chargeOutcomeVersion).toBe(link.chargeOutcomeVersion);
     expect(rows[0]?.chargeOutcomeVersion).not.toBe(rows[0]?.finalOutcomeVersion);
     expect(rows[0]?.candidateAttemptId).not.toBe(rows[0]?.taskAttemptId);
     const missing = await recordRunnerTurnOutcome(cfg, "bot", {

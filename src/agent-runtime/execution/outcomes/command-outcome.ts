@@ -6,6 +6,7 @@ import {
 } from "../../../task-outcome/runtime-from-runner.js";
 import type { Entrypoint, TrustedScope } from "../../../task-outcome/types.js";
 import type { CommandDeliveryReceipt } from "../../contracts/delivery.js";
+import type { CommandCandidateChargeState } from "../runner/command-budget.js";
 /** Execution outcome only; acceptance and delivery need separate evidence. */
 export function createCommandOutcomeCloseout(params: {
   config: OpenBotConfig;
@@ -20,6 +21,7 @@ export function createCommandOutcomeCloseout(params: {
     failureReason?: RunnerTurnFailureReason;
     failureDetail?: string;
     budgetCharged: boolean;
+    chargeState?: CommandCandidateChargeState;
     costUsd?: number;
     deliveryReceipt?: CommandDeliveryReceipt;
     modelCallLinks?: ModelCallCloseoutLink[];
@@ -34,10 +36,14 @@ export function createCommandOutcomeCloseout(params: {
       failureReason: agentOutcomeFailureReason,
       failureDetail: agentOutcomeFailureDetail,
       budgetCharged: tipBudgetChargedThisTurn,
+      chargeState,
       costUsd: tipBudgetCostUsd,
       deliveryReceipt,
       modelCallLinks,
     } = params.readContext();
+    const settledCharge = chargeState ?? (tipBudgetChargedThisTurn ? "committed" : "not_attempted");
+    const skipBudgetCharge = settledCharge !== "not_attempted";
+    const closeoutCostUsd = settledCharge === "not_attempted" ? tipBudgetCostUsd : undefined;
     if (agentOutcomeCloseoutDone || !params.entrypoint) {
       return;
     }
@@ -60,10 +66,8 @@ export function createCommandOutcomeCloseout(params: {
           ? { delivery: { status: deliveryReceipt.status }, deliveryId: deliveryReceipt.deliveryId }
           : {}),
         latencyMs: Math.max(0, Date.now() - params.startedAtMs),
-        ...(tipBudgetChargedThisTurn ? { skipBudgetCharge: true } : {}),
-        ...(!tipBudgetChargedThisTurn && tipBudgetCostUsd != null
-          ? { costUsd: tipBudgetCostUsd }
-          : {}),
+        ...(skipBudgetCharge ? { skipBudgetCharge: true } : {}),
+        ...(!skipBudgetCharge && closeoutCostUsd != null ? { costUsd: closeoutCostUsd } : {}),
         ...(success
           ? {}
           : {

@@ -457,7 +457,10 @@ export function createFollowupRunner(params: {
                   recordWarnings: (warnings) => {
                     bootstrapPromptWarningSignaturesSeen = warnings;
                   },
-                  recordUsage: (result, provider, model) => {
+                  recordUsage: (identity) => {
+                    if (identity.pricingSource !== "transport") {
+                      return;
+                    }
                     if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
                       followupBudgetCallSeq += 1;
                       const charged = chargeModelCallAgainstTip(
@@ -468,9 +471,9 @@ export function createFollowupRunner(params: {
                           scope: followupOutcomeScope,
                           runId,
                           callSeq: followupBudgetCallSeq,
-                          usage: result.meta?.agentMeta?.usage,
-                          provider,
-                          model,
+                          usage: identity.usage,
+                          provider: identity.transportProvider,
+                          model: identity.transportModel,
                           ...(parentTaskId
                             ? { parentTaskId, parentAgentId: queued.run.agentId }
                             : {}),

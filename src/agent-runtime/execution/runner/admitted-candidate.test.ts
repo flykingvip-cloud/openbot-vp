@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TaskBudgetExceededError } from "../../../task-outcome/runtime-from-runner.js";
 import {
   createAdmittedCandidateInvoker,
   type AdmittedCandidateHost,
@@ -86,6 +87,42 @@ describe("admitted candidate boundary", () => {
     expect(mocks.embedded).not.toHaveBeenCalled();
     expect(host.chargeTipBudgetAfterModelCall).toHaveBeenCalledTimes(1);
     expect(host.setBootstrapWarnings).toHaveBeenCalledTimes(1);
+  });
+  it("keeps one failed terminal when post-processing throws after the model response", async () => {
+    const { host, invoke } = setup();
+    const stages: string[] = [];
+    host.observeExecution = (stage) => {
+      stages.push(stage);
+    };
+    host.setBootstrapWarnings = () => {
+      throw new Error("bootstrap after model");
+    };
+    mocks.cli.mockResolvedValue({
+      payloads: [{ text: "result" }],
+      meta: { agentMeta: { usage: { input: 2, output: 3 } } },
+    });
+    await expect(invoke("codex-cli", "model-a")).rejects.toThrow("bootstrap after model");
+    expect(stages).toEqual(["started", "failed"]);
+    expect(host.chargeTipBudgetAfterModelCall).toHaveBeenCalledTimes(1);
+  });
+  it("keeps one failed terminal when the budget charge rejects the candidate", async () => {
+    const { host, invoke } = setup();
+    const stages: string[] = [];
+    host.observeExecution = (stage) => {
+      stages.push(stage);
+    };
+    host.chargeTipBudgetAfterModelCall = () => {
+      throw new TaskBudgetExceededError("task-a", { dimension: "cost", detail: "over" });
+    };
+    mocks.cli.mockResolvedValue({
+      payloads: [{ text: "result" }],
+      meta: { agentMeta: { usage: { input: 2, output: 3 } } },
+    });
+    await expect(invoke("codex-cli", "model-a")).rejects.toBeInstanceOf(TaskBudgetExceededError);
+    expect(stages).toEqual(["started", "failed"]);
+    expect(stages.filter((stage) => stage === "completed" || stage === "failed")).toEqual([
+      "failed",
+    ]);
   });
   it("preserves cancellation errors for the original fallback owner", async () => {
     const { host, invoke } = setup();

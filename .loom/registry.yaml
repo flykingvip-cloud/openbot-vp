@@ -11568,12 +11568,16 @@ landingStreams:
       - src/agent-runtime/model/authorized-session.ts
       - src/agent-runtime/execution/runner/admitted-turn.ts
       - src/agent-runtime/execution/runner/admitted-candidate.ts
+      - src/agent-runtime/execution/runner/admitted-candidate.test.ts
       - src/agent-runtime/execution/runner/command-budget.ts
+      - src/agent-runtime/execution/runner/command-budget.test.ts
       - src/agent-runtime/execution/runner/command-candidate.ts
       - src/agent-runtime/execution/runner/command-lifecycle.ts
       - src/agent-runtime/execution/runner/queued-candidate.ts
+      - src/agent-runtime/execution/runner/queued-candidate.pricing.test.ts
       - src/agent-runtime/execution/runner/scheduled-candidate.ts
       - src/agent-runtime/execution/outcomes/command-outcome.ts
+      - src/agent-runtime/execution/outcomes/command-outcome.test.ts
       - src/agent-runtime/execution/outcomes/turn-outcome.ts
       - src/agent-runtime/state/command-session.ts
       - src/commands/agent.ts

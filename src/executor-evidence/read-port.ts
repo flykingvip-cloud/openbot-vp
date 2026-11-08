@@ -127,7 +127,7 @@ function tokenFieldOk(value: unknown): boolean {
   return value === null || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0);
 }
 
-function finiteTimeOk(value: unknown): boolean {
+function finiteTimeOk(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 

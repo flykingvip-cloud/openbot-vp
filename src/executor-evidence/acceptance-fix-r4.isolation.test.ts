@@ -70,8 +70,7 @@ async function legalChain(label: string) {
   const taskId = `task-${label}`;
   const runId = `run-${label}`;
   const storeRoot = path.join(agentDir, "task-outcomes");
-  let link: ModelCallCloseoutLink | null = null;
-  await observeModelCandidate({
+  const link = await observeModelCandidate({
     context: {
       agentId: "bot",
       scope,
@@ -95,8 +94,7 @@ async function legalChain(label: string) {
         usage: fullUsage(1, 0),
         budgetLimits: { maxIterations: 8, maxCostUsd: 20, maxDurationMinutes: 30 },
       });
-      link = charged.modelCallLink;
-      return "ok";
+      return charged.modelCallLink;
     },
   });
   if (!link) {
@@ -311,7 +309,7 @@ describe("R4 commit and association identity", () => {
     );
     expect(replay.ok).toBe(false);
     if (!replay.ok) {
-      expect(replay.committedSpend).toBeUndefined();
+      expect(replay).not.toHaveProperty("committedSpend");
     }
   });
 });

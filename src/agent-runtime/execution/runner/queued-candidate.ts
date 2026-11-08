@@ -13,6 +13,17 @@ import { sessionTaskState } from "../../state/index.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";
 
+/** Catalog id selected for the queue, and the transport model that actually ran. */
+export type QueuedCandidateChargeIdentity = {
+  usage?: unknown;
+  catalogProvider: string;
+  catalogModel: string;
+  transportProvider: string;
+  transportModel: string;
+  /** Rates come from the transport model. The catalog id is not a price. */
+  pricingSource: "transport";
+};
+
 /** One queued provider candidate. The shared model session owns fallback and admission. */
 export async function runQueuedCandidate(
   input: {
@@ -31,7 +42,7 @@ export async function runQueuedCandidate(
     assertBudget: () => void;
     onCompaction: () => void;
     recordWarnings: (warnings: string[]) => void;
-    recordUsage: (result: EmbeddedPiRunResult, provider: string, model: string) => void;
+    recordUsage: (identity: QueuedCandidateChargeIdentity) => void;
   },
 ) {
   const { queued, provider, model, runId, modelGate, runOptions } = input;
@@ -53,7 +64,14 @@ export async function runQueuedCandidate(
       return;
     }
     charged = true;
-    host.recordUsage({ meta: { agentMeta: { usage } } } as EmbeddedPiRunResult, provider, model);
+    host.recordUsage({
+      usage,
+      catalogProvider: provider,
+      catalogModel: model,
+      transportProvider: embeddedProvider,
+      transportModel: embeddedModel,
+      pricingSource: "transport",
+    });
   };
   if (
     queued.run.taskCompletionBinding &&

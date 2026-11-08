@@ -72,6 +72,33 @@ it("reports persistence failure and retains the original at-most-once closeout",
   expect(log).toHaveBeenCalled();
   log.mockRestore();
 });
+it("does not guess a second spend when the command commit result is unknown", async () => {
+  const close = createCommandOutcomeCloseout({
+    config: {},
+    agentId: "agent",
+    runId: "run",
+    startedAtMs: Date.now(),
+    entrypoint: "cli",
+    readContext: () => ({
+      taskId: "task",
+      scope: {
+        kind: "personal",
+        personalDomainId: "domain",
+        subjectRef: "user",
+        authzScopeRef: "scope",
+      },
+      success: false,
+      failureReason: "run_failed",
+      budgetCharged: false,
+      chargeState: "attempted_unknown",
+      costUsd: 5,
+    }),
+  });
+  await close();
+  const outcome = vi.mocked(recordRunnerTurnOutcome).mock.calls[0]?.[2];
+  expect(outcome).toMatchObject({ skipBudgetCharge: true });
+  expect(outcome).not.toHaveProperty("costUsd");
+});
 it("persists failed delivery independently of successful execution", async () => {
   const close = createCommandOutcomeCloseout({
     config: {},

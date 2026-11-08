@@ -63,6 +63,26 @@ export type AdmittedCandidateHost = {
   getModelGate: () => EmployeeModelGateResult | undefined;
   identity: { user?: string; domain?: GatewayClient["sessionDomain"]; platformUserId?: string };
 };
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+type CandidateExecutionTerminal = "completed" | "failed" | "cancelled";
+
+/** Model-response observation is not an execution terminal. A candidate records at most one. */
+function createCandidateTerminal(host: AdmittedCandidateHost) {
+  let terminal: CandidateExecutionTerminal | null = null;
+  return {
+    finish(stage: CandidateExecutionTerminal) {
+      if (terminal) {
+        return;
+      }
+      terminal = stage;
+      host.observeExecution?.(stage);
+    },
+  };
+}
+
 export function createAdmittedCandidateInvoker(
   params: AgentTurnExecutionParams,
   runId: string,
@@ -103,6 +123,7 @@ export function createAdmittedCandidateInvoker(
         });
         let lifecycleTerminalEmitted = false;
         let notedCliUsage: unknown;
+        const executionTerminal = createCandidateTerminal(host);
         let cliCharged = false;
         const chargeCliOnce = (usage?: unknown) => {
           if (cliCharged) {
@@ -148,7 +169,6 @@ export function createAdmittedCandidateInvoker(
             credentialEnv,
           });
           notedCliUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
-          host.observeExecution?.("completed");
           host.setBootstrapWarnings(
             resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport),
           );
@@ -192,13 +212,14 @@ export function createAdmittedCandidateInvoker(
           }
 
           chargeCliOnce(notedCliUsage);
+          executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "completed");
 
           return result;
         } catch (err) {
-          if (!(err instanceof TaskBudgetExceededError)) {
+          if (!(err instanceof TaskBudgetExceededError) && !isAbortError(err)) {
             chargeCliOnce(usageRetainedForCandidateCharge(notedCliUsage, err));
           }
-          host.observeExecution?.(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
+          executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
           emitAgentEvent({
             runId,
             stream: "lifecycle",
@@ -307,6 +328,7 @@ export function createAdmittedCandidateInvoker(
       });
       let notedEmbeddedUsage: unknown;
       let embeddedCharged = false;
+      const executionTerminal = createCandidateTerminal(host);
       const chargeEmbeddedOnce = (usage?: unknown) => {
         if (embeddedCharged) {
           return;
@@ -403,11 +425,10 @@ export function createAdmittedCandidateInvoker(
               if (phase === "start") {
                 host.observeExecution?.("started");
               }
-              if (phase === "end") {
-                host.observeExecution?.("completed");
-              }
               if (phase === "error") {
-                host.observeExecution?.(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
+                executionTerminal.finish(
+                  params.opts?.abortSignal?.aborted ? "cancelled" : "failed",
+                );
               }
             }
             // Tool stream only. Does not write assistant text into the ledger.
@@ -531,15 +552,17 @@ export function createAdmittedCandidateInvoker(
         });
         emitModelStage("assistant_persisted", { source: "session_manager" });
         chargeEmbeddedOnce(notedEmbeddedUsage);
+        executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "completed");
         return result;
       } catch (err) {
         emitModelStage("model_finished", {
           modelMs: Date.now() - modelStartedAtMs,
           ok: false,
         });
-        if (!(err instanceof TaskBudgetExceededError)) {
+        if (!(err instanceof TaskBudgetExceededError) && !isAbortError(err)) {
           chargeEmbeddedOnce(usageRetainedForCandidateCharge(notedEmbeddedUsage, err));
         }
+        executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
         throw err;
       }
     })();

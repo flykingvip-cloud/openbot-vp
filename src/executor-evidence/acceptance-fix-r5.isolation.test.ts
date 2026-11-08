@@ -526,7 +526,7 @@ describe("R5 original receipt binding", () => {
       expect(second.code).toBe("command_conflict");
       expect(second.commandConflict?.reason).toBe("call_binding_conflict");
       expect(second.commandConflict?.storedCallBinding).toEqual(bindingA);
-      expect(second.commandReceipt).toBeUndefined();
+      expect(second).not.toHaveProperty("commandReceipt");
     }
   });
 });

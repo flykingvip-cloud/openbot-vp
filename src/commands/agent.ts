@@ -2,6 +2,7 @@ import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
 import { assertControlledExecutionStages, createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createCommandExecutionLifecycle, runCommandAcpTurn, type EmbeddedPiRunResult } from "../agent-runtime/execution/index.js";
+import { settleCommandBudgetForCloseout } from "../agent-runtime/execution/runner/command-budget.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
 import { LEGACY_INTERNAL_EVENT_CONTEXT_PREFIXES } from "../compat/legacy-names.js";
@@ -390,7 +391,7 @@ async function agentCommandInternal(
   const commandBudget = createCommandBudget({ config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, taskId: agentOutcomeTaskId, scope: agentOutcomeScope, parentTaskId: opts.parentTaskId, parentAgentId: opts.parentAgentId });
   const submitAgentOutcomeCloseout = createCommandOutcomeCloseout({
     config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, entrypoint: agentOutcomeEntrypoint,
-    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, costUsd: tipBudgetCostUsd, deliveryReceipt: commandDeliveryReceipt, modelCallLinks: commandBudget.modelCallLinks}),
+    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, chargeState: commandBudget.chargeState, costUsd: tipBudgetCostUsd, deliveryReceipt: commandDeliveryReceipt, modelCallLinks: commandBudget.modelCallLinks}),
   });
 
   try {
@@ -790,19 +791,24 @@ async function agentCommandInternal(
           }),
         }),
       });
-      tipBudgetChargedThisTurn = commandBudget.charged;
-      tipBudgetCostUsd = commandBudget.costUsd;
+      const settledBudget = settleCommandBudgetForCloseout(
+        commandBudget,
+        commandBudget.chargeState === "not_attempted"
+          ? {
+              costUsd: estimateTipBudgetCostUsdFromUsage({
+                usage: fallbackResult.result.meta?.agentMeta?.usage,
+                provider: fallbackResult.provider,
+                model: fallbackResult.result.meta?.agentMeta?.model ?? fallbackResult.model,
+                config: cfg,
+              }),
+            }
+          : undefined,
+      );
+      tipBudgetChargedThisTurn = settledBudget.budgetCharged;
+      tipBudgetCostUsd = settledBudget.costUsd;
       result = fallbackResult.result;
       fallbackProvider = fallbackResult.provider;
       fallbackModel = fallbackResult.model;
-      if (!tipBudgetChargedThisTurn) {
-        tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
-          usage: result.meta?.agentMeta?.usage,
-          provider: fallbackProvider,
-          model: result.meta?.agentMeta?.model ?? fallbackModel,
-          config: cfg,
-        });
-      }
       // Enterprise credit usage. Subagent runs record against the slot they acquired.
       await recordAgentCommandCreditUsage({
         gate: commercialGate,
@@ -900,8 +906,14 @@ async function agentCommandInternal(
       payloads,
     });
   } catch (err) {
-    tipBudgetChargedThisTurn ||= commandBudget.charged;
-    tipBudgetCostUsd ??= commandBudget.costUsd;
+    const settledBudget = settleCommandBudgetForCloseout(commandBudget);
+    if (settledBudget.chargeState === "attempted_unknown" || err instanceof TaskBudgetExceededError) {
+      tipBudgetChargedThisTurn = true;
+      tipBudgetCostUsd = undefined;
+    } else {
+      tipBudgetChargedThisTurn = tipBudgetChargedThisTurn || settledBudget.budgetCharged;
+      tipBudgetCostUsd = tipBudgetCostUsd ?? settledBudget.costUsd;
+    }
     if (agentOutcomeSuccess === undefined) {
       agentOutcomeSuccess = false;
       const msg = String(err);

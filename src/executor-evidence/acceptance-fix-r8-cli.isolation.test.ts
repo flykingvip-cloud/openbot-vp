@@ -52,7 +52,7 @@ beforeEach(() => {
   vi.spyOn(configModule, "readConfigFileSnapshotForWrite").mockResolvedValue({
     snapshot: { valid: false, resolved: {} as never },
     writeOptions: {},
-  } as Awaited<ReturnType<typeof configModule.readConfigFileSnapshotForWrite>>);
+  } as unknown as Awaited<ReturnType<typeof configModule.readConfigFileSnapshotForWrite>>);
   vi.spyOn(scopeModule, "resolveAgentRunEntitlementScope").mockResolvedValue({
     tenantId: "tenant-a",
     employeeId: "emp-1",
@@ -142,7 +142,7 @@ describe("R8 CLI entry keeps usage after post-processing failure", () => {
   });
 
   it("keeps usage when the session-expired retry fails while saving the session", async () => {
-    vi.spyOn(usageAttribution, "recordCliBackendUsage").mockImplementation(() => undefined);
+    vi.spyOn(usageAttribution, "recordCliBackendUsage").mockResolvedValue(undefined);
     process.env.OPENBOT_TEST_CLI_PERSIST_THROW = "1";
     vi.spyOn(cliRun, "runCliAgent")
       .mockRejectedValueOnce(
