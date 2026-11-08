@@ -1,6 +1,7 @@
 /** Shared model-context projection and compilation. Source I/O remains host owned. */
 export {
   assembleIndividual,
+  assembleCollaborationMember,
   selectSystemContextParts,
   appendSystemContextPart,
   finalizeSystemContext,

@@ -1395,3 +1395,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved individual initial material allowlist and fixed ordering into a data-only context catalog. The production reply host supplies named, already-rendered values; unknown material (including empty group material) is rejected. Source reads, learning exposure, late event consumption and collaboration assembly remain with existing owners; no model call or task mutation is introduced. — codex-runtime-manager
 - Assembly/production-context regression 3 files / 21 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. Scoped attribution follows the previously authorized transfer while preserving predecessor history. Collaboration material catalog and late-material lifecycle remain open. — codex-runtime-manager
+
+## Collaboration context material catalog (2026-11-08)
+
+- Moved established collaboration material allowlist and order to a data-only context catalog. Existing host retains profile/knowledge/identity reads and delivery-side-effect updates, passing named rendered material to shared assembly. Original order, blanks and duplicate text behavior remain; no second classifier, scheduler or model invocation. — codex-runtime-manager
+- Assembly/reply/collaboration delivery regression 5 files / 33 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. Initial personal/collaboration catalogs now have production consumers; common late materials and complete source lifecycle remain open. This is not final collaboration real-model acceptance. — codex-runtime-manager

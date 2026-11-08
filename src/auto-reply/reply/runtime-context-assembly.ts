@@ -7,6 +7,7 @@ export {
   isCollaborationGroupRuntimeSession,
   resolveCollaborationGroupIdForRun,
 } from "../../agent-runtime/command/index.js";
+import { assembleCollaborationMember } from "../../agent-runtime/context/index.js";
 import { renderCollaborationMission } from "../../agent-runtime/context/sources/collaboration-mission.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
@@ -222,17 +223,17 @@ export async function assembleCollaborationRuntimeContextParts(
       : { ...params.sessionCtx, ThreadStarterBody: undefined },
   );
 
-  return [
-    operationalIdentityPrompt,
-    groupCharterPrompt,
-    groupMissionPrompt,
-    deliveryExecPrompt,
-    operatingPhasePrompt,
-    groupChatContext,
+  return assembleCollaborationMember({
+    operationalIdentity: operationalIdentityPrompt,
+    charter: groupCharterPrompt,
+    mission: groupMissionPrompt,
+    delivery: deliveryExecPrompt,
+    phase: operatingPhasePrompt,
+    groupContext: groupChatContext,
     groupIntro,
-    sessionContinuityPrompt,
-    collaborationCapabilityPrompt,
+    continuity: sessionContinuityPrompt,
+    capabilities: collaborationCapabilityPrompt,
     groupSystemPrompt,
-    inboundMetaPrompt,
-  ].filter((entry): entry is string => Boolean(entry?.trim()));
+    inboundMetadata: inboundMetaPrompt,
+  });
 }

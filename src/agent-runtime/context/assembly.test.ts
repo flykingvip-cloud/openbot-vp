@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assembleIndividual,
+  assembleCollaborationMember,
   appendSystemContextPart,
   finalizeSystemContext,
   selectSystemContextParts,
@@ -15,6 +16,19 @@ it("orders individual material without changing source bytes or reading sources"
 it("rejects collaboration and unknown material in individual context", () => {
   expect(() => assembleIndividual({ groupSystemPrompt: "" } as never)).toThrow(/not allowed/);
   expect(() => assembleIndividual({ unexpected: "instructions" } as never)).toThrow(/not allowed/);
+});
+
+it("preserves collaboration material order, duplicate text and source bytes", () => {
+  expect(
+    assembleCollaborationMember({
+      inboundMetadata: "last",
+      mission: "same",
+      operationalIdentity: "  first  ",
+      charter: "same",
+      groupIntro: " ",
+    }),
+  ).toEqual(["  first  ", "same", "same", "last"]);
+  expect(() => assembleCollaborationMember({ unknown: "" } as never)).toThrow(/not allowed/);
 });
 
 describe("system context assembly compatibility", () => {
