@@ -1415,3 +1415,7 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced automatic continuation cap disappearing after runtime-local reset (one failing regression). Continuation reservations now persist on the scoped task under the existing board lock; policy owns the unchanged three-per-15-minute limit. Removed process-local continuation authority; existing timer and queue remain the only dispatch path. Concurrent reservation revalidates task/focus/pause/tombstone before writing. — codex-runtime-manager
 - Continuation/followup regression 2 files / 48 PASS, including a separate Node process reading and enforcing the persisted cap; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. This proves durable limiting, not restart rescheduling, background process reattachment or complete asynchronous recovery. — codex-runtime-manager
+
+## Continuation reservation concurrency evidence (2026-11-08)
+
+- Two independent Node processes competed for the last available continuation reservation: exactly one accepted and one refused with continue_cap. Another session carrying the same taskId remained eligible, proving the cap is session/task scoped. Continuation suite 17 PASS; full tsgo PASS; changed-file typed lint clean. No production restart or deployment; restart rescheduling remains open. — codex-runtime-manager

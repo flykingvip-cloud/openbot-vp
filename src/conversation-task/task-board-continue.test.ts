@@ -66,6 +66,41 @@ describe("isExplicitHumanGateWait", () => {
 });
 
 describe("decideTaskBoardContinue", () => {
+  it("shares the last continuation reservation across processes without leaking into another session", async () => {
+    const sessionFile = tempSessionFile();
+    const otherSessionFile = tempSessionFile();
+    const board = unfinishedBoard("shared-task-id");
+    board.current!.continuationWakeAtMs = [3_000_000, 3_000_001];
+    seedSessionTaskBoard(sessionFile, board);
+    seedSessionTaskBoard(otherSessionFile, unfinishedBoard("shared-task-id"));
+    try {
+      const moduleUrl = new URL("../agent-runtime/state/continuation-ticket.ts", import.meta.url)
+        .href;
+      const input = { sessionFile, taskId: "shared-task-id", focusRevision: 1, nowMs: 3_000_010 };
+      const code = `import { reserveTaskContinuation } from ${JSON.stringify(moduleUrl)}; console.log(JSON.stringify(reserveTaskContinuation(${JSON.stringify(input)})));`;
+      const run = () =>
+        promisify(execFile)(
+          process.execPath,
+          ["--import", "tsx", "--input-type=module", "--eval", code],
+          { timeout: 30000 },
+        );
+      const results = await Promise.all([run(), run()]);
+      const decisions = results.map(({ stdout }) => JSON.parse(stdout.trim().split("\n").at(-1)!));
+      expect(decisions.filter((decision) => decision.ok)).toHaveLength(1);
+      expect(decisions.filter((decision) => decision.reason === "continue_cap")).toHaveLength(1);
+      expect(
+        decideTaskBoardContinue({
+          sessionFile: otherSessionFile,
+          assistantText: "still working",
+          nowMs: 3_000_011,
+        }).action,
+      ).toBe("schedule");
+    } finally {
+      fs.rmSync(`${sessionFile}.task-board.json`, { force: true });
+      fs.rmSync(`${otherSessionFile}.task-board.json`, { force: true });
+    }
+  });
+
   it("retains the continuation cap after runtime-local state is reset", async () => {
     const sessionFile = tempSessionFile();
     seedSessionTaskBoard(sessionFile, unfinishedBoard("task-durable-cap"));
