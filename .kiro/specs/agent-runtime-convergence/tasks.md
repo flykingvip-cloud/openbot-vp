@@ -1589,7 +1589,7 @@ Also: auxiliary governance 3 PASS; slug wiring 1 PASS; memory governance 8 PASS;
 
 ## Package 2 P2-D5 evidence pack — stop for acceptance (2026-11-08)
 
-**Final HEAD for Package 2 independent acceptance:** `529eaa1fe12bc133b31971f22de2100bfb5b6cef`  
+**Final HEAD for Package 2 independent acceptance:** `037f5aa6d4c4214a6012aa605d2480a5b41e86e2`  
 **Baseline (Package 1 PASSED):** `71a266e32fbc56f2f960cc5c8e444499c04edb52`  
 **Package 3 not started.** No push / merge / deploy / production restart.
 
