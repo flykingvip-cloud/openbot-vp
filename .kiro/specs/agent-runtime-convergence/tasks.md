@@ -1766,5 +1766,5 @@ Preserved: production `ensureAsyncWaitRecoveryFollowupConsumer` → `createFollo
 
 Typed oxlint on changed sources: 0 warnings / 0 errors.
 
-**Remelt tip for re-acceptance:** `TIP_PLACEHOLDER` (4-defect close). Prior failed tip `efe0e2ce9` retained above. — grok-bot
+**Remelt tip for re-acceptance:** `378a65402` (4-defect close). Prior failed tip `efe0e2ce9` retained above. — grok-bot
 
