@@ -1,3 +1,8 @@
+import type { readExecutorTechnicalEvidence } from "../../../../src/observation/executor-technical-evidence.js";
+type TechnicalEvidence = Extract<
+  ReturnType<typeof readExecutorTechnicalEvidence>,
+  { ok: true }
+>["technicalEvidence"];
 import type { projectExecutionEvidence } from "../../../../src/observation/execution-projection.js";
 import type { assembleObservationSamples } from "../../../../src/observation/sample-assembler.js";
 export type EvidenceProjection = Omit<
@@ -5,6 +10,7 @@ export type EvidenceProjection = Omit<
   "evidenceLookupWindow"
 > & {
   evidenceLookupWindow?: ReturnType<typeof assembleObservationSamples>["evidenceLookupWindow"];
+  executorTechnicalEvidence?: TechnicalEvidence;
   executionSource?: ReturnType<typeof projectExecutionEvidence>["executionSource"];
 };
 export function evidenceModel(projection: EvidenceProjection | null) {
@@ -13,6 +19,7 @@ export function evidenceModel(projection: EvidenceProjection | null) {
   const data = supported ? projection : null;
   return {
     samples: data?.samples ?? [],
+    technical: data?.executorTechnicalEvidence ?? null,
     executionSource: data?.executionSource ?? null,
     projectedAt: data?.projectedAt ?? null,
     watermark: data?.sourceWatermark ?? null,
