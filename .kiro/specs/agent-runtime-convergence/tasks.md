@@ -2041,4 +2041,4 @@ Do **not** expand architecture to close these. Stub/unit ≠ runtime final pass.
 
 **Closure:** source-code migration phase (Packages 1–6) **closable** after these doc corrections. Runtime final acceptance remains separate — **no merge/deploy/restart** and **no claim** of full executor retirement or deploy readiness until that checklist closes.
 
-**Remelt tip for Package6 acceptance:** `1dcc5ba7e7e091012f44cde7774f95bd3a9f607f` (same-SHA acceptance pack; zero src fixes). Prior Package5 tip `a1b14f80c` retained. Independent-review doc corrections tip filled after commit. — grok-bot
+**Remelt tip for Package6 acceptance:** `f22898eeb14797e85f330d3dbbbedc222fd7fba4` (conditional PASS doc corrections after independent review; zero src fixes). Freeze source `a1b14f80c`; prior evidence pack `1dcc5ba7e`. — grok-bot
