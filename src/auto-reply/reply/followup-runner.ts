@@ -52,7 +52,9 @@ import {
   chargeModelCallAgainstTip,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  runnerExecutorEvidenceContext,
   TaskBudgetExceededError,
+  type ModelCallCloseoutLink,
 } from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
@@ -290,6 +292,7 @@ export function createFollowupRunner(params: {
     let tipBudgetCostUsd: number | undefined;
     let followupBudgetCharged = false;
     let followupBudgetCallSeq = 0;
+    const modelCallLinks: ModelCallCloseoutLink[] = [];
     let parentTaskId: string | undefined;
     const submitFollowupOutcomeCloseout = async (overrides?: {
       success?: boolean;
@@ -335,6 +338,7 @@ export function createFollowupRunner(params: {
             ? { failureReason, ...(failureDetail ? { failureDetail } : {}) }
             : {}),
           ...(followupCapabilityOutcome ? { capabilityOutcome: followupCapabilityOutcome } : {}),
+          ...(modelCallLinks.length > 0 ? { modelCallLinks } : {}),
         });
       } catch (err) {
         logVerbose(`followup unified recordRunnerTurnOutcome failed: ${String(err)}`);
@@ -491,6 +495,11 @@ export function createFollowupRunner(params: {
             taskText: queued.prompt,
             signal: opts?.abortSignal,
             agentDir: queued.run.agentDir,
+            executorEvidence: runnerExecutorEvidenceContext(queued.run.config, queued.run.agentId, {
+              taskId: followupOutcomeTaskId,
+              scope: followupOutcomeScope,
+              runId,
+            }),
             fallbacksOverride: resolveRunModelFallbacksOverride({
               cfg: queued.run.config,
               agentId: queued.run.agentId,
@@ -528,7 +537,10 @@ export function createFollowupRunner(params: {
                   recordWarnings: (warnings) => {
                     bootstrapPromptWarningSignaturesSeen = warnings;
                   },
-                  recordUsage: (result, provider, model) => {
+                  recordUsage: (identity) => {
+                    if (identity.pricingSource !== "transport") {
+                      return;
+                    }
                     if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
                       followupBudgetCallSeq += 1;
                       const charged = chargeModelCallAgainstTip(
@@ -539,15 +551,18 @@ export function createFollowupRunner(params: {
                           scope: followupOutcomeScope,
                           runId,
                           callSeq: followupBudgetCallSeq,
-                          usage: result.meta?.agentMeta?.usage,
-                          provider,
-                          model,
+                          usage: identity.usage,
+                          provider: identity.transportProvider,
+                          model: identity.transportModel,
                           ...(parentTaskId
                             ? { parentTaskId, parentAgentId: queued.run.agentId }
                             : {}),
                         },
                       );
                       followupBudgetCharged = true;
+                      if (charged.modelCallLink) {
+                        modelCallLinks.push(charged.modelCallLink);
+                      }
                       if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
                         tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
                       }
