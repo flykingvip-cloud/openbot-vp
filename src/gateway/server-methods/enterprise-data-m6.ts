@@ -38,6 +38,7 @@ import { resolveDataSourceHealthRows } from "../enterprise-data/dashboard-source
 import { resolveDataCapabilityDashboardSummary } from "../enterprise-data/dashboard-summary-store.js";
 import { recordSourceConnectionCheck } from "../enterprise-data/data-asset-linkage.js";
 import { findDataSource } from "../enterprise-data/data-source-store.js";
+import { supplyDefaultDataProductsSafely } from "../enterprise-data/default-data-product-supply.js";
 import { requireResolvedEnterpriseAdminTenantId } from "../enterprise-data/enterprise-data-seat-context.js";
 import { listKnowledgeSupplyAuditEvents } from "../enterprise-data/knowledge-supply-audit-store.js";
 import { resolveOrgTargets } from "../enterprise-data/org-targets-store.js";
@@ -50,6 +51,7 @@ import type { EnterpriseDataStore, HttpRestAuthScheme } from "../enterprise-data
 import {
   listConnectorSyncLogEntries,
   syncYonyouTplusSource,
+  yonyouTplusStreamActionKey,
 } from "../enterprise-data/yonyou-tplus-sync.js";
 import { listTenantSeats, loadEnterpriseSeatAssetsStore } from "../enterprise-seat-assets-store.js";
 import { resolveConnectorOAuthSessionStorePathForTenantId } from "../tenant-context.js";
@@ -320,7 +322,7 @@ export function createEnterpriseDataM6Handlers(
                 : undefined,
           });
           if (!sourceId) {
-            return { probe, observation: undefined };
+            return { probe, supply: undefined, observation: undefined };
           }
           const source = findDataSource(store, tenantId, sourceId);
           if (!source || source.connectorId.toLowerCase() !== probe.connectorId.toLowerCase()) {
@@ -335,8 +337,17 @@ export function createEnterpriseDataM6Handlers(
             sourceId,
             nowIso: checkedAt,
           });
+          const supply = probe.ok
+            ? await supplyDefaultDataProductsSafely({
+                store,
+                tenantId,
+                sourceId,
+                nowIso: checkedAt,
+              })
+            : undefined;
           return {
             probe,
+            supply,
             observation: {
               lastCheckedAt: source.lastCheckedAt,
               lastSucceededAt: source.lastSucceededAt,
@@ -346,7 +357,12 @@ export function createEnterpriseDataM6Handlers(
             },
           };
         });
-        respond(true, { tenantId, probe: probed.probe, observation: probed.observation });
+        respond(true, {
+          tenantId,
+          probe: probed.probe,
+          observation: probed.observation,
+          ...(probed.supply ? { supply: probed.supply } : {}),
+        });
       } catch (error) {
         respondUnavailable(respond, error);
       }
@@ -593,10 +609,25 @@ export function createEnterpriseDataM6Handlers(
             throw new Error("DataSource not found.");
           }
           const result = await syncYonyouTplusSource({ store, tenantId, sourceId });
+          const actionKeys = result.streams
+            .filter((stream) => stream.status === "success" || stream.status === "warning")
+            .map((stream) => yonyouTplusStreamActionKey(stream.streamKey))
+            .filter((actionKey): actionKey is string => Boolean(actionKey));
+          const supply =
+            actionKeys.length > 0
+              ? await supplyDefaultDataProductsSafely({
+                  store,
+                  tenantId,
+                  sourceId,
+                  nowIso: new Date().toISOString(),
+                  actionKeys,
+                })
+              : undefined;
           return {
             status: result.status,
             summary: result.summary,
             streams: result.streams,
+            ...(supply ? { supply } : {}),
             observation: {
               lastCheckedAt: source.lastCheckedAt,
               lastSucceededAt: source.lastSucceededAt,

@@ -1,13 +1,19 @@
+import { CONNECTOR_DEFAULT_PRODUCT_ACTOR } from "../../enterprise-data/connector-default-product-marker.js";
+import { findDataCapability } from "../../enterprise-data/data-capability-store.js";
 import { listEnterpriseKnowledgeProjectionBindings } from "../../enterprise-data/enterprise-knowledge-projection-binding-store.js";
 import { listKnowledgeFeedItems } from "../../enterprise-data/knowledge-feed-item-store.js";
 import { listKnowledgeLineageRecords } from "../../enterprise-data/knowledge-lineage-store.js";
+import { findEnterpriseKnowledgeProjectionSpec } from "../../enterprise-data/projection-spec-store.js";
+import { listSeatActionGrants } from "../../enterprise-data/seat-action-grant-store.js";
 import type {
   EnterpriseDataStore,
   EnterpriseKnowledgeObjectFeedItem,
   EnterpriseKnowledgeProjectionBinding,
   EnterpriseKnowledgeProjectionSpec,
+  SeatActionGrant,
 } from "../../enterprise-data/types.js";
 import { applyKnowledgeCompliance } from "../governance/compliance.js";
+import { resolveCapabilityAccessForKnowledge } from "../sources/capability-access-resolver.js";
 import type { KnowledgeSourceContext } from "../sources/types.js";
 import type { KnowledgeObject, KnowledgeObjectKind } from "../types.js";
 import type { KnowledgeFeedItem } from "./types.js";
@@ -441,6 +447,47 @@ export function knowledgeObjectFromFeedItem(feedItem: KnowledgeFeedItem): Knowle
   });
 }
 
+/**
+ * Pack-generated products stay unread until the seat is authorized.
+ * Other feed rows keep the existing visibility-policy rule.
+ */
+function autoSuppliedProductGranted(params: {
+  store: EnterpriseDataStore;
+  tenantId: string;
+  projectionId: string;
+  context: KnowledgeSourceContext;
+  grants: SeatActionGrant[];
+}): boolean {
+  const spec = findEnterpriseKnowledgeProjectionSpec(
+    params.store,
+    params.tenantId,
+    params.projectionId,
+  );
+  if (!spec || spec.createdBy !== CONNECTOR_DEFAULT_PRODUCT_ACTOR || !spec.capabilityId) {
+    return true;
+  }
+  if (!params.context.seatId) {
+    return false;
+  }
+  const capability = findDataCapability(params.store, params.tenantId, spec.capabilityId);
+  if (!capability?.enabled) {
+    return false;
+  }
+  return (
+    resolveCapabilityAccessForKnowledge({
+      store: params.store,
+      capability,
+      context: {
+        tenantId: params.tenantId,
+        seatId: params.context.seatId,
+        departmentId: params.context.departmentId,
+        roleCode: params.context.roleCode,
+      },
+      grants: params.grants,
+    }) === "granted"
+  );
+}
+
 export function loadEnterpriseKnowledgeFeed(params: {
   store: EnterpriseDataStore;
   context: KnowledgeSourceContext;
@@ -459,6 +506,13 @@ export function loadEnterpriseKnowledgeFeed(params: {
     enabled: true,
   });
   const feedRecords = listKnowledgeFeedItems({ store: params.store, tenantId });
+  const grants = params.context.seatId
+    ? listSeatActionGrants({
+        store: params.store,
+        tenantId,
+        seatId: params.context.seatId,
+      })
+    : [];
 
   const feedItems: KnowledgeFeedItem[] = [];
   const accessible: KnowledgeObject[] = [];
@@ -473,10 +527,18 @@ export function loadEnterpriseKnowledgeFeed(params: {
       visibilityPolicyId: binding?.visibilityPolicyId,
       context: params.context,
     });
+    const granted = autoSuppliedProductGranted({
+      store: params.store,
+      tenantId,
+      projectionId: record.projectionId,
+      context: params.context,
+      grants,
+    });
+    const visible = visibility.visible && granted;
     const feedItem = adaptEnterpriseFeedRecord({
       item: record,
       binding,
-      accessState: visibility.accessState,
+      accessState: visible ? visibility.accessState : "restricted",
       lineageId: resolveLineageIdForFeedRecord({
         store: params.store,
         tenantId,
@@ -485,7 +547,7 @@ export function loadEnterpriseKnowledgeFeed(params: {
     });
     feedItems.push(feedItem);
     const object = knowledgeObjectFromFeedItem(feedItem);
-    if (visibility.visible) {
+    if (visible) {
       accessible.push(object);
     } else {
       restricted.push(object);
