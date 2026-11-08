@@ -4,6 +4,11 @@ import type { FollowupRun } from "../../../auto-reply/reply/queue.js";
 import { resolveEnterpriseEmbeddedTransport } from "../../../gateway/enterprise-model/embedded-transport.js";
 import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
 import type { EmployeeModelGateResult } from "../../../gateway/model-entitlement/employee-model-gate.js";
+import {
+  rememberModelResultUsage,
+  TaskBudgetExceededError,
+  usageRetainedForCandidateCharge,
+} from "../../../task-outcome/runtime-from-runner.js";
 import { sessionTaskState } from "../../state/index.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";
@@ -42,89 +47,115 @@ export async function runQueuedCandidate(
   const providerAuthOverride = transport.providerAuthOverride;
   const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
   host.assertBudget();
+  let charged = false;
+  const chargeOnce = (usage?: unknown) => {
+    if (charged) {
+      return;
+    }
+    charged = true;
+    host.recordUsage({ meta: { agentMeta: { usage } } } as EmbeddedPiRunResult, provider, model);
+  };
   if (
     queued.run.taskCompletionBinding &&
     !sessionTaskState.bindingCurrent(queued.run.sessionFile, queued.run.taskCompletionBinding)
   ) {
     throw new Error("Queued task was paused, closed or replaced before provider startup");
   }
-  const result = await runEmbeddedPiAgent({
-    sessionId: queued.run.sessionId,
-    abortSignal: input.abortSignal,
-    taskExecutionBinding: queued.run.taskCompletionBinding,
-    sessionKey: queued.run.sessionKey,
-    agentId: queued.run.agentId,
-    trigger: "user",
-    messageChannel: queued.originatingChannel ?? undefined,
-    messageProvider: queued.run.messageProvider,
-    agentAccountId: queued.run.agentAccountId,
-    messageTo: queued.originatingTo,
-    messageThreadId: queued.originatingThreadId,
-    currentChannelId: queued.originatingTo,
-    currentThreadTs:
-      queued.originatingThreadId != null ? String(queued.originatingThreadId) : undefined,
-    groupId: queued.run.groupId,
-    groupChannel: queued.run.groupChannel,
-    groupSpace: queued.run.groupSpace,
-    senderId: queued.run.senderId,
-    senderName: queued.run.senderName,
-    senderUsername: queued.run.senderUsername,
-    senderE164: queued.run.senderE164,
-    senderIsOwner: queued.run.senderIsOwner,
-    ...inheritExecutionIdentityRunFields(queued.run),
-    sessionFile: queued.run.sessionFile,
-    agentDir: queued.run.agentDir,
-    workspaceDir: queued.run.workspaceDir,
-    config: queued.run.config,
-    skillsSnapshot: queued.run.skillsSnapshot,
-    prompt: input.modelPrompt ?? queued.prompt,
-    extraSystemPrompt: queued.run.extraSystemPrompt,
-    ...(queued.run.disableTools ? { disableTools: true } : {}),
-    ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
-    ...(queued.run.inboundToolCeiling ? { inboundToolCeiling: queued.run.inboundToolCeiling } : {}),
-    ...(queued.run.contextLane ? { contextLane: queued.run.contextLane } : {}),
-    ...(queued.run.sessionEntry ? { sessionEntry: queued.run.sessionEntry } : {}),
-    ...(queued.run.oguiDecisionRun ? { oguiDecisionRun: queued.run.oguiDecisionRun } : {}),
-    ...(queued.run.knowledgeConsumeRefs?.length
-      ? { knowledgeConsumeRefs: queued.run.knowledgeConsumeRefs }
-      : {}),
-    ...(queued.run.skipUserTranscriptPersist === true ? { skipUserTranscriptPersist: true } : {}),
-    ...(queued.run.collaborationRoundInvoked === true ? { collaborationRoundInvoked: true } : {}),
-    ...(queued.run.deliveryToolSideEffect
-      ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
-      : {}),
-    ...(queued.run.privateRunBag ? { privateRunBag: queued.run.privateRunBag } : {}),
-    ownerNumbers: queued.run.ownerNumbers,
-    enforceFinalTag: queued.run.enforceFinalTag,
-    provider: embeddedProvider,
-    model: embeddedModel,
-    ...(providerAuthOverride ? { providerAuthOverride } : {}),
-    ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
-    ...authProfile,
-    thinkLevel: queued.run.thinkLevel,
-    verboseLevel: queued.run.verboseLevel,
-    reasoningLevel: queued.run.reasoningLevel,
-    suppressToolErrorWarnings: input.suppressToolErrorWarnings,
-    execOverrides: queued.run.execOverrides,
-    bashElevated: queued.run.bashElevated,
-    timeoutMs: queued.run.timeoutMs,
-    runId,
-    allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
-    blockReplyBreak: queued.run.blockReplyBreak,
-    bootstrapPromptWarningSignaturesSeen,
-    bootstrapPromptWarningSignature:
-      bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1],
-    onAgentEvent: (evt) => {
-      if (evt.stream !== "compaction") {
-        return;
+  let notedUsage: unknown;
+  let result: EmbeddedPiRunResult;
+  try {
+    result = await runEmbeddedPiAgent({
+      sessionId: queued.run.sessionId,
+      abortSignal: input.abortSignal,
+      taskExecutionBinding: queued.run.taskCompletionBinding,
+      sessionKey: queued.run.sessionKey,
+      agentId: queued.run.agentId,
+      trigger: "user",
+      messageChannel: queued.originatingChannel ?? undefined,
+      messageProvider: queued.run.messageProvider,
+      agentAccountId: queued.run.agentAccountId,
+      messageTo: queued.originatingTo,
+      messageThreadId: queued.originatingThreadId,
+      currentChannelId: queued.originatingTo,
+      currentThreadTs:
+        queued.originatingThreadId != null ? String(queued.originatingThreadId) : undefined,
+      groupId: queued.run.groupId,
+      groupChannel: queued.run.groupChannel,
+      groupSpace: queued.run.groupSpace,
+      senderId: queued.run.senderId,
+      senderName: queued.run.senderName,
+      senderUsername: queued.run.senderUsername,
+      senderE164: queued.run.senderE164,
+      senderIsOwner: queued.run.senderIsOwner,
+      ...inheritExecutionIdentityRunFields(queued.run),
+      sessionFile: queued.run.sessionFile,
+      agentDir: queued.run.agentDir,
+      workspaceDir: queued.run.workspaceDir,
+      config: queued.run.config,
+      skillsSnapshot: queued.run.skillsSnapshot,
+      prompt: input.modelPrompt ?? queued.prompt,
+      extraSystemPrompt: queued.run.extraSystemPrompt,
+      ...(queued.run.disableTools ? { disableTools: true } : {}),
+      ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
+      ...(queued.run.inboundToolCeiling
+        ? { inboundToolCeiling: queued.run.inboundToolCeiling }
+        : {}),
+      ...(queued.run.contextLane ? { contextLane: queued.run.contextLane } : {}),
+      ...(queued.run.sessionEntry ? { sessionEntry: queued.run.sessionEntry } : {}),
+      ...(queued.run.oguiDecisionRun ? { oguiDecisionRun: queued.run.oguiDecisionRun } : {}),
+      ...(queued.run.knowledgeConsumeRefs?.length
+        ? { knowledgeConsumeRefs: queued.run.knowledgeConsumeRefs }
+        : {}),
+      ...(queued.run.skipUserTranscriptPersist === true ? { skipUserTranscriptPersist: true } : {}),
+      ...(queued.run.collaborationRoundInvoked === true ? { collaborationRoundInvoked: true } : {}),
+      ...(queued.run.deliveryToolSideEffect
+        ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
+        : {}),
+      ...(queued.run.privateRunBag ? { privateRunBag: queued.run.privateRunBag } : {}),
+      ownerNumbers: queued.run.ownerNumbers,
+      enforceFinalTag: queued.run.enforceFinalTag,
+      provider: embeddedProvider,
+      model: embeddedModel,
+      ...(providerAuthOverride ? { providerAuthOverride } : {}),
+      ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
+      ...authProfile,
+      thinkLevel: queued.run.thinkLevel,
+      verboseLevel: queued.run.verboseLevel,
+      reasoningLevel: queued.run.reasoningLevel,
+      suppressToolErrorWarnings: input.suppressToolErrorWarnings,
+      execOverrides: queued.run.execOverrides,
+      bashElevated: queued.run.bashElevated,
+      timeoutMs: queued.run.timeoutMs,
+      runId,
+      allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
+      blockReplyBreak: queued.run.blockReplyBreak,
+      bootstrapPromptWarningSignaturesSeen,
+      bootstrapPromptWarningSignature:
+        bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1],
+      onAgentEvent: (evt) => {
+        if (evt.stream !== "compaction") {
+          return;
+        }
+        const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
+        if (phase === "end") {
+          host.onCompaction();
+        }
+      },
+    });
+    notedUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
+    host.recordWarnings(resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport));
+    chargeOnce(result.meta?.agentMeta?.usage ?? notedUsage);
+    return result;
+  } catch (err) {
+    if (!(err instanceof TaskBudgetExceededError)) {
+      try {
+        chargeOnce(usageRetainedForCandidateCharge(notedUsage, err));
+      } catch (chargeErr) {
+        if (chargeErr instanceof TaskBudgetExceededError) {
+          throw chargeErr;
+        }
       }
-      const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
-      if (phase === "end") {
-        host.onCompaction();
-      }
-    },
-  });
-  host.recordWarnings(resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport));
-  host.recordUsage(result, provider, model);
-  return result;
+    }
+    throw err;
+  }
 }

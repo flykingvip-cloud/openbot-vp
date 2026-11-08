@@ -20,7 +20,11 @@ import { emitAgentEvent } from "../../../infra/agent-events.js";
 import { getExecApprovalReplyMetadata } from "../../../infra/exec-approval-reply.js";
 import { APPROVE_CARD_CTA } from "../../../shared/text/assistant-scratchpad.js";
 import type { ModalityExecutionArtifact } from "../../../task-outcome/modality-artifact-evidence.js";
-import { TaskBudgetExceededError } from "../../../task-outcome/runtime-from-runner.js";
+import {
+  rememberModelResultUsage,
+  TaskBudgetExceededError,
+  usageRetainedForCandidateCharge,
+} from "../../../task-outcome/runtime-from-runner.js";
 import {
   isMarkdownCapableMessageChannel,
   resolveMessageChannel,
@@ -98,6 +102,24 @@ export function createAdmittedCandidateInvoker(
           fallbackUserId: params.sessionCtx.GatewayClientUser,
         });
         let lifecycleTerminalEmitted = false;
+        let notedCliUsage: unknown;
+        let cliCharged = false;
+        const chargeCliOnce = (usage?: unknown) => {
+          if (cliCharged) {
+            return;
+          }
+          cliCharged = true;
+          try {
+            host.chargeTipBudgetAfterModelCall({ provider, model, usage });
+          } catch (chargeErr) {
+            if (chargeErr instanceof TaskBudgetExceededError) {
+              throw chargeErr;
+            }
+            logVerbose(
+              `tip budget mid-run charge failed (cli): ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
+            );
+          }
+        };
         try {
           host.assertOriginalTaskCurrent();
           host.observeExecution?.("started");
@@ -125,6 +147,7 @@ export function createAdmittedCandidateInvoker(
             images: params.opts?.images,
             credentialEnv,
           });
+          notedCliUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
           host.observeExecution?.("completed");
           host.setBootstrapWarnings(
             resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport),
@@ -168,23 +191,13 @@ export function createAdmittedCandidateInvoker(
             });
           }
 
-          try {
-            host.chargeTipBudgetAfterModelCall({
-              provider,
-              model,
-              usage: result.meta?.agentMeta?.usage,
-            });
-          } catch (chargeErr) {
-            if (chargeErr instanceof TaskBudgetExceededError) {
-              throw chargeErr;
-            }
-            logVerbose(
-              `tip budget mid-run charge failed (cli): ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
-            );
-          }
+          chargeCliOnce(notedCliUsage);
 
           return result;
         } catch (err) {
+          if (!(err instanceof TaskBudgetExceededError)) {
+            chargeCliOnce(usageRetainedForCandidateCharge(notedCliUsage, err));
+          }
           host.observeExecution?.(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
           emitAgentEvent({
             runId,
@@ -292,6 +305,24 @@ export function createAdmittedCandidateInvoker(
         storeRoot: defaultShadowStoreRoot(),
         cronStorePath: resolveCronStorePath(params.followupRun.run.config.cron?.store),
       });
+      let notedEmbeddedUsage: unknown;
+      let embeddedCharged = false;
+      const chargeEmbeddedOnce = (usage?: unknown) => {
+        if (embeddedCharged) {
+          return;
+        }
+        embeddedCharged = true;
+        try {
+          host.chargeTipBudgetAfterModelCall({ provider, model, usage });
+        } catch (chargeErr) {
+          if (chargeErr instanceof TaskBudgetExceededError) {
+            throw chargeErr;
+          }
+          logVerbose(
+            `tip budget mid-run charge failed: ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
+          );
+        }
+      };
       try {
         host.assertOriginalTaskCurrent();
         const result = await runEmbeddedPiAgent({
@@ -490,6 +521,7 @@ export function createAdmittedCandidateInvoker(
               })()
             : undefined,
         });
+        notedEmbeddedUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
         host.setBootstrapWarnings(
           resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport),
         );
@@ -498,26 +530,16 @@ export function createAdmittedCandidateInvoker(
           ok: true,
         });
         emitModelStage("assistant_persisted", { source: "session_manager" });
-        try {
-          host.chargeTipBudgetAfterModelCall({
-            provider,
-            model,
-            usage: result.meta?.agentMeta?.usage,
-          });
-        } catch (chargeErr) {
-          if (chargeErr instanceof TaskBudgetExceededError) {
-            throw chargeErr;
-          }
-          logVerbose(
-            `tip budget mid-run charge failed: ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
-          );
-        }
+        chargeEmbeddedOnce(notedEmbeddedUsage);
         return result;
       } catch (err) {
         emitModelStage("model_finished", {
           modelMs: Date.now() - modelStartedAtMs,
           ok: false,
         });
+        if (!(err instanceof TaskBudgetExceededError)) {
+          chargeEmbeddedOnce(usageRetainedForCandidateCharge(notedEmbeddedUsage, err));
+        }
         throw err;
       }
     })();

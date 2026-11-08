@@ -363,6 +363,61 @@ export type SubmitTransition =
       };
     };
 
+/** Versioned command receipt from the original submit/idempotency boundary. */
+export type CommandReceipt = {
+  schemaVersion: 1;
+  commandId: string;
+  taskId: string;
+  outcomeVersion: number;
+  requestDigest: string;
+  disposition: "applied" | "replayed" | "no_effect";
+  /** Null when the durable log predates commit ids, or when nothing was committed. */
+  commitId: string | null;
+};
+
+/** Spend that was actually committed with a budget command. Not a later callback. */
+export type CommittedSpend = {
+  iterations: number;
+  costUsd: number | null;
+  costEvidence: "known" | "unknown" | "not_applicable" | null;
+};
+
+/** Stable model-call identity bound to one budget command. Not interchangeable. */
+export type BudgetCallBinding = {
+  callId: string;
+  evidenceId: string;
+  usageFingerprint: string;
+};
+
+/** Same command id, different payload. Not a successful charge. */
+export type CommandConflictDetail = {
+  commandId: string;
+  taskId: string;
+  storedDigest: string;
+  requestDigest: string;
+  storedOutcomeVersion: number;
+  storedCommitId: string | null;
+  /** Original committed spend, when the winning command was a budget charge. */
+  storedSpend: CommittedSpend | null;
+  /** Set when the transition matches and only the model-call binding differs. */
+  reason?: "call_binding_conflict" | "payload_conflict";
+  storedCallBinding?: BudgetCallBinding | null;
+};
+
+/** The command log cannot be turned into an exact replay. */
+export type CommandEvidenceGap = {
+  schemaVersion: 1;
+  commandId: string;
+  taskId: string;
+  outcomeVersion: number;
+  requestDigest: string;
+  reason:
+    | "version_snapshot_missing"
+    | "snapshot_identity_mismatch"
+    | "commit_identity_mismatch"
+    | "snapshot_fingerprint_absent";
+};
+
 export type SubmitFailure = {
   ok: false;
   code:
@@ -374,13 +429,24 @@ export type SubmitFailure = {
     | "unauthorized_correction"
     | "evidence_stale"
     | "command_conflict"
+    | "evidence_missing"
     | "not_found";
   message: string;
   current?: TaskOutcomeRecord;
+  commandConflict?: CommandConflictDetail;
+  evidenceGap?: CommandEvidenceGap;
 };
 
 export type SubmitResult =
-  | { ok: true; record: TaskOutcomeRecord; createdEvents: OutcomeOutboxEvent[] }
+  | {
+      ok: true;
+      record: TaskOutcomeRecord;
+      createdEvents: OutcomeOutboxEvent[];
+      /** Set only when the caller passed commandId. Legacy submits omit it. */
+      commandReceipt?: CommandReceipt;
+      /** Present when this command committed or replayed a budget spend. */
+      committedSpend?: CommittedSpend | null;
+    }
   | SubmitFailure;
 
 export type { TaskBudgetState, TaskBudgetLimits } from "./budget.js";

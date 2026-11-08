@@ -3,6 +3,8 @@ import {
   assertRunnerTurnBudgetAllowsModelCall,
   chargeModelCallAgainstTip,
   TaskBudgetExceededError,
+  usageRetainedForCandidateCharge,
+  type ModelCallCloseoutLink,
 } from "../../../task-outcome/runtime-from-runner.js";
 import type { TrustedScope } from "../../../task-outcome/types.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
@@ -21,6 +23,7 @@ export function createCommandBudget(params: {
   let sequence = 0;
   let charged = false;
   let costUsd: number | undefined;
+  const modelCallLinks: ModelCallCloseoutLink[] = [];
   const parent = {
     ...(params.parentTaskId?.trim() ? { parentTaskId: params.parentTaskId.trim() } : {}),
     ...(params.parentAgentId?.trim() ? { parentAgentId: params.parentAgentId.trim() } : {}),
@@ -31,6 +34,9 @@ export function createCommandBudget(params: {
     },
     get costUsd() {
       return costUsd;
+    },
+    get modelCallLinks() {
+      return modelCallLinks;
     },
     assertAllowed() {
       if (!params.taskId || !params.scope) {
@@ -48,7 +54,7 @@ export function createCommandBudget(params: {
         return undefined;
       }
       sequence += 1;
-      return chargeModelCallAgainstTip(params.config, params.agentId, {
+      const receipt = chargeModelCallAgainstTip(params.config, params.agentId, {
         taskId: params.taskId,
         scope: params.scope,
         runId: params.runId,
@@ -56,6 +62,10 @@ export function createCommandBudget(params: {
         ...input,
         ...parent,
       });
+      if (receipt.modelCallLink) {
+        modelCallLinks.push(receipt.modelCallLink);
+      }
+      return receipt;
     },
     async runCandidate(input: {
       provider: string;
@@ -80,7 +90,11 @@ export function createCommandBudget(params: {
       } catch (error) {
         if (!(error instanceof TaskBudgetExceededError)) {
           try {
-            const receipt = budget.charge({ provider: input.provider, model: input.model });
+            const receipt = budget.charge({
+              provider: input.provider,
+              model: input.model,
+              usage: usageRetainedForCandidateCharge(undefined, error),
+            });
             if (receipt) {
               charged = true;
             }

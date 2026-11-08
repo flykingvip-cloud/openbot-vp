@@ -75,7 +75,9 @@ import {
   chargeModelCallAgainstTip,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  runnerExecutorEvidenceContext,
   TaskBudgetExceededError,
+  type ModelCallCloseoutLink,
 } from "../../task-outcome/runtime-from-runner.js";
 import { classifyCronCompletion } from "../completion-contract.js";
 import { isCronDeliveryOnlyFailure, isCronDeliveryToolError } from "../delivery-only-failure.js";
@@ -847,6 +849,7 @@ export async function runCronIsolatedAgentTurn(params: {
   let cronBudgetCharged = false;
   let cronBudgetCallSeq = 0;
   let cronForcedFailureReason: "budget_exceeded" | undefined;
+  const modelCallLinks: ModelCallCloseoutLink[] = [];
   const chargeCronModelCall = (params: { usage?: unknown; provider?: string; model?: string }) => {
     if (!cronOutcomeTaskId || !cronOutcomeScope) {
       return;
@@ -862,6 +865,9 @@ export async function runCronIsolatedAgentTurn(params: {
       model: params.model,
     });
     cronBudgetCharged = true;
+    if (charged.modelCallLink) {
+      modelCallLinks.push(charged.modelCallLink);
+    }
     if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
       tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
     }
@@ -979,6 +985,7 @@ export async function runCronIsolatedAgentTurn(params: {
               ? { delivery: { status: "failed" as const } }
               : {}),
           ...(cronCapabilityOutcome ? { capabilityOutcome: cronCapabilityOutcome } : {}),
+          ...(modelCallLinks.length > 0 ? { modelCallLinks } : {}),
         });
       } catch (err) {
         logWarn(`[cron:${params.job.id}] unified recordRunnerTurnOutcome failed: ${String(err)}`);
@@ -1059,6 +1066,11 @@ export async function runCronIsolatedAgentTurn(params: {
           agentDir,
           fallbacksOverride:
             payloadFallbacks ?? resolveAgentModelFallbacksOverride(params.cfg, agentId),
+          executorEvidence: runnerExecutorEvidenceContext(cfgWithAgentDefaults, agentId, {
+            taskId: cronOutcomeTaskId,
+            scope: cronOutcomeScope,
+            runId: `${cronSession.sessionEntry.sessionId}:${runStartedAt}`,
+          }),
           run: async (providerOverride, modelOverride, runOptions) => {
             if (abortSignal?.aborted) {
               throw new Error(abortReason());

@@ -90,6 +90,7 @@ import { recordAgentCommandCreditUsage } from "./agent/credit-usage.js";
 import { deliverAgentCommandResult } from "../agent-runtime/delivery/index.js";
 import {
   estimateTipBudgetCostUsdFromUsage,
+  runnerExecutorEvidenceContext,
   TaskBudgetExceededError,
   type RunnerTurnFailureReason,
 } from "../task-outcome/runtime-from-runner.js";
@@ -389,7 +390,7 @@ async function agentCommandInternal(
   const commandBudget = createCommandBudget({ config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, taskId: agentOutcomeTaskId, scope: agentOutcomeScope, parentTaskId: opts.parentTaskId, parentAgentId: opts.parentAgentId });
   const submitAgentOutcomeCloseout = createCommandOutcomeCloseout({
     config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, entrypoint: agentOutcomeEntrypoint,
-    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, costUsd: tipBudgetCostUsd, deliveryReceipt: commandDeliveryReceipt}),
+    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, costUsd: tipBudgetCostUsd, deliveryReceipt: commandDeliveryReceipt, modelCallLinks: commandBudget.modelCallLinks}),
   });
 
   try {
@@ -742,6 +743,11 @@ async function agentCommandInternal(
         fallbacksOverride: effectiveFallbacksOverride,
         taskText: opts.message ?? "",
         signal: opts.abortSignal,
+        executorEvidence: runnerExecutorEvidenceContext(cfg, sessionAgentId, {
+          taskId: agentOutcomeTaskId,
+          scope: agentOutcomeScope,
+          runId,
+        }),
         run: (providerOverride, modelOverride, runOptions, isFallbackRetry) => commandBudget.runCandidate({
           provider: providerOverride,
           model: modelOverride,

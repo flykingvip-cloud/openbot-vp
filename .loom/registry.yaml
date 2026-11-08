@@ -11514,7 +11514,77 @@ tasks:
     ownerHistory: []
     since: 2026-11-06
     metadata: {}
+  - id: agent-runtime-observability-evidence-on-71a266e:cursor-grok-executor
+    owner: cursor-grok-executor
+    intent:
+      - Port upstream executor evidence onto runtime-convergence package-1
+    paths:
+      - src/executor-evidence/**
+      - src/task-outcome/types.ts
+      - src/task-outcome/store.ts
+      - src/task-outcome/result-service.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/command-log-path.test.ts
+      - src/agents/model-fallback.ts
+      - src/agent-runtime/model/authorized-session.ts
+      - src/agent-runtime/execution/runner/admitted-turn.ts
+      - src/agent-runtime/execution/runner/admitted-candidate.ts
+      - src/agent-runtime/execution/runner/command-budget.ts
+      - src/agent-runtime/execution/runner/command-candidate.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.ts
+      - src/agent-runtime/execution/runner/queued-candidate.ts
+      - src/agent-runtime/execution/runner/scheduled-candidate.ts
+      - src/agent-runtime/execution/outcomes/command-outcome.ts
+      - src/agent-runtime/execution/outcomes/turn-outcome.ts
+      - src/agent-runtime/state/command-session.ts
+      - src/commands/agent.ts
+      - src/cron/isolated-agent/run.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: 7c2a9e14-6725-4b1e-9c3a-evidence-port
+        taskId: agent-runtime-observability-evidence-on-71a266e:cursor-grok-executor
+        ide: cursor
+        agent: cursor-grok-executor
+        status: active
+        lastSignalAt: 2026-11-08T08:09:08.046Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-08
+    metadata: {}
 landingStreams:
+  - id: agent-runtime-observability-evidence-on-71a266e
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/executor-evidence/**
+      - src/task-outcome/types.ts
+      - src/task-outcome/store.ts
+      - src/task-outcome/result-service.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/command-log-path.test.ts
+      - src/agents/model-fallback.ts
+      - src/agent-runtime/model/authorized-session.ts
+      - src/agent-runtime/execution/runner/admitted-turn.ts
+      - src/agent-runtime/execution/runner/admitted-candidate.ts
+      - src/agent-runtime/execution/runner/command-budget.ts
+      - src/agent-runtime/execution/runner/command-candidate.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.ts
+      - src/agent-runtime/execution/runner/queued-candidate.ts
+      - src/agent-runtime/execution/runner/scheduled-candidate.ts
+      - src/agent-runtime/execution/outcomes/command-outcome.ts
+      - src/agent-runtime/execution/outcomes/turn-outcome.ts
+      - src/agent-runtime/state/command-session.ts
+      - src/commands/agent.ts
+      - src/cron/isolated-agent/run.ts
+      - src/auto-reply/reply/followup-runner.ts
+    canLandWith: []
+    metadata:
+      task: agent-runtime-observability-evidence-on-71a266e
+      owner: cursor-grok-executor
+      purpose: Port upstream executor evidence onto runtime-convergence package-1.
+        Does not include src/observation.
   - id: agent-runtime-observability-p0
     landingPolicy: serial
     paths:
@@ -27352,8 +27422,8 @@ sharedPaths:
     reason: Human-authorized bounded command delivery migration; preserve other
       scopes and history.
     reviewAfter: 2026-11-30
-
   - glob: src/agent-runtime/state/acp-transcript.ts
     landerTask: agent-runtime-convergence
-    reason: Human-authorized bounded ACP transcript state migration; preserve other scopes and history.
+    reason: Human-authorized bounded ACP transcript state migration; preserve other
+      scopes and history.
     reviewAfter: 2026-11-30

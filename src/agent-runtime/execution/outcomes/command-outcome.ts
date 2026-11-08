@@ -1,6 +1,7 @@
 import type { OpenBotConfig } from "../../../config/config.js";
 import {
   recordRunnerTurnOutcome,
+  type ModelCallCloseoutLink,
   type RunnerTurnFailureReason,
 } from "../../../task-outcome/runtime-from-runner.js";
 import type { Entrypoint, TrustedScope } from "../../../task-outcome/types.js";
@@ -21,6 +22,7 @@ export function createCommandOutcomeCloseout(params: {
     budgetCharged: boolean;
     costUsd?: number;
     deliveryReceipt?: CommandDeliveryReceipt;
+    modelCallLinks?: ModelCallCloseoutLink[];
   };
 }) {
   let agentOutcomeCloseoutDone = false;
@@ -34,6 +36,7 @@ export function createCommandOutcomeCloseout(params: {
       budgetCharged: tipBudgetChargedThisTurn,
       costUsd: tipBudgetCostUsd,
       deliveryReceipt,
+      modelCallLinks,
     } = params.readContext();
     if (agentOutcomeCloseoutDone || !params.entrypoint) {
       return;
@@ -67,6 +70,7 @@ export function createCommandOutcomeCloseout(params: {
               failureReason: agentOutcomeFailureReason ?? ("run_failed" as const),
               ...(agentOutcomeFailureDetail ? { failureDetail: agentOutcomeFailureDetail } : {}),
             }),
+        ...(modelCallLinks && modelCallLinks.length > 0 ? { modelCallLinks } : {}),
       });
     } catch (err) {
       console.error(

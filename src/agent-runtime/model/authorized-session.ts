@@ -50,6 +50,8 @@ export type ModelInferenceInput<T> = {
   fallbacksOverride?: string[];
   taskText: string;
   signal?: AbortSignal;
+  /** When set, each fallback candidate records model-call evidence before `run`. */
+  executorEvidence?: Parameters<typeof runWithModelFallback<T>>[0]["executorEvidence"];
   run: Parameters<typeof runWithModelFallback<T>>[0]["run"];
 };
 export type ModelInferenceResult<T> = Awaited<ReturnType<typeof runWithModelFallback<T>>>;
@@ -161,6 +163,7 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
         model: input.model,
         agentDir: input.agentDir,
         fallbacksOverride: input.fallbacksOverride,
+        ...(input.executorEvidence ? { executorEvidence: input.executorEvidence } : {}),
         ...prepared.governance,
         ...(prepared.preferredModelOrder
           ? { preferredModelOrder: prepared.preferredModelOrder }

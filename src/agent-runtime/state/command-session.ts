@@ -33,6 +33,16 @@ const OVERRIDE_FIELDS_CLEARED_BY_DELETE: OverrideFieldClearedByDelete[] = [
 export async function persistCommandSessionEntry(
   params: PersistCommandSessionEntryParams,
 ): Promise<void> {
+  const savedCliSession = params.entry.cliSessionIds
+    ? Object.values(params.entry.cliSessionIds)
+    : [];
+  // Isolation hook: a session save after the model returned must not drop usage.
+  if (
+    process.env.OPENBOT_TEST_CLI_PERSIST_THROW === "1" &&
+    savedCliSession.includes("cli-session")
+  ) {
+    throw new Error("persist after retry");
+  }
   const persisted = await updateSessionStore(params.storePath, (store) => {
     const merged = mergeSessionEntry(store[params.sessionKey], params.entry);
     // Preserve explicit `delete` clears done by session override helpers.
