@@ -50,13 +50,13 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     disposition: "retain",
   },
   {
-    id: "interaction.legacy.occupancy",
-    category: "compatibility",
-    owner: "command",
-    implementation: "src/agent-runtime/command/interaction.ts",
-    checkpoint: "legacy_reply_dispatch",
-    management: "retirement_review",
-    disposition: "review_for_retirement",
+    id: "execution.lifecycle.preparation",
+    category: "lifecycle",
+    owner: "execution",
+    implementation: "src/agent-runtime/execution/runner/execution-lifecycle.ts",
+    checkpoint: "before_provider_startup",
+    management: "code_required",
+    disposition: "retain",
   },
 ];
 
