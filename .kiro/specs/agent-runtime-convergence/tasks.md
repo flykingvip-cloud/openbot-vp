@@ -1332,3 +1332,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 ## Rule inventory retirement consistency (2026-11-08)
 
 - Reproduced a stale current-rule declaration pointing to retired command/interaction.ts (one failing test). Replaced that declaration with the current shared execution preparation lifecycle and added a source-existence gate for every current catalog entry. Historical retirement evidence remains in the archive; current metadata does not execute or grant authority. Catalog 2 PASS; typed lint clean. — codex-runtime-manager
+
+## Command joins shared execution stage scope (2026-11-08)
+
+- Command, chat, queue and cron now share execution-scope readiness, cancellation propagation, per-inference fallback attempt identity and disposal ordering. Fixed command authority adapter preserves E2/E3/E6 and child snapshot inheritance; command host no longer constructs fallback governance. Scene candidate parameters, budgeting, accounting and delivery adapters remain explicit; complete task-orchestration convergence is not claimed. — codex-runtime-manager
+- Removed the consumerless command-fallback adapter after byte-matching source/tests to the existing archive tag and preserving retry tests on the shared scope. Governance registry now tracks the actual command callsite and associates cron E4 with the shared authorized session instead of a stale direct call. — codex-runtime-manager
+- Command governance/credits/delivery/ACP 4 files / 54 PASS; model governance registry 95 PASS; shared scope/lifecycle 2 files / 7 PASS. Full tsgo and typed lint PASS; architecture 54 PASS. No real-model/restart acceptance, merge, push or deployment. — codex-runtime-manager

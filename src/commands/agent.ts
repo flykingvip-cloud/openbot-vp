@@ -1,8 +1,7 @@
 import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery.js";
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
-import { createCommandAdmissionSession } from "../agent-runtime/model/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
-import { createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, runCommandFallback, runCommandAcpTurn } from "../agent-runtime/execution/index.js";
+import { createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createCommandExecutionLifecycle, runCommandAcpTurn } from "../agent-runtime/execution/index.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
 import { LEGACY_INTERNAL_EVENT_CONTEXT_PREFIXES } from "../compat/legacy-names.js";
@@ -364,7 +363,7 @@ async function agentCommandInternal(
   let sessionEntry = prepared.sessionEntry;
   const laneRaw = typeof opts.lane === "string" ? opts.lane.trim() : "";
   const isSubagentLane = laneRaw === String(AGENT_LANE_SUBAGENT);
-  const commercialLease = createCommandAdmissionSession({runId, isSubagentLane, identity: opts.executionIdentity, entry: opts.governanceEntry});
+  const commercialLease = createCommandExecutionLifecycle({runId, isSubagentLane, identity: opts.executionIdentity, entry: opts.governanceEntry});
   // Subagent runs take their own commercial slot (quota + concurrency).
   // Model allowlists for the child still come from the parent snapshot.
   let commercialGate: AgentCommandCommercialGateResult | undefined;
@@ -408,14 +407,16 @@ async function agentCommandInternal(
       }
     }
 
-    commercialGate = await commercialLease.acquire({
+    const executionPreparation = await commercialLease.prepare({ signal: opts.abortSignal, authorization: {
       runId,
       sessionAgentId,
       gatewayClientUser: opts.gatewayClientUser,
       enterpriseId: opts.gatewayClientSessionTenantId,
       taskText: opts.message ?? body,
       ...(isSubagentLane ? { entry: "E6" as const } : opts.governanceEntry ? { entry: opts.governanceEntry } : {}),
-    });
+    } });
+    commercialGate = executionPreparation.authorization;
+
     if (commercialGate.status === "denied") {
       agentOutcomeSuccess = false;
       agentOutcomeFailureReason = "authz_denied";
@@ -730,19 +731,14 @@ async function agentCommandInternal(
         model,
         runId,
       });
-      const fallbackResult = await runCommandFallback({
+      const fallbackResult = await commercialLease.infer({
         cfg,
         provider,
         model,
-        runId,
         agentDir,
         fallbacksOverride: effectiveFallbacksOverride,
-        runtimeAdmission: {
-          taskText: opts.message ?? "",
-        },
-        // legacy when the gate skipped (no enterprise scope); otherwise
-        // OPENBOT_GOVERNANCE_AGENT_COMMAND_MODEL_MODE (default shadow: record only).
-        ...commercialLease.fallbackGovernance(),
+        taskText: opts.message ?? "",
+        signal: opts.abortSignal,
         run: (providerOverride, modelOverride, runOptions, isFallbackRetry) => {
           commandBudget.assertAllowed();
           return (async () => {

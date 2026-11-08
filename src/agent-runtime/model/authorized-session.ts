@@ -42,6 +42,17 @@ export type InteractionPreparationPorts = {
 };
 type AdmissionResult = Awaited<ReturnType<typeof tryAcquireEnterpriseAgentRun>>;
 type Acquired = Extract<AdmissionResult, { acquired: true }>;
+export type ModelInferenceInput<T> = {
+  cfg: OpenBotConfig;
+  provider: string;
+  model: string;
+  agentDir?: string;
+  fallbacksOverride?: string[];
+  taskText: string;
+  signal?: AbortSignal;
+  run: Parameters<typeof runWithModelFallback<T>>[0]["run"];
+};
+export type ModelInferenceResult<T> = Awaited<ReturnType<typeof runWithModelFallback<T>>>;
 
 export function createAuthorizedModelSession(runId: string, ports: ModelSessionPorts) {
   let admitted = false;
@@ -139,16 +150,7 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
       prepared = { governance, preferredModelOrder: input.routing.preferredModelOrder };
       return governance;
     },
-    async infer<T>(input: {
-      cfg: OpenBotConfig;
-      provider: string;
-      model: string;
-      agentDir?: string;
-      fallbacksOverride?: string[];
-      taskText: string;
-      signal?: AbortSignal;
-      run: Parameters<typeof runWithModelFallback<T>>[0]["run"];
-    }) {
+    async infer<T>(input: ModelInferenceInput<T>) {
       if (!admitted || !prepared || disposed) {
         throw new Error("Model session is not prepared");
       }

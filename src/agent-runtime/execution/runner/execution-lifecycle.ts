@@ -1,6 +1,7 @@
 import type { OpenBotConfig } from "../../../config/config.js";
 import { createAuthorizedModelSession } from "../../model/index.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
+import { createExecutionScope } from "./execution-scope.js";
 
 type Session = ReturnType<typeof createAuthorizedModelSession>;
 type Host = Pick<AdmittedTurnHost, "admission" | "model" | "accounting">;
@@ -10,15 +11,13 @@ type Host = Pick<AdmittedTurnHost, "admission" | "model" | "accounting">;
  * This is host code, never executable configuration or a new scheduler. */
 export function createExecutionLifecycle(runId: string, host: Host) {
   const session = createAuthorizedModelSession(runId, host);
-  let ready = false;
-  return {
+  const scope = createExecutionScope({
     async prepare(input: {
       config: OpenBotConfig;
       authorization: Parameters<Session["authorize"]>[0];
       actorId?: string;
       signal?: AbortSignal;
     }) {
-      ready = false;
       input.signal?.throwIfAborted();
       const admission = await session.authorize(input.authorization);
       input.signal?.throwIfAborted();
@@ -47,21 +46,19 @@ export function createExecutionLifecycle(runId: string, host: Host) {
       }
       session.prepareModelSet({ config: input.config, actorId: input.actorId, routing });
       input.signal?.throwIfAborted();
-      ready = true;
       return { kind: "ready" as const, gate, capability };
     },
     infer<T>(input: Parameters<typeof session.infer<T>>[0]) {
-      if (!ready) {
-        throw new Error("Execution lifecycle is not prepared");
-      }
       return session.infer(input);
     },
+    dispose() {
+      return session.dispose();
+    },
+  });
+  return {
+    ...scope,
     recordUsage(input: Parameters<Session["recordUsage"]>[0]) {
       return session.recordUsage(input);
-    },
-    dispose() {
-      ready = false;
-      return session.dispose();
     },
   };
 }

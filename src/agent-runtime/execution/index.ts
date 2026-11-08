@@ -7,13 +7,12 @@ export type {
 
 export { runAdmittedTurn } from "./runner/admitted-turn.js";
 export { createExecutionLifecycle } from "./runner/execution-lifecycle.js";
+export { createCommandExecutionLifecycle } from "./runner/command-lifecycle.js";
 export type { AgentTurnExecutionParams, AgentRunLoopResult } from "./runner/turn-contract.js";
 
 export { runCommandCandidate } from "./runner/command-candidate.js";
 
 export { createCommandBudget } from "./runner/command-budget.js";
-
-export { runCommandFallback } from "./runner/command-fallback.js";
 
 export { runCommandAcpTurn } from "./runner/acp-turn.js";
 
