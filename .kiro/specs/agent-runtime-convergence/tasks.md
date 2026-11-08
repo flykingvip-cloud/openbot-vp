@@ -1385,3 +1385,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced non-collaboration model input containing GroupSystemPrompt (one failing regression). Individual assembly no longer consumes group context, intro or system prompt; removed unreachable collaboration capability assembly in that branch. Explicit collaboration assembly retains its original source evaluation and ordering; channel adapters and session intro bookkeeping remain unchanged. — codex-runtime-manager
 - Context regression 2 files / 16 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. Two explicit context catalogs and complete source lifecycle convergence remain open. Collaboration contract/plan/stop regression on the prior production-source candidate: 5 files / 26 PASS, simulated execution only. — codex-runtime-manager
+
+## Speaker label trust placement (2026-11-08)
+
+- Reproduced sender-derived untrusted speaker text entering the system prompt in both individual and collaboration assembly (two failing regressions). Speaker projection now joins the existing untrusted user-body wrapper; trusted inbound metadata, source rendering and task association remain unchanged. No additional model call. — codex-runtime-manager
+- Reply/context/inbound metadata regression 3 files / 42 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. This does not establish full context catalog migration or final lifecycle acceptance. — codex-runtime-manager

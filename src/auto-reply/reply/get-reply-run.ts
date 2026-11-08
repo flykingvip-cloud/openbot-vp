@@ -1214,9 +1214,6 @@ export async function runPreparedReply(
     extraSystemPromptParts = appendSystemContextPart(extraSystemPromptParts, inboundTaskClarify);
   }
   const currentSpeakerPrompt = buildCurrentSpeakerUntrustedPrompt(sessionCtx);
-  if (currentSpeakerPrompt) {
-    extraSystemPromptParts = appendSystemContextPart(extraSystemPromptParts, currentSpeakerPrompt);
-  }
   if (!isHeartbeat) {
     const learningExposureKey = learningExperienceRunKey(opts?.runId);
     const learningRecallPrompt = await buildLearningRecallSystemPrompt({
@@ -1328,6 +1325,7 @@ export async function runPreparedReply(
   }
   const queueBodyBaseSource = effectiveBaseBody;
   prefixedBodyBase = appendUntrustedContext(prefixedBodyBase, [
+    ...(currentSpeakerPrompt ? [currentSpeakerPrompt] : []),
     ...(Array.isArray(sessionCtx.UntrustedContext) ? sessionCtx.UntrustedContext : []),
     ...(asideDialogueUntrustedContext ? [asideDialogueUntrustedContext] : []),
   ]);

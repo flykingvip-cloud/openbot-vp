@@ -160,7 +160,10 @@ vi.mock("./typing-mode.js", () => ({
 }));
 
 import { runReplyAgent } from "./agent-runner.js";
-import { buildInboundMetaSystemPrompt } from "./inbound-meta.js";
+import {
+  buildInboundMetaSystemPrompt,
+  buildCurrentSpeakerUntrustedPrompt,
+} from "./inbound-meta.js";
 import { buildKnowledgeUniversePromptContext } from "./knowledge-universe-context.js";
 import {
   assembleCollaborationRuntimeContextParts,
@@ -351,6 +354,7 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
         "  COLLAB_FIRST  ",
       ]);
       vi.mocked(buildInboundMetaSystemPrompt).mockReturnValue("  DIRECT_FIRST  ");
+      vi.mocked(buildCurrentSpeakerUntrustedPrompt).mockReturnValue("UNTRUSTED_SPEAKER_SENTINEL");
       vi.mocked(drainFormattedSystemEvents).mockResolvedValue("EVENT_LAST");
       const params = baseParams();
       await runPreparedReply({
@@ -367,6 +371,8 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
       expect(buildKnowledgeUniversePromptContext).toHaveBeenCalledTimes(1);
       const system = call?.followupRun.run.extraSystemPrompt ?? "";
       expect(system).not.toContain("USER_ONLY_SENTINEL");
+      expect(system).not.toContain("UNTRUSTED_SPEAKER_SENTINEL");
+      expect(call?.commandBody).toContain("UNTRUSTED_SPEAKER_SENTINEL");
       expect(call?.commandBody).toContain("USER_ONLY_SENTINEL");
       expect(call?.commandBody).toContain("Untrusted context");
       if (collab) {
