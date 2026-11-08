@@ -1,4 +1,10 @@
 /** Shared inference infrastructure. Business task ownership stays outside this boundary. */
+export {
+  resolveAuxiliaryModelGovernance,
+  type AuxiliaryModelPurpose,
+  type AuxiliaryModelGovernance,
+} from "./auxiliary-model-governance.js";
+
 export { createAuthorizedModelSession, type ModelSessionPorts } from "./authorized-session.js";
 export type { InteractionPreparationPorts } from "./authorized-session.js";
 export type { ModelInferenceInput, ModelInferenceResult } from "./authorized-session.js";

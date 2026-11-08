@@ -1485,3 +1485,10 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - Cron and Followup scene hosts now bind `controlledExecution` via `createExecutionLifecycle` and share `assertControlledExecutionStages` with Chat/Command, removing duplicated hand-written stage-order asserts. Scene adapters retain queue/OGUI/ledger/delivery; no parallel prepare/infer loop and no whole-host move into runner. — grok-bot
 - Added `assertControlledExecutionStages` on the controlled use-case contract (exported from execution/index). Chat/Command refactored to the same helper. — grok-bot
 - Regressions: controlled suite 6 PASS (incl. assert accept/reject); admitted-turn 9 PASS; command-lifecycle 4 PASS; cron long-horizon ledger 11 PASS (incl. denied admission never starts backend). 30 total PASS. Full tsgo PASS; typed oxlint clean; architecture 63 PASS. No push/merge/deploy. — grok-bot
+
+## Package 1 D5 Memory flush + slug → auxiliary model contract (2026-11-08)
+
+- Added shared `resolveAuxiliaryModelGovernance` (`purpose: memory_flush | slug_filename`) under agent-runtime/model. Auxiliary inference inherits parent model-set when present; never creates or advances business tasks / commercial work-item admission. — grok-bot
+- Memory flush `resolveMemoryFlushModelGovernance` now delegates to the shared contract (context stamps `purpose: memory_flush`). Slug generator routes through `runWithModelFallback` + auxiliary governance instead of a bare embedded call. — grok-bot
+- Architecture: +2 rules (memory/slug cannot open controlled-execution or commercial admission sessions). Manifest 65 PASS. — grok-bot
+- Tests: auxiliary governance 3 PASS; slug auxiliary wiring 1 PASS (under model/); memory governance 8 PASS; memory 1 PASS. Full tsgo PASS; typed oxlint clean. No push/merge/deploy. — grok-bot

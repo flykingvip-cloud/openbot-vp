@@ -604,5 +604,29 @@
       "src/agent-runtime/execution/runner/admitted-turn"
     ],
     "description": "Chat host enters admitted execution through the public execution API / reply wiring; it cannot deep-import lifecycle internals or model fallback."
+  },
+  {
+    "name": "runtime-memory-flush-auxiliary-governance",
+    "from": "src/auto-reply/reply/agent-runner-memory.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution",
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session"
+    ],
+    "description": "Memory flush is auxiliary inference via shared model governance; it cannot open work-item controlled execution or commercial admission sessions."
+  },
+  {
+    "name": "runtime-hooks-slug-auxiliary-governance",
+    "from": "src/hooks/llm-slug-generator.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution",
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner"
+    ],
+    "description": "Slug filename generation is auxiliary inference via shared model governance; it cannot open work-item admission or legacy embedded facades."
   }
 ]
