@@ -1792,4 +1792,4 @@ Preserved: original payload remelt, delivery_unknown, accepted/rejected bind, de
 
 Typed oxlint on changed sources: 0 warnings / 0 errors.
 
-**Remelt tip for re-acceptance:** *(filled after tip SHA commit)*. Prior failed tip `72c478de3` retained above. — grok-bot
+**Remelt tip for re-acceptance:** `d5aadec7b` (3-defect close). Prior failed tip `72c478de3` retained above. — grok-bot
