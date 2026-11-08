@@ -3,7 +3,7 @@ import { activeConstraintTexts } from "../../policy/index.js";
 import { claimTaskBoardContinue } from "../continuation-ticket.js";
 import { bindAsyncWaitRecoveryTurn } from "../repository/async-wait-job.js";
 import { mutateSessionTaskBoard, readSessionTaskBoard } from "../repository/task-board-file.js";
-import { bindCurrentExecution, startBoundTaskExecution } from "./execution-binding.js";
+import { startBoundTaskExecution } from "./execution-binding.js";
 
 const RECOVERY_APPENDIX_MARKER = "Async-wait job recovery context (Package2):";
 
@@ -35,7 +35,7 @@ export function mergeContinuePromptWithRecoveryAppendix(
 /**
  * CAS board rollback after a failed exclusive recovery bind.
  * Only restores when the board attempt is still THIS write's runId —
- * never overwrite a concurrent newer attempt. Empty original attempt is restored.
+ * never overwrite a concurrent newer attempt. Absent original fields stay absent (not "").
  */
 export function restoreBoardExecutionAttemptAfterFailedBind(
   sessionFile: string,
@@ -57,15 +57,24 @@ export function restoreBoardExecutionAttemptAfterFailedBind(
     if (current.executionAttempt !== written) {
       return { board, value: false };
     }
-    const prevAttempt = previous.executionAttempt?.trim() ?? "";
-    const prevDeliverable = previous.deliverableVersion?.trim() ?? prevAttempt;
+    // Restore original field shape: absent/undefined stays absent (never "" for undefined).
+    // Strict identity compare treats undefined !== "", so substituting blocks re-claim.
+    const nextCurrent: typeof current = { ...current };
+    if (previous.executionAttempt === undefined) {
+      delete nextCurrent.executionAttempt;
+    } else {
+      nextCurrent.executionAttempt = previous.executionAttempt;
+    }
+    if (previous.deliverableVersion === undefined) {
+      delete nextCurrent.deliverableVersion;
+    } else {
+      nextCurrent.deliverableVersion = previous.deliverableVersion;
+    }
     return {
-      board: bindCurrentExecution({
-        board,
-        taskId: tid,
-        executionAttempt: prevAttempt,
-        deliverableVersion: prevDeliverable,
-      }),
+      board: {
+        ...board,
+        current: nextCurrent,
+      },
       value: true,
     };
   });

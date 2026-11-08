@@ -10,6 +10,7 @@ export {
   claimAsyncWaitJobForRecovery,
   markAsyncWaitRecoveryContinueArmed,
   bindAsyncWaitRecoveryTurn,
+  releaseAsyncWaitRecoveryTurn,
   markAsyncWaitRecoveryDelivered,
   buildAsyncWaitRecoveryPromptAppendix,
   clearAsyncWaitJobIntent,

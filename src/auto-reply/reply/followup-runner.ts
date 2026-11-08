@@ -11,6 +11,7 @@ import {
   bindAsyncWaitRecoveryTurn,
   claimQueuedExecution,
   readAsyncWaitJobIntent,
+  releaseAsyncWaitRecoveryTurn,
 } from "../../agent-runtime/state/index.js";
 import {
   incrementRunCompactionCount,
@@ -803,6 +804,32 @@ export function createFollowupRunner(params: {
       // askOutcome W1: unified closeout for ordinary success / preflight fail / exception.
       // Missing evidence → leave acceptance/delivery pending (no invent not_required).
       await submitFollowupOutcomeCloseout();
+      // Package2: if recovery turn ended without delivery, release holder so Gateway-alive
+      // PID cannot leave permanent active_exec after auth/provider/prepare failure.
+      if (
+        queued.asyncWaitRecoveryBind?.jobId?.trim() &&
+        queued.asyncWaitRecoveryBind?.claimToken?.trim()
+      ) {
+        try {
+          const liveIntent = readAsyncWaitJobIntent(
+            queued.run.sessionFile,
+            queued.asyncWaitRecoveryBind.jobId,
+          );
+          if (
+            liveIntent?.recovery?.stage === "turn_bound" &&
+            !liveIntent.recovery.boundDeliveryId
+          ) {
+            releaseAsyncWaitRecoveryTurn({
+              sessionFile: queued.run.sessionFile,
+              jobId: queued.asyncWaitRecoveryBind.jobId,
+              claimToken: queued.asyncWaitRecoveryBind.claimToken,
+              runId,
+            });
+          }
+        } catch (releaseErr) {
+          logVerbose(`async-wait recovery turn release failed: ${String(releaseErr)}`);
+        }
+      }
       if (oguiResume && !oguiResumeSettled) {
         await releaseOguiDecisionResume({
           storePath: oguiResume.storePath,

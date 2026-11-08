@@ -775,6 +775,7 @@ export type BindAsyncWaitRecoveryTurnResult =
       reason:
         | "missing_params"
         | "run_conflict"
+        | "already_bound"
         | "no_candidate"
         | "token_mismatch"
         | "cleared"
@@ -866,6 +867,13 @@ export function bindAsyncWaitRecoveryTurn(input: {
       rejectReason = { accepted: false, reason: "cleared", intent: current };
       return "keep";
     }
+    // Same job/token already bound to another run → refuse overwrite.
+    // Same-run idempotent retry OK; a different run must re-claim (new gen/token).
+    const existingBound = current.recovery.boundRunId?.trim();
+    if (existingBound && existingBound !== runId) {
+      rejectReason = { accepted: false, reason: "already_bound", intent: current };
+      return "keep";
+    }
     const nextStage = input.deliveryId ? "delivery_pending" : "turn_bound";
     // No stage regression (e.g. delivery_pending must not fall back to turn_bound).
     if (
@@ -915,6 +923,94 @@ export function bindAsyncWaitRecoveryTurn(input: {
     return rejectReason;
   }
   return { accepted: false, reason: "unchanged", intent: intent ?? target };
+}
+
+/**
+ * Release a turn_bound recovery claim after controlled-turn prepare/exec failure
+ * or other terminal exit without delivery. Fences the old holder with a new
+ * generation/token so Gateway-alive PID alone cannot keep permanent active_exec.
+ * delivery_pending / delivered are left untouched (delivery owns those stages).
+ */
+export function releaseAsyncWaitRecoveryTurn(input: {
+  sessionFile: string;
+  jobId: string;
+  claimToken: string;
+  /** When set, only release if boundRunId still matches this turn. */
+  runId?: string;
+}):
+  | { released: true; intent: AsyncWaitJobIntent; claimToken: string }
+  | {
+      released: false;
+      reason:
+        | "missing_params"
+        | "no_candidate"
+        | "token_mismatch"
+        | "not_turn_bound"
+        | "run_mismatch"
+        | "unchanged";
+      intent?: AsyncWaitJobIntent;
+    } {
+  const jobId = input.jobId.trim();
+  const token = input.claimToken.trim();
+  const runId = input.runId?.trim() || undefined;
+  if (!input.sessionFile.trim() || !jobId || !token) {
+    return { released: false, reason: "missing_params" };
+  }
+  let outcome:
+    | { released: true; intent: AsyncWaitJobIntent; claimToken: string }
+    | {
+        released: false;
+        reason: "no_candidate" | "token_mismatch" | "not_turn_bound" | "run_mismatch" | "unchanged";
+        intent?: AsyncWaitJobIntent;
+      } = { released: false, reason: "unchanged" };
+  let mutated = false;
+  const intent = transitionAsyncWaitJobIntent(input.sessionFile, jobId, (current) => {
+    if (!current?.recovery) {
+      outcome = { released: false, reason: "no_candidate", intent: current };
+      return "keep";
+    }
+    if (current.recovery.claimToken !== token) {
+      outcome = { released: false, reason: "token_mismatch", intent: current };
+      return "keep";
+    }
+    if (current.recovery.stage !== "turn_bound" || current.recovery.boundDeliveryId) {
+      outcome = { released: false, reason: "not_turn_bound", intent: current };
+      return "keep";
+    }
+    if (
+      runId &&
+      current.recovery.boundRunId?.trim() &&
+      current.recovery.boundRunId.trim() !== runId
+    ) {
+      outcome = { released: false, reason: "run_mismatch", intent: current };
+      return "keep";
+    }
+    const nextToken = randomUUID();
+    const nextGen = (current.recovery.claimGeneration ?? 0) + 1;
+    mutated = true;
+    const next = {
+      ...current,
+      recovery: {
+        ...current.recovery,
+        stage: "continue_armed" as const,
+        claimGeneration: nextGen,
+        claimToken: nextToken,
+        boundRunId: undefined,
+        boundSessionId: undefined,
+        holderPid: undefined,
+        lastAttemptAtMs: Date.now(),
+      },
+    };
+    outcome = { released: true, intent: next, claimToken: nextToken };
+    return next;
+  });
+  if (mutated && outcome.released) {
+    return outcome;
+  }
+  if (!outcome.released && outcome.reason !== "unchanged") {
+    return outcome;
+  }
+  return { released: false, reason: "unchanged", intent: intent };
 }
 
 export function markAsyncWaitRecoveryDelivered(input: {

@@ -1768,3 +1768,28 @@ Typed oxlint on changed sources: 0 warnings / 0 errors.
 
 **Remelt tip for re-acceptance:** `378a65402` (4-defect close). Prior failed tip `efe0e2ce9` retained above. — grok-bot
 
+
+## Package 2 remelt — close 3 remaining defects (2026-11-08)
+
+**Failed tip:** `72c478de3cb25b53cf3c769c729619f37abb57e8`. Package 3 still NOT started.
+
+Preserved: original payload remelt, delivery_unknown, accepted/rejected bind, dead-holder generation/token fence, production ensure→createFollowupRunner chain. No architecture expansion. No push/merge/deploy.
+
+### Defects closed
+
+1. **Same job/token different run overwrite** — `bindAsyncWaitRecoveryTurn` lock rejects `already_bound` when `boundRunId` exists and differs; same-run idempotent retry kept. Different run must re-claim (new gen/token).
+2. **Gateway-alive ≠ turn alive** — `releaseAsyncWaitRecoveryTurn` reopens `turn_bound` (no delivery) to `continue_armed` with new generation/token on controlled-turn terminal/prepare failure; followup-runner finally releases when stage still `turn_bound` without delivery. Recheck is no longer permanent `active_exec` while Gateway PID lives.
+3. **Absent identity rollback shape** — `restoreBoardExecutionAttemptAfterFailedBind` deletes absent `executionAttempt`/`deliverableVersion` instead of writing `""`; original binding can re-claim after failed bind CAS rollback.
+
+### Regression evidence
+
+| Case | Suite | Result |
+| --- | --- | --- |
+| Same token different run refused; original unchanged | four-defects | PASS |
+| Gateway-alive after release recoverable; old token fenced | four-defects | PASS |
+| Absent identity rollback → original binding re-claims | four-defects | PASS |
+| Prior four-defects + production-path + claim-fence + related | 7 files / 34 tests | PASS |
+
+Typed oxlint on changed sources: 0 warnings / 0 errors.
+
+**Remelt tip for re-acceptance:** *(filled after tip SHA commit)*. Prior failed tip `72c478de3` retained above. — grok-bot
