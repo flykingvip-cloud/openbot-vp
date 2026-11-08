@@ -1916,3 +1916,56 @@ PPTX: original bytes retained → HTML preview derivative; download/save use ori
 | Source edits for Package4 blockers | **none** |
 
 **Remelt tip for Package4 acceptance:** `6fc0bf08c1efd190fde3dc3cbb56fe0ed694f364` (gap verification only; zero blockers). Prior Package3 tip `5b2af981a` retained. — grok-bot
+
+## Package 5 — intent audit / archive / old-path retirement (2026-11-08)
+
+**Baseline (Package 4 PASSED):** `8d60206fb497fd8bf48af57dbdda4980abc816c1`  
+**Package 5 status:** limited retire of unused misleading recovery aliases + full keep/retire audit.  
+**Package 6 not started** (final fixed candidate + same-version regression is Package6).  
+No push / merge / deploy / production restart. Foreign concurrent WIP left untouched.
+
+Charter: strip/archive/retire old control paths that still interfere with the new main chain. Delete only when duties taken over with evidence. Unknown/in-use → keep with reason. No bulk directory deletes; embedded/CLI backends stay; thin forward-only façades need not be force-deleted for a zero count. No replacement executor.
+
+### Audit matrix (verified at Package4 tip)
+
+| Candidate | Intent | Production consumers | Durable assets | New-main takeover | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| `claimAsyncWaitJobIntent` / `deliverRecoveredAsyncWaitCompletion` | Legacy recovery names; mapped continue_armed → `"woke"` / implied delivery | **None** (definitions + public re-exports only) | None | `armAsyncWaitRecoveryContinuation` + `confirmPendingTurnDelivery` | **Retire now** (removed) |
+| `agents/cli-runner.ts` thin façade | Forward to `execution/runner/cli-run` | Tests + wiring still import façade | CLI session/cred state in backend | Unique CLI adapter in execution | **Keep** — forward-only; migrate consumers before delete |
+| `agents/pi-embedded.ts` / `pi-embedded-runner.ts` façades | Forward run/abort/lane APIs | Gateway chat/reset, cron, commands, auto-reply (live) | Active-run registry in execution | `runEmbeddedPiAgent` in execution/index | **Keep** — capability backend + live consumers; not old main chain |
+| Embedded/CLI execution backends | Model/tool loop providers | admitted-turn / cron / followup / command | Sessions, tools, abort | Same backends under execution/runner | **Keep** — backends until state migration clears them |
+| Lobster (`extensions/lobster`) | External workflow + resumeToken | Plugin tool path; install/allowlist unknown in this audit | resumeToken / pipeline files unknown | Declared delegated_workflow in capability catalog | **Keep** — no config+asset proof to delete |
+| OpenProse (`extensions/open-prose`) | Skill-shipped prose VM / sessions_spawn | Skill load path; user `.prose` assets unknown | Programs / VM / child sessions unknown | N/A without asset migration | **Keep** — no asset proof |
+| `task-orchestration` | Shadow observe / dormant dispatch | `dispatch-from-config` web-read shadow observe; LIVE_INVOKE frozen false | Ledger/job stores unused when dormant | Reply mainline is `runAdmittedTurn` | **Keep** — observe/dormant; not bulk-delete by name |
+| BOOT / cron / followup triggers | Legitimate scene adapters | Gateway boot, cron isolated agent, followup runner | Queues / tickets | Controlled execution lifecycle | **Keep** — triggers ≠ redundant |
+| `agents/usage.ts`, `pi-tools.abort.ts`, `execution-preflight/validation.ts`, session-usage façades | Forward-only to shared/runtime | Many live imports | N/A | Single implementations elsewhere | **Keep** — harmless façades; do not force-delete for zero count |
+| Already-removed shells (`untrusted-context`, `execution-stall-continue-loop`, `agent-runner-payloads`) | Prior safe-retirements | Gone | Archive in git history | Public runtime APIs | **Archive pointer only** (safe-retirements.md) |
+| Composer mention eager `tool.execute` | Pre-admission auto-execute | Retired earlier (7f13e7930) | N/A | Admitted runner hints only | Already retired — do not redo |
+| Concurrent WIP (`executor-evidence/`, task-outcome model-call closeout, etc.) | Other team | Uncommitted on worktree | Unknown | Out of Package5 | **Leave untouched** — do not stage |
+
+### Retired this package
+
+1. Removed unused `claimAsyncWaitJobIntent` (misleading `"woke"`) and `deliverRecoveredAsyncWaitCompletion` (name implied delivery; only armed continue).
+2. Public `state/index` no longer re-exports those aliases.
+3. Source archive comment points to sole arm entry: `armAsyncWaitRecoveryContinuation`; delivery remains `confirmPendingTurnDelivery` only.
+
+### Call-chain evidence (recovery / completion)
+
+```
+boot/recheck → recoverAsyncWaitJobsAtGatewayBoot
+  → armAsyncWaitRecoveryContinuation (claim under lock)
+      → continue enqueue / delivery-only enqueue
+  → followup claimQueuedExecution → turn → prepareVisible → confirmPendingTurnDelivery
+Deprecated aliases: removed (no callers).
+```
+
+### Verification
+
+| Suite | Result |
+| --- | --- |
+| package5-retire (new) | 3 PASS |
+| async-wait-job-recovery | 8 PASS |
+| production-path | 3 PASS |
+| oxlint changed sources | 0/0 |
+
+**Remelt tip for Package5 acceptance:** *(filled after tip SHA commit)*. — grok-bot

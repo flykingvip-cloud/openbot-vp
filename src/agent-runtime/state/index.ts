@@ -27,8 +27,6 @@ export {
 export {
   recoverAsyncWaitJobsAtGatewayBoot,
   armAsyncWaitRecoveryContinuation,
-  claimAsyncWaitJobIntent,
-  deliverRecoveredAsyncWaitCompletion,
   collectRecoverableAsyncWaitIntents,
   setAsyncWaitRecoveryContinueEnqueue,
   startAsyncWaitJobRecoveryRecheck,

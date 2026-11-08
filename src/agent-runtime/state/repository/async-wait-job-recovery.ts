@@ -303,52 +303,13 @@ export function armAsyncWaitRecoveryContinuation(params: {
   };
 }
 
-/** @deprecated name — use armAsyncWaitRecoveryContinuation. Never means delivered. */
-export function claimAsyncWaitJobIntent(
-  intent: AsyncWaitJobIntent,
-  opts?: { cfg?: OpenBotConfig; enqueue?: AsyncWaitRecoveryContinueEnqueue },
-): {
-  outcome: "still_waiting" | "woke" | "cleared" | "skipped";
-} {
-  const result = armAsyncWaitRecoveryContinuation({
-    intent,
-    enqueue: opts?.enqueue,
-  });
-  if (result.outcome === "still_waiting") {
-    return { outcome: "still_waiting" };
-  }
-  if (result.outcome === "cleared") {
-    return { outcome: "cleared" };
-  }
-  if (result.outcome === "continue_armed" || result.outcome === "retried_open") {
-    // "woke" kept for older tests = continue armed, NOT delivered.
-    return { outcome: "woke" };
-  }
-  return { outcome: "skipped" };
-}
-
-/** @deprecated — delivery is only via confirmPending after a real turn. */
-export function deliverRecoveredAsyncWaitCompletion(params: {
-  intent: AsyncWaitJobIntent;
-  cfg?: OpenBotConfig;
-  enqueue?: AsyncWaitRecoveryContinueEnqueue;
-}): { delivered: boolean; reason: "issued" | "already" | "refused" | "skipped" | "armed" } {
-  if (params.intent.recovery?.stage === "delivered") {
-    return { delivered: false, reason: "already" };
-  }
-  const result = armAsyncWaitRecoveryContinuation({
-    intent: params.intent,
-    enqueue: params.enqueue,
-  });
-  if (result.outcome === "cleared") {
-    return { delivered: false, reason: "refused" };
-  }
-  if (result.outcome === "continue_armed" || result.outcome === "retried_open") {
-    // Explicitly NOT delivered — continue was armed onto the mainline.
-    return { delivered: false, reason: "armed" };
-  }
-  return { delivered: false, reason: "skipped" };
-}
+/**
+ * Retired Package5 aliases (no remaining consumers):
+ * - claimAsyncWaitJobIntent — mapped continue_armed to misleading outcome "woke".
+ * - deliverRecoveredAsyncWaitCompletion — name implied delivery; only armed continue.
+ * Sole recovery arm entry: armAsyncWaitRecoveryContinuation. Delivery only via
+ * confirmPendingTurnDelivery after a real turn / delivery-only retry.
+ */
 
 export function recoverAsyncWaitJobsAtGatewayBoot(params: {
   cfg: OpenBotConfig;
