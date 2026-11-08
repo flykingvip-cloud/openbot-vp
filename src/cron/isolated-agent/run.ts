@@ -68,7 +68,6 @@ import {
   getHookType,
   isExternalHookSession,
 } from "../../security/external-content.js";
-import { isReadonlyInvokeEnabled } from "../../task-orchestration/feature.js";
 import { ensureCronTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
 import {
   assertRunnerTurnBudgetAllowsModelCall,
@@ -737,7 +736,6 @@ export async function runCronIsolatedAgentTurn(params: {
   });
   let activeTaskFocus = cronTaskFocus;
   let ledgerStepPrompt = "";
-  let readonlyPrompt = "";
   let ledgerHasNoWritableStep = false;
   if (ledgerSession) {
     try {
@@ -754,29 +752,8 @@ export async function runCronIsolatedAgentTurn(params: {
           acceptanceRules: [step.title],
           anchorText: [cronTaskFocus.goal, step.title].filter((part) => part.trim()).join("\n"),
         };
-        // Read-only orchestration is a separate flag. Off: this block does not run.
-        // The appendix is untrusted prompt context, never ledger evidence.
-        if (isReadonlyInvokeEnabled()) {
-          try {
-            const { considerReadonlyInvoke } = await import("../../task-orchestration/dispatch.js");
-            const title = step.title.trim();
-            const readonly = await considerReadonlyInvoke({
-              intent: /^https?:\/\//i.test(title) ? "read_web" : "recall_memory",
-              query: step.title,
-              config: cfgWithAgentDefaults,
-              agentSessionKey,
-              workspaceDir,
-              agentId,
-              isFastTestEnv,
-              existingSkillsSnapshot: skillsSnapshot,
-            });
-            if (readonly.promptAppendix.trim()) {
-              readonlyPrompt = readonly.promptAppendix;
-            }
-          } catch (err) {
-            logWarn(`[cron:${params.job.id}] readonly orchestration invoke failed: ${String(err)}`);
-          }
-        }
+        // The admitted runner selects memory/web tools through the common
+        // capability boundary; preparing a step must not invoke tools itself.
       }
     } catch (err) {
       logWarn(`[cron:${params.job.id}] progress ledger step prompt failed: ${String(err)}`);
@@ -1186,7 +1163,7 @@ export async function runCronIsolatedAgentTurn(params: {
         }),
       );
     }
-    const runCommandBody = [commandBody, ledgerStepPrompt, readonlyPrompt]
+    const runCommandBody = [commandBody, ledgerStepPrompt]
       .filter((part) => part.trim())
       .join("\n\n")
       .trim();
@@ -1231,9 +1208,7 @@ export async function runCronIsolatedAgentTurn(params: {
           "Use tools when needed, including sessions_spawn for parallel subtasks, wait for spawned subagents to finish, then return only the final summary.",
         ].join(" ");
         await runPrompt(
-          [continuationPrompt, ledgerStepPrompt, readonlyPrompt]
-            .filter((part) => part.trim())
-            .join("\n\n"),
+          [continuationPrompt, ledgerStepPrompt].filter((part) => part.trim()).join("\n\n"),
         );
       }
     }

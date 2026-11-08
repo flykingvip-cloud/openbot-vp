@@ -1419,3 +1419,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 ## Continuation reservation concurrency evidence (2026-11-08)
 
 - Two independent Node processes competed for the last available continuation reservation: exactly one accepted and one refused with continue_cap. Another session carrying the same taskId remained eligible, proving the cap is session/task scoped. Continuation suite 17 PASS; full tsgo PASS; changed-file typed lint clean. No production restart or deployment; restart rescheduling remains open. — codex-runtime-manager
+
+## Cron pre-admission tool prefetch retired (2026-11-08)
+
+- Reproduced readonly orchestration invoking a tool before a denied execution admission (one failing regression). Removed the cron-only heuristic prefetch branch. Its original purpose was current-step supporting context; the admitted runner retains memory/web tools and current-step guidance through existing capability checks. No replacement prefetch scheduler or flag-controlled bypass was added; standalone workflow assets remain preserved pending their own consumer audit. — codex-runtime-manager
+- Cron long-horizon/owner/credit regression 3 files / 20 PASS, including qualifying tasks retaining tools, nonqualifying reminders remaining tools-disabled and denied admission invoking no prefetch/provider. Full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. This does not establish whole cron/group real-model acceptance or complete workflow retirement. — codex-runtime-manager
