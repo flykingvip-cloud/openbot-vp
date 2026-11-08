@@ -38,13 +38,18 @@ import {
   isPlatformAdmissionEmptyError,
 } from "../../../gateway/models/capability-admission/apply-runtime-admission.js";
 import { logVerbose } from "../../../globals.js";
+import { emitAgentEvent } from "../../../infra/agent-events.js";
 import {
   createRunCostCollector,
   snapshotRunCostPricing,
 } from "../../../observation/run-cost-collector.js";
 import { createRuntimeEvidenceObserver } from "../../../observation/runtime-evidence.js";
 import { defaultRuntime } from "../../../runtime.js";
-import { TaskBudgetExceededError } from "../../../task-outcome/runtime-from-runner.js";
+import {
+  runnerExecutorEvidenceContext,
+  TaskBudgetExceededError,
+  type ModelCallCloseoutLink,
+} from "../../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../../utils/message-channel.js";
 import { createTurnOutcomeRecorder } from "../outcomes/index.js";
 import { createAdmittedCandidateInvoker } from "./admitted-candidate.js";
@@ -125,6 +130,7 @@ export async function runAdmittedTurn(
   const tipBudgetStartedAtMs = growthStartedAt;
   let tipBudgetChargedThisTurn = false;
   let tipBudgetModelCallSeq = 0;
+  const modelCallLinks: ModelCallCloseoutLink[] = [];
   const assertTipBudgetAllowsModelCall = (): void => {
     if (!chatOutcomeTaskId || !chatOutcomeScope || params.isHeartbeat || !growthAgentIdForEntry) {
       return;
@@ -178,6 +184,9 @@ export async function runAdmittedTurn(
         model: opts.model,
       },
     );
+    if (receipt.modelCallLink) {
+      modelCallLinks.push(receipt.modelCallLink);
+    }
     costEvidence.capture({ ...opts, callSeq: tipBudgetModelCallSeq, nowMs, pricing, receipt });
     tipBudgetChargedThisTurn = true;
   };
@@ -205,6 +214,7 @@ export async function runAdmittedTurn(
       tenantId: modelGate?.tenantId,
       capabilityOutcome: capabilityOutcomeForTurn,
       budgetCharged: tipBudgetChargedThisTurn,
+      modelCallLinks,
     }),
   });
   const recordGrowthTaskOutcome = outcomeRecorder.commit;
@@ -393,6 +403,15 @@ export async function runAdmittedTurn(
           chargeTipBudgetAfterModelCall,
           notifyAgentRunStart,
           observeExecution: (stage) => runtimeEvidence.capture(stage),
+          // Internal embedded failure is collected on the host event bus.
+          // It is not a candidate terminal and is not written as one.
+          observeAttempt: (event) => {
+            emitAgentEvent({
+              runId,
+              stream: "execution-attempt",
+              data: { kind: event.kind, terminal: false, coverage: "collected" },
+            });
+          },
           handlePartialForTyping,
           normalizeStreamingText,
           normalizeReplyMediaPaths,
@@ -421,6 +440,11 @@ export async function runAdmittedTurn(
         const fallbackResult = await controlledExecution.infer({
           ...resolveModelFallbackOptions(params.followupRun.run),
           taskText: params.followupRun.prompt || params.commandBody,
+          executorEvidence: runnerExecutorEvidenceContext(
+            params.followupRun.run.config,
+            growthAgentIdForEntry ?? "",
+            { taskId: chatOutcomeTaskId, scope: chatOutcomeScope, runId },
+          ),
           run: (provider, model, runOptions) => {
             // Notify that model selection is complete (including after fallback).
             // This allows responsePrefix template interpolation with the actual model.

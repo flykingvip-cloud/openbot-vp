@@ -13,6 +13,7 @@ import type { ExecutionIdentityRunFields } from "../../../gateway/execution-iden
 import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
 import { resolveAgentRunEntitlementScope } from "../../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
+import { rememberModelResultUsage } from "../../../task-outcome/runtime-from-runner.js";
 import type { resolveMessageChannel } from "../../../utils/message-channel.js";
 import type { AgentRunContext } from "../../contracts/command.js";
 import { resolveCliRunCredential } from "../../model/index.js";
@@ -162,6 +163,7 @@ export function runCommandCandidate(params: {
 
             // Retry with no session ID (will create a new session)
             return runCliWithSession(undefined).then(async (result) => {
+              rememberModelResultUsage(result.meta?.agentMeta?.usage);
               // Update session store with new CLI session ID if available
               if (
                 result.meta.agentMeta?.sessionId &&
@@ -193,6 +195,7 @@ export function runCommandCandidate(params: {
           throw err;
         })
         .then((result) => {
+          rememberModelResultUsage(result.meta?.agentMeta?.usage);
           // UsageAttribution（Task 9）：成功完成（首次或会话过期重试后）写一次归因。
           if (usageAttr) {
             void recordCliBackendUsage({

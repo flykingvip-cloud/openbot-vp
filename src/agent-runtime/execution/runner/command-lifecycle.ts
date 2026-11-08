@@ -31,6 +31,7 @@ export function createCommandExecutionLifecycle(
         fallbacksOverride: input.fallbacksOverride,
         runId: params.runId,
         runtimeAdmission: { taskText: input.taskText },
+        ...(input.executorEvidence ? { executorEvidence: input.executorEvidence } : {}),
         ...authority.fallbackGovernance(),
         run: input.run,
       });

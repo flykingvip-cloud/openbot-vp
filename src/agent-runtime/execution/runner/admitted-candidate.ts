@@ -20,7 +20,11 @@ import { emitAgentEvent } from "../../../infra/agent-events.js";
 import { getExecApprovalReplyMetadata } from "../../../infra/exec-approval-reply.js";
 import { APPROVE_CARD_CTA } from "../../../shared/text/assistant-scratchpad.js";
 import type { ModalityExecutionArtifact } from "../../../task-outcome/modality-artifact-evidence.js";
-import { TaskBudgetExceededError } from "../../../task-outcome/runtime-from-runner.js";
+import {
+  rememberModelResultUsage,
+  TaskBudgetExceededError,
+  usageRetainedForCandidateCharge,
+} from "../../../task-outcome/runtime-from-runner.js";
 import {
   isMarkdownCapableMessageChannel,
   resolveMessageChannel,
@@ -33,6 +37,11 @@ import { runEmbeddedPiAgent } from "./embedded-run.js";
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
 export type AdmittedCandidateHost = {
   observeExecution?: (stage: "started" | "completed" | "failed" | "cancelled") => void;
+  /**
+   * An embedded lifecycle error inside the runner. This is one internal attempt,
+   * not the candidate's execution terminal. A later successful return may still complete.
+   */
+  observeAttempt?: (event: { kind: "embedded_lifecycle_error" }) => void;
   assertOriginalTaskCurrent: () => void;
   assertTipBudgetAllowsModelCall: () => void;
 
@@ -59,6 +68,26 @@ export type AdmittedCandidateHost = {
   getModelGate: () => EmployeeModelGateResult | undefined;
   identity: { user?: string; domain?: GatewayClient["sessionDomain"]; platformUserId?: string };
 };
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+type CandidateExecutionTerminal = "completed" | "failed" | "cancelled";
+
+/** Model-response observation is not an execution terminal. A candidate records at most one. */
+function createCandidateTerminal(host: AdmittedCandidateHost) {
+  let terminal: CandidateExecutionTerminal | null = null;
+  return {
+    finish(stage: CandidateExecutionTerminal) {
+      if (terminal) {
+        return;
+      }
+      terminal = stage;
+      host.observeExecution?.(stage);
+    },
+  };
+}
+
 export function createAdmittedCandidateInvoker(
   params: AgentTurnExecutionParams,
   runId: string,
@@ -98,6 +127,25 @@ export function createAdmittedCandidateInvoker(
           fallbackUserId: params.sessionCtx.GatewayClientUser,
         });
         let lifecycleTerminalEmitted = false;
+        let notedCliUsage: unknown;
+        const executionTerminal = createCandidateTerminal(host);
+        let cliCharged = false;
+        const chargeCliOnce = (usage?: unknown) => {
+          if (cliCharged) {
+            return;
+          }
+          cliCharged = true;
+          try {
+            host.chargeTipBudgetAfterModelCall({ provider, model, usage });
+          } catch (chargeErr) {
+            if (chargeErr instanceof TaskBudgetExceededError) {
+              throw chargeErr;
+            }
+            logVerbose(
+              `tip budget mid-run charge failed (cli): ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
+            );
+          }
+        };
         try {
           host.assertOriginalTaskCurrent();
           host.observeExecution?.("started");
@@ -125,7 +173,7 @@ export function createAdmittedCandidateInvoker(
             images: params.opts?.images,
             credentialEnv,
           });
-          host.observeExecution?.("completed");
+          notedCliUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
           host.setBootstrapWarnings(
             resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport),
           );
@@ -168,24 +216,15 @@ export function createAdmittedCandidateInvoker(
             });
           }
 
-          try {
-            host.chargeTipBudgetAfterModelCall({
-              provider,
-              model,
-              usage: result.meta?.agentMeta?.usage,
-            });
-          } catch (chargeErr) {
-            if (chargeErr instanceof TaskBudgetExceededError) {
-              throw chargeErr;
-            }
-            logVerbose(
-              `tip budget mid-run charge failed (cli): ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
-            );
-          }
+          chargeCliOnce(notedCliUsage);
+          executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "completed");
 
           return result;
         } catch (err) {
-          host.observeExecution?.(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
+          if (!(err instanceof TaskBudgetExceededError) && !isAbortError(err)) {
+            chargeCliOnce(usageRetainedForCandidateCharge(notedCliUsage, err));
+          }
+          executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
           emitAgentEvent({
             runId,
             stream: "lifecycle",
@@ -292,6 +331,25 @@ export function createAdmittedCandidateInvoker(
         storeRoot: defaultShadowStoreRoot(),
         cronStorePath: resolveCronStorePath(params.followupRun.run.config.cron?.store),
       });
+      let notedEmbeddedUsage: unknown;
+      let embeddedCharged = false;
+      const executionTerminal = createCandidateTerminal(host);
+      const chargeEmbeddedOnce = (usage?: unknown) => {
+        if (embeddedCharged) {
+          return;
+        }
+        embeddedCharged = true;
+        try {
+          host.chargeTipBudgetAfterModelCall({ provider, model, usage });
+        } catch (chargeErr) {
+          if (chargeErr instanceof TaskBudgetExceededError) {
+            throw chargeErr;
+          }
+          logVerbose(
+            `tip budget mid-run charge failed: ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
+          );
+        }
+      };
       try {
         host.assertOriginalTaskCurrent();
         const result = await runEmbeddedPiAgent({
@@ -372,11 +430,8 @@ export function createAdmittedCandidateInvoker(
               if (phase === "start") {
                 host.observeExecution?.("started");
               }
-              if (phase === "end") {
-                host.observeExecution?.("completed");
-              }
               if (phase === "error") {
-                host.observeExecution?.(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
+                host.observeAttempt?.({ kind: "embedded_lifecycle_error" });
               }
             }
             // Tool stream only. Does not write assistant text into the ledger.
@@ -490,6 +545,7 @@ export function createAdmittedCandidateInvoker(
               })()
             : undefined,
         });
+        notedEmbeddedUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
         host.setBootstrapWarnings(
           resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport),
         );
@@ -498,26 +554,18 @@ export function createAdmittedCandidateInvoker(
           ok: true,
         });
         emitModelStage("assistant_persisted", { source: "session_manager" });
-        try {
-          host.chargeTipBudgetAfterModelCall({
-            provider,
-            model,
-            usage: result.meta?.agentMeta?.usage,
-          });
-        } catch (chargeErr) {
-          if (chargeErr instanceof TaskBudgetExceededError) {
-            throw chargeErr;
-          }
-          logVerbose(
-            `tip budget mid-run charge failed: ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
-          );
-        }
+        chargeEmbeddedOnce(notedEmbeddedUsage);
+        executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "completed");
         return result;
       } catch (err) {
         emitModelStage("model_finished", {
           modelMs: Date.now() - modelStartedAtMs,
           ok: false,
         });
+        if (!(err instanceof TaskBudgetExceededError) && !isAbortError(err)) {
+          chargeEmbeddedOnce(usageRetainedForCandidateCharge(notedEmbeddedUsage, err));
+        }
+        executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
         throw err;
       }
     })();

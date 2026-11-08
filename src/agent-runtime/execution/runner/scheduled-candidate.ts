@@ -5,6 +5,11 @@ import { isCliProvider } from "../../../agents/model-selection.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
 import { resolveEnterpriseEmbeddedTransport } from "../../../gateway/enterprise-model/embedded-transport.js";
+import {
+  rememberModelResultUsage,
+  TaskBudgetExceededError,
+  usageRetainedForCandidateCharge,
+} from "../../../task-outcome/runtime-from-runner.js";
 import { resolveCliRunCredential } from "../../model/index.js";
 import { runCliAgent } from "./cli-run.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
@@ -42,56 +47,111 @@ export async function runScheduledCandidate(
       model: run.model,
       config: run.config,
     });
-    const result = await runCliAgent({
-      taskExecutionBinding: run.taskExecutionBinding,
-      sessionId: run.sessionId,
-      sessionKey: run.sessionKey,
-      agentId: run.agentId,
-      sessionFile: run.sessionFile,
-      workspaceDir: run.workspaceDir,
-      config: run.config,
-      prompt: run.prompt,
-      provider: run.provider,
-      model: run.model,
-      thinkLevel: run.thinkLevel,
-      timeoutMs: run.timeoutMs,
-      runId: run.runId,
-      abortSignal: run.abortSignal,
-      cliSessionId,
-      bootstrapPromptWarningSignaturesSeen: run.bootstrapPromptWarningSignaturesSeen,
-      bootstrapPromptWarningSignature: run.bootstrapPromptWarningSignature,
-      ...(run.extraSystemPrompt ? { extraSystemPrompt: run.extraSystemPrompt } : {}),
-      ...(credentialEnv ? { credentialEnv } : {}),
-    });
-    if (usageAttr) {
-      void recordCliBackendUsage({
-        ...usageAttr,
-        backendId: run.provider,
+    let cliCharged = false;
+    const chargeCli = (usage?: unknown) => {
+      if (cliCharged) {
+        return;
+      }
+      cliCharged = true;
+      host.recordUsage(
+        { meta: { agentMeta: { usage } } } as EmbeddedPiRunResult,
+        run.provider,
+        run.model,
+      );
+    };
+    let notedCliUsage: unknown;
+    let result: EmbeddedPiRunResult;
+    try {
+      result = await runCliAgent({
+        taskExecutionBinding: run.taskExecutionBinding,
+        sessionId: run.sessionId,
+        sessionKey: run.sessionKey,
+        agentId: run.agentId,
+        sessionFile: run.sessionFile,
+        workspaceDir: run.workspaceDir,
+        config: run.config,
+        prompt: run.prompt,
+        provider: run.provider,
         model: run.model,
-        executionId: run.runId,
+        thinkLevel: run.thinkLevel,
+        timeoutMs: run.timeoutMs,
+        runId: run.runId,
+        abortSignal: run.abortSignal,
+        cliSessionId,
+        bootstrapPromptWarningSignaturesSeen: run.bootstrapPromptWarningSignaturesSeen,
+        bootstrapPromptWarningSignature: run.bootstrapPromptWarningSignature,
+        ...(run.extraSystemPrompt ? { extraSystemPrompt: run.extraSystemPrompt } : {}),
+        ...(credentialEnv ? { credentialEnv } : {}),
       });
+      notedCliUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
+      if (usageAttr) {
+        void recordCliBackendUsage({
+          ...usageAttr,
+          backendId: run.provider,
+          model: run.model,
+          executionId: run.runId,
+        });
+      }
+      host.recordWarnings(resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport));
+      chargeCli(notedCliUsage);
+      return result;
+    } catch (err) {
+      if (!(err instanceof TaskBudgetExceededError)) {
+        try {
+          chargeCli(usageRetainedForCandidateCharge(notedCliUsage, err));
+        } catch (chargeErr) {
+          if (chargeErr instanceof TaskBudgetExceededError) {
+            throw chargeErr;
+          }
+        }
+      }
+      throw err;
     }
-    host.recordWarnings(resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport));
-    host.recordUsage(result, run.provider, run.model);
-    return result;
   }
   const transport = await resolveEnterpriseEmbeddedTransport({
     provider: run.provider,
     model: run.model,
     tenantId: input.tenantId,
   });
-  const result = await runEmbeddedPiAgent({
-    ...run,
-    provider: transport.provider,
-    model: transport.model,
-    ...(transport.providerAuthOverride
-      ? { providerAuthOverride: transport.providerAuthOverride }
-      : {}),
-    ...(transport.enterpriseRuntimeModelId
-      ? { enterpriseRuntimeModelId: transport.enterpriseRuntimeModelId }
-      : {}),
-  });
-  host.recordWarnings(resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport));
-  host.recordUsage(result, transport.provider, transport.model);
-  return result;
+  let embeddedCharged = false;
+  const chargeEmbedded = (usage?: unknown) => {
+    if (embeddedCharged) {
+      return;
+    }
+    embeddedCharged = true;
+    host.recordUsage(
+      { meta: { agentMeta: { usage } } } as EmbeddedPiRunResult,
+      transport.provider,
+      transport.model,
+    );
+  };
+  let notedEmbeddedUsage: unknown;
+  try {
+    const result = await runEmbeddedPiAgent({
+      ...run,
+      provider: transport.provider,
+      model: transport.model,
+      ...(transport.providerAuthOverride
+        ? { providerAuthOverride: transport.providerAuthOverride }
+        : {}),
+      ...(transport.enterpriseRuntimeModelId
+        ? { enterpriseRuntimeModelId: transport.enterpriseRuntimeModelId }
+        : {}),
+    });
+    notedEmbeddedUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
+    host.recordWarnings(resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport));
+    chargeEmbedded(result.meta?.agentMeta?.usage ?? notedEmbeddedUsage);
+    return result;
+  } catch (err) {
+    if (!(err instanceof TaskBudgetExceededError)) {
+      try {
+        chargeEmbedded(usageRetainedForCandidateCharge(notedEmbeddedUsage, err));
+      } catch (chargeErr) {
+        if (chargeErr instanceof TaskBudgetExceededError) {
+          throw chargeErr;
+        }
+      }
+    }
+    throw err;
+  }
 }

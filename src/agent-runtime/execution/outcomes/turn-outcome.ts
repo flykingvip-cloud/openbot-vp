@@ -9,6 +9,7 @@ import type { ModalityExecutionArtifact } from "../../../task-outcome/modality-a
 import {
   recordRunnerTurnOutcome,
   type GrowthOutcomeCommitOpts,
+  type ModelCallCloseoutLink,
   type RunnerTurnFailureReason,
 } from "../../../task-outcome/runtime-from-runner.js";
 import type { TrustedScope } from "../../../task-outcome/types.js";
@@ -28,6 +29,7 @@ export function createTurnOutcomeRecorder(params: {
     tenantId?: string;
     capabilityOutcome?: CapabilityOutcomeForTurn;
     budgetCharged: boolean;
+    modelCallLinks?: ModelCallCloseoutLink[];
   };
 }) {
   const runId = params.runId;
@@ -106,6 +108,7 @@ export function createTurnOutcomeRecorder(params: {
     const chatOutcomeScope = context.scope;
     const capabilityOutcomeForTurn = context.capabilityOutcome;
     const tipBudgetChargedThisTurn = context.budgetCharged;
+    const modelCallLinks = context.modelCallLinks;
     // askOutcome R83: requires entry taskId; never invent run:${runId} at finish.
     if (!chatOutcomeTaskId || !chatOutcomeScope) {
       reportEvolutionOutcomeWriteFailure({
@@ -152,6 +155,7 @@ export function createTurnOutcomeRecorder(params: {
         ? { adoptedAssetIds: opts.adoptedAssetIds }
         : {}),
       ...(tipBudgetChargedThisTurn || opts?.skipBudgetCharge ? { skipBudgetCharge: true } : {}),
+      ...(modelCallLinks && modelCallLinks.length > 0 ? { modelCallLinks } : {}),
     })
       .then(async (receipt) => {
         if (receipt?.record) {
