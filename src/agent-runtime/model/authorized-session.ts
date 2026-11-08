@@ -15,6 +15,7 @@ import type {
   rememberRunModelSet,
   snapshotCreditReportingFromGate,
 } from "../../gateway/governance/spawn-snapshot-handoff.js";
+import type { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import type { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
 import type { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { createRunAdmissionLease } from "./admission-lease.js";
@@ -34,6 +35,10 @@ export type ModelSessionPorts = {
     resolvePlatformModelsMode: typeof resolvePlatformModelsMode;
     runWithModelFallback: typeof runWithModelFallback;
   };
+};
+export type InteractionPreparationPorts = {
+  buildRunContextEstimateParts: typeof buildRunContextEstimateParts;
+  resolveExecutionRoutingFromCapabilityPlan: typeof resolveExecutionRoutingFromCapabilityPlan;
 };
 type AdmissionResult = Awaited<ReturnType<typeof tryAcquireEnterpriseAgentRun>>;
 type Acquired = Extract<AdmissionResult, { acquired: true }>;

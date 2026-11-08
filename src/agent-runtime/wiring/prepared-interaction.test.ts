@@ -1,8 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import { expect, it, vi } from "vitest";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
-import { runAuthorizedInteraction } from "../command/authorized-interaction.js";
-import { createAuthorizedModelSession } from "../model/index.js";
+import { runGovernedInteraction } from "../command/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 const calls = vi.hoisted(() => ({ complete: vi.fn() }));
 vi.mock("@earendil-works/pi-ai/compat", async (original) => ({
@@ -19,9 +18,13 @@ const model = {
   maxTokens: 1000,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 } as Model<Api>;
-it.each(["reply", "execution_request"] as const)(
-  "routes %s from one governed completion",
-  async (kind) => {
+it.each([
+  ["reply", true],
+  ["execution_request", true],
+  ["execution_request", false],
+] as const)(
+  "routes %s with authorization=%s from one governed completion",
+  async (kind, authorized) => {
     const host = bindAdmittedTurnHost();
     host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
       acquired: true as const,
@@ -37,12 +40,10 @@ it.each(["reply", "execution_request"] as const)(
     host.task.ensureChatTurnTaskOutcome = vi.fn();
     host.admission.releaseEnterpriseAgentRun = vi.fn(async () => {});
     host.model.forgetRunModelSet = vi.fn();
-    const session = createAuthorizedModelSession("interaction-test", host);
     const decision =
       kind === "reply"
         ? { kind, text: "你好" }
         : { kind, request: { goal: "生成报告", acceptance: ["来源可核验"] } };
-    const authorize = vi.fn(async () => true);
     const commit = vi.fn(() => ({ kind: "rejected" as const, reason: "stale_revision" }));
     calls.complete.mockClear();
     calls.complete.mockResolvedValue({
@@ -51,7 +52,7 @@ it.each(["reply", "execution_request"] as const)(
       usage: makeZeroUsageSnapshot(),
       stopReason: "stop",
     });
-    const result = await runAuthorizedInteraction(
+    const result = await runGovernedInteraction(
       {
         input: {
           message: "你好",
@@ -60,35 +61,36 @@ it.each(["reply", "execution_request"] as const)(
             { role: "user", content: "untrusted knowledge" },
           ],
         },
+        runId: "interaction-test",
+        agentId: "bot",
+        agentDir: "/tmp/agent",
+        sessionFile: "/tmp/session.jsonl",
+        requestId: "message-a",
+        captured: { expectedFocusRevision: 0, expectedWriteEpoch: 0 },
+        identity: { gatewayClientPlatformUserId: "user" },
+        authorized,
         config: {},
         provider: "test",
         model: "test",
         timeoutMs: 1000,
-        maxTokens: 200,
       },
       {
-        session,
-        authorization: {},
-        prepare: (active) => {
-          active.prepareModelSet({
-            config: {},
-            routing: host.model.resolveExecutionRoutingFromCapabilityPlan({}),
-          });
-        },
+        modelSession: host,
+        model: host.model,
+        resolveFallbacks: () => undefined,
         candidate: async () => ({ model }),
-        admission: {
-          captured: { requestId: "message-a", expectedFocusRevision: 0, expectedWriteEpoch: 0 },
-          ports: { authorize, commit },
-        },
+        commit,
       },
     );
     expect(result).toEqual(
       kind === "reply"
         ? { kind: "respond", text: "你好", clarification: false }
-        : { kind: "execution_admission", result: { kind: "rejected", reason: "stale_revision" } },
+        : {
+            kind: "execution_admission",
+            result: { kind: "rejected", reason: authorized ? "stale_revision" : "unauthorized" },
+          },
     );
-    expect(authorize).toHaveBeenCalledTimes(kind === "reply" ? 0 : 1);
-    expect(commit).toHaveBeenCalledTimes(kind === "reply" ? 0 : 1);
+    expect(commit).toHaveBeenCalledTimes(kind === "execution_request" && authorized ? 1 : 0);
     expect(calls.complete).toHaveBeenCalledOnce();
     const context = calls.complete.mock.calls[0]?.[1];
     expect(context.tools).toEqual([]);
@@ -98,6 +100,5 @@ it.each(["reply", "execution_request"] as const)(
     expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
     expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
     expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();
-    await session.dispose();
   },
 );

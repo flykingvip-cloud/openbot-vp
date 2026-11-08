@@ -32,3 +32,5 @@ export { isHumanInteractionIngress } from "./ingress-kind.js";
 export { bindExecutionAdmissionPorts } from "./execution-admission.js";
 
 export { openCommandOutcomeEntry } from "./command-outcome-entry.js";
+
+export { runGovernedInteraction } from "./governed-interaction.js";
