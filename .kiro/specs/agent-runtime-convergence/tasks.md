@@ -1375,3 +1375,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Moved candidate budget gating, success/failure charging and accumulated charge facts out of the command host into its execution-owned budget component. Command retains scene input and delivery adaptation; parent identity, sequence and budget-exhaustion precedence remain unchanged. No task creation or additional model call. — codex-runtime-manager
 - Budget/command/credit regression 3 files / 50 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. Earlier candidate 575bd7900 joint regression 75 files / 386 PASS. Full lifecycle convergence and final real-model/restart acceptance remain open. — codex-runtime-manager
+
+## Current candidate individual real-model recheck (2026-11-08)
+
+- Candidate eeae5d645 local full build PASS; 209 existing ineffective dynamic-import warnings and UI-size warnings remain; pinned Control UI sync skipped. No production restart or deployment. — codex-runtime-manager
+- Isolated Gateway with api-proxy-deepseek/deepseek-v4-flash completed the deterministic file task: exact UTF-8 artifact bytes, acceptance passed with digest, delivered receipt, deliverableChecked=true and unfinished=false. Task task-a26b8b0b755e; run/attempt 7b446f57-21c9-4807-9b3d-eb948ea29c42. Probe exited normally and temporary state was removed. This validates one personal artifact scenario, not semantic/layout acceptance, collaboration real-model lifecycle or asynchronous recovery after restart. — codex-runtime-manager
