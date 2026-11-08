@@ -36,3 +36,5 @@ export { buildResumePrompt, sanitizeTaskBoardPathForPrompt } from "./sources/tas
 export { buildTaskBoardContext } from "./sources/task-board-context.js";
 
 export { renderIdentityBootstrapGuard } from "./sources/identity-bootstrap.js";
+
+export { omitTaskStatusSeparators, omitParkedPriorTurns } from "./sources/task-history.js";
