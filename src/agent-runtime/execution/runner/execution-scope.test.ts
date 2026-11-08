@@ -2,6 +2,43 @@ import { expect, it, vi } from "vitest";
 import type { ModelInferenceInput } from "../../model/index.js";
 import { createExecutionScope } from "./execution-scope.js";
 
+it("rejects preparation that finishes after disposal", async () => {
+  let finish!: (value: { kind: "ready" }) => void;
+  const dispose = vi.fn(async () => {});
+  const scope = createExecutionScope({
+    prepare: (_input: { signal?: AbortSignal }) =>
+      new Promise<{ kind: "ready" }>((resolve) => {
+        finish = resolve;
+      }),
+    infer: vi.fn(),
+    dispose,
+  });
+  const pending = scope.prepare({});
+  const disposal = scope.dispose();
+  expect(dispose).not.toHaveBeenCalled();
+  finish({ kind: "ready" });
+  await expect(pending).rejects.toThrow(/disposed/);
+  await disposal;
+  expect(dispose).toHaveBeenCalledOnce();
+});
+
+it("refuses overlapping preparations instead of allowing stale readiness", async () => {
+  let finish!: (value: { kind: "ready" }) => void;
+  const prepare = vi.fn(
+    (_input: { signal?: AbortSignal }) =>
+      new Promise<{ kind: "ready" }>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const scope = createExecutionScope({ prepare, infer: vi.fn(), dispose: vi.fn(async () => {}) });
+  const pending = scope.prepare({});
+  await expect(scope.prepare({})).rejects.toThrow(/in progress/);
+  expect(prepare).toHaveBeenCalledOnce();
+  finish({ kind: "ready" });
+  await pending;
+  await scope.dispose();
+});
+
 function setup() {
   const prepare = vi.fn(async (_input: { signal?: AbortSignal }) => ({ kind: "ready" as const }));
   const dispose = vi.fn(async () => {});

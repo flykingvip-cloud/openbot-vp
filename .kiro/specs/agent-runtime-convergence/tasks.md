@@ -1365,3 +1365,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced preserved external article content entering a system message (one failing trust regression). Retained article rewrite continuity but injects preserved material as explicitly untrusted user content. Moved article and task-history projection to shared context; provider history sanitation no longer imports the legacy semantic focus module. Legacy exports reference the same implementation. — codex-runtime-manager
 - Article/focus/board regression 3 files / 45 PASS; provider adapter regression 2 PASS separately. Full tsgo, typed lint and 55 architecture rules PASS. Prior candidate 288bf9110 joint regression 75 files / 359 PASS and build PASS; no Gateway restart or deployment. These checks do not establish complete async-job recovery or final personal/group real-model acceptance. — codex-runtime-manager
+
+## Shared execution preparation race closure (2026-11-08)
+
+- Reproduced disposal racing with pending preparation: late preparation returned ready after disposal; overlapping preparations could overwrite readiness. Shared scope now rejects overlap, rejects late readiness and drains pending admission before releasing its authority, so a late-acquired lease is not abandoned. No new scheduler or scenario classifier. — codex-runtime-manager
+- Red/green regression: two failures before fix; scope/lifecycle 2 files / 9 PASS after fix. Full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. This is shared lifecycle component evidence, not final same-version personal/collaboration real-model or restart acceptance. — codex-runtime-manager

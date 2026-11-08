@@ -16,21 +16,40 @@ export function createExecutionScope<
   dispose: () => Promise<void>;
 }) {
   let ready = false;
+  let preparing = false;
+  let preparationFinished: Promise<void> | undefined;
   let disposed = false;
   let disposal: Promise<void> | undefined;
   let signal: AbortSignal | undefined;
   return {
     async prepare(input: Input) {
-      ready = false;
       if (disposed) {
         throw new Error("Execution lifecycle is disposed");
       }
-      input.signal?.throwIfAborted();
-      const result = await ports.prepare(input);
-      input.signal?.throwIfAborted();
-      signal = input.signal;
-      ready = result.kind === "ready";
-      return result;
+      if (preparing) {
+        throw new Error("Execution preparation is already in progress");
+      }
+      ready = false;
+      preparing = true;
+      let finishPreparation!: () => void;
+      preparationFinished = new Promise<void>((resolve) => {
+        finishPreparation = resolve;
+      });
+      try {
+        input.signal?.throwIfAborted();
+        const result = await ports.prepare(input);
+        input.signal?.throwIfAborted();
+        // An asynchronous preparation cannot revive a disposed lifecycle.
+        if (disposed) {
+          throw new Error("Execution lifecycle is disposed");
+        }
+        signal = input.signal;
+        ready = result.kind === "ready";
+        return result;
+      } finally {
+        preparing = false;
+        finishPreparation();
+      }
     },
     infer<T>(input: ExecutionInferenceInput<T>) {
       if (!ready || disposed) {
@@ -59,7 +78,11 @@ export function createExecutionScope<
     dispose() {
       ready = false;
       disposed = true;
-      return (disposal ??= ports.dispose());
+      // Admission may acquire a lease after disposal was requested. Drain it first.
+      return (disposal ??= (async () => {
+        await preparationFinished;
+        await ports.dispose();
+      })());
     },
   };
 }
