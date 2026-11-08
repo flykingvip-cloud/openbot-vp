@@ -516,5 +516,11 @@
     "from": "src/auto-reply/**",
     "denyImportsFrom": ["src/task-orchestration/complex-task-loop"],
     "description": "Accepted execution output cannot re-enter legacy semantic classification, synthetic planning or heuristic acceptance after delivery preparation."
+  },
+  {
+    "name": "runtime-cron-no-preadmission-tool-prefetch",
+    "from": "src/cron/isolated-agent/run.ts",
+    "denyImportsFrom": ["src/task-orchestration/**"],
+    "description": "Scheduled task preparation cannot invoke the retired orchestration prefetch path; tools execute through the admitted capability boundary."
   }
 ]

@@ -1424,3 +1424,7 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced readonly orchestration invoking a tool before a denied execution admission (one failing regression). Removed the cron-only heuristic prefetch branch. Its original purpose was current-step supporting context; the admitted runner retains memory/web tools and current-step guidance through existing capability checks. No replacement prefetch scheduler or flag-controlled bypass was added; standalone workflow assets remain preserved pending their own consumer audit. — codex-runtime-manager
 - Cron long-horizon/owner/credit regression 3 files / 20 PASS, including qualifying tasks retaining tools, nonqualifying reminders remaining tools-disabled and denied admission invoking no prefetch/provider. Full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. This does not establish whole cron/group real-model acceptance or complete workflow retirement. — codex-runtime-manager
+
+## Retired cron path prevention (2026-11-08)
+
+- Added a source dependency gate preventing the scheduled host from importing legacy task-orchestration prefetch again. Added the persisted continuation-limit policy to the detached rule inventory; inventory remains metadata only and cannot disable enforcement or execute configuration. Catalog 2 PASS; architecture 56 PASS; full tsgo PASS; changed-file typed lint clean. No whole-runtime retirement or deployment claimed. — codex-runtime-manager

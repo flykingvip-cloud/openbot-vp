@@ -41,6 +41,15 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     disposition: "retain",
   },
   {
+    id: "execution.continuation.bounds",
+    category: "operational",
+    owner: "policy",
+    implementation: "src/agent-runtime/policy/task-board-limits.ts",
+    checkpoint: "before_continuation_reservation",
+    management: "reviewed_parameters",
+    disposition: "retain",
+  },
+  {
     id: "delivery.receipt.identity",
     category: "lifecycle",
     owner: "delivery",
