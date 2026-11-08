@@ -11,14 +11,16 @@ import { confirmPendingTurnDeliveryWithPorts } from "../../../src/agent-runtime/
 import { claimQueuedExecution } from "../../../src/agent-runtime/state/mutations/claim-queued-execution.js";
 import { armAsyncWaitRecoveryContinuation } from "../../../src/agent-runtime/state/repository/async-wait-job-recovery.js";
 import {
-  claimAsyncWaitJobForRecovery,
   clearAsyncWaitJobIntent,
   markAsyncWaitJobExited,
-  markAsyncWaitRecoveryDelivered,
   readAsyncWaitJobIntent,
   recordAsyncWaitJobIntent,
-  bindAsyncWaitRecoveryTurn,
 } from "../../../src/agent-runtime/state/repository/async-wait-job.js";
+import { claimAsyncWaitJobForRecovery } from "../../../src/agent-runtime/state/repository/async-wait-recovery-claim.js";
+import {
+  markAsyncWaitRecoveryDelivered,
+  bindAsyncWaitRecoveryTurn,
+} from "../../../src/agent-runtime/state/repository/async-wait-recovery-turn.js";
 import {
   emptySessionTaskBoard,
   mutateSessionTaskBoard,

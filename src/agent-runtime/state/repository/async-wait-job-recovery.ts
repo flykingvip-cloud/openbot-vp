@@ -14,14 +14,13 @@ import { resolveSessionTranscriptsDirForAgent } from "../../../config/sessions/p
 import { isPidAlive } from "../../../shared/pid-alive.js";
 import { buildTaskBoardContinuePrompt, reserveTaskContinuation } from "../continuation-ticket.js";
 import { checkTaskActionBoundary } from "../task-action.js";
+import { type AsyncWaitJobIntent } from "./async-wait-job-store.js";
+import { clearAsyncWaitJobIntent, readAsyncWaitJobIntent } from "./async-wait-job.js";
 import {
-  type AsyncWaitJobIntent,
   buildAsyncWaitRecoveryPromptAppendix,
   claimAsyncWaitJobForRecovery,
-  clearAsyncWaitJobIntent,
   markAsyncWaitRecoveryContinueArmed,
-  readAsyncWaitJobIntent,
-} from "./async-wait-job.js";
+} from "./async-wait-recovery-claim.js";
 import { setAsyncWaitRecoveryFollowupConsumerEnsure } from "./async-wait-recovery-enqueue.js";
 import { readSessionTaskBoard } from "./task-board-file.js";
 

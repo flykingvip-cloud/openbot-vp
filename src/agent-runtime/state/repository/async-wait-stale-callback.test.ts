@@ -19,7 +19,6 @@ import {
   readAsyncWaitJobIntent,
   recordAsyncWaitJobIntent,
 } from "./async-wait-job.js";
-
 vi.mock("../../../infra/system-events.js", () => ({ enqueueSystemEvent: vi.fn() }));
 vi.mock("../../../infra/heartbeat-wake.js", () => ({ requestHeartbeatNow: vi.fn() }));
 

@@ -1,7 +1,7 @@
 import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
 import { activeConstraintTexts } from "../../policy/index.js";
 import { claimTaskBoardContinue } from "../continuation-ticket.js";
-import { bindAsyncWaitRecoveryTurn } from "../repository/async-wait-job.js";
+import { bindAsyncWaitRecoveryTurn } from "../repository/async-wait-recovery-turn.js";
 import { mutateSessionTaskBoard, readSessionTaskBoard } from "../repository/task-board-file.js";
 import { startBoundTaskExecution } from "./execution-binding.js";
 

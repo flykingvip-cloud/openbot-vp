@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
 import {
-  claimAsyncWaitJobForRecovery,
   clearAsyncWaitJobIntent,
   clearAsyncWaitJobsForTask,
   listWaitingAsyncWaitJobIntents,
@@ -12,7 +11,7 @@ import {
   recordAsyncWaitJobIntent,
   transitionAsyncWaitJobIntent,
 } from "./async-wait-job.js";
-
+import { claimAsyncWaitJobForRecovery } from "./async-wait-recovery-claim.js";
 const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) {

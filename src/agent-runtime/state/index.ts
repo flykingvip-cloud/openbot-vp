@@ -7,23 +7,29 @@ export {
   listAsyncWaitJobIntents,
   listWaitingAsyncWaitJobIntents,
   markAsyncWaitJobExited,
-  claimAsyncWaitJobForRecovery,
-  markAsyncWaitRecoveryContinueArmed,
-  bindAsyncWaitRecoveryTurn,
-  releaseAsyncWaitRecoveryTurn,
-  markAsyncWaitRecoveryDelivered,
-  buildAsyncWaitRecoveryPromptAppendix,
   clearAsyncWaitJobIntent,
   clearAsyncWaitJobsForTask,
   transitionAsyncWaitJobIntent,
-  isBoundAsyncWaitRunLive,
-  sanitizeAsyncWaitBoundPayloads,
+} from "./repository/async-wait-job.js";
+export {
   type AsyncWaitJobIntent,
   type AsyncWaitRecoveryStage,
   type AsyncWaitResultEvidence,
   type AsyncWaitBoundPayload,
+} from "./repository/async-wait-job-store.js";
+export {
+  claimAsyncWaitJobForRecovery,
+  markAsyncWaitRecoveryContinueArmed,
+  buildAsyncWaitRecoveryPromptAppendix,
+  isBoundAsyncWaitRunLive,
+} from "./repository/async-wait-recovery-claim.js";
+export {
+  bindAsyncWaitRecoveryTurn,
+  releaseAsyncWaitRecoveryTurn,
+  markAsyncWaitRecoveryDelivered,
+  sanitizeAsyncWaitBoundPayloads,
   type BindAsyncWaitRecoveryTurnResult,
-} from "./repository/async-wait-job.js";
+} from "./repository/async-wait-recovery-turn.js";
 export {
   recoverAsyncWaitJobsAtGatewayBoot,
   armAsyncWaitRecoveryContinuation,

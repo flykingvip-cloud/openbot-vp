@@ -3,16 +3,17 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
 import {
-  bindAsyncWaitRecoveryTurn,
-  claimAsyncWaitJobForRecovery,
   clearAsyncWaitJobIntent,
   clearAsyncWaitJobsForTests,
   markAsyncWaitJobExited,
-  markAsyncWaitRecoveryContinueArmed,
   readAsyncWaitJobIntent,
   recordAsyncWaitJobIntent,
 } from "./async-wait-job.js";
-
+import {
+  claimAsyncWaitJobForRecovery,
+  markAsyncWaitRecoveryContinueArmed,
+} from "./async-wait-recovery-claim.js";
+import { bindAsyncWaitRecoveryTurn } from "./async-wait-recovery-turn.js";
 const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) {

@@ -22,15 +22,16 @@ import {
   restoreBoardExecutionAttemptAfterFailedBind,
 } from "../mutations/claim-queued-execution.js";
 import {
-  bindAsyncWaitRecoveryTurn,
-  claimAsyncWaitJobForRecovery,
   clearAsyncWaitJobsForTests,
   markAsyncWaitJobExited,
   readAsyncWaitJobIntent,
   recordAsyncWaitJobIntent,
-  releaseAsyncWaitRecoveryTurn,
 } from "./async-wait-job.js";
-
+import { claimAsyncWaitJobForRecovery } from "./async-wait-recovery-claim.js";
+import {
+  bindAsyncWaitRecoveryTurn,
+  releaseAsyncWaitRecoveryTurn,
+} from "./async-wait-recovery-turn.js";
 const roots: string[] = [];
 
 afterEach(() => {
