@@ -4,6 +4,33 @@ import {
 } from "./catalog/collaboration-member.js";
 import { INDIVIDUAL_CONTEXT_ORDER, type IndividualContextMaterial } from "./catalog/individual.js";
 
+/** Common tail of both scene catalogs. Values are rendered by their existing source owners. */
+export function appendSharedTurnContext(
+  parts: readonly string[],
+  material: {
+    taskSurface?: string;
+    clarification?: string;
+    learningRecall?: string;
+    runtimeEvents?: string;
+    skillGuidance?: string;
+  },
+): string[] {
+  const allowed = [
+    "taskSurface",
+    "clarification",
+    "learningRecall",
+    "runtimeEvents",
+    "skillGuidance",
+  ] as const;
+  for (const key of Object.keys(material)) {
+    if (!(allowed as readonly string[]).includes(key)) {
+      throw new Error(`Material is not allowed in shared turn context: ${key}`);
+    }
+  }
+  // Preserve the original truthy-only append semantics, including whitespace.
+  return [...parts, ...allowed.flatMap((key) => (material[key] ? [material[key]] : []))];
+}
+
 /** Pure projection of host-authorized collaboration material, preserving the established order. */
 export function assembleCollaborationMember(
   material: Partial<Record<CollaborationMemberContextMaterial, string | undefined>>,

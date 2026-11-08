@@ -2,6 +2,7 @@
 export {
   assembleIndividual,
   assembleCollaborationMember,
+  appendSharedTurnContext,
   selectSystemContextParts,
   appendSystemContextPart,
   finalizeSystemContext,

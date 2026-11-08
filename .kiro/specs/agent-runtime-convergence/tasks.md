@@ -1405,3 +1405,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Candidate 581557cd0 combined regression 84 files / 455 PASS, including personal runtime, command credits, queue, durable stop/delivery restart, collaboration plans/contracts/abort and delivery-side-effect boundaries. Local full build PASS; 209 existing ineffective dynamic-import warnings and UI-size warnings remain; pinned Control UI sync skipped. — codex-runtime-manager
 - Same production-source candidate isolated real-model personal file task PASS: task-743981999f8a; run/attempt 01218527-2d55-4465-bbdf-59b9408248ae; exact bytes, acceptance passed with digest, delivery delivered, deliverableChecked=true and unfinished=false. Temporary Gateway exited normally and state was removed. No production restart, push, merge or deployment. Full collaboration real-model sequence, asynchronous restart recovery, late-material catalog and whole-executor retirement remain unaccepted. — codex-runtime-manager
+
+## Shared late-context assembly ownership (2026-11-08)
+
+- Moved common late-material ordering (task surface, clarification, learning recall, runtime events and skill guidance) into shared context assembly. Existing hosts retain source reads, exposure accounting and one-time event consumption. Sender-derived material remains untrusted user-body context. Preserved truthy-only append behavior and original bytes/order; no new scenario or model call. — codex-runtime-manager
+- Assembly/production-context regression 3 files / 23 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. Complete Builder read/render/audit and full executor lifecycle acceptance remain open. — codex-runtime-manager

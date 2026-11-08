@@ -2,10 +2,28 @@ import { describe, expect, it } from "vitest";
 import {
   assembleIndividual,
   assembleCollaborationMember,
+  appendSharedTurnContext,
   appendSystemContextPart,
   finalizeSystemContext,
   selectSystemContextParts,
 } from "./assembly.js";
+
+it("appends shared turn material in fixed order without changing bytes or prior snapshots", () => {
+  const base = ["base"];
+  expect(
+    appendSharedTurnContext(base, {
+      skillGuidance: "last",
+      learningRecall: " ",
+      clarification: "second",
+      taskSurface: "first",
+      runtimeEvents: "events",
+    }),
+  ).toEqual(["base", "first", "second", " ", "events", "last"]);
+  expect(base).toEqual(["base"]);
+  expect(() => appendSharedTurnContext(base, { speaker: "untrusted" } as never)).toThrow(
+    /not allowed/,
+  );
+});
 
 it("orders individual material without changing source bytes or reading sources", () => {
   expect(
