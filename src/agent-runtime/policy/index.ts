@@ -11,6 +11,12 @@ export type { BlockerGrade, EnvProbe } from "./blocker.js";
 export { isLiveTaskBinding, isTaskTombstoned } from "./task-binding.js";
 
 export {
+  MAX_PARKED_TASKS,
+  TASK_BOARD_CONTINUE_MAX_PER_TASK,
+  TASK_BOARD_CONTINUE_COOLDOWN_MS,
+} from "./task-board-limits.js";
+
+export {
   CONTEXT_WINDOW_HARD_MIN_TOKENS,
   CONTEXT_WINDOW_WARN_BELOW_TOKENS,
   resolveContextWindowInfo,

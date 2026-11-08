@@ -5,7 +5,7 @@ import { isTaskTombstoned } from "../policy/index.js";
 import {
   TASK_BOARD_CONTINUE_MAX_PER_TASK,
   TASK_BOARD_CONTINUE_COOLDOWN_MS,
-} from "../policy/task-board-limits.js";
+} from "../policy/index.js";
 import {
   readSessionTaskBoard,
   withSessionTaskBoardLock,

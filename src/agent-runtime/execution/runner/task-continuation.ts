@@ -27,11 +27,11 @@ const log = createSubsystemLogger("conversation-task/task-board-continue");
 export const TASK_BOARD_CONTINUE_DELAY_MS = 1_500;
 
 /** Cap chained auto-continues per taskId within the cooldown window. */
-import { TASK_BOARD_CONTINUE_MAX_PER_TASK } from "../../policy/task-board-limits.js";
+import { TASK_BOARD_CONTINUE_MAX_PER_TASK } from "../../policy/index.js";
 export {
   TASK_BOARD_CONTINUE_MAX_PER_TASK,
   TASK_BOARD_CONTINUE_COOLDOWN_MS,
-} from "../../policy/task-board-limits.js";
+} from "../../policy/index.js";
 
 /** Cooldown window for the per-task continue cap (ms). */
 

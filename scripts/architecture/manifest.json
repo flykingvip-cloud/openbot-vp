@@ -219,6 +219,33 @@
     "description": "Policy classification must not read/write task state, perform environment probes or initiate execution and delivery."
   },
   {
+    "name": "runtime-policy-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": ["src/agent-runtime/policy/!(index).ts", "src/agent-runtime/policy/*/**"],
+    "exemptFiles": [
+      "src/agent-runtime/policy/acceptance-checks.ts",
+      "src/agent-runtime/policy/blocker.test.ts",
+      "src/agent-runtime/policy/blocker.ts",
+      "src/agent-runtime/policy/catalog.test.ts",
+      "src/agent-runtime/policy/catalog.ts",
+      "src/agent-runtime/policy/constraints.ts",
+      "src/agent-runtime/policy/context-window.ts",
+      "src/agent-runtime/policy/execution-queue.test.ts",
+      "src/agent-runtime/policy/execution-queue.ts",
+      "src/agent-runtime/policy/explicit-task-control.test.ts",
+      "src/agent-runtime/policy/explicit-task-control.ts",
+      "src/agent-runtime/policy/index.ts",
+      "src/agent-runtime/policy/input-stamp.ts",
+      "src/agent-runtime/policy/prompt-mode.ts",
+      "src/agent-runtime/policy/run-limits.test.ts",
+      "src/agent-runtime/policy/run-limits.ts",
+      "src/agent-runtime/policy/task-binding.test.ts",
+      "src/agent-runtime/policy/task-binding.ts",
+      "src/agent-runtime/policy/task-board-limits.ts"
+    ],
+    "description": "Production code consumes policy through the public index facade; numeric limits and decisions share one entry. Policy internals may cross-import; listed policy sources/tests are exempt."
+  },
+  {
     "name": "runtime-acceptance-no-platform-effects",
     "from": "src/agent-runtime/delivery/acceptance/**",
     "denyImportsFrom": [

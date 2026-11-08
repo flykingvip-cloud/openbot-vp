@@ -1,6 +1,6 @@
 import { titleFromGoal } from "../../context/sources/task-title.js";
 import type { TrackedTask, ArchivedTask } from "../../contracts/task.js";
-import { MAX_PARKED_TASKS } from "../../policy/task-board-limits.js";
+import { MAX_PARKED_TASKS } from "../../policy/index.js";
 import { allocateTaskInstanceId } from "../repository/task-identity.js";
 
 export function createTask(

@@ -1,5 +1,5 @@
 import type { TrackedTask } from "../../contracts/task.js";
-import { MAX_PARKED_TASKS } from "../../policy/task-board-limits.js";
+import { MAX_PARKED_TASKS } from "../../policy/index.js";
 
 export function formatParkedAt(ms?: number): string {
   if (typeof ms !== "number" || !Number.isFinite(ms)) {

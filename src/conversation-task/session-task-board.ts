@@ -100,7 +100,7 @@ import {
   isOwnerConstraintRevision,
   shouldPersistOwnerConstraint,
 } from "./turn-relation.js";
-export { MAX_PARKED_TASKS } from "../agent-runtime/policy/task-board-limits.js";
+export { MAX_PARKED_TASKS } from "../agent-runtime/policy/index.js";
 
 // Compatibility type exports; definitions have a single owner in runtime contracts.
 export type {
