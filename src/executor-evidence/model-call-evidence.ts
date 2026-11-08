@@ -534,6 +534,13 @@ function lockOwnershipHolds(fd: number, lockPath: string, lockId: string): boole
   }
 }
 
+function writeLockRecord(fd: number, record: unknown): void {
+  const payload = JSON.stringify(record);
+  fs.ftruncateSync(fd, 0);
+  fs.writeSync(fd, payload, 0, "utf8");
+  fs.fsyncSync(fd);
+}
+
 function releaseOwnedLock(fd: number, lockPath: string, lockId: string): void {
   let held: fs.Stats;
   try {
@@ -732,18 +739,25 @@ export function writeBoundedEvidenceFile(
     while (fd === undefined) {
       try {
         fd = fs.openSync(lockPath, "wx");
-        const pauseMs = Number(process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_AFTER_CREATE_MS);
-        if (Number.isFinite(pauseMs) && pauseMs > 0) {
-          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pauseMs);
-        }
         lockId = randomUUID();
         const owner: EvidenceLockOwner = {
           pid: process.pid,
           startToken: processStartToken(process.pid) ?? "unknown",
           lockId,
         };
-        fs.writeFileSync(fd, JSON.stringify(owner));
-        fs.fsyncSync(fd);
+        // Provisional owner is durable before any pause. A crash after this
+        // write can be reclaimed because the pid and start token prove death.
+        // A live pid is never reclaimed, including during the pause below.
+        writeLockRecord(fd, { ...owner, phase: "publishing" });
+        if (process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_BEFORE_PUBLISH === "1") {
+          fs.closeSync(fd);
+          process.exit(0);
+        }
+        const pauseMs = Number(process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_AFTER_CREATE_MS);
+        if (Number.isFinite(pauseMs) && pauseMs > 0) {
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pauseMs);
+        }
+        writeLockRecord(fd, { ...owner, phase: "published" });
         if (!lockOwnershipHolds(fd, lockPath, lockId)) {
           fs.closeSync(fd);
           fd = undefined;

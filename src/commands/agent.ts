@@ -117,6 +117,7 @@ import {
 import { resolveExecutionRoutingFromCapabilityPlan } from "../gateway/model-entitlement/task-capability-plan.js";
 import { recordAgentCommandCreditUsage } from "./agent/credit-usage.js";
 import { deliverAgentCommandResult } from "./agent/delivery.js";
+import { currentExecutorModelCall } from "../executor-evidence/model-call-evidence.js";
 import {
   ensureCliTurnTaskOutcome,
   ensureGatewayAgentTurnTaskOutcome,
@@ -172,6 +173,15 @@ const OVERRIDE_FIELDS_CLEARED_BY_DELETE: OverrideFieldClearedByDelete[] = [
 ];
 
 async function persistSessionEntry(params: PersistSessionEntryParams): Promise<void> {
+  const savedCliSession = params.entry.cliSessionIds
+    ? Object.values(params.entry.cliSessionIds)
+    : [];
+  if (
+    process.env.OPENBOT_TEST_CLI_PERSIST_THROW === "1" &&
+    savedCliSession.includes("cli-session")
+  ) {
+    throw new Error("persist after retry");
+  }
   const persisted = await updateSessionStore(params.storePath, (store) => {
     const merged = mergeSessionEntry(store[params.sessionKey], params.entry);
     // Preserve explicit `delete` clears done by session override helpers.
@@ -438,6 +448,10 @@ function runAgentAttempt(params: {
         credentialEnv = undefined;
         usageAttr = undefined;
       }
+      const noteCliResult = <T extends { meta?: { agentMeta?: { usage?: unknown } } }>(result: T): T => {
+        rememberModelResultUsage(result.meta?.agentMeta?.usage);
+        return result;
+      };
       const runCliWithSession = (nextCliSessionId: string | undefined) =>
         runCliAgent({
           sessionId: params.sessionId,
@@ -461,6 +475,7 @@ function runAgentAttempt(params: {
           ...(credentialEnv ? { credentialEnv } : {}),
         });
       return runCliWithSession(cliSessionId)
+        .then(noteCliResult)
         .catch(async (err) => {
           // Handle CLI session expired error
           if (
@@ -502,7 +517,9 @@ function runAgentAttempt(params: {
             }
 
             // Retry with no session ID (will create a new session)
-            return runCliWithSession(undefined).then(async (result) => {
+            return runCliWithSession(undefined)
+              .then(noteCliResult)
+              .then(async (result) => {
               // Update session store with new CLI session ID if available
               if (
                 result.meta.agentMeta?.sessionId &&
@@ -534,7 +551,7 @@ function runAgentAttempt(params: {
           throw err;
         })
         .then((result) => {
-          rememberModelResultUsage(result.meta?.agentMeta?.usage);
+          // Usage was recorded on each model return above, before this attribution.
           // UsageAttribution（Task 9）：成功完成（首次或会话过期重试后）写一次归因。
           if (usageAttr) {
             void recordCliBackendUsage({
@@ -573,7 +590,7 @@ function runAgentAttempt(params: {
     const embeddedModel = transport.model;
     const providerAuthOverride = transport.providerAuthOverride;
     const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
-    return runEmbeddedPiAgent({
+    const embeddedResult = await runEmbeddedPiAgent({
       sessionId: params.sessionId,
       sessionKey: params.sessionKey,
       agentId: params.sessionAgentId,
@@ -621,6 +638,8 @@ function runAgentAttempt(params: {
       bootstrapPromptWarningSignaturesSeen,
       bootstrapPromptWarningSignature, ...inheritExecutionIdentityRunFields(params.opts),
     });
+    rememberModelResultUsage(embeddedResult.meta?.agentMeta?.usage);
+    return embeddedResult;
   })();
 }
 
@@ -1558,7 +1577,11 @@ async function agentCommandInternal(
             } catch (err) {
               if (!(err instanceof TaskBudgetExceededError)) {
                 try {
-                  chargeAgentCandidate(notedUsage ?? usageCarriedByModelError(err));
+                  chargeAgentCandidate(
+                    notedUsage ??
+                      currentExecutorModelCall()?.usage ??
+                      usageCarriedByModelError(err),
+                  );
                 } catch (chargeErr) {
                   if (chargeErr instanceof TaskBudgetExceededError) {
                     throw chargeErr;

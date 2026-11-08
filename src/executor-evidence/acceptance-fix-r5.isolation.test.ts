@@ -23,6 +23,7 @@ import { resetEvidenceAssociations } from "./association.js";
 import { SNAPSHOT_IDENTITY_COVERS, SNAPSHOT_IDENTITY_DOES_NOT_COVER } from "./identity.js";
 import {
   observeModelCandidate,
+  processStartToken,
   resetModelCallsForTests,
   writeBoundedEvidenceFile,
 } from "./model-call-evidence.js";
@@ -55,6 +56,7 @@ afterEach(() => {
   delete process.env.OPENBOT_EXECUTOR_EVIDENCE;
   delete process.env.OPENBOT_EXECUTOR_EVIDENCE_DISK_CAP;
   delete process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_AFTER_CREATE_MS;
+  delete process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_BEFORE_PUBLISH;
   for (const root of roots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -180,6 +182,59 @@ describe("R5 lock and call identity", () => {
     expect(
       fs.existsSync(path.join(storeRoot, "executor-evidence", "associations", "parent.json")),
     ).toBe(false);
+  });
+
+  it("recovers a lock whose owner died before publish and still refuses a live lock", async () => {
+    process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
+    const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r8-crash-"));
+    roots.push(storeRoot);
+    const childPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "evidence-write-child.ts",
+    );
+    const out = path.join(storeRoot, "crash-result.json");
+    const child = spawn(
+      process.execPath,
+      ["--import", "tsx", childPath, storeRoot, "crashed.json", "4", out],
+      {
+        cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."),
+        env: {
+          ...process.env,
+          OPENBOT_EXECUTOR_EVIDENCE: "1",
+          OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_BEFORE_PUBLISH: "1",
+        },
+      },
+    );
+    const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
+    expect(code).toBe(0);
+    const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
+    const crashedOwner = JSON.parse(fs.readFileSync(lockPath, "utf8")) as {
+      phase?: string;
+      pid?: number;
+    };
+    expect(crashedOwner.phase).toBe("publishing");
+    expect(crashedOwner.pid).not.toBe(process.pid);
+    const recovered = writeBoundedEvidenceFile(storeRoot, "recovered.json", { pad: "ok" });
+    expect(recovered).toBe("written");
+    expect(
+      fs.existsSync(path.join(storeRoot, "executor-evidence", "associations", "recovered.json")),
+    ).toBe(true);
+    const liveLock = path.join(storeRoot, "executor-evidence", "write.lock");
+    fs.mkdirSync(path.dirname(liveLock), { recursive: true });
+    fs.writeFileSync(
+      liveLock,
+      JSON.stringify({
+        pid: process.pid,
+        startToken: processStartToken(process.pid) ?? "unknown",
+        lockId: "still-alive",
+        phase: "publishing",
+      }),
+    );
+    const blocked = writeBoundedEvidenceFile(storeRoot, "stolen.json", { pad: "no" });
+    expect(blocked).toBe("failed");
+    expect(fs.existsSync(liveLock)).toBe(true);
+    const still = JSON.parse(fs.readFileSync(liveLock, "utf8")) as { lockId?: string };
+    expect(still.lockId).toBe("still-alive");
   });
 
   it("rejects a changed scope, run, provider, or startedAt as an immutable conflict", () => {
