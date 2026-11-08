@@ -1739,5 +1739,5 @@ Typed oxlint on changed sources: 0 warnings / 0 errors.
 
 Registry sharedPaths / protected plans left uncommitted for kiro-loom. Package 3 not started.
 
-**Remelt tip for re-acceptance:** `TIP_PLACEHOLDER` (4-gap close). Prior failed tip `8743811fa` retained above. — grok-bot
+**Remelt tip for re-acceptance:** `1c98ff7ee` (4-gap close). Prior failed tip `8743811fa` retained above. — grok-bot
 
