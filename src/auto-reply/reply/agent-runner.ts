@@ -27,7 +27,6 @@ import { generateSecureUuid } from "../../infra/secure-random.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { enforceVisibleReplyLanguage } from "../../shared/text/visible-reply-language.js";
-import { shapeAdmittedComplexTaskReply } from "../../task-orchestration/complex-task-loop.js";
 import { resolveTurnContractFromRunMeta } from "../../task-outcome/chat-entry.js";
 import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../utils/directive-tags.js";
@@ -1009,28 +1008,6 @@ export async function runReplyAgent(params: {
     if (responseUsageLine) {
       finalPayloads = appendUsageLine(finalPayloads, responseUsageLine);
     }
-
-    finalPayloads = shapeAdmittedComplexTaskReply({
-      payloads: finalPayloads,
-      userText: commandBody,
-      tenantId:
-        sessionCtx.GatewayClientSessionEnterpriseId?.trim() ||
-        sessionCtx.CollaborationTenantId?.trim() ||
-        null,
-      surface:
-        sessionCtx.CollaborationGroupId?.trim() ||
-        sessionCtx.ChatType === "group" ||
-        sessionCtx.GroupSubject?.trim()
-          ? "group"
-          : "direct",
-      fromAgentId: sessionCtx.CollaborationBotAgentId,
-      sessionFile: followupRun.run.sessionFile,
-      completionBinding,
-      sessionKey: sessionKey ?? followupRun.run.sessionKey,
-      cfg: followupRun.run.config,
-      disableTools: followupRun.run.disableTools === true,
-      env: process.env,
-    });
 
     return completeDelivery({ kind: "visible", payloads: finalPayloads, acceptanceStatus });
   } catch (error) {

@@ -1349,3 +1349,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced the system prompt renderer rereading workspace identity despite captured facts (one failing regression). Added explicit captured identity input and moved unchanged identity guard projection to shared context. Embedded, CLI and prompt-inspection production adapters capture source facts before rendering; minimal/none embedded modes retain their original no-read behavior. The legacy direct-call fallback remains compatibility-only and does not establish complete Builder convergence. — codex-runtime-manager
 - Prompt/source/embedded regression 3 files / 62 PASS; earlier CLI adapter regression 13 PASS separately. Full tsgo, changed-file typed lint and 54 architecture rules PASS. No deployment, whole-source lifecycle acceptance or rule-inventory completeness claimed. — codex-runtime-manager
+
+## Legacy output replanning disconnected (2026-11-08)
+
+- Reproduced enabled legacy complex-task flags replacing actual executor output with a synthetic plan and lexical acceptance report (one failing host regression). Removed the sole mainline postprocessing hook; command and delivery retain their current authority. Added a no-return import gate. Legacy source/tests remain isolated and archived; collaboration round execution is untouched. — codex-runtime-manager
+- Reply-host regression 29 PASS; full tsgo and typed lint PASS; architecture 55 PASS. Prior candidate e07e531ca full build PASS with 209 existing dynamic-import warnings and UI-size warnings; UI sync remained pinned. No production cutover or whole-migration completion claimed. — codex-runtime-manager

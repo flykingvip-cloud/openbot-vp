@@ -510,5 +510,11 @@
       "src/agent-runtime/execution/runner/command-fallback"
     ],
     "description": "Archived semantic routing has no source consumers or public export; no legacy fallback may be restored."
+  },
+  {
+    "name": "runtime-mainline-no-legacy-output-shaping",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/task-orchestration/complex-task-loop"],
+    "description": "Accepted execution output cannot re-enter legacy semantic classification, synthetic planning or heuristic acceptance after delivery preparation."
   }
 ]

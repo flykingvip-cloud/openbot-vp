@@ -119,6 +119,8 @@ afterEach(() => {
 
 describe("runReplyAgent onAgentRunStart", () => {
   function createRun(params?: {
+    commandBody?: string;
+    tenantId?: string;
     provider?: string;
     model?: string;
     opts?: {
@@ -130,6 +132,7 @@ describe("runReplyAgent onAgentRunStart", () => {
     const model = params?.model ?? "claude";
     const typing = createMockTypingController();
     const sessionCtx = {
+      GatewayClientSessionEnterpriseId: params?.tenantId,
       Provider: "webchat",
       OriginatingTo: "session:1",
       AccountId: "primary",
@@ -137,7 +140,7 @@ describe("runReplyAgent onAgentRunStart", () => {
     } as unknown as TemplateContext;
     const resolvedQueue = { mode: "interrupt" } as unknown as QueueSettings;
     const followupRun = {
-      prompt: "hello",
+      prompt: params?.commandBody ?? "hello",
       summaryLine: "hello",
       enqueuedAt: Date.now(),
       run: {
@@ -165,7 +168,7 @@ describe("runReplyAgent onAgentRunStart", () => {
     } as unknown as FollowupRun;
 
     return runReplyAgent({
-      commandBody: "hello",
+      commandBody: params?.commandBody ?? "hello",
       followupRun,
       queueKey: "main",
       resolvedQueue,
@@ -200,6 +203,24 @@ describe("runReplyAgent onAgentRunStart", () => {
     expect(result).toMatchObject({
       text: expect.stringContaining('No API key found for provider "anthropic".'),
     });
+  });
+
+  it("does not reclassify or replace execution output through retired orchestration flags", async () => {
+    const original =
+      "这是执行器返回的正式成果，保留原有内容与交付身份，不允许额外加工器重写。".repeat(8);
+    runEmbeddedPiAgentMock.mockResolvedValueOnce({ payloads: [{ text: original }], meta: {} });
+    vi.stubEnv("OPENBOT_CONVERSATION_TASK_ORCH_DISPATCH", "1");
+    vi.stubEnv("OPENBOT_CONVERSATION_TASK_ORCH_TENANT_ALLOWLIST", "t-1");
+    try {
+      const result = await createRun({
+        commandBody: "请分步骤做竞品分析",
+        tenantId: "t-1",
+        opts: { runId: "no-legacy-postprocessing" },
+      });
+      expect(result).toMatchObject({ text: original });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("emits start callback when cli runner starts", async () => {
