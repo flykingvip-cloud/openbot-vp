@@ -182,6 +182,24 @@ function callRecordSchemaOk(call: ModelCallEvidence | undefined): call is ModelC
   return true;
 }
 
+/**
+ * Missing status is a legacy file, not a DTO value. The returned object always
+ * has a status. Null status plus a completedAt is invalid, not unknown.
+ */
+function prepareReadCall(
+  raw: ModelCallEvidence,
+): { call: ModelCallEvidence; legacy: boolean } | "invalid" {
+  const statusAbsent = (raw as { status?: unknown }).status == null;
+  if (statusAbsent && raw.completedAt != null) {
+    return "invalid";
+  }
+  const call = statusAbsent ? { ...raw, status: "unknown" as const } : raw;
+  if (!callRecordSchemaOk(call)) {
+    return "invalid";
+  }
+  return { call, legacy: statusAbsent };
+}
+
 export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView {
   const projectedAt = Date.now();
   const gaps: string[] = [];
@@ -320,13 +338,21 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
   }
 
   const callReport = readCallFiles(query.storeRoot);
-  const schemaCalls = callReport.rows.filter((call) => {
-    if (!callRecordSchemaOk(call)) {
+  const schemaCalls: ModelCallEvidence[] = [];
+  for (const raw of callReport.rows) {
+    const prepared = prepareReadCall(raw);
+    if (prepared === "invalid") {
       gaps.push("call_schema_invalid");
-      return false;
+      continue;
     }
-    return true;
-  });
+    if (prepared.legacy) {
+      gaps.push("call_status_legacy");
+      reasons.push(
+        "a call file omitted status; the view uses unknown and does not return the raw object",
+      );
+    }
+    schemaCalls.push(prepared.call);
+  }
   const associationReport = readAssociationFiles(query.storeRoot);
   gaps.push(...callReport.gaps, ...associationReport.gaps);
   let calls = schemaCalls.filter(
@@ -484,12 +510,21 @@ export function readExecutorEvidence(query: EvidenceReadQuery): EvidenceReadView
     gaps.push("call_capacity_reached");
     reasons.push("the call log is capped and is not a complete history");
   }
+  let clockUntrusted = false;
   const watermark = calls.reduce<number | null>((max, call) => {
+    if (call.observedAt > projectedAt) {
+      clockUntrusted = true;
+      return max;
+    }
     if (max == null || call.observedAt > max) {
       return call.observedAt;
     }
     return max;
   }, null);
+  if (clockUntrusted) {
+    gaps.push("clock_untrusted");
+    reasons.push("observedAt is after the read clock, so it is not a watermark");
+  }
   const budgetRows = finalAssociations.filter((row) => row.budgetCommandId);
   const callChainBlocked = gaps.some((gap) =>
     [

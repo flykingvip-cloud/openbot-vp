@@ -494,6 +494,8 @@ describe("R3 read port and shared persistence", () => {
       scope,
       startedAt: 1,
       observedAt: 1,
+      status: "unknown",
+      completedAt: null,
       usage: fullUsage(1, 0),
     });
     fs.writeFileSync(

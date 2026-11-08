@@ -524,7 +524,11 @@ function lockOwnershipHolds(fd: number, lockPath: string, lockId: string): boole
     if (!sameLockFile(held, current)) {
       return false;
     }
-    return parseLockOwner(fs.readFileSync(lockPath, "utf8"))?.lockId === lockId;
+    const owner = parseLockOwner(fs.readFileSync(lockPath, "utf8"));
+    if (!owner || owner.lockId !== lockId || owner.pid !== process.pid) {
+      return false;
+    }
+    return owner.startToken === (processStartToken(process.pid) ?? "unknown");
   } catch {
     return false;
   }
@@ -546,7 +550,11 @@ function releaseOwnedLock(fd: number, lockPath: string, lockId: string): void {
     const current = fs.statSync(lockPath);
     if (sameLockFile(held, current)) {
       const owner = parseLockOwner(fs.readFileSync(lockPath, "utf8"));
-      if (owner?.lockId === lockId) {
+      if (
+        owner?.lockId === lockId &&
+        owner.pid === process.pid &&
+        owner.startToken === (processStartToken(process.pid) ?? "unknown")
+      ) {
         fs.rmSync(lockPath, { force: true });
       }
     }
