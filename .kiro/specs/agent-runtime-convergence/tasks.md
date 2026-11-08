@@ -1390,3 +1390,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced sender-derived untrusted speaker text entering the system prompt in both individual and collaboration assembly (two failing regressions). Speaker projection now joins the existing untrusted user-body wrapper; trusted inbound metadata, source rendering and task association remain unchanged. No additional model call. — codex-runtime-manager
 - Reply/context/inbound metadata regression 3 files / 42 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. This does not establish full context catalog migration or final lifecycle acceptance. — codex-runtime-manager
+
+## Individual context material catalog (2026-11-08)
+
+- Moved individual initial material allowlist and fixed ordering into a data-only context catalog. The production reply host supplies named, already-rendered values; unknown material (including empty group material) is rejected. Source reads, learning exposure, late event consumption and collaboration assembly remain with existing owners; no model call or task mutation is introduced. — codex-runtime-manager
+- Assembly/production-context regression 3 files / 21 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. Scoped attribution follows the previously authorized transfer while preserving predecessor history. Collaboration material catalog and late-material lifecycle remain open. — codex-runtime-manager

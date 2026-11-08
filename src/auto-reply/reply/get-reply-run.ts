@@ -3,6 +3,7 @@ import fs from "node:fs";
 import { formatTaskProposalReply } from "../../agent-runtime/command/index.js";
 import {
   appendSystemContextPart,
+  assembleIndividual,
   finalizeSystemContext,
   selectSystemContextParts,
 } from "../../agent-runtime/context/assembly.js";
@@ -1188,24 +1189,24 @@ export async function runPreparedReply(
             ...(applyChatLane ? { listingMode: "lightweight" as const } : {}),
           })
         : undefined;
-    extraSystemPromptParts = selectSystemContextParts([
-      inboundMetaPrompt,
-      turnReplyLanguageInstruction,
-      userTimezonePrompt,
-      remoteEnvironmentPrompt,
-      userProfileInstructions,
-      seatRulesPrompt,
-      conversationTaskFocusPrompt,
-      sessionFocusResumePrompt,
-      primaryObjectivePrompt,
-      taskDataPreflightPrompt,
-      sessionContinuityPrompt,
-      knowledgeUniversePrompt,
-      operationalIdentityPrompt,
-      composerPluginMentionBindings.turnPrompt,
-      growthBirthPrompt,
-      cronReplyPrompt,
-    ]);
+    extraSystemPromptParts = assembleIndividual({
+      inboundMetadata: inboundMetaPrompt,
+      replyLanguage: turnReplyLanguageInstruction,
+      timezone: userTimezonePrompt,
+      environment: remoteEnvironmentPrompt,
+      userProfile: userProfileInstructions,
+      seatRules: seatRulesPrompt,
+      conversationFocus: conversationTaskFocusPrompt,
+      taskBoard: sessionFocusResumePrompt,
+      primaryObjective: primaryObjectivePrompt,
+      dataPreflight: taskDataPreflightPrompt,
+      continuity: sessionContinuityPrompt,
+      knowledge: knowledgeUniversePrompt,
+      operationalIdentity: operationalIdentityPrompt,
+      mentionHints: composerPluginMentionBindings.turnPrompt,
+      birth: growthBirthPrompt,
+      scheduledReply: cronReplyPrompt,
+    });
   }
   if (taskSurfaceNote) {
     extraSystemPromptParts = appendSystemContextPart(extraSystemPromptParts, taskSurfaceNote);

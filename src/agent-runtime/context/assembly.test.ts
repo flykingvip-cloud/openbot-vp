@@ -1,9 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
+  assembleIndividual,
   appendSystemContextPart,
   finalizeSystemContext,
   selectSystemContextParts,
 } from "./assembly.js";
+
+it("orders individual material without changing source bytes or reading sources", () => {
+  expect(
+    assembleIndividual({ knowledge: "second", inboundMetadata: "  first  ", userProfile: " " }),
+  ).toEqual(["  first  ", "second"]);
+});
+
+it("rejects collaboration and unknown material in individual context", () => {
+  expect(() => assembleIndividual({ groupSystemPrompt: "" } as never)).toThrow(/not allowed/);
+  expect(() => assembleIndividual({ unexpected: "instructions" } as never)).toThrow(/not allowed/);
+});
 
 describe("system context assembly compatibility", () => {
   it("filters blank initial material while preserving bytes, order and duplicate sources", () => {
