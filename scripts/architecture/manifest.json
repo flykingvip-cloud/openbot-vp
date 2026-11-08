@@ -315,6 +315,37 @@
     "description": "Production code consumes model infrastructure through the public model/index facade. Model internals may cross-import; listed model sources/tests and the R8 CLI isolation test (which must bind command-commercial-gate directly) are exempt."
   },
   {
+    "name": "runtime-command-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts", "src/agent-runtime/command/*/**"],
+    "exemptFiles": [
+      "src/agent-runtime/command/index.ts",
+      "src/agent-runtime/command/authorized-interaction.ts",
+      "src/agent-runtime/command/command-outcome-entry.ts",
+      "src/agent-runtime/command/command-outcome-entry.test.ts",
+      "src/agent-runtime/command/execution-admission.ts",
+      "src/agent-runtime/command/execution-admission.test.ts",
+      "src/agent-runtime/command/gateway-task-stop.ts",
+      "src/agent-runtime/command/gateway-task-stop.test.ts",
+      "src/agent-runtime/command/governed-interaction.ts",
+      "src/agent-runtime/command/ingress-kind.ts",
+      "src/agent-runtime/command/ingress-kind.test.ts",
+      "src/agent-runtime/command/interpret-interaction.ts",
+      "src/agent-runtime/command/interpret-interaction.test.ts",
+      "src/agent-runtime/command/prepared-interaction.ts",
+      "src/agent-runtime/command/route-interaction.ts",
+      "src/agent-runtime/command/route-interaction.test.ts",
+      "src/agent-runtime/command/scenarios/collaboration-entry.ts",
+      "src/agent-runtime/command/scenarios/collaboration-entry.test.ts",
+      "src/agent-runtime/command/task-proposal-reply.ts",
+      "src/agent-runtime/command/task-proposal-reply.test.ts",
+      "src/agent-runtime/command/task-status.ts",
+      "src/agent-runtime/command/task-status.test.ts",
+      "src/agent-runtime/command/task-status-format.test.ts"
+    ],
+    "description": "Production code consumes command use-cases through the public command/index facade. Command internals may cross-import; listed command sources/tests are exempt. Existing auto-reply and gateway entry rules remain."
+  },
+  {
     "name": "runtime-acceptance-no-platform-effects",
     "from": "src/agent-runtime/delivery/acceptance/**",
     "denyImportsFrom": [
