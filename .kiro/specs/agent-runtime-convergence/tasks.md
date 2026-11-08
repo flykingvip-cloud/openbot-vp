@@ -2017,4 +2017,4 @@ Charter: freeze one reproducible candidate; prove personal + collab applicable m
 3. Real-model / real-channel / PPT physical renderer acceptance.  
 4. Foreign WIP stays out of convergence commits.
 
-**Remelt tip for Package6 acceptance:** *(filled after tip SHA commit)*. — grok-bot
+**Remelt tip for Package6 acceptance:** `1dcc5ba7e7e091012f44cde7774f95bd3a9f607f` (same-SHA acceptance pack; zero src fixes). Prior Package5 tip `a1b14f80c` retained. — grok-bot
