@@ -278,6 +278,43 @@
     "description": "Production code consumes capabilities through the public capabilities/index facade. Capabilities internals may cross-import; listed capabilities sources/tests are exempt."
   },
   {
+    "name": "runtime-model-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": ["src/agent-runtime/model/!(index).ts", "src/agent-runtime/model/*/**"],
+    "exemptFiles": [
+      "src/agent-runtime/model/admission-lease.test.ts",
+      "src/agent-runtime/model/admission-lease.ts",
+      "src/agent-runtime/model/apply-provider-credential.test.ts",
+      "src/agent-runtime/model/apply-provider-credential.ts",
+      "src/agent-runtime/model/auth-profile-candidates.test.ts",
+      "src/agent-runtime/model/auth-profile-candidates.ts",
+      "src/agent-runtime/model/auth-profile-rotation.test.ts",
+      "src/agent-runtime/model/auth-profile-rotation.ts",
+      "src/agent-runtime/model/authorized-session.test.ts",
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/agent-runtime/model/auxiliary-model-governance.test.ts",
+      "src/agent-runtime/model/auxiliary-model-governance.ts",
+      "src/agent-runtime/model/cli-run-credential.ts",
+      "src/agent-runtime/model/command-admission-session.test.ts",
+      "src/agent-runtime/model/command-admission-session.ts",
+      "src/agent-runtime/model/command-commercial-gate.ts",
+      "src/agent-runtime/model/command-governance.ts",
+      "src/agent-runtime/model/copilot-token-refresh.test.ts",
+      "src/agent-runtime/model/copilot-token-refresh.ts",
+      "src/agent-runtime/model/index.ts",
+      "src/agent-runtime/model/interaction-completion.test.ts",
+      "src/agent-runtime/model/interaction-completion.ts",
+      "src/agent-runtime/model/llm-slug-auxiliary.test.ts",
+      "src/agent-runtime/model/native-tool-stream.ts",
+      "src/agent-runtime/model/ollama-context-stream.ts",
+      "src/agent-runtime/model/prepare-embedded-model.test.ts",
+      "src/agent-runtime/model/prepare-embedded-model.ts",
+      "src/agent-runtime/model/xai-arguments-stream.ts",
+      "src/executor-evidence/acceptance-fix-r8-cli.isolation.test.ts"
+    ],
+    "description": "Production code consumes model infrastructure through the public model/index facade. Model internals may cross-import; listed model sources/tests and the R8 CLI isolation test (which must bind command-commercial-gate directly) are exempt."
+  },
+  {
     "name": "runtime-acceptance-no-platform-effects",
     "from": "src/agent-runtime/delivery/acceptance/**",
     "denyImportsFrom": [

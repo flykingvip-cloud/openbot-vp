@@ -48,3 +48,10 @@ export {
 export { applyProviderCredential } from "./apply-provider-credential.js";
 
 export { resolveCliRunCredential } from "./cli-run-credential.js";
+
+export {
+  AGENT_COMMAND_MODEL_MODE_ENV,
+  resolveAgentCommandConfiguredModelMode,
+  resolveAgentCommandActorId,
+  resolveAgentCommandModelGovernance,
+} from "./command-governance.js";

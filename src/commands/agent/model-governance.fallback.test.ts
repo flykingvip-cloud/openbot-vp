@@ -13,8 +13,7 @@ vi.mock("../../gateway/governance/shadow-sink.js", () => ({
 const { runWithModelFallback } = await import("../../agents/model-fallback.js");
 const { makeModelFallbackCfg } =
   await import("../../agents/test-helpers/model-fallback-config-fixture.js");
-const { resolveAgentCommandModelGovernance } =
-  await import("../../agent-runtime/model/command-governance.js");
+const { resolveAgentCommandModelGovernance } = await import("../../agent-runtime/model/index.js");
 const { createExecutionIdentityContext } =
   await import("../../gateway/execution-identity-context.js");
 

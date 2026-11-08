@@ -4,7 +4,7 @@ import {
   resolveAgentCommandActorId,
   resolveAgentCommandConfiguredModelMode,
   resolveAgentCommandModelGovernance,
-} from "../../agent-runtime/model/command-governance.js";
+} from "../../agent-runtime/model/index.js";
 import { createExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
 
 const acquired = {
