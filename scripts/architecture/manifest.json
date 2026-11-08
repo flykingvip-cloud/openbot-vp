@@ -452,7 +452,9 @@
     "denyImportsFrom": [
       "src/agents/pi-embedded",
       "src/agents/cli-runner",
-      "src/agent-runtime/execution/runner/**"
+      "src/agent-runtime/execution/runner/**",
+      "src/agents/pi-embedded-runner/types",
+      "src/agents/pi-embedded-runner/runs"
     ],
     "description": "Command orchestration invokes candidates through execution/index; direct provider execution and private runner imports cannot return."
   },
@@ -522,5 +524,35 @@
     "from": "src/cron/isolated-agent/run.ts",
     "denyImportsFrom": ["src/task-orchestration/**"],
     "description": "Scheduled task preparation cannot invoke the retired orchestration prefetch path; tools execute through the admitted capability boundary."
+  },
+  {
+    "name": "runtime-supervisor-cli-public-entry",
+    "from": "src/gateway/supervisor/worker-executor.ts",
+    "denyImportsFrom": [
+      "src/agents/cli-runner",
+      "src/agents/pi-embedded",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "Supervisor worker dispatch invokes CLI through execution/index; legacy cli-runner facade and private runner imports cannot return."
+  },
+  {
+    "name": "runtime-hooks-model-public-entry",
+    "from": "src/hooks/llm-slug-generator.ts",
+    "denyImportsFrom": [
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "Hook utility model calls use the execution public API; legacy embedded facades cannot return as a second entry."
+  },
+  {
+    "name": "runtime-memory-flush-public-entry",
+    "from": "src/auto-reply/reply/agent-runner-memory.ts",
+    "denyImportsFrom": [
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "Memory-flush model runs use the execution public API; legacy embedded facades cannot return on the reply host."
   }
 ]

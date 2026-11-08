@@ -1,7 +1,16 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { runCliAgent } from "./cli-run.js";
 const mocks = vi.hoisted(() => ({ current: vi.fn(), spawn: vi.fn() }));
-vi.mock("../../state/index.js", () => ({ sessionTaskState: { bindingCurrent: mocks.current } }));
+vi.mock("../../state/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../state/index.js")>();
+  return {
+    ...actual,
+    sessionTaskState: {
+      ...actual.sessionTaskState,
+      bindingCurrent: mocks.current,
+    },
+  };
+});
 vi.mock("../../../process/supervisor/index.js", () => ({
   getProcessSupervisor: () => ({ spawn: mocks.spawn }),
 }));

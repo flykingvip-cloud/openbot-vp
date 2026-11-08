@@ -6,10 +6,10 @@
  */
 
 import crypto from "node:crypto";
+import { runCliAgent } from "../../agent-runtime/execution/index.js";
 import { recordCliBackendUsage } from "../../agents/cli-backend-usage-attribution.js";
 import { createWorkerFromBackend } from "../../agents/cli-backend-worker.js";
 import { resolveCliBackendConfig } from "../../agents/cli-backends.js";
-import { runCliAgent } from "../../agents/cli-runner.js";
 import { FailoverError } from "../../agents/failover-error.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { resolveSessionTranscriptPath } from "../../config/sessions/paths.js";

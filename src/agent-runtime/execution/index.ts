@@ -32,6 +32,8 @@ export { resolveAttemptEndOfRunAttribution } from "./outcomes/attempt-attributio
 
 export { runEmbeddedPiAgent } from "./runner/embedded-run.js";
 
+export { runCliAgent, runClaudeCliAgent } from "./runner/cli-run.js";
+
 export { cleanupEmbeddedAttempt } from "./runner/attempt-cleanup.js";
 
 export { runQueuedCandidate } from "./runner/queued-candidate.js";

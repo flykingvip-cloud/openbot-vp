@@ -29,7 +29,7 @@ vi.mock("../../agents/model-selection.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../agents/pi-embedded.js", () => ({
+vi.mock("../../agent-runtime/execution/index.js", () => ({
   runEmbeddedPiAgent: vi.fn().mockResolvedValue({
     payloads: [],
     meta: { durationMs: 10 },

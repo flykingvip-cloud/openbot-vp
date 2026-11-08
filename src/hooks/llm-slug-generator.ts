@@ -5,6 +5,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { runEmbeddedPiAgent } from "../agent-runtime/execution/index.js";
 import {
   resolveDefaultAgentId,
   resolveAgentWorkspaceDir,
@@ -13,7 +14,6 @@ import {
 } from "../agents/agent-scope.js";
 import { DEFAULT_PROVIDER, DEFAULT_MODEL } from "../agents/defaults.js";
 import { parseModelRef } from "../agents/model-selection.js";
-import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 
