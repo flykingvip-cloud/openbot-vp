@@ -1380,3 +1380,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Candidate eeae5d645 local full build PASS; 209 existing ineffective dynamic-import warnings and UI-size warnings remain; pinned Control UI sync skipped. No production restart or deployment. — codex-runtime-manager
 - Isolated Gateway with api-proxy-deepseek/deepseek-v4-flash completed the deterministic file task: exact UTF-8 artifact bytes, acceptance passed with digest, delivered receipt, deliverableChecked=true and unfinished=false. Task task-a26b8b0b755e; run/attempt 7b446f57-21c9-4807-9b3d-eb948ea29c42. Probe exited normally and temporary state was removed. This validates one personal artifact scenario, not semantic/layout acceptance, collaboration real-model lifecycle or asynchronous recovery after restart. — codex-runtime-manager
+
+## Individual context excludes collaboration material (2026-11-08)
+
+- Reproduced non-collaboration model input containing GroupSystemPrompt (one failing regression). Individual assembly no longer consumes group context, intro or system prompt; removed unreachable collaboration capability assembly in that branch. Explicit collaboration assembly retains its original source evaluation and ordering; channel adapters and session intro bookkeeping remain unchanged. — codex-runtime-manager
+- Context regression 2 files / 16 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. Two explicit context catalogs and complete source lifecycle convergence remain open. Collaboration contract/plan/stop regression on the prior production-source candidate: 5 files / 26 PASS, simulated execution only. — codex-runtime-manager

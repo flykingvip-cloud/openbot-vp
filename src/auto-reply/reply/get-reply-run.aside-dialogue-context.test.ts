@@ -379,8 +379,8 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
       } else {
         expect(assembleCollaborationRuntimeContextParts).not.toHaveBeenCalled();
         expect(buildInboundMetaSystemPrompt).toHaveBeenCalledTimes(1);
-        expect(system.startsWith("  DIRECT_FIRST  \n\nGROUP_MIDDLE")).toBe(true);
-        expect(system.indexOf("GROUP_MIDDLE")).toBeLessThan(system.indexOf("EVENT_LAST"));
+        expect(system.startsWith("  DIRECT_FIRST  ")).toBe(true);
+        expect(system).not.toContain("GROUP_MIDDLE");
       }
     },
   );

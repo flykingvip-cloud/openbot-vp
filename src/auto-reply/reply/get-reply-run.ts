@@ -131,13 +131,12 @@ import {
   formatCollaborationKnowledgeRecoveryHint,
   isCollaborationExplicitKnowledgeRecoveryEnabled,
 } from "./collab-knowledge-recovery.js";
-import { buildCollaborationCapabilitySystemPrompt } from "./collaboration-capability-context.js";
 import { resolveCollaborationAwareSessionFile } from "./collaboration-session-file.js";
 import type { buildCommandContext } from "./commands.js";
 import { resolveComposerPluginMentionBindings } from "./composer-plugin-mention-bindings.js";
 import type { InlineDirectives } from "./directive-handling.js";
 import { buildActivePrimaryObjectivePrompt } from "./goal-correction-mutation.js";
-import { buildGroupChatContext, buildGroupIntro } from "./groups.js";
+import type { buildGroupIntro } from "./groups.js";
 import {
   ceilingForDepth,
   classifyInboundDepth,
@@ -1140,32 +1139,9 @@ export async function runPreparedReply(
       cronReplyPrompt,
     ]);
   } else {
-    const groupChatContext = isGroupChat
-      ? buildGroupChatContext({ sessionCtx, organizationContext })
-      : "";
-    const groupIntro = shouldInjectGroupIntro
-      ? buildGroupIntro({
-          cfg,
-          sessionCtx,
-          sessionEntry,
-          defaultActivation,
-          silentToken: SILENT_REPLY_TOKEN,
-        })
-      : "";
     const inboundMetaPrompt = buildInboundMetaSystemPrompt(
       isNewSession ? sessionCtx : { ...sessionCtx, ThreadStarterBody: undefined },
     );
-    // Non-collab 1:1 sessions and chat-lane skips must not inject capability/overlay prompts.
-    const collaborationCapabilityPrompt =
-      applyChatLane || !useCollaborationAssembly
-        ? undefined
-        : await buildCollaborationCapabilitySystemPrompt({
-            sessionEntry,
-            groupId: collaborationGroupId ?? undefined,
-            botId: sessionCtx.CollaborationBotAgentId,
-            workspaceDir,
-            cfg,
-          });
     const sessionContinuityPrompt = await buildSessionContinuityPrompt({
       cfg,
       workspaceDir,
@@ -1214,13 +1190,9 @@ export async function runPreparedReply(
         : undefined;
     extraSystemPromptParts = selectSystemContextParts([
       inboundMetaPrompt,
-      groupChatContext,
-      groupIntro,
-      groupSystemPrompt,
       turnReplyLanguageInstruction,
       userTimezonePrompt,
       remoteEnvironmentPrompt,
-      collaborationCapabilityPrompt,
       userProfileInstructions,
       seatRulesPrompt,
       conversationTaskFocusPrompt,
