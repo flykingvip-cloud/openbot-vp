@@ -1,14 +1,14 @@
 import { runWithModelFallback } from "../../../agents/model-fallback.js";
 import { createCommandAdmissionSession, type ModelInferenceInput } from "../../model/index.js";
-import { createExecutionScope } from "./execution-scope.js";
+import { createControlledExecutionUseCase } from "./controlled-execution.js";
 
 /** Command authority adapter: preserves E2/E3/E6 and inherited child snapshots.
- * Stage order, readiness, cancellation and retry identity belong to the shared scope. */
+ * Stage order belongs to the unique controlled execution use-case. */
 export function createCommandExecutionLifecycle(
   params: Parameters<typeof createCommandAdmissionSession>[0],
 ) {
   const authority = createCommandAdmissionSession(params);
-  return createExecutionScope({
+  return createControlledExecutionUseCase({
     async prepare(input: {
       authorization: Parameters<typeof authority.acquire>[0];
       signal?: AbortSignal;

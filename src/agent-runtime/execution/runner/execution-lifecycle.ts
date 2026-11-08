@@ -1,17 +1,18 @@
 import type { OpenBotConfig } from "../../../config/config.js";
 import { createAuthorizedModelSession } from "../../model/index.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
-import { createExecutionScope } from "./execution-scope.js";
+import { createControlledExecutionUseCase } from "./controlled-execution.js";
 
 type Session = ReturnType<typeof createAuthorizedModelSession>;
 type Host = Pick<AdmittedTurnHost, "admission" | "model" | "accounting">;
 
 /** Shared execution admission, routing and provider-session lifetime.
+ * Implements the unique controlled execution use-case stage order.
  * Scene adapters retain task ownership, candidate parameters and delivery.
  * This is host code, never executable configuration or a new scheduler. */
 export function createExecutionLifecycle(runId: string, host: Host) {
   const session = createAuthorizedModelSession(runId, host);
-  const scope = createExecutionScope({
+  const scope = createControlledExecutionUseCase({
     async prepare(input: {
       config: OpenBotConfig;
       authorization: Parameters<Session["authorize"]>[0];

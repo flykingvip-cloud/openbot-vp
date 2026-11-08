@@ -7,6 +7,12 @@ export type {
 
 export { runAdmittedTurn } from "./runner/admitted-turn.js";
 export { createExecutionLifecycle } from "./runner/execution-lifecycle.js";
+export {
+  CONTROLLED_EXECUTION_STAGE_ORDER,
+  createControlledExecutionUseCase,
+  type ControlledExecutionStage,
+  type ControlledExecutionUseCase,
+} from "./runner/controlled-execution.js";
 export { createCommandExecutionLifecycle } from "./runner/command-lifecycle.js";
 export type { AgentTurnExecutionParams, AgentRunLoopResult } from "./runner/turn-contract.js";
 

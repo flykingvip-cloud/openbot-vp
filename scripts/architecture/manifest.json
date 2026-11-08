@@ -554,5 +554,55 @@
       "src/agent-runtime/execution/runner/**"
     ],
     "description": "Memory-flush model runs use the execution public API; legacy embedded facades cannot return on the reply host."
+  },
+  {
+    "name": "runtime-command-host-controlled-execution",
+    "from": "src/commands/agent.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/model-fallback",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution"
+    ],
+    "description": "Command host consumes the controlled execution use-case via execution/index lifecycle factories; it cannot assemble prepare/infer ports privately."
+  },
+  {
+    "name": "runtime-cron-host-controlled-execution",
+    "from": "src/cron/isolated-agent/run.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/model-fallback",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution"
+    ],
+    "description": "Cron host consumes createExecutionLifecycle from execution/index; it cannot skip preparation by calling model fallback directly."
+  },
+  {
+    "name": "runtime-followup-host-controlled-execution",
+    "from": "src/auto-reply/reply/followup-runner.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/model-fallback",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution"
+    ],
+    "description": "Followup host consumes createExecutionLifecycle from execution/index; it cannot assemble a parallel prepare/infer loop."
+  },
+  {
+    "name": "runtime-chat-host-controlled-execution",
+    "from": "src/auto-reply/reply/agent-runner.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/model-fallback",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution",
+      "src/agent-runtime/execution/runner/execution-lifecycle",
+      "src/agent-runtime/execution/runner/admitted-turn"
+    ],
+    "description": "Chat host enters admitted execution through the public execution API / reply wiring; it cannot deep-import lifecycle internals or model fallback."
   }
 ]
