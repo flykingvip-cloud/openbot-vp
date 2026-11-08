@@ -1,7 +1,10 @@
 import path from "node:path";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Type } from "@sinclair/typebox";
-import { clearAsyncWaitJobIntent } from "../agent-runtime/state/repository/async-wait-job.js";
+import {
+  clearAsyncWaitJobIntent,
+  readAsyncWaitJobIntent,
+} from "../agent-runtime/state/repository/async-wait-job.js";
 import {
   checkTaskActionBoundary,
   type TaskActionBoundary,
@@ -221,9 +224,16 @@ function maybeNotifyOnExit(session: ProcessSession, status: "completed" | "faile
   }
   session.exitNotified = true;
   // A completed child is evidence, not permission to wake a cancelled or replaced task.
-  if (session.taskBoundary && checkTaskActionBoundary(session.taskBoundary)) {
-    clearAsyncWaitJobIntent(session.taskBoundary.sessionFile, session.id);
-    return;
+  if (session.taskBoundary) {
+    if (checkTaskActionBoundary(session.taskBoundary)) {
+      clearAsyncWaitJobIntent(session.taskBoundary.sessionFile, session.id);
+      return;
+    }
+    // Owner stop may have cleared the durable intent before the child exited.
+    const intent = readAsyncWaitJobIntent(session.taskBoundary.sessionFile, session.id);
+    if (intent?.status === "cleared") {
+      return;
+    }
   }
   const exitLabel = session.exitSignal
     ? `signal ${session.exitSignal}`

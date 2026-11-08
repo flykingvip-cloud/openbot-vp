@@ -1576,3 +1576,8 @@ Also: auxiliary governance 3 PASS; slug wiring 1 PASS; memory governance 8 PASS;
 - Adds `async-wait-job-recovery.ts` next to consumer-boot: gateway `server.impl` calls `recoverAsyncWaitJobsAtGatewayBoot` after TaskOutcome consumer recovery. Light recheck reuses the same claim helper on an unref'd interval (no new scheduler/executor/task type). — grok-bot
 - Claim rules: TaskActionBoundary refuse → clear intent (no wake); `waiting` + pid alive → leave waiting; pid dead/missing or already `exited` → mark exited if needed, then **one** bounded wake via existing `enqueueSystemEvent` + `requestHeartbeatNow` / scoped heartbeat options; `recoveryWakeIssuedAtMs` makes wake idempotent. — grok-bot
 - Tests: recovery suite 5 PASS (dirs discover; alive wait; exited one wake + skip; pause clears; boot scan + idempotent). Prior async-wait-job 4 PASS retained. Full tsgo PASS; typed oxlint on changed sources PASS. Registry sharedPaths for recovery + server.impl appended uncommitted for kiro-loom. No push/merge/deploy. — grok-bot
+
+## Package 2 P2-D3 stale callback fence (2026-11-08)
+
+- Strengthens exit notify: after TaskActionBoundary refuse, clear durable intent; if intent already `cleared` (owner pause/cancel), do not enqueue system-event or heartbeat wake. — grok-bot
+- Regressions: exec.task-binding matrix adds `cancelled` (5 PASS: current wakes; paused/replaced/constraints/cancelled do not). New async-wait-stale-callback 3 PASS (pause→recovery no wake; cancel→claimQueuedExecution rejected; replace→boundary refuse). Delivery/followup retain existing boundary checks. Full tsgo PASS; typed oxlint clean. No new scheduler. — grok-bot

@@ -23,7 +23,7 @@ afterEach(() => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
-it.each(["current", "paused", "replaced", "constraints"])(
+it.each(["current", "paused", "replaced", "constraints", "cancelled"])(
   "real background child wakes only its current accepted task: %s",
   async (change) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "exec-task-binding-"));
@@ -70,7 +70,9 @@ it.each(["current", "paused", "replaced", "constraints"])(
               ? { wakeSuppress: true }
               : change === "replaced"
                 ? { taskId: "b" }
-                : { effectiveConstraints: ["changed"] }),
+                : change === "cancelled"
+                  ? { unfinished: false }
+                  : { effectiveConstraints: ["changed"] }),
           },
         },
         value: undefined,
