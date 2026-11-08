@@ -34,3 +34,5 @@ export { summarizeSessionContext } from "./session-summary.js";
 
 export { buildResumePrompt, sanitizeTaskBoardPathForPrompt } from "./sources/task-resume.js";
 export { buildTaskBoardContext } from "./sources/task-board-context.js";
+
+export { renderIdentityBootstrapGuard } from "./sources/identity-bootstrap.js";
