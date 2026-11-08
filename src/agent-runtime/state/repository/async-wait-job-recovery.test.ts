@@ -9,29 +9,20 @@ import {
   mutateSessionTaskBoard,
   startBoundTaskExecution,
 } from "../../../conversation-task/session-task-board.js";
-import { requestHeartbeatNow } from "../../../infra/heartbeat-wake.js";
-import { enqueueSystemEvent } from "../../../infra/system-events.js";
 import {
-  peekAwaitingDelivery,
-  clearAwaitingDeliveriesForTests,
-} from "../../../task-outcome/pending-delivery.js";
-import {
-  claimAsyncWaitJobIntent,
+  armAsyncWaitRecoveryContinuation,
   collectRecoverableAsyncWaitIntents,
-  deliverRecoveredAsyncWaitCompletion,
   findAsyncWaitJobsDirs,
   recoverAsyncWaitJobsAtGatewayBoot,
   stopAsyncWaitJobRecoveryRecheckForTests,
 } from "./async-wait-job-recovery.js";
 import {
+  claimAsyncWaitJobForRecovery,
   clearAsyncWaitJobsForTests,
   markAsyncWaitJobExited,
   readAsyncWaitJobIntent,
   recordAsyncWaitJobIntent,
 } from "./async-wait-job.js";
-
-vi.mock("../../../infra/system-events.js", () => ({ enqueueSystemEvent: vi.fn() }));
-vi.mock("../../../infra/heartbeat-wake.js", () => ({ requestHeartbeatNow: vi.fn() }));
 
 const roots: string[] = [];
 const prevState = process.env.OPENBOT_STATE_DIR;
@@ -39,8 +30,6 @@ const prevOperator = process.env.OPENBOT_OPERATOR_ID;
 
 afterEach(() => {
   stopAsyncWaitJobRecoveryRecheckForTests();
-  clearAwaitingDeliveriesForTests();
-  vi.clearAllMocks();
   for (const root of roots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -60,6 +49,7 @@ function liveBoard(sessionFile: string, taskId = "task-a") {
   mutateSessionTaskBoard(sessionFile, () => ({
     board: {
       ...emptySessionTaskBoard(),
+      focusRevision: 1,
       current: {
         taskId,
         title: "A",
@@ -94,7 +84,7 @@ it("findAsyncWaitJobsDirs discovers nested async-wait-jobs folders", () => {
   expect(findAsyncWaitJobsDirs(root)).toEqual([nested]);
 });
 
-it("pid alive → still waiting; no wake", () => {
+it("pid alive → still waiting; no continue arm", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-alive-"));
   roots.push(root);
   const sessionFile = path.join(root, "session.jsonl");
@@ -110,19 +100,19 @@ it("pid alive → still waiting; no wake", () => {
     pid: process.pid,
     startedAt: Date.now(),
   })!;
-  expect(claimAsyncWaitJobIntent(intent).outcome).toBe("still_waiting");
+  const enqueue = vi.fn(() => true);
+  expect(armAsyncWaitRecoveryContinuation({ intent, enqueue }).outcome).toBe("still_waiting");
+  expect(enqueue).not.toHaveBeenCalled();
   expect(readAsyncWaitJobIntent(sessionFile, "job-alive")?.status).toBe("waiting");
-  expect(enqueueSystemEvent).not.toHaveBeenCalled();
-  expect(requestHeartbeatNow).not.toHaveBeenCalled();
 });
 
-it("exited pid → one bounded wake; second claim skips", () => {
+it("exited → arm continue once; second call retries open stage without double enqueue success required", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-exit-"));
   roots.push(root);
   const sessionFile = path.join(root, "session.jsonl");
   fs.writeFileSync(sessionFile, "");
   const binding = liveBoard(sessionFile);
-  const intent = recordAsyncWaitJobIntent({
+  recordAsyncWaitJobIntent({
     jobId: "job-exit",
     sessionKey: "agent:main:main",
     sessionFile,
@@ -131,34 +121,76 @@ it("exited pid → one bounded wake; second claim skips", () => {
     deliverableVersion: binding.deliverableVersion,
     pid: 999_999_999,
     startedAt: Date.now(),
-  })!;
-  expect(claimAsyncWaitJobIntent(intent).outcome).toBe("woke");
-  expect(readAsyncWaitJobIntent(sessionFile, "job-exit")?.status).toBe("exited");
-  expect(readAsyncWaitJobIntent(sessionFile, "job-exit")?.recoveryWakeIssuedAtMs).toEqual(
-    expect.any(Number),
-  );
-  expect(enqueueSystemEvent).toHaveBeenCalledTimes(1);
-  expect(requestHeartbeatNow).toHaveBeenCalledTimes(1);
-  expect(claimAsyncWaitJobIntent(intent).outcome).toBe("skipped");
-  expect(enqueueSystemEvent).toHaveBeenCalledTimes(1);
+  });
+  markAsyncWaitJobExited({
+    sessionFile,
+    jobId: "job-exit",
+    exitStatus: "completed",
+    exitCode: 0,
+    summary: "done",
+  });
+  const intent = readAsyncWaitJobIntent(sessionFile, "job-exit")!;
+  expect(intent.resultEvidence?.kind).toBe("process_exit_observed");
+  const enqueue = vi.fn(() => true);
+  const first = armAsyncWaitRecoveryContinuation({ intent, enqueue });
+  expect(first.outcome).toBe("continue_armed");
+  expect(enqueue).toHaveBeenCalledTimes(1);
+  expect(readAsyncWaitJobIntent(sessionFile, "job-exit")?.recovery?.stage).toBe("continue_armed");
+  // Second arm: open stage retries (enqueue may run again) — NOT skipped as delivered
+  const second = armAsyncWaitRecoveryContinuation({ intent, enqueue });
+  expect(["continue_armed", "retried_open"]).toContain(second.outcome);
+  expect(readAsyncWaitJobIntent(sessionFile, "job-exit")?.recovery?.stage).not.toBe("delivered");
 });
 
-it("paused/cancelled binding clears without wake", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-clear-"));
+it("pid missing → unconfirmed evidence, never packaged as success", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-miss-"));
   roots.push(root);
   const sessionFile = path.join(root, "session.jsonl");
   fs.writeFileSync(sessionFile, "");
   const binding = liveBoard(sessionFile);
-  const intent = recordAsyncWaitJobIntent({
-    jobId: "job-stale",
+  recordAsyncWaitJobIntent({
+    jobId: "job-miss",
     sessionKey: "agent:main:main",
     sessionFile,
     taskId: binding.taskId,
     executionAttempt: binding.executionAttempt,
     deliverableVersion: binding.deliverableVersion,
-    pid: 999_999_999,
+    pid: 999_999_991,
+    startedAt: Date.now(),
+  });
+  const claimed = claimAsyncWaitJobForRecovery({
+    sessionFile,
+    jobId: "job-miss",
+    isPidAlive: () => false,
+  });
+  expect(claimed.ok).toBe(true);
+  if (claimed.ok) {
+    expect(claimed.intent.resultEvidence?.kind).toBe("process_missing_unconfirmed");
+    expect(claimed.intent.resultEvidence?.summary).toMatch(/unconfirmed/i);
+  }
+});
+
+it("pause clears; recovery does not arm continue", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-pause-"));
+  roots.push(root);
+  const sessionFile = path.join(root, "session.jsonl");
+  fs.writeFileSync(sessionFile, "");
+  const binding = liveBoard(sessionFile);
+  const intent = recordAsyncWaitJobIntent({
+    jobId: "job-pause",
+    sessionKey: "agent:main:main",
+    sessionFile,
+    taskId: binding.taskId,
+    executionAttempt: binding.executionAttempt,
+    deliverableVersion: binding.deliverableVersion,
+    pid: 999_999_992,
     startedAt: Date.now(),
   })!;
+  markAsyncWaitJobExited({
+    sessionFile,
+    jobId: "job-pause",
+    exitStatus: "completed",
+  });
   mutateSessionTaskBoard(sessionFile, (board) => ({
     board: {
       ...board,
@@ -166,12 +198,12 @@ it("paused/cancelled binding clears without wake", () => {
     },
     value: undefined,
   }));
-  expect(claimAsyncWaitJobIntent(intent).outcome).toBe("cleared");
-  expect(readAsyncWaitJobIntent(sessionFile, "job-stale")?.status).toBe("cleared");
-  expect(enqueueSystemEvent).not.toHaveBeenCalled();
+  const enqueue = vi.fn(() => true);
+  expect(armAsyncWaitRecoveryContinuation({ intent, enqueue }).outcome).toBe("cleared");
+  expect(enqueue).not.toHaveBeenCalled();
 });
 
-it("boot recovery scans agent sessions and wakes exited intents once", () => {
+it("boot recovery scans agent sessions and arms continue (not delivered)", () => {
   const state = fs.mkdtempSync(path.join(os.tmpdir(), "aw-boot-"));
   roots.push(state);
   process.env.OPENBOT_STATE_DIR = state;
@@ -197,53 +229,17 @@ it("boot recovery scans agent sessions and wakes exited intents once", () => {
     exitStatus: "completed",
   });
   const cfg = { agents: { list: [{ id: "bot" }] } } as unknown as OpenBotConfig;
-  const first = recoverAsyncWaitJobsAtGatewayBoot({ cfg, startRecheck: false });
+  const enqueue = vi.fn(() => true);
+  const first = recoverAsyncWaitJobsAtGatewayBoot({
+    cfg,
+    startRecheck: false,
+    enqueue,
+  });
   expect(first.intentsSeen).toBeGreaterThanOrEqual(1);
-  expect(first.woke).toBe(1);
+  expect(first.continueArmed).toBe(1);
+  expect(enqueue).toHaveBeenCalledTimes(1);
   expect(collectRecoverableAsyncWaitIntents(cfg).some((row) => row.jobId === "job-boot")).toBe(
     true,
   );
-  const second = recoverAsyncWaitJobsAtGatewayBoot({ cfg, startRecheck: false });
-  expect(second.woke).toBe(0);
-  expect(enqueueSystemEvent).toHaveBeenCalledTimes(1);
   clearAsyncWaitJobsForTests(sessionFile);
-});
-
-it("proactive recovered delivery is idempotent (event+pending once)", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-p2d4-"));
-  roots.push(root);
-  const agentDir = path.join(root, "agent");
-  fs.mkdirSync(agentDir, { recursive: true });
-  const sessionFile = path.join(root, "session.jsonl");
-  fs.writeFileSync(sessionFile, "");
-  const binding = liveBoard(sessionFile);
-  recordAsyncWaitJobIntent({
-    jobId: "job-p2d4",
-    sessionKey: "agent:bot:main",
-    sessionFile,
-    taskId: binding.taskId,
-    executionAttempt: binding.executionAttempt,
-    deliverableVersion: binding.deliverableVersion,
-    pid: 999_999_990,
-    startedAt: Date.now(),
-  });
-  markAsyncWaitJobExited({
-    sessionFile,
-    jobId: "job-p2d4",
-    exitStatus: "completed",
-  });
-  const intent = readAsyncWaitJobIntent(sessionFile, "job-p2d4")!;
-  const cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
-  const first = deliverRecoveredAsyncWaitCompletion({ intent, cfg });
-  expect(first).toEqual({ delivered: true, reason: "issued" });
-  expect(enqueueSystemEvent).toHaveBeenCalledTimes(1);
-  expect(requestHeartbeatNow).toHaveBeenCalledTimes(1);
-  expect(peekAwaitingDelivery("async-wait-recovery:job-p2d4")?.taskId).toBe(binding.taskId);
-  const second = deliverRecoveredAsyncWaitCompletion({ intent, cfg });
-  expect(second.reason).toBe("already");
-  expect(enqueueSystemEvent).toHaveBeenCalledTimes(1);
-  expect(requestHeartbeatNow).toHaveBeenCalledTimes(1);
-  expect(readAsyncWaitJobIntent(sessionFile, "job-p2d4")?.proactiveDeliveryIssuedAtMs).toEqual(
-    expect.any(Number),
-  );
 });

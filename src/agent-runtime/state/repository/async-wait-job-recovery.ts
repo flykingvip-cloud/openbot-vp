@@ -1,36 +1,28 @@
 /**
- * Package2 P2-D2/D4: recover durable async-wait intents at gateway boot (and
- * light recheck), next to TaskOutcome consumer-boot. No new scheduler/executor:
- * pid alive → leave waiting; exited → one bounded proactive delivery via
- * pending-delivery + system-event + heartbeat-wake. Idempotent. Stale bindings clear.
+ * Package2 recovery: claim durable async-wait intents at gateway boot / recheck
+ * and arm the existing task-board continue mainline. enqueueSystemEvent /
+ * requestHeartbeatNow / pending register are NOT delivery.
+ *
+ * Stages: claimed → continue_armed → turn_bound → delivery_pending → delivered.
+ * Unconfirmed stages retry. Dual-claim prevented by per-job file lock.
  */
 import fs from "node:fs";
 import path from "node:path";
-import { listAgentIds, resolveAgentDir } from "../../../agents/agent-scope.js";
+import { listAgentIds } from "../../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { resolveSessionTranscriptsDirForAgent } from "../../../config/sessions/paths.js";
-import { requestHeartbeatNow } from "../../../infra/heartbeat-wake.js";
-import { enqueueSystemEvent } from "../../../infra/system-events.js";
-import {
-  resolveAgentIdFromSessionKey,
-  scopedHeartbeatWakeOptions,
-} from "../../../routing/session-key.js";
 import { isPidAlive } from "../../../shared/pid-alive.js";
-import {
-  peekAwaitingDelivery,
-  registerAwaitingDelivery,
-} from "../../../task-outcome/pending-delivery.js";
-import { TASK_OUTCOME_STORE_DIRNAME } from "../../../task-outcome/runtime-from-runner.js";
+import { buildTaskBoardContinuePrompt, reserveTaskContinuation } from "../continuation-ticket.js";
 import { checkTaskActionBoundary } from "../task-action.js";
 import {
   type AsyncWaitJobIntent,
+  buildAsyncWaitRecoveryPromptAppendix,
+  claimAsyncWaitJobForRecovery,
   clearAsyncWaitJobIntent,
-  listAsyncWaitJobIntents,
-  markAsyncWaitJobExited,
-  markAsyncWaitJobProactiveDeliveryIssued,
-  markAsyncWaitJobRecoveryWakeIssued,
+  markAsyncWaitRecoveryContinueArmed,
   readAsyncWaitJobIntent,
 } from "./async-wait-job.js";
+import { readSessionTaskBoard } from "./task-board-file.js";
 
 export type AsyncWaitRecoveryLog = {
   info?: (message: string) => void;
@@ -41,9 +33,11 @@ export type AsyncWaitRecoveryResult = {
   agentsScanned: number;
   intentsSeen: number;
   stillWaiting: number;
-  woke: number;
+  /** Armed into task-board continue (not delivered). */
+  continueArmed: number;
   cleared: number;
   skipped: number;
+  retried: number;
 };
 
 const JOBS_DIRNAME = "async-wait-jobs";
@@ -52,25 +46,53 @@ const RECHECK_INTERVAL_MS = 15_000;
 let recheckTimer: ReturnType<typeof setInterval> | undefined;
 let recheckCfg: OpenBotConfig | undefined;
 
+/**
+ * Production/tests inject how a continue prompt is enqueued onto the existing
+ * followup / controlled-execution mainline. Must NOT fake delivery.
+ */
+export type AsyncWaitRecoveryContinueEnqueue = (params: {
+  sessionFile: string;
+  sessionKey: string;
+  taskId: string;
+  focusRevision: number;
+  prompt: string;
+  messageId: string;
+  claimToken: string;
+  jobId: string;
+  intent: AsyncWaitJobIntent;
+}) => boolean;
+
+let continueEnqueuePort: AsyncWaitRecoveryContinueEnqueue | undefined;
+
+export function setAsyncWaitRecoveryContinueEnqueue(
+  port: AsyncWaitRecoveryContinueEnqueue | undefined,
+): void {
+  continueEnqueuePort = port;
+}
+
+export function getAsyncWaitRecoveryContinueEnqueue():
+  | AsyncWaitRecoveryContinueEnqueue
+  | undefined {
+  return continueEnqueuePort;
+}
+
 function readIntentFile(filePath: string): AsyncWaitJobIntent | undefined {
   try {
     const row = JSON.parse(fs.readFileSync(filePath, "utf8")) as AsyncWaitJobIntent;
     if (
       row &&
-      row.version === 1 &&
+      (row.version === 2 || (row as { version?: number }).version === 1) &&
       typeof row.jobId === "string" &&
-      typeof row.sessionFile === "string" &&
-      (row.status === "waiting" || row.status === "exited" || row.status === "cleared")
+      typeof row.sessionFile === "string"
     ) {
-      return row;
+      return readAsyncWaitJobIntent(row.sessionFile, row.jobId) ?? row;
     }
   } catch {
-    // ignore corrupt
+    // ignore
   }
   return undefined;
 }
 
-/** Find async-wait-jobs directories under an agent sessions root (bounded depth). */
 export function findAsyncWaitJobsDirs(sessionsRoot: string, maxDepth = 3): string[] {
   const root = sessionsRoot.trim();
   if (!root || !fs.existsSync(root)) {
@@ -126,15 +148,10 @@ export function collectRecoverableAsyncWaitIntents(cfg: OpenBotConfig): AsyncWai
         if (!intent || intent.status === "cleared") {
           continue;
         }
-        // Prefer freshest read via sessionFile API when possible.
-        const fresh =
-          readAsyncWaitJobIntent(intent.sessionFile, intent.jobId) ??
-          listAsyncWaitJobIntents(intent.sessionFile).find((row) => row.jobId === intent.jobId) ??
-          intent;
-        if (fresh.status === "cleared") {
+        if (intent.recovery?.stage === "delivered") {
           continue;
         }
-        byKey.set(`${fresh.sessionFile}::${fresh.jobId}`, fresh);
+        byKey.set(`${intent.sessionFile}::${intent.jobId}`, intent);
       }
     }
   }
@@ -153,178 +170,179 @@ function boundaryFor(intent: AsyncWaitJobIntent) {
   };
 }
 
-function recoveryRunId(jobId: string): string {
-  return `async-wait-recovery:${jobId}`;
-}
-
-function recoveryDeliveryId(jobId: string): string {
-  return `delivery:async-wait:${jobId}:recovery`;
-}
-
-function buildRecoverySummary(intent: AsyncWaitJobIntent): string {
-  if (intent.completionSummary?.trim()) {
-    return intent.completionSummary.trim();
-  }
-  const exitLabel = intent.exitStatus ?? "exited";
-  return `Exec ${exitLabel} recovered (${intent.jobId.slice(0, 8)}) after restart`;
+function buildRecoveryContinuePrompt(intent: AsyncWaitJobIntent, boardPrompt: string): string {
+  return [boardPrompt, "", buildAsyncWaitRecoveryPromptAppendix(intent)].join("\n");
 }
 
 /**
- * P2-D4: proactive recovered-completion delivery (system-event + heartbeat +
- * pending-delivery registration). Idempotent across boot/recheck.
+ * Claim under lock, then arm existing task-board continue via the injected enqueue
+ * port. Returns continue_armed — never "delivered".
  */
-export function deliverRecoveredAsyncWaitCompletion(params: {
+export function armAsyncWaitRecoveryContinuation(params: {
   intent: AsyncWaitJobIntent;
-  cfg?: OpenBotConfig;
-}): { delivered: boolean; reason: "issued" | "already" | "refused" | "skipped" } {
-  const current =
-    readAsyncWaitJobIntent(params.intent.sessionFile, params.intent.jobId) ?? params.intent;
-  if (current.status === "cleared") {
-    return { delivered: false, reason: "skipped" };
-  }
-  if (checkTaskActionBoundary(boundaryFor(current))) {
-    clearAsyncWaitJobIntent(current.sessionFile, current.jobId);
-    return { delivered: false, reason: "refused" };
-  }
-  if (current.status !== "exited") {
-    return { delivered: false, reason: "skipped" };
-  }
-  if (typeof current.proactiveDeliveryIssuedAtMs === "number") {
-    return { delivered: false, reason: "already" };
-  }
-  const runId = current.proactiveDeliveryRunId ?? recoveryRunId(current.jobId);
-  if (peekAwaitingDelivery(runId)) {
-    markAsyncWaitJobProactiveDeliveryIssued({
-      sessionFile: current.sessionFile,
-      jobId: current.jobId,
-      runId,
-      summary: buildRecoverySummary(current),
-    });
-    if (typeof current.recoveryWakeIssuedAtMs !== "number") {
-      markAsyncWaitJobRecoveryWakeIssued(current.sessionFile, current.jobId);
-    }
-    return { delivered: false, reason: "already" };
-  }
-  const sessionKey = current.sessionKey.trim();
-  if (!sessionKey) {
-    return { delivered: false, reason: "skipped" };
-  }
-  const summary = buildRecoverySummary(current);
-  const agentId = resolveAgentIdFromSessionKey(sessionKey);
-  if (params.cfg) {
-    try {
-      const persistRoot = path.join(
-        resolveAgentDir(params.cfg, agentId),
-        TASK_OUTCOME_STORE_DIRNAME,
-      );
-      registerAwaitingDelivery({
-        runId,
-        deliveryId: recoveryDeliveryId(current.jobId),
-        taskId: current.taskId,
-        agentId,
-        persistRoot,
-        checkedTask: {
-          sessionFile: current.sessionFile,
-          binding: {
-            taskId: current.taskId,
-            executionAttempt: current.executionAttempt,
-            deliverableVersion: current.deliverableVersion,
-            constraints: [...current.constraints],
-          },
-        },
-      });
-    } catch {
-      // pending-delivery is best-effort; wake still proceeds
-    }
-  }
-  enqueueSystemEvent(summary, { sessionKey, contextKey: `async-wait:${current.jobId}:recovery` });
-  requestHeartbeatNow(
-    scopedHeartbeatWakeOptions(sessionKey, {
-      reason: `exec:${current.jobId}:recovery-exit`,
-    }),
-  );
-  markAsyncWaitJobProactiveDeliveryIssued({
-    sessionFile: current.sessionFile,
-    jobId: current.jobId,
-    runId,
-    summary,
+  enqueue?: AsyncWaitRecoveryContinueEnqueue;
+  isPidAlive?: (pid: number) => boolean;
+}): {
+  outcome:
+    | "still_waiting"
+    | "continue_armed"
+    | "cleared"
+    | "skipped"
+    | "retried_open"
+    | "enqueue_failed";
+  intent?: AsyncWaitJobIntent;
+} {
+  const claimed = claimAsyncWaitJobForRecovery({
+    sessionFile: params.intent.sessionFile,
+    jobId: params.intent.jobId,
+    isPidAlive: params.isPidAlive ?? isPidAlive,
   });
-  markAsyncWaitJobRecoveryWakeIssued(current.sessionFile, current.jobId);
-  return { delivered: true, reason: "issued" };
-}
-
-function issueBoundedRecoveryWake(intent: AsyncWaitJobIntent, cfg?: OpenBotConfig): boolean {
-  if (
-    typeof intent.recoveryWakeIssuedAtMs === "number" &&
-    typeof intent.proactiveDeliveryIssuedAtMs === "number"
-  ) {
-    return false;
+  if (!claimed.ok) {
+    if (claimed.reason === "still_waiting_pid") {
+      return { outcome: "still_waiting", intent: claimed.intent };
+    }
+    if (claimed.reason === "cleared") {
+      return { outcome: "cleared", intent: claimed.intent };
+    }
+    return { outcome: "skipped", intent: claimed.intent };
   }
-  return deliverRecoveredAsyncWaitCompletion({ intent, cfg }).delivered;
+
+  const intent = claimed.intent;
+  if (checkTaskActionBoundary(boundaryFor(intent))) {
+    clearAsyncWaitJobIntent(intent.sessionFile, intent.jobId);
+    return { outcome: "cleared", intent };
+  }
+
+  const board = readSessionTaskBoard(intent.sessionFile);
+  const current = board.current;
+  if (!current?.unfinished || current.taskId !== intent.taskId) {
+    clearAsyncWaitJobIntent(intent.sessionFile, intent.jobId);
+    return { outcome: "cleared", intent };
+  }
+  const focusRevision = board.focusRevision ?? 0;
+  const reservation = reserveTaskContinuation({
+    sessionFile: intent.sessionFile,
+    taskId: intent.taskId,
+    focusRevision,
+    nowMs: Date.now(),
+  });
+  if (!reservation.ok) {
+    // Cap / revision mismatch — leave claimed for retry; do not mark delivered.
+    return { outcome: "retried_open", intent };
+  }
+
+  const boardPrompt = buildTaskBoardContinuePrompt(current);
+  const prompt = buildRecoveryContinuePrompt(intent, boardPrompt);
+  const messageId = `async-wait-recovery:${intent.jobId}:g${intent.recovery?.claimGeneration ?? 0}`;
+  const enqueue = params.enqueue ?? continueEnqueuePort;
+  if (!enqueue) {
+    // No port yet (boot before wiring) — keep claimed for retry.
+    return { outcome: "retried_open", intent };
+  }
+  const ok = enqueue({
+    sessionFile: intent.sessionFile,
+    sessionKey: intent.sessionKey,
+    taskId: intent.taskId,
+    focusRevision,
+    prompt,
+    messageId,
+    claimToken: claimed.claimToken,
+    jobId: intent.jobId,
+    intent,
+  });
+  if (!ok) {
+    return { outcome: "enqueue_failed", intent };
+  }
+  const armed = markAsyncWaitRecoveryContinueArmed({
+    sessionFile: intent.sessionFile,
+    jobId: intent.jobId,
+    claimToken: claimed.claimToken,
+    focusRevision,
+    messageId,
+  });
+  return {
+    outcome: claimed.freshClaim ? "continue_armed" : "retried_open",
+    intent: armed ?? intent,
+  };
 }
 
-/**
- * Claim one durable intent: refuse stale bindings; pid alive → wait;
- * exited → one bounded wake.
- */
+/** @deprecated name — use armAsyncWaitRecoveryContinuation. Never means delivered. */
 export function claimAsyncWaitJobIntent(
   intent: AsyncWaitJobIntent,
-  opts?: { cfg?: OpenBotConfig },
+  opts?: { cfg?: OpenBotConfig; enqueue?: AsyncWaitRecoveryContinueEnqueue },
 ): {
   outcome: "still_waiting" | "woke" | "cleared" | "skipped";
 } {
-  const current = readAsyncWaitJobIntent(intent.sessionFile, intent.jobId) ?? intent;
-  if (current.status === "cleared") {
-    return { outcome: "skipped" };
+  const result = armAsyncWaitRecoveryContinuation({
+    intent,
+    enqueue: opts?.enqueue,
+  });
+  if (result.outcome === "still_waiting") {
+    return { outcome: "still_waiting" };
   }
-  if (checkTaskActionBoundary(boundaryFor(current))) {
-    clearAsyncWaitJobIntent(current.sessionFile, current.jobId);
+  if (result.outcome === "cleared") {
     return { outcome: "cleared" };
   }
-  if (current.status === "waiting") {
-    if (typeof current.pid === "number" && isPidAlive(current.pid)) {
-      return { outcome: "still_waiting" };
-    }
-    markAsyncWaitJobExited({
-      sessionFile: current.sessionFile,
-      jobId: current.jobId,
-      exitStatus: "failed",
-    });
+  if (result.outcome === "continue_armed" || result.outcome === "retried_open") {
+    // "woke" kept for older tests = continue armed, NOT delivered.
+    return { outcome: "woke" };
   }
-  const after = readAsyncWaitJobIntent(current.sessionFile, current.jobId) ?? current;
-  if (after.status !== "exited") {
-    return { outcome: "skipped" };
+  return { outcome: "skipped" };
+}
+
+/** @deprecated — delivery is only via confirmPending after a real turn. */
+export function deliverRecoveredAsyncWaitCompletion(params: {
+  intent: AsyncWaitJobIntent;
+  cfg?: OpenBotConfig;
+  enqueue?: AsyncWaitRecoveryContinueEnqueue;
+}): { delivered: boolean; reason: "issued" | "already" | "refused" | "skipped" | "armed" } {
+  if (params.intent.recovery?.stage === "delivered") {
+    return { delivered: false, reason: "already" };
   }
-  if (typeof after.recoveryWakeIssuedAtMs === "number") {
-    return { outcome: "skipped" };
+  const result = armAsyncWaitRecoveryContinuation({
+    intent: params.intent,
+    enqueue: params.enqueue,
+  });
+  if (result.outcome === "cleared") {
+    return { delivered: false, reason: "refused" };
   }
-  return { outcome: issueBoundedRecoveryWake(after, opts?.cfg) ? "woke" : "skipped" };
+  if (result.outcome === "continue_armed" || result.outcome === "retried_open") {
+    // Explicitly NOT delivered — continue was armed onto the mainline.
+    return { delivered: false, reason: "armed" };
+  }
+  return { delivered: false, reason: "skipped" };
 }
 
 export function recoverAsyncWaitJobsAtGatewayBoot(params: {
   cfg: OpenBotConfig;
   log?: AsyncWaitRecoveryLog;
-  /** When true, also start the light recheck interval (alive pids → later exit). */
   startRecheck?: boolean;
   intervalMs?: number;
+  enqueue?: AsyncWaitRecoveryContinueEnqueue;
 }): AsyncWaitRecoveryResult {
   const intents = collectRecoverableAsyncWaitIntents(params.cfg);
   const result: AsyncWaitRecoveryResult = {
     agentsScanned: listAgentIds(params.cfg).length,
     intentsSeen: intents.length,
     stillWaiting: 0,
-    woke: 0,
+    continueArmed: 0,
     cleared: 0,
     skipped: 0,
+    retried: 0,
   };
   for (const intent of intents) {
     try {
-      const { outcome } = claimAsyncWaitJobIntent(intent, { cfg: params.cfg });
-      if (outcome === "still_waiting") {
+      const out = armAsyncWaitRecoveryContinuation({
+        intent,
+        enqueue: params.enqueue ?? continueEnqueuePort,
+      });
+      if (out.outcome === "still_waiting") {
         result.stillWaiting += 1;
-      } else if (outcome === "woke") {
-        result.woke += 1;
-      } else if (outcome === "cleared") {
+      } else if (out.outcome === "continue_armed") {
+        result.continueArmed += 1;
+      } else if (out.outcome === "retried_open") {
+        result.retried += 1;
+      } else if (out.outcome === "cleared") {
         result.cleared += 1;
       } else {
         result.skipped += 1;
@@ -332,19 +350,20 @@ export function recoverAsyncWaitJobsAtGatewayBoot(params: {
     } catch (err) {
       result.skipped += 1;
       params.log?.warn?.(
-        `async-wait recovery claim failed job=${intent.jobId}: ${
+        `async-wait recovery failed job=${intent.jobId}: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
     }
   }
   params.log?.info?.(
-    `async-wait recovery boot: agents=${result.agentsScanned} seen=${result.intentsSeen} waiting=${result.stillWaiting} woke=${result.woke} cleared=${result.cleared} skipped=${result.skipped}`,
+    `async-wait recovery boot: agents=${result.agentsScanned} seen=${result.intentsSeen} waiting=${result.stillWaiting} continueArmed=${result.continueArmed} retried=${result.retried} cleared=${result.cleared} skipped=${result.skipped}`,
   );
   if (params.startRecheck !== false) {
     startAsyncWaitJobRecoveryRecheck(params.cfg, {
       intervalMs: params.intervalMs,
       log: params.log,
+      enqueue: params.enqueue,
     });
   }
   return result;
@@ -352,7 +371,11 @@ export function recoverAsyncWaitJobsAtGatewayBoot(params: {
 
 export function startAsyncWaitJobRecoveryRecheck(
   cfg: OpenBotConfig,
-  opts?: { intervalMs?: number; log?: AsyncWaitRecoveryLog },
+  opts?: {
+    intervalMs?: number;
+    log?: AsyncWaitRecoveryLog;
+    enqueue?: AsyncWaitRecoveryContinueEnqueue;
+  },
 ): void {
   recheckCfg = cfg;
   if (recheckTimer) {
@@ -365,19 +388,16 @@ export function startAsyncWaitJobRecoveryRecheck(
       return;
     }
     try {
-      const intents = collectRecoverableAsyncWaitIntents(active);
-      let woke = 0;
-      let cleared = 0;
-      for (const intent of intents) {
-        const { outcome } = claimAsyncWaitJobIntent(intent, { cfg: active });
-        if (outcome === "woke") {
-          woke += 1;
-        } else if (outcome === "cleared") {
-          cleared += 1;
-        }
-      }
-      if (woke > 0 || cleared > 0) {
-        opts?.log?.info?.(`async-wait recovery recheck: woke=${woke} cleared=${cleared}`);
+      const boot = recoverAsyncWaitJobsAtGatewayBoot({
+        cfg: active,
+        startRecheck: false,
+        log: opts?.log,
+        enqueue: opts?.enqueue ?? continueEnqueuePort,
+      });
+      if (boot.continueArmed > 0 || boot.retried > 0 || boot.cleared > 0) {
+        opts?.log?.info?.(
+          `async-wait recovery recheck: continueArmed=${boot.continueArmed} retried=${boot.retried} cleared=${boot.cleared}`,
+        );
       }
     } catch (err) {
       opts?.log?.warn?.(
@@ -390,11 +410,11 @@ export function startAsyncWaitJobRecoveryRecheck(
   }
 }
 
-/** Test helper */
 export function stopAsyncWaitJobRecoveryRecheckForTests(): void {
   if (recheckTimer) {
     clearInterval(recheckTimer);
     recheckTimer = undefined;
   }
   recheckCfg = undefined;
+  continueEnqueuePort = undefined;
 }

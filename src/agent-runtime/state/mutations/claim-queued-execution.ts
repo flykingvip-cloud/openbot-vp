@@ -1,6 +1,7 @@
 import type { TaskCompletionBinding } from "../../contracts/task.js";
 import { activeConstraintTexts } from "../../policy/index.js";
 import { claimTaskBoardContinue } from "../continuation-ticket.js";
+import { bindAsyncWaitRecoveryTurn } from "../repository/async-wait-job.js";
 import { readSessionTaskBoard } from "../repository/task-board-file.js";
 import { startBoundTaskExecution } from "./execution-binding.js";
 
@@ -37,6 +38,13 @@ export function claimQueuedExecution(input: {
       return { kind: "rejected", reason: "invalid_binding" };
     }
     binding = claimed;
+  }
+  if (binding?.taskId) {
+    bindAsyncWaitRecoveryTurn({
+      sessionFile: input.sessionFile,
+      taskId: binding.taskId,
+      runId: input.runId,
+    });
   }
   return { kind: "accepted", prompt, binding };
 }

@@ -13,7 +13,7 @@ import { enqueueSystemEvent } from "../../../infra/system-events.js";
 import { claimQueuedExecution } from "../mutations/claim-queued-execution.js";
 import { cancelCurrentTask, suppressCurrentTaskWake } from "../mutations/task-control.js";
 import { captureTaskActionBoundary, checkTaskActionBoundary } from "../task-action.js";
-import { claimAsyncWaitJobIntent } from "./async-wait-job-recovery.js";
+import { armAsyncWaitRecoveryContinuation } from "./async-wait-job-recovery.js";
 import {
   clearAsyncWaitJobIntent,
   readAsyncWaitJobIntent,
@@ -79,7 +79,7 @@ it("pause then recovery claim clears intent and does not wake", () => {
     return { board: result.board, value: undefined };
   });
   expect(readAsyncWaitJobIntent(sessionFile, "job-stale")?.status).toBe("cleared");
-  expect(claimAsyncWaitJobIntent(intent).outcome).toBe("skipped");
+  expect(armAsyncWaitRecoveryContinuation({ intent, enqueue: () => true }).outcome).toBe("cleared");
   expect(enqueueSystemEvent).not.toHaveBeenCalled();
   expect(requestHeartbeatNow).not.toHaveBeenCalled();
 });
@@ -91,7 +91,7 @@ it("cancel then recovery claim does not wake; claimQueuedExecution rejects", () 
     return { board: result.board, value: undefined };
   });
   expect(readAsyncWaitJobIntent(sessionFile, "job-stale")?.status).toBe("cleared");
-  expect(claimAsyncWaitJobIntent(intent).outcome).toBe("skipped");
+  expect(armAsyncWaitRecoveryContinuation({ intent, enqueue: () => true }).outcome).toBe("cleared");
   const claimed = claimQueuedExecution({
     sessionFile,
     runId: "run-stale",

@@ -6,6 +6,7 @@ import {
 } from "../../../task-outcome/pending-delivery.js";
 import { confirmRunnerTurnDelivery } from "../../../task-outcome/runtime-from-runner.js";
 import type { TaskCompletionBinding } from "../../contracts/task.js";
+import { markAsyncWaitRecoveryDelivered } from "../../state/repository/async-wait-job.js";
 /** Production delivery confirm — exported so tests use this path, not a copy. */
 export async function confirmPendingTurnDeliveryWithPorts(
   params: {
@@ -111,6 +112,10 @@ export async function confirmPendingTurnDeliveryWithPorts(
       ) {
         return; // Retain the durable association after transient lock failure.
       }
+      markAsyncWaitRecoveryDelivered({
+        sessionFile: pending.checkedTask.sessionFile,
+        runId: pending.runId,
+      });
     }
     // A transport receipt cannot discard an unresolved task-acceptance association.
     if (

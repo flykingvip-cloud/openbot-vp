@@ -1,5 +1,9 @@
 import path from "node:path";
-import { recoverAsyncWaitJobsAtGatewayBoot } from "../agent-runtime/state/index.js";
+import {
+  recoverAsyncWaitJobsAtGatewayBoot,
+  setAsyncWaitRecoveryContinueEnqueue,
+} from "../agent-runtime/state/index.js";
+import { createAsyncWaitRecoveryContinueEnqueue } from "../agent-runtime/state/repository/async-wait-recovery-enqueue.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { maybeProvisionBuiltinStewardAtStartup } from "../agents/builtin-steward/provision.js";
 import { getActiveEmbeddedRunCount } from "../agents/pi-embedded-runner/runs.js";
@@ -807,6 +811,7 @@ export async function startGatewayServer(
   if (!minimalTestGateway) {
     void (async () => {
       const logRecovery = log.child("async-wait-recovery");
+      setAsyncWaitRecoveryContinueEnqueue(createAsyncWaitRecoveryContinueEnqueue(cfgAtStart));
       recoverAsyncWaitJobsAtGatewayBoot({
         cfg: cfgAtStart,
         startRecheck: true,
