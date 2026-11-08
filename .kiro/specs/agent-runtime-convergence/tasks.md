@@ -1370,3 +1370,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced disposal racing with pending preparation: late preparation returned ready after disposal; overlapping preparations could overwrite readiness. Shared scope now rejects overlap, rejects late readiness and drains pending admission before releasing its authority, so a late-acquired lease is not abandoned. No new scheduler or scenario classifier. — codex-runtime-manager
 - Red/green regression: two failures before fix; scope/lifecycle 2 files / 9 PASS after fix. Full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. This is shared lifecycle component evidence, not final same-version personal/collaboration real-model or restart acceptance. — codex-runtime-manager
+
+## Command candidate budget ownership (2026-11-08)
+
+- Moved candidate budget gating, success/failure charging and accumulated charge facts out of the command host into its execution-owned budget component. Command retains scene input and delivery adaptation; parent identity, sequence and budget-exhaustion precedence remain unchanged. No task creation or additional model call. — codex-runtime-manager
+- Budget/command/credit regression 3 files / 50 PASS; full tsgo PASS; changed-file typed lint clean; architecture 55 PASS. Earlier candidate 575bd7900 joint regression 75 files / 386 PASS. Full lifecycle convergence and final real-model/restart acceptance remain open. — codex-runtime-manager

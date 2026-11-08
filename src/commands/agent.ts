@@ -739,11 +739,10 @@ async function agentCommandInternal(
         fallbacksOverride: effectiveFallbacksOverride,
         taskText: opts.message ?? "",
         signal: opts.abortSignal,
-        run: (providerOverride, modelOverride, runOptions, isFallbackRetry) => {
-          commandBudget.assertAllowed();
-          return (async () => {
-            try {
-              const result = await runCommandCandidate({
+        run: (providerOverride, modelOverride, runOptions, isFallbackRetry) => commandBudget.runCandidate({
+          provider: providerOverride,
+          model: modelOverride,
+          run: () => runCommandCandidate({
             providerOverride,
             modelOverride,
             cfg,
@@ -779,35 +778,11 @@ async function agentCommandInternal(
                 lifecycleEnded = true;
               }
             },
-          });
-              if (agentOutcomeTaskId && agentOutcomeScope) {
-                const charged = commandBudget.charge({ usage: result.meta?.agentMeta?.usage, provider: providerOverride, model: modelOverride })!;
-                tipBudgetChargedThisTurn = true;
-                if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
-                  tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
-                }
-              }
-              return result;
-            } catch (err) {
-              if (
-                agentOutcomeTaskId &&
-                agentOutcomeScope &&
-                !(err instanceof TaskBudgetExceededError)
-              ) {
-                try {
-                  commandBudget.charge({ provider: providerOverride, model: modelOverride });
-                  tipBudgetChargedThisTurn = true;
-                } catch (chargeErr) {
-                  if (chargeErr instanceof TaskBudgetExceededError) {
-                    throw chargeErr;
-                  }
-                }
-              }
-              throw err;
-            }
-          })();
-        },
+          }),
+        }),
       });
+      tipBudgetChargedThisTurn = commandBudget.charged;
+      tipBudgetCostUsd = commandBudget.costUsd;
       result = fallbackResult.result;
       fallbackProvider = fallbackResult.provider;
       fallbackModel = fallbackResult.model;
@@ -916,6 +891,8 @@ async function agentCommandInternal(
       payloads,
     });
   } catch (err) {
+    tipBudgetChargedThisTurn ||= commandBudget.charged;
+    tipBudgetCostUsd ??= commandBudget.costUsd;
     if (agentOutcomeSuccess === undefined) {
       agentOutcomeSuccess = false;
       const msg = String(err);
