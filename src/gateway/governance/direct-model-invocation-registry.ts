@@ -50,6 +50,19 @@ export type DirectModelInvocationEntry = {
 
 export const DIRECT_MODEL_INVOCATION_REGISTRY: readonly DirectModelInvocationEntry[] = [
   {
+    id: "observation-metadata-completion",
+    file: "src/agent-runtime/model/metadata-completion.ts",
+    invocation: "pi-complete",
+    caller: "invokeMetadataCompletion",
+    inventoryIds: ["E1"],
+    disposition: "instrumented",
+    evidenceFiles: [
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/observation/reasoning-model-resolver.ts",
+    ],
+    note: "Default-off metadata hypotheses through commercial admission, governed fallback, usage accounting and finally disposal; no task/session writes.",
+  },
+  {
     id: "interaction-completion",
     file: "src/agent-runtime/model/interaction-completion.ts",
     invocation: "pi-complete",

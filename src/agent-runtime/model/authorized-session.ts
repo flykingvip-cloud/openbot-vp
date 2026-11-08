@@ -49,6 +49,7 @@ export type ModelInferenceInput<T> = {
   agentDir?: string;
   fallbacksOverride?: string[];
   taskText: string;
+  authStoreReadOnly?: boolean;
   signal?: AbortSignal;
   /** When set, each fallback candidate records model-call evidence before `run`. */
   executorEvidence?: Parameters<typeof runWithModelFallback<T>>[0]["executorEvidence"];
@@ -159,6 +160,7 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
       input.signal?.throwIfAborted();
       const result = await ports.model.runWithModelFallback({
         cfg: input.cfg,
+        authStoreReadOnly: input.authStoreReadOnly,
         provider: input.provider,
         model: input.model,
         agentDir: input.agentDir,

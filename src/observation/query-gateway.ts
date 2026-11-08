@@ -26,6 +26,7 @@ export function createObservationQueryHandlers(
     platformActivityCollector?: Pick<ReturnType<typeof startHeartbeatActivity>, "query"> | null;
     loadConfig?: () => OpenBotConfig;
     now?: () => number;
+    reasoningResolver?: typeof import("./reasoning-model-resolver.js").createReasoningModelResolver;
     reasoning?: {
       enabled?: boolean;
       modelRef?: string;
@@ -270,8 +271,20 @@ export function createObservationQueryHandlers(
         };
         let reasoningPass;
         if (params.reasoning !== undefined) {
+          const resolved =
+            options.reasoning?.enabled && options.reasoningResolver
+              ? options.reasoningResolver({
+                  cfg,
+                  agentId: params.agentId,
+                  tenantId: caller.tenantId,
+                  subjectRef: caller.subjectRef,
+                  client,
+                  authorize: finalAuth,
+                })
+              : undefined;
           const reasoning = await createReasoningGatewayAdapter({
             ...options.reasoning,
+            ...resolved,
             authorize: async () =>
               (await finalAuth())
                 ? {

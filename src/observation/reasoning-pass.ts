@@ -23,10 +23,31 @@ export type ReasoningItem = {
   source: "reasoning";
   modelRef: string;
 };
-export type ReasoningModelPort = (
+export type ReasoningDiagnostics = {
+  reconciliationRef: string;
+  retention: "process_only";
+  usageStatus:
+    | "not_observed"
+    | "pending_reconciliation"
+    | "late_usage_pending_reconciliation"
+    | "accounting_pending"
+    | "accounted";
+  cleanupStatus: "not_acquired" | "pending" | "released" | "cleanup_unconfirmed";
+  observedUsage: {
+    input: number | null;
+    output: number | null;
+    cacheRead: number | null;
+    cacheWrite: number | null;
+  } | null;
+  reasonCodes: string[];
+};
+export type ReasoningModelPort = ((
   input: ReasoningInput,
   context: { signal: AbortSignal; modelRef: string },
-) => Promise<unknown>;
+) => Promise<unknown>) & {
+  readonly settlesOnAbort?: true;
+  diagnostics?: () => ReasoningDiagnostics | undefined;
+};
 function object(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v);
 }
@@ -126,16 +147,29 @@ export async function runReasoningPass(
         reject(new Error("reasoning_timeout"));
       }, timeoutMs);
     });
-    const value = await Promise.race([
-      Promise.resolve().then(() =>
-        options.model!(structuredClone(safe), {
-          signal: controller.signal,
-          modelRef: options.modelRef!,
-        }),
-      ),
-      timeout,
-    ]);
-    const items = parse(value, new Set(safe.evidence.map((e) => e.evidenceId)), options.modelRef);
+    void timeout.catch(() => undefined);
+    const invocation = Promise.resolve().then(() =>
+      options.model!(structuredClone(safe), {
+        signal: controller.signal,
+        modelRef: options.modelRef!,
+      }),
+    );
+    const value = options.model.settlesOnAbort
+      ? await invocation
+      : await Promise.race([invocation, timeout]);
+    // A server resolver may attach the actual transport identity; model text cannot set this wrapper.
+    const resolved =
+      object(value) &&
+      exact(value, ["value", "actualModelRef"]) &&
+      typeof value.actualModelRef === "string" &&
+      value.actualModelRef.trim()
+        ? { value: value.value, modelRef: value.actualModelRef }
+        : { value, modelRef: options.modelRef };
+    const items = parse(
+      resolved.value,
+      new Set(safe.evidence.map((e) => e.evidenceId)),
+      resolved.modelRef,
+    );
     return items
       ? {
           scoringMethod: "rule_v1_with_hypotheses" as const,
@@ -145,11 +179,18 @@ export async function runReasoningPass(
         }
       : fallback("reasoning_schema_invalid");
   } catch (error) {
-    return fallback(
-      error instanceof Error && error.message === "reasoning_timeout"
-        ? "reasoning_timeout"
-        : "reasoning_model_error",
-    );
+    const governance = options.model?.diagnostics?.();
+    if (governance?.cleanupStatus === "cleanup_unconfirmed") {
+      return { ...fallback("cleanup_unconfirmed"), governance };
+    }
+    return {
+      ...fallback(
+        error instanceof Error && error.message === "reasoning_timeout"
+          ? "reasoning_timeout"
+          : "reasoning_model_error",
+      ),
+      ...(governance ? { governance } : {}),
+    };
   } finally {
     if (timer !== undefined) {
       clearTimeout(timer);

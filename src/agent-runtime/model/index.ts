@@ -55,3 +55,5 @@ export {
   resolveAgentCommandActorId,
   resolveAgentCommandModelGovernance,
 } from "./command-governance.js";
+
+export { invokeMetadataCompletion } from "./metadata-completion.js";

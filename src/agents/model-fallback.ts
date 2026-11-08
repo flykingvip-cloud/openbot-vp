@@ -18,6 +18,7 @@ import { createSubsystemLogger } from "../logging/subsystem.js";
 import { sanitizeForLog } from "../terminal/ansi.js";
 import {
   ensureAuthProfileStore,
+  loadAuthProfileStoreForSecretsRuntime,
   getSoonestCooldownExpiry,
   isProfileInCooldown,
   resolveProfilesUnavailableReason,
@@ -153,6 +154,7 @@ function allowlistIsEnterpriseCatalogOnly(allowlist: readonly string[] | undefin
 
 function entitlementFilterWillApply(params: {
   governanceMode?: GovernanceMode;
+
   entitlementAllowlist?: readonly string[];
   allowlistEnforcement?: AllowlistEnforcement;
 }): boolean {
@@ -838,6 +840,9 @@ export async function runWithModelFallback<T>(params: {
    * - `enforced`: filters like `undefined` and records the decision.
    */
   governanceMode?: GovernanceMode;
+  /** Trusted host policy for metadata-only inference; never request-controlled. */
+  authStoreReadOnly?: boolean;
+
   /**
    * Controls when an allowlist hard-filters candidates (P3-1).
    * - `governance-mode` (default): filter only when `governanceMode === "enforced"`.
@@ -952,7 +957,9 @@ export async function runWithModelFallback<T>(params: {
     }
   }
   const authStore = params.cfg
-    ? ensureAuthProfileStore(params.agentDir, { allowKeychainPrompt: false })
+    ? params.authStoreReadOnly
+      ? loadAuthProfileStoreForSecretsRuntime(params.agentDir)
+      : ensureAuthProfileStore(params.agentDir, { allowKeychainPrompt: false })
     : null;
   const attempts: FallbackAttempt[] = [];
   let lastError: unknown;
@@ -1219,6 +1226,7 @@ export async function runWithImageModelFallback<T>(params: {
    * `OPENBOT_GOVERNANCE_IMAGE_MODEL_MODE`.
    */
   governanceMode?: GovernanceMode;
+
   governanceContext?: ModelGovernanceContext;
   runId?: string;
   /** Same platform admission input as text fallback. Role stays orchestrator. */
