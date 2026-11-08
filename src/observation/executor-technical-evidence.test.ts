@@ -247,7 +247,11 @@ describe("technical projection source and gap semantics", () => {
     if (!result.ok) {
       throw new Error("query_failed");
     }
-    expect(result.executorTechnicalEvidence.completeness).toBe("unknown");
+    const technical = result.executorTechnicalEvidence;
+    if (!("completeness" in technical)) {
+      throw new Error("projection_unavailable");
+    }
+    expect(technical.completeness).toBe("unknown");
     expect(result.executorTechnicalEvidence.reasons).toContain("window_filtered");
     expect(result.executorTechnicalEvidence.reasons).toContain(
       "source_watermark_is_not_window_coverage",
@@ -285,11 +289,13 @@ describe("technical projection source and gap semantics", () => {
     if (!result.ok) {
       throw new Error("query_failed");
     }
-    expect(
-      result.executorTechnicalEvidence.attributionGaps?.some((row) =>
-        row.reasons.includes("charge_unknown"),
-      ),
-    ).toBe(true);
+    const technical = result.executorTechnicalEvidence;
+    if (!("attributionGaps" in technical)) {
+      throw new Error("projection_unavailable");
+    }
+    expect(technical.attributionGaps.some((row) => row.reasons.includes("charge_unknown"))).toBe(
+      true,
+    );
     expect(result.executorTechnicalEvidence.runTotalCost).toBeNull();
   });
 });
