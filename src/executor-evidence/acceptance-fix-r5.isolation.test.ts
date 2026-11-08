@@ -57,6 +57,7 @@ afterEach(() => {
   delete process.env.OPENBOT_EXECUTOR_EVIDENCE_DISK_CAP;
   delete process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_AFTER_CREATE_MS;
   delete process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_BEFORE_PUBLISH;
+  delete process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_AFTER_CREATE;
   for (const root of roots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -235,6 +236,52 @@ describe("R5 lock and call identity", () => {
     expect(fs.existsSync(liveLock)).toBe(true);
     const still = JSON.parse(fs.readFileSync(liveLock, "utf8")) as { lockId?: string };
     expect(still.lockId).toBe("still-alive");
+  });
+
+  it("recovers an empty lock left by a crash after create and before any owner bytes", async () => {
+    process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
+    const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r9-empty-"));
+    roots.push(storeRoot);
+    const childPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "evidence-write-child.ts",
+    );
+    const child = spawn(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        childPath,
+        storeRoot,
+        "never.json",
+        "4",
+        path.join(storeRoot, "out.json"),
+      ],
+      {
+        cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."),
+        env: {
+          ...process.env,
+          OPENBOT_EXECUTOR_EVIDENCE: "1",
+          OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_AFTER_CREATE: "1",
+        },
+      },
+    );
+    const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
+    expect(code).toBe(0);
+    const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
+    expect(fs.readFileSync(lockPath, "utf8")).toBe("");
+    const recovered = writeBoundedEvidenceFile(storeRoot, "after-empty.json", { pad: "recovered" });
+    expect(recovered).toBe("written");
+    expect(
+      fs.existsSync(path.join(storeRoot, "executor-evidence", "associations", "after-empty.json")),
+    ).toBe(true);
+    const held = fs.openSync(lockPath, "wx");
+    const blocked = writeBoundedEvidenceFile(storeRoot, "while-held.json", { pad: "no" });
+    expect(blocked).toBe("failed");
+    expect(fs.readFileSync(lockPath, "utf8")).toBe("");
+    fs.closeSync(held);
+    const afterRelease = writeBoundedEvidenceFile(storeRoot, "after-release.json", { pad: "yes" });
+    expect(afterRelease).toBe("written");
   });
 
   it("rejects a changed scope, run, provider, or startedAt as an immutable conflict", () => {

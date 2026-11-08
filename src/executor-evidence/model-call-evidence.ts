@@ -480,9 +480,41 @@ function ownerStillLive(owner: EvidenceLockOwner): boolean {
 }
 
 /**
- * Reclaim a lock only when its published owner is proven gone.
- * An empty or unreadable lock is the window before that record exists.
- * Age alone does not prove it is abandoned, so it is left in place.
+ * True when any live process still has this inode open.
+ * An unreadable /proc entry is treated as a holder: we cannot prove the creator died.
+ */
+function lockInodeHeldByLiveProcess(stat: fs.Stats): boolean {
+  let pids: string[];
+  try {
+    pids = fs.readdirSync("/proc").filter((name) => /^\d+$/.test(name));
+  } catch {
+    return true;
+  }
+  for (const pid of pids) {
+    let fds: string[];
+    try {
+      fds = fs.readdirSync(`/proc/${pid}/fd`);
+    } catch {
+      continue;
+    }
+    for (const fdName of fds) {
+      try {
+        const held = fs.statSync(`/proc/${pid}/fd/${fdName}`);
+        if (held.dev === stat.dev && held.ino === stat.ino) {
+          return true;
+        }
+      } catch {
+        // The fd closed while we looked. It is not a proven holder.
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Reclaim a lock whose owner is proven dead, or an ownerless file whose
+ * creator no longer holds the inode. A live fd on an empty lock is not deleted.
+ * Age alone never reclaims a lock.
  */
 function recoverStaleEvidenceLock(lockPath: string): void {
   let before: fs.Stats;
@@ -498,7 +530,30 @@ function recoverStaleEvidenceLock(lockPath: string): void {
     return;
   }
   const owner = parseLockOwner(text);
-  if (!owner || ownerStillLive(owner)) {
+  if (owner) {
+    if (ownerStillLive(owner)) {
+      return;
+    }
+    let after: fs.Stats;
+    let again: string;
+    try {
+      after = fs.statSync(lockPath);
+      again = fs.readFileSync(lockPath, "utf8");
+    } catch {
+      return;
+    }
+    const current = parseLockOwner(again);
+    if (
+      !sameLockFile(before, after) ||
+      current?.lockId !== owner.lockId ||
+      ownerStillLive(current)
+    ) {
+      return;
+    }
+    fs.rmSync(lockPath, { force: true });
+    return;
+  }
+  if (lockInodeHeldByLiveProcess(before)) {
     return;
   }
   let after: fs.Stats;
@@ -509,8 +564,7 @@ function recoverStaleEvidenceLock(lockPath: string): void {
   } catch {
     return;
   }
-  const current = parseLockOwner(again);
-  if (!sameLockFile(before, after) || current?.lockId !== owner.lockId || ownerStillLive(current)) {
+  if (!sameLockFile(before, after) || parseLockOwner(again) || lockInodeHeldByLiveProcess(after)) {
     return;
   }
   fs.rmSync(lockPath, { force: true });
@@ -739,6 +793,9 @@ export function writeBoundedEvidenceFile(
     while (fd === undefined) {
       try {
         fd = fs.openSync(lockPath, "wx");
+        if (process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_AFTER_CREATE === "1") {
+          process.exit(0);
+        }
         lockId = randomUUID();
         const owner: EvidenceLockOwner = {
           pid: process.pid,
