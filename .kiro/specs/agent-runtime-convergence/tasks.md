@@ -1492,3 +1492,10 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - Memory flush `resolveMemoryFlushModelGovernance` now delegates to the shared contract (context stamps `purpose: memory_flush`). Slug generator routes through `runWithModelFallback` + auxiliary governance instead of a bare embedded call. — grok-bot
 - Architecture: +2 rules (memory/slug cannot open controlled-execution or commercial admission sessions). Manifest 65 PASS. — grok-bot
 - Tests: auxiliary governance 3 PASS; slug auxiliary wiring 1 PASS (under model/); memory governance 8 PASS; memory 1 PASS. Full tsgo PASS; typed oxlint clean. No push/merge/deploy. — grok-bot
+
+## Package 1 D6 Supervisor work-item lifecycle (2026-11-08)
+
+- Added `createSupervisorWorkItemLifecycle` — supervisor commercial acquire/release as authority ports over the unique controlled execution use-case. Denied prepare never arms CLI/node backends; dispose releases an acquired slot exactly once. — grok-bot
+- `GatewayWorkerExecutor` / `NodeAgentWorkerExecutor` now admit via controlled lifecycle **before** starting workers or node dispatch; billing `executionId` keeps the commercial admission run id. Preserves permissions, identity, cancel registry, embedded/CLI backends; no second executor. — grok-bot
+- Architecture: strengthened `runtime-supervisor-cli-public-entry` against private scope/lifecycle/session/fallback assembly. Manifest 65 PASS. — grok-bot
+- Tests: supervisor-lifecycle 5 PASS (stages; deny-no-backend; cancel releases without CLI; dispose once; skipped no release). worker-executor 5 PASS; commercial-hint 2 PASS. Full tsgo PASS; typed oxlint clean. No push/merge/deploy. — grok-bot

@@ -529,11 +529,17 @@
     "name": "runtime-supervisor-cli-public-entry",
     "from": "src/gateway/supervisor/worker-executor.ts",
     "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/**",
+      "src/agent-runtime/execution/runner/controlled-execution",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle",
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
       "src/agents/cli-runner",
-      "src/agents/pi-embedded",
-      "src/agent-runtime/execution/runner/**"
+      "src/agents/model-fallback",
+      "src/agents/pi-embedded"
     ],
-    "description": "Supervisor worker dispatch invokes CLI through execution/index; legacy cli-runner facade and private runner imports cannot return."
+    "description": "Supervisor worker dispatch admits work items through execution/index createSupervisorWorkItemLifecycle and runs CLI via runCliAgent; it cannot assemble prepare/infer privately or revive legacy facades."
   },
   {
     "name": "runtime-hooks-model-public-entry",

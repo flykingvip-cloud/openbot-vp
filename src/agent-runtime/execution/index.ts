@@ -15,6 +15,10 @@ export {
   type ControlledExecutionUseCase,
 } from "./runner/controlled-execution.js";
 export { createCommandExecutionLifecycle } from "./runner/command-lifecycle.js";
+export {
+  createSupervisorWorkItemLifecycle,
+  type SupervisorWorkItemAdmission,
+} from "./runner/supervisor-lifecycle.js";
 export type { AgentTurnExecutionParams, AgentRunLoopResult } from "./runner/turn-contract.js";
 
 export { runCommandCandidate } from "./runner/command-candidate.js";

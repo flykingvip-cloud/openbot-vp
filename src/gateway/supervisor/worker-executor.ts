@@ -6,7 +6,12 @@
  */
 
 import crypto from "node:crypto";
-import { runCliAgent } from "../../agent-runtime/execution/index.js";
+import {
+  assertControlledExecutionStages,
+  createSupervisorWorkItemLifecycle,
+  runCliAgent,
+  type SupervisorWorkItemAdmission,
+} from "../../agent-runtime/execution/index.js";
 import { recordCliBackendUsage } from "../../agents/cli-backend-usage-attribution.js";
 import { createWorkerFromBackend } from "../../agents/cli-backend-worker.js";
 import { resolveCliBackendConfig } from "../../agents/cli-backends.js";
@@ -24,6 +29,7 @@ import { DEFAULT_AGENT_ID } from "../../routing/session-key.js";
 import {
   acquireSupervisorCommercialRun,
   releaseSupervisorCommercialRun,
+  SupervisorCommercialRunDeniedError,
 } from "./commercial-run-gate.js";
 import type { WorkerDispatchResult, WorkerPort } from "./engine.js";
 import { WorkerAuthError } from "./engine.js";
@@ -36,6 +42,24 @@ import {
   unregisterSupervisorRun,
 } from "./run-registry.js";
 import type { SupervisedTask } from "./types.js";
+
+/** Bind supervisor commercial ports to the shared controlled work-item lifecycle. */
+function bindSupervisorWorkItemLifecycle() {
+  return createSupervisorWorkItemLifecycle({
+    async acquire(input): Promise<SupervisorWorkItemAdmission> {
+      try {
+        const held = await acquireSupervisorCommercialRun(input);
+        return held ? { status: "acquired" } : { status: "skipped" };
+      } catch (err) {
+        if (err instanceof SupervisorCommercialRunDeniedError) {
+          return { status: "denied", message: err.message };
+        }
+        throw err;
+      }
+    },
+    release: (runId) => releaseSupervisorCommercialRun(runId),
+  });
+}
 
 export class WorkerPlacementError extends Error {
   constructor(message = "worker placement unavailable") {
@@ -185,70 +209,82 @@ export class GatewayWorkerExecutor implements WorkerExecutor {
 
     const credentialEnv = input.context.identity.credentialEnv;
     const timeoutMs = Math.max(60_000, task.budget.maxDurationMinutes * 60_000);
-    const handle = await worker.start({
-      task: { goal: task.goal, prompt: input.prompt },
-      workspaceDir: task.workspace.root,
-      model,
-      continuityKey: task.continuityKey ?? task.taskId,
-      timeoutMs,
-      executionContext: input.context,
-      ...(credentialEnv ? { credentialEnv } : {}),
-    });
-
-    let commercialSlotHeld = false;
+    // Admit before starting the CLI backend so denied work items never spawn workers.
+    const commercialRunId = crypto.randomUUID();
+    const controlledExecution = bindSupervisorWorkItemLifecycle();
+    assertControlledExecutionStages(controlledExecution, "Supervisor gateway worker");
     try {
-      commercialSlotHeld = await acquireSupervisorCommercialRun({
-        runId: handle.runId,
+      const prepared = await controlledExecution.prepare({
+        runId: commercialRunId,
         agentId,
         enterpriseId: input.context.attribution.tenantId,
       });
-    } catch (err) {
-      await worker.cancel(handle.runId).catch(() => undefined);
-      throw err;
-    }
-
-    registerSupervisorRun({
-      taskId: task.taskId,
-      runId: handle.runId,
-      workerId: handle.workerId,
-      worker,
-    });
-    await input.onStarted?.({ runId: handle.runId, workerId: handle.workerId });
-
-    try {
-      for await (const event of worker.logs(handle.runId)) {
-        if (input.shouldAbort && (await input.shouldAbort())) {
-          await worker.cancel(handle.runId).catch(() => undefined);
-          break;
-        }
-        input.onProgress?.(event);
+      if (prepared.kind === "denied") {
+        throw new SupervisorCommercialRunDeniedError(prepared.message);
       }
 
-      const status = await worker.status(handle.runId);
-      if (input.context.attribution.credentialId && input.context.attribution.tenantId) {
-        void recordCliBackendUsage({
-          tenantId: input.context.attribution.tenantId,
-          userId:
-            input.context.attribution.userId ??
-            input.context.attribution.seatId ??
-            task.userId ??
-            "unknown",
-          backendId,
-          credentialId: input.context.attribution.credentialId,
-          model,
-          executionId: `${task.taskId}:${handle.runId}`,
-        });
-      }
-      return {
-        summary: status.summary ?? "",
-        exitCode: status.exitCode,
-        usage: status.usage,
-      };
+      const inferred = await controlledExecution.infer({
+        cfg: this.cfg,
+        provider: backendId,
+        model: model ?? "default",
+        taskText: input.prompt,
+        run: async () => {
+          const handle = await worker.start({
+            task: { goal: task.goal, prompt: input.prompt },
+            workspaceDir: task.workspace.root,
+            model,
+            continuityKey: task.continuityKey ?? task.taskId,
+            timeoutMs,
+            executionContext: input.context,
+            ...(credentialEnv ? { credentialEnv } : {}),
+          });
+
+          registerSupervisorRun({
+            taskId: task.taskId,
+            runId: handle.runId,
+            workerId: handle.workerId,
+            worker,
+          });
+          try {
+            await input.onStarted?.({ runId: handle.runId, workerId: handle.workerId });
+
+            for await (const event of worker.logs(handle.runId)) {
+              if (input.shouldAbort && (await input.shouldAbort())) {
+                await worker.cancel(handle.runId).catch(() => undefined);
+                break;
+              }
+              input.onProgress?.(event);
+            }
+
+            const status = await worker.status(handle.runId);
+            if (input.context.attribution.credentialId && input.context.attribution.tenantId) {
+              void recordCliBackendUsage({
+                tenantId: input.context.attribution.tenantId,
+                userId:
+                  input.context.attribution.userId ??
+                  input.context.attribution.seatId ??
+                  task.userId ??
+                  "unknown",
+                backendId,
+                credentialId: input.context.attribution.credentialId,
+                model,
+                // Billing identity stays on the commercial admission run id.
+                executionId: `${task.taskId}:${commercialRunId}`,
+              });
+            }
+            return {
+              summary: status.summary ?? "",
+              exitCode: status.exitCode,
+              usage: status.usage,
+            } satisfies WorkerDispatchResult;
+          } finally {
+            unregisterSupervisorRun(task.taskId);
+          }
+        },
+      });
+      return inferred.result;
     } finally {
-      unregisterSupervisorRun(task.taskId);
-      if (commercialSlotHeld) {
-        void releaseSupervisorCommercialRun(handle.runId);
-      }
+      await controlledExecution.dispose();
     }
   }
 }
@@ -293,85 +329,99 @@ export class NodeAgentWorkerExecutor implements WorkerExecutor {
     const timeoutMs = Math.max(60_000, task.budget.maxDurationMinutes * 60_000);
     const agentId = (task.agentId ?? DEFAULT_AGENT_ID).trim() || DEFAULT_AGENT_ID;
 
-    let commercialSlotHeld = false;
-    commercialSlotHeld = await acquireSupervisorCommercialRun({
-      runId,
-      agentId,
-      enterpriseId: input.context.attribution.tenantId,
-    });
-
-    registerSupervisorRun({
-      taskId: task.taskId,
-      runId,
-      workerId: backendId,
-      worker: {
-        cancel: async () => {
-          if (!declared.includes(SUPERVISOR_WORKER_CANCEL_COMMAND)) {
-            return;
-          }
-          await this.invokePort.invoke({
-            nodeId,
-            command: SUPERVISOR_WORKER_CANCEL_COMMAND,
-            params: { runId, taskId: task.taskId, workerId: backendId },
-            timeoutMs: 30_000,
-            idempotencyKey: `${task.taskId}:${runId}:cancel`,
-          });
-        },
-      },
-      onProgress: input.onProgress,
-    });
-    await input.onStarted?.({ runId, workerId: backendId });
-
+    const controlledExecution = bindSupervisorWorkItemLifecycle();
+    assertControlledExecutionStages(controlledExecution, "Supervisor node worker");
     try {
-      if (input.shouldAbort && (await input.shouldAbort())) {
-        return { summary: "aborted before node dispatch", exitCode: 130 };
+      const prepared = await controlledExecution.prepare({
+        runId,
+        agentId,
+        enterpriseId: input.context.attribution.tenantId,
+      });
+      if (prepared.kind === "denied") {
+        throw new SupervisorCommercialRunDeniedError(prepared.message);
       }
 
-      const result = await this.invokePort.invoke({
-        nodeId,
-        command: SUPERVISOR_WORKER_DISPATCH_COMMAND,
-        params: {
-          runId,
-          taskId: task.taskId,
-          workerId: backendId,
-          ...(model ? { model } : {}),
-          prompt: input.prompt,
-          goal: task.goal,
-          workspaceDir: task.workspace.root,
-          identityPolicy: input.context.identity.policy,
+      const inferred = await controlledExecution.infer({
+        cfg: {},
+        provider: backendId,
+        model: model ?? "default",
+        taskText: input.prompt,
+        run: async () => {
+          registerSupervisorRun({
+            taskId: task.taskId,
+            runId,
+            workerId: backendId,
+            worker: {
+              cancel: async () => {
+                if (!declared.includes(SUPERVISOR_WORKER_CANCEL_COMMAND)) {
+                  return;
+                }
+                await this.invokePort.invoke({
+                  nodeId,
+                  command: SUPERVISOR_WORKER_CANCEL_COMMAND,
+                  params: { runId, taskId: task.taskId, workerId: backendId },
+                  timeoutMs: 30_000,
+                  idempotencyKey: `${task.taskId}:${runId}:cancel`,
+                });
+              },
+            },
+            onProgress: input.onProgress,
+          });
+          try {
+            await input.onStarted?.({ runId, workerId: backendId });
+
+            if (input.shouldAbort && (await input.shouldAbort())) {
+              return { summary: "aborted before node dispatch", exitCode: 130 };
+            }
+
+            const result = await this.invokePort.invoke({
+              nodeId,
+              command: SUPERVISOR_WORKER_DISPATCH_COMMAND,
+              params: {
+                runId,
+                taskId: task.taskId,
+                workerId: backendId,
+                ...(model ? { model } : {}),
+                prompt: input.prompt,
+                goal: task.goal,
+                workspaceDir: task.workspace.root,
+                identityPolicy: input.context.identity.policy,
+              },
+              timeoutMs,
+              idempotencyKey: `${task.taskId}:${runId}`,
+            });
+
+            if (!result.ok) {
+              const code = result.error?.code ?? "NODE_INVOKE_FAILED";
+              const message = result.error?.message ?? "node worker dispatch failed";
+              if (code === "NOT_CONNECTED" || code === "UNAVAILABLE" || code === "TIMEOUT") {
+                throw new WorkerPlacementError(message);
+              }
+              if (/auth|login|logged in|unauthor|expired|invalid key/i.test(message)) {
+                throw new WorkerAuthError(message);
+              }
+              return { summary: message, exitCode: 1 };
+            }
+
+            const payload = readNodeInvokePayload(result) as SupervisorWorkerDispatchResult | null;
+            input.onProgress?.({
+              type: "status",
+              phase: "terminal",
+              data: payload?.summary ?? "node worker finished",
+            });
+            return {
+              summary: payload?.summary ?? "",
+              exitCode: payload?.exitCode,
+              usage: payload?.usage,
+            } satisfies WorkerDispatchResult;
+          } finally {
+            unregisterSupervisorRun(task.taskId);
+          }
         },
-        timeoutMs,
-        idempotencyKey: `${task.taskId}:${runId}`,
       });
-
-      if (!result.ok) {
-        const code = result.error?.code ?? "NODE_INVOKE_FAILED";
-        const message = result.error?.message ?? "node worker dispatch failed";
-        if (code === "NOT_CONNECTED" || code === "UNAVAILABLE" || code === "TIMEOUT") {
-          throw new WorkerPlacementError(message);
-        }
-        if (/auth|login|logged in|unauthor|expired|invalid key/i.test(message)) {
-          throw new WorkerAuthError(message);
-        }
-        return { summary: message, exitCode: 1 };
-      }
-
-      const payload = readNodeInvokePayload(result) as SupervisorWorkerDispatchResult | null;
-      input.onProgress?.({
-        type: "status",
-        phase: "terminal",
-        data: payload?.summary ?? "node worker finished",
-      });
-      return {
-        summary: payload?.summary ?? "",
-        exitCode: payload?.exitCode,
-        usage: payload?.usage,
-      };
+      return inferred.result;
     } finally {
-      unregisterSupervisorRun(task.taskId);
-      if (commercialSlotHeld) {
-        void releaseSupervisorCommercialRun(runId);
-      }
+      await controlledExecution.dispose();
     }
   }
 }
