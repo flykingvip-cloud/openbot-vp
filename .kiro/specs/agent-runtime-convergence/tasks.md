@@ -1433,3 +1433,8 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Candidate 6bdb1c4f7 combined regression 88 files / 493 PASS across runtime, command credits, queued execution, continuation persistence/concurrency, cron admission/ledger, collaboration contracts/plans/abort and durable stop/delivery restart. Local full build PASS; 209 existing ineffective dynamic-import warnings and UI-size warnings remain; pinned Control UI sync skipped. — codex-runtime-manager
 - Same candidate isolated real-model personal file task PASS: task-86bde518b45a; run/attempt a66cc6c6-9cb8-4f5d-ac79-84020b7dd615; exact bytes, acceptance passed with digest, delivery delivered, deliverableChecked=true and unfinished=false. Temporary Gateway exited normally and state was removed. No production restart, merge, push or deployment. Complete collaboration real-model sequence and asynchronous restart rescheduling remain open; whole executor retirement is not accepted. — codex-runtime-manager
+
+## Heartbeat deferral preserves event identity (2026-11-08)
+
+- Reproduced occupied heartbeat dropping pending completion events. Removed automatic parked-task creation from this wake path and retained deferred events for the next eligible turn. Occupancy still suppresses model execution; a wake is not execution admission. Cron result surfacing remains a separate pending audit. — codex-runtime-manager
+- Heartbeat focus/notice regression 3 files / 17 PASS; full tsgo PASS; changed-file typed lint clean; architecture 56 PASS. This does not prove durable event storage or restart rescheduling. — codex-runtime-manager
