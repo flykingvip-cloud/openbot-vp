@@ -10872,6 +10872,7 @@ landingStreams:
       - src/gateway/knowledge/enterprise-data-query.ts
       - src/gateway/knowledge/feed/enterprise-feed-adapter.ts
       - src/gateway/server-methods/enterprise-data-m6.ts
+      - src/gateway/server-methods/enterprise-data-m6.test.ts
       - ui/src/ui/ports/enterprise/views/enterprise-data-capability/asset-linkage.node.test.ts
       - ui/src/ui/ports/enterprise/views/enterprise-data-capability/asset-linkage.ts
       - ui/src/ui/ports/enterprise/views/enterprise-data-capability/assets-page.ts
