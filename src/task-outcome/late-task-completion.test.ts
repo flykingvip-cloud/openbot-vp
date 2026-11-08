@@ -139,8 +139,7 @@ it("runs real preparation and durable outcome confirmation before closing the ca
   const actual = await vi.importActual<typeof import("./runtime-from-runner.js")>(
     "./runtime-from-runner.js",
   );
-  const { prepareVisibleDelivery } =
-    await import("../agent-runtime/delivery/dispatch/prepare-visible.js");
+  const { prepareVisibleDelivery } = await import("../agent-runtime/delivery/index.js");
   const { chatTurnTaskId } = await import("./chat-entry.js");
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "late-real-"));
   dirs.push(root);

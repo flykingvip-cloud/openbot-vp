@@ -194,12 +194,20 @@
   },
   {
     "name": "runtime-delivery-public-entry",
-    "from": "src/auto-reply/**",
+    "from": "src/**",
     "denyImportsFrom": [
       "src/agent-runtime/delivery/presentation/**",
       "src/agent-runtime/delivery/dispatch/**"
     ],
-    "description": "Reply adapters consume the delivery public API rather than presentation or terminal delivery internals."
+    "description": "Reply adapters consume the delivery public API rather than presentation or terminal delivery internals.",
+    "exemptFiles": [
+      "src/agent-runtime/delivery/index.ts",
+      "src/agent-runtime/delivery/dispatch/command-result.ts",
+      "src/agent-runtime/delivery/dispatch/complete-reply.ts",
+      "src/agent-runtime/delivery/dispatch/complete-reply.test.ts",
+      "src/agent-runtime/delivery/dispatch/confirm-pending.test.ts",
+      "src/agent-runtime/delivery/dispatch/prepare-visible.test.ts"
+    ]
   },
   {
     "name": "runtime-policy-no-effects",
