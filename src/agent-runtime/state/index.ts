@@ -1,6 +1,16 @@
 /** Public task-state access. The original board remains the sole storage/lock adapter. */
 export { sessionTaskState } from "./repository/session-task.js";
 export { createTaskStopRepository } from "./repository/task-stop.js";
+export {
+  recordAsyncWaitJobIntent,
+  readAsyncWaitJobIntent,
+  listAsyncWaitJobIntents,
+  listWaitingAsyncWaitJobIntents,
+  markAsyncWaitJobExited,
+  clearAsyncWaitJobIntent,
+  clearAsyncWaitJobsForTask,
+  type AsyncWaitJobIntent,
+} from "./repository/async-wait-job.js";
 export type { ResumeParkedRecheck } from "./mutations/resume-parked.js";
 
 export { resetCorruptedSession, prepareReplacementSessionEntry } from "./session-recovery.js";

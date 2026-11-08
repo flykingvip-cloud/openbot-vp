@@ -47,8 +47,8 @@ export function commitInteractionTaskProposal(params: {
     }
     const result =
       params.decision.action === "pause"
-        ? suppressCurrentTaskWake({ board })
-        : cancelCurrentTask({ board });
+        ? suppressCurrentTaskWake({ board, sessionFile: params.sessionFile })
+        : cancelCurrentTask({ board, sessionFile: params.sessionFile });
     writeSessionTaskBoardUnlocked(params.sessionFile, result.board);
     return { kind: "applied", text: result.statusLine ?? "已处理任务控制。", abort: true };
   });

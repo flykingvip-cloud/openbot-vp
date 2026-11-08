@@ -1,4 +1,5 @@
 import type { SessionTaskBoard, TrackedTask, IncomingTurnResult } from "../../contracts/task.js";
+import { clearAsyncWaitJobsForTask } from "../repository/async-wait-job.js";
 import { cloneBoardShell } from "../repository/task-board-file.js";
 
 export function findParked(board: SessionTaskBoard, token: string): TrackedTask | undefined {
@@ -26,6 +27,7 @@ export function continueResult(
 export function suppressCurrentTaskWake(params: {
   board: SessionTaskBoard;
   reason?: string;
+  sessionFile?: string;
 }): IncomingTurnResult {
   const board = cloneBoardShell(params.board);
   const current = board.current;
@@ -40,6 +42,10 @@ export function suppressCurrentTaskWake(params: {
     ...board,
     current: { ...current, wakeSuppress: true },
   };
+  const sessionFile = params.sessionFile?.trim();
+  if (sessionFile) {
+    clearAsyncWaitJobsForTask(sessionFile, current.taskId);
+  }
   return {
     ...continueResult(nextBoard, current.taskId),
     focusRevision: board.focusRevision,
@@ -51,6 +57,7 @@ export function suppressCurrentTaskWake(params: {
 export function cancelCurrentTask(params: {
   board: SessionTaskBoard;
   nowMs?: number;
+  sessionFile?: string;
 }): IncomingTurnResult {
   const board = cloneBoardShell(params.board);
   const current = board.current;
@@ -71,6 +78,10 @@ export function cancelCurrentTask(params: {
     current: undefined,
     tombstones,
   };
+  const sessionFile = params.sessionFile?.trim();
+  if (sessionFile) {
+    clearAsyncWaitJobsForTask(sessionFile, current.taskId);
+  }
   return {
     board: nextBoard,
     action: "cancel_parked",

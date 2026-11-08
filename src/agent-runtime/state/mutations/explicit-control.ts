@@ -26,8 +26,8 @@ export function commitExplicitTaskControl(input: {
     const result =
       control.scope === "current"
         ? control.action === "pause"
-          ? suppressCurrentTaskWake({ board })
-          : cancelCurrentTask({ board, nowMs: input.nowMs })
+          ? suppressCurrentTaskWake({ board, sessionFile: file })
+          : cancelCurrentTask({ board, nowMs: input.nowMs, sessionFile: file })
         : control.action === "resume"
           ? resumeParkedTask({
               board,

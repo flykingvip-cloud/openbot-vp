@@ -238,6 +238,7 @@ export function isOwnerCurrentTaskControlUtterance(text: string): boolean {
 
 export function applyIncomingUserMessage(params: {
   board: SessionTaskBoard;
+  sessionFile?: string;
   incomingText: string;
   nowMs?: number;
   workspacePaths?: string[];
@@ -271,7 +272,7 @@ export function applyIncomingUserMessage(params: {
   // Owner pause of the *current* unfinished task: suppress auto-continue wakes.
   // Does not bump focusRevision (same-task control, not a focus switch).
   if (/^(?:暂停(?:当前(?:任务)?)?|先暂停)[。.!！]?$/u.test(incoming)) {
-    return suppressCurrentTaskWake({ board });
+    return suppressCurrentTaskWake({ board, sessionFile: params.sessionFile });
   }
   const pauseMatch = incoming.match(/^暂停挂起\s+(\S+)/u);
   if (pauseMatch) {
@@ -279,7 +280,7 @@ export function applyIncomingUserMessage(params: {
   }
   // Cancel the *current* unfinished task (tombstone + clear current).
   if (/^(?:取消当前(?:任务)?|取消任务)[。.!！]?$/u.test(incoming)) {
-    return cancelCurrentTask({ board, nowMs });
+    return cancelCurrentTask({ board, nowMs, sessionFile: params.sessionFile });
   }
   // CLOSE / 关闭挂起 / 取消挂起 — remove deferred item from the board entirely.
   const cancelMatch = incoming.match(/^(?:取消挂起|关闭挂起|CLOSE)\s+(\S+)/iu);
@@ -608,6 +609,7 @@ export function applyFocusSwitchGate(params: {
     const result = mutateSessionTaskBoard(sessionFile, (board) => {
       const next = applyIncomingUserMessage({
         board,
+        sessionFile,
         incomingText: incoming,
         nowMs: params.nowMs,
         workspacePaths: params.workspacePaths,
