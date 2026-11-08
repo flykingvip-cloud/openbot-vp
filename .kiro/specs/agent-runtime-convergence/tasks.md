@@ -1467,3 +1467,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - Froze the unique controlled execution stage order (`prepare → assert_budget → infer → record_usage → dispose → record_execution_outcome`) as `createControlledExecutionUseCase` / `CONTROLLED_EXECUTION_STAGE_ORDER`. Command and shared execution lifecycles now implement that use-case; delivery remains outside the sequence. — grok-bot
 - Architecture gates: chat/command/cron/followup hosts cannot deep-import model session factories, model-fallback, or execution-scope/controlled-execution internals; they must consume lifecycle factories from execution/index. Manifest 63 PASS. — grok-bot
 - Contract suite 5 PASS (stage freeze; deny/unprepared never starts backend; cancel blocks next fallback candidate; dispose once). Related scope/lifecycle 9 PASS. Full tsgo PASS; typed oxlint clean. No host behavior migration in D1; D2+ align callers. No push/merge/deploy. — grok-bot
+
+## Package 1 D2 Chat/runAdmittedTurn alignment (2026-11-08)
+
+- Aligned Chat `runAdmittedTurn` as a scene adapter over the unique controlled execution use-case: renamed lifecycle binding to `controlledExecution`, asserted `stages === CONTROLLED_EXECUTION_STAGE_ORDER`, and corrected the transient-retry comment so retries stay on prepare→infer (no parallel `host.model.runWithModelFallback`). — grok-bot
+- Documented that Chat/cron/followup must consume `createExecutionLifecycle` (or the command twin) and must not open a parallel prepare/infer loop. — grok-bot
+- Regressions: denied admission never constructs/starts backend; cancel after first fallback candidate never starts the next; dispose-once semantics retained; execution success returns deferred `commitGrowthOutcome` separate from delivery. Admitted-turn suite 9 PASS; controlled+scope+lifecycle 14 PASS (23 total). Full tsgo PASS; typed oxlint clean; architecture 63 PASS. No push/merge/deploy. — grok-bot

@@ -49,10 +49,17 @@ import { isInternalMessageChannel } from "../../../utils/message-channel.js";
 import { createTurnOutcomeRecorder } from "../outcomes/index.js";
 import { createAdmittedCandidateInvoker } from "./admitted-candidate.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
+import { CONTROLLED_EXECUTION_STAGE_ORDER } from "./controlled-execution.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
 import { createExecutionLifecycle } from "./execution-lifecycle.js";
 import type { AgentRunLoopResult, AgentTurnExecutionParams } from "./turn-contract.js";
 
+/**
+ * Chat scene adapter over the unique controlled execution use-case.
+ * Owns task binding, tip budget, candidate params, recovery loops and deferred
+ * delivery/outcome recording. Must not invent a parallel prepare/infer/dispose
+ * loop or call model fallback outside createExecutionLifecycle.
+ */
 export async function runAdmittedTurn(
   params: AgentTurnExecutionParams,
   host: AdmittedTurnHost,
@@ -261,7 +268,10 @@ export async function runAdmittedTurn(
     params.getActiveSessionEntry()?.systemPromptReport,
   );
 
-  const modelSession = createExecutionLifecycle(runId, host);
+  const controlledExecution = createExecutionLifecycle(runId, host);
+  if (controlledExecution.stages !== CONTROLLED_EXECUTION_STAGE_ORDER) {
+    throw new Error("Chat admitted turn must consume the frozen controlled execution stage order");
+  }
   try {
     while (true) {
       commercialToolCallCount = 0;
@@ -351,7 +361,7 @@ export async function runAdmittedTurn(
             : {}),
         };
         const collaborationGroupId = params.sessionCtx.CollaborationGroupId?.trim();
-        const prepared = await modelSession.prepare({
+        const prepared = await controlledExecution.prepare({
           config: params.followupRun.run.config,
           authorization: {
             agentId: params.followupRun.run.agentId,
@@ -410,7 +420,7 @@ export async function runAdmittedTurn(
             platformUserId: runGatewayClientPlatformUserId,
           },
         });
-        const fallbackResult = await modelSession.infer({
+        const fallbackResult = await controlledExecution.infer({
           ...resolveModelFallbackOptions(params.followupRun.run),
           taskText: params.followupRun.prompt || params.commandBody,
           run: (provider, model, runOptions) => {
@@ -468,7 +478,7 @@ export async function runAdmittedTurn(
             params.sessionCtx.CollaborationGroupOwnerEntitlement?.userEmail?.trim() ||
             params.sessionCtx.CollaborationGroupOwnerEntitlement?.employeeId?.trim() ||
             params.sessionCtx.GatewayClientUser;
-          void modelSession
+          void controlledExecution
             .recordUsage({
               provider: fallbackResult.provider,
               model: fallbackResult.model,
@@ -649,10 +659,11 @@ export async function runAdmittedTurn(
             throw gateErr;
           }
           didRetryTransientHttpError = true;
-          // Retry the full host.model.runWithModelFallback() cycle — transient errors
+          // Retry the full controlledExecution prepare→infer cycle — transient errors
           // (502/521/etc.) typically affect the whole provider, so falling
           // back to an alternate model first would not help. Instead we wait
-          // and retry the complete primary→fallback chain.
+          // and retry the complete primary→fallback chain through the same
+          // controlled use-case (no parallel host.model.runWithModelFallback).
           defaultRuntime.error(
             `Transient HTTP provider error before reply (${message}). Retrying once in ${TRANSIENT_HTTP_RETRY_DELAY_MS}ms.`,
           );
@@ -758,6 +769,6 @@ export async function runAdmittedTurn(
       commitGrowthOutcome: recordGrowthTaskOutcome,
     };
   } finally {
-    await modelSession.dispose();
+    await controlledExecution.dispose();
   }
 }

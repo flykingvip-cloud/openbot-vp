@@ -8,6 +8,8 @@ type Host = Pick<AdmittedTurnHost, "admission" | "model" | "accounting">;
 
 /** Shared execution admission, routing and provider-session lifetime.
  * Implements the unique controlled execution use-case stage order.
+ * Chat (`runAdmittedTurn`), cron and followup scene adapters must consume this
+ * factory (or the command twin) and must not open a parallel prepare/infer loop.
  * Scene adapters retain task ownership, candidate parameters and delivery.
  * This is host code, never executable configuration or a new scheduler. */
 export function createExecutionLifecycle(runId: string, host: Host) {

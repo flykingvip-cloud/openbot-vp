@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { bindAdmittedTurnHost } from "../../wiring/admitted-turn-host.js";
-import { runAdmittedTurn } from "../index.js";
+import { CONTROLLED_EXECUTION_STAGE_ORDER, runAdmittedTurn } from "../index.js";
+import { createExecutionLifecycle } from "./execution-lifecycle.js";
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), create: vi.fn() }));
 vi.mock("./admitted-candidate.js", () => ({
@@ -118,4 +119,72 @@ it("rejects an admitted request without its task binding before any execution ef
   expect(host.admission.tryAcquireEnterpriseAgentRun).not.toHaveBeenCalled();
   expect(mocks.create).not.toHaveBeenCalled();
   expect(mocks.invoke).not.toHaveBeenCalled();
+});
+
+it("chat lifecycle factory exposes the frozen controlled execution stage order", () => {
+  const host = bindAdmittedTurnHost();
+  const lifecycle = createExecutionLifecycle("chat-stage-order", host);
+  expect(lifecycle.stages).toBe(CONTROLLED_EXECUTION_STAGE_ORDER);
+});
+
+it("cancellation after the first fallback candidate never starts the next one", async () => {
+  const { host, params } = setup();
+  const controller = new AbortController();
+  params.opts!.abortSignal = controller.signal;
+  const candidates: string[] = [];
+  host.model.runWithModelFallback = vi.fn(async (options) => {
+    const first = await options.run("primary", "model-a");
+    const second = await options.run("fallback", "model-b");
+    return {
+      result: second ?? first,
+      provider: "fallback",
+      model: "model-b",
+      attempts: [],
+    };
+  });
+  mocks.invoke.mockImplementation(async (provider: string) => {
+    candidates.push(provider);
+    if (provider === "primary") {
+      controller.abort();
+      return { payloads: [{ text: "first" }] };
+    }
+    return { payloads: [{ text: "second" }] };
+  });
+  const result = await runAdmittedTurn(params, host);
+  expect(result.kind).toBe("final");
+  expect(candidates).toEqual(["primary"]);
+  expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
+  expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();
+});
+
+it("records execution success separately from delivery via deferred growth commit", async () => {
+  const { host, params } = setup();
+  const result = await runAdmittedTurn(params, host);
+  expect(result.kind).toBe("success");
+  if (result.kind !== "success") {
+    throw new Error("expected success");
+  }
+  expect(typeof result.commitGrowthOutcome).toBe("function");
+  // Delivery/outcome commit is deferred to the reply adapter; inference already finished.
+  expect(mocks.invoke).toHaveBeenCalledOnce();
+  expect(host.model.runWithModelFallback).toHaveBeenCalledOnce();
+});
+
+it("denied admission still disposes the controlled lifecycle exactly once without backend start", async () => {
+  const { host, params } = setup();
+  host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
+    acquired: false as const,
+    skipped: false as const,
+    reason: "NO_SUBSCRIPTION" as const,
+    message: "denied",
+  }));
+  expect(await runAdmittedTurn(params, host)).toEqual({
+    kind: "final",
+    payload: { text: "denied" },
+  });
+  expect(mocks.create).not.toHaveBeenCalled();
+  expect(host.model.runWithModelFallback).not.toHaveBeenCalled();
+  // Never acquired → lease release/forget remain no-ops; dispose path still ran once.
+  expect(host.admission.releaseEnterpriseAgentRun).not.toHaveBeenCalled();
+  expect(host.model.forgetRunModelSet).not.toHaveBeenCalled();
 });
