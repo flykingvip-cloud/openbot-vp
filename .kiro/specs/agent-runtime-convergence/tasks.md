@@ -1968,4 +1968,4 @@ Deprecated aliases: removed (no callers).
 | production-path | 3 PASS |
 | oxlint changed sources | 0/0 |
 
-**Remelt tip for Package5 acceptance:** *(filled after tip SHA commit)*. — grok-bot
+**Remelt tip for Package5 acceptance:** `8d596ac185cca586f060ff45e80c8cf3987bb62f` (alias retire + audit). Prior Package4 tip `8d60206fb` retained. — grok-bot
