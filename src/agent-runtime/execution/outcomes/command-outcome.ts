@@ -22,6 +22,7 @@ export function createCommandOutcomeCloseout(params: {
     failureDetail?: string;
     budgetCharged: boolean;
     chargeState?: CommandCandidateChargeState;
+    budgetChargeReasons?: readonly string[];
     costUsd?: number;
     deliveryReceipt?: CommandDeliveryReceipt;
     modelCallLinks?: ModelCallCloseoutLink[];
@@ -37,6 +38,7 @@ export function createCommandOutcomeCloseout(params: {
       failureDetail: agentOutcomeFailureDetail,
       budgetCharged: tipBudgetChargedThisTurn,
       chargeState,
+      budgetChargeReasons,
       costUsd: tipBudgetCostUsd,
       deliveryReceipt,
       modelCallLinks,
@@ -75,6 +77,7 @@ export function createCommandOutcomeCloseout(params: {
               ...(agentOutcomeFailureDetail ? { failureDetail: agentOutcomeFailureDetail } : {}),
             }),
         ...(modelCallLinks && modelCallLinks.length > 0 ? { modelCallLinks } : {}),
+        ...(budgetChargeReasons && budgetChargeReasons.length > 0 ? { budgetChargeReasons } : {}),
       });
     } catch (err) {
       console.error(

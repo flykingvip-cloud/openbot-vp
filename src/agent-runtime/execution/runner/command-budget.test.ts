@@ -32,17 +32,48 @@ function chargeReceipt(input: {
   evidence: "known" | "unknown";
   costUsd?: number;
   closedForBudget: boolean;
+  disposition?: BudgetCommandReport["disposition"];
+  callId?: string;
 }): ReturnType<typeof chargeModelCallAgainstTip> {
-  const link: ModelCallCloseoutLink | null = null;
+  const command = budgetCommand(input.costUsd ?? null);
+  if (input.disposition) {
+    command.disposition = input.disposition;
+    command.costStatus =
+      input.disposition === "applied" || input.disposition === "replayed"
+        ? command.costStatus
+        : "not_committed";
+  }
+  const link: ModelCallCloseoutLink | null = input.callId
+    ? {
+        callId: input.callId,
+        evidenceId: `mce_${input.callId}`,
+        candidateAttemptId: `attempt_${input.callId}`,
+        chargeOutcomeVersion: 2,
+        chargeCommitId: "c_once",
+        requestDigest: "digest-1",
+        usageFingerprint: "usage",
+        commandId: command.commandId,
+      }
+    : null;
   return {
     record: { taskId: "task" } as ReturnType<typeof chargeModelCallAgainstTip>["record"],
     evidence: input.evidence,
     ...(input.costUsd != null ? { costUsd: input.costUsd } : {}),
     closedForBudget: input.closedForBudget,
-    budgetCommand: budgetCommand(input.costUsd ?? null),
-    callId: null,
-    associationCompleteness: "unlinked",
+    budgetCommand: command,
+    callId: input.callId ?? null,
+    associationCompleteness: link ? "partial" : "unlinked",
     modelCallLink: link,
+  };
+}
+
+function candidateResult(usage: { input: number; output: number }) {
+  return {
+    payloads: [{ text: "ok" }],
+    meta: {
+      durationMs: 1,
+      agentMeta: { sessionId: "s", provider: "p", model: "m", usage },
+    },
   };
 }
 beforeEach(() => vi.resetAllMocks());
@@ -178,7 +209,10 @@ it("does not open a second command when the committed charge then throws", async
   expect(budget.charged).toBe(false);
   expect(budget.costUsd).toBeUndefined();
   const settled = settleCommandBudgetForCloseout(budget, { costUsd: 9 });
-  expect(settled).toEqual({ chargeState: "attempted_unknown", budgetCharged: true });
+  expect(settled.chargeState).toBe("attempted_unknown");
+  expect(settled.budgetCharged).toBe(true);
+  expect(settled.costUsd).toBeUndefined();
+  expect(settled.reasons.join(" ")).toContain("parent attribution failed after commit");
   const close = createCommandOutcomeCloseout({
     config: {},
     agentId: "bot",
@@ -197,6 +231,7 @@ it("does not open a second command when the committed charge then throws", async
       failureReason: "run_failed",
       budgetCharged: settled.budgetCharged,
       chargeState: settled.chargeState,
+      budgetChargeReasons: settled.reasons,
       costUsd: settled.costUsd,
     }),
   });
@@ -205,6 +240,135 @@ it("does not open a second command when the committed charge then throws", async
   const outcome = vi.mocked(recordRunnerTurnOutcome).mock.calls[0]?.[2];
   expect(outcome).toMatchObject({ skipBudgetCharge: true });
   expect(outcome).not.toHaveProperty("costUsd");
+  expect(outcome?.budgetChargeReasons?.join(" ")).toContain(
+    "parent attribution failed after commit",
+  );
+});
+it("charges A and B on one command when A fails and B succeeds", async () => {
+  const budget = boundBudget();
+  vi.mocked(chargeModelCallAgainstTip)
+    .mockReturnValueOnce(
+      chargeReceipt({
+        evidence: "known",
+        costUsd: 0.2,
+        closedForBudget: false,
+        callId: "call-a",
+      }),
+    )
+    .mockReturnValueOnce(
+      chargeReceipt({
+        evidence: "known",
+        costUsd: 0.3,
+        closedForBudget: false,
+        callId: "call-b",
+      }),
+    );
+  await expect(
+    budget.runCandidate({
+      provider: "p",
+      model: "a",
+      run: async () => {
+        throw new Error("candidate A failed");
+      },
+    }),
+  ).rejects.toThrow("candidate A failed");
+  await budget.runCandidate({
+    provider: "p",
+    model: "b",
+    run: async () => candidateResult({ input: 2, output: 2 }),
+  });
+  expect(vi.mocked(chargeModelCallAgainstTip).mock.calls.map((call) => call[2].callSeq)).toEqual([
+    1, 2,
+  ]);
+  expect(budget.modelCallLinks.map((link) => link.callId)).toEqual(["call-a", "call-b"]);
+  expect(budget.chargeState).toBe("committed");
+  expect(budget.costUsd).toBeCloseTo(0.5);
+});
+it("does not re-charge A after a post-commit throw and still charges B", async () => {
+  const budget = boundBudget();
+  vi.mocked(chargeModelCallAgainstTip)
+    .mockImplementationOnce(() => {
+      throw new Error("parent attribution failed after commit");
+    })
+    .mockReturnValueOnce(
+      chargeReceipt({
+        evidence: "known",
+        costUsd: 0.3,
+        closedForBudget: false,
+        callId: "call-b",
+      }),
+    );
+  await expect(
+    budget.runCandidate({
+      provider: "p",
+      model: "a",
+      run: async () => candidateResult({ input: 4, output: 1 }),
+    }),
+  ).rejects.toThrow("parent attribution failed after commit");
+  await budget.runCandidate({
+    provider: "p",
+    model: "b",
+    run: async () => candidateResult({ input: 1, output: 1 }),
+  });
+  expect(vi.mocked(chargeModelCallAgainstTip).mock.calls.map((call) => call[2].callSeq)).toEqual([
+    1, 2,
+  ]);
+  expect(budget.modelCallLinks.map((link) => link.callId)).toEqual(["call-b"]);
+  expect(budget.chargeState).toBe("attempted_unknown");
+  expect(budget.chargeRecords.map((record) => record.state)).toEqual([
+    "attempted_unknown",
+    "committed",
+  ]);
+});
+it("does not label a conflict receipt as committed", async () => {
+  const budget = boundBudget();
+  vi.mocked(chargeModelCallAgainstTip).mockReturnValue(
+    chargeReceipt({
+      evidence: "unknown",
+      closedForBudget: false,
+      disposition: "conflict",
+      callId: "call-conflict",
+    }),
+  );
+  await budget.runCandidate({
+    provider: "p",
+    model: "m",
+    run: async () => candidateResult({ input: 1, output: 1 }),
+  });
+  expect(chargeModelCallAgainstTip).toHaveBeenCalledTimes(1);
+  expect(budget.charged).toBe(false);
+  expect(budget.chargeState).toBe("conflict");
+  expect(budget.chargeRecords[0]?.disposition).toBe("conflict");
+  const settled = settleCommandBudgetForCloseout(budget, { costUsd: 9 });
+  expect(settled.chargeState).toBe("conflict");
+  expect(settled.costUsd).toBeUndefined();
+  const close = createCommandOutcomeCloseout({
+    config: {},
+    agentId: "bot",
+    runId: "run",
+    startedAtMs: 1,
+    entrypoint: "cli",
+    readContext: () => ({
+      taskId: "task",
+      scope: {
+        kind: "personal",
+        personalDomainId: "personal:test",
+        subjectRef: "user",
+        authzScopeRef: "test",
+      },
+      success: false,
+      failureReason: "run_failed",
+      budgetCharged: settled.budgetCharged,
+      chargeState: settled.chargeState,
+      budgetChargeReasons: settled.reasons,
+      costUsd: settled.costUsd,
+    }),
+  });
+  await close();
+  const outcome = vi.mocked(recordRunnerTurnOutcome).mock.calls.at(-1)?.[2];
+  expect(outcome).toMatchObject({ skipBudgetCharge: true });
+  expect(outcome).not.toHaveProperty("costUsd");
+  expect(outcome?.budgetChargeReasons?.join(" ")).toContain("conflict");
 });
 it("does not invent a task or charge when no outcome binding exists", () => {
   const budget = createCommandBudget({

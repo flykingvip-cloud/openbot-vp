@@ -52,6 +52,18 @@ function fullUsage(input: number, output: number) {
   return { input, output, cacheRead: 0, cacheWrite: 0 };
 }
 
+/** Wait until the child has linked the public lock. A fixed sleep is not that stage. */
+async function waitForPublicLockStage(stageFile: string): Promise<void> {
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(stageFile) && fs.readFileSync(stageFile, "utf8").includes("public_lock")) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 15));
+  }
+  throw new Error("child did not publish the public evidence lock");
+}
+
 afterEach(() => {
   setEmptyLockHolderProbeForTests(null);
   resetModelCallsForTests();
@@ -129,6 +141,7 @@ describe("R5 lock and call identity", () => {
       "evidence-write-child.ts",
     );
     const out = path.join(storeRoot, "child-result.json");
+    const stageFile = path.join(storeRoot, "lock-stage");
     const child = spawn(
       process.execPath,
       ["--import", "tsx", childPath, storeRoot, "child.json", "8", out],
@@ -138,10 +151,12 @@ describe("R5 lock and call identity", () => {
           ...process.env,
           OPENBOT_EXECUTOR_EVIDENCE: "1",
           OPENBOT_EXECUTOR_EVIDENCE_LOCK_AFTER_CREATE_MS: "1500",
+          OPENBOT_EXECUTOR_EVIDENCE_LOCK_STAGE_FILE: stageFile,
         },
       },
     );
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await waitForPublicLockStage(stageFile);
+    process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
     const raced = writeBoundedEvidenceFile(storeRoot, "parent.json", { pad: "parent" });
     expect(raced).toBe("failed");
     expect(fs.existsSync(path.join(storeRoot, "executor-evidence", "write.lock"))).toBe(true);
@@ -164,6 +179,7 @@ describe("R5 lock and call identity", () => {
       "evidence-write-child.ts",
     );
     const out = path.join(storeRoot, "child-result.json");
+    const stageFile = path.join(storeRoot, "lock-stage");
     const child = spawn(
       process.execPath,
       ["--import", "tsx", childPath, storeRoot, "child.json", "8", out],
@@ -173,10 +189,12 @@ describe("R5 lock and call identity", () => {
           ...process.env,
           OPENBOT_EXECUTOR_EVIDENCE: "1",
           OPENBOT_EXECUTOR_EVIDENCE_LOCK_AFTER_CREATE_MS: "4000",
+          OPENBOT_EXECUTOR_EVIDENCE_LOCK_STAGE_FILE: stageFile,
         },
       },
     );
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await waitForPublicLockStage(stageFile);
+    process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
     const raced = writeBoundedEvidenceFile(storeRoot, "parent.json", { pad: "parent" });
     expect(raced).toBe("failed");
     expect(fs.existsSync(path.join(storeRoot, "executor-evidence", "write.lock"))).toBe(true);

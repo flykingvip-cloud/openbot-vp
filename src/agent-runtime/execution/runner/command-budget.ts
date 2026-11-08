@@ -1,4 +1,5 @@
 import type { OpenBotConfig } from "../../../config/config.js";
+import type { BudgetCommandDisposition } from "../../../executor-evidence/association.js";
 import {
   assertRunnerTurnBudgetAllowsModelCall,
   chargeModelCallAgainstTip,
@@ -13,33 +14,107 @@ function errorName(error: unknown): string | undefined {
   return error instanceof Error ? error.name : undefined;
 }
 
-/** One candidate charge. Unknown means a commit was attempted and its result is not known. */
-export type CommandCandidateChargeState = "not_attempted" | "attempted_unknown" | "committed";
+/**
+ * One candidate's charge result.
+ * `attempted_unknown` means the call was made and no receipt came back.
+ * A non-empty receipt is classified from its disposition, not treated as committed.
+ */
+export type CommandCandidateChargeState =
+  | "not_attempted"
+  | "attempted_unknown"
+  | "committed"
+  | "conflict"
+  | "evidence_missing"
+  | "absent"
+  | "no_effect";
+
+export type CommandCandidateChargeRecord = {
+  callSeq: number | null;
+  state: CommandCandidateChargeState;
+  disposition?: BudgetCommandDisposition;
+  reason: string;
+};
 
 /**
  * Closeout view of a command budget.
- * An unknown commit skips another spend and does not pass a guessed amount.
- * A charge that never started may still carry one explicit fallback amount.
+ * Anything other than a clean commit skips another spend and does not pass a guessed amount.
+ * The returned state is the aggregate reason, not a claim that every receipt committed.
  */
 export function settleCommandBudgetForCloseout(
-  budget: { chargeState: CommandCandidateChargeState; costUsd?: number },
+  budget: {
+    chargeState: CommandCandidateChargeState;
+    costUsd?: number;
+    chargeReasons?: readonly string[];
+  },
   fallback?: { costUsd?: number },
-): { chargeState: CommandCandidateChargeState; budgetCharged: boolean; costUsd?: number } {
-  if (budget.chargeState === "attempted_unknown") {
-    return { chargeState: "attempted_unknown", budgetCharged: true };
+): {
+  chargeState: CommandCandidateChargeState;
+  budgetCharged: boolean;
+  costUsd?: number;
+  reasons: readonly string[];
+} {
+  const reasons = budget.chargeReasons ?? [];
+  if (budget.chargeState === "not_attempted") {
+    return {
+      chargeState: "not_attempted",
+      budgetCharged: false,
+      reasons,
+      ...(fallback?.costUsd != null ? { costUsd: fallback.costUsd } : {}),
+    };
   }
   if (budget.chargeState === "committed") {
     return {
       chargeState: "committed",
       budgetCharged: true,
+      reasons,
       ...(budget.costUsd != null ? { costUsd: budget.costUsd } : {}),
     };
   }
-  return {
-    chargeState: "not_attempted",
-    budgetCharged: false,
-    ...(fallback?.costUsd != null ? { costUsd: fallback.costUsd } : {}),
-  };
+  return { chargeState: budget.chargeState, budgetCharged: true, reasons };
+}
+
+function stateFromDisposition(
+  disposition: BudgetCommandDisposition | undefined,
+): CommandCandidateChargeState {
+  switch (disposition) {
+    case "applied":
+    case "replayed":
+      return "committed";
+    case "conflict":
+      return "conflict";
+    case "evidence_missing":
+      return "evidence_missing";
+    case "absent":
+      return "absent";
+    case "no_effect":
+      return "no_effect";
+    default:
+      return "attempted_unknown";
+  }
+}
+
+function aggregateChargeState(
+  records: readonly CommandCandidateChargeRecord[],
+): CommandCandidateChargeState {
+  if (records.length === 0) {
+    return "not_attempted";
+  }
+  const rank: CommandCandidateChargeState[] = [
+    "attempted_unknown",
+    "conflict",
+    "evidence_missing",
+    "absent",
+    "no_effect",
+  ];
+  for (const state of rank) {
+    if (records.some((record) => record.state === state)) {
+      return state;
+    }
+  }
+  if (records.every((record) => record.state === "committed")) {
+    return "committed";
+  }
+  return "attempted_unknown";
 }
 
 /** Original per-command budget sequence; parent attribution stays in the existing store. */
@@ -54,9 +129,9 @@ export function createCommandBudget(params: {
   parentAgentId?: string;
 }) {
   let sequence = 0;
-  let chargeState: CommandCandidateChargeState = "not_attempted";
   let charged = false;
   let costUsd: number | undefined;
+  const chargeRecords: CommandCandidateChargeRecord[] = [];
   const modelCallLinks: ModelCallCloseoutLink[] = [];
   const parent = {
     ...(params.parentTaskId?.trim() ? { parentTaskId: params.parentTaskId.trim() } : {}),
@@ -64,7 +139,16 @@ export function createCommandBudget(params: {
   };
   const budget = {
     get chargeState() {
-      return chargeState;
+      return aggregateChargeState(chargeRecords);
+    },
+    get chargeRecords() {
+      return chargeRecords;
+    },
+    get chargeReasons() {
+      return chargeRecords.map(
+        (record) =>
+          `${record.callSeq ?? "none"}:${record.state}:${record.disposition ?? record.reason}`,
+      );
     },
     get charged() {
       return charged;
@@ -105,26 +189,40 @@ export function createCommandBudget(params: {
       return receipt;
     },
     /**
-     * At most one charge attempt per candidate.
-     * The latch is set before `charge`, so a commit that then throws cannot open a second command.
+     * Record one charge attempt. The caller supplies the per-candidate latch.
+     * A throw leaves the attempt unknown and does not retry inside this call.
      */
-    chargeCandidateOnce(input: { provider: string; model: string; usage?: unknown }) {
-      if (chargeState !== "not_attempted") {
-        return;
-      }
+    recordChargeAttempt(input: { provider: string; model: string; usage?: unknown }) {
       if (!params.taskId || !params.scope) {
         return;
       }
-      chargeState = "attempted_unknown";
-      const receipt = budget.charge(input);
+      const record: CommandCandidateChargeRecord = {
+        callSeq: null,
+        state: "attempted_unknown",
+        reason: "charge_not_returned",
+      };
+      chargeRecords.push(record);
+      let receipt: ReturnType<typeof budget.charge>;
+      try {
+        receipt = budget.charge(input);
+      } catch (error) {
+        record.callSeq = sequence;
+        record.reason = error instanceof Error ? error.message : "charge_threw";
+        throw error;
+      }
       if (!receipt) {
-        chargeState = "not_attempted";
+        chargeRecords.pop();
         return;
       }
-      chargeState = "committed";
-      charged = true;
-      if (receipt.evidence === "known" && receipt.costUsd && receipt.costUsd > 0) {
-        costUsd = (costUsd ?? 0) + receipt.costUsd;
+      record.callSeq = sequence;
+      record.disposition = receipt.budgetCommand.disposition;
+      record.state = stateFromDisposition(record.disposition);
+      record.reason = record.disposition ?? "disposition_missing";
+      if (record.state === "committed") {
+        charged = true;
+        if (receipt.evidence === "known" && receipt.costUsd && receipt.costUsd > 0) {
+          costUsd = (costUsd ?? 0) + receipt.costUsd;
+        }
       }
     },
     async runCandidate(input: {
@@ -133,22 +231,27 @@ export function createCommandBudget(params: {
       run: () => Promise<EmbeddedPiRunResult>;
     }) {
       budget.assertAllowed();
-      try {
-        const result = await input.run();
-        budget.chargeCandidateOnce({
+      // The latch belongs to this candidate. The next candidate on this command gets a new one.
+      let attempted = false;
+      const chargeThisCandidateOnce = (usage?: unknown) => {
+        if (attempted) {
+          return;
+        }
+        attempted = true;
+        budget.recordChargeAttempt({
           provider: input.provider,
           model: input.model,
-          usage: result.meta?.agentMeta?.usage,
+          usage,
         });
+      };
+      try {
+        const result = await input.run();
+        chargeThisCandidateOnce(result.meta?.agentMeta?.usage);
         return result;
       } catch (error) {
         if (!(error instanceof TaskBudgetExceededError) && errorName(error) !== "AbortError") {
           try {
-            budget.chargeCandidateOnce({
-              provider: input.provider,
-              model: input.model,
-              usage: usageRetainedForCandidateCharge(undefined, error),
-            });
+            chargeThisCandidateOnce(usageRetainedForCandidateCharge(undefined, error));
           } catch (chargeError) {
             if (chargeError instanceof TaskBudgetExceededError) {
               throw chargeError;

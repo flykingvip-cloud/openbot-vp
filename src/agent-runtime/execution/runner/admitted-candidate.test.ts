@@ -54,6 +54,13 @@ function setup() {
     },
     commandBody: "hello",
     sessionCtx: {},
+    typingSignals: {
+      shouldStartOnReasoning: false,
+      signalMessageStart: async () => undefined,
+      signalReasoningDelta: async () => undefined,
+      signalTextDelta: async () => undefined,
+      signalToolStart: async () => undefined,
+    },
     getActiveSessionEntry: () => undefined,
     blockReplyPipeline: null,
     opts: {},
@@ -122,6 +129,34 @@ describe("admitted candidate boundary", () => {
     expect(stages).toEqual(["started", "failed"]);
     expect(stages.filter((stage) => stage === "completed" || stage === "failed")).toEqual([
       "failed",
+    ]);
+  });
+  it("treats an embedded lifecycle error as an internal attempt and still completes", async () => {
+    const { host, invoke } = setup();
+    const terminals: string[] = [];
+    const attempts: string[] = [];
+    host.observeExecution = (stage) => {
+      terminals.push(stage);
+    };
+    host.observeAttempt = (event) => {
+      attempts.push(event.kind);
+    };
+    mocks.embedded.mockImplementation(
+      async (params: { onAgentEvent?: (evt: unknown) => unknown }) => {
+        await params.onAgentEvent?.({ stream: "lifecycle", data: { phase: "start" } });
+        await params.onAgentEvent?.({ stream: "lifecycle", data: { phase: "error" } });
+        return {
+          payloads: [{ text: "recovered" }],
+          meta: { durationMs: 1, agentMeta: { usage: { input: 1, output: 1 } } },
+        };
+      },
+    );
+    await expect(invoke("openai", "gpt-test")).resolves.toMatchObject({
+      payloads: [{ text: "recovered" }],
+    });
+    expect(attempts).toEqual(["embedded_lifecycle_error"]);
+    expect(terminals.filter((stage) => stage === "completed" || stage === "failed")).toEqual([
+      "completed",
     ]);
   });
   it("preserves cancellation errors for the original fallback owner", async () => {

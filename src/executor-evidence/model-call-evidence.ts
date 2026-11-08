@@ -877,6 +877,10 @@ export function writeBoundedEvidenceFile(
         }
         fs.rmSync(companion, { force: true });
         fd = fs.openSync(lockPath, "r+");
+        const stageFile = process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_STAGE_FILE;
+        if (stageFile) {
+          fs.appendFileSync(stageFile, "public_lock\n");
+        }
         if (process.env.OPENBOT_EXECUTOR_EVIDENCE_LOCK_CRASH_BEFORE_PUBLISH === "1") {
           fs.closeSync(fd);
           process.exit(0);

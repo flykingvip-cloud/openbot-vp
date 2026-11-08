@@ -146,6 +146,11 @@ export type RunnerTurnOutcomeInput = {
   modelCallLink?: ModelCallCloseoutLink | null;
   /** Every candidate in the turn, including failed and cancelled calls. */
   modelCallLinks?: ModelCallCloseoutLink[];
+  /**
+   * Per-candidate charge dispositions. An unknown or conflict reason is not a committed spend.
+   * Closeout must keep these reasons and must not invent another charge from them.
+   */
+  budgetChargeReasons?: readonly string[];
 };
 
 export type ModelCallCloseoutLink = {

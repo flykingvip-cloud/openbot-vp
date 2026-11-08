@@ -391,7 +391,7 @@ async function agentCommandInternal(
   const commandBudget = createCommandBudget({ config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, taskId: agentOutcomeTaskId, scope: agentOutcomeScope, parentTaskId: opts.parentTaskId, parentAgentId: opts.parentAgentId });
   const submitAgentOutcomeCloseout = createCommandOutcomeCloseout({
     config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, entrypoint: agentOutcomeEntrypoint,
-    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, chargeState: commandBudget.chargeState, costUsd: tipBudgetCostUsd, deliveryReceipt: commandDeliveryReceipt, modelCallLinks: commandBudget.modelCallLinks}),
+    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, chargeState: commandBudget.chargeState, budgetChargeReasons: commandBudget.chargeReasons, costUsd: tipBudgetCostUsd, deliveryReceipt: commandDeliveryReceipt, modelCallLinks: commandBudget.modelCallLinks}),
   });
 
   try {

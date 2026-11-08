@@ -37,6 +37,11 @@ import { runEmbeddedPiAgent } from "./embedded-run.js";
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
 export type AdmittedCandidateHost = {
   observeExecution?: (stage: "started" | "completed" | "failed" | "cancelled") => void;
+  /**
+   * An embedded lifecycle error inside the runner. This is one internal attempt,
+   * not the candidate's execution terminal. A later successful return may still complete.
+   */
+  observeAttempt?: (event: { kind: "embedded_lifecycle_error" }) => void;
   assertOriginalTaskCurrent: () => void;
   assertTipBudgetAllowsModelCall: () => void;
 
@@ -426,9 +431,7 @@ export function createAdmittedCandidateInvoker(
                 host.observeExecution?.("started");
               }
               if (phase === "error") {
-                executionTerminal.finish(
-                  params.opts?.abortSignal?.aborted ? "cancelled" : "failed",
-                );
+                host.observeAttempt?.({ kind: "embedded_lifecycle_error" });
               }
             }
             // Tool stream only. Does not write assistant text into the ledger.
