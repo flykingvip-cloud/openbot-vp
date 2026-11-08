@@ -71,6 +71,7 @@ const EXPECTED_REGISTERED_GAPS: string[] = [
 const ENTERPRISE_MODEL_CALLER_IDS = [
   "auto-reply",
   "memory-flush",
+  "llm-slug-generator",
   "agent-command",
   "image-tool",
   "pdf-tool",
@@ -287,8 +288,8 @@ describe("§5 execution entry inventory", () => {
         "recordCliBackendUsage",
       );
       // Gate is acquired in agentCommandInternal before runWithModelFallback → runAgentAttempt → runCliAgent.
-      const gateIdx = agent!.indexOf("await commercialLease.prepare");
-      const fallbackIdx = agent!.indexOf("await commercialLease.infer");
+      const gateIdx = agent!.indexOf("await controlledExecution.prepare");
+      const fallbackIdx = agent!.indexOf("await controlledExecution.infer");
       expect(gateIdx).toBeGreaterThan(-1);
       expect(fallbackIdx).toBeGreaterThan(-1);
       expect(gateIdx).toBeLessThan(fallbackIdx);
