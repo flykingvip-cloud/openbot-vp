@@ -11,6 +11,8 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { withFileLockSync, SESSION_TASK_BOARD_LOCK_OPTIONS } from "../../../infra/file-lock.js";
+import { isEmbeddedPiRunActive } from "../../execution/runner/run-registry.js";
+import { readSessionTaskBoard } from "./task-board-file.js";
 
 export type AsyncWaitJobStatus = "waiting" | "exited" | "cleared";
 
@@ -45,10 +47,22 @@ export type AsyncWaitRecoveryState = {
   continueMessageId?: string;
   /** Real agent/followup run id once claimQueuedExecution accepts — never synthetic. */
   boundRunId?: string;
+  /** Session id used with isEmbeddedPiRunActive for live-vs-dead claim distinction. */
+  boundSessionId?: string;
   boundDeliveryId?: string;
   boundOutcomeTaskId?: string;
   lastAttemptAtMs?: number;
   deliveredAtMs?: number;
+};
+
+/** Trusted host identity snapshot for recovery followup — never invented from prompt text. */
+export type AsyncWaitTrustedIdentity = {
+  user?: string;
+  platformUserId?: string;
+  sessionDomain?: "platform" | "enterprise" | "employee";
+  enterpriseId?: string;
+  membershipId?: string;
+  seatId?: string;
 };
 
 export type AsyncWaitJobIntent = {
@@ -68,6 +82,8 @@ export type AsyncWaitJobIntent = {
   exitedAtMs?: number;
   clearedAtMs?: number;
   resultEvidence?: AsyncWaitResultEvidence;
+  /** Captured from the live host turn when the wait was recorded. */
+  trustedIdentity?: AsyncWaitTrustedIdentity;
   recovery?: AsyncWaitRecoveryState;
 };
 
@@ -230,6 +246,7 @@ export function recordAsyncWaitJobIntent(input: {
   pid?: number;
   startedAt: number;
   command?: string;
+  trustedIdentity?: AsyncWaitTrustedIdentity;
 }): AsyncWaitJobIntent | undefined {
   const sessionFile = input.sessionFile.trim();
   const jobId = input.jobId.trim();
@@ -261,6 +278,7 @@ export function recordAsyncWaitJobIntent(input: {
     recovery: { stage: "none", claimGeneration: 0 },
     ...(typeof input.pid === "number" && Number.isFinite(input.pid) ? { pid: input.pid } : {}),
     ...(input.command?.trim() ? { command: input.command.trim().slice(0, 500) } : {}),
+    ...(input.trustedIdentity ? { trustedIdentity: { ...input.trustedIdentity } } : {}),
   }));
 }
 
@@ -411,6 +429,34 @@ export function asyncWaitRecoveryStageRank(stage: AsyncWaitRecoveryStage): numbe
 }
 
 /**
+ * Trusted run-liveness: board still bound to this attempt AND embedded run active
+ * for the bound session id. Missing session id or inactive registry ⇒ dead claim
+ * (recoverable). Never treats turn_bound as permanently unreclaimable.
+ */
+export function isBoundAsyncWaitRunLive(
+  intent: AsyncWaitJobIntent,
+  opts?: { isEmbeddedPiRunActive?: (sessionId: string) => boolean },
+): boolean {
+  const recovery = intent.recovery;
+  if (!recovery || recovery.stage !== "turn_bound" || !recovery.boundRunId) {
+    return false;
+  }
+  if (recovery.boundDeliveryId) {
+    return false;
+  }
+  const board = readSessionTaskBoard(intent.sessionFile);
+  if (board.current?.executionAttempt !== recovery.boundRunId) {
+    return false;
+  }
+  const sessionId = recovery.boundSessionId?.trim();
+  if (!sessionId) {
+    return false;
+  }
+  const active = opts?.isEmbeddedPiRunActive ?? isEmbeddedPiRunActive;
+  return active(sessionId);
+}
+
+/**
  * Atomic recovery claim. PID alive → leave waiting (not success proof).
  * PID gone → exited with process_missing_unconfirmed (not success packaging).
  * Unconfirmed stages (claimed..delivery_pending) are returned for retry — never
@@ -421,6 +467,8 @@ export function claimAsyncWaitJobForRecovery(input: {
   jobId: string;
   /** Injected for tests: override pid liveness. */
   isPidAlive?: (pid: number) => boolean;
+  /** Injected for tests: override embedded-run liveness. */
+  isEmbeddedPiRunActive?: (sessionId: string) => boolean;
 }): AsyncWaitClaimResult {
   const file = input.sessionFile.trim();
   const id = input.jobId.trim();
@@ -453,10 +501,32 @@ export function claimAsyncWaitJobForRecovery(input: {
       result = { ok: false, reason: "delivered", intent: current };
       return "keep";
     }
-    // Active execution is not re-claimable for another business continue.
+    // turn_bound without delivery: live run ⇒ active_exec; dead claim ⇒ reopen for recovery.
     if (recovery.stage === "turn_bound" && recovery.boundRunId && !recovery.boundDeliveryId) {
-      result = { ok: false, reason: "active_exec", intent: current };
-      return "keep";
+      if (
+        isBoundAsyncWaitRunLive(current, { isEmbeddedPiRunActive: input.isEmbeddedPiRunActive })
+      ) {
+        result = { ok: false, reason: "active_exec", intent: current };
+        return "keep";
+      }
+      // Dead claim: allow existing recovery continue path (not delivery-only, not permanent).
+      if (recovery.claimToken) {
+        result = {
+          ok: true,
+          intent: current,
+          claimToken: recovery.claimToken,
+          freshClaim: false,
+        };
+        return {
+          ...current,
+          recovery: {
+            ...recovery,
+            // Re-open to continue_armed fence so arm can re-enqueue without stage regression refusal.
+            stage: "continue_armed",
+            lastAttemptAtMs: Date.now(),
+          },
+        };
+      }
     }
     // Executed-not-delivered: delivery-only recovery (do not re-run business).
     if (recovery.stage === "delivery_pending" && recovery.claimToken) {
@@ -615,6 +685,7 @@ export function bindAsyncWaitRecoveryTurn(input: {
   jobId?: string;
   /** Required with jobId for exclusive bind; rejects late/stopped holders. */
   claimToken?: string;
+  sessionId?: string;
   deliveryId?: string;
   outcomeTaskId?: string;
   /** Sync recovery intent to the live bound attempt so recheck cannot clear with a stale attempt. */
@@ -628,15 +699,29 @@ export function bindAsyncWaitRecoveryTurn(input: {
   }
   const jobIdFilter = input.jobId?.trim() || undefined;
   const tokenFilter = input.claimToken?.trim() || undefined;
-  // When jobId+claimToken are provided, bind that exact job only.
+  // Exclusive bind requires jobId + claimToken under lock — never first-open-by-taskId.
+  if (!jobIdFilter || !tokenFilter) {
+    return undefined;
+  }
+  // Refuse if another job already owns this runId.
+  for (const other of listAsyncWaitJobIntents(input.sessionFile)) {
+    if (
+      other.jobId !== jobIdFilter &&
+      other.recovery?.boundRunId === runId &&
+      other.recovery.stage !== "delivered" &&
+      other.status !== "cleared"
+    ) {
+      return undefined;
+    }
+  }
   const candidates = listAsyncWaitJobIntents(input.sessionFile).filter((intent) => {
     if (intent.taskId !== tid || intent.status === "cleared") {
       return false;
     }
-    if (jobIdFilter && intent.jobId !== jobIdFilter) {
+    if (intent.jobId !== jobIdFilter) {
       return false;
     }
-    if (tokenFilter && intent.recovery?.claimToken !== tokenFilter) {
+    if (intent.recovery?.claimToken !== tokenFilter) {
       return false;
     }
     const stage = intent.recovery?.stage;
@@ -647,10 +732,6 @@ export function bindAsyncWaitRecoveryTurn(input: {
       stage === "delivery_pending"
     );
   });
-  // Without jobId, refuse to guess among multiple open jobs for the same taskId.
-  if (!jobIdFilter && candidates.length !== 1) {
-    return undefined;
-  }
   const target = candidates[0];
   if (!target) {
     return undefined;
@@ -682,6 +763,7 @@ export function bindAsyncWaitRecoveryTurn(input: {
         ...current.recovery,
         stage: nextStage,
         boundRunId: runId,
+        ...(input.sessionId?.trim() ? { boundSessionId: input.sessionId.trim() } : {}),
         ...(input.deliveryId ? { boundDeliveryId: input.deliveryId } : {}),
         ...(input.outcomeTaskId ? { boundOutcomeTaskId: input.outcomeTaskId } : {}),
         lastAttemptAtMs: Date.now(),

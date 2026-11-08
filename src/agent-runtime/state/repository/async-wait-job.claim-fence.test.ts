@@ -40,7 +40,7 @@ function seedExited(sessionFile: string, jobId = "job-a", taskId = "task-a") {
   });
 }
 
-it("active turn_bound exec is not re-claimable for business continue", () => {
+it("live turn_bound exec is not re-claimable; dead claim reopens for recovery", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-fence-active-"));
   roots.push(root);
   const sessionFile = path.join(root, "session.jsonl");
@@ -55,25 +55,59 @@ it("active turn_bound exec is not re-claimable for business continue", () => {
   if (!claimed.ok) {
     return;
   }
+  // Need board attempt to match bound run for liveness check.
+  const boardMod = await import("../../../conversation-task/session-task-board.js");
+  boardMod.mutateSessionTaskBoard(sessionFile, () => ({
+    board: {
+      ...boardMod.emptySessionTaskBoard(),
+      current: {
+        taskId: "task-a",
+        title: "t",
+        goalText: "g",
+        unfinished: true,
+        createdAtMs: 1,
+        executionAttempt: "run-live",
+        deliverableVersion: "run-live",
+        stop: { summary: "", workspacePaths: [] },
+      },
+    },
+    value: undefined,
+  }));
   bindAsyncWaitRecoveryTurn({
     sessionFile,
     taskId: "task-a",
     jobId: "job-a",
     claimToken: claimed.claimToken,
     runId: "run-live",
+    sessionId: "sess-live",
     executionAttempt: "run-live",
     deliverableVersion: "run-live",
   });
   expect(readAsyncWaitJobIntent(sessionFile, "job-a")?.recovery?.stage).toBe("turn_bound");
-  const again = claimAsyncWaitJobForRecovery({
+  // Live: embedded run active for bound session.
+  const live = claimAsyncWaitJobForRecovery({
     sessionFile,
     jobId: "job-a",
     isPidAlive: () => false,
+    isEmbeddedPiRunActive: (sid) => sid === "sess-live",
   });
-  expect(again.ok).toBe(false);
-  if (!again.ok) {
-    expect(again.reason).toBe("active_exec");
+  expect(live.ok).toBe(false);
+  if (!live.ok) {
+    expect(live.reason).toBe("active_exec");
   }
+  // Dead: registry inactive → reopen to continue_armed for recovery (not permanent).
+  const dead = claimAsyncWaitJobForRecovery({
+    sessionFile,
+    jobId: "job-a",
+    isPidAlive: () => false,
+    isEmbeddedPiRunActive: () => false,
+  });
+  expect(dead.ok).toBe(true);
+  if (dead.ok) {
+    expect(dead.freshClaim).toBe(false);
+    expect(dead.deliveryOnly).not.toBe(true);
+  }
+  expect(readAsyncWaitJobIntent(sessionFile, "job-a")?.recovery?.stage).toBe("continue_armed");
 });
 
 it("continue_armed cannot regress from turn_bound with old claimToken", () => {

@@ -39,7 +39,16 @@ export type FollowupRun = {
    * Package2 async-wait recovery bind fence: specific job + claimToken.
    * claimQueuedExecution uses these so bind does not pick the first open job by taskId.
    */
-  asyncWaitRecoveryBind?: { jobId: string; claimToken: string };
+  asyncWaitRecoveryBind?: {
+    jobId: string;
+    claimToken: string;
+    boundRunId?: string;
+    boundDeliveryId?: string;
+  };
+  /**
+   * Package2: delivery-only recovery retry — followup must not re-run business/model.
+   */
+  asyncWaitDeliveryOnly?: boolean;
   /**
    * askOutcome W1: optional parent TaskOutcome taskId when this followup is
    * an independent child of a prior user/chat/collab task.

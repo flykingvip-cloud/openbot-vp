@@ -63,6 +63,8 @@ export type AsyncWaitRecoveryContinueEnqueue = (params: {
   claimToken: string;
   jobId: string;
   intent: AsyncWaitJobIntent;
+  /** When true, enqueue delivery-only retry (no business/model re-run). */
+  deliveryOnly?: boolean;
 }) => boolean;
 
 let continueEnqueuePort: AsyncWaitRecoveryContinueEnqueue | undefined;
@@ -215,10 +217,31 @@ export function armAsyncWaitRecoveryContinuation(params: {
 
   const intent = claimed.intent;
 
-  // Executed-not-delivered: do NOT re-enqueue business continue / re-run the model.
-  // Pending-delivery recovery stays with TaskOutcome consumer + confirmPending receipt.
+  // Executed-not-delivered: enqueue delivery-only retry — never re-run business/model.
   if (claimed.deliveryOnly) {
-    return { outcome: "delivery_only", intent };
+    const enqueue = params.enqueue ?? continueEnqueuePort;
+    if (!enqueue) {
+      return { outcome: "delivery_only", intent };
+    }
+    const board = readSessionTaskBoard(intent.sessionFile);
+    const focusRevision = board.focusRevision ?? intent.recovery?.continueFocusRevision ?? 0;
+    const messageId = `async-wait-delivery-only:${intent.jobId}:g${intent.recovery?.claimGeneration ?? 0}`;
+    const ok = enqueue({
+      sessionFile: intent.sessionFile,
+      sessionKey: intent.sessionKey,
+      taskId: intent.taskId,
+      focusRevision,
+      prompt: buildAsyncWaitRecoveryPromptAppendix(intent),
+      messageId,
+      claimToken: claimed.claimToken,
+      jobId: intent.jobId,
+      intent,
+      deliveryOnly: true,
+    });
+    return {
+      outcome: ok ? "delivery_only" : "enqueue_failed",
+      intent,
+    };
   }
 
   // Boundary uses the locked intent (synced attempt after bind) — not the caller's stale snapshot.

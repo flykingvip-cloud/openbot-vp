@@ -22,6 +22,10 @@ import { resolveDefaultSessionStorePath } from "../../../config/sessions/paths.j
 import { loadSessionStore } from "../../../config/sessions/store.js";
 import type { SessionEntry } from "../../../config/sessions/types.js";
 import { captureTaskCompletionBinding } from "../../../conversation-task/session-task-board.js";
+import {
+  createExecutionIdentityContext,
+  hasAuthenticatedIdentity,
+} from "../../../gateway/execution-identity-context.js";
 import { resolveAgentIdFromSessionKey } from "../../../routing/session-key.js";
 import type { AsyncWaitRecoveryContinueEnqueue } from "./async-wait-job-recovery.js";
 
@@ -104,6 +108,38 @@ export function resolveTrustedRecoveryModel(params: {
   return { provider, model };
 }
 
+export function resolveTrustedRecoveryIdentity(params: {
+  intentTrusted?: {
+    user?: string;
+    platformUserId?: string;
+    sessionDomain?: "platform" | "enterprise" | "employee";
+    enterpriseId?: string;
+    membershipId?: string;
+    seatId?: string;
+  };
+  agentId: string;
+  sessionKey: string;
+}): ReturnType<typeof createExecutionIdentityContext> | undefined {
+  const snap = params.intentTrusted;
+  if (!snap) {
+    return undefined;
+  }
+  const identity = createExecutionIdentityContext({
+    user: snap.user,
+    platformUserId: snap.platformUserId,
+    sessionDomain: snap.sessionDomain,
+    enterpriseId: snap.enterpriseId,
+    membershipId: snap.membershipId,
+    seatId: snap.seatId,
+    agentId: params.agentId,
+    sessionKey: params.sessionKey,
+  });
+  if (!hasAuthenticatedIdentity(identity)) {
+    return undefined;
+  }
+  return identity;
+}
+
 export function createAsyncWaitRecoveryContinueEnqueue(
   cfg: OpenBotConfig,
 ): AsyncWaitRecoveryContinueEnqueue {
@@ -113,6 +149,15 @@ export function createAsyncWaitRecoveryContinueEnqueue(
     const trusted = tryLoadTrustedSessionEntry(params.sessionKey);
     const sessionId = trusted?.sessionId ?? `async-wait-recovery:${params.jobId}`;
     const { provider, model } = resolveTrustedRecoveryModel({ cfg, agentId, session: trusted });
+    const executionIdentity = resolveTrustedRecoveryIdentity({
+      intentTrusted: params.intent.trustedIdentity,
+      agentId,
+      sessionKey: params.sessionKey,
+    });
+    // Missing trusted host identity → explicit refuse; never unscoped exec.
+    if (!executionIdentity) {
+      return false;
+    }
     // Task workspace from session record, else agent workspace — never agentDir.
     const workspaceDir = trusted?.workspaceDir || resolveAgentWorkspaceDir(cfg, agentId);
     let binding;
@@ -140,7 +185,14 @@ export function createAsyncWaitRecoveryContinueEnqueue(
       asyncWaitRecoveryBind: {
         jobId: params.jobId,
         claimToken: params.claimToken,
+        ...(params.intent.recovery?.boundRunId
+          ? { boundRunId: params.intent.recovery.boundRunId }
+          : {}),
+        ...(params.intent.recovery?.boundDeliveryId
+          ? { boundDeliveryId: params.intent.recovery.boundDeliveryId }
+          : {}),
       },
+      ...(params.deliveryOnly ? { asyncWaitDeliveryOnly: true } : {}),
       ...(originatingChannel ? { originatingChannel } : {}),
       ...(trusted?.lastTo ? { originatingTo: trusted.lastTo } : {}),
       ...(trusted?.lastAccountId ? { originatingAccountId: trusted.lastAccountId } : {}),
@@ -157,6 +209,10 @@ export function createAsyncWaitRecoveryContinueEnqueue(
         config: cfg,
         provider,
         model,
+        executionIdentity,
+        gatewayClientUser: executionIdentity.user,
+        gatewayClientPlatformUserId: executionIdentity.platformUserId,
+        gatewayClientSessionDomain: executionIdentity.sessionDomain,
         ...(trusted?.authProfileId
           ? {
               authProfileId: trusted.authProfileId,

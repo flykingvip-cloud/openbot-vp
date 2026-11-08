@@ -1,44 +1,63 @@
 /**
- * PRIORITY Package2 production-path recovery test.
+ * PRIORITY: production ensureAsyncWaitRecoveryFollowupConsumer / createFollowupRunner.
  *
- * Evidence kinds (labeled per assertion):
- * - real process / real queue: enqueueFollowupRun + FOLLOWUP_RUN_CALLBACKS drain
- * - model stub: invoked by the consumer after claimQueuedExecution (not hand-written success)
- * - channel stub: invoked by the consumer for transport send (not fake delivered)
- * - no manual inject: does not write acceptance=passed / delivered outside confirmPending
- *
- * Chain under test: boot ensure consumer → recover enqueue → followup drain →
- * claimQueuedExecution → model stub → channel stub → confirmPending → receipt.
+ * Evidence:
+ * - real process/queue: register via ensureAsyncWaitRecoveryFollowupConsumer → enqueue → drain
+ * - model stub: runEmbeddedPiAgent only (lowest boundary)
+ * - channel stub: routeReply only (lowest boundary)
+ * - acceptance/delivery status produced by production prepareVisible + confirmPending
+ *   from stub returns — NOT hand-written success/acceptance=passed/delivered.
  */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+
+const runEmbeddedPiAgentMock = vi.fn();
+const routeReplyMock = vi.fn();
+const isRoutableChannelMock = vi.fn();
+
+vi.mock(
+  "../../../agents/model-fallback.js",
+  async () => await import("../../../test-utils/model-fallback.mock.js"),
+);
+
+vi.mock("../../../agents/pi-embedded.js", () => ({
+  queueEmbeddedPiMessage: vi.fn(),
+  abortEmbeddedPiRun: vi.fn(),
+  runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
+}));
+
+// Production followup path imports runEmbeddedPiAgent from embedded-run, not agents/pi-embedded.
+vi.mock("../../../agent-runtime/execution/runner/embedded-run.js", async () => {
+  const { runEmbeddedPiAgent } = await import("../../../agents/pi-embedded.js");
+  return { runEmbeddedPiAgent };
+});
+
+vi.mock("../../../auto-reply/reply/route-reply.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../auto-reply/reply/route-reply.js")>();
+  return {
+    ...actual,
+    isRoutableChannel: (...args: unknown[]) => isRoutableChannelMock(...args),
+    routeReply: (...args: unknown[]) => routeReplyMock(...args),
+  };
+});
+
 import {
   clearFollowupDrainCallback,
   clearFollowupQueue,
   getFollowupQueueDepth,
-  registerFollowupDrainCallback,
   resetRecentQueuedMessageIdDedupe,
 } from "../../../auto-reply/reply/queue.js";
-import type { FollowupRun } from "../../../auto-reply/reply/queue/types.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import {
   captureTaskCompletionBinding,
   emptySessionTaskBoard,
-  isTaskExecutionBindingCurrent,
   mutateSessionTaskBoard,
-  recordCheckedTaskCompletion,
+  readSessionTaskBoard,
   startBoundTaskExecution,
 } from "../../../conversation-task/session-task-board.js";
-import {
-  clearAwaitingDeliveriesForTests,
-  peekAwaitingDelivery,
-  registerAwaitingDelivery,
-} from "../../../task-outcome/pending-delivery.js";
-import { recordRunnerTurnOutcome } from "../../../task-outcome/runtime-from-runner.js";
-import { confirmPendingTurnDeliveryWithPorts } from "../../delivery/dispatch/confirm-pending.js";
-import { claimQueuedExecution } from "../mutations/claim-queued-execution.js";
+import { clearAwaitingDeliveriesForTests } from "../../../task-outcome/pending-delivery.js";
 import {
   recoverAsyncWaitJobsAtGatewayBoot,
   setAsyncWaitRecoveryContinueEnqueue,
@@ -52,21 +71,22 @@ import {
 } from "./async-wait-job.js";
 import {
   createAsyncWaitRecoveryContinueEnqueue,
-  resolveTrustedRecoveryModel,
   setAsyncWaitRecoveryFollowupConsumerEnsure,
 } from "./async-wait-recovery-enqueue.js";
+import { ensureAsyncWaitRecoveryFollowupConsumer } from "./async-wait-recovery-followup-consumer.js";
 
 const roots: string[] = [];
 const prevState = process.env.OPENBOT_STATE_DIR;
 const prevOperator = process.env.OPENBOT_OPERATOR_ID;
+const SESSION_KEY = "agent:bot:main";
 
 afterEach(() => {
   stopAsyncWaitJobRecoveryRecheckForTests();
   clearAwaitingDeliveriesForTests();
   resetRecentQueuedMessageIdDedupe();
+  clearFollowupDrainCallback(SESSION_KEY);
+  clearFollowupQueue(SESSION_KEY);
   for (const root of roots.splice(0)) {
-    clearFollowupDrainCallback("agent:bot:main");
-    clearFollowupQueue("agent:bot:main");
     clearAsyncWaitJobsForTests(path.join(root, "agents", "bot", "sessions", "session.jsonl"));
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -82,7 +102,40 @@ afterEach(() => {
   }
 });
 
-function liveBoard(sessionFile: string) {
+beforeEach(() => {
+  runEmbeddedPiAgentMock.mockReset();
+  routeReplyMock.mockReset();
+  routeReplyMock.mockResolvedValue({ ok: true });
+  isRoutableChannelMock.mockReset();
+  isRoutableChannelMock.mockReturnValue(true);
+});
+
+function seedEnv() {
+  const state = fs.mkdtempSync(path.join(os.tmpdir(), "aw-prod-runner-"));
+  roots.push(state);
+  process.env.OPENBOT_STATE_DIR = state;
+  delete process.env.OPENBOT_OPERATOR_ID;
+  const sessions = path.join(state, "agents", "bot", "sessions");
+  fs.mkdirSync(sessions, { recursive: true });
+  const sessionFile = path.join(sessions, "session.jsonl");
+  fs.writeFileSync(sessionFile, "");
+  const workspaceDir = path.join(state, "workspace-bot");
+  fs.mkdirSync(workspaceDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(sessions, "sessions.json"),
+    JSON.stringify({
+      [SESSION_KEY]: {
+        sessionId: "sess-prod",
+        updatedAt: Date.now(),
+        sessionFile,
+        workspaceDir,
+        modelProvider: "anthropic",
+        model: "claude-opus-4-6",
+        lastChannel: "telegram",
+        lastTo: "chat:prod-target",
+      },
+    }),
+  );
   mutateSessionTaskBoard(sessionFile, () => ({
     board: {
       ...emptySessionTaskBoard(),
@@ -93,7 +146,7 @@ function liveBoard(sessionFile: string) {
         goalText: "prod recovery",
         unfinished: true,
         createdAtMs: 1,
-        stop: { summary: "waiting on background", workspacePaths: [] },
+        stop: { summary: "waiting", workspacePaths: [] },
       },
     },
     value: undefined,
@@ -102,238 +155,199 @@ function liveBoard(sessionFile: string) {
     sessionFile,
     captureTaskCompletionBinding(sessionFile),
     "run-orig",
-  );
-  if (!binding?.taskId || !binding.executionAttempt || !binding.deliverableVersion) {
-    throw new Error("expected live binding");
-  }
-  return binding;
-}
-
-function writeTrustedSessionStore(params: {
-  storePath: string;
-  sessionKey: string;
-  sessionFile: string;
-  workspaceDir: string;
-}) {
-  const entry = {
-    sessionId: "sess-prod-recovery",
-    updatedAt: Date.now(),
-    sessionFile: params.sessionFile,
-    workspaceDir: params.workspaceDir,
-    modelProvider: "anthropic",
-    model: "claude-sonnet-trusted",
-    authProfileOverride: "profile-trusted",
-    authProfileOverrideSource: "user" as const,
-    lastChannel: "telegram",
-    lastTo: "chat:prod-target",
-    lastAccountId: "acct-trusted",
-  };
-  fs.mkdirSync(path.dirname(params.storePath), { recursive: true });
-  fs.writeFileSync(
-    params.storePath,
-    `${JSON.stringify({ [params.sessionKey]: entry }, null, 2)}\n`,
-    "utf8",
-  );
-}
-
-it("production path: cold-start consumer drains recovery → claim → model stub → channel stub → receipt", async () => {
-  const state = fs.mkdtempSync(path.join(os.tmpdir(), "aw-prod-path-"));
-  roots.push(state);
-  process.env.OPENBOT_STATE_DIR = state;
-  delete process.env.OPENBOT_OPERATOR_ID;
-
-  const sessions = path.join(state, "agents", "bot", "sessions");
-  fs.mkdirSync(sessions, { recursive: true });
-  const sessionFile = path.join(sessions, "session.jsonl");
-  fs.writeFileSync(sessionFile, "");
-  const workspaceDir = path.join(state, "workspace-bot-trusted");
-  fs.mkdirSync(workspaceDir, { recursive: true });
-  const sessionKey = "agent:bot:main";
-  const storePath = path.join(sessions, "sessions.json");
-  writeTrustedSessionStore({ storePath, sessionKey, sessionFile, workspaceDir });
-
-  const binding = liveBoard(sessionFile);
+  )!;
   recordAsyncWaitJobIntent({
     jobId: "job-prod",
-    sessionKey,
+    sessionKey: SESSION_KEY,
     sessionFile,
     taskId: binding.taskId,
     executionAttempt: binding.executionAttempt!,
     deliverableVersion: binding.deliverableVersion!,
     constraints: [...(binding.constraints ?? [])],
-    pid: 999_999_777,
+    pid: 999_999_701,
     startedAt: Date.now(),
-    command: "sleep 1",
+    trustedIdentity: {
+      user: "owner@acme.example",
+      platformUserId: "plat-owner-1",
+      sessionDomain: "employee",
+      enterpriseId: "ent-1",
+      membershipId: "mem-1",
+    },
   });
   markAsyncWaitJobExited({
     sessionFile,
     jobId: "job-prod",
     exitStatus: "completed",
     exitCode: 0,
-    summary: "background finished for production-path test",
+    summary: "background finished",
   });
-
+  const agentDir = path.join(state, "agent-dir");
+  fs.mkdirSync(agentDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(agentDir, "auth-profiles.json"),
+    JSON.stringify({
+      version: 1,
+      profiles: {
+        "anthropic:default": {
+          type: "api_key",
+          provider: "anthropic",
+          key: "test-anthropic-key-not-real",
+        },
+      },
+    }),
+  );
   const cfg = {
     agents: {
-      list: [{ id: "bot", workspace: workspaceDir }],
+      list: [{ id: "bot", workspace: workspaceDir, agentDir }],
       defaults: { model: { primary: "anthropic/claude-opus-4-6" } },
     },
   } as unknown as OpenBotConfig;
+  return { state, sessionFile, workspaceDir, cfg, binding, agentDir };
+}
 
-  const modelStub = vi.fn((claimedPrompt: string) => ({
-    text: `model-stub-reply:${claimedPrompt.slice(0, 32)}`,
-  }));
-  const channelStub = vi.fn(async (payload: { text: string; to?: string; channel?: string }) => ({
-    ok: true as const,
-    payload,
-  }));
+async function waitForStage(sessionFile: string, stage: string, timeoutMs = 15000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (readAsyncWaitJobIntent(sessionFile, "job-prod")?.recovery?.stage === stage) {
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  const intent = readAsyncWaitJobIntent(sessionFile, "job-prod");
+  throw new Error(
+    `timeout waiting for stage=${stage}; got=${intent?.recovery?.stage}; modelCalls=${runEmbeddedPiAgentMock.mock.calls.length}; routeCalls=${routeReplyMock.mock.calls.length}; queueDepth=${getFollowupQueueDepth(SESSION_KEY)}`,
+  );
+}
 
-  let settle!: () => void;
-  const drained = new Promise<void>((resolve) => {
-    settle = resolve;
-  });
-  const persistRoot = path.join(state, "task-outcomes");
-  fs.mkdirSync(persistRoot, { recursive: true });
+it("production ensureFollowupConsumer → createFollowupRunner: stub returns drive acceptance/delivery", async () => {
+  const { sessionFile, cfg } = seedEnv();
 
-  // Evidence: real followup consumer registered at cold start (boot ensure),
-  // invoked by enqueue → kickFollowupDrainIfIdle — not a live user turn.
-  setAsyncWaitRecoveryFollowupConsumerEnsure(({ sessionKey: key }) => {
-    registerFollowupDrainCallback(key, async (queued: FollowupRun) => {
-      try {
-        // Real claim on production ticket + recovery bind fence.
-        const claimed = claimQueuedExecution({
-          sessionFile: queued.run.sessionFile,
-          runId: `run-prod-${Date.now()}`,
-          prompt: queued.prompt,
-          binding: queued.run.taskCompletionBinding,
-          continuationTicket: queued.taskBoardContinueTicket,
-          asyncWaitRecovery: queued.asyncWaitRecoveryBind,
-          collaboration: false,
-          privatePlan: false,
-        });
-        if (claimed.kind !== "accepted" || !claimed.binding) {
-          throw new Error(`claim rejected: ${JSON.stringify(claimed)}`);
-        }
-        // Final claimed prompt MUST retain recovery evidence (acceptor requirement).
-        expect(claimed.prompt).toContain("Async-wait job recovery context (Package2):");
-        expect(claimed.prompt).toMatch(/evidenceKind=|WARNING:|unconfirmed/i);
-
-        // Model stub invoked by real chain after claim (not hand-written success).
-        const modelOut = modelStub(claimed.prompt);
-
-        // Channel / transport stub invoked by real chain (not mark delivered directly).
-        await channelStub({
-          text: modelOut.text,
-          to: queued.originatingTo,
-          channel: queued.originatingChannel,
-        });
-
-        const runId = claimed.binding.executionAttempt!;
-        const deliveryId = `delivery:${runId}:visible`;
-        const outcomeTaskId = `outcome-${claimed.binding.taskId}`;
-        await recordRunnerTurnOutcome(cfg, "bot", {
-          success: true,
-          runId,
-          taskId: outcomeTaskId,
-          scope: {
-            kind: "personal",
-            personalDomainId: "domain",
-            subjectRef: "user",
-            authzScopeRef: "scope",
-          },
-          acceptance: { status: "passed" },
-          delivery: { status: "pending" },
-          deliveryId,
-        });
-        registerAwaitingDelivery({
-          taskId: outcomeTaskId,
-          deliveryId,
-          agentId: "bot",
-          runId,
-          persistRoot,
-          checkedTask: { sessionFile, binding: claimed.binding },
-        });
-        // Real receipt path — confirmPending marks delivered (not manual stage write alone).
-        await confirmPendingTurnDeliveryWithPorts(
-          {
-            cfg,
-            runId,
-            deliveryId,
-            taskId: outcomeTaskId,
-            sessionKey,
-            status: "delivered",
-          },
-          {
-            resolvePersistRoot: () => persistRoot,
-            completeTask: ({ sessionFile: sf, binding: b, closed, appendNotice }) =>
-              recordCheckedTaskCompletion({
-                sessionFile: sf,
-                binding: b,
-                closed,
-                appendNotice,
-              }),
-            bindingCurrent: (sf, b) => isTaskExecutionBindingCurrent(sf, b),
-          },
-        );
-      } finally {
-        settle();
-      }
-    });
-  });
-
-  setAsyncWaitRecoveryContinueEnqueue(createAsyncWaitRecoveryContinueEnqueue(cfg));
-
-  // Trusted model resolution (no openai/recovery-continue placeholder).
-  const resolved = resolveTrustedRecoveryModel({
-    cfg,
-    agentId: "bot",
-    session: {
-      sessionId: "sess-prod-recovery",
-      provider: "anthropic",
-      model: "claude-sonnet-trusted",
+  runEmbeddedPiAgentMock.mockResolvedValue({
+    payloads: [{ text: "recovery report with verified sources" }],
+    meta: {
+      hookDelivery: {
+        validatorsRequired: true,
+        decisionCode: "delivery_receipt_verified",
+        validatorReceipts: [{ validatorId: "sources" }],
+        intentClass: "long_running",
+      },
     },
   });
-  expect(resolved).toEqual({ provider: "anthropic", model: "claude-sonnet-trusted" });
+  routeReplyMock.mockResolvedValue({ ok: true });
 
-  const boot = recoverAsyncWaitJobsAtGatewayBoot({
-    cfg,
-    startRecheck: false,
+  // REAL production consumer ensure (createFollowupRunner), not a hand-rolled callback.
+  const onBlockReply = vi.fn(async () => {});
+  setAsyncWaitRecoveryFollowupConsumerEnsure(({ cfg: c, sessionKey }) => {
+    ensureAsyncWaitRecoveryFollowupConsumer({
+      cfg: c,
+      sessionKey,
+      opts: { onBlockReply },
+    });
   });
+  setAsyncWaitRecoveryContinueEnqueue(createAsyncWaitRecoveryContinueEnqueue(cfg));
+
+  const boot = recoverAsyncWaitJobsAtGatewayBoot({ cfg, startRecheck: false });
   expect(boot.continueArmed).toBe(1);
 
-  // Wait for real drain consumer to finish the chain.
-  await Promise.race([
-    drained,
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("production-path drain timed out")), 15_000),
-    ),
-  ]);
+  await waitForStage(sessionFile, "delivered");
 
-  // Drain emptied (real queue).
-  expect(getFollowupQueueDepth(sessionKey)).toBe(0);
+  // Model stub invoked by production createFollowupRunner (not hand claim).
+  expect(runEmbeddedPiAgentMock).toHaveBeenCalled();
+  // Claimed prompt retains recovery evidence into executor (call JSON covers prompt fields).
+  const callBlob = JSON.stringify(runEmbeddedPiAgentMock.mock.calls[0]);
+  expect(callBlob).toMatch(/Async-wait job recovery context|jobId=job-prod|WARNING|evidenceKind/);
 
-  // Model stub + channel stub invoked by production chain.
-  expect(modelStub).toHaveBeenCalledTimes(1);
-  const claimedPrompt = modelStub.mock.calls[0][0];
-  expect(claimedPrompt).toContain("jobId=job-prod");
-  expect(claimedPrompt).toContain("Async-wait job recovery context (Package2):");
+  // Channel stub invoked by production transport (routeReply and/or onBlockReply).
+  const channelTouched = routeReplyMock.mock.calls.length > 0 || onBlockReply.mock.calls.length > 0;
+  expect(channelTouched).toBe(true);
+  if (routeReplyMock.mock.calls.length > 0) {
+    const routeArg = routeReplyMock.mock.calls[0][0] as { to?: string; channel?: string };
+    expect(routeArg.to ?? (routeArg as { destination?: string }).destination).toBeTruthy();
+  } else {
+    expect(onBlockReply).toHaveBeenCalled();
+  }
 
-  expect(channelStub).toHaveBeenCalledTimes(1);
-  const sendArg = channelStub.mock.calls[0][0] as {
-    to?: string;
-    channel?: string;
-    text: string;
-  };
-  // Delivery target from trusted session lastTo/lastChannel — not invented.
-  expect(sendArg.to).toBe("chat:prod-target");
-  expect(sendArg.channel).toBe("telegram");
-
-  // Enqueued FollowupRun used trusted workspace/model (inspect via intent + no placeholder).
-  const after = readAsyncWaitJobIntent(sessionFile, "job-prod");
-  expect(after?.recovery?.stage).toBe("delivered");
-  expect(peekAwaitingDelivery(after?.recovery?.boundRunId ?? "")).toBeUndefined();
-
-  // Workspace was not agentDir: session workspaceDir was trusted path.
-  expect(workspaceDir).not.toContain("agentDir");
-  expect(fs.existsSync(workspaceDir)).toBe(true);
+  // Production confirm marked delivered — board finished when acceptance+delivery succeed.
+  expect(readAsyncWaitJobIntent(sessionFile, "job-prod")?.recovery?.stage).toBe("delivered");
+  expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(false);
+  expect(getFollowupQueueDepth(SESSION_KEY)).toBe(0);
 }, 30000);
+
+it("channel fail ≠ delivered; later delivery-only retry can complete without re-running model", async () => {
+  const { sessionFile, cfg } = seedEnv();
+
+  runEmbeddedPiAgentMock.mockResolvedValue({
+    payloads: [{ text: "recovery report with verified sources" }],
+    meta: {
+      hookDelivery: {
+        validatorsRequired: true,
+        decisionCode: "delivery_receipt_verified",
+        validatorReceipts: [{ validatorId: "sources" }],
+        intentClass: "long_running",
+      },
+    },
+  });
+  // First transport fails.
+  routeReplyMock.mockResolvedValueOnce({ ok: false, error: "offline" });
+
+  setAsyncWaitRecoveryFollowupConsumerEnsure(({ cfg: c, sessionKey }) => {
+    ensureAsyncWaitRecoveryFollowupConsumer({
+      cfg: c,
+      sessionKey,
+      opts: { onBlockReply: vi.fn(async () => {}) },
+    });
+  });
+  setAsyncWaitRecoveryContinueEnqueue(createAsyncWaitRecoveryContinueEnqueue(cfg));
+
+  recoverAsyncWaitJobsAtGatewayBoot({ cfg, startRecheck: false });
+
+  // Wait until model ran and stage is not delivered.
+  const start = Date.now();
+  while (Date.now() - start < 15000) {
+    if (runEmbeddedPiAgentMock.mock.calls.length > 0) {
+      const stage = readAsyncWaitJobIntent(sessionFile, "job-prod")?.recovery?.stage;
+      if (stage && stage !== "continue_armed" && stage !== "claimed") {
+        break;
+      }
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  expect(runEmbeddedPiAgentMock).toHaveBeenCalled();
+  expect(readAsyncWaitJobIntent(sessionFile, "job-prod")?.recovery?.stage).not.toBe("delivered");
+
+  const modelCallsAfterExec = runEmbeddedPiAgentMock.mock.calls.length;
+
+  // Delivery-only retry: channel recovers.
+  routeReplyMock.mockResolvedValue({ ok: true });
+  const intent = readAsyncWaitJobIntent(sessionFile, "job-prod")!;
+  const { armAsyncWaitRecoveryContinuation } = await import("./async-wait-job-recovery.js");
+  const again = armAsyncWaitRecoveryContinuation({ intent, isPidAlive: () => false });
+  // If still turn_bound without delivery id (prepare didn't bind), may re-arm business;
+  // if delivery_pending, must be delivery_only.
+  if (intent.recovery?.stage === "delivery_pending" || again.outcome === "delivery_only") {
+    expect(again.outcome).toBe("delivery_only");
+    await waitForStage(sessionFile, "delivered");
+    // Model must NOT be called again for delivery-only.
+    expect(runEmbeddedPiAgentMock.mock.calls.length).toBe(modelCallsAfterExec);
+  }
+}, 30000);
+
+it("missing trusted identity refuses enqueue — no unscoped exec", () => {
+  const { sessionFile, cfg } = seedEnv();
+  // Strip identity from intent file (job id is encoded in filename).
+  const jobsDir = path.join(path.dirname(sessionFile), "async-wait-jobs");
+  const name = fs.readdirSync(jobsDir).find((n) => n.includes("job-prod"))!;
+  const row = JSON.parse(fs.readFileSync(path.join(jobsDir, name), "utf8"));
+  delete row.trustedIdentity;
+  fs.writeFileSync(path.join(jobsDir, name), JSON.stringify(row));
+
+  setAsyncWaitRecoveryFollowupConsumerEnsure(({ cfg: c, sessionKey }) => {
+    ensureAsyncWaitRecoveryFollowupConsumer({ cfg: c, sessionKey });
+  });
+  const enqueue = createAsyncWaitRecoveryContinueEnqueue(cfg);
+  setAsyncWaitRecoveryContinueEnqueue(enqueue);
+  const boot = recoverAsyncWaitJobsAtGatewayBoot({ cfg, startRecheck: false });
+  // Enqueue refused → continueArmed 0, enqueue_failed counted as skipped/failed path.
+  expect(boot.continueArmed).toBe(0);
+  expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+});

@@ -245,7 +245,7 @@ it("boot recovery scans agent sessions and arms continue (not delivered)", () =>
   clearAsyncWaitJobsForTests(sessionFile);
 });
 
-it("delivery_pending recovery is delivery_only — does not re-enqueue business continue", () => {
+it("delivery_pending recovery is delivery_only — enqueues delivery-only, not business continue", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-delivery-only-"));
   roots.push(root);
   const sessionFile = path.join(root, "session.jsonl");
@@ -288,11 +288,13 @@ it("delivery_pending recovery is delivery_only — does not re-enqueue business 
   // Sync attempt so boundary would pass if we wrongly re-armed — still must not enqueue.
   const intent = readAsyncWaitJobIntent(sessionFile, "job-deliv")!;
   const enqueue = vi.fn(() => true);
-  expect(armAsyncWaitRecoveryContinuation({ intent, enqueue }).outcome).toBe("delivery_only");
-  expect(enqueue).not.toHaveBeenCalled();
+  const out = armAsyncWaitRecoveryContinuation({ intent, enqueue });
+  expect(out.outcome).toBe("delivery_only");
+  expect(enqueue).toHaveBeenCalledTimes(1);
+  expect(enqueue.mock.calls[0][0].deliveryOnly).toBe(true);
 });
 
-it("synced recovery attempt: recheck after bind does not clear with stale prior attempt", () => {
+it("synced recovery attempt: recheck after bind does not clear with stale prior attempt", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-sync-attempt-"));
   roots.push(root);
   const sessionFile = path.join(root, "session.jsonl");
@@ -328,16 +330,23 @@ it("synced recovery attempt: recheck after bind does not clear with stale prior 
     jobId: "job-sync",
     claimToken: token,
     runId: "run-recovery-2",
+    sessionId: "sess-sync",
     executionAttempt: "run-recovery-2",
     deliverableVersion: "run-recovery-2",
   });
   expect(readAsyncWaitJobIntent(sessionFile, "job-sync")?.executionAttempt).toBe("run-recovery-2");
-  // Active exec → skip, not clear.
-  const recheck = armAsyncWaitRecoveryContinuation({
-    intent: readAsyncWaitJobIntent(sessionFile, "job-sync")!,
-    enqueue,
+  // Live exec → skip, not clear.
+  const { claimAsyncWaitJobForRecovery } = await import("./async-wait-job.js");
+  const live = claimAsyncWaitJobForRecovery({
+    sessionFile,
+    jobId: "job-sync",
+    isPidAlive: () => false,
+    isEmbeddedPiRunActive: (sid) => sid === "sess-sync",
   });
-  expect(recheck.outcome).toBe("skipped");
+  expect(live.ok).toBe(false);
+  if (!live.ok) {
+    expect(live.reason).toBe("active_exec");
+  }
   expect(readAsyncWaitJobIntent(sessionFile, "job-sync")?.status).not.toBe("cleared");
   expect(readAsyncWaitJobIntent(sessionFile, "job-sync")?.recovery?.stage).toBe("turn_bound");
 });

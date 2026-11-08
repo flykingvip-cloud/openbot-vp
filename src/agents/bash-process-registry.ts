@@ -38,6 +38,14 @@ export interface ProcessSession {
   sessionKey?: string;
   notifyOnExit?: boolean;
   notifyOnExitEmptySuccess?: boolean;
+  trustedIdentity?: {
+    user?: string;
+    platformUserId?: string;
+    sessionDomain?: "platform" | "enterprise" | "employee";
+    enterpriseId?: string;
+    membershipId?: string;
+    seatId?: string;
+  };
   exitNotified?: boolean;
   child?: ChildProcessWithoutNullStreams;
   stdin?: SessionStdin;
@@ -193,6 +201,7 @@ export function markBackgrounded(session: ProcessSession) {
       ...(typeof session.pid === "number" ? { pid: session.pid } : {}),
       startedAt: session.startedAt,
       command: session.command,
+      ...(session.trustedIdentity ? { trustedIdentity: session.trustedIdentity } : {}),
     });
   }
 }

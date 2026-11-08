@@ -12,6 +12,7 @@ import {
   registerFollowupDrainCallback,
 } from "../../../auto-reply/reply/queue.js";
 import { createTypingController } from "../../../auto-reply/reply/typing.js";
+import type { GetReplyOptions } from "../../../auto-reply/types.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { resolveDefaultSessionStorePath } from "../../../config/sessions/paths.js";
 import { loadSessionStore } from "../../../config/sessions/store.js";
@@ -21,6 +22,7 @@ import { resolveAgentIdFromSessionKey } from "../../../routing/session-key.js";
 export function ensureAsyncWaitRecoveryFollowupConsumer(params: {
   cfg: OpenBotConfig;
   sessionKey: string;
+  opts?: GetReplyOptions;
 }): boolean {
   const key = params.sessionKey.trim();
   if (!key) {
@@ -46,6 +48,7 @@ export function ensureAsyncWaitRecoveryFollowupConsumer(params: {
   const defaultModel = `${modelRef.provider}/${modelRef.model}`;
   const typing = createTypingController({});
   const runFollowup = createFollowupRunner({
+    opts: params.opts,
     typing,
     typingMode: "never",
     sessionEntry,

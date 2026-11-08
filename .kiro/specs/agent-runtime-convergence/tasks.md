@@ -1705,3 +1705,39 @@ Registry sharedPaths for new files appended uncommitted for kiro-loom. Protected
 
 **Remelt tip for re-acceptance:** `ec975b057` (production-loop close). Prior failed tip `69aeef0ae` retained above. — grok-bot
 
+## Package 2 remelt — close 4 production gaps (2026-11-08)
+
+**Failed tip:** `8743811fad2901b9a35c81f18f96e6cde461b445`. Package 3 still NOT started.
+
+Preserved: prior remelt cold-start consumer, claim fences, trusted enqueue fields, delivery_only arming, claimed prompt evidence. No new executor/task types. No push/merge/deploy.
+
+### FIRST — production ensure/createFollowupRunner path
+
+`async-wait-recovery.production-path` now registers via real `ensureAsyncWaitRecoveryFollowupConsumer` → `createFollowupRunner`. Stubs only at lowest boundary: `runEmbeddedPiAgent` (via embedded-run → pi-embedded mock) and `routeReply` / `onBlockReply`. Acceptance + delivery status come from production `prepareVisibleDelivery` + `confirmPendingTurnDelivery` driven by stub returns — no hand-written success/acceptance=passed/delivered.
+
+### Gaps closed
+
+1. **turn_bound without boundDeliveryId** — `isBoundAsyncWaitRunLive` (trusted `isEmbeddedPiRunActive(sessionId)` + board.executionAttempt===boundRunId). Live → keep active_exec; dead claim → reopen `continue_armed` via existing recovery (no permanent active_exec; no unconditional re-run).
+2. **Real delivery-prep → delivery_pending** — `publishPending` binds `deliveryId` into recovery (`delivery_pending`). Delivery-only retry consumer path (`asyncWaitDeliveryOnly`) skips claim/model; transport + confirm only.
+3. **Exclusive job/token/stage/run bind under lock** — `claimQueuedExecution` requires jobId+claimToken; bind failure refuses execution (not accepted) and `restoreBoardExecutionAttempt` rolls back wrong board attempt.
+4. **Trusted enterprise/owner identity** — `resolveTrustedRecoveryIdentity` / `hasAuthenticatedIdentity` into `FollowupRun.executionIdentity` (+ owner-tenant fields followup consumes). Missing identity → explicit enqueue refuse; no unscoped exec.
+
+### Validation evidence
+
+| Case | Suite | Result |
+| --- | --- | --- |
+| ensure+createFollowupRunner → delivered from stubs | production-path happy | PASS |
+| channel fail ≠ delivered; delivery-only retry no re-model | production-path channel-fail | PASS |
+| missing trusted identity refuse | production-path identity | PASS |
+| crash after claim recoverable | cross-process crash-retry | PASS |
+| dual-process cannot overwrite same exec | cross-process dual claim | PASS |
+| stage/token fences + stop/stale | claim-fence 5 | PASS |
+| delivery_only arm + attempt sync | async-wait-job-recovery | PASS |
+| Related Package2 suites | 7 files / 30 tests | PASS |
+
+Typed oxlint on changed sources: 0 warnings / 0 errors.
+
+Registry sharedPaths / protected plans left uncommitted for kiro-loom. Package 3 not started.
+
+**Remelt tip for re-acceptance:** `TIP_PLACEHOLDER` (4-gap close). Prior failed tip `8743811fa` retained above. — grok-bot
+

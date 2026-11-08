@@ -52,6 +52,15 @@ export type ExecToolDefaults = {
   accountId?: string;
   notifyOnExit?: boolean;
   notifyOnExitEmptySuccess?: boolean;
+  /** Trusted host identity for async-wait recovery followup (Package2). */
+  trustedIdentity?: {
+    user?: string;
+    platformUserId?: string;
+    sessionDomain?: "platform" | "enterprise" | "employee";
+    enterpriseId?: string;
+    membershipId?: string;
+    seatId?: string;
+  };
   cwd?: string;
   /**
    * When true (tools.fs.workspaceOnly / forceWorkspaceOnly), host exec

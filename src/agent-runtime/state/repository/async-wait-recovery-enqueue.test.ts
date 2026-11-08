@@ -126,6 +126,13 @@ it("enqueue uses trusted session model/workspace/delivery and registers cold-sta
       constraints: [],
       startedAt: Date.now(),
       status: "exited",
+      trustedIdentity: {
+        user: "owner@test.example",
+        platformUserId: "plat-1",
+        sessionDomain: "employee",
+        enterpriseId: "ent-1",
+        membershipId: "mem-1",
+      },
     },
   });
   expect(ok).toBe(true);
@@ -142,6 +149,9 @@ it("enqueue uses trusted session model/workspace/delivery and registers cold-sta
   expect(captured!.run.authProfileId).toBe("auth-1");
   expect(captured!.originatingChannel).toBe("telegram");
   expect(captured!.originatingTo).toBe("chat:target-1");
-  expect(captured!.asyncWaitRecoveryBind).toEqual({ jobId: "job-1", claimToken: "token-1" });
+  expect(captured!.asyncWaitRecoveryBind?.jobId).toBe("job-1");
+  expect(captured!.asyncWaitRecoveryBind?.claimToken).toBe("token-1");
+  expect(captured!.run.executionIdentity?.enterpriseId).toBe("ent-1");
+  expect(captured!.run.gatewayClientUser).toBe("owner@test.example");
   expect(getFollowupQueueDepth(sessionKey)).toBe(0);
 });

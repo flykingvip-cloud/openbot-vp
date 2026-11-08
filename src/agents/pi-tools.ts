@@ -529,6 +529,40 @@ export function createOpenClawCodingTools(options?: {
     currentChannelId: options?.currentChannelId,
     currentThreadTs: options?.currentThreadTs,
     accountId: options?.agentAccountId,
+    trustedIdentity: options?.executionIdentity
+      ? {
+          ...(options.executionIdentity.user ? { user: options.executionIdentity.user } : {}),
+          ...(options.executionIdentity.platformUserId
+            ? { platformUserId: options.executionIdentity.platformUserId }
+            : {}),
+          ...(options.executionIdentity.sessionDomain
+            ? { sessionDomain: options.executionIdentity.sessionDomain }
+            : {}),
+          ...(options.executionIdentity.enterpriseId
+            ? { enterpriseId: options.executionIdentity.enterpriseId }
+            : {}),
+          ...(options.executionIdentity.membershipId
+            ? { membershipId: options.executionIdentity.membershipId }
+            : {}),
+          ...(options.executionIdentity.seatId ? { seatId: options.executionIdentity.seatId } : {}),
+        }
+      : options?.gatewayClientUser || options?.gatewayClientPlatformUserId
+        ? {
+            ...(options.gatewayClientUser ? { user: options.gatewayClientUser } : {}),
+            ...(options.gatewayClientPlatformUserId
+              ? { platformUserId: options.gatewayClientPlatformUserId }
+              : {}),
+            ...(options.gatewayClientSessionDomain
+              ? { sessionDomain: options.gatewayClientSessionDomain }
+              : {}),
+            ...(options.gatewayClientSessionEnterpriseId
+              ? { enterpriseId: options.gatewayClientSessionEnterpriseId }
+              : {}),
+            ...(options.gatewayClientSessionMembershipId
+              ? { membershipId: options.gatewayClientSessionMembershipId }
+              : {}),
+          }
+        : undefined,
     backgroundMs: options?.exec?.backgroundMs ?? execConfig.backgroundMs,
     timeoutSec: options?.exec?.timeoutSec ?? execConfig.timeoutSec,
     approvalRunningNoticeMs:

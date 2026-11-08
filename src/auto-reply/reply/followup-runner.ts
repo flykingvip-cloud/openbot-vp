@@ -7,7 +7,10 @@ import {
 } from "../../agent-runtime/execution/index.js";
 import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
 import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
-import { claimQueuedExecution } from "../../agent-runtime/state/index.js";
+import {
+  bindAsyncWaitRecoveryTurn,
+  claimQueuedExecution,
+} from "../../agent-runtime/state/index.js";
 import {
   incrementRunCompactionCount,
   persistRunSessionUsage,
@@ -40,6 +43,7 @@ import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { resolveTurnContractFromRunMeta } from "../../task-outcome/chat-entry.js";
 import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
+import { peekAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
 import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import {
   assertRunnerTurnBudgetAllowsModelCall,
@@ -151,6 +155,46 @@ export function createFollowupRunner(params: {
   return async (queued: FollowupRun) => {
     // Agent run correlation id (may differ across retries of the same queue item).
     const runId = crypto.randomUUID();
+    // Package2 delivery-only retry: skip business claim/model; only transport + receipt.
+    if (queued.asyncWaitDeliveryOnly) {
+      try {
+        const lookupRunId =
+          queued.asyncWaitRecoveryBind?.boundRunId?.trim() ||
+          queued.run.taskCompletionBinding?.executionAttempt?.trim() ||
+          "";
+        const pending = lookupRunId
+          ? peekAwaitingDelivery({
+              runId: lookupRunId,
+              ...(queued.asyncWaitRecoveryBind?.boundDeliveryId
+                ? { deliveryId: queued.asyncWaitRecoveryBind.boundDeliveryId }
+                : {}),
+            })
+          : undefined;
+        const deliveryRunId = pending?.runId || lookupRunId || runId;
+        const deliveryId = pending?.deliveryId || `delivery:${deliveryRunId}:visible`;
+        const taskId = pending?.taskId;
+        const retryPayloads = [
+          {
+            text: "Delivery retry for a completed async-wait recovery turn. Prior business execution is not re-run.",
+          },
+        ];
+        const delivered = await sendFollowupPayloads(retryPayloads, queued, true);
+        await confirmPendingTurnDelivery({
+          cfg: queued.run.config,
+          runId: deliveryRunId,
+          deliveryId,
+          ...(taskId ? { taskId } : {}),
+          sessionKey: queued.run.sessionKey ?? sessionKey,
+          status: delivered === "none" ? "failed" : delivered,
+        });
+      } catch (err) {
+        logVerbose(`async-wait delivery-only retry failed: ${String(err)}`);
+      } finally {
+        typing.markRunComplete();
+        typing.markDispatchIdle();
+      }
+      return;
+    }
     // Claim the original queued task before creating outcome/admission/provider side effects.
     // Collaboration plans retain their own admission when no session-task binding exists.
     try {
@@ -161,6 +205,7 @@ export function createFollowupRunner(params: {
         binding: queued.run.taskCompletionBinding,
         continuationTicket: queued.taskBoardContinueTicket,
         asyncWaitRecovery: queued.asyncWaitRecoveryBind,
+        sessionId: queued.run.sessionId,
         collaboration: Boolean(queued.run.collaborationRoundInvoked),
         privatePlan: Boolean(queued.run.privateRunBag),
       });
@@ -661,6 +706,25 @@ export function createFollowupRunner(params: {
           commitOutcome: (success, outcome) => submitFollowupOutcomeCloseout({ success, outcome }),
           publishPending: (identity) => {
             preparedDelivery = identity;
+            if (
+              queued.asyncWaitRecoveryBind?.jobId &&
+              queued.asyncWaitRecoveryBind?.claimToken &&
+              queued.run.taskCompletionBinding?.taskId
+            ) {
+              bindAsyncWaitRecoveryTurn({
+                sessionFile: queued.run.sessionFile,
+                taskId: queued.run.taskCompletionBinding.taskId,
+                jobId: queued.asyncWaitRecoveryBind.jobId,
+                claimToken: queued.asyncWaitRecoveryBind.claimToken,
+                runId: identity.runId,
+                sessionId: queued.run.sessionId,
+                deliveryId: identity.deliveryId,
+                outcomeTaskId: identity.taskId,
+                executionAttempt: identity.runId,
+                deliverableVersion:
+                  queued.run.taskCompletionBinding.deliverableVersion ?? identity.runId,
+              });
+            }
           },
         });
       }
