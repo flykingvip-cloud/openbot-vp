@@ -6,6 +6,7 @@ import {
   type createExecutionJournalRuntime,
 } from "./execution-journal-runtime.js";
 import { projectExecutionEvidence, type ExecutionSource } from "./execution-projection.js";
+import { readExecutorTechnicalEvidence } from "./executor-technical-evidence.js";
 import { OBSERVATION_METRIC_DICT, OBSERVATION_METRIC_DICT_VERSION } from "./metric-dict.js";
 import { readOutcomeMetadata } from "./outcome-reader.js";
 import {
@@ -86,8 +87,13 @@ export function queryObservation(input: {
     ],
     executions: execution.executions,
   });
+  const technical = readExecutorTechnicalEvidence(input);
+  if (!technical.ok) {
+    return technical;
+  }
   return {
     ok: true as const,
+    executorTechnicalEvidence: technical.technicalEvidence,
     ...projection,
     executionSource: execution.executionSource,
     outcomeSource,
