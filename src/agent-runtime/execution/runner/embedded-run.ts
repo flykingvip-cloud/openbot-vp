@@ -19,6 +19,7 @@ import { generateSecureToken } from "../../../infra/secure-random.js";
 import { enqueueCommandInLane } from "../../../process/command-queue.js";
 import { isMarkdownCapableMessageChannel } from "../../../utils/message-channel.js";
 import { sessionTaskState } from "../../state/index.js";
+import { embeddedPayloadFormatting } from "../../wiring/embedded-payloads.js";
 import { buildErrorAgentMeta, createUsageAccumulator } from "../outcomes/usage-summary.js";
 import { cleanupEmbeddedRun } from "./embedded-cleanup.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
@@ -301,6 +302,7 @@ export async function runEmbeddedPiAgent(
             isProbeSession,
             resolvedToolResultFormat,
             releaseRunTask,
+            embeddedPayloadFormatting,
           });
           if (resultOutcome.action === "continue") {
             continue;

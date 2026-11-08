@@ -769,5 +769,17 @@
       "src/agents/cli-runner"
     ],
     "description": "Slug filename generation is auxiliary inference via shared model governance; it cannot open work-item admission or legacy embedded facades."
+  },
+  {
+    "name": "runtime-execution-no-wiring",
+    "from": "src/agent-runtime/execution/**",
+    "denyImportsFrom": ["src/agent-runtime/wiring/**"],
+    "exemptFiles": [
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agent-runtime/execution/runner/admitted-turn.attempt-host.test.ts",
+      "src/agent-runtime/execution/runner/admitted-turn.test.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.test.ts"
+    ],
+    "description": "Execution settles with injected ports; only the embedded-run loop may bind the fixed payload formatting adapter from wiring."
   }
 ]

@@ -17,8 +17,7 @@ import {
 import { log } from "../../../agents/pi-embedded-runner/logger.js";
 import { createFailoverDecisionLogger } from "../../../agents/pi-embedded-runner/run/failover-observation.js";
 import { derivePromptTokens, normalizeUsage, type UsageLike } from "../../../agents/usage.js";
-import { buildEmbeddedRunPayloads } from "../../delivery/index.js";
-import { embeddedPayloadFormatting } from "../../wiring/embedded-payloads.js";
+import { buildEmbeddedRunPayloads, type EmbeddedPayloadFormatting } from "../../delivery/index.js";
 import { toNormalizedUsage } from "../outcomes/usage-summary.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 import type { EmbeddedPiAgentMeta } from "./embedded-result.js";
@@ -36,6 +35,7 @@ export async function runEmbeddedRunResult(args: {
   isProbeSession: boolean;
   resolvedToolResultFormat: "markdown" | "plain";
   releaseRunTask: (outcome: "failed" | "cancelled") => void;
+  embeddedPayloadFormatting: EmbeddedPayloadFormatting;
 }): Promise<EmbeddedRunLoopOutcome> {
   const {
     session,
@@ -47,6 +47,7 @@ export async function runEmbeddedRunResult(args: {
     isProbeSession,
     resolvedToolResultFormat,
     releaseRunTask,
+    embeddedPayloadFormatting,
   } = args;
   const {
     attempt,
