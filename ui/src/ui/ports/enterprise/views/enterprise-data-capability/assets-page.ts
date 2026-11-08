@@ -14,6 +14,7 @@ import {
 } from "./asset-filters.ts";
 import {
   accessMethodLabel,
+  assetLinkedCapabilityLabel,
   connectionHealthLabel,
   freshnessLabel,
   observationTimeLabel,
@@ -125,10 +126,19 @@ function renderDetail(
               : html``
           }
           ${
-            capabilities.length === 0
+            capabilities.length === 0 && (linkage?.products.length ?? 0) === 0
               ? html`
                   <div>关联能力：无。验证未知，不计入健康。</div>
                 `
+              : linkage && linkage.products.length > 0
+                ? html`
+                    <div>关联数据产品：${linkage.products.map((product) => product.displayName).join("、")}</div>
+                  `
+                : html``
+          }
+          ${
+            capabilities.length === 0
+              ? html``
               : html`
                   <ul>
                     ${capabilities.map(
@@ -187,12 +197,7 @@ export function renderAssetsPageContent(
     const connectorLabel = connectorLabelById.get(source.connectorId);
     const categoryLabel = formatters.formatCategory(source.category);
     const meta = connectorLabel ? `${categoryLabel} · ${connectorLabel}` : categoryLabel;
-    const capabilityText =
-      linkage && linkage.verification.capabilities.length > 0
-        ? linkage.verification.capabilities
-            .map((capability) => `${capability.capabilityId}@${capability.version}`)
-            .join("、")
-        : "无";
+    const capabilityText = assetLinkedCapabilityLabel(linkage);
     const scopeText = linkage?.scope.known ? linkage.scope.supportedScopeTypes.join("、") : "未知";
     const selected = model.selectedSourceId === source.sourceId;
     return html`
