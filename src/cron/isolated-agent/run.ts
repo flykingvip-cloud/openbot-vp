@@ -94,6 +94,7 @@ import {
   runnerExecutorEvidenceContext,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  rememberModelResultUsage,
   TaskBudgetExceededError,
   usageCarriedByModelError,
 } from "../../task-outcome/runtime-from-runner.js";
@@ -1162,6 +1163,7 @@ export async function runCronIsolatedAgentTurn(params: {
             payloadFallbacks ?? resolveAgentModelFallbacksOverride(params.cfg, agentId),
           run: async (providerOverride, modelOverride, runOptions) => {
             const cronCharge = { done: false };
+            let notedCronUsage: unknown;
             const chargeCronOnce = (opts: {
               usage?: unknown;
               provider?: string;
@@ -1251,6 +1253,7 @@ export async function runCronIsolatedAgentTurn(params: {
                   ...(cronExtraSystemPrompt ? { extraSystemPrompt: cronExtraSystemPrompt } : {}),
                   ...(credentialEnv ? { credentialEnv } : {}),
                 });
+                notedCronUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
                 if (usageAttr) {
                   void recordCliBackendUsage({
                     tenantId: usageAttr.tenantId,
@@ -1265,7 +1268,7 @@ export async function runCronIsolatedAgentTurn(params: {
                   result.meta?.systemPromptReport,
                 );
                 chargeCronOnce({
-                  usage: result.meta?.agentMeta?.usage,
+                  usage: notedCronUsage,
                   provider: providerOverride,
                   model: modelOverride,
                 });
@@ -1334,11 +1337,12 @@ export async function runCronIsolatedAgentTurn(params: {
                     }
                   : {}),
               });
+              notedCronUsage = rememberModelResultUsage(result.meta?.agentMeta?.usage);
               bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
                 result.meta?.systemPromptReport,
               );
               chargeCronOnce({
-                usage: result.meta?.agentMeta?.usage,
+                usage: notedCronUsage,
                 provider: embeddedProvider,
                 model: embeddedModel,
               });
@@ -1347,7 +1351,7 @@ export async function runCronIsolatedAgentTurn(params: {
               if (!(err instanceof TaskBudgetExceededError)) {
                 try {
                   chargeCronOnce({
-                    usage: usageCarriedByModelError(err),
+                    usage: notedCronUsage ?? usageCarriedByModelError(err),
                     provider: providerOverride,
                     model: modelOverride,
                   });

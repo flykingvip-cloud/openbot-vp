@@ -121,14 +121,22 @@ function scopeMatches(candidate: { scope?: TrustedScope }, scope: TrustedScope):
   return isScope(candidate.scope) && fullScopeEqual(candidate.scope, scope);
 }
 
+const CALL_PROVENANCE = new Set(["live", "seed", "injected", "unknown"]);
+
+function tokenFieldOk(value: unknown): boolean {
+  return value === null || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0);
+}
+
+function finiteTimeOk(value: unknown): boolean {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 function usageShapeOk(usage: unknown): boolean {
   if (!usage || typeof usage !== "object") {
     return false;
   }
   const row = usage as Record<string, unknown>;
-  return ["input", "output", "cacheRead", "cacheWrite"].every(
-    (key) => row[key] === null || typeof row[key] === "number",
-  );
+  return ["input", "output", "cacheRead", "cacheWrite"].every((key) => tokenFieldOk(row[key]));
 }
 
 /** Reader schema for a call. The snapshot fingerprint does not cover these fields. */
@@ -142,13 +150,33 @@ function callRecordSchemaOk(call: ModelCallEvidence | undefined): call is ModelC
   if (typeof call.attemptId !== "string" || call.attemptId.length === 0) {
     return false;
   }
-  if (typeof call.provenance !== "string" || call.provenance.length === 0) {
+  if (!CALL_PROVENANCE.has(call.provenance)) {
     return false;
   }
-  if (typeof call.startedAt !== "number" || typeof call.observedAt !== "number") {
+  if (
+    !finiteTimeOk(call.startedAt) ||
+    !finiteTimeOk(call.observedAt) ||
+    call.observedAt < call.startedAt
+  ) {
     return false;
   }
   if (!isScope(call.scope) || !usageShapeOk(call.usage)) {
+    return false;
+  }
+  const completed = call.completedAt;
+  if (call.status === "unknown" || call.status == null) {
+    if (completed != null) {
+      return false;
+    }
+  } else if (
+    call.status === "completed" ||
+    call.status === "failed" ||
+    call.status === "cancelled"
+  ) {
+    if (!finiteTimeOk(completed) || completed < call.startedAt || completed > call.observedAt) {
+      return false;
+    }
+  } else if (call.status != null) {
     return false;
   }
   return true;

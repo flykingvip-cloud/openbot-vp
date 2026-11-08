@@ -442,8 +442,6 @@ function processAlive(pid: number): boolean {
   }
 }
 
-const LOCK_PUBLISH_GRACE_MS = 2_000;
-
 type EvidenceLockOwner = { pid: number; startToken: string; lockId: string };
 
 function parseLockOwner(text: string): EvidenceLockOwner | null {
@@ -482,10 +480,9 @@ function ownerStillLive(owner: EvidenceLockOwner): boolean {
 }
 
 /**
- * Reclaim a lock only when the same file instance is still the stale one.
- * An empty lock is the window before the owner record is published and is
- * not reclaimed until the grace period has passed.
- * A read error is not proof that the lock is abandoned.
+ * Reclaim a lock only when its published owner is proven gone.
+ * An empty or unreadable lock is the window before that record exists.
+ * Age alone does not prove it is abandoned, so it is left in place.
  */
 function recoverStaleEvidenceLock(lockPath: string): void {
   let before: fs.Stats;
@@ -501,28 +498,7 @@ function recoverStaleEvidenceLock(lockPath: string): void {
     return;
   }
   const owner = parseLockOwner(text);
-  if (!owner) {
-    if (Date.now() - before.mtimeMs < LOCK_PUBLISH_GRACE_MS) {
-      return;
-    }
-    let after: fs.Stats;
-    let again: string;
-    try {
-      after = fs.statSync(lockPath);
-      again = fs.readFileSync(lockPath, "utf8");
-    } catch {
-      return;
-    }
-    if (!sameLockFile(before, after) || parseLockOwner(again)) {
-      return;
-    }
-    if (Date.now() - after.mtimeMs < LOCK_PUBLISH_GRACE_MS) {
-      return;
-    }
-    fs.rmSync(lockPath, { force: true });
-    return;
-  }
-  if (ownerStillLive(owner)) {
+  if (!owner || ownerStillLive(owner)) {
     return;
   }
   let after: fs.Stats;
@@ -534,10 +510,24 @@ function recoverStaleEvidenceLock(lockPath: string): void {
     return;
   }
   const current = parseLockOwner(again);
-  if (!sameLockFile(before, after) || current?.lockId !== owner.lockId) {
+  if (!sameLockFile(before, after) || current?.lockId !== owner.lockId || ownerStillLive(current)) {
     return;
   }
   fs.rmSync(lockPath, { force: true });
+}
+
+/** True only when this descriptor still names the published owner record. */
+function lockOwnershipHolds(fd: number, lockPath: string, lockId: string): boolean {
+  try {
+    const held = fs.fstatSync(fd);
+    const current = fs.statSync(lockPath);
+    if (!sameLockFile(held, current)) {
+      return false;
+    }
+    return parseLockOwner(fs.readFileSync(lockPath, "utf8"))?.lockId === lockId;
+  } catch {
+    return false;
+  }
 }
 
 function releaseOwnedLock(fd: number, lockPath: string, lockId: string): void {
@@ -669,6 +659,47 @@ function legalCallAdvance(
   if (usageDetermined(previousUsage) && !usageSame(previousUsage, nextUsage)) {
     return false;
   }
+  if (typeof previous.completedAt === "number" && next.completedAt !== previous.completedAt) {
+    return false;
+  }
+  if (
+    typeof previous.observedAt === "number" &&
+    typeof next.observedAt === "number" &&
+    next.observedAt < previous.observedAt
+  ) {
+    return false;
+  }
+  if (
+    typeof previous.terminalCause === "string" &&
+    previous.terminalCause !== "none" &&
+    next.terminalCause !== previous.terminalCause
+  ) {
+    return false;
+  }
+  if (
+    typeof previous.providerRequestId === "string" &&
+    previous.providerRequestId.length > 0 &&
+    next.providerRequestId !== previous.providerRequestId
+  ) {
+    return false;
+  }
+  if (
+    typeof previous.providerResponseId === "string" &&
+    previous.providerResponseId.length > 0 &&
+    next.providerResponseId !== previous.providerResponseId
+  ) {
+    return false;
+  }
+  if (typeof next.completedAt === "number") {
+    const started = typeof next.startedAt === "number" ? next.startedAt : previous.startedAt;
+    const observed = typeof next.observedAt === "number" ? next.observedAt : previous.observedAt;
+    if (typeof started === "number" && next.completedAt < started) {
+      return false;
+    }
+    if (typeof observed === "number" && next.completedAt > observed) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -705,6 +736,12 @@ export function writeBoundedEvidenceFile(
         };
         fs.writeFileSync(fd, JSON.stringify(owner));
         fs.fsyncSync(fd);
+        if (!lockOwnershipHolds(fd, lockPath, lockId)) {
+          fs.closeSync(fd);
+          fd = undefined;
+          lockId = undefined;
+          throw new Error("evidence lock ownership lost before entry");
+        }
       } catch {
         if (fd !== undefined) {
           releaseOwnedLock(fd, lockPath, lockId ?? "");
@@ -718,6 +755,9 @@ export function writeBoundedEvidenceFile(
       }
     }
     try {
+      if (fd === undefined || !lockId || !lockOwnershipHolds(fd, lockPath, lockId)) {
+        return "failed";
+      }
       fs.mkdirSync(dir, { recursive: true });
       for (const name of fs.readdirSync(dir)) {
         if (name.endsWith(".tmp")) {

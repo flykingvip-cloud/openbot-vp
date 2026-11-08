@@ -599,7 +599,14 @@ describe("R3 read port and shared persistence", () => {
     fs.writeFileSync(path.join(dir, "pad.json"), "x".repeat(300));
     fs.writeFileSync(path.join(dir, "leftover.json.1.tmp"), "temp");
     const lockPath = path.join(storeRoot, "executor-evidence", "write.lock");
-    fs.writeFileSync(lockPath, "999999");
+    fs.writeFileSync(
+      lockPath,
+      JSON.stringify({
+        pid: 2_147_483_646,
+        startToken: "not-a-live-process",
+        lockId: "stale-dead",
+      }),
+    );
     const stale = new Date(Date.now() - 10_000);
     fs.utimesSync(lockPath, stale, stale);
     const capped = writeBoundedEvidenceFile(storeRoot, "big.json", { pad: "y".repeat(200) });

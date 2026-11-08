@@ -392,10 +392,10 @@ describe("R4 persistence protocol", () => {
       callId: "call_peak",
       status: "unknown",
       usage: { input: null, output: null, cacheRead: null, cacheWrite: null },
-      providerResponseId: "x".repeat(400),
+      usageSource: "x".repeat(400),
     };
     fs.writeFileSync(path.join(dir, "peak.json"), `${JSON.stringify(original)}\n`);
-    const smaller = { ...original, status: "failed", providerResponseId: "y" };
+    const smaller = { ...original, status: "failed", usageSource: "y" };
     expect(writeBoundedEvidenceFile(storeRoot, "peak.json", smaller, "calls")).toBe("capped");
     expect(fs.readFileSync(path.join(dir, "peak.json"), "utf8")).toContain("x".repeat(40));
   });

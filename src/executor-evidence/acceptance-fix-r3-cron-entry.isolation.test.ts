@@ -7,6 +7,25 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FailoverError } from "../agents/failover-error.js";
+
+vi.mock("../agents/bootstrap-budget.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../agents/bootstrap-budget.js")>();
+  return {
+    ...actual,
+    resolveBootstrapWarningSignaturesSeen: (
+      report?: Parameters<typeof actual.resolveBootstrapWarningSignaturesSeen>[0],
+    ) => {
+      if (process.env.OPENBOT_TEST_CRON_BOOTSTRAP_THROW === "1") {
+        const seen = Number(process.env.OPENBOT_TEST_CRON_BOOTSTRAP_SEEN ?? "0") + 1;
+        process.env.OPENBOT_TEST_CRON_BOOTSTRAP_SEEN = String(seen);
+        if (seen > 1) {
+          throw new Error("bootstrap after model");
+        }
+      }
+      return actual.resolveBootstrapWarningSignaturesSeen(report);
+    },
+  };
+});
 import { makeIsolatedAgentParamsFixture } from "../cron/isolated-agent/job-fixtures.js";
 import {
   clearFastTestEnv,
@@ -235,5 +254,79 @@ describe("R3 cron entry keeps failed and successful candidates", () => {
         row.committedSpend?.costUsd == null,
     );
     expect(unknown?.committedSpend?.costEvidence).not.toBe("known");
+  });
+
+  it("keeps the model usage when cron post-processing throws after the result", async () => {
+    process.env.OPENBOT_TEST_CRON_BOOTSTRAP_THROW = "1";
+    process.env.OPENBOT_TEST_CRON_BOOTSTRAP_SEEN = "0";
+    const actual = await vi.importActual<typeof import("../agents/model-fallback.js")>(
+      "../agents/model-fallback.js",
+    );
+    runWithModelFallbackMock.mockImplementation((params) => actual.runWithModelFallback(params));
+    const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r6-cron-usage-"));
+    roots.push(agentDir);
+    resolveAgentDirMock.mockReturnValue(agentDir);
+    resolveAgentConfigMock.mockReturnValue({ agentDir });
+    resolveConfiguredModelRefMock.mockReturnValue({ provider: "local", model: "a" });
+    runEmbeddedPiAgentMock.mockResolvedValue({
+      payloads: [{ text: "model finished before bootstrap" }],
+      meta: { agentMeta: { usage: { input: 4, output: 1, cacheRead: 0, cacheWrite: 0 } } },
+    });
+    const result = await runCronIsolatedAgentTurn(
+      makeIsolatedAgentParamsFixture({
+        cfg: {
+          agents: {
+            defaults: { workspace: agentDir },
+            list: [{ id: "default", agentDir, workspace: agentDir }],
+          },
+          models: {
+            providers: {
+              local: {
+                models: [
+                  {
+                    id: "a",
+                    cost: { input: 1_000_000, output: 1_000_000, cacheRead: 0, cacheWrite: 0 },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        job: {
+          id: "r6-cron-bootstrap",
+          payload: { kind: "agentTurn", message: "finish then fail bootstrap" },
+        },
+        message: "finish then fail bootstrap",
+        sessionKey: "cron:r6-cron-bootstrap",
+      }) as never,
+    );
+    delete process.env.OPENBOT_TEST_CRON_BOOTSTRAP_THROW;
+    delete process.env.OPENBOT_TEST_CRON_BOOTSTRAP_SEEN;
+    expect(result.status).toBe("error");
+    const spends = fs
+      .readdirSync(path.join(agentDir, "task-outcomes", "command-log"))
+      .map((name) =>
+        JSON.parse(
+          fs.readFileSync(path.join(agentDir, "task-outcomes", "command-log", name), "utf8"),
+        ),
+      )
+      .filter(
+        (row: {
+          commandId?: string;
+          committedSpend?: { costUsd: number | null; costEvidence?: string };
+        }) => typeof row.commandId === "string" && row.commandId.includes("budget-spend"),
+      );
+    expect(spends).toHaveLength(1);
+    const calls = fs
+      .readdirSync(path.join(agentDir, "task-outcomes", "executor-evidence", "calls"))
+      .map((name) =>
+        JSON.parse(
+          fs.readFileSync(
+            path.join(agentDir, "task-outcomes", "executor-evidence", "calls", name),
+            "utf8",
+          ),
+        ),
+      ) as Array<{ usage?: { input?: number; output?: number } }>;
+    expect(calls.some((row) => row.usage?.input === 4 && row.usage?.output === 1)).toBe(true);
   });
 });

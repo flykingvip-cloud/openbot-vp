@@ -223,7 +223,12 @@ export class TaskOutcomeResultService {
     if (commandId && requestDigest && transitionDigest) {
       const prior = this.store.loadCommand(commandId);
       if (prior) {
-        if (prior.digest !== requestDigest) {
+        const legacySamePayload =
+          !prior.transitionDigest &&
+          !prior.callBinding &&
+          !opts?.callBinding &&
+          prior.digest === transitionDigest;
+        if (prior.digest !== requestDigest && !legacySamePayload) {
           const sameTransition = prior.transitionDigest
             ? prior.transitionDigest === transitionDigest
             : prior.digest === transitionDigest;

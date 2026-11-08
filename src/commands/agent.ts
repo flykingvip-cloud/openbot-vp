@@ -534,6 +534,7 @@ function runAgentAttempt(params: {
           throw err;
         })
         .then((result) => {
+          rememberModelResultUsage(result.meta?.agentMeta?.usage);
           // UsageAttribution（Task 9）：成功完成（首次或会话过期重试后）写一次归因。
           if (usageAttr) {
             void recordCliBackendUsage({

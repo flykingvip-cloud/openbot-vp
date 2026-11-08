@@ -150,6 +150,38 @@ describe("R5 lock and call identity", () => {
     ).toBe(false);
   });
 
+  it("does not steal an unpublished lock after the old grace period", async () => {
+    const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "executor-evidence-r6-lock-grace-"));
+    roots.push(storeRoot);
+    const childPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "evidence-write-child.ts",
+    );
+    const out = path.join(storeRoot, "child-result.json");
+    const child = spawn(
+      process.execPath,
+      ["--import", "tsx", childPath, storeRoot, "child.json", "8", out],
+      {
+        cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.."),
+        env: {
+          ...process.env,
+          OPENBOT_EXECUTOR_EVIDENCE: "1",
+          OPENBOT_EXECUTOR_EVIDENCE_LOCK_AFTER_CREATE_MS: "4000",
+        },
+      },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const raced = writeBoundedEvidenceFile(storeRoot, "parent.json", { pad: "parent" });
+    expect(raced).toBe("failed");
+    expect(fs.existsSync(path.join(storeRoot, "executor-evidence", "write.lock"))).toBe(true);
+    const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
+    expect(code).toBe(0);
+    expect(JSON.parse(fs.readFileSync(out, "utf8"))).toMatchObject({ result: "written" });
+    expect(
+      fs.existsSync(path.join(storeRoot, "executor-evidence", "associations", "parent.json")),
+    ).toBe(false);
+  });
+
   it("rejects a changed scope, run, provider, or startedAt as an immutable conflict", () => {
     process.env.OPENBOT_EXECUTOR_EVIDENCE = "1";
     const base = {
