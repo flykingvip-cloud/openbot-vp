@@ -11,20 +11,20 @@ import {
 } from "../../../conversation-task/session-task-board.js";
 import {
   armAsyncWaitRecoveryContinuation,
+  type AsyncWaitRecoveryContinueEnqueue,
   collectRecoverableAsyncWaitIntents,
   findAsyncWaitJobsDirs,
   recoverAsyncWaitJobsAtGatewayBoot,
   stopAsyncWaitJobRecoveryRecheckForTests,
 } from "./async-wait-job-recovery.js";
 import {
-  bindAsyncWaitRecoveryTurn,
-  claimAsyncWaitJobForRecovery,
   clearAsyncWaitJobsForTests,
   markAsyncWaitJobExited,
   readAsyncWaitJobIntent,
   recordAsyncWaitJobIntent,
 } from "./async-wait-job.js";
-
+import { claimAsyncWaitJobForRecovery } from "./async-wait-recovery-claim.js";
+import { bindAsyncWaitRecoveryTurn } from "./async-wait-recovery-turn.js";
 const roots: string[] = [];
 const prevState = process.env.OPENBOT_STATE_DIR;
 const prevOperator = process.env.OPENBOT_OPERATOR_ID;
@@ -101,7 +101,7 @@ it("pid alive → still waiting; no continue arm", () => {
     pid: process.pid,
     startedAt: Date.now(),
   })!;
-  const enqueue = vi.fn(() => true);
+  const enqueue = vi.fn<AsyncWaitRecoveryContinueEnqueue>(() => true);
   expect(armAsyncWaitRecoveryContinuation({ intent, enqueue }).outcome).toBe("still_waiting");
   expect(enqueue).not.toHaveBeenCalled();
   expect(readAsyncWaitJobIntent(sessionFile, "job-alive")?.status).toBe("waiting");
@@ -132,7 +132,7 @@ it("exited → arm continue once; second call retries open stage without double 
   });
   const intent = readAsyncWaitJobIntent(sessionFile, "job-exit")!;
   expect(intent.resultEvidence?.kind).toBe("process_exit_observed");
-  const enqueue = vi.fn(() => true);
+  const enqueue = vi.fn<AsyncWaitRecoveryContinueEnqueue>(() => true);
   const first = armAsyncWaitRecoveryContinuation({ intent, enqueue });
   expect(first.outcome).toBe("continue_armed");
   expect(enqueue).toHaveBeenCalledTimes(1);
@@ -199,7 +199,7 @@ it("pause clears; recovery does not arm continue", () => {
     },
     value: undefined,
   }));
-  const enqueue = vi.fn(() => true);
+  const enqueue = vi.fn<AsyncWaitRecoveryContinueEnqueue>(() => true);
   expect(armAsyncWaitRecoveryContinuation({ intent, enqueue }).outcome).toBe("cleared");
   expect(enqueue).not.toHaveBeenCalled();
 });
@@ -230,7 +230,7 @@ it("boot recovery scans agent sessions and arms continue (not delivered)", () =>
     exitStatus: "completed",
   });
   const cfg = { agents: { list: [{ id: "bot" }] } } as unknown as OpenBotConfig;
-  const enqueue = vi.fn(() => true);
+  const enqueue = vi.fn<AsyncWaitRecoveryContinueEnqueue>(() => true);
   const first = recoverAsyncWaitJobsAtGatewayBoot({
     cfg,
     startRecheck: false,
@@ -287,11 +287,11 @@ it("delivery_pending recovery is delivery_only — enqueues delivery-only, not b
   });
   // Sync attempt so boundary would pass if we wrongly re-armed — still must not enqueue.
   const intent = readAsyncWaitJobIntent(sessionFile, "job-deliv")!;
-  const enqueue = vi.fn(() => true);
+  const enqueue = vi.fn<AsyncWaitRecoveryContinueEnqueue>(() => true);
   const out = armAsyncWaitRecoveryContinuation({ intent, enqueue });
   expect(out.outcome).toBe("delivery_only");
   expect(enqueue).toHaveBeenCalledTimes(1);
-  expect(enqueue.mock.calls[0][0].deliveryOnly).toBe(true);
+  expect(enqueue.mock.calls[0]?.[0].deliveryOnly).toBe(true);
 });
 
 it("synced recovery attempt: recheck after bind does not clear with stale prior attempt", async () => {
@@ -315,7 +315,7 @@ it("synced recovery attempt: recheck after bind does not clear with stale prior 
     jobId: "job-sync",
     exitStatus: "completed",
   });
-  const enqueue = vi.fn(() => true);
+  const enqueue = vi.fn<AsyncWaitRecoveryContinueEnqueue>(() => true);
   const first = armAsyncWaitRecoveryContinuation({
     intent: readAsyncWaitJobIntent(sessionFile, "job-sync")!,
     enqueue,
@@ -336,7 +336,7 @@ it("synced recovery attempt: recheck after bind does not clear with stale prior 
   });
   expect(readAsyncWaitJobIntent(sessionFile, "job-sync")?.executionAttempt).toBe("run-recovery-2");
   // Live exec → skip, not clear.
-  const { claimAsyncWaitJobForRecovery } = await import("./async-wait-job.js");
+  const { claimAsyncWaitJobForRecovery } = await import("./async-wait-recovery-claim.js");
   const live = claimAsyncWaitJobForRecovery({
     sessionFile,
     jobId: "job-sync",

@@ -80,7 +80,7 @@ function tryLoadTrustedSessionEntry(sessionKey: string): TrustedSessionFields | 
     return {
       sessionId: entry.sessionId,
       sessionFile: entry.sessionFile,
-      workspaceDir: entry.workspaceDir?.trim() || undefined,
+      workspaceDir: entry.systemPromptReport?.workspaceDir?.trim() || undefined,
       provider,
       model,
       authProfileId: entry.authProfileOverride?.trim() || undefined,
