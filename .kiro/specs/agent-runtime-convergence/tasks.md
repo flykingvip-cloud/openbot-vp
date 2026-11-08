@@ -1479,3 +1479,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 - Command host (`commands/agent.ts`) now binds `controlledExecution` via `createCommandExecutionLifecycle`, asserts `stages === CONTROLLED_EXECUTION_STAGE_ORDER`, and gates backends on `executionPreparation.kind === "denied"` so ACP/candidate never start after refused admission. Retains E2/E3/E6 entry ports on the command authority adapter. — grok-bot
 - Command lifecycle prepare now honors abort signals before/after commercial acquire (parity with chat). — grok-bot
 - New command-lifecycle suite 4 PASS (stage freeze + E2 retention; deny never starts backend; cancel blocks next candidate; dispose once). Related controlled + admission-session 9 PASS (13 total). Full tsgo PASS; typed oxlint clean; architecture 63 PASS. No push/merge/deploy. — grok-bot
+
+## Package 1 D4 Cron/Followup controlled-execution alignment (2026-11-08)
+
+- Cron and Followup scene hosts now bind `controlledExecution` via `createExecutionLifecycle` and share `assertControlledExecutionStages` with Chat/Command, removing duplicated hand-written stage-order asserts. Scene adapters retain queue/OGUI/ledger/delivery; no parallel prepare/infer loop and no whole-host move into runner. — grok-bot
+- Added `assertControlledExecutionStages` on the controlled use-case contract (exported from execution/index). Chat/Command refactored to the same helper. — grok-bot
+- Regressions: controlled suite 6 PASS (incl. assert accept/reject); admitted-turn 9 PASS; command-lifecycle 4 PASS; cron long-horizon ledger 11 PASS (incl. denied admission never starts backend). 30 total PASS. Full tsgo PASS; typed oxlint clean; architecture 63 PASS. No push/merge/deploy. — grok-bot

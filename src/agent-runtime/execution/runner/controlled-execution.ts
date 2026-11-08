@@ -48,3 +48,14 @@ export type ControlledExecutionUseCase<
   Input extends { signal?: AbortSignal } = { signal?: AbortSignal },
   Result extends Preparation = Preparation,
 > = ReturnType<typeof createControlledExecutionUseCase<Input, Result>>;
+
+/** Scene hosts call this after create*ExecutionLifecycle so they cannot drift
+ * from the frozen stage contract without a loud failure. */
+export function assertControlledExecutionStages(
+  lifecycle: { stages: readonly ControlledExecutionStage[] },
+  scene: string,
+): void {
+  if (lifecycle.stages !== CONTROLLED_EXECUTION_STAGE_ORDER) {
+    throw new Error(`${scene} must consume the frozen controlled execution stage order`);
+  }
+}

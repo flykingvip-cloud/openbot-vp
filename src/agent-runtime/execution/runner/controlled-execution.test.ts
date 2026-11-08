@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 import type { ModelInferenceInput } from "../../model/index.js";
 import {
   CONTROLLED_EXECUTION_STAGE_ORDER,
+  assertControlledExecutionStages,
   createControlledExecutionUseCase,
 } from "./controlled-execution.js";
 
@@ -131,4 +132,25 @@ it("disposes exactly once and keeps later inference disarmed", async () => {
       run: async () => "x",
     }),
   ).toThrow(/not prepared/);
+});
+
+it("assertControlledExecutionStages accepts the frozen order and rejects drift", () => {
+  const useCase = createControlledExecutionUseCase({
+    prepare: async () => ({ kind: "ready" as const }),
+    infer: vi.fn(),
+    dispose: async () => {},
+  });
+  expect(() => assertControlledExecutionStages(useCase, "Cron host")).not.toThrow();
+  expect(() =>
+    assertControlledExecutionStages(
+      {
+        stages: [
+          "prepare",
+          "infer",
+          "dispose",
+        ] as unknown as typeof CONTROLLED_EXECUTION_STAGE_ORDER,
+      },
+      "Cron host",
+    ),
+  ).toThrow(/Cron host must consume the frozen controlled execution stage order/);
 });

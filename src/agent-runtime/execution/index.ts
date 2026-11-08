@@ -9,6 +9,7 @@ export { runAdmittedTurn } from "./runner/admitted-turn.js";
 export { createExecutionLifecycle } from "./runner/execution-lifecycle.js";
 export {
   CONTROLLED_EXECUTION_STAGE_ORDER,
+  assertControlledExecutionStages,
   createControlledExecutionUseCase,
   type ControlledExecutionStage,
   type ControlledExecutionUseCase,

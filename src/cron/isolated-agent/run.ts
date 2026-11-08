@@ -1,4 +1,5 @@
 import {
+  assertControlledExecutionStages,
   runScheduledCandidate,
   createExecutionLifecycle,
 } from "../../agent-runtime/execution/index.js";
@@ -1011,13 +1012,15 @@ export async function runCronIsolatedAgentTurn(params: {
 
     const runPrompt = async (promptText: string) => {
       const cronRunId = cronSession.sessionEntry.sessionId;
-      const modelSession = createExecutionLifecycle(cronRunId, bindAdmittedTurnHost());
+      // Cron scene adapter: schedule/ledger/delivery stay here; stage order is controlled.
+      const controlledExecution = createExecutionLifecycle(cronRunId, bindAdmittedTurnHost());
+      assertControlledExecutionStages(controlledExecution, "Cron host");
       const runContextEstimate = buildRunContextEstimateParts({
         taskText: promptText,
         sessionEntry: cronSession.sessionEntry,
       });
       try {
-        const prepared = await modelSession.prepare({
+        const prepared = await controlledExecution.prepare({
           config: cfgWithAgentDefaults,
           authorization: {
             agentId,
@@ -1047,7 +1050,7 @@ export async function runCronIsolatedAgentTurn(params: {
         if (prepared.kind === "unavailable") {
           throw new Error(prepared.message);
         }
-        const fallbackResult = await modelSession.infer({
+        const fallbackResult = await controlledExecution.infer({
           cfg: cfgWithAgentDefaults,
           provider,
           model,
@@ -1149,7 +1152,7 @@ export async function runCronIsolatedAgentTurn(params: {
         commercialFallbackAttempts = fallbackResult.attempts;
         runEndedAt = Date.now();
       } finally {
-        await modelSession.dispose();
+        await controlledExecution.dispose();
       }
     };
 

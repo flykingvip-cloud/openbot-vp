@@ -1,7 +1,7 @@
 import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery.js";
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
-import { CONTROLLED_EXECUTION_STAGE_ORDER, createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createCommandExecutionLifecycle, runCommandAcpTurn, type EmbeddedPiRunResult } from "../agent-runtime/execution/index.js";
+import { assertControlledExecutionStages, createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createCommandExecutionLifecycle, runCommandAcpTurn, type EmbeddedPiRunResult } from "../agent-runtime/execution/index.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
 import { LEGACY_INTERNAL_EVENT_CONTEXT_PREFIXES } from "../compat/legacy-names.js";
@@ -365,11 +365,7 @@ async function agentCommandInternal(
   // Command scene adapter: commercial admission + E2/E3/E6 ports stay on the
   // authority adapter; stage order comes only from the controlled use-case.
   const controlledExecution = createCommandExecutionLifecycle({runId, isSubagentLane, identity: opts.executionIdentity, entry: opts.governanceEntry});
-  if (controlledExecution.stages !== CONTROLLED_EXECUTION_STAGE_ORDER) {
-    throw new Error(
-      "Command host must consume the frozen controlled execution stage order",
-    );
-  }
+  assertControlledExecutionStages(controlledExecution, "Command host");
   // Subagent runs take their own commercial slot (quota + concurrency).
   // Model allowlists for the child still come from the parent snapshot.
   let commercialGate: AgentCommandCommercialGateResult | undefined;

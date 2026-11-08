@@ -49,7 +49,7 @@ import { isInternalMessageChannel } from "../../../utils/message-channel.js";
 import { createTurnOutcomeRecorder } from "../outcomes/index.js";
 import { createAdmittedCandidateInvoker } from "./admitted-candidate.js";
 import type { AdmittedTurnHost } from "./admitted-turn-host.js";
-import { CONTROLLED_EXECUTION_STAGE_ORDER } from "./controlled-execution.js";
+import { assertControlledExecutionStages } from "./controlled-execution.js";
 import type { EmbeddedPiRunResult } from "./embedded-result.js";
 import { createExecutionLifecycle } from "./execution-lifecycle.js";
 import type { AgentRunLoopResult, AgentTurnExecutionParams } from "./turn-contract.js";
@@ -269,9 +269,7 @@ export async function runAdmittedTurn(
   );
 
   const controlledExecution = createExecutionLifecycle(runId, host);
-  if (controlledExecution.stages !== CONTROLLED_EXECUTION_STAGE_ORDER) {
-    throw new Error("Chat admitted turn must consume the frozen controlled execution stage order");
-  }
+  assertControlledExecutionStages(controlledExecution, "Chat admitted turn");
   try {
     while (true) {
       commercialToolCallCount = 0;

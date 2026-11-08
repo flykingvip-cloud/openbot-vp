@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
 import {
+  assertControlledExecutionStages,
   runQueuedCandidate,
   createExecutionLifecycle,
 } from "../../agent-runtime/execution/index.js";
@@ -294,7 +295,9 @@ export function createFollowupRunner(params: {
         logVerbose(`followup task-outcome entry failed: ${opened.code} ${opened.message}`);
       }
     }
-    const modelSession = createExecutionLifecycle(runId, bindAdmittedTurnHost());
+    // Followup scene adapter: queue/OGUI/delivery stay here; stage order is controlled.
+    const controlledExecution = createExecutionLifecycle(runId, bindAdmittedTurnHost());
+    assertControlledExecutionStages(controlledExecution, "Followup host");
     let oguiResume:
       | { storePath: string; sessionKey: string; decisionId: string; resumeRef: string }
       | undefined;
@@ -370,7 +373,7 @@ export function createFollowupRunner(params: {
           taskText: queued.prompt,
           contextParts: runContextEstimate.contextParts,
         };
-        const prepared = await modelSession.prepare({
+        const prepared = await controlledExecution.prepare({
           config: queued.run.config,
           authorization: {
             agentId: queued.run.agentId,
@@ -401,7 +404,7 @@ export function createFollowupRunner(params: {
           return;
         }
         const runFallback = () =>
-          modelSession.infer({
+          controlledExecution.infer({
             cfg: queued.run.config,
             provider: queued.run.provider,
             model: queued.run.model,
@@ -698,7 +701,7 @@ export function createFollowupRunner(params: {
         });
       }
       try {
-        await modelSession.dispose();
+        await controlledExecution.dispose();
       } finally {
         // Both signals are required for the typing controller to clean up.
         // The main inbound dispatch path calls markDispatchIdle() from the
