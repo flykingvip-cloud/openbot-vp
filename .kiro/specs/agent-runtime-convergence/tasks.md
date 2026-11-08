@@ -1586,3 +1586,57 @@ Also: auxiliary governance 3 PASS; slug wiring 1 PASS; memory governance 8 PASS;
 
 - `deliverRecoveredAsyncWaitCompletion`: after recovery claim marks exited, registers stable pending-delivery (`async-wait-recovery:<jobId>`), enqueues system-event, requests scoped heartbeat wake, and stamps `proactiveDeliveryIssuedAtMs` + `recoveryWakeIssuedAtMs`. Second call / peek hit → `already` (no duplicate event/wake). Boundary refuse → clear, no delivery. — grok-bot
 - Boot/recheck claim path uses the same helper with cfg so TaskOutcome persistRoot is available. Reuses pending-delivery + heartbeat/followup; no new scheduler/executor. Tests: recovery suite 6 PASS incl. idempotent proactive delivery. Full tsgo PASS; typed oxlint clean. — grok-bot
+
+## Package 2 P2-D5 evidence pack — stop for acceptance (2026-11-08)
+
+**Final HEAD for Package 2 independent acceptance:** `529eaa1fe12bc133b31971f22de2100bfb5b6cef`  
+**Baseline (Package 1 PASSED):** `71a266e32fbc56f2f960cc5c8e444499c04edb52`  
+**Package 3 not started.** No push / merge / deploy / production restart.
+
+### SHA chain (P2-D1→P2-D4)
+
+| Slice | SHA | Summary |
+| --- | --- | --- |
+| P2-D1 | `eb5e1e5303b9fe24245cccac549e3dd08557ecfe` | Durable async-wait job intent under `dirname(sessionFile)/async-wait-jobs/`; record on background+notify; mark exited; clear on refuse/owner stop |
+| P2-D2 | `168c164f733c340056cf0cf269f128784c3b955e` | Boot recovery claim next to TaskOutcome consumer-boot in `server.impl`; pid alive → wait; exited → one bounded wake; light recheck |
+| P2-D3 | `e7c1763894fbbe32139bbe5eeae8641f724d4c2e` | Stale callback after pause/cancel/replace does not wake/exec; cleared intent short-circuits notify; claimQueuedExecution rejects |
+| P2-D4 | `529eaa1fe12bc133b31971f22de2100bfb5b6cef` | Proactive recovered-completion delivery via pending-delivery + system-event + heartbeat; idempotent `proactiveDeliveryIssuedAtMs` |
+
+### Duty / production call sites
+
+| Concern | Owner | Production entry | Notes |
+| --- | --- | --- | --- |
+| Intent write | `async-wait-job` repo | `bash-process-registry.markBackgrounded` / `markExited` | Only notify+live boundary |
+| Intent clear | same | `maybeNotifyOnExit` boundary refuse; `suppressCurrentTaskWake` / `cancelCurrentTask` (+ sessionFile); explicit/interaction control | Owner stop wins |
+| Boot recovery | `async-wait-job-recovery` | `gateway/server.impl` next to `recoverTaskOutcomeConsumersAtGatewayBoot` | Scans agent sessions `async-wait-jobs/`; recheck interval unref'd |
+| Proactive delivery | `deliverRecoveredAsyncWaitCompletion` | claim path at boot/recheck | Registers `async-wait-recovery:<jobId>` pending-delivery; one event+wake |
+| Stale fence | TaskActionBoundary + claimQueuedExecution | exec notify, followup, delivery-queue/deliver | Existing hosts retained |
+
+### Order regressions (P2 suite on evidence HEAD)
+
+OPENBOT_TEST_PROFILE=low — **5 files / 20 PASS**:
+
+| Requirement | Evidence |
+| --- | --- |
+| Durable intent survives reread | async-wait-job 4 PASS |
+| pid alive → wait; exited → one wake | async-wait-job-recovery (alive/exit/boot) |
+| Proactive delivery idempotent | recovery “proactive recovered delivery is idempotent” |
+| Pause/cancel/replace → no wake/exec | exec.task-binding 5 PASS (incl. cancelled); stale-callback 3 PASS; claimQueuedExecution rejected after cancel |
+| Task board authority under real background exit | async-process-lifecycle 2 PASS |
+
+### Gates on evidence HEAD
+
+- Full `pnpm tsgo` PASS
+- Typed oxlint on Package 2 changed sources PASS at each land
+- Architecture: no new manifest rules required this package (reused board + claimQueuedExecution + pending-delivery + heartbeat/followup)
+- Registry sharedPaths / canLandWith edits remain **uncommitted** for kiro-loom; protected `.loom/registry.yaml`, context-component-plan.md, materials-manifest.md, `out/` preserved
+- No new scheduler / executor / task types; no Package 1 redo
+
+### Remaining risks (for acceptor)
+
+1. Alive-at-boot jobs depend on the light recheck interval (or next restart) to observe later exit — not a second scheduler, but not instant.
+2. System-events remain ephemeral; durability is the intent + pending-delivery registration; followup/heartbeat still consume the event.
+3. `server.impl` sharedPath lander temporarily pointed at agent-runtime-convergence for Package 2 boot wiring (uncommitted registry); observe-owner history preserved in reason text.
+4. Package 3+ not in scope.
+
+**Ready for independent Package 2 acceptance:** yes (implementer view). **Stop here. Package 3 not started.** — grok-bot
