@@ -1,9 +1,16 @@
+import fs from "node:fs";
+import path from "node:path";
+import type { TaskStopScope, TaskStopRecord } from "../../agent-runtime/contracts/task-stop.js";
 import type {
   CurrentTaskResumeRequest,
   CurrentTaskResumeResult,
 } from "../../agent-runtime/contracts/task.js";
 import { parseExplicitTaskControl } from "../../agent-runtime/policy/index.js";
-import { sessionTaskState, type ResumeParkedRecheck } from "../../agent-runtime/state/index.js";
+import {
+  sessionTaskState,
+  createTaskStopRepository,
+  type ResumeParkedRecheck,
+} from "../../agent-runtime/state/index.js";
 /**
  * Live ResumeParkedRecheck for the chat.send entry path.
  *
@@ -43,12 +50,12 @@ import { sessionTaskState, type ResumeParkedRecheck } from "../../agent-runtime/
  *
  * ## Durability boundary (disclose)
  *
- * The registry is a **process-local Map**. It survives AbortController delete
- * within one gateway process for single-gateway, no-mid-restart exploratory
- * tests. It is **not** durable across process restart / multi-host; cross-
- * process stop authority remains separately unproven.
+ * Scoped stop records are durable under the runtime state root and survive
+ * process replacement. Atomic writes and compare-token clearing preserve newer
+ * records. This does not establish distributed multi-host execution ownership.
  */
 import { loadConfig } from "../../config/config.js";
+import { resolveStateDir } from "../../config/paths.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import {
   recordFocusSwitchDecision,
@@ -111,24 +118,9 @@ export const AUTHORITATIVE_STOP_PERSONAL_TENANT = "__personal__";
 export const AUTHORITATIVE_STOP_INTERNAL_TENANT = "__internal__";
 export const AUTHORITATIVE_STOP_INTERNAL_USER = "__internal__";
 
-export type AuthoritativeTaskStopScopeKind = "managed" | "personal" | "internal";
-
-/** Trusted scope dimensions that must bind with taskId — never taskId alone. */
-export type AuthoritativeTaskStopScope = {
-  kind: AuthoritativeTaskStopScopeKind;
-  /** Trusted tenant id (managed) or explicit personal/internal marker. */
-  tenantId: string;
-  /** Trusted user id (managed/personal) or explicit internal marker. */
-  userId: string;
-  /** Canonical trusted session key — required for every kind. */
-  sessionKey: string;
-};
-
-export type AuthoritativeTaskStopEntry = AuthoritativeTaskStopScope & {
-  taskId: string;
-  stoppedAtMs: number;
-  reason?: string;
-};
+export type AuthoritativeTaskStopScopeKind = TaskStopScope["kind"];
+export type AuthoritativeTaskStopScope = TaskStopScope;
+export type AuthoritativeTaskStopEntry = TaskStopRecord;
 
 export type AuthoritativeTaskStopScopeInput = {
   tenantId?: string | null;
@@ -147,14 +139,22 @@ export type AuthoritativeTaskStopScopeInput = {
 export type AuthoritativeTaskStopQueryResult =
   | { state: "active" }
   | { state: "inactive" }
-  | { state: "unverifiable"; reason: "incomplete_scope" | "missing_task_id" };
+  | {
+      state: "unverifiable";
+      reason: "incomplete_scope" | "missing_task_id" | "storage_unavailable";
+    };
 
 /**
- * Process-local authoritative stop registry.
+ * Durable authoritative stop storage; explicit test maps remain optional adapters.
  * Key = tenantId + userId + sessionKey + taskId (see {@link authoritativeStopRegistryKey}).
- * NOT durable across gateway restart / multi-host.
+ * Records survive process replacement on the same state root; distributed multi-host replication is not provided.
  */
-const authoritativeTaskStops = new Map<string, AuthoritativeTaskStopEntry>();
+function stopStorageRoot(): string {
+  return path.join(resolveStateDir(), "agent-runtime", "task-stops");
+}
+function stopRepository() {
+  return createTaskStopRepository(stopStorageRoot());
+}
 
 /** Explicit owner resume lifts only its scoped paused task, after the original state CAS. */
 export function resumeInterpretedCurrentTask(
@@ -178,14 +178,19 @@ export function resumeInterpretedCurrentTask(
   }
   // This synchronous transaction cannot interleave with a newer same-process stop.
   // Cancelled tasks remain tombstoned and a running task cannot be resumed twice.
-  const key = authoritativeStopRegistryKey(scope, params.request.taskId);
-  const capturedStop = authoritativeTaskStops.get(key);
+  const repository = stopRepository();
+  let capturedStop: ReturnType<typeof repository.read>;
+  try {
+    capturedStop = repository.read(scope, params.request.taskId);
+  } catch {
+    return { kind: "rejected", reason: "stop_state_unavailable" };
+  }
   const result = sessionTaskState.resumeCurrent(params.sessionFile, params.request, {
     authOk: true,
     stopActive: false,
   });
-  if (result.kind === "accepted" && authoritativeTaskStops.get(key) === capturedStop) {
-    authoritativeTaskStops.delete(key);
+  if (result.kind === "accepted") {
+    repository.clear(scope, params.request.taskId, { token: capturedStop?.token ?? null });
   }
   return result;
 }
@@ -294,7 +299,10 @@ export function authoritativeStopRegistryKey(
 }
 
 export function resetAuthoritativeTaskStopsForTest(): void {
-  authoritativeTaskStops.clear();
+  if (process.env.VITEST !== "true" && process.env.VITEST !== "1") {
+    throw new Error("Stop reset is test-only");
+  }
+  fs.rmSync(stopStorageRoot(), { recursive: true, force: true });
 }
 
 export function recordAuthoritativeTaskStop(
@@ -316,7 +324,7 @@ export function recordAuthoritativeTaskStop(
     stoppedAtMs: params.nowMs ?? Date.now(),
     ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
   };
-  authoritativeTaskStops.set(authoritativeStopRegistryKey(scope, taskId), entry);
+  stopRepository().record(entry);
   return entry;
 }
 
@@ -329,7 +337,7 @@ export function clearAuthoritativeTaskStop(
   if (!taskId || !scope) {
     return false;
   }
-  return authoritativeTaskStops.delete(authoritativeStopRegistryKey(scope, taskId));
+  return stopRepository().clear(scope, taskId);
 }
 
 /**
@@ -351,10 +359,16 @@ export function queryAuthoritativeTaskStop(
   if (!scope) {
     return { state: "unverifiable", reason: "incomplete_scope" };
   }
-  const store = params.store ?? authoritativeTaskStops;
-  return store.has(authoritativeStopRegistryKey(scope, taskId))
-    ? { state: "active" }
-    : { state: "inactive" };
+  if (params.store) {
+    return params.store.has(authoritativeStopRegistryKey(scope, taskId))
+      ? { state: "active" }
+      : { state: "inactive" };
+  }
+  try {
+    return stopRepository().read(scope, taskId) ? { state: "active" } : { state: "inactive" };
+  } catch {
+    return { state: "unverifiable", reason: "storage_unavailable" };
+  }
 }
 
 /**
@@ -392,7 +406,7 @@ export function sessionStopBarrierActive(params: {
 }): boolean {
   const taskId = trimOrNull(params.taskId) ?? "";
   if (taskId) {
-    const store = params.authoritativeStops ?? authoritativeTaskStops;
+    const store = params.authoritativeStops;
     const sessionKeyList: string[] = [];
     for (const rawKey of params.sessionKeys) {
       const trimmed = trimOrNull(rawKey);

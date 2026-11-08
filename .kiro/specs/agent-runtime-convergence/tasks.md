@@ -1354,3 +1354,9 @@ Deployment is deferred by explicit user instruction until the migration and comb
 
 - Reproduced enabled legacy complex-task flags replacing actual executor output with a synthetic plan and lexical acceptance report (one failing host regression). Removed the sole mainline postprocessing hook; command and delivery retain their current authority. Added a no-return import gate. Legacy source/tests remain isolated and archived; collaboration round execution is untouched. — codex-runtime-manager
 - Reply-host regression 29 PASS; full tsgo and typed lint PASS; architecture 55 PASS. Prior candidate e07e531ca full build PASS with 209 existing dynamic-import warnings and UI-size warnings; UI sync remained pinned. No production cutover or whole-migration completion claimed. — codex-runtime-manager
+
+## Durable scoped stop records (2026-11-08)
+
+- Reproduced owner stop disappearing after process replacement (restart fixture returned inactive). Replaced process-local authority with state-owned atomic stop records scoped by tenant/user/session/task, opaque version tokens and compare-token clearing. Corrupt/unreadable records fail closed for resume. Explicit test-map adapters remain; no second executor or wake scheduler was introduced. — codex-runtime-manager
+- Isolated cross-process and store regression 2 files / 3 PASS; Gateway current/parked resume 2 files / 37 PASS. Earlier combined run timed out during worker startup and was not counted as passing; isolated reruns completed successfully. Full tsgo, typed lint and 55 architecture rules PASS. This proves stop persistence on one shared state root, not distributed multi-host task ownership or complete asynchronous job recovery. — codex-runtime-manager
+- Candidate eeef70ea6 joint regression before durable-stop change: 76 files / 439 PASS. No merge, push or deployment. — codex-runtime-manager
