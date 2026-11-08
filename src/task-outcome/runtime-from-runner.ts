@@ -2,6 +2,22 @@ import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import { normalizeUsage } from "../agents/usage.js";
 import type { OpenBotConfig } from "../config/config.js";
+import {
+  associateBudgetCharge,
+  type BudgetCommandReport,
+} from "../executor-evidence/association.js";
+import { publishFinalEvidenceLink } from "../executor-evidence/association.js";
+import { buildCostColumns } from "../executor-evidence/cost-columns.js";
+import { fullScopeEqual, snapshotIdentityFingerprint } from "../executor-evidence/identity.js";
+import {
+  currentExecutorModelCall,
+  getModelCall,
+  noteModelResponse,
+  readCallFiles,
+  usageFingerprint,
+  usageFromUnknown,
+  type ExecutorEvidenceContext,
+} from "../executor-evidence/model-call-evidence.js";
 import { recordToolOutcomes } from "../gateway/agent-growth/operational-metrics-store.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../utils/usage-format.js";
 import { applySpendAndAssess, assessTaskBudgetExhaustion, buildTaskBudgetState } from "./budget.js";
@@ -23,7 +39,13 @@ import { createModeQualityHandler, createSkillQualityHandler } from "./quality-h
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { scopeIdOf } from "./transitions.js";
-import type { CloseReasonCode, TaskOutcomeRecord, TrustedScope } from "./types.js";
+import type {
+  CloseReasonCode,
+  CommittedSpend,
+  SubmitResult,
+  TaskOutcomeRecord,
+  TrustedScope,
+} from "./types.js";
 export { assessTargetModalityAcceptance } from "./capability-modality.js";
 
 function scopeIdSafe(scope: TrustedScope): string {
@@ -120,6 +142,26 @@ export type RunnerTurnOutcomeInput = {
    * Closeout still assesses exhaustion and may fail_closed.
    */
   skipBudgetCharge?: boolean;
+  /** Captured from chargeModelCallAgainstTip. Closeout does not invent a call. */
+  modelCallLink?: ModelCallCloseoutLink | null;
+  /** Every candidate in the turn, including failed and cancelled calls. */
+  modelCallLinks?: ModelCallCloseoutLink[];
+  /**
+   * Per-candidate charge dispositions. An unknown or conflict reason is not a committed spend.
+   * Closeout must keep these reasons and must not invent another charge from them.
+   */
+  budgetChargeReasons?: readonly string[];
+};
+
+export type ModelCallCloseoutLink = {
+  callId: string;
+  evidenceId: string;
+  candidateAttemptId: string;
+  chargeOutcomeVersion: number;
+  chargeCommitId: string | null;
+  requestDigest: string | null;
+  usageFingerprint: string;
+  commandId: string;
 };
 
 export type GrowthOutcomeCommitOpts = {
@@ -137,8 +179,121 @@ export type GrowthOutcomeCommitOpts = {
   skipBudgetCharge?: boolean;
 };
 
+/**
+ * One budget charge per candidate. A later post-processing or charge error
+ * must not allocate another callSeq for the same candidate.
+ */
+export async function runModelCandidateWithSingleCharge<T>(params: {
+  run: () => Promise<T>;
+  /** Runs as soon as the model result exists, before post-processing. */
+  noteResponse?: (value: T) => void;
+  /** Bootstrap or delivery. A throw here must not drop the result usage. */
+  afterResponse?: (value: T) => void;
+  charge: (
+    outcome: { ok: true; value: T } | { ok: false; error: unknown; notedUsage?: unknown },
+  ) => void;
+}): Promise<T> {
+  let charged = false;
+  let notedUsage: unknown;
+  const chargeOnce = (
+    outcome: { ok: true; value: T } | { ok: false; error: unknown; notedUsage?: unknown },
+  ) => {
+    if (charged) {
+      return;
+    }
+    charged = true;
+    params.charge(outcome);
+  };
+  try {
+    const value = await params.run();
+    try {
+      notedUsage = params.noteResponse?.(value);
+    } catch {
+      // Noting the response must not hide the result or its usage.
+    }
+    try {
+      params.afterResponse?.(value);
+    } catch (postErr) {
+      chargeOnce({ ok: true, value });
+      throw postErr;
+    }
+    chargeOnce({ ok: true, value });
+    return value;
+  } catch (err) {
+    if (!(err instanceof TaskBudgetExceededError)) {
+      try {
+        chargeOnce({ ok: false, error: err, notedUsage });
+      } catch (chargeErr) {
+        if (chargeErr instanceof TaskBudgetExceededError) {
+          throw chargeErr;
+        }
+      }
+    }
+    throw err;
+  }
+}
+
+/** Record provider usage at the moment the model result exists. */
+export function rememberModelResultUsage(usage: unknown): unknown {
+  const call = currentExecutorModelCall();
+  if (call && call.modelResponseStatus !== "observed") {
+    try {
+      noteModelResponse(call, { usage, usageSource: "model_result" });
+    } catch {
+      // The business result stays available even if the note fails.
+    }
+  }
+  return usage;
+}
+
+/** Usage attached by a candidate failure, when the transport recorded it before throwing. */
+export function usageCarriedByModelError(err: unknown): unknown {
+  if (!err || typeof err !== "object" || !("usage" in err)) {
+    return undefined;
+  }
+  return (err as { usage?: unknown }).usage;
+}
+
+/**
+ * Usage that must survive a post-processing throw.
+ * Prefer the value noted when the model result existed. Otherwise use a
+ * response already observed on the active call, then usage carried by the error.
+ */
+export function usageRetainedForCandidateCharge(noted: unknown, err?: unknown): unknown {
+  if (noted !== undefined) {
+    return noted;
+  }
+  const active = currentExecutorModelCall();
+  if (active?.modelResponseStatus === "observed") {
+    return active.usage;
+  }
+  return usageCarriedByModelError(err);
+}
+
 function resolveStoreRoot(cfg: OpenBotConfig, agentId: string): string {
   return path.join(resolveAgentDir(cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
+}
+
+/** Optional model-fallback evidence context. Missing task identity collects nothing. */
+export function runnerExecutorEvidenceContext(
+  cfg: OpenBotConfig,
+  agentId: string | undefined,
+  params: { taskId?: string; scope?: TrustedScope; runId: string },
+): ExecutorEvidenceContext | undefined {
+  const taskId = params.taskId?.trim();
+  const agent = agentId?.trim();
+  if (!taskId || !params.scope || !agent || !params.runId.trim()) {
+    return undefined;
+  }
+  return {
+    agentId: agent,
+    scope: params.scope,
+    taskId,
+    runId: params.runId,
+    storeRoot: resolveStoreRoot(cfg, agent),
+    provenance: "live",
+    collector: "model-fallback",
+  };
 }
 
 export class TaskBudgetExceededError extends Error {
@@ -452,18 +607,69 @@ export function chargeRunnerTurnBudgetSpend(
     nowMs?: number;
     parentTaskId?: string;
     parentAgentId?: string;
+    budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
+    callBinding?: import("./types.js").BudgetCallBinding;
   },
 ): {
   record: TaskOutcomeRecord;
   exhaustion: import("./budget.js").TaskBudgetExhaustion | null;
   closedForBudget: boolean;
+  budgetCommand: BudgetCommandReport;
 } {
   const ctx = openRunnerBudgetContext(cfg, agentId, {
     taskId: params.taskId,
     scope: params.scope,
+    ...(params.budgetLimits ? { budgetLimits: params.budgetLimits } : {}),
   });
-  if (!ctx.record.budget || ctx.record.lifecycle === "closed") {
-    return { record: ctx.record, exhaustion: null, closedForBudget: false };
+  if (!ctx.record.budget) {
+    return {
+      record: ctx.record,
+      exhaustion: null,
+      closedForBudget: false,
+      budgetCommand: {
+        commandId: `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`,
+        requestDigest: null,
+        disposition: "absent",
+        commitId: null,
+        chargeOutcomeVersion: ctx.record.outcomeVersion,
+        closeOutcomeVersion: null,
+        committedCostUsd: null,
+        costStatus: "not_committed",
+      },
+    };
+  }
+  if (ctx.record.lifecycle === "closed") {
+    const commandId = `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`;
+    const verified = verifyStoredSpend(ctx.store, commandId, params.scope);
+    const parentTaskId = params.parentTaskId?.trim();
+    if (parentTaskId && parentTaskId !== params.taskId && verified) {
+      attributeChildSpendToParent(cfg, agentId, {
+        childTaskId: params.taskId,
+        parentTaskId,
+        parentAgentId: params.parentAgentId,
+        runId: params.runId,
+        callSeq: params.callSeq,
+        iterations: verified.iterations,
+        ...(verified.costUsd != null ? { costUsd: verified.costUsd } : {}),
+        ...(verified.costEvidence ? { costEvidence: verified.costEvidence } : {}),
+        nowMs: params.nowMs ?? Date.now(),
+      });
+    }
+    return {
+      record: ctx.record,
+      exhaustion: null,
+      closedForBudget: false,
+      budgetCommand: {
+        commandId: `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`,
+        requestDigest: null,
+        disposition: "absent",
+        commitId: null,
+        chargeOutcomeVersion: ctx.record.outcomeVersion,
+        closeOutcomeVersion: null,
+        committedCostUsd: null,
+        costStatus: "not_committed",
+      },
+    };
   }
   const nowMs = params.nowMs ?? Date.now();
   const iterations =
@@ -480,6 +686,7 @@ export function chargeRunnerTurnBudgetSpend(
     Number.isFinite(params.costUsd) &&
     params.costUsd === 0;
   const costUsd = knownPositive ?? (knownZero ? 0 : undefined);
+  const commandId = `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`;
   const spent = ctx.service.submit(
     params.taskId,
     {
@@ -493,43 +700,174 @@ export function chargeRunnerTurnBudgetSpend(
     },
     {
       requiredScope: params.scope,
-      commandId: `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`,
+      commandId,
+      ...(params.callBinding ? { callBinding: params.callBinding } : {}),
     },
   );
-  if (!spent.ok && spent.code !== "command_conflict") {
+  if (!spent.ok && spent.code !== "command_conflict" && spent.code !== "evidence_missing") {
     throw new Error(`task-outcome mid-run budget charge failed: ${spent.code}`);
   }
-  // Same callSeq already charged. Keep the first payload and do not add spend again.
+  const knownSubmitted = params.costEvidence === "known" && costUsd != null;
+  let budgetCommand = budgetReportFromSubmit(commandId, spent, {
+    known: knownSubmitted,
+    costUsd,
+  });
+  // Replay and conflict keep the stored command. A new callback cost is not committed.
   let record = spent.ok ? spent.record : (ctx.store.loadTask(params.taskId) ?? ctx.record);
+  const storedSpend = verifyStoredSpend(ctx.store, commandId, params.scope);
+  const recovering =
+    budgetCommand.disposition === "replayed" || budgetCommand.disposition === "conflict";
+  const sideEffectSpend: CommittedSpend | null =
+    budgetCommand.disposition === "applied"
+      ? {
+          iterations,
+          costUsd: costUsd ?? null,
+          costEvidence: params.costEvidence ?? null,
+        }
+      : recovering
+        ? storedSpend
+        : null;
   const parentTaskId = params.parentTaskId?.trim();
-  if (parentTaskId && parentTaskId !== params.taskId) {
+  if (parentTaskId && parentTaskId !== params.taskId && sideEffectSpend) {
     attributeChildSpendToParent(cfg, agentId, {
       childTaskId: params.taskId,
       parentTaskId,
       parentAgentId: params.parentAgentId,
       runId: params.runId,
       callSeq: params.callSeq,
-      iterations,
-      ...(costUsd != null ? { costUsd } : {}),
-      ...(params.costEvidence ? { costEvidence: params.costEvidence } : {}),
+      iterations: sideEffectSpend.iterations,
+      ...(sideEffectSpend.costUsd != null ? { costUsd: sideEffectSpend.costUsd } : {}),
+      ...(sideEffectSpend.costEvidence ? { costEvidence: sideEffectSpend.costEvidence } : {}),
       nowMs,
     });
   }
-  const exhaustion =
-    record.budget != null ? assessTaskBudgetExhaustion(record.budget, nowMs) : null;
-  if (exhaustion && record.lifecycle !== "closed") {
-    const closed = ctx.chat.failClosed(params.taskId, record.outcomeVersion, "budget_exceeded", {
-      fencingToken: ctx.fencingToken,
+  const tip = ctx.store.loadTask(params.taskId) ?? record;
+  record = tip;
+  const exhaustion = tip.budget != null ? assessTaskBudgetExhaustion(tip.budget, nowMs) : null;
+  if (exhaustion && tip.lifecycle !== "closed" && sideEffectSpend) {
+    const closeCommandId = `budget-exceeded:${params.taskId}:${params.runId}:call:${params.callSeq}`;
+    const closed = ctx.chat.failClosed(params.taskId, tip.outcomeVersion, "budget_exceeded", {
+      fencingToken: tip.fencingToken || ctx.fencingToken,
       reasonDetail: exhaustion.detail,
       scope: params.scope,
-      commandId: `budget-exceeded:${params.taskId}:${params.runId}:call:${params.callSeq}`,
+      commandId: closeCommandId,
     });
-    if (!closed.ok) {
+    if (!closed.ok && closed.code !== "command_conflict" && closed.code !== "evidence_missing") {
       throw new Error(`task-outcome mid-run budget fail_closed failed: ${closed.code}`);
     }
-    return { record: closed.record, exhaustion, closedForBudget: true };
+    const closeReport = budgetReportFromSubmit(closeCommandId, closed, { known: false });
+    budgetCommand = {
+      ...budgetCommand,
+      closeOutcomeVersion: closeReport.chargeOutcomeVersion,
+    };
+    if (closed.ok) {
+      record = closed.record;
+    }
+    return { record, exhaustion, closedForBudget: closed.ok, budgetCommand };
   }
-  return { record, exhaustion, closedForBudget: false };
+  return { record, exhaustion, closedForBudget: false, budgetCommand };
+}
+
+function verifyStoredSpend(
+  store: DurableTaskOutcomeStore,
+  commandId: string,
+  scope: TrustedScope,
+): CommittedSpend | null {
+  const prior = store.loadCommand(commandId);
+  const spend = prior?.committedSpend;
+  if (!prior?.commitId || !spend) {
+    return null;
+  }
+  if (!Number.isInteger(spend.iterations) || spend.iterations < 0) {
+    return null;
+  }
+  if (spend.costUsd != null && (!Number.isFinite(spend.costUsd) || spend.costUsd < 0)) {
+    return null;
+  }
+  const bundle = store.loadCommitBundle(prior.commitId);
+  const logged = bundle?.commandLog?.committedSpend;
+  if (
+    !bundle ||
+    !logged ||
+    bundle.commandLog?.commandId !== commandId ||
+    bundle.commandLog?.digest !== prior.digest ||
+    logged.iterations !== spend.iterations ||
+    logged.costUsd !== spend.costUsd ||
+    logged.costEvidence !== spend.costEvidence ||
+    bundle.taskId !== prior.taskId ||
+    bundle.record.taskId !== prior.taskId ||
+    bundle.record.outcomeVersion !== prior.outcomeVersion ||
+    bundle.commitId !== prior.commitId
+  ) {
+    return null;
+  }
+  const snapshot = store.loadTaskVersion(prior.taskId, prior.outcomeVersion);
+  if (
+    !snapshot ||
+    snapshot.taskId !== prior.taskId ||
+    snapshot.outcomeVersion !== prior.outcomeVersion ||
+    !fullScopeEqual(snapshot.scope, scope) ||
+    !prior.snapshotFingerprint ||
+    snapshotIdentityFingerprint(snapshot) !== prior.snapshotFingerprint ||
+    snapshotIdentityFingerprint(bundle.record) !== prior.snapshotFingerprint
+  ) {
+    return null;
+  }
+  return spend;
+}
+
+function budgetReportFromSubmit(
+  commandId: string,
+  spent: SubmitResult,
+  submitted: { known: boolean; costUsd?: number },
+): BudgetCommandReport {
+  if (spent.ok && spent.commandReceipt) {
+    const applied = spent.commandReceipt.disposition === "applied";
+    return {
+      commandId,
+      requestDigest: spent.commandReceipt.requestDigest,
+      disposition: spent.commandReceipt.disposition,
+      commitId: spent.commandReceipt.commitId,
+      chargeOutcomeVersion: spent.commandReceipt.outcomeVersion,
+      closeOutcomeVersion: null,
+      committedCostUsd: applied && submitted.known ? (submitted.costUsd ?? null) : null,
+      costStatus: !applied ? "not_committed" : submitted.known ? "known" : "unknown",
+    };
+  }
+  if (!spent.ok && spent.code === "command_conflict" && spent.commandConflict) {
+    return {
+      commandId,
+      requestDigest: spent.commandConflict.requestDigest,
+      disposition: "conflict",
+      commitId: spent.commandConflict.storedCommitId,
+      chargeOutcomeVersion: spent.commandConflict.storedOutcomeVersion,
+      closeOutcomeVersion: null,
+      committedCostUsd: null,
+      costStatus: "not_committed",
+    };
+  }
+  if (!spent.ok && spent.code === "evidence_missing") {
+    return {
+      commandId,
+      requestDigest: spent.evidenceGap?.requestDigest ?? null,
+      disposition: "evidence_missing",
+      commitId: null,
+      chargeOutcomeVersion: spent.evidenceGap?.outcomeVersion ?? null,
+      closeOutcomeVersion: null,
+      committedCostUsd: null,
+      costStatus: "not_committed",
+    };
+  }
+  return {
+    commandId,
+    requestDigest: null,
+    disposition: "absent",
+    commitId: null,
+    chargeOutcomeVersion: spent.ok ? spent.record.outcomeVersion : null,
+    closeOutcomeVersion: null,
+    committedCostUsd: null,
+    costStatus: "not_committed",
+  };
 }
 
 /**
@@ -550,12 +888,17 @@ export function chargeModelCallAgainstTip(
     parentTaskId?: string;
     parentAgentId?: string;
     nowMs?: number;
+    budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
   },
 ): {
   record: TaskOutcomeRecord;
   evidence: "known" | "unknown";
   costUsd?: number;
   closedForBudget: boolean;
+  budgetCommand: BudgetCommandReport;
+  callId: string | null;
+  associationCompleteness: "complete" | "partial" | "unlinked";
+  modelCallLink: ModelCallCloseoutLink | null;
 } {
   const classified = classifyTipBudgetCostFromUsage({
     usage: params.usage,
@@ -563,6 +906,8 @@ export function chargeModelCallAgainstTip(
     model: params.model,
     config: cfg,
   });
+  const activeBeforeCharge = currentExecutorModelCall();
+  const boundUsage = usageFromUnknown(params.usage);
   const charged = chargeRunnerTurnBudgetSpend(cfg, agentId, {
     taskId: params.taskId,
     scope: params.scope,
@@ -576,12 +921,86 @@ export function chargeModelCallAgainstTip(
     ...(params.parentTaskId ? { parentTaskId: params.parentTaskId } : {}),
     ...(params.parentAgentId ? { parentAgentId: params.parentAgentId } : {}),
     ...(params.nowMs != null ? { nowMs: params.nowMs } : {}),
+    ...(params.budgetLimits ? { budgetLimits: params.budgetLimits } : {}),
+    ...(activeBeforeCharge
+      ? {
+          callBinding: {
+            callId: activeBeforeCharge.callId,
+            evidenceId: activeBeforeCharge.evidenceId,
+            usageFingerprint: usageFingerprint(boundUsage),
+          },
+        }
+      : {}),
   });
+  const active = currentExecutorModelCall();
+  if (active && active.modelResponseStatus !== "observed") {
+    try {
+      noteModelResponse(active, { usage: params.usage, usageSource: "charge_callback" });
+    } catch {
+      // Noting usage must not change the committed budget result.
+    }
+  }
+  const usage = usageFromUnknown(params.usage);
+  const pricing = resolveModelCostConfig({
+    provider: params.provider,
+    model: params.model,
+    config: cfg,
+  });
+  let associationCompleteness: "complete" | "partial" | "unlinked" = "unlinked";
+  try {
+    const linked = associateBudgetCharge({
+      storeRoot: resolveStoreRoot(cfg, agentId),
+      call: active && active.taskId === params.taskId ? active : null,
+      budget: charged.budgetCommand,
+      record: charged.record,
+      scope: params.scope,
+      agentId,
+      taskId: params.taskId,
+      runId: params.runId,
+      attemptId: active?.attemptId ?? null,
+      usage,
+      cost: buildCostColumns({
+        usage,
+        provider: params.provider,
+        model: params.model,
+        cost: pricing ?? null,
+        businessTaskId: params.taskId,
+        runId: params.runId,
+        rollupRole: params.parentTaskId ? "child" : "own",
+      }),
+    });
+    associationCompleteness = linked?.completeness ?? "unlinked";
+  } catch {
+    associationCompleteness = "unlinked";
+  }
+  const committed =
+    charged.budgetCommand.disposition === "applied" && charged.budgetCommand.costStatus === "known"
+      ? charged.budgetCommand.committedCostUsd
+      : undefined;
   return {
     record: charged.record,
     evidence: classified.evidence,
-    ...(classified.costUsd != null ? { costUsd: classified.costUsd } : {}),
+    ...(committed != null ? { costUsd: committed } : {}),
     closedForBudget: charged.closedForBudget,
+    budgetCommand: charged.budgetCommand,
+    callId: active?.callId ?? null,
+    associationCompleteness,
+    modelCallLink:
+      active &&
+      (charged.budgetCommand.disposition === "applied" ||
+        charged.budgetCommand.disposition === "replayed") &&
+      typeof charged.budgetCommand.chargeOutcomeVersion === "number"
+        ? {
+            callId: active.callId,
+            evidenceId: active.evidenceId,
+            candidateAttemptId: active.attemptId,
+            chargeOutcomeVersion: charged.budgetCommand.chargeOutcomeVersion,
+            chargeCommitId: charged.budgetCommand.commitId,
+            requestDigest: charged.budgetCommand.requestDigest,
+            usageFingerprint: usageFingerprint(active.usage),
+            commandId: charged.budgetCommand.commandId,
+          }
+        : null,
   };
 }
 
@@ -883,6 +1302,18 @@ export async function recordRunnerTurnOutcome(
         throw new Error(`task-outcome fail_closed budget_exceeded failed: ${closed.code}`);
       }
       const evolution = await drainGrowthEvolution(cfg, agentId, store);
+      linkRunnerFinalEvidence(
+        cfg,
+        agentId,
+        scope,
+        taskId,
+        input.runId,
+        attemptId,
+        closed.record,
+        input.modelCallLink,
+        input.modelCallLinks,
+        input.budgetChargeReasons,
+      );
       return { record: closed.record, evolution };
     }
   }
@@ -1015,7 +1446,99 @@ export async function recordRunnerTurnOutcome(
   }
 
   const evolution = await drainGrowthEvolution(cfg, agentId, store);
+  linkRunnerFinalEvidence(
+    cfg,
+    agentId,
+    scope,
+    taskId,
+    input.runId,
+    attemptId,
+    record,
+    input.modelCallLink,
+    input.modelCallLinks,
+    input.budgetChargeReasons,
+  );
   return { record, evolution };
+}
+
+function linkRunnerFinalEvidence(
+  cfg: OpenBotConfig,
+  agentId: string,
+  scope: TrustedScope,
+  taskId: string,
+  runId: string,
+  taskAttemptId: string,
+  record: TaskOutcomeRecord,
+  link: ModelCallCloseoutLink | null | undefined,
+  links: ModelCallCloseoutLink[] | undefined,
+  budgetChargeReasons?: readonly string[],
+): void {
+  const all = dedupeLinks([...(links ?? []), ...(link ? [link] : [])]);
+  try {
+    const storeRoot = resolveStoreRoot(cfg, agentId);
+    if (all.length === 0) {
+      publishFinalEvidenceLink({
+        storeRoot,
+        call: null,
+        scope,
+        agentId,
+        taskId,
+        runId,
+        candidateAttemptId: null,
+        taskAttemptId,
+        chargeOutcomeVersion: null,
+        finalOutcomeVersion: record.outcomeVersion,
+        recordRuns: record.runs.map((run) => ({ runId: run.runId, attemptIds: run.attemptIds })),
+        recordAttempts: record.attempts.map((attempt) => attempt.attemptId),
+        receiptReturned: true,
+        snapshotFingerprint: snapshotIdentityFingerprint(record),
+        budgetChargeReasons,
+      });
+      return;
+    }
+    for (const item of all) {
+      const call =
+        getModelCall(item.callId) ??
+        readCallFiles(storeRoot).rows.find((row) => row.callId === item.callId) ??
+        null;
+      publishFinalEvidenceLink({
+        storeRoot,
+        call,
+        scope,
+        agentId,
+        taskId,
+        runId,
+        candidateAttemptId: item.candidateAttemptId,
+        taskAttemptId,
+        chargeOutcomeVersion: item.chargeOutcomeVersion,
+        finalOutcomeVersion: record.outcomeVersion,
+        recordRuns: record.runs.map((run) => ({ runId: run.runId, attemptIds: run.attemptIds })),
+        recordAttempts: record.attempts.map((attempt) => attempt.attemptId),
+        receiptReturned: true,
+        usageFingerprint: item.usageFingerprint,
+        snapshotFingerprint: snapshotIdentityFingerprint(record),
+        budgetCommandId: item.commandId,
+        chargeCommitId: item.chargeCommitId,
+        requestDigest: item.requestDigest,
+        budgetChargeReasons,
+      });
+    }
+  } catch {
+    // Final evidence must not change the task receipt.
+  }
+}
+
+function dedupeLinks(links: ModelCallCloseoutLink[]): ModelCallCloseoutLink[] {
+  const seen = new Set<string>();
+  const out: ModelCallCloseoutLink[] = [];
+  for (const link of links) {
+    if (!link.callId || seen.has(link.callId)) {
+      continue;
+    }
+    seen.add(link.callId);
+    out.push(link);
+  }
+  return out;
 }
 
 /**
