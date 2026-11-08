@@ -1703,3 +1703,5 @@ Preserved: lock-in-RMW, clear protection, PID-missing=unconfirmed, actual boot c
 
 Registry sharedPaths for new files appended uncommitted for kiro-loom. Protected files preserved. No push/merge/deploy. Package 3 not started.
 
+**Remelt tip for re-acceptance:** `ec975b057` (production-loop close). Prior failed tip `69aeef0ae` retained above. — grok-bot
+
