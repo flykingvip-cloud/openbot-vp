@@ -89,6 +89,11 @@ export type EvidenceAssociation = {
   cost: CostColumns;
   scopeId: string;
   agentId: string;
+  /**
+   * Uncertain command-charge reasons from closeout.
+   * Present only when a charge was not a clean new commit. Not a second task ledger.
+   */
+  budgetChargeReasons?: readonly string[];
 };
 
 const memoryAssociations: EvidenceAssociation[] = [];
@@ -439,6 +444,8 @@ export function publishFinalEvidenceLink(params: {
   budgetCommandId?: string | null;
   chargeCommitId?: string | null;
   requestDigest?: string | null;
+  /** Copied onto the durable association. Empty means no uncertain charge to explain. */
+  budgetChargeReasons?: readonly string[];
 }): EvidenceAssociation | null {
   if (!params.receiptReturned || params.finalOutcomeVersion == null) {
     return null;
@@ -567,6 +574,9 @@ export function publishFinalEvidenceLink(params: {
     },
     scopeId: scopeIdOf(params.scope),
     agentId: params.agentId,
+    ...(params.budgetChargeReasons && params.budgetChargeReasons.length > 0
+      ? { budgetChargeReasons: [...params.budgetChargeReasons] }
+      : {}),
   };
   rememberAssociation(association);
   if (!params.storeRoot || !executorEvidenceCollectionEnabled()) {

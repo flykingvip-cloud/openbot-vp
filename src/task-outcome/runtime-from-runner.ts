@@ -1312,6 +1312,7 @@ export async function recordRunnerTurnOutcome(
         closed.record,
         input.modelCallLink,
         input.modelCallLinks,
+        input.budgetChargeReasons,
       );
       return { record: closed.record, evolution };
     }
@@ -1455,6 +1456,7 @@ export async function recordRunnerTurnOutcome(
     record,
     input.modelCallLink,
     input.modelCallLinks,
+    input.budgetChargeReasons,
   );
   return { record, evolution };
 }
@@ -1469,6 +1471,7 @@ function linkRunnerFinalEvidence(
   record: TaskOutcomeRecord,
   link: ModelCallCloseoutLink | null | undefined,
   links: ModelCallCloseoutLink[] | undefined,
+  budgetChargeReasons?: readonly string[],
 ): void {
   const all = dedupeLinks([...(links ?? []), ...(link ? [link] : [])]);
   try {
@@ -1489,6 +1492,7 @@ function linkRunnerFinalEvidence(
         recordAttempts: record.attempts.map((attempt) => attempt.attemptId),
         receiptReturned: true,
         snapshotFingerprint: snapshotIdentityFingerprint(record),
+        budgetChargeReasons,
       });
       return;
     }
@@ -1516,6 +1520,7 @@ function linkRunnerFinalEvidence(
         budgetCommandId: item.commandId,
         chargeCommitId: item.chargeCommitId,
         requestDigest: item.requestDigest,
+        budgetChargeReasons,
       });
     }
   } catch {

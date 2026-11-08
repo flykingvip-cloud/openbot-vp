@@ -38,6 +38,7 @@ import {
   isPlatformAdmissionEmptyError,
 } from "../../../gateway/models/capability-admission/apply-runtime-admission.js";
 import { logVerbose } from "../../../globals.js";
+import { emitAgentEvent } from "../../../infra/agent-events.js";
 import {
   createRunCostCollector,
   snapshotRunCostPricing,
@@ -402,6 +403,15 @@ export async function runAdmittedTurn(
           chargeTipBudgetAfterModelCall,
           notifyAgentRunStart,
           observeExecution: (stage) => runtimeEvidence.capture(stage),
+          // Internal embedded failure is collected on the host event bus.
+          // It is not a candidate terminal and is not written as one.
+          observeAttempt: (event) => {
+            emitAgentEvent({
+              runId,
+              stream: "execution-attempt",
+              data: { kind: event.kind, terminal: false, coverage: "collected" },
+            });
+          },
           handlePartialForTyping,
           normalizeStreamingText,
           normalizeReplyMediaPaths,

@@ -11528,6 +11528,7 @@ tasks:
       - src/agents/model-fallback.ts
       - src/agent-runtime/model/authorized-session.ts
       - src/agent-runtime/execution/runner/admitted-turn.ts
+      - src/agent-runtime/execution/runner/admitted-turn.attempt-host.test.ts
       - src/agent-runtime/execution/runner/admitted-candidate.ts
       - src/agent-runtime/execution/runner/command-budget.ts
       - src/agent-runtime/execution/runner/command-candidate.ts
@@ -11567,6 +11568,7 @@ landingStreams:
       - src/agents/model-fallback.ts
       - src/agent-runtime/model/authorized-session.ts
       - src/agent-runtime/execution/runner/admitted-turn.ts
+      - src/agent-runtime/execution/runner/admitted-turn.attempt-host.test.ts
       - src/agent-runtime/execution/runner/admitted-candidate.ts
       - src/agent-runtime/execution/runner/admitted-candidate.test.ts
       - src/agent-runtime/execution/runner/command-budget.ts
