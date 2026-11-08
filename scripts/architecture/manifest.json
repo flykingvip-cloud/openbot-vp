@@ -246,6 +246,12 @@
     "description": "Production code consumes policy through the public index facade; numeric limits and decisions share one entry. Policy internals may cross-import; listed policy sources/tests are exempt."
   },
   {
+    "name": "runtime-context-reply-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/context/!(index).ts", "src/agent-runtime/context/*/**"],
+    "description": "Reply host consumes context projections through the public context/index facade, not assembly/history/untrusted/aside/learning internals."
+  },
+  {
     "name": "runtime-acceptance-no-platform-effects",
     "from": "src/agent-runtime/delivery/acceptance/**",
     "denyImportsFrom": [

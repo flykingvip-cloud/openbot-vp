@@ -3,14 +3,15 @@ import fs from "node:fs";
 import { formatTaskProposalReply } from "../../agent-runtime/command/index.js";
 import {
   appendSharedTurnContext,
+  appendUntrustedContext,
   assembleIndividual,
+  buildResumePrompt,
+  buildTaskBoardContext,
   finalizeSystemContext,
+  projectInteractionHistory,
+  resolveContextLane,
   selectSystemContextParts,
-} from "../../agent-runtime/context/assembly.js";
-import { resolveContextLane } from "../../agent-runtime/context/index.js";
-import { buildResumePrompt, buildTaskBoardContext } from "../../agent-runtime/context/index.js";
-import { projectInteractionHistory } from "../../agent-runtime/context/interaction-history.js";
-import { appendUntrustedContext } from "../../agent-runtime/context/untrusted.js";
+} from "../../agent-runtime/context/index.js";
 import {
   abortEmbeddedPiRun,
   isEmbeddedPiRunActive,

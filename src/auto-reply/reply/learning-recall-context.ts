@@ -1,7 +1,4 @@
-import {
-  mergeRecall,
-  renderLearningRecallPrompt,
-} from "../../agent-runtime/context/sources/learning-recall.js";
+import { mergeRecall, renderLearningRecallPrompt } from "../../agent-runtime/context/index.js";
 /**
  * 学习经验的系统提示词注入点。
  *
@@ -27,7 +24,7 @@ import {
   resolvePersonalLearningScopeId,
 } from "./learning-recall.js";
 
-export { renderLearningRecallPrompt } from "../../agent-runtime/context/sources/learning-recall.js";
+export { renderLearningRecallPrompt } from "../../agent-runtime/context/index.js";
 
 export type LearningRecallPromptBuildResult = {
   prompt: string | undefined;

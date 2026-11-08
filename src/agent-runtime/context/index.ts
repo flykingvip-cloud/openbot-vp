@@ -41,3 +41,14 @@ export { buildTaskBoardContext } from "./sources/task-board-context.js";
 export { renderIdentityBootstrapGuard } from "./sources/identity-bootstrap.js";
 
 export { omitTaskStatusSeparators, omitParkedPriorTurns } from "./sources/task-history.js";
+
+export { appendUntrustedContext } from "./untrusted.js";
+export { projectInteractionHistory } from "./interaction-history.js";
+export {
+  ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS,
+  ASIDE_DIALOGUE_HISTORY_TURN_CAP,
+  selectAsideTurnsWithinCharBudget,
+  type AsideDialogueTurn,
+} from "./aside-budget.js";
+export { renderCollaborationMission } from "./sources/collaboration-mission.js";
+export { mergeRecall, renderLearningRecallPrompt } from "./sources/learning-recall.js";

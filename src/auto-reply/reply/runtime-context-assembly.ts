@@ -7,8 +7,10 @@ export {
   isCollaborationGroupRuntimeSession,
   resolveCollaborationGroupIdForRun,
 } from "../../agent-runtime/command/index.js";
-import { assembleCollaborationMember } from "../../agent-runtime/context/index.js";
-import { renderCollaborationMission } from "../../agent-runtime/context/sources/collaboration-mission.js";
+import {
+  assembleCollaborationMember,
+  renderCollaborationMission,
+} from "../../agent-runtime/context/index.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import {

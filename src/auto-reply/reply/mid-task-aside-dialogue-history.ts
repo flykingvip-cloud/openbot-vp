@@ -17,7 +17,7 @@ import {
   ASIDE_DIALOGUE_HISTORY_TURN_CAP,
   selectAsideTurnsWithinCharBudget,
   type AsideDialogueTurn,
-} from "../../agent-runtime/context/aside-budget.js";
+} from "../../agent-runtime/context/index.js";
 import { wrapUntrustedPromptDataBlock } from "../../agents/sanitize-for-prompt.js";
 import {
   activeConstraintTexts,
@@ -416,4 +416,4 @@ export {
   ASIDE_DIALOGUE_HISTORY_TURN_CAP,
   selectAsideTurnsWithinCharBudget,
   type AsideDialogueTurn,
-} from "../../agent-runtime/context/aside-budget.js";
+} from "../../agent-runtime/context/index.js";
