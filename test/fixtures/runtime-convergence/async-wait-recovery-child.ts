@@ -1,6 +1,9 @@
 /**
- * Cross-process child for Package2 async-wait recovery acceptance.
+ * Cross-process child for Package2 async-wait recovery (lock / receipt wiring).
  * Modes: write-wait | claim-once | clear-stop | arm-and-execute | crash-after-claim | retry-after-crash
+ *
+ * Evidence: real process. arm-and-execute manually injects claim + outcome + confirmPending —
+ * it is NOT the production followup→transport loop (see production-path.test.ts).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -214,12 +217,17 @@ if (mode === "write-wait") {
     persistRoot,
     checkedTask: { sessionFile, binding: claimed.binding },
   });
+  const armedIntent = readAsyncWaitJobIntent(sessionFile, jobId);
   bindAsyncWaitRecoveryTurn({
     sessionFile,
     taskId: binding.taskId,
+    jobId,
+    claimToken: armedIntent?.recovery?.claimToken,
     runId,
     deliveryId,
     outcomeTaskId,
+    executionAttempt: claimed.binding.executionAttempt,
+    deliverableVersion: claimed.binding.deliverableVersion,
   });
   await confirmPendingTurnDeliveryWithPorts(
     {
@@ -259,6 +267,11 @@ if (mode === "write-wait") {
       promptHasUnconfirmed:
         enqueuedPrompt.includes("unconfirmed") || enqueuedPrompt.includes("WARNING"),
       promptHasEvidence: enqueuedPrompt.includes("evidenceKind="),
+      claimedPromptHasEvidence: claimed.prompt.includes(
+        "Async-wait job recovery context (Package2):",
+      ),
+      claimedPromptHasWarning:
+        claimed.prompt.includes("WARNING") || claimed.prompt.includes("unconfirmed"),
     }),
   );
 } else {

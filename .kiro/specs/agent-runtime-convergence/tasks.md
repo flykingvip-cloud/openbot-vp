@@ -1674,3 +1674,32 @@ Registry sharedPaths remain uncommitted for kiro-loom. Protected files preserved
 **Re-acceptance tip:** `d2bafcb14b47153e83cafc22d3daebf8ded8a7c3`
 
 Ready for Package 2 re-acceptance. — grok-bot
+
+## Package 2 re-acceptance remelt — production loop (2026-11-08)
+
+**Failed tip:** `69aeef0ae08c5345e8d6a2d722222a90f859bcb9`. Package 3 still NOT started.
+
+Preserved: lock-in-RMW, clear protection, PID-missing=unconfirmed, actual boot call site.
+
+### Fixes (closed production loop only; no new scheduler/task types)
+
+1. **Cold-start followup consumer** — `registerFollowupDrainCallback` + `ensureAsyncWaitRecoveryFollowupConsumer` (createFollowupRunner) wired before recovery enqueue; drain no longer no-ops after boot enqueue.
+2. **Trusted run fields** — enqueue resolves model/workspace/auth/delivery target from session store + config (`resolveTrustedRecoveryModel`, `resolveAgentWorkspaceDir`, lastChannel/lastTo). Deleted openai/recovery-continue and agentDir-as-workspaceDir.
+3. **Claim fences** — jobId+claimToken+stage+attempt; active `turn_bound` not re-claimable; no stage regression to `continue_armed`; bind refuses multiple open jobs by taskId alone; stop then late token cannot overwrite cleared.
+4. **Exec vs delivery recovery** — `delivery_pending` → `delivery_only` (no business re-enqueue); bind syncs `executionAttempt` so recheck cannot clear new recovery with stale attempt.
+5. **Claimed prompt evidence** — `claimQueuedExecution` merges wake.prompt with recovery appendix (WARNING/unconfirmed retained). Tests assert final claimed prompt.
+
+### Evidence (labeled)
+
+| Kind | Suite | Result |
+| --- | --- | --- |
+| Real queue/process + model stub + channel stub | `async-wait-recovery.production-path` 1 | PASS (boot→enqueue→followup drain→claim→model stub→channel stub→confirmPending→delivered) |
+| Trusted enqueue + cold-start consumer | `async-wait-recovery-enqueue` 2 | PASS |
+| Claim prompt merge | `claim-queued-execution.recovery-prompt` 2 | PASS |
+| Stage/token fences + overlapping stop | `async-wait-job.claim-fence` 5 | PASS |
+| Unit recovery (incl. delivery_only + attempt sync) | `async-wait-job-recovery` 8 | PASS |
+| Intent / stale-callback | async-wait-job 6, stale-callback 3 | PASS |
+| Real two-process (renamed; NOT full loop proof) | cross-process 4 — manual-inject receipt; dual claim; crash-retry; sequential stop-then-retry | PASS |
+
+Registry sharedPaths for new files appended uncommitted for kiro-loom. Protected files preserved. No push/merge/deploy. Package 3 not started.
+

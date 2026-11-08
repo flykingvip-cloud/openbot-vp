@@ -160,6 +160,7 @@ export function createFollowupRunner(params: {
         prompt: queued.prompt,
         binding: queued.run.taskCompletionBinding,
         continuationTicket: queued.taskBoardContinueTicket,
+        asyncWaitRecovery: queued.asyncWaitRecoveryBind,
         collaboration: Boolean(queued.run.collaborationRoundInvoked),
         privatePlan: Boolean(queued.run.privateRunBag),
       });

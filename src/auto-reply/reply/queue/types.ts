@@ -36,6 +36,11 @@ export type FollowupRun = {
   /** Original wake identity, revalidated when dequeued. */
   taskBoardContinueTicket?: { taskId: string; focusRevision: number };
   /**
+   * Package2 async-wait recovery bind fence: specific job + claimToken.
+   * claimQueuedExecution uses these so bind does not pick the first open job by taskId.
+   */
+  asyncWaitRecoveryBind?: { jobId: string; claimToken: string };
+  /**
    * askOutcome W1: optional parent TaskOutcome taskId when this followup is
    * an independent child of a prior user/chat/collab task.
    */

@@ -17,6 +17,7 @@ import {
   stopAsyncWaitJobRecoveryRecheckForTests,
 } from "./async-wait-job-recovery.js";
 import {
+  bindAsyncWaitRecoveryTurn,
   claimAsyncWaitJobForRecovery,
   clearAsyncWaitJobsForTests,
   markAsyncWaitJobExited,
@@ -242,4 +243,101 @@ it("boot recovery scans agent sessions and arms continue (not delivered)", () =>
     true,
   );
   clearAsyncWaitJobsForTests(sessionFile);
+});
+
+it("delivery_pending recovery is delivery_only — does not re-enqueue business continue", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-delivery-only-"));
+  roots.push(root);
+  const sessionFile = path.join(root, "session.jsonl");
+  fs.writeFileSync(sessionFile, "");
+  const binding = liveBoard(sessionFile);
+  recordAsyncWaitJobIntent({
+    jobId: "job-deliv",
+    sessionKey: "agent:main:main",
+    sessionFile,
+    taskId: binding.taskId,
+    executionAttempt: binding.executionAttempt,
+    deliverableVersion: binding.deliverableVersion,
+    pid: 999_999_700,
+    startedAt: Date.now(),
+  });
+  markAsyncWaitJobExited({
+    sessionFile,
+    jobId: "job-deliv",
+    exitStatus: "completed",
+  });
+  const claimed = claimAsyncWaitJobForRecovery({
+    sessionFile,
+    jobId: "job-deliv",
+    isPidAlive: () => false,
+  });
+  expect(claimed.ok).toBe(true);
+  if (!claimed.ok) {
+    return;
+  }
+  bindAsyncWaitRecoveryTurn({
+    sessionFile,
+    taskId: binding.taskId,
+    jobId: "job-deliv",
+    claimToken: claimed.claimToken,
+    runId: "run-done",
+    deliveryId: "delivery:run-done",
+    executionAttempt: "run-done",
+    deliverableVersion: "run-done",
+  });
+  // Sync attempt so boundary would pass if we wrongly re-armed — still must not enqueue.
+  const intent = readAsyncWaitJobIntent(sessionFile, "job-deliv")!;
+  const enqueue = vi.fn(() => true);
+  expect(armAsyncWaitRecoveryContinuation({ intent, enqueue }).outcome).toBe("delivery_only");
+  expect(enqueue).not.toHaveBeenCalled();
+});
+
+it("synced recovery attempt: recheck after bind does not clear with stale prior attempt", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-sync-attempt-"));
+  roots.push(root);
+  const sessionFile = path.join(root, "session.jsonl");
+  fs.writeFileSync(sessionFile, "");
+  const binding = liveBoard(sessionFile);
+  recordAsyncWaitJobIntent({
+    jobId: "job-sync",
+    sessionKey: "agent:main:main",
+    sessionFile,
+    taskId: binding.taskId,
+    executionAttempt: binding.executionAttempt,
+    deliverableVersion: binding.deliverableVersion,
+    pid: 999_999_701,
+    startedAt: Date.now(),
+  });
+  markAsyncWaitJobExited({
+    sessionFile,
+    jobId: "job-sync",
+    exitStatus: "completed",
+  });
+  const enqueue = vi.fn(() => true);
+  const first = armAsyncWaitRecoveryContinuation({
+    intent: readAsyncWaitJobIntent(sessionFile, "job-sync")!,
+    enqueue,
+  });
+  expect(first.outcome).toBe("continue_armed");
+  const token = readAsyncWaitJobIntent(sessionFile, "job-sync")!.recovery!.claimToken!;
+  // Simulate claimQueuedExecution binding a new attempt (board + intent synced).
+  startBoundTaskExecution(sessionFile, captureTaskCompletionBinding(sessionFile), "run-recovery-2");
+  bindAsyncWaitRecoveryTurn({
+    sessionFile,
+    taskId: binding.taskId,
+    jobId: "job-sync",
+    claimToken: token,
+    runId: "run-recovery-2",
+    executionAttempt: "run-recovery-2",
+    deliverableVersion: "run-recovery-2",
+  });
+  expect(readAsyncWaitJobIntent(sessionFile, "job-sync")?.executionAttempt).toBe("run-recovery-2");
+  // Active exec → skip, not clear.
+  const recheck = armAsyncWaitRecoveryContinuation({
+    intent: readAsyncWaitJobIntent(sessionFile, "job-sync")!,
+    enqueue,
+  });
+  expect(recheck.outcome).toBe("skipped");
+  expect(readAsyncWaitJobIntent(sessionFile, "job-sync")?.status).not.toBe("cleared");
+  expect(readAsyncWaitJobIntent(sessionFile, "job-sync")?.recovery?.stage).toBe("turn_bound");
 });

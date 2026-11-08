@@ -379,12 +379,36 @@ export type AsyncWaitClaimResult =
       claimToken: string;
       /** True when this call newly acquired the claim (vs retrying an open stage). */
       freshClaim: boolean;
+      /**
+       * Business already executed; only delivery confirmation remains.
+       * Caller must NOT re-enqueue business continue / re-run the model.
+       */
+      deliveryOnly?: boolean;
     }
   | {
       ok: false;
-      reason: "missing" | "cleared" | "still_waiting_pid" | "delivered" | "no_session";
+      reason:
+        | "missing"
+        | "cleared"
+        | "still_waiting_pid"
+        | "delivered"
+        | "no_session"
+        | "active_exec";
       intent?: AsyncWaitJobIntent;
     };
+
+const STAGE_RANK: Record<AsyncWaitRecoveryStage, number> = {
+  none: 0,
+  claimed: 1,
+  continue_armed: 2,
+  turn_bound: 3,
+  delivery_pending: 4,
+  delivered: 5,
+};
+
+export function asyncWaitRecoveryStageRank(stage: AsyncWaitRecoveryStage): number {
+  return STAGE_RANK[stage] ?? 0;
+}
 
 /**
  * Atomic recovery claim. PID alive → leave waiting (not success proof).
@@ -429,13 +453,55 @@ export function claimAsyncWaitJobForRecovery(input: {
       result = { ok: false, reason: "delivered", intent: current };
       return "keep";
     }
-    // Open stages stay claimable for retry (same claimToken if present).
-    if (recovery.stage !== "none" && recovery.claimToken) {
+    // Active execution is not re-claimable for another business continue.
+    if (recovery.stage === "turn_bound" && recovery.boundRunId && !recovery.boundDeliveryId) {
+      result = { ok: false, reason: "active_exec", intent: current };
+      return "keep";
+    }
+    // Executed-not-delivered: delivery-only recovery (do not re-run business).
+    if (recovery.stage === "delivery_pending" && recovery.claimToken) {
       result = {
         ok: true,
         intent: current,
         claimToken: recovery.claimToken,
         freshClaim: false,
+        deliveryOnly: true,
+      };
+      return {
+        ...current,
+        recovery: {
+          ...recovery,
+          lastAttemptAtMs: Date.now(),
+        },
+      };
+    }
+    // claimed / continue_armed stay claimable for retry with the same token.
+    if (
+      (recovery.stage === "claimed" || recovery.stage === "continue_armed") &&
+      recovery.claimToken
+    ) {
+      result = {
+        ok: true,
+        intent: current,
+        claimToken: recovery.claimToken,
+        freshClaim: false,
+      };
+      return {
+        ...current,
+        recovery: {
+          ...recovery,
+          lastAttemptAtMs: Date.now(),
+        },
+      };
+    }
+    // turn_bound with delivery id but not yet delivery_pending — treat as delivery-only.
+    if (recovery.stage === "turn_bound" && recovery.boundDeliveryId && recovery.claimToken) {
+      result = {
+        ok: true,
+        intent: current,
+        claimToken: recovery.claimToken,
+        freshClaim: false,
+        deliveryOnly: true,
       };
       return {
         ...current,
@@ -515,10 +581,16 @@ export function markAsyncWaitRecoveryContinueArmed(input: {
       return current;
     }
     const recovery = current.recovery;
+    // Token fence: late/stopped holders cannot overwrite.
     if (!recovery || recovery.claimToken !== input.claimToken) {
       return "keep";
     }
-    if (recovery.stage === "delivered") {
+    // No stage regression: turn_bound / delivery_pending / delivered cannot fall back.
+    if (
+      recovery.stage !== "claimed" &&
+      recovery.stage !== "continue_armed" &&
+      recovery.stage !== "none"
+    ) {
       return "keep";
     }
     return {
@@ -539,45 +611,83 @@ export function bindAsyncWaitRecoveryTurn(input: {
   sessionFile: string;
   taskId: string;
   runId: string;
+  /** Prefer explicit jobId — never bind the first open job by taskId alone when set. */
+  jobId?: string;
+  /** Required with jobId for exclusive bind; rejects late/stopped holders. */
+  claimToken?: string;
   deliveryId?: string;
   outcomeTaskId?: string;
+  /** Sync recovery intent to the live bound attempt so recheck cannot clear with a stale attempt. */
+  executionAttempt?: string;
+  deliverableVersion?: string;
 }): AsyncWaitJobIntent | undefined {
   const tid = input.taskId.trim();
   const runId = input.runId.trim();
   if (!tid || !runId) {
     return undefined;
   }
-  for (const intent of listAsyncWaitJobIntents(input.sessionFile)) {
+  const jobIdFilter = input.jobId?.trim() || undefined;
+  const tokenFilter = input.claimToken?.trim() || undefined;
+  // When jobId+claimToken are provided, bind that exact job only.
+  const candidates = listAsyncWaitJobIntents(input.sessionFile).filter((intent) => {
     if (intent.taskId !== tid || intent.status === "cleared") {
-      continue;
+      return false;
+    }
+    if (jobIdFilter && intent.jobId !== jobIdFilter) {
+      return false;
+    }
+    if (tokenFilter && intent.recovery?.claimToken !== tokenFilter) {
+      return false;
     }
     const stage = intent.recovery?.stage;
-    if (
-      stage !== "claimed" &&
-      stage !== "continue_armed" &&
-      stage !== "turn_bound" &&
-      stage !== "delivery_pending"
-    ) {
-      continue;
-    }
-    return transitionAsyncWaitJobIntent(input.sessionFile, intent.jobId, (current) => {
-      if (!current?.recovery?.claimToken) {
-        return "keep";
-      }
-      return {
-        ...current,
-        recovery: {
-          ...current.recovery,
-          stage: input.deliveryId ? "delivery_pending" : "turn_bound",
-          boundRunId: runId,
-          ...(input.deliveryId ? { boundDeliveryId: input.deliveryId } : {}),
-          ...(input.outcomeTaskId ? { boundOutcomeTaskId: input.outcomeTaskId } : {}),
-          lastAttemptAtMs: Date.now(),
-        },
-      };
-    });
+    return (
+      stage === "claimed" ||
+      stage === "continue_armed" ||
+      stage === "turn_bound" ||
+      stage === "delivery_pending"
+    );
+  });
+  // Without jobId, refuse to guess among multiple open jobs for the same taskId.
+  if (!jobIdFilter && candidates.length !== 1) {
+    return undefined;
   }
-  return undefined;
+  const target = candidates[0];
+  if (!target) {
+    return undefined;
+  }
+  return transitionAsyncWaitJobIntent(input.sessionFile, target.jobId, (current) => {
+    if (!current?.recovery?.claimToken) {
+      return "keep";
+    }
+    if (tokenFilter && current.recovery.claimToken !== tokenFilter) {
+      return "keep";
+    }
+    if (current.status === "cleared") {
+      return "keep";
+    }
+    const nextStage = input.deliveryId ? "delivery_pending" : "turn_bound";
+    // No stage regression (e.g. delivery_pending must not fall back to turn_bound).
+    if (
+      asyncWaitRecoveryStageRank(nextStage) < asyncWaitRecoveryStageRank(current.recovery.stage)
+    ) {
+      return "keep";
+    }
+    const syncedAttempt = input.executionAttempt?.trim();
+    const syncedDeliverable = input.deliverableVersion?.trim();
+    return {
+      ...current,
+      ...(syncedAttempt ? { executionAttempt: syncedAttempt } : {}),
+      ...(syncedDeliverable ? { deliverableVersion: syncedDeliverable } : {}),
+      recovery: {
+        ...current.recovery,
+        stage: nextStage,
+        boundRunId: runId,
+        ...(input.deliveryId ? { boundDeliveryId: input.deliveryId } : {}),
+        ...(input.outcomeTaskId ? { boundOutcomeTaskId: input.outcomeTaskId } : {}),
+        lastAttemptAtMs: Date.now(),
+      },
+    };
+  });
 }
 
 export function markAsyncWaitRecoveryDelivered(input: {

@@ -1,3 +1,15 @@
+/**
+ * Cross-process Package2 coverage — accurately scoped (NOT full production-loop proof).
+ *
+ * Evidence kinds:
+ * - real process: separate Node child via execFile (test/fixtures/.../async-wait-recovery-child.ts)
+ * - model stub: none here (no model invocation)
+ * - channel stub: none here (no transport send)
+ * - manual inject: arm-and-execute mode still manually drives claimQueuedExecution +
+ *   recordRunnerTurnOutcome(acceptance=passed) + confirmPending — useful for lock/receipt
+ *   wiring, but NOT proof of followup consumer → execute → transport. See
+ *   async-wait-recovery.production-path.test.ts for the real production-path chain.
+ */
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -16,7 +28,9 @@ async function run(root: string, mode: string) {
   return JSON.parse(line) as Record<string, unknown>;
 }
 
-it("Process A writes wait → Process B arms continue and completes real claim+delivery receipt", async () => {
+it("real-process (manual inject): A writes wait → B arms continue + claimQueuedExecution + confirmPending receipt", async () => {
+  // Coverage: cross-process intent durability + claimQueuedExecution bind + confirmPending
+  // receipt hook. Does NOT run followup drain or transport send.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-cross-loop-"));
   try {
     await run(root, "write-wait");
@@ -28,12 +42,14 @@ it("Process A writes wait → Process B arms continue and completes real claim+d
     expect(result.pendingAfter).toBe(false);
     expect(result.taskUnfinished).toBe(false);
     expect(result.promptHasEvidence).toBe(true);
+    expect(result.claimedPromptHasEvidence).toBe(true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 }, 90000);
 
-it("two processes claim under lock: single claimToken generation", async () => {
+it("real-process: two claimers under lock share one claimToken generation (one freshClaim)", async () => {
+  // Coverage: per-job file lock RMW for claim generation. Not a followup/execute race.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-cross-race-"));
   try {
     await run(root, "write-wait");
@@ -54,7 +70,8 @@ it("two processes claim under lock: single claimToken generation", async () => {
   }
 }, 90000);
 
-it("crash after claim before enqueue → retry arms continue", async () => {
+it("real-process: crash after claim before enqueue → retry arms continue_armed", async () => {
+  // Coverage: claimed-stage crash window retry. Sequential processes (not overlapping).
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-cross-crash-"));
   try {
     await run(root, "write-wait");
@@ -71,7 +88,9 @@ it("crash after claim before enqueue → retry arms continue", async () => {
   }
 }, 90000);
 
-it("stop/pause concurrent with recovery clears intent", async () => {
+it("real-process (sequential stop-then-retry): owner clear then recovery sees cleared", async () => {
+  // Coverage: stop/clear then later recovery. NOT a true overlapping stop-vs-claim race —
+  // stop completes before retry starts. See claim-fence tests for late-holder overwrite refusal.
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aw-cross-stop-"));
   try {
     await run(root, "write-wait");

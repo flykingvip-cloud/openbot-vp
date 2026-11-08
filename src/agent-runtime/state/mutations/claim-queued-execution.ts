@@ -5,6 +5,33 @@ import { bindAsyncWaitRecoveryTurn } from "../repository/async-wait-job.js";
 import { readSessionTaskBoard } from "../repository/task-board-file.js";
 import { startBoundTaskExecution } from "./execution-binding.js";
 
+const RECOVERY_APPENDIX_MARKER = "Async-wait job recovery context (Package2):";
+
+/** Extract Package2 recovery evidence appendix so wake.prompt cannot drop it. */
+export function extractAsyncWaitRecoveryAppendix(prompt: string): string | undefined {
+  const text = prompt ?? "";
+  const idx = text.indexOf(RECOVERY_APPENDIX_MARKER);
+  if (idx < 0) {
+    return undefined;
+  }
+  return text.slice(idx).trim();
+}
+
+/** Merge board continue prompt with preserved recovery evidence appendix. */
+export function mergeContinuePromptWithRecoveryAppendix(
+  wakePrompt: string,
+  inputPrompt: string,
+): string {
+  const appendix = extractAsyncWaitRecoveryAppendix(inputPrompt);
+  if (!appendix) {
+    return wakePrompt;
+  }
+  if (wakePrompt.includes(RECOVERY_APPENDIX_MARKER)) {
+    return wakePrompt;
+  }
+  return [wakePrompt.trimEnd(), "", appendix].join("\n");
+}
+
 /** Claim the original queued identity before commercial admission or provider work. */
 export function claimQueuedExecution(input: {
   sessionFile: string;
@@ -12,6 +39,8 @@ export function claimQueuedExecution(input: {
   prompt: string;
   binding?: TaskCompletionBinding;
   continuationTicket?: { taskId: string; focusRevision: number };
+  /** Package2: bind specific job + claimToken (not first open job by taskId). */
+  asyncWaitRecovery?: { jobId: string; claimToken: string };
   collaboration: boolean;
   privatePlan: boolean;
 }):
@@ -25,7 +54,8 @@ export function claimQueuedExecution(input: {
     if (!wake.ok || binding?.taskId !== ticket.taskId) {
       return { kind: "rejected", reason: "stale_wake" };
     }
-    prompt = wake.prompt;
+    // Preserve recovery appendix (incl. unconfirmed-result WARNING) into final claimed prompt.
+    prompt = mergeContinuePromptWithRecoveryAppendix(wake.prompt, input.prompt);
     binding = { ...binding, constraints: activeConstraintTexts(wake.task) };
   }
   const trackedIndividual =
@@ -44,6 +74,15 @@ export function claimQueuedExecution(input: {
       sessionFile: input.sessionFile,
       taskId: binding.taskId,
       runId: input.runId,
+      ...(input.asyncWaitRecovery
+        ? {
+            jobId: input.asyncWaitRecovery.jobId,
+            claimToken: input.asyncWaitRecovery.claimToken,
+          }
+        : {}),
+      // Sync intent attempt to the newly bound execution so recheck cannot clear with stale attempt.
+      executionAttempt: binding.executionAttempt,
+      deliverableVersion: binding.deliverableVersion,
     });
   }
   return { kind: "accepted", prompt, binding };

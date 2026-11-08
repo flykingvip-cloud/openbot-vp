@@ -22,6 +22,7 @@ import {
   markAsyncWaitRecoveryContinueArmed,
   readAsyncWaitJobIntent,
 } from "./async-wait-job.js";
+import { setAsyncWaitRecoveryFollowupConsumerEnsure } from "./async-wait-recovery-enqueue.js";
 import { readSessionTaskBoard } from "./task-board-file.js";
 
 export type AsyncWaitRecoveryLog = {
@@ -35,6 +36,8 @@ export type AsyncWaitRecoveryResult = {
   stillWaiting: number;
   /** Armed into task-board continue (not delivered). */
   continueArmed: number;
+  /** Executed-not-delivered — left for pending-delivery receipt path. */
+  deliveryOnly: number;
   cleared: number;
   skipped: number;
   retried: number;
@@ -189,9 +192,11 @@ export function armAsyncWaitRecoveryContinuation(params: {
     | "cleared"
     | "skipped"
     | "retried_open"
-    | "enqueue_failed";
+    | "enqueue_failed"
+    | "delivery_only";
   intent?: AsyncWaitJobIntent;
 } {
+  // Always re-read under claim lock — never trust a stale in-memory attempt from the caller.
   const claimed = claimAsyncWaitJobForRecovery({
     sessionFile: params.intent.sessionFile,
     jobId: params.intent.jobId,
@@ -204,10 +209,19 @@ export function armAsyncWaitRecoveryContinuation(params: {
     if (claimed.reason === "cleared") {
       return { outcome: "cleared", intent: claimed.intent };
     }
+    // active_exec / delivered / missing → skip; do not clear a live binding.
     return { outcome: "skipped", intent: claimed.intent };
   }
 
   const intent = claimed.intent;
+
+  // Executed-not-delivered: do NOT re-enqueue business continue / re-run the model.
+  // Pending-delivery recovery stays with TaskOutcome consumer + confirmPending receipt.
+  if (claimed.deliveryOnly) {
+    return { outcome: "delivery_only", intent };
+  }
+
+  // Boundary uses the locked intent (synced attempt after bind) — not the caller's stale snapshot.
   if (checkTaskActionBoundary(boundaryFor(intent))) {
     clearAsyncWaitJobIntent(intent.sessionFile, intent.jobId);
     return { outcome: "cleared", intent };
@@ -326,6 +340,7 @@ export function recoverAsyncWaitJobsAtGatewayBoot(params: {
     intentsSeen: intents.length,
     stillWaiting: 0,
     continueArmed: 0,
+    deliveryOnly: 0,
     cleared: 0,
     skipped: 0,
     retried: 0,
@@ -340,6 +355,8 @@ export function recoverAsyncWaitJobsAtGatewayBoot(params: {
         result.stillWaiting += 1;
       } else if (out.outcome === "continue_armed") {
         result.continueArmed += 1;
+      } else if (out.outcome === "delivery_only") {
+        result.deliveryOnly += 1;
       } else if (out.outcome === "retried_open") {
         result.retried += 1;
       } else if (out.outcome === "cleared") {
@@ -357,7 +374,7 @@ export function recoverAsyncWaitJobsAtGatewayBoot(params: {
     }
   }
   params.log?.info?.(
-    `async-wait recovery boot: agents=${result.agentsScanned} seen=${result.intentsSeen} waiting=${result.stillWaiting} continueArmed=${result.continueArmed} retried=${result.retried} cleared=${result.cleared} skipped=${result.skipped}`,
+    `async-wait recovery boot: agents=${result.agentsScanned} seen=${result.intentsSeen} waiting=${result.stillWaiting} continueArmed=${result.continueArmed} deliveryOnly=${result.deliveryOnly} retried=${result.retried} cleared=${result.cleared} skipped=${result.skipped}`,
   );
   if (params.startRecheck !== false) {
     startAsyncWaitJobRecoveryRecheck(params.cfg, {
@@ -417,4 +434,5 @@ export function stopAsyncWaitJobRecoveryRecheckForTests(): void {
   }
   recheckCfg = undefined;
   continueEnqueuePort = undefined;
+  setAsyncWaitRecoveryFollowupConsumerEnsure(undefined);
 }

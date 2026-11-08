@@ -1,21 +1,65 @@
 /**
  * Production enqueue adapter: arm task-board continue onto the existing
  * followup queue with a real taskBoardContinueTicket. Does not mark delivery.
+ *
+ * Resolves model / workspace / auth / delivery target from trusted session +
+ * config records — never openai/recovery-continue placeholders or agentDir-as-workspace.
+ * Ensures the existing followup drain consumer is registered before enqueue so
+ * cold-start recovery actually drains (FOLLOWUP_RUN_CALLBACKS wired at boot).
  */
 import fs from "node:fs";
-import { resolveAgentDir } from "../../../agents/agent-scope.js";
-import { enqueueFollowupRun } from "../../../auto-reply/reply/queue.js";
+import { resolveAgentDir, resolveAgentWorkspaceDir } from "../../../agents/agent-scope.js";
+import { resolveDefaultModelForAgent } from "../../../agents/model-selection.js";
+import {
+  enqueueFollowupRun,
+  hasFollowupDrainCallback,
+  kickFollowupDrainIfIdle,
+} from "../../../auto-reply/reply/queue.js";
 import type { FollowupRun } from "../../../auto-reply/reply/queue/types.js";
+import type { OriginatingChannelType } from "../../../auto-reply/templating.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { resolveDefaultSessionStorePath } from "../../../config/sessions/paths.js";
 import { loadSessionStore } from "../../../config/sessions/store.js";
+import type { SessionEntry } from "../../../config/sessions/types.js";
 import { captureTaskCompletionBinding } from "../../../conversation-task/session-task-board.js";
 import { resolveAgentIdFromSessionKey } from "../../../routing/session-key.js";
 import type { AsyncWaitRecoveryContinueEnqueue } from "./async-wait-job-recovery.js";
 
-function tryLoadSessionEntry(
-  sessionKey: string,
-): { sessionId: string; sessionFile?: string } | undefined {
+export type AsyncWaitRecoveryFollowupConsumerEnsure = (params: {
+  cfg: OpenBotConfig;
+  sessionKey: string;
+}) => void;
+
+let followupConsumerEnsurePort: AsyncWaitRecoveryFollowupConsumerEnsure | undefined;
+
+export function setAsyncWaitRecoveryFollowupConsumerEnsure(
+  port: AsyncWaitRecoveryFollowupConsumerEnsure | undefined,
+): void {
+  followupConsumerEnsurePort = port;
+}
+
+export function getAsyncWaitRecoveryFollowupConsumerEnsure():
+  | AsyncWaitRecoveryFollowupConsumerEnsure
+  | undefined {
+  return followupConsumerEnsurePort;
+}
+
+type TrustedSessionFields = {
+  sessionId: string;
+  sessionFile?: string;
+  workspaceDir?: string;
+  provider?: string;
+  model?: string;
+  authProfileId?: string;
+  authProfileIdSource?: "auto" | "user";
+  lastChannel?: string;
+  lastTo?: string;
+  lastAccountId?: string;
+  lastThreadId?: string | number;
+  entry?: SessionEntry;
+};
+
+function tryLoadTrustedSessionEntry(sessionKey: string): TrustedSessionFields | undefined {
   try {
     const agentId = resolveAgentIdFromSessionKey(sessionKey);
     const storePath = resolveDefaultSessionStorePath(agentId);
@@ -27,10 +71,37 @@ function tryLoadSessionEntry(
     if (!entry?.sessionId) {
       return undefined;
     }
-    return { sessionId: entry.sessionId, sessionFile: entry.sessionFile };
+    const provider = entry.providerOverride?.trim() || entry.modelProvider?.trim() || undefined;
+    const model = entry.modelOverride?.trim() || entry.model?.trim() || undefined;
+    return {
+      sessionId: entry.sessionId,
+      sessionFile: entry.sessionFile,
+      workspaceDir: entry.workspaceDir?.trim() || undefined,
+      provider,
+      model,
+      authProfileId: entry.authProfileOverride?.trim() || undefined,
+      authProfileIdSource: entry.authProfileOverrideSource,
+      lastChannel: entry.lastChannel,
+      lastTo: entry.lastTo,
+      lastAccountId: entry.lastAccountId,
+      lastThreadId: entry.lastThreadId,
+      entry,
+    };
   } catch {
     return undefined;
   }
+}
+
+/** Resolve provider/model from session overrides then agent/config defaults — never placeholders. */
+export function resolveTrustedRecoveryModel(params: {
+  cfg: OpenBotConfig;
+  agentId: string;
+  session?: TrustedSessionFields;
+}): { provider: string; model: string } {
+  const defaults = resolveDefaultModelForAgent({ cfg: params.cfg, agentId: params.agentId });
+  const provider = params.session?.provider?.trim() || defaults.provider;
+  const model = params.session?.model?.trim() || defaults.model;
+  return { provider, model };
 }
 
 export function createAsyncWaitRecoveryContinueEnqueue(
@@ -39,14 +110,24 @@ export function createAsyncWaitRecoveryContinueEnqueue(
   return (params) => {
     const agentId = resolveAgentIdFromSessionKey(params.sessionKey);
     const agentDir = resolveAgentDir(cfg, agentId);
-    const sessionMeta = tryLoadSessionEntry(params.sessionKey);
-    const sessionId = sessionMeta?.sessionId ?? `async-wait-recovery:${params.jobId}`;
+    const trusted = tryLoadTrustedSessionEntry(params.sessionKey);
+    const sessionId = trusted?.sessionId ?? `async-wait-recovery:${params.jobId}`;
+    const { provider, model } = resolveTrustedRecoveryModel({ cfg, agentId, session: trusted });
+    // Task workspace from session record, else agent workspace — never agentDir.
+    const workspaceDir = trusted?.workspaceDir || resolveAgentWorkspaceDir(cfg, agentId);
     let binding;
     try {
       binding = captureTaskCompletionBinding(params.sessionFile);
     } catch {
       binding = undefined;
     }
+
+    // Cold start: establish existing followup consumer before enqueue/drain.
+    if (!hasFollowupDrainCallback(params.sessionKey)) {
+      followupConsumerEnsurePort?.({ cfg, sessionKey: params.sessionKey });
+    }
+
+    const originatingChannel = trusted?.lastChannel as OriginatingChannelType | undefined;
     const run: FollowupRun = {
       prompt: params.prompt,
       messageId: params.messageId,
@@ -56,22 +137,40 @@ export function createAsyncWaitRecoveryContinueEnqueue(
         taskId: params.taskId,
         focusRevision: params.focusRevision,
       },
+      asyncWaitRecoveryBind: {
+        jobId: params.jobId,
+        claimToken: params.claimToken,
+      },
+      ...(originatingChannel ? { originatingChannel } : {}),
+      ...(trusted?.lastTo ? { originatingTo: trusted.lastTo } : {}),
+      ...(trusted?.lastAccountId ? { originatingAccountId: trusted.lastAccountId } : {}),
+      ...(trusted?.lastThreadId != null && trusted.lastThreadId !== ""
+        ? { originatingThreadId: trusted.lastThreadId }
+        : {}),
       run: {
         agentId,
         agentDir,
         sessionId,
         sessionKey: params.sessionKey,
         sessionFile: params.sessionFile,
-        workspaceDir: agentDir,
+        workspaceDir,
         config: cfg,
-        provider: "openai",
-        model: "recovery-continue",
+        provider,
+        model,
+        ...(trusted?.authProfileId
+          ? {
+              authProfileId: trusted.authProfileId,
+              authProfileIdSource: trusted.authProfileIdSource ?? "user",
+            }
+          : {}),
+        ...(originatingChannel ? { messageProvider: String(originatingChannel) } : {}),
+        ...(trusted?.entry ? { sessionEntry: trusted.entry } : {}),
         timeoutMs: 120_000,
         blockReplyBreak: "message_end",
         ...(binding ? { taskCompletionBinding: binding } : {}),
       },
     };
-    return enqueueFollowupRun(
+    const enqueued = enqueueFollowupRun(
       params.sessionKey,
       run,
       {
@@ -81,5 +180,10 @@ export function createAsyncWaitRecoveryContinueEnqueue(
       },
       "message-id",
     );
+    // Defensive: if consumer registered after enqueue raced, kick again.
+    if (enqueued && hasFollowupDrainCallback(params.sessionKey)) {
+      kickFollowupDrainIfIdle(params.sessionKey);
+    }
+    return enqueued;
   };
 }
