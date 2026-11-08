@@ -45,11 +45,18 @@ export type DataAssetLinkedCapability = {
   demoCapability: boolean;
 };
 
+export type DataAssetLinkedProduct = {
+  capabilityId: string;
+  displayName: string;
+};
+
 export type DataAssetLinkage = {
   sourceId: string;
   tenantId: string;
   accessMethod: DataConnectorAccessMethod;
   demo: boolean;
+  /** Data products whose sourceIds include this asset. Not a SAR verification. */
+  products: DataAssetLinkedProduct[];
   connection: {
     status: DataSourceStatus | "unknown";
     health: DataAssetConnectionHealth;
@@ -446,11 +453,19 @@ function buildOne(params: {
       : bridges.find((bridge) => bridge.bindingId === source.bindingId)?.userId;
   const primary = capabilities[0];
   const sameTenant = source.tenantId === params.store.dataSources[source.sourceId]?.tenantId;
+  const products = dataCapabilities
+    .filter((capability) => capability.enabled)
+    .map((capability) => ({
+      capabilityId: capability.capabilityId,
+      displayName: capability.displayName,
+    }))
+    .toSorted((left, right) => left.displayName.localeCompare(right.displayName, "zh"));
   return {
     sourceId: source.sourceId,
     tenantId: source.tenantId,
     accessMethod,
     demo: definition?.integrationTier === "demo",
+    products,
     connection: connectionOf(source),
     verification: aggregateVerification(capabilities),
     freshness: freshnessOf(source, params.nowIso),

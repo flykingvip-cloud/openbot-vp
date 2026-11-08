@@ -18,10 +18,17 @@ export type DataAssetLinkedCapabilityView = {
   demoCapability?: boolean;
 };
 
+export type DataAssetLinkedProductView = {
+  capabilityId: string;
+  displayName: string;
+};
+
 export type DataAssetLinkageView = {
   sourceId: string;
   accessMethod: "credential" | "website_session";
   demo: boolean;
+  /** Data products linked by sourceIds. Empty when the payload predates this field. */
+  products: DataAssetLinkedProductView[];
   connection: {
     status: string;
     health: DataAssetConnectionHealth;
@@ -204,6 +211,17 @@ export function normalizeAssetLinkage(raw: unknown): DataAssetLinkageView | null
         ];
       })
     : [];
+  const products = Array.isArray(record?.products)
+    ? record.products.flatMap((entry) => {
+        const item = asRecord(entry);
+        const capabilityId = typeof item?.capabilityId === "string" ? item.capabilityId : "";
+        const displayName = typeof item?.displayName === "string" ? item.displayName.trim() : "";
+        if (!capabilityId || !displayName) {
+          return [];
+        }
+        return [{ capabilityId, displayName }];
+      })
+    : [];
   const claimsSynced =
     freshness?.claimsSynced === true &&
     freshnessStatus !== "live_query" &&
@@ -216,6 +234,7 @@ export function normalizeAssetLinkage(raw: unknown): DataAssetLinkageView | null
     sourceId,
     accessMethod: record?.accessMethod === "website_session" ? "website_session" : "credential",
     demo: record?.demo === true,
+    products,
     connection: {
       status: typeof connection?.status === "string" ? connection.status : "unknown",
       health,
@@ -269,6 +288,23 @@ export function normalizeAssetLinkage(raw: unknown): DataAssetLinkageView | null
           : null,
     },
   };
+}
+
+/** SAR bridge names when present; otherwise linked data-product names. */
+export function assetLinkedCapabilityLabel(
+  linkage: DataAssetLinkageView | null | undefined,
+): string {
+  const bridges = linkage?.verification.capabilities ?? [];
+  if (bridges.length > 0) {
+    return bridges
+      .map((capability) => `${capability.capabilityId}@${capability.version}`)
+      .join("、");
+  }
+  const products = linkage?.products ?? [];
+  if (products.length > 0) {
+    return products.map((product) => product.displayName).join("、");
+  }
+  return "无";
 }
 
 export function normalizeAssetStats(raw: unknown): DataAssetStatsView {

@@ -10859,6 +10859,30 @@ tasks:
     since: 2026-11-05
     metadata: {}
 landingStreams:
+  - id: auto-data-product-supply-20261108
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/enterprise-data/connector-default-product-marker.ts
+      - src/gateway/enterprise-data/connector-default-products.ts
+      - src/gateway/enterprise-data/default-data-product-supply.ts
+      - src/gateway/enterprise-data/default-data-product-supply.test.ts
+      - src/gateway/enterprise-data/data-asset-linkage.ts
+      - src/gateway/enterprise-data/yonyou-tplus-sync.ts
+      - src/gateway/knowledge/enterprise-data-query.ts
+      - src/gateway/knowledge/feed/enterprise-feed-adapter.ts
+      - src/gateway/server-methods/enterprise-data-m6.ts
+      - src/gateway/server-methods/enterprise-data-m6.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/asset-linkage.node.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/asset-linkage.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/assets-page.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/outputs-page.ts
+    canLandWith: []
+    metadata:
+      task: auto-data-product-supply
+      owner: cursor-grok
+      purpose: After connect or sync, supply connector-pack default data products
+        into FeedItems. Seat authorization stays the human gate.
   - id: ensure-package-update-when-ready-20261105
     landingPolicy: serial
     paths:
