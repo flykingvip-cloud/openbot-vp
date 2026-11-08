@@ -1851,4 +1851,4 @@ Tool path: wrapToolWithBeforeToolCallHook → existing policy/hooks/boundary; de
 | `get-reply-run.aside-dialogue-context` + `collaboration-capability-context` | 2 files / 8 PASS |
 | Source edits for Package3 blockers | **none** (zero blockers) |
 
-**Remelt tip for Package3 acceptance:** *(filled after tip SHA commit)*. — grok-bot
+**Remelt tip for Package3 acceptance:** `17101ca9eca4010b0765720c81d47d684f14ad67` (gap verification only; zero blockers). Prior Package2 tip `4509f11b9` retained. — grok-bot
