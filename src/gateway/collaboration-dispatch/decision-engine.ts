@@ -762,6 +762,10 @@ export function decideParticipants(
     mentionMode: mentionResolution.mode,
     mentionAll,
   });
+  baseline.visibleReplyBudget = {
+    kind: resolvedLimit.mode === "group_broadcast" ? "broadcast" : "ordinary",
+    limit: visibleReplyLimit,
+  };
   // v1-only — P0.2 15:13 roll-call hotfix (allow-list groups only; default off).
   return finish(
     applyV1RollCallDecisionHotfix({

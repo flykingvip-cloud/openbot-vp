@@ -119,11 +119,22 @@ export function buildCollaborationRoundStages(
   };
 }
 
-export function sleepMs(ms: number) {
-  if (ms <= 0) {
+/** Resolve on abort so the caller can persist the normal round abort transition. */
+export function sleepMs(ms: number, signal?: AbortSignal): Promise<void> {
+  if (ms <= 0 || signal?.aborted) {
     return Promise.resolve();
   }
   return new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
+    const finish = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    signal?.addEventListener("abort", finish, { once: true });
+    // Covers an abort between the initial check and listener registration.
+    if (signal?.aborted) {
+      finish();
+    }
   });
 }

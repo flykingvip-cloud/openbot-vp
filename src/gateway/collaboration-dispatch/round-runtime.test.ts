@@ -1,9 +1,15 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, test } from "vitest";
-import { executeCollaborationRoundForTest } from "./__fixtures__/runtime-authority-test-utils.js";
+import { describe, expect, test, vi } from "vitest";
+import {
+  executeCollaborationRoundForTest,
+  decideParticipantsForTest,
+} from "./__fixtures__/runtime-authority-test-utils.js";
+import * as completionContract from "./completion-contract.js";
+import * as memberAdmission from "./member-admission.js";
 import { DEFAULT_COLLABORATION_POLICY } from "./policy.js";
+import * as roundOrchestrator from "./round-orchestrator.js";
 import {
   abortPersistedRound,
   applyRoundRecovery,
@@ -1027,3 +1033,391 @@ describe("collaboration round runtime contract", () => {
     expect(calls.some((entry) => entry.startsWith("fallback:"))).toBe(true);
   });
 });
+
+describe("invited member continuation after a settled primary deadline", () => {
+  test.each(["continue", "abort", "abort_supplement", "visible_limit", "optional"] as const)(
+    "%s retains admission and stop boundaries",
+    async (scenario) => {
+      const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-invited-"));
+      const calls: string[] = [];
+      let aborted = false;
+      const deadline = vi
+        .spyOn(completionContract, "resolvePrimaryDeadlineMs")
+        .mockImplementation(({ startedAtMs }) => startedAtMs + 5);
+      try {
+        const decision = createDecision({
+          roundId: "invited-late",
+          executionBots: [botA, botB],
+          roundPlan: {
+            ...createDecision().roundPlan,
+            participants: [
+              ...createDecision().roundPlan.participants,
+              {
+                agentId: "bot-b",
+                displayName: "Bot B",
+                tier: scenario === "optional" ? "duty" : "mention",
+                contributionRole: "supplement",
+                reasonText: "requested member",
+              },
+            ],
+          },
+        });
+        const scope = createCoordinatorScope();
+        if (scenario === "visible_limit" && scope.operatingState) {
+          scope.operatingState.collaborationPolicy.maxVisibleBotRepliesPerRound = 1;
+        }
+        const round = await executeCollaborationRoundForTest({
+          decision,
+          scope,
+          roundsDir,
+          sessionKey: "space:alpha",
+          message: "请分别给出建议",
+          isAborted: () => aborted,
+          policy: {
+            ...policyWithoutWrap(),
+            supplement: {
+              ...DEFAULT_COLLABORATION_POLICY.supplement,
+              enabled: true,
+            },
+          },
+          runBot: async ({ bot }) => {
+            calls.push(bot.agentId);
+            if (bot.agentId === "bot-a") {
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              aborted = scenario === "abort";
+            } else if (scenario === "abort_supplement") {
+              aborted = true;
+            }
+            return { text: "结论：给出可验证的独立建议。下一步：核实证据。" };
+          },
+        });
+        expect(calls).toEqual(
+          scenario === "continue" || scenario === "abort_supplement"
+            ? ["bot-a", "bot-b"]
+            : ["bot-a"],
+        );
+        expect(round.state).toBe(
+          scenario === "abort" || scenario === "abort_supplement"
+            ? "ROUND_ABORTED"
+            : "ROUND_COMPLETE",
+        );
+        if (scenario === "continue") {
+          expect(round.policyDecision?.supplementDenialDiagnosis?.structuralGate).toMatchObject({
+            primaryBudgetClosed: true,
+            invitedContinuation: true,
+          });
+        }
+      } finally {
+        deadline.mockRestore();
+        await fs.rm(roundsDir, { recursive: true, force: true });
+      }
+    },
+  );
+});
+
+describe("explicit member queue budgets and coordination", () => {
+  test.each(["late", "stop_between", "signal_between"] as const)("%s", async (scenario) => {
+    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-multi-"));
+    const calls: string[] = [];
+    let stopped = false;
+    const controller = new AbortController();
+    const deadline = vi
+      .spyOn(completionContract, "resolvePrimaryDeadlineMs")
+      .mockImplementation(({ startedAtMs }) => startedAtMs + (scenario === "late" ? 5 : 1000));
+    const wait = vi.spyOn(roundOrchestrator, "sleepMs").mockImplementation(async () => {
+      if (scenario === "stop_between" && calls.length === 1) {
+        stopped = true;
+      }
+      if (scenario === "signal_between" && calls.length === 1) {
+        controller.abort();
+      }
+    });
+    try {
+      const round = await executeCollaborationRoundForTest({
+        decision: createDecision({
+          roundId: "multi-continuation",
+          primaryMode: "explicit_multi",
+          mentionMode: "explicit_multi",
+          responseMode: "debate_or_brainstorm",
+          primaryQueue: ["bot-a", "bot-b"],
+          executionBots: [botA, botB],
+        }),
+        policy: policyWithoutWrap(),
+        scope: createScope(),
+        roundsDir,
+        message: "@bot-a @bot-b 分别给出建议",
+        sessionKey: "space:alpha",
+        isAborted: () => stopped,
+        signal: controller.signal,
+        runBot: async ({ bot }) => {
+          calls.push(bot.agentId);
+          if (scenario === "late") {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          return { text: "结论：给出独立建议。下一步：核对证据。" };
+        },
+      });
+      expect(calls).toEqual(scenario === "late" ? ["bot-a", "bot-b"] : ["bot-a"]);
+      expect(round.state).toBe(scenario === "late" ? "ROUND_COMPLETE" : "ROUND_ABORTED");
+      expect(wait).toHaveBeenCalledWith(2500, controller.signal);
+    } finally {
+      wait.mockRestore();
+      deadline.mockRestore();
+      await fs.rm(roundsDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("restart during a pending collaboration sequence", () => {
+  test.each(["PRIMARY_COMPLETED", "SUPPLEMENT_WINDOW"] as const)(
+    "%s records an interruption rather than successful queue completion",
+    async (state) => {
+      const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-pending-recovery-"));
+      try {
+        const round = {
+          ...createRespondingRound("pending-recovery"),
+          state,
+          primaryQueue: ["bot-a", "bot-b"],
+          primaryCursor: 0,
+        };
+        await writePersistedRound({ round, roundsDir });
+        const decision = decideRoundRecovery(round, Date.now());
+        expect(decision.action).toBe("abort");
+        expect(decision.reason).toBe("restart_pending_dispatch");
+        const recovered = await applyRoundRecovery(round, decision, { roundsDir });
+        expect(recovered.state).toBe("ROUND_ABORTED");
+        expect(recovered.dispatches).toEqual(round.dispatches);
+        expect(decideRoundRecovery(recovered, Date.now()).action).toBe("noop");
+        const events = await fs.readFile(
+          path.join(roundsDir, "pending-recovery.events.jsonl"),
+          "utf8",
+        );
+        expect(events).toContain("restart_pending_dispatch");
+        expect(events).toContain("bot-b");
+      } finally {
+        await fs.rm(roundsDir, { recursive: true, force: true });
+      }
+    },
+  );
+});
+
+test.each([undefined, 4])(
+  "explicit introduction honors broad ceiling %s beyond ordinary budget",
+  async (broadCeiling) => {
+    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-intro-contract-"));
+    const bots = Array.from({ length: 8 }, (_, index) => ({
+      ...botA,
+      agentId: `member-${index}`,
+      name: `成员${index}`,
+      sessionKey: `agent:member-${index}:space:alpha`,
+    }));
+    const scope: CollaborationDispatchScope = { ...createScope(), bots };
+    if (broadCeiling !== undefined) {
+      const operating = createCoordinatorScope().operatingState!;
+      scope.operatingState = {
+        ...operating,
+        collaborationPolicy: {
+          ...operating.collaborationPolicy,
+          maxVisibleBotRepliesPerRound: 3,
+          maxVisibleBotRepliesPerRoundBroad: broadCeiling,
+        },
+      };
+    }
+    const expectedCount = broadCeiling ?? 8;
+    const decision = decideParticipantsForTest({
+      scope,
+      message: "请你们分别介绍一下自己",
+      roundId: "intro-contract",
+    });
+    expect(decision.executionBots).toHaveLength(expectedCount);
+    expect(decision.visibleReplyBudget).toEqual({ kind: "broadcast", limit: expectedCount });
+    const calls: string[] = [];
+    const wait = vi.spyOn(roundOrchestrator, "sleepMs").mockResolvedValue();
+    try {
+      const round = await executeCollaborationRoundForTest({
+        decision,
+        scope,
+        roundsDir,
+        message: "请你们分别介绍一下自己",
+        sessionKey: "space:alpha",
+        policy: {
+          ...policyWithoutWrap(),
+          supplement: { ...DEFAULT_COLLABORATION_POLICY.supplement, enabled: true },
+        },
+        runBot: async ({ bot }) => {
+          calls.push(bot.agentId);
+          return { text: `我是${bot.name}，负责提供自己专业领域的独立意见。` };
+        },
+      });
+      expect(round.state).toBe("ROUND_COMPLETE");
+      expect(calls).toHaveLength(expectedCount);
+      expect(new Set(calls)).toEqual(new Set(decision.executionBots.map((bot) => bot.agentId)));
+      expect(round.policyDecision?.visibleReplyBudget).toEqual(decision.visibleReplyBudget);
+    } finally {
+      wait.mockRestore();
+      await fs.rm(roundsDir, { recursive: true, force: true });
+    }
+  },
+);
+
+test.each(["closed", "open", "late"] as const)(
+  "open discussion %s does not require conclusion formatting for selected members",
+  async (scenario) => {
+    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-policy-window-"));
+    const open = scenario !== "closed";
+    const deadline = vi
+      .spyOn(completionContract, "resolvePrimaryDeadlineMs")
+      .mockImplementation(({ startedAtMs }) => startedAtMs + (scenario === "late" ? 5 : 1000));
+    const scope = createCoordinatorScope();
+    scope.operatingState!.collaborationPolicy.openDiscussionWithoutMention = open;
+    scope.operatingState!.activeContext.currentOperatingPhase = "debate";
+    const calls: string[] = [];
+    try {
+      const round = await executeCollaborationRoundForTest({
+        scope,
+        roundsDir,
+        sessionKey: "space:alpha",
+        message: "请分析方案风险",
+        decision: createDecision({ roundId: "policy-window", executionBots: [botA, botB] }),
+        policy: {
+          ...policyWithoutWrap(),
+          supplement: { ...DEFAULT_COLLABORATION_POLICY.supplement, enabled: true },
+        },
+        runBot: async ({ bot }) => {
+          calls.push(bot.agentId);
+          if (scenario === "late" && bot.agentId === "bot-a") {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          return { text: "当前实现存在多个需要核查的边界，可以对照已有记录逐项验证。" };
+        },
+      });
+      expect(calls).toEqual(open ? ["bot-a", "bot-b"] : ["bot-a"]);
+      expect(round.state).toBe("ROUND_COMPLETE");
+      if (open) {
+        expect(round.policyDecision?.supplementWindow?.reason).toBe("policy");
+      }
+    } finally {
+      deadline.mockRestore();
+      await fs.rm(roundsDir, { recursive: true, force: true });
+    }
+  },
+);
+
+test("formal admitted executor is independent of speaking limit and supplement switch", async () => {
+  const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-formal-admission-"));
+  const scope = createCoordinatorScope();
+  scope.operatingState!.collaborationPolicy.maxVisibleBotRepliesPerRound = 1;
+  const admission = vi.spyOn(memberAdmission, "resolveMemberAdmission").mockResolvedValue({
+    purpose: "formal_execution",
+    binding: {
+      groupId: "alpha",
+      taskId: "t",
+      boardItemId: "b",
+      runId: "formal:bot-b",
+      source: "explicit_run",
+    },
+    taskBag: {
+      planGate: { confirmed: true, todolistStatus: "confirmed" },
+    } as import("./executor-private-todolist.js").ExecutionTaskBag,
+  });
+  const calls: string[] = [];
+  try {
+    const round = await executeCollaborationRoundForTest({
+      scope,
+      roundsDir,
+      decision: createDecision({
+        roundId: "formal",
+        responseMode: "decision_to_executor",
+        executionBots: [botA, botB],
+        roundPlan: {
+          ...createDecision().roundPlan,
+          participants: [
+            {
+              agentId: "bot-a",
+              displayName: "A",
+              tier: "mention",
+              contributionRole: "confirm",
+              reasonText: "confirm",
+            },
+            {
+              agentId: "bot-b",
+              displayName: "B",
+              tier: "duty",
+              contributionRole: "executor",
+              reasonText: "execute",
+            },
+          ],
+        },
+      }),
+      policy: policyWithoutWrap(),
+      message: "执行已确认任务",
+      sessionKey: "space:alpha",
+      runBot: async ({ bot }) => {
+        calls.push(bot.agentId);
+        return { text: "结论：已完成本次回合。" };
+      },
+    });
+    expect(round.state).toBe("ROUND_COMPLETE");
+    expect(calls).toEqual(["bot-a", "bot-b"]);
+    expect(admission).toHaveBeenCalledTimes(2);
+  } finally {
+    admission.mockRestore();
+    await fs.rm(roundsDir, { recursive: true, force: true });
+  }
+});
+
+test.each([false, true])(
+  "public receipt %s determines speaking consumption, not dispatch count",
+  async (committed) => {
+    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-public-receipt-"));
+    const scope = createCoordinatorScope();
+    scope.operatingState!.collaborationPolicy.maxVisibleBotRepliesPerRound = 2;
+    const calls: string[] = [];
+    try {
+      await executeCollaborationRoundForTest({
+        scope,
+        roundsDir,
+        sessionKey: "space:alpha",
+        message: "请分析方案风险",
+        decision: createDecision({
+          roundId: "receipt",
+          executionBots: [botA, botB, botC],
+          roundPlan: {
+            ...createDecision().roundPlan,
+            participants: [
+              ...createDecision().roundPlan.participants,
+              {
+                agentId: "bot-b",
+                displayName: "B",
+                tier: "mention",
+                contributionRole: "supplement",
+                reasonText: "invited",
+              },
+              {
+                agentId: "bot-c",
+                displayName: "C",
+                tier: "mention",
+                contributionRole: "supplement",
+                reasonText: "invited",
+              },
+            ],
+          },
+        }),
+        policy: {
+          ...policyWithoutWrap(),
+          supplement: { ...DEFAULT_COLLABORATION_POLICY.supplement, enabled: true },
+        },
+        runBot: async ({ bot }) => {
+          calls.push(bot.agentId);
+          return {
+            text: "结论：本成员已经给出独立意见。",
+            publicReplyCommitted: bot.agentId === "bot-b" ? committed : true,
+          };
+        },
+      });
+      expect(calls).toEqual(committed ? ["bot-a", "bot-b"] : ["bot-a", "bot-b", "bot-c"]);
+    } finally {
+      await fs.rm(roundsDir, { recursive: true, force: true });
+    }
+  },
+);

@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
-import { buildCollaborationRoundStages } from "./round-orchestrator.js";
+import { describe, expect, test, vi } from "vitest";
+import { buildCollaborationRoundStages, sleepMs } from "./round-orchestrator.js";
 import type { ParticipationDecision } from "./types.js";
 
 function createDecision(overrides: Partial<ParticipationDecision> = {}): ParticipationDecision {
@@ -154,4 +154,20 @@ describe("collaboration round orchestrator", () => {
     expect(stages.wrap.bots).toEqual([]);
     expect(stages.coordinationDelayMs).toBe(500);
   });
+});
+
+test("coordination wait cancels promptly and removes its timer", async () => {
+  vi.useFakeTimers();
+  try {
+    const controller = new AbortController();
+    const wait = sleepMs(2500, controller.signal);
+    expect(vi.getTimerCount()).toBe(1);
+    controller.abort();
+    await wait;
+    expect(vi.getTimerCount()).toBe(0);
+    await sleepMs(2500, controller.signal);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });

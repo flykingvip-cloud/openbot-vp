@@ -127,3 +127,14 @@ describe("collaboration group inbound history", () => {
     expect([...already].toSorted()).toEqual(["bot", "bot-skill"]);
   });
 });
+
+test("excludes the triggering identity while retaining later human interjections", () => {
+  const history = buildCollaborationGroupInboundHistory({
+    messages: [
+      { id: "trigger", role: "user", content: "原始问题", timestamp: 1 },
+      { id: "update", role: "user", content: "补充限制", timestamp: 2 },
+    ],
+    excludeMessageId: "trigger",
+  });
+  expect(history.map((entry) => entry.body)).toEqual(["补充限制"]);
+});

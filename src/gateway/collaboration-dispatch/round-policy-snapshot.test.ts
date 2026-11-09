@@ -73,12 +73,12 @@ describe("round-policy-snapshot (P0.0b)", () => {
     );
   });
 
-  it("G0-1: SYSTEM_INVARIANTS / protocol version stay at 1.1; L1 defaults unchanged", () => {
+  it("G0-1: SYSTEM_INVARIANTS / protocol version stay at 1.1; Owner-selected L1 defaults are revisioned", () => {
     expect(SYSTEM_INVARIANTS.protocolVersion).toBe("1.1");
     const empty = compileEffectiveCollaborationPolicy({});
     expect(empty.protocolVersion).toBe("1.1");
-    expect(empty.participation.maxVisibleBotRepliesPerRound).toBe(5);
-    expect(empty.participation.openDiscussionWithoutMention).toBe(false);
+    expect(empty.participation.maxVisibleBotRepliesPerRound).toBe(3);
+    expect(empty.participation.openDiscussionWithoutMention).toBe(true);
     expect(empty.participation.mentionBotMustRespond).toBe(false);
     expect(empty.dispatch.supplementEnabled).toBe(true);
     expect(empty.governance.botMaySelfAdvanceWithoutHuman).toBe(false);

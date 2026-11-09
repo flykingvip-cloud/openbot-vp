@@ -112,3 +112,23 @@ describe("supplement-denial-diagnosis (pure)", () => {
     expect(d.structureOutcome).toBe("passed_without_window");
   });
 });
+
+it("a settled late primary preserves only an explicitly admitted continuation", () => {
+  const gate = {
+    primaryCompleted: true,
+    primaryBudgetClosed: true,
+    invitedContinuation: true,
+    primaryMode: "single",
+    supplementEnabled: true,
+    responseMode: "lead_plus_supplement",
+    edgeTargetCount: 0,
+    supplementStructurallyAllowed: true,
+  };
+  expect(resolveSupplementFirstRejectReason(gate)).toBeNull();
+  expect(resolveSupplementFirstRejectReason({ ...gate, primaryCompleted: false })).toBe(
+    "primary_not_completed",
+  );
+  expect(resolveSupplementFirstRejectReason({ ...gate, supplementEnabled: false })).toBe(
+    "supplement_disabled",
+  );
+});

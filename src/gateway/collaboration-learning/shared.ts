@@ -36,6 +36,7 @@ import { readJsonFileWithFallback, writeJsonFileAtomically } from "../../plugin-
 import { toCollaborationSpaceSessionKey } from "../../sessions/session-key-utils.js";
 import { createInitialGrowthStatus } from "../agent-growth/factory.js";
 import type { GrowthStatus } from "../agent-growth/types.js";
+import { L1_DEFAULT } from "../collaboration-dispatch/policy-compiler.js";
 import { withRoundLock } from "../collaboration-dispatch/round-store-io.js";
 import { findActiveOwnershipRecord, listOwnershipRecords } from "../ownership-store.js";
 import { readSessionMessages, resolveSessionTranscriptCandidates } from "../session-utils.js";
@@ -1376,9 +1377,9 @@ export async function syncGroupOperatingState(params: {
       humanStartsNewRound: true,
       mentionBotMustRespond: true,
       mentionHumanNotifiesOnly: true,
-      openDiscussionWithoutMention: false,
+      openDiscussionWithoutMention: L1_DEFAULT.openDiscussionWithoutMention,
       allowSupplementAfterPrimary: true,
-      maxVisibleBotRepliesPerRound: 3,
+      maxVisibleBotRepliesPerRound: L1_DEFAULT.maxVisibleBotRepliesPerRound,
       replyLanguage: "zh",
       botMaySelfAdvanceWithoutHuman: false,
       entersWaitingForHumanAfterVisibleTurnsExhausted: true,

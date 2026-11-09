@@ -17,21 +17,34 @@ const golden = JSON.parse(
 ) as Array<{ input: GroupPolicyInput; legacy: ReturnType<typeof legacyEffectivePolicySlice> }>;
 
 describe("P1-A1 policy compiler segments", () => {
-  it("keeps pre-P1-A1 fields byte-identical on the combination matrix", () => {
+  it("preserves explicit legacy policies on the historical combination matrix", () => {
     for (const fixture of golden) {
-      const compiled = compileEffectiveCollaborationPolicy(fixture.input);
-      expect(legacyEffectivePolicySlice(compiled)).toEqual(fixture.legacy);
+      const compiled = compileEffectiveCollaborationPolicy({
+        openDiscussionWithoutMention: false,
+        maxVisibleBotRepliesPerRound: 5,
+        ...fixture.input,
+      });
+      const expected = structuredClone(fixture.legacy);
+      // Pin the former defaults as explicit L2 policy. Their provenance must
+      // change to L2 rather than pretending the platform still defaults to them.
+      if (fixture.input.openDiscussionWithoutMention === undefined) {
+        expected.provenance.openDiscussionWithoutMention = { value: false, source: "l2" };
+      }
+      if (fixture.input.maxVisibleBotRepliesPerRound === undefined) {
+        expected.provenance.maxVisibleBotRepliesPerRound = { value: 5, source: "l2", requested: 5 };
+      }
+      expect(legacyEffectivePolicySlice(compiled)).toEqual(expected);
     }
   });
 
   it("adds five capability segments with floorProtocol=legacy and no consumer flags", () => {
     const effective = compileEffectiveCollaborationPolicy({});
-    expect(effective.participation.floorOpenness).toBe("single");
+    expect(effective.participation.floorOpenness).toBe("open");
     expect(effective.participation.proactiveBots).toBe(false);
     expect(effective.participation.emergencyFanoutFuse).toBe(12);
     expect(effective.participation.rollCall).toEqual({ enabled: true, ceiling: 12 });
     expect(effective.dispatch.floorProtocol).toBe("legacy");
-    expect(effective.dispatch.tuning.floor.admission.budgets.visiblePosts).toBe(5);
+    expect(effective.dispatch.tuning.floor.admission.budgets.visiblePosts).toBe(3);
     expect(effective.dispatch.tuning.tier1Merge.dutyFloor).toBe(25);
     expect(effective.dispatch.tuning.cheapGate.clearlyIrrelevant).toBe(18);
     expect(effective.governance.capabilities).toEqual(L1_GOVERNANCE_CAPABILITIES);
@@ -40,7 +53,7 @@ describe("P1-A1 policy compiler segments", () => {
     expect(effective.context.crossSourceRetrieval).toBe(true);
     expect(effective.context.confidentialityCeiling).toBe("internal");
     expect(effective.presentation.replyLanguage).toBe("inherit");
-    expect(POLICY_COMPILER_REVISION).toBe("1.2.0");
+    expect(POLICY_COMPILER_REVISION).toBe("1.3.0");
   });
 
   it("derives floorOpenness / proactiveBots / rollCall / presentation from L2 inputs", () => {

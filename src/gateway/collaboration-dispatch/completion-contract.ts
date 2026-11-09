@@ -18,7 +18,7 @@ const PLACEHOLDER_SIGNALS = [
 const ACK_SIGNAL_LIMIT = 80;
 
 const CHITCHAT_GREETING_RE =
-  /^(你好|您好|嗨|大家好|各位好|全体好|hi|hello|hey|在吗|在不在|早上好|下午好|晚上好|中午好|谢谢|感谢|thanks|thx|ok|好的|嗯+|哈+)[!！?？。.\s~～👋🙏]*$/iu;
+  /^(?:(?:大家|各位|全体)[，,\s]*)?(你好|您好|嗨|大家好|各位好|全体好|hi|hello|hey|在吗|在不在|早上好|下午好|晚上好|中午好|谢谢|感谢|thanks|thx|ok|好的|嗯+|哈+)[!！?？。.\s~～👋🙏]*$/iu;
 
 const CHITCHAT_TASK_VERB_RE =
   /分析|研究|调研|统计|报表|数据|查询|检索|帮忙|请帮|写入|发布|执行|方案|计划|报告|对比|评估|总结|查一下|帮我/u;

@@ -15,6 +15,10 @@ export type SupplementFirstRejectReason =
 export type SupplementStructuralGateValues = {
   primaryCompleted: boolean;
   primaryBudgetClosed: boolean;
+  /** Settled primary deadline may preserve already invited member turns only. */
+  invitedContinuation?: boolean;
+  /** Already-selected related members retain the ordinary round budget. */
+  policyContinuation?: boolean;
   primaryMode: string;
   supplementEnabled: boolean;
   responseMode: string;
@@ -67,7 +71,7 @@ export function resolveSupplementFirstRejectReason(
   if (!gate.primaryCompleted) {
     return "primary_not_completed";
   }
-  if (gate.primaryBudgetClosed) {
+  if (gate.primaryBudgetClosed && !gate.invitedContinuation && !gate.policyContinuation) {
     return "primary_budget_closed";
   }
   if (gate.primaryMode === "explicit_multi") {

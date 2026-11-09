@@ -245,6 +245,7 @@ export type SupplementGateEntry = {
 
 /** Why these bots were scheduled. Not the Collaboration Ledger. */
 export type PolicyDecisionRecord = {
+  visibleReplyBudget?: import("./types.js").RoundVisibleReplyBudget;
   roundId: string;
   protocolVersion: typeof COLLABORATION_POLICY_PROTOCOL_VERSION;
   effectivePolicyHash: string;
@@ -254,7 +255,7 @@ export type PolicyDecisionRecord = {
   /** Why the supplement window did / did not open after the primary. */
   supplementWindow?: {
     opened: boolean;
-    reason: "conclusion" | "invited" | "no_conclusion" | "not_allowed";
+    reason: "conclusion" | "invited" | "policy" | "no_conclusion" | "not_allowed";
   };
   /** Per-candidate Cheap Gate verdicts, including drop reasons. */
   supplementGate?: SupplementGateEntry[];

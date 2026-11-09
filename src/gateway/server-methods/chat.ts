@@ -196,6 +196,7 @@ import {
 } from "../collaboration-dispatch/discussion-turn-prompt.js";
 import type { EffectiveCollaborationPolicy } from "../collaboration-dispatch/effective-policy.js";
 import { runSingleBeatEpisodeAroundRound } from "../collaboration-dispatch/episode-single-beat-runtime.js";
+import { formatExecutionTaskBagForPrompt } from "../collaboration-dispatch/executor-private-todolist.js";
 import { resolveExplicitMentionTokens } from "../collaboration-dispatch/explicit-mention-tokens.js";
 import {
   emitCollabFaultRoundDiagnostic,
@@ -203,7 +204,6 @@ import {
   type FaultRoundVisibleOutcome,
 } from "../collaboration-dispatch/fault-round-diagnostic.js";
 import { isRosterAllowedGroupDiscussionBot } from "../collaboration-dispatch/group-discussion-roster.js";
-import { buildCollaborationGroupInboundHistory } from "../collaboration-dispatch/group-inbound-history.js";
 import {
   buildV1RollCallRosterFromExecutions,
   buildV1RollCallRosterPromptLines,
@@ -212,6 +212,11 @@ import {
   type V1RollCallRoster,
 } from "../collaboration-dispatch/hotfix-rollcall-v1.js"; // v1-only
 import { resolveProductionCollaborationExecutor } from "../collaboration-dispatch/legacy-production-executor.js";
+import { resolveMemberAdmission } from "../collaboration-dispatch/member-admission.js";
+import {
+  assertMemberContextFitsModel,
+  readCollaborationMemberContext,
+} from "../collaboration-dispatch/member-context.js";
 import {
   normalizeAgentIdentifier,
   normalizeMentionIdentity,
@@ -247,7 +252,6 @@ import {
 import { buildGroupRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import type { RuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import {
-  buildSameRoundContext,
   type SameRoundContext,
   type SameRoundReply,
 } from "../collaboration-dispatch/same-round-context.js";
@@ -3561,6 +3565,20 @@ async function runGroupBotDiscussionTurn(params: {
       cfg,
       overrideMs: params.timeoutMs,
     });
+    const modelRef = resolveSessionModelRef(cfg, entry, params.bot.agentId);
+    const catalog = await params.context.loadGatewayModelCatalog();
+    const selectedModel = catalog.find(
+      (model) => model.provider === modelRef.provider && model.id === modelRef.model,
+    );
+    // The executor still owns total prompt/tool admission. This checks only the
+    // collaboration material against the currently selected member model.
+    if (selectedModel?.contextWindow) {
+      assertMemberContextFitsModel({
+        contextWindowTokens: selectedModel.contextWindow,
+        history: params.groupInboundHistory ?? [],
+        sameRoundContext: params.sameRoundContext,
+      });
+    }
     const runId = `${params.clientRunId}:${params.bot.agentId}`;
     let faultOutcome: FaultRoundVisibleOutcome = { kind: "empty", skipReason: "empty" };
     const now = Date.now();
@@ -4181,6 +4199,7 @@ async function runGroupBotDiscussionTurn(params: {
         agentId: params.bot.agentId,
         agentName: params.bot.name,
         contributionRole: params.contributionRole ?? "supplement",
+        publicReplyCommitted: appended.ok,
         text: replyText,
         ...(collabEdgeDirectiveSource ? { rawText: collabEdgeDirectiveSource } : {}),
         ...(appended.ok && appended.messageId ? { messageId: appended.messageId } : {}),
@@ -5399,21 +5418,6 @@ export const chatHandlers: GatewayRequestHandlers = {
         runId: clientRunId,
         log: context.logGateway,
       });
-      const groupMessagesAfterUserAppend =
-        groupSession.entry.sessionId && groupSession.storePath
-          ? readSessionMessages(
-              groupSession.entry.sessionId,
-              groupSession.storePath,
-              groupSession.entry.sessionFile,
-            )
-          : [];
-      const groupInboundHistory = buildCollaborationGroupInboundHistory({
-        messages:
-          groupMessagesAfterUserAppend.length > 0
-            ? groupMessagesAfterUserAppend.slice(0, -1)
-            : groupMessagesAfterUserAppend,
-        limit: 24,
-      });
 
       const groupCfg = (await loadSessionEntryForClient("main", client)).cfg;
       const groupTimeoutMs = resolveAgentTimeoutMs({
@@ -5532,7 +5536,36 @@ export const chatHandlers: GatewayRequestHandlers = {
                 return;
               }
               try {
+                // Read the authorized public transcript again for every member; a
+                // round-start snapshot misses human interjections during prior turns.
+                const memberContext = readCollaborationMemberContext({
+                  readMessages: () =>
+                    readSessionMessages(
+                      groupSession.entry.sessionId,
+                      groupSession.storePath,
+                      groupSession.entry.sessionFile,
+                    ),
+                  triggeringMessageId: `local-${clientRunId}`,
+                  completedReplies: sameRoundReplies,
+                });
+                if (parentAbortController.signal.aborted) {
+                  return;
+                }
+                const admission = await resolveMemberAdmission({
+                  authority,
+                  agentId: params.bot.agentId,
+                  runId: `${clientRunId}:${params.bot.agentId}`,
+                  taskId: scope.operatingState?.activeContext.currentTaskId,
+                  executionRequested: params.contributionRole === "executor",
+                  cfg: groupCfg,
+                });
+                if (admission.purpose === "blocked") {
+                  throw new Error(`正式执行尚未准入：${admission.reason}`);
+                }
                 const reply = await runGroupBotDiscussionTurn({
+                  ...(admission.purpose === "formal_execution"
+                    ? { executionDeliverableBinding: admission.binding }
+                    : {}),
                   context,
                   client,
                   bot: params.bot,
@@ -5544,7 +5577,10 @@ export const chatHandlers: GatewayRequestHandlers = {
                   contributionRole:
                     params.contributionRole ?? contributionRoleByAgentId.get(params.bot.agentId),
                   isWrapTurn: params.isWrapTurn,
-                  message: transcriptMessage,
+                  message:
+                    admission.purpose === "formal_execution"
+                      ? `${transcriptMessage}\n\n${formatExecutionTaskBagForPrompt(admission.taskBag)}`
+                      : transcriptMessage,
                   thinking: p.thinking,
                   timeoutMs: p.timeoutMs,
                   deliver: p.deliver,
@@ -5552,9 +5588,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                   stagedMediaContext,
                   systemInputProvenance,
                   systemProvenanceReceipt,
-                  groupInboundHistory,
-                  // Only prior completed replies — never in-flight future turns.
-                  sameRoundContext: buildSameRoundContext(sameRoundReplies),
+                  ...memberContext,
                   dispatchRole: params.dispatchRole,
                   ...(params.collabEdge ? { collabEdge: params.collabEdge } : {}),
                   ...(p.contextScope ? { contextScopeRequest: p.contextScope } : {}),

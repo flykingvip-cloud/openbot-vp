@@ -10,6 +10,7 @@ import {
 } from "../../shared/text/visible-message-text.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../utils/directive-tags.js";
 import { classifyPlaceholderReply } from "./completion-contract.js";
+import { CollaborationMemberContextBudgetError } from "./member-context.js";
 import { isNoReplyText } from "./quality-classifier.js";
 
 export type CollaborationSkipReason =
@@ -366,6 +367,9 @@ export function formatCollaborationRoundAbortNotice(params: {
 }
 
 export function formatCollaborationDispatchFailure(err: unknown): string {
+  if (err instanceof CollaborationMemberContextBudgetError) {
+    return err.message;
+  }
   const message = err instanceof Error ? err.message : String(err);
   if (message.includes("workspace_authorization_failed")) {
     return (

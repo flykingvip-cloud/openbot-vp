@@ -24,13 +24,13 @@ import {
 
 export const L1_DEFAULT = {
   collaborationMode: "discussion_driven" as CollaborationModeTemplateId,
-  openDiscussionWithoutMention: false,
+  openDiscussionWithoutMention: true,
   // Decoupled from openDiscussion: analysis/task rounds may still open SUPPLEMENT_WINDOW.
-  // New field only — do not change openDiscussion/maxVisible/mention L1 defaults to match seed.
+  // Owner-selected default: related members participate within a three-reply budget.
   allowSupplementAfterPrimary: true,
   // Distinct from COLLABORATION_DEFAULT_MAX_VISIBLE_REPLIES (missing-config fallback).
   // New-group seed in collaboration-learning/shared.ts may differ (task_driven / maxVisible=3).
-  maxVisibleBotRepliesPerRound: 5,
+  maxVisibleBotRepliesPerRound: 3,
   mentionBotMustRespond: false,
   humanStartsNewRound: true,
   botMaySelfAdvanceWithoutHuman: false,
