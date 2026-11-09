@@ -5,6 +5,7 @@ import {
   type ExecutionAdmissionPorts,
   type ExecutionAdmissionResult,
 } from "./execution-admission.js";
+import { formatRestrictedInteractionNotice } from "./interaction-sources.js";
 import { interpretInteraction, type InteractionInferencePort } from "./interpret-interaction.js";
 
 export type RoutedInteraction =
@@ -23,6 +24,17 @@ export async function routeInteraction(
   ports: { inference: InteractionInferencePort; admission: ExecutionAdmissionPorts },
 ): Promise<RoutedInteraction> {
   const decision = await interpretInteraction(input, ports.inference);
+  if (
+    input.availability?.mode === "restricted" &&
+    decision.kind !== "reply" &&
+    decision.kind !== "clarify"
+  ) {
+    return {
+      kind: "respond",
+      text: formatRestrictedInteractionNotice(input.availability),
+      clarification: false,
+    };
+  }
   switch (decision.kind) {
     case "reply":
     case "clarify":

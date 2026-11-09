@@ -1,3 +1,4 @@
+import type { InteractionAvailability } from "./interaction-availability.js";
 import type { TaskAcceptanceCheck } from "./quality.js";
 /** Model interpretation is a proposal. Execution admission remains a host decision. */
 export type InteractionExecutionRequest = {
@@ -25,6 +26,8 @@ export type InteractionModelDecision =
   | { kind: "execution_request"; request: InteractionExecutionRequest };
 
 export type InteractionModelInput = {
+  /** Trusted source availability. Does not waive model or identity authorization. */
+  availability?: InteractionAvailability;
   message: string;
   /** Authorized, sanitized inbound pixels; no tool permission is implied. */
   images?: readonly { type: "image"; data: string; mimeType: string }[];

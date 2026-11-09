@@ -1,11 +1,30 @@
 import { expect, it, vi } from "vitest";
-import { admitExecutionRequest, type ExecutionAdmissionInput } from "./execution-admission.js";
+import {
+  admitExecutionRequest,
+  bindExecutionAdmissionPorts,
+  type ExecutionAdmissionInput,
+} from "./execution-admission.js";
 const input: ExecutionAdmissionInput = {
   requestId: "message-a",
   expectedFocusRevision: 0,
   expectedWriteEpoch: 0,
   proposal: { goal: "报告", acceptance: ["来源可核验"] },
 };
+it("does not retry or claim no task was written after a storage failure", async () => {
+  const commit = vi.fn(() => {
+    throw Object.assign(new Error("after write failed"), { code: "EIO" });
+  });
+  const ports = bindExecutionAdmissionPorts({
+    sessionFile: "/tmp/task",
+    authorize: async () => true,
+    commit,
+  });
+  expect(await admitExecutionRequest(input, ports)).toEqual({
+    kind: "rejected",
+    reason: "task_mutation_unconfirmed",
+  });
+  expect(commit).toHaveBeenCalledOnce();
+});
 it("denies before task creation", async () => {
   const commit = vi.fn();
   expect(await admitExecutionRequest(input, { authorize: async () => false, commit })).toEqual({

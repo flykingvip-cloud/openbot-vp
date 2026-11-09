@@ -49,6 +49,11 @@ export function buildInteractionCompletionContext(
   }
   // Shared identity/skill guidance must not override the host's wire protocol.
   system.push(PROTOCOL);
+  if (input.availability?.mode === "restricted") {
+    system.push(
+      "Host restricted interaction: answer or clarify only. Execution and all task mutations are unavailable this turn. Do not claim any task is running, stopped, changed, recovered or complete. If asked to act, explain that no task action has been applied. Use only available context; do not invent missing history. This restriction never waives authorization or model budgets.",
+    );
+  }
   system.push(`Host-bound task target: ${JSON.stringify(input.taskTarget ?? null)}`);
   const images = input.images ?? [];
   const canSeeImages = model.input?.includes("image");

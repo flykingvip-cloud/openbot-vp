@@ -21,6 +21,7 @@ export type ChatInboundStage =
   | "tool_policy_applied"
   | "tool_rejected"
   | "context_compiled"
+  | "interaction_restricted"
   | "context_provider_boundary";
 
 export function hashChatSessionKey(sessionKey: string): string {

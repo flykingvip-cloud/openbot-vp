@@ -1,6 +1,6 @@
 import type { ExecutionAdmissionInput, ExecutionAdmissionResult } from "../contracts/execution.js";
 import type { TaskAcceptanceCheck } from "../contracts/quality.js";
-import { parseTaskAcceptanceChecks } from "../policy/index.js";
+import { parseTaskAcceptanceChecks, isRecoverableInteractionSourceError } from "../policy/index.js";
 export type { ExecutionAdmissionInput, ExecutionAdmissionResult } from "../contracts/execution.js";
 
 export type ExecutionAdmissionPorts = {
@@ -73,16 +73,25 @@ export function bindExecutionAdmissionPorts(params: {
   return {
     authorize: params.authorize,
     commit: (request) => {
-      const result = params.commit({
-        sessionFile: params.sessionFile,
-        requestId: request.requestId,
-        goal: request.proposal.goal,
-        acceptance: request.proposal.acceptance,
-        ...(request.proposal.checks !== undefined ? { checks: request.proposal.checks } : {}),
-        expectedFocusRevision: request.expectedFocusRevision,
-        expectedWriteEpoch: request.expectedWriteEpoch,
-        expectedTaskId: request.expectedTaskId,
-      });
+      let result: ReturnType<typeof params.commit>;
+      try {
+        result = params.commit({
+          sessionFile: params.sessionFile,
+          requestId: request.requestId,
+          goal: request.proposal.goal,
+          acceptance: request.proposal.acceptance,
+          ...(request.proposal.checks !== undefined ? { checks: request.proposal.checks } : {}),
+          expectedFocusRevision: request.expectedFocusRevision,
+          expectedWriteEpoch: request.expectedWriteEpoch,
+          expectedTaskId: request.expectedTaskId,
+        });
+      } catch (error) {
+        if (!isRecoverableInteractionSourceError(error)) {
+          throw error;
+        }
+        // A writer may have partially completed. Never retry or claim no state changed.
+        return { kind: "rejected", reason: "task_mutation_unconfirmed" };
+      }
       return result.kind === "accepted"
         ? {
             ...result,
