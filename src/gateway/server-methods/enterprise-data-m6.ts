@@ -32,13 +32,13 @@ import {
   startDataConnectorOAuthSession,
 } from "../enterprise-data/connector-oauth.js";
 import { ensureConnectorPackage } from "../enterprise-data/connector-packages.js";
+import { syncConnectedSourceAndSupply } from "../enterprise-data/connector-sync-lifecycle.js";
 import { resolveDataAuthorizationCards } from "../enterprise-data/dashboard-authorization-store.js";
 import { resolveDataCapabilityUsageRows } from "../enterprise-data/dashboard-capability-rows-store.js";
 import { resolveDataSourceHealthRows } from "../enterprise-data/dashboard-source-health-store.js";
 import { resolveDataCapabilityDashboardSummary } from "../enterprise-data/dashboard-summary-store.js";
 import { recordSourceConnectionCheck } from "../enterprise-data/data-asset-linkage.js";
 import { findDataSource } from "../enterprise-data/data-source-store.js";
-import { supplyDefaultDataProductsSafely } from "../enterprise-data/default-data-product-supply.js";
 import { requireResolvedEnterpriseAdminTenantId } from "../enterprise-data/enterprise-data-seat-context.js";
 import { listKnowledgeSupplyAuditEvents } from "../enterprise-data/knowledge-supply-audit-store.js";
 import { resolveOrgTargets } from "../enterprise-data/org-targets-store.js";
@@ -48,11 +48,7 @@ import {
 } from "../enterprise-data/semantic-object-store.js";
 import { probeDataSourceConnection } from "../enterprise-data/source-connection-probe.js";
 import type { EnterpriseDataStore, HttpRestAuthScheme } from "../enterprise-data/types.js";
-import {
-  listConnectorSyncLogEntries,
-  syncYonyouTplusSource,
-  yonyouTplusStreamActionKey,
-} from "../enterprise-data/yonyou-tplus-sync.js";
+import { listConnectorSyncLogEntries } from "../enterprise-data/yonyou-tplus-sync.js";
 import { listTenantSeats, loadEnterpriseSeatAssetsStore } from "../enterprise-seat-assets-store.js";
 import { resolveConnectorOAuthSessionStorePathForTenantId } from "../tenant-context.js";
 import { resolveControlPlaneStorePathForClient } from "../tenant-context.js";
@@ -322,7 +318,7 @@ export function createEnterpriseDataM6Handlers(
                 : undefined,
           });
           if (!sourceId) {
-            return { probe, supply: undefined, observation: undefined };
+            return { probe, supply: undefined, sync: undefined, observation: undefined };
           }
           const source = findDataSource(store, tenantId, sourceId);
           if (!source || source.connectorId.toLowerCase() !== probe.connectorId.toLowerCase()) {
@@ -337,17 +333,18 @@ export function createEnterpriseDataM6Handlers(
             sourceId,
             nowIso: checkedAt,
           });
-          const supply = probe.ok
-            ? await supplyDefaultDataProductsSafely({
+          const followed = probe.ok
+            ? await syncConnectedSourceAndSupply({
                 store,
                 tenantId,
                 sourceId,
-                nowIso: checkedAt,
+                now: new Date(checkedAt),
               })
             : undefined;
           return {
             probe,
-            supply,
+            supply: followed?.supply,
+            ...(followed?.sync ? { sync: followed.sync } : {}),
             observation: {
               lastCheckedAt: source.lastCheckedAt,
               lastSucceededAt: source.lastSucceededAt,
@@ -362,6 +359,7 @@ export function createEnterpriseDataM6Handlers(
           probe: probed.probe,
           observation: probed.observation,
           ...(probed.supply ? { supply: probed.supply } : {}),
+          ...(probed.sync ? { sync: probed.sync } : {}),
         });
       } catch (error) {
         respondUnavailable(respond, error);
@@ -608,26 +606,21 @@ export function createEnterpriseDataM6Handlers(
           if (!source || source.tenantId !== tenantId) {
             throw new Error("DataSource not found.");
           }
-          const result = await syncYonyouTplusSource({ store, tenantId, sourceId });
-          const actionKeys = result.streams
-            .filter((stream) => stream.status === "success" || stream.status === "warning")
-            .map((stream) => yonyouTplusStreamActionKey(stream.streamKey))
-            .filter((actionKey): actionKey is string => Boolean(actionKey));
-          const supply =
-            actionKeys.length > 0
-              ? await supplyDefaultDataProductsSafely({
-                  store,
-                  tenantId,
-                  sourceId,
-                  nowIso: new Date().toISOString(),
-                  actionKeys,
-                })
-              : undefined;
+          const followed = await syncConnectedSourceAndSupply({
+            store,
+            tenantId,
+            sourceId,
+            requireDriver: true,
+          });
+          const result = followed.sync;
+          if (!result) {
+            throw new Error("该数据源未接入增量同步。");
+          }
           return {
             status: result.status,
             summary: result.summary,
             streams: result.streams,
-            ...(supply ? { supply } : {}),
+            ...(followed.supply ? { supply: followed.supply } : {}),
             observation: {
               lastCheckedAt: source.lastCheckedAt,
               lastSucceededAt: source.lastSucceededAt,

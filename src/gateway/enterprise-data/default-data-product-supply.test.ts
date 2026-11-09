@@ -9,6 +9,7 @@ import { saveCredentialSecret } from "./connector-credential-vault.js";
 import { CONNECTOR_DEFAULT_PRODUCT_ACTOR } from "./connector-default-product-marker.js";
 import { listConnectorDefaultProducts } from "./connector-default-products.js";
 import { ensureConnectorPackage } from "./connector-packages.js";
+import { writeConnectorSyncSnapshot } from "./connector-sync-snapshot.js";
 import { buildDataAssetLinkage } from "./data-asset-linkage.js";
 import { upsertDataCapability } from "./data-capability-store.js";
 import { upsertDataSource } from "./data-source-store.js";
@@ -140,6 +141,37 @@ describe("default data product supply", () => {
     expect(second.materialized).toBe(0);
     expect(second.ensured).toBe(0);
     expect(listKnowledgeFeedItems({ store, tenantId })).toHaveLength(2);
+
+    writeConnectorSyncSnapshot({
+      store,
+      tenantId,
+      sourceId,
+      connectorId: "erp-yonyou-tplus",
+      streamKey: "warehouse",
+      actionKey: "erp.warehouse.query",
+      rows: Array.from({ length: 130 }, (_, index) => ({
+        Code: `WH-${index}`,
+        Name: `仓${index}`,
+      })),
+      mode: "replace",
+      nowIso,
+    });
+    const refreshed = await supplyDefaultDataProducts({
+      store,
+      tenantId,
+      sourceId,
+      nowIso,
+      actionKeys: ["erp.warehouse.query"],
+      forceRefresh: true,
+    });
+    expect(refreshed.materialized).toBe(1);
+    expect(refreshed.failed).toBe(0);
+    const refreshedWarehouse = listKnowledgeFeedItems({ store, tenantId }).find((item) =>
+      item.title.includes("仓库"),
+    );
+    expect(refreshedWarehouse?.payload.count).toBe(130);
+    const refreshedItems = refreshedWarehouse?.payload.items as Array<{ Code?: string }>;
+    expect(refreshedItems[120]?.Code).toBe("WH-120");
   });
 
   it("promotes an existing manual binding and does not re-enable a disabled one", async () => {
