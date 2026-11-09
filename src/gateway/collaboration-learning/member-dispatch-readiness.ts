@@ -18,6 +18,7 @@ import {
 } from "../../config/sessions.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
+import { normalizeAgentId } from "../../routing/session-key.js";
 
 /**
  * Board claimants are often `bot:<agentId>` while gateway agents.list and some
@@ -40,7 +41,14 @@ export function collaborationDispatchIdsMatch(
 ): boolean {
   const a = collaborationDispatchAgentNeedle(left);
   const b = collaborationDispatchAgentNeedle(right);
-  return a !== "" && a === b;
+  if (!a || !b) {
+    return false;
+  }
+  if (a === b) {
+    return true;
+  }
+  // Gateway agents.list ids are normalizeAgentId'd (/ → -); OS/member ids may keep /.
+  return normalizeAgentId(a) === normalizeAgentId(b);
 }
 
 export type MemberRegistrationStatus = "registered" | "not_registered";

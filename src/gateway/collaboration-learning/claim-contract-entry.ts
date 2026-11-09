@@ -468,7 +468,15 @@ function isBotLikeMemberId(memberId: string | null | undefined): boolean {
   if (!id || id.includes("@") || id.startsWith("human:")) {
     return false;
   }
-  return true;
+  // Emp/human roster ids (e.g. tenant/emp-owner) must not trip agent-peer auto-confirm.
+  if (id.startsWith("bot:") || id.startsWith("agent:")) {
+    return true;
+  }
+  // Bare or path-qualified bot agents: bot-analyst, tenant/bot-analyst.
+  if (id.startsWith("bot-") || /(?:^|\/)bot-[^/]+$/.test(id)) {
+    return true;
+  }
+  return false;
 }
 
 /**

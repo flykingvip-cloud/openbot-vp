@@ -309,6 +309,8 @@ describe("P3 runGroupTaskHeartbeat", () => {
     );
     expect(published.ok).toBe(true);
 
+    // Wake-off emit records nudge attempts as not_dispatched → fail backoff (30s).
+    // Space ticks beyond NUDGE_FAIL_BACKOFF_MS so consecutive no-response can escalate.
     const tick1 = await runGroupTaskHeartbeat(
       auth,
       { groupId: SAMPLE_GRAY },
@@ -333,7 +335,7 @@ describe("P3 runGroupTaskHeartbeat", () => {
       {
         cfg,
         force: true,
-        nowMs: 2_000,
+        nowMs: 35_000,
         coordinatorBotId: "bot-coord",
       },
     );
@@ -348,7 +350,7 @@ describe("P3 runGroupTaskHeartbeat", () => {
       {
         cfg,
         force: true,
-        nowMs: 3_000,
+        nowMs: 70_000,
         coordinatorBotId: "bot-coord",
       },
     );

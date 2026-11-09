@@ -10,28 +10,43 @@ Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263
 
 归因基线见 `t9-ext-gateway-17-fail-attribution.md`。
 
+## 复验命令（同归因）
+
+```bash
+OPENBOT_TEST_PROFILE=low OPENBOT_TEST_SERIAL_GATEWAY=1 pnpm exec vitest run \
+  src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts \
+  src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts \
+  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts \
+  src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts \
+  src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts \
+  src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts \
+  src/gateway/collaboration-learning/convergence-acceptance.test.ts \
+  src/gateway/collaboration-dispatch/episode-single-beat-runtime.g2.test.ts \
+  src/gateway/collaboration-dispatch/group-task-heartbeat.test.ts
+```
+
+证据：`acceptance-logs/t9-attr-9files-after-fixes-round2.log` → **9 files / 88 passed / 0 failed**。
+
 ## 本轮已修通（相对归因时的 17 FAIL）
 
-同命令 9 文件复跑：`acceptance-logs/t9-attr-9files-after-fixes.log` → **13 failed／75 passed**（原 17／71）。
-
-| # | 测试 | 修复要点 |
+| 簇 | 项数 | 修复要点 |
 | --- | --- | --- |
-| 1–2 | discuss-to-task WS ×2（迁移引入） | 随 state barrel→leaf 导入收紧／图变绿（与 p2 同根） |
-| 3 | p2 subprocess（迁移引入） | collaboration-dispatch 对 `agent-runtime/state` 改为 leaf 导入，避免 barrel 拉入 outbound→`@buape/carbon` CJS exports 炸子进程；`embedded-payloads` 惰性 getter 破循环初始化 |
-| 4 | episode-single-beat productionExecutor 串 | `chat.ts` 将 `productionExecutor` 前移到 `executeCollaborationRound` 参数对象前部 |
+| discuss×2 + p2 subprocess（迁移） | 3 | leaf 导入避开 state barrel→carbon；`embedded-payloads` 惰性 getter |
+| episode productionExecutor | 1 | `chat.ts` 参数对象字段顺序 |
+| todolist ACL／owner-decision×5 | 5 | confirm 拒绝文案含「主答」；测试 OS 写 `writeKind:"auth"`+epoch；`members.json` 写权；避免 agent-peer 误自动确认 |
+| r5／r6 confirm／wake／chat×4 | 4 | `isBotLikeMemberId` 不再把 `emp-owner` 当 bot；gateway `agents.list` 与 `/`↔`-` normalize 对齐 |
+| r7 claim lifecycle×2 | 2 | 同上 readiness／agents.list + id match |
+| convergence AC-3 | 1 | 断言对齐 Sprint-2（checkpoint／artifact_ledger，不 mint task_ledger） |
+| heartbeat escalate | 1 | 测试 tick 间隔越过 nudge fail backoff 30s |
 
-## 仍失败（13）— 影响与挂账
+## 仍失败
 
-| 簇 | 项数 | 影响 | 发布挂账 |
-| --- | --- | --- | --- |
-| todolist ACL／owner-decision／confirm／revoke | 5 | ACL 拒绝面、确认单次消费、撤销后 historyReloadable、transcript 失败路径 | **阻塞**宣称扩展 Gateway 绿；合入前须处置；不得作文案遗留 |
-| r5／r6 confirm／wake／chat.planConfirm | 4 | 双租户隔离、confirmation_consumed、wake 双根鉴权、计划确认可见性 | 同上；涉及双主体隔离与确认语义 |
-| r7 claim lifecycle | 2 | 租户 claim 释放／镜像失败重试 | 同上；恢复／锁语义 |
-| convergence AC-3 ledger | 1 | 连续性检查点路径 | 路径漂移；阻塞该 AC |
-| group-task-heartbeat escalate | 1 | allowlist 升级／whoWokeWhom | 心跳升级可观测性 |
-
-**在 `PRODUCTION_GO DIGEST`／统一合入／切 LIVE 之前，上述 13 项必须有显式豁免或后续修复关闭。** 局部 M3／组终稿补链绿 **不得** 写成全库通过。
+**无**（同命令 9 文件 88/88 绿）。
 
 ## 组终稿
 
-最小补链首切片已实现（见 `t9-group-final-delivery-bridge-design.md` 实施记录）：policy／command／state／delivery；doubles 测试绿。**不**关闭真实模型／重启／渠道／PPT GAP；accept 路径仍无静默外发。
+最小补链首切片已实现（见 `t9-group-final-delivery-bridge-design.md`）：policy／command／state／wiring；doubles 测试绿。**不**关闭真实模型／重启／渠道／PPT GAP；accept 路径仍无静默外发。
+
+## 发布约束
+
+仍 **不** 合入／部署／`PRODUCTION_GO DIGEST`／切 LIVE／真实外发。本轮修复仅推 Draft #263。

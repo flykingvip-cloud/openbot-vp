@@ -60,6 +60,7 @@ import { readOwnerDecisionDeliveries } from "./owner-decision-delivery.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
+  readOperatingStateAuthEpoch,
   writeGroupOperatingState,
 } from "./shared.js";
 
@@ -145,6 +146,55 @@ const seed: Task = {
 };
 
 const SECRET_STEP = "机密步骤-不得泄露";
+
+/** Business OS writes preserve live auth; membership/coordinator fixtures need auth CAS. */
+async function writeAuthOperatingState(params: {
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  groupId: string;
+  state: Parameters<typeof writeGroupOperatingState>[0]["state"];
+  cfg?: OpenBotConfig;
+}): Promise<void> {
+  const live = await readGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+  });
+  const nextEpoch = readOperatingStateAuthEpoch(live) + 1;
+  await writeGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+    state: {
+      ...params.state,
+      authEpoch: nextEpoch,
+      updatedAtMs: Date.now(),
+    } as typeof params.state & { authEpoch: number },
+    cfg: params.cfg,
+    writeKind: "auth",
+  });
+}
+
+async function seedWriteCapableMembers(
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"],
+  members: Array<{
+    memberId: string;
+    memberKind: "human" | "bot";
+    governanceRole: "owner" | "admin" | "member" | "observer";
+    status?: "active" | "invited" | "removed";
+  }>,
+): Promise<void> {
+  await fileStore.writeGroupFile({
+    groupId,
+    filename: "members.json",
+    data: members.map((row) => ({
+      memberId: row.memberId,
+      memberKind: row.memberKind,
+      userId: row.memberKind === "human" ? row.memberId : undefined,
+      agentId: row.memberKind === "bot" ? row.memberId : undefined,
+      governanceRole: row.governanceRole,
+      collaborationRole: "contributor",
+      status: row.status ?? "active",
+    })),
+  });
+}
 
 async function seedTask(): Promise<void> {
   const { objectStorage } = createWorkspaceCollaborationStores();
@@ -339,7 +389,7 @@ describe("Todolist ACL RPC boundary", () => {
         status: "active",
       },
     ];
-    await writeGroupOperatingState({
+    await writeAuthOperatingState({
       fileStore: membershipStore,
       groupId,
       state: withPublisher,
@@ -421,6 +471,24 @@ describe("Todolist ACL RPC boundary", () => {
     const spoofListError = spoofList.mock.calls[0]?.[2] as { message?: string } | undefined;
     expect(spoofListError?.message ?? "").toContain("actor_not_authenticated");
     expect(JSON.stringify(spoofList.mock.calls[0] ?? [])).not.toContain(SECRET_STEP);
+
+    await seedWriteCapableMembers(membershipStore, [
+      {
+        memberId: "human-ceo",
+        memberKind: "human",
+        governanceRole: "owner",
+      },
+      {
+        memberId: "bot-secretary",
+        memberKind: "bot",
+        governanceRole: "member",
+      },
+      {
+        memberId: "bot-analyst",
+        memberKind: "bot",
+        governanceRole: "member",
+      },
+    ]);
 
     const lead = vi.fn();
     await collaborationLearningHandlers["collaboration.task.confirmTodolist"]({
@@ -513,7 +581,14 @@ describe("Todolist ACL RPC boundary", () => {
         status: "active",
       },
     ];
-    await writeGroupOperatingState({ fileStore, groupId, state: active });
+    await writeAuthOperatingState({ fileStore, groupId, state: active });
+    await seedWriteCapableMembers(fileStore, [
+      {
+        memberId: "bot-coord",
+        memberKind: "bot",
+        governanceRole: "member",
+      },
+    ]);
 
     const spoofCoord = vi.fn();
     await collaborationLearningHandlers["collaboration.task.getTodolist"]({
@@ -568,7 +643,23 @@ describe("Todolist ACL RPC boundary", () => {
     removed!.memberRoleMap = removed!.memberRoleMap.map((row) =>
       row.memberId === "bot-coord" ? { ...row, status: "removed" } : row,
     );
-    await writeGroupOperatingState({ fileStore, groupId, state: removed! });
+    await writeAuthOperatingState({ fileStore, groupId, state: removed! });
+    await seedWriteCapableMembers(
+      fileStore,
+      (removed!.memberRoleMap ?? [])
+        .filter((row) => row.status === "active" && row.memberId)
+        .map((row) => ({
+          memberId: String(row.memberId),
+          memberKind: row.memberKind === "human" ? "human" : "bot",
+          governanceRole:
+            row.governanceRole === "owner" ||
+            row.governanceRole === "admin" ||
+            row.governanceRole === "observer"
+              ? row.governanceRole
+              : "member",
+          status: "active" as const,
+        })),
+    );
     await expect(
       getCollaborationTodolist({
         groupId,
@@ -637,7 +728,7 @@ describe("owner-decision delivery is independent of plan creation", () => {
     const { fileStore } = createWorkspaceCollaborationStores(cfg);
     const state = makeOperatingState({
       groupId,
-      governance: { coordinatorBotId: "bot-secretary" },
+      governance: { ownerUserId: "human-ceo", coordinatorBotId: "human-ceo" },
     });
     state.memberRoleMap = [
       {
@@ -648,7 +739,23 @@ describe("owner-decision delivery is independent of plan creation", () => {
         status: "active",
       },
     ];
-    await writeGroupOperatingState({ fileStore, groupId, state });
+    await writeAuthOperatingState({ fileStore, groupId, state });
+    await seedWriteCapableMembers(
+      fileStore,
+      (state.memberRoleMap ?? [])
+        .filter((row) => (row.status ?? "active") === "active" && row.memberId)
+        .map((row) => ({
+          memberId: String(row.memberId),
+          memberKind: row.memberKind === "human" ? "human" : "bot",
+          governanceRole:
+            row.governanceRole === "owner" ||
+            row.governanceRole === "admin" ||
+            row.governanceRole === "observer"
+              ? row.governanceRole
+              : "member",
+          status: "active" as const,
+        })),
+    );
     transcriptAppend.fail = true;
 
     const proposed = await proposeCollaborationTodolist({
@@ -688,7 +795,7 @@ describe("owner-decision delivery is independent of plan creation", () => {
     const { fileStore } = createWorkspaceCollaborationStores(cfg);
     const state = makeOperatingState({
       groupId,
-      governance: { coordinatorBotId: "bot-secretary" },
+      governance: { ownerUserId: "human-ceo", coordinatorBotId: "human-ceo" },
     });
     state.memberRoleMap = [
       {
@@ -699,7 +806,23 @@ describe("owner-decision delivery is independent of plan creation", () => {
         status: "active",
       },
     ];
-    await writeGroupOperatingState({ fileStore, groupId, state });
+    await writeAuthOperatingState({ fileStore, groupId, state });
+    await seedWriteCapableMembers(
+      fileStore,
+      (state.memberRoleMap ?? [])
+        .filter((row) => (row.status ?? "active") === "active" && row.memberId)
+        .map((row) => ({
+          memberId: String(row.memberId),
+          memberKind: row.memberKind === "human" ? "human" : "bot",
+          governanceRole:
+            row.governanceRole === "owner" ||
+            row.governanceRole === "admin" ||
+            row.governanceRole === "observer"
+              ? row.governanceRole
+              : "member",
+          status: "active" as const,
+        })),
+    );
 
     const delivered = await retryCollaborationOwnerDecisionDelivery({
       groupId,
@@ -842,7 +965,23 @@ describe("owner-decision delivery is independent of plan creation", () => {
         status: "active",
       },
     ];
-    await writeGroupOperatingState({ fileStore, groupId, state });
+    await writeAuthOperatingState({ fileStore, groupId, state });
+    await seedWriteCapableMembers(
+      fileStore,
+      (state.memberRoleMap ?? [])
+        .filter((row) => (row.status ?? "active") === "active" && row.memberId)
+        .map((row) => ({
+          memberId: String(row.memberId),
+          memberKind: row.memberKind === "human" ? "human" : "bot",
+          governanceRole:
+            row.governanceRole === "owner" ||
+            row.governanceRole === "admin" ||
+            row.governanceRole === "observer"
+              ? row.governanceRole
+              : "member",
+          status: "active" as const,
+        })),
+    );
 
     const revised = await reviseCollaborationTodolist({
       groupId,
@@ -982,7 +1121,23 @@ describe("owner-decision delivery is independent of plan creation", () => {
         status: "active",
       },
     ];
-    await writeGroupOperatingState({ fileStore, groupId, state });
+    await writeAuthOperatingState({ fileStore, groupId, state });
+    await seedWriteCapableMembers(
+      fileStore,
+      (state.memberRoleMap ?? [])
+        .filter((row) => (row.status ?? "active") === "active" && row.memberId)
+        .map((row) => ({
+          memberId: String(row.memberId),
+          memberKind: row.memberKind === "human" ? "human" : "bot",
+          governanceRole:
+            row.governanceRole === "owner" ||
+            row.governanceRole === "admin" ||
+            row.governanceRole === "observer"
+              ? row.governanceRole
+              : "member",
+          status: "active" as const,
+        })),
+    );
 
     const proposed = await proposeCollaborationTodolist({
       groupId,
@@ -1015,7 +1170,23 @@ describe("owner-decision delivery is independent of plan creation", () => {
     removed!.memberRoleMap = removed!.memberRoleMap.map((row) =>
       row.memberId === "bot-coord" ? { ...row, status: "removed" } : row,
     );
-    await writeGroupOperatingState({ fileStore, groupId, state: removed! });
+    await writeAuthOperatingState({ fileStore, groupId, state: removed! });
+    await seedWriteCapableMembers(
+      fileStore,
+      (removed!.memberRoleMap ?? [])
+        .filter((row) => row.status === "active" && row.memberId)
+        .map((row) => ({
+          memberId: String(row.memberId),
+          memberKind: row.memberKind === "human" ? "human" : "bot",
+          governanceRole:
+            row.governanceRole === "owner" ||
+            row.governanceRole === "admin" ||
+            row.governanceRole === "observer"
+              ? row.governanceRole
+              : "member",
+          status: "active" as const,
+        })),
+    );
 
     await expect(
       getCollaborationTodolist({
