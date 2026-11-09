@@ -11,7 +11,10 @@ import {
   observeConversationToolEvent,
 } from "./ledger-binding.js";
 import * as ledgerBinding from "./ledger-binding.js";
-import { observeConversationTaskReplyCompleted } from "./reply-completion.js";
+import {
+  classifyReplyCompletionBoardAssociation,
+  observeConversationTaskReplyCompleted,
+} from "./reply-completion.js";
 import * as runtimeBootstrap from "./runtime-bootstrap.js";
 import {
   readSessionTaskBoard,
@@ -20,6 +23,7 @@ import {
 } from "./session-task-board.js";
 import * as sessionTaskBoard from "./session-task-board.js";
 import { openTaskStore, type StoredConversationTask } from "./store.js";
+import * as taskStore from "./store.js";
 
 let root: string;
 
@@ -73,6 +77,10 @@ function seedBoard(sessionFile: string, currentOverrides: Record<string, unknown
     parked: [],
     focusRevision: 0,
   });
+}
+
+function noticeCount(sessionFile: string): number {
+  return fs.readFileSync(sessionFile, "utf8").match(/当前任务已完成，交付已核对。/g)?.length ?? 0;
 }
 
 function binding(overrides: Partial<TaskCompletionBinding> = {}): TaskCompletionBinding {
@@ -269,7 +277,7 @@ describe("reply completion partial-success window", () => {
     expect(readSessionTaskBoard(sessionFile).current?.deliverableChecked).not.toBe(true);
   });
 
-  it("closes the conversation task without a second notice when the board was already checked", async () => {
+  it("publishes one idempotent notice when closing a conversation task whose board is already checked", async () => {
     const task = await seedActiveTask("m-reconcile");
     const sessionFile = path.join(root, "reconcile.jsonl");
     seedBoard(sessionFile, { unfinished: false, deliverableChecked: true });
@@ -278,10 +286,17 @@ describe("reply completion partial-success window", () => {
       sessionFile,
       completionBinding: binding(),
     });
-    expect(notice).toBeUndefined();
+    expect(notice).toContain("当前任务已完成，交付已核对。");
     expect(await lifecycleOf(task.id)).toBe("closed");
     expect(readSessionTaskBoard(sessionFile).current?.deliverableChecked).toBe(true);
-    expect(fs.readFileSync(sessionFile, "utf8")).toBe("");
+    expect(noticeCount(sessionFile)).toBe(1);
+    const again = await complete({
+      sourceMessageId: "m-reconcile",
+      sessionFile,
+      completionBinding: binding(),
+    });
+    expect(again).toBeUndefined();
+    expect(noticeCount(sessionFile)).toBe(1);
   });
 
   it("does not announce success when strict close lacks canonical evidence", async () => {
@@ -303,6 +318,137 @@ describe("reply completion partial-success window", () => {
     expect(await lifecycleOf(task.id)).toBe("active");
     expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
     expect(fs.readFileSync(sessionFile, "utf8")).toBe("");
+  });
+
+  it("does not write a transcript notice when conversation-task close throws, then writes one on retry", async () => {
+    const task = await seedActiveTask("m-close-throw");
+    const sessionFile = path.join(root, "close-throw.jsonl");
+    seedBoard(sessionFile);
+    const realOpen = taskStore.openTaskStore;
+    let transitions = 0;
+    vi.spyOn(taskStore, "openTaskStore").mockImplementation((params) => {
+      const store = realOpen(params);
+      const transition = store.transitionTask.bind(store);
+      store.transitionTask = (id, next) => {
+        transitions += 1;
+        if (transitions === 1) {
+          throw new Error("injected conversation task close failure");
+        }
+        return transition(id, next);
+      };
+      return store;
+    });
+
+    const first = await complete({
+      sourceMessageId: "m-close-throw",
+      sessionFile,
+      completionBinding: binding(),
+    });
+    expect(first).toBeUndefined();
+    expect(await lifecycleOf(task.id)).toBe("active");
+    expect(readSessionTaskBoard(sessionFile).current?.deliverableChecked).toBe(true);
+    expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(false);
+    expect(noticeCount(sessionFile)).toBe(0);
+
+    const second = await complete({
+      sourceMessageId: "m-close-throw",
+      sessionFile,
+      completionBinding: binding(),
+    });
+    expect(second).toContain("当前任务已完成，交付已核对。");
+    expect(await lifecycleOf(task.id)).toBe("closed");
+    expect(noticeCount(sessionFile)).toBe(1);
+
+    const third = await complete({
+      sourceMessageId: "m-close-throw",
+      sessionFile,
+      completionBinding: binding(),
+    });
+    expect(third).toBeUndefined();
+    expect(noticeCount(sessionFile)).toBe(1);
+    expect(
+      fs.readFileSync(sessionFile, "utf8").match(/task-completion:live:run-1:draft-1/g),
+    ).toHaveLength(1);
+  });
+
+  it("classifies board association before any close", () => {
+    expect(classifyReplyCompletionBoardAssociation({})).toEqual({ kind: "independent" });
+    expect(classifyReplyCompletionBoardAssociation({ binding: binding() })).toEqual({
+      kind: "incomplete",
+      reason: "session_file_missing",
+    });
+    expect(classifyReplyCompletionBoardAssociation({ sessionFile: "/tmp/session.jsonl" })).toEqual({
+      kind: "incomplete",
+      reason: "binding_missing",
+    });
+    expect(
+      classifyReplyCompletionBoardAssociation({
+        sessionFile: "/tmp/session.jsonl",
+        binding: { taskId: " " },
+      }),
+    ).toEqual({ kind: "incomplete", reason: "binding_task_id_missing" });
+    expect(
+      classifyReplyCompletionBoardAssociation({
+        sessionFile: "/tmp/session.jsonl",
+        binding: { taskId: "live" },
+      }).kind,
+    ).toBe("ready");
+  });
+
+  it("closes an independent conversation task when neither session file nor binding is supplied", async () => {
+    const task = await seedActiveTask("m-independent");
+    const notice = await complete({ sourceMessageId: "m-independent" });
+    expect(notice).toBeUndefined();
+    expect(await lifecycleOf(task.id)).toBe("closed");
+  });
+
+  it("does not close when the session file is missing but a binding is present", async () => {
+    const task = await seedActiveTask("m-no-file");
+    const notice = await complete({
+      sourceMessageId: "m-no-file",
+      completionBinding: binding(),
+    });
+    expect(notice).toBeUndefined();
+    expect(await lifecycleOf(task.id)).toBe("active");
+  });
+
+  it("does not close when the session file is present but the binding is missing", async () => {
+    const task = await seedActiveTask("m-no-binding");
+    const sessionFile = path.join(root, "no-binding.jsonl");
+    seedBoard(sessionFile);
+    const notice = await complete({
+      sourceMessageId: "m-no-binding",
+      sessionFile,
+    });
+    expect(notice).toBeUndefined();
+    expect(await lifecycleOf(task.id)).toBe("active");
+    expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
+    expect(noticeCount(sessionFile)).toBe(0);
+  });
+
+  it("does not skip verification when binding fields are incomplete", async () => {
+    const task = await seedActiveTask("m-incomplete");
+    const sessionFile = path.join(root, "incomplete.jsonl");
+    seedBoard(sessionFile);
+    const blankId = await complete({
+      sourceMessageId: "m-incomplete",
+      sessionFile,
+      completionBinding: { taskId: "  ", executionAttempt: "run-1", deliverableVersion: "draft-1" },
+    });
+    expect(blankId).toBeUndefined();
+    expect(await lifecycleOf(task.id)).toBe("active");
+    expect(readSessionTaskBoard(sessionFile).current?.deliverableChecked).not.toBe(true);
+
+    const missingAttempt = await complete({
+      sourceMessageId: "m-incomplete",
+      sessionFile,
+      completionBinding: { taskId: "live", deliverableVersion: "draft-1" },
+    });
+    expect(missingAttempt).toBeUndefined();
+    expect(await lifecycleOf(task.id)).toBe("active");
+    expect(readSessionTaskBoard(sessionFile).current?.executionAttempt).toBe("run-1");
+    expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
+    expect(noticeCount(sessionFile)).toBe(0);
   });
 
   it("does not confirm delivery from the reply-completion observer", () => {
