@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 /**
  * P2 — Executor-private Todolist + plan gate (COLLAB-EXECUTION-SYSTEM-FINAL §3.3).
  *
@@ -13,9 +16,11 @@
  *
  * Does not open LIVE flags, claimContract allowlist, Floor, P3 heartbeat, or P4 self_advance.
  */
-import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
+import {
+  freeChatIsTodolist,
+  isTodolistConfirmedForDelivery,
+  todolistIsGroupSharedBoardSubrecord,
+} from "../../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
@@ -203,15 +208,7 @@ function safeStem(id: string): string | null {
   return encodeURIComponent(trimmed);
 }
 
-/** Free-chat / oral plans are never a Todolist fact. */
-export function freeChatIsTodolist(): false {
-  return false;
-}
-
-/** Todolist is never a group-shared board sub-record. */
-export function todolistIsGroupSharedBoardSubrecord(): false {
-  return false;
-}
+export { freeChatIsTodolist, isTodolistConfirmedForDelivery, todolistIsGroupSharedBoardSubrecord };
 
 /** Private store under `<ns>/executor-todolists` (not board-claims). */
 export function executorTodolistsDir(authority: RuntimeAuthority): string {
@@ -588,12 +585,6 @@ export async function loadLatestOwnerTodolistForBoardItem(
   }
   items.sort((a, b) => b.version - a.version || b.proposedAt - a.proposedAt);
   return items[0] ?? null;
-}
-
-export function isTodolistConfirmedForDelivery(
-  todolist: ExecutorPrivateTodolist | null | undefined,
-): boolean {
-  return todolist?.status === "confirmed";
 }
 
 /**
