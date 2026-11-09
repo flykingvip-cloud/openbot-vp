@@ -138,6 +138,9 @@ import {
   CollaborationTaskMarkInProgressParamsSchema,
   CollaborationTaskSubmitForReviewParamsSchema,
   CollaborationTaskAcceptSubmissionParamsSchema,
+  CollaborationTaskRequestAcceptedArtifactDeliveryParamsSchema,
+  CollaborationTaskRevokeAcceptedArtifactDeliveryParamsSchema,
+  CollaborationTaskReadAcceptedArtifactDeliveryParamsSchema,
   CollaborationTaskReturnSubmissionParamsSchema,
   CollaborationTaskBlockBoardItemParamsSchema,
   CollaborationTaskUnblockBoardItemParamsSchema,
@@ -665,6 +668,15 @@ export const validateCollaborationTaskAcceptSubmissionParams =
   ajv.compile<CollaborationTaskAcceptSubmissionParams>(
     CollaborationTaskAcceptSubmissionParamsSchema,
   );
+export const validateCollaborationTaskRequestAcceptedArtifactDeliveryParams = ajv.compile(
+  CollaborationTaskRequestAcceptedArtifactDeliveryParamsSchema,
+);
+export const validateCollaborationTaskRevokeAcceptedArtifactDeliveryParams = ajv.compile(
+  CollaborationTaskRevokeAcceptedArtifactDeliveryParamsSchema,
+);
+export const validateCollaborationTaskReadAcceptedArtifactDeliveryParams = ajv.compile(
+  CollaborationTaskReadAcceptedArtifactDeliveryParamsSchema,
+);
 export const validateCollaborationTaskReturnSubmissionParams =
   ajv.compile<CollaborationTaskReturnSubmissionParams>(
     CollaborationTaskReturnSubmissionParamsSchema,

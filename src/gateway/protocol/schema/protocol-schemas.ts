@@ -79,6 +79,9 @@ import {
   CollaborationTaskMarkInProgressParamsSchema,
   CollaborationTaskSubmitForReviewParamsSchema,
   CollaborationTaskAcceptSubmissionParamsSchema,
+  CollaborationTaskRequestAcceptedArtifactDeliveryParamsSchema,
+  CollaborationTaskRevokeAcceptedArtifactDeliveryParamsSchema,
+  CollaborationTaskReadAcceptedArtifactDeliveryParamsSchema,
   CollaborationTaskReturnSubmissionParamsSchema,
   CollaborationTaskBlockBoardItemParamsSchema,
   CollaborationTaskUnblockBoardItemParamsSchema,
@@ -392,6 +395,12 @@ export const ProtocolSchemas = {
   CollaborationTaskMarkInProgressParams: CollaborationTaskMarkInProgressParamsSchema,
   CollaborationTaskSubmitForReviewParams: CollaborationTaskSubmitForReviewParamsSchema,
   CollaborationTaskAcceptSubmissionParams: CollaborationTaskAcceptSubmissionParamsSchema,
+  CollaborationTaskRequestAcceptedArtifactDeliveryParams:
+    CollaborationTaskRequestAcceptedArtifactDeliveryParamsSchema,
+  CollaborationTaskRevokeAcceptedArtifactDeliveryParams:
+    CollaborationTaskRevokeAcceptedArtifactDeliveryParamsSchema,
+  CollaborationTaskReadAcceptedArtifactDeliveryParams:
+    CollaborationTaskReadAcceptedArtifactDeliveryParamsSchema,
   CollaborationTaskReturnSubmissionParams: CollaborationTaskReturnSubmissionParamsSchema,
   CollaborationTaskBlockBoardItemParams: CollaborationTaskBlockBoardItemParamsSchema,
   CollaborationTaskUnblockBoardItemParams: CollaborationTaskUnblockBoardItemParamsSchema,
