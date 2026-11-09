@@ -96,7 +96,6 @@ export {
   commitMemberArtifactDeliveryAssociation,
   deliveryKeyHash,
   noteAssociationRenamedAwayFromStaged,
-  recordAssociationObservation,
   recoverPartialStagedAssociation,
 } from "./collaboration/accepted-artifact-delivery-txn.js";
 export type {
