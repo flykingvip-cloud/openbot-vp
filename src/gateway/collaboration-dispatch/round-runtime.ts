@@ -91,6 +91,7 @@ export type RoundRecoveryDecision = {
   event?: RoundTransitionEvent;
   eventType?: RoundEventType;
   reason: string;
+  pendingAgentIds?: string[];
 };
 
 type PersistOpts = {
@@ -305,11 +306,39 @@ export function decideRoundRecovery(round: PersistedRound, nowMs: number): Round
       reason: round.state === "PRIMARY_QUEUE" ? "restart_no_rerun" : "inflight_dispatch_lost",
     };
   }
-  if (
-    round.state === "PRIMARY_COMPLETED" ||
-    round.state === "SUPPLEMENT_WINDOW" ||
-    round.state === "CONVERGENCE_CHECK"
-  ) {
+  if (round.state === "PRIMARY_COMPLETED" || round.state === "SUPPLEMENT_WINDOW") {
+    const attempted = new Set(round.dispatches.map((dispatch) => dispatch.agentId));
+    const dropped = new Set(
+      (round.policyDecision?.supplementGate ?? [])
+        .filter((entry) => entry.decision === "DROP")
+        .map((entry) => entry.agentId),
+    );
+    const pendingAgentIds = [
+      ...new Set([
+        ...round.primaryQueue.slice(round.primaryCursor + 1),
+        ...(round.policyDecision?.participants ?? [])
+          .filter(
+            (member) =>
+              member.tier !== "wrap" &&
+              !attempted.has(member.agentId) &&
+              !dropped.has(member.agentId),
+          )
+          .map((member) => member.agentId),
+      ]),
+    ];
+    // A restart cannot prove outstanding work ran, or safely replay unknown
+    // side effects. Preserve the dispatch log and expose the interruption.
+    if (pendingAgentIds.length > 0 || round.state === "SUPPLEMENT_WINDOW") {
+      return {
+        action: "abort",
+        event: "abort",
+        eventType: "ROUND_ABORTED",
+        reason: "restart_pending_dispatch",
+        pendingAgentIds,
+      };
+    }
+  }
+  if (round.state === "PRIMARY_COMPLETED" || round.state === "CONVERGENCE_CHECK") {
     return {
       action: "complete",
       event:
@@ -332,6 +361,20 @@ export async function applyRoundRecovery(
     return round;
   }
   let current = round;
+  if (decision.action === "abort" && decision.reason === "restart_pending_dispatch") {
+    return await stepRound(
+      { ...current, abortReason: "fatal" },
+      decision.event,
+      decision.eventType,
+      persist,
+      {
+        payload: {
+          recoveryReason: decision.reason,
+          pendingAgentIds: decision.pendingAgentIds ?? [],
+        },
+      },
+    );
+  }
   if (decision.action === "complete" && round.state === "PRIMARY_COMPLETED") {
     current = await stepRound(
       current,

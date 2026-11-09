@@ -1163,3 +1163,36 @@ describe("explicit member queue budgets and coordination", () => {
     }
   });
 });
+
+describe("restart during a pending collaboration sequence", () => {
+  test.each(["PRIMARY_COMPLETED", "SUPPLEMENT_WINDOW"] as const)(
+    "%s records an interruption rather than successful queue completion",
+    async (state) => {
+      const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-pending-recovery-"));
+      try {
+        const round = {
+          ...createRespondingRound("pending-recovery"),
+          state,
+          primaryQueue: ["bot-a", "bot-b"],
+          primaryCursor: 0,
+        };
+        await writePersistedRound({ round, roundsDir });
+        const decision = decideRoundRecovery(round, Date.now());
+        expect(decision.action).toBe("abort");
+        expect(decision.reason).toBe("restart_pending_dispatch");
+        const recovered = await applyRoundRecovery(round, decision, { roundsDir });
+        expect(recovered.state).toBe("ROUND_ABORTED");
+        expect(recovered.dispatches).toEqual(round.dispatches);
+        expect(decideRoundRecovery(recovered, Date.now()).action).toBe("noop");
+        const events = await fs.readFile(
+          path.join(roundsDir, "pending-recovery.events.jsonl"),
+          "utf8",
+        );
+        expect(events).toContain("restart_pending_dispatch");
+        expect(events).toContain("bot-b");
+      } finally {
+        await fs.rm(roundsDir, { recursive: true, force: true });
+      }
+    },
+  );
+});
