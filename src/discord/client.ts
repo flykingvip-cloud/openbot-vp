@@ -1,4 +1,6 @@
 import { RequestClient } from "@buape/carbon";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
+import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { loadConfig } from "../config/config.js";
 import { createDiscordRetryRunner, type RetryRunner } from "../infra/retry-policy.js";
 import type { RetryConfig } from "../infra/retry.js";
@@ -11,6 +13,7 @@ import {
 import { normalizeDiscordToken } from "./token.js";
 
 export type DiscordClientOpts = {
+  taskBoundary?: TaskActionBoundary;
   cfg?: ReturnType<typeof loadConfig>;
   token?: string;
   accountId?: string;
@@ -80,7 +83,17 @@ export function createDiscordClient(
     configRetry: account.config.retry,
     verbose: opts.verbose,
   });
-  return { token, rest, request };
+  const guardedRequest: RetryRunner = opts.taskBoundary
+    ? (fn, label) =>
+        request(() => {
+          const refusal = checkTaskActionBoundary(opts.taskBoundary!);
+          if (refusal) {
+            throw new Error(refusal);
+          }
+          return fn();
+        }, label)
+    : request;
+  return { token, rest, request: guardedRequest };
 }
 
 export function resolveDiscordRest(opts: DiscordClientOpts) {

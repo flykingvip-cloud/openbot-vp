@@ -1,11 +1,12 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { finalizeCronRun, observeCronToolEvent } from "../../progress-ledger/cron-binding.js";
 import { PROGRESS_LEDGER_ENABLED_ENV } from "../../progress-ledger/feature.js";
 import { foldEvents } from "../../progress-ledger/fold.js";
 import { createFileLedgerStore } from "../../progress-ledger/store.js";
+import { considerReadonlyInvoke } from "../../task-orchestration/dispatch.js";
 import {
   makeIsolatedAgentTurnJob,
   makeIsolatedAgentTurnParams,
@@ -18,7 +19,14 @@ import {
   runCliAgentMock,
   runEmbeddedPiAgentMock,
   runWithModelFallbackMock,
+  tryAcquireEnterpriseAgentRunMock,
 } from "./run.test-harness.js";
+vi.mock("../../task-orchestration/dispatch.js", async (original) => ({
+  ...(await original<typeof import("../../task-orchestration/dispatch.js")>()),
+  considerReadonlyInvoke: vi
+    .fn()
+    .mockResolvedValue({ promptAppendix: "READONLY_CONTEXT", invokedTool: true }),
+}));
 
 const runCronIsolatedAgentTurn = await loadRunCronIsolatedAgentTurn();
 
@@ -86,6 +94,19 @@ describe("runCronIsolatedAgentTurn long-horizon ledger ticks", () => {
       message: "执行当前定时步",
     });
   }
+
+  it("does not prefetch readonly tools when execution admission is denied", async () => {
+    tryAcquireEnterpriseAgentRunMock.mockResolvedValue({
+      acquired: false,
+      skipped: false,
+      reason: "TENANT_SUSPENDED",
+      message: "denied",
+    });
+    const result = await runCronIsolatedAgentTurn(paramsFor("job-denied-readonly"));
+    expect(result.status).toBe("error");
+    expect(considerReadonlyInvoke).not.toHaveBeenCalled();
+    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+  });
 
   it("runs embedded Pi for a long-horizon job when the ledger flag is unset", async () => {
     expect(process.env[PROGRESS_LEDGER_ENABLED_ENV]).toBeUndefined();

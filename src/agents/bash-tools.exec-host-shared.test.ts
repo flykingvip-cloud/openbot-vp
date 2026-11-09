@@ -5,12 +5,51 @@ import {
   operatorElevatedFullBreakGlass,
   resolveHostAsk,
   resolveRuntimeAskSource,
+  resolveApprovalDecisionOrUndefined,
 } from "./bash-tools.exec-host-shared.js";
 
 vi.mock("./tools/gateway.js", () => ({
   callGatewayTool: vi.fn(),
   readGatewayCallOptions: vi.fn(() => ({})),
 }));
+
+describe("approval failure notification ownership", () => {
+  it("waits for notification before settling the decision", async () => {
+    const { callGatewayTool } = await import("./tools/gateway.js");
+    vi.mocked(callGatewayTool).mockRejectedValueOnce(new Error("gateway closed"));
+    let release!: () => void;
+    const notification = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let settled = false;
+    const result = resolveApprovalDecisionOrUndefined({
+      approvalId: "failed-approval",
+      preResolvedDecision: undefined,
+      onFailure: () => notification,
+    }).then((value) => {
+      settled = true;
+      return value;
+    });
+    await vi.waitFor(() => expect(callGatewayTool).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    release();
+    await expect(result).resolves.toBeUndefined();
+  });
+  it("contains notification rejection without authorizing execution", async () => {
+    const { callGatewayTool } = await import("./tools/gateway.js");
+    vi.mocked(callGatewayTool).mockRejectedValueOnce(new Error("gateway closed"));
+    await expect(
+      resolveApprovalDecisionOrUndefined({
+        approvalId: "failed-approval",
+        preResolvedDecision: undefined,
+        onFailure: async () => {
+          throw new Error("notification gateway closed");
+        },
+      }),
+    ).resolves.toBeUndefined();
+  });
+});
 
 vi.mock("./tools/nodes-utils.js", () => ({
   listNodes: vi.fn(async () => [

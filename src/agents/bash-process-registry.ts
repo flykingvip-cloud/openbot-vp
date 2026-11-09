@@ -1,4 +1,9 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  markAsyncWaitJobExited,
+  recordAsyncWaitJobIntent,
+} from "../agent-runtime/state/repository/async-wait-job.js";
+import type { TaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import { createSessionSlug as createSessionSlugId } from "./session-slug.js";
 
 const DEFAULT_JOB_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -26,12 +31,21 @@ export type SessionStdin = {
 };
 
 export interface ProcessSession {
+  taskBoundary?: TaskActionBoundary;
   id: string;
   command: string;
   scopeKey?: string;
   sessionKey?: string;
   notifyOnExit?: boolean;
   notifyOnExitEmptySuccess?: boolean;
+  trustedIdentity?: {
+    user?: string;
+    platformUserId?: string;
+    sessionDomain?: "platform" | "enterprise" | "employee";
+    enterpriseId?: string;
+    membershipId?: string;
+    seatId?: string;
+  };
   exitNotified?: boolean;
   child?: ChildProcessWithoutNullStreams;
   stdin?: SessionStdin;
@@ -151,11 +165,45 @@ export function markExited(
   session.exitCode = exitCode;
   session.exitSignal = exitSignal;
   session.tail = tail(session.aggregated, 2000);
+  if (session.backgrounded && session.taskBoundary?.sessionFile) {
+    const exitStatus =
+      status === "completed" ? "completed" : status === "killed" ? "killed" : "failed";
+    markAsyncWaitJobExited({
+      sessionFile: session.taskBoundary.sessionFile,
+      jobId: session.id,
+      exitStatus,
+      exitCode: session.exitCode,
+      summary: session.tail ? session.tail.slice(0, 500) : undefined,
+    });
+  }
   moveToFinished(session, status);
 }
 
 export function markBackgrounded(session: ProcessSession) {
   session.backgrounded = true;
+  // Durable wait intent only for notify-on-exit jobs bound to a live task attempt.
+  if (
+    session.notifyOnExit &&
+    session.sessionKey?.trim() &&
+    session.taskBoundary?.sessionFile &&
+    session.taskBoundary.binding?.taskId &&
+    session.taskBoundary.binding.executionAttempt &&
+    session.taskBoundary.binding.deliverableVersion
+  ) {
+    recordAsyncWaitJobIntent({
+      jobId: session.id,
+      sessionKey: session.sessionKey.trim(),
+      sessionFile: session.taskBoundary.sessionFile,
+      taskId: session.taskBoundary.binding.taskId,
+      executionAttempt: session.taskBoundary.binding.executionAttempt,
+      deliverableVersion: session.taskBoundary.binding.deliverableVersion,
+      constraints: [...(session.taskBoundary.constraints ?? [])],
+      ...(typeof session.pid === "number" ? { pid: session.pid } : {}),
+      startedAt: session.startedAt,
+      command: session.command,
+      ...(session.trustedIdentity ? { trustedIdentity: session.trustedIdentity } : {}),
+    });
+  }
 }
 
 function moveToFinished(session: ProcessSession, status: ProcessStatus) {

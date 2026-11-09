@@ -1,9 +1,13 @@
-export type ThinkLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "adaptive";
+import type { ReasoningLevel } from "../agent-runtime/contracts/prompt.js";
+export type { ReasoningLevel } from "../agent-runtime/contracts/prompt.js";
+import type { ThinkLevel } from "../agent-runtime/contracts/prompt.js";
+export type { ThinkLevel } from "../agent-runtime/contracts/prompt.js";
+
 export type VerboseLevel = "off" | "on" | "full";
 export type NoticeLevel = "off" | "on" | "full";
 export type ElevatedLevel = "off" | "on" | "ask" | "full";
 export type ElevatedMode = "off" | "ask" | "full";
-export type ReasoningLevel = "off" | "on" | "stream";
+
 export type UsageDisplayLevel = "off" | "tokens" | "full";
 
 function normalizeProviderId(provider?: string | null): string {

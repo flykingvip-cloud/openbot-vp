@@ -125,8 +125,8 @@ function resolvePrimary(params: {
     if (contract.aliasOf) {
       const target = byId.get(contract.aliasOf.toLowerCase());
       if (!target) {
-        // Target missing from this bot's skill set (e.g. pptx alias-of cyber-ppt when
-        // only the thin pptx entry is installed). Degrade: keep the alias as primary
+        // Target missing from this bot's skill set when only an alias is installed.
+        // Degrade: keep the alias as primary
         // instead of skill_alias_unresolved clarification/DM stop.
         aliases.push(contract.skillId);
         collapsed.set(contract.skillId.toLowerCase(), {

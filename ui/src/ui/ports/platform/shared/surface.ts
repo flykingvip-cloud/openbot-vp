@@ -14,6 +14,7 @@ export type PlatformSurfaceTab =
   | "platformCapabilities"
   | "platformModels"
   | "platformAgents"
+  | "platformObservation"
   | "platformDiagnosis"
   | "platformAdvanced"
   | "platformSystemSettings"
@@ -25,6 +26,7 @@ export type PlatformSurfaceProps = {
   basePath: string;
   client?: GatewayBrowserClient | null;
   readModel: PlatformPortReadModel;
+  observationHost?: object | null;
   channelsProps: PlatformPortRenderModel["channelsProps"];
   skillsProps?: PlatformPortRenderModel["skillsProps"];
   instancesProps?: PlatformPortRenderModel["instancesProps"];

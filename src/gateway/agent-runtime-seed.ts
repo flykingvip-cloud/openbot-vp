@@ -122,6 +122,7 @@ function seedTelemetrySample(params: {
   return {
     runtimeAgentId: params.runtimeAgentId,
     capabilityId: params.capabilityId,
+    provenance: "seed",
     calls7d: 0,
     successRate7d: 1,
     avgLatencyMs: 0,

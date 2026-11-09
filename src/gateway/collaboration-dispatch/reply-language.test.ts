@@ -93,6 +93,26 @@ describe("resolveCollaborationReplyLanguage", () => {
 });
 
 describe("sanitizeCollaborationVisibleReply", () => {
+  test.each([
+    "已生成文件：/tmp/runtime-live-acceptance-test/workspace/result.txt，内容为 MAINLINE_ARTIFACT_OK，不含换行。",
+    "已生成成果，请下载 [result.txt](/tmp/runtime-live-acceptance-test/workspace/result.txt)。",
+  ])("preserves Chinese delivery containing an opaque artifact locator: %s", (text) => {
+    expect(sanitizeCollaborationVisibleReply({ text, expectedLanguage: "zh" })).toEqual({
+      ok: true,
+      text,
+      trimmed: false,
+    });
+  });
+
+  test("still rejects English planning around an artifact path", () => {
+    expect(
+      sanitizeCollaborationVisibleReply({
+        text: "I'll check /tmp/runtime-live-acceptance-test/workspace/result.txt next.",
+        expectedLanguage: "zh",
+      }).ok,
+    ).toBe(false);
+  });
+
   const leakedPlanning = [
     'The CEO (黄老师, per 王军\'s clarification that CEO = his friend 黄老师) is asking: "王老师今天给你们布置新任务了吗".',
     "This is a direct question from the CEO (黄老师). I'm 招聘经理. Looking at the chat history: 文化总监 (lead) has already answered this question.",

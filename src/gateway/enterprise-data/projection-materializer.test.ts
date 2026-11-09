@@ -502,7 +502,7 @@ describe("yonyou projection cursor window", () => {
             version: "v1",
           },
         ],
-        objectKind: "aggregate",
+        objectKind: "data",
         templateKey: "AggregateTemplate",
         description: "用友存货汇总，不应用同步水位窗",
         outputSchema: { type: "object" },

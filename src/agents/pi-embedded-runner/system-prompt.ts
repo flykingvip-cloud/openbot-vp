@@ -3,6 +3,7 @@ import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { MemoryCitationsMode } from "../../config/types.memory.js";
 import type { RuntimeOrganizationContext } from "../../organization/runtime.js";
 import type { ResolvedTimeFormat } from "../date-time.js";
+import { resolveWorkspaceIdentityBootstrapState } from "../identity-file.js";
 import type { EmbeddedContextFile } from "../pi-embedded-helpers.js";
 import { buildAgentSystemPrompt, type PromptMode } from "../system-prompt.js";
 import { buildToolSummaryMap } from "../tool-summaries.js";
@@ -58,6 +59,10 @@ export function buildEmbeddedSystemPrompt(params: {
   memoryCitationsMode?: MemoryCitationsMode;
 }): string {
   return buildAgentSystemPrompt({
+    identityBootstrapState:
+      params.promptMode === "minimal" || params.promptMode === "none"
+        ? undefined
+        : resolveWorkspaceIdentityBootstrapState(params.workspaceDir),
     workspaceDir: params.workspaceDir,
     defaultThinkLevel: params.defaultThinkLevel,
     reasoningLevel: params.reasoningLevel,

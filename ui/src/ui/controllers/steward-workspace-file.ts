@@ -4,6 +4,7 @@ import type { GatewayBrowserClient } from "../gateway.ts";
 
 /** Payload returned by the `workbench.steward-file.read` gateway RPC. */
 export type StewardWorkspaceFilePayload = {
+  contentHash?: string;
   /** Download basename. */
   filename: string;
   /** Canonical path relative to the selected agent workspace. */
@@ -83,7 +84,7 @@ export async function patchStewardWorkspacePptx(
   client: GatewayBrowserClient | null,
   filename: string,
   slides: OfficeSlideText[],
-  options?: { sessionKey?: string },
+  options?: { sessionKey?: string; expectedContentHash?: string },
 ): Promise<StewardWorkspaceFilePayload | null> {
   const trimmed = filename.trim();
   if (!client || !trimmed || slides.length === 0) {
@@ -96,6 +97,7 @@ export async function patchStewardWorkspacePptx(
       {
         filename: trimmed,
         slides,
+        expectedContentHash: options?.expectedContentHash,
         ...(sessionKey ? { sessionKey } : {}),
       },
     );
@@ -103,7 +105,10 @@ export async function patchStewardWorkspacePptx(
       return null;
     }
     return res;
-  } catch {
+  } catch (error) {
+    if (String(error).includes("ARTIFACT_VERSION_CONFLICT")) {
+      throw error;
+    }
     return null;
   }
 }

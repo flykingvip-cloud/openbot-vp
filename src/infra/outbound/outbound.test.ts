@@ -364,10 +364,124 @@ describe("delivery-queue", () => {
       return { result, log };
     };
 
+    it.each(["paused", "replaced", "constraints"])(
+      "refuses stale task recovery before sending: %s",
+      async (mode) => {
+        const board = await import("../../conversation-task/session-task-board.js");
+        const sessionFile = path.join(tmpDir, "task-session.jsonl");
+        board.mutateSessionTaskBoard(sessionFile, () => ({
+          board: {
+            ...board.emptySessionTaskBoard(),
+            current: {
+              taskId: "a",
+              title: "A",
+              goalText: "A",
+              unfinished: true,
+              createdAtMs: 1,
+              stop: { summary: "", workspacePaths: [] },
+              executionAttempt: "run-a",
+              deliverableVersion: "v1",
+            },
+          },
+          value: undefined,
+        }));
+        const binding = board.captureTaskCompletionBinding(sessionFile)!;
+        const id = await enqueueDelivery(
+          {
+            channel: "whatsapp",
+            to: "+1",
+            payloads: [{ text: "old result" }],
+            taskBoundary: { sessionFile, binding, constraints: binding.constraints ?? [] },
+          },
+          tmpDir,
+        );
+        board.mutateSessionTaskBoard(sessionFile, (current) => ({
+          board: {
+            ...current,
+            current: {
+              ...current.current!,
+              ...(mode === "paused"
+                ? { wakeSuppress: true }
+                : mode === "replaced"
+                  ? { taskId: "b" }
+                  : { effectiveConstraints: ["do not send"] }),
+            },
+          },
+          value: undefined,
+        }));
+        const deliver = vi.fn().mockResolvedValue([{ messageId: "receipt" }]);
+        const { result } = await runRecovery({ deliver });
+        expect(deliver).not.toHaveBeenCalled();
+        expect(result.recovered).toBe(0);
+        expect(fs.existsSync(path.join(tmpDir, "delivery-queue", "failed", `${id}.json`))).toBe(
+          true,
+        );
+      },
+    );
+
+    it("does not ack bestEffort recovery failure", async () => {
+      await enqueueDelivery(
+        { channel: "whatsapp", to: "+1", payloads: [{ text: "a" }], bestEffort: true },
+        tmpDir,
+      );
+      const deliver = vi.fn(async (params: { onError?: (error: unknown) => void }) => {
+        params.onError?.(new Error("partial failure"));
+        return [];
+      });
+      const { result } = await runRecovery({ deliver });
+      expect(result.recovered).toBe(0);
+      expect(result.failed).toBe(1);
+      const pending = await loadPendingDeliveries(tmpDir);
+      expect(pending).toHaveLength(1);
+      expect(pending[0].retryCount).toBe(1);
+    });
+
+    it("holds partially delivered batches instead of replaying confirmed payloads", async () => {
+      const id = await enqueueDelivery(
+        {
+          channel: "whatsapp",
+          to: "+1",
+          payloads: [{ text: "a" }, { text: "b" }],
+          bestEffort: true,
+        },
+        tmpDir,
+      );
+      const deliver = vi.fn(async (params: { onError?: (error: unknown) => void }) => {
+        params.onError?.(new Error("second payload failed"));
+        return [{ messageId: "confirmed-first-payload" }];
+      });
+      const { result } = await runRecovery({ deliver });
+      expect(result.recovered).toBe(0);
+      expect(result.failed).toBe(1);
+      expect(await loadPendingDeliveries(tmpDir)).toHaveLength(0);
+      expect(fs.existsSync(path.join(tmpDir, "delivery-queue", "failed", `${id}.json`))).toBe(true);
+      const replay = vi.fn();
+      await runRecovery({ deliver: replay });
+      expect(replay).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { receipts: [] },
+      { receipts: [{ messageId: "unknown" }] },
+      { receipts: [{ messageId: "ok" }, { messageId: "unknown" }] },
+    ])("does not acknowledge unknown receipts: %j", async ({ receipts }) => {
+      const id = await enqueueDelivery(
+        { channel: "whatsapp", to: "+1", payloads: [{ text: "a" }] },
+        tmpDir,
+      );
+      const { result } = await runRecovery({ deliver: vi.fn().mockResolvedValue(receipts) });
+      expect(result.recovered).toBe(0);
+      expect(result.failed).toBe(1);
+      const replay = vi.fn();
+      await runRecovery({ deliver: replay });
+      expect(replay).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(tmpDir, "delivery-queue", "failed", `${id}.json`))).toBe(true);
+    });
+
     it("recovers entries from a simulated crash", async () => {
       // Manually create queue entries as if gateway crashed before delivery.
       await enqueueCrashRecoveryEntries();
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const { result } = await runRecovery({ deliver });
 
       expect(deliver).toHaveBeenCalledTimes(2);
@@ -440,7 +554,7 @@ describe("delivery-queue", () => {
     it("passes skipQueue: true to prevent re-enqueueing during recovery", async () => {
       await enqueueDelivery({ channel: "whatsapp", to: "+1", payloads: [{ text: "a" }] }, tmpDir);
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       await runRecovery({ deliver });
 
       expect(deliver).toHaveBeenCalledWith(expect.objectContaining({ skipQueue: true }));
@@ -464,7 +578,7 @@ describe("delivery-queue", () => {
         tmpDir,
       );
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       await runRecovery({ deliver });
 
       expect(deliver).toHaveBeenCalledWith(
@@ -485,7 +599,7 @@ describe("delivery-queue", () => {
       await enqueueCrashRecoveryEntries();
       await enqueueDelivery({ channel: "slack", to: "#c", payloads: [{ text: "c" }] }, tmpDir);
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const { result, log } = await runRecovery({
         deliver,
         maxRecoveryMs: 0, // Immediate timeout -- no entries should be processed.
@@ -512,7 +626,7 @@ describe("delivery-queue", () => {
       );
       setEntryState(id, { retryCount: 3, lastAttemptAt: Date.now() });
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const { result, log } = await runRecovery({
         deliver,
         maxRecoveryMs: 60_000,
@@ -546,7 +660,7 @@ describe("delivery-queue", () => {
       setEntryState(blockedId, { retryCount: 3, lastAttemptAt: now, enqueuedAt: now - 30_000 });
       setEntryState(readyId, { retryCount: 0, enqueuedAt: now - 10_000 });
 
-      const deliver = vi.fn().mockResolvedValue([]);
+      const deliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const { result } = await runRecovery({ deliver, maxRecoveryMs: 60_000 });
 
       expect(result).toEqual({
@@ -576,7 +690,7 @@ describe("delivery-queue", () => {
       );
       setEntryState(id, { retryCount: 3, lastAttemptAt: start.getTime() });
 
-      const firstDeliver = vi.fn().mockResolvedValue([]);
+      const firstDeliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const firstRun = await runRecovery({ deliver: firstDeliver, maxRecoveryMs: 60_000 });
       expect(firstRun.result).toEqual({
         recovered: 0,
@@ -587,7 +701,7 @@ describe("delivery-queue", () => {
       expect(firstDeliver).not.toHaveBeenCalled();
 
       vi.setSystemTime(new Date(start.getTime() + 600_000 + 1));
-      const secondDeliver = vi.fn().mockResolvedValue([]);
+      const secondDeliver = vi.fn().mockResolvedValue([{ messageId: "confirmed-test-id" }]);
       const secondRun = await runRecovery({ deliver: secondDeliver, maxRecoveryMs: 60_000 });
       expect(secondRun.result).toEqual({
         recovered: 1,

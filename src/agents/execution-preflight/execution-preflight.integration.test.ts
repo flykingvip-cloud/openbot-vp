@@ -14,6 +14,8 @@ import {
   gateAssistantTexts,
   hashArtifact,
   issueValidationReceipt,
+  noteConfirmationPassed,
+  resetConfirmationGatesForTest,
   readExecutionDecisionCount,
   readExecutionTraces,
   readSkillContract,
@@ -59,6 +61,7 @@ function build(taskId: string, skills = [alias, primary]) {
 beforeEach(() => {
   resetExecutionTraceForTest();
   resetValidationStateForTest();
+  resetConfirmationGatesForTest();
   resetDeliveryArtifactsForTest();
   registerTrustedValidator({ id: "sample-validator", version: "1" });
 });
@@ -133,9 +136,11 @@ describe("execution preflight integration", () => {
   it("invalidates a receipt when the artifact bytes change and blocks a completion claim", () => {
     registerTrustedValidator({ id: "sample-validator", version: "1" });
     const preflight = build("qa-task");
+    noteConfirmationPassed(preflight.taskId, preflight.attemptNumber, "stage-a");
     const artifactPath = "out/output.bin";
     const original = "version-1";
     const receipt = issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: preflight.taskId,
       artifactPath,
@@ -165,6 +170,7 @@ describe("execution preflight integration", () => {
     expect(fresh.allowedToDeliver).toBe(true);
     expect(
       issueValidationReceipt({
+        result: "passed",
         validatorId: "unregistered-validator",
         taskId: preflight.taskId,
         artifactPath,
@@ -204,8 +210,10 @@ describe("execution preflight integration", () => {
   it("records reconstructable traces without prompt text", () => {
     registerTrustedValidator({ id: "sample-validator", version: "1" });
     const success = build("trace-success");
+    noteConfirmationPassed(success.taskId, success.attemptNumber, "stage-a");
     const artifactPath = "out/output.bin";
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: success.taskId,
       artifactPath,
@@ -300,7 +308,7 @@ describe("execution preflight integration", () => {
       "utf8",
     );
     const attempt = readFileSync(
-      new URL("../pi-embedded-runner/run/attempt.ts", import.meta.url),
+      new URL("../../agent-runtime/execution/runner/embedded-attempt.ts", import.meta.url),
       "utf8",
     );
     const chat = readFileSync(
@@ -308,7 +316,12 @@ describe("execution preflight integration", () => {
       "utf8",
     );
     expect(cron).toContain("runEmbeddedPiAgent");
-    expect(agent).toContain("runEmbeddedPiAgent");
+    expect(agent).toContain("runCommandCandidate");
+    const candidate = readFileSync(
+      new URL("../../agent-runtime/execution/runner/command-candidate.ts", import.meta.url),
+      "utf8",
+    );
+    expect(candidate).toContain("runEmbeddedPiAgent");
     expect(gatewayAgent).toContain("agentCommandFromIngress");
     expect(ledger).not.toContain("runEmbeddedPiAgent");
     expect(attempt).toContain("filterLaneTools");
@@ -331,7 +344,7 @@ describe("execution preflight integration", () => {
     expect(attempt.split("buildExecutionPreflight(").length - 1).toBe(1);
     expect(attempt).toContain("passedToSession: customToolAllowlist");
     const embeddedRun = readFileSync(
-      new URL("../pi-embedded-runner/run.ts", import.meta.url),
+      new URL("../../agent-runtime/execution/runner/embedded-run.ts", import.meta.url),
       "utf8",
     );
     expect(embeddedRun).toContain("assistantTexts: attempt.assistantTexts");
@@ -370,6 +383,7 @@ describe("execution preflight integration", () => {
         },
       ]);
       const relativePath = "out/output.bin";
+      noteConfirmationPassed(preflight.taskId, preflight.attemptNumber, "stage-a");
       const absolutePath = path.join(workspace, relativePath);
       mkdirSync(path.dirname(absolutePath), { recursive: true });
       const tool = {
@@ -383,6 +397,7 @@ describe("execution preflight integration", () => {
       await guarded?.execute?.("call-1", { path: relativePath, content: "version-1" }, undefined);
       const bytes = readFileSync(absolutePath);
       issueValidationReceipt({
+        result: "passed",
         validatorId: "sample-validator",
         taskId: preflight.taskId,
         artifactPath: relativePath,
@@ -419,6 +434,8 @@ describe("execution preflight integration", () => {
         { path: relativePath, content: "version-2" },
         undefined,
       );
+      // Byte invalidation is independent of the confirmation required by this fixture.
+      noteConfirmationPassed(revised.taskId, revised.attemptNumber, "stage-a");
       const blocked = resolveAttemptDelivery({ preflight: revised, workspaceDir: workspace });
       expect(blocked.decisionCode).toBe("artifact_changed");
       expect(blocked.allowedToDeliver).toBe(false);

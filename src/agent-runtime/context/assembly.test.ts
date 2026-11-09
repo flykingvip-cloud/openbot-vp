@@ -1,0 +1,79 @@
+import { describe, expect, it } from "vitest";
+import {
+  assembleIndividual,
+  assembleCollaborationMember,
+  appendSharedTurnContext,
+  appendSystemContextPart,
+  finalizeSystemContext,
+  selectSystemContextParts,
+} from "./assembly.js";
+
+it("appends shared turn material in fixed order without changing bytes or prior snapshots", () => {
+  const base = ["base"];
+  expect(
+    appendSharedTurnContext(base, {
+      skillGuidance: "last",
+      learningRecall: " ",
+      clarification: "second",
+      taskSurface: "first",
+      runtimeEvents: "events",
+    }),
+  ).toEqual(["base", "first", "second", " ", "events", "last"]);
+  expect(base).toEqual(["base"]);
+  expect(() => appendSharedTurnContext(base, { speaker: "untrusted" } as never)).toThrow(
+    /not allowed/,
+  );
+});
+
+it("orders individual material without changing source bytes or reading sources", () => {
+  expect(
+    assembleIndividual({ knowledge: "second", inboundMetadata: "  first  ", userProfile: " " }),
+  ).toEqual(["  first  ", "second"]);
+});
+
+it("rejects collaboration and unknown material in individual context", () => {
+  expect(() => assembleIndividual({ groupSystemPrompt: "" } as never)).toThrow(/not allowed/);
+  expect(() => assembleIndividual({ unexpected: "instructions" } as never)).toThrow(/not allowed/);
+});
+
+it("preserves collaboration material order, duplicate text and source bytes", () => {
+  expect(
+    assembleCollaborationMember({
+      inboundMetadata: "last",
+      mission: "same",
+      operationalIdentity: "  first  ",
+      charter: "same",
+      groupIntro: " ",
+    }),
+  ).toEqual(["  first  ", "same", "same", "last"]);
+  expect(() => assembleCollaborationMember({ unknown: "" } as never)).toThrow(/not allowed/);
+});
+
+describe("system context assembly compatibility", () => {
+  it("filters blank initial material while preserving bytes, order and duplicate sources", () => {
+    const input = [undefined, "", " \n", "  first\n", "second", "second"];
+    const previous = input.filter((entry): entry is string => Boolean(entry?.trim()));
+    expect(selectSystemContextParts(input)).toEqual(previous);
+    expect(finalizeSystemContext(selectSystemContextParts(input))).toBe(
+      "  first\n\n\nsecond\n\nsecond",
+    );
+  });
+
+  it("preserves caller-admitted append semantics and does not mutate earlier snapshots", () => {
+    const initial = selectSystemContextParts(["base"]);
+    const appended = appendSystemContextPart(initial, " ");
+    expect(initial).toEqual(["base"]);
+    expect(finalizeSystemContext(appended)).toBe("base\n\n ");
+  });
+
+  it("keeps ordered late additions and represents absent system context as undefined", () => {
+    expect(finalizeSystemContext([])).toBeUndefined();
+    let parts = selectSystemContextParts(["identity", "task"]);
+    for (const value of ["speaker", "recall", "events", "skill"]) {
+      parts = appendSystemContextPart(parts, value);
+    }
+    expect(finalizeSystemContext(parts)).toBe(
+      ["identity", "task", "speaker", "recall", "events", "skill"].join("\n\n"),
+    );
+  });
+});

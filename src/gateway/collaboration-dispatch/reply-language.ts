@@ -68,9 +68,15 @@ export function stripReplyLanguageSample(text: string): string {
 }
 
 function countScripts(text: string): { han: number; latin: number } {
+  // Artifact locators are opaque data, not English prose. Keep the original
+  // text for planning-marker checks and output; mask paths only for counting.
+  const sample = text.replace(
+    /(?:[A-Za-z]:)?[\\/](?:[A-Za-z0-9._~%+-]+[\\/])*[A-Za-z0-9._~%+-]+/gu,
+    " ",
+  );
   return {
-    han: (text.match(/[\u4e00-\u9fff]/g) ?? []).length,
-    latin: (text.match(/[A-Za-z]/g) ?? []).length,
+    han: (sample.match(/[\u4e00-\u9fff]/g) ?? []).length,
+    latin: (sample.match(/[A-Za-z]/g) ?? []).length,
   };
 }
 

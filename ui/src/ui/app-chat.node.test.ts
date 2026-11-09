@@ -4,7 +4,7 @@ import * as appScroll from "./app-scroll.ts";
 import { chatCapability } from "./capability/chat/index.ts";
 import { sessionsCapability } from "./capability/sessions/index.ts";
 import type { ChatQuoteDraft } from "./chat/quote-draft.ts";
-import type { ChatAttachment } from "./ui-types.ts";
+import type { ChatAttachment, ChatQueueItem } from "./ui-types.ts";
 
 function createSendHost(overrides: {
   chatMessage: string;
@@ -14,8 +14,8 @@ function createSendHost(overrides: {
   return {
     connected: true,
     chatSending: false,
-    chatRunId: null,
-    chatQueue: [],
+    chatRunId: null as string | null,
+    chatQueue: [] as ChatQueueItem[],
     chatMessage: overrides.chatMessage,
     chatQuoteDraft: overrides.chatQuoteDraft ?? null,
     chatAttachments: overrides.chatAttachments ?? [],

@@ -119,7 +119,7 @@ describe("heartbeat runner focus gate (P8 / P9 / EA-B5)", () => {
     });
   });
 
-  it("parks event-driven heartbeat and injects a notice instead of punching occupied FOCUS", async () => {
+  it("defers an occupied heartbeat without inventing a task or discarding its event", async () => {
     await withTempTelegramHeartbeatSandbox(async ({ tmpDir, storePath, replySpy }) => {
       const nowMs = Date.parse("2026-09-17T06:00:00.000Z");
       const cfg: OpenBotConfig = {
@@ -164,7 +164,8 @@ describe("heartbeat runner focus gate (P8 / P9 / EA-B5)", () => {
           }),
         }),
       );
-      expect(peekSystemEvents(sessionKey)).toEqual([]);
+      expect(peekSystemEvents(sessionKey)).toEqual(["Exec finished: npm test"]);
+      await expect(fs.access(path.join(tmpDir, "sid.jsonl.task-board.json"))).rejects.toThrow();
       expect(sendTelegram).not.toHaveBeenCalled();
     });
   });

@@ -7,6 +7,36 @@ import { describe, expect, it } from "vitest";
  * chains must not import or invoke it.
  */
 describe("seedSessionTaskBoard production-call-chain audit", () => {
+  it("does not restore retired inbound inference in production sources", () => {
+    const root = path.resolve(import.meta.dirname, "..", "..");
+    const retired = [
+      "applyIncomingUserMessage",
+      "isSureDistinctWork",
+      "evaluateFocusSwitch",
+      "applyLegacyTaskControl",
+      "applyFocusSwitchGate",
+      "isLikelyContinuation",
+    ];
+    const hits: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
+          const source = fs.readFileSync(full, "utf8");
+          for (const symbol of retired) {
+            if (source.includes(symbol)) {
+              hits.push(`${path.relative(root, full)}: ${symbol}`);
+            }
+          }
+        }
+      }
+    };
+    walk(path.join(root, "src"));
+    expect(hits).toEqual([]);
+  });
+
   it("is only referenced from tests, docs, or its definition", () => {
     const root = path.resolve(import.meta.dirname, "..", "..");
     const hits: string[] = [];
@@ -44,8 +74,11 @@ describe("seedSessionTaskBoard production-call-chain audit", () => {
         if (rel.startsWith("docs/")) {
           return true;
         }
-        // Definition + comment only in the board module.
-        if (rel === "src/conversation-task/session-task-board.ts") {
+        // Sole definition is in the repository; the old board only re-exports it.
+        if (
+          rel === "src/conversation-task/session-task-board.ts" ||
+          rel === "src/agent-runtime/state/repository/task-board-file.ts"
+        ) {
           return true;
         }
         // Cross-process child is a test helper process, not a production entry.
@@ -60,7 +93,7 @@ describe("seedSessionTaskBoard production-call-chain audit", () => {
     expect(banned).toEqual([]);
 
     // Sanity: definition exists and tests use it.
-    expect(hits.some((h) => h.endsWith("session-task-board.ts"))).toBe(true);
+    expect(hits).toContain("src/agent-runtime/state/repository/task-board-file.ts");
     expect(hits.some((h) => h.includes(".test.ts"))).toBe(true);
 
     // Production board module must document test-only + must not call seed from other exports' bodies via import cycle — check no other src non-test imports the symbol.
@@ -68,7 +101,8 @@ describe("seedSessionTaskBoard production-call-chain audit", () => {
       (rel) =>
         rel.startsWith("src/") &&
         !rel.endsWith(".test.ts") &&
-        rel !== "src/conversation-task/session-task-board.ts",
+        rel !== "src/conversation-task/session-task-board.ts" &&
+        rel !== "src/agent-runtime/state/repository/task-board-file.ts",
     );
     expect(productionImporters).toEqual([]);
   });

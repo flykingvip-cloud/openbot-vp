@@ -4,7 +4,10 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), "../auto-reply/reply/agent-runner-execution.ts"),
+  resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "../agent-runtime/execution/runner/admitted-candidate.ts",
+  ),
   "utf8",
 );
 

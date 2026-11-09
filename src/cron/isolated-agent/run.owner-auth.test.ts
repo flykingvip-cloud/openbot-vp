@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "../../agents/test-helpers/fast-coding-tools.js";
-import { createOpenClawCodingTools } from "../../agents/pi-tools.js";
 import { cronIsolatedAgentFixtureCfg } from "./job-fixtures.js";
 import {
   clearFastTestEnv,
@@ -60,6 +59,7 @@ describe("runCronIsolatedAgentTurn owner auth", () => {
     const senderIsOwner = runEmbeddedPiAgentMock.mock.calls[0]?.[0]?.senderIsOwner;
     expect(senderIsOwner).toBe(true);
 
+    const { createOpenClawCodingTools } = await import("../../agents/pi-tools.js");
     const toolNames = createOpenClawCodingTools({ senderIsOwner }).map((tool) => tool.name);
     expect(toolNames).toContain("cron");
     expect(toolNames).toContain("gateway");

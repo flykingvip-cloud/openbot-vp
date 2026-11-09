@@ -19,8 +19,7 @@ vi.mock("../gateway/evolution-control/pattern-proposal.js", () => ({
   registerNamedPatternCandidateProposal: vi.fn(),
 }));
 
-const { resolveAttemptEndOfRunAttribution } =
-  await import("../agents/pi-embedded-runner/run/attempt.js");
+const { resolveAttemptEndOfRunAttribution } = await import("../agent-runtime/execution/index.js");
 const { ingestPatternSampleFromRun, namedToolsFromList } =
   await import("../gateway/pattern-detection/ingest-from-run.js");
 const {

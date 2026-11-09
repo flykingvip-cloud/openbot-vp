@@ -1,7 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import type { ExtensionFactory, SessionManager } from "@earendil-works/pi-coding-agent";
+import { resolveContextWindowInfo } from "../../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../../config/config.js";
-import { resolveContextWindowInfo } from "../context-window-guard.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../defaults.js";
 import { setCompactionSafeguardRuntime } from "../pi-extensions/compaction-safeguard-runtime.js";
 import compactionSafeguardExtension from "../pi-extensions/compaction-safeguard.js";

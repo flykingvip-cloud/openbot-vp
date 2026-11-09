@@ -371,3 +371,107 @@ describe("resolveCliNoOutputTimeoutMs", () => {
     expect(timeoutMs).toBe(42_000);
   });
 });
+
+it("does not spawn CLI when the host signal was already cancelled", async () => {
+  supervisorSpawnMock.mockClear();
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    runCliAgent({
+      sessionId: "cancelled",
+      sessionFile: "/tmp/session.jsonl",
+      workspaceDir: "/tmp",
+      prompt: "hi",
+      provider: "codex-cli",
+      model: "gpt-5.2-codex",
+      timeoutMs: 1000,
+      runId: "cancelled-run",
+      abortSignal: controller.signal,
+    }),
+  ).rejects.toMatchObject({ name: "AbortError" });
+  expect(supervisorSpawnMock).not.toHaveBeenCalled();
+});
+
+it("cancels the supervisor handle if stop arrives while spawn is pending and removes the listener", async () => {
+  const controller = new AbortController();
+  const remove = vi.spyOn(controller.signal, "removeEventListener");
+  const managed = createManagedRun({
+    reason: "manual-cancel",
+    exitCode: null,
+    exitSignal: "SIGTERM",
+    durationMs: 1,
+    stdout: "",
+    stderr: "",
+    timedOut: false,
+    noOutputTimedOut: false,
+  });
+  supervisorSpawnMock.mockImplementationOnce(async () => {
+    controller.abort();
+    return managed;
+  });
+  await expect(
+    runCliAgent({
+      sessionId: "cancel-during-spawn",
+      sessionFile: "/tmp/session.jsonl",
+      workspaceDir: "/tmp",
+      prompt: "hi",
+      provider: "codex-cli",
+      model: "gpt-5.2-codex",
+      timeoutMs: 1000,
+      runId: "cancel-spawn-run",
+      abortSignal: controller.signal,
+    }),
+  ).rejects.toMatchObject({ name: "AbortError" });
+  expect(managed.cancel).toHaveBeenCalledWith("manual-cancel");
+  expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+});
+
+it.each([false, true])(
+  "stops a running CLI without late success even if cancel throws (%s)",
+  async (cancelThrows) => {
+    const controller = new AbortController();
+    const managed = createManagedRun({
+      reason: "exit",
+      exitCode: 0,
+      exitSignal: null,
+      durationMs: 1,
+      stdout: "late success",
+      stderr: "",
+      timedOut: false,
+      noOutputTimedOut: false,
+    });
+    if (cancelThrows) {
+      managed.cancel.mockImplementationOnce(() => {
+        throw new Error("cancel failure");
+      });
+    }
+    managed.wait.mockImplementationOnce(async () => {
+      controller.abort();
+      return {
+        reason: "exit",
+        exitCode: 0,
+        exitSignal: null,
+        durationMs: 1,
+        stdout: "late success",
+        stderr: "",
+        timedOut: false,
+        noOutputTimedOut: false,
+      };
+    });
+    supervisorSpawnMock.mockResolvedValueOnce(managed);
+    await expect(
+      runCliAgent({
+        sessionId: "cancel-running",
+        sessionFile: "/tmp/session.jsonl",
+        workspaceDir: "/tmp",
+        prompt: "hi",
+        provider: "codex-cli",
+        model: "gpt-5.2-codex",
+        timeoutMs: 1000,
+        runId: "cancel-running-run",
+        abortSignal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(managed.cancel).toHaveBeenCalledTimes(1);
+  },
+);

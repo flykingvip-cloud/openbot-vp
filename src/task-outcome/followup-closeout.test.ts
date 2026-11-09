@@ -17,6 +17,8 @@ vi.mock(
 );
 
 vi.mock("../agents/pi-embedded.js", () => ({
+  queueEmbeddedPiMessage: vi.fn(),
+  abortEmbeddedPiRun: vi.fn(),
   runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
 }));
 
@@ -84,7 +86,7 @@ describe("askOutcome W1 followup unified closeout through createFollowupRunner",
     routeReplyMock.mockReset();
     routeReplyMock.mockResolvedValue({ ok: true });
     isRoutableChannelMock.mockReset();
-    isRoutableChannelMock.mockReturnValue(true);
+    isRoutableChannelMock.mockImplementation((channel) => Boolean(channel));
     runEmbeddedPiAgentMock.mockReset();
   });
 
@@ -92,7 +94,7 @@ describe("askOutcome W1 followup unified closeout through createFollowupRunner",
     fs.rmSync(agentDir, { recursive: true, force: true });
   });
 
-  it("records ordinary success tip for stable followupItemId child task", async () => {
+  it("records stable followup task identity without claiming dispatcher enqueue was delivered", async () => {
     runEmbeddedPiAgentMock.mockResolvedValueOnce({
       payloads: [{ text: "done" }],
       meta: {},
@@ -113,7 +115,8 @@ describe("askOutcome W1 followup unified closeout through createFollowupRunner",
     expect(record?.entrypoint).toBe("chat");
     expect(record?.parentTaskId).toBe("chat:bot:parent-1");
     expect(record?.runs?.some((r) => r.status === "succeeded")).toBe(true);
-    expect(record?.delivery.status).toBe("pending");
+    expect(record?.delivery.status).toBe("delivery_unknown");
+    expect(routeReplyMock).not.toHaveBeenCalled();
   });
 
   it("records run_failed tip when embedded agent throws", async () => {
@@ -163,3 +166,7 @@ describe("askOutcome W1 followup unified closeout through createFollowupRunner",
     void taskFiles;
   });
 });
+
+vi.mock("../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
+}));

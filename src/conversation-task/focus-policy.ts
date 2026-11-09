@@ -1,3 +1,5 @@
+import { formatDroppedParkedTaskSentence } from "../agent-runtime/context/task-focus.js";
+export { formatDroppedParkedTaskSentence } from "../agent-runtime/context/task-focus.js";
 /**
  * Focus / Parked scheduling policy (EA-B2, EA-B4, EA-B5).
  *
@@ -73,23 +75,6 @@ const IDENTITY_CREATE_TRIGGERS = new Set<WakeReason>(["cron", "heartbeat"]);
 
 export function isHeartbeatActionAllowed(action: string): boolean {
   return !(HEARTBEAT_FORBIDDEN_ACTIONS as readonly string[]).includes(action);
-}
-
-export function formatDroppedParkedTaskSentence(params: {
-  droppedTaskId?: string;
-  droppedTitle?: string;
-  droppedPaths?: readonly string[];
-}): string {
-  const name = params.droppedTitle?.trim() || params.droppedTaskId?.trim() || "";
-  if (!name) {
-    return "";
-  }
-  const paths = (params.droppedPaths ?? []).map((item) => item.trim()).filter(Boolean);
-  // C6 / §3.6: capacity overflow → searchable archive + notify (not silent drop).
-  if (paths.length === 0) {
-    return `已归档最早挂起的「${name}」（可追溯）。`;
-  }
-  return `已归档最早挂起的「${name}」（可追溯），文件仍在 ${paths.join("、")}。`;
 }
 
 function parkIncomingDroppingOldest(

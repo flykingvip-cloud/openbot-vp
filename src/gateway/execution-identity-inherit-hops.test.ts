@@ -16,16 +16,16 @@ function readRepo(relativePath: string): string {
 }
 
 const RECONSTRUCT_HOPS = [
-  "src/agents/pi-embedded-runner/run.ts",
-  "src/agents/pi-embedded-runner/run/attempt.ts",
+  "src/agent-runtime/execution/runner/embedded-run.ts",
+  "src/agent-runtime/execution/runner/embedded-attempt.ts",
   "src/agents/pi-embedded-runner/compact.ts",
-  "src/auto-reply/reply/agent-runner-utils.ts",
+  "src/agent-runtime/execution/preparation/embedded-parameters.ts",
   "src/auto-reply/reply/followup-runner.ts",
-  "src/auto-reply/reply/agent-runner-execution.ts",
+  "src/agent-runtime/execution/runner/admitted-candidate.ts",
   "src/auto-reply/reply/commands-compact.ts",
   "src/auto-reply/reply/get-reply-inline-actions.ts",
   "src/agents/pi-tools.ts",
-  "src/commands/agent.ts",
+  "src/agent-runtime/execution/runner/command-candidate.ts",
   "src/gateway/server-methods/agent.ts",
   "src/gateway/tools-invoke-http.ts",
 ] as const;

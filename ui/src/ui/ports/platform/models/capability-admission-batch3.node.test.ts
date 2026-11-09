@@ -434,30 +434,32 @@ describe("pooled connection writes executable admission", () => {
 
   it("writes eligible admission through the gateway when no row exists", async () => {
     const calls: Array<{ method: string; params?: Record<string, unknown> }> = [];
-    await bindCapabilityAdmissionGateway(async (method, params) => {
-      calls.push({ method, params });
-      if (method === "models.admission.listModelAdmissions") {
-        return { admissions: [] };
-      }
-      if (method === "models.admission.setRoutingEligibility") {
-        return {
-          status: "applied",
-          modelRef: params?.modelRef,
-          autoRouting: params?.autoRouting,
-          admission: {
+    await bindCapabilityAdmissionGateway(
+      async <T>(method: string, params?: Record<string, unknown>): Promise<T> => {
+        calls.push({ method, params });
+        if (method === "models.admission.listModelAdmissions") {
+          return { admissions: [] } as T;
+        }
+        if (method === "models.admission.setRoutingEligibility") {
+          return {
+            status: "applied",
             modelRef: params?.modelRef,
-            autoRouting: "eligible",
-            tenantSelectable: false,
-            autoRoutingTaskCategories: [],
-            capabilityEvidence: [],
-            updatedAt: 1,
-            platformEffective: true,
-            autoRoutingReason: params?.reason,
-          },
-        };
-      }
-      return {};
-    });
+            autoRouting: params?.autoRouting,
+            admission: {
+              modelRef: params?.modelRef,
+              autoRouting: "eligible",
+              tenantSelectable: false,
+              autoRoutingTaskCategories: [],
+              capabilityEvidence: [],
+              updatedAt: 1,
+              platformEffective: true,
+              autoRoutingReason: params?.reason,
+            },
+          } as T;
+        }
+        return {} as T;
+      },
+    );
     expect(await admitPooledModelAfterConnection("api-proxy-deepseek/deepseek-v4-flash")).toBe(
       true,
     );
@@ -477,12 +479,12 @@ describe("pooled connection writes executable admission", () => {
       platformEffective: true,
     });
     const calls: string[] = [];
-    await bindCapabilityAdmissionGateway(async (method) => {
+    await bindCapabilityAdmissionGateway(async <T>(method: string): Promise<T> => {
       calls.push(method);
       if (method === "models.admission.listModelAdmissions") {
-        return { admissions: [] };
+        return { admissions: [] } as T;
       }
-      return {};
+      return {} as T;
     });
     expect(await admitPooledModelAfterConnection("api-proxy-deepseek/deepseek-v4-flash")).toBe(
       false,

@@ -305,7 +305,7 @@ describe("collaboration_board tool", () => {
       submissionId: "942755ff-d18e-40aa-8252-8c399069d675",
       artifactVersion: "v20261019",
     };
-    const submitForReview = vi.fn(async () => item);
+    const submitForReview = vi.fn(async () => ({ item, eventRelay: null }));
     const tool = createCollaborationBoardTool({
       requesterAgentIdOverride: "bot-2",
       agentSessionKey: SESSION,
@@ -438,7 +438,7 @@ describe("collaboration_board tool", () => {
       acceptedSubmissionId: "942755ff-d18e-40aa-8252-8c399069d675",
       acceptedArtifactVersion: "v20261019",
     };
-    const acceptSubmission = vi.fn(async () => item);
+    const acceptSubmission = vi.fn(async () => ({ item, eventRelay: null }));
     const tool = createCollaborationBoardTool({
       requesterAgentIdOverride: "bot-secretary",
       agentSessionKey: SESSION,
@@ -540,7 +540,7 @@ describe("collaboration_board tool", () => {
       claimantId: "bot-2",
       returnReason: "need more sources",
     };
-    const returnSubmission = vi.fn(async () => item);
+    const returnSubmission = vi.fn(async () => ({ item, eventRelay: null }));
     const tool = createCollaborationBoardTool({
       requesterAgentIdOverride: "bot-secretary",
       agentSessionKey: SESSION,

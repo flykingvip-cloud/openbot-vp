@@ -26,6 +26,10 @@ vi.mock("../../agents/pi-embedded.js", async () => {
   };
 });
 
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
+}));
+
 vi.mock("./queue.js", async () => {
   const actual = await vi.importActual<typeof import("./queue.js")>("./queue.js");
   return {
@@ -76,6 +80,7 @@ describe("runReplyAgent media path normalization", () => {
         prompt: "generate",
         enqueuedAt: Date.now(),
         run: {
+          inputProvenance: { kind: "internal_system" },
           agentId: "main",
           agentDir: "/tmp/agent",
           sessionId: "session",

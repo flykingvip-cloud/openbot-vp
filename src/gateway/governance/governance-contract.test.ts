@@ -70,9 +70,8 @@ const EXPECTED_REGISTERED_GAPS: string[] = [
 /** Enterprise-scope model paths that must pass `governanceMode` (plan §4 / P3-3). */
 const ENTERPRISE_MODEL_CALLER_IDS = [
   "auto-reply",
-  "followup",
-  "cron-isolated",
   "memory-flush",
+  "llm-slug-generator",
   "agent-command",
   "image-tool",
   "pdf-tool",
@@ -249,7 +248,7 @@ describe("§5 execution entry inventory", () => {
       expect(e5?.status).not.toBe("Bypass");
       expect(e5?.exemptReason).toMatch(/E1/);
       expect(e5?.exemptReason).toMatch(/getReplyFromConfig/);
-      expect(e5?.exemptReason).toMatch(/runAgentTurnWithFallback/);
+      expect(e5?.exemptReason).toMatch(/runAdmittedTurn/);
       expect(e5?.note).toMatch(/E1/);
       expect(e5?.symbols).toEqual(["runHeartbeatOnce", "getReplyFromConfig"]);
       const heartbeat = SOURCE_TEXT.get("src/infra/heartbeat-runner.ts");
@@ -264,7 +263,7 @@ describe("§5 execution entry inventory", () => {
       expect(prepared).toContain("runReplyAgent");
       const runner = SOURCE_TEXT.get("src/auto-reply/reply/agent-runner.ts");
       expect(runner).toBeDefined();
-      expect(runner).toContain("runAgentTurnWithFallback");
+      expect(runner).toContain("replyTurnRuntime.execution.runAdmittedTurn");
     });
 
     it("E16: commands/agent.ts CLI backend runs pass the commercial gate; stay Exempt", () => {
@@ -278,12 +277,19 @@ describe("§5 execution entry inventory", () => {
       expect(e16?.symbols).toEqual(["runCliAgent", "recordCliBackendUsage"]);
       const agent = SOURCE_TEXT.get("src/commands/agent.ts");
       expect(agent).toBeDefined();
-      expect(agent).toContain("acquireAgentCommandCommercialRun");
-      expect(agent).toContain("runCliAgent");
-      expect(agent).toContain("recordCliBackendUsage");
+      expect(agent).toContain("createCommandExecutionLifecycle");
+      expect(SOURCE_TEXT.get("src/agent-runtime/model/command-admission-session.ts")).toContain(
+        "await acquireAgentCommandCommercialRun",
+      );
+      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/command-candidate.ts")).toContain(
+        "runCliAgent",
+      );
+      expect(SOURCE_TEXT.get("src/agent-runtime/execution/runner/command-candidate.ts")).toContain(
+        "recordCliBackendUsage",
+      );
       // Gate is acquired in agentCommandInternal before runWithModelFallback → runAgentAttempt → runCliAgent.
-      const gateIdx = agent!.indexOf("commercialGate = await acquireAgentCommandCommercialRun");
-      const fallbackIdx = agent!.indexOf("await runWithModelFallback");
+      const gateIdx = agent!.indexOf("await controlledExecution.prepare");
+      const fallbackIdx = agent!.indexOf("await controlledExecution.infer");
       expect(gateIdx).toBeGreaterThan(-1);
       expect(fallbackIdx).toBeGreaterThan(-1);
       expect(gateIdx).toBeLessThan(fallbackIdx);
@@ -618,7 +624,7 @@ describe("direct model invocation registry (§4.8 blind spot)", () => {
     expect(e19?.followUp).toMatch(/enforced 未实现|enforced not implemented/);
     expect(e19?.note).toMatch(/skipped/);
     const instrumented = DIRECT_MODEL_INVOCATION_REGISTRY.filter(
-      (row) => row.disposition === "instrumented",
+      (row) => row.disposition === "instrumented" && row.id.startsWith("media-understanding-"),
     );
     expect(instrumented.length).toBeGreaterThan(0);
     for (const row of instrumented) {

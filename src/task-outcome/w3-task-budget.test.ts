@@ -88,6 +88,22 @@ describe("W3 task-type acceptance (reuse chat-entry)", () => {
     ).toBe("passed");
   });
 
+  it.each(["execution", "code", "document", "external_action"] as const)(
+    "preserves explicit verified acceptance for %s without named validators",
+    (kind) => {
+      const contract = resolveTurnTaskContract({ kind, acceptanceVerified: true });
+      expect(contract.kind).toBe(kind);
+      expect(contract.acceptanceVerified).toBe(true);
+      expect(
+        resolveChatTurnCloseGates({
+          deliveryId: "verified-no-named-validator",
+          contract,
+          acceptanceVerified: contract.acceptanceVerified,
+        }).acceptance.status,
+      ).toBe("passed");
+    },
+  );
+
   it("A4: tip refuses invented not_required for non-chat_turn contract", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "w3-acc-"));
     try {

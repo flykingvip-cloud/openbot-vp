@@ -131,6 +131,7 @@ describe("delayed completion sends", () => {
     vi.mocked(callGateway).mockClear();
 
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: preflight.taskId,
       artifactPath: relativePath,

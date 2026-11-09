@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { OpenBotConfig } from "../config/config.js";
 import {
   CONTEXT_WINDOW_HARD_MIN_TOKENS,
   CONTEXT_WINDOW_WARN_BELOW_TOKENS,
   evaluateContextWindowGuard,
   resolveContextWindowInfo,
-} from "./context-window-guard.js";
+} from "../agent-runtime/policy/index.js";
+import type { OpenBotConfig } from "../config/config.js";
 
 describe("context-window-guard", () => {
   it("blocks below 16k (model metadata)", () => {

@@ -3,10 +3,10 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { runEmbeddedAttempt } from "../../agent-runtime/execution/runner/embedded-attempt.js";
+import { runEmbeddedPiAgent } from "../../agent-runtime/execution/runner/embedded-run.js";
 import { surfaceCronJobResult } from "../../cron/isolated-agent/result-surfacing.js";
 import type { CronJob } from "../../cron/types.js";
-import { runEmbeddedPiAgent } from "../pi-embedded-runner/run.js";
-import { runEmbeddedAttempt } from "../pi-embedded-runner/run/attempt.js";
 import { runSubagentAnnounceDispatch } from "../subagent-announce-dispatch.js";
 import { deliverSubagentAnnouncement } from "../subagent-announce.js";
 import {
@@ -188,6 +188,7 @@ describe("isolated gateway behavioral smoke", () => {
       ["data-validator", "out/data.bin", data],
     ] as const) {
       issueValidationReceipt({
+        result: "passed",
         validatorId,
         taskId: both.taskId,
         artifactPath,
@@ -204,18 +205,21 @@ describe("isolated gateway behavioral smoke", () => {
     registerTrustedValidator({ id: "layout-validator", version: "1" });
     registerTrustedValidator({ id: "data-validator", version: "1" });
     issueValidationReceipt({
+      result: "passed",
       validatorId: "layout-validator",
       taskId: both.taskId,
       artifactPath: "out/layout.bin",
       artifactBytes: layout,
     });
     issueValidationReceipt({
+      result: "passed",
       validatorId: "layout-validator",
       taskId: both.taskId,
       artifactPath: "out/data.bin",
       artifactBytes: data,
     });
     issueValidationReceipt({
+      result: "passed",
       validatorId: "data-validator",
       taskId: both.taskId,
       artifactPath: "out/layout.bin",
@@ -233,6 +237,7 @@ describe("isolated gateway behavioral smoke", () => {
     );
     noteDeliveryArtifactPath(missingFile.taskId, missingFile.attemptNumber, "out/layout.bin");
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: missingFile.taskId,
       artifactPath: "out/layout.bin",
@@ -251,6 +256,7 @@ describe("isolated gateway behavioral smoke", () => {
     const changedTask = preflightFor("task-changed", "sample-validator", "layout.bin");
     noteDeliveryArtifactPath(changedTask.taskId, changedTask.attemptNumber, "out/layout.bin");
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: changedTask.taskId,
       artifactPath: "out/layout.bin",
@@ -347,6 +353,7 @@ describe("isolated gateway behavioral smoke", () => {
     expect(readDeliveryContextMetrics().retained).toBe(1);
 
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: delayed.taskId,
       artifactPath: "out/layout.bin",

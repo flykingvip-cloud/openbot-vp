@@ -46,6 +46,10 @@ vi.mock("../auto-reply/reply/queue.js", async (importOriginal) => {
   return { ...actual, enqueueFollowupRun: vi.fn(), scheduleFollowupDrain: vi.fn() };
 });
 
+vi.mock("../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => mocks.runEmbeddedPiAgent(params),
+}));
+
 import { runReplyAgent } from "../auto-reply/reply/agent-runner.js";
 import { confirmPendingTurnDelivery } from "../auto-reply/reply/dispatch-from-config.js";
 import { createReplyDispatcher } from "../auto-reply/reply/reply-dispatcher.js";

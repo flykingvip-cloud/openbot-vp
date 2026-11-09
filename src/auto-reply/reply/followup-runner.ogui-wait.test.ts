@@ -20,6 +20,8 @@ vi.mock(
 );
 
 vi.mock("../../agents/pi-embedded.js", () => ({
+  queueEmbeddedPiMessage: vi.fn(),
+  abortEmbeddedPiRun: vi.fn(),
   runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
 }));
 
@@ -119,4 +121,9 @@ describe("follow-up drain OGUI WAIT (Ev10)", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", async () => {
+  const { runEmbeddedPiAgent } = await import("../../agents/pi-embedded.js");
+  return { runEmbeddedPiAgent };
 });

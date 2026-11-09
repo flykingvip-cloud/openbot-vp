@@ -1,3 +1,5 @@
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/task-action.js";
 import {
   finalizeDeliveryContext,
   judgeSessionOutbound,
@@ -40,7 +42,7 @@ import type { sendMessageSlack } from "../../slack/send.js";
 import type { sendMessageTelegram } from "../../telegram/send.js";
 import type { sendMessageWhatsApp } from "../../web/outbound.js";
 import { throwIfAborted } from "./abort.js";
-import { ackDelivery, enqueueDelivery, failDelivery } from "./delivery-queue.js";
+import { ackDelivery, enqueueDelivery, failDelivery, moveToFailed } from "./delivery-queue.js";
 import type { OutboundIdentity } from "./identity.js";
 import type { NormalizedOutboundPayload } from "./payloads.js";
 import { normalizeReplyPayloadsForDelivery } from "./payloads.js";
@@ -127,6 +129,7 @@ type ChannelHandler = {
 };
 
 type ChannelHandlerParams = {
+  taskBoundary?: TaskActionBoundary;
   cfg: OpenBotConfig;
   channel: Exclude<OutboundChannel, "none">;
   to: string;
@@ -209,6 +212,7 @@ function createChannelOutboundContextBase(
   params: ChannelHandlerParams,
 ): Omit<ChannelOutboundContext, "text" | "mediaUrl"> {
   return {
+    taskBoundary: params.taskBoundary,
     cfg: params.cfg,
     to: params.to,
     accountId: params.accountId,
@@ -243,6 +247,8 @@ type DeliverOutboundPayloadsCoreParams = {
   session?: OutboundSessionContext;
   /** Execution preflight task id. Missing ids do not select another retained task. */
   taskId?: string;
+  /** Trusted task snapshot, retained by the write-ahead queue across restart. */
+  taskBoundary?: TaskActionBoundary;
   mirror?: {
     sessionKey: string;
     agentId?: string;
@@ -492,6 +498,7 @@ export async function deliverOutboundPayloads(
         gifPlayback: params.gifPlayback,
         silent: params.silent,
         mirror: params.mirror,
+        taskBoundary: params.taskBoundary,
       }).catch(() => null); // Best-effort — don't block delivery if queue write fails.
 
   // Wrap onError to detect partial failures under bestEffort mode.
@@ -499,21 +506,22 @@ export async function deliverOutboundPayloads(
   // without throwing — so the outer try/catch never fires. We track whether any
   // payload failed so we can call failDelivery instead of ackDelivery.
   let hadPartialFailure = false;
-  const wrappedParams = params.onError
-    ? {
-        ...params,
-        onError: (err: unknown, payload: NormalizedOutboundPayload) => {
-          hadPartialFailure = true;
-          params.onError!(err, payload);
-        },
-      }
-    : params;
+  const wrappedParams = {
+    ...params,
+    onError: (err: unknown, payload: NormalizedOutboundPayload) => {
+      hadPartialFailure = true;
+      params.onError?.(err, payload);
+    },
+  };
 
   try {
     const results = await deliverOutboundPayloadsCore(wrappedParams);
     if (queueId) {
       if (hadPartialFailure) {
         await failDelivery(queueId, "partial delivery failure (bestEffort)").catch(() => {});
+        if (results.length > 0) {
+          await moveToFailed(queueId).catch(() => {});
+        }
       } else {
         await ackDelivery(queueId).catch(() => {}); // Best-effort cleanup.
       }
@@ -546,10 +554,19 @@ async function deliverOutboundPayloadsCore(
     cfg,
     params.session?.agentId ?? params.mirror?.agentId,
   );
+  const assertTaskCurrent = () => {
+    if (params.taskBoundary) {
+      const refusal = checkTaskActionBoundary(params.taskBoundary);
+      if (refusal) {
+        throw new Error(refusal);
+      }
+    }
+  };
   const results: OutboundDeliveryResult[] = [];
   let completionTransportSucceeded = false;
   let transportFailed = false;
   const handler = await createChannelHandler({
+    taskBoundary: params.taskBoundary,
     cfg,
     channel,
     to,
@@ -592,6 +609,7 @@ async function deliverOutboundPayloadsCore(
   ) => {
     throwIfAborted(abortSignal);
     if (!handler.chunker || textLimit === undefined) {
+      assertTaskCurrent();
       results.push(await handler.sendText(text, overrides));
       return;
     }
@@ -612,6 +630,7 @@ async function deliverOutboundPayloadsCore(
         }
         for (const chunk of chunks) {
           throwIfAborted(abortSignal);
+          assertTaskCurrent();
           results.push(await handler.sendText(chunk, overrides));
         }
       }
@@ -620,15 +639,18 @@ async function deliverOutboundPayloadsCore(
     const chunks = handler.chunker(text, textLimit);
     for (const chunk of chunks) {
       throwIfAborted(abortSignal);
+      assertTaskCurrent();
       results.push(await handler.sendText(chunk, overrides));
     }
   };
 
   const sendSignalText = async (text: string, styles: SignalTextStyleRange[]) => {
     throwIfAborted(abortSignal);
+    assertTaskCurrent();
     return {
       channel: "signal" as const,
       ...(await sendSignal(to, text, {
+        taskBoundary: params.taskBoundary,
         cfg,
         maxBytes: signalMaxBytes,
         accountId: accountId ?? undefined,
@@ -663,9 +685,11 @@ async function deliverOutboundPayloadsCore(
       text: caption,
       styles: [],
     };
+    assertTaskCurrent();
     return {
       channel: "signal" as const,
       ...(await sendSignal(to, formatted.text, {
+        taskBoundary: params.taskBoundary,
         cfg,
         mediaUrl,
         maxBytes: signalMaxBytes,
@@ -725,6 +749,12 @@ async function deliverOutboundPayloadsCore(
       if (hookResult.cancelled) {
         continue;
       }
+      if (params.taskBoundary) {
+        const refusal = checkTaskActionBoundary(params.taskBoundary);
+        if (refusal) {
+          throw new Error(refusal);
+        }
+      }
       const effectivePayload = hookResult.payload;
       payloadSummary = hookResult.payloadSummary;
 
@@ -748,6 +778,7 @@ async function deliverOutboundPayloadsCore(
         threadId: params.threadId ?? undefined,
       };
       if (handler.sendPayload && effectivePayload.channelData) {
+        assertTaskCurrent();
         const delivery = await handler.sendPayload(effectivePayload, sendOverrides);
         results.push(delivery);
         emitMessageSent({
@@ -817,6 +848,7 @@ async function deliverOutboundPayloadsCore(
           results.push(delivery);
           lastMessageId = delivery.messageId;
         } else {
+          assertTaskCurrent();
           const delivery = await handler.sendMedia(caption, url, sendOverrides);
           results.push(delivery);
           lastMessageId = delivery.messageId;

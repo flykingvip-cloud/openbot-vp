@@ -59,7 +59,7 @@ function bind(
     taskId,
     artifactPath,
     artifactBytes: bytes,
-    ...(result ? { result } : {}),
+    result: result ?? "passed",
   });
 }
 

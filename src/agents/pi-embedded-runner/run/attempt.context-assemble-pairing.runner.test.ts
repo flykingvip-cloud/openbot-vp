@@ -20,6 +20,8 @@ const hoisted = vi.hoisted(() => {
   const acquireSessionWriteLockMock = vi.fn();
   const subscribeEmbeddedPiSessionMock = vi.fn();
   const seedMessages: unknown[] = [];
+  const bootstrap = vi.fn(async () => ({ bootstrapFiles: [], contextFiles: [] }));
+  const restoreSkillEnv = vi.fn();
   const sessionManager = {
     getHeader: vi.fn(() => ({ type: "session", id: "pairing-session", version: 1 })),
     getLeafEntry: vi.fn(() => null),
@@ -34,6 +36,8 @@ const hoisted = vi.hoisted(() => {
     acquireSessionWriteLockMock,
     subscribeEmbeddedPiSessionMock,
     seedMessages,
+    bootstrap,
+    restoreSkillEnv,
     sessionManager,
   };
 });
@@ -75,12 +79,12 @@ vi.mock("../../../infra/net/undici-global-dispatcher.js", () => ({
 
 vi.mock("../../bootstrap-files.js", () => ({
   makeBootstrapWarn: () => () => {},
-  resolveBootstrapContextForRun: async () => ({ bootstrapFiles: [], contextFiles: [] }),
+  resolveBootstrapContextForRun: hoisted.bootstrap,
 }));
 
 vi.mock("../../skills.js", () => ({
-  applySkillEnvOverrides: () => () => {},
-  applySkillEnvOverridesFromSnapshot: () => () => {},
+  applySkillEnvOverrides: () => hoisted.restoreSkillEnv,
+  applySkillEnvOverridesFromSnapshot: () => hoisted.restoreSkillEnv,
   resolveSkillsPromptForRun: () => "",
 }));
 
@@ -143,9 +147,8 @@ vi.mock("../wait-for-idle-before-flush.js", () => ({
   flushPendingToolResultsAfterIdle: async () => {},
 }));
 
-vi.mock("../runs.js", () => ({
-  setActiveEmbeddedRun: () => {},
-  clearActiveEmbeddedRun: () => {},
+vi.mock("../runs.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../runs.js")>()),
 }));
 
 vi.mock("./images.js", async (importOriginal) => {
@@ -205,7 +208,8 @@ vi.mock("../../model-selection.js", async (importOriginal) => {
   };
 });
 
-const { runEmbeddedAttempt } = await import("./attempt.js");
+const { runEmbeddedAttempt } =
+  await import("../../../agent-runtime/execution/runner/embedded-attempt.js");
 
 const constitutionalRuntimeShadowDeps: ConstitutionalRuntimeShadowDeps = Object.freeze({
   runtimeShadowEnabled: false,
@@ -261,6 +265,9 @@ describe("runEmbeddedAttempt context assemble pairing boundary", () => {
     workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "attempt-pair-ws-"));
     agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "attempt-pair-agent-"));
     providerMessages = [];
+    hoisted.bootstrap.mockReset();
+    hoisted.bootstrap.mockResolvedValue({ bootstrapFiles: [], contextFiles: [] });
+    hoisted.restoreSkillEnv.mockClear();
     hoisted.seedMessages.length = 0;
     hoisted.createAgentSessionMock.mockReset();
     hoisted.sessionManagerOpenMock.mockReset();
@@ -356,6 +363,69 @@ describe("runEmbeddedAttempt context assemble pairing boundary", () => {
     await fs.rm(agentDir, { recursive: true, force: true });
   });
 
+  it("restores cwd and skill environment when preflight fails", async () => {
+    const cwd = process.cwd();
+    hoisted.bootstrap.mockRejectedValueOnce(new Error("bootstrap failed"));
+    await expect(
+      runEmbeddedAttempt({
+        sessionId: "pairing-session",
+        sessionKey: "agent:main:main",
+        sessionFile: path.join(workspaceDir, "session.jsonl"),
+        workspaceDir,
+        agentDir,
+        prompt: "continue",
+        timeoutMs: 10000,
+        runId: "preflight-failure",
+        thinkLevel: "off",
+        provider: "openai",
+        modelId: "gpt-test",
+        model: MODEL,
+        authStorage: { getApiKey: async () => undefined } as unknown as OpenBotAuthStorage,
+        modelRegistry: {} as ModelRegistry,
+        constitutionalRuntimeShadowDeps,
+      }),
+    ).rejects.toThrow("bootstrap failed");
+    expect(process.cwd()).toBe(cwd);
+    expect(hoisted.restoreSkillEnv).toHaveBeenCalledOnce();
+    expect(hoisted.acquireSessionWriteLockMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["user", "timeout"])(
+    "handles an already cancelled %s signal and cleans up once",
+    async (kind) => {
+      const controller = new AbortController();
+      const reason = new Error(kind === "timeout" ? "request timed out" : "owner cancelled");
+      if (kind === "timeout") {
+        reason.name = "TimeoutError";
+      }
+      controller.abort(reason);
+      const release = vi.fn(async () => {});
+      hoisted.acquireSessionWriteLockMock.mockResolvedValue({ release });
+      const attempt = runEmbeddedAttempt({
+        sessionId: "pairing-session",
+        sessionKey: "agent:main:main",
+        sessionFile: path.join(workspaceDir, "session.jsonl"),
+        workspaceDir,
+        agentDir,
+        prompt: "continue",
+        timeoutMs: 10000,
+        runId: "cancelled-input",
+        thinkLevel: "off",
+        provider: "openai",
+        modelId: "gpt-test",
+        model: MODEL,
+        authStorage: { getApiKey: async () => undefined } as unknown as OpenBotAuthStorage,
+        modelRegistry: {} as ModelRegistry,
+        abortSignal: controller.signal,
+        constitutionalRuntimeShadowDeps,
+      });
+      await expect(attempt).rejects.toMatchObject({ name: "AbortError", cause: reason });
+      expect(providerMessages).toEqual([]);
+      expect(release).toHaveBeenCalledOnce();
+      expect(hoisted.restoreSkillEnv).toHaveBeenCalledOnce();
+    },
+  );
+
   it("runEmbeddedAttempt drops orphan toolResult before prompt/provider", async () => {
     const sessionFile = path.join(workspaceDir, "session.jsonl");
     await fs.writeFile(sessionFile, "", "utf8");
@@ -417,5 +487,66 @@ describe("runEmbeddedAttempt context assemble pairing boundary", () => {
       );
     });
     expect(hasResult && !hasCall).toBe(false);
+  });
+  it("aborts stopped tasks at registration without starting prompt and releases the session lock", async () => {
+    const boardApi = await import("../../../conversation-task/session-task-board.js");
+    const runs = await import("../runs.js");
+    const sessionFile = path.join(workspaceDir, "session.jsonl");
+    await fs.writeFile(sessionFile, "");
+    boardApi.mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...boardApi.emptySessionTaskBoard(),
+        current: {
+          taskId: "task-a",
+          title: "A",
+          goalText: "A",
+          unfinished: true,
+          createdAtMs: 1,
+          stop: { summary: "preparing", workspacePaths: [] },
+          executionAttempt: "attempt-a",
+          deliverableVersion: "attempt-a",
+        },
+      },
+      value: undefined,
+    }));
+    const binding = boardApi.captureTaskCompletionBinding(sessionFile);
+    const create = hoisted.createAgentSessionMock.getMockImplementation()!;
+    hoisted.createAgentSessionMock.mockImplementationOnce(async (...args: unknown[]) => {
+      const value = await create(...args);
+      // Owner stop arrives while the runtime is still preparing, before active registration.
+      boardApi.mutateSessionTaskBoard(sessionFile, (board) => ({
+        board: { ...board, current: { ...board.current!, wakeSuppress: true } },
+        value: undefined,
+      }));
+      return value;
+    });
+    const release = vi.fn(async () => {});
+    hoisted.acquireSessionWriteLockMock.mockResolvedValue({ release });
+    await expect(
+      runEmbeddedAttempt({
+        sessionId: "pairing-session",
+        sessionKey: "agent:main:main",
+        sessionFile,
+        taskExecutionBinding: binding,
+        workspaceDir,
+        agentDir,
+        config: { conversation: { projection: { enabled: false } } } as never,
+        prompt: "continue",
+        timeoutMs: 10_000,
+        runId: "stopped-run",
+        provider: "openai",
+        modelId: "gpt-test",
+        model: MODEL,
+        authStorage: { getApiKey: async () => undefined } as unknown as OpenBotAuthStorage,
+        modelRegistry: {} as ModelRegistry,
+        thinkLevel: "off",
+        senderIsOwner: true,
+        disableMessageTool: true,
+        constitutionalRuntimeShadowDeps,
+      }),
+    ).rejects.toThrow("aborted");
+    expect(providerMessages).toEqual([]);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(runs.isEmbeddedPiRunActive("pairing-session")).toBe(false);
   });
 });

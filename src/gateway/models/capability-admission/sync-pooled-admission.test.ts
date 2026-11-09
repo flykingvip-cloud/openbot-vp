@@ -66,7 +66,7 @@ describe("pooled healthy platform admission sync", () => {
   it("lets chat call an allowlisted probe-ok model that had no admission row", async () => {
     const { storePath, probeStorePath } = await tempPair("openbot-pool-admit-");
     await writeProbe(probeStorePath, MODEL_REF, "ok");
-    const run = vi.fn(async () => "hello");
+    const run = vi.fn(async (_provider: string, _model: string) => "hello");
     const result = await runWithModelFallback({
       cfg: {},
       provider: "api-proxy-deepseek",

@@ -35,6 +35,10 @@ vi.mock("../../agents/pi-embedded.js", async (importOriginal) => {
   };
 });
 
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: mocks.runEmbeddedPiAgent,
+}));
+
 vi.mock("./queue.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./queue.js")>();
   return { ...actual, enqueueFollowupRun: vi.fn(), scheduleFollowupDrain: vi.fn() };
@@ -67,6 +71,7 @@ function buildParams(): Parameters<typeof runReplyAgent>[0] {
       prompt: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         agentId: "main",
         agentDir: "/tmp/agent",
         sessionId: "session",

@@ -57,7 +57,8 @@ export const surfaceCronJobResultMock = createMock();
 export const resolveAgentDirMock = createMock();
 resolveAgentDirMock.mockReturnValue("/tmp/agent-dir");
 
-vi.mock("../../agents/agent-scope.js", () => ({
+vi.mock("../../agents/agent-scope.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agents/agent-scope.js")>()),
   resolveAgentConfig: resolveAgentConfigMock,
   resolveAgentDir: resolveAgentDirMock,
   resolveAgentModelFallbacksOverride: resolveAgentModelFallbacksOverrideMock,
@@ -104,6 +105,8 @@ vi.mock("../../agents/model-fallback.js", () => ({
 }));
 
 vi.mock("../../agents/pi-embedded.js", () => ({
+  queueEmbeddedPiMessage: vi.fn(),
+  abortEmbeddedPiRun: vi.fn(),
   runEmbeddedPiAgent: runEmbeddedPiAgentMock,
 }));
 
@@ -122,6 +125,7 @@ vi.mock("../../agents/timeout.js", () => ({
 }));
 
 vi.mock("../../agents/usage.js", () => ({
+  normalizeUsage: vi.fn((usage) => usage),
   deriveSessionTotalTokens: vi.fn().mockReturnValue(30),
   hasNonzeroUsage: hasNonzeroUsageMock,
 }));
@@ -148,7 +152,7 @@ vi.mock("../../agents/subagent-registry.js", () => ({
   listDescendantRunsForRequester: listDescendantRunsForRequesterMock,
 }));
 
-vi.mock("../../agents/cli-runner.js", () => ({
+vi.mock("../../agent-runtime/execution/runner/cli-run.js", () => ({
   runCliAgent: runCliAgentMock,
 }));
 
@@ -378,3 +382,7 @@ export async function loadRunCronIsolatedAgentTurn() {
   const { runCronIsolatedAgentTurn } = await import("./run.js");
   return runCronIsolatedAgentTurn;
 }
+
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: runEmbeddedPiAgentMock,
+}));

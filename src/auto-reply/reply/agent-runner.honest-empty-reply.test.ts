@@ -9,6 +9,20 @@ import { HONEST_EMPTY_REPLY_EN, HONEST_EMPTY_REPLY_ZH } from "./honest-empty-rep
 import type { FollowupRun, QueueSettings } from "./queue.js";
 import { createMockTypingController } from "./test-helpers.js";
 
+const replyFilter = vi.hoisted(() => ({ enabled: false }));
+vi.mock("./turn-reply-language.js", async () => {
+  const actual = await vi.importActual<typeof import("./turn-reply-language.js")>(
+    "./turn-reply-language.js",
+  );
+  return {
+    ...actual,
+    sanitizeTurnVisibleReply: (params: Parameters<typeof actual.sanitizeTurnVisibleReply>[0]) =>
+      replyFilter.enabled
+        ? { ok: false, reason: "wrong_language_planning" }
+        : actual.sanitizeTurnVisibleReply(params),
+  };
+});
+
 const runEmbeddedPiAgentMock = vi.fn();
 const runWithModelFallbackMock = vi.fn();
 
@@ -27,6 +41,10 @@ vi.mock("../../agents/pi-embedded.js", async () => {
   };
 });
 
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
+}));
+
 vi.mock("./queue.js", async () => {
   const actual = await vi.importActual<typeof import("./queue.js")>("./queue.js");
   return { ...actual, enqueueFollowupRun: vi.fn(), scheduleFollowupDrain: vi.fn() };
@@ -41,6 +59,7 @@ function followupRun(): FollowupRun {
     prompt: "hi",
     enqueuedAt: Date.now(),
     run: {
+      inputProvenance: { kind: "internal_system" },
       agentId: "bot-2",
       agentDir: "/tmp/agent",
       sessionId: "session",
@@ -103,6 +122,7 @@ function gapEvents() {
 describe("runReplyAgent honest empty reply (private chat only)", () => {
   beforeEach(() => {
     resetEvolutionLoopLogsForTests();
+    replyFilter.enabled = false;
     runEmbeddedPiAgentMock.mockReset();
     runWithModelFallbackMock.mockReset();
     runWithModelFallbackMock.mockImplementation(
@@ -233,6 +253,35 @@ describe("runReplyAgent honest empty reply (private chat only)", () => {
     });
     const result = await run({});
     expect(result).toBeUndefined();
+    expect(gapEvents()).toHaveLength(0);
+  });
+
+  it("filtered final without tools stays silent rather than emitting an empty-turn fallback", async () => {
+    replyFilter.enabled = true;
+    runEmbeddedPiAgentMock.mockResolvedValue({
+      payloads: [{ text: "Hello." }],
+      meta,
+    });
+    const result = await run({ opts: { expectedReplyLanguage: "en" } });
+    expect(result).toBeUndefined();
+    expect(gapEvents()).toHaveLength(0);
+  });
+
+  it("filtered final after a tool result emits a process placeholder through the original entry", async () => {
+    replyFilter.enabled = true;
+    runEmbeddedPiAgentMock.mockImplementation(
+      async (params: {
+        onAgentEvent?: (event: { stream: string; data: Record<string, unknown> }) => Promise<void>;
+      }) => {
+        await params.onAgentEvent?.({
+          stream: "tool",
+          data: { phase: "result", name: "read", isError: false },
+        });
+        return { payloads: [{ text: "Hello." }], meta };
+      },
+    );
+    const result = await run({ opts: { expectedReplyLanguage: "en" } });
+    expect(result).toEqual({ text: "Looking this up." });
     expect(gapEvents()).toHaveLength(0);
   });
 

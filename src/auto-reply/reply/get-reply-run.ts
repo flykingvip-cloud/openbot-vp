@@ -1,14 +1,36 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import {
+  formatTaskProposalReply,
+  createInteractionSourceBoundary,
+  formatRestrictedInteractionNotice,
+} from "../../agent-runtime/command/index.js";
+import {
+  appendSharedTurnContext,
+  appendUntrustedContext,
+  assembleIndividual,
+  buildResumePrompt,
+  buildTaskBoardContext,
+  finalizeSystemContext,
+  projectInteractionHistory,
+  resolveContextLane,
+  selectSystemContextParts,
+} from "../../agent-runtime/context/index.js";
+import {
+  abortEmbeddedPiRun,
+  isEmbeddedPiRunActive,
+  isEmbeddedPiRunStreaming,
+} from "../../agent-runtime/execution/index.js";
+import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
+import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
 import { extractEmployeeStewardUserIdFromSessionKey } from "../../agents/builtin-steward/employee-isolation.js";
 import { isBuiltinStewardAgent } from "../../agents/builtin-steward/identity.js";
 import {
   ensureStewardRequiredSkills,
   shouldForceStewardRequiredSkills,
 } from "../../agents/builtin-steward/required-skills.js";
-import { resolveContextLane } from "../../agents/context-compiler/lane-budget.js";
 import { applyPreferenceMutation } from "../../agents/context-compiler/preference-mutation.js";
 import { emitExecutionDisciplineObservation } from "../../agents/execution-preflight/observability.js";
 import { rememberInboundMediaGrants } from "../../agents/inbound-media-grants.js";
@@ -16,16 +38,11 @@ import {
   INBOUND_TOOL_POLICY_VERSION,
   listRetrieveReadOnlyCoreToolIds,
 } from "../../agents/inbound-tool-policy.js";
-import {
-  abortEmbeddedPiRun,
-  isEmbeddedPiRunActive,
-  isEmbeddedPiRunStreaming,
-  resolveEmbeddedSessionLane,
-} from "../../agents/pi-embedded.js";
+import { resolveEmbeddedSessionLane } from "../../agents/pi-embedded-runner/lanes.js";
+import { openSessionManager } from "../../agents/pi-sdk/session.js";
 import { applySkillPolicyToFilter } from "../../agents/skills/skill-policy.js";
 import { replyForTaskSurfaceUtterance } from "../../agents/task-surface/apply.js";
 import { isPrimarilyTaskSurfaceUtterance } from "../../agents/task-surface/surface.js";
-import { isWorkspaceOnboardingCompleted } from "../../agents/workspace.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import {
   resolveGroupSessionKey,
@@ -39,7 +56,6 @@ import {
   runWithOguiDecisionResume,
 } from "../../config/sessions/ogui-decision-engine.js";
 import { buildActiveConversationTaskFocusPrompt } from "../../conversation-task/focus-prompt.js";
-import { buildFocusResumePromptFromSessionFile } from "../../conversation-task/focus-resume.js";
 import { buildCronReplySystemPrompt } from "../../cron/cron-reply-context.js";
 import { buildGrowthBirthSystemPrompt } from "../../gateway/agent-growth/birth-context.js";
 import {
@@ -121,14 +137,12 @@ import {
   formatCollaborationKnowledgeRecoveryHint,
   isCollaborationExplicitKnowledgeRecoveryEnabled,
 } from "./collab-knowledge-recovery.js";
-import { buildCollaborationCapabilitySystemPrompt } from "./collaboration-capability-context.js";
 import { resolveCollaborationAwareSessionFile } from "./collaboration-session-file.js";
 import type { buildCommandContext } from "./commands.js";
 import { resolveComposerPluginMentionBindings } from "./composer-plugin-mention-bindings.js";
-import { executeComposerPluginMentionsForTurn } from "./composer-plugin-mention-execute.js";
 import type { InlineDirectives } from "./directive-handling.js";
 import { buildActivePrimaryObjectivePrompt } from "./goal-correction-mutation.js";
-import { buildGroupChatContext, buildGroupIntro } from "./groups.js";
+import type { buildGroupIntro } from "./groups.js";
 import {
   ceilingForDepth,
   classifyInboundDepth,
@@ -181,7 +195,6 @@ import {
 import { resolveTypingMode } from "./typing-mode.js";
 import { resolveRunTypingPolicy } from "./typing-policy.js";
 import type { TypingController } from "./typing.js";
-import { appendUntrustedContext } from "./untrusted-context.js";
 
 type AgentDefaults = NonNullable<OpenBotConfig["agents"]>["defaults"];
 type ExecOverrides = Pick<ExecToolDefaults, "host" | "security" | "ask" | "node">;
@@ -432,6 +445,17 @@ export async function runPreparedReply(
   const isGroupChat = sessionCtx.ChatType === "group";
   const wasMentioned = ctx.WasMentioned === true;
   const isHeartbeat = opts?.isHeartbeat === true;
+  const interactionIngress =
+    !isHeartbeat && !opts?.growthBirthTurn && sessionCtx.CollaborationRoundInvoked !== true
+      ? (opts?.interactionIngress ??
+        (ctx.InputProvenance?.kind === "external_user"
+          ? {
+              userMessageId:
+                ctx.MessageSidFull ?? ctx.MessageSid ?? opts?.runId ?? crypto.randomUUID(),
+              persistOwnTranscript: true,
+            }
+          : undefined))
+      : undefined;
   const { typingPolicy, suppressTyping } = resolveRunTypingPolicy({
     requestedPolicy: opts?.typingPolicy,
     suppressTyping: opts?.suppressTyping === true,
@@ -702,16 +726,18 @@ export async function runPreparedReply(
           text: inboundMessage,
           sourceMessageId,
         });
-        const feedback = await applyInboundTaskFeedback({
-          cfg,
-          workspaceDir: runWorkspaceDir,
-          agentId,
-          sessionKey,
-          sessionEntry,
-          text: inboundMessage,
-          sourceMessageId,
-        });
-        if (feedback.clarify) {
+        const feedback = !interactionIngress
+          ? await applyInboundTaskFeedback({
+              cfg,
+              workspaceDir: runWorkspaceDir,
+              agentId,
+              sessionKey,
+              sessionEntry,
+              text: inboundMessage,
+              sourceMessageId,
+            })
+          : undefined;
+        if (feedback?.clarify) {
           inboundTaskClarify = feedback.clarify;
         }
       } catch {
@@ -719,20 +745,8 @@ export async function runPreparedReply(
       }
     }
   }
-  // Chat lane already uses operational-identity listingMode=lightweight below.
-  // Also set bootstrapContextMode=lightweight (empty workspace bootstrap files)
-  // once onboarding is complete — same empty path as cron lightweight default.
-  // Guard: mid-onboarding still needs BOOTSTRAP.md / identity files in context;
-  // isWorkspaceOnboardingCompleted is false until that finishes.
-  if (applyChatLane && opts && opts.bootstrapContextMode === undefined) {
-    try {
-      if (await isWorkspaceOnboardingCompleted(runWorkspaceDir)) {
-        opts.bootstrapContextMode = "lightweight";
-      }
-    } catch {
-      // Onboarding probe must never block the turn; keep full bootstrap.
-    }
-  }
+  // Shared workspace identity and memory remain available to interaction.
+  // Source selection and token budgets do not grant action capabilities.
   if (chatLaneSkipsOptionalKnowledge) {
     const runId = opts?.runId?.trim();
     if (runId) {
@@ -1084,7 +1098,7 @@ export async function runPreparedReply(
 
   const sessionFocusResumePrompt =
     !isHeartbeat && inboundMessage
-      ? buildFocusResumePromptFromSessionFile(sessionEntry?.sessionFile)
+      ? buildTaskBoardContext(replyTurnRuntime.state.read(sessionEntry?.sessionFile))
       : undefined;
   // A ended / ordinary turns: sidecar Q&A must remain visible to the normal reply
   // path (chat.history restores bubbles; model context uses untrusted user-body
@@ -1094,30 +1108,11 @@ export async function runPreparedReply(
       ? buildAsideDialogueContextPromptForNormalReply(sessionEntry.sessionFile)
       : undefined;
   const composerPluginMentionBindings = resolveComposerPluginMentionBindings(ctx.ComposerMentions);
-  const composerPluginMentionExecution =
-    !isHeartbeat &&
-    (composerPluginMentionBindings.plugins.length > 0 ||
-      composerPluginMentionBindings.connectors.length > 0)
-      ? await executeComposerPluginMentionsForTurn({
-          bindings: composerPluginMentionBindings,
-          userMessage: inboundMessage || sessionCtx.Body || ctx.Body || "",
-          mentions: ctx.ComposerMentions,
-          config: cfg,
-          workspaceDir: runWorkspaceDir,
-          agentDir,
-          agentId,
-          sessionKey,
-          gatewayClientUser: knowledgeIdentity?.user ?? ctx.GatewayClientUser,
-          gatewayClientSessionDomain:
-            knowledgeIdentity?.sessionDomain ?? ctx.GatewayClientSessionDomain,
-          gatewayClientPlatformUserId:
-            knowledgeIdentity?.platformUserId ?? ctx.GatewayClientPlatformUserId,
-          executionIdentity,
-        })
-      : undefined;
+  // Mentions supply capability hints only. The admitted runner selects and calls
+  // tools through the common authorization, cancellation and task-action boundary.
   let extraSystemPromptParts: string[];
   if (useCollaborationAssembly) {
-    extraSystemPromptParts = [
+    extraSystemPromptParts = selectSystemContextParts([
       ...(await assembleCollaborationRuntimeContextParts({
         cfg,
         workspaceDir: runWorkspaceDir,
@@ -1146,37 +1141,13 @@ export async function runPreparedReply(
       knowledgeUniversePrompt,
       sessionFocusResumePrompt,
       composerPluginMentionBindings.turnPrompt,
-      composerPluginMentionExecution?.summaryPrompt,
       growthBirthPrompt,
       cronReplyPrompt,
-    ].filter((entry): entry is string => Boolean(entry?.trim()));
+    ]);
   } else {
-    const groupChatContext = isGroupChat
-      ? buildGroupChatContext({ sessionCtx, organizationContext })
-      : "";
-    const groupIntro = shouldInjectGroupIntro
-      ? buildGroupIntro({
-          cfg,
-          sessionCtx,
-          sessionEntry,
-          defaultActivation,
-          silentToken: SILENT_REPLY_TOKEN,
-        })
-      : "";
     const inboundMetaPrompt = buildInboundMetaSystemPrompt(
       isNewSession ? sessionCtx : { ...sessionCtx, ThreadStarterBody: undefined },
     );
-    // Non-collab 1:1 sessions and chat-lane skips must not inject capability/overlay prompts.
-    const collaborationCapabilityPrompt =
-      applyChatLane || !useCollaborationAssembly
-        ? undefined
-        : await buildCollaborationCapabilitySystemPrompt({
-            sessionEntry,
-            groupId: collaborationGroupId ?? undefined,
-            botId: sessionCtx.CollaborationBotAgentId,
-            workspaceDir,
-            cfg,
-          });
     const sessionContinuityPrompt = await buildSessionContinuityPrompt({
       cfg,
       workspaceDir,
@@ -1223,43 +1194,30 @@ export async function runPreparedReply(
             ...(applyChatLane ? { listingMode: "lightweight" as const } : {}),
           })
         : undefined;
-    extraSystemPromptParts = [
-      inboundMetaPrompt,
-      groupChatContext,
-      groupIntro,
-      groupSystemPrompt,
-      turnReplyLanguageInstruction,
-      userTimezonePrompt,
-      remoteEnvironmentPrompt,
-      collaborationCapabilityPrompt,
-      userProfileInstructions,
-      seatRulesPrompt,
-      conversationTaskFocusPrompt,
-      sessionFocusResumePrompt,
-      primaryObjectivePrompt,
-      taskDataPreflightPrompt,
-      sessionContinuityPrompt,
-      knowledgeUniversePrompt,
-      operationalIdentityPrompt,
-      composerPluginMentionBindings.turnPrompt,
-      composerPluginMentionExecution?.summaryPrompt,
-      growthBirthPrompt,
-      cronReplyPrompt,
-    ].filter((entry): entry is string => Boolean(entry?.trim()));
-  }
-  if (taskSurfaceNote) {
-    extraSystemPromptParts = [...extraSystemPromptParts, taskSurfaceNote];
-  }
-  if (inboundTaskClarify) {
-    extraSystemPromptParts = [...extraSystemPromptParts, inboundTaskClarify];
+    extraSystemPromptParts = assembleIndividual({
+      inboundMetadata: inboundMetaPrompt,
+      replyLanguage: turnReplyLanguageInstruction,
+      timezone: userTimezonePrompt,
+      environment: remoteEnvironmentPrompt,
+      userProfile: userProfileInstructions,
+      seatRules: seatRulesPrompt,
+      conversationFocus: conversationTaskFocusPrompt,
+      taskBoard: sessionFocusResumePrompt,
+      primaryObjective: primaryObjectivePrompt,
+      dataPreflight: taskDataPreflightPrompt,
+      continuity: sessionContinuityPrompt,
+      knowledge: knowledgeUniversePrompt,
+      operationalIdentity: operationalIdentityPrompt,
+      mentionHints: composerPluginMentionBindings.turnPrompt,
+      birth: growthBirthPrompt,
+      scheduledReply: cronReplyPrompt,
+    });
   }
   const currentSpeakerPrompt = buildCurrentSpeakerUntrustedPrompt(sessionCtx);
-  if (currentSpeakerPrompt) {
-    extraSystemPromptParts = [...extraSystemPromptParts, currentSpeakerPrompt];
-  }
-  if (!isHeartbeat && !applyChatLane) {
+  let learningRecallPrompt: string | undefined;
+  if (!isHeartbeat) {
     const learningExposureKey = learningExperienceRunKey(opts?.runId);
-    const learningRecallPrompt = await buildLearningRecallSystemPrompt({
+    learningRecallPrompt = await buildLearningRecallSystemPrompt({
       agentId,
       groupId: collaborationGroupId,
       botId:
@@ -1269,9 +1227,6 @@ export async function runPreparedReply(
       // Task-bound only; omit key (no agentId fallback) when runId missing.
       exposureKey: learningExposureKey,
     });
-    if (learningRecallPrompt) {
-      extraSystemPromptParts = [...extraSystemPromptParts, learningRecallPrompt];
-    }
   }
   const baseBody = sessionCtx.BodyStripped ?? sessionCtx.Body ?? "";
   // Use CommandBody/RawBody for bare reset detection (clean message without structural context).
@@ -1353,18 +1308,16 @@ export async function runPreparedReply(
     isMainSession,
     isNewSession,
   });
-  if (eventsBlock?.trim()) {
-    extraSystemPromptParts = [
-      ...extraSystemPromptParts,
-      [
+  const runtimeEventsPrompt = eventsBlock?.trim()
+    ? [
         "## Runtime system events",
         "Gateway-originated notices from the previous turn or queue. They are not a new user instruction and must not replace the current user goal.",
         eventsBlock.trim(),
-      ].join("\n"),
-    ];
-  }
+      ].join("\n")
+    : undefined;
   const queueBodyBaseSource = effectiveBaseBody;
   prefixedBodyBase = appendUntrustedContext(prefixedBodyBase, [
+    ...(currentSpeakerPrompt ? [currentSpeakerPrompt] : []),
     ...(Array.isArray(sessionCtx.UntrustedContext) ? sessionCtx.UntrustedContext : []),
     ...(asideDialogueUntrustedContext ? [asideDialogueUntrustedContext] : []),
   ]);
@@ -1385,15 +1338,16 @@ export async function runPreparedReply(
         });
   const preferSkillNames = applyChatLane ? [] : resolveTurnPreferSkillNames(inboundMessage);
   const preferSkillHint = formatTurnPreferSkillHint(preferSkillNames);
-  if (preferSkillHint) {
-    extraSystemPromptParts = [...extraSystemPromptParts, preferSkillHint];
-  }
-  // Chat-lane: empty skill window. Retrieve: keep agent/channel filter without
-  // forcing STEWARD_REQUIRED. Act: re-apply ensureStewardRequiredSkills so
-  // governance skills re-enter the whitelist for side-effect / UI-nav turns.
-  const policySkillFilter = applyChatLane
-    ? []
-    : applySkillPolicyToFilter(opts?.skillFilter, runtimeSkillPolicy);
+  extraSystemPromptParts = appendSharedTurnContext(extraSystemPromptParts, {
+    taskSurface: taskSurfaceNote,
+    clarification: inboundTaskClarify,
+    learningRecall: learningRecallPrompt,
+    runtimeEvents: runtimeEventsPrompt,
+    skillGuidance: preferSkillHint,
+  });
+  // Skill guidance is shared context. A conversation may select guidance without
+  // gaining executable tools; mandatory action skills remain execution-only.
+  const policySkillFilter = applySkillPolicyToFilter(opts?.skillFilter, runtimeSkillPolicy);
   const skillFilter =
     !applyChatLane &&
     isBuiltinStewardAgent(agentId) &&
@@ -1478,6 +1432,248 @@ export async function runPreparedReply(
     storePath,
     cfg,
   });
+  let admittedBinding = opts?.resumedTaskBinding;
+  if (interactionIngress && !admittedBinding) {
+    const sources = createInteractionSourceBoundary();
+    const persistOwnReply = (text: string) => {
+      const availability = sources.availability;
+      if (availability) {
+        const notice = formatRestrictedInteractionNotice(availability);
+        if (!text.includes(notice)) {
+          text = `${text}\n\n${notice}`;
+        }
+      }
+      if (interactionIngress.persistOwnTranscript) {
+        sources.read(
+          "transcript_unavailable",
+          () =>
+            replyTurnRuntime.persistInteractionMessage({
+              sessionFile,
+              sessionId: sessionIdFinal,
+              cwd: runWorkspaceDir,
+              messageId: interactionIngress.userMessageId,
+              role: "assistant",
+              text,
+            }),
+          undefined,
+        );
+      }
+      const current = sources.availability;
+      if (current && opts?.runId) {
+        emitChatInboundStage({
+          runId: opts.runId,
+          sessionKey,
+          stage: "interaction_restricted",
+          extra: { reasonCodes: current.reasons, executionAvailable: false },
+        });
+      }
+      if (!availability && current) {
+        text = `${text}\n\n本条回复未能保存到对话记录；刚才任务操作的结果以上述回执为准。`;
+      }
+      return { text, ...(current ? { channelData: { runtimeInteraction: current } } : {}) };
+    };
+    if (interactionIngress.persistOwnTranscript) {
+      sources.read(
+        "transcript_unavailable",
+        () =>
+          replyTurnRuntime.persistInteractionMessage({
+            sessionFile,
+            sessionId: sessionIdFinal,
+            cwd: runWorkspaceDir,
+            messageId: interactionIngress.userMessageId,
+            role: "user",
+            text: inboundMessage,
+          }),
+        undefined,
+      );
+    }
+    const board = sources.read(
+      "task_state_unavailable",
+      () => replyTurnRuntime.state.readForInteraction(sessionFile),
+      { parked: [], focusRevision: 0 },
+    );
+    const captured = {
+      expectedFocusRevision: board.focusRevision,
+      expectedWriteEpoch: board.writeEpoch ?? 0,
+      expectedTaskId: board.current?.taskId,
+    };
+    const history = sources.read(
+      "transcript_unavailable",
+      () => openSessionManager(sessionFile).buildSessionContext().messages,
+      [],
+    );
+    const bootstrap = await sources.readAsync(
+      "context_source_unavailable",
+      () =>
+        resolveBootstrapContextForRun({
+          workspaceDir: runWorkspaceDir,
+          config: cfg,
+          sessionKey,
+          sessionId: sessionIdFinal,
+          agentId,
+        }),
+      { bootstrapFiles: [], contextFiles: [] },
+    );
+    const systemContext = [
+      ...bootstrap.contextFiles.map((file) => `## ${file.path}\n${file.content}`),
+      skillsSnapshot?.prompt,
+      finalizeSystemContext(extraSystemPromptParts),
+    ].filter((part): part is string => Boolean(part));
+    const interactionAuthProfileId = await resolveSessionAuthProfileOverride({
+      cfg,
+      provider,
+      agentDir,
+      sessionEntry,
+      sessionStore,
+      sessionKey,
+      storePath,
+      isNewSession,
+    });
+    const routed = await replyTurnRuntime.interaction({
+      config: cfg,
+      runId: opts?.runId ?? crypto.randomUUID(),
+      agentId,
+      agentDir,
+      sessionKey,
+      sessionFile,
+      requestId: interactionIngress.userMessageId,
+      captured,
+      authorized: commandAuthorized && command.isAuthorizedSender,
+      identity: {
+        executionIdentity: turnExecutionIdentity,
+        gatewayClientUser: replyGatewayUser,
+        gatewayClientPlatformUserId: replyGatewayPlatformUserId,
+        gatewayClientSessionDomain: ctx.GatewayClientSessionDomain,
+      },
+      provider,
+      model,
+      authProfileId: interactionAuthProfileId,
+      timeoutMs,
+      input: {
+        availability: sources.availability,
+        message: prefixedCommandBody,
+        images: opts?.images,
+        abortSignal: opts?.abortSignal,
+        taskTarget: board.current
+          ? { taskId: board.current.taskId, revision: String(board.writeEpoch ?? 0) }
+          : undefined,
+        context: [
+          ...systemContext.map((content) => ({ role: "system" as const, content })),
+          ...projectInteractionHistory(history, interactionIngress.userMessageId),
+        ],
+      },
+    });
+    if (routed.kind === "respond") {
+      typing.cleanup();
+      return persistOwnReply(routed.text);
+    }
+    let acceptedCriteria: readonly string[] = [];
+    if (routed.kind === "task_proposal") {
+      opts?.abortSignal?.throwIfAborted();
+      if (routed.decision.kind === "task_control" && routed.decision.action === "resume") {
+        const resumed =
+          commandAuthorized && command.isAuthorizedSender && opts?.onInteractionTaskResume
+            ? await opts.onInteractionTaskResume({
+                sessionFile,
+                taskId: routed.decision.target.taskId,
+                expectedFocusRevision: captured.expectedFocusRevision,
+                expectedWriteEpoch: captured.expectedWriteEpoch,
+                abortSignal: opts.abortSignal,
+              })
+            : { kind: "rejected" as const, reason: "resume_requires_live_recheck" };
+        opts?.abortSignal?.throwIfAborted();
+        if (resumed.kind !== "accepted") {
+          typing.cleanup();
+          return persistOwnReply(formatTaskProposalReply(routed.decision, resumed));
+        }
+        admittedBinding = resumed.binding;
+        acceptedCriteria = resumed.acceptance;
+      } else {
+        const applied =
+          commandAuthorized && command.isAuthorizedSender
+            ? sources.read(
+                "task_mutation_unconfirmed",
+                () =>
+                  replyTurnRuntime.state.applyInteractionProposal({
+                    sessionFile,
+                    ...captured,
+                    decision:
+                      routed.decision.kind === "task_change"
+                        ? { ...routed.decision, text: inboundMessage }
+                        : routed.decision,
+                  }),
+                { kind: "rejected" as const, reason: "task_mutation_unconfirmed" },
+              )
+            : { kind: "rejected" as const, reason: "unauthorized" };
+        if (applied.kind === "applied" && applied.abort) {
+          replyTurnRuntime.interrupt(sessionIdFinal, sessionKey);
+          if (routed.decision.kind === "task_control" && routed.decision.action !== "resume") {
+            await opts?.onInteractionTaskEffect?.({
+              kind: routed.decision.action,
+              taskId: routed.decision.target.taskId,
+              previousRunId: board.current?.executionAttempt,
+            });
+          }
+        }
+        if (applied.kind === "applied" && routed.decision.kind === "task_change") {
+          replyTurnRuntime.steer(sessionIdFinal, inboundMessage);
+        }
+        typing.cleanup();
+        return persistOwnReply(formatTaskProposalReply(routed.decision, applied));
+      }
+    }
+    if (routed.kind === "execution_admission") {
+      if (routed.result.kind !== "accepted") {
+        if (
+          routed.result.kind === "rejected" &&
+          routed.result.reason === "task_mutation_unconfirmed"
+        ) {
+          sources.restrict("task_mutation_unconfirmed");
+          typing.cleanup();
+          return persistOwnReply(
+            "任务请求的写入结果暂时无法确认，没有启动执行器，也没有自动重试。",
+          );
+        }
+        typing.cleanup();
+        return persistOwnReply(
+          routed.result.kind === "duplicate"
+            ? "该执行请求已经接纳，未重复启动。"
+            : "任务状态已变化或执行未获准，本次未启动；请确认当前目标后重试。",
+        );
+      }
+      admittedBinding = routed.result.binding;
+      acceptedCriteria = routed.result.acceptance;
+      await opts?.onInteractionTaskEffect?.({
+        kind: "replace",
+        taskId: board.current?.taskId ?? "",
+        previousRunId: board.current?.executionAttempt,
+      });
+    }
+    if (!admittedBinding) {
+      typing.cleanup();
+      return persistOwnReply("执行请求缺少有效任务身份，本次未启动。");
+    }
+    const acceptedTask = replyTurnRuntime.state.read(sessionFile).current;
+    if (acceptedTask?.taskId !== admittedBinding.taskId) {
+      typing.cleanup();
+      return persistOwnReply("任务焦点已变化，本次未启动执行。");
+    }
+    extraSystemPromptParts = extraSystemPromptParts.filter(
+      (part) => part !== sessionFocusResumePrompt,
+    );
+    extraSystemPromptParts.push(
+      [
+        "## Admitted execution request",
+        "This is the authoritative accepted goal for this execution. Earlier task references are history only.",
+        buildResumePrompt(acceptedTask),
+        `Goal: ${acceptedTask.goalText}`,
+        "Acceptance criteria:",
+        ...acceptedCriteria.map((criterion, index) => `${index + 1}. ${criterion}`),
+      ].join("\n"),
+    );
+    // New accepted focus supersedes the old active attempt, using the existing abort path.
+    abortEmbeddedPiRun(sessionIdFinal);
+  }
   const collaborationRoundInvoked = sessionCtx.CollaborationRoundInvoked === true;
   // Queue body stays the user utterance (plus thread/media notes). System events
   // travel with followupRun.run.extraSystemPrompt so deferred turns still see them.
@@ -1638,7 +1834,10 @@ export async function runPreparedReply(
       senderE164: sessionCtx.SenderE164?.trim() || undefined,
       senderIsOwner: command.senderIsOwner,
       sessionFile,
-      skipUserTranscriptPersist: collaborationRoundInvoked,
+      taskCompletionBinding:
+        admittedBinding ?? replyTurnRuntime.state.captureBinding(sessionFile, inboundMessage),
+      ...(admittedBinding ? { executionAdmitted: true } : {}),
+      skipUserTranscriptPersist: collaborationRoundInvoked || Boolean(interactionIngress),
       collaborationRoundInvoked,
       ...(sessionCtx.DeliveryToolSideEffect
         ? { deliveryToolSideEffect: sessionCtx.DeliveryToolSideEffect }
@@ -1667,12 +1866,12 @@ export async function runPreparedReply(
       blockReplyBreak: resolvedBlockStreamingBreak,
       ownerNumbers: command.ownerList.length > 0 ? command.ownerList : undefined,
       inputProvenance: ctx.InputProvenance ?? sessionCtx.InputProvenance,
-      extraSystemPrompt: extraSystemPromptParts.join("\n\n") || undefined,
+      extraSystemPrompt: finalizeSystemContext(extraSystemPromptParts),
       organizationContext,
       ...(isReasoningTagProvider(provider) ? { enforceFinalTag: true } : {}),
-      ...(chatLaneSkipsOptionalKnowledge ? { disableTools: true } : {}),
+      ...(applyChatLane && !admittedBinding ? { disableTools: true } : {}),
       ...(useCollaborationAssembly && !applyChatLane ? { skillPolicy: runtimeSkillPolicy } : {}),
-      ...(applyRetrieveToolPolicy && inboundDepthDecision
+      ...(applyRetrieveToolPolicy && inboundDepthDecision && !admittedBinding
         ? {
             inboundToolCeiling: {
               depth: inboundDepthDecision.depth,

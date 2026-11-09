@@ -84,7 +84,7 @@ vi.mock("../pi-embedded-helpers.js", () => ({
   pickFallbackThinkingLevel: vi.fn(() => null),
 }));
 
-vi.mock("./run/attempt.js", () => ({
+vi.mock("../../agent-runtime/execution/runner/embedded-attempt.js", () => ({
   runEmbeddedAttempt: vi.fn(),
 }));
 
@@ -122,7 +122,8 @@ vi.mock("../models-config.js", () => ({
   ensureOpenClawModelsJson: vi.fn(async () => {}),
 }));
 
-vi.mock("../context-window-guard.js", () => ({
+vi.mock("../../agent-runtime/policy/index.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agent-runtime/policy/index.js")>()),
   CONTEXT_WINDOW_HARD_MIN_TOKENS: 1000,
   CONTEXT_WINDOW_WARN_BELOW_TOKENS: 5000,
   evaluateContextWindowGuard: vi.fn(() => ({
@@ -179,7 +180,14 @@ vi.mock("./logger.js", () => ({
   },
 }));
 
-vi.mock("./run/payloads.js", () => ({
+// Runner-only suites already stub payload projection. Keep its formatting dependencies
+// inert here; payload suites exercise the real production formatting adapter.
+vi.mock("../../agent-runtime/wiring/embedded-payloads.js", () => ({
+  embeddedPayloadFormatting: {},
+}));
+
+vi.mock("../../agent-runtime/delivery/index.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agent-runtime/delivery/index.js")>()),
   buildEmbeddedRunPayloads: vi.fn(() => []),
 }));
 

@@ -1,8 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/task-action.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { resolveStateDir } from "../../config/paths.js";
+import { confirmedDeliveryMessageIds } from "../../shared/delivery-receipt.js";
 import { generateSecureUuid } from "../secure-random.js";
 import type { OutboundChannel } from "./targets.js";
 
@@ -41,6 +44,8 @@ type QueuedDeliveryPayload = {
   gifPlayback?: boolean;
   silent?: boolean;
   mirror?: DeliveryMirrorPayload;
+  /** Original host-captured task identity; never recaptured during recovery. */
+  taskBoundary?: TaskActionBoundary;
 };
 
 export interface QueuedDelivery extends QueuedDeliveryPayload {
@@ -125,6 +130,7 @@ export async function enqueueDelivery(
     gifPlayback: params.gifPlayback,
     silent: params.silent,
     mirror: params.mirror,
+    taskBoundary: params.taskBoundary,
     retryCount: 0,
   };
   const filePath = path.join(queueDir, `${id}.json`);
@@ -307,6 +313,7 @@ export type DeliverFn = (
     cfg: OpenBotConfig;
   } & QueuedDeliveryParams & {
       skipQueue?: boolean;
+      onError?: (error: unknown) => void;
     },
 ) => Promise<unknown>;
 
@@ -375,7 +382,19 @@ export async function recoverPendingDeliveries(opts: {
     }
 
     try {
-      await opts.deliver({
+      if (entry.taskBoundary) {
+        const refusal = checkTaskActionBoundary(entry.taskBoundary);
+        if (refusal) {
+          await failDelivery(entry.id, refusal, opts.stateDir);
+          await moveToFailed(entry.id, opts.stateDir);
+          failed += 1;
+          opts.log.warn(`Delivery ${entry.id} refused: original task binding is stale`);
+          continue;
+        }
+      }
+      let payloadFailure: unknown;
+      let hadPayloadFailure = false;
+      const receipts = await opts.deliver({
         cfg: opts.cfg,
         channel: entry.channel,
         to: entry.to,
@@ -387,8 +406,38 @@ export async function recoverPendingDeliveries(opts: {
         gifPlayback: entry.gifPlayback,
         silent: entry.silent,
         mirror: entry.mirror,
+        taskBoundary: entry.taskBoundary,
+        onError: (error) => {
+          hadPayloadFailure = true;
+          payloadFailure = error;
+        },
         skipQueue: true, // Prevent re-enqueueing during recovery
       });
+      if (hadPayloadFailure) {
+        if (Array.isArray(receipts) && receipts.length > 0) {
+          // Some payloads may already be visible. Without per-item replay identity,
+          // retrying the original batch could duplicate those messages.
+          await failDelivery(entry.id, "partial_delivery: held for reconciliation", opts.stateDir);
+          await moveToFailed(entry.id, opts.stateDir);
+          failed += 1;
+          opts.log.warn(`Delivery ${entry.id} partially sent — held for reconciliation`);
+          continue;
+        }
+        throw payloadFailure instanceof Error ? payloadFailure : new Error(String(payloadFailure));
+      }
+      if (!confirmedDeliveryMessageIds(receipts)) {
+        // A successful call without acknowledgement may already have sent.
+        // Preserve it for reconciliation rather than blindly replaying the batch.
+        await failDelivery(
+          entry.id,
+          "delivery_unknown: transport acknowledgement missing",
+          opts.stateDir,
+        );
+        await moveToFailed(entry.id, opts.stateDir);
+        failed += 1;
+        opts.log.warn(`Delivery ${entry.id} has unknown acknowledgement — held for reconciliation`);
+        continue;
+      }
       await ackDelivery(entry.id, opts.stateDir);
       recovered += 1;
       opts.log.info(`Recovered delivery ${entry.id} to ${entry.channel}:${entry.to}`);

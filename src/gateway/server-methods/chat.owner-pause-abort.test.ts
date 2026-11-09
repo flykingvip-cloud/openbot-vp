@@ -17,6 +17,7 @@ import { claimTaskBoardContinue } from "../../conversation-task/task-board-conti
 import type { GatewayRequestContext } from "./types.js";
 
 const mockState = vi.hoisted(() => ({
+  replyText: "",
   transcriptPath: "",
   sessionId: "sess-owner-pause",
   mainSessionKey: "main",
@@ -26,9 +27,9 @@ const mockState = vi.hoisted(() => ({
 }));
 
 const clearSessionQueuesMock = vi.hoisted(() =>
-  vi.fn(() => ({ followupCleared: 1, laneCleared: 0, keys: ["main"] })),
+  vi.fn((..._args: unknown[]) => ({ followupCleared: 1, laneCleared: 0, keys: ["main"] })),
 );
-const abortEmbeddedPiRunMock = vi.hoisted(() => vi.fn(() => true));
+const abortEmbeddedPiRunMock = vi.hoisted(() => vi.fn((..._args: unknown[]) => true));
 
 vi.mock("../session-utils.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../session-utils.js")>();
@@ -75,11 +76,23 @@ vi.mock("../tenant-context.js", async (importOriginal) => {
 });
 
 vi.mock("../../auto-reply/dispatch.js", () => ({
-  dispatchInboundMessage: vi.fn(async (params: { ctx: MsgContext }) => {
-    mockState.dispatchCount += 1;
-    mockState.lastDispatchCtx = params.ctx;
-    return { ok: true };
-  }),
+  dispatchInboundMessage: vi.fn(
+    async (params: {
+      ctx: MsgContext;
+      dispatcher?: {
+        sendFinalReply: (payload: { text: string }) => boolean;
+        waitForIdle: () => Promise<void>;
+      };
+    }) => {
+      mockState.dispatchCount += 1;
+      mockState.lastDispatchCtx = params.ctx;
+      if (mockState.replyText) {
+        params.dispatcher?.sendFinalReply({ text: mockState.replyText });
+        await params.dispatcher?.waitForIdle();
+      }
+      return { ok: true };
+    },
+  ),
 }));
 
 vi.mock("../../auto-reply/reply/queue.js", async (importOriginal) => {
@@ -167,6 +180,7 @@ function createChatContext(): Pick<
 }
 
 afterEach(() => {
+  mockState.replyText = "";
   mockState.dispatchCount = 0;
   mockState.lastDispatchCtx = undefined;
   mockState.sessionEntry = {};
@@ -176,6 +190,48 @@ afterEach(() => {
 });
 
 describe("gateway chat.send owner pause/cancel stop sequence", () => {
+  it("persists direct conversation without changing the task board or starting an executor", async () => {
+    const { dir, transcriptPath } = createTranscriptWithBoard("openbot-taskless-chat-");
+    try {
+      const before = fs.readFileSync(`${transcriptPath}.task-board.json`, "utf8");
+      mockState.replyText = "你好，有什么可以帮你？";
+      const context = createChatContext();
+      const respond = vi.fn();
+      await chatHandlers["chat.send"]({
+        params: { sessionKey: "main", message: "你好", idempotencyKey: "greeting" },
+        respond: respond as never,
+        req: {} as never,
+        client: null,
+        isWebchatConnect: () => false,
+        context: context as GatewayRequestContext,
+      });
+      await vi.waitFor(() =>
+        expect(fs.readFileSync(transcriptPath, "utf8")).toContain(mockState.replyText),
+      );
+      expect(fs.readFileSync(`${transcriptPath}.task-board.json`, "utf8")).toBe(before);
+      const dispatched = vi.mocked(dispatchInboundMessage).mock.calls[0]?.[0];
+      expect(dispatched?.replyOptions?.interactionIngress).toEqual({ userMessageId: "greeting" });
+      const entries = fs
+        .readFileSync(transcriptPath, "utf8")
+        .trim()
+        .split("\n")
+        .map(
+          (line) =>
+            JSON.parse(line) as {
+              type?: string;
+              id?: string;
+              parentId?: string | null;
+              message?: { role?: string };
+            },
+        );
+      const messages = entries.filter((entry) => entry.type === "message");
+      expect(messages.map((entry) => entry.message?.role)).toEqual(["user", "assistant"]);
+      expect(messages[1]?.parentId).toBe(messages[0]?.id);
+      expect(abortEmbeddedPiRunMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
   it("暂停 via chat.send aborts active run, skips dispatch, clears queue, keeps stop state", async () => {
     const { dir, transcriptPath } = createTranscriptWithBoard("openclaw-owner-pause-");
     try {

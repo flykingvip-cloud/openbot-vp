@@ -5,12 +5,11 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resolveMidTaskAsideDisposition } from "../auto-reply/reply/mid-task-aside.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { routeInteraction } from "../agent-runtime/command/index.js";
 import {
   activeConstraintTexts,
   appendSameTaskConstraint,
-  applyIncomingUserMessage,
   buildResumePrompt,
   commitSameTaskConstraint,
   emptySessionTaskBoard,
@@ -18,7 +17,6 @@ import {
   seedSessionTaskBoard,
   type SessionTaskBoard,
 } from "./session-task-board.js";
-import { classifyTurnRelation } from "./turn-relation.js";
 
 function baseBoard(overrides?: Partial<SessionTaskBoard["current"]>): SessionTaskBoard {
   const board = emptySessionTaskBoard();
@@ -51,31 +49,37 @@ describe("slice3 constraint context — red then green", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("goal/constraint queries do not write constraints", () => {
+  async function respondWithoutMutation(message: string) {
     const before = readSessionTaskBoard(sessionFile);
-    const goalAsk = resolveMidTaskAsideDisposition({
-      prompt: "当前任务目标是什么",
-      board: before,
-    });
-    expect(goalAsk.kind).toBe("board_readonly");
+    const authorize = vi.fn();
+    const commit = vi.fn();
+    const result = await routeInteraction(
+      {
+        message,
+        context: [],
+        taskTarget: { taskId: "task-a", revision: String(before.writeEpoch ?? 0) },
+      },
+      {
+        requestId: "query",
+        expectedFocusRevision: before.focusRevision,
+        expectedWriteEpoch: before.writeEpoch ?? 0,
+      },
+      {
+        inference: { infer: async () => ({ kind: "reply", text: "任务信息答复" }) },
+        admission: { authorize, commit },
+      },
+    );
+    expect(result.kind).toBe("respond");
+    expect(authorize).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
+    expect(readSessionTaskBoard(sessionFile)).toEqual(before);
+  }
 
-    // applyIncoming must also refuse to persist query as amend constraint
-    const afterGoal = applyIncomingUserMessage({
-      board: before,
-      incomingText: "当前任务目标是什么",
-    });
-    expect(activeConstraintTexts(afterGoal.board.current).length).toBe(0);
-
-    const constrAsk = resolveMidTaskAsideDisposition({
-      prompt: "有效约束有哪些",
-      board: before,
-    });
-    expect(constrAsk.kind).toBe("board_readonly");
-    const afterConstr = applyIncomingUserMessage({
-      board: before,
-      incomingText: "有效约束有哪些",
-    });
-    expect(activeConstraintTexts(afterConstr.board.current).length).toBe(0);
+  it("goal/constraint queries do not write constraints", async () => {
+    const before = readSessionTaskBoard(sessionFile);
+    await respondWithoutMutation("当前任务目标是什么");
+    await respondWithoutMutation("有效约束有哪些");
+    expect(activeConstraintTexts(before.current).length).toBe(0);
 
     // File path: commit must also refuse query text
     expect(
@@ -88,16 +92,8 @@ describe("slice3 constraint context — red then green", () => {
     expect(activeConstraintTexts(readSessionTaskBoard(sessionFile).current).length).toBe(0);
   });
 
-  it("bare 「继续」 is not recorded as a business constraint", () => {
-    // Turn relation may still be amend (continue current work) — but must not persist.
-    expect(classifyTurnRelation("请继续", "调研国内手机市场并写报告")).toBe("amend");
-    expect(classifyTurnRelation("继续", "调研国内手机市场并写报告")).toBe("amend");
-
-    const result = applyIncomingUserMessage({
-      board: readSessionTaskBoard(sessionFile),
-      incomingText: "请继续",
-    });
-    expect(activeConstraintTexts(result.board.current).length).toBe(0);
+  it("a reply decision for bare 「继续」 is not recorded as a business constraint", async () => {
+    await respondWithoutMutation("请继续");
 
     expect(
       commitSameTaskConstraint({

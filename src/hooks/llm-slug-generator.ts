@@ -1,10 +1,13 @@
 /**
- * LLM-based slug generator for session memory filenames
+ * LLM-based slug generator for session memory filenames.
+ * Auxiliary inference only: uses shared model governance; never creates or advances tasks.
  */
 
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { runEmbeddedPiAgent } from "../agent-runtime/execution/index.js";
+import { resolveAuxiliaryModelGovernance } from "../agent-runtime/model/index.js";
 import {
   resolveDefaultAgentId,
   resolveAgentWorkspaceDir,
@@ -12,8 +15,8 @@ import {
   resolveAgentEffectiveModelPrimary,
 } from "../agents/agent-scope.js";
 import { DEFAULT_PROVIDER, DEFAULT_MODEL } from "../agents/defaults.js";
+import { runWithModelFallback } from "../agents/model-fallback.js";
 import { parseModelRef } from "../agents/model-selection.js";
-import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 
@@ -25,6 +28,8 @@ const log = createSubsystemLogger("llm-slug-generator");
 export async function generateSlugViaLLM(params: {
   sessionContent: string;
   cfg: OpenBotConfig;
+  /** Optional parent turn id for inherited model-set governance. */
+  parentRunId?: string;
 }): Promise<string | null> {
   let tempSessionFile: string | null = null;
 
@@ -49,28 +54,44 @@ Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", 
     const parsed = modelRef ? parseModelRef(modelRef, DEFAULT_PROVIDER) : null;
     const provider = parsed?.provider ?? DEFAULT_PROVIDER;
     const model = parsed?.model ?? DEFAULT_MODEL;
+    const runId = `slug-gen-${Date.now()}`;
+    const auxiliaryGovernance = resolveAuxiliaryModelGovernance({
+      purpose: "slug_filename",
+      parentRunId: params.parentRunId,
+    });
 
-    const result = await runEmbeddedPiAgent({
-      sessionId: `slug-generator-${Date.now()}`,
-      sessionKey: "temp:slug-generator",
-      agentId,
-      sessionFile: tempSessionFile,
-      workspaceDir,
-      agentDir,
-      config: params.cfg,
-      prompt,
+    const fallbackResult = await runWithModelFallback({
+      cfg: params.cfg,
       provider,
       model,
-      timeoutMs: 15_000, // 15 second timeout
-      runId: `slug-gen-${Date.now()}`,
+      agentDir,
+      runId,
+      ...auxiliaryGovernance,
+      run: async (providerOverride, modelOverride) =>
+        runEmbeddedPiAgent({
+          sessionId: `slug-generator-${Date.now()}`,
+          sessionKey: "temp:slug-generator",
+          agentId,
+          sessionFile: tempSessionFile!,
+          workspaceDir,
+          agentDir,
+          config: params.cfg,
+          prompt,
+          provider: providerOverride,
+          model: modelOverride,
+          timeoutMs: 15_000, // 15 second timeout
+          runId,
+        }),
     });
+
+    const result = fallbackResult.result;
 
     // Extract text from payloads
     if (result.payloads && result.payloads.length > 0) {
-      const text = result.payloads[0]?.text;
-      if (text) {
+      const textPayload = result.payloads[0]?.text;
+      if (textPayload) {
         // Clean up the response - extract just the slug
-        const slug = text
+        const slug = textPayload
           .trim()
           .toLowerCase()
           .replace(/[^a-z0-9-]/g, "-")

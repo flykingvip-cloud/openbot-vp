@@ -781,9 +781,12 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         });
         expect(sendAlice.ok).toBe(true);
         await statusAlice;
-        // Drain parent final before second principal send (avoids in-flight run starve).
+        // A child final can precede parent cleanup and still hit same-body retry
+        // deduplication. Only this matching parent final closes Alice's round.
         await vi.waitFor(() => {
-          expect(activeCollector.finals().length).toBeGreaterThan(0);
+          expect(
+            activeCollector.finals().some((frame) => runIdOf(frame.payload) === idemAlice),
+          ).toBe(true);
         }, FAST_WAIT);
 
         const bindingAlice = peekDiscussToTaskSourceBinding({
@@ -814,6 +817,7 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
           timeoutMs: 60_000,
         });
         expect(sendBob.ok).toBe(true);
+        expect(sendBob.payload).toMatchObject({ runId: idemBob, status: "started" });
         const taskIdBob = mintDiscussToTaskId({
           tenantId: "_local",
           groupId,

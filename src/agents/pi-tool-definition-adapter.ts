@@ -4,6 +4,12 @@ import type {
   AgentToolUpdateCallback,
 } from "@earendil-works/pi-agent-core";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { HookContext } from "../agent-runtime/capabilities/index.js";
+import {
+  isToolWrappedWithBeforeToolCallHook,
+  runBeforeToolCallHook,
+} from "../agent-runtime/capabilities/index.js";
+import { checkTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { runDeliveryToolSideEffect } from "../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
 import type { DeliveryToolSideEffectSchedule } from "../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
@@ -11,11 +17,6 @@ import type { CollaborationPrivateRunBag } from "../gateway/collaboration-dispat
 import { logDebug, logError } from "../logger.js";
 import { isPlainObject } from "../utils.js";
 import type { ClientToolDefinition } from "./pi-embedded-runner/run/params.js";
-import type { HookContext } from "./pi-tools.before-tool-call.js";
-import {
-  isToolWrappedWithBeforeToolCallHook,
-  runBeforeToolCallHook,
-} from "./pi-tools.before-tool-call.js";
 import { normalizeToolName } from "./tool-policy.js";
 import { jsonResult } from "./tools/common.js";
 import { annotateToolResultText } from "./turn-completion/contract.js";
@@ -270,6 +271,12 @@ export function toClientToolDefinitions(
         });
         if (outcome.blocked) {
           throw new Error(outcome.reason);
+        }
+        const refusal = hookContext?.taskBoundary
+          ? checkTaskActionBoundary(hookContext.taskBoundary)
+          : undefined;
+        if (refusal) {
+          throw new Error(refusal);
         }
         const adjustedParams = outcome.params;
         const paramsRecord = isPlainObject(adjustedParams) ? adjustedParams : {};

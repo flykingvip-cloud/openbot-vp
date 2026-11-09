@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import ts from "typescript";
 import { afterEach, describe, expect, test } from "vitest";
 import { clearRuntimeConfigSnapshot, setRuntimeConfigSnapshot } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
@@ -266,9 +267,24 @@ describe("P0 G8 legacy primary production executor", () => {
     const chat = readFileSync(new URL("../server-methods/chat.ts", import.meta.url), "utf8");
     const calls = chat.match(/executeCollaborationRound\(/g) ?? [];
     expect(calls).toHaveLength(1);
-    const callAt = chat.indexOf("executeCollaborationRound(");
-    const window = chat.slice(callAt, callAt + 280);
-    expect(window).toContain(
+    const parsed = ts.createSourceFile("chat.ts", chat, ts.ScriptTarget.Latest, true);
+    const executorOptions: string[] = [];
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "executeCollaborationRound"
+      ) {
+        const options = node.arguments[2];
+        if (options && ts.isObjectLiteralExpression(options)) {
+          executorOptions.push(options.getText(parsed));
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(parsed);
+    expect(executorOptions).toHaveLength(1);
+    expect(executorOptions[0]).toContain(
       "productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg)",
     );
     expect(chat).not.toContain("episode-store.js");
