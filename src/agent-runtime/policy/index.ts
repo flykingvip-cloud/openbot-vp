@@ -48,14 +48,31 @@ export {
   HEARTBEAT_FORBIDDEN_ACTIONS,
   isHeartbeatActionAllowed,
   evaluateWakeEligibility,
+  MAX_FOCUS_SLOTS,
+  MAX_PARKED_SLOTS,
+  decideWake,
 } from "./explicit-task-control.js";
 export type {
   WakeReason,
   HeartbeatForbiddenAction,
   WakeEligibility,
+  FocusSnapshot,
+  FocusDecision,
 } from "./explicit-task-control.js";
 
-export { normalizeConstraintEntries, activeConstraintTexts } from "./constraints.js";
+export {
+  normalizeConstraintEntries,
+  activeConstraintTexts,
+  PRIOR_UTTERANCE_CORRECTION_MAX_CHARS,
+  PRIOR_UTTERANCE_CORRECTION_START_RE,
+  PRIOR_UTTERANCE_CORRECTION_ANYWHERE_RE,
+  isPriorUtteranceCorrection,
+  isBareContinueCue,
+  isOwnerConstraintRevision,
+  isOwnerConstraintFullReplace,
+  isOwnerExecutionBarrierUtterance,
+  shouldPersistOwnerConstraint,
+} from "./constraints.js";
 
 export { stripInboundStamp } from "./input-stamp.js";
 export { parseTaskAcceptanceChecks } from "./acceptance-checks.js";
