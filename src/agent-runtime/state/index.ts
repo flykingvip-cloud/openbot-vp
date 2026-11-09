@@ -93,6 +93,19 @@ export {
 } from "./collaboration/handoff-txn.js";
 export type { HandoffLedgerPort, HandoffStoredFact } from "./collaboration/handoff-txn.js";
 export {
+  commitMemberArtifactDeliveryAssociation,
+  deliveryKeyHash,
+  noteAssociationRenamedAwayFromStaged,
+  recordAssociationObservation,
+  recoverPartialStagedAssociation,
+} from "./collaboration/accepted-artifact-delivery-txn.js";
+export type {
+  AssociationCommitResult,
+  DeliveryAssociationPhase,
+  DeliveryExternalEffect,
+  MemberArtifactDeliveryIntent,
+} from "./collaboration/accepted-artifact-delivery-txn.js";
+export {
   DIRECTORY_LOCK_STALE_MS,
   withDirectoryLock,
   appendJsonlDurable,
