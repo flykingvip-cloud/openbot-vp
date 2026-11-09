@@ -1,4 +1,6 @@
 import { type Bot, GrammyError, InputFile } from "grammy";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { chunkMarkdownTextWithMode, type ChunkMode } from "../../auto-reply/chunk.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import type { ReplyToMode } from "../../config/config.js";
@@ -103,6 +105,7 @@ function markDelivered(progress: DeliveryProgress): void {
 }
 
 async function deliverTextReply(params: {
+  taskBoundary?: TaskActionBoundary;
   bot: Bot;
   chatId: string;
   runtime: RuntimeEnv;
@@ -135,6 +138,7 @@ async function deliverTextReply(params: {
       chunk.html,
       params.runtime,
       {
+        taskBoundary: params.taskBoundary,
         replyToMessageId: replyToForChunk,
         replyQuoteText: params.replyQuoteText,
         thread: params.thread,
@@ -154,6 +158,7 @@ async function deliverTextReply(params: {
 }
 
 async function sendPendingFollowUpText(params: {
+  taskBoundary?: TaskActionBoundary;
   bot: Bot;
   chatId: string;
   runtime: RuntimeEnv;
@@ -175,6 +180,7 @@ async function sendPendingFollowUpText(params: {
       progress: params.progress,
     });
     await sendTelegramText(params.bot, params.chatId, chunk.html, params.runtime, {
+      taskBoundary: params.taskBoundary,
       replyToMessageId: replyToForFollowUp,
       thread: params.thread,
       textMode: "html",
@@ -202,6 +208,7 @@ function isCaptionTooLong(err: unknown): boolean {
 }
 
 async function sendTelegramVoiceFallbackText(opts: {
+  taskBoundary?: TaskActionBoundary;
   bot: Bot;
   chatId: string;
   runtime: RuntimeEnv;
@@ -221,6 +228,7 @@ async function sendTelegramVoiceFallbackText(opts: {
     // Only apply reply reference, quote text, and buttons to the first chunk.
     const replyToForChunk = !appliedReplyTo ? opts.replyToId : undefined;
     const messageId = await sendTelegramText(opts.bot, opts.chatId, chunk.html, opts.runtime, {
+      taskBoundary: opts.taskBoundary,
       replyToMessageId: replyToForChunk,
       replyQuoteText: !appliedReplyTo ? opts.replyQuoteText : undefined,
       thread: opts.thread,
@@ -240,6 +248,7 @@ async function sendTelegramVoiceFallbackText(opts: {
 }
 
 async function deliverMediaReply(params: {
+  taskBoundary?: TaskActionBoundary;
   reply: ReplyPayload;
   mediaList: string[];
   bot: Bot;
@@ -301,6 +310,7 @@ async function deliverMediaReply(params: {
     if (isGif) {
       const result = await sendTelegramWithThreadFallback({
         operation: "sendAnimation",
+        taskBoundary: params.taskBoundary,
         runtime: params.runtime,
         thread: params.thread,
         requestParams: mediaParams,
@@ -314,6 +324,7 @@ async function deliverMediaReply(params: {
     } else if (kind === "image") {
       const result = await sendTelegramWithThreadFallback({
         operation: "sendPhoto",
+        taskBoundary: params.taskBoundary,
         runtime: params.runtime,
         thread: params.thread,
         requestParams: mediaParams,
@@ -327,6 +338,7 @@ async function deliverMediaReply(params: {
     } else if (kind === "video") {
       const result = await sendTelegramWithThreadFallback({
         operation: "sendVideo",
+        taskBoundary: params.taskBoundary,
         runtime: params.runtime,
         thread: params.thread,
         requestParams: mediaParams,
@@ -349,6 +361,7 @@ async function deliverMediaReply(params: {
         try {
           const result = await sendTelegramWithThreadFallback({
             operation: "sendVoice",
+            taskBoundary: params.taskBoundary,
             runtime: params.runtime,
             thread: params.thread,
             requestParams: mediaParams,
@@ -377,6 +390,7 @@ async function deliverMediaReply(params: {
             const fallbackMessageId = await sendTelegramVoiceFallbackText({
               bot: params.bot,
               chatId: params.chatId,
+              taskBoundary: params.taskBoundary,
               runtime: params.runtime,
               text: fallbackText,
               chunkText: params.chunkText,
@@ -402,6 +416,7 @@ async function deliverMediaReply(params: {
             delete noCaptionParams.parse_mode;
             const result = await sendTelegramWithThreadFallback({
               operation: "sendVoice",
+              taskBoundary: params.taskBoundary,
               runtime: params.runtime,
               thread: params.thread,
               requestParams: noCaptionParams,
@@ -417,6 +432,7 @@ async function deliverMediaReply(params: {
               await sendTelegramVoiceFallbackText({
                 bot: params.bot,
                 chatId: params.chatId,
+                taskBoundary: params.taskBoundary,
                 runtime: params.runtime,
                 text: fallbackText,
                 chunkText: params.chunkText,
@@ -434,6 +450,7 @@ async function deliverMediaReply(params: {
       } else {
         const result = await sendTelegramWithThreadFallback({
           operation: "sendAudio",
+          taskBoundary: params.taskBoundary,
           runtime: params.runtime,
           thread: params.thread,
           requestParams: mediaParams,
@@ -448,6 +465,7 @@ async function deliverMediaReply(params: {
     } else {
       const result = await sendTelegramWithThreadFallback({
         operation: "sendDocument",
+        taskBoundary: params.taskBoundary,
         runtime: params.runtime,
         thread: params.thread,
         requestParams: mediaParams,
@@ -464,6 +482,7 @@ async function deliverMediaReply(params: {
       await sendPendingFollowUpText({
         bot: params.bot,
         chatId: params.chatId,
+        taskBoundary: params.taskBoundary,
         runtime: params.runtime,
         thread: params.thread,
         chunkText: params.chunkText,
@@ -481,6 +500,7 @@ async function deliverMediaReply(params: {
 }
 
 async function maybePinFirstDeliveredMessage(params: {
+  taskBoundary?: TaskActionBoundary;
   shouldPin: boolean;
   bot: Bot;
   chatId: string;
@@ -489,6 +509,12 @@ async function maybePinFirstDeliveredMessage(params: {
 }): Promise<void> {
   if (!params.shouldPin || typeof params.firstDeliveredMessageId !== "number") {
     return;
+  }
+  if (params.taskBoundary) {
+    const refusal = checkTaskActionBoundary(params.taskBoundary);
+    if (refusal) {
+      throw new Error(refusal);
+    }
   }
   try {
     await params.bot.api.pinChatMessage(params.chatId, params.firstDeliveredMessageId, {
@@ -557,6 +583,7 @@ function emitMessageSentHooks(params: {
 }
 
 export async function deliverReplies(params: {
+  taskBoundary?: TaskActionBoundary;
   replies: ReplyPayload[];
   chatId: string;
   accountId?: string;
@@ -649,6 +676,7 @@ export async function deliverReplies(params: {
         firstDeliveredMessageId = await deliverTextReply({
           bot: params.bot,
           chatId: params.chatId,
+          taskBoundary: params.taskBoundary,
           runtime: params.runtime,
           thread: params.thread,
           chunkText,
@@ -666,6 +694,7 @@ export async function deliverReplies(params: {
           mediaList,
           bot: params.bot,
           chatId: params.chatId,
+          taskBoundary: params.taskBoundary,
           runtime: params.runtime,
           thread: params.thread,
           tableMode: params.tableMode,
@@ -684,6 +713,7 @@ export async function deliverReplies(params: {
         shouldPin: shouldPinFirstMessage,
         bot: params.bot,
         chatId: params.chatId,
+        taskBoundary: params.taskBoundary,
         runtime: params.runtime,
         firstDeliveredMessageId,
       });

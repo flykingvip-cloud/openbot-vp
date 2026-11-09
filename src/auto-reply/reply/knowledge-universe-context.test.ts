@@ -140,7 +140,8 @@ describe("knowledge universe auto-reply context", () => {
     expect(prompt).toContain("Do not call external CRM/ERP/Connector APIs directly");
     expect(prompt).toContain("knowledge_search");
     expect(prompt).toContain("knowledge_get");
-    expect(prompt).toMatch(/客户画像|客户画像能力/);
+    expect(prompt).toContain("华东客户A 画像");
+    expect(prompt).toContain("customer.profile");
     expect(prompt).toContain("enterprise");
   });
 
@@ -168,7 +169,8 @@ describe("knowledge universe auto-reply context", () => {
     });
 
     expect(prompt).toBeTruthy();
-    expect(prompt).toMatch(/客户画像|客户画像能力/);
+    expect(prompt).toContain("华东客户A 画像");
+    expect(prompt).toContain("customer.profile");
     expect(prompt).toContain("enterprise");
   });
 });

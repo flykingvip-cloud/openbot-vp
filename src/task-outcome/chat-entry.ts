@@ -339,8 +339,9 @@ export function resolveTurnTaskContract(params: {
       version: params.contractVersion?.trim() || "1.0.0",
       kind: params.kind,
       // Execution/code/document/external_action with empty validators stay that kind
-      // (acceptance remains pending — never auto-downgrade to chat_turn waiver).
+      // Without trusted verification acceptance remains pending; never waive it.
       requiredValidators: validators,
+      ...(params.acceptanceVerified ? { acceptanceVerified: true } : {}),
     };
   }
   const id = params.contractId?.trim() || "";

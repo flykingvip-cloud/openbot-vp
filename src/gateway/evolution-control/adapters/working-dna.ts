@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   type ApplyEvolutionInput,
   type EvolutionAdapter,
@@ -20,7 +21,8 @@ import {
 import {
   readRobotWorkingStyleOrDefault,
   resolveRobotWorkingStyleChangePath,
-  updateRobotWorkingStyle,
+  compareAndSwapRobotWorkingStyle,
+  workingStyleVersion,
   type WorkingStyleChangeRecord,
 } from "../../agent-growth/working-style-store.js";
 import {
@@ -119,10 +121,7 @@ export type WorkingDnaCandidate = {
   candidateVersion: string;
 };
 
-function styleVersion(style: WorkingStyle): string {
-  return `style:${style.outputFormat}:${style.reportingCadence}:${style.decisionPreference}:${style.riskPreference}:${style.communicationTone}`;
-}
-
+const styleVersion = workingStyleVersion;
 function isAgentTarget(target: EvolutionTarget): target is { domain: "agent"; agentId: string } {
   return target.domain === "agent";
 }
@@ -130,7 +129,14 @@ function isAgentTarget(target: EvolutionTarget): target is { domain: "agent"; ag
 export function createWorkingDnaAdapter(
   cfg: OpenBotConfig,
   options?: { persistDir?: string; observationPort?: WorkingDnaObservationPort },
-): EvolutionAdapter<WorkingDnaCandidate> {
+): EvolutionAdapter<WorkingDnaCandidate> & {
+  withExpectedVersion<T>(
+    commandId: string,
+    expectedVersion: string,
+    execute: () => Promise<T>,
+  ): Promise<T>;
+} {
+  const expectedWrite = new AsyncLocalStorage<{ commandId: string; version: string }>();
   const observationPort = options?.observationPort ?? createFileWorkingDnaObservationPort(cfg);
   const loaded = loadAdapterSnapshots(options?.persistDir, "working-dna", {
     snapshots: {} as Record<string, WorkingStyle>,
@@ -150,6 +156,16 @@ export function createWorkingDnaAdapter(
   return {
     adapterId: "working-dna",
     domain: "agent",
+    withExpectedVersion<T>(
+      commandId: string,
+      expectedVersion: string,
+      execute: () => Promise<T>,
+    ): Promise<T> {
+      if (!commandId.trim() || !expectedVersion.trim()) {
+        throw new Error("invalid_expected_version");
+      }
+      return expectedWrite.run({ commandId, version: expectedVersion }, execute);
+    },
 
     async inspect(target): Promise<TargetSnapshot> {
       if (!isAgentTarget(target)) {
@@ -204,8 +220,15 @@ export function createWorkingDnaAdapter(
     },
 
     async apply(input: ApplyEvolutionInput<WorkingDnaCandidate>): Promise<EvolutionApplication> {
+      const expected = expectedWrite.getStore();
+      if (expected && expected.commandId !== input.idempotencyKey) {
+        throw new Error("expected_version_command_mismatch");
+      }
       const existing = applied.get(input.idempotencyKey);
       if (existing) {
+        if (expected && existing.targetVersionBefore !== expected.version) {
+          throw new Error("version_conflict");
+        }
         return existing;
       }
       const validation = await this.validate(input.candidate, input.context);
@@ -215,6 +238,14 @@ export function createWorkingDnaAdapter(
       const agentId = input.candidate.agentId;
       const current = await readRobotWorkingStyleOrDefault(cfg, agentId);
       const beforeVersion = styleVersion(current);
+      if (expected && beforeVersion !== expected.version) {
+        throw new Error("version_conflict");
+      }
+      const frozen = { ...DEFAULT_WORKING_STYLE, ...input.candidate.baselineStyle };
+      const candidateVersion = styleVersion(applyWorkingStyleDelta(frozen, input.candidate.delta));
+      if (beforeVersion !== styleVersion(frozen) && beforeVersion !== candidateVersion) {
+        throw new Error("baseline_drift");
+      }
       if (input.scope === "shadow") {
         const shadow: EvolutionApplication = {
           schemaVersion: 1,
@@ -242,7 +273,15 @@ export function createWorkingDnaAdapter(
           Object.assign(previousValues, { [key]: current[key] });
         }
       }
-      await updateRobotWorkingStyle(cfg, agentId, () => nextStyle);
+      const swapped = await compareAndSwapRobotWorkingStyle(
+        cfg,
+        agentId,
+        expected?.version ?? beforeVersion,
+        (locked) => applyWorkingStyleDelta(locked, input.candidate.delta),
+      );
+      if (!swapped.ok) {
+        throw new Error("version_conflict");
+      }
       const change: WorkingStyleChangeRecord = {
         changedAtMs: Date.now(),
         baselineOperationalScore: null,
@@ -251,7 +290,7 @@ export function createWorkingDnaAdapter(
         assessedAtMs: null,
       };
       await writeJsonAtomic(resolveRobotWorkingStyleChangePath(cfg, agentId), change);
-      const after = await readRobotWorkingStyleOrDefault(cfg, agentId);
+      const after = swapped.after;
       const application: EvolutionApplication = {
         schemaVersion: 1,
         applicationId: `app:${input.idempotencyKey}`,
@@ -380,7 +419,20 @@ export function createWorkingDnaAdapter(
           reason: "rollback snapshot missing",
         };
       }
-      await updateRobotWorkingStyle(cfg, agentId, () => snapshot);
+      const swapped = await compareAndSwapRobotWorkingStyle(
+        cfg,
+        agentId,
+        application.targetVersionAfter,
+        () => snapshot,
+      );
+      if (!swapped.ok) {
+        return {
+          applicationId: application.applicationId,
+          status: "failed",
+          restoredVersion: swapped.actualVersion,
+          reason: "version_conflict",
+        };
+      }
       const rolled: EvolutionApplication = { ...application, status: "rolled_back" };
       applied.set(application.idempotencyKey, rolled);
       persist();

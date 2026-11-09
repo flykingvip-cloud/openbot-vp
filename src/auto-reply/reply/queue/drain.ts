@@ -21,6 +21,22 @@ export function clearFollowupDrainCallback(key: string): void {
   FOLLOWUP_RUN_CALLBACKS.delete(key);
 }
 
+/**
+ * Cold-start / recovery: register the existing followup consumer before enqueue
+ * so kickFollowupDrainIfIdle can drain recovery work without waiting for a live turn.
+ * Does not start a drain by itself.
+ */
+export function registerFollowupDrainCallback(
+  key: string,
+  runFollowup: (run: FollowupRun) => Promise<void>,
+): void {
+  FOLLOWUP_RUN_CALLBACKS.set(key, runFollowup);
+}
+
+export function hasFollowupDrainCallback(key: string): boolean {
+  return FOLLOWUP_RUN_CALLBACKS.has(key);
+}
+
 /** Restart the drain for `key` if it is currently idle, using the stored callback. */
 export function kickFollowupDrainIfIdle(key: string): void {
   const cb = FOLLOWUP_RUN_CALLBACKS.get(key);

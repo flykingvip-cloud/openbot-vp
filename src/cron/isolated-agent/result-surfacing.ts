@@ -21,10 +21,7 @@ import {
   resolveStorePath,
 } from "../../config/sessions.js";
 import type { OpenBotConfig } from "../../config/types.js";
-import {
-  commitAutomaticPark,
-  enrichFocusSnapshotWithBoard,
-} from "../../conversation-task/session-task-board.js";
+import { enrichFocusSnapshotWithBoard } from "../../conversation-task/session-task-board.js";
 import { callGateway } from "../../gateway/call.js";
 import { ensureHookSurfaceTranscript } from "../../gateway/hook-surface-session.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
@@ -231,24 +228,12 @@ export async function surfaceCronJobResult(params: {
       if (shouldInjectCronResultIntoMainSession(decision)) {
         cronResultKind = "result";
       } else if (shouldNotifyCronWakeOnMainSession(decision)) {
-        if (decision.action === "park") {
-          commitAutomaticPark({
-            sessionFile,
-            incomingTaskId: decision.taskId,
-            nowMs: params.nowMs ?? Date.now(),
-          });
-        }
+        // Result presentation cannot admit work or evict a personal parked task.
         message = formatCronParkedNoticeMessage({
           jobName: params.job.name,
           jobId: params.job.id,
+          presentationOnly: true,
           reason: "park",
-          ...(decision.action === "park"
-            ? {
-                droppedTaskId: decision.droppedTaskId,
-                droppedTitle: decision.droppedTitle,
-                droppedPaths: decision.droppedPaths,
-              }
-            : {}),
         });
         cronResultKind = "parked_notice";
       } else {

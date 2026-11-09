@@ -1,3 +1,4 @@
+import type { TaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { SeatPolicyControls } from "../gateway/seat-rules/priority-compiler.js";
 import type { ExecAsk, ExecHost, ExecSecurity } from "../infra/exec-approvals.js";
 import type { SafeBinProfileFixture } from "../infra/exec-safe-bin-policy.js";
@@ -5,6 +6,7 @@ import type { LocalExecPermissionDecision } from "../infra/local-exec-permission
 import type { BashSandboxConfig } from "./bash-tools.shared.js";
 
 export type ExecToolDefaults = {
+  taskBoundary?: TaskActionBoundary;
   host?: ExecHost;
   security?: ExecSecurity;
   ask?: ExecAsk;
@@ -50,6 +52,15 @@ export type ExecToolDefaults = {
   accountId?: string;
   notifyOnExit?: boolean;
   notifyOnExitEmptySuccess?: boolean;
+  /** Trusted host identity for async-wait recovery followup (Package2). */
+  trustedIdentity?: {
+    user?: string;
+    platformUserId?: string;
+    sessionDomain?: "platform" | "enterprise" | "employee";
+    enterpriseId?: string;
+    membershipId?: string;
+    seatId?: string;
+  };
   cwd?: string;
   /**
    * When true (tools.fs.workspaceOnly / forceWorkspaceOnly), host exec

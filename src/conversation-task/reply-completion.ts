@@ -29,7 +29,7 @@ import {
   isConversationTaskCloseRequiresEvidence,
 } from "./ledger-binding.js";
 import { defaultShadowStoreRoot } from "./runtime-bootstrap.js";
-import { recordCheckedTaskCompletion } from "./session-task-board.js";
+import { recordCheckedTaskCompletion, type TaskCompletionBinding } from "./session-task-board.js";
 import { openTaskStore, type StoredConversationTask } from "./store.js";
 
 export type { ConversationTaskDeliveryCloseConsultRecord };
@@ -45,6 +45,7 @@ export type ConversationTaskReplyCompletionInput = {
   cronStorePath?: string;
   /** Session transcript. Completion notice is written here only after a real close. */
   sessionFile?: string | null;
+  completionBinding?: TaskCompletionBinding;
 };
 
 /**
@@ -222,6 +223,7 @@ export function observeConversationTaskReplyCompleted(
     const sourceMessageId =
       typeof input.sourceMessageId === "string" ? input.sourceMessageId.trim() : "";
 
+    const completionBinding = input.completionBinding;
     return (async () => {
       const store = openTaskStore({
         tenantId,
@@ -280,10 +282,18 @@ export function observeConversationTaskReplyCompleted(
           if (!ledgerOutcome.closedNow) {
             return undefined;
           }
-          return recordCheckedTaskCompletion({ sessionFile, closed: true }).notice;
+          return recordCheckedTaskCompletion({
+            sessionFile,
+            closed: true,
+            binding: completionBinding,
+          }).notice;
         }
         store.transitionTask(task.id, "closed");
-        return recordCheckedTaskCompletion({ sessionFile, closed: true }).notice;
+        return recordCheckedTaskCompletion({
+          sessionFile,
+          closed: true,
+          binding: completionBinding,
+        }).notice;
       } catch {
         // Ledger close must never surface on the reply path.
       } finally {

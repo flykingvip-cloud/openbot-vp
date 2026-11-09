@@ -1,10 +1,10 @@
 import "./run.overflow-compaction.mocks.shared.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runEmbeddedPiAgent } from "../../agent-runtime/execution/runner/embedded-run.js";
 import type { ConstitutionalRuntimeShadowDeps } from "../execution-preflight/constitutional-runtime-shadow-deps.js";
 import { NOOP_CONSTITUTIONAL_RUNTIME_SHADOW_SINK } from "../execution-preflight/constitutional-runtime-shadow-sink.js";
 import { pickFallbackThinkingLevel } from "../pi-embedded-helpers.js";
 import { ensureRuntimePluginsLoaded } from "../runtime-plugins.js";
-import { runEmbeddedPiAgent } from "./run.js";
 import {
   makeAttemptResult,
   makeCompactionSuccess,

@@ -1,3 +1,4 @@
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
 import type { OpenBotConfig } from "../../config/types.openbot.js";
 import type { GroupToolPolicyConfig } from "../../config/types.tools.js";
@@ -87,6 +88,7 @@ export type ChannelGroupAdapter = {
 };
 
 export type ChannelOutboundContext = {
+  taskBoundary?: TaskActionBoundary;
   cfg: OpenBotConfig;
   to: string;
   text: string;

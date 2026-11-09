@@ -16,20 +16,20 @@ const CURRENT = "生成今日竞品价格检查结果，并验收至少一个竞
 
 describe("turn relation", () => {
   it("classifies language, correction, and continuation as non-cutting", () => {
-    expect(classifyTurnRelation("请用中文回复", CURRENT)).toBe("aside");
+    expect(classifyTurnRelation("请用中文回复", CURRENT)).toBe("conversation");
     // Explicit unrelated marker wins over constraint-cue words inside the body.
     expect(
       classifyTurnRelation(
         "【插问】与任务无关：写一篇短文，主题是为何要区分旁路插问与任务约束",
         CURRENT,
       ),
-    ).toBe("aside");
+    ).toBe("conversation");
     expect(
       classifyTurnRelation(
         "【插问B】现在是什么星期几？只回答星期几，与当前任务无关，不要改任务。",
         CURRENT,
       ),
-    ).toBe("aside");
+    ).toBe("conversation");
     expect(classifyTurnRelation("不对，我说的是国内", CURRENT)).toBe("amend");
     expect(classifyTurnRelation("补充一节", CURRENT)).toBe("amend");
     expect(classifyTurnRelation("把标题改成市场稿", CURRENT)).toBe("amend");
@@ -57,9 +57,9 @@ describe("turn relation", () => {
     expect(isWeakNewWorkCueOnly("请先阅读一下")).toBe(true);
     expect(isWeakNewWorkCueOnly("调研")).toBe(true);
     expect(isWeakNewWorkCueOnly("请先把口径改一下")).toBe(true);
-    expect(classifyTurnRelation("请输出中文版", CURRENT)).toBe("aside");
-    expect(classifyTurnRelation("请先阅读一下", CURRENT)).toBe("aside");
-    expect(classifyTurnRelation("调研", CURRENT)).toBe("aside");
+    expect(classifyTurnRelation("请输出中文版", CURRENT)).toBe("conversation");
+    expect(classifyTurnRelation("请先阅读一下", CURRENT)).toBe("conversation");
+    expect(classifyTurnRelation("调研", CURRENT)).toBe("conversation");
     expect(classifyTurnRelation("请先把口径改一下", CURRENT)).toBe("amend");
     expect(isWeakNewWorkCueOnly("请使用 web-research 做一次调研")).toBe(false);
   });
@@ -135,7 +135,7 @@ describe("slice3 constraint persist gates", () => {
   it("classifyTurnRelation accepts context without scanning constraint history", () => {
     const poisoned = "继续|暂停|取消|新任务";
     expect(classifyTurnRelation("请用中文回复", CURRENT, { activeConstraints: [poisoned] })).toBe(
-      "aside",
+      "conversation",
     );
   });
 });
@@ -155,16 +155,38 @@ describe("slice2 mid-task routing amend cues", () => {
   it("recalling mid-task aside (插问/旁路) stays aside, not amend via 刚才", () => {
     expect(
       classifyTurnRelation("【追问B】刚才插问里你回答的星期几是什么？只回顾插问B的答案。", goal),
-    ).toBe("aside");
+    ).toBe("conversation");
     expect(
       classifyTurnRelation(
         "【A结束后追问】请根据旁路历史，复述刚才插问B的星期几答案；不要编造任务A细节。",
         goal,
       ),
-    ).toBe("aside");
+    ).toBe("conversation");
     // Real constraint with 约束 cue still amends.
     expect(classifyTurnRelation("【补充约束】最终输出必须包含 E2E_CONSTRAINT_OK", goal)).toBe(
       "amend",
     );
   });
+});
+
+describe("unified interaction semantics", () => {
+  it("does not let historical lane words override real task amendments", () => {
+    const goal = "调研国内手机市场并写报告";
+    for (const prompt of [
+      "【插问】报告增加欧洲市场",
+      "旁路历史：报告改为只用公开资料",
+      "【追问B】报告补充图表",
+    ]) {
+      expect(classifyTurnRelation(prompt, goal), prompt).toBe("amend");
+    }
+  });
+  it("recognizes ordinary history recall without requiring lane labels", () => {
+    for (const prompt of ["请复述上一条回答", "刚才回答的星期几是什么？", "请回顾之前的答案"]) {
+      expect(classifyTurnRelation(prompt, CURRENT), prompt).toBe("conversation");
+    }
+  });
+});
+
+it("keeps explicit new work containing recall language on the task path", () => {
+  expect(classifyTurnRelation("新任务：整理复述技巧并写一份报告", CURRENT)).toBe("new_work");
 });

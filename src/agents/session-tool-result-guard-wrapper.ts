@@ -27,6 +27,7 @@ export function guardSessionManager(
     allowedToolNames?: Iterable<string>;
     /** Drop user-role persistence (collaboration already wrote the shared user turn). */
     skipUserTranscriptPersist?: boolean;
+    refreshBeforeAppend?: boolean;
   },
 ): GuardedSessionManager {
   if (typeof (sessionManager as GuardedSessionManager).flushPendingToolResults === "function") {
@@ -73,6 +74,7 @@ export function guardSessionManager(
     : undefined;
 
   const guard = installSessionToolResultGuard(sessionManager, {
+    refreshBeforeAppend: opts?.refreshBeforeAppend,
     transformMessageForPersistence: (message) =>
       applyInputProvenanceToUserMessage(message, opts?.inputProvenance),
     transformToolResultForPersistence: transform,

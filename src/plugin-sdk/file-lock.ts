@@ -65,8 +65,9 @@ async function resolveNormalizedFilePath(filePath: string): Promise<string> {
 
 async function isStaleLock(lockPath: string, staleMs: number): Promise<boolean> {
   const payload = await readLockPayload(lockPath);
-  if (payload?.pid && !isPidAlive(payload.pid)) {
-    return true;
+  if (payload?.pid) {
+    // Elapsed time alone cannot revoke a live process holding the critical section.
+    return !isPidAlive(payload.pid);
   }
   if (payload?.createdAt) {
     const createdAt = Date.parse(payload.createdAt);
@@ -78,7 +79,8 @@ async function isStaleLock(lockPath: string, staleMs: number): Promise<boolean> 
     const stat = await fs.stat(lockPath);
     return Date.now() - stat.mtimeMs > staleMs;
   } catch {
-    return true;
+    // Losing the inspection snapshot does not authorize deleting a replacement lock.
+    return false;
   }
 }
 
@@ -202,8 +204,8 @@ function readLockPayloadSync(lockPath: string): LockFilePayload | null {
 
 function isStaleLockSync(lockPath: string, staleMs: number): boolean {
   const payload = readLockPayloadSync(lockPath);
-  if (payload?.pid && !isPidAlive(payload.pid)) {
-    return true;
+  if (payload?.pid) {
+    return !isPidAlive(payload.pid);
   }
   if (payload?.createdAt) {
     const createdAt = Date.parse(payload.createdAt);
@@ -215,7 +217,8 @@ function isStaleLockSync(lockPath: string, staleMs: number): boolean {
     const stat = fsSync.statSync(lockPath);
     return Date.now() - stat.mtimeMs > staleMs;
   } catch {
-    return true;
+    // Losing the inspection snapshot does not authorize deleting a replacement lock.
+    return false;
   }
 }
 

@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { commitAutomaticPark } from "../../conversation-task/session-task-board.js";
 import type { CronJob } from "../types.js";
+vi.mock("../../conversation-task/session-task-board.js", async (original) => ({
+  ...(await original<typeof import("../../conversation-task/session-task-board.js")>()),
+  commitAutomaticPark: vi.fn(),
+}));
 import {
   formatCronResultSurfaceMessage,
   resolveCronSurfaceSessionKey,
@@ -125,6 +130,7 @@ describe("surfaceCronJobResult", () => {
 
   it("injects a parked notice, not the full result, when FOCUS is occupied (EA-B4)", async () => {
     vi.mocked(callGateway).mockClear();
+    vi.mocked(commitAutomaticPark).mockClear();
     const nowMs = Date.now();
     const surfaced = await surfaceCronJobResult({
       cfg: { session: { mainKey: "main" } },
@@ -151,6 +157,9 @@ describe("surfaceCronJobResult", () => {
       params?: { message?: string };
     };
     expect(injected?.params?.message).not.toContain("## 任务成果");
+    expect(commitAutomaticPark).not.toHaveBeenCalled();
+    expect(injected?.params?.message).not.toContain("结果已挂起");
+    expect(injected?.params?.message).toContain("未新增或调整个人待办");
   });
 
   // Regression: the inject runs over a loopback CLI/operator socket that carries no

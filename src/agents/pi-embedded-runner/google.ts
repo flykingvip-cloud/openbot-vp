@@ -1,11 +1,11 @@
 import { EventEmitter } from "node:events";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
-import type { OpenBotConfig } from "../../config/config.js";
 import {
   omitParkedPriorTurns,
   omitTaskStatusSeparators,
-} from "../../conversation-task/focus-switch.js";
+} from "../../agent-runtime/context/index.js";
+import type { OpenBotConfig } from "../../config/config.js";
 import { omitCronResultSurfaces } from "../../cron/cron-result-surface.js";
 import { omitHeartbeatParkedNotices } from "../../infra/heartbeat-parked-notice.js";
 import { registerUnhandledRejectionHandler } from "../../infra/unhandled-rejections.js";

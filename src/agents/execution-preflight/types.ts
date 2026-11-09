@@ -60,15 +60,7 @@ export type FailureClass =
   | "validation_failed"
   | "permanent_failure";
 
-export type ValidationReceipt = {
-  taskId: string;
-  artifactPath: string;
-  artifactHash: string;
-  validatorId: string;
-  validatorVersion: string;
-  timestamp: string;
-  result: "passed" | "failed";
-};
+export type { ValidationReceipt } from "../../agent-runtime/contracts/quality.js";
 
 export type ExecutionTraceRecord = {
   taskId: string;

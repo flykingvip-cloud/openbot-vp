@@ -8,10 +8,12 @@
  */
 import {
   applyIncomingUserMessage,
+  activeConstraintTexts,
   commitSameTaskConstraint,
   mutateSessionTaskBoard,
   readSessionTaskBoard,
   recordCheckedTaskCompletion,
+  captureTaskCompletionBinding,
   writeSessionTaskBoard,
   type SessionTaskBoard,
 } from "./session-task-board.js";
@@ -73,7 +75,11 @@ if (mode === "complete") {
   let fail = 0;
   for (let i = 0; i < rounds; i += 1) {
     try {
-      const result = recordCheckedTaskCompletion({ sessionFile, closed: true });
+      const result = recordCheckedTaskCompletion({
+        sessionFile,
+        closed: true,
+        binding: captureTaskCompletionBinding(sessionFile),
+      });
       if (result.persisted) {
         ok += 1;
         break;
@@ -132,14 +138,8 @@ if (mode === "cancel" || mode === "pause") {
       wakeSuppress: board.current?.wakeSuppress ?? null,
       tombstoneIds: (board.tombstones ?? []).map((row) => row.taskId),
       writeEpoch: board.writeEpoch ?? 0,
-      activeConstraints: (board.current?.effectiveConstraints ?? [])
-        .filter((row) => !row.superseded)
-        .map((row) => row.text),
-      parkedConstraints: board.parked.flatMap((row) =>
-        (row.effectiveConstraints ?? [])
-          .filter((entry) => !entry.superseded)
-          .map((entry) => entry.text),
-      ),
+      activeConstraints: activeConstraintTexts(board.current),
+      parkedConstraints: board.parked.flatMap((row) => activeConstraintTexts(row)),
     }),
   );
   process.exit(0);
@@ -168,14 +168,8 @@ if (mode === "switch") {
       currentTaskId: board.current?.taskId ?? null,
       parkedIds: board.parked.map((row) => row.taskId),
       writeEpoch: board.writeEpoch ?? 0,
-      parkedConstraintTexts: board.parked.flatMap((row) =>
-        (row.effectiveConstraints ?? [])
-          .filter((entry) => !entry.superseded)
-          .map((entry) => entry.text),
-      ),
-      currentConstraintTexts: (board.current?.effectiveConstraints ?? [])
-        .filter((row) => !row.superseded)
-        .map((row) => row.text),
+      parkedConstraintTexts: board.parked.flatMap((row) => activeConstraintTexts(row)),
+      currentConstraintTexts: activeConstraintTexts(board.current),
     }),
   );
   process.exit(0);

@@ -1,5 +1,8 @@
-import path from "node:path";
-import { resolveAgentDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { randomUUID } from "node:crypto";
+import { isHumanInteractionIngress } from "../../agent-runtime/command/index.js";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
+import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
+import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import {
   loadSessionStore,
@@ -7,9 +10,9 @@ import {
   resolveStorePath,
   type SessionEntry,
 } from "../../config/sessions.js";
-import { observeInboundTurnActivation } from "../../conversation-task/gateway-activation-hook.js";
 import { observeInboundTurnShadow } from "../../conversation-task/gateway-shadow-hook.js";
 import { observeConversationTaskReplyCompleted } from "../../conversation-task/reply-completion.js";
+import { captureTaskCompletionBinding } from "../../conversation-task/session-task-board.js";
 import { resolveCronStorePath } from "../../cron/store.js";
 import { shouldSuppressLocalDiscordExecApprovalPrompt } from "../../discord/exec-approvals.js";
 import { resolveKnowledgeSourceContext } from "../../gateway/knowledge/context.js";
@@ -36,22 +39,11 @@ import {
 } from "../../logging/diagnostic.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
-import {
-  observeOrchestrationConsider,
-  observeWebReadShadowFromChat,
-} from "../../task-orchestration/gateway-hook.js";
+import { observeWebReadShadowFromChat } from "../../task-orchestration/gateway-hook.js";
 import {
   resolveRequiredDeliveryConfirmStatus,
   type RequiredDeliveryAttempt,
 } from "../../task-outcome/delivery-confirm.js";
-import {
-  peekAwaitingDelivery,
-  resolveAndTakeAwaitingDelivery,
-} from "../../task-outcome/pending-delivery.js";
-import {
-  confirmRunnerTurnDelivery,
-  TASK_OUTCOME_STORE_DIRNAME,
-} from "../../task-outcome/runtime-from-runner.js";
 import { maybeApplyTtsToPayload, normalizeTtsAutoMode, resolveTtsConfig } from "../../tts/tts.js";
 import { INTERNAL_MESSAGE_CHANNEL, normalizeMessageChannel } from "../../utils/message-channel.js";
 import { getReplyFromConfig } from "../reply.js";
@@ -67,81 +59,7 @@ import { resolveRunTypingPolicy } from "./typing-policy.js";
 
 const AUDIO_PLACEHOLDER_RE = /^<media:audio>(\s*\([^)]*\))?$/i;
 
-/** Production delivery confirm — exported so tests use this path, not a copy. */
-export async function confirmPendingTurnDelivery(params: {
-  cfg: OpenBotConfig;
-  runId?: string;
-  /** Stable ids from prepare — required when runId is omitted. */
-  deliveryId?: string;
-  taskId?: string;
-  /** Session key used to resolve agentDir when runId is missing after restart. */
-  sessionKey?: string;
-  /** Aggregated required-delivery status (AND). enqueue_only alone → delivery_unknown. */
-  status: "delivered" | "failed" | "delivery_unknown";
-  error?: string;
-}): Promise<void> {
-  const runId = params.runId?.trim() || undefined;
-  const deliveryId = params.deliveryId?.trim() || undefined;
-  const taskId = params.taskId?.trim() || undefined;
-  const sessionKey = params.sessionKey?.trim() || undefined;
-  let persistRoot: string | undefined;
-  if (sessionKey) {
-    const agentId = resolveSessionAgentId({ sessionKey, config: params.cfg });
-    persistRoot = path.join(resolveAgentDir(params.cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
-  }
-
-  // R85e: persistRoot alone cannot locate a record — need runId / deliveryId / taskId.
-  // askOutcome P1: observe missing locators; never guess session pending or clear.
-  if (!runId && !deliveryId && !taskId) {
-    logVerbose(
-      [
-        "event=confirm_skipped_no_locator_ids",
-        "source=confirmPendingTurnDelivery",
-        `hasRunId=0`,
-        `hasDeliveryId=0`,
-        `hasTaskId=0`,
-        `hasSessionKey=${sessionKey ? 1 : 0}`,
-        `persistScopeResolvable=${persistRoot ? 1 : 0}`,
-        `status=${params.status}`,
-      ].join(" "),
-    );
-    return;
-  }
-
-  const lookup = {
-    ...(runId ? { runId } : {}),
-    ...(deliveryId ? { deliveryId } : {}),
-    ...(taskId ? { taskId } : {}),
-    ...(persistRoot ? { persistRoot } : {}),
-  };
-  const pending = peekAwaitingDelivery(lookup);
-  if (!pending) {
-    return;
-  }
-  try {
-    await confirmRunnerTurnDelivery(params.cfg, pending.agentId, {
-      taskId: pending.taskId,
-      deliveryId: pending.deliveryId,
-      status: params.status,
-      ...(params.error ? { failureDetail: params.error } : {}),
-    });
-    // R85e: unknown is not terminal — keep durable association for later verify.
-    // Only clear after delivered / failed (or explicit abandon elsewhere).
-    if (params.status === "delivered" || params.status === "failed") {
-      resolveAndTakeAwaitingDelivery({
-        runId: pending.runId,
-        deliveryId: pending.deliveryId,
-        taskId: pending.taskId,
-        ...(persistRoot ? { persistRoot } : {}),
-      });
-    }
-  } catch (err) {
-    logVerbose(
-      `dispatch-from-config: delivery confirm failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-}
-
+export { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 const AUDIO_HEADER_RE = /^\[Audio\b/i;
 const normalizeMediaType = (value: string): string => value.split(";")[0]?.trim().toLowerCase();
 
@@ -216,6 +134,22 @@ export async function dispatchReplyFromConfig(params: {
   replyResolver?: typeof getReplyFromConfig;
 }): Promise<DispatchFromConfigResult> {
   const { ctx, cfg, dispatcher } = params;
+  const humanInteraction = isHumanInteractionIngress({
+    provenanceKind: ctx.InputProvenance?.kind,
+    heartbeat: params.replyOptions?.isHeartbeat,
+    birthTurn: params.replyOptions?.growthBirthTurn,
+    collaborationRound: ctx.CollaborationRoundInvoked,
+  });
+  const interactionIngress =
+    params.replyOptions?.interactionIngress ??
+    (humanInteraction
+      ? {
+          userMessageId: String(
+            ctx.MessageSidFull ?? ctx.MessageSid ?? params.replyOptions?.runId ?? randomUUID(),
+          ),
+          persistOwnTranscript: true,
+        }
+      : undefined);
   const gatewayClient = buildKnowledgeReplyGatewayClient({
     gatewayClientUser: ctx.GatewayClientUser,
     gatewayClientSessionDomain: ctx.GatewayClientSessionDomain,
@@ -339,34 +273,7 @@ export async function dispatchReplyFromConfig(params: {
     text: ctx.BodyForCommands ?? ctx.Body ?? "",
   });
 
-  // ConversationTask Runtime — Activation (env-gated, default-dormant). Same
-  // identity fields as shadow. Uninitialized / flag-off is a no-op and never
-  // throws into this path. Does not open orchestration live invoke.
-  observeInboundTurnActivation({
-    tenantId: sourceContext.tenantId,
-    requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
-    conversationId: sessionKey ?? null,
-    employeeScopeAllowed: sourceContext.hasEnterpriseScope,
-    messageId: messageId ?? "",
-    text:
-      [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
-        (value): value is string => typeof value === "string" && value.trim() !== "",
-      ) ?? "",
-  });
-
-  // Orchestration Plane — dormant choke-point (P4.5b). Same contract as shadow:
-  // synchronous, never throws, never awaits tools, flag OFF / empty allowlist = no-op.
-  observeOrchestrationConsider({
-    tenantId: sourceContext.tenantId,
-    requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
-    conversationId: sessionKey ?? null,
-    messageId: messageId ?? "",
-    text:
-      [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
-        (value): value is string => typeof value === "string" && value.trim() !== "",
-      ) ?? "",
-  });
-
+  // Accepted execution requests replace automatic activation and parallel dispatch.
   // Phase B B2 — web_read shadow (ORCH_SHADOW && WEB_READ_SHADOW). Utterance
   // selected here; Profile resolved only inside the adapter. Never mutates reply.
   observeWebReadShadowFromChat({
@@ -582,10 +489,35 @@ export async function dispatchReplyFromConfig(params: {
       systemEvent: shouldRouteToOriginating,
     });
 
+    let completionBinding =
+      interactionIngress && !params.replyOptions?.resumedTaskBinding
+        ? undefined
+        : captureTaskCompletionBinding(
+            sessionStoreEntry.entry?.sessionFile,
+            [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
+              (value): value is string => typeof value === "string" && value.trim() !== "",
+            ) ?? "",
+          );
+    let executionDeliveryBoundary: TaskActionBoundary | undefined;
+    const taskDeliveryContext = () =>
+      executionDeliveryBoundary ? { taskBoundary: executionDeliveryBoundary } : undefined;
     const replyResult = await (params.replyResolver ?? getReplyFromConfig)(
       ctx,
       {
         ...params.replyOptions,
+        ...(interactionIngress ? { interactionIngress } : {}),
+        onTaskExecutionBound: (binding, context) => {
+          completionBinding = binding;
+          const sessionFile = context?.sessionFile ?? sessionStoreEntry.entry?.sessionFile;
+          executionDeliveryBoundary = sessionFile
+            ? {
+                sessionFile,
+                binding: { ...binding },
+                constraints: [...(binding.constraints ?? [])],
+              }
+            : undefined;
+          params.replyOptions?.onTaskExecutionBound?.(binding, context);
+        },
         pendingTurnDeliveryRef,
         typingPolicy: typing.typingPolicy,
         suppressTyping: typing.suppressTyping,
@@ -609,7 +541,10 @@ export async function dispatchReplyFromConfig(params: {
             if (shouldRouteToOriginating) {
               await sendPayloadAsync(deliveryPayload, undefined, false);
             } else {
-              dispatcher.sendToolResult(deliveryPayload);
+              dispatcher.sendToolResult(
+                deliveryPayload,
+                ...(taskDeliveryContext() ? [taskDeliveryContext()] : []),
+              );
             }
           };
           return run();
@@ -639,7 +574,10 @@ export async function dispatchReplyFromConfig(params: {
               ttsAuto: sessionTtsAuto,
             });
             if (!shouldRouteToOriginating) {
-              dispatcher.sendBlockReply(ttsPayload);
+              dispatcher.sendBlockReply(
+                ttsPayload,
+                ...(taskDeliveryContext() ? [taskDeliveryContext()] : []),
+              );
             }
           };
           return run();
@@ -674,6 +612,7 @@ export async function dispatchReplyFromConfig(params: {
       }
     }
 
+    const deliveryTaskBoundary = executionDeliveryBoundary;
     const replies = replyResult ? (Array.isArray(replyResult) ? replyResult : [replyResult]) : [];
 
     let queuedFinal = false;
@@ -702,6 +641,7 @@ export async function dispatchReplyFromConfig(params: {
           to: originatingTo,
           sessionKey: ctx.SessionKey,
           taskId: params.replyOptions?.runId,
+          taskBoundary: deliveryTaskBoundary,
           accountId: ctx.AccountId,
           threadId: ctx.MessageThreadId,
           cfg: effectiveCfg,
@@ -730,7 +670,10 @@ export async function dispatchReplyFromConfig(params: {
         }
       } else {
         // Dispatcher enqueue is NOT a send receipt.
-        const didQueue = dispatcher.sendFinalReply(ttsReply);
+        const didQueue = dispatcher.sendFinalReply(
+          ttsReply,
+          ...(taskDeliveryContext() ? [taskDeliveryContext()] : []),
+        );
         requiredDeliveryAttempts.push({
           source: "enqueue_only",
           ok: didQueue,
@@ -761,6 +704,7 @@ export async function dispatchReplyFromConfig(params: {
             to: originatingTo,
             sessionKey: ctx.SessionKey,
             taskId: params.replyOptions?.runId,
+            taskBoundary: deliveryTaskBoundary,
             accountId: ctx.AccountId,
             threadId: ctx.MessageThreadId,
             cfg: effectiveCfg,
@@ -899,28 +843,32 @@ export async function dispatchReplyFromConfig(params: {
       .map((reply) => (typeof reply.text === "string" ? reply.text.trim() : ""))
       .filter(Boolean)
       .join("\n\n");
-    void observeConversationTaskReplyCompleted({
-      tenantId: sourceContext.tenantId,
-      requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
-      conversationId: sessionKey ?? null,
-      sourceMessageId: messageId ?? "",
-      text:
-        [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
-          (value): value is string => typeof value === "string" && value.trim() !== "",
-        ) ?? "",
-      assistantReplyText: assistantReplyText || accumulatedBlockText.trim() || undefined,
-      cronStorePath: resolveCronStorePath(effectiveCfg.cron?.store),
-      sessionFile: sessionStoreEntry.entry?.sessionFile,
-    }).then((notice) => {
-      if (!notice) {
-        return;
-      }
-      try {
-        dispatcher.sendFinalReply({ text: notice });
-      } catch {
-        // Completion notice must not fail the already-finished reply.
-      }
-    });
+    // A queued or failed final must not close the conversation task.
+    if (resolveRequiredDeliveryConfirmStatus(requiredDeliveryAttempts) === "delivered") {
+      void observeConversationTaskReplyCompleted({
+        tenantId: sourceContext.tenantId,
+        requesterId: ctx.GatewayClientPlatformUserId ?? sourceContext.userId ?? null,
+        conversationId: sessionKey ?? null,
+        sourceMessageId: messageId ?? "",
+        text:
+          [ctx.BodyForCommands, ctx.CommandBody, ctx.RawBody, ctx.Body].find(
+            (value): value is string => typeof value === "string" && value.trim() !== "",
+          ) ?? "",
+        assistantReplyText: assistantReplyText || accumulatedBlockText.trim() || undefined,
+        cronStorePath: resolveCronStorePath(effectiveCfg.cron?.store),
+        sessionFile: sessionStoreEntry.entry?.sessionFile,
+        completionBinding,
+      }).then((notice) => {
+        if (!notice) {
+          return;
+        }
+        try {
+          dispatcher.sendFinalReply({ text: notice });
+        } catch {
+          // Completion notice must not fail the already-finished reply.
+        }
+      });
+    }
     recordProcessed("completed");
     markIdle("message_completed");
     return { queuedFinal, counts };

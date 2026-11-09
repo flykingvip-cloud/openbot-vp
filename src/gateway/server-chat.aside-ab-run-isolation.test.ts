@@ -4,13 +4,6 @@
  * (evt.runId); aside reply_lane uses a distinct sessionId + clientRunId.
  */
 import { describe, expect, it } from "vitest";
-import {
-  abortMidTaskAsideLanes,
-  isMidTaskAsideLaneCancelled,
-  listMidTaskAsideLanesForTests,
-  registerMidTaskAsideLane,
-  unregisterMidTaskAsideLane,
-} from "../auto-reply/reply/mid-task-aside-reply-lane.js";
 import { createChatRunRegistry, createChatRunState } from "./server-chat.js";
 
 describe("slice2 A/B chatRun + aside cancel isolation", () => {
@@ -59,30 +52,5 @@ describe("slice2 A/B chatRun + aside cancel isolation", () => {
     expect(state.buffers.get("client-run-b")).toBe("B partial…");
     expect(state.deltaSentAt.get("client-run-b")).toBe(2);
     expect(state.buffers.has("client-run-a")).toBe(false);
-  });
-
-  it("owner cancel marks aside cancelled without dropping registration before B finally", () => {
-    const parent = "session-a-parent";
-    const aside = "aside-live-b";
-    registerMidTaskAsideLane(parent, aside);
-    expect(listMidTaskAsideLanesForTests(parent)).toEqual([aside]);
-
-    abortMidTaskAsideLanes(parent);
-    expect(isMidTaskAsideLaneCancelled(parent, aside)).toBe(true);
-    // Still registered so late prepare/run observes cancel (no drop-then-late-start)
-    expect(listMidTaskAsideLanesForTests(parent)).toEqual([aside]);
-
-    unregisterMidTaskAsideLane(parent, aside);
-    expect(listMidTaskAsideLanesForTests(parent)).toEqual([]);
-  });
-
-  it("B unregister does not clear a sibling aside on the same parent", () => {
-    const parent = "session-a-multi";
-    registerMidTaskAsideLane(parent, "aside-1");
-    registerMidTaskAsideLane(parent, "aside-2");
-    unregisterMidTaskAsideLane(parent, "aside-1");
-    expect(listMidTaskAsideLanesForTests(parent)).toEqual(["aside-2"]);
-    expect(isMidTaskAsideLaneCancelled(parent, "aside-2")).toBe(false);
-    unregisterMidTaskAsideLane(parent, "aside-2");
   });
 });

@@ -143,9 +143,8 @@ vi.mock("../wait-for-idle-before-flush.js", () => ({
   flushPendingToolResultsAfterIdle: async () => {},
 }));
 
-vi.mock("../runs.js", () => ({
-  setActiveEmbeddedRun: () => {},
-  clearActiveEmbeddedRun: () => {},
+vi.mock("../runs.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../runs.js")>()),
 }));
 
 vi.mock("./images.js", async (importOriginal) => {
@@ -205,7 +204,8 @@ vi.mock("../../model-selection.js", async (importOriginal) => {
   };
 });
 
-const { runEmbeddedAttempt } = await import("./attempt.js");
+const { runEmbeddedAttempt } =
+  await import("../../../agent-runtime/execution/runner/embedded-attempt.js");
 
 const constitutionalRuntimeShadowDeps: ConstitutionalRuntimeShadowDeps = Object.freeze({
   runtimeShadowEnabled: false,
@@ -417,5 +417,66 @@ describe("runEmbeddedAttempt context assemble pairing boundary", () => {
       );
     });
     expect(hasResult && !hasCall).toBe(false);
+  });
+  it("aborts stopped tasks at registration without starting prompt and releases the session lock", async () => {
+    const boardApi = await import("../../../conversation-task/session-task-board.js");
+    const runs = await import("../runs.js");
+    const sessionFile = path.join(workspaceDir, "session.jsonl");
+    await fs.writeFile(sessionFile, "");
+    boardApi.mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...boardApi.emptySessionTaskBoard(),
+        current: {
+          taskId: "task-a",
+          title: "A",
+          goalText: "A",
+          unfinished: true,
+          createdAtMs: 1,
+          stop: { summary: "preparing", workspacePaths: [] },
+          executionAttempt: "attempt-a",
+          deliverableVersion: "attempt-a",
+        },
+      },
+      value: undefined,
+    }));
+    const binding = boardApi.captureTaskCompletionBinding(sessionFile);
+    const create = hoisted.createAgentSessionMock.getMockImplementation()!;
+    hoisted.createAgentSessionMock.mockImplementationOnce(async (...args: unknown[]) => {
+      const value = await create(...args);
+      // Owner stop arrives while the runtime is still preparing, before active registration.
+      boardApi.mutateSessionTaskBoard(sessionFile, (board) => ({
+        board: { ...board, current: { ...board.current!, wakeSuppress: true } },
+        value: undefined,
+      }));
+      return value;
+    });
+    const release = vi.fn(async () => {});
+    hoisted.acquireSessionWriteLockMock.mockResolvedValue({ release });
+    await expect(
+      runEmbeddedAttempt({
+        sessionId: "pairing-session",
+        sessionKey: "agent:main:main",
+        sessionFile,
+        taskExecutionBinding: binding,
+        workspaceDir,
+        agentDir,
+        config: { conversation: { projection: { enabled: false } } } as never,
+        prompt: "continue",
+        timeoutMs: 10_000,
+        runId: "stopped-run",
+        provider: "openai",
+        modelId: "gpt-test",
+        model: MODEL,
+        authStorage: { getApiKey: async () => undefined } as unknown as OpenBotAuthStorage,
+        modelRegistry: {} as ModelRegistry,
+        thinkLevel: "off",
+        senderIsOwner: true,
+        disableMessageTool: true,
+        constitutionalRuntimeShadowDeps,
+      }),
+    ).rejects.toThrow("aborted");
+    expect(providerMessages).toEqual([]);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(runs.isEmbeddedPiRunActive("pairing-session")).toBe(false);
   });
 });

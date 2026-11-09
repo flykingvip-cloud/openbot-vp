@@ -50,8 +50,8 @@ export type ExecutionEntry = {
 export const EXECUTION_ENTRY_REGISTRY: readonly ExecutionEntry[] = [
   {
     id: "E1",
-    name: "chat.send → agent-runner-execution",
-    symbols: ["runAgentTurnWithFallback", "authorizeCommercialRun"],
+    name: "chat.send → runtime execution",
+    symbols: ["runAdmittedTurn", "authorizeCommercialRun"],
     status: "Governed",
     dimensions: {
       commercial: { status: "Governed" },
@@ -81,7 +81,7 @@ export const EXECUTION_ENTRY_REGISTRY: readonly ExecutionEntry[] = [
       "resolveModelFallbackOptions",
     ],
     status: "Shadow",
-    note: "默认 shadow、只记录、flag 不另设；allowlistEnforcement 缺省 governance-mode，不过滤；chat 路径上 flush 早于 rememberRunModelSet（runReplyAgent 先 runMemoryFlushIfNeeded，后 runAgentTurnWithFallback），父集合查找落空，信封为 skipped + parent-model-set-absent，拿不到父 allowlist",
+    note: "默认 shadow、只记录、flag 不另设；allowlistEnforcement 缺省 governance-mode，不过滤；chat 路径上 flush 早于 rememberRunModelSet（runReplyAgent 先 runMemoryFlushIfNeeded，后 runAdmittedTurn），父集合查找落空，信封为 skipped + parent-model-set-absent，拿不到父 allowlist",
     followUp: "P3 enforced after §8.4 parity (default stays shadow; no separate flush flag)",
   },
   // --- Post-PR-1a (#134): E2/E3 are `Shadow` for enterprise-scoped runs; a run whose
@@ -135,7 +135,7 @@ export const EXECUTION_ENTRY_REGISTRY: readonly ExecutionEntry[] = [
     symbols: ["runHeartbeatOnce", "getReplyFromConfig"],
     status: "Exempt",
     exemptReason:
-      "routes into E1 (runHeartbeatOnce → getReplyFromConfig → runPreparedReply → runReplyAgent → runAgentTurnWithFallback); not an independent surface",
+      "routes into E1 (runHeartbeatOnce → getReplyFromConfig → runPreparedReply → runReplyAgent → runAdmittedTurn); not an independent surface",
     note: "P2-0 symbol check: joins the already-governed E1 chat reply path; do not newly mark Governed",
   },
   {

@@ -265,7 +265,7 @@ export async function executeNodeHostCommand(
         approvalId,
         preResolvedDecision,
         onFailure: () =>
-          void sendExecApprovalFollowup({
+          sendExecApprovalFollowup({
             approvalId,
             sessionKey: params.notifySessionKey,
             turnSourceChannel: params.turnSourceChannel,

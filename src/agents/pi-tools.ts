@@ -1,4 +1,7 @@
 import { createReadTool } from "@earendil-works/pi-coding-agent";
+import { wrapToolWithBeforeToolCallHook } from "../agent-runtime/capabilities/index.js";
+import type { TaskCompletionBinding } from "../agent-runtime/contracts/task-binding.js";
+import { captureTaskActionBoundary } from "../agent-runtime/state/task-action.js";
 import type { OpenBotConfig } from "../config/config.js";
 import type { ToolLoopDetectionConfig } from "../config/types.tools.js";
 import {
@@ -36,7 +39,6 @@ import type { ModelAuthMode } from "./model-auth.js";
 import { createOpenClawTools } from "./openclaw-tools.js";
 import { createWorkspaceCodingTools } from "./pi-sdk/coding-tools.js";
 import { wrapToolWithAbortSignal } from "./pi-tools.abort.js";
-import { wrapToolWithBeforeToolCallHook } from "./pi-tools.before-tool-call.js";
 import {
   isToolAllowedByPolicies,
   resolveEffectiveToolPolicy,
@@ -229,6 +231,8 @@ export const __testing = {
 } as const;
 
 export function createOpenClawCodingTools(options?: {
+  sessionFile?: string;
+  taskExecutionBinding?: TaskCompletionBinding;
   agentId?: string;
   exec?: ExecToolDefaults & ProcessToolDefaults;
   messageProvider?: string;
@@ -500,6 +504,10 @@ export function createOpenClawCodingTools(options?: {
   const { cleanupMs: cleanupMsOverride, ...execDefaults } = options?.exec ?? {};
   const execTool = createExecTool({
     ...execDefaults,
+    taskBoundary:
+      options?.sessionFile && options.taskExecutionBinding
+        ? captureTaskActionBoundary(options.sessionFile, options.taskExecutionBinding)
+        : undefined,
     host: options?.exec?.host ?? execConfig.host,
     security: options?.exec?.security ?? execConfig.security,
     ask: options?.exec?.ask ?? execConfig.ask,
@@ -521,6 +529,40 @@ export function createOpenClawCodingTools(options?: {
     currentChannelId: options?.currentChannelId,
     currentThreadTs: options?.currentThreadTs,
     accountId: options?.agentAccountId,
+    trustedIdentity: options?.executionIdentity
+      ? {
+          ...(options.executionIdentity.user ? { user: options.executionIdentity.user } : {}),
+          ...(options.executionIdentity.platformUserId
+            ? { platformUserId: options.executionIdentity.platformUserId }
+            : {}),
+          ...(options.executionIdentity.sessionDomain
+            ? { sessionDomain: options.executionIdentity.sessionDomain }
+            : {}),
+          ...(options.executionIdentity.enterpriseId
+            ? { enterpriseId: options.executionIdentity.enterpriseId }
+            : {}),
+          ...(options.executionIdentity.membershipId
+            ? { membershipId: options.executionIdentity.membershipId }
+            : {}),
+          ...(options.executionIdentity.seatId ? { seatId: options.executionIdentity.seatId } : {}),
+        }
+      : options?.gatewayClientUser || options?.gatewayClientPlatformUserId
+        ? {
+            ...(options.gatewayClientUser ? { user: options.gatewayClientUser } : {}),
+            ...(options.gatewayClientPlatformUserId
+              ? { platformUserId: options.gatewayClientPlatformUserId }
+              : {}),
+            ...(options.gatewayClientSessionDomain
+              ? { sessionDomain: options.gatewayClientSessionDomain }
+              : {}),
+            ...(options.gatewayClientSessionEnterpriseId
+              ? { enterpriseId: options.gatewayClientSessionEnterpriseId }
+              : {}),
+            ...(options.gatewayClientSessionMembershipId
+              ? { membershipId: options.gatewayClientSessionMembershipId }
+              : {}),
+          }
+        : undefined,
     backgroundMs: options?.exec?.backgroundMs ?? execConfig.backgroundMs,
     timeoutSec: options?.exec?.timeoutSec ?? execConfig.timeoutSec,
     approvalRunningNoticeMs:
@@ -800,6 +842,10 @@ export function createOpenClawCodingTools(options?: {
       sessionKey: options?.sessionKey,
       sessionId: options?.sessionId,
       runId: options?.runId,
+      taskBoundary:
+        options?.sessionFile && options.taskExecutionBinding
+          ? captureTaskActionBoundary(options.sessionFile, options.taskExecutionBinding)
+          : undefined,
       loopDetection: resolveToolLoopDetectionConfig({ cfg: options?.config, agentId }),
       candidateCapabilities,
       policyFilteredCapabilities,

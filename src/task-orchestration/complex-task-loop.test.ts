@@ -7,6 +7,7 @@ import { resolveSubagentToolPolicy } from "../agents/pi-tools.policy.js";
 import { decideHonestEmptyReply } from "../auto-reply/reply/honest-empty-reply.js";
 import { DEFAULT_SUBAGENT_MAX_SPAWN_DEPTH } from "../config/agent-limits.js";
 import type { OpenBotConfig } from "../config/config.js";
+import { captureTaskCompletionBinding } from "../conversation-task/session-task-board.js";
 import {
   applyIncomingUserMessage,
   emptySessionTaskBoard,
@@ -222,6 +223,7 @@ describe("P3 complex task loop", () => {
       toolNames: ["read"],
       payloads: [{ text: drift }],
       sessionFile,
+      completionBinding: captureTaskCompletionBinding(sessionFile),
       currentGoal: started.board.current?.goalText,
       env: admitEnv(),
     });
@@ -272,13 +274,14 @@ describe("P3 complex task loop", () => {
       toolNames: ["read"],
       payloads: [{ text: draft }],
       sessionFile,
+      completionBinding: captureTaskCompletionBinding(sessionFile),
       env: admitEnv(),
     });
-    expect(checked.deliverableChecked).toBe(true);
+    expect(checked.deliverableChecked).toBe(false);
     expect(checked.failedStep).toBeUndefined();
-    expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(false);
-    expect(readSessionTaskBoard(sessionFile).current?.deliverableChecked).toBe(true);
-    expect(fs.readFileSync(sessionFile, "utf8")).toContain("交付已核对");
+    expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
+    expect(readSessionTaskBoard(sessionFile).current?.deliverableChecked).not.toBe(true);
+    expect(fs.readFileSync(sessionFile, "utf8")).not.toContain("交付已核对");
   });
 
   it("keeps collab depth and leaf spawn denial, and does not write evolution proposals", () => {

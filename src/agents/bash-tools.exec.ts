@@ -769,6 +769,8 @@ async function executeResolvedExecPolicy(params: {
     notifyOnExitEmptySuccess,
     scopeKey: defaults?.scopeKey,
     sessionKey: notifySessionKey,
+    taskBoundary: defaults?.taskBoundary,
+    trustedIdentity: defaults?.trustedIdentity,
     timeoutSec: effectiveTimeout,
     onUpdate,
   });

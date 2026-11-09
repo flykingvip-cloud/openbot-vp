@@ -17,6 +17,8 @@ vi.mock(
 );
 
 vi.mock("../../agents/pi-embedded.js", () => ({
+  queueEmbeddedPiMessage: vi.fn(),
+  abortEmbeddedPiRun: vi.fn(),
   runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
 }));
 
@@ -210,4 +212,9 @@ describe("createFollowupRunner BYOK", () => {
       },
     });
   });
+});
+
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", async () => {
+  const { runEmbeddedPiAgent } = await import("../../agents/pi-embedded.js");
+  return { runEmbeddedPiAgent };
 });

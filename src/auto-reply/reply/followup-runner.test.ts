@@ -17,6 +17,8 @@ vi.mock(
 );
 
 vi.mock("../../agents/pi-embedded.js", () => ({
+  queueEmbeddedPiMessage: vi.fn(),
+  abortEmbeddedPiRun: vi.fn(),
   runEmbeddedPiAgent: (params: unknown) => runEmbeddedPiAgentMock(params),
 }));
 
@@ -665,4 +667,301 @@ describe("createFollowupRunner agentDir forwarding", () => {
     expect(call?.gatewayClientSessionMembershipId).toBe("mem-1");
     expect(call?.gatewayClientUser).toBe("employee@acme.example");
   });
+});
+
+describe("queued task binding claim", () => {
+  it.each(["delivered", "failed", "unknown", "unverified", "empty"] as const)(
+    "settles queued task only with verified acceptance and actual delivery: %s",
+    async (mode) => {
+      const board = await import("../../conversation-task/session-task-board.js");
+      const governance = await import("../../gateway/billing/agent-run-governance.js");
+      const root = await fs.mkdtemp(path.join(tmpdir(), "followup-delivery-"));
+      const sessionFile = path.join(root, "session.jsonl");
+      await fs.writeFile(sessionFile, "");
+      board.mutateSessionTaskBoard(sessionFile, () => ({
+        board: {
+          ...board.emptySessionTaskBoard(),
+          current: {
+            taskId: "a",
+            title: "report",
+            goalText: "write report",
+            unfinished: true,
+            createdAtMs: 1,
+            stop: { summary: "waiting", workspacePaths: [] },
+          },
+        },
+        value: undefined,
+      }));
+      const queued = createQueuedRun({
+        originatingChannel: mode === "unknown" ? undefined : "telegram",
+        originatingTo: "target",
+        followupItemId: "item",
+        run: {
+          agentId: "test",
+          sessionKey: "agent:test:main",
+          sessionFile,
+          config: { agents: { list: [{ id: "test", agentDir: root }] } },
+          taskCompletionBinding: board.captureTaskCompletionBinding(sessionFile),
+        },
+      });
+      const admission = vi
+        .spyOn(governance, "tryAcquireEnterpriseAgentRun")
+        .mockResolvedValue({ acquired: false, skipped: true });
+      runEmbeddedPiAgentMock.mockReset();
+      runEmbeddedPiAgentMock.mockResolvedValue({
+        payloads: mode === "empty" ? [] : [{ text: "report with verified sources" }],
+        meta: {
+          hookDelivery: {
+            validatorsRequired: true,
+            decisionCode: mode === "unverified" ? "delivery_blocked" : "delivery_receipt_verified",
+            validatorReceipts: [{ validatorId: "sources" }],
+            intentClass: "long_running",
+          },
+        },
+      });
+      routeReplyMock.mockResolvedValue(
+        mode === "failed" ? { ok: false, error: "offline" } : { ok: true },
+      );
+      try {
+        await createFollowupRunner({
+          opts: { onBlockReply: createAsyncReplySpy() },
+          typing: createMockTypingController(),
+          typingMode: "instant",
+          defaultModel: "anthropic/claude",
+        })(queued);
+        expect(runEmbeddedPiAgentMock).toHaveBeenCalledOnce();
+        expect(board.readSessionTaskBoard(sessionFile).current?.unfinished).toBe(
+          mode !== "delivered",
+        );
+      } finally {
+        admission.mockRestore();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+  it("rejects a queued A request after same-goal B becomes current without invoking the provider", async () => {
+    const {
+      mutateSessionTaskBoard,
+      emptySessionTaskBoard,
+      captureTaskCompletionBinding,
+      readSessionTaskBoard,
+    } = await import("../../conversation-task/session-task-board.js");
+    const dir = await fs.mkdtemp(path.join(tmpdir(), "followup-binding-"));
+    try {
+      const sessionFile = path.join(dir, "session.jsonl");
+      await fs.writeFile(sessionFile, "");
+      const task = {
+        taskId: "a",
+        title: "same",
+        goalText: "same",
+        unfinished: true,
+        createdAtMs: 1,
+        stop: { summary: "", workspacePaths: [] },
+      };
+      mutateSessionTaskBoard(sessionFile, () => ({
+        board: { ...emptySessionTaskBoard(), current: task },
+        value: undefined,
+      }));
+      const binding = captureTaskCompletionBinding(sessionFile);
+      mutateSessionTaskBoard(sessionFile, (board) => ({
+        board: { ...board, current: { ...task, taskId: "b" } },
+        value: undefined,
+      }));
+      const typing = createMockTypingController();
+      const onBlockReply = createAsyncReplySpy();
+      const runner = createFollowupRunner({
+        opts: { onBlockReply },
+        typing,
+        typingMode: "instant",
+        sessionStore: {},
+        sessionKey: "main",
+        defaultModel: "anthropic/claude",
+      });
+      runEmbeddedPiAgentMock.mockClear();
+      await runner(createQueuedRun({ run: { sessionFile, taskCompletionBinding: binding } }));
+      expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+      expect(readSessionTaskBoard(sessionFile).current?.taskId).toBe("b");
+      expect(readSessionTaskBoard(sessionFile).current?.executionAttempt).toBeUndefined();
+      expect(typing.markRunComplete).toHaveBeenCalled();
+      expect(typing.markDispatchIdle).toHaveBeenCalled();
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+it("does not start queued provider work when owner pause arrives during async transport preparation", async () => {
+  const boardApi = await import("../../conversation-task/session-task-board.js");
+  const transportApi = await import("../../gateway/enterprise-model/embedded-transport.js");
+  const dir = await fs.mkdtemp(path.join(tmpdir(), "followup-pause-prep-"));
+  const sessionFile = path.join(dir, "session.jsonl");
+  await fs.writeFile(sessionFile, "");
+  const task = {
+    taskId: "a",
+    title: "A",
+    goalText: "A",
+    unfinished: true,
+    createdAtMs: 1,
+    stop: { summary: "", workspacePaths: [] },
+  };
+  boardApi.mutateSessionTaskBoard(sessionFile, () => ({
+    board: { ...boardApi.emptySessionTaskBoard(), current: task },
+    value: undefined,
+  }));
+  const queued = createQueuedRun({
+    run: { sessionFile, taskCompletionBinding: boardApi.captureTaskCompletionBinding(sessionFile) },
+  });
+  const spy = vi
+    .spyOn(transportApi, "resolveEnterpriseEmbeddedTransport")
+    .mockImplementationOnce(async ({ provider, model }) => {
+      boardApi.mutateSessionTaskBoard(sessionFile, (board) => ({
+        board: { ...board, current: { ...board.current!, wakeSuppress: true } },
+        value: undefined,
+      }));
+      return { provider, model };
+    });
+  try {
+    runEmbeddedPiAgentMock.mockClear();
+    const typing = createMockTypingController();
+    await createFollowupRunner({
+      opts: { onBlockReply: createAsyncReplySpy() },
+      typing,
+      typingMode: "instant",
+      sessionStore: {},
+      sessionKey: "main",
+      defaultModel: "anthropic/claude",
+    })(queued);
+    expect(spy).toHaveBeenCalled();
+    expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+    expect(typing.markRunComplete).toHaveBeenCalled();
+    expect(typing.markDispatchIdle).toHaveBeenCalled();
+  } finally {
+    spy.mockRestore();
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+it("refreshes queued task-board continuation with owner constraints accepted after enqueue", async () => {
+  const boardApi = await import("../../conversation-task/session-task-board.js");
+  const dir = await fs.mkdtemp(path.join(tmpdir(), "followup-continue-live-"));
+  try {
+    const sessionFile = path.join(dir, "session.jsonl");
+    await fs.writeFile(sessionFile, "");
+    boardApi.mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...boardApi.emptySessionTaskBoard(),
+        focusRevision: 1,
+        current: {
+          taskId: "a",
+          title: "report",
+          goalText: "write report",
+          unfinished: true,
+          createdAtMs: 1,
+          executionAttempt: "old-run",
+          deliverableVersion: "v1",
+          stop: { summary: "waiting", workspacePaths: [] },
+        },
+      },
+      value: undefined,
+    }));
+    const queued = createQueuedRun({
+      prompt: "old resume text",
+      taskBoardContinueTicket: { taskId: "a", focusRevision: 1 },
+      run: {
+        sessionFile,
+        taskCompletionBinding: boardApi.captureTaskCompletionBinding(sessionFile),
+      },
+    });
+    expect(
+      boardApi.commitSameTaskConstraint({
+        sessionFile,
+        expectedTaskId: "a",
+        constraintText: "必须保留来源链接，不要发布",
+      }),
+    ).toBe(true);
+    runEmbeddedPiAgentMock.mockReset();
+    runEmbeddedPiAgentMock.mockResolvedValue({
+      payloads: [{ text: "report with sources" }],
+      meta: {},
+    });
+    const runner = createFollowupRunner({
+      opts: { onBlockReply: createAsyncReplySpy() },
+      typing: createMockTypingController(),
+      typingMode: "instant",
+      defaultModel: "anthropic/claude",
+    });
+    await runner(queued);
+    expect(runEmbeddedPiAgentMock).toHaveBeenCalledOnce();
+    expect(runEmbeddedPiAgentMock.mock.calls[0][0].prompt).toContain("必须保留来源链接，不要发布");
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+it.each(["paused", "focus changed", "new attempt"] as const)(
+  "rejects a queued continue ticket after %s without provider execution",
+  async (change) => {
+    const api = await import("../../conversation-task/session-task-board.js");
+    const dir = await fs.mkdtemp(path.join(tmpdir(), "continue-revalidate-"));
+    try {
+      const sessionFile = path.join(dir, "session.jsonl");
+      await fs.writeFile(sessionFile, "");
+      api.mutateSessionTaskBoard(sessionFile, () => ({
+        board: {
+          ...api.emptySessionTaskBoard(),
+          focusRevision: 1,
+          current: {
+            taskId: "a",
+            title: "A",
+            goalText: "A",
+            unfinished: true,
+            createdAtMs: 1,
+            executionAttempt: "old",
+            deliverableVersion: "v1",
+            stop: { summary: "waiting", workspacePaths: [] },
+          },
+        },
+        value: undefined,
+      }));
+      const queued = createQueuedRun({
+        taskBoardContinueTicket: { taskId: "a", focusRevision: 1 },
+        run: { sessionFile, taskCompletionBinding: api.captureTaskCompletionBinding(sessionFile) },
+      });
+      api.mutateSessionTaskBoard(sessionFile, (board) => ({
+        board: {
+          ...board,
+          ...(change === "focus changed" ? { focusRevision: 2 } : {}),
+          current: {
+            ...board.current!,
+            ...(change === "paused"
+              ? { wakeSuppress: true }
+              : change === "new attempt"
+                ? { executionAttempt: "new" }
+                : {}),
+          },
+        },
+        value: undefined,
+      }));
+      const before = api.readSessionTaskBoard(sessionFile);
+      runEmbeddedPiAgentMock.mockClear();
+      const typing = createMockTypingController();
+      await createFollowupRunner({
+        opts: { onBlockReply: createAsyncReplySpy() },
+        typing,
+        typingMode: "instant",
+        defaultModel: "anthropic/claude",
+      })(queued);
+      expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+      expect(api.readSessionTaskBoard(sessionFile).current).toEqual(before.current);
+      expect(typing.markRunComplete).toHaveBeenCalled();
+      expect(typing.markDispatchIdle).toHaveBeenCalled();
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", async () => {
+  const { runEmbeddedPiAgent } = await import("../../agents/pi-embedded.js");
+  return { runEmbeddedPiAgent };
 });

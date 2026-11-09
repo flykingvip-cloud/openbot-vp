@@ -20,6 +20,7 @@ import {
   isTaskTombstoned,
   readSessionTaskBoard,
   recordCheckedTaskCompletion,
+  captureTaskCompletionBinding,
   sanitizeTaskBoardPathForPrompt,
   seedSessionTaskBoard,
   pauseParkedTask,
@@ -290,7 +291,11 @@ it("announces a real close and a fourth automatic park drops the oldest file", (
   expect(stored.parked).toHaveLength(3);
   expect(stored.parked.some((row) => row.taskId === "a")).toBe(false);
   expect(stored.parked[0]?.taskId).toBe("cron-job-9");
-  const finished = recordCheckedTaskCompletion({ sessionFile, closed: true });
+  const finished = recordCheckedTaskCompletion({
+    sessionFile,
+    closed: true,
+    binding: captureTaskCompletionBinding(sessionFile),
+  });
   expect(finished.persisted).toBe(true);
   expect(finished.notice).toContain("当前任务已完成，交付已核对。");
   expect(finished.notice).toContain("[PARKED_TASK_REMINDER]");

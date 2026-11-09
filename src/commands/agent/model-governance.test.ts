@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
 import {
   AGENT_COMMAND_MODEL_MODE_ENV,
   resolveAgentCommandActorId,
   resolveAgentCommandConfiguredModelMode,
   resolveAgentCommandModelGovernance,
-} from "./model-governance.js";
+} from "../../agent-runtime/model/index.js";
+import { createExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
 
 const acquired = {
   status: "acquired" as const,

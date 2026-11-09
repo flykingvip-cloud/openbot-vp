@@ -4,7 +4,7 @@ import {
   estimateContextTokens,
   estimateMessageTokens,
 } from "../../../node_modules/@earendil-works/pi-ai/dist/utils/estimate.js";
-import { wrapOutboundMessageEstimateGuard } from "./install.js";
+import { wrapOutboundMessageEstimateGuard } from "../../agent-runtime/capabilities/index.js";
 import { normalizeCompiledMessage, normalizeCompiledMessages } from "./normalize-outbound.js";
 
 /**

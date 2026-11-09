@@ -54,6 +54,7 @@ export const PLATFORM_SURFACE_TABS = [
   "platformCapabilities",
   "platformModels",
   "platformAgents",
+  "platformObservation",
   "platformDiagnosis",
   "platformAdvanced",
   "platformSystemSettings",
@@ -249,6 +250,7 @@ export type Tab =
   | "platformCapabilities"
   | "platformModels"
   | "platformAgents"
+  | "platformObservation"
   | "platformDiagnosis"
   | "platformAdvanced"
   | "platformSystemSettings"
@@ -350,6 +352,7 @@ const TAB_PATHS: Record<Tab, string> = {
   platformCapabilities: "/platform/capabilities",
   platformModels: "/platform/models",
   platformAgents: "/platform/agents",
+  platformObservation: "/platform/observation",
   platformDiagnosis: "/platform/diagnosis",
   platformAdvanced: "/platform/advanced",
   platformSystemSettings: "/platform/system-settings",
@@ -476,6 +479,7 @@ const TAB_PORTS: Record<Tab, FrontendPort> = {
   platformCapabilities: "platform",
   platformModels: "platform",
   platformAgents: "platform",
+  platformObservation: "platform",
   platformDiagnosis: "platform",
   platformAdvanced: "platform",
   platformSystemSettings: "platform",
@@ -1027,6 +1031,7 @@ function matchCanonicalNestedRoute(path: RoutePath): TabRouteMatch | null {
     { prefix: "/platform/capabilities", tab: "platformCapabilities" },
     { prefix: "/platform/models", tab: "platformModels" },
     { prefix: "/platform/agents", tab: "platformAgents" },
+    { prefix: "/platform/observation", tab: "platformObservation" },
     { prefix: "/platform/diagnosis", tab: "platformDiagnosis" },
     { prefix: "/platform/advanced", tab: "platformAdvanced" },
     { prefix: "/platform/system-settings", tab: "platformSystemSettings" },
@@ -1610,6 +1615,8 @@ export function navItemDescriptionForTab(tab: Tab) {
       return t("nav.items.platformModels");
     case "platformAgents":
       return t("nav.items.platformAgents");
+    case "platformObservation":
+      return "运行观测";
     case "platformDiagnosis":
       return t("nav.items.platformDiagnosis");
     case "platformAdvanced":

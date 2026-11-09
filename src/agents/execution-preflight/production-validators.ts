@@ -1,5 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  issueValidationReceipt,
+  registerTrustedValidator,
+} from "../../agent-runtime/delivery/acceptance/index.js";
 import { readNotedDeliveryArtifactPaths } from "./delivery.js";
 import {
   JSON_CANVAS_VALIDATOR_ID,
@@ -8,7 +12,6 @@ import {
 } from "./json-canvas-validator.js";
 import type { SkillRuntimeContract } from "./skill-contract.js";
 import type { ExecutionPreflight } from "./types.js";
-import { issueValidationReceipt, registerTrustedValidator } from "./validation.js";
 
 const DEFAULT_VALIDATOR_BUDGET_MS = 2_000;
 

@@ -72,6 +72,12 @@ function expectSubagentAllowedBootstrapNames(files: WorkspaceBootstrapFile[]) {
 }
 
 describe("ensureAgentWorkspace", () => {
+  it("can bootstrap a conversation workspace without creating a Git checkout", async () => {
+    const tempDir = await makeTempWorkspace("runtime-conversation-workspace-");
+    await ensureAgentWorkspace({ dir: tempDir, ensureBootstrapFiles: true, initializeGit: false });
+    await expectBootstrapSeeded(tempDir);
+    await expect(fs.access(path.join(tempDir, ".git"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
   it("creates BOOTSTRAP.md and records a seeded marker for brand new workspaces", async () => {
     const tempDir = await makeTempWorkspace("openclaw-workspace-");
 

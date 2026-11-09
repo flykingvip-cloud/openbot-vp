@@ -1,3 +1,4 @@
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { formatReasoningMessage } from "../agents/pi-embedded-utils.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
 import { findCodeRegions, isInsideCode } from "../shared/text/code-regions.js";
@@ -88,6 +89,7 @@ export function splitTelegramReasoningText(text?: string): TelegramReasoningSpli
 }
 
 export type BufferedFinalAnswer = {
+  taskBoundary?: TaskActionBoundary;
   payload: ReplyPayload;
   text: string;
 };

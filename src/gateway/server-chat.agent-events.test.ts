@@ -122,6 +122,27 @@ describe("agent event handler", () => {
     return harness;
   }
 
+  it("retains original engine identity when publishing a client-mapped lifecycle event", () => {
+    const harness = createHarness();
+    harness.chatRunState.registry.add("engine", { sessionKey: "own", clientRunId: "client" });
+    harness.handler({
+      runId: "engine",
+      seq: 1,
+      stream: "lifecycle",
+      ts: 1,
+      data: { phase: "start" },
+    });
+    expect(harness.broadcast).toHaveBeenCalledWith(
+      "agent",
+      expect.objectContaining({
+        runId: "client",
+        sourceRunId: "engine",
+        sessionKey: "own",
+        seq: 1,
+      }),
+    );
+  });
+
   function chatBroadcastCalls(broadcastChat: ReturnType<typeof vi.fn>) {
     // broadcastChat(sessionKey, payload) — isolated steward fan-out entry.
     return broadcastChat.mock.calls;

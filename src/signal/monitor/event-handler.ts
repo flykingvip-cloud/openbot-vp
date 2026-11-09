@@ -274,8 +274,9 @@ export function createSignalEventHandler(deps: SignalEventHandlerDeps) {
       ...prefixOptions,
       humanDelay: resolveHumanDelayConfig(deps.cfg, route.agentId),
       typingCallbacks,
-      deliver: async (payload) => {
+      deliver: async (payload, info) => {
         await deps.deliverReplies({
+          taskBoundary: info.taskBoundary,
           replies: [payload],
           target: ctxPayload.To,
           baseUrl: deps.baseUrl,

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // @vitest-environment node
 import fs from "node:fs";
 import path from "node:path";
@@ -261,6 +262,7 @@ describe("workbench.group-file preview/open/write", () => {
     fs.writeFileSync(filePath!, Buffer.from(await zip.generateAsync({ type: "nodebuffer" })));
 
     const patched = await invoke("workbench.group-file.patch-pptx", {
+      expectedContentHash: createHash("sha256").update(fs.readFileSync(filePath!)).digest("hex"),
       groupId: "g1",
       filename: "deck.pptx",
       slides: [{ index: 1, lines: ["通州后勤方案"] }],
@@ -270,6 +272,19 @@ describe("workbench.group-file preview/open/write", () => {
     const html = typeof patched.payload?.html === "string" ? patched.payload.html : "";
     expect(html).toContain("通州后勤方案");
     expect(patched.payload?.officeSlides).toEqual([{ index: 1, lines: ["通州后勤方案"] }]);
+    const savedBytes = fs.readFileSync(filePath!);
+    expect(patched.payload?.contentHash).toBe(
+      createHash("sha256").update(savedBytes).digest("hex"),
+    );
+    const stale = await invoke("workbench.group-file.patch-pptx", {
+      groupId: "g1",
+      filename: "deck.pptx",
+      expectedContentHash: "0".repeat(64),
+      slides: [{ index: 1, lines: ["stale"] }],
+    });
+    expect(stale.ok).toBe(false);
+    expect(stale.error?.message).toContain("ARTIFACT_VERSION_CONFLICT");
+    expect(fs.readFileSync(filePath!)).toEqual(savedBytes);
   });
 });
 

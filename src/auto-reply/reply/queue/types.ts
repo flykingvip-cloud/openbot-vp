@@ -33,6 +33,36 @@ export type FollowupRun = {
    * must not mint an unrelated task. Distinct from agent runId (correlation).
    */
   followupItemId?: string;
+  /** Original wake identity, revalidated when dequeued. */
+  taskBoardContinueTicket?: { taskId: string; focusRevision: number };
+  /**
+   * Package2 async-wait recovery bind fence: specific job + claimToken.
+   * claimQueuedExecution uses these so bind does not pick the first open job by taskId.
+   */
+  asyncWaitRecoveryBind?: {
+    jobId: string;
+    claimToken: string;
+    boundRunId?: string;
+    boundDeliveryId?: string;
+  };
+  /**
+   * Package2: delivery-only recovery retry — followup must not re-run business/model.
+   */
+  asyncWaitDeliveryOnly?: boolean;
+  /**
+   * Package2: original visible payloads (+ version) for delivery-only resend.
+   * Must match the prepared delivery — never a placeholder string.
+   */
+  asyncWaitDeliveryPayloads?: Array<{
+    text?: string;
+    mediaUrl?: string;
+    mediaUrls?: string[];
+    replyToId?: string;
+    audioAsVoice?: boolean;
+    isError?: boolean;
+    channelData?: Record<string, unknown>;
+  }>;
+  asyncWaitDeliverableVersion?: string;
   /**
    * askOutcome W1: optional parent TaskOutcome taskId when this followup is
    * an independent child of a prior user/chat/collab task.
@@ -76,6 +106,9 @@ export type FollowupRun = {
     senderE164?: string;
     senderIsOwner?: boolean;
     sessionFile: string;
+    taskCompletionBinding?: import("../../../agent-runtime/contracts/task-binding.js").TaskCompletionBinding;
+    /** Host accepted this request; do not classify it again as ordinary dialogue. */
+    executionAdmitted?: boolean;
     /** Collaboration rounds: suppress SessionManager user persistence on shared transcripts. */
     skipUserTranscriptPersist?: boolean;
     collaborationRoundInvoked?: boolean;

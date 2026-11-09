@@ -2,8 +2,7 @@
  * Mid-task aside dialogue history helpers (read / format / merge / budget).
  *
  * No embedded-runner dependency — safe for static imports from get-reply-run,
- * chat.history, and tests that mock the embedded runner. Lane execution stays in
- * mid-task-aside-reply-lane.ts.
+ * chat.history, and tests. Historical sidecar compatibility does not start execution.
  *
  * Role policy:
  * - chat.history merges sidecar turns as original user/assistant roles.
@@ -12,29 +11,20 @@
  *   character budget. Role labels inside the block are data only.
  */
 import fs from "node:fs";
+import { stripInboundStampForDialogue } from "../../agent-runtime/command/index.js";
+import {
+  ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS,
+  ASIDE_DIALOGUE_HISTORY_TURN_CAP,
+  selectAsideTurnsWithinCharBudget,
+  type AsideDialogueTurn,
+} from "../../agent-runtime/context/index.js";
 import { wrapUntrustedPromptDataBlock } from "../../agents/sanitize-for-prompt.js";
 import {
   activeConstraintTexts,
   formatTaskBoardFocusLine,
   type SessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
-import { stripInboundStampForDialogue } from "./mid-task-dialogue.js";
 import { readSessionMessages } from "./session-continuity.js";
-
-/** History-body budget for normal-reply untrusted aside context (chars of `role: text` lines only; wrapper/disclaimer overhead is separate). */
-export const ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS = 4_000;
-
-/** Soft cap on turns considered before the char budget trims further. */
-export const ASIDE_DIALOGUE_HISTORY_TURN_CAP = 24;
-
-export type AsideDialogueTurn = {
-  atMs: number;
-  runId: string;
-  role: "user" | "assistant";
-  text: string;
-  /** Stable inbound / transcript message id when known (cross-source dedupe). */
-  messageId?: string;
-};
 
 export function asideDialogueLogPath(parentSessionFile: string): string {
   return `${parentSessionFile.trim()}.aside-dialogue.jsonl`;
@@ -126,46 +116,6 @@ export function stableDialogueMessageIdentity(params: {
     return `mid:${mid}`;
   }
   return null;
-}
-
-/**
- * Newest-first selection that respects a character budget on `role: text` lines.
- * Always keeps at least the most recent turn (truncated if needed).
- */
-export function selectAsideTurnsWithinCharBudget(
-  turns: readonly AsideDialogueTurn[],
-  maxChars: number = ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS,
-): AsideDialogueTurn[] {
-  if (turns.length === 0) {
-    return [];
-  }
-  const budget = Math.max(64, maxChars);
-  const selected: AsideDialogueTurn[] = [];
-  let used = 0;
-  for (let i = turns.length - 1; i >= 0; i -= 1) {
-    const turn = turns[i];
-    const line = `${turn.role}: ${turn.text}`;
-    const cost = line.length + (selected.length > 0 ? 1 : 0);
-    if (selected.length === 0) {
-      if (line.length <= budget) {
-        selected.unshift(turn);
-        used = line.length;
-      } else {
-        selected.unshift({
-          ...turn,
-          text: `${turn.text.slice(0, Math.max(0, budget - `${turn.role}: `.length - 1))}…`,
-        });
-        used = budget;
-      }
-      continue;
-    }
-    if (used + cost > budget) {
-      break;
-    }
-    selected.unshift(turn);
-    used += cost;
-  }
-  return selected;
 }
 
 /**
@@ -459,3 +409,11 @@ export function buildAsideReplyLanePrompt(params: {
     `主人插问：${cleaned}`,
   ].join("\n");
 }
+
+// Compatibility exports; budget policy has one implementation in runtime context.
+export {
+  ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS,
+  ASIDE_DIALOGUE_HISTORY_TURN_CAP,
+  selectAsideTurnsWithinCharBudget,
+  type AsideDialogueTurn,
+} from "../../agent-runtime/context/index.js";

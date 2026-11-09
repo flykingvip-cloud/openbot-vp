@@ -13,7 +13,11 @@ import {
 } from "./chat-entry.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { TaskOutcomeResultService } from "./result-service.js";
-import { TASK_OUTCOME_STORE_DIRNAME, recordRunnerTurnOutcome } from "./runtime-from-runner.js";
+import {
+  TASK_OUTCOME_STORE_DIRNAME,
+  recordRunnerTurnOutcome,
+  runnerExecutorEvidenceContext,
+} from "./runtime-from-runner.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 
 describe("recordRunnerTurnOutcome", () => {
@@ -470,5 +474,13 @@ describe("recordRunnerTurnOutcome — artifact-backed modality completion", () =
     expect(musicOut.record.reasonDetail).toContain(
       "target_modality_completed_via=execution_artifact:.openbot/generated-audio/theme.mp3",
     );
+  });
+});
+
+describe("legacy executor identity", () => {
+  it("skips absent agent identity", () => {
+    expect(
+      runnerExecutorEvidenceContext({}, undefined, { taskId: "task", runId: "run" }),
+    ).toBeUndefined();
   });
 });

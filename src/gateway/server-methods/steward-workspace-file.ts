@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { patchAuthorizedPptx, artifactContentHash } from "../../agent-runtime/delivery/index.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { isBuiltinStewardAgent } from "../../agents/builtin-steward/identity.js";
 import { loadConfig } from "../../config/config.js";
@@ -12,7 +13,7 @@ import {
   resolveEmployeeWorkbenchActor,
 } from "../employee-workbench-scope.js";
 import { resolveKnowledgeSourceContext } from "../knowledge/context.js";
-import { parseOfficeSlidesInput, patchPptxSlideTexts } from "../office-pptx-text.js";
+import { parseOfficeSlidesInput } from "../office-pptx-text.js";
 import { renderOfficePreviewHtml } from "../office-render.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { listAgentsForGateway } from "../session-utils.js";
@@ -424,6 +425,7 @@ async function handleStewardFileOpen(params: {
         relativePath: authorized.relativePath,
         mimeType: inferMimeType(ext),
         byteLength: buffer.length,
+        contentHash: artifactContentHash(buffer),
         textLike: false,
         renderKind: "html",
         html: rendered.html,
@@ -439,6 +441,7 @@ async function handleStewardFileOpen(params: {
     relativePath: authorized.relativePath,
     mimeType: inferMimeType(ext),
     byteLength: buffer.length,
+    contentHash: artifactContentHash(buffer),
     textLike: TEXT_LIKE_EXTENSIONS.has(ext),
     base64: buffer.toString("base64"),
   });
@@ -543,34 +546,40 @@ export const stewardWorkspaceFileHandlers: GatewayRequestHandlers = {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "pptx file required"));
       return;
     }
-    let buffer: Buffer;
+    const expectedHash =
+      typeof record.expectedContentHash === "string" ? record.expectedContentHash : "";
+    let edited: Awaited<ReturnType<typeof patchAuthorizedPptx>>;
     try {
-      buffer = fs.readFileSync(authorized.authorized.absoluteFilePath);
+      edited = await patchAuthorizedPptx(
+        authorized.authorized.absoluteFilePath,
+        expectedHash,
+        slides,
+      );
     } catch {
       respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, PREVIEW_FILE_NOT_SYNCED));
       return;
     }
-    const patched = await patchPptxSlideTexts(buffer, slides);
-    if (!patched) {
-      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "failed to patch pptx"));
-      return;
-    }
-    try {
-      fs.writeFileSync(authorized.authorized.absoluteFilePath, patched);
-    } catch {
+    if (edited.kind !== "saved") {
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.UNAVAILABLE, "failed to write workspace file"),
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          edited.kind === "conflict"
+            ? "ARTIFACT_VERSION_CONFLICT: reload the latest original before editing"
+            : "expectedContentHash and valid pptx required",
+        ),
       );
       return;
     }
+    const patched = edited.bytes;
     const rendered = await renderOfficePreviewHtml({ filename, buffer: patched });
     respond(true, {
       filename,
       relativePath: authorized.relativePath,
       mimeType: inferMimeType(path.extname(filename).toLowerCase()),
       byteLength: patched.length,
+      contentHash: edited.contentHash,
       textLike: false,
       renderKind: "html",
       html: rendered?.html,

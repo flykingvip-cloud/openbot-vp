@@ -649,7 +649,12 @@ describe("agentCommand ACP CLI turn preflight observe", () => {
   });
 
   it("does not enforce preflight on the CLI ACP turn", () => {
-    const source = fs.readFileSync(new URL("./agent.ts", import.meta.url), "utf8");
+    const entry = fs.readFileSync(new URL("./agent.ts", import.meta.url), "utf8");
+    expect(entry).toContain("await runCommandAcpTurn(");
+    const source = fs.readFileSync(
+      new URL("../agent-runtime/execution/runner/acp-turn.ts", import.meta.url),
+      "utf8",
+    );
     expect(source).toContain('kind: "cli-turn"');
     expect(source).toContain("observeAcpCliSteerPreflight");
     expect(source).not.toContain("applyPreflightToTools");

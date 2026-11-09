@@ -1,3 +1,4 @@
+import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
 import { setCliSessionId } from "../../agents/cli-session.js";
 import { resolveContextTokensForModel } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
@@ -12,9 +13,7 @@ import {
 } from "../../config/sessions.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 
-type RunResult = Awaited<
-  ReturnType<(typeof import("../../agents/pi-embedded.js"))["runEmbeddedPiAgent"]>
->;
+type RunResult = EmbeddedPiRunResult;
 
 export async function updateSessionStoreAfterAgentRun(params: {
   cfg: OpenBotConfig;

@@ -1,4 +1,10 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
+import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
 import { STEWARD_REQUIRED_SKILLS } from "../../agents/builtin-steward/required-skills.js";
 import { listRetrieveReadOnlyCoreToolIds } from "../../agents/inbound-tool-policy.js";
 import { createOpenClawTools } from "../../agents/openclaw-tools.js";
@@ -8,6 +14,7 @@ import {
 } from "../../agents/pi-embedded-runner/run/resolve-embedded-tools.js";
 import { composeSkillPolicy } from "../../agents/skills/skill-policy.js";
 import { isWorkspaceOnboardingCompleted } from "../../agents/workspace.js";
+import { resolveSessionFilePath } from "../../config/sessions.js";
 import { resolveGroupSessionKey } from "../../config/sessions.js";
 import { loadContextScopeCatalog } from "../../gateway/context-scope/catalog.js";
 import { authorizeContextScopePlan } from "../../gateway/context-scope/index.js";
@@ -28,11 +35,18 @@ import { ensureSkillSnapshot } from "./session-updates.js";
 vi.mock("../../agents/auth-profiles/session-override.js", () => ({
   resolveSessionAuthProfileOverride: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("../../agents/bootstrap-files.js", () => ({
+  resolveBootstrapContextForRun: vi.fn().mockResolvedValue({
+    bootstrapFiles: [],
+    contextFiles: [{ path: "IDENTITY.md", content: "shared identity" }],
+  }),
+}));
 
 vi.mock("../../agents/pi-embedded.js", () => ({
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunActive: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunStreaming: vi.fn().mockReturnValue(false),
+  queueEmbeddedPiMessage: vi.fn().mockReturnValue(false),
   resolveEmbeddedSessionLane: vi.fn().mockReturnValue("session:session-key"),
 }));
 
@@ -51,7 +65,8 @@ vi.mock("../../agents/workspace.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../gateway/agent-growth/working-style-store.js", () => ({
+vi.mock("../../gateway/agent-growth/working-style-store.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../gateway/agent-growth/working-style-store.js")>()),
   resolveWorkingStyleInstructions: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -322,6 +337,151 @@ function baseParams(
 }
 
 describe("runPreparedReply inbound depth router", () => {
+  it.each([
+    "respond",
+    "accepted",
+    "duplicate",
+    "rejected",
+    "resumed",
+    "resume_denied",
+    "direct_respond",
+  ] as const)("Gateway interaction %s enters execution only after acceptance", async (kind) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-ingress-reply-"));
+    const file = path.join(dir, "session.jsonl");
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        type: "session",
+        version: CURRENT_SESSION_VERSION,
+        id: "ingress",
+        cwd: dir,
+        timestamp: new Date().toISOString(),
+      }) + "\n",
+    );
+    vi.mocked(resolveSessionFilePath).mockReturnValue(file);
+    const binding = { taskId: "accepted-task" };
+    const isResume = kind === "resumed" || kind === "resume_denied";
+    const executes = kind === "accepted" || kind === "resumed";
+    const interaction = vi.spyOn(replyTurnRuntime, "interaction").mockResolvedValue(
+      kind === "respond" || kind === "direct_respond"
+        ? { kind: "respond", text: "你好", clarification: false }
+        : isResume
+          ? {
+              kind: "task_proposal",
+              decision: {
+                kind: "task_control",
+                target: { taskId: binding.taskId, revision: "0" },
+                action: "resume",
+              },
+            }
+          : {
+              kind: "execution_admission",
+              result:
+                kind === "accepted"
+                  ? { kind, binding, acceptance: ["来源"] }
+                  : kind === "duplicate"
+                    ? { kind, binding }
+                    : { kind, reason: "revision_mismatch" },
+            },
+    );
+    const read = vi.spyOn(replyTurnRuntime.state, "read").mockReturnValue({
+      focusRevision: 0,
+      parked: [],
+      current:
+        kind === "accepted" || isResume
+          ? {
+              taskId: binding.taskId,
+              title: "报告",
+              goalText: "生成报告",
+              unfinished: true,
+              createdAtMs: 1,
+              stop: { summary: "已接纳", workspacePaths: [] },
+            }
+          : undefined,
+    });
+    try {
+      vi.mocked(runReplyAgent).mockClear();
+      const result = await runPreparedReply(
+        baseParams({
+          ctx: {
+            ...baseParams().ctx,
+            ...(kind === "direct_respond"
+              ? { InputProvenance: { kind: "external_user" as const } }
+              : {}),
+            ComposerMentions: [
+              {
+                mention_id: "plugin-mention",
+                displayName: "Origin",
+                offset: 0,
+                length: 7,
+                target: { kind: "plugin", pluginId: "plugin:ext:origin" },
+              },
+            ],
+          },
+          sessionId: "ingress",
+          sessionEntry: { sessionId: "ingress", sessionFile: file, updatedAt: 1 },
+          opts: {
+            runId: "ingress-message",
+            ...(kind === "direct_respond"
+              ? {}
+              : {
+                  interactionIngress: {
+                    userMessageId: "ingress-message",
+                    persistOwnTranscript: true,
+                  },
+                }),
+            onInteractionTaskResume: async () =>
+              kind === "resumed"
+                ? { kind: "accepted", binding, acceptance: ["来源"] }
+                : { kind: "rejected", reason: "resume_not_authorized" },
+          },
+        }),
+      );
+      expect(interaction).toHaveBeenCalledOnce();
+      expect(resolveBootstrapContextForRun).toHaveBeenCalled();
+      expect(interaction.mock.calls[0]?.[0].input.context).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: "system",
+            content: expect.stringContaining("shared identity"),
+          }),
+        ]),
+      );
+      expect(runReplyAgent).toHaveBeenCalledTimes(executes ? 1 : 0);
+      if (executes) {
+        const run = vi.mocked(runReplyAgent).mock.calls[0]?.[0].followupRun.run;
+        expect(run).toMatchObject({
+          taskCompletionBinding: binding,
+          executionAdmitted: true,
+          skipUserTranscriptPersist: true,
+        });
+        expect(run?.extraSystemPrompt).toContain("Acceptance criteria:");
+        expect(run?.mentionedPluginToolAllowlist).toEqual(["origin"]);
+        expect(run?.extraSystemPrompt).toContain("pluginId=origin");
+        expect(run?.extraSystemPrompt).not.toContain("host-executed");
+      }
+      if (kind === "respond" || kind === "direct_respond") {
+        expect(result).toEqual({ text: "你好" });
+      }
+      if (!executes) {
+        const entries = fs
+          .readFileSync(file, "utf8")
+          .trim()
+          .split("\n")
+          .map((line) => JSON.parse(line) as unknown);
+        expect(entries).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ message: expect.objectContaining({ role: "assistant" }) }),
+          ]),
+        );
+      }
+    } finally {
+      interaction.mockRestore();
+      read.mockRestore();
+      vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
   let previousShadow: string | undefined;
   let previousRouter: string | undefined;
   let previousKnowledgePolicy: string | undefined;
@@ -366,7 +526,7 @@ describe("runPreparedReply inbound depth router", () => {
     }
   });
 
-  it("applies classify-only chat-lane cuts for steward chat when the router flag is off", async () => {
+  it("restricts chat actions without emptying shared identity or skill context", async () => {
     const events: Array<Record<string, unknown>> = [];
     const stop = onAgentEvent((evt) => {
       events.push(evt.data);
@@ -383,8 +543,10 @@ describe("runPreparedReply inbound depth router", () => {
     expect(vi.mocked(buildOperationalIdentitySystemPrompt)).toHaveBeenCalledWith(
       expect.objectContaining({ listingMode: "lightweight" }),
     );
-    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({ skillFilter: [] });
-    expect(opts.bootstrapContextMode).toBe("lightweight");
+    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      skillFilter: undefined,
+    });
+    expect(opts.bootstrapContextMode).toBeUndefined();
     expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
     expect(lastReplyCall()?.followupRun.run.contextLane).toBe("chat");
     const tools = constructedToolsFromLastRun();
@@ -398,7 +560,7 @@ describe("runPreparedReply inbound depth router", () => {
     expect(toolEvents[0]?.toolSkippedReason).toBe("depth_chat");
   });
 
-  it("selected knowledge sources survive chat-lane: prefetch + tools stay available", async () => {
+  it("selected knowledge supplies context without granting execution tools", async () => {
     vi.mocked(loadContextScopeCatalog).mockResolvedValue([
       { type: "file", id: "article-1", label: "article" },
     ]);
@@ -424,15 +586,17 @@ describe("runPreparedReply inbound depth router", () => {
     expect(opts.contextScopePlan?.mode).toBe("focused");
     expect(vi.mocked(buildKnowledgeUniversePromptContext)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(resolveKnowledgeGatewayClientForAgentRun)).toHaveBeenCalledTimes(1);
-    expect(lastReplyCall()?.followupRun.run.disableTools).toBeUndefined();
+    expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
     const tools = constructedToolsFromLastRun();
-    expect(tools.length).toBeGreaterThan(0);
-    expect(embeddedToolSetContainsKnowledgeSource(tools)).toBe(true);
-    // Other chat-lane cuts still apply (OI lightweight, empty skill window).
+    expect(tools).toHaveLength(0);
+    expect(embeddedToolSetContainsKnowledgeSource(tools)).toBe(false);
+    // Identity stays concise while the skill filter remains available to context selection.
     expect(vi.mocked(buildOperationalIdentitySystemPrompt)).toHaveBeenCalledWith(
       expect.objectContaining({ listingMode: "lightweight" }),
     );
-    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({ skillFilter: [] });
+    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      skillFilter: undefined,
+    });
     expect(events.filter((evt) => evt.event === "chat.knowledge_degraded")).toEqual([]);
   });
 
@@ -467,7 +631,7 @@ describe("runPreparedReply inbound depth router", () => {
     );
     expect(opts.inboundDepthDecision?.depth).toBe("chat");
     expect(vi.mocked(buildKnowledgeUniversePromptContext)).toHaveBeenCalledTimes(1);
-    expect(lastReplyCall()?.followupRun.run.disableTools).toBeUndefined();
+    expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
   });
 
   it("keeps full bootstrap on chat-lane while workspace onboarding is incomplete", async () => {
@@ -477,6 +641,19 @@ describe("runPreparedReply inbound depth router", () => {
     expect(opts.inboundDepthDecision?.depth).toBe("chat");
     expect(opts.bootstrapContextMode).toBeUndefined();
     expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
+  });
+
+  it("retains selected skill guidance and memory in interaction without enabling tools", async () => {
+    vi.mocked(buildLearningRecallSystemPrompt).mockResolvedValueOnce("RELEVANT_MEMORY");
+    const opts: GetReplyOptions = { runId: "run-shared-supply", skillFilter: ["writing-guidance"] };
+    await runPreparedReply(baseParams({ opts }));
+    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      skillFilter: ["writing-guidance"],
+    });
+    expect(lastReplyCall()?.followupRun.run.extraSystemPrompt).toContain("RELEVANT_MEMORY");
+    expect(lastReplyCall()?.followupRun.run.extraSystemPrompt).toContain("identity");
+    expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
+    expect(opts.bootstrapContextMode).toBeUndefined();
   });
 
   it("does not force steward-required skills into retrieve skillFilter", async () => {
@@ -545,7 +722,7 @@ describe("runPreparedReply inbound depth router", () => {
     );
 
     // Space + round-invoked so collaboration assembly runs; act text avoids
-    // steward classify-only chat-lane emptying skillFilter.
+    // steward-specific chat action restriction.
     await runPreparedReply(
       baseParams({
         ...messageParams(ACT_WRITE),
@@ -588,7 +765,7 @@ describe("runPreparedReply inbound depth router", () => {
     expect(tools.map((tool) => tool.name)).not.toContain("web_search");
   });
 
-  it("skips knowledge, identity listing and tools for chat when the router is on", async () => {
+  it("keeps unselected knowledge optional and chat actions disabled when the router is on", async () => {
     process.env.OPENBOT_CHAT_INBOUND_DEPTH_ROUTER = "1";
     const events: Array<Record<string, unknown>> = [];
     const stop = onAgentEvent((evt) => {
@@ -605,8 +782,10 @@ describe("runPreparedReply inbound depth router", () => {
     expect(vi.mocked(buildOperationalIdentitySystemPrompt)).toHaveBeenCalledWith(
       expect.objectContaining({ listingMode: "lightweight" }),
     );
-    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({ skillFilter: [] });
-    expect(opts.bootstrapContextMode).toBe("lightweight");
+    expect(vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]).toMatchObject({
+      skillFilter: undefined,
+    });
+    expect(opts.bootstrapContextMode).toBeUndefined();
     expect(lastReplyCall()?.followupRun.run.disableTools).toBe(true);
     expect(lastReplyCall()?.followupRun.run.contextLane).toBe("chat");
     const constructedTools = constructedToolsFromLastRun();

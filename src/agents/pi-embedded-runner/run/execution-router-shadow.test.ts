@@ -252,7 +252,8 @@ vi.mock("../../cache-trace.js", () => ({
   createCacheTrace: () => undefined,
 }));
 
-const { runEmbeddedAttempt } = await import("./attempt.js");
+const { runEmbeddedAttempt } =
+  await import("../../../agent-runtime/execution/runner/embedded-attempt.js");
 
 // Direct caller: explicit frozen Constitutional shadow deps (gate off, production
 // no-op sink, fixed clock). No environment access and no fallback.

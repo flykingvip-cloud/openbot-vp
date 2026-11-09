@@ -4589,13 +4589,29 @@ export class OpenBotApp extends LitElement {
       sessionsResult: this.sessionsResult,
       workbenchTeamSelectedKey: this.workbenchTeamSelectedKey,
     });
-    const file = await persistWorkspacePptxSlideDraft({
-      client: adaptDaibaiState(this).client,
-      filename,
-      draft,
-      groupId,
-      sessionKey: this.sessionKey,
-    });
+    let file: Awaited<ReturnType<typeof persistWorkspacePptxSlideDraft>>;
+    try {
+      file = await persistWorkspacePptxSlideDraft({
+        client: adaptDaibaiState(this).client,
+        filename,
+        draft,
+        expectedContentHash:
+          typeof workspace.artifact.providerMetadata?.contentHash === "string"
+            ? workspace.artifact.providerMetadata.contentHash
+            : undefined,
+        groupId,
+        sessionKey: this.sessionKey,
+      });
+    } catch (error) {
+      this.showDeliverableSaveToast({
+        message: String(error).includes("ARTIFACT_VERSION_CONFLICT")
+          ? t("chat.deliverableEditStale")
+          : t("chat.deliverableSaveFailed"),
+        kind: "error",
+        shownAt: Date.now(),
+      });
+      return;
+    }
     if (!file) {
       this.showDeliverableSaveToast({
         message: t("chat.deliverableSaveFailed"),
@@ -4605,6 +4621,20 @@ export class OpenBotApp extends LitElement {
       return;
     }
     if (this.sidebarArtifactWorkspace?.artifact.artifactId !== workspace.artifact.artifactId) {
+      return;
+    }
+    if (this.sidebarArtifactWorkspace.artifact.providerMetadata?.previewText !== draft) {
+      this.sidebarArtifactWorkspace = {
+        ...this.sidebarArtifactWorkspace,
+        artifact: {
+          ...this.sidebarArtifactWorkspace.artifact,
+          providerMetadata: {
+            ...this.sidebarArtifactWorkspace.artifact.providerMetadata,
+            contentHash: file.contentHash,
+            fileBase64: file.base64,
+          },
+        },
+      };
       return;
     }
     applyWorkspaceFilePreview({

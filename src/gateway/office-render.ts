@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import mammoth from "mammoth";
+import { renderPptxIsolatedPreview } from "./office-pptx-isolated.js";
 import { extractPptxSlides, type OfficeSlideText } from "./office-pptx-text.js";
 
 /**
@@ -10,8 +11,8 @@ import { extractPptxSlides, type OfficeSlideText } from "./office-pptx-text.js";
  * data URIs), which the client sanitizes (DOMPurify) before rendering. Conversion is best-effort:
  * on any failure the caller falls back to a plain download of the original file.
  *
- * PPTX has no mammoth equivalent here — we extract per-slide text from the OOXML package and
- * render a lightweight slide-deck HTML so "打开成果" can preview decks in the sidebar.
+ * PPTX uses local Impress/Poppler static-slide rendering, retaining original bytes for downloads.
+ * If native rendering is unavailable, the explicitly labelled text-only preview remains available.
  *
  * XLSX is parsed via OOXML (JSZip) into a self-contained HTML table + optional SVG chart.
  */
@@ -105,6 +106,10 @@ async function renderPptxPreview(
   if (!slides) {
     return null;
   }
+  const visualHtml = await renderPptxIsolatedPreview(buffer, title, slides.length);
+  if (visualHtml) {
+    return { html: visualHtml, slides };
+  }
   const safeTitle = escapeHtml(title.trim() || "Presentation");
   const body = slides
     .map((slide) => {
@@ -134,7 +139,7 @@ ${body}
 }
 
 /**
- * Convert a .pptx buffer to a self-contained HTML slide deck (text-first preview).
+ * Convert a .pptx buffer to static-slide HTML, with an explicitly labelled text fallback.
  * Returns null when the package cannot be parsed or yields no slide text.
  */
 export async function renderPptxBufferToHtml(

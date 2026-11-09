@@ -6,6 +6,9 @@ import {
 
 vi.mock("../agents/pi-embedded.js", () => ({
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
+  queueEmbeddedPiMessage: vi.fn().mockReturnValue(false),
+  isEmbeddedPiRunActive: vi.fn().mockReturnValue(false),
+  isEmbeddedPiRunStreaming: vi.fn().mockReturnValue(false),
   runEmbeddedPiAgent: vi.fn(),
   resolveEmbeddedSessionLane: (key: string) => `session:${key.trim() || "main"}`,
 }));
@@ -32,3 +35,8 @@ vi.mock("../gateway/call.js", () => ({
 
 export const makeIsolatedAgentJob = makeIsolatedAgentJobFixture;
 export const makeIsolatedAgentParams = makeIsolatedAgentParamsFixture;
+
+vi.mock("../agent-runtime/execution/runner/embedded-run.js", async () => {
+  const { runEmbeddedPiAgent } = await import("../agents/pi-embedded.js");
+  return { runEmbeddedPiAgent };
+});
