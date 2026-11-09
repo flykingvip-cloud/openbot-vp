@@ -90,12 +90,12 @@ import type {
   SessionTaskBoard,
 } from "../agent-runtime/contracts/task.js";
 import type { IncomingTurnResult } from "../agent-runtime/contracts/turn-result.js";
-import type { FocusSnapshot } from "./focus-policy.js";
+import type { FocusSnapshot } from "../agent-runtime/policy/index.js";
 import {
   isOwnerConstraintFullReplace,
   isOwnerConstraintRevision,
   shouldPersistOwnerConstraint,
-} from "./turn-relation.js";
+} from "../agent-runtime/policy/index.js";
 export { MAX_PARKED_TASKS } from "../agent-runtime/policy/index.js";
 
 // Compatibility type exports; definitions have a single owner in runtime contracts.
