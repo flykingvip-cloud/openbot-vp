@@ -18,6 +18,19 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
+import {
+  applyHandoffContractToResponsibility,
+  appendHandoffHistoryById,
+  classifyHandoffApplyAgainstLive,
+  handoffPartyLooksLikeBot as looksLikeBot,
+  resolveHandoffApproval as resolveApproval,
+  responsibilityFromHandoffTask,
+} from "../../agent-runtime/policy/index.js";
+import {
+  appendHandoffLogLine,
+  withHandoffRoundLock,
+  writeHandoffJson,
+} from "../../agent-runtime/state/index.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import type { CollaborationFactRecord, HandoffFactType } from "../collaboration-ledger/types.js";
 import { appendCollaborationFactRecord } from "../collaboration-ledger/writer.js";
@@ -32,7 +45,6 @@ import {
   enrichHandoffAssumptionsWithOguiBrief,
   resolveOguiHandoffBriefForPropose,
 } from "./ogui-handoff-projection.js";
-import { appendJsonlDurable, withRoundLock, writeJsonDurable } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import {
   assertCollaborationRuntimeWritable,
@@ -255,25 +267,6 @@ function isHandoffContract(value: unknown): value is HandoffContract {
   );
 }
 
-function resolveApproval(
-  kind: HandoffKind,
-  toRole: ResponsibilityRole,
-  requested: HandoffApproval | undefined,
-): HandoffApproval {
-  if (toRole === "owner" || toRole === "approver" || kind === "owner_transfer") {
-    return "human";
-  }
-  if (requested === "human" || requested === "governance" || requested === "none") {
-    return requested;
-  }
-  return "none";
-}
-
-function looksLikeBot(agentId: string): boolean {
-  const id = agentId.trim().toLowerCase();
-  return id.startsWith("bot:") || id.startsWith("agent:");
-}
-
 function flagOff<T>(): HandoffResult<T> {
   return fail(
     "flag_off",
@@ -340,7 +333,7 @@ async function appendContract(
   at: number,
 ): Promise<void> {
   const line: HandoffLogLine = { kind: "handoff_contract", at, contract };
-  await appendJsonlDurable(logPath, line);
+  await appendHandoffLogLine(logPath, line);
 }
 
 function isTxn(value: unknown): value is HandoffApplyTxn {
@@ -484,55 +477,12 @@ async function hasFactTypes(params: {
   return needed.size === 0;
 }
 
-function responsibilityOf(task: HandoffTask): TaskResponsibility {
-  if (task.responsibility) {
-    return {
-      ...task.responsibility,
-      executors: [...task.responsibility.executors],
-    };
-  }
-  const owner = compact(task.ownerMemberId) || "group";
-  const assigned = uniqueIds(task.assignedMemberIds);
-  return {
-    owner,
-    executors: assigned.length > 0 ? assigned : owner === "group" ? [] : [owner],
-    decisionAuthority: owner,
-  };
-}
-
-function nextResponsibility(
-  current: TaskResponsibility,
-  contract: HandoffContract,
-): TaskResponsibility {
-  const to = contract.to.agentId;
-  if (contract.kind === "owner_transfer" || contract.to.responsibilityRole === "owner") {
-    return { ...current, owner: to };
-  }
-  if (contract.to.responsibilityRole === "reviewer") {
-    return { ...current, reviewer: to };
-  }
-  if (contract.to.responsibilityRole === "approver") {
-    return { ...current, approver: to };
-  }
-  const executors = uniqueIds([
-    to,
-    ...current.executors.filter((id) => id !== contract.from.agentId),
-  ]);
-  return { ...current, executors };
-}
-
-/** T45: expose responsibility projection for live-lock apply. */
-export function responsibilityFromHandoffTask(task: HandoffTask): TaskResponsibility {
-  return responsibilityOf(task);
-}
-
-/** T45: apply approved contract to a live responsibility snapshot. */
-export function applyHandoffContractToResponsibility(
-  current: TaskResponsibility,
-  contract: HandoffContract,
-): TaskResponsibility {
-  return nextResponsibility(current, contract);
-}
+export {
+  appendHandoffHistoryById,
+  applyHandoffContractToResponsibility,
+  classifyHandoffApplyAgainstLive,
+  responsibilityFromHandoffTask,
+};
 
 export type HandoffLiveApplyDecision =
   | { kind: "apply"; responsibility: TaskResponsibility }
@@ -543,155 +493,6 @@ export type HandoffLiveApplyDecision =
       detail: string;
     }
   | { kind: "conflict"; detail: string; responsibility: TaskResponsibility };
-
-/**
- * T45/T47/T48: classify whether an approved handoff may still change live responsibility.
- *
- * Idempotent ONLY when the same handoffId is already in task history (contract identity).
- * Live responsibility happening to equal `toId` is `already_at_target` — never "already applied".
- * `baseHistoryLen` binds duty-chain version so A→B→A then replay of an old contract conflicts.
- * Ledger/status `applied` without history may still repair projection — but ONLY after the same
- * owner/reviewer/approver/executor `from` checks as a fresh apply. Applied proves the contract
- * reached apply once; it does not prove live responsibility is still safe to re-project.
- */
-export function classifyHandoffApplyAgainstLive(params: {
-  contract: HandoffContract;
-  live: HandoffTask;
-  historyHandoffIds?: ReadonlySet<string> | readonly (string | undefined | null)[];
-  /** Live task.handoffs length (duty-chain version). */
-  liveHistoryLen?: number;
-}): HandoffLiveApplyDecision {
-  const liveResp = responsibilityOf(params.live);
-  const handoffId = compact(params.contract.handoffId);
-  const ids = params.historyHandoffIds;
-  const idSet =
-    ids instanceof Set
-      ? ids
-      : new Set([...(ids ?? [])].map((v) => compact(v)).filter((v): v is string => Boolean(v)));
-  if (handoffId && idSet.has(handoffId)) {
-    return { kind: "idempotent", responsibility: liveResp };
-  }
-
-  const liveHistoryLen =
-    typeof params.liveHistoryLen === "number"
-      ? params.liveHistoryLen
-      : Array.isArray(params.live.handoffs)
-        ? params.live.handoffs.length
-        : idSet.size;
-  const baseHistoryLen = params.contract.baseHistoryLen;
-  if (typeof baseHistoryLen === "number" && liveHistoryLen !== baseHistoryLen) {
-    return {
-      kind: "conflict",
-      detail: `expected handoff history length ${baseHistoryLen}, live ${liveHistoryLen}`,
-      responsibility: liveResp,
-    };
-  }
-
-  // T48: do NOT short-circuit on status===applied. Missing history may repair only when
-  // live still satisfies the same from-preconditions as a fresh apply; otherwise conflict.
-
-  const fromId = compact(params.contract.from.agentId);
-  const toId = compact(params.contract.to.agentId);
-  const role = params.contract.to.responsibilityRole;
-  const isOwnerMove = params.contract.kind === "owner_transfer" || role === "owner";
-
-  if (isOwnerMove) {
-    if (compact(liveResp.owner) === toId) {
-      return {
-        kind: "already_at_target",
-        detail: `live owner already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
-        responsibility: liveResp,
-      };
-    }
-    if (compact(liveResp.owner) !== fromId) {
-      return {
-        kind: "conflict",
-        detail: `expected owner ${fromId}, live owner ${liveResp.owner}`,
-        responsibility: liveResp,
-      };
-    }
-    return {
-      kind: "apply",
-      responsibility: nextResponsibility(liveResp, params.contract),
-    };
-  }
-
-  if (role === "reviewer") {
-    if (compact(liveResp.reviewer) === toId) {
-      return {
-        kind: "already_at_target",
-        detail: `live reviewer already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
-        responsibility: liveResp,
-      };
-    }
-    if (liveResp.reviewer && compact(liveResp.reviewer) !== fromId) {
-      return {
-        kind: "conflict",
-        detail: `expected reviewer ${fromId}, live reviewer ${liveResp.reviewer}`,
-        responsibility: liveResp,
-      };
-    }
-    return {
-      kind: "apply",
-      responsibility: nextResponsibility(liveResp, params.contract),
-    };
-  }
-
-  if (role === "approver") {
-    if (compact(liveResp.approver) === toId) {
-      return {
-        kind: "already_at_target",
-        detail: `live approver already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
-        responsibility: liveResp,
-      };
-    }
-    if (liveResp.approver && compact(liveResp.approver) !== fromId) {
-      return {
-        kind: "conflict",
-        detail: `expected approver ${fromId}, live approver ${liveResp.approver}`,
-        responsibility: liveResp,
-      };
-    }
-    return {
-      kind: "apply",
-      responsibility: nextResponsibility(liveResp, params.contract),
-    };
-  }
-
-  // continue / evidence / executor role
-  const executors = new Set(liveResp.executors.map((id) => compact(id)).filter(Boolean));
-  if (executors.has(toId) && !executors.has(fromId)) {
-    return {
-      kind: "already_at_target",
-      detail: `live executors already include ${toId} without ${fromId}; handoff ${handoffId || "(missing)"} not in history`,
-      responsibility: liveResp,
-    };
-  }
-  if (!executors.has(fromId)) {
-    return {
-      kind: "conflict",
-      detail: `expected executor ${fromId} still assigned; live executors=[${[...executors].join(",")}]`,
-      responsibility: liveResp,
-    };
-  }
-  return {
-    kind: "apply",
-    responsibility: nextResponsibility(liveResp, params.contract),
-  };
-}
-
-/** Append handoff history by handoffId (no whole-array replace from outside the lock). */
-export function appendHandoffHistoryById(
-  existing: readonly TaskHandoff[] | null | undefined,
-  entry: TaskHandoff,
-): TaskHandoff[] {
-  const prior = [...(existing ?? [])];
-  const id = compact(entry.handoffId);
-  if (id && prior.some((h) => compact(h.handoffId) === id)) {
-    return prior;
-  }
-  return [...prior, entry];
-}
 
 function withResponsibility(
   task: HandoffTask,
@@ -746,7 +547,7 @@ async function finishHandoffApply(params: {
   await appendFactOnce({ fact: params.txn.fact, ledgerFile: params.ledgerFile, cfg: params.cfg });
   params.hooks?.afterFactBeforeTask?.();
   assertCollaborationRuntimeWritable(overlayPath, params.cfg);
-  await writeJsonDurable(overlayPath, params.txn.task);
+  await writeHandoffJson(overlayPath, params.txn.task);
   await appendAppliedIfNeeded({
     logPath: params.logPath,
     contract: params.txn.contract,
@@ -819,7 +620,7 @@ export async function recoverPendingHandoffTxns(params: {
     if (!stem) {
       continue;
     }
-    await withRoundLock(handoffsDir, stem, async () => {
+    await withHandoffRoundLock(handoffsDir, stem, async () => {
       const done = await rollForwardTask({
         handoffsDir,
         taskId: txn.taskId,
@@ -940,7 +741,7 @@ export async function proposeHandoff(
   const stem = safeStem(taskId)!;
   const logPath = handoffLogPath(handoffsDir, taskId);
   assertCollaborationRuntimeWritable(logPath, cfg);
-  await withRoundLock(handoffsDir, stem, async () => {
+  await withHandoffRoundLock(handoffsDir, stem, async () => {
     await appendContract(logPath, contract, at);
   });
   await recordWakeEventBestEffort(
@@ -986,7 +787,7 @@ export async function acceptHandoff(
   }
   const logPath = handoffLogPath(handoffsDir, contract.taskId);
   const ledgerFile = ledgerFileFor(authority, cfg);
-  return await withRoundLock(handoffsDir, stem, async () => {
+  return await withHandoffRoundLock(handoffsDir, stem, async () => {
     const persisted = await requirePersisted({ logPath, contract, status: "proposed" });
     if (!persisted.ok) {
       return persisted;
@@ -1029,7 +830,7 @@ export async function approveHandoff(
   }
   const logPath = handoffLogPath(handoffsDir, contract.taskId);
   const ledgerFile = ledgerFileFor(authority, cfg);
-  return await withRoundLock(handoffsDir, stem, async () => {
+  return await withHandoffRoundLock(handoffsDir, stem, async () => {
     const persisted = await requirePersisted({
       logPath,
       contract,
@@ -1091,7 +892,7 @@ export async function applyApprovedHandoff(
   const logPath = handoffLogPath(handoffsDir, contract.taskId);
   const txnPath = handoffTxnPath(handoffsDir, contract.taskId);
   const ledgerFile = ledgerFileFor(authority, cfg);
-  return await withRoundLock(handoffsDir, stem, async () => {
+  return await withHandoffRoundLock(handoffsDir, stem, async () => {
     const pending = await rollForwardTask({
       handoffsDir,
       taskId: contract.taskId,
@@ -1117,8 +918,8 @@ export async function applyApprovedHandoff(
       );
     }
     const at = nowOf(options);
-    const before = responsibilityOf(task);
-    const responsibility = nextResponsibility(before, persisted.value);
+    const before = responsibilityFromHandoffTask(task);
+    const responsibility = applyHandoffContractToResponsibility(before, persisted.value);
     const nextTask = withResponsibility(task, responsibility, at);
     const applied: HandoffContract = { ...persisted.value, status: "applied", appliedAt: at };
     const fact = buildFact({
@@ -1140,7 +941,7 @@ export async function applyApprovedHandoff(
       taskOverlayPath: overlayPath,
     };
     assertCollaborationRuntimeWritable(txnPath, cfg);
-    await writeJsonDurable(txnPath, txn);
+    await writeHandoffJson(txnPath, txn);
     await finishHandoffApply({
       handoffsDir,
       txnPath,

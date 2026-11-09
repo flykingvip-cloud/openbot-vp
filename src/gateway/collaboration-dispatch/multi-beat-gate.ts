@@ -1,3 +1,8 @@
+import {
+  MULTI_BEAT_DEFAULT_MAX,
+  MULTI_BEAT_HARD_CEILING,
+  clampMaxBeatsPerEpisode,
+} from "../../agent-runtime/policy/index.js";
 /**
  * P5 — multi-Beat Episode gate (scaffold).
  *
@@ -21,14 +26,7 @@
 import type { OpenBotConfig } from "../../config/types.js";
 import type { EpisodeFacilitatorGateKind } from "./episode-decision-record.js";
 
-/** Default / flag-off ceiling: single Beat only. */
-export const MULTI_BEAT_DEFAULT_MAX = 1;
-
-/**
- * Hard melt aligned with SYSTEM_INVARIANTS.maxVisibleRepliesCeiling (12).
- * Raising above this is clamped — never a silent unbounded loop.
- */
-export const MULTI_BEAT_HARD_CEILING = 12;
+export { MULTI_BEAT_DEFAULT_MAX, MULTI_BEAT_HARD_CEILING, clampMaxBeatsPerEpisode };
 
 /**
  * Plan flag `collab.episode.maxBeats` → `collaboration.episode.maxBeats`.
@@ -52,24 +50,6 @@ export function resolveMaxBeatsPerEpisode(cfg?: OpenBotConfig | null): number {
 /** True only when an explicit config raise is above the single-beat default. */
 export function isCollabMultiBeatGateOpen(cfg?: OpenBotConfig | null): boolean {
   return resolveMaxBeatsPerEpisode(cfg) > MULTI_BEAT_DEFAULT_MAX;
-}
-
-/**
- * Clamp a raw maxBeats value the same way config resolve does.
- * Used by the policy compiler when GroupPolicyInput carries an override.
- */
-export function clampMaxBeatsPerEpisode(raw: number | null | undefined): number {
-  if (typeof raw !== "number" || !Number.isFinite(raw)) {
-    return MULTI_BEAT_DEFAULT_MAX;
-  }
-  const floored = Math.floor(raw);
-  if (floored < MULTI_BEAT_DEFAULT_MAX) {
-    return MULTI_BEAT_DEFAULT_MAX;
-  }
-  if (floored > MULTI_BEAT_HARD_CEILING) {
-    return MULTI_BEAT_HARD_CEILING;
-  }
-  return floored;
 }
 
 /**

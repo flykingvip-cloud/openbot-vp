@@ -21,6 +21,7 @@ import {
   isTodolistConfirmedForDelivery,
   todolistIsGroupSharedBoardSubrecord,
 } from "../../agent-runtime/policy/index.js";
+import { commitPrivateTodolistLog } from "../../agent-runtime/state/index.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
@@ -33,7 +34,6 @@ import {
   loadBoardClaimItem,
   type GroupBoardClaimItem,
 } from "./claim-contract.js";
-import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 import { noteUnattendedStaleConfirmation } from "./single-group-unattended.js";
@@ -422,21 +422,13 @@ async function commitTodolistLines(
   }
   const dir = executorTodolistsDir(authority);
   const logPath = executorTodolistLogPath(dir, taskId);
-  return withRoundLock(dir, stem, async () => {
-    await fs.mkdir(dir, { recursive: true });
-    const lines = await readLog(logPath);
-    const outcome = fn(lines);
-    if (outcome.result.ok && outcome.appends && outcome.appends.length > 0) {
-      const at = nowOf(options);
-      for (const todolist of outcome.appends) {
-        await appendJsonlDurable(logPath, {
-          kind: "executor_private_todolist",
-          at,
-          todolist,
-        } satisfies TodolistLogLine);
-      }
-    }
-    return outcome.result;
+  return commitPrivateTodolistLog({
+    dir,
+    stem,
+    logPath,
+    at: () => nowOf(options),
+    readLines: () => readLog(logPath),
+    decide: fn,
   });
 }
 
