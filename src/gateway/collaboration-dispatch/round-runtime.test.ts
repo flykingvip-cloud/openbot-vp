@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { executeCollaborationRoundForTest } from "./__fixtures__/runtime-authority-test-utils.js";
+import * as completionContract from "./completion-contract.js";
 import { DEFAULT_COLLABORATION_POLICY } from "./policy.js";
 import {
   abortPersistedRound,
@@ -1026,4 +1027,75 @@ describe("collaboration round runtime contract", () => {
     expect(round.state).toBe("ROUND_COMPLETE");
     expect(calls.some((entry) => entry.startsWith("fallback:"))).toBe(true);
   });
+});
+
+describe("invited member continuation after a settled primary deadline", () => {
+  test.each(["continue", "abort", "visible_limit", "optional"] as const)(
+    "%s retains admission and stop boundaries",
+    async (scenario) => {
+      const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-invited-"));
+      const calls: string[] = [];
+      let aborted = false;
+      const deadline = vi
+        .spyOn(completionContract, "resolvePrimaryDeadlineMs")
+        .mockImplementation(({ startedAtMs }) => startedAtMs + 5);
+      try {
+        const decision = createDecision({
+          roundId: "invited-late",
+          executionBots: [botA, botB],
+          roundPlan: {
+            ...createDecision().roundPlan,
+            participants: [
+              ...createDecision().roundPlan.participants,
+              {
+                agentId: "bot-b",
+                displayName: "Bot B",
+                tier: scenario === "optional" ? "duty" : "mention",
+                contributionRole: "supplement",
+                reasonText: "requested member",
+              },
+            ],
+          },
+        });
+        const scope = createCoordinatorScope();
+        if (scenario === "visible_limit" && scope.operatingState) {
+          scope.operatingState.collaborationPolicy.maxVisibleBotRepliesPerRound = 1;
+        }
+        const round = await executeCollaborationRoundForTest({
+          decision,
+          scope,
+          roundsDir,
+          sessionKey: "space:alpha",
+          message: "请分别给出建议",
+          isAborted: () => aborted,
+          policy: {
+            ...policyWithoutWrap(),
+            supplement: {
+              ...DEFAULT_COLLABORATION_POLICY.supplement,
+              enabled: true,
+            },
+          },
+          runBot: async ({ bot }) => {
+            calls.push(bot.agentId);
+            if (bot.agentId === "bot-a") {
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              aborted = scenario === "abort";
+            }
+            return { text: "结论：给出可验证的独立建议。下一步：核实证据。" };
+          },
+        });
+        expect(calls).toEqual(scenario === "continue" ? ["bot-a", "bot-b"] : ["bot-a"]);
+        expect(round.state).toBe(scenario === "abort" ? "ROUND_ABORTED" : "ROUND_COMPLETE");
+        if (scenario === "continue") {
+          expect(round.policyDecision?.supplementDenialDiagnosis?.structuralGate).toMatchObject({
+            primaryBudgetClosed: true,
+            invitedContinuation: true,
+          });
+        }
+      } finally {
+        deadline.mockRestore();
+        await fs.rm(roundsDir, { recursive: true, force: true });
+      }
+    },
+  );
 });

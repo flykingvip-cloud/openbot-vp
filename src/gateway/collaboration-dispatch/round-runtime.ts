@@ -1004,13 +1004,16 @@ export async function executeCollaborationRound(
       .map((edge) => normalizeAgentIdentifier(edge.toAgentId))
       .filter((id): id is string => Boolean(id) && !leadIds.has(id as string)),
   );
-  const invitedSupplementPresent =
-    stages.supplement.bots.some((bot) =>
-      invitedAgentIds.has(normalizeAgentIdentifier(bot.agentId) ?? ""),
-    ) || edgeTargetIds.size > 0;
+  const invitedMemberPresent = stages.supplement.bots.some((bot) =>
+    invitedAgentIds.has(normalizeAgentIdentifier(bot.agentId) ?? ""),
+  );
+  const invitedSupplementPresent = invitedMemberPresent || edgeTargetIds.size > 0;
+  // A settled primary's soft deadline closes optional discussion, not an already
+  // invited member's turn. Per-member admission, abort and visible limits still apply.
+  const invitedContinuation = primaryBudgetClosed && invitedMemberPresent;
   const supplementStructurallyAllowed =
     primaryCompleted &&
-    !primaryBudgetClosed &&
+    (!primaryBudgetClosed || invitedContinuation) &&
     params.decision.primaryMode !== "explicit_multi" &&
     frozen.supplement.enabled &&
     (params.decision.responseMode !== "single_owner" || edgeTargetIds.size > 0);
@@ -1018,7 +1021,10 @@ export async function executeCollaborationRound(
   // @mention, primary CollabEdge) open an invited-only window even without one.
   const supplementWindowReason: "conclusion" | "invited" | null = !supplementStructurallyAllowed
     ? null
-    : primaryHasConclusion && !isChitchatRound && params.decision.responseMode !== "single_owner"
+    : !primaryBudgetClosed &&
+        primaryHasConclusion &&
+        !isChitchatRound &&
+        params.decision.responseMode !== "single_owner"
       ? "conclusion"
       : invitedSupplementPresent
         ? "invited"
@@ -1034,6 +1040,7 @@ export async function executeCollaborationRound(
     const structuralGate = {
       primaryCompleted,
       primaryBudgetClosed,
+      invitedContinuation,
       primaryMode: String(params.decision.primaryMode ?? ""),
       supplementEnabled: Boolean(frozen.supplement.enabled),
       responseMode: String(params.decision.responseMode ?? ""),
@@ -1121,7 +1128,7 @@ export async function executeCollaborationRound(
       supplementWindowReason === "invited"
         ? orderedSupplementBots.filter((bot) => {
             const id = normalizeAgentIdentifier(bot.agentId) ?? "";
-            return invitedAgentIds.has(id) || edgeTargetIds.has(id);
+            return invitedAgentIds.has(id) || (!primaryBudgetClosed && edgeTargetIds.has(id));
           })
         : orderedSupplementBots;
     const preserveConflict = effective.strategy.preserveConflict;

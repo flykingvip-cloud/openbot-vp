@@ -140,3 +140,21 @@ describe("same-round context", () => {
     expect(shouldAttemptPrimaryQualityRedo({ enabled: false })).toBe(false);
   });
 });
+
+test("prompt preserves late qualifications beyond the short summary", () => {
+  const text = "背景说明包含足够长的完整主张。".repeat(60) + "关键限制：只做调查，禁止发布。";
+  const context = buildSameRoundContext([
+    { agentId: "a", agentName: "A", contributionRole: "lead", text, messageId: "m1" },
+  ]);
+  expect(context).toBeDefined();
+  expect(formatSameRoundContextForPrompt(context!)).toContain("关键限制：只做调查，禁止发布。");
+});
+
+test("a dispatched context snapshot cannot acquire later or edited replies", () => {
+  const replies = [{ agentId: "a", agentName: "A", contributionRole: "lead", text: "原始回答" }];
+  const context = buildSameRoundContext(replies);
+  replies[0].text = "后来改写";
+  replies.push({ agentId: "b", agentName: "B", contributionRole: "supplement", text: "后续回答" });
+  expect(context?.replies).toHaveLength(1);
+  expect(context?.replies[0].text).toBe("原始回答");
+});
