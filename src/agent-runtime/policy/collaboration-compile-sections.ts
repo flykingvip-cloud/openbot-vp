@@ -1,6 +1,5 @@
 import type {
   ActorCapability,
-  DecisionMode,
   DeepProvenance,
   DispatchTuning,
   EffectiveContextPolicy,
@@ -10,12 +9,17 @@ import type {
   GovernanceRole,
   GovernanceTaskPolicy,
   GroupPolicyInput,
-  LowSignalStrategy,
-  ModeTemplate,
   PolicyValueSource,
 } from "./collaboration-policy-model.js";
-import { OBSERVER_PERMISSIONS, SYSTEM_INVARIANTS } from "./collaboration-rules.js";
-import { clampMaxBeatsPerEpisode, MULTI_BEAT_DEFAULT_MAX } from "./collaboration-rules.js";
+import {
+  clampMaxBeatsPerEpisode,
+  MULTI_BEAT_DEFAULT_MAX,
+  OBSERVER_PERMISSIONS,
+  SYSTEM_INVARIANTS,
+  type DecisionMode,
+  type LowSignalStrategy,
+  type ModeTemplate,
+} from "./collaboration-rules.js";
 /**
  * Debt: split this file by the existing segment functions (participation, dispatch,
  * governance, context, presentation). Not part of the current transaction move.

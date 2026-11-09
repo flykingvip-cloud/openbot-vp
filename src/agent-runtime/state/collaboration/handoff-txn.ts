@@ -6,6 +6,7 @@ import {
   responsibilityFromHandoffTask,
   type CollaborationGovernanceView,
   type GovernanceActor,
+  type HandoffResponsibilityRole,
   type TaskResponsibility,
 } from "../../policy/index.js";
 import {
@@ -32,9 +33,20 @@ const HANDOFF_STATUSES = new Set([
   "expired",
   "cancelled",
 ]);
-const RESPONSIBILITY_ROLES = new Set(["owner", "executor", "reviewer", "approver", "contributor"]);
+function isResponsibilityRole(value: unknown): value is HandoffResponsibilityRole {
+  return (
+    value === "owner" ||
+    value === "executor" ||
+    value === "reviewer" ||
+    value === "approver" ||
+    value === "contributor"
+  );
+}
 
-export type HandoffTxnParty = { agentId: string; responsibilityRole: string };
+export type HandoffTxnParty = {
+  agentId: string;
+  responsibilityRole: HandoffResponsibilityRole;
+};
 
 export type HandoffTxnContract = {
   handoffId: string;
@@ -122,11 +134,11 @@ function isParty(value: unknown): value is HandoffTxnParty {
   if (!value || typeof value !== "object") {
     return false;
   }
-  const party = value as HandoffTxnParty;
+  const party = value as { agentId?: unknown; responsibilityRole?: unknown };
   return (
     typeof party.agentId === "string" &&
     party.agentId.trim().length > 0 &&
-    RESPONSIBILITY_ROLES.has(party.responsibilityRole)
+    isResponsibilityRole(party.responsibilityRole)
   );
 }
 
