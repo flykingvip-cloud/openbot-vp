@@ -9,6 +9,7 @@ import {
   appendSharedTurnContext,
   appendUntrustedContext,
   assembleIndividual,
+  selectContextCatalog,
   buildResumePrompt,
   buildTaskBoardContext,
   finalizeSystemContext,
@@ -502,6 +503,12 @@ export async function runPreparedReply(
     collaborationGroupId,
     sessionEntry,
     collaborationRoundInvoked: sessionCtx.CollaborationRoundInvoked === true,
+  });
+  // ChatType is not a catalog. Group chat without an explicit collaboration
+  // binding stays on the individual catalog and must not load group materials.
+  const contextCatalog = selectContextCatalog({
+    chatType: sessionCtx.ChatType,
+    collaborationAssembly: useCollaborationAssembly,
   });
   const runWorkspaceDir = resolveCollaborationRunWorkspaceDir({
     cfg,
@@ -1111,7 +1118,7 @@ export async function runPreparedReply(
   // Mentions supply capability hints only. The admitted runner selects and calls
   // tools through the common authorization, cancellation and task-action boundary.
   let extraSystemPromptParts: string[];
-  if (useCollaborationAssembly) {
+  if (contextCatalog === "collaboration-member") {
     extraSystemPromptParts = selectSystemContextParts([
       ...(await assembleCollaborationRuntimeContextParts({
         cfg,

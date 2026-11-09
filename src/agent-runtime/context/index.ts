@@ -7,6 +7,11 @@ export {
   appendSystemContextPart,
   finalizeSystemContext,
 } from "./assembly.js";
+export {
+  selectContextCatalog,
+  INDIVIDUAL_FORBIDDEN_GROUP_MATERIALS,
+} from "./catalog/select-catalog.js";
+export type { ContextCatalogName } from "./catalog/select-catalog.js";
 export { compileModelContext, COMPILED_CONTEXT_CAPSULE_MARKER } from "./compilation/compile.js";
 export { normalizeCompiledMessages } from "./compilation/normalize-outbound.js";
 export { resolveContextLane, resolveLaneBudget } from "./compilation/lane-budget.js";
