@@ -13,7 +13,7 @@ For the reply host (`get-reply-run.ts`):
 2. Select: `shouldUseCollaborationRuntimeAssembly` is the only collaboration binding. `selectContextCatalog` then returns `individual` or `collaboration-member`. `ChatType === "group"` without that binding stays `individual`.
 3. Order and render: the host renders fragments. `assembleIndividual` or `assembleCollaborationRuntimeContextParts` (which calls `assembleCollaborationMember`) orders them. Group ids are absent from the individual catalog and throw if passed.
 4. Audit and trust: untrusted speaker and `UntrustedContext` stay on the user body via `appendUntrustedContext`. System events are drained once into the system tail.
-5. Model messages: the admitted runner embeds `extraSystemPrompt` through the existing `buildAgentSystemPrompt`. `compileModelContext` only compresses history when its switch is on. It is not a second chapter compiler.
+5. Model messages split. A direct answer uses `invokeInteractionCompletion` and `buildInteractionCompletionContext` (bootstrap files, skill prompt, catalog fragments, JSONL history, and the interaction protocol). It returns on `routed.kind === "respond"` and does not call `runAdmittedTurn`. An accepted execution admission later embeds `extraSystemPrompt` through `buildAgentSystemPrompt`. `compileModelContext` only compresses history when its switch is on. It is not a second chapter compiler.
 
 Host reads that stay outside context: knowledge retrieval and receipts, learning exposure, profile and seat and runtime identity, skill policy, the one-shot system-event queue, and `DeliveryToolSideEffect` written before the delivery text is passed into the collaboration catalog.
 
