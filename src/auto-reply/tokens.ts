@@ -1,7 +1,8 @@
 import { escapeRegExp } from "../utils.js";
 
 export const HEARTBEAT_TOKEN = "HEARTBEAT_OK";
-export const SILENT_REPLY_TOKEN = "NO_REPLY";
+import { SILENT_REPLY_TOKEN } from "../agent-runtime/contracts/delivery.js";
+export { SILENT_REPLY_TOKEN } from "../agent-runtime/contracts/delivery.js";
 
 const silentExactRegexByToken = new Map<string, RegExp>();
 const silentTrailingRegexByToken = new Map<string, RegExp>();

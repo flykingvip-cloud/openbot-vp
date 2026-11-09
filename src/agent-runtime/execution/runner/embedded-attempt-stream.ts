@@ -47,9 +47,6 @@ export async function runEmbeddedAttemptStream(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<void> {
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- phase bag temp */
-  let __d: any;
-
   const { runtime } = await createPiModelRuntime({
     authStorage: params.authStorage,
     agentDir: s.agentDir,

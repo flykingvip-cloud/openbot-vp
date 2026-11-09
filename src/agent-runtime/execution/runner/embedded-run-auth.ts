@@ -48,7 +48,7 @@ export type EmbeddedRunSession = {
   effectiveModel: EmbeddedModelPrep["effectiveModel"];
   authStore: ReturnType<typeof ensureAuthProfileStore>;
   lockedProfileId: string | undefined;
-  profileCandidates: string[];
+  profileCandidates: ReturnType<typeof resolveRunAuthProfileCandidates>["profileCandidates"];
   legacyBeforeAgentStartResult: Awaited<
     ReturnType<typeof resolveModelHookResult>
   >["legacyBeforeAgentStartResult"];

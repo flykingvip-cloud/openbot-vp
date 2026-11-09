@@ -52,3 +52,5 @@ export {
 } from "./aside-budget.js";
 export { renderCollaborationMission } from "./sources/collaboration-mission.js";
 export { mergeRecall, renderLearningRecallPrompt } from "./sources/learning-recall.js";
+
+export { renderAgentSystemPrompt, buildRuntimeLine, type PromptMode } from "./system-prompt.js";

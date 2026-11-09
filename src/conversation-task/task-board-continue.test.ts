@@ -5,11 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { seedSessionTaskBoard, type SessionTaskBoard } from "./session-task-board.js";
-import {
-  insertLatestTaskDeferringCurrent,
-  emptySessionTaskBoard,
-  applyIncomingUserMessage,
-} from "./session-task-board.js";
+import { insertLatestTaskDeferringCurrent, emptySessionTaskBoard } from "./session-task-board.js";
 import {
   claimTaskBoardContinue,
   decideTaskBoardContinue,
@@ -334,12 +330,8 @@ describe("board-latest v2 C2 continue ticket / AC13", () => {
 
   it("AC13: A queued then insert B → claim A rejects", () => {
     const sessionFile = tempSessionFile();
-    const started = applyIncomingUserMessage({
-      board: emptySessionTaskBoard(),
-      incomingText: "你帮我制作一个贪吃蛇的小游戏",
-      nowMs: 1,
-    });
-    seedSessionTaskBoard(sessionFile, started.board);
+    const started = unfinishedBoard("task-snake", 1);
+    seedSessionTaskBoard(sessionFile, started);
     const decision = decideTaskBoardContinue({
       sessionFile,
       assistantText: "snake draft in progress",
@@ -350,7 +342,7 @@ describe("board-latest v2 C2 continue ticket / AC13", () => {
     }
     const ticket = decision.ticket;
     const inserted = insertLatestTaskDeferringCurrent({
-      board: started.board,
+      board: started,
       goalText: "请继续写《调律》小说第七章，六时启闸，并验收交付",
       nowMs: 2,
     });

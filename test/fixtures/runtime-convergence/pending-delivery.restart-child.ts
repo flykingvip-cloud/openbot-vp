@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { confirmPendingTurnDeliveryWithPorts } from "../../../src/agent-runtime/delivery/dispatch/confirm-pending.js";
+import { markAsyncWaitRecoveryDelivered } from "../../../src/agent-runtime/state/index.js";
 import {
   emptySessionTaskBoard,
   mutateSessionTaskBoard,
@@ -87,6 +88,7 @@ if (mode === "prepare") {
       return result;
     },
     bindingCurrent: isTaskExecutionBindingCurrent,
+    recordRecoveryDelivered: markAsyncWaitRecoveryDelivered,
   };
   const receipt = {
     cfg,

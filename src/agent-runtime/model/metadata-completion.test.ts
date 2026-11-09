@@ -5,7 +5,7 @@ vi.mock("@earendil-works/pi-ai/compat", async (original) => ({
   ...(await original<typeof import("@earendil-works/pi-ai/compat")>()),
   complete: invoke,
 }));
-import { invokeMetadataCompletion } from "./metadata-completion.js";
+import { invokeMetadataCompletion } from "./index.js";
 it("sends zero tools and preserves usage before JSON validation", async () => {
   const model = fixture;
   invoke.mockResolvedValue({

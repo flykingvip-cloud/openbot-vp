@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { sessionTaskState } from "../../agent-runtime/state/index.js";
 import {
-  applyIncomingUserMessage,
   emptySessionTaskBoard,
   seedSessionTaskBoard,
   readSessionTaskBoard,
@@ -47,18 +47,21 @@ function tempSessionFile(): string {
 
 function parkOneTask(sessionFile: string): string {
   fs.writeFileSync(sessionFile, "", "utf8");
-  const first = applyIncomingUserMessage({
-    board: emptySessionTaskBoard(),
-    incomingText: PRICE,
-    nowMs: 1_000,
-  });
-  const switched = applyIncomingUserMessage({
-    board: first.board,
-    incomingText: RESEARCH,
-    nowMs: 2_000,
-  });
-  seedSessionTaskBoard(sessionFile, switched.board);
-  return switched.board.parked[0]?.taskId ?? "";
+  seedSessionTaskBoard(sessionFile, emptySessionTaskBoard());
+  for (const [index, goal] of [PRICE, RESEARCH].entries()) {
+    const board = readSessionTaskBoard(sessionFile);
+    const admitted = sessionTaskState.admitExecution({
+      sessionFile,
+      requestId: `resume-recheck:${index}`,
+      goal,
+      acceptance: ["完成并交付目标成果"],
+      expectedFocusRevision: board.focusRevision,
+      expectedWriteEpoch: board.writeEpoch ?? 0,
+      expectedTaskId: board.current?.taskId,
+    });
+    expect(admitted.kind).toBe("accepted");
+  }
+  return readSessionTaskBoard(sessionFile).parked[0]?.taskId ?? "";
 }
 
 it.each(["你好", "今天星期几", "另外帮我做一份竞品研究提纲"])(

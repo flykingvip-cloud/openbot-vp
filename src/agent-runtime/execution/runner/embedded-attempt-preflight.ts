@@ -56,9 +56,8 @@ import { collectConnectedPreferredNodeIds } from "../../../infra/operator-local-
 import { isSubagentSessionKey } from "../../../routing/session-key.js";
 import { resolveAttemptFsWorkspaceOnly } from "../../capabilities/index.js";
 import { renderRunSkillContext } from "../../context/index.js";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export type EmbeddedAttemptState = Record<string, any>;
+import type { EmbeddedAttemptState } from "./embedded-attempt-state.js";
+export type { EmbeddedAttemptState } from "./embedded-attempt-state.js";
 
 export function createEmbeddedAttemptState(): EmbeddedAttemptState {
   return {
@@ -67,7 +66,7 @@ export function createEmbeddedAttemptState(): EmbeddedAttemptState {
     timedOutDuringCompaction: false,
     promptError: null,
     promptErrorSource: null,
-  };
+  } as EmbeddedAttemptState;
 }
 
 /** Workspace, abort, image capability, sandbox, LaneMode, constitutional shadow, reaction guidance. */
@@ -75,8 +74,6 @@ export async function runEmbeddedAttemptPreflight(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<void> {
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- destructure scratch */
-  let __d: any;
   s.skillContextInput = {
     workspaceDir: s.effectiveWorkspace,
     config: params.config,
@@ -87,9 +84,9 @@ export async function runEmbeddedAttemptPreflight(
     input: s.skillContextInput,
     selection: resolveEmbeddedRunSkillEntries(s.skillContextInput),
   };
-  __d = s.preparedSkillContext.selection;
-  s.skillEntries = __d.skillEntries;
-  s.preferLiveEntries = __d.preferLiveEntries;
+  const phaseValue1 = s.preparedSkillContext.selection;
+  s.skillEntries = phaseValue1.skillEntries;
+  s.preferLiveEntries = phaseValue1.preferLiveEntries;
   s.restoreSkillEnv =
     params.skillsSnapshot && !s.preferLiveEntries
       ? applySkillEnvOverridesFromSnapshot({
@@ -112,7 +109,7 @@ export async function runEmbeddedAttemptPreflight(
     { render: resolveSkillsPromptForRun, observe: observeAttemptSkillPreparation },
   );
   s.sessionLabel = params.sessionKey ?? params.sessionId;
-  __d = await resolveBootstrapContextForRun({
+  const phaseValue2 = await resolveBootstrapContextForRun({
     workspaceDir: s.effectiveWorkspace,
     config: params.config,
     sessionKey: params.sessionKey,
@@ -121,8 +118,8 @@ export async function runEmbeddedAttemptPreflight(
     contextMode: params.bootstrapContextMode,
     runKind: params.bootstrapContextRunKind,
   });
-  s.hookAdjustedBootstrapFiles = __d.bootstrapFiles;
-  s.contextFiles = __d.contextFiles;
+  s.hookAdjustedBootstrapFiles = phaseValue2.bootstrapFiles;
+  s.contextFiles = phaseValue2.contextFiles;
   s.bootstrapMaxChars = resolveBootstrapMaxChars(params.config);
   s.bootstrapTotalMaxChars = resolveBootstrapTotalMaxChars(params.config);
   s.bootstrapAnalysis = analyzeBootstrapBudget({
@@ -146,13 +143,13 @@ export async function runEmbeddedAttemptPreflight(
     ? ["Reminder: commit your changes in this workspace after edits."]
     : undefined;
   s.agentDir = params.agentDir ?? resolveOpenClawAgentDir();
-  __d = resolveSessionAgentIds({
+  const phaseValue3 = resolveSessionAgentIds({
     sessionKey: params.sessionKey,
     config: params.config,
     agentId: params.agentId,
   });
-  s.defaultAgentId = __d.defaultAgentId;
-  s.sessionAgentId = __d.sessionAgentId;
+  s.defaultAgentId = phaseValue3.defaultAgentId;
+  s.sessionAgentId = phaseValue3.sessionAgentId;
   s.effectiveFsWorkspaceOnly = resolveAttemptFsWorkspaceOnly({
     config: params.config,
     sessionAgentId: s.sessionAgentId,

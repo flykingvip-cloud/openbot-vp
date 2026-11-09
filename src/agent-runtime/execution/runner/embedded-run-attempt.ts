@@ -54,7 +54,7 @@ export type EmbeddedRunAttemptCarry = {
 };
 
 export type EmbeddedRunAttemptIterationResult =
-  | EmbeddedRunLoopOutcome
+  | Exclude<EmbeddedRunLoopOutcome, { action: "next" }>
   | ({ action: "next" } & EmbeddedRunAttemptCarry);
 
 export async function runEmbeddedRunAttemptIteration(args: {
@@ -199,7 +199,7 @@ export async function runEmbeddedRunAttemptIteration(args: {
     (attempt.bootstrapPromptWarningSignature
       ? Array.from(
           new Set([
-            ...bootstrapPromptWarningSignaturesSeen,
+            ...loop.bootstrapPromptWarningSignaturesSeen,
             attempt.bootstrapPromptWarningSignature,
           ]),
         )

@@ -75,6 +75,8 @@ export type EmbeddedPiRunResult = {
   // successfully sent a message. Used to suppress agent's confirmation text.
   didSendViaMessagingTool?: boolean;
   didSendReaction?: boolean;
+  /** The attempt already emitted its deterministic approval prompt. */
+  didSendDeterministicApprovalPrompt?: boolean;
   // Texts successfully sent via messaging tools during the run.
   messagingToolSentTexts?: string[];
   // Media URLs successfully sent via messaging tools during the run.
@@ -100,24 +102,4 @@ export type EmbeddedPiCompactResult = {
   };
 };
 
-export type EmbeddedSandboxInfo = {
-  enabled: boolean;
-  workspaceDir?: string;
-  containerWorkspaceDir?: string;
-  workspaceAccess?: "none" | "ro" | "rw";
-  agentWorkspaceMount?: string;
-  browserBridgeUrl?: string;
-  browserNoVncUrl?: string;
-  hostBrowserAllowed?: boolean;
-  /** Account Computer control bridge is attached. Host browser stays blocked. */
-  accountComputerBrowser?: boolean;
-  /**
-   * Browser lease exists, control bridge is not ready. Prompt a retry.
-   * Do not treat this as a host-browser block.
-   */
-  accountComputerAttachFailure?: string;
-  elevated?: {
-    allowed: boolean;
-    defaultLevel: "on" | "off" | "ask" | "full";
-  };
-};
+export type { EmbeddedSandboxInfo } from "../../contracts/prompt.js";

@@ -6,7 +6,7 @@ import {
 } from "../../../task-outcome/runtime-from-runner.js";
 import type { Entrypoint, TrustedScope } from "../../../task-outcome/types.js";
 import type { CommandDeliveryReceipt } from "../../contracts/delivery.js";
-import type { CommandCandidateChargeState } from "../runner/command-budget.js";
+import type { CommandCandidateChargeState } from "../../contracts/execution.js";
 /** Execution outcome only; acceptance and delivery need separate evidence. */
 export function createCommandOutcomeCloseout(params: {
   config: OpenBotConfig;

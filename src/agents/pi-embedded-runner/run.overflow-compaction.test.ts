@@ -39,6 +39,32 @@ describe("runEmbeddedPiAgent overflow compaction trigger routing", () => {
     mockedGlobalHookRunner.hasHooks.mockImplementation(() => false);
   });
 
+  it("retains legacy single warning signatures across an overflow retry", async () => {
+    mockedRunEmbeddedAttempt
+      .mockResolvedValueOnce(
+        makeAttemptResult({
+          promptError: makeOverflowError(),
+          bootstrapPromptWarningSignature: "new-warning",
+        }),
+      )
+      .mockResolvedValueOnce(makeAttemptResult());
+    mockedCompactDirect.mockResolvedValueOnce(
+      makeCompactionSuccess({
+        summary: "compacted",
+        firstKeptEntryId: "entry",
+        tokensBefore: 150000,
+      }),
+    );
+    await runEmbeddedPiAgent({
+      ...overflowBaseRunParams,
+      bootstrapPromptWarningSignaturesSeen: ["old-warning"],
+    });
+    expect(mockedRunEmbeddedAttempt).toHaveBeenCalledTimes(2);
+    expect(
+      mockedRunEmbeddedAttempt.mock.calls[1]?.[0].bootstrapPromptWarningSignaturesSeen,
+    ).toEqual(["old-warning", "new-warning"]);
+  });
+
   it("passes precomputed legacy before_agent_start result into the attempt", async () => {
     const legacyResult = {
       modelOverride: "legacy-model",

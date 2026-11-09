@@ -36,7 +36,7 @@ export async function runEmbeddedRunResult(args: {
   resolvedToolResultFormat: "markdown" | "plain";
   releaseRunTask: (outcome: "failed" | "cancelled") => void;
   embeddedPayloadFormatting: EmbeddedPayloadFormatting;
-}): Promise<EmbeddedRunLoopOutcome> {
+}): Promise<Exclude<EmbeddedRunLoopOutcome, { action: "next" }>> {
   const {
     session,
     loop,

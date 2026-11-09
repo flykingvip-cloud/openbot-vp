@@ -1,7 +1,8 @@
+import type { ResolvedTimeFormat } from "../agent-runtime/contracts/prompt.js";
+export type { ResolvedTimeFormat } from "../agent-runtime/contracts/prompt.js";
 import { execFileSync } from "node:child_process";
 
 export type TimeFormatPreference = "auto" | "12" | "24";
-export type ResolvedTimeFormat = "12" | "24";
 
 let cachedTimeFormat: ResolvedTimeFormat | undefined;
 

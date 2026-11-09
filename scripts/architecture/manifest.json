@@ -781,5 +781,17 @@
       "src/agent-runtime/execution/runner/execution-lifecycle.test.ts"
     ],
     "description": "Execution settles with injected ports; only the embedded-run loop may bind the fixed payload formatting adapter from wiring."
+  },
+  {
+    "name": "runtime-system-prompt-renderer-source-isolation",
+    "from": "src/agent-runtime/context/system-prompt.ts",
+    "denyImportsFrom": [
+      "src/agents/identity-file",
+      "src/utils/message-channel",
+      "src/config/sessions/**",
+      "src/agents/workspace",
+      "src/agents/skills/**"
+    ],
+    "description": "Pure system prompt rendering consumes captured facts. Workspace, registry and skill source reads remain in hosts; no hidden second source compiler."
   }
 ]

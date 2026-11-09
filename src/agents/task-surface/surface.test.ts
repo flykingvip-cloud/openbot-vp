@@ -2,10 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  applyIncomingUserMessage,
-  emptySessionTaskBoard,
-} from "../../conversation-task/session-task-board.js";
 import { replyForTaskSurfaceUtterance } from "./apply.js";
 import {
   ghostInjectionShouldOmit,
@@ -278,23 +274,31 @@ describe("task surface keep-only", () => {
   });
 
   it("does not turn a keep-only utterance into a new parked task", () => {
-    const started = applyIncomingUserMessage({
-      board: emptySessionTaskBoard(),
-      incomingText: "写审查记录并生成 PDF",
-    });
-    const kept = applyIncomingUserMessage({
-      board: started.board,
-      incomingText: "只保留第三条，其它都清掉",
-    });
-    expect(kept.action).toBe("continue");
-    expect(kept.board.current?.title).toBe(started.board.current?.title);
-    expect(kept.board.current?.title).not.toContain("只保留");
-    const listed = applyIncomingUserMessage({
-      board: started.board,
-      incomingText: "现在挂着的任务有几个？",
-    });
-    expect(listed.action).toBe("continue");
-    expect(listed.board.current?.taskId).toBe(started.board.current?.taskId);
+    const dir = tempDir();
+    const sessionFile = path.join(dir, "session.jsonl");
+    seedLedger(dir);
+    seedBoard(sessionFile);
+    const params = {
+      workspaceDir: dir,
+      agentId: "main",
+      sessionFile,
+      cfg: { agents: { defaults: { workspace: dir } } },
+    };
+    const before = fs.readFileSync(`${sessionFile}.task-board.json`, "utf8");
+    expect(
+      replyForTaskSurfaceUtterance({ ...params, text: "现在挂着的任务有几个？" }),
+    ).toBeTruthy();
+    expect(fs.readFileSync(`${sessionFile}.task-board.json`, "utf8")).toBe(before);
+    expect(
+      replyForTaskSurfaceUtterance({ ...params, text: "只保留第三条，其它都清掉" }),
+    ).toBeTruthy();
+    const board = JSON.parse(fs.readFileSync(`${sessionFile}.task-board.json`, "utf8")) as {
+      current?: { taskId: string; title: string };
+      parked: unknown[];
+    };
+    expect(board.current?.taskId).toBe("task-review");
+    expect(board.current?.title).not.toContain("只保留");
+    expect(board.parked).toEqual([]);
   });
 });
 

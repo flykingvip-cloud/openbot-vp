@@ -19,14 +19,8 @@ function errorName(error: unknown): string | undefined {
  * `attempted_unknown` means the call was made and no receipt came back.
  * A non-empty receipt is classified from its disposition, not treated as committed.
  */
-export type CommandCandidateChargeState =
-  | "not_attempted"
-  | "attempted_unknown"
-  | "committed"
-  | "conflict"
-  | "evidence_missing"
-  | "absent"
-  | "no_effect";
+export type { CommandCandidateChargeState } from "../../contracts/execution.js";
+import type { CommandCandidateChargeState } from "../../contracts/execution.js";
 
 export type CommandCandidateChargeRecord = {
   callSeq: number | null;

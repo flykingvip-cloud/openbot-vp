@@ -1,3 +1,5 @@
+export const SILENT_REPLY_TOKEN = "NO_REPLY";
+
 /** Transport facts only. Never grants acceptance or permission to retry. */
 export type CommandDeliveryReceipt = {
   deliveryId: string;

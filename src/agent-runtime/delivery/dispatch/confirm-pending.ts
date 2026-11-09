@@ -6,7 +6,6 @@ import {
 } from "../../../task-outcome/pending-delivery.js";
 import { confirmRunnerTurnDelivery } from "../../../task-outcome/runtime-from-runner.js";
 import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
-import { markAsyncWaitRecoveryDelivered } from "../../state/repository/async-wait-recovery-turn.js";
 /** Production delivery confirm — exported so tests use this path, not a copy. */
 export async function confirmPendingTurnDeliveryWithPorts(
   params: {
@@ -30,6 +29,7 @@ export async function confirmPendingTurnDeliveryWithPorts(
       appendNotice: boolean;
     }) => { persisted: boolean };
     bindingCurrent: (sessionFile: string, binding: TaskCompletionBinding) => boolean;
+    recordRecoveryDelivered: (input: { sessionFile: string; runId: string }) => void;
   },
 ): Promise<void> {
   const runId = params.runId?.trim() || undefined;
@@ -112,7 +112,7 @@ export async function confirmPendingTurnDeliveryWithPorts(
       ) {
         return; // Retain the durable association after transient lock failure.
       }
-      markAsyncWaitRecoveryDelivered({
+      ports.recordRecoveryDelivered({
         sessionFile: pending.checkedTask.sessionFile,
         runId: pending.runId,
       });

@@ -3,11 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { queryCurrentTaskStatus } from "../agent-runtime/command/index.js";
+import { parseExplicitTaskControl } from "../agent-runtime/policy/index.js";
+import { sessionTaskState } from "../agent-runtime/state/index.js";
 import { markBackgrounded, resetProcessRegistryForTests } from "../agents/bash-process-registry.js";
 import { runExecProcess } from "../agents/bash-tools.exec-runtime.js";
 import { peekSystemEvents, resetSystemEventsForTest } from "../infra/system-events.js";
 import {
-  applyIncomingUserMessage,
   commitSameTaskConstraint,
   emptySessionTaskBoard,
   mutateSessionTaskBoard,
@@ -77,10 +78,16 @@ it.each([false, true])(
         }),
       ).toBe(true);
       if (paused) {
-        mutateSessionTaskBoard(sessionFile, (board) => {
-          const result = applyIncomingUserMessage({ board, incomingText: "暂停当前任务" });
-          return { board: result.board, value: undefined };
+        const control = parseExplicitTaskControl("暂停当前任务");
+        if (!control) {
+          throw new Error("explicit pause must parse");
+        }
+        const result = sessionTaskState.applyExplicitControl({
+          sessionFile,
+          control,
+          recheck: { authOk: true, stopActive: false },
         });
+        expect(result?.abortInFlight).toBe(true);
       }
       const outcome = await run.promise;
       expect(outcome.status).toBe("completed");

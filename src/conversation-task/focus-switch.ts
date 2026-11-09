@@ -6,7 +6,6 @@
 import fs from "node:fs";
 import { type PreserveArticleOptions } from "./preserve-article-across-cut.js";
 import { qualifyTurn } from "./qualification.js";
-import { isSureDistinctWork } from "./session-task-board.js";
 
 export type { PreserveArticleOptions } from "./preserve-article-across-cut.js";
 
@@ -44,8 +43,6 @@ const GOAL_IDENTITY_NOISE = new Set([
 const INBOUND_STAMP_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} [0-9:]{4,8} GMT[+-]\d+\]\s*/;
 
 export {
-  applyFocusSwitchGate,
-  evaluateFocusSwitch,
   readFocusSwitchDecisionCount,
   recordFocusSwitchDecision,
   resetFocusSwitchDecisionCountsForTest,
@@ -306,14 +303,6 @@ export function tokenOverlapRatio(
     }
   }
   return hits / Math.min(a.size, b.size);
-}
-
-export function isLikelyContinuation(incoming: string, currentFocus: string): boolean {
-  const trimmed = incoming.trim();
-  if (!trimmed || !currentFocus.trim()) {
-    return true;
-  }
-  return !isSureDistinctWork(trimmed, currentFocus);
 }
 
 export function isLikelyNewTask(text: string): boolean {

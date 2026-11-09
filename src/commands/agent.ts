@@ -2,7 +2,7 @@ import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery
 import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
 import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
 import { assertControlledExecutionStages, createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createCommandExecutionLifecycle, runCommandAcpTurn, type EmbeddedPiRunResult } from "../agent-runtime/execution/index.js";
-import { settleCommandBudgetForCloseout } from "../agent-runtime/execution/runner/command-budget.js";
+import { settleCommandBudgetForCloseout } from "../agent-runtime/execution/index.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
 import { LEGACY_INTERNAL_EVENT_CONTEXT_PREFIXES } from "../compat/legacy-names.js";

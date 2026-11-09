@@ -35,8 +35,9 @@ export async function runEmbeddedAttemptStreamInner(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<void> {
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- phase bag temp */
-  let __d: any;
+  if (!s.sessionManager) {
+    throw new Error("Attempt session must be prepared before stream-inner");
+  }
 
   // Mistral (and other strict providers) reject tool call IDs that don't match their
   // format requirements (e.g. [a-zA-Z0-9]{9}). sanitizeSessionHistory only processes

@@ -32,8 +32,6 @@ export async function runEmbeddedAttemptCloseout(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<EmbeddedRunAttemptResult> {
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- phase bag temp */
-  let __d: any;
   // Let the active context engine run its post-turn lifecycle.
   if (params.contextEngine) {
     const afterTurnRuntimeContext = buildAfterTurnRuntimeContext({
@@ -312,8 +310,6 @@ export async function cleanupEmbeddedAttemptSession(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<void> {
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- phase bag temp */
-  let __d: any;
   // In-attempt keys drop here. The retained task context stays so a cron
   // result or subagent relay after this return can still see the receipt.
   disarmCompletionHold([
@@ -352,8 +348,6 @@ export function cleanupEmbeddedAttemptSubscription(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): void {
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- phase bag temp */
-  let __d: any;
   clearTimeout(s.abortTimer);
   if (s.abortWarnTimer) {
     clearTimeout(s.abortWarnTimer);

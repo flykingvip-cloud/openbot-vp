@@ -23,7 +23,7 @@ export type { AgentTurnExecutionParams, AgentRunLoopResult } from "./runner/turn
 
 export { runCommandCandidate } from "./runner/command-candidate.js";
 
-export { createCommandBudget } from "./runner/command-budget.js";
+export { createCommandBudget, settleCommandBudgetForCloseout } from "./runner/command-budget.js";
 
 export { runCommandAcpTurn } from "./runner/acp-turn.js";
 

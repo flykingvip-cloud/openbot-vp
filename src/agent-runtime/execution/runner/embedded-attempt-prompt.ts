@@ -35,8 +35,10 @@ export async function runEmbeddedAttemptPrompt(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<void> {
-  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- phase bag temp */
-  let __d: any;
+  if (!s.sessionManager) {
+    throw new Error("Attempt session must be prepared before prompt");
+  }
+
   s.lifecycleSkillNamesLoaded = resolveLifecycleSkillNamesLoaded(
     s.skillEntries.map((entry) => entry.skill.name),
   );
@@ -105,21 +107,21 @@ export async function runEmbeddedAttemptPrompt(
     agentId: s.sessionAgentId,
   });
 
-  __d = s.subscription;
-  s.assistantTexts = __d.assistantTexts;
-  s.toolMetas = __d.toolMetas;
-  s.unsubscribe = __d.unsubscribe;
-  s.waitForCompactionRetry = __d.waitForCompactionRetry;
-  s.isCompactionInFlight = __d.isCompactionInFlight;
-  s.flushPendingCompactionEnd = __d.flushPendingCompactionEnd;
-  s.getMessagingToolSentTexts = __d.getMessagingToolSentTexts;
-  s.getMessagingToolSentMediaUrls = __d.getMessagingToolSentMediaUrls;
-  s.getMessagingToolSentTargets = __d.getMessagingToolSentTargets;
-  s.getSuccessfulCronAdds = __d.getSuccessfulCronAdds;
-  s.didSendViaMessagingTool = __d.didSendViaMessagingTool;
-  s.getLastToolError = __d.getLastToolError;
-  s.getUsageTotals = __d.getUsageTotals;
-  s.getCompactionCount = __d.getCompactionCount;
+  const phaseValue1 = s.subscription;
+  s.assistantTexts = phaseValue1.assistantTexts;
+  s.toolMetas = phaseValue1.toolMetas;
+  s.unsubscribe = phaseValue1.unsubscribe;
+  s.waitForCompactionRetry = phaseValue1.waitForCompactionRetry;
+  s.isCompactionInFlight = phaseValue1.isCompactionInFlight;
+  s.flushPendingCompactionEnd = phaseValue1.flushPendingCompactionEnd;
+  s.getMessagingToolSentTexts = phaseValue1.getMessagingToolSentTexts;
+  s.getMessagingToolSentMediaUrls = phaseValue1.getMessagingToolSentMediaUrls;
+  s.getMessagingToolSentTargets = phaseValue1.getMessagingToolSentTargets;
+  s.getSuccessfulCronAdds = phaseValue1.getSuccessfulCronAdds;
+  s.didSendViaMessagingTool = phaseValue1.didSendViaMessagingTool;
+  s.getLastToolError = phaseValue1.getLastToolError;
+  s.getUsageTotals = phaseValue1.getUsageTotals;
+  s.getCompactionCount = phaseValue1.getCompactionCount;
 
   s.queueHandle = {
     queueMessage: async (text: string) => {
@@ -169,7 +171,7 @@ export async function runEmbeddedAttemptPrompt(
   s.messagesSnapshot = [];
   s.sessionIdUsed = s.activeSession.sessionId;
   s.onAbort = () => {
-    const reason = params.abortSignal ? getAbortReason(params.abortSignal) : undefined;
+    const reason = params.abortSignal?.reason;
     const timeout = reason ? isTimeoutError(reason) : false;
     if (
       shouldFlagCompactionTimeout({

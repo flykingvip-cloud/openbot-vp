@@ -12,8 +12,6 @@ import {
 import {
   armAsyncWaitRecoveryContinuation,
   type AsyncWaitRecoveryContinueEnqueue,
-  collectRecoverableAsyncWaitIntents,
-  findAsyncWaitJobsDirs,
   recoverAsyncWaitJobsAtGatewayBoot,
   stopAsyncWaitJobRecoveryRecheckForTests,
 } from "./async-wait-job-recovery.js";
@@ -24,6 +22,10 @@ import {
   recordAsyncWaitJobIntent,
 } from "./async-wait-job.js";
 import { claimAsyncWaitJobForRecovery } from "./async-wait-recovery-claim.js";
+import {
+  collectRecoverableAsyncWaitIntents,
+  findAsyncWaitJobsDirs,
+} from "./async-wait-recovery-scan.js";
 import { bindAsyncWaitRecoveryTurn } from "./async-wait-recovery-turn.js";
 const roots: string[] = [];
 const prevState = process.env.OPENBOT_STATE_DIR;
