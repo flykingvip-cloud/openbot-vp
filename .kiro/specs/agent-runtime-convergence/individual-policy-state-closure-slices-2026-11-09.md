@@ -1,11 +1,11 @@
 # 个体机器人执行任务规则 → policy/state 收口切片（修订版）
 
-**日期：** 2026-11-09（Asia/Shanghai）  
-**核对树：** `runtime-convergence/openbot`  
-**分支：** `codex/openbot/runtime-convergence`  
-**文档原定位 tip：** `5b46483c9`（`5b46483c96fb087723e959545a3106e2699466b9`）  
-**专家源码抽核 tip：** `e3fef11c8b40a8ec0ace10a29e2fd82e07c9be66`（消费者/权威清单按此修订）  
-**作者角色：** 执行器迁移（grok-bot）  
+**日期：** 2026-11-09（Asia/Shanghai）
+**核对树：** `runtime-convergence/openbot`
+**分支：** `codex/openbot/runtime-convergence`
+**文档原定位 tip：** `5b46483c9`（`5b46483c96fb087723e959545a3106e2699466b9`）
+**专家源码抽核 tip：** `e3fef11c8b40a8ec0ace10a29e2fd82e07c9be66`（消费者/权威清单按此修订）
+**作者角色：** 执行器迁移（grok-bot）
 **性质：** **迁移盘点依据 + 修订后的切片建议。不宜原样作为实施指令。** 方向正确；若切片把旧机制整包搬进新目录，会固化重复逻辑。本轮仍不改代码、不跑测试；实施须另授权；仍不 push/PR/部署。
 
 **配套交互页：** [协作小组长程任务规则体系](https://cursor.com/canvas/store-761ce8fe-deeb-4b47-b0f3-f32c7a3b3acc/bd5a2b21-9e94-4c2e-aa39-dba05d0d2040)（页签「个体完整度 / 个体切片」）
@@ -83,9 +83,9 @@
 
 ### 5.1 双源 / 待证等价（优先消，但须先证语义）
 
-1. `MAX_PARKED_TASKS`（policy，会话任务板限制）∥ `MAX_PARKED_SLOTS`（focus-policy，执行槽位）— **先判定是否同一种资源**  
-2. `stripInboundStamp`：`policy/input-stamp.ts` ∥ `focus-switch.ts` 本地实现 — **先用输入样本证明行为等价**  
-3. completion-gates：须明确 session 文件锁权威是「合法 state adapter」还是「已迁入仓库」——二选一写清，避免目录幻觉  
+1. `MAX_PARKED_TASKS`（policy，会话任务板限制）∥ `MAX_PARKED_SLOTS`（focus-policy，执行槽位）— **先判定是否同一种资源**
+2. `stripInboundStamp`：`policy/input-stamp.ts` ∥ `focus-switch.ts` 本地实现 — **先用输入样本证明行为等价**
+3. completion-gates：须明确 session 文件锁权威是「合法 state adapter」还是「已迁入仓库」——二选一写清，避免目录幻觉
 
 ### 5.2 消费者与权威清单（按抽核；原笼统清单作废）
 
@@ -109,12 +109,12 @@
 
 ### 6.1 收口原则（保留）
 
-1. **policy** 只收纯判定；**state** 只收既有板事务；IO/flag/ledger 留 conversation-task adapter。  
-2. 迁后旧文件只 **re-export / delegate**，禁止第二实现；**每批只移动一项权威实现**。  
-3. **SessionTaskBoard ≠ ConversationTask store/ledger** — 可联动关闭，权威不合并。  
-4. 不与协作 ClaimContract 切片混提同一变更集。  
-5. 不能为了「分类规则都在 policy」而恢复旧分类器的主链地位。  
-6. 本清单不改代码，直至另授权。  
+1. **policy** 只收纯判定；**state** 只收既有板事务；IO/flag/ledger 留 conversation-task adapter。
+2. 迁后旧文件只 **re-export / delegate**，禁止第二实现；**每批只移动一项权威实现**。
+3. **SessionTaskBoard ≠ ConversationTask store/ledger** — 可联动关闭，权威不合并。
+4. 不与协作 ClaimContract 切片混提同一变更集。
+5. 不能为了「分类规则都在 policy」而恢复旧分类器的主链地位。
+6. 本清单不改代码，直至另授权。
 
 ### 6.2 I0 — 先证语义，再消等价副本（修订）
 
@@ -168,8 +168,8 @@
 
 `src/conversation-task/reply-completion.ts:291` 当前顺序：
 
-1. `store.transitionTask(task.id, "closed")`  
-2. 随后才 `recordCheckedTaskCompletion`  
+1. `store.transitionTask(task.id, "closed")`
+2. 随后才 `recordCheckedTaskCompletion`
 
 这不证明已经发生错误，但存在**需核准的窗口**：前一权威已关，后一因绑定或写入失败未完成。
 
@@ -200,10 +200,10 @@
 
 **每切片验收须同时证明：**
 
-1. **唯一实现**  
-2. **正确消费者**  
-3. **行为等价**  
-4. **失败可收口**  
+1. **唯一实现**
+2. **正确消费者**
+3. **行为等价**
+4. **失败可收口**
 
 公开入口和目录检查只是其中一部分；**不能**用 helper 文件数 / 目录齐全代替主链收口。
 
@@ -211,26 +211,26 @@
 
 ## 8. 明确不做
 
-- 不把 `complex-task-loop` 当个体主链（默认关；验收不得第二关闭权）  
-- **不为「分类规则都在 policy」整包迁移或恢复 `classifyTurnRelation` 主链地位**  
-- 不因「都等于 3」合并 `MAX_PARKED_SLOTS` 与 `MAX_PARKED_TASKS`  
-- 不删 `control-plane` / ledger，除非另开退役证据（见 `retirement-intent-contract.md`）  
-- 不与协作 S0–S5 混提  
-- 不用「helper 文件数 / 目录齐全」代替主链收口  
-- **不把本盘点文档原样当实施指令**  
+- 不把 `complex-task-loop` 当个体主链（默认关；验收不得第二关闭权）
+- **不为「分类规则都在 policy」整包迁移或恢复 `classifyTurnRelation` 主链地位**
+- 不因「都等于 3」合并 `MAX_PARKED_SLOTS` 与 `MAX_PARKED_TASKS`
+- 不删 `control-plane` / ledger，除非另开退役证据（见 `retirement-intent-contract.md`）
+- 不与协作 S0–S5 混提
+- 不用「helper 文件数 / 目录齐全」代替主链收口
+- **不把本盘点文档原样当实施指令**
 
 ---
 
 ## 9. 专家验收检查点（修订）
 
-1. 是否承认：**盘点依据 ≠ 可原样实施指令**；I1/I4 修订已写入正文？  
-2. 消费者清单是否已按抽核区分现役主链 / 观察或可选路径 / 遗留（Gateway 用 `shouldTaskParkAbortInFlight`，而非笼统「classifyTurnRelation 消费者」）？  
-3. 完成态：两种「关闭」语义与失败重试/拒绝/对账是否已定义，而不仅是「两条权威」声明？  
-4. 常量与 `stripInboundStamp`：是否先证同资源/行为等价，再合并？  
-5. Session 板任何完成/取消/续跑写是否只经 **state mutations**？  
-6. ConversationTask ledger 关闭与 SessionTaskBoard 完成是否仍可**分别**论证且失败可收口？  
-7. 是否避免为目录整齐恢复旧分类器主链地位？  
-8. catalog 更新后是否诚实标注仍非完整 inventory（或补齐声明）？  
+1. 是否承认：**盘点依据 ≠ 可原样实施指令**；I1/I4 修订已写入正文？
+2. 消费者清单是否已按抽核区分现役主链 / 观察或可选路径 / 遗留（Gateway 用 `shouldTaskParkAbortInFlight`，而非笼统「classifyTurnRelation 消费者」）？
+3. 完成态：两种「关闭」语义与失败重试/拒绝/对账是否已定义，而不仅是「两条权威」声明？
+4. 常量与 `stripInboundStamp`：是否先证同资源/行为等价，再合并？
+5. Session 板任何完成/取消/续跑写是否只经 **state mutations**？
+6. ConversationTask ledger 关闭与 SessionTaskBoard 完成是否仍可**分别**论证且失败可收口？
+7. 是否避免为目录整齐恢复旧分类器主链地位？
+8. catalog 更新后是否诚实标注仍非完整 inventory（或补齐声明）？
 
 ---
 
