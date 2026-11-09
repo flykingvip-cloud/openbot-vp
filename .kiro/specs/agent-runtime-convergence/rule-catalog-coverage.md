@@ -148,10 +148,21 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/agent-runtime/policy/catalog.t
 结果（Asia/Shanghai 2026-11-09，目录契约补丁后）：
 
 ```text
-✓ src/agent-runtime/policy/catalog.test.ts (7 tests)
+✓ src/agent-runtime/policy/catalog.test.ts (8 tests)
 Test Files  1 passed (1)
-Tests  7 passed (7)
+Tests  8 passed (8)
 ```
+
+## 6.2 元数据准确性补丁（相对 daa8a3a10）
+
+| id | 修正 |
+| --- | --- |
+| `collab.peer.review_gate` | `configuration` 登记 `collaboration.task.requirePeerReview` 默认 false；仅影响 accept 门槛，不控制 `recordPeerReview` 事实写入 |
+| `task.reply.completion` | `configuration` 登记 `OPENBOT_CONVERSATION_TASK_ACTIVATION` / `flags.activation` 默认 OFF 门控 |
+| `collab.governance.gate` | `tests` 补入 `governance-gate.test.ts` |
+| 其它 pending 条目 | 核对 plan/submit 配置边界；`task.park.abort_inflight` 测试路径改为真实 `session-task-board.inbound-stop.test.ts` |
+
+新增断言：`records accurate configuration and tests for reviewed rules`（catalog.test 现 8/8）。
 
 ## 7. 覆盖缺口（诚实）
 
