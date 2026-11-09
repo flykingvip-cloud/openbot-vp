@@ -11,6 +11,23 @@ import {
   writeSessionTaskBoardUnlocked,
 } from "../repository/task-board-file.js";
 
+function completionBindingMatches(
+  board: SessionTaskBoard,
+  binding: TaskCompletionBinding,
+): boolean {
+  const current = board.current;
+  if (!current) {
+    return false;
+  }
+  return (
+    current.taskId === binding.taskId &&
+    current.executionAttempt === binding.executionAttempt &&
+    current.deliverableVersion === binding.deliverableVersion &&
+    (binding.constraints === undefined ||
+      JSON.stringify(binding.constraints) === JSON.stringify(activeConstraintTexts(current)))
+  );
+}
+
 /** Real close only. A model claim with closed=false does not announce or rewrite the board. */
 export function recordCheckedTaskCompletion(params: {
   sessionFile?: string;
@@ -21,6 +38,11 @@ export function recordCheckedTaskCompletion(params: {
 }): {
   notice?: string;
   persisted: boolean;
+  /**
+   * Same live binding was already checked. The board and transcript are unchanged.
+   * Callers may close their own domain without treating this as a new success notice.
+   */
+  alreadyChecked?: boolean;
 } {
   if (!params.closed || !params.binding?.taskId?.trim()) {
     return { persisted: false };
@@ -31,11 +53,27 @@ export function recordCheckedTaskCompletion(params: {
   }
   // Lock contention / stale CAS must not crash the caller (cross-process completer
   // busy-loops). Surface persisted:false so the peer can retry.
-  let finished: { board: SessionTaskBoard; notice?: string; rejected?: boolean };
+  let finished: {
+    board: SessionTaskBoard;
+    notice?: string;
+    rejected?: boolean;
+    alreadyChecked?: boolean;
+  };
   try {
     finished = withSessionTaskBoardLock(file, () => {
       const board = readSessionTaskBoardUnlocked(file);
       const binding = params.binding!;
+      const current = board.current;
+      if (
+        current &&
+        current.deliverableChecked === true &&
+        !current.unfinished &&
+        !current.wakeSuppress &&
+        !isTaskTombstoned(board, binding.taskId) &&
+        completionBindingMatches(board, binding)
+      ) {
+        return { board, alreadyChecked: true };
+      }
       if (!isLiveTaskBinding(board, binding, activeConstraintTexts(board.current))) {
         return { board, rejected: true };
       }
@@ -55,6 +93,9 @@ export function recordCheckedTaskCompletion(params: {
       return { persisted: false };
     }
     throw err;
+  }
+  if (finished.alreadyChecked) {
+    return { persisted: false, alreadyChecked: true };
   }
   if (finished.rejected) {
     return { persisted: false };
