@@ -2,7 +2,7 @@
 
 ## Agents
 
-- codex-collab-runtime · role: owner · scope: invited continuation and public context snapshot · paths: src/gateway/collaboration-dispatch/round-runtime.ts, src/gateway/collaboration-dispatch/round-runtime.test.ts, src/gateway/collaboration-dispatch/supplement-denial-diagnosis.ts, src/gateway/collaboration-dispatch/supplement-denial-diagnosis.test.ts, src/gateway/collaboration-dispatch/same-round-context.ts, src/gateway/collaboration-dispatch/same-round-context.test.ts, .kiro/specs/collaboration-invited-continuation/tasks.md, src/gateway/collaboration-dispatch/round-orchestrator.ts, src/gateway/collaboration-dispatch/round-orchestrator.test.ts · since: 2026-11-09
+- codex-collab-runtime · role: owner · scope: bounded participation, member context and interrupted recovery · paths: src/gateway/collaboration-dispatch/round-runtime.ts, src/gateway/collaboration-dispatch/round-runtime.test.ts, src/gateway/collaboration-dispatch/supplement-denial-diagnosis.ts, src/gateway/collaboration-dispatch/supplement-denial-diagnosis.test.ts, src/gateway/collaboration-dispatch/same-round-context.ts, src/gateway/collaboration-dispatch/same-round-context.test.ts, .kiro/specs/collaboration-invited-continuation/tasks.md, src/gateway/collaboration-dispatch/round-orchestrator.ts, src/gateway/collaboration-dispatch/round-orchestrator.test.ts, src/gateway/server-methods/chat.ts, src/gateway/collaboration-dispatch/group-inbound-history.ts, src/gateway/collaboration-dispatch/group-inbound-history.test.ts, src/gateway/collaboration-dispatch/member-context.ts, src/gateway/collaboration-dispatch/member-context.test.ts, src/gateway/collaboration-dispatch/policy-compiler.ts, src/gateway/collaboration-dispatch/policy-compiler.test.ts, src/gateway/collaboration-dispatch/policy-compiler-sections.test.ts, src/gateway/collaboration-dispatch/policy-identity.ts, src/gateway/collaboration-learning/shared.ts, src/gateway/collaboration-dispatch/types.ts, src/gateway/collaboration-dispatch/effective-policy.ts, src/gateway/collaboration-dispatch/policy-decision-record.ts, src/gateway/collaboration-dispatch/decision-engine.ts, src/gateway/collaboration-dispatch/decision-engine.test.ts, src/gateway/collaboration-dispatch/policy-lane-participation.test.ts, src/gateway/collaboration-dispatch/completion-contract.ts, src/gateway/collaboration-dispatch/completion-contract.test.ts, src/gateway/collaboration-dispatch/round-policy-snapshot.test.ts, src/gateway/collaboration-dispatch/visible-reply-limit.test.ts, src/gateway/collaboration-dispatch/visible-reply-limit.ts, src/gateway/collaboration-dispatch/visible-reply.ts, src/gateway/collaboration-dispatch/visible-reply.test.ts · since: 2026-11-09
 
 ## Baseline and takeover
 
@@ -18,7 +18,7 @@ Fresh origin/main ea7149373; detached checkout advanced from e847e6481. Target f
 ## Scope and remaining acceptance
 
 No configuration or production deployment. No RCIS input to admission, no Floor cutover, no new scheduler or task responsibility changes. Existing per-turn execution gates remain authoritative.
-Remaining: default proactive participation policy (requires explicit compiler migration), user interjection/history refresh, context token-budget verification, per-supplement timeout and durable restart continuation. Full LIVE group behavior is not accepted by these local tests.
+Remaining: LIVE validation; full-history retrieval and model-specific token admission; per-supplement timeout; durable automatic restart continuation with idempotent side-effect receipts. Current history is refreshed per member within the existing 24-message window, with a conservative serialized-character admission guard. Full LIVE group behavior is not accepted by these local tests.
 
 ## Verification
 
@@ -32,3 +32,26 @@ Scoped runtime/context/prompt/diagnosis/orchestration/rollcall: 67 passing tests
 - [x] Before-fix targeted regressions: late queue and stop-between fail; cancellable wait times out. After-fix: 72 tests across 6 files pass, TypeScript noEmit and scoped oxlint pass. — codex-collab-runtime
 
 Full repository check has the already recorded unrelated formatting/JSON5 blockers. No production configuration or deployment performed. No new policy defaults or Floor cutover. — codex-collab-runtime
+
+## Third checkpoint acceptance
+
+Reviewing external inventory as evidence, not instructions. Implement per-member latest public transcript, bounded same-round input, and fail-closed recovery without replaying unknown side effects. Default LIVE policy and configuration remain unchanged. — codex-collab-runtime
+
+- [x] Per-member Gateway dispatch rereads the authorized public transcript; excludes the original trigger by message identity, not last-position slicing; admits only public user/assistant text. — codex-collab-runtime
+- [x] Combined active history/same-round material has a 24,000 serialized-character guard; oversize refuses before a model call with an actionable notice. This is not model-specific token accounting or full-history summarization. — codex-collab-runtime
+- [x] Restart with pending primary/supplement dispatch records ROUND_ABORTED and pending ids in the event, rather than ROUND_COMPLETE. No replay of unknown external effects. Two fail-before/pass-after regressions. — codex-collab-runtime
+- [x] Human explicitly selected related-member participation, ordinary limit 3, greeting 1, ordered explicit introductions. Compiler revision 1.3.0; existing explicit L2 choices preserved, new-group seed uses the compiler defaults. humanStartsNewRound/proactiveBots coupling is unchanged; no autonomous new-round permission added. — codex-collab-runtime
+- [x] Decision-derived ordinary/broadcast reply budget persists with the round decision and is consumed by runtime. Explicit introductions dispatch 8 selected members; explicit broad ceiling 4 restricts to 4. No second policy source or Wake queue. — codex-collab-runtime
+- [x] Final targeted suite: 254 tests in 24 files passed; TypeScript, changed-file oxlint and oxfmt checks passed. Group-transcript tests use mocked dispatch: no claim of real model or LIVE group acceptance. Full pnpm check retains the previously recorded unrelated formatting/invalid nested JSON5 blocker. — codex-collab-runtime
+
+## External inventory review
+
+Accepted: collaboration orchestration belongs inside Gateway Control before single-turn execution; RCIS stays asynchronous; Floor stays shadow; individual #261 is a separate scope. The inventory's LIVE statements are secondhand evidence, not independently replayed here. — codex-collab-runtime
+
+Corrections: same-round serial dispatch need not emit task Wake Contract events; cross-round task nudges use the existing Wake mechanism. Do not add a parallel queue. proactiveBots=false is a compiled/presentation field, not proof it alone suppresses same-round participation; Decision actually consumes openDiscussionWithoutMention and the active strategy. The previously absent local pause/context paths now have implementation and tests but are not deployed. Planned membership, accepted dispatch and execution completion remain distinct facts. — codex-collab-runtime
+
+Release acceptance: replay greeting, ordinary professional question, explicit introductions and constrained broadcast on the same approved source/build/config version; compare selected vs dispatched vs executed vs suppressed ids and capture each member input version. Test human interjection, abort and restart at every handoff. LIVE charter/config/deployment still require their own explicit authorization and production gates. — codex-collab-runtime
+
+- [x] Open discussion admits existing selected peers without conclusion-keyword dependence. A settled late primary retains their ordinary visible budget; new auto-selected/model-only targets do not gain this continuation. Existing Cheap Gates, cancellation and tool/cost authorization remain in force. New closed/open/late regression scenarios pass; old open case failed before the fix. — codex-collab-runtime
+
+Latest code checkpoint: 8859cc197 (policy-selected continuation); earlier third-checkpoint commits: 390def081 (context), d774ae45d (Gateway wiring), 8de07406a (restart), 627be5f66 (active defaults + broadcast budget), 941b9c9ee (new-group seed), 779d58ea8 (visible refusal). No push, merge or deploy. Loom registry metadata remains uncommitted for its designated owner. — codex-collab-runtime
