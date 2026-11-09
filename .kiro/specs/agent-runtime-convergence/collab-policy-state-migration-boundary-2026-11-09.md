@@ -1,11 +1,11 @@
 # 协作小组长程任务规则 → policy/state 迁移边界（修订版）
 
-**日期：** 2026-11-09（Asia/Shanghai）  
-**核对树：** `runtime-convergence/openbot`  
-**分支：** `codex/openbot/runtime-convergence`  
-**文档原定位 tip：** `5b46483c9`（`5b46483c96fb087723e959545a3106e2699466b9`）  
-**专家源码抽核 tip：** `e3fef11c8b40a8ec0ace10a29e2fd82e07c9be66`（消费者/权威清单按此修订）  
-**作者角色：** 执行器迁移（grok-bot）  
+**日期：** 2026-11-09（Asia/Shanghai）
+**核对树：** `runtime-convergence/openbot`
+**分支：** `codex/openbot/runtime-convergence`
+**文档原定位 tip：** `5b46483c9`（`5b46483c96fb087723e959545a3106e2699466b9`）
+**专家源码抽核 tip：** `e3fef11c8b40a8ec0ace10a29e2fd82e07c9be66`（消费者/权威清单按此修订）
+**作者角色：** 执行器迁移（grok-bot）
 **性质：** **迁移盘点依据 + 修订后的边界/切片建议。不宜原样作为实施指令。** 方向正确；若切片把旧机制整包搬进新目录，会固化重复逻辑。本轮仍不改代码、不跑测试；实施须另授权；仍不 push/PR/部署。
 
 **配套交互页：** [协作小组长程任务规则体系](https://cursor.com/canvas/store-761ce8fe-deeb-4b47-b0f3-f32c7a3b3acc/bd5a2b21-9e94-4c2e-aa39-dba05d0d2040)（页签「迁移边界 / 尚未迁入」）
@@ -94,9 +94,9 @@
 
 硬约束：
 
-- **不能**要求协作成员额外创建个人任务才能执行群工作。  
-- **不能**让个人看板关闭群契约。  
-- 须**逐个恢复入口核准 binding** 要求；async-wait 仍须 `jobId`+`claimToken` 等既有栅栏。  
+- **不能**要求协作成员额外创建个人任务才能执行群工作。
+- **不能**让个人看板关闭群契约。
+- 须**逐个恢复入口核准 binding** 要求；async-wait 仍须 `jobId`+`claimToken` 等既有栅栏。
 - 群板状态**不写入** session board；`claimQueuedExecution` 协作路径不因 ClaimContract 跳过 binding。
 
 （源码可溯的共享能力示例，仍受上述准入区分约束：）
@@ -184,38 +184,38 @@
 
 ## 9. 明确不做
 
-- 不把 ClaimContract 并进 SessionTaskBoard  
-- 不把 ExecutorPrivateTodolist 做成群共享板  
-- 不让 peer review 驱动 Admission  
-- 口头「已派工」不成板事实  
-- 不要求协作成员额外创建个人任务；不让个人看板关闭群契约  
-- 不因目录齐全宣布协作机制已迁完  
-- **不把 Gateway 暂留写成最终领域归属**  
-- **不统一把 flag 改成 OFF** 冒充「安全迁移」  
-- **不把本盘点文档原样当实施指令**  
-- 不与个体完成态/I1 分类器整包迁移混提  
+- 不把 ClaimContract 并进 SessionTaskBoard
+- 不把 ExecutorPrivateTodolist 做成群共享板
+- 不让 peer review 驱动 Admission
+- 口头「已派工」不成板事实
+- 不要求协作成员额外创建个人任务；不让个人看板关闭群契约
+- 不因目录齐全宣布协作机制已迁完
+- **不把 Gateway 暂留写成最终领域归属**
+- **不统一把 flag 改成 OFF** 冒充「安全迁移」
+- **不把本盘点文档原样当实施指令**
+- 不与个体完成态/I1 分类器整包迁移混提
 
 ---
 
 ## 10. 专家验收检查点（修订）
 
-1. 是否承认：**盘点依据 ≠ 可原样实施指令**；「留 Gateway」已改为迁移期暂留 + §3.2 最终归属表？  
-2. 「共用 SessionTaskBoard」是否已区分为共享能力 vs 准入权威，且逐入口核准 binding？  
-3. `compileEffectiveCollaborationPolicy` 迁后是否同输入同 policyHash / 有效策略 / 限制？  
-4. 群板写是否只经一条 store 事务（读→校验→写），fan-out 仍在锁外？  
-5. Session / Claim / Todolist 三板边界是否在代码与文档中仍可分离论证？  
-6. 迁移是否**保留**迁移前默认值、已有配置及启用行为（而非统一 OFF）？  
-7. Gateway/command 是否仍可编排，但迁完后不再私藏 L1 硬不变量实现为「最终归属」？  
-8. 每切片是否证明：唯一实现、正确消费者、行为等价、失败可收口？  
+1. 是否承认：**盘点依据 ≠ 可原样实施指令**；「留 Gateway」已改为迁移期暂留 + §3.2 最终归属表？
+2. 「共用 SessionTaskBoard」是否已区分为共享能力 vs 准入权威，且逐入口核准 binding？
+3. `compileEffectiveCollaborationPolicy` 迁后是否同输入同 policyHash / 有效策略 / 限制？
+4. 群板写是否只经一条 store 事务（读→校验→写），fan-out 仍在锁外？
+5. Session / Claim / Todolist 三板边界是否在代码与文档中仍可分离论证？
+6. 迁移是否**保留**迁移前默认值、已有配置及启用行为（而非统一 OFF）？
+7. Gateway/command 是否仍可编排，但迁完后不再私藏 L1 硬不变量实现为「最终归属」？
+8. 每切片是否证明：唯一实现、正确消费者、行为等价、失败可收口？
 
 ---
 
 ## 11. 遗留问题（诚实）
 
-1. **架构债：** EffectivePolicy 编译链与 ClaimContract 全状态机仍在 gateway（相关核心约 7k+ 行量级）；迁往 command/policy/state 需多批且保持行为。  
-2. **双权威风险：** 迁入过程中若 re-export 不严，易出现第二判定副本。  
-3. **个体缺口并行：** 见配套个体文档（I1 拆分、I4 提前）；勿与本清单混提同一 PR。  
-4. **Package6 / completion-gates：** 源码迁移阶段可关闭 ≠ 旧执行器全部退役 ≠ 生产终验通过。  
-5. **暂留清理：** 迁移期 Gateway 宿主清单须有退出条件（消费者归零 + 恢复资产核准），否则「暂留」会变成事实终态。  
+1. **架构债：** EffectivePolicy 编译链与 ClaimContract 全状态机仍在 gateway（相关核心约 7k+ 行量级）；迁往 command/policy/state 需多批且保持行为。
+2. **双权威风险：** 迁入过程中若 re-export 不严，易出现第二判定副本。
+3. **个体缺口并行：** 见配套个体文档（I1 拆分、I4 提前）；勿与本清单混提同一 PR。
+4. **Package6 / completion-gates：** 源码迁移阶段可关闭 ≠ 旧执行器全部退役 ≠ 生产终验通过。
+5. **暂留清理：** 迁移期 Gateway 宿主清单须有退出条件（消费者归零 + 恢复资产核准），否则「暂留」会变成事实终态。
 
 — 执行器迁移 / 2026-11-09（修订：纳入专家评审 t37u）
