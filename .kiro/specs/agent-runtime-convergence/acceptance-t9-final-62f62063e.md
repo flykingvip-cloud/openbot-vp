@@ -9,7 +9,7 @@ Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263
 | 角色 | SHA |
 | --- | --- |
 | 受测运行时（代码 tip） | `62f62063eb3f481186d53df746a627f86e98a4ab` |
-| 本包证据头（正文＋日志；本文件提交后钉入） | （见 git tip after evidence commit／PR） |
+| 本包证据头（正文＋日志） | `e44f4f24d8f3c7889f49f9d1eb381e9f2e28b117` |
 
 本包为 tip `62f62063e` 的同版本门禁复跑证据；**不**宣称最终统一验收通过，**不**通知双轨 GO，**不**授权合入／部署／DIGEST／切 LIVE／真实外发。
 
