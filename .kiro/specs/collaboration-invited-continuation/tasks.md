@@ -2,7 +2,7 @@
 
 ## Agents
 
-- codex-collab-runtime · role: owner · scope: invited continuation and public context snapshot · paths: src/gateway/collaboration-dispatch/round-runtime.ts, src/gateway/collaboration-dispatch/round-runtime.test.ts, src/gateway/collaboration-dispatch/supplement-denial-diagnosis.ts, src/gateway/collaboration-dispatch/supplement-denial-diagnosis.test.ts, src/gateway/collaboration-dispatch/same-round-context.ts, src/gateway/collaboration-dispatch/same-round-context.test.ts, .kiro/specs/collaboration-invited-continuation/tasks.md · since: 2026-11-09
+- codex-collab-runtime · role: owner · scope: invited continuation and public context snapshot · paths: src/gateway/collaboration-dispatch/round-runtime.ts, src/gateway/collaboration-dispatch/round-runtime.test.ts, src/gateway/collaboration-dispatch/supplement-denial-diagnosis.ts, src/gateway/collaboration-dispatch/supplement-denial-diagnosis.test.ts, src/gateway/collaboration-dispatch/same-round-context.ts, src/gateway/collaboration-dispatch/same-round-context.test.ts, .kiro/specs/collaboration-invited-continuation/tasks.md, src/gateway/collaboration-dispatch/round-orchestrator.ts, src/gateway/collaboration-dispatch/round-orchestrator.test.ts · since: 2026-11-09
 
 ## Baseline and takeover
 
@@ -18,8 +18,17 @@ Fresh origin/main ea7149373; detached checkout advanced from e847e6481. Target f
 ## Scope and remaining acceptance
 
 No configuration or production deployment. No RCIS input to admission, no Floor cutover, no new scheduler or task responsibility changes. Existing per-turn execution gates remain authoritative.
-Remaining: default proactive participation policy (requires explicit compiler migration), explicit_multi late-primary queue semantics, user interjection/history refresh, context token-budget verification, per-supplement timeout and durable restart continuation. Full LIVE group behavior is not accepted by these local tests.
+Remaining: default proactive participation policy (requires explicit compiler migration), user interjection/history refresh, context token-budget verification, per-supplement timeout and durable restart continuation. Full LIVE group behavior is not accepted by these local tests.
 
 ## Verification
 
 Scoped runtime/context/prompt/diagnosis/orchestration/rollcall: 67 passing tests (6 files). Initial context regressions: 2 failures before fix. Restoring baseline round-runtime with the new regression reproduces invited continuation failure (1 failed, 3 passed). Final TypeScript check and scoped lint passed. Full pnpm check stops at pre-existing formatting failures and invalid JSON5 under the unrelated nested checkout; no unrelated files repaired. — codex-collab-runtime
+
+## Continuation checkpoint
+
+- [x] Explicit multi-member queue preserves remaining invitations after a settled visible late reply. Each member receives its existing independent primary deadline; empty/in-flight replies are not treated as completion. — codex-collab-runtime
+- [x] Existing coordination windows apply between queued leads and between dispatched supplements; signal cancellation releases timer and listener. Durations remain unchanged (0 / 500 / 2500ms by existing response mode). — codex-collab-runtime
+- [x] AbortSignal cannot be overridden by a false custom stop callback. Recheck after wait and final supplement/close before completion. — codex-collab-runtime
+- [x] Before-fix targeted regressions: late queue and stop-between fail; cancellable wait times out. After-fix: 72 tests across 6 files pass, TypeScript noEmit and scoped oxlint pass. — codex-collab-runtime
+
+Full repository check has the already recorded unrelated formatting/JSON5 blockers. No production configuration or deployment performed. No new policy defaults or Floor cutover. — codex-collab-runtime
