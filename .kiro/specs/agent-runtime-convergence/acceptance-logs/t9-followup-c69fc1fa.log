@@ -1,0 +1,500 @@
+
+ RUN  v4.0.18 /agent/repos/openbot-vp
+
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction respond enters execution only after acceptance 30ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction accepted enters execution only after acceptance 9ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction duplicate enters execution only after acceptance 8ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction rejected enters execution only after acceptance 6ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction resumed enters execution only after acceptance 6ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction resume_denied enters execution only after acceptance 4ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction direct_respond enters execution only after acceptance 4ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction corrupt_state enters execution only after acceptance 5ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction transcript_failure enters execution only after acceptance 4ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > restricts chat actions without emptying shared identity or skill context 7ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > selected knowledge supplies context without granting execution tools 4ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > chat without selected sources still skips optional knowledge 2ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > selected folder sources also survive chat-lane knowledge skip 5ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps full bootstrap on chat-lane while workspace onboarding is incomplete 2ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > retains selected skill guidance and memory in interaction without enabling tools 2ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not force steward-required skills into retrieve skillFilter 3ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > force-merges steward-required skills into act skillFilter 3ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not apply chat-lane cuts for steward act when the router flag is off 11ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > leaves non-steward sessions unchanged when depth flags are off 3ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > writes group skill policy onto skillFilter, blocklist, and the embedded run allowlist 10ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > maps group blockedSkills=search onto the constructed tools array 1ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps unselected knowledge optional and chat actions disabled when the router is on 4ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps knowledge prefetch and tools for retrieve 3ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps knowledge prefetch and tools for act 3ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not apply the inbound-depth chat skip to space sessions 3ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > chat assembly avoids the knowledge wait that retrieve still pays 86ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not change retrieve knowledge args when only the router flag is on 82ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > passes retrieve source policy without enabling live sources 86ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps the act knowledge path without source policy 82ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps chat zero-knowledge zero-tools when both router and knowledge policy are on 3ms
+stderr | src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on agent error
+Followup agent failed before reply: agent exploded
+
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner compaction > adds verbose auto-compaction notice and tracks count 29ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner bootstrap warning dedupe > passes stored warning signature history to embedded followup runs 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > drops payloads already sent via messaging tool 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > delivers payloads when not duplicates 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > suppresses replies when a messaging tool sent via the same provider + target 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > suppresses replies when provider is synthetic but originating channel matches 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > does not suppress replies for same target when account differs 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > drops media URL from payload when messaging tool already sent it 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > delivers media payload when not a duplicate 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > persists usage even when replies are suppressed 11ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > does not fall back to dispatcher when cross-channel origin routing fails 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > falls back to dispatcher when same-channel origin routing fails 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > routes followups with originating account/thread metadata 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on NO_REPLY 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on empty payloads 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on agent error 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on successful delivery 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner agentDir forwarding > passes queued run agentDir to runEmbeddedPiAgent 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner agentDir forwarding > forwards disableTools so the embedded run tool list stays empty 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner agentDir forwarding > forwards inboundToolCeiling so retrieve stays on the read-only set 1ms
+stdout | src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > production ensureFollowupConsumer → createFollowupRunner: stub returns drive acceptance/delivery
+{"event":"evolution.outcome.written","runId":"5b15bf21-27bb-43d8-8a22-73fbb46a5436","agentId":"bot","tenantId":"ent-1","surfaceId":"task.execution","reason":"eligible"}
+
+ ✓ src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > production ensureFollowupConsumer → createFollowupRunner: stub returns drive acceptance/delivery 97ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > defaults stay off and a multi-group list authorizes nobody 2ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 正常推进一步（已确认计划内） 49ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > dry_run / 未开白名单时无外部副作用 27ms
+stdout | src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: delivered
+{"event":"evolution.outcome.written","runId":"76784907-41db-41dd-943a-fe352f2797c5","agentId":"test","tenantId":"personal:agent:test:main","surfaceId":"task.execution","reason":"eligible"}
+
+stdout | src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > channel fail ≠ delivered; later delivery-only retry can complete without re-running model
+{"event":"evolution.outcome.written","runId":"9938e935-6d46-4984-bb3f-77a71aa025be","agentId":"bot","tenantId":"ent-1","surfaceId":"task.execution","reason":"eligible"}
+
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not apply retrieve tool policy when only the router flag is on 83ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > applies retrieve read-only ceiling without giving that allowlist to chat 88ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps chat on disableTools instead of the retrieve allowlist 3ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > still applies classify-only chat-lane when only the tool policy flag is on 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner agentDir forwarding > forwards queued execution identity tenant and membership into the embedded run 42ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: delivered 58ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: failed 42ms
+ ✓ src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > channel fail ≠ delivered; later delivery-only retry can complete without re-running model 111ms
+ ✓ src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > missing trusted identity refuses enqueue — no unscoped exec 3ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 重复 heartbeat / wake 不重复副作用 27ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 偏离动作被拒或升人闸 15ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 触发硬停止后排队与进行中任务被安全处理 19ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 硬停止演练：越权 accept 34ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 硬停止演练：越权 finalize 6ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 硬停止演练：陈旧确认 12ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 硬停止演练：重复外部副作用 16ms
+stderr | src/auto-reply/reply/followup-runner.test.ts > does not start queued provider work when owner pause arrives during async transport preparation
+Followup agent failed before reply: Queued task was paused, closed or replaced before provider startup
+
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: unknown 36ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: unverified 39ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: empty 20ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > rejects a queued A request after same-goal B becomes current without invoking the provider 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > does not start queued provider work when owner pause arrives during async transport preparation 3ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > refreshes queued task-board continuation with owner constraints accepted after enqueue 4ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > rejects a queued continue ticket after paused without provider execution 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > rejects a queued continue ticket after focus changed without provider execution 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > rejects a queued continue ticket after new attempt without provider execution 2ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > leaves act on the existing tool set when tool policy is on 84ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > persists authorized Scope onto Round/Ledger before optional retrieve 83ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > skips optional retrieve when authorize throws 2ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > skips optional retrieve when managed Scope persist degrades 2ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > still retrieves when a group has no open managed round 82ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > does not require Round persist on 1:1 retrieve 83ms
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > isBareChatCompletionPhrase only matches bare completion claims 1ms
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > submit → return → revise → accept persists accepted; bare 完成 never writes 47ms
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > acceptBoardItemSubmission refuses bare chat completion before any write 0ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > findAsyncWaitJobsDirs discovers nested async-wait-jobs folders 2ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > pid alive → still waiting; no continue arm 4ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > exited → arm continue once; second call retries open stage without double enqueue success required 5ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > pid missing → unconfirmed evidence, never packaged as success 2ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > pause clears; recovery does not arm continue 5ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > boot recovery scans agent sessions and arms continue (not delivered) 3ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > delivery_pending recovery is delivery_only — enqueues delivery-only, not business continue 3ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > synced recovery attempt: recheck after bind does not clear with stale prior attempt 3ms
+ ✓ src/agent-runtime/wiring/execution-admission.test.ts > persists accepted checks and refuses changing their bytes on an idempotent replay 4ms
+ ✓ src/agent-runtime/wiring/execution-admission.test.ts > applies bound semantic amendments and refuses stale control writes 4ms
+ ✓ src/agent-runtime/wiring/execution-admission.test.ts > admits once, persists acceptance, and rejects stale or conflicting requests without writing 3ms
+ ✓ src/agent-runtime/wiring/execution-admission.test.ts > uses explicit amendment scope instead of legacy wording to supersede constraints 3ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > live turn_bound exec is not re-claimable; dead claim reopens for recovery 8ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > continue_armed cannot regress from turn_bound with old claimToken 2ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > bind refuses multiple open jobs for same taskId without jobId 2ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > delivery_pending claim is deliveryOnly — no business re-arm token reuse as fresh 2ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > overlapping stop vs claim: cleared wins; late claimToken cannot resurrect 2ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves declarative checks and refuses executable acceptance fields 2ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves the explicit amendment scope supplement 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves the explicit amendment scope revise 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves the explicit amendment scope replace_all 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves a mixed question and bound task_change in one inference 1ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves a mixed question and bound task_control in one inference 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects malformed mixed answer null 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects malformed mixed answer 1 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects malformed mixed answer " " 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > answers with one inference and preserves authorized context roles 1ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > returns an execution proposal without executing or looping 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: null 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: {"kind":"reply","text":" "} 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: {"kind":"execution_request","request":{"goal":"run","acceptance":[]}} 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: {"kind":"reply","text":"ok","script":"execute"} 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: {"kind":"execution_request","request":{"goal":"run","acceptance":["done"],"tools":["exec"]}} 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > does not call inference after cancellation 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects late output after cancellation without another inference 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > binds task_change proposals to the captured task revision 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > binds task_control proposals to the captured task revision 0ms
+ ✓ src/agent-runtime/command/task-status.test.ts > current task status query > does not read state for amendments or control 2ms
+ ✓ src/agent-runtime/command/task-status.test.ts > current task status query > does not claim a task exists when current is absent 0ms
+ ✓ src/agent-runtime/command/task-status.test.ts > current task status query > reads once and projects recorded facts without mutating state 3ms
+ ✓ src/agent-runtime/command/task-status.test.ts > current task status query > strips inbound stamps through the policy implementation 3ms
+ × src/commands/agent.lifecycle-attribution-path.node.test.ts > CLI embedded run lifecycle attribution path > routes openbot agent through runEmbeddedPiAgent into attempt attribution helper 14ms
+   → expected 'import fs from "node:fs/promises";\ni…' to contain 'runEmbeddedAttempt'
+ ✓ src/agent-runtime/execution/runner/queued-candidate.pricing.test.ts > prices a followup candidate from the transport model, not the ent catalog id 3ms
+ ✓ src/agent-runtime/execution/runner/scheduled-candidate.test.ts > forwards scheduled cancellation to the CLI execution adapter 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/commands/agent.lifecycle-attribution-path.node.test.ts > CLI embedded run lifecycle attribution path > routes openbot agent through runEmbeddedPiAgent into attempt attribution helper
+AssertionError: expected 'import fs from "node:fs/promises";\ni…' to contain 'runEmbeddedAttempt'
+
+- Expected
++ Received
+
+- runEmbeddedAttempt
++ import fs from "node:fs/promises";
++ import { resolveOpenClawAgentDir } from "../../../agents/agent-paths.js";
++ import { hasConfiguredModelFallbacks } from "../../../agents/agent-scope.js";
++ import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../../agents/defaults.js";
++ import { finalizeDeliveryContext } from "../../../agents/execution-preflight/completion-hold.js";
++ import type { ConstitutionalRuntimeShadowDeps } from "../../../agents/execution-preflight/constitutional-runtime-shadow-deps.js";
++ import { parseConstitutionalRuntimeShadowFlag } from "../../../agents/execution-preflight/constitutional-runtime-shadow-gate.js";
++ import { NOOP_CONSTITUTIONAL_RUNTIME_SHADOW_SINK } from "../../../agents/execution-preflight/constitutional-runtime-shadow-sink.js";
++ import { ensureOpenClawModelsJson } from "../../../agents/models-config.js";
++ import { resolveGlobalLane, resolveSessionLane } from "../../../agents/pi-embedded-runner/lanes.js";
++ import { log } from "../../../agents/pi-embedded-runner/logger.js";
++ import { ensureRuntimePluginsLoaded } from "../../../agents/runtime-plugins.js";
++ import { redactRunIdentifier, resolveRunWorkspaceDir } from "../../../agents/workspace-run.js";
++ import {
++   ensureContextEnginesInitialized,
++   resolveContextEngine,
++ } from "../../../context-engine/index.js";
++ import { generateSecureToken } from "../../../infra/secure-random.js";
++ import { enqueueCommandInLane } from "../../../process/command-queue.js";
++ import { isMarkdownCapableMessageChannel } from "../../../utils/message-channel.js";
++ import { sessionTaskState } from "../../state/index.js";
++ import { embeddedPayloadFormatting } from "../../wiring/embedded-payloads.js";
++ import { buildErrorAgentMeta, createUsageAccumulator } from "../outcomes/usage-summary.js";
++ import { cleanupEmbeddedRun } from "./embedded-cleanup.js";
++ import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
++ import type { EmbeddedPiRunResult } from "./embedded-result.js";
++ import {
++   runEmbeddedRunAttemptIteration,
++   type EmbeddedRunLoopState,
++ } from "./embedded-run-attempt.js";
++ import {
++   prepareEmbeddedRunAuth,
++   type EmbeddedRunLoopOutcome,
++   type EmbeddedRunSession,
++ } from "./embedded-run-auth.js";
++ import { runEmbeddedRunFailover } from "./embedded-run-failover.js";
++ import { runEmbeddedRunResult } from "./embedded-run-result.js";
++
++ // Avoid Anthropic's refusal test token poisoning session transcripts.
++ const ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL = "ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL";
++ const ANTHROPIC_MAGIC_STRING_REPLACEMENT = "ANTHROPIC MAGIC STRING TRIGGER REFUSAL (redacted)";
++
++ function scrubAnthropicRefusalMagic(prompt: string): string {
++   if (!prompt.includes(ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL)) {
++     return prompt;
++   }
++   return prompt.replaceAll(
++     ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL,
++     ANTHROPIC_MAGIC_STRING_REPLACEMENT,
++   );
++ }
++
++ function createCompactionDiagId(): string {
++   return `ovf-${Date.now().toString(36)}-${generateSecureToken(4)}`;
++ }
++
++ function resolveActiveErrorContext(params: {
++   lastAssistant: { provider?: string; model?: string } | undefined;
++   provider: string;
++   model: string;
++ }): { provider: string; model: string } {
++   return {
++     provider: params.lastAssistant?.provider ?? params.provider,
++     model: params.lastAssistant?.model ?? params.model,
++   };
++ }
++
++ function buildEmbeddedRunRetryLimitResult(args: {
++   session: EmbeddedRunSession;
++   loop: EmbeddedRunLoopState;
++   params: RunEmbeddedPiAgentParams;
++   started: number;
++   releaseRunTask: (outcome: "failed" | "cancelled") => void;
++ }): EmbeddedRunLoopOutcome {
++   const { session, loop, params, started, releaseRunTask } = args;
++   const message =
++     `Exceeded retry limit after ${loop.runLoopIterations} attempts ` +
++     `(max=${session.MAX_RUN_LOOP_ITERATIONS}).`;
++   log.error(
++     `[run-retry-limit] sessionKey=${params.sessionKey ?? params.sessionId} ` +
++       `provider=${session.provider}/${session.modelId} attempts=${loop.runLoopIterations} ` +
++       `maxAttempts=${session.MAX_RUN_LOOP_ITERATIONS}`,
++   );
++   releaseRunTask("failed");
++   return {
++     action: "return",
++     result: {
++       payloads: [
++         {
++           text:
++             "Request failed after repeated internal retries. " +
++             "Please try again, or use /new to start a fresh session.",
++           isError: true,
++         },
++       ],
++       meta: {
++         durationMs: Date.now() - started,
++         agentMeta: buildErrorAgentMeta({
++           sessionId: params.sessionId,
++           provider: session.provider,
++           model: session.effectiveModel.id,
++           usageAccumulator: loop.usageAccumulator,
++           lastRunPromptUsage: loop.lastRunPromptUsage,
++           lastTurnTotal: loop.lastTurnTotal,
++         }),
++         error: { kind: "retry_limit", message },
++       },
++     },
++   };
++ }
++
++ export async function runEmbeddedPiAgent(
++   params: RunEmbeddedPiAgentParams,
++ ): Promise<EmbeddedPiRunResult> {
++   const constitutionalRuntimeShadowDeps = Object.freeze<ConstitutionalRuntimeShadowDeps>({
++     runtimeShadowEnabled: parseConstitutionalRuntimeShadowFlag(
++       process.env.OPENBOT_CONSTITUTIONAL_RUNTIME_SHADOW,
++     ),
++     sink: NOOP_CONSTITUTIONAL_RUNTIME_SHADOW_SINK,
++     now: performance.now.bind(performance),
++   });
++   const assertExecutionCurrent = () => {
++     if (
++       params.taskExecutionBinding &&
++       !sessionTaskState.bindingCurrent(params.sessionFile, params.taskExecutionBinding)
++     ) {
++       throw new Error(
++         "Original task was paused, closed, revised or replaced before execution startup",
++       );
++     }
++   };
++   assertExecutionCurrent();
++   const sessionLane = resolveSessionLane(params.sessionKey?.trim() || params.sessionId);
++   const globalLane = resolveGlobalLane(params.lane);
++   const enqueueGlobal =
++     params.enqueue ?? ((task, opts) => enqueueCommandInLane(globalLane, task, opts));
++   const enqueueSession =
++     params.enqueue ?? ((task, opts) => enqueueCommandInLane(sessionLane, task, opts));
++   const channelHint = params.messageChannel ?? params.messageProvider;
++   const resolvedToolResultFormat =
++     params.toolResultFormat ??
++     (channelHint
++       ? isMarkdownCapableMessageChannel(channelHint)
++         ? "markdown"
++         : "plain"
++       : "markdown");
++   const isProbeSession = params.sessionId?.startsWith("probe-") ?? false;
++
++   return enqueueSession(() =>
++     enqueueGlobal(async () => {
++       assertExecutionCurrent();
++       const started = Date.now();
++       const workspaceResolution = resolveRunWorkspaceDir({
++         workspaceDir: params.workspaceDir,
++         sessionKey: params.sessionKey,
++         agentId: params.agentId,
++         config: params.config,
++         userId:
++           params.gatewayClientPlatformUserId?.trim() ||
++           params.executionIdentity?.platformUserId?.trim() ||
++           undefined,
++         tenantId:
++           params.gatewayClientSessionEnterpriseId?.trim() ||
++           params.executionIdentity?.enterpriseId?.trim() ||
++           undefined,
++       });
++       const resolvedWorkspace = workspaceResolution.workspaceDir;
++       const redactedSessionId = redactRunIdentifier(params.sessionId);
++       const redactedSessionKey = redactRunIdentifier(params.sessionKey);
++       const redactedWorkspace = redactRunIdentifier(resolvedWorkspace);
++       if (workspaceResolution.usedFallback) {
++         log.warn(
++           `[workspace-fallback] caller=runEmbeddedPiAgent reason=${workspaceResolution.fallbackReason} run=${params.runId} session=${redactedSessionId} sessionKey=${redactedSessionKey} agent=${workspaceResolution.agentId} workspace=${redactedWorkspace}`,
++         );
++       }
++       ensureRuntimePluginsLoaded({
++         config: params.config,
++         workspaceDir: resolvedWorkspace,
++       });
++       const prevCwd = process.cwd();
++
++       let provider = (params.provider ?? DEFAULT_PROVIDER).trim() || DEFAULT_PROVIDER;
++       let modelId = (params.model ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL;
++       const agentDir = params.agentDir ?? resolveOpenClawAgentDir();
++       const fallbackConfigured = hasConfiguredModelFallbacks({
++         cfg: params.config,
++         agentId: params.agentId,
++         sessionKey: params.sessionKey,
++       });
++       await ensureOpenClawModelsJson(params.config, agentDir);
++
++       const session = await prepareEmbeddedRunAuth({
++         params,
++         provider,
++         modelId,
++         agentDir,
++         fallbackConfigured,
++         resolvedWorkspace,
++         workspaceAgentId: workspaceResolution.agentId,
++       });
++       provider = session.provider;
++       modelId = session.modelId;
++
++       ensureContextEnginesInitialized();
++       const contextEngine = await resolveContextEngine(params.config);
++       try {
++         const loop: EmbeddedRunLoopState = {
++           overflowCompactionAttempts: 0,
++           toolResultTruncationAttempted: false,
++           bootstrapPromptWarningSignaturesSeen:
++             params.bootstrapPromptWarningSignaturesSeen ??
++             (params.bootstrapPromptWarningSignature
++               ? [params.bootstrapPromptWarningSignature]
++               : []),
++           usageAccumulator: createUsageAccumulator(),
++           lastRunPromptUsage: undefined,
++           autoCompactionCount: 0,
++           runLoopIterations: 0,
++           authRetryPending: false,
++           lastTurnTotal: undefined,
++           lastAttemptTaskId: "",
++           lastHookDelivery: undefined,
++         };
++         const releaseRunTask = (outcome: "failed" | "cancelled") => {
++           const taskId = loop.lastAttemptTaskId.trim() || params.runId?.trim() || "";
++           if (!taskId) {
++             return;
++           }
++           finalizeDeliveryContext({ taskId, outcome });
++         };
++
++         while (true) {
++           assertExecutionCurrent();
++           if (loop.runLoopIterations >= session.MAX_RUN_LOOP_ITERATIONS) {
++             const limited = buildEmbeddedRunRetryLimitResult({
++               session,
++               loop,
++               params,
++               started,
++               releaseRunTask,
++             });
++             if (limited.action === "return") {
++               return limited.result;
++             }
++           }
++           loop.runLoopIterations += 1;
++           const copilotAuthRetry = loop.authRetryPending;
++           loop.authRetryPending = false;
++           session.attemptedThinking.add(session.thinkLevel);
++           await fs.mkdir(resolvedWorkspace, { recursive: true });
++
++           const prompt =
++             session.provider === "anthropic"
++               ? scrubAnthropicRefusalMagic(params.prompt)
++               : params.prompt;
++
++           const attemptOutcome = await runEmbeddedRunAttemptIteration({
++             session,
++             loop,
++             params,
++             prompt,
++             resolvedWorkspace,
++             workspaceAgentId: workspaceResolution.agentId,
++             resolvedToolResultFormat,
++             constitutionalRuntimeShadowDeps,
++             contextEngine,
++             started,
++             releaseRunTask,
++             createCompactionDiagId,
++             resolveActiveErrorContext,
++           });
++           if (attemptOutcome.action === "continue") {
++             continue;
++           }
++           if (attemptOutcome.action === "return") {
++             return attemptOutcome.result;
++           }
++
++           const failoverOutcome = await runEmbeddedRunFailover({
++             session,
++             loop,
++             params,
++             carry: attemptOutcome,
++             started,
++             copilotAuthRetry,
++             releaseRunTask,
++           });
++           if (failoverOutcome.action === "continue") {
++             continue;
++           }
++           if (failoverOutcome.action === "return") {
++             return failoverOutcome.result;
++           }
++
++           const resultOutcome = await runEmbeddedRunResult({
++             session,
++             loop,
++             params,
++             carry: attemptOutcome,
++             started,
++             copilotAuthRetry,
++             isProbeSession,
++             resolvedToolResultFormat,
++             releaseRunTask,
++             embeddedPayloadFormatting,
++           });
++           if (resultOutcome.action === "continue") {
++             continue;
++           }
++           return resultOutcome.result;
++         }
++       } finally {
++         await cleanupEmbeddedRun({
++           disposeContext: () => contextEngine.dispose?.(),
++           stopCredentialRefresh: () => session.copilotRefresh.stop(),
++           restoreWorkingDirectory: () => process.chdir(prevCwd),
++         });
++       }
++     }),
++   );
++ }
++
+
+ ❯ src/commands/agent.lifecycle-attribution-path.node.test.ts:21:20
+     19|     expect(agentSrc).toContain("runCommandCandidate");
+     20|     expect(candidateSrc).toContain("runEmbeddedPiAgent");
+     21|     expect(runSrc).toContain("runEmbeddedAttempt");
+       |                    ^
+     22|     expect(attemptSrc).toContain("createLifecycleSkillToolAttributionH…
+     23|     expect(attemptSrc).toContain("subscribeEmbeddedPiSession");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 12 passed (13)
+      Tests  1 failed | 131 passed (132)
+   Start at  10:39:47
+   Duration  28.05s (transform 34.77s, setup 1.87s, import 97.19s, tests 1.89s, environment 1ms)
+
