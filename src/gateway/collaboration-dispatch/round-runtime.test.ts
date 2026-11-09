@@ -1258,3 +1258,46 @@ test.each([undefined, 4])(
     }
   },
 );
+
+test.each(["closed", "open", "late"] as const)(
+  "open discussion %s does not require conclusion formatting for selected members",
+  async (scenario) => {
+    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-policy-window-"));
+    const open = scenario !== "closed";
+    const deadline = vi
+      .spyOn(completionContract, "resolvePrimaryDeadlineMs")
+      .mockImplementation(({ startedAtMs }) => startedAtMs + (scenario === "late" ? 5 : 1000));
+    const scope = createCoordinatorScope();
+    scope.operatingState!.collaborationPolicy.openDiscussionWithoutMention = open;
+    scope.operatingState!.activeContext.currentOperatingPhase = "debate";
+    const calls: string[] = [];
+    try {
+      const round = await executeCollaborationRoundForTest({
+        scope,
+        roundsDir,
+        sessionKey: "space:alpha",
+        message: "请分析方案风险",
+        decision: createDecision({ roundId: "policy-window", executionBots: [botA, botB] }),
+        policy: {
+          ...policyWithoutWrap(),
+          supplement: { ...DEFAULT_COLLABORATION_POLICY.supplement, enabled: true },
+        },
+        runBot: async ({ bot }) => {
+          calls.push(bot.agentId);
+          if (scenario === "late" && bot.agentId === "bot-a") {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          return { text: "当前实现存在多个需要核查的边界，可以对照已有记录逐项验证。" };
+        },
+      });
+      expect(calls).toEqual(open ? ["bot-a", "bot-b"] : ["bot-a"]);
+      expect(round.state).toBe("ROUND_COMPLETE");
+      if (open) {
+        expect(round.policyDecision?.supplementWindow?.reason).toBe("policy");
+      }
+    } finally {
+      deadline.mockRestore();
+      await fs.rm(roundsDir, { recursive: true, force: true });
+    }
+  },
+);

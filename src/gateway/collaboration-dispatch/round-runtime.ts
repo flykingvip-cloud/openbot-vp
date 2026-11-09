@@ -1072,24 +1072,37 @@ export async function executeCollaborationRound(
   // A settled primary's soft deadline closes optional discussion, not an already
   // invited member's turn. Per-member admission, abort and visible limits still apply.
   const invitedContinuation = primaryBudgetClosed && invitedMemberPresent;
+  const selectedPolicyMembers =
+    !isChitchatRound &&
+    params.decision.responseMode !== "single_owner" &&
+    effective.participation.openDiscussionWithoutMention &&
+    stages.supplement.bots.length > 0;
+  const policyContinuation = primaryBudgetClosed && selectedPolicyMembers;
   const supplementStructurallyAllowed =
     primaryCompleted &&
-    (!primaryBudgetClosed || invitedContinuation) &&
+    (!primaryBudgetClosed || invitedContinuation || policyContinuation) &&
     params.decision.primaryMode !== "explicit_multi" &&
     frozen.supplement.enabled &&
     (params.decision.responseMode !== "single_owner" || edgeTargetIds.size > 0);
   // Structural conclusion opens the open window; explicit invitations (broadcast,
   // @mention, primary CollabEdge) open an invited-only window even without one.
-  const supplementWindowReason: "conclusion" | "invited" | null = !supplementStructurallyAllowed
-    ? null
-    : !primaryBudgetClosed &&
-        primaryHasConclusion &&
-        !isChitchatRound &&
-        params.decision.responseMode !== "single_owner"
-      ? "conclusion"
-      : invitedSupplementPresent
-        ? "invited"
-        : null;
+  // Open discussion also admits already-selected members without requiring the
+  // primary to emit conclusion keywords; all existing Cheap Gates still apply.
+  const supplementWindowReason: "conclusion" | "invited" | "policy" | null =
+    !supplementStructurallyAllowed
+      ? null
+      : !primaryBudgetClosed &&
+          primaryHasConclusion &&
+          !isChitchatRound &&
+          params.decision.responseMode !== "single_owner"
+        ? "conclusion"
+        : invitedMemberPresent
+          ? "invited"
+          : selectedPolicyMembers
+            ? "policy"
+            : invitedSupplementPresent && !primaryBudgetClosed
+              ? "invited"
+              : null;
   const allowSupplement = supplementWindowReason !== null;
   const recordSupplementDecision = (
     window: NonNullable<NonNullable<PersistedRound["policyDecision"]>["supplementWindow"]>,
@@ -1102,6 +1115,7 @@ export async function executeCollaborationRound(
       primaryCompleted,
       primaryBudgetClosed,
       invitedContinuation,
+      policyContinuation,
       primaryMode: String(params.decision.primaryMode ?? ""),
       supplementEnabled: Boolean(frozen.supplement.enabled),
       responseMode: String(params.decision.responseMode ?? ""),
@@ -1199,7 +1213,11 @@ export async function executeCollaborationRound(
             const id = normalizeAgentIdentifier(bot.agentId) ?? "";
             return invitedAgentIds.has(id) || (!primaryBudgetClosed && edgeTargetIds.has(id));
           })
-        : orderedSupplementBots;
+        : policyContinuation
+          ? orderedSupplementBots.filter((bot) =>
+              stages.supplement.bots.some((selected) => selected.agentId === bot.agentId),
+            )
+          : orderedSupplementBots;
     const preserveConflict = effective.strategy.preserveConflict;
     const pendingLowRelevance: Array<{ bot: CollaborationBotTarget; relevance: number }> = [];
 

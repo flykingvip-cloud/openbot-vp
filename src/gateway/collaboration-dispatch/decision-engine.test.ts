@@ -1055,7 +1055,7 @@ test("active default uses related members within three replies, greetings remain
     roundId: "active-default",
   });
   expect(analysis.visibleReplyBudget).toEqual({ kind: "ordinary", limit: 3 });
-  expect(analysis.executionBots.length).toBeGreaterThan(0);
+  expect(analysis.executionBots.length).toBeGreaterThan(1);
   expect(analysis.executionBots.length).toBeLessThanOrEqual(3);
   const greeting = decideParticipantsForTest({
     scope,
