@@ -7,6 +7,7 @@ import {
   decideParticipantsForTest,
 } from "./__fixtures__/runtime-authority-test-utils.js";
 import * as completionContract from "./completion-contract.js";
+import * as memberAdmission from "./member-admission.js";
 import { DEFAULT_COLLABORATION_POLICY } from "./policy.js";
 import * as roundOrchestrator from "./round-orchestrator.js";
 import {
@@ -1301,3 +1302,66 @@ test.each(["closed", "open", "late"] as const)(
     }
   },
 );
+
+test("formal admitted executor is independent of speaking limit and supplement switch", async () => {
+  const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-formal-admission-"));
+  const scope = createCoordinatorScope();
+  scope.operatingState!.collaborationPolicy.maxVisibleBotRepliesPerRound = 1;
+  const admission = vi.spyOn(memberAdmission, "resolveMemberAdmission").mockResolvedValue({
+    purpose: "formal_execution",
+    binding: {
+      groupId: "alpha",
+      taskId: "t",
+      boardItemId: "b",
+      runId: "formal:bot-b",
+      source: "explicit_run",
+    },
+    taskBag: {
+      planGate: { confirmed: true, todolistStatus: "confirmed" },
+    } as import("./executor-private-todolist.js").ExecutionTaskBag,
+  });
+  const calls: string[] = [];
+  try {
+    const round = await executeCollaborationRoundForTest({
+      scope,
+      roundsDir,
+      decision: createDecision({
+        roundId: "formal",
+        responseMode: "decision_to_executor",
+        executionBots: [botA, botB],
+        roundPlan: {
+          ...createDecision().roundPlan,
+          participants: [
+            {
+              agentId: "bot-a",
+              displayName: "A",
+              tier: "mention",
+              contributionRole: "confirm",
+              reasonText: "confirm",
+            },
+            {
+              agentId: "bot-b",
+              displayName: "B",
+              tier: "duty",
+              contributionRole: "executor",
+              reasonText: "execute",
+            },
+          ],
+        },
+      }),
+      policy: policyWithoutWrap(),
+      message: "执行已确认任务",
+      sessionKey: "space:alpha",
+      runBot: async ({ bot }) => {
+        calls.push(bot.agentId);
+        return { text: "结论：已完成本次回合。" };
+      },
+    });
+    expect(round.state).toBe("ROUND_COMPLETE");
+    expect(calls).toEqual(["bot-a", "bot-b"]);
+    expect(admission).toHaveBeenCalledTimes(2);
+  } finally {
+    admission.mockRestore();
+    await fs.rm(roundsDir, { recursive: true, force: true });
+  }
+});

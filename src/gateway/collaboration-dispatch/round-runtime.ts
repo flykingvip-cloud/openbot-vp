@@ -39,6 +39,11 @@ import {
   assertLegacyProductionExecutor,
   readCollaborationCutoverFlags,
 } from "./legacy-production-executor.js";
+import {
+  memberSpeakingGate,
+  resolveMemberAdmission,
+  type MemberAdmission,
+} from "./member-admission.js";
 import { normalizeAgentIdentifier } from "./mention-utils.js";
 import { buildPolicyDecisionRecord } from "./policy-decision-record.js";
 import { resolveContextLaneForRound } from "./policy-lane-context.js";
@@ -793,6 +798,25 @@ export async function executeCollaborationRound(
   // "Primary answered" (visible, non-placeholder) is tracked separately from
   // "primary carried a structural conclusion". Only the latter gates the open
   // supplement window; neither turns a real reply into a timeout.
+  const formalAdmissions = new Map<string, MemberAdmission>();
+  if (params.decision.responseMode === "decision_to_executor") {
+    for (const bot of stages.supplement.bots) {
+      formalAdmissions.set(
+        bot.agentId,
+        await resolveMemberAdmission({
+          authority,
+          agentId: bot.agentId,
+          runId: `${round.roundId}:${bot.agentId}`,
+          taskId: facts.activeContext.currentTaskId,
+          executionRequested: true,
+          cfg: getRuntimeConfigSnapshot() ?? undefined,
+        }),
+      );
+    }
+  }
+  const formalExecutionPresent = [...formalAdmissions.values()].some(
+    (a) => a.purpose === "formal_execution",
+  );
   let primaryCompleted = false;
   let primaryHasConclusion = false;
   let primaryVisibleText = "";
@@ -1080,9 +1104,9 @@ export async function executeCollaborationRound(
   const policyContinuation = primaryBudgetClosed && selectedPolicyMembers;
   const supplementStructurallyAllowed =
     primaryCompleted &&
-    (!primaryBudgetClosed || invitedContinuation || policyContinuation) &&
+    (!primaryBudgetClosed || invitedContinuation || policyContinuation || formalExecutionPresent) &&
     params.decision.primaryMode !== "explicit_multi" &&
-    frozen.supplement.enabled &&
+    (frozen.supplement.enabled || formalExecutionPresent) &&
     (params.decision.responseMode !== "single_owner" || edgeTargetIds.size > 0);
   // Structural conclusion opens the open window; explicit invitations (broadcast,
   // @mention, primary CollabEdge) open an invited-only window even without one.
@@ -1267,10 +1291,25 @@ export async function executeCollaborationRound(
       const edgeForBot = round.edges?.find(
         (edge) => normalizeAgentIdentifier(edge.toAgentId) === botId,
       );
+      const admission = formalAdmissions.has(bot.agentId)
+        ? await resolveMemberAdmission({
+            authority,
+            agentId: bot.agentId,
+            runId: `${round.roundId}:${bot.agentId}`,
+            taskId: facts.activeContext.currentTaskId,
+            executionRequested: true,
+            cfg: getRuntimeConfigSnapshot() ?? undefined,
+          })
+        : { purpose: "discussion" as const };
+      const speaking = memberSpeakingGate(admission, leadVisibleCount + dispatched >= visibleCap);
       const invited = invitedAgentIds.has(botId);
-      const gate: CheapGateResult =
-        leadVisibleCount + dispatched >= visibleCap
-          ? { decision: "DROP" as const, reason: "visible_limit" }
+      const gate: CheapGateResult = !speaking.allowed
+        ? {
+            decision: "DROP" as const,
+            reason: admission.purpose === "blocked" ? "policy_disabled" : "visible_limit",
+          }
+        : admission.purpose === "formal_execution"
+          ? { decision: "KEEP" as const, reason: speaking.reason }
           : autoSupplement && bot.agentId === autoSupplement.agentId
             ? kept >= frozen.supplement.maxSupplementBots
               ? { decision: "DROP" as const, reason: "budget_limit" }
