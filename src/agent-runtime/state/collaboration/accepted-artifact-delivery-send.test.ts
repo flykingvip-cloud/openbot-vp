@@ -119,8 +119,10 @@ async function publish(
 
 function send(params: {
   root: string;
+  auth: string;
   queueState: string;
   who?: MemberArtifactDeliveryIdentity;
+  nowMs?: number;
   sendTelegram: ReturnType<typeof vi.fn>;
 }) {
   const who = params.who ?? identity();
@@ -133,7 +135,9 @@ function send(params: {
       claim: (recheck) =>
         claimMemberArtifactSendUnknown({
           rootDir: params.root,
+          authDir: params.auth,
           identity: who,
+          nowMs: params.nowMs,
           recheck,
         }),
       recordReceipt: async (ids) => {
@@ -174,10 +178,15 @@ describe("accepted artifact send boundary", () => {
     const queueState = await tempDir();
     const prepared = await publish(root, auth, queueState);
     const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-1", chatId: "chat-1" });
-    const claimed = await claimMemberArtifactSendUnknown({ rootDir: root, identity: identity() });
+    const claimed = await claimMemberArtifactSendUnknown({
+      rootDir: root,
+      authDir: auth,
+      identity: identity(),
+      nowMs: 9,
+    });
     expect(claimed.ok && claimed.send).toBe(true);
     const entry = (await loadPendingDeliveries(queueState))[0];
-    const outcome = await send({ root, queueState, sendTelegram })(entry);
+    const outcome = await send({ root, auth, queueState, sendTelegram })(entry);
     expect(outcome).toBe("deferred");
     expect(sendTelegram).not.toHaveBeenCalled();
     const raw = JSON.parse(
@@ -194,7 +203,7 @@ describe("accepted artifact send boundary", () => {
     const prepared = await publish(root, auth, queueState);
     const sendTelegram = vi.fn().mockRejectedValue(new Error("timeout"));
     const entry = (await loadPendingDeliveries(queueState))[0];
-    const run = send({ root, queueState, sendTelegram });
+    const run = send({ root, auth, queueState, sendTelegram });
     expect(await run(entry)).toBe("failed");
     expect(await run(entry)).toBe("deferred");
     expect(sendTelegram).toHaveBeenCalledTimes(1);
@@ -215,7 +224,7 @@ describe("accepted artifact send boundary", () => {
     queued.payloads = [{ text: "tampered" }];
     await fs.writeFile(file, JSON.stringify(queued), "utf8");
     const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-1", chatId: "chat-1" });
-    const outcome = await send({ root, queueState, sendTelegram })(queued);
+    const outcome = await send({ root, auth, queueState, sendTelegram })(queued);
     expect(outcome).toBe("failed");
     expect(sendTelegram).not.toHaveBeenCalled();
     const raw = JSON.parse(
@@ -242,7 +251,7 @@ describe("accepted artifact send boundary", () => {
     );
     expect(queued.channel).toBe("slack");
     const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-1", chatId: "chat-1" });
-    await send({ root, queueState, who: slack, sendTelegram })(queued);
+    await send({ root, auth, queueState, who: slack, sendTelegram })(queued);
     expect(sendTelegram).not.toHaveBeenCalled();
   });
 
@@ -253,10 +262,71 @@ describe("accepted artifact send boundary", () => {
     await publish(root, auth, queueState);
     const entry = (await loadPendingDeliveries(queueState))[0];
     const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-9", chatId: "chat-1" });
-    const run = send({ root, queueState, sendTelegram });
+    const run = send({ root, auth, queueState, nowMs: 11, sendTelegram });
     const [first, second] = await Promise.all([run(entry), run(entry)]);
     expect([first, second].toSorted()).toEqual(["deferred", "recovered"]);
     expect(sendTelegram).toHaveBeenCalledTimes(1);
+  });
+
+  it("claims at most one send when two recoveries share a millisecond", async () => {
+    const root = await tempDir();
+    const auth = await tempDir();
+    const queueState = await tempDir();
+    await publish(root, auth, queueState);
+    const entry = (await loadPendingDeliveries(queueState))[0];
+    const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-same", chatId: "chat-1" });
+    const run = send({ root, auth, queueState, nowMs: 42, sendTelegram });
+    const [first, second] = await Promise.all([run(entry), run(entry)]);
+    const calls = sendTelegram.mock.calls.length;
+    expect(calls).toBeLessThanOrEqual(1);
+    expect([first, second].filter((outcome) => outcome === "recovered").length).toBe(calls);
+    const repeat = await run(entry);
+    expect(repeat).toBe("deferred");
+    expect(sendTelegram).toHaveBeenCalledTimes(calls);
+  });
+
+  it("does not send after the grant is revoked or deleted", async () => {
+    const root = await tempDir();
+    const auth = await tempDir();
+    const queueState = await tempDir();
+    await publish(root, auth, queueState);
+    await writeServerOutboundArtifactGrant({
+      authDir: auth,
+      identity: identity(),
+      revokedAtMs: 20,
+    });
+    const revokedEntry = (await loadPendingDeliveries(queueState))[0];
+    const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-no", chatId: "chat-1" });
+    const revoked = await send({ root, auth, queueState, sendTelegram })(revokedEntry);
+    expect(revoked).toBe("failed");
+    expect(sendTelegram).not.toHaveBeenCalled();
+
+    const root2 = await tempDir();
+    const auth2 = await tempDir();
+    const queue2 = await tempDir();
+    await publish(root2, auth2, queue2);
+    await fs.rm(auth2, { recursive: true, force: true });
+    const missingEntry = (await loadPendingDeliveries(queue2))[0];
+    const deleted = await send({ root: root2, auth: auth2, queueState: queue2, sendTelegram })(
+      missingEntry,
+    );
+    expect(deleted).toBe("deferred");
+    expect(sendTelegram).not.toHaveBeenCalled();
+  });
+
+  it("refuses a payload that carries media or another effect field", async () => {
+    const root = await tempDir();
+    const auth = await tempDir();
+    const queueState = await tempDir();
+    const prepared = await publish(root, auth, queueState);
+    const file = path.join(resolveDeliveryQueueDir(queueState), `${prepared.queueId}.json`);
+    const queued = JSON.parse(await fs.readFile(file, "utf8"));
+    queued.payloads = [{ text: body, mediaUrl: "https://example.invalid/a.png" }];
+    await fs.writeFile(file, JSON.stringify(queued), "utf8");
+    const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-media", chatId: "chat-1" });
+    const outcome = await send({ root, auth, queueState, sendTelegram })(queued);
+    expect(outcome).toBe("failed");
+    expect(sendTelegram).not.toHaveBeenCalled();
   });
 
   it("leaves an ordinary queue entry on the existing recovery path", async () => {

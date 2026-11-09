@@ -601,25 +601,42 @@ async function mutateIntent(
   });
 }
 
-/** Marks effect unknown before any channel call. Already unknown or terminal does not send again. */
+/**
+ * Marks effect unknown before any channel call.
+ * `send` is decided inside the lock and returned unchanged.
+ * The current grant is read here; a missing grant waits, a revoked grant blocks.
+ */
 export async function claimMemberArtifactSendUnknown(params: {
   rootDir: string;
+  authDir: string;
   identity: MemberArtifactDeliveryIdentity;
   nowMs?: number;
   /** Runs inside the key lock after the intent is re-read. */
   recheck?: (intent: MemberArtifactDeliveryIntent) => Promise<"proceed" | "stop" | "block">;
-}): Promise<AssociationCommitResult & { send?: boolean }> {
+}): Promise<AssociationCommitResult & { send: boolean; blocked?: boolean }> {
+  const keyHash = deliveryKeyHash(params.identity);
+  if (!keyHash) {
+    return { ok: false, reason: "target_required", send: false };
+  }
+  if (!compact(params.authDir)) {
+    return { ok: false, reason: "auth_dir_required", send: false };
+  }
   const nowMs = params.nowMs ?? Date.now();
-  return mutateIntent(params.rootDir, params.identity, async (existing) => {
+  return withDirectoryLock(params.rootDir, keyHash, async () => {
+    const read = await readIntent(params.rootDir, keyHash);
+    if (read.status === "unreadable") {
+      return { ok: false, reason: read.reason, send: false };
+    }
+    if (read.status === "missing") {
+      return { ok: false, reason: "intent_missing", send: false };
+    }
+    const existing = read.intent;
     const gate = params.recheck ? await params.recheck(existing) : "proceed";
     if (gate === "stop") {
       return { ok: true, intent: existing, created: false, send: false };
     }
-    if (gate === "block") {
-      if (existing.phase === "delivered" || existing.phase === "unknown") {
-        return { ok: true, intent: existing, created: false, send: false };
-      }
-      return {
+    if (gate === "block" && existing.phase !== "delivered" && existing.phase !== "unknown") {
+      const blocked: MemberArtifactDeliveryIntent = {
         ...existing,
         phase: "blocked",
         bridgeSendStarted: false,
@@ -627,6 +644,8 @@ export async function claimMemberArtifactSendUnknown(params: {
         retryable: false,
         updatedAtMs: nowMs,
       };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), blocked);
+      return { ok: true, intent: blocked, created: false, send: false, blocked: true };
     }
     if (
       existing.phase === "unknown" ||
@@ -634,6 +653,31 @@ export async function claimMemberArtifactSendUnknown(params: {
       existing.phase === "blocked"
     ) {
       return { ok: true, intent: existing, created: false, send: false };
+    }
+    const grant = await readServerOutboundArtifactGrant(params.authDir, keyHash);
+    const auth = evaluateAcceptedArtifactOutboundAuthorization({
+      tenantId: existing.tenantId,
+      groupId: existing.groupId,
+      actorId: existing.actorId,
+      normalizedTarget: existing.normalizedTarget,
+      acceptedArtifactVersion: existing.acceptedArtifactVersion,
+      linkedContentSha256: existing.linkedContentSha256,
+      grant,
+    });
+    if (auth.outcome === "authorization_pending") {
+      return { ok: true, intent: existing, created: false, send: false };
+    }
+    if (auth.outcome === "deny") {
+      const blocked: MemberArtifactDeliveryIntent = {
+        ...existing,
+        phase: "blocked",
+        bridgeSendStarted: false,
+        externalEffect: "none",
+        retryable: false,
+        updatedAtMs: nowMs,
+      };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), blocked);
+      return { ok: true, intent: blocked, created: false, send: false, blocked: true };
     }
     const retryable =
       existing.phase === "failed_retryable" &&
@@ -647,7 +691,7 @@ export async function claimMemberArtifactSendUnknown(params: {
     if (!retryable && !fresh) {
       return { ok: true, intent: existing, created: false, send: false };
     }
-    return {
+    const claimed: MemberArtifactDeliveryIntent = {
       ...existing,
       phase: "unknown",
       bridgeSendStarted: true,
@@ -655,13 +699,8 @@ export async function claimMemberArtifactSendUnknown(params: {
       retryable: false,
       updatedAtMs: nowMs,
     };
-  }).then((result) => {
-    if (!result.ok) {
-      return result;
-    }
-    const send = result.intent.phase === "unknown" && result.intent.updatedAtMs === nowMs;
-    const blocked = result.intent.phase === "blocked" && result.intent.updatedAtMs === nowMs;
-    return { ...result, send, blocked };
+    await writeJsonDurable(intentPath(params.rootDir, keyHash), claimed);
+    return { ok: true, intent: claimed, created: false, send: true };
   });
 }
 

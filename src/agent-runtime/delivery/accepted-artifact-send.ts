@@ -39,6 +39,41 @@ function payloadDigest(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
 }
 
+const QUEUE_EFFECT_FIELDS = [
+  "mirror",
+  "gifPlayback",
+  "threadId",
+  "replyToId",
+  "bestEffort",
+  "silent",
+] as const;
+
+/** M1/M2 accept one plain-text payload. Media and other effect fields are refused. */
+export function unsupportedPlainTextQueueEntry(entry: QueuedDelivery): boolean {
+  if (!Array.isArray(entry.payloads) || entry.payloads.length !== 1) {
+    return true;
+  }
+  const payload = entry.payloads[0];
+  if (!payload || typeof payload !== "object") {
+    return true;
+  }
+  const keys = Object.keys(payload);
+  if (
+    keys.length !== 1 ||
+    keys[0] !== "text" ||
+    typeof payload.text !== "string" ||
+    !payload.text.trim()
+  ) {
+    return true;
+  }
+  for (const field of QUEUE_EFFECT_FIELDS) {
+    if (entry[field] != null && entry[field] !== false) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function payloadText(entry: QueuedDelivery): string {
   return entry.payloads.map((payload) => payload.text ?? "").join("\n");
 }
@@ -118,6 +153,9 @@ export async function sendAcceptedArtifactBridge(params: {
     }
     if (!isEntryEligibleForRecoveryRetry(fresh, Date.now()).eligible) {
       return "stop";
+    }
+    if (unsupportedPlainTextQueueEntry(fresh)) {
+      return "block";
     }
     const account = fresh.accountId ?? null;
     const bound =
