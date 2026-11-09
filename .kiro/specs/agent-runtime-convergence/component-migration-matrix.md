@@ -4,6 +4,7 @@
 - 分支：`codex/openbot/runtime-authority-closure`
 - 开工 / 抽核 SHA：`efdb1b98d83e096a31e251095080de954f5883ec`（`#250`/`#252` 已合入 main）
 - 性质：**T1 规格**；对照 `execution-authority-closure-plan-2026-11-09.md` §4 与工作项 T3–T8。
+- Batch B 更新（2026-11-09，head `050098bc3c318b3c76d89278d293a65d29950999`）：T3/T4 相关行改为待验收。证据见 `t4-completion-window-2026-11-09.md`。不构成独立验收通过。
 - 处置枚举：`迁移` | `适配保留` | `观察保留` | `归档退役` | `证据不足` | `已在main接续`
 - 状态枚举：`未开始` | `核准中` | `实施中` | `待验收` | `通过` | `阻塞` | `保留有因`
 - 冲突原则：原个体/协作盘点与方案冲突时，**先核准后迁移**；已在 main 的实现 **接续或等待**，禁止从旧 tip 重做。
@@ -15,16 +16,16 @@
 
 | 旧组件 / 现役锚点 | 原设计意图 | 当前路径（main efdb1b98d） | 目标归属 | 依赖 | 处置 | 状态 | 对照 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `conversation-task/turn-relation.ts` | 回合关系：安全中止谓词、owner 约束谓词、旧 amend/conversation/new_work 分类、title re-export | 仍在 `src/conversation-task/turn-relation.ts`；`stripInboundStamp`/`titleFromGoal` 已 re-export 自 agent-runtime | policy：仅现役安全/约束谓词；**不**把 `classifyTurnRelation` 升权威；重复分类→归档 | policy/input-stamp；Gateway chat；session-task-board 约束路径；complex-task-loop（dormant） | **迁移**（谓词）+ **观察保留→归档退役**（整包分类器） | 核准中 | T3 / T8 |
+| `conversation-task/turn-relation.ts` | 回合关系：安全中止谓词、owner 约束谓词、旧 amend/conversation/new_work 分类、title re-export | 分类器仍在 turn-relation；abort 谓词已拆到 `park-abort.ts` 并由本文件 re-export；title 仍 re-export context | policy：仅现役安全/约束谓词；**不**把 `classifyTurnRelation` 升权威；重复分类→归档 | policy/input-stamp；Gateway chat；session-task-board 约束路径；complex-task-loop（dormant） | **迁移**（谓词）+ **观察保留→归档退役**（整包分类器） | 待验收 | T3 / T8 |
 | `classifyTurnRelation` | 旧语义分流（与 command `interpretInteraction` 重叠风险） | 唯一定义于 turn-relation；**唯一源码调用** `task-orchestration/complex-task-loop.ts:186`；shaping API **无生产 importer**；orch dispatch 默认 OFF | 不进入新 policy 权威；核准后归档 | observe-gate / feature flags / allowlist | **观察保留** → 条件满足后 **归档退役** | 核准中 | T3 / T8 |
-| `shouldTaskParkAbortInFlight` | 切焦点时是否 abort in-flight / 清队列 | `turn-relation.ts:299`；Gateway `chat.ts:6142` **现役** | policy 安全谓词 | chat abort / embedded abort / queue clear | **迁移** | 核准中 | T3 |
+| `shouldTaskParkAbortInFlight` | 切焦点时是否 abort in-flight / 清队列 | `park-abort.ts`；turn-relation re-export；Gateway 仍 import turn-relation | policy 安全谓词（本批未进 policy/index，避免混 landing stream） | chat abort / embedded abort / queue clear | **迁移** | 待验收 | T3 |
 | `isOwnerConstraint*` / `shouldPersistOwnerConstraint` | 约束修订 vs 全量替换 vs 是否落盘 | turn-relation；由 `session-task-board` 约束辅助调用 | policy 纯谓词；写仍 state | state `appendTaskConstraint` | **迁移** | 核准中 | T3 |
-| `conversation-task/focus-policy.ts` | FOCUS/PARKED **执行槽**调度、`decideWake`、heartbeat 禁动作 | 仍在 conversation-task；生产：`infra/heartbeat-focus.ts`、`cron/.../main-session-focus.ts` | policy focus-wake；写板仍 state；触发留宿主 | FocusSnapshot；board enrich；`MAX_PARKED_SLOTS` | **迁移** | 核准中 | T3 / T4 |
-| `MAX_PARKED_SLOTS` | 执行槽位上限（非任务基数 cap，见文件头注释） | `focus-policy.ts:11` =3 | 独立命名归属 policy 或保留；**勿与 TASKS 硬合** | decideWake park 路径 | **证据不足**（是否同资源） | 核准中 | T3（I0） |
+| `conversation-task/focus-policy.ts` | FOCUS/PARKED **执行槽**调度、`decideWake`、heartbeat 禁动作 | 仍在 conversation-task；`evaluateWakeEligibility` 与 `decideWake` 已分开；写板仍 state | policy focus-wake；写板仍 state；触发留宿主 | FocusSnapshot；board enrich；`MAX_PARKED_SLOTS` | **迁移** | 待验收 | T3 / T4 |
+| `MAX_PARKED_SLOTS` | 执行槽位上限（非任务基数 cap，见文件头注释） | `focus-policy.ts` =3；与 `MAX_PARKED_TASKS` 分属不同模块 | 独立命名；**勿与 TASKS 硬合** | decideWake park 路径 | **适配保留** | 待验收 | T3（I0） |
 | `policy/task-board-limits.MAX_PARKED_TASKS` | 会话板 parked **任务**容量与续跑窗口 | **已在** `agent-runtime/policy/task-board-limits.ts`；`task-record.parkTask` 使用 | policy（已落位） | state park / completion-notice | **已在main接续** | 通过（相对本切片） | T3 / T2 |
-| `conversation-task/focus-switch.ts` | 用户消息焦点切换启发式 + transcript 只读 IO + fence 文案 | 仍在；Gateway `chat.ts` 消费；**本地** `stripInboundStamp` 副本 | 纯判定→policy；IO→adapter；文案→context | session 文件；qualifyTurn | **迁移** | 核准中 | T3 / T7 |
-| `stripInboundStamp` 多源 | 去入站 GMT 戳 | 权威：`policy/input-stamp.ts`；副本：`focus-switch.ts`；对话：`command/task-status.stripInboundStampForDialogue`（同正则） | 单一 policy 实现；旧处 import/re-export | 多判定链 | **迁移**（先样本等价） | 核准中 | T3（I0） |
-| `conversation-task/reply-completion.ts` | 成功回复后关闭 CTR + ledger + 触发会话板完成；delivery-close consult | `dispatch-from-config` 调 `observeConversationTaskReplyCompleted`；顺序 **先** `transitionTask(closed)` **后** `recordCheckedTaskCompletion`；activation 默认 OFF | 编排可留 conversation-task adapter；完成写只经 state；须定义双关闭失败重试/拒绝/对账 | store / ledger-binding / session completion | **适配保留** + **T4 优先核准窗口** | 核准中 | **T4** |
+| `conversation-task/focus-switch.ts` | 用户消息焦点切换启发式 + transcript 只读 IO + fence 文案 | 仍在；stamp re-export policy；title 委托 context；transcript 读取留本文件 | 纯判定→policy；IO→adapter；文案→context | session 文件；qualifyTurn | **迁移** | 待验收 | T3 / T7 |
+| `stripInboundStamp` 多源 | 去入站 GMT 戳 | 权威：`policy/input-stamp.ts`；focus-switch re-export；dialogue 委托同一函数 | 单一 policy 实现；旧处 import/re-export | 多判定链 | **迁移** | 待验收 | T3（I0） |
+| `conversation-task/reply-completion.ts` | 成功回复后关闭 CTR + ledger + 触发会话板完成；delivery-close consult | 先板结算再 `transitionTask(closed)`；拒绝/抛错不关 CTR、不返回 notice；activation 默认 OFF | 编排留 conversation-task adapter；完成写只经 state | store / ledger-binding / session completion | **适配保留** | 待验收 | **T4** |
 | `conversation-task/session-task-board.ts` | 会话任务板门面：曾含实现，现大量 re-export | facade → `agent-runtime/state|policy|contracts|context`；仍含少量约束/分类辅助 | 兼容门面直至消费者归零；禁止新增长期业务实现 | 大量 Gateway / agents / auto-reply / async-wait | **适配保留** | 保留有因 | T4 / T8 |
 | `conversation-task/control-plane.ts` | CTR 激活控制面（SQLite） | 仍在；activation / bootstrap / degrade | 保留领域含义；不粗并会话板 | feature flags；store | **适配保留** | 保留有因 | T4 / T8 |
 | `conversation-task/ledger-binding.ts` | Conversation ledger 关闭与工具观察 | reply-completion；embedded-attempt 观察创建 | 独立权威；与板完成联动条件写清 | cron store；tool observations | **适配保留** | 保留有因 | T4 / T8 |

@@ -9,6 +9,7 @@
 - 性质：**只读声明视图**；无 UI / 脚本引擎 / 表达式求值 / 自动规则调度器
 - 输入：`execution-authority-inventory.md`、`component-migration-matrix.md`、`execution-authority-closure-plan-2026-11-09.md` §5 T2
 - 覆盖声明：**非完整 inventory**。可查询 ≠ 已迁入新目录；现役规则按**真实当前位置**登记，待迁用 `disposition: pending_migration` + `currentOwner`/`targetOwner` 表达。
+- Batch B（head `050098bc3c318b3c76d89278d293a65d29950999`）：更新 abort / wake / switch / reply-completion 的当前位置说明。目录仍非完整清单。
 
 ## 1. 分类原则（落地）
 
@@ -68,11 +69,11 @@
 
 | id | current→target | implementation | 说明 |
 | --- | --- | --- | --- |
-| `task.park.abort_inflight` | conversation-task→policy | `src/conversation-task/turn-relation.ts` | **仅**现役安全谓词；非整包分类器 |
+| `task.park.abort_inflight` | conversation-task→policy | `src/conversation-task/park-abort.ts` | **仅**现役安全谓词；本批未进 policy/index；非整包分类器 |
 | `task.constraint.owner_gate` | conversation-task→policy | `src/conversation-task/turn-relation.ts` | REV-CONSTRAINT 谓词 |
-| `task.focus.wake` | conversation-task→policy | `src/conversation-task/focus-policy.ts` | 含 MAX_PARKED_SLOTS；勿与 TASKS 硬合 |
-| `task.focus.switch` | conversation-task→policy | `src/conversation-task/focus-switch.ts` | 判定→policy；IO→adapter |
-| `task.reply.completion` | conversation-task→state | `src/conversation-task/reply-completion.ts` | 编排可留 adapter；**不**假装完成权威闭环；T4 优先 |
+| `task.focus.wake` | conversation-task→policy | `src/conversation-task/focus-policy.ts` | eligibility 与 decideWake 已分开；槽位勿与 TASKS 硬合 |
+| `task.focus.switch` | conversation-task→policy | `src/conversation-task/focus-switch.ts` | stamp/title 已委托；transcript IO 留 adapter |
+| `task.reply.completion` | conversation-task→state | `src/conversation-task/reply-completion.ts` | 板结算后再关 CTR；拒绝不对外报成功；见 T4 窗口记录 |
 
 ### 3.3 现役协作规则（pending_migration，按 Gateway 真实路径登记）
 
@@ -114,7 +115,7 @@
 | REV-CONSTRAINT | `task.constraint.owner_gate` + `task.constraints.normalize` |
 | REL-CLASSIFY | **不进 catalog**（观察） |
 | FOCUS-WAKE / FOCUS-SWITCH-HEUR | `task.focus.wake` / `task.focus.switch`（pending_migration） |
-| CLOSE-* / reply-completion | `task.reply.completion`（pending；T4 窗口优先） |
+| CLOSE-* / reply-completion | `task.reply.completion`（pending；T4 窗口已注入并收口，待验收） |
 | COLLAB-POLICY-COMPILE / SUBMIT / GOVERN / PEER / PLAN-GATE | 对应 `collab.*` pending_migration 条目 |
 | COLLAB-CLAIM | **不进 catalog**（ClaimContract 领域对象） |
 | DELIV-CONFIRM | `delivery.receipt.identity` |
