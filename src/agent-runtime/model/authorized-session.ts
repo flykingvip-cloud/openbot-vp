@@ -8,6 +8,7 @@ import type {
   tryAcquireEnterpriseAgentRun,
   releaseEnterpriseAgentRun,
 } from "../../gateway/billing/agent-run-governance.js";
+import { ContractEndedError } from "../../gateway/billing/billing-period.js";
 import type { recordCreditUsage } from "../../gateway/billing/record-credit-usage.js";
 import type {
   buildRunModelSetSnapshot,
@@ -68,7 +69,21 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
       }
     | undefined;
   const lease = createRunAdmissionLease({
-    acquire: ports.admission.tryAcquireEnterpriseAgentRun,
+    acquire: async (input): Promise<AdmissionResult> => {
+      try {
+        return await ports.admission.tryAcquireEnterpriseAgentRun(input);
+      } catch (error) {
+        if (!(error instanceof ContractEndedError)) {
+          throw error;
+        }
+        return {
+          acquired: false,
+          skipped: false,
+          reason: "CONTRACT_ENDED",
+          message: "当前服务合同已结束，本次执行未获准入。请联系管理员续订后重试。",
+        };
+      }
+    },
     release: () => ports.admission.releaseEnterpriseAgentRun(runId),
     forgetSnapshot: () => {
       ports.model.forgetRunModelSet(runId);

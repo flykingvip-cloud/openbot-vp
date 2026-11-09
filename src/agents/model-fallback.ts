@@ -49,6 +49,7 @@ import {
 } from "./model-selection.js";
 import type { FailoverReason } from "./pi-embedded-helpers.js";
 import { isLikelyContextOverflowError } from "./pi-embedded-helpers.js";
+import { isSandboxAccountIdentityError } from "./sandbox/account-scope.js";
 import { isSandboxInfraPreReplyError } from "./sandbox/docker-engine-client.js";
 
 const log = createSubsystemLogger("model-fallback");
@@ -1146,7 +1147,7 @@ export async function runWithModelFallback<T>(params: {
       // Sandbox / 云电脑 create failures are infra, not per-model. Fail overing
       // only burns another candidate (and another create) and wraps the honest
       // 云电脑 notice as "All models failed".
-      if (isSandboxInfraPreReplyError(errMessage)) {
+      if (isSandboxInfraPreReplyError(errMessage) || isSandboxAccountIdentityError(err)) {
         throw err;
       }
       const normalized =

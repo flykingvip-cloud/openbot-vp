@@ -14,6 +14,7 @@ import {
   isTransientHttpError,
   sanitizeUserFacingText,
 } from "../../../agents/pi-embedded-helpers.js";
+import { isSandboxAccountIdentityError } from "../../../agents/sandbox/account-scope.js";
 import { userFacingPreReplyFailure } from "../../../agents/sandbox/docker-engine-client.js";
 import { isSoftRecoverableEntitlementFailure } from "../../../agents/sandbox/user-facing-entitlement-failure.js";
 import { buildUserFacingModelCallFailure } from "../../../auto-reply/reply/model-call-failure-copy.js";
@@ -54,6 +55,25 @@ export async function runAdmittedTurnRecovery(args: {
     transientHttpRetryDelayMs: TRANSIENT_HTTP_RETRY_DELAY_MS,
     softEntitlementRetryDelayMs: SOFT_ENTITLEMENT_RETRY_DELAY_MS,
   } = args;
+
+  if (isSandboxAccountIdentityError(err)) {
+    void recordGrowthTaskOutcome(false, {
+      prepareFailed: true,
+      failureReason: "authz_denied",
+      errorMessage: "sandbox_account_identity_unavailable",
+      failureDetail: "sandbox_account_identity_unavailable",
+      skipBudgetCharge: state.tipBudgetChargedThisTurn,
+    });
+    return {
+      action: "return",
+      result: {
+        kind: "final",
+        payload: {
+          text: "本次执行未启动：缺少可信的租户或用户身份，或身份与执行环境不一致。请重新登录或联系管理员核对账号绑定后重试。",
+        },
+      },
+    };
+  }
 
   if (err instanceof TaskBudgetExceededError) {
     void recordGrowthTaskOutcome(false, {

@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
+import { ContractEndedError } from "../../gateway/billing/billing-period.js";
 import { createCommandAdmissionSession } from "./command-admission-session.js";
 const m = vi.hoisted(() => ({
   acquire: vi.fn(),
@@ -21,6 +22,22 @@ vi.mock("../../gateway/governance/spawn-snapshot-handoff.js", () => ({
 beforeEach(() => {
   vi.resetAllMocks();
   m.build.mockReturnValue({ runId: "run" });
+});
+it("returns denied for an ended contract without acquiring or releasing a lease", async () => {
+  m.acquire.mockRejectedValue(new ContractEndedError("2026-01-01", "2026-11-09"));
+  const session = createCommandAdmissionSession({ runId: "run", isSubagentLane: false });
+  await expect(session.acquire({ runId: "run", sessionAgentId: "main" })).resolves.toMatchObject({
+    status: "denied",
+  });
+  await session.dispose();
+  expect(m.release).not.toHaveBeenCalled();
+  expect(m.remember).not.toHaveBeenCalled();
+});
+it("keeps unexpected admission failures visible instead of disguising them as a denial", async () => {
+  const error = new Error("storage unavailable");
+  m.acquire.mockRejectedValue(error);
+  const session = createCommandAdmissionSession({ runId: "run", isSubagentLane: false });
+  await expect(session.acquire({ runId: "run", sessionAgentId: "main" })).rejects.toBe(error);
 });
 it("acquired parent snapshots once and releases before forgetting", async () => {
   m.acquire.mockResolvedValue({

@@ -1,3 +1,4 @@
+import { ContractEndedError } from "../../gateway/billing/billing-period.js";
 import type { ExecutionIdentityContext } from "../../gateway/execution-identity-context.js";
 import {
   buildRunModelSetSnapshot,
@@ -25,7 +26,19 @@ export function createCommandAdmissionSession(params: {
   let routing: ReturnType<typeof resolveExecutionRoutingFromCapabilityPlan> | undefined;
   const lease = createRunAdmissionLease({
     acquire: async (input: Parameters<typeof acquireAgentCommandCommercialRun>[0]) => {
-      const result = await acquireAgentCommandCommercialRun(input);
+      let result: AgentCommandCommercialGateResult;
+      try {
+        result = await acquireAgentCommandCommercialRun(input);
+      } catch (error) {
+        // A known commercial refusal is not a provider failure or a held lease.
+        if (!(error instanceof ContractEndedError)) {
+          throw error;
+        }
+        result = {
+          status: "denied",
+          message: "当前服务合同已结束，本次执行未获准入。请联系管理员续订后重试。",
+        };
+      }
       return { acquired: result.status === "acquired", gate: result };
     },
     release: () => releaseAgentCommandCommercialRun(params.runId),
