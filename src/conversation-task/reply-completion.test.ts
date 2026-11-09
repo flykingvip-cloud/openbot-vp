@@ -23,6 +23,7 @@ import {
 } from "./ledger-binding.js";
 import {
   CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_ENV,
+  isSilentOrPlaceholderReply,
   observeConversationTaskReplyCompleted,
   readConversationTaskDeliveryCloseConsults,
   resetConversationTaskDeliveryCloseConsultsForTest,
@@ -537,5 +538,19 @@ describe("session task completion notice", () => {
     });
     expect(notice).toBeUndefined();
     expect(fs.readFileSync(sessionFile, "utf8")).toBe("keep\n");
+  });
+});
+
+describe("isSilentOrPlaceholderReply", () => {
+  it("rejects blank, silent, and ellipsis text", () => {
+    expect(isSilentOrPlaceholderReply("")).toBe(true);
+    expect(isSilentOrPlaceholderReply("  NO_REPLY  ")).toBe(true);
+    expect(isSilentOrPlaceholderReply("……")).toBe(true);
+    expect(isSilentOrPlaceholderReply("...")).toBe(true);
+  });
+
+  it("keeps a substantive reply", () => {
+    expect(isSilentOrPlaceholderReply("价格表已经写好并核对了三家店铺的结果。")).toBe(false);
+    expect(isSilentOrPlaceholderReply("done, but NO_REPLY was not the whole reply")).toBe(false);
   });
 });

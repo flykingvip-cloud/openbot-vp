@@ -1,0 +1,110 @@
+
+ RUN  v4.0.18 /agent/repos/openbot-vp
+
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > restricted interaction never bypasses a model authorization denial 5ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes reply with authorization=true from one governed completion 5ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes execution_request with authorization=true from one governed completion 2ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes execution_request with authorization=false from one governed completion 2ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes reply with authorization=true from one governed completion 2ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes execution_request with authorization=true from one governed completion 2ms
+ ✓ src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts > runPreparedReply aside dialogue context (A-ended normal path) > does not promote historical conversation into an admitted task focus 37ms
+ ✓ src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts > runPreparedReply aside dialogue context (A-ended normal path) > injects aside Q&A as untrusted commandBody context via normal reply entrance 9ms
+ ✓ src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts > runPreparedReply aside dialogue context (A-ended normal path) > preserves context order and trust at the real runner boundary (collab=false) 4ms
+ ✓ src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts > runPreparedReply aside dialogue context (A-ended normal path) > preserves context order and trust at the real runner boundary (collab=true) 4ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close the conversation task or announce success when the binding mismatches 39ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > keeps the conversation task active when the session board write throws 12ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close either domain when the ledger write throws 10ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > retries a rejected board close on the next delivered reply 17ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not reopen or announce again after a completed close 14ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > rejects a stale execution attempt without closing the conversation task 24ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close or announce when acceptance alignment fails 8ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not treat silence or a placeholder reply as completion 18ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > publishes one idempotent notice when closing a conversation task whose board is already checked 13ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not announce success when strict close lacks canonical evidence 10ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not write a transcript notice when conversation-task close throws, then writes one on retry 16ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > classifies board association before any close 1ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > closes an independent conversation task when neither session file nor binding is supplied 14ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close when the session file is missing but a binding is present 6ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close when the session file is present but the binding is missing 10ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not skip verification when binding fields are incomplete 10ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not confirm delivery from the reply-completion observer 2ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > oral dispatch never creates a board fact 1ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > P1 gray allowlist enables claim for listed group without global flag 14ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > P1 rollback: empty allowlist + global false refuses writes 1ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > flag defaults off 1ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > flag-off: publish refuses and writes nothing 5ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > flag-on: publish → claim → apply seeds responsibility + assigned 14ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > flag-on: unintended claimant is refused 11ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > exactly one of two concurrent claims succeeds; unique claimantId 29ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > re-claim after winner fails (not published) 11ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > expectedRevision mismatch → revision_conflict 11ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > C2: concurrent accept vs return — exactly one ok; accepted XOR returned; revision +1 once 67ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > C3: concurrent cancel vs submit from in_progress — ends cancelled; post-cancel submit refused 44ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > C3 ordered: submit → cancel from submitted_for_review; then accept/re-submit refuse; revision matches 29ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > C1 claim progress states > flag-off: markInProgress refuses 1ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > C1 claim progress states > flag-on: apply → in_progress → submit(submission_id) → accept; illegal jumps refused 48ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > C1 claim progress states > draft≠submitted: applied is active work, not submitted 6ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4 submit empty/duplicate + acceptance loop > helpers: empty body and default loop cap 2ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4 submit empty/duplicate + acceptance loop > empty submission is not success; duplicate returned body refused 24ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4 submit empty/duplicate + acceptance loop > acceptance loop over cap escalates (returnCount) 19ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > resolvePostClaimFanoutTargets excludes claimant and dedupes 0ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > default off: claim wakes only claimant (no fan-out event) 8ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > allowlisted claimed → non-claimants woken; claimant not in fan-out targets 4ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > empty intended → fan-out no-op even when allowlisted 8ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > global postClaimFanoutWake=true enables without allowlist entry 11ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > default off 1ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > allowlist enables without global true 1ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > resolveBoardKickoffMultiParticipantBots: mention lead then intended 0ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > collectActiveBoardIntendedClaimantIds skips accepted/cancelled 0ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > allowlisted board kickoff → explicit_multi over intended 6ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > default off preserves single_primary today 2ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > non-board chat mention still overrides (no intended) 2ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P1 submit-for-review wakes reviewer (best-effort) > wakeContract on: submit wakes coordinatorBotId when provided 21ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P1 submit-for-review wakes reviewer (best-effort) > wakeContract on: without coordinatorBotId falls back to publishedBy 21ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P1 submit-for-review wakes reviewer (best-effort) > wakeContract off: submit still succeeds without wake write 16ms
+ ✓ src/agent-runtime/context/assembly.test.ts > appends shared turn material in fixed order without changing bytes or prior snapshots 2ms
+ ✓ src/agent-runtime/context/assembly.test.ts > orders individual material without changing source bytes or reading sources 0ms
+ ✓ src/agent-runtime/context/assembly.test.ts > rejects collaboration and unknown material in individual context 0ms
+ ✓ src/agent-runtime/context/assembly.test.ts > preserves collaboration material order, duplicate text and source bytes 1ms
+ ✓ src/agent-runtime/context/assembly.test.ts > system context assembly compatibility > filters blank initial material while preserving bytes, order and duplicate sources 0ms
+ ✓ src/agent-runtime/context/assembly.test.ts > system context assembly compatibility > preserves caller-admitted append semantics and does not mutate earlier snapshots 0ms
+ ✓ src/agent-runtime/context/assembly.test.ts > system context assembly compatibility > keeps ordered late additions and represents absent system context as undefined 0ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > does not retry or claim no task was written after a storage failure 4ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > denies before task creation 0ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > commits once only after authorization 1ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > refuses cancellation during authorization 1ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > does not authorize malformed goals or budgets 0ms
+ ✓ src/agent-runtime/command/route-interaction.test.ts > reply bypasses execution authorization and state mutation 2ms
+ ✓ src/agent-runtime/command/route-interaction.test.ts > clarify bypasses execution authorization and state mutation 0ms
+ ✓ src/agent-runtime/command/route-interaction.test.ts > explicit work alone reaches admission, once 1ms
+ ✓ src/agent-runtime/command/route-interaction.test.ts > bound changes remain proposals rather than entering new-task admission 0ms
+ ✓ src/shared/preview-artifact/artifact-hash.test.ts > preview-artifact canonicalize + hash > canonicalizes line endings and trailing whitespace 1ms
+ ✓ src/shared/preview-artifact/artifact-hash.test.ts > preview-artifact canonicalize + hash > uses stable sha256 body hash independent of title 2ms
+ ✓ src/shared/preview-artifact/artifact-hash.test.ts > preview-artifact canonicalize + hash > matches legacy and modern artifact hashes 0ms
+ ✓ src/shared/preview-artifact/artifact-hash.test.ts > deliverable envelope multiline attrs > parses versioned multiline DELIVERABLE headers 1ms
+ ✓ src/agent-runtime/context/catalog/select-catalog.test.ts > does not select the collaboration catalog from chat type alone 1ms
+ ✓ src/agent-runtime/context/catalog/select-catalog.test.ts > fails individual assembly for every group-layer id 2ms
+ ✓ src/agent-runtime/context/catalog/select-catalog.test.ts > keeps the existing collaboration material order after the member prefix 1ms
+ ✓ src/agent-runtime/delivery/artifacts/patch-pptx.test.ts > only one concurrent editor can replace the same original version 12ms
+ ✓ src/agent-runtime/state/repository/async-wait-stale-callback.test.ts > pause then recovery claim clears intent and does not wake 11ms
+ ✓ src/agent-runtime/state/repository/async-wait-stale-callback.test.ts > cancel then recovery claim does not wake; claimQueuedExecution rejects 4ms
+ ✓ src/agent-runtime/state/repository/async-wait-stale-callback.test.ts > replace binding refuses TaskActionBoundary and blocks delivery-style check 5ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > verifies admitted artifacts without completing or mutating the task 7ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > fails mismatched bytes and leaves missing artifacts pending 2ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > rejects symlink escape without exposing outside bytes as evidence 2ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > invalidates evidence if the board revision changes during artifact reads 3ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > does not evaluate another execution attempt 2ms
+ ✓ src/agents/pi-tools.task-action.test.ts > refuses the next action after owner constraint without executing it 7ms
+ ✓ src/agents/pi-tools.task-action.test.ts > refuses the next action after owner pause without executing it 3ms
+ ✓ src/agents/pi-tools.task-action.test.ts > refuses the next action after owner cancel without executing it 2ms
+ ✓ src/agents/pi-tools.task-action.test.ts > refuses the next action after owner replace without executing it 2ms
+ ✓ src/agents/pi-tools.task-action.test.ts > rechecks restrictions accepted while an asynchronous plugin hook waits 2ms
+ ✓ src/agent-runtime/delivery/dispatch/pending-delivery.restart.test.ts > rehydrates durable delivery in a new process: active 8464ms
+ ✓ src/agent-runtime/delivery/dispatch/pending-delivery.restart.test.ts > rehydrates durable delivery in a new process: paused 6569ms
+ ✓ src/agent-runtime/delivery/dispatch/pending-delivery.restart.test.ts > rehydrates durable delivery in a new process: cancelled 6861ms
+
+ Test Files  14 passed (14)
+      Tests  101 passed (101)
+   Start at  09:30:19
+   Duration  41.24s (transform 37.95s, setup 1.87s, import 89.54s, tests 22.75s, environment 1ms)
+

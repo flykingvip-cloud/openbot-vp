@@ -13,6 +13,13 @@
  *   confirmed current Todolist step); missing any → refuse delivery exec
  * - Unconfirmed / revise_requested → only plan_nudge (remind), never delivery_exec
  */
+import {
+  boardTodolistDeliveryMapping,
+  DELIVERY_EXEC_BOARD_STATUSES,
+  NO_DELIVERY_SELF_ADVANCE_BOARD_STATUSES,
+  s2DoesNotDefaultSelfAdvanceOn,
+  type BoardTodolistDeliveryMapping,
+} from "../../agent-runtime/policy/index.js";
 import { deliveryActorIdsEqual } from "../collaboration-learning/delivery-actor-binding.js";
 import type { GroupBoardClaimItem } from "./claim-contract.js";
 import {
@@ -31,111 +38,13 @@ function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
-/** Board statuses that still allow ordinary delivery work (not terminal / waiting review). */
-export const DELIVERY_EXEC_BOARD_STATUSES = ["applied", "in_progress", "returned"] as const;
-
-/** Board statuses that must never receive delivery-type self-advance. */
-export const NO_DELIVERY_SELF_ADVANCE_BOARD_STATUSES = [
-  "published",
-  "claimed",
-  "submitted_for_review",
-  "accepted",
-  "blocked",
-  "cancelled",
-] as const;
-
-export type BoardTodolistDeliveryMapping = Readonly<{
-  boardStatus: string;
-  /** Draft/propose allowed without confirm. */
-  draftAllowed: boolean;
-  /** Delivery-type self-advance / exec inject allowed only when confirmed. */
-  deliveryRequiresConfirmedPlan: boolean;
-  /** Ordinary delivery self-advance permitted for this board status at all. */
-  deliverySelfAdvanceEligible: boolean;
-  note: string;
-}>;
-
-/**
- * FINAL v3 §A board ↔ Todolist cross-state mapping (code-enforced, not prompt-only).
- */
-export function boardTodolistDeliveryMapping(boardStatus: string): BoardTodolistDeliveryMapping {
-  const status = compact(boardStatus);
-  switch (status) {
-    case "published":
-      return {
-        boardStatus: status,
-        draftAllowed: false,
-        deliveryRequiresConfirmedPlan: true,
-        deliverySelfAdvanceEligible: false,
-        note: "published: claim first; no delivery self-advance",
-      };
-    case "claimed":
-      return {
-        boardStatus: status,
-        draftAllowed: true,
-        deliveryRequiresConfirmedPlan: true,
-        deliverySelfAdvanceEligible: false,
-        note: "claimed: ownership only; draft OK; no delivery self-advance yet",
-      };
-    case "applied":
-      return {
-        boardStatus: status,
-        draftAllowed: true,
-        deliveryRequiresConfirmedPlan: true,
-        deliverySelfAdvanceEligible: true,
-        note: "applied: draft OK unconfirmed; delivery self-advance requires confirmed plan",
-      };
-    case "in_progress":
-      return {
-        boardStatus: status,
-        draftAllowed: false,
-        deliveryRequiresConfirmedPlan: true,
-        deliverySelfAdvanceEligible: true,
-        note: "in_progress: must have confirmed Todolist owned by current claimant",
-      };
-    case "returned":
-      return {
-        boardStatus: status,
-        draftAllowed: true,
-        deliveryRequiresConfirmedPlan: true,
-        deliverySelfAdvanceEligible: true,
-        note: "returned: revise + re-confirm plan before delivery self-advance",
-      };
-    case "submitted_for_review":
-      return {
-        boardStatus: status,
-        draftAllowed: false,
-        deliveryRequiresConfirmedPlan: true,
-        deliverySelfAdvanceEligible: false,
-        note: "submitted_for_review: wait accept/return; do not re-exec same submission",
-      };
-    case "accepted":
-      return {
-        boardStatus: status,
-        draftAllowed: false,
-        deliveryRequiresConfirmedPlan: true,
-        deliverySelfAdvanceEligible: false,
-        note: "accepted: terminal; no auto advance",
-      };
-    case "blocked":
-    case "cancelled":
-      return {
-        boardStatus: status,
-        draftAllowed: false,
-        deliveryRequiresConfirmedPlan: true,
-        deliverySelfAdvanceEligible: false,
-        note: `${status}: no ordinary delivery self-advance`,
-      };
-    default:
-      return {
-        boardStatus: status || "unknown",
-        draftAllowed: false,
-        deliveryRequiresConfirmedPlan: true,
-        deliverySelfAdvanceEligible: false,
-        note: "unknown board status; fail closed for delivery",
-      };
-  }
-}
+export {
+  boardTodolistDeliveryMapping,
+  DELIVERY_EXEC_BOARD_STATUSES,
+  NO_DELIVERY_SELF_ADVANCE_BOARD_STATUSES,
+  s2DoesNotDefaultSelfAdvanceOn,
+};
+export type { BoardTodolistDeliveryMapping } from "../../agent-runtime/policy/index.js";
 
 export type DeliveryExecMode = "delivery_exec" | "plan_nudge" | "blocked";
 
@@ -355,6 +264,3 @@ export function todolistHasCurrentStep(
 }
 
 /** Compile-time / docs contract: platform never defaults self-advance on. */
-export function s2DoesNotDefaultSelfAdvanceOn(): true {
-  return true;
-}

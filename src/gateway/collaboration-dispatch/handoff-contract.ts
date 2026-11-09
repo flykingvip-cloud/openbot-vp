@@ -18,21 +18,32 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
+import {
+  appendHandoffHistoryById,
+  applyHandoffContractToResponsibility,
+  classifyHandoffApplyAgainstLive,
+  handoffPartyLooksLikeBot as looksLikeBot,
+  resolveHandoffApproval as resolveApproval,
+  responsibilityFromHandoffTask,
+} from "../../agent-runtime/policy/index.js";
+import {
+  acceptHandoffTransaction,
+  applyApprovedHandoffTransaction,
+  approveHandoffTransaction,
+  commitProposedHandoff,
+  recoverHandoffTransactions,
+  type HandoffLedgerPort,
+} from "../../agent-runtime/state/index.js";
 import type { OpenBotConfig } from "../../config/types.js";
-import type { CollaborationFactRecord, HandoffFactType } from "../collaboration-ledger/types.js";
+import type { CollaborationFactRecord } from "../collaboration-ledger/types.js";
 import { appendCollaborationFactRecord } from "../collaboration-ledger/writer.js";
 import { eventKeyOf } from "./collaboration-event-key.js";
-import type {
-  EffectiveCollaborationPolicy,
-  TaskHandoff,
-  TaskResponsibility,
-} from "./effective-policy.js";
-import { evaluateGovernanceGate, type GovernanceActor } from "./governance-gate.js";
+import type { TaskHandoff, TaskResponsibility } from "./effective-policy.js";
+import type { GovernanceActor } from "./governance-gate.js";
 import {
   enrichHandoffAssumptionsWithOguiBrief,
   resolveOguiHandoffBriefForPropose,
 } from "./ogui-handoff-projection.js";
-import { appendJsonlDurable, withRoundLock, writeJsonDurable } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import {
   assertCollaborationRuntimeWritable,
@@ -136,16 +147,6 @@ type HandoffLogLine = {
   kind: "handoff_contract";
   at: number;
   contract: HandoffContract;
-};
-
-type HandoffApplyTxn = {
-  version: 1;
-  handoffId: string;
-  taskId: string;
-  fact: CollaborationFactRecord;
-  task: HandoffTask;
-  contract: HandoffContract;
-  taskOverlayPath: string;
 };
 
 const HANDOFF_KINDS = new Set<HandoffKind>(["continue", "review", "owner_transfer", "evidence"]);
@@ -255,25 +256,6 @@ function isHandoffContract(value: unknown): value is HandoffContract {
   );
 }
 
-function resolveApproval(
-  kind: HandoffKind,
-  toRole: ResponsibilityRole,
-  requested: HandoffApproval | undefined,
-): HandoffApproval {
-  if (toRole === "owner" || toRole === "approver" || kind === "owner_transfer") {
-    return "human";
-  }
-  if (requested === "human" || requested === "governance" || requested === "none") {
-    return requested;
-  }
-  return "none";
-}
-
-function looksLikeBot(agentId: string): boolean {
-  const id = agentId.trim().toLowerCase();
-  return id.startsWith("bot:") || id.startsWith("agent:");
-}
-
 function flagOff<T>(): HandoffResult<T> {
   return fail(
     "flag_off",
@@ -334,45 +316,6 @@ function latestContract(
   return null;
 }
 
-async function appendContract(
-  logPath: string,
-  contract: HandoffContract,
-  at: number,
-): Promise<void> {
-  const line: HandoffLogLine = { kind: "handoff_contract", at, contract };
-  await appendJsonlDurable(logPath, line);
-}
-
-function isTxn(value: unknown): value is HandoffApplyTxn {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  const txn = value as HandoffApplyTxn;
-  return (
-    txn.version === 1 &&
-    typeof txn.handoffId === "string" &&
-    typeof txn.taskId === "string" &&
-    typeof txn.taskOverlayPath === "string" &&
-    isHandoffContract(txn.contract) &&
-    Boolean(txn.fact) &&
-    txn.fact.kind === "fact" &&
-    Boolean(txn.task)
-  );
-}
-
-async function readTxn(txnPath: string): Promise<HandoffApplyTxn | null> {
-  try {
-    const raw = await fs.readFile(txnPath, "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    return isTxn(parsed) ? parsed : null;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return null;
-    }
-    throw error;
-  }
-}
-
 function ledgerFileFor(authority: RuntimeAuthority, cfg: OpenBotConfig): string {
   return resolveCollaborationRuntimeFactPaths({
     groupId: authority.groupId,
@@ -382,157 +325,36 @@ function ledgerFileFor(authority: RuntimeAuthority, cfg: OpenBotConfig): string 
   }).ledgerFile;
 }
 
-async function ledgerHasFact(ledgerFile: string, factId: string): Promise<boolean> {
-  let raw: string;
-  try {
-    raw = await fs.readFile(ledgerFile, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return false;
-    }
-    throw error;
-  }
-  for (const line of raw.split("\n")) {
-    if (!line.includes(factId)) {
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(line) as { kind?: string; factId?: string };
-      if (parsed.kind === "fact" && parsed.factId === factId) {
-        return true;
-      }
-    } catch {
-      // skip
-    }
-  }
-  return false;
-}
-
-function factIdFor(handoffId: string, type: HandoffFactType): string {
-  return `fact_${handoffId}_${type}`;
-}
-
-function buildFact(params: {
-  authority: RuntimeAuthority;
-  contract: HandoffContract;
-  type: HandoffFactType;
-  at: number;
-  ownerBefore?: string;
-  ownerAfter?: string;
-}): CollaborationFactRecord {
+function ledgerPort(cfg: OpenBotConfig): HandoffLedgerPort {
   return {
-    kind: "fact",
-    type: params.type,
-    factId: factIdFor(params.contract.handoffId, params.type),
-    groupId: params.authority.groupId,
-    taskId: params.contract.taskId,
-    handoffId: params.contract.handoffId,
-    key: params.contract.key,
-    at: params.at,
-    recordedAtMs: params.at,
-    fromAgentId: params.contract.from.agentId,
-    toAgentId: params.contract.to.agentId,
-    responsibilityRole: params.contract.to.responsibilityRole,
-    ...(params.ownerBefore ? { ownerBefore: params.ownerBefore } : {}),
-    ...(params.ownerAfter ? { ownerAfter: params.ownerAfter } : {}),
+    async readText(filePath) {
+      try {
+        return await fs.readFile(filePath, "utf8");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          return null;
+        }
+        throw error;
+      }
+    },
+    async appendFact(fact) {
+      const written = await appendCollaborationFactRecord({ record: fact, cfg });
+      if (!written) {
+        throw new Error("handoff fact was not written; collaboration.task.handoffContract is off");
+      }
+    },
+    assertWritable(filePath) {
+      assertCollaborationRuntimeWritable(filePath, cfg);
+    },
   };
 }
 
-async function appendFactOnce(params: {
-  fact: CollaborationFactRecord;
-  ledgerFile: string;
-  cfg: OpenBotConfig;
-}): Promise<void> {
-  if (await ledgerHasFact(params.ledgerFile, params.fact.factId)) {
-    return;
-  }
-  assertCollaborationRuntimeWritable(params.ledgerFile, params.cfg);
-  const written = await appendCollaborationFactRecord({ record: params.fact, cfg: params.cfg });
-  if (!written) {
-    throw new Error("handoff fact was not written; collaboration.task.handoffContract is off");
-  }
-}
-
-async function hasFactTypes(params: {
-  ledgerFile: string;
-  handoffId: string;
-  types: readonly HandoffFactType[];
-}): Promise<boolean> {
-  const needed = new Set(params.types);
-  let raw: string;
-  try {
-    raw = await fs.readFile(params.ledgerFile, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return false;
-    }
-    throw error;
-  }
-  for (const line of raw.split("\n")) {
-    if (!line.includes(params.handoffId)) {
-      continue;
-    }
-    try {
-      const parsed = JSON.parse(line) as { kind?: string; handoffId?: string; type?: string };
-      if (parsed.kind === "fact" && parsed.handoffId === params.handoffId && parsed.type) {
-        needed.delete(parsed.type as HandoffFactType);
-      }
-    } catch {
-      // skip
-    }
-  }
-  return needed.size === 0;
-}
-
-function responsibilityOf(task: HandoffTask): TaskResponsibility {
-  if (task.responsibility) {
-    return {
-      ...task.responsibility,
-      executors: [...task.responsibility.executors],
-    };
-  }
-  const owner = compact(task.ownerMemberId) || "group";
-  const assigned = uniqueIds(task.assignedMemberIds);
-  return {
-    owner,
-    executors: assigned.length > 0 ? assigned : owner === "group" ? [] : [owner],
-    decisionAuthority: owner,
-  };
-}
-
-function nextResponsibility(
-  current: TaskResponsibility,
-  contract: HandoffContract,
-): TaskResponsibility {
-  const to = contract.to.agentId;
-  if (contract.kind === "owner_transfer" || contract.to.responsibilityRole === "owner") {
-    return { ...current, owner: to };
-  }
-  if (contract.to.responsibilityRole === "reviewer") {
-    return { ...current, reviewer: to };
-  }
-  if (contract.to.responsibilityRole === "approver") {
-    return { ...current, approver: to };
-  }
-  const executors = uniqueIds([
-    to,
-    ...current.executors.filter((id) => id !== contract.from.agentId),
-  ]);
-  return { ...current, executors };
-}
-
-/** T45: expose responsibility projection for live-lock apply. */
-export function responsibilityFromHandoffTask(task: HandoffTask): TaskResponsibility {
-  return responsibilityOf(task);
-}
-
-/** T45: apply approved contract to a live responsibility snapshot. */
-export function applyHandoffContractToResponsibility(
-  current: TaskResponsibility,
-  contract: HandoffContract,
-): TaskResponsibility {
-  return nextResponsibility(current, contract);
-}
+export {
+  appendHandoffHistoryById,
+  applyHandoffContractToResponsibility,
+  classifyHandoffApplyAgainstLive,
+  responsibilityFromHandoffTask,
+};
 
 export type HandoffLiveApplyDecision =
   | { kind: "apply"; responsibility: TaskResponsibility }
@@ -543,315 +365,6 @@ export type HandoffLiveApplyDecision =
       detail: string;
     }
   | { kind: "conflict"; detail: string; responsibility: TaskResponsibility };
-
-/**
- * T45/T47/T48: classify whether an approved handoff may still change live responsibility.
- *
- * Idempotent ONLY when the same handoffId is already in task history (contract identity).
- * Live responsibility happening to equal `toId` is `already_at_target` — never "already applied".
- * `baseHistoryLen` binds duty-chain version so A→B→A then replay of an old contract conflicts.
- * Ledger/status `applied` without history may still repair projection — but ONLY after the same
- * owner/reviewer/approver/executor `from` checks as a fresh apply. Applied proves the contract
- * reached apply once; it does not prove live responsibility is still safe to re-project.
- */
-export function classifyHandoffApplyAgainstLive(params: {
-  contract: HandoffContract;
-  live: HandoffTask;
-  historyHandoffIds?: ReadonlySet<string> | readonly (string | undefined | null)[];
-  /** Live task.handoffs length (duty-chain version). */
-  liveHistoryLen?: number;
-}): HandoffLiveApplyDecision {
-  const liveResp = responsibilityOf(params.live);
-  const handoffId = compact(params.contract.handoffId);
-  const ids = params.historyHandoffIds;
-  const idSet =
-    ids instanceof Set
-      ? ids
-      : new Set([...(ids ?? [])].map((v) => compact(v)).filter((v): v is string => Boolean(v)));
-  if (handoffId && idSet.has(handoffId)) {
-    return { kind: "idempotent", responsibility: liveResp };
-  }
-
-  const liveHistoryLen =
-    typeof params.liveHistoryLen === "number"
-      ? params.liveHistoryLen
-      : Array.isArray(params.live.handoffs)
-        ? params.live.handoffs.length
-        : idSet.size;
-  const baseHistoryLen = params.contract.baseHistoryLen;
-  if (typeof baseHistoryLen === "number" && liveHistoryLen !== baseHistoryLen) {
-    return {
-      kind: "conflict",
-      detail: `expected handoff history length ${baseHistoryLen}, live ${liveHistoryLen}`,
-      responsibility: liveResp,
-    };
-  }
-
-  // T48: do NOT short-circuit on status===applied. Missing history may repair only when
-  // live still satisfies the same from-preconditions as a fresh apply; otherwise conflict.
-
-  const fromId = compact(params.contract.from.agentId);
-  const toId = compact(params.contract.to.agentId);
-  const role = params.contract.to.responsibilityRole;
-  const isOwnerMove = params.contract.kind === "owner_transfer" || role === "owner";
-
-  if (isOwnerMove) {
-    if (compact(liveResp.owner) === toId) {
-      return {
-        kind: "already_at_target",
-        detail: `live owner already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
-        responsibility: liveResp,
-      };
-    }
-    if (compact(liveResp.owner) !== fromId) {
-      return {
-        kind: "conflict",
-        detail: `expected owner ${fromId}, live owner ${liveResp.owner}`,
-        responsibility: liveResp,
-      };
-    }
-    return {
-      kind: "apply",
-      responsibility: nextResponsibility(liveResp, params.contract),
-    };
-  }
-
-  if (role === "reviewer") {
-    if (compact(liveResp.reviewer) === toId) {
-      return {
-        kind: "already_at_target",
-        detail: `live reviewer already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
-        responsibility: liveResp,
-      };
-    }
-    if (liveResp.reviewer && compact(liveResp.reviewer) !== fromId) {
-      return {
-        kind: "conflict",
-        detail: `expected reviewer ${fromId}, live reviewer ${liveResp.reviewer}`,
-        responsibility: liveResp,
-      };
-    }
-    return {
-      kind: "apply",
-      responsibility: nextResponsibility(liveResp, params.contract),
-    };
-  }
-
-  if (role === "approver") {
-    if (compact(liveResp.approver) === toId) {
-      return {
-        kind: "already_at_target",
-        detail: `live approver already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
-        responsibility: liveResp,
-      };
-    }
-    if (liveResp.approver && compact(liveResp.approver) !== fromId) {
-      return {
-        kind: "conflict",
-        detail: `expected approver ${fromId}, live approver ${liveResp.approver}`,
-        responsibility: liveResp,
-      };
-    }
-    return {
-      kind: "apply",
-      responsibility: nextResponsibility(liveResp, params.contract),
-    };
-  }
-
-  // continue / evidence / executor role
-  const executors = new Set(liveResp.executors.map((id) => compact(id)).filter(Boolean));
-  if (executors.has(toId) && !executors.has(fromId)) {
-    return {
-      kind: "already_at_target",
-      detail: `live executors already include ${toId} without ${fromId}; handoff ${handoffId || "(missing)"} not in history`,
-      responsibility: liveResp,
-    };
-  }
-  if (!executors.has(fromId)) {
-    return {
-      kind: "conflict",
-      detail: `expected executor ${fromId} still assigned; live executors=[${[...executors].join(",")}]`,
-      responsibility: liveResp,
-    };
-  }
-  return {
-    kind: "apply",
-    responsibility: nextResponsibility(liveResp, params.contract),
-  };
-}
-
-/** Append handoff history by handoffId (no whole-array replace from outside the lock). */
-export function appendHandoffHistoryById(
-  existing: readonly TaskHandoff[] | null | undefined,
-  entry: TaskHandoff,
-): TaskHandoff[] {
-  const prior = [...(existing ?? [])];
-  const id = compact(entry.handoffId);
-  if (id && prior.some((h) => compact(h.handoffId) === id)) {
-    return prior;
-  }
-  return [...prior, entry];
-}
-
-function withResponsibility(
-  task: HandoffTask,
-  responsibility: TaskResponsibility,
-  at: number,
-): HandoffTask {
-  return {
-    ...task,
-    responsibility,
-    ownerMemberId: responsibility.owner,
-    assignedMemberIds: [...responsibility.executors],
-    updatedAtMs: at,
-  };
-}
-
-function overlayPathInside(handoffsDir: string, overlayPath: string, taskId: string): string {
-  const expected = handoffTaskOverlayPath(handoffsDir, taskId);
-  const relative = path.relative(handoffsDir, overlayPath);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    return expected;
-  }
-  return overlayPath;
-}
-
-async function appendAppliedIfNeeded(params: {
-  logPath: string;
-  contract: HandoffContract;
-  at: number;
-}): Promise<void> {
-  const lines = await readLog(params.logPath);
-  const current = latestContract(lines, params.contract.handoffId);
-  if (current?.status === "applied") {
-    return;
-  }
-  await appendContract(params.logPath, params.contract, params.at);
-}
-
-async function finishHandoffApply(params: {
-  handoffsDir: string;
-  txnPath: string;
-  txn: HandoffApplyTxn;
-  ledgerFile: string;
-  logPath: string;
-  cfg: OpenBotConfig;
-  hooks?: HandoffContractOptions["hooks"];
-}): Promise<void> {
-  const overlayPath = overlayPathInside(
-    params.handoffsDir,
-    params.txn.taskOverlayPath,
-    params.txn.taskId,
-  );
-  await appendFactOnce({ fact: params.txn.fact, ledgerFile: params.ledgerFile, cfg: params.cfg });
-  params.hooks?.afterFactBeforeTask?.();
-  assertCollaborationRuntimeWritable(overlayPath, params.cfg);
-  await writeJsonDurable(overlayPath, params.txn.task);
-  await appendAppliedIfNeeded({
-    logPath: params.logPath,
-    contract: params.txn.contract,
-    at: params.txn.contract.appliedAt ?? params.txn.fact.at,
-  });
-  try {
-    await fs.unlink(params.txnPath);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
-  }
-}
-
-async function rollForwardTask(params: {
-  handoffsDir: string;
-  taskId: string;
-  ledgerFile: string;
-  cfg: OpenBotConfig;
-}): Promise<HandoffApplyTxn | null> {
-  const stem = safeStem(params.taskId);
-  if (!stem) {
-    return null;
-  }
-  const txnPath = handoffTxnPath(params.handoffsDir, params.taskId);
-  const txn = await readTxn(txnPath);
-  if (!txn || txn.taskId !== params.taskId) {
-    return null;
-  }
-  await finishHandoffApply({
-    handoffsDir: params.handoffsDir,
-    txnPath,
-    txn,
-    ledgerFile: params.ledgerFile,
-    logPath: handoffLogPath(params.handoffsDir, params.taskId),
-    cfg: params.cfg,
-  });
-  return txn;
-}
-
-export async function recoverPendingHandoffTxns(params: {
-  authority: RuntimeAuthority;
-  cfg?: OpenBotConfig;
-}): Promise<{ rolledForward: string[] }> {
-  const cfg = params.cfg;
-  if (!cfg || !isCollabTaskHandoffContractEnabled(cfg)) {
-    return { rolledForward: [] };
-  }
-  const handoffsDir = params.authority.namespace.handoffsDir;
-  let names: string[];
-  try {
-    names = await fs.readdir(handoffsDir);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return { rolledForward: [] };
-    }
-    throw error;
-  }
-  const ledgerFile = ledgerFileFor(params.authority, cfg);
-  const rolledForward: string[] = [];
-  for (const name of names) {
-    if (!name.endsWith(".txn")) {
-      continue;
-    }
-    const txn = await readTxn(path.join(handoffsDir, name));
-    if (!txn) {
-      continue;
-    }
-    const stem = safeStem(txn.taskId);
-    if (!stem) {
-      continue;
-    }
-    await withRoundLock(handoffsDir, stem, async () => {
-      const done = await rollForwardTask({
-        handoffsDir,
-        taskId: txn.taskId,
-        ledgerFile,
-        cfg,
-      });
-      if (done) {
-        rolledForward.push(done.handoffId);
-      }
-    });
-  }
-  return { rolledForward };
-}
-
-async function requirePersisted(params: {
-  logPath: string;
-  contract: HandoffContract;
-  status: HandoffStatus;
-}): Promise<HandoffResult<HandoffContract>> {
-  const lines = await readLog(params.logPath);
-  const persisted = latestContract(lines, params.contract.handoffId);
-  if (!persisted || persisted.taskId !== params.contract.taskId) {
-    return fail("handoff_not_found", "handoff contract is not in the task log");
-  }
-  if (persisted.status !== params.status) {
-    return fail(
-      "status_mismatch",
-      `handoff status is ${persisted.status}; expected ${params.status}`,
-    );
-  }
-  return { ok: true, value: persisted };
-}
 
 export async function proposeHandoff(
   authority: RuntimeAuthority,
@@ -939,9 +452,13 @@ export async function proposeHandoff(
   const handoffsDir = authority.namespace.handoffsDir;
   const stem = safeStem(taskId)!;
   const logPath = handoffLogPath(handoffsDir, taskId);
-  assertCollaborationRuntimeWritable(logPath, cfg);
-  await withRoundLock(handoffsDir, stem, async () => {
-    await appendContract(logPath, contract, at);
+  await commitProposedHandoff({
+    handoffsDir,
+    stem,
+    logPath,
+    at,
+    contract,
+    storage: ledgerPort(cfg),
   });
   await recordWakeEventBestEffort(
     authority,
@@ -984,24 +501,15 @@ export async function acceptHandoff(
   if (!stem) {
     return fail("invalid_handoff", "handoff taskId is not a safe id");
   }
-  const logPath = handoffLogPath(handoffsDir, contract.taskId);
-  const ledgerFile = ledgerFileFor(authority, cfg);
-  return await withRoundLock(handoffsDir, stem, async () => {
-    const persisted = await requirePersisted({ logPath, contract, status: "proposed" });
-    if (!persisted.ok) {
-      return persisted;
-    }
-    const at = nowOf(options);
-    const next: HandoffContract = {
-      ...persisted.value,
-      status: "receiver_accepted",
-      acceptedAt: at,
-    };
-    const fact = buildFact({ authority, contract: next, type: "TaskHandoffReceiverAccepted", at });
-    await appendFactOnce({ fact, ledgerFile, cfg });
-    assertCollaborationRuntimeWritable(logPath, cfg);
-    await appendContract(logPath, next, at);
-    return { ok: true, value: next };
+  return acceptHandoffTransaction({
+    handoffsDir,
+    stem,
+    logPath: handoffLogPath(handoffsDir, contract.taskId),
+    ledgerFile: ledgerFileFor(authority, cfg),
+    groupId: authority.groupId,
+    at: nowOf(options),
+    contract,
+    storage: ledgerPort(cfg),
   });
 }
 
@@ -1027,43 +535,17 @@ export async function approveHandoff(
   if (!stem) {
     return fail("invalid_handoff", "handoff taskId is not a safe id");
   }
-  const logPath = handoffLogPath(handoffsDir, contract.taskId);
-  const ledgerFile = ledgerFileFor(authority, cfg);
-  return await withRoundLock(handoffsDir, stem, async () => {
-    const persisted = await requirePersisted({
-      logPath,
-      contract,
-      status: "receiver_accepted",
-    });
-    if (!persisted.ok) {
-      return persisted;
-    }
-    const current = persisted.value;
-    const humanRequired =
-      current.requiresApproval === "human" ||
-      current.to.responsibilityRole === "owner" ||
-      current.to.responsibilityRole === "approver" ||
-      current.kind === "owner_transfer";
-    if (humanRequired && by.type !== "human") {
-      return fail("human_approval_required", "owner or approver handoff requires a human approver");
-    }
-    if (current.requiresApproval !== "none") {
-      const gate = evaluateGovernanceGate({
-        action: "finalize_decision",
-        actor: by,
-        effective: authority.policy.effective as EffectiveCollaborationPolicy,
-      });
-      if (!gate.allowed) {
-        return fail(gate.reason, gate.message);
-      }
-    }
-    const at = nowOf(options);
-    const next: HandoffContract = { ...current, status: "approved", approvedAt: at };
-    const fact = buildFact({ authority, contract: next, type: "TaskHandoffApproved", at });
-    await appendFactOnce({ fact, ledgerFile, cfg });
-    assertCollaborationRuntimeWritable(logPath, cfg);
-    await appendContract(logPath, next, at);
-    return { ok: true, value: next };
+  return approveHandoffTransaction({
+    handoffsDir,
+    stem,
+    logPath: handoffLogPath(handoffsDir, contract.taskId),
+    ledgerFile: ledgerFileFor(authority, cfg),
+    groupId: authority.groupId,
+    at: nowOf(options),
+    contract,
+    actor: by,
+    effective: authority.policy.effective,
+    storage: ledgerPort(cfg),
   });
 }
 
@@ -1088,68 +570,32 @@ export async function applyApprovedHandoff(
   if (!stem) {
     return fail("invalid_handoff", "handoff taskId is not a safe id");
   }
-  const logPath = handoffLogPath(handoffsDir, contract.taskId);
-  const txnPath = handoffTxnPath(handoffsDir, contract.taskId);
-  const ledgerFile = ledgerFileFor(authority, cfg);
-  return await withRoundLock(handoffsDir, stem, async () => {
-    const pending = await rollForwardTask({
-      handoffsDir,
-      taskId: contract.taskId,
-      ledgerFile,
-      cfg,
-    });
-    if (pending && pending.handoffId === contract.handoffId) {
-      return { ok: true, value: { task: pending.task, fact: pending.fact } };
-    }
-    const persisted = await requirePersisted({ logPath, contract, status: "approved" });
-    if (!persisted.ok) {
-      return persisted;
-    }
-    const eventsReady = await hasFactTypes({
-      ledgerFile,
-      handoffId: contract.handoffId,
-      types: ["TaskHandoffReceiverAccepted", "TaskHandoffApproved"],
-    });
-    if (!eventsReady) {
-      return fail(
-        "events_required",
-        "responsibility cannot change before receiver-accepted and approved facts",
-      );
-    }
-    const at = nowOf(options);
-    const before = responsibilityOf(task);
-    const responsibility = nextResponsibility(before, persisted.value);
-    const nextTask = withResponsibility(task, responsibility, at);
-    const applied: HandoffContract = { ...persisted.value, status: "applied", appliedAt: at };
-    const fact = buildFact({
-      authority,
-      contract: applied,
-      type: "TaskResponsibilityChanged",
-      at,
-      ownerBefore: before.owner,
-      ownerAfter: responsibility.owner,
-    });
-    const overlayPath = handoffTaskOverlayPath(handoffsDir, contract.taskId);
-    const txn: HandoffApplyTxn = {
-      version: 1,
-      handoffId: applied.handoffId,
-      taskId: applied.taskId,
-      fact,
-      task: nextTask,
-      contract: applied,
-      taskOverlayPath: overlayPath,
-    };
-    assertCollaborationRuntimeWritable(txnPath, cfg);
-    await writeJsonDurable(txnPath, txn);
-    await finishHandoffApply({
-      handoffsDir,
-      txnPath,
-      txn,
-      ledgerFile,
-      logPath,
-      cfg,
-      hooks: options?.hooks,
-    });
-    return { ok: true, value: { task: nextTask, fact } };
+  return applyApprovedHandoffTransaction({
+    handoffsDir,
+    stem,
+    logPath: handoffLogPath(handoffsDir, contract.taskId),
+    txnPath: handoffTxnPath(handoffsDir, contract.taskId),
+    ledgerFile: ledgerFileFor(authority, cfg),
+    groupId: authority.groupId,
+    at: nowOf(options),
+    contract,
+    task,
+    storage: ledgerPort(cfg),
+    afterFactBeforeTask: options?.hooks?.afterFactBeforeTask,
+  });
+}
+
+export async function recoverPendingHandoffTxns(params: {
+  authority: RuntimeAuthority;
+  cfg?: OpenBotConfig;
+}): Promise<{ rolledForward: string[] }> {
+  const cfg = params.cfg;
+  if (!cfg || !isCollabTaskHandoffContractEnabled(cfg)) {
+    return { rolledForward: [] };
+  }
+  return recoverHandoffTransactions({
+    handoffsDir: params.authority.namespace.handoffsDir,
+    ledgerFile: ledgerFileFor(params.authority, cfg),
+    storage: ledgerPort(cfg),
   });
 }

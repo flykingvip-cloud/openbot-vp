@@ -1,0 +1,314 @@
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot
+
+ ❯ src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts (6 tests | 2 failed) 158ms
+     × op-A success → finally clears tenant claim → op-B succeeds; legacy root has no task write 60ms
+     × claim commit then mirror fail → release on tenant root → retry ok; stale claimId cannot clear new claim 87ms
+     ✓ recheckCurrentDispatchAuthorization managed missing stores → auth_source_unreadable 6ms
+     ✓ recheck partial mix (only fileStore) refused 1ms
+     ✓ resolveTaskControlTrustedStores managed incomplete throws 1ms
+     ✓ casClear without trusted in managed throws (no legacy self-create) 1ms
+ ❯ src/gateway/collaboration-dispatch/group-task-heartbeat.test.ts (10 tests | 1 failed) 847ms
+     ✓ defaults OFF; allowlist enables wake for listed group only 6ms
+     ✓ rollback: empty allowlist + global false refuses 6ms
+     ✓ defaults and contracts 0ms
+     ✓ nudge unclaimed; escalate after consecutive no-response 1ms
+     ✓ wake off + dryRun false refuses emit; default observe still scans 35ms
+     × allowlist on: nudge → second no-response escalate; whoWokeWhom auditable 449ms
+     ✓ scan interval skip without force 42ms
+     ✓ shouldAttemptUnclaimedClaimBridge gates emit+execute+unclaimed 0ms
+     ✓ emit + selfAdvance execute: nudge then claim intended lead 155ms
+     ✓ selfAdvance dry_run: nudge only, no claim 151ms
+ ❯ src/gateway/collaboration-learning/convergence-acceptance.test.ts (6 tests | 1 failed) 2610ms
+       ✓ skips bots who already introduced on follow-up prompts 1ms
+       ✓ materializes one canonical workspace path for every bot in the group 4ms
+       × writes continuity checkpoints only under the resolver collaboration root 117ms
+       ✓ reads promoted learning assets from the gateway collaboration store root 59ms
+       ✓ does not reintroduce legacy readParticipations helper exports  1944ms
+       ✓ does not export resolveCollaborationStoreRoot  480ms
+ ✓ src/gateway/collaboration-dispatch/episode-single-beat-runtime.g2.test.ts (6 tests) 1890ms
+     ✓ flag off delegates the round and does not recover or write episodes  464ms
+     ✓ flag on walks one beat to EPISODE_CLOSED and does not open another  643ms
+     ✓ flag on stops unmatched and empty rounds without a second beat  388ms
+ ❯ src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts (4 tests | 1 failed) 881ms
+     ✓ accepts schema-backed planConfirm* binding fields 1ms
+     ✓ rejects unknown planConfirm binding junk under additionalProperties:false 0ms
+     × activate→claim→propose→confirm→deliverable→stop stay on trusted locator per tenant 868ms
+     ✓ managed service call without auth/trusted/stores hard-refuses dual-root compat 7ms
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts (7 tests | 5 failed) 9076ms
+     ✓ schema rejects caller-supplied confirmer and coordinator ids 3ms
+     × service and RPC ignore attacker ACL and fail closed 6655ms
+     ✓ retry schema rejects extra fields and accepts an expected version 0ms
+     × transcript write failure still returns the proposal and a retryable delivery 717ms
+     × same-version retry does not mint a proposal or a second card; confirm is single-consume 611ms
+     × service and RPC refuse stale plan confirms without widening confirmer ACL 592ms
+     × D6b: revoked coordinator cannot list historyReloadable delivery rows 497ms
+ ❯ src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts (7 tests | 3 failed) 1937ms
+     ✓ tenant revoked + legacy still authorized → wake refuses, dispatcher=0 99ms
+     × tenant authorized + legacy revoked → wake does not mis-reject on legacy 197ms
+     × two-tenant activate→claim→propose→confirm→deliverable→stop→wake stay isolated 651ms
+     ✓ real ACL rejects cross-tenant actor; task state unchanged 15ms
+     × unique card binding succeeds via chat.send; message visible; no agent dispatch 578ms
+     ✓ stale expectedVersion refuses via chat.send; no execution  351ms
+     ✓ ambiguous confirm message refuses via chat.send; no execution 45ms
+ ✓ src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts (36 tests) 15236ms
+     ✓ legitimate deliverable can submit + accept; forged / wrong-task cannot  316ms
+     ✓ dispatcher unavailable → pending retained → recovery dispatches exactly once  390ms
+     ✓ item 8: submitForReview RPC refuses unauthenticated client (same trusted root)  4942ms
+     ✓ accept AFTER adjudication read BEFORE permit commit blocks stale return  371ms
+     ✓ subprocess: permit commit then exit → invalidate then recover; no duplicate; no Corepack download  4552ms
+stderr | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts
+Config warnings:\n- plugins.entries.media-monitor: plugin media-monitor: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot/extensions/media-monitor/index.ts)
+- plugins.entries.wecom: plugin wecom: duplicate plugin id detected; later plugin may be overridden (/Users/daniel/AI VP/openbot/extensions/wecom/index.ts)
+Config was last written by a newer OpenBot (2026.7.12-rc.2); current version is 0.0.0.
+
+ ✓ src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts (6 tests) 61918ms
+     ✓ legal establish: chat.send → formal entry → durable task+source → status receipt → coordinator context; parent run continues  801ms
+     ✓ flag-off: claimContract false → unified flag-off copy; no task/board writes  388ms
+     ✓ observer (non-writer): injected observer identity cannot establish formal task  553ms
+     ✓ dual principals same local groupId: sequential principals isolate source+task  46117ms
+     ✓ same-request retry: second chat.send with same idempotencyKey is cached; durable task remains singular  409ms
+     ✓ receipt persist-fail: client still receives safe status (no raw internal error); parent run continues  546ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/gateway/collaboration-learning/convergence-acceptance.test.ts > Collaboration convergence acceptance (design §9) > AC-3 single task_ledger > writes continuity checkpoints only under the resolver collaboration root
+AssertionError: promise rejected "Error: ENOENT: no such file or directory,… { …(4) }" instead of resolving
+ ❯ src/gateway/collaboration-learning/convergence-acceptance.test.ts:226:46
+    224|       );
+    225| 
+    226|       await expect(fs.access(canonicalLedger)).resolves.toBeUndefined(…
+       |                                              ^
+    227|       await expect(fs.access(legacyLedger)).rejects.toThrow();
+    228|     });
+
+Caused by: Error: ENOENT: no such file or directory, access '/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-convergence-ac-ledger-n08B6S/collaboration-shared/groups/upbeyond/memory/task_ledger.json'
+ ❯ src/gateway/collaboration-learning/convergence-acceptance.test.ts:226:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { errno: -2, code: 'ENOENT', syscall: 'access', path: '/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-convergence-ac-ledger-n08B6S/collaboration-shared/groups/upbeyond/memory/task_ledger.json' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts > R5 gateway handlers · two-tenant same local ids > activate→claim→propose→confirm→deliverable→stop stay on trusted locator per tenant
+AssertionError: {"code":"INVALID_REQUEST","message":"confirmTodolist: confirmation_consumed: 该确认已生效","reasonCode":"confirmation_consumed","details":{"reason":"confirmation_consumed"}}: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts:415:61
+    413|         client,
+    414|       );
+    415|       expect(confirmed.ok, JSON.stringify(confirmed.error)).toBe(true);
+       |                                                             ^
+    416|       steps.push({ groupsRoot: ctx.trusted.groupsRoot, groupLocator: c…
+    417| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts > R6 wake auth recheck uses authority-aligned stores (dual-root conflict) > tenant authorized + legacy revoked → wake does not mis-reject on legacy
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts:660:32
+    658|     // Strong positive: must actually dispatch once (not "any non-auth…
+    659|     expect(consume.reason).not.toBe("auth_revoked");
+    660|     expect(consume.dispatched).toBe(true);
+       |                                ^
+    661|     expect(dispatchedCalls).toBe(1);
+    662|     expect(consume.roundId).toBe("round-auth-ok");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts > R6 continuous handlers · real ACL · stop→wake (no mid seedOs) > two-tenant activate→claim→propose→confirm→deliverable→stop→wake stay isolated
+AssertionError: {"code":"INVALID_REQUEST","message":"confirmTodolist: confirmation_consumed: 该确认已生效","reasonCode":"confirmation_consumed","details":{"reason":"confirmation_consumed"}}: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts:799:61
+    797|         client,
+    798|       );
+    799|       expect(confirmed.ok, JSON.stringify(confirmed.error)).toBe(true);
+       |                                                             ^
+    800| 
+    801|       const delivered = await invoke(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts > R6 chatHandlers chat.send plan confirm (visible result, no execution) > unique card binding succeeds via chat.send; message visible; no agent dispatch
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts:1102:7
+    1100|     expect(
+    1101|       plan.confirmed === true || plan.status === "confirmed" || plan.s…
+    1102|     ).toBe(true);
+       |       ^
+    1103|     // Product wiring: confirmed path attempts post-confirm advance (n…
+    1104|     expect(payload.autoAdvanceWired).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts > R7 claim lifecycle · same trusted SoT/lock (managed) > op-A success → finally clears tenant claim → op-B succeeds; legacy root has no task write
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts:315:30
+    313|       },
+    314|     });
+    315|     expect(wakeA.dispatched).toBe(true);
+       |                              ^
+    316|     expect(callsA).toBe(1);
+    317|     expect(wakeA.roundId).toBe("r7-op-a");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts > R7 claim lifecycle · same trusted SoT/lock (managed) > claim commit then mirror fail → release on tenant root → retry ok; stale claimId cannot clear new claim
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts:422:21
+    420|       },
+    421|     });
+    422|     expect(callsOk).toBe(1);
+       |                     ^
+    423|     expect(wakeOk.dispatched).toBe(true);
+    424| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > Todolist ACL RPC boundary > service and RPC ignore attacker ACL and fail closed
+AssertionError: expected 'write_acl_denied: not authorized to r…' to contain '主答'
+
+Expected: "主答"
+Received: "write_acl_denied: not authorized to read group workspace file"
+
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:308:42
+    306|     expect(attacker.mock.calls[0]?.[0]).toBe(false);
+    307|     expect(attackerError?.message ?? "").not.toContain(SECRET_STEP);
+    308|     expect(attackerError?.message ?? "").toContain("主答");
+       |                                          ^
+    309| 
+    310|     const spoofedPublisher = vi.fn();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > owner-decision delivery is independent of plan creation > transcript write failure still returns the proposal and a retryable delivery
+AssertionError: expected 'no_active_confirmer' to be 'transcript_append' // Object.is equality
+
+Expected: "transcript_append"
+Received: "no_active_confirmer"
+
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:665:33
+    663|     const { todolist, cardDelivery } = proposed;
+    664|     expect(todolist.status).toBe("proposed");
+    665|     expect(cardDelivery.reason).toBe("transcript_append");
+       |                                 ^
+    666|     expect(cardDelivery.ok).toBe(false);
+    667|     expect(cardDelivery.retryable).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > owner-decision delivery is independent of plan creation > same-version retry does not mint a proposal or a second card; confirm is single-consume
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:714:54
+    712|     expect(delivered.todolist.todolistId).toBe(todolist.todolistId);
+    713|     expect(delivered.todolist.version).toBe(todolist.version);
+    714|     expect(delivered.cardDelivery.historyReloadable).toBe(true);
+       |                                                      ^
+    715|     expect(delivered.cardDelivery.clientPresented).toBe(false);
+    716|     expect(delivered.cardDelivery.userFacing).toBe("waiting_confirmati…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > owner-decision delivery is independent of plan creation > service and RPC refuse stale plan confirms without widening confirmer ACL
+ClaimContractEntryError: reviseTodolist: reviseTodolist requires 主答/lead or coordinator
+ ❯ unwrapTodolist src/gateway/collaboration-learning/claim-contract-entry.ts:1750:9
+    1748|     throw new ClaimContractFlagOffError();
+    1749|   }
+    1750|   throw new ClaimContractEntryError(result.reason, `${step}: ${result.…
+       |         ^
+    1751| }
+    1752| 
+ ❯ Module.reviseCollaborationTodolist src/gateway/collaboration-learning/claim-contract-entry.ts:2250:10
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:847:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/13]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > owner-decision delivery is independent of plan creation > D6b: revoked coordinator cannot list historyReloadable delivery rows
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:1004:54
+    1002|       cfg,
+    1003|     });
+    1004|     expect(delivered.cardDelivery.historyReloadable).toBe(true);
+       |                                                      ^
+    1005| 
+    1006|     const beforeRevoke = await listCollaborationOwnerDecisionDeliverie…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/13]⎯
+
+ FAIL  src/gateway/collaboration-dispatch/group-task-heartbeat.test.ts > P3 runGroupTaskHeartbeat > allowlist on: nudge → second no-response escalate; whoWokeWhom auditable
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-dispatch/group-task-heartbeat.test.ts:359:67
+    357|       throw new Error("expected third scan");
+    358|     }
+    359|     expect(tick3.wakeEvents.some((e) => e.source === "escalate")).toBe…
+       |                                                                   ^
+    360|     expect(tick3.decisions.some((d) => d.action === "escalate")).toBe(…
+    361| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/13]⎯
+
+
+ Test Files  6 failed | 3 passed (9)
+      Tests  13 failed | 75 passed (88)
+   Start at  07:02:57
+   Duration  67.57s (transform 54.32s, setup 1.79s, import 63.23s, tests 94.55s, environment 1ms)
+

@@ -65,6 +65,21 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => fsp.rm(dir, { recursive: true, force: true })));
 });
 
+function ensureGatewayAgentListed(cfg: OpenBotConfig, agentId: string): OpenBotConfig {
+  const id = agentId.trim();
+  if (!id) {
+    return cfg;
+  }
+  const list = [...(cfg.agents?.list ?? [])];
+  if (!list.some((row) => row?.id === id)) {
+    list.push({ id });
+  }
+  const next = { ...cfg, agents: { ...cfg.agents, list } } as OpenBotConfig;
+  setRuntimeConfigSnapshot(next);
+  clearConfigCache();
+  return next;
+}
+
 async function useManagedRoot() {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "openbot-r7-claim-"));
   tempDirs.push(root);
@@ -278,10 +293,11 @@ async function seedTenantTaskReady(params: {
 
 describe("R7 claim lifecycle · same trusted SoT/lock (managed)", () => {
   test("op-A success → finally clears tenant claim → op-B succeeds; legacy root has no task write", async () => {
-    const { cfg } = await useManagedRoot();
+    let { cfg } = await useManagedRoot();
     const tenantId = "tenant-r7-life-a";
     const owner = `${tenantId}/emp-owner`;
     const bot = `${tenantId}/bot-analyst`;
+    cfg = ensureGatewayAgentListed(cfg, bot);
     const groupId = "grp-r7-life-a";
     const taskId = "task-r7-life-a";
     const { seeded, legacy, authority } = await seedTenantTaskReady({
@@ -354,10 +370,11 @@ describe("R7 claim lifecycle · same trusted SoT/lock (managed)", () => {
   });
 
   test("claim commit then mirror fail → release on tenant root → retry ok; stale claimId cannot clear new claim", async () => {
-    const { cfg } = await useManagedRoot();
+    let { cfg } = await useManagedRoot();
     const tenantId = "tenant-r7-life-b";
     const owner = `${tenantId}/emp-owner`;
     const bot = `${tenantId}/bot-analyst`;
+    cfg = ensureGatewayAgentListed(cfg, bot);
     const groupId = "grp-r7-life-b";
     const taskId = "task-r7-life-b";
     const { seeded, legacy, authority } = await seedTenantTaskReady({

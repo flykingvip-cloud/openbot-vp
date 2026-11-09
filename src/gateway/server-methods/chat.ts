@@ -4,6 +4,7 @@ import path from "node:path";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { stopTaskAtGateway } from "../../agent-runtime/command/index.js";
 import type { FocusSwitchGateDecision } from "../../agent-runtime/contracts/task-control.js";
+import { shouldTaskParkAbortInFlight } from "../../agent-runtime/policy/index.js";
 import { sessionTaskState } from "../../agent-runtime/state/index.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
@@ -66,7 +67,6 @@ import {
   transcriptEntriesForInboundTurn,
 } from "../../conversation-task/focus-switch.js";
 import { observeConversationTaskCancelPathConsult } from "../../conversation-task/reply-completion.js";
-import { shouldTaskParkAbortInFlight } from "../../conversation-task/turn-relation.js";
 import { resolveConversationFlags } from "../../conversations/flags.js";
 import { pageHistoryMessages } from "../../conversations/history-cursor.js";
 import {
@@ -5801,10 +5801,10 @@ export const chatHandlers: GatewayRequestHandlers = {
               executeRound: () =>
                 executeCollaborationRound(authority, facts, {
                   decision,
+                  productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg),
                   message: discussToTaskCoordinatorBinding
                     ? `${discussToTaskCoordinatorBinding}\n\n${transcriptMessage}`
                     : transcriptMessage,
-                  productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg),
                   sessionKey: rawSessionKey,
                   skipRoundIds: [clientRunId, ...context.chatAbortControllers.keys()],
                   signal: parentAbortController.signal,

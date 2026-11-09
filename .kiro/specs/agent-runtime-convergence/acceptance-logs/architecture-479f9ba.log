@@ -1,0 +1,5 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:core:architecture-manifest /agent/repos/openbot-vp
+> node --import tsx scripts/check-architecture-manifest.ts
+
+Architecture manifest passed (72 rules, 14147 files scanned).

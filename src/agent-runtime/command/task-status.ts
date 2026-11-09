@@ -4,15 +4,15 @@ import { formatTaskBoardFocusLine } from "../context/task-focus.js";
  * Display / classification only — task mutations go through session-task-board.
  */
 import type { SessionTaskBoard } from "../contracts/task.js";
-
-const INBOUND_STAMP_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} [0-9:]{4,8} GMT[+-]\d+\]\s*/;
+import { stripInboundStamp } from "../policy/index.js";
 
 /** Narrow progress / status asks that can be answered from the board alone. */
 const PROGRESS_STATUS_QUERY_RE =
   /^(?:请问?)?(?:现在)?(?:任务)?(?:进度(?:如何|怎样|怎么样)?|做到哪(?:里|儿)?了?|怎么样了|进行到哪了|还差(?:什么|多少)?|完成了吗|完成了没|到哪一步了|当前进度)[?？!！。.\s]*$/u;
 
+/** Dialogue status copy uses the policy stamp strip. This name stays for existing callers. */
 export function stripInboundStampForDialogue(text: string): string {
-  return text.replace(INBOUND_STAMP_RE, "").trim();
+  return stripInboundStamp(text);
 }
 
 export function isProgressStatusQuery(text: string): boolean {

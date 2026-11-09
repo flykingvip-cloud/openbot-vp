@@ -1,11 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { loadSessionStore, resolveSessionFilePath } from "../config/sessions.js";
 import {
   decideWake,
   type FocusDecision,
   type FocusSnapshot,
-} from "../conversation-task/focus-policy.js";
+} from "../agent-runtime/policy/index.js";
+import { loadSessionStore, resolveSessionFilePath } from "../config/sessions.js";
 import { readLastUserMessageAtMsFromTranscript } from "../cron/isolated-agent/main-session-focus.js";
 import { resolveHeartbeatReasonKind } from "./heartbeat-reason.js";
 

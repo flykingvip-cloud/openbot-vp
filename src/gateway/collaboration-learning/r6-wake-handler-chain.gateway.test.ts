@@ -226,6 +226,21 @@ afterEach(async () => {
   listSpacesMock.mockReset();
 });
 
+function ensureGatewayAgentListed(cfg: OpenBotConfig, agentId: string): OpenBotConfig {
+  const id = agentId.trim();
+  if (!id) {
+    return cfg;
+  }
+  const list = [...(cfg.agents?.list ?? [])];
+  if (!list.some((row) => row?.id === id)) {
+    list.push({ id });
+  }
+  const next = { ...cfg, agents: { ...cfg.agents, list } } as OpenBotConfig;
+  setRuntimeConfigSnapshot(next);
+  clearConfigCache();
+  return next;
+}
+
 async function useManagedRoot() {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "openbot-r6-handlers-"));
   tempDirs.push(root);
@@ -526,7 +541,7 @@ describe("R6 wake auth recheck uses authority-aligned stores (dual-root conflict
   });
 
   test("tenant authorized + legacy revoked → wake does not mis-reject on legacy", async () => {
-    const { cfg } = await useManagedRoot();
+    let { cfg } = await useManagedRoot();
     const tenantId = "tenant-r6-wake-ok";
     const owner = `${tenantId}/emp-owner`;
     const bot = `${tenantId}/bot-analyst`;
@@ -613,8 +628,9 @@ describe("R6 wake auth recheck uses authority-aligned stores (dual-root conflict
     expect(direct.ok).toBe(true);
 
     // Readiness is tenant agent registry ∩ active OS bot. Register this bot in
-    // the tenant catalog so the auth-positive path can dispatch. Legacy revoke
-    // is still not the authorization source.
+    // the tenant catalog + gateway agents.list so the auth-positive path can dispatch.
+    // Legacy revoke is still not the authorization source.
+    cfg = ensureGatewayAgentListed(cfg, bot);
     upsertAgent({
       runtimeAgentId: bot,
       name: bot,

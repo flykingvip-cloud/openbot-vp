@@ -1,0 +1,291 @@
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot
+
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction respond enters execution only after acceptance 96ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction accepted enters execution only after acceptance 22ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction duplicate enters execution only after acceptance 11ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction rejected enters execution only after acceptance 11ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction resumed enters execution only after acceptance 12ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction resume_denied enters execution only after acceptance 14ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction direct_respond enters execution only after acceptance 13ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction corrupt_state enters execution only after acceptance 18ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > Gateway interaction transcript_failure enters execution only after acceptance 23ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > restricts chat actions without emptying shared identity or skill context 13ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > selected knowledge supplies context without granting execution tools 10ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > chat without selected sources still skips optional knowledge 6ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > selected folder sources also survive chat-lane knowledge skip 8ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps full bootstrap on chat-lane while workspace onboarding is incomplete 4ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > retains selected skill guidance and memory in interaction without enabling tools 4ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not force steward-required skills into retrieve skillFilter 6ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > force-merges steward-required skills into act skillFilter 10ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not apply chat-lane cuts for steward act when the router flag is off 21ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > leaves non-steward sessions unchanged when depth flags are off 13ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > writes group skill policy onto skillFilter, blocklist, and the embedded run allowlist 32ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > maps group blockedSkills=search onto the constructed tools array 1ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps unselected knowledge optional and chat actions disabled when the router is on 27ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps knowledge prefetch and tools for retrieve 18ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps knowledge prefetch and tools for act 26ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not apply the inbound-depth chat skip to space sessions 8ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > chat assembly avoids the knowledge wait that retrieve still pays 100ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not change retrieve knowledge args when only the router flag is on 90ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > passes retrieve source policy without enabling live sources 112ms
+ ✓ src/agent-runtime/wiring/execution-admission.test.ts > persists accepted checks and refuses changing their bytes on an idempotent replay 8ms
+ ✓ src/agent-runtime/wiring/execution-admission.test.ts > applies bound semantic amendments and refuses stale control writes 14ms
+ ✓ src/agent-runtime/wiring/execution-admission.test.ts > admits once, persists acceptance, and rejects stale or conflicting requests without writing 8ms
+ ✓ src/agent-runtime/wiring/execution-admission.test.ts > uses explicit amendment scope instead of legacy wording to supersede constraints 8ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps the act knowledge path without source policy 96ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps chat zero-knowledge zero-tools when both router and knowledge policy are on 9ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > does not apply retrieve tool policy when only the router flag is on 96ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > applies retrieve read-only ceiling without giving that allowlist to chat 107ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > keeps chat on disableTools instead of the retrieve allowlist 7ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > still applies classify-only chat-lane when only the tool policy flag is on 14ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply inbound depth router > leaves act on the existing tool set when tool policy is on 86ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > persists authorized Scope onto Round/Ledger before optional retrieve 89ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > skips optional retrieve when authorize throws 5ms
+ ✓ src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts > runPreparedReply aside dialogue context (A-ended normal path) > does not promote historical conversation into an admitted task focus 88ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner compaction > adds verbose auto-compaction notice and tracks count 89ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner bootstrap warning dedupe > passes stored warning signature history to embedded followup runs 3ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > drops payloads already sent via messaging tool 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > delivers payloads when not duplicates 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > suppresses replies when a messaging tool sent via the same provider + target 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > suppresses replies when provider is synthetic but originating channel matches 1ms
+ ✓ src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts > runPreparedReply aside dialogue context (A-ended normal path) > injects aside Q&A as untrusted commandBody context via normal reply entrance 32ms
+ ✓ src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts > runPreparedReply aside dialogue context (A-ended normal path) > preserves context order and trust at the real runner boundary (collab=false) 9ms
+ ✓ src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts > runPreparedReply aside dialogue context (A-ended normal path) > preserves context order and trust at the real runner boundary (collab=true) 11ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close the conversation task or announce success when the binding mismatches 90ms
+stderr | src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on agent error
+Followup agent failed before reply: agent exploded
+
+ ✓ src/gateway/collaboration-dispatch/policy-compiler-sections.test.ts > P1-A1 policy compiler segments > keeps pre-P1-A1 fields byte-identical on the combination matrix 12ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler-sections.test.ts > P1-A1 policy compiler segments > adds five capability segments with floorProtocol=legacy and no consumer flags 1ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler-sections.test.ts > P1-A1 policy compiler segments > derives floorOpenness / proactiveBots / rollCall / presentation from L2 inputs 1ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler-sections.test.ts > P1-A1 policy compiler segments > achieves 100% provenance coverage on the five capability segments 6ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler-sections.test.ts > P1-A1 policy compiler segments > keeps legacy fields including clamps unchanged when new segment inputs are dirty 2ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler-sections.test.ts > P1-A1 policy compiler segments > keeps bot roles free of L3 task capabilities (L1-hard) 1ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > skips optional retrieve when managed Scope persist degrades 4ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > still retrieves when a group has no open managed round 87ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > defaults stay off and a multi-group list authorizes nobody 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > does not suppress replies for same target when account differs 3ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > drops media URL from payload when messaging tool already sent it 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > delivers media payload when not a duplicate 3ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > persists usage even when replies are suppressed 34ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > does not fall back to dispatcher when cross-channel origin routing fails 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > falls back to dispatcher when same-channel origin routing fails 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner messaging tool dedupe > routes followups with originating account/thread metadata 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on NO_REPLY 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on empty payloads 0ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on agent error 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner typing cleanup > calls both markRunComplete and markDispatchIdle on successful delivery 0ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner agentDir forwarding > passes queued run agentDir to runEmbeddedPiAgent 1ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner agentDir forwarding > forwards disableTools so the embedded run tool list stays empty 0ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner agentDir forwarding > forwards inboundToolCeiling so retrieve stays on the read-only set 0ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > collaboration.task.handoffContract > defaults off and is documented 10ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > collaboration.task.handoffContract > flag-off owner_transfer shortcut is refused and does not change owner 1ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > collaboration.task.handoffContract > flag-on owner_transfer shortcut does not change responsibility 0ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts > runPreparedReply context-scope production entry > does not require Round persist on 1:1 retrieve 85ms
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > isBareChatCompletionPhrase only matches bare completion claims 3ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > keeps the conversation task active when the session board write throws 79ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > applies L1 defaults when the group sends an empty policy 5ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > clamps L2 visible replies to the L1 ceiling 1ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > records L2 source when the group stays inside the ceiling 1ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > lets L2 require a visible mention reply without making silence illegal 1ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > keeps an explicit open-discussion L2 value after the single-speaker default 0ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > keeps observer write/approve permanently closed 0ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > compiles mode templates without treating them as a flat enum 2ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > lets L2 replace the low-signal default without widening L1-Hard 1ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > treats custom instructions as guidance only 1ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > hashes the compiled policy without clamp noise 2ms
+ ✓ src/gateway/collaboration-dispatch/policy-compiler.test.ts > compileEffectiveCollaborationPolicy > decouples supplement from openDiscussionWithoutMention 1ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > live turn_bound exec is not re-claimable; dead claim reopens for recovery 32ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > continue_armed cannot regress from turn_bound with old claimToken 65ms
+ ✓ src/gateway/collaboration-dispatch/collab-s2-plan-gate-all-paths.test.ts > FINAL v3 S2 plan gate on all exec paths > contracts: flags stay off defaults; mapping §A 2ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > findAsyncWaitJobsDirs discovers nested async-wait-jobs folders 3ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > pid alive → still waiting; no continue arm 25ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > bind refuses multiple open jobs for same taskId without jobId 180ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves declarative checks and refuses executable acceptance fields 3ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves the explicit amendment scope supplement 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves the explicit amendment scope revise 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves the explicit amendment scope replace_all 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves a mixed question and bound task_change in one inference 1ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > preserves a mixed question and bound task_control in one inference 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects malformed mixed answer null 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects malformed mixed answer 1 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects malformed mixed answer " " 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > answers with one inference and preserves authorized context roles 1ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > returns an execution proposal without executing or looping 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: null 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: {"kind":"reply","text":" "} 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: {"kind":"execution_request","request":{"goal":"run","acceptance":[]}} 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: {"kind":"reply","text":"ok","script":"execute"} 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects invalid or executable decision payload: {"kind":"execution_request","request":{"goal":"run","acceptance":["done"],"tools":["exec"]}} 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > does not call inference after cancellation 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > rejects late output after cancellation without another inference 0ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > binds task_change proposals to the captured task revision 1ms
+ ✓ src/agent-runtime/command/interpret-interaction.test.ts > binds task_control proposals to the captured task revision 1ms
+ ✓ src/gateway/collaboration-dispatch/collab-s2-plan-gate-all-paths.test.ts > FINAL v3 S2 plan gate on all exec paths > unconfirmed plan cannot markInProgress; revise invalidates confirm 286ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > exited → arm continue once; second call retries open stage without double enqueue success required 315ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > handoff contract invariants > flag-on closed loop changes owner only after propose→accept→approve→apply 347ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > handoff contract invariants > flag-off propose does not write under handoffs/ 47ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close either domain when the ledger write throws 359ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > delivery_pending claim is deliveryOnly — no business re-arm token reuse as fresh 177ms
+ ✓ src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts > overlapping stop vs claim: cleared wins; late claimToken cannot resurrect 137ms
+ ✓ src/gateway/collaboration-dispatch/collab-s2-plan-gate-all-paths.test.ts > FINAL v3 S2 plan gate on all exec paths > applied self-advance without confirm → plan_nudge; with confirm → delivery_exec 177ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 正常推进一步（已确认计划内） 502ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > pid missing → unconfirmed evidence, never packaged as success 130ms
+ ✓ src/gateway/collaboration-dispatch/collab-s2-plan-gate-all-paths.test.ts > FINAL v3 S2 plan gate on all exec paths > private Todolist ACL: unauthorized read + cross-executor bag 串读 refused 180ms
+ ✓ src/gateway/collaboration-dispatch/collab-s2-plan-gate-all-paths.test.ts > FINAL v3 S2 plan gate on all exec paths > in_progress delivery bag incomplete without confirmed step → refuse 0ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > handoff contract invariants > missing accept or approve leaves responsibility unchanged 202ms
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > submit → return → revise → accept persists accepted; bare 完成 never writes 623ms
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > acceptBoardItemSubmission refuses bare chat completion before any write 1ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > pause clears; recovery does not arm continue 196ms
+ ✓ src/agent-runtime/context/assembly.test.ts > appends shared turn material in fixed order without changing bytes or prior snapshots 2ms
+ ✓ src/agent-runtime/context/assembly.test.ts > orders individual material without changing source bytes or reading sources 0ms
+ ✓ src/agent-runtime/context/assembly.test.ts > rejects collaboration and unknown material in individual context 1ms
+ ✓ src/agent-runtime/context/assembly.test.ts > preserves collaboration material order, duplicate text and source bytes 1ms
+ ✓ src/agent-runtime/context/assembly.test.ts > system context assembly compatibility > filters blank initial material while preserving bytes, order and duplicate sources 0ms
+ ✓ src/agent-runtime/context/assembly.test.ts > system context assembly compatibility > preserves caller-admitted append semantics and does not mutate earlier snapshots 0ms
+ ✓ src/agent-runtime/context/assembly.test.ts > system context assembly compatibility > keeps ordered late additions and represents absent system context as undefined 0ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > retries a rejected board close on the next delivered reply 482ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > boot recovery scans agent sessions and arms continue (not delivered) 215ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > handoff contract invariants > crash after the fact and before the task write rolls forward 362ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > handoffCollaborationTask × handoffContract (learning seam) > flag-off refuses handoffCollaborationTask and leaves owner unchanged 67ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > handoffCollaborationTask × handoffContract (learning seam) > flag-on never calls applyTaskHandoff and leaves responsibility unchanged 83ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > dry_run / 未开白名单时无外部副作用 599ms
+ ✓ src/gateway/collaboration-dispatch/handoff-invariant.test.ts > handoffCollaborationTask × handoffContract (learning seam) > flag-on error points at the contract API sequence 80ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > delivery_pending recovery is delivery_only — enqueues delivery-only, not business continue 184ms
+ ✓ src/agent-runtime/state/repository/async-wait-job-recovery.test.ts > synced recovery attempt: recheck after bind does not clear with stale prior attempt 194ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > oral dispatch never creates a board fact 2ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > does not retry or claim no task was written after a storage failure 3ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > denies before task creation 1ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > commits once only after authorization 1ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > refuses cancellation during authorization 2ms
+ ✓ src/agent-runtime/command/execution-admission.test.ts > does not authorize malformed goals or budgets 0ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not reopen or announce again after a completed close 335ms
+stdout | src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > production ensureFollowupConsumer → createFollowupRunner: stub returns drive acceptance/delivery
+{"event":"evolution.outcome.written","runId":"15cd2f99-76fc-4b74-b4b7-ef0f191e955b","agentId":"bot","tenantId":"ent-1","surfaceId":"task.execution","reason":"eligible"}
+
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > review-event relay stays unknown until accept, and accept does not dispatch another review round 714ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > P1 gray allowlist enables claim for listed group without global flag 120ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > P1 rollback: empty allowlist + global false refuses writes 44ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > flag defaults off 20ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > flag-off: publish refuses and writes nothing 44ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > rejects a stale execution attempt without closing the conversation task 245ms
+ ✓ src/agent-runtime/command/route-interaction.test.ts > reply bypasses execution authorization and state mutation 3ms
+ ✓ src/agent-runtime/command/route-interaction.test.ts > clarify bypasses execution authorization and state mutation 0ms
+ ✓ src/agent-runtime/command/route-interaction.test.ts > explicit work alone reaches admission, once 3ms
+ ✓ src/agent-runtime/command/route-interaction.test.ts > bound changes remain proposals rather than entering new-task admission 1ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > flag-on: publish → claim → apply seeds responsibility + assigned 141ms
+ ✓ src/agent-runtime/command/task-status.test.ts > current task status query > does not read state for amendments or control 4ms
+ ✓ src/agent-runtime/command/task-status.test.ts > current task status query > does not claim a task exists when current is absent 1ms
+ ✓ src/agent-runtime/command/task-status.test.ts > current task status query > reads once and projects recorded facts without mutating state 3ms
+ ✓ src/agent-runtime/command/task-status.test.ts > current task status query > strips inbound stamps through the policy implementation 3ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4b claim contract > flag-on: unintended claimant is refused 92ms
+ ✓ src/agent-runtime/context/catalog/select-catalog.test.ts > does not select the collaboration catalog from chat type alone 1ms
+ ✓ src/agent-runtime/context/catalog/select-catalog.test.ts > fails individual assembly for every group-layer id 2ms
+ ✓ src/agent-runtime/context/catalog/select-catalog.test.ts > keeps the existing collaboration material order after the member prefix 1ms
+ ✓ src/shared/preview-artifact/artifact-hash.test.ts > preview-artifact canonicalize + hash > canonicalizes line endings and trailing whitespace 1ms
+ ✓ src/shared/preview-artifact/artifact-hash.test.ts > preview-artifact canonicalize + hash > uses stable sha256 body hash independent of title 2ms
+ ✓ src/shared/preview-artifact/artifact-hash.test.ts > preview-artifact canonicalize + hash > matches legacy and modern artifact hashes 1ms
+ ✓ src/shared/preview-artifact/artifact-hash.test.ts > deliverable envelope multiline attrs > parses versioned multiline DELIVERABLE headers 2ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close or announce when acceptance alignment fails 92ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 重复 heartbeat / wake 不重复副作用 567ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > exactly one of two concurrent claims succeeds; unique claimantId 111ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not treat silence or a placeholder reply as completion 214ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > re-claim after winner fails (not published) 110ms
+ ✓ src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > production ensureFollowupConsumer → createFollowupRunner: stub returns drive acceptance/delivery 1816ms
+ ✓ src/agent-runtime/delivery/artifacts/patch-pptx.test.ts > only one concurrent editor can replace the same original version 61ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 偏离动作被拒或升人闸 264ms
+ ✓ src/commands/agent.lifecycle-attribution-path.node.test.ts > CLI embedded run lifecycle attribution path > routes openbot agent through runEmbeddedPiAgent into attempt attribution helper 2ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > expectedRevision mismatch → revision_conflict 108ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > publishes one idempotent notice when closing a conversation task whose board is already checked 255ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not announce success when strict close lacks canonical evidence 165ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > C2: concurrent accept vs return — exactly one ok; accepted XOR returned; revision +1 once 311ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 触发硬停止后排队与进行中任务被安全处理 417ms
+stdout | src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: delivered
+{"event":"evolution.outcome.written","runId":"39e60682-fd84-49a9-952e-ebc671eda5b0","agentId":"test","tenantId":"personal:agent:test:main","surfaceId":"task.execution","reason":"eligible"}
+
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not write a transcript notice when conversation-task close throws, then writes one on retry 337ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > classifies board association before any close 11ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > C3: concurrent cancel vs submit from in_progress — ends cancelled; post-cancel submit refused 291ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > createFollowupRunner agentDir forwarding > forwards queued execution identity tenant and membership into the embedded run 1448ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > closes an independent conversation task when neither session file nor binding is supplied 237ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close when the session file is missing but a binding is present 171ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Contract C1 concurrent claim (atomic RMW) > C3 ordered: submit → cancel from submitted_for_review; then accept/re-submit refuse; revision matches 393ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > C1 claim progress states > flag-off: markInProgress refuses 30ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 硬停止演练：越权 accept 788ms
+stdout | src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > channel fail ≠ delivered; later delivery-only retry can complete without re-running model
+{"event":"evolution.outcome.written","runId":"a0d31b47-356e-430b-9f25-de7a10cadff1","agentId":"bot","tenantId":"ent-1","surfaceId":"task.execution","reason":"eligible"}
+
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not close when the session file is present but the binding is missing 292ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 硬停止演练：越权 finalize 160ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not skip verification when binding fields are incomplete 214ms
+ ✓ src/conversation-task/reply-completion.window.test.ts > reply completion partial-success window > does not confirm delivery from the reply-completion observer 10ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 硬停止演练：陈旧确认 145ms
+ ✓ src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > channel fail ≠ delivered; later delivery-only retry can complete without re-running model 1988ms
+ ✓ src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts > missing trusted identity refuses enqueue — no unscoped exec 104ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > C1 claim progress states > flag-on: apply → in_progress → submit(submission_id) → accept; illegal jumps refused 632ms
+ ✓ src/gateway/collaboration-dispatch/single-group-unattended.test.ts > batch 5 single-group unattended > 硬停止演练：重复外部副作用 291ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > C1 claim progress states > draft≠submitted: applied is active work, not submitted 96ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4 submit empty/duplicate + acceptance loop > helpers: empty body and default loop cap 2ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: delivered 1418ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4 submit empty/duplicate + acceptance loop > empty submission is not success; duplicate returned body refused 209ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P4 submit empty/duplicate + acceptance loop > acceptance loop over cap escalates (returnCount) 295ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > resolvePostClaimFanoutTargets excludes claimant and dedupes 0ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > default off: claim wakes only claimant (no fan-out event) 61ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > allowlisted claimed → non-claimants woken; claimant not in fan-out targets 65ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > empty intended → fan-out no-op even when allowlisted 62ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B post-claim intended fan-out wake > global postClaimFanoutWake=true enables without allowlist entry 86ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > default off 13ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > allowlist enables without global true 26ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > resolveBoardKickoffMultiParticipantBots: mention lead then intended 1ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > collectActiveBoardIntendedClaimantIds skips accepted/cancelled 0ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > allowlisted board kickoff → explicit_multi over intended 25ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > default off preserves single_primary today 19ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > Mode B board-tied kickoff multi-participant > non-board chat mention still overrides (no intended) 13ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: failed 1174ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P1 submit-for-review wakes reviewer (best-effort) > wakeContract on: submit wakes coordinatorBotId when provided 230ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P1 submit-for-review wakes reviewer (best-effort) > wakeContract on: without coordinatorBotId falls back to publishedBy 203ms
+ ✓ src/gateway/collaboration-dispatch/claim-contract.test.ts > P1 submit-for-review wakes reviewer (best-effort) > wakeContract off: submit still succeeds without wake write 150ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: unknown 817ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: unverified 635ms
+stderr | src/auto-reply/reply/followup-runner.test.ts > does not start queued provider work when owner pause arrives during async transport preparation
+Followup agent failed before reply: Queued task was paused, closed or replaced before provider startup
+
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > settles queued task only with verified acceptance and actual delivery: empty 395ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > queued task binding claim > rejects a queued A request after same-goal B becomes current without invoking the provider 8ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > does not start queued provider work when owner pause arrives during async transport preparation 11ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > refreshes queued task-board continuation with owner constraints accepted after enqueue 15ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > rejects a queued continue ticket after paused without provider execution 7ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > rejects a queued continue ticket after focus changed without provider execution 7ms
+ ✓ src/auto-reply/reply/followup-runner.test.ts > rejects a queued continue ticket after new attempt without provider execution 7ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > restricted interaction never bypasses a model authorization denial 4ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes reply with authorization=true from one governed completion 4ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes execution_request with authorization=true from one governed completion 2ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes execution_request with authorization=false from one governed completion 1ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes reply with authorization=true from one governed completion 1ms
+ ✓ src/agent-runtime/wiring/prepared-interaction.test.ts > routes execution_request with authorization=true from one governed completion 1ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > verifies admitted artifacts without completing or mutating the task 11ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > fails mismatched bytes and leaves missing artifacts pending 7ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > rejects symlink escape without exposing outside bytes as evidence 6ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > invalidates evidence if the board revision changes during artifact reads 7ms
+ ✓ src/agent-runtime/wiring/task-acceptance.test.ts > does not evaluate another execution attempt 4ms
+ ✓ src/agent-runtime/execution/runner/queued-candidate.pricing.test.ts > prices a followup candidate from the transport model, not the ent catalog id 4ms
+ ✓ src/agent-runtime/state/repository/async-wait-stale-callback.test.ts > pause then recovery claim clears intent and does not wake 10ms
+ ✓ src/agent-runtime/state/repository/async-wait-stale-callback.test.ts > cancel then recovery claim does not wake; claimQueuedExecution rejects 10ms
+ ✓ src/agent-runtime/state/repository/async-wait-stale-callback.test.ts > replace binding refuses TaskActionBoundary and blocks delivery-style check 8ms
+ ✓ src/agents/pi-tools.task-action.test.ts > refuses the next action after owner constraint without executing it 17ms
+ ✓ src/agents/pi-tools.task-action.test.ts > refuses the next action after owner pause without executing it 6ms
+ ✓ src/agents/pi-tools.task-action.test.ts > refuses the next action after owner cancel without executing it 8ms
+ ✓ src/agents/pi-tools.task-action.test.ts > refuses the next action after owner replace without executing it 5ms
+ ✓ src/agents/pi-tools.task-action.test.ts > rechecks restrictions accepted while an asynchronous plugin hook waits 8ms
+ ✓ src/agent-runtime/execution/runner/scheduled-candidate.test.ts > forwards scheduled cancellation to the CLI execution adapter 4ms
+ ✓ src/agent-runtime/delivery/dispatch/pending-delivery.restart.test.ts > rehydrates durable delivery in a new process: active 14235ms
+ ✓ src/agent-runtime/delivery/dispatch/pending-delivery.restart.test.ts > rehydrates durable delivery in a new process: paused 9991ms
+ ✓ src/agent-runtime/delivery/dispatch/pending-delivery.restart.test.ts > rehydrates durable delivery in a new process: cancelled 10636ms
+
+ Test Files  31 passed (31)
+      Tests  266 passed (266)
+   Start at  23:56:54
+   Duration  75.26s (transform 252.61s, setup 11.59s, import 576.99s, tests 63.29s, environment 4ms)
+
+EXIT:0
