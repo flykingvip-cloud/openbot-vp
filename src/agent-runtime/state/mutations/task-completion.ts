@@ -95,13 +95,23 @@ export function recordCheckedTaskCompletion(params: {
     throw err;
   }
   if (finished.alreadyChecked) {
+    if (params.appendNotice === false) {
+      return {
+        persisted: false,
+        alreadyChecked: true,
+        notice: renderCompletionNotice(finished.board.parked),
+      };
+    }
     return { persisted: false, alreadyChecked: true };
   }
   if (finished.rejected) {
     return { persisted: false };
   }
   if (params.appendNotice === false) {
-    return { persisted: true };
+    return {
+      persisted: true,
+      notice: finished.notice ?? renderCompletionNotice(finished.board.parked),
+    };
   }
   const notice = finished.notice ?? renderCompletionNotice(finished.board.parked);
   let persisted = false;

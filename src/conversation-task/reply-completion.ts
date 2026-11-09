@@ -4,6 +4,7 @@
  */
 
 import { SILENT_REPLY_TOKEN } from "../agent-runtime/contracts/delivery.js";
+import { appendTaskCompletionNotice } from "../agent-runtime/state/completion-notice.js";
 import {
   consultDeliveryHoldForClose,
   type DeliveryCloseConsult,
@@ -214,20 +215,65 @@ function matchesTask(
 }
 
 /**
- * Three closes stay separate:
- * - ConversationTask `closed` is the CTR lifecycle. It is terminal and is not
- *   the session board or a delivery receipt.
- * - Ledger close is acceptance evidence for that conversation task.
- * - SessionTaskBoard completion is `recordCheckedTaskCompletion` only.
- * A notice is returned only after the board write is newly persisted and the
- * conversation task then transitions to `closed`. A rejected or failed board
- * write leaves the conversation task active so a later delivered reply can retry.
+ * Three results stay separate:
+ * - SessionTaskBoard completion is `recordCheckedTaskCompletion` with `appendNotice: false`.
+ * - The transcript notice is `appendTaskCompletionNotice`, and only after ConversationTask close returns.
+ * - ConversationTask `closed` is the CTR lifecycle. It is not a delivery receipt.
+ * A rejected board write, a thrown board write, or incomplete association info leaves the
+ * conversation task active. Returning undefined is not evidence that the transcript is unchanged.
  * Delivery confirmation is not decided here.
  */
+export type ReplyCompletionBoardAssociation =
+  | { kind: "independent" }
+  | {
+      kind: "incomplete";
+      reason: "session_file_missing" | "binding_missing" | "binding_task_id_missing";
+    }
+  | { kind: "ready"; sessionFile: string; binding: TaskCompletionBinding };
+
+/**
+ * Independent: neither a session file nor a binding was supplied.
+ * Incomplete: one side of an association is present, or the binding has no task id.
+ * Ready: both sides are present and the binding names a task; attempt and version are
+ * checked by the board write, not skipped here.
+ */
+export function classifyReplyCompletionBoardAssociation(params: {
+  sessionFile?: string | null;
+  binding?: TaskCompletionBinding | null;
+}): ReplyCompletionBoardAssociation {
+  const file = typeof params.sessionFile === "string" ? params.sessionFile.trim() : "";
+  const binding = params.binding ?? undefined;
+  if (!file && !binding) {
+    return { kind: "independent" };
+  }
+  if (!file) {
+    return { kind: "incomplete", reason: "session_file_missing" };
+  }
+  if (!binding) {
+    return { kind: "incomplete", reason: "binding_missing" };
+  }
+  const taskId = binding.taskId?.trim() ?? "";
+  if (!taskId) {
+    return { kind: "incomplete", reason: "binding_task_id_missing" };
+  }
+  return { kind: "ready", sessionFile: file, binding: { ...binding, taskId } };
+}
+
 type SessionBoardCloseSettlement =
   | { kind: "not_applicable" }
-  | { kind: "accepted"; notice?: string }
-  | { kind: "already_checked" }
+  | { kind: "association_incomplete" }
+  | {
+      kind: "accepted";
+      notice?: string;
+      sessionFile: string;
+      binding: TaskCompletionBinding;
+    }
+  | {
+      kind: "already_checked";
+      notice?: string;
+      sessionFile: string;
+      binding: TaskCompletionBinding;
+    }
   | { kind: "rejected" }
   | { kind: "unavailable" };
 
@@ -235,22 +281,35 @@ function settleSessionBoardClose(params: {
   sessionFile?: string;
   binding?: TaskCompletionBinding;
 }): SessionBoardCloseSettlement {
-  const file = params.sessionFile?.trim() ?? "";
-  const taskId = params.binding?.taskId?.trim() ?? "";
-  if (!file || !taskId) {
+  const association = classifyReplyCompletionBoardAssociation(params);
+  if (association.kind === "independent") {
     return { kind: "not_applicable" };
+  }
+  if (association.kind === "incomplete") {
+    return { kind: "association_incomplete" };
   }
   try {
     const result = recordCheckedTaskCompletion({
-      sessionFile: file,
+      sessionFile: association.sessionFile,
       closed: true,
-      binding: params.binding,
+      binding: association.binding,
+      appendNotice: false,
     });
     if (result.persisted) {
-      return { kind: "accepted", ...(result.notice ? { notice: result.notice } : {}) };
+      return {
+        kind: "accepted",
+        sessionFile: association.sessionFile,
+        binding: association.binding,
+        ...(result.notice ? { notice: result.notice } : {}),
+      };
     }
     if (result.alreadyChecked) {
-      return { kind: "already_checked" };
+      return {
+        kind: "already_checked",
+        sessionFile: association.sessionFile,
+        binding: association.binding,
+        ...(result.notice ? { notice: result.notice } : {}),
+      };
     }
     return { kind: "rejected" };
   } catch {
@@ -351,7 +410,11 @@ export function observeConversationTaskReplyCompleted(
           sessionFile,
           binding: completionBinding,
         });
-        if (settlement.kind === "rejected" || settlement.kind === "unavailable") {
+        if (
+          settlement.kind === "rejected" ||
+          settlement.kind === "unavailable" ||
+          settlement.kind === "association_incomplete"
+        ) {
           return undefined;
         }
         const current = store.getTaskById(task.id);
@@ -359,7 +422,11 @@ export function observeConversationTaskReplyCompleted(
           return undefined;
         }
         store.transitionTask(task.id, "closed");
-        return settlement.kind === "accepted" ? settlement.notice : undefined;
+        if (settlement.kind === "not_applicable" || !settlement.notice) {
+          return undefined;
+        }
+        appendTaskCompletionNotice(settlement.sessionFile, settlement.binding, settlement.notice);
+        return settlement.notice;
       } catch {
         // Ledger close must never surface on the reply path.
       } finally {
