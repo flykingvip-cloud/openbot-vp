@@ -454,10 +454,10 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
   {
     id: "collab.policy.compile",
     category: "operational",
-    currentOwner: "gateway",
+    currentOwner: "policy",
     targetOwner: "policy",
     scope: "collaboration effective-policy compile + policyHash",
-    implementation: "src/gateway/collaboration-dispatch/policy-compiler.ts",
+    implementation: "src/agent-runtime/policy/collaboration-compile.ts",
     enforcementPoints: ["before_collab_dispatch", "policyHash"],
     version: INVENTORY_VERSION,
     dependencies: {
@@ -475,9 +475,9 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
       "src/agent-runtime/policy/collaboration-rules.test.ts",
     ],
     retirementCondition:
-      "compiler and policyHash stay the gateway migration host because section modules still live there; do not change L1 defaults",
+      "compile, sections, and hash are policy; resolve-effective-policy.ts still assembles operating state and overlay",
     management: "code_required",
-    disposition: "pending_migration",
+    disposition: "retain",
   },
   {
     id: "collab.submit.review_versioning",

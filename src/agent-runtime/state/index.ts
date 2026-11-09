@@ -78,3 +78,12 @@ export {
   countRecentTaskContinuations,
   reserveTaskContinuation,
 } from "./continuation-ticket.js";
+export {
+  mutateBoardClaimLog,
+  appendBoardClaimLog,
+  commitPrivateTodolistLog,
+  appendPeerReviewLog,
+  withHandoffRoundLock,
+  appendHandoffLogLine,
+  writeHandoffJson,
+} from "./collaboration/round-txn.js";
