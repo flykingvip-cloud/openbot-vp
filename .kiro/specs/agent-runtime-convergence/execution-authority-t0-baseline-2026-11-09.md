@@ -51,7 +51,7 @@
 | `collab-policy-state-migration-boundary-2026-11-09.md` | `52517a80f939fcbae9010c0e93e049350cbf516f2f3cd7bd4d8016a078aa2c3c` |
 | `individual-policy-state-closure-slices-2026-11-09.md` | `ee2b19900144b8210dacfa41b2715256ce0b85977eb9f1bedf736b040a9df5ba` |
 
-三者已在本实施分支工作树 specs 目录（未暂存、未提交）。方案原文与用户附件字节一致（同指纹）。
+三者在 T0 登记当时（2026-11-09 开工快照）位于本实施分支工作树 specs 目录且尚未暂存/提交；其后已随 Batch A 切片进入 PR。方案原文与用户附件字节一致（同指纹）。
 
 ## 5. 推荐流程约束（用户 t39u）
 
@@ -77,7 +77,7 @@
 ## 7. 工作树快照（登记时）
 
 ```
-HEAD     efdb1b98d83e096a31e251095080de954f5883ec
+HEAD     efdb1b98d83e096a31e251095080de954f5883ec  （T0 开工快照；非最终交付 SHA）
 branch   codex/openbot/runtime-authority-closure
 dirty    仅 specs 下未跟踪 MD（方案/盘点/本登记）；无已暂存；无业务源码 diff
 ```
