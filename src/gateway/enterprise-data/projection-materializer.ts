@@ -1,17 +1,19 @@
+import { randomUUID } from "node:crypto";
 import { EnterpriseDataStoreError } from "./connector-action-store.js";
+import { readConnectorSyncSnapshotForAction } from "./connector-sync-snapshot.js";
 import { recordMaterializedConnectorAction } from "./data-asset-linkage.js";
 import { invokeEnterpriseDataAction } from "./data-gateway.js";
 import { resolveMaterializerExecutionContextFromBinding } from "./enterprise-data-seat-context.js";
 import { findEnterpriseKnowledgeProjectionBinding } from "./enterprise-knowledge-projection-binding-store.js";
-import { upsertKnowledgeFeedItem } from "./knowledge-feed-item-store.js";
+import { listKnowledgeFeedItems, upsertKnowledgeFeedItem } from "./knowledge-feed-item-store.js";
 import { createKnowledgeLineageRecord } from "./knowledge-lineage-store.js";
 import {
   decideKnowledgePublication,
+  projectionSourceId,
   resolveProjectionExecutionIdentity,
-  type KnowledgePublicationDecision,
 } from "./knowledge-publication.js";
-import { projectionSourceId } from "./knowledge-publication.js";
 import { recordKnowledgeSupplyAudit } from "./knowledge-supply-audit-store.js";
+import { applyClassificationMasking } from "./masking-engine.js";
 import { findEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
 import { applyProjectionTemplate } from "./projection-template-engine.js";
 import { findSarExecutionBridge, type SarGovernanceProvider } from "./sar-governance-bridge.js";
@@ -23,8 +25,58 @@ import type {
   KnowledgeLineageRecord,
   EnterpriseDataStore,
   ProjectionSourceActionRef,
+  SarGatewayCorrelation,
 } from "./types.js";
 import { applyYonyouTplusSyncCursorToInput } from "./yonyou-tplus-sync.js";
+
+type MaterializedPublication = {
+  publication: "complete" | "partial";
+  data: unknown;
+  maskedFields: string[];
+  scopeApplied: string;
+  traceId: string;
+  sar?: SarGatewayCorrelation;
+};
+
+/**
+ * Aggregate products prefer the sync snapshot so the Feed holds every finished
+ * page, not the first live connector page. Masking still uses the action's
+ * field classifications. No snapshot falls through to one governed live read.
+ */
+function publishAggregateFromSyncSnapshot(params: {
+  store: EnterpriseDataStore;
+  tenantId: string;
+  spec: EnterpriseKnowledgeProjectionSpec;
+  sourceRef: ProjectionSourceActionRef;
+}): MaterializedPublication | null {
+  const sourceId = projectionSourceId(params.spec);
+  if (!sourceId) {
+    return null;
+  }
+  const snapshot = readConnectorSyncSnapshotForAction({
+    store: params.store,
+    tenantId: params.tenantId,
+    sourceId,
+    connectorId: params.sourceRef.connectorId,
+    actionKey: params.sourceRef.actionKey,
+  });
+  if (!snapshot) {
+    return null;
+  }
+  const masking = applyClassificationMasking({
+    store: params.store,
+    tenantId: params.tenantId,
+    ref: params.sourceRef,
+    payload: { records: snapshot.rows },
+  });
+  return {
+    publication: snapshot.truncated ? "partial" : "complete",
+    data: masking.data,
+    maskedFields: masking.maskedFields,
+    scopeApplied: "SYNC_SNAPSHOT",
+    traceId: `sync-snapshot:${snapshot.snapshotId}:${randomUUID()}`,
+  };
+}
 
 export type ProjectionMaterializationResult = {
   bindingId: string;
@@ -73,7 +125,7 @@ async function invokeSourceAction(params: {
   input?: Record<string, unknown>;
   nowIso: string;
   sarProvider?: SarGovernanceProvider;
-}): Promise<Exclude<KnowledgePublicationDecision, { kind: "withhold" }>> {
+}): Promise<MaterializedPublication> {
   const identity = resolveProjectionExecutionIdentity({
     store: params.store,
     tenantId: params.tenantId,
@@ -177,10 +229,21 @@ export async function runProjectionMaterialization(params: {
     const cursorNow = Number.isFinite(Date.parse(params.nowIso))
       ? new Date(params.nowIso)
       : new Date();
-    // AggregateTemplate = list/汇总 knowledge: do not inject incremental sync watermark
+    // AggregateTemplate = list/汇总 knowledge. A finished sync snapshot is the
+    // full/latest pull. Without one, do not inject the incremental watermark
     // (NormalizeTemplate "存货增量" still receives the cursor window).
-    const input =
-      spec.templateKey === "AggregateTemplate"
+    const snapshotPublication =
+      spec.templateKey === "AggregateTemplate" && !params.input
+        ? publishAggregateFromSyncSnapshot({
+            store: params.store,
+            tenantId: params.tenantId,
+            spec,
+            sourceRef,
+          })
+        : null;
+    const input = snapshotPublication
+      ? undefined
+      : spec.templateKey === "AggregateTemplate"
         ? params.input
         : applyYonyouTplusSyncCursorToInput({
             store: params.store,
@@ -192,16 +255,18 @@ export async function runProjectionMaterialization(params: {
             now: cursorNow,
           });
 
-    const published = await invokeSourceAction({
-      store: params.store,
-      tenantId: params.tenantId,
-      spec,
-      sourceRef,
-      binding,
-      input,
-      sarProvider: params.sarProvider,
-      nowIso: params.nowIso,
-    });
+    const published =
+      snapshotPublication ??
+      (await invokeSourceAction({
+        store: params.store,
+        tenantId: params.tenantId,
+        spec,
+        sourceRef,
+        binding,
+        input,
+        sarProvider: params.sarProvider,
+        nowIso: params.nowIso,
+      }));
 
     const templateResult = applyProjectionTemplate({
       templateKey: spec.templateKey,
@@ -213,14 +278,23 @@ export async function runProjectionMaterialization(params: {
       published.publication === "partial" && !templateResult.title.includes("不完整")
         ? `${templateResult.title}（不完整）`
         : templateResult.title;
-    const query = input && Object.keys(input).length > 0 ? { ...input } : undefined;
+    const query =
+      !snapshotPublication && input && Object.keys(input).length > 0 ? { ...input } : undefined;
 
+    // Refresh the current FeedItem in place so a sync does not leave a second,
+    // equally timestamped copy that digital humans can still quote.
+    const currentFeed = listKnowledgeFeedItems({
+      store: params.store,
+      tenantId: params.tenantId,
+      projectionId: spec.projectionId,
+    })[0];
     const feedItem = upsertKnowledgeFeedItem({
       store: params.store,
       tenantId: params.tenantId,
       nowIso: params.nowIso,
       freshnessSlaMinutes: binding.freshnessSlaMinutes,
       item: {
+        objectId: currentFeed?.objectId,
         projectionId: spec.projectionId,
         title,
         kind: spec.objectKind,
@@ -234,6 +308,14 @@ export async function runProjectionMaterialization(params: {
         payload: {
           ...templateResult.payload,
           ...(query ? { query } : {}),
+          ...(snapshotPublication
+            ? {
+                syncSnapshot: {
+                  scopeApplied: "SYNC_SNAPSHOT",
+                  truncated: snapshotPublication.publication === "partial",
+                },
+              }
+            : {}),
           ...(published.publication === "partial"
             ? { publicationNotice: "不完整输出，不是完整知识对象" }
             : {}),
