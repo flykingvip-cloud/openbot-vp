@@ -8,7 +8,7 @@ description: >-
 
 # spreadsheets
 
-OpenBot 化表格技能。优先 **openpyxl**（或用户环境已有的等价库）编写本地 `.xlsx`；分析可用 pandas。**警告：** 勿捆绑或调用 Codex `@oai/artifact-tool` 专有 API 树；以 openpyxl 写工作区文件。
+OpenBot 化表格技能。优先 **openpyxl**（或用户环境已有的等价库）编写本地 `.xlsx`；分析可用 pandas。**警告：** 勿捆绑或调用 Codex `@oai/artifact-tool` 专有 API 树。文件模式优先调用 `office_file`（技能 `office-file-suite`）生成可重算的 xlsx。不要把文件生成说成已连接的桌面 Excel。Excel 实时会话未接入。
 
 ## 何时用
 
