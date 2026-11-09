@@ -105,12 +105,115 @@ function partialPath(rootDir: string, keyHash: string): string {
   return path.join(rootDir, "staged", `bridge-${keyHash}.bridge-partial`);
 }
 
+function nonEmpty(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isTarget(value: unknown): value is NormalizedDeliveryTarget {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const target = value as NormalizedDeliveryTarget;
+  return (
+    nonEmpty(target.channel) &&
+    nonEmpty(target.to) &&
+    (target.accountId === null || typeof target.accountId === "string")
+  );
+}
+
+function isFixedNonSend(parsed: MemberArtifactDeliveryIntent): boolean {
+  if (parsed.queueId !== null || parsed.bridgeSendStarted) {
+    return false;
+  }
+  if (parsed.authorization !== "authorization_pending" || parsed.scope !== "member_artifact") {
+    return false;
+  }
+  if (
+    parsed.phase === "authorization_pending" ||
+    parsed.phase === "staged" ||
+    parsed.phase === "associated"
+  ) {
+    return (
+      parsed.externalEffect === "none" && !parsed.retryable && parsed.receiptMessageIds === null
+    );
+  }
+  if (parsed.phase === "unknown") {
+    return parsed.externalEffect === "unknown" && !parsed.retryable;
+  }
+  if (parsed.phase === "delivered") {
+    return (
+      parsed.externalEffect === "acknowledged" &&
+      !parsed.retryable &&
+      Array.isArray(parsed.receiptMessageIds) &&
+      parsed.receiptMessageIds.length > 0 &&
+      parsed.receiptMessageIds.every((id) => nonEmpty(id))
+    );
+  }
+  return parsed.externalEffect === "none";
+}
+
+function intentMatchesKey(parsed: MemberArtifactDeliveryIntent): boolean {
+  const target = normalizeDeliveryTarget(parsed.normalizedTarget);
+  if (
+    !target ||
+    target.channel !== parsed.normalizedTarget.channel ||
+    target.to !== parsed.normalizedTarget.to ||
+    target.accountId !== parsed.normalizedTarget.accountId
+  ) {
+    return false;
+  }
+  const material = memberArtifactDeliveryKeyMaterial(
+    {
+      tenantId: parsed.tenantId,
+      groupId: parsed.groupId,
+      taskId: parsed.taskId,
+      itemId: parsed.itemId,
+      actorId: parsed.actorId,
+      scope: "member_artifact",
+      boardStatus: "accepted",
+      acceptedSubmissionId: parsed.acceptedSubmissionId,
+      acceptedArtifactVersion: parsed.acceptedArtifactVersion,
+      linkedDeliverableId: parsed.linkedDeliverableId,
+      linkedDeliverableVersion: parsed.linkedDeliverableVersion,
+      linkedContentSha256: parsed.linkedContentSha256,
+      target,
+    },
+    target,
+  );
+  return createHash("sha256").update(material, "utf8").digest("hex") === parsed.keyHash;
+}
+
 function isIntent(value: unknown, keyHash: string): value is MemberArtifactDeliveryIntent {
   if (!value || typeof value !== "object") {
     return false;
   }
   const parsed = value as MemberArtifactDeliveryIntent;
-  return parsed.version === 1 && parsed.keyHash === keyHash && RECOGNIZED.has(parsed.phase);
+  if (parsed.version !== 1 || parsed.keyHash !== keyHash || !RECOGNIZED.has(parsed.phase)) {
+    return false;
+  }
+  if (
+    !nonEmpty(parsed.tenantId) ||
+    !nonEmpty(parsed.groupId) ||
+    !nonEmpty(parsed.taskId) ||
+    !nonEmpty(parsed.itemId) ||
+    !nonEmpty(parsed.actorId) ||
+    !nonEmpty(parsed.acceptedSubmissionId) ||
+    !nonEmpty(parsed.acceptedArtifactVersion) ||
+    !nonEmpty(parsed.linkedDeliverableId) ||
+    !nonEmpty(parsed.linkedContentSha256) ||
+    !nonEmpty(parsed.stagedName) ||
+    typeof parsed.linkedDeliverableVersion !== "number" ||
+    !Number.isFinite(parsed.linkedDeliverableVersion) ||
+    parsed.linkedDeliverableVersion <= 0 ||
+    typeof parsed.createdAtMs !== "number" ||
+    typeof parsed.updatedAtMs !== "number" ||
+    !isTarget(parsed.normalizedTarget) ||
+    !isFixedNonSend(parsed) ||
+    !intentMatchesKey(parsed)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /** ENOENT is the only missing intent. Corrupt and IO errors must not be rebuilt. */
@@ -341,6 +444,15 @@ export async function recoverPartialStagedAssociation(params: {
       return { ok: false, reason: read.reason };
     }
     const intent = read.status === "ok" ? read.intent : null;
+    if (intent && intent.phase !== "authorization_pending" && intent.phase !== "staged") {
+      if (intent.phase === "associated") {
+        const retained = await readStagedBody(associatedPath(params.rootDir, keyHash));
+        if (retained?.keyHash !== keyHash) {
+          return { ok: false, reason: "association_file_missing" };
+        }
+      }
+      return { ok: true, keyHash, completedFromIntent: false };
+    }
     if (body?.keyHash === keyHash) {
       return { ok: true, keyHash, completedFromIntent: false };
     }

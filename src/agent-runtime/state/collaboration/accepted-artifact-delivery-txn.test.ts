@@ -264,6 +264,78 @@ describe("commitMemberArtifactDeliveryAssociation", () => {
     );
   });
 
+  it("rejects an incomplete intent and an identity that does not match the key", async () => {
+    const root = await rootDir();
+    const keyHash = deliveryKeyHash(identity());
+    expect(keyHash).toBeTruthy();
+    const intentFile = path.join(root, "intents", `${keyHash}.intent.json`);
+    await fs.mkdir(path.dirname(intentFile), { recursive: true });
+    const shallow = JSON.stringify({ version: 1, keyHash, phase: "staged" });
+    await fs.writeFile(intentFile, shallow, "utf8");
+    const rejected = await commitMemberArtifactDeliveryAssociation({
+      rootDir: root,
+      identity: identity(),
+      nowMs: 1,
+    });
+    expect(rejected).toEqual({ ok: false, reason: "intent_corrupt" });
+    expect(await fs.readFile(intentFile, "utf8")).toBe(shallow);
+
+    const created = await commitMemberArtifactDeliveryAssociation({
+      rootDir: root,
+      identity: identity({ itemId: "item-2" }),
+      nowMs: 2,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) {
+      return;
+    }
+    const mismatchedFile = path.join(root, "intents", `${created.intent.keyHash}.intent.json`);
+    const mismatched = { ...created.intent, tenantId: "ten-other" };
+    const mismatchedBytes = `${JSON.stringify(mismatched)}\n`;
+    await fs.writeFile(mismatchedFile, mismatchedBytes, "utf8");
+    const inconsistent = await commitMemberArtifactDeliveryAssociation({
+      rootDir: root,
+      identity: identity({ itemId: "item-2" }),
+      nowMs: 3,
+    });
+    expect(inconsistent).toEqual({ ok: false, reason: "intent_corrupt" });
+    expect(await fs.readFile(mismatchedFile, "utf8")).toBe(mismatchedBytes);
+  });
+
+  it("does not recreate a staged file after the association is retained", async () => {
+    const root = await rootDir();
+    const created = await commitMemberArtifactDeliveryAssociation({
+      rootDir: root,
+      identity: identity(),
+      nowMs: 1,
+    });
+    expect(created.ok).toBe(true);
+    const renamed = await noteAssociationRenamedAwayFromStaged({
+      rootDir: root,
+      identity: identity(),
+      nowMs: 2,
+    });
+    expect(renamed.ok).toBe(true);
+    const recovered = await recoverPartialStagedAssociation({
+      rootDir: root,
+      identity: identity(),
+    });
+    expect(recovered).toMatchObject({ ok: true, completedFromIntent: false });
+    const names = await fs.readdir(path.join(root, "staged"));
+    expect(names.some((name) => name.endsWith(".bridge-staged"))).toBe(false);
+    expect(names.some((name) => name.endsWith(".bridge-associated"))).toBe(true);
+
+    await fs.rm(path.join(root, "staged"), { recursive: true, force: true });
+    const missing = await recoverPartialStagedAssociation({ rootDir: root, identity: identity() });
+    expect(missing).toEqual({ ok: false, reason: "association_file_missing" });
+    const intentRaw = await fs.readFile(
+      path.join(root, "intents", `${deliveryKeyHash(identity())}.intent.json`),
+      "utf8",
+    );
+    expect(JSON.parse(intentRaw).phase).toBe("associated");
+    await expect(fs.readdir(path.join(root, "staged"))).rejects.toThrow();
+  });
+
   it("does not associate a group-final or unaccepted identity", async () => {
     const root = await rootDir();
     const groupFinal = await commitMemberArtifactDeliveryAssociation({
