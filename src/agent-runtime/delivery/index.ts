@@ -31,3 +31,12 @@ export {
 } from "./presentation/embedded-payloads.js";
 
 export { deliverQueuedReply } from "./dispatch/queued-reply.js";
+
+export {
+  writeAcceptedArtifactQueueFile,
+  sendAcceptedArtifactBridge,
+} from "./accepted-artifact-send.js";
+export {
+  recoverAcceptedArtifactBridgeEntry,
+  recoverAcceptedArtifactDeliveries,
+} from "./accepted-artifact-recover.js";

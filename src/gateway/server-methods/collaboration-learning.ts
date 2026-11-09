@@ -1,5 +1,14 @@
 import type { CapsuleReusability } from "@openbot/collaboration-core";
+import {
+  acceptedArtifactDeliveryDirs,
+  issuanceFactsFromBoard,
+  requestAcceptedArtifactDelivery,
+  revokeAcceptedArtifactDelivery,
+} from "../../agent-runtime/command/accepted-artifact-delivery.js";
+import { readAcceptedArtifactDelivery } from "../../agent-runtime/state/collaboration/accepted-artifact-delivery-read.js";
+import { createOutboundSendDeps, type CliDeps } from "../../cli/deps.js";
 import { loadConfig } from "../../config/config.js";
+import type { OutboundSendDeps } from "../../infra/outbound/deliver.js";
 import { isCollabRuntimeNamespaceEnabled } from "../collaboration-dispatch/runtime-namespace.js";
 import {
   acceptCollaborationTaskHandoffContract,
@@ -70,6 +79,7 @@ import {
 } from "../collaboration-learning/learning-skill-draft-entry.js";
 import { triggerPostPlanConfirmAdvance } from "../collaboration-learning/post-plan-confirm-advance.js";
 import { promotePrivateMemoryCapsuleAuthorized } from "../collaboration-learning/private-memory-promote-entry.js";
+import { readTeamDeliverable } from "../collaboration-learning/team-deliverable-submit.js";
 import { resolveHandlerTrustedTeamContext } from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
@@ -96,6 +106,9 @@ import {
   validateCollaborationTaskMarkInProgressParams,
   validateCollaborationTaskSubmitForReviewParams,
   validateCollaborationTaskAcceptSubmissionParams,
+  validateCollaborationTaskRequestAcceptedArtifactDeliveryParams,
+  validateCollaborationTaskRevokeAcceptedArtifactDeliveryParams,
+  validateCollaborationTaskReadAcceptedArtifactDeliveryParams,
   validateCollaborationTaskReturnSubmissionParams,
   validateCollaborationTaskRecordPeerReviewParams,
   validateCollaborationTaskListPeerReviewsParams,
@@ -213,6 +226,88 @@ async function resolveTrustedReadContext(client: GatewayClient | null, groupId: 
     stores: trusted.stores,
     trusted: trusted.trusted,
   };
+}
+
+function trustedDeliveryIssuerInput(
+  ctx: { actor: string; tenant: { tenantId: string | null } },
+  groupId: string,
+) {
+  return {
+    source: "resolveTrustedWriteContext",
+    tenantId: ctx.tenant.tenantId ?? "",
+    actorId: ctx.actor,
+    groupId,
+    groupAction: "write",
+  };
+}
+
+/** Map gateway context.deps (CliDeps) or test OutboundSendDeps stubs into send deps. */
+function outboundDepsFromGatewayContext(deps: unknown): OutboundSendDeps | undefined {
+  if (!deps || typeof deps !== "object") {
+    return undefined;
+  }
+  const record = deps as Record<string, unknown>;
+  if (typeof record.sendMessageTelegram === "function") {
+    return createOutboundSendDeps(deps as CliDeps);
+  }
+  return deps as OutboundSendDeps;
+}
+
+async function loadAcceptedArtifactIssuanceFacts(params: {
+  groupId: string;
+  taskId: string;
+  itemId: string;
+  client: GatewayClient | null;
+  ctx: {
+    actor: string;
+    tenant: Parameters<typeof listCollaborationBoardItems>[0]["tenant"];
+    auth: Parameters<typeof listCollaborationBoardItems>[0]["auth"];
+    trusted: Parameters<typeof listCollaborationBoardItems>[0]["trusted"];
+    stores: Parameters<typeof listCollaborationBoardItems>[0]["stores"];
+  };
+}) {
+  const items = await listCollaborationBoardItems({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    auth: params.ctx.auth,
+    trusted: params.ctx.trusted,
+    stores: params.ctx.stores,
+    tenant: params.ctx.tenant,
+  });
+  const item = items.find((entry) => entry.itemId === params.itemId) ?? null;
+  const deliverableId = item?.linkedDeliverableId?.trim() ?? "";
+  let deliverable: {
+    deliverableId: string;
+    version: number;
+    contentSha256: string;
+    content: string;
+  } | null = null;
+  if (item?.status === "accepted" && deliverableId) {
+    const read = await readTeamDeliverable({
+      groupId: params.groupId,
+      deliverableId,
+      actor: params.ctx.actor,
+      tenant: params.ctx.tenant,
+      client: params.client,
+      trusted: params.ctx.trusted,
+      enforceAcl: true,
+    });
+    if (read.ok) {
+      deliverable = {
+        deliverableId: read.deliverableId,
+        version: read.version,
+        contentSha256: read.contentSha256,
+        content: read.content,
+      };
+    }
+  }
+  return issuanceFactsFromBoard({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    itemId: params.itemId,
+    item,
+    deliverable,
+  });
 }
 
 export const collaborationLearningHandlers: GatewayRequestHandlers = {
@@ -890,11 +985,12 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
     try {
       const ctx = await resolveTrustedWriteContext(client, params.groupId);
       if (!ctx.ok) {
-        respond(
-          false,
-          undefined,
-          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
-        );
+        const base = ctx.error + (ctx.detail ? `: ${ctx.detail}` : "");
+        // Confirm refusals must name 主答/lead/coordinator without leaking plan step secrets.
+        const message = base.includes("主答")
+          ? base
+          : `${base}; confirmTodolist requires 主答/lead or coordinator`;
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, message));
         return;
       }
       const todolist = await confirmCollaborationTodolist({
@@ -1285,6 +1381,154 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         trusted: ctx.trusted,
       });
       respond(true, { item: result.item, eventRelay: result.eventRelay }, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          resolveCollaborationTransitionError(error) ?? String(error),
+        ),
+      );
+    }
+  },
+  "collaboration.task.requestAcceptedArtifactDelivery": async ({
+    params,
+    respond,
+    client,
+    context,
+  }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateCollaborationTaskRequestAcceptedArtifactDeliveryParams,
+        "collaboration.task.requestAcceptedArtifactDelivery",
+        respond,
+      )
+    ) {
+      return;
+    }
+    try {
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
+      const facts = await loadAcceptedArtifactIssuanceFacts({
+        groupId: params.groupId,
+        taskId: params.taskId,
+        itemId: params.itemId,
+        client,
+        ctx,
+      });
+      const cfg = loadConfig();
+      const result = await requestAcceptedArtifactDelivery({
+        issuerInput: trustedDeliveryIssuerInput(ctx, params.groupId),
+        facts,
+        target: params.target,
+        dirs: acceptedArtifactDeliveryDirs(),
+        cfg,
+        deps: outboundDepsFromGatewayContext(context?.deps),
+      });
+      if (!result.ok) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
+        return;
+      }
+      respond(true, result.delivery, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          resolveCollaborationTransitionError(error) ?? String(error),
+        ),
+      );
+    }
+  },
+  "collaboration.task.revokeAcceptedArtifactDelivery": async ({ params, respond, client }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateCollaborationTaskRevokeAcceptedArtifactDeliveryParams,
+        "collaboration.task.revokeAcceptedArtifactDelivery",
+        respond,
+      )
+    ) {
+      return;
+    }
+    try {
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
+      const result = await revokeAcceptedArtifactDelivery({
+        issuerInput: trustedDeliveryIssuerInput(ctx, params.groupId),
+        taskId: params.taskId,
+        itemId: params.itemId,
+        target: params.target,
+        dirs: acceptedArtifactDeliveryDirs(),
+      });
+      if (!result.ok) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
+        return;
+      }
+      respond(true, { revoked: true }, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          resolveCollaborationTransitionError(error) ?? String(error),
+        ),
+      );
+    }
+  },
+  "collaboration.task.readAcceptedArtifactDelivery": async ({ params, respond, client }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateCollaborationTaskReadAcceptedArtifactDeliveryParams,
+        "collaboration.task.readAcceptedArtifactDelivery",
+        respond,
+      )
+    ) {
+      return;
+    }
+    try {
+      const ctx = await resolveTrustedReadContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
+      const result = await readAcceptedArtifactDelivery({
+        tenantId: ctx.tenant.tenantId ?? "",
+        actorId: ctx.actor,
+        groupId: params.groupId,
+        taskId: params.taskId,
+        itemId: params.itemId,
+        target: params.target,
+        rootDir: acceptedArtifactDeliveryDirs().rootDir,
+      });
+      if (!result.ok) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
+        return;
+      }
+      respond(true, result.delivery, undefined);
     } catch (error) {
       respond(
         false,

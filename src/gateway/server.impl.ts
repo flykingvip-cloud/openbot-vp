@@ -769,10 +769,11 @@ export async function startGatewayServer(
   // Recover pending outbound deliveries from previous crash/restart.
   if (!minimalTestGateway) {
     void (async () => {
-      const { recoverPendingDeliveries } = await import("../infra/outbound/delivery-queue.js");
       const { deliverOutboundPayloads } = await import("../infra/outbound/deliver.js");
+      const { recoverAcceptedArtifactDeliveries } =
+        await import("../agent-runtime/delivery/accepted-artifact-recover.js");
       const logRecovery = log.child("delivery-recovery");
-      await recoverPendingDeliveries({
+      await recoverAcceptedArtifactDeliveries({
         deliver: deliverOutboundPayloads,
         log: logRecovery,
         cfg: cfgAtStart,

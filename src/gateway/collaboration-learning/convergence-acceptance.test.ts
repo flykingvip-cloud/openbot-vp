@@ -206,25 +206,23 @@ describe("Collaboration convergence acceptance (design §9)", () => {
 
       expect(checkpoint?.scope).toBe("group");
 
-      const canonicalLedger = path.join(
-        collaborationRoot,
-        "groups",
-        groupId,
-        "memory",
-        "task_ledger.json",
-      );
-      const legacyLedger = path.join(
+      // Sprint-2 continuity binds artifacts without minting task_ledger rows; the
+      // AC checks the checkpoint/artifact SoT stays under the collaboration root.
+      const canonicalMemory = path.join(collaborationRoot, "groups", groupId, "memory");
+      const canonicalArtifactLedger = path.join(canonicalMemory, "artifact_ledger.json");
+      const canonicalCheckpointDir = path.join(canonicalMemory, "checkpoints");
+      const legacyMemory = path.join(
         workspaceDir,
         ".openbot",
         "collaboration",
         "groups",
         encodeURIComponent(groupId),
         "memory",
-        "task_ledger.json",
       );
 
-      await expect(fs.access(canonicalLedger)).resolves.toBeUndefined();
-      await expect(fs.access(legacyLedger)).rejects.toThrow();
+      await expect(fs.access(canonicalArtifactLedger)).resolves.toBeUndefined();
+      await expect(fs.access(canonicalCheckpointDir)).resolves.toBeUndefined();
+      await expect(fs.access(legacyMemory)).rejects.toThrow();
     });
   });
 

@@ -1,0 +1,46 @@
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot
+
+ ✓ src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts (6 tests) 238ms
+ ✓ src/gateway/collaboration-learning/convergence-acceptance.test.ts (6 tests) 1300ms
+       ✓ does not reintroduce legacy readParticipations helper exports  708ms
+       ✓ does not export resolveCollaborationStoreRoot  480ms
+ ✓ src/gateway/collaboration-dispatch/group-task-heartbeat.test.ts (10 tests) 1197ms
+     ✓ allowlist on: nudge → second no-response escalate; whoWokeWhom auditable  662ms
+ ✓ src/gateway/collaboration-dispatch/episode-single-beat-runtime.g2.test.ts (6 tests) 2055ms
+     ✓ flag off delegates the round and does not recover or write episodes  484ms
+     ✓ flag on walks one beat to EPISODE_CLOSED and does not open another  663ms
+     ✓ flag on stops unmatched and empty rounds without a second beat  480ms
+ ✓ src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts (4 tests) 2067ms
+     ✓ activate→claim→propose→confirm→deliverable→stop stay on trusted locator per tenant  2047ms
+ ✓ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts (7 tests) 9357ms
+     ✓ service and RPC ignore attacker ACL and fail closed  6658ms
+     ✓ transcript write failure still returns the proposal and a retryable delivery  669ms
+     ✓ same-version retry does not mint a proposal or a second card; confirm is single-consume  801ms
+     ✓ service and RPC refuse stale plan confirms without widening confirmer ACL  672ms
+     ✓ D6b: revoked coordinator cannot list historyReloadable delivery rows  554ms
+ ✓ src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts (7 tests) 2810ms
+     ✓ tenant authorized + legacy revoked → wake does not mis-reject on legacy  387ms
+     ✓ two-tenant activate→claim→propose→confirm→deliverable→stop→wake stay isolated  1507ms
+     ✓ unique card binding succeeds via chat.send; message visible; no agent dispatch  401ms
+     ✓ stale expectedVersion refuses via chat.send; no execution  375ms
+ ✓ src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts (36 tests) 14379ms
+     ✓ legitimate deliverable can submit + accept; forged / wrong-task cannot  403ms
+     ✓ dispatcher unavailable → pending retained → recovery dispatches exactly once  480ms
+     ✓ item 8: submitForReview RPC refuses unauthenticated client (same trusted root)  4663ms
+     ✓ accept AFTER adjudication read BEFORE permit commit blocks stale return  327ms
+     ✓ post-write ok:false keeps unknown; recovery does not produce second side effect  310ms
+     ✓ subprocess: permit commit then exit → invalidate then recover; no duplicate; no Corepack download  4126ms
+ ✓ src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts (6 tests) 61697ms
+     ✓ legal establish: chat.send → formal entry → durable task+source → status receipt → coordinator context; parent run continues  806ms
+     ✓ flag-off: claimContract false → unified flag-off copy; no task/board writes  376ms
+     ✓ observer (non-writer): injected observer identity cannot establish formal task  417ms
+     ✓ dual principals same local groupId: sequential principals isolate source+task  45916ms
+     ✓ same-request retry: second chat.send with same idempotencyKey is cached; durable task remains singular  401ms
+     ✓ receipt persist-fail: client still receives safe status (no raw internal error); parent run continues  538ms
+
+ Test Files  9 passed (9)
+      Tests  88 passed (88)
+   Start at  07:21:48
+   Duration  66.68s (transform 53.07s, setup 1.69s, import 57.99s, tests 95.10s, environment 1ms)
+

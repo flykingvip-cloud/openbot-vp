@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SessionTaskBoard } from "../contracts/task.js";
-import { queryCurrentTaskStatus } from "./task-status.js";
+import { stripInboundStamp } from "../policy/index.js";
+import { stripInboundStampForDialogue, queryCurrentTaskStatus } from "./task-status.js";
 
 describe("current task status query", () => {
   it("does not read state for amendments or control", () => {
@@ -37,5 +38,18 @@ describe("current task status query", () => {
     expect(reply).not.toContain("正在推进");
     expect(read).toHaveBeenCalledTimes(1);
     expect(board).toEqual(before);
+  });
+
+  it("strips inbound stamps through the policy implementation", () => {
+    const samples = [
+      "",
+      "进度如何？",
+      "[Sat 2026-09-19 15:07 GMT+8] 进度如何？",
+      "[Wed 2026-01-01 00:00:00 GMT-5] body",
+      "not a stamp [Sat 2026-09-19 15:07 GMT+8]",
+    ];
+    for (const sample of samples) {
+      expect(stripInboundStampForDialogue(sample)).toBe(stripInboundStamp(sample));
+    }
   });
 });

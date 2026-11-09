@@ -1,4 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { titleFromGoal as titleFromContext } from "../agent-runtime/context/sources/task-title.js";
+import * as policy from "../agent-runtime/policy/index.js";
+import {
+  isOwnerConstraintRevision as policyOwnerRevision,
+  shouldPersistOwnerConstraint as policyShouldPersist,
+  shouldTaskParkAbortInFlight as policyParkAbort,
+} from "../agent-runtime/policy/index.js";
+import * as parkAbortModule from "./park-abort.js";
+import { shouldTaskParkAbortInFlight as parkAbort } from "./park-abort.js";
 import { isWeakNewWorkCueOnly } from "./qualification.js";
 import {
   classifyTurnRelation,
@@ -10,6 +19,7 @@ import {
   isLanguageAsideMessage,
   isPriorUtteranceCorrection,
   shouldTaskParkAbortInFlight,
+  titleFromGoal,
 } from "./turn-relation.js";
 
 const CURRENT = "生成今日竞品价格检查结果，并验收至少一个竞品价格";
@@ -189,4 +199,16 @@ describe("unified interaction semantics", () => {
 
 it("keeps explicit new work containing recall language on the task path", () => {
   expect(classifyTurnRelation("新任务：整理复述技巧并写一份报告", CURRENT)).toBe("new_work");
+});
+
+it("keeps the live abort predicate separate from the legacy classifier and title helper", () => {
+  expect(shouldTaskParkAbortInFlight).toBe(parkAbort);
+  expect(shouldTaskParkAbortInFlight).toBe(policyParkAbort);
+  expect(isOwnerConstraintRevision).toBe(policyOwnerRevision);
+  expect(shouldPersistOwnerConstraint).toBe(policyShouldPersist);
+  expect(policy).not.toHaveProperty("classifyTurnRelation");
+  expect(parkAbortModule).not.toHaveProperty("classifyTurnRelation");
+  expect(titleFromGoal).toBe(titleFromContext);
+  expect(shouldTaskParkAbortInFlight(false, true)).toBe(true);
+  expect(shouldTaskParkAbortInFlight(false, false)).toBe(false);
 });

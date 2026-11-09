@@ -1,0 +1,10 @@
+
+ RUN  v4.0.18 /agent/repos/openbot-vp
+
+ ✓ src/commands/agent.lifecycle-attribution-path.node.test.ts > CLI embedded run lifecycle attribution path > routes openbot agent through runEmbeddedPiAgent into attempt attribution helper 1ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  10:45:20
+   Duration  401ms (transform 228ms, setup 283ms, import 4ms, tests 3ms, environment 0ms)
+

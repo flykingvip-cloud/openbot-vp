@@ -1,0 +1,47 @@
+# Batch D evidence supplement
+
+- Tree: `d6aa343b627e9241636a9af8c4f161e761423faf` and the follow-up docs commit on Draft PR #262.
+- Batch E is not started. No files were deleted. No flag defaults changed.
+
+## 1. Model-entry chains
+
+`selectContextCatalog` at `d6aa343b627e9241636a9af8c4f161e761423faf` applies only to the interactive reply host. The independent 6-file / 32-test pass on that SHA covers catalog selection, assembly rejection of group ids, collaboration order, and the aside-dialogue reply test. It does not cover cron, command, or CLI prompt assembly.
+
+| Entry | Read | Assembly | Audit / trust | Model input | Scope of the citation |
+| --- | --- | --- | --- | --- | --- |
+| Interactive direct answer | When `interactionIngress` is set, `get-reply-run.ts` reads the task board, `openSessionManager(sessionFile).buildSessionContext().messages`, and `resolveBootstrapContextForRun` | System parts are bootstrap context files, `skillsSnapshot.prompt`, and `finalizeSystemContext(extraSystemPromptParts)` from `selectContextCatalog`. History is `projectInteractionHistory`. This is not `buildAgentSystemPrompt` | Untrusted speaker and `UntrustedContext` stay on the user body. The interaction completion sets `tools: []` and appends its own JSON protocol | `replyTurnRuntime.interaction` → `runGatewayInteraction` → `runPreparedInteraction` → `invokeInteractionCompletion` (`buildInteractionCompletionContext`). `reply` and `clarify` return `routed.kind === "respond"`: typing is cleared, the reply is persisted, and the function returns. No execution task is created and `runAdmittedTurn` is not called | Source read of `get-reply-run.ts` around the `respond` return. Catalog tests at `d6aa343b627e9241636a9af8c4f161e761423faf` cover fragment order only, not this return |
+| Interactive admitted execution request | Same ingress reads, plus an accepted execution admission and binding | After admission, the host appends an "Admitted execution request" block to `extraSystemPromptParts` | Admission rejection returns a persisted reply and does not start the runner | `runReplyAgent` in `agent-runner.ts` calls `runAdmittedTurn`. The embedded or CLI backend then uses `buildAgentSystemPrompt` | Source read of the `execution_admission` branch. Not the direct-answer path |
+| Command | `commands/agent.ts` `agentCommandInternal` reads the command message, session file, and skill snapshot | Command options carry `extraSystemPrompt`. This host does not call `selectContextCatalog` | `createCommandExecutionLifecycle` and `commandBudget.runCandidate` | `runCommandCandidate` calls `runEmbeddedPiAgent` or `runCliAgent`. It does not call `runAdmittedTurn` | Source read on this tree. Command tests were not re-run |
+| Cron | `cron/service/timer.ts` calls `runHeartbeatOnce` for `wakeMode=now`. Isolated jobs use `cron/isolated-agent/run.ts` | That run builds `cronExtraSystemPrompt` and passes it to `runScheduledCandidate`. It does not use the reply catalog | Schedule ownership stays outside the candidate. Ledger observation is optional on the cron session | `runScheduledCandidate` calls `runEmbeddedPiAgent` or `runCliAgent` | Source read on this tree. Not the reply-catalog SHA |
+| Followup continue | The queue already holds the prompt and `extraSystemPrompt` built by the reply that enqueued it | No second catalog selection in the runner | The queued prompt is not rebuilt as a new group catalog | `followup-runner.ts` calls `runQueuedCandidate`, which calls `runEmbeddedPiAgent` | Source read on this tree |
+| Embedded | Attempt params include `extraSystemPrompt`, workspace, tools, and the session file | `embedded-attempt-tools.ts` calls `buildEmbeddedSystemPrompt`, which calls `buildAgentSystemPrompt` | Tool transactions stay in the attempt. `compileModelContext` compresses history only when enabled | Provider call inside `embedded-run.ts` | Source read. Chapter table was not moved. Confirmed unchanged at `d6aa343b` |
+| CLI | `cli-run.ts` reads bootstrap files and the passed `extraSystemPrompt` | `agents/cli-runner/helpers.ts` `buildSystemPrompt` calls `buildAgentSystemPrompt` | CLI runs append a tools-disabled line. That is existing CLI behavior, not a new catalog | `executeCliWithSession` | Source read. The agents facade still re-exports `runCliAgent` |
+
+Session JSONL remains the history source for the reply path. This supplement does not add a switch that drops it.
+
+## 2. Capability gate
+
+Catalog tests only check `declareCapability` fields. The action block is `src/agents/pi-tools.task-action.test.ts`, re-run on this tree:
+
+`OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/agents/pi-tools.task-action.test.ts`
+
+Result: **1 file, 5 tests passed.**
+
+The exercised boundary is `wrapToolWithBeforeToolCallHook` in `src/agent-runtime/capabilities/invocation/before-call.ts`, re-exported by `src/agents/pi-tools.before-tool-call.ts`. After the before-tool hook returns, `checkTaskActionBoundary` runs. If it returns a reason, the wrapper throws and does not call `tool.execute`.
+
+- Owner constraint, pause, cancel, and replace: the first call executes once; the second call throws `Task action refused` and `execute` is not called again.
+- Restriction accepted while the hook is waiting: the hook writes the constraint, then the recheck throws `constraints changed`. `execute` is not called.
+
+This does not prove every tool in production is wrapped. It proves this wrapper refuses execution after those restriction changes.
+
+## 3. Corrected call names
+
+Followup execution is `runQueuedCandidate`, not “an admitted turn after dequeue”. Command execution is the command host plus `createCommandExecutionLifecycle` and `runCommandCandidate`. A direct interactive answer (`routed.kind === "respond"`) returns before `agent-runner.ts`. `runAdmittedTurn` is only the accepted execution-admission path, plus heartbeat, growth-birth, and collaboration-round turns that never open `interactionIngress`.
+
+## 4. Added disposition rows
+
+`retirement-disposition.md` now includes `control-plane`, `ledger-binding`, `reply-completion`, the CLI facade, and the embedded facade/backend. Reply-completion ordering cites Batch B `a679f5ca6158d7bfb23f0dc17faf66feb95d6958`, scope limited to board settlement before ConversationTask close. Unknown extension assets stay 证据不足. No deletes.
+
+## Non-goals
+
+No delegation supplement, no new confirmation mode, no collaboration card, no flag flip, no merge, no deploy, no Batch E.

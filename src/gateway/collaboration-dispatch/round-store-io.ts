@@ -1,25 +1,26 @@
-import { randomUUID } from "node:crypto";
-import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
+import {
+  DIRECTORY_LOCK_STALE_MS,
+  appendJsonlDurable,
+  withDirectoryLock,
+  writeJsonDurable,
+} from "../../agent-runtime/state/repository/durable-json.js";
 import type { PersistedRound, RoundRuntimeEvent } from "./round-state.js";
 
 /** Stale lock age before withRoundLock unlinks and retries (ms). */
-export const ROUND_LOCK_STALE_MS = 30_000;
-const LOCK_STALE_MS = ROUND_LOCK_STALE_MS;
-const LOCK_RETRY_MS = 20;
-const LOCK_MAX_ATTEMPTS = 250;
+export const ROUND_LOCK_STALE_MS = DIRECTORY_LOCK_STALE_MS;
+
+export { appendJsonlDurable, writeJsonDurable };
+
+export function withRoundLock<T>(dir: string, stem: string, fn: () => T | Promise<T>): Promise<T> {
+  return withDirectoryLock(dir, stem, fn);
+}
 
 export type RoundCommit = {
   snapshot: PersistedRound;
   event: RoundRuntimeEvent;
 };
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
 
 export function roundSnapshotPath(roundsDir: string, roundId: string): string {
   return path.join(roundsDir, `${roundId}.json`);
@@ -35,71 +36,6 @@ export function roundTxnPath(roundsDir: string, roundId: string): string {
 
 export function roundLockPath(roundsDir: string, roundId: string): string {
   return path.join(roundsDir, `${roundId}.lock`);
-}
-
-export async function withRoundLock<T>(
-  roundsDir: string,
-  roundId: string,
-  fn: () => T | Promise<T>,
-): Promise<T> {
-  const lockPath = roundLockPath(roundsDir, roundId);
-  fs.mkdirSync(roundsDir, { recursive: true });
-  for (let attempt = 0; attempt < LOCK_MAX_ATTEMPTS; attempt += 1) {
-    try {
-      const fd = fs.openSync(lockPath, "wx", 0o600);
-      try {
-        fs.writeFileSync(fd, `${process.pid}\n${Date.now()}\n`, "utf8");
-        return await fn();
-      } finally {
-        fs.closeSync(fd);
-        try {
-          fs.unlinkSync(lockPath);
-        } catch {
-          // ignore
-        }
-      }
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== "EEXIST") {
-        throw error;
-      }
-      try {
-        const st = fs.statSync(lockPath);
-        if (Date.now() - st.mtimeMs > LOCK_STALE_MS) {
-          fs.unlinkSync(lockPath);
-          continue;
-        }
-      } catch {
-        // raced unlock
-      }
-      await sleep(LOCK_RETRY_MS);
-    }
-  }
-  throw new Error(`round lock timeout: ${roundId}`);
-}
-
-export async function writeJsonDurable(dest: string, value: unknown): Promise<void> {
-  await fsp.mkdir(path.dirname(dest), { recursive: true });
-  const tmp = `${dest}.${process.pid}.${randomUUID()}.tmp`;
-  const handle = await fsp.open(tmp, "w", 0o600);
-  try {
-    await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8");
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
-  await fsp.rename(tmp, dest);
-}
-
-export async function appendJsonlDurable(dest: string, value: unknown): Promise<void> {
-  await fsp.mkdir(path.dirname(dest), { recursive: true });
-  const handle = await fsp.open(dest, "a", 0o600);
-  try {
-    await handle.appendFile(`${JSON.stringify(value)}\n`, "utf8");
-    await handle.sync();
-  } finally {
-    await handle.close();
-  }
 }
 
 export async function readRoundEventIds(eventsPath: string): Promise<Set<string>> {

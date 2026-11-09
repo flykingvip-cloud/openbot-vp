@@ -71,20 +71,20 @@ describe("elastic visible reply limit", () => {
     expect(classifyOpenDiscussionLimitMode("谁还在")).toBe("group_broadcast");
   });
 
-  test("room greeting broadcasts only on an introduction mission", () => {
+  test("room greeting remains one even on an introduction mission", () => {
     const intro = createScope(4, 3);
     if (intro.operatingState) {
       intro.operatingState.activeContext.currentMission = "完成成员介绍并建立协作上下文";
     }
     expect(classifyOpenDiscussionLimitMode("大家好", projectRuntimeFacts(intro))).toBe(
-      "group_broadcast",
+      "chitchat_idle",
     );
     expect(classifyOpenDiscussionLimitMode("下午好", projectRuntimeFacts(intro))).toBe(
       "chitchat_idle",
     );
     const resolved = resolveLimit("大家好", intro);
-    expect(resolved.mode).toBe("group_broadcast");
-    expect(resolved.limit).toBe(4);
+    expect(resolved.mode).toBe("chitchat_idle");
+    expect(resolved.limit).toBe(1);
   });
 
   test("classifies task directives as focused", () => {
@@ -128,7 +128,7 @@ describe("elastic visible reply limit", () => {
     expect(resolved.policyCeiling).toBe(1);
   });
 
-  test("missing operating state uses compiled L1 policy default (5), not legacy scan constant", () => {
+  test("missing operating state uses compiled L1 policy default (3), not legacy scan constant", () => {
     const scope: CollaborationDispatchScope = {
       groupId: "alpha",
       rawSessionKey: "space:alpha",
@@ -141,7 +141,7 @@ describe("elastic visible reply limit", () => {
       })),
     };
     const resolved = resolveLimit("请分析方案风险", scope);
-    expect(resolved.policyCeiling).toBe(5);
-    expect(resolved.limit).toBe(5);
+    expect(resolved.policyCeiling).toBe(3);
+    expect(resolved.limit).toBe(3);
   });
 });

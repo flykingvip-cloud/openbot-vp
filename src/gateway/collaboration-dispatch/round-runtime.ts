@@ -39,6 +39,11 @@ import {
   assertLegacyProductionExecutor,
   readCollaborationCutoverFlags,
 } from "./legacy-production-executor.js";
+import {
+  memberSpeakingGate,
+  resolveMemberAdmission,
+  type MemberAdmission,
+} from "./member-admission.js";
 import { normalizeAgentIdentifier } from "./mention-utils.js";
 import { buildPolicyDecisionRecord } from "./policy-decision-record.js";
 import { resolveContextLaneForRound } from "./policy-lane-context.js";
@@ -84,13 +89,14 @@ export type RoundDispatchRunner = (params: {
   isWrapTurn: boolean;
   /** Same-round CollabEdge that nominated this bot (edge-target dispatches only). */
   edge?: CollabEdge;
-}) => Promise<{ text?: string; rawText?: string } | undefined>;
+}) => Promise<{ text?: string; rawText?: string; publicReplyCommitted?: boolean } | undefined>;
 
 export type RoundRecoveryDecision = {
   action: "noop" | "abort" | "timeout" | "complete";
   event?: RoundTransitionEvent;
   eventType?: RoundEventType;
   reason: string;
+  pendingAgentIds?: string[];
 };
 
 type PersistOpts = {
@@ -197,7 +203,16 @@ async function recordCandidateDropped(params: {
   });
 }
 
-type RoundBotReply = { text?: string; rawText?: string };
+type RoundBotReply = { text?: string; rawText?: string; publicReplyCommitted?: boolean };
+
+/** Public transcript commit is not a client delivery acknowledgment. Legacy adapters
+ * without a receipt conservatively consume a slot for any nonempty visible body. */
+function consumesSpeakingSlot(reply: RoundBotReply | undefined): boolean {
+  if (reply?.publicReplyCommitted !== undefined) {
+    return reply.publicReplyCommitted;
+  }
+  return Boolean(reply?.text?.trim());
+}
 
 async function racePrimaryReply(params: {
   run: () => Promise<RoundBotReply | undefined>;
@@ -205,7 +220,7 @@ async function racePrimaryReply(params: {
   onDeadline?: () => void;
   /**
    * Primary deadline must not drop the in-flight turn. The deadline still wins
-   * the race (budget closed: no supplement, no extra leads, no fallback while a
+   * the race (optional follow-up closed; no fallback while a
    * real body is in flight), but the same run is awaited so a late visible
    * reply is classified and delivered before the round seals. Applies to every
    * task type, not only chitchat soft-timeout. A settled empty body still
@@ -305,11 +320,39 @@ export function decideRoundRecovery(round: PersistedRound, nowMs: number): Round
       reason: round.state === "PRIMARY_QUEUE" ? "restart_no_rerun" : "inflight_dispatch_lost",
     };
   }
-  if (
-    round.state === "PRIMARY_COMPLETED" ||
-    round.state === "SUPPLEMENT_WINDOW" ||
-    round.state === "CONVERGENCE_CHECK"
-  ) {
+  if (round.state === "PRIMARY_COMPLETED" || round.state === "SUPPLEMENT_WINDOW") {
+    const attempted = new Set(round.dispatches.map((dispatch) => dispatch.agentId));
+    const dropped = new Set(
+      (round.policyDecision?.supplementGate ?? [])
+        .filter((entry) => entry.decision === "DROP")
+        .map((entry) => entry.agentId),
+    );
+    const pendingAgentIds = [
+      ...new Set([
+        ...round.primaryQueue.slice(round.primaryCursor + 1),
+        ...(round.policyDecision?.participants ?? [])
+          .filter(
+            (member) =>
+              member.tier !== "wrap" &&
+              !attempted.has(member.agentId) &&
+              !dropped.has(member.agentId),
+          )
+          .map((member) => member.agentId),
+      ]),
+    ];
+    // A restart cannot prove outstanding work ran, or safely replay unknown
+    // side effects. Preserve the dispatch log and expose the interruption.
+    if (pendingAgentIds.length > 0 || round.state === "SUPPLEMENT_WINDOW") {
+      return {
+        action: "abort",
+        event: "abort",
+        eventType: "ROUND_ABORTED",
+        reason: "restart_pending_dispatch",
+        pendingAgentIds,
+      };
+    }
+  }
+  if (round.state === "PRIMARY_COMPLETED" || round.state === "CONVERGENCE_CHECK") {
     return {
       action: "complete",
       event:
@@ -332,6 +375,20 @@ export async function applyRoundRecovery(
     return round;
   }
   let current = round;
+  if (decision.action === "abort" && decision.reason === "restart_pending_dispatch") {
+    return await stepRound(
+      { ...current, abortReason: "fatal" },
+      decision.event,
+      decision.eventType,
+      persist,
+      {
+        payload: {
+          recoveryReason: decision.reason,
+          pendingAgentIds: decision.pendingAgentIds ?? [],
+        },
+      },
+    );
+  }
   if (decision.action === "complete" && round.state === "PRIMARY_COMPLETED") {
     current = await stepRound(
       current,
@@ -528,7 +585,7 @@ export async function executeCollaborationRound(
     policy: input.policy,
     message: input.message,
     sessionKey: input.sessionKey,
-    isAborted: input.isAborted ?? (() => Boolean(input.signal?.aborted)),
+    isAborted: () => Boolean(input.signal?.aborted) || Boolean(input.isAborted?.()),
     runBot: input.runBot as RoundDispatchRunner,
     roundsDir: input.roundsDir,
     skipRoundIds: input.skipRoundIds,
@@ -750,15 +807,38 @@ export async function executeCollaborationRound(
   // "Primary answered" (visible, non-placeholder) is tracked separately from
   // "primary carried a structural conclusion". Only the latter gates the open
   // supplement window; neither turns a real reply into a timeout.
+  const formalAdmissions = new Map<string, MemberAdmission>();
+  if (params.decision.responseMode === "decision_to_executor") {
+    for (const bot of stages.supplement.bots) {
+      formalAdmissions.set(
+        bot.agentId,
+        await resolveMemberAdmission({
+          authority,
+          agentId: bot.agentId,
+          runId: `${round.roundId}:${bot.agentId}`,
+          taskId: facts.activeContext.currentTaskId,
+          executionRequested: true,
+          cfg: getRuntimeConfigSnapshot() ?? undefined,
+        }),
+      );
+    }
+  }
+  const formalExecutionPresent = [...formalAdmissions.values()].some(
+    (a) => a.purpose === "formal_execution",
+  );
   let primaryCompleted = false;
   let primaryHasConclusion = false;
   let primaryVisibleText = "";
   // Budget already elapsed: chitchat soft-close, or any task type whose primary
-  // settled after the deadline. Blocks supplement and extra leads.
+  // settled after the deadline. Blocks optional supplement and wrap; already
+  // invited turns retain their own admission and deadline.
   let primaryBudgetClosed = false;
   let leadVisibleCount = 0;
 
   for (let cursor = 0; cursor < leadBots.length; cursor += 1) {
+    if (cursor > 0) {
+      await sleepMs(stages.coordinationDelayMs, input.signal);
+    }
     if (params.isAborted()) {
       return finishShadow(
         (await abortPersistedRound({
@@ -806,7 +886,7 @@ export async function executeCollaborationRound(
     const raced = await racePrimaryReply({
       deadlineAt,
       onDeadline: params.onPrimaryDeadline,
-      // The budget closes supplement / fallback / extra leads. It does not
+      // The budget closes optional supplement / fallback. It does not
       // discard the in-flight primary. A reply that lands after the deadline
       // (chitchat ~8s, analysis 30s, or any other task type) is still
       // classified and delivered before ROUND_COMPLETE or ROUND_ABORTED.
@@ -835,15 +915,15 @@ export async function executeCollaborationRound(
     });
     round = { ...round, completion };
     // A late reply after the primary budget is still a visible primary, for
-    // every task type. The budget stays closed (no supplement / no extra leads
-    // / no fallback). Only a settled empty body keeps visibleReply false and
+    // every task type. Optional follow-up stays closed; explicitly queued members
+    // retain independent turns. Only a settled empty body keeps visibleReply false and
     // takes the timeout / abort path.
     const lateVisiblePrimary = raced.timedOut && completion.visibleReply;
     if ((!raced.timedOut || lateVisiblePrimary) && completion.responseStatus === "complete") {
       // A real visible reply (incl. tool / execution results) always completes the
       // primary. Missing 结论/下一步 is a quality tag, never a timeout or fallback.
       primaryCompleted = true;
-      leadVisibleCount += 1;
+      leadVisibleCount += consumesSpeakingSlot(raced.reply) ? 1 : 0;
       if (completion.hasConclusion) {
         primaryHasConclusion = true;
       }
@@ -871,9 +951,12 @@ export async function executeCollaborationRound(
         });
       }
       if (lateVisiblePrimary) {
-        // Budget already elapsed: keep the visible body, do not open more speakers.
+        // One member's soft deadline must not cancel other explicit invitations.
+        // This never advances an in-flight or empty reply, or creates new members.
         primaryBudgetClosed = true;
-        break;
+        if (params.decision.primaryMode !== "explicit_multi") {
+          break;
+        }
       }
     } else if (isChitchatRound && raced.timedOut) {
       primaryBudgetClosed = true;
@@ -937,7 +1020,7 @@ export async function executeCollaborationRound(
         return finishShadow(await stepRound(round, "fallback_failed", "ROUND_ABORTED", persist));
       }
       primaryCompleted = true;
-      leadVisibleCount += 1;
+      leadVisibleCount += consumesSpeakingSlot(fallbackReply) ? 1 : 0;
       primaryHasConclusion = fallbackCompletion.hasConclusion;
       primaryVisibleText = fallbackReply?.text ?? "";
       round = await stepRound(round, "fallback_completed", "FALLBACK_COMPLETED", persist, {
@@ -966,7 +1049,16 @@ export async function executeCollaborationRound(
     }
   }
 
-  await sleepMs(stages.coordinationDelayMs);
+  await sleepMs(stages.coordinationDelayMs, input.signal);
+  if (params.isAborted()) {
+    return finishShadow(
+      (await abortPersistedRound({
+        groupId: authority.groupId,
+        roundId: round.roundId,
+        ...persist,
+      })) ?? round,
+    );
+  }
 
   const leadIds = new Set(
     leadBots
@@ -975,12 +1067,14 @@ export async function executeCollaborationRound(
   );
   // Bots the human explicitly invited (@name / @所有人 broadcast) beyond the lead.
   // decision_to_executor executors are the core of that mode, not optional extras.
+  const replyBudget = round.policyDecision?.visibleReplyBudget;
+  const broadcastBudget = replyBudget?.kind === "broadcast";
   const invitedAgentIdsBaseline = new Set(
     [
       ...params.decision.roundPlan.participants
         .filter((participant) => participant.tier === "mention")
         .map((participant) => participant.agentId),
-      ...(params.decision.responseMode === "decision_to_executor"
+      ...(broadcastBudget || params.decision.responseMode === "decision_to_executor"
         ? stages.supplement.bots.map((bot) => bot.agentId)
         : []),
     ]
@@ -1004,25 +1098,44 @@ export async function executeCollaborationRound(
       .map((edge) => normalizeAgentIdentifier(edge.toAgentId))
       .filter((id): id is string => Boolean(id) && !leadIds.has(id as string)),
   );
-  const invitedSupplementPresent =
-    stages.supplement.bots.some((bot) =>
-      invitedAgentIds.has(normalizeAgentIdentifier(bot.agentId) ?? ""),
-    ) || edgeTargetIds.size > 0;
+  const invitedMemberPresent = stages.supplement.bots.some((bot) =>
+    invitedAgentIds.has(normalizeAgentIdentifier(bot.agentId) ?? ""),
+  );
+  const invitedSupplementPresent = invitedMemberPresent || edgeTargetIds.size > 0;
+  // A settled primary's soft deadline closes optional discussion, not an already
+  // invited member's turn. Per-member admission, abort and visible limits still apply.
+  const invitedContinuation = primaryBudgetClosed && invitedMemberPresent;
+  const selectedPolicyMembers =
+    !isChitchatRound &&
+    params.decision.responseMode !== "single_owner" &&
+    effective.participation.openDiscussionWithoutMention &&
+    stages.supplement.bots.length > 0;
+  const policyContinuation = primaryBudgetClosed && selectedPolicyMembers;
   const supplementStructurallyAllowed =
     primaryCompleted &&
-    !primaryBudgetClosed &&
+    (!primaryBudgetClosed || invitedContinuation || policyContinuation || formalExecutionPresent) &&
     params.decision.primaryMode !== "explicit_multi" &&
-    frozen.supplement.enabled &&
+    (frozen.supplement.enabled || formalExecutionPresent) &&
     (params.decision.responseMode !== "single_owner" || edgeTargetIds.size > 0);
   // Structural conclusion opens the open window; explicit invitations (broadcast,
   // @mention, primary CollabEdge) open an invited-only window even without one.
-  const supplementWindowReason: "conclusion" | "invited" | null = !supplementStructurallyAllowed
-    ? null
-    : primaryHasConclusion && !isChitchatRound && params.decision.responseMode !== "single_owner"
-      ? "conclusion"
-      : invitedSupplementPresent
-        ? "invited"
-        : null;
+  // Open discussion also admits already-selected members without requiring the
+  // primary to emit conclusion keywords; all existing Cheap Gates still apply.
+  const supplementWindowReason: "conclusion" | "invited" | "policy" | null =
+    !supplementStructurallyAllowed
+      ? null
+      : !primaryBudgetClosed &&
+          primaryHasConclusion &&
+          !isChitchatRound &&
+          params.decision.responseMode !== "single_owner"
+        ? "conclusion"
+        : invitedMemberPresent
+          ? "invited"
+          : selectedPolicyMembers
+            ? "policy"
+            : invitedSupplementPresent && !primaryBudgetClosed
+              ? "invited"
+              : null;
   const allowSupplement = supplementWindowReason !== null;
   const recordSupplementDecision = (
     window: NonNullable<NonNullable<PersistedRound["policyDecision"]>["supplementWindow"]>,
@@ -1034,6 +1147,8 @@ export async function executeCollaborationRound(
     const structuralGate = {
       primaryCompleted,
       primaryBudgetClosed,
+      invitedContinuation,
+      policyContinuation,
       primaryMode: String(params.decision.primaryMode ?? ""),
       supplementEnabled: Boolean(frozen.supplement.enabled),
       responseMode: String(params.decision.responseMode ?? ""),
@@ -1092,10 +1207,19 @@ export async function executeCollaborationRound(
     );
     let kept = 0;
     let dispatched = 0;
+    let supplementVisibleCount = 0;
     const gateLog: SupplementGateEntry[] = [];
     const visibleCap = Math.min(
       COLLABORATION_ABSOLUTE_VISIBLE_TURN_LIMIT,
-      Math.max(1, effective.participation.maxVisibleBotRepliesPerRound),
+      Math.max(
+        1,
+        broadcastBudget
+          ? Math.min(replyBudget.limit, effective.participation.rollCall.ceiling)
+          : Math.min(
+              replyBudget?.limit ?? effective.participation.maxVisibleBotRepliesPerRound,
+              effective.participation.maxVisibleBotRepliesPerRound,
+            ),
+      ),
     );
     // Only fill an empty planned queue. Same-round CollabEdges already nominate
     // targets via prioritizeSupplementBotsForEdges — do not add a third speaker.
@@ -1121,9 +1245,13 @@ export async function executeCollaborationRound(
       supplementWindowReason === "invited"
         ? orderedSupplementBots.filter((bot) => {
             const id = normalizeAgentIdentifier(bot.agentId) ?? "";
-            return invitedAgentIds.has(id) || edgeTargetIds.has(id);
+            return invitedAgentIds.has(id) || (!primaryBudgetClosed && edgeTargetIds.has(id));
           })
-        : orderedSupplementBots;
+        : policyContinuation
+          ? orderedSupplementBots.filter((bot) =>
+              stages.supplement.bots.some((selected) => selected.agentId === bot.agentId),
+            )
+          : orderedSupplementBots;
     const preserveConflict = effective.strategy.preserveConflict;
     const pendingLowRelevance: Array<{ bot: CollaborationBotTarget; relevance: number }> = [];
 
@@ -1147,16 +1275,22 @@ export async function executeCollaborationRound(
       }
       kept += 1;
       dispatched += 1;
-      await runBot({
+      const reply = await runBot({
         bot,
         role: "supplement",
         dispatchId,
         isWrapTurn: false,
         ...(edge ? { edge } : {}),
       });
+      if (consumesSpeakingSlot(reply)) {
+        supplementVisibleCount += 1;
+      }
     };
 
     for (const bot of supplementBots) {
+      if (dispatched > 0) {
+        await sleepMs(stages.coordinationDelayMs, input.signal);
+      }
       if (params.isAborted()) {
         return finishShadow(
           (await abortPersistedRound({
@@ -1170,10 +1304,28 @@ export async function executeCollaborationRound(
       const edgeForBot = round.edges?.find(
         (edge) => normalizeAgentIdentifier(edge.toAgentId) === botId,
       );
+      const admission = formalAdmissions.has(bot.agentId)
+        ? await resolveMemberAdmission({
+            authority,
+            agentId: bot.agentId,
+            runId: `${round.roundId}:${bot.agentId}`,
+            taskId: facts.activeContext.currentTaskId,
+            executionRequested: true,
+            cfg: getRuntimeConfigSnapshot() ?? undefined,
+          })
+        : { purpose: "discussion" as const };
+      const speaking = memberSpeakingGate(
+        admission,
+        leadVisibleCount + supplementVisibleCount >= visibleCap,
+      );
       const invited = invitedAgentIds.has(botId);
-      const gate: CheapGateResult =
-        leadVisibleCount + dispatched >= visibleCap
-          ? { decision: "DROP" as const, reason: "visible_limit" }
+      const gate: CheapGateResult = !speaking.allowed
+        ? {
+            decision: "DROP" as const,
+            reason: admission.purpose === "blocked" ? "policy_disabled" : "visible_limit",
+          }
+        : admission.purpose === "formal_execution"
+          ? { decision: "KEEP" as const, reason: speaking.reason }
           : autoSupplement && bot.agentId === autoSupplement.agentId
             ? kept >= frozen.supplement.maxSupplementBots
               ? { decision: "DROP" as const, reason: "budget_limit" }
@@ -1216,6 +1368,15 @@ export async function executeCollaborationRound(
       await dispatchSupplement(bot, edgeForBot);
     }
 
+    if (params.isAborted()) {
+      return finishShadow(
+        (await abortPersistedRound({
+          groupId: authority.groupId,
+          roundId: round.roundId,
+          ...persist,
+        })) ?? round,
+      );
+    }
     // Calibration: when the open window would otherwise drop everyone for
     // low_relevance, let the single top-scoring candidate through if the group
     // runs open discussion and the primary explicitly asked for others' input.
@@ -1226,7 +1387,7 @@ export async function executeCollaborationRound(
       supplementWindowReason === "conclusion" &&
       pendingLowRelevance.length > 0 &&
       effective.participation.openDiscussionWithoutMention &&
-      leadVisibleCount < visibleCap &&
+      leadVisibleCount + supplementVisibleCount < visibleCap &&
       primaryInvitesSupplementInput({
         text: primaryVisibleText,
         bots: facts.bots as CollaborationBotTarget[],
@@ -1315,6 +1476,15 @@ export async function executeCollaborationRound(
         dispatchId,
         isWrapTurn: true,
       });
+    }
+    if (params.isAborted()) {
+      return finishShadow(
+        (await abortPersistedRound({
+          groupId: authority.groupId,
+          roundId: round.roundId,
+          ...persist,
+        })) ?? round,
+      );
     }
     if (round.state === "OPTIONAL_CLOSE") {
       round = await stepRound(round, "close_completed", "ROUND_COMPLETED", persist);

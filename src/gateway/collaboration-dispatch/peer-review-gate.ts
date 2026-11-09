@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 /**
  * C3 — Peer review gate before accept (2026-10-13).
  *
@@ -11,14 +14,15 @@
  * Non-goals: Floor live, ui.* RPC, default-on flag, second orchestrator,
  * inventing a multi-beat controller, bypassing Steward / Exec Approvals.
  */
-import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
+import {
+  peerReviewAcceptAllowed,
+  peerReviewMustNotDriveAdmission,
+} from "../../agent-runtime/policy/index.js";
+import { appendPeerReviewLog } from "../../agent-runtime/state/collaboration/round-txn.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { recordCollaborationQualityBestEffort } from "../collaboration-ledger/writer.js";
 import { isCollabTaskClaimContractEnabled } from "./claim-contract.js";
-import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 
@@ -81,12 +85,7 @@ export function isCollabTaskRequirePeerReviewEnabled(cfg?: OpenBotConfig): boole
   }
 }
 
-/**
- * Hard invariant: peer-review / RCIS observation must never drive Admission.
- */
-export function peerReviewMustNotDriveAdmission(): true {
-  return true;
-}
+export { peerReviewMustNotDriveAdmission };
 
 function fail(reason: string, message: string): PeerReviewResult<never> {
   return { ok: false, reason, message };
@@ -294,14 +293,7 @@ export async function recordPeerReview(
     return fail("invalid_input", "taskId is not a safe id");
   }
   const logPath = peerReviewLogPath(reviewsDir, taskId);
-  await withRoundLock(reviewsDir, stem, async () => {
-    await fs.mkdir(reviewsDir, { recursive: true });
-    await appendJsonlDurable(logPath, {
-      kind: "peer_review",
-      at,
-      event,
-    } satisfies PeerReviewLogLine);
-  });
+  await appendPeerReviewLog({ reviewsDir, stem, logPath, at, event });
   // RCIS observe-only: quality ledger review event (never Admission).
   recordCollaborationQualityBestEffort({
     groupId: event.groupId,
@@ -345,13 +337,12 @@ export async function assertPeerReviewGateForAccept(
     submissionId,
     authorId,
   });
-  if (count < 1) {
-    return {
-      ok: false,
-      reason: "peer_review_required",
-      message:
-        "collaboration.task.requirePeerReview is on; accept requires ≥1 non-author peer review on this submission",
-    };
+  const decision = peerReviewAcceptAllowed({
+    requirePeerReview: true,
+    nonAuthorReviewCount: count,
+  });
+  if (!decision.ok) {
+    return decision;
   }
   return { ok: true, value: true };
 }

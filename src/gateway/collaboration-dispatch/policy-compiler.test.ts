@@ -9,8 +9,8 @@ describe("compileEffectiveCollaborationPolicy", () => {
     expect(effective.protocolVersion).toBe("1.1");
     expect(effective.invariants).toEqual(SYSTEM_INVARIANTS);
     expect(effective.strategy).toEqual(MODE_TEMPLATES.discussion_driven);
-    expect(effective.participation.maxVisibleBotRepliesPerRound).toBe(5);
-    expect(effective.participation.openDiscussionWithoutMention).toBe(false);
+    expect(effective.participation.maxVisibleBotRepliesPerRound).toBe(3);
+    expect(effective.participation.openDiscussionWithoutMention).toBe(true);
     expect(effective.participation.mentionBotMustRespond).toBe(false);
     expect(effective.dispatch.supplementEnabled).toBe(true);
     expect(effective.participation.mentionMustDispatch).toBe(true);
@@ -76,7 +76,7 @@ describe("compileEffectiveCollaborationPolicy", () => {
     });
   });
 
-  it("keeps an explicit open-discussion L2 value after the single-speaker default", () => {
+  it("keeps an explicit open-discussion L2 value alongside the active-discussion default", () => {
     const effective = compileEffectiveCollaborationPolicy({
       openDiscussionWithoutMention: true,
     });
@@ -141,4 +141,15 @@ describe("compileEffectiveCollaborationPolicy", () => {
     });
     expect(singleOwnerStyle.dispatch.supplementEnabled).toBe(false);
   });
+});
+
+it("preserves an explicit closed-group policy after the active default migration", () => {
+  const effective = compileEffectiveCollaborationPolicy({
+    openDiscussionWithoutMention: false,
+    maxVisibleBotRepliesPerRound: 1,
+  });
+  expect(effective.participation.openDiscussionWithoutMention).toBe(false);
+  expect(effective.participation.maxVisibleBotRepliesPerRound).toBe(1);
+  expect(effective.provenance.openDiscussionWithoutMention.source).toBe("l2");
+  expect(effective.participation.humanStartsNewRound).toBe(true);
 });

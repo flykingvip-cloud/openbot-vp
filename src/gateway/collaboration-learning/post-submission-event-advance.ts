@@ -52,6 +52,7 @@ import {
   buildExecutionDeliverableBinding,
   runIdFromWakeOpAttempt,
 } from "./execution-deliverable-binding.js";
+import { reviewSubmissionAdmission } from "./review-admission.js";
 import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import { TRUSTED_GROUP_LOCATOR_REQUIRED } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
@@ -420,6 +421,12 @@ async function adjudicatePendingAtDispatchCommit(params: {
     };
   }
 
+  if (params.expectedBusinessEvent === "submitted_for_review") {
+    const admission = reviewSubmissionAdmission(liveItem);
+    if (!admission.allowed) {
+      return { ok: false, reason: admission.reason, markBlocked: true };
+    }
+  }
   if (params.expectedBusinessEvent !== "returned") {
     return {
       ok: true,

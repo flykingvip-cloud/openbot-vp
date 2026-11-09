@@ -40,6 +40,9 @@ export function buildPolicyDecisionRecord(params: {
   );
   return {
     roundId: params.decision.roundId,
+    ...(params.decision.visibleReplyBudget
+      ? { visibleReplyBudget: { ...params.decision.visibleReplyBudget } }
+      : {}),
     protocolVersion: params.effective.protocolVersion,
     effectivePolicyHash: hashEffectiveCollaborationPolicy(params.effective),
     mode: params.effective.strategy.id,

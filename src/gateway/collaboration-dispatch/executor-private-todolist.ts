@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
 /**
  * P2 — Executor-private Todolist + plan gate (COLLAB-EXECUTION-SYSTEM-FINAL §3.3).
  *
@@ -13,9 +16,12 @@
  *
  * Does not open LIVE flags, claimContract allowlist, Floor, P3 heartbeat, or P4 self_advance.
  */
-import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
+import {
+  freeChatIsTodolist,
+  isTodolistConfirmedForDelivery,
+  todolistIsGroupSharedBoardSubrecord,
+} from "../../agent-runtime/policy/index.js";
+import { commitPrivateTodolistLog } from "../../agent-runtime/state/collaboration/round-txn.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
@@ -28,7 +34,6 @@ import {
   loadBoardClaimItem,
   type GroupBoardClaimItem,
 } from "./claim-contract.js";
-import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 import { noteUnattendedStaleConfirmation } from "./single-group-unattended.js";
@@ -203,15 +208,7 @@ function safeStem(id: string): string | null {
   return encodeURIComponent(trimmed);
 }
 
-/** Free-chat / oral plans are never a Todolist fact. */
-export function freeChatIsTodolist(): false {
-  return false;
-}
-
-/** Todolist is never a group-shared board sub-record. */
-export function todolistIsGroupSharedBoardSubrecord(): false {
-  return false;
-}
+export { freeChatIsTodolist, isTodolistConfirmedForDelivery, todolistIsGroupSharedBoardSubrecord };
 
 /** Private store under `<ns>/executor-todolists` (not board-claims). */
 export function executorTodolistsDir(authority: RuntimeAuthority): string {
@@ -425,21 +422,13 @@ async function commitTodolistLines(
   }
   const dir = executorTodolistsDir(authority);
   const logPath = executorTodolistLogPath(dir, taskId);
-  return withRoundLock(dir, stem, async () => {
-    await fs.mkdir(dir, { recursive: true });
-    const lines = await readLog(logPath);
-    const outcome = fn(lines);
-    if (outcome.result.ok && outcome.appends && outcome.appends.length > 0) {
-      const at = nowOf(options);
-      for (const todolist of outcome.appends) {
-        await appendJsonlDurable(logPath, {
-          kind: "executor_private_todolist",
-          at,
-          todolist,
-        } satisfies TodolistLogLine);
-      }
-    }
-    return outcome.result;
+  return commitPrivateTodolistLog({
+    dir,
+    stem,
+    logPath,
+    at: () => nowOf(options),
+    readLines: () => readLog(logPath),
+    decide: fn,
   });
 }
 
@@ -588,12 +577,6 @@ export async function loadLatestOwnerTodolistForBoardItem(
   }
   items.sort((a, b) => b.version - a.version || b.proposedAt - a.proposedAt);
   return items[0] ?? null;
-}
-
-export function isTodolistConfirmedForDelivery(
-  todolist: ExecutorPrivateTodolist | null | undefined,
-): boolean {
-  return todolist?.status === "confirmed";
 }
 
 /**

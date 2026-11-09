@@ -78,3 +78,53 @@ export {
   countRecentTaskContinuations,
   reserveTaskContinuation,
 } from "./continuation-ticket.js";
+export {
+  mutateBoardClaimLog,
+  appendBoardClaimLog,
+  commitPrivateTodolistLog,
+  appendPeerReviewLog,
+} from "./collaboration/round-txn.js";
+export {
+  commitProposedHandoff,
+  acceptHandoffTransaction,
+  approveHandoffTransaction,
+  applyApprovedHandoffTransaction,
+  recoverHandoffTransactions,
+} from "./collaboration/handoff-txn.js";
+export type { HandoffLedgerPort, HandoffStoredFact } from "./collaboration/handoff-txn.js";
+export {
+  assignMemberArtifactQueueId,
+  claimMemberArtifactSendUnknown,
+  commitMemberArtifactDeliveryAssociation,
+  deliveryKeyHash,
+  markMemberArtifactQueued,
+  noteAssociationRenamedAwayFromStaged,
+  payloadTextDigest,
+  prepareMemberArtifactQueuePublication,
+  readMemberArtifactDeliveryIntent,
+  readServerOutboundArtifactGrant,
+  recordMemberArtifactBlocked,
+  recordMemberArtifactNotSent,
+  recordMemberArtifactReceipt,
+  recoverPartialStagedAssociation,
+  writeIssuedOutboundArtifactGrant,
+  writeServerOutboundArtifactGrant,
+} from "./collaboration/accepted-artifact-delivery-txn.js";
+export type {
+  AssociationCommitResult,
+  DeliveryAssociationPhase,
+  DeliveryExternalEffect,
+  MemberArtifactDeliveryIntent,
+} from "./collaboration/accepted-artifact-delivery-txn.js";
+export {
+  findMemberArtifactDeliveryIntent,
+  readAcceptedArtifactDelivery,
+  viewAcceptedArtifactDelivery,
+} from "./collaboration/accepted-artifact-delivery-read.js";
+export type { AcceptedArtifactDeliveryView } from "./collaboration/accepted-artifact-delivery-read.js";
+export {
+  DIRECTORY_LOCK_STALE_MS,
+  withDirectoryLock,
+  appendJsonlDurable,
+  writeJsonDurable,
+} from "./repository/durable-json.js";

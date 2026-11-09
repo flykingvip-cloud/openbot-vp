@@ -54,6 +54,9 @@ describe("completion contract", () => {
     expect(isCollaborationChitchat("你好")).toBe(true);
     expect(isCollaborationChitchat("大家好")).toBe(true);
     expect(isCollaborationChitchat("下午好")).toBe(true);
+    expect(isCollaborationChitchat("大家下午好")).toBe(true);
+    expect(isCollaborationChitchat("各位，晚上好！")).toBe(true);
+    expect(isCollaborationChitchat("大家下午好，请分析方案")).toBe(false);
     expect(isCollaborationChitchat("请研究这份资料")).toBe(false);
     expect(isCollaborationChitchat("各位介绍一下自己")).toBe(false);
     expect(isCollaborationChitchat("还有谁在线")).toBe(false);

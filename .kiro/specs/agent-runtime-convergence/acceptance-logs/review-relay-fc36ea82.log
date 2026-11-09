@@ -1,0 +1,13 @@
+
+ RUN  v4.0.18 /agent/repos/openbot-vp
+
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > isBareChatCompletionPhrase only matches bare completion claims 1ms
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > submit → return → revise → accept persists accepted; bare 完成 never writes 35ms
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > acceptBoardItemSubmission refuses bare chat completion before any write 0ms
+ ✓ src/gateway/collaboration-learning/formal-delivery-acceptance.test.ts > formal delivery acceptance (production entries) > review-event relay stays unknown until accept, and accept does not dispatch another review round 40ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  11:40:59
+   Duration  18.50s (transform 12.43s, setup 280ms, import 18.04s, tests 78ms, environment 0ms)
+

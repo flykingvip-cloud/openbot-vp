@@ -512,6 +512,44 @@ export type CollaborationTaskAcceptSubmissionParams = {
   proxyBasis?: string;
 };
 
+const AcceptedArtifactDeliveryTargetSchema = Type.Object(
+  {
+    channel: NonEmptyString,
+    accountId: Type.Optional(Type.String()),
+    to: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export type CollaborationTaskRequestAcceptedArtifactDeliveryParams = {
+  groupId: string;
+  taskId: string;
+  itemId: string;
+  target: { channel: string; accountId?: string; to: string };
+};
+
+export const CollaborationTaskRequestAcceptedArtifactDeliveryParamsSchema = Type.Object(
+  {
+    groupId: NonEmptyString,
+    taskId: NonEmptyString,
+    itemId: NonEmptyString,
+    target: AcceptedArtifactDeliveryTargetSchema,
+  },
+  { additionalProperties: false },
+);
+
+export type CollaborationTaskRevokeAcceptedArtifactDeliveryParams =
+  CollaborationTaskRequestAcceptedArtifactDeliveryParams;
+
+export const CollaborationTaskRevokeAcceptedArtifactDeliveryParamsSchema =
+  CollaborationTaskRequestAcceptedArtifactDeliveryParamsSchema;
+
+export type CollaborationTaskReadAcceptedArtifactDeliveryParams =
+  CollaborationTaskRequestAcceptedArtifactDeliveryParams;
+
+export const CollaborationTaskReadAcceptedArtifactDeliveryParamsSchema =
+  CollaborationTaskRequestAcceptedArtifactDeliveryParamsSchema;
+
 export const CollaborationTaskAcceptSubmissionParamsSchema = Type.Object(
   {
     groupId: NonEmptyString,

@@ -1,0 +1,52 @@
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot
+
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateMemberArtifactDeliveryEligibility > does not treat a complete member artifact as outbound permission 1ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateMemberArtifactDeliveryEligibility > denies group-final scope 0ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateMemberArtifactDeliveryEligibility > denies a missing target and an unaccepted item 0ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateMemberArtifactDeliveryEligibility > puts tenant and the normalized target into the key material 0ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateAcceptedArtifactOutboundAuthorization > stays pending when the server grant is missing 0ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateAcceptedArtifactOutboundAuthorization > denies a revoked grant or a different artifact 0ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > issueOutboundArtifactGrant > issues only from a trusted write context and the stored artifact 0ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateChannelAccountOutboundScope > allows only when the target matches server defaultTo scope 0ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateChannelAccountOutboundScope > stays pending when scope facts or destinations are missing 0ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateChannelAccountOutboundScope > denies write-ok facts when the target is outside defaultTo 0ms
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts > evaluateChannelAccountOutboundScope > denies a disabled channel account 0ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > persists one non-sendable staged record for the same key 24ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > does not create another record after the staged file is renamed away 23ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > keeps a half-written staged file on the same key 24ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > isolates tenants 68ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > does not rebuild a corrupt intent or roll a terminal phase back 57ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > refuses the rename when both association files are missing 49ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > does not share a key when fields contain separators 82ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > rejects an incomplete intent and an identity that does not match the key 26ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > does not recreate a staged file after the association is retained 35ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts > commitMemberArtifactDeliveryAssociation > does not associate a group-final or unaccepted identity 4ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery-entry.test.ts > collaboration.task.requestAcceptedArtifactDelivery > rejects a request body that carries a grant 1ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery-entry.test.ts > collaboration.task.requestAcceptedArtifactDelivery > does not issue when the gateway client is unauthenticated 1ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery-entry.test.ts > collaboration.task.requestAcceptedArtifactDelivery > authenticated handler runs real ACL, artifact facts, grant issuance, and live send 68ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > does not send when the server grant is missing 45ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery.test.ts > accepted artifact public delivery chain > does not create a grant or send without trusted issuance 3ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery.test.ts > accepted artifact public delivery chain > delivers in-process after request without a separate recover call (no-restart) 87ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > does not send again after the effect is marked unknown 76ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery.test.ts > accepted artifact public delivery chain > still recovers after an interrupt mid-publish, and duplicate recover sends once 80ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery.test.ts > accepted artifact public delivery chain > refuses scope when defaultTo does not match target (no grant, no send) 52ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > isolates a timeout instead of retrying 105ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery.test.ts > accepted artifact public delivery chain > refuses missing outbound scope basis without writing a grant 49ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > blocks a tampered payload and does not send it 96ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > does not send a non-telegram target through telegram 95ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery.test.ts > accepted artifact public delivery chain > does not send after a trusted revoke, and keeps an unknown effect isolated 173ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery.test.ts > accepted artifact public delivery chain > lets revoke win over a concurrent grant rewrite (CAS) 116ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery.test.ts > accepted artifact public delivery chain > leaves an ordinary queue entry on the existing recovery path 12ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > does not let a stale snapshot send twice 125ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > claims at most one send when two recoveries share a millisecond 78ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > does not send after the grant is revoked or deleted 113ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > refuses a payload that carries media or another effect field 63ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts > accepted artifact send boundary > leaves an ordinary queue entry on the existing recovery path 6ms
+
+ Test Files  5 passed (5)
+      Tests  42 passed (42)
+   Start at  23:49:41
+   Duration  18.46s (transform 34.56s, setup 2.51s, import 50.78s, tests 1.85s, environment 0ms)
+
+EXIT:0

@@ -1,3 +1,7 @@
+import { randomUUID } from "node:crypto";
+import fs from "node:fs/promises";
+import path from "node:path";
+import type { Task } from "@openbot/collaboration-core";
 /**
  * P4b — Group task board ClaimContract (collab groups only).
  *
@@ -40,10 +44,14 @@
  * Wake / fan-out / insight side effects run outside the lock, only after success.
  * In-process races covered by C1–C3; not a cross-process / stale-lock recovery claim.
  */
-import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
-import type { Task } from "@openbot/collaboration-core";
+import {
+  claimBoardActionAllowed,
+  oralDispatchCreatesBoardFact,
+} from "../../agent-runtime/policy/index.js";
+import {
+  appendBoardClaimLog,
+  mutateBoardClaimLog,
+} from "../../agent-runtime/state/collaboration/round-txn.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { isBareChatCompletionPhrase } from "../collaboration-learning/formal-delivery-acceptance.js";
@@ -57,7 +65,6 @@ import { normalizeAgentIdentifier } from "./mention-utils.js";
 import { modeBActiveBoardItems } from "./mode-b-member-selection.js";
 import { assertPeerReviewGateForAccept } from "./peer-review-gate.js";
 import { buildCollaborationRoundPlan } from "./round-plan.js";
-import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 import { guardUnattendedAccept } from "./single-group-unattended.js";
@@ -487,9 +494,7 @@ export function boardItemGoal(item: Pick<GroupBoardClaimItem, "goal" | "remainin
  * Oral “已派工”, chat bubbles, and collab_edge never create a board claim fact.
  * Organizers must publishBoardItem → claimBoardItem → applyClaim.
  */
-export function oralDispatchCreatesBoardFact(): false {
-  return false;
-}
+export { oralDispatchCreatesBoardFact };
 
 export function isAppliedBoardClaim(item: GroupBoardClaimItem | null | undefined): boolean {
   return item?.status === "applied" && Boolean(item.claimantId?.trim());
@@ -710,26 +715,15 @@ async function mutateBoardClaimItem(
   const claimsDir = boardClaimsDir(authority);
   const logPath = boardClaimLogPath(claimsDir, taskId);
   const at = nowOf(options);
-  return withRoundLock(claimsDir, stem, async () => {
-    const lines = await readLog(logPath);
-    const current = latestItem(lines, itemId);
-    if (!current) {
-      return fail("not_found", `board claim item not found: ${itemId}`);
-    }
-    const mutated = await mutator(current);
-    if (!mutated.ok) {
-      return mutated;
-    }
-    if (mutated.skipAppend) {
-      return { ok: true, value: mutated.value };
-    }
-    await fs.mkdir(claimsDir, { recursive: true });
-    await appendJsonlDurable(logPath, {
-      kind: "board_claim",
-      at,
-      item: mutated.value,
-    } satisfies BoardClaimLogLine);
-    return { ok: true, value: mutated.value };
+  return mutateBoardClaimLog({
+    claimsDir,
+    stem,
+    logPath,
+    itemId,
+    at,
+    readLines: () => readLog(logPath),
+    currentOf: (lines) => latestItem(lines as BoardClaimLogLine[], itemId),
+    mutate: mutator,
   });
 }
 
@@ -747,14 +741,7 @@ async function appendItem(
   }
   const logPath = boardClaimLogPath(claimsDir, item.taskId);
   const at = nowOf(options);
-  await withRoundLock(claimsDir, stem, async () => {
-    await fs.mkdir(claimsDir, { recursive: true });
-    await appendJsonlDurable(logPath, {
-      kind: "board_claim",
-      at,
-      item,
-    } satisfies BoardClaimLogLine);
-  });
+  await appendBoardClaimLog({ claimsDir, stem, logPath, at, item });
 }
 
 export async function publishBoardItem(
@@ -867,7 +854,7 @@ export async function claimBoardItem(
       if (!isCollabTaskClaimContractEnabled(cfg, groupId, authority.tenantId)) {
         return flagOff();
       }
-      if (current.status !== "published") {
+      if (!claimBoardActionAllowed(current.status, "claim")) {
         return fail(
           "invalid_status",
           `board claim item status is ${current.status}; expected published`,
@@ -968,7 +955,7 @@ export async function applyClaim(
       if (!isCollabTaskClaimContractEnabled(cfg, groupId, authority.tenantId)) {
         return flagOff();
       }
-      if (current.status !== "claimed") {
+      if (!claimBoardActionAllowed(current.status, "apply")) {
         return fail(
           "invalid_status",
           `board claim item status is ${current.status}; expected claimed`,
@@ -1216,8 +1203,7 @@ export async function markBoardItemInProgress(
     authority,
     { taskId, itemId },
     async (current) => {
-      const allowed = new Set(["claimed", "applied", "returned", "blocked"]);
-      if (!allowed.has(current.status)) {
+      if (!claimBoardActionAllowed(current.status, "mark_in_progress")) {
         return fail(
           "invalid_status",
           `board claim item status is ${current.status}; expected claimed|applied|returned|blocked`,
@@ -1308,7 +1294,7 @@ export async function submitBoardItemForReview(
           "item already submitted_for_review with a different submissionId",
         );
       }
-      if (current.status !== "in_progress" && current.status !== "returned") {
+      if (!claimBoardActionAllowed(current.status, "submit")) {
         return fail(
           "invalid_status",
           `board claim item status is ${current.status}; expected in_progress|returned`,
@@ -1500,7 +1486,7 @@ export async function acceptBoardItemSubmission(
     authority,
     { taskId, itemId },
     async (current) => {
-      if (current.status !== "submitted_for_review") {
+      if (!claimBoardActionAllowed(current.status, "accept")) {
         return fail(
           "invalid_status",
           `board claim item status is ${current.status}; expected submitted_for_review (late accept of prior version refused)`,
@@ -1618,7 +1604,7 @@ export async function returnBoardItemSubmission(
     authority,
     { taskId, itemId },
     async (current) => {
-      if (current.status !== "submitted_for_review") {
+      if (!claimBoardActionAllowed(current.status, "return")) {
         return fail(
           "invalid_status",
           `board claim item status is ${current.status}; expected submitted_for_review (late return of prior version refused)`,
@@ -2285,7 +2271,7 @@ export async function blockBoardItem(
     authority,
     { taskId, itemId },
     (current) => {
-      if (current.status !== "in_progress" && current.status !== "submitted_for_review") {
+      if (!claimBoardActionAllowed(current.status, "block")) {
         return fail(
           "invalid_status",
           `board claim item status is ${current.status}; expected in_progress|submitted_for_review`,
@@ -2333,7 +2319,7 @@ export async function unblockBoardItem(
     authority,
     { taskId, itemId },
     (current) => {
-      if (current.status !== "blocked") {
+      if (!claimBoardActionAllowed(current.status, "unblock")) {
         return fail(
           "invalid_status",
           `board claim item status is ${current.status}; unblock requires blocked (cancel/terminal stay stopped)`,
@@ -2388,14 +2374,7 @@ export async function cancelBoardItem(
     authority,
     { taskId, itemId },
     (current) => {
-      const allowed = new Set([
-        "published",
-        "claimed",
-        "applied",
-        "in_progress",
-        "submitted_for_review",
-      ]);
-      if (!allowed.has(current.status)) {
+      if (!claimBoardActionAllowed(current.status, "cancel")) {
         return fail(
           "invalid_status",
           `board claim item status is ${current.status}; expected published|claimed|applied|in_progress|submitted_for_review (cancel is terminal; use unblock for blocked)`,

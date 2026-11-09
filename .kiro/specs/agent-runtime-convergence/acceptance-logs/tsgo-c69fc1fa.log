@@ -1,0 +1,8 @@
+src/agent-runtime/policy/collaboration-compile-sections.ts(3,3): error TS2459: Module '"./collaboration-policy-model.js"' declares 'DecisionMode' locally, but it is not exported.
+src/agent-runtime/policy/collaboration-compile-sections.ts(13,3): error TS2459: Module '"./collaboration-policy-model.js"' declares 'LowSignalStrategy' locally, but it is not exported.
+src/agent-runtime/policy/collaboration-compile-sections.ts(14,3): error TS2459: Module '"./collaboration-policy-model.js"' declares 'ModeTemplate' locally, but it is not exported.
+src/agent-runtime/state/collaboration/handoff-txn.ts(591,73): error TS2345: Argument of type 'TContract' is not assignable to parameter of type 'HandoffContractView'.
+  Type 'HandoffTxnContract' is not assignable to type 'HandoffContractView'.
+    The types of 'from.responsibilityRole' are incompatible between these types.
+      Type 'string' is not assignable to type 'HandoffResponsibilityRole'.
+src/gateway/collaboration-dispatch/plan-gate-exec.ts(54,12): error TS2304: Cannot find name 'BoardTodolistDeliveryMapping'.

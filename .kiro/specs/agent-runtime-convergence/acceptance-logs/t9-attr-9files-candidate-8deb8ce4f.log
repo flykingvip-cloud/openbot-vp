@@ -1,0 +1,537 @@
+START candidate 2026-11-10 06:43:29 +0800 HEAD=8deb8ce4fd139e2690b8c918e0c7cfb01ae2e496
+CMD: OPENBOT_TEST_PROFILE=low OPENBOT_TEST_SERIAL_GATEWAY=1 pnpm exec vitest run src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts src/gateway/collaboration-learning/todolist-acl-rpc.test.ts src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts src/gateway/collaboration-learning/convergence-acceptance.test.ts src/gateway/collaboration-dispatch/episode-single-beat-runtime.g2.test.ts src/gateway/collaboration-dispatch/group-task-heartbeat.test.ts
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot
+
+ ❯ src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts (6 tests | 2 failed) 2387ms
+     × op-A success → finally clears tenant claim → op-B succeeds; legacy root has no task write 407ms
+     × claim commit then mirror fail → release on tenant root → retry ok; stale claimId cannot clear new claim 1797ms
+     ✓ recheckCurrentDispatchAuthorization managed missing stores → auth_source_unreadable 39ms
+     ✓ recheck partial mix (only fileStore) refused 32ms
+     ✓ resolveTaskControlTrustedStores managed incomplete throws 38ms
+     ✓ casClear without trusted in managed throws (no legacy self-create) 62ms
+ ❯ src/gateway/collaboration-dispatch/group-task-heartbeat.test.ts (10 tests | 1 failed) 3970ms
+     ✓ defaults OFF; allowlist enables wake for listed group only 49ms
+     ✓ rollback: empty allowlist + global false refuses 53ms
+     ✓ defaults and contracts 0ms
+     ✓ nudge unclaimed; escalate after consecutive no-response 1ms
+     ✓ wake off + dryRun false refuses emit; default observe still scans 124ms
+     × allowlist on: nudge → second no-response escalate; whoWokeWhom auditable 1108ms
+     ✓ scan interval skip without force 205ms
+     ✓ shouldAttemptUnclaimedClaimBridge gates emit+execute+unclaimed 0ms
+     ✓ emit + selfAdvance execute: nudge then claim intended lead  926ms
+     ✓ selfAdvance dry_run: nudge only, no claim  1500ms
+ ❯ src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts (4 tests | 1 failed) 4461ms
+     ✓ accepts schema-backed planConfirm* binding fields 2ms
+     ✓ rejects unknown planConfirm binding junk under additionalProperties:false 0ms
+     × activate→claim→propose→confirm→deliverable→stop stay on trusted locator per tenant 4418ms
+     ✓ managed service call without auth/trusted/stores hard-refuses dual-root compat 32ms
+ ❯ src/gateway/collaboration-learning/convergence-acceptance.test.ts (6 tests | 1 failed) 4951ms
+       ✓ skips bots who already introduced on follow-up prompts 1ms
+       ✓ materializes one canonical workspace path for every bot in the group 108ms
+       × writes continuity checkpoints only under the resolver collaboration root 346ms
+       ✓ reads promoted learning assets from the gateway collaboration store root 88ms
+       ✓ does not reintroduce legacy readParticipations helper exports  3877ms
+       ✓ does not export resolveCollaborationStoreRoot  528ms
+ ❯ src/gateway/collaboration-dispatch/episode-single-beat-runtime.g2.test.ts (6 tests | 1 failed) 10286ms
+     × episodeStore stays default off and does not select another executor 8ms
+     ✓ flag off delegates the round and does not recover or write episodes  2320ms
+     ✓ flag on walks one beat to EPISODE_CLOSED and does not open another  2637ms
+     ✓ flag on stops unmatched and empty rounds without a second beat  2078ms
+     ✓ a refused G8 executor still throws and the open beat stops  916ms
+     ✓ store writes do not read or write the rounds directory  2316ms
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts (7 tests | 5 failed) 13384ms
+     ✓ schema rejects caller-supplied confirmer and coordinator ids 2ms
+     × service and RPC ignore attacker ACL and fail closed 4206ms
+     ✓ retry schema rejects extra fields and accepts an expected version 0ms
+     × transcript write failure still returns the proposal and a retryable delivery 2282ms
+     × same-version retry does not mint a proposal or a second card; confirm is single-consume 2253ms
+     × service and RPC refuse stale plan confirms without widening confirmer ACL 2475ms
+     × D6b: revoked coordinator cannot list historyReloadable delivery rows 2162ms
+ ❯ src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts (7 tests | 3 failed) 9030ms
+     ✓ tenant revoked + legacy still authorized → wake refuses, dispatcher=0  366ms
+     × tenant authorized + legacy revoked → wake does not mis-reject on legacy 950ms
+     × two-tenant activate→claim→propose→confirm→deliverable→stop→wake stay isolated 2451ms
+     ✓ real ACL rejects cross-tenant actor; task state unchanged 135ms
+     × unique card binding succeeds via chat.send; message visible; no agent dispatch 3362ms
+     ✓ stale expectedVersion refuses via chat.send; no execution  1659ms
+     ✓ ambiguous confirm message refuses via chat.send; no execution 105ms
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > legal establish: chat.send → formal entry → durable task+source → status receipt → coordinator context; parent run continues
+{"event":"evolution.capability.gap_recorded","runId":"d2t-legal-1794264266669:bot-coord","agentId":"bot-coord","tenantId":null,"surfaceId":"capability.skill-installation","taskId":"evo:capability-gap:e27587857cfde2628da50621","reason":"unresolved_run_error"}
+
+stderr | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > legal establish: chat.send → formal entry → durable task+source → status receipt → coordinator context; parent run continues
+Embedded agent failed before reply: No API key found for provider "anthropic". Auth store: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent/auth-profiles.json (agentDir: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent). Configure auth for this agent (openbot agents add <id>) or copy auth-profiles.json from the main agentDir.
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > legal establish: chat.send → formal entry → durable task+source → status receipt → coordinator context; parent run continues
+{"event":"evolution.outcome.written","runId":"d2t-legal-1794264266669:bot-coord","agentId":"bot-coord","tenantId":"personal:agent:main:space:d2t-ws-mw9um8pv","surfaceId":"task.execution","reason":"eligible"}
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > observer (non-writer): injected observer identity cannot establish formal task
+{"event":"evolution.capability.gap_recorded","runId":"d2t-flagoff-1794264268476:bot-coord","agentId":"bot-coord","tenantId":null,"surfaceId":"capability.skill-installation","taskId":"evo:capability-gap:6f662c988c6c5365679ce55b","reason":"unresolved_run_error"}
+
+stderr | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > observer (non-writer): injected observer identity cannot establish formal task
+Embedded agent failed before reply: No API key found for provider "anthropic". Auth store: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent/auth-profiles.json (agentDir: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent). Configure auth for this agent (openbot agents add <id>) or copy auth-profiles.json from the main agentDir.
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > observer (non-writer): injected observer identity cannot establish formal task
+{"event":"evolution.outcome.written","runId":"d2t-flagoff-1794264268476:bot-coord","agentId":"bot-coord","tenantId":"personal:agent:main:space:d2t-ws-mw9uma43","surfaceId":"task.execution","reason":"eligible"}
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > dual principals same local groupId: sequential principals isolate source+task
+{"event":"evolution.capability.gap_recorded","runId":"d2t-observer-1794264269064:bot-coord","agentId":"bot-coord","tenantId":null,"surfaceId":"capability.skill-installation","taskId":"evo:capability-gap:06fb630dc163752cf98ee648","reason":"unresolved_run_error"}
+
+stderr | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > dual principals same local groupId: sequential principals isolate source+task
+Embedded agent failed before reply: No API key found for provider "anthropic". Auth store: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent/auth-profiles.json (agentDir: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent). Configure auth for this agent (openbot agents add <id>) or copy auth-profiles.json from the main agentDir.
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > dual principals same local groupId: sequential principals isolate source+task
+{"event":"evolution.outcome.written","runId":"d2t-observer-1794264269064:bot-coord","agentId":"bot-coord","tenantId":"personal:agent:main:space:d2t-ws-mw9umajo","surfaceId":"task.execution","reason":"eligible"}
+
+stderr | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > dual principals same local groupId: sequential principals isolate source+task
+Embedded agent failed before reply: No API key found for provider "anthropic". Auth store: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent/auth-profiles.json (agentDir: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent). Configure auth for this agent (openbot agents add <id>) or copy auth-profiles.json from the main agentDir.
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > dual principals same local groupId: sequential principals isolate source+task
+{"event":"evolution.capability.gap_recorded","runId":"d2t-alice-1794264271294:bot-coord","agentId":"bot-coord","tenantId":null,"surfaceId":"capability.skill-installation","taskId":"evo:capability-gap:9acad420ac9cac7862fad19f","reason":"unresolved_run_error"}
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > dual principals same local groupId: sequential principals isolate source+task
+{"event":"evolution.outcome.written","runId":"d2t-alice-1794264271294:bot-coord","agentId":"bot-coord","tenantId":"personal:agent:main:space:d2t-ws-mw9umc7x","surfaceId":"task.execution","reason":"eligible"}
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > same-request retry: second chat.send with same idempotencyKey is cached; durable task remains singular
+{"event":"evolution.capability.gap_recorded","runId":"d2t-bob-1794264271294:bot-coord","agentId":"bot-coord","tenantId":null,"surfaceId":"capability.skill-installation","reason":"deduped:unresolved_run_error"}
+
+stderr | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > same-request retry: second chat.send with same idempotencyKey is cached; durable task remains singular
+Embedded agent failed before reply: No API key found for provider "anthropic". Auth store: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent/auth-profiles.json (agentDir: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent). Configure auth for this agent (openbot agents add <id>) or copy auth-profiles.json from the main agentDir.
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > same-request retry: second chat.send with same idempotencyKey is cached; durable task remains singular
+{"event":"evolution.outcome.written","runId":"d2t-bob-1794264271294:bot-coord","agentId":"bot-coord","tenantId":"personal:agent:main:space:d2t-ws-mw9umc7x","surfaceId":"task.execution","reason":"eligible"}
+
+ ❯ src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts (36 tests | 1 failed) 27733ms
+     ✓ legitimate deliverable can submit + accept; forged / wrong-task cannot  1402ms
+     ✓ classify: flag-off / no_consumer / unknown retain; dispatched clears 1ms
+     ✓ dispatcher unavailable → pending retained → recovery dispatches exactly once  1911ms
+     ✓ after accepted, old pending does not execute  1060ms
+     ✓ return binds claimant/todolist/version; duplicate return event does not double-dispatch  758ms
+     ✓ return superseded by new submit / accept does not start old event  807ms
+     ✓ requireTrustedScope refuses missing locator; dual-tenant same groupId stays isolated  710ms
+     ✓ items 1/3/4/5/7: link, return, late-accept refuse, accept clears relay  872ms
+     ✓ item 5: same submissionId+version idempotent — same relay opKey  536ms
+     ✓ item 8: submitForReview RPC refuses unauthenticated client (same trusted root) 13ms
+     ✓ return-revise builds full binding from durable op/attempt; Mode B formal submit accepts revise  916ms
+     ✓ accept AFTER adjudication read BEFORE permit commit blocks stale return  1037ms
+     ✓ new submit AFTER adjudication read BEFORE permit commit blocks stale return  949ms
+     ✓ reassign claimant AFTER adjudication read BEFORE permit commit blocks  1050ms
+     ✓ post-write ok:false keeps unknown; recovery does not produce second side effect  931ms
+     × subprocess: permit commit then exit → invalidate then recover; no duplicate; no Corepack download 6616ms
+     ✓ mark write reject → dispatcher not called (dispatcher=0)  350ms
+     ✓ mark throw → dispatcher not called (dispatcher=0) 284ms
+     ✓ live pause between permit and invoke → heartbeat does not release or re-dispatch  352ms
+     ✓ after invalidate: recovery vs old executor — at most one obtains execution  577ms
+     ✓ counterexample: mark wins first → invalidate reject → wake+board unchanged  483ms
+     ✓ counterexample: stale/old attempt cleanup late → reject → unchanged  460ms
+     ✓ counterexample: unknown wake → reject → unchanged pending-verification  362ms
+     ✓ positive: permit not-started + proven-dead invalidate → recover once  551ms
+     ✓ mid-cleanup: new wake attempt must not be failed by old cleanup  461ms
+     ✓ mid-cleanup: same attempt → unknown must not become failed  401ms
+     ✓ mid-cleanup: same attempt → completed must not become failed  349ms
+     ✓ positive: permit binds wake attempt; invalidate → failed → recover once  603ms
+     ✓ wake read throws → binding retained, dispatcher=0; then recover  638ms
+     ✓ CAS write throws → binding retained, dispatcher=0; then recover  476ms
+     ✓ binding clear fails → binding retained, dispatcher=0; then recover  352ms
+     ✓ classifyConditionalWakeFailCasResult: null → unverifiable; failed → completed; other → determined 0ms
+     ✓ deferred: read ok then wake file deleted before CAS → unverifiable, binding retained, dispatcher=0 249ms
+     ✓ deferred: read ok then wake file corrupt before CAS → unverifiable, binding retained, dispatcher=0 268ms
+     ✓ immediate invalidate: wake deleted after board CAS → binding retained (shared判定)  344ms
+     ✓ entry loop: review dispatch, return-revise, formal resubmit, accept then no further advance  599ms
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > receipt persist-fail: client still receives safe status (no raw internal error); parent run continues
+{"event":"evolution.capability.gap_recorded","runId":"d2t-retry-1794264275911:bot-coord","agentId":"bot-coord","tenantId":null,"surfaceId":"capability.skill-installation","taskId":"evo:capability-gap:514f7dc4290eca740f7f9e75","reason":"unresolved_run_error"}
+
+stderr | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > receipt persist-fail: client still receives safe status (no raw internal error); parent run continues
+Embedded agent failed before reply: No API key found for provider "anthropic". Auth store: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent/auth-profiles.json (agentDir: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent). Configure auth for this agent (openbot agents add <id>) or copy auth-profiles.json from the main agentDir.
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > receipt persist-fail: client still receives safe status (no raw internal error); parent run continues
+{"event":"evolution.outcome.written","runId":"d2t-retry-1794264275911:bot-coord","agentId":"bot-coord","tenantId":"personal:agent:main:space:d2t-ws-mw9umftg","surfaceId":"task.execution","reason":"eligible"}
+
+stderr | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > receipt persist-fail: client still receives safe status (no raw internal error); parent run continues
+Embedded agent failed before reply: No API key found for provider "anthropic". Auth store: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent/auth-profiles.json (agentDir: /var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openclaw-gateway-home-rhCUdq/.openclaw/agents/bot-coord/agent). Configure auth for this agent (openbot agents add <id>) or copy auth-profiles.json from the main agentDir.
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > receipt persist-fail: client still receives safe status (no raw internal error); parent run continues
+{"event":"evolution.capability.gap_recorded","runId":"d2t-persistfail-1794264277605:bot-coord","agentId":"bot-coord","tenantId":null,"surfaceId":"capability.skill-installation","taskId":"evo:capability-gap:65573b0691cad0c3708f3dc8","reason":"unresolved_run_error"}
+
+stdout | src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > receipt persist-fail: client still receives safe status (no raw internal error); parent run continues
+{"event":"evolution.outcome.written","runId":"d2t-persistfail-1794264277605:bot-coord","agentId":"bot-coord","tenantId":"personal:agent:main:space:d2t-ws-mw9umh5h","surfaceId":"task.execution","reason":"eligible"}
+
+ ❯ src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts (6 tests | 2 failed) 31627ms
+     × legal establish: chat.send → formal entry → durable task+source → status receipt → coordinator context; parent run continues 1922ms
+     ✓ flag-off: claimContract false → unified flag-off copy; no task/board writes  517ms
+     ✓ observer (non-writer): injected observer identity cannot establish formal task  2169ms
+     × dual principals same local groupId: sequential principals isolate source+task 4726ms
+     ✓ same-request retry: second chat.send with same idempotencyKey is cached; durable task remains singular  1743ms
+     ✓ receipt persist-fail: client still receives safe status (no raw internal error); parent run continues  2451ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 17 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/gateway/collaboration-dispatch/episode-single-beat-runtime.g2.test.ts > P0 G2 single-beat episode runtime > episodeStore stays default off and does not select another executor
+AssertionError: expected 'executeCollaborationRound(authority, …' to contain 'productionExecutor: resolveProduction…'
+
+- Expected
++ Received
+
+- productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg)
++ executeCollaborationRound(authority, facts, {
++                   decision,
++                   message: discussToTaskCoordinatorBinding
++                     ? `${discussToTaskCoordinatorBinding}\n\n${transcriptMessage}`
++                     : transcriptMessage,
++                   produ
+
+ ❯ src/gateway/collaboration-dispatch/episode-single-beat-runtime.g2.test.ts:210:46
+    208|     const callAt = chat.indexOf("executeCollaborationRound(authority, …
+    209|     expect(callAt).toBeGreaterThan(-1);
+    210|     expect(chat.slice(callAt, callAt + 280)).toContain(
+       |                                              ^
+    211|       "productionExecutor: resolveProductionCollaborationExecutor(poli…
+    212|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/17]⎯
+
+ FAIL  src/gateway/collaboration-dispatch/group-task-heartbeat.test.ts > P3 runGroupTaskHeartbeat > allowlist on: nudge → second no-response escalate; whoWokeWhom auditable
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-dispatch/group-task-heartbeat.test.ts:359:67
+    357|       throw new Error("expected third scan");
+    358|     }
+    359|     expect(tick3.wakeEvents.some((e) => e.source === "escalate")).toBe…
+       |                                                                   ^
+    360|     expect(tick3.decisions.some((d) => d.action === "escalate")).toBe(…
+    361| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts > P2 R5/R6 — permit vs dispatch + subprocess (preinstalled runtime) > subprocess: permit commit then exit → invalidate then recover; no duplicate; no Corepack download
+Error: child exit 1 stdout= stderr=/Users/daniel/AI VP/openbot/src/agents/pi-embedded-helpers.ts:1
+export {
+^
+
+
+TypeError: Cannot read properties of undefined (reading 'BILLING_ERROR_USER_MESSAGE')
+    at Object.BILLING_ERROR_USER_MESSAGE (/Users/daniel/AI VP/openbot/src/agents/pi-embedded-helpers.ts:1:1)
+    at Object.get [as BILLING_ERROR_USER_MESSAGE] (/Users/daniel/AI VP/openbot/src/agents/pi-embedded-helpers.ts:2:517)
+    at <anonymous> (/Users/daniel/AI VP/openbot/src/agent-runtime/wiring/embedded-payloads.ts:22:28)
+    at Object.<anonymous> (/Users/daniel/AI VP/openbot/src/agent-runtime/wiring/embedded-payloads.ts:34:1)
+    at Module._compile (node:internal/modules/cjs/loader:1688:14)
+    at Object.transformer (/Users/daniel/AI VP/openbot/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/register-D46fvsV_.cjs:3:1104)
+    at Module.load (node:internal/modules/cjs/loader:1423:32)
+    at Function._load (node:internal/modules/cjs/loader:1246:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+
+Node.js v22.18.0
+
+ ❯ Object.BILLING_ERROR_USER_MESSAGE src/agents/pi-embedded-helpers.ts:1:1
+      1| export {
+       | ^
+      2|   buildBootstrapContextFiles,
+      3|   DEFAULT_BOOTSTRAP_MAX_CHARS,
+ ❯ Object.get [as BILLING_ERROR_USER_MESSAGE] src/agents/pi-embedded-helpers.ts:2:517
+ ❯ <anonymous> src/agent-runtime/wiring/embedded-payloads.ts:22:28
+ ❯ Object.<anonymous> src/agent-runtime/wiring/embedded-payloads.ts:34:1
+ ❯ Object.transformer node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/register-D46fvsV_.cjs:3:1104
+ ❯ src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts:1911:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/convergence-acceptance.test.ts > Collaboration convergence acceptance (design §9) > AC-3 single task_ledger > writes continuity checkpoints only under the resolver collaboration root
+AssertionError: promise rejected "Error: ENOENT: no such file or directory,… { …(4) }" instead of resolving
+ ❯ src/gateway/collaboration-learning/convergence-acceptance.test.ts:226:46
+    224|       );
+    225| 
+    226|       await expect(fs.access(canonicalLedger)).resolves.toBeUndefined(…
+       |                                              ^
+    227|       await expect(fs.access(legacyLedger)).rejects.toThrow();
+    228|     });
+
+Caused by: Error: ENOENT: no such file or directory, access '/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-convergence-ac-ledger-KZojO6/collaboration-shared/groups/upbeyond/memory/task_ledger.json'
+ ❯ src/gateway/collaboration-learning/convergence-acceptance.test.ts:226:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { errno: -2, code: 'ENOENT', syscall: 'access', path: '/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-convergence-ac-ledger-KZojO6/collaboration-shared/groups/upbeyond/memory/task_ledger.json' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > legal establish: chat.send → formal entry → durable task+source → status receipt → coordinator context; parent run continues
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts:638:38
+    636|         // Coordinator context: collaboration round bot turn ran after…
+    637|         // (group + bot stamped); durable task + source binding alread…
+    638|         expect(coordinatorContextOk).toBe(true);
+       |                                      ^
+    639|         expect(replySpy.mock.calls.length).toBeGreaterThan(0);
+    640| 
+ ❯ withGatewayWsHarness src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts:447:5
+ ❯ src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts:541:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts > discuss-to-task gateway WS integration (Phase-1 final) > dual principals same local groupId: sequential principals isolate source+task
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts:850:30
+    848|           timeoutMs: 60_000,
+    849|         });
+    850|         expect(sendSteal.ok).toBe(true);
+       |                              ^
+    851|         try {
+    852|           const stealEvt = (await statusSteal) as ChatEventFrame;
+ ❯ withGatewayWsHarness src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts:447:5
+ ❯ src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts:760:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts > R5 gateway handlers · two-tenant same local ids > activate→claim→propose→confirm→deliverable→stop stay on trusted locator per tenant
+AssertionError: {"code":"INVALID_REQUEST","message":"confirmTodolist: confirmation_consumed: 该确认已生效","reasonCode":"confirmation_consumed","details":{"reason":"confirmation_consumed"}}: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts:415:61
+    413|         client,
+    414|       );
+    415|       expect(confirmed.ok, JSON.stringify(confirmed.error)).toBe(true);
+       |                                                             ^
+    416|       steps.push({ groupsRoot: ctx.trusted.groupsRoot, groupLocator: c…
+    417| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts > R6 wake auth recheck uses authority-aligned stores (dual-root conflict) > tenant authorized + legacy revoked → wake does not mis-reject on legacy
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts:660:32
+    658|     // Strong positive: must actually dispatch once (not "any non-auth…
+    659|     expect(consume.reason).not.toBe("auth_revoked");
+    660|     expect(consume.dispatched).toBe(true);
+       |                                ^
+    661|     expect(dispatchedCalls).toBe(1);
+    662|     expect(consume.roundId).toBe("round-auth-ok");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts > R6 continuous handlers · real ACL · stop→wake (no mid seedOs) > two-tenant activate→claim→propose→confirm→deliverable→stop→wake stay isolated
+AssertionError: {"code":"INVALID_REQUEST","message":"confirmTodolist: confirmation_consumed: 该确认已生效","reasonCode":"confirmation_consumed","details":{"reason":"confirmation_consumed"}}: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts:799:61
+    797|         client,
+    798|       );
+    799|       expect(confirmed.ok, JSON.stringify(confirmed.error)).toBe(true);
+       |                                                             ^
+    800| 
+    801|       const delivered = await invoke(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts > R6 chatHandlers chat.send plan confirm (visible result, no execution) > unique card binding succeeds via chat.send; message visible; no agent dispatch
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r6-wake-handler-chain.gateway.test.ts:1102:7
+    1100|     expect(
+    1101|       plan.confirmed === true || plan.status === "confirmed" || plan.s…
+    1102|     ).toBe(true);
+       |       ^
+    1103|     // Product wiring: confirmed path attempts post-confirm advance (n…
+    1104|     expect(payload.autoAdvanceWired).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts > R7 claim lifecycle · same trusted SoT/lock (managed) > op-A success → finally clears tenant claim → op-B succeeds; legacy root has no task write
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts:315:30
+    313|       },
+    314|     });
+    315|     expect(wakeA.dispatched).toBe(true);
+       |                              ^
+    316|     expect(callsA).toBe(1);
+    317|     expect(wakeA.roundId).toBe("r7-op-a");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts > R7 claim lifecycle · same trusted SoT/lock (managed) > claim commit then mirror fail → release on tenant root → retry ok; stale claimId cannot clear new claim
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/gateway/collaboration-learning/r7-claim-lifecycle-trusted.gateway.test.ts:422:21
+    420|       },
+    421|     });
+    422|     expect(callsOk).toBe(1);
+       |                     ^
+    423|     expect(wakeOk.dispatched).toBe(true);
+    424| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > Todolist ACL RPC boundary > service and RPC ignore attacker ACL and fail closed
+AssertionError: expected 'write_acl_denied: not authorized to r…' to contain '主答'
+
+Expected: "主答"
+Received: "write_acl_denied: not authorized to read group workspace file"
+
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:308:42
+    306|     expect(attacker.mock.calls[0]?.[0]).toBe(false);
+    307|     expect(attackerError?.message ?? "").not.toContain(SECRET_STEP);
+    308|     expect(attackerError?.message ?? "").toContain("主答");
+       |                                          ^
+    309| 
+    310|     const spoofedPublisher = vi.fn();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > owner-decision delivery is independent of plan creation > transcript write failure still returns the proposal and a retryable delivery
+AssertionError: expected 'no_active_confirmer' to be 'transcript_append' // Object.is equality
+
+Expected: "transcript_append"
+Received: "no_active_confirmer"
+
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:665:33
+    663|     const { todolist, cardDelivery } = proposed;
+    664|     expect(todolist.status).toBe("proposed");
+    665|     expect(cardDelivery.reason).toBe("transcript_append");
+       |                                 ^
+    666|     expect(cardDelivery.ok).toBe(false);
+    667|     expect(cardDelivery.retryable).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > owner-decision delivery is independent of plan creation > same-version retry does not mint a proposal or a second card; confirm is single-consume
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:714:54
+    712|     expect(delivered.todolist.todolistId).toBe(todolist.todolistId);
+    713|     expect(delivered.todolist.version).toBe(todolist.version);
+    714|     expect(delivered.cardDelivery.historyReloadable).toBe(true);
+       |                                                      ^
+    715|     expect(delivered.cardDelivery.clientPresented).toBe(false);
+    716|     expect(delivered.cardDelivery.userFacing).toBe("waiting_confirmati…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > owner-decision delivery is independent of plan creation > service and RPC refuse stale plan confirms without widening confirmer ACL
+ClaimContractEntryError: reviseTodolist: reviseTodolist requires 主答/lead or coordinator
+ ❯ unwrapTodolist src/gateway/collaboration-learning/claim-contract-entry.ts:1750:9
+    1748|     throw new ClaimContractFlagOffError();
+    1749|   }
+    1750|   throw new ClaimContractEntryError(result.reason, `${step}: ${result.…
+       |         ^
+    1751| }
+    1752| 
+ ❯ Module.reviseCollaborationTodolist src/gateway/collaboration-learning/claim-contract-entry.ts:2250:10
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:847:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/17]⎯
+
+ FAIL  src/gateway/collaboration-learning/todolist-acl-rpc.test.ts > owner-decision delivery is independent of plan creation > D6b: revoked coordinator cannot list historyReloadable delivery rows
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/gateway/collaboration-learning/todolist-acl-rpc.test.ts:1004:54
+    1002|       cfg,
+    1003|     });
+    1004|     expect(delivered.cardDelivery.historyReloadable).toBe(true);
+       |                                                      ^
+    1005| 
+    1006|     const beforeRevoke = await listCollaborationOwnerDecisionDeliverie…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/17]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+Error: closed 1012: service restart
+ ❯ WebSocket.closeHandler src/gateway/test-helpers.server.ts:297:14
+    295|       clearTimeout(timer);
+    296|       ws.off("message", handler);
+    297|       reject(new Error(`closed ${code}: ${reason.toString()}`));
+       |              ^
+    298|     };
+    299|     const handler = (data: WebSocket.RawData) => {
+ ❯ Object.onceWrapper node:events:633:26
+ ❯ WebSocket.emit node:events:518:28
+ ❯ WebSocket.emitClose node_modules/.pnpm/ws@8.21.0/node_modules/ws/lib/websocket.js:279:10
+ ❯ Socket.socketOnClose node_modules/.pnpm/ws@8.21.0/node_modules/ws/lib/websocket.js:1360:15
+ ❯ Socket.emit node:events:518:28
+ ❯ TCP.<anonymous> node:net:346:12
+ ❯ TCP.callbackTrampoline node:internal/async_hooks:130:17
+
+This error originated in "src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "same-request retry: second chat.send with same idempotencyKey is cached; durable task remains singular". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  9 failed (9)
+      Tests  17 failed | 71 passed (88)
+     Errors  1 error
+   Start at  06:43:42
+   Duration  57.12s (transform 140.91s, setup 3.83s, import 216.84s, tests 107.83s, environment 1ms)
+
+EXIT:1

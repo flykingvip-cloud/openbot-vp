@@ -14,11 +14,11 @@ describe("CLI embedded run lifecycle attribution path", () => {
     const agentSrc = readRepo("src/commands/agent.ts");
     const candidateSrc = readRepo("src/agent-runtime/execution/runner/command-candidate.ts");
     const runSrc = readRepo("src/agent-runtime/execution/runner/embedded-run.ts");
-    const attemptSrc = readRepo("src/agent-runtime/execution/runner/embedded-attempt.ts");
+    const attemptSrc = readRepo("src/agent-runtime/execution/runner/embedded-attempt-prompt.ts");
 
     expect(agentSrc).toContain("runCommandCandidate");
     expect(candidateSrc).toContain("runEmbeddedPiAgent");
-    expect(runSrc).toContain("runEmbeddedAttempt");
+    expect(runSrc).toContain("runEmbeddedRunAttemptIteration");
     expect(attemptSrc).toContain("createLifecycleSkillToolAttributionHandler");
     expect(attemptSrc).toContain("subscribeEmbeddedPiSession");
   });

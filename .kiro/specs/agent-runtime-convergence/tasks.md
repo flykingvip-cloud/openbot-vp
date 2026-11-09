@@ -2,6 +2,7 @@
 
 ## Autonomous closure checkpoint
 
+- Execution-authority closure batch A start: dedicated worktree/branch from latest origin/main tip `efdb1b98d83e096a31e251095080de954f5883ec`; PR #250 (`cf364161a0…`) and #252 (`45c6c227c…`) already merged — do not redo from older tip `e3fef11c8…`. Plan + inventory MD retained under specs with fingerprints; T0 baseline registered in `execution-authority-t0-baseline-2026-11-09.md`. Independent acceptance remains codex-runtime-manager; no push/deploy; no business source edits this turn. — 执行器迁移 / grok-bot
 - Observability/UX v2 included in current migration: observability-handoff-v2.md fixes source ownership, identity limits and phased acceptance; collapsible work detail is now migration acceptance support rather than a separate executor. Added frontend metadata-only projectRuntimeObservation adapter; no page integration, persistent event collection, fully-linked qualification or production rollout claimed. — codex-runtime-manager
 
 - Two-difference alignment: decisions and substantive gap ownership fixed in structure-alignment.md. Execution admission DTO moved to contracts/execution; state repository/resume mutation moved with old files removed; all existing repository consumers use state/index and three manifest rules prohibit deep imports. 39 files / 233 PASS; isolated cross-process 7 PASS; first joint race failure retained explicitly, not waived. Build PASS/209 warnings, manifest 44 PASS, tsgo 47 baseline. — codex-runtime-manager
@@ -23,6 +24,9 @@
 ## Agents
 
 - codex-runtime-manager · role: owner · scope: integration, M0 acceptance, M1 context extraction · paths: .kiro/specs/agent-runtime-convergence/**, src/agent-runtime/context/**, src/auto-reply/reply/get-reply-run.ts, src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts, scripts/architecture/manifest.json · since: 2026-11-03
+- 执行器迁移 / grok-bot · role: batch-A implementer · scope: authority inventory + rule catalog（T0–T2）· paths: `.kiro/specs/agent-runtime-convergence/execution-authority-*.md`, `component-migration-matrix.md`, `rule-catalog-coverage.md`, `retirement-disposition.md`（后续）, 以及方案/盘点 MD（`execution-authority-closure-plan-2026-11-09.md`, `collab-policy-state-migration-boundary-2026-11-09.md`, `individual-policy-state-closure-slices-2026-11-09.md`, `execution-authority-t0-baseline-2026-11-09.md`）· since: 2026-11-09
+- grok-bot · role: owner · scope: Batch B T3–T4 individual completion window and classification closure · paths: `src/conversation-task/reply-completion.ts`, `src/conversation-task/reply-completion.test.ts`, `src/conversation-task/reply-completion.window.test.ts`, `src/conversation-task/park-abort.ts`, `src/conversation-task/turn-relation.ts`, `src/conversation-task/focus-policy.ts`, `src/conversation-task/focus-switch.ts`, `src/agent-runtime/state/mutations/task-completion.ts`, `src/agent-runtime/policy/catalog.ts`, `src/agent-runtime/policy/task-board-limits.ts`, `src/agent-runtime/command/task-status.ts`, `.kiro/specs/agent-runtime-convergence/**` · since: 2026-11-09
+- 独立验收仍为方案编制方 **codex-runtime-manager**（及用户固定 SHA 验收）；Owner 合入权不因本登记转移；不改他人 observability / `.loom` WIP。 — 执行器迁移 / grok-bot
 
 Registry is authoritative. Contributors below execute delegated bounded changes; only owner commits.
 

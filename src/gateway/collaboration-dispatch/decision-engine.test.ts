@@ -443,7 +443,7 @@ describe("collaboration dispatch decision engine", () => {
     ).toBe(true);
   });
 
-  test("room greeting on intro mission broadcasts without opening unmentioned discussion", () => {
+  test("room greeting remains one on an introduction mission", () => {
     const scope = createScope("explore");
     if (scope.operatingState) {
       scope.operatingState.collaborationPolicy.openDiscussionWithoutMention = false;
@@ -455,10 +455,10 @@ describe("collaboration dispatch decision engine", () => {
       roundId: "round-intro-hello",
     });
 
-    expect(decision.executionBots.length).toBeGreaterThan(1);
+    expect(decision.executionBots).toHaveLength(1);
     expect(
       decision.roundPlan.alerts?.some((alert) => alert.kind === "group_broadcast_expanded"),
-    ).toBe(true);
+    ).not.toBe(true);
   });
 
   test("idle greeting without coordinator rotates instead of always picking the first bot", () => {
@@ -1044,4 +1044,23 @@ describe("missing/empty agentId selection (preferSkill path)", () => {
     expect(decision.executionBots.length).toBeGreaterThan(0);
     expect(decision.executionBots.every((bot) => Boolean(bot.agentId?.trim()))).toBe(true);
   });
+});
+
+test("active default uses related members within three replies, greetings remain one", () => {
+  const source = createScope("explore");
+  const scope = { ...source, operatingState: undefined };
+  const analysis = decideParticipantsForTest({
+    scope,
+    message: "请分析方案的风险并提出专业改进建议",
+    roundId: "active-default",
+  });
+  expect(analysis.visibleReplyBudget).toEqual({ kind: "ordinary", limit: 3 });
+  expect(analysis.executionBots.length).toBeGreaterThan(1);
+  expect(analysis.executionBots.length).toBeLessThanOrEqual(3);
+  const greeting = decideParticipantsForTest({
+    scope,
+    message: "大家下午好",
+    roundId: "greeting-default",
+  });
+  expect(greeting.executionBots).toHaveLength(1);
 });
