@@ -408,6 +408,15 @@ const CORE_TOOL_DEFINITIONS: CoreToolDefinition[] = [
     includeInOpenClawGroup: true,
   },
   {
+    id: "office_file",
+    label: "office_file",
+    description:
+      "Create and edit DOCX, PPTX, XLSX, and PDF files for the signed-in user without desktop Office",
+    sectionId: "fs",
+    profiles: ["coding", "messaging"],
+    includeInOpenClawGroup: true,
+  },
+  {
     id: "tts",
     label: "tts",
     description: "Text-to-speech conversion",
@@ -534,6 +543,7 @@ const CORE_TOOL_CAPABILITIES: Record<string, CoreToolCapability> = {
   site_describe: { toolMode: "read", sideEffectLevel: "none" },
   site_invoke: { toolMode: "write", sideEffectLevel: "reversible" },
   image: { toolMode: "read", sideEffectLevel: "none" },
+  office_file: { toolMode: "write", sideEffectLevel: "reversible" },
   write: { toolMode: "write", sideEffectLevel: "reversible" },
   edit: { toolMode: "write", sideEffectLevel: "reversible" },
   apply_patch: { toolMode: "write", sideEffectLevel: "reversible" },
