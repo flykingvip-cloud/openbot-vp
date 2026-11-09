@@ -3,8 +3,8 @@
 - Date: 2026-11-09
 - Branch: `cursor/runtime-authority-batch-b-bf87`
 - Baseline before this batch: `32578f9a73693008e3717f89993f262b6c635e9f` (includes accepted Batch A `591c9475fd287fad92eb38a45d9cca75c81ec263`)
-- Implementation tip: `050098bc3c318b3c76d89278d293a65d29950999`
-- This evidence note is the commit immediately after that tip.
+- Implementation tip: `050098bc3c318b3c76d89278d293a65d29950999` (`27e9acc6`, `ebf4f650`, `050098bc`)
+- Evidence notes follow that tip. The fixed head is the branch tip after this file.
 - Nature: implementation evidence for Batch B. Not merge approval and not a production deploy.
 
 ## Close meanings
