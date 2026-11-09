@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vitest";
-import { routeInteraction } from "./route-interaction.js";
+import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../contracts/interaction.js";
+import { interactionAdmissionFact, routeInteraction } from "./route-interaction.js";
 const captured = { requestId: "message", expectedFocusRevision: 0, expectedWriteEpoch: 0 };
 it.each(["reply", "clarify"] as const)(
   "%s bypasses execution authorization and state mutation",
@@ -36,6 +37,7 @@ it("explicit work alone reaches admission, once", async () => {
     admission: { authorize, commit },
   });
   expect(result.kind).toBe("execution_admission");
+  expect(interactionAdmissionFact(result)).toEqual({ admitted: true, taskId: "a" });
   expect(authorize).toHaveBeenCalledOnce();
   expect(commit).toHaveBeenCalledOnce();
   expect(commit.mock.calls[0]?.[0]).toMatchObject({
@@ -43,6 +45,28 @@ it("explicit work alone reaches admission, once", async () => {
     proposal: { goal: "报告", acceptance: ["来源"] },
   });
 });
+it("records a prose downgrade without admitting work the reply claims has started", async () => {
+  const text = "好的，我现在制作报告。任务已接纳，已开始。";
+  const authorize = vi.fn();
+  const commit = vi.fn();
+  const routed = await routeInteraction({ message: "做报告", context: [] }, captured, {
+    inference: {
+      infer: async () => ({
+        kind: "reply",
+        text,
+        protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+      }),
+    },
+    admission: { authorize, commit },
+  });
+  expect(interactionAdmissionFact(routed)).toEqual({
+    admitted: false,
+    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  });
+  expect(authorize).not.toHaveBeenCalled();
+  expect(commit).not.toHaveBeenCalled();
+});
+
 it("bound changes remain proposals rather than entering new-task admission", async () => {
   const target = { taskId: "a", revision: "1" };
   const authorize = vi.fn();

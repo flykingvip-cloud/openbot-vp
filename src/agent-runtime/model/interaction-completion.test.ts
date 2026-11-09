@@ -1,6 +1,8 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import { beforeEach, expect, it, vi } from "vitest";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
+import { interactionAdmissionFact, routeInteraction } from "../command/route-interaction.js";
+import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../contracts/interaction.js";
 import {
   buildInteractionCompletionContext,
   invokeInteractionCompletion,
@@ -95,7 +97,11 @@ it("treats conversational prose as a reply instead of a JSON parse error", async
     ...request,
     input: { message: "你好，请告诉我今天是星期几，并简短介绍你能帮我做什么。", context: [] },
   });
-  expect(result.readDecision()).toEqual({ kind: "reply", text });
+  expect(result.readDecision()).toEqual({
+    kind: "reply",
+    text,
+    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  });
 });
 
 it("still parses a fenced JSON reply and a real execution request", async () => {
@@ -124,6 +130,80 @@ it("still parses a fenced JSON reply and a real execution request", async () => 
     usage: makeZeroUsageSnapshot(),
   });
   expect((await invokeInteractionCompletion(request)).readDecision()).toEqual(execution);
+});
+
+it("keeps a code fence and does not pull execution JSON out of prose", async () => {
+  const code = "```python\nprint('好的，我现在制作报告')\n```";
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: code }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  expect((await invokeInteractionCompletion(request)).readDecision()).toEqual({
+    kind: "reply",
+    text: code,
+    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  });
+
+  const mixed =
+    '好的，我现在制作报告\n```json\n{"kind":"execution_request","request":{"goal":"报告","acceptance":["来源"]}}\n```';
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: mixed }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  const decision = (await invokeInteractionCompletion(request)).readDecision() as {
+    kind: string;
+    text: string;
+  };
+  expect(decision.kind).toBe("reply");
+  expect(decision.text).toBe(mixed);
+  const authorize = vi.fn();
+  const commit = vi.fn();
+  const routed = await routeInteraction(
+    { message: "做报告", context: [] },
+    { requestId: "m1", expectedFocusRevision: 0, expectedWriteEpoch: 0 },
+    { inference: { infer: async () => decision }, admission: { authorize, commit } },
+  );
+  expect(interactionAdmissionFact(routed)).toEqual({
+    admitted: false,
+    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  });
+  expect(authorize).not.toHaveBeenCalled();
+  expect(commit).not.toHaveBeenCalled();
+});
+
+it("does not treat a false-start reply as admission", async () => {
+  const text = "好的，我现在制作报告。任务已接纳，已开始。";
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  const decision = (await invokeInteractionCompletion(request)).readDecision();
+  const authorize = vi.fn(async () => true);
+  const commit = vi.fn(() => ({
+    kind: "accepted" as const,
+    binding: { taskId: "task-should-not-run" },
+    acceptance: ["来源"],
+  }));
+  const routed = await routeInteraction(
+    { message: "做报告", context: [] },
+    { requestId: "m1", expectedFocusRevision: 0, expectedWriteEpoch: 0 },
+    { inference: { infer: async () => decision }, admission: { authorize, commit } },
+  );
+  expect(routed).toMatchObject({
+    kind: "respond",
+    text,
+    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  });
+  expect(interactionAdmissionFact(routed)).toEqual({
+    admitted: false,
+    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  });
+  expect(authorize).not.toHaveBeenCalled();
+  expect(commit).not.toHaveBeenCalled();
+  expect(JSON.stringify(interactionAdmissionFact(routed))).not.toContain("task-should-not-run");
 });
 
 it("still rejects a broken JSON decision instead of showing it as a reply", async () => {

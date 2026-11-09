@@ -2,6 +2,7 @@
 import { complete, type Api, type Context, type Model } from "@earendil-works/pi-ai/compat";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
 import { withTimeout } from "../../utils/with-timeout.js";
+import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../contracts/interaction.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
 
 const PROTOCOL = [
@@ -74,42 +75,40 @@ function looksLikeJsonValue(text: string): boolean {
   return start.startsWith("{") || start.startsWith("[");
 }
 
-/** Models often wrap the required JSON object in a markdown fence. */
-function stripOptionalJsonFence(text: string): string {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("```")) {
-    return trimmed;
-  }
-  const inner = trimmed
-    .replace(/^```(?:json)?[^\n]*\r?\n?/i, "")
-    .replace(/\r?\n?```$/i, "")
-    .trim();
-  return inner || trimmed;
+/** Entire message is one fence. Tag is the info string, body is untrimmed inner. */
+const FULL_MESSAGE_FENCE = /^```([^\n`]*)\r?\n([\s\S]*?)\r?\n```[ \t]*$/;
+
+function proseDowngrade(text: string) {
+  return {
+    kind: "reply" as const,
+    text,
+    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  };
 }
 
 /**
- * The host protocol asks for one JSON decision. A conversational answer is
- * still a reply: parsing it throws SyntaxError and that string is what the
- * employee chat shows. Prose never becomes an execution request. A broken
- * JSON document stays a protocol failure.
+ * The host protocol asks for one JSON decision. Plain text, code fences, and
+ * prose that merely contains JSON stay replies. Only a whole-message JSON
+ * value, or a fence whose entire body is a JSON value, is a structured
+ * decision. Embedded execution JSON is not extracted. A broken JSON document
+ * still throws; the chat UI must not show that SyntaxError.
  */
 function readInteractionDecisionText(text: string): unknown {
-  const candidate = stripOptionalJsonFence(text);
-  try {
-    const parsed = JSON.parse(candidate) as unknown;
-    if (typeof parsed === "string") {
-      const inner = parsed.trim();
-      if (inner && !looksLikeJsonValue(inner)) {
-        return { kind: "reply", text: inner };
-      }
+  const trimmed = text.trim();
+  const fenced = FULL_MESSAGE_FENCE.exec(trimmed);
+  if (fenced) {
+    const tag = fenced[1].trim().toLowerCase();
+    const inner = fenced[2].trim();
+    const jsonFence = tag === "" || tag === "json";
+    if (jsonFence && looksLikeJsonValue(inner)) {
+      return JSON.parse(inner) as unknown;
     }
-    return parsed;
-  } catch (err) {
-    if (!candidate || looksLikeJsonValue(candidate)) {
-      throw err;
-    }
-    return { kind: "reply", text: candidate };
+    return proseDowngrade(trimmed);
   }
+  if (looksLikeJsonValue(trimmed)) {
+    return JSON.parse(trimmed) as unknown;
+  }
+  return proseDowngrade(trimmed);
 }
 
 /** Fixed provider adapter. No runner, task board, hooks, scheduling or history writes. */

@@ -9,6 +9,7 @@ import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
   extractEmployeeStewardUserIdFromSessionKey,
   isEmployeeBuiltinStewardSession,
+  sanitizeEmployeeStewardIdentity,
   sessionKeysForChatHistoryActiveRun,
 } from "../../agents/builtin-steward/employee-isolation.js";
 import { isBuiltinStewardAgent } from "../../agents/builtin-steward/identity.js";
@@ -406,6 +407,7 @@ import {
   loadSessionEntryForClient,
   resolveTenantContext,
   resolveTenantContextForSessionStore,
+  TenantContextError,
 } from "../tenant-context.js";
 import { truncateTranscriptToBoundary } from "../transcript-truncate.js";
 import { detectReplyLanguage } from "../user-modeling/derive.js";
@@ -415,7 +417,7 @@ import { resolveLiveRobotWriteRoot } from "../workspace-resolver/write-roots.js"
 import { loadAuthoritativeGroupMembers } from "../workspace/group-acl.js";
 import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
 import {
-  resolveAuthorizedToolCwd,
+  resolveAuthorizedToolCwdDetailed,
   resolveWorkspaceDirAfterAuthorization,
 } from "../workspace/handler-bridge.js";
 import { formatForLog } from "../ws-log.js";
@@ -1222,15 +1224,50 @@ function readTranscriptSessionCwd(filePath: string): string | null {
   return null;
 }
 
+function sameStewardActor(left: string, right: string): boolean {
+  return (
+    left === right ||
+    sanitizeEmployeeStewardIdentity(left) === sanitizeEmployeeStewardIdentity(right)
+  );
+}
+
+function workspaceDenialCode(err: unknown): string {
+  if (err instanceof TenantContextError) {
+    return err.code === "hint_mismatch" ? "hint_mismatch" : "missing_tenant";
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  if (/hint_mismatch|does not match authoritative tenant/i.test(message)) {
+    return "hint_mismatch";
+  }
+  if (/unresolved_tenant|no enterprise membership|trusted tenant context required/i.test(message)) {
+    return "missing_tenant";
+  }
+  return message.slice(0, 180) || "workspace_authorization_failed";
+}
+
+export function transcriptCreateDeniedMessage(reason: string | null | undefined): string {
+  const code = reason?.trim() || "";
+  if (code === "missing_tenant" || code === "unresolved_tenant" || code === "missing_actor") {
+    return "trusted tenant context required to create transcript";
+  }
+  if (code === "hint_mismatch" || code === "actor_mismatch") {
+    return "enterprise or user identity does not match this session; transcript was not created";
+  }
+  if (!code) {
+    return "authorized workspace cwd required to create transcript";
+  }
+  return `authorized workspace cwd required to create transcript: ${code}`;
+}
+
 /** Freeze pins P5:1001 / P1:1005 / P1:1819.
  * Shorten this header when imports above grow.
  */
-export async function resolveCallerWorkspaceCwd(params: {
+export async function resolveCallerWorkspaceCwdDetailed(params: {
   cfg: OpenBotConfig;
   sessionKey: string;
   agentId: string;
   client: GatewayClient | null;
-}): Promise<string | null> {
+}): Promise<{ cwd: string | null; reasonCode?: string }> {
   const ownerId = extractEmployeeStewardUserIdFromSessionKey(params.sessionKey);
   const stewardException = Boolean(
     ownerId &&
@@ -1247,6 +1284,15 @@ export async function resolveCallerWorkspaceCwd(params: {
     // Tenant on the client is enough to name the shadow helper below.
   }
   const shadowTenantId = contextTenantId || params.client?.sessionEnterpriseId?.trim() || "";
+  const trustedUser = contextUserId || params.client?.platformUserId?.trim() || "";
+  // Server membership is the tenant. A missing one is not filled from a
+  // request body, a default enterprise, or an arbitrary directory.
+  if (profile.profile === "managed_enterprise" && !shadowTenantId) {
+    return { cwd: null, reasonCode: "missing_tenant" };
+  }
+  if (ownerId && trustedUser && !sameStewardActor(ownerId, trustedUser)) {
+    return { cwd: null, reasonCode: "actor_mismatch" };
+  }
   const personalFallback = () => {
     // Legacy locator fallback is Personal Local only (Managed has no path fallback).
     if (stewardException && ownerId) {
@@ -1273,12 +1319,11 @@ export async function resolveCallerWorkspaceCwd(params: {
     }
   };
   let authorized: string | null = null;
+  let reasonCode: string | undefined;
   try {
-    const actorUserId = contextUserId || params.client?.platformUserId?.trim() || ownerId || "";
+    const actorUserId = trustedUser || ownerId || "";
     if (actorUserId) {
-      // resolveAuthorizedToolCwd fail-closes a steward lookup before the
-      // trusted Handle when this shadow dir is omitted. The helper is not
-      // the managed cwd; Handle still has to authorize the transcript root.
+      // The shadow helper only unblocks Handle lookup. It is not permission.
       let stewardWorkspaceDir: string | null = null;
       if (stewardException) {
         try {
@@ -1287,7 +1332,7 @@ export async function resolveCallerWorkspaceCwd(params: {
           stewardWorkspaceDir = null;
         }
       }
-      authorized = await resolveAuthorizedToolCwd({
+      const resolved = await resolveAuthorizedToolCwdDetailed({
         client: params.client,
         cfg: params.cfg,
         userId: actorUserId,
@@ -1296,15 +1341,30 @@ export async function resolveCallerWorkspaceCwd(params: {
         stewardException,
         stewardWorkspaceDir,
       });
+      authorized = resolved.cwd;
+      reasonCode = resolved.reasonCode;
+    } else {
+      reasonCode = "missing_actor";
     }
-  } catch {
+  } catch (err) {
     authorized = null;
+    reasonCode = workspaceDenialCode(err);
   }
-  return resolveWorkspaceDirAfterAuthorization({
+  const cwd = resolveWorkspaceDirAfterAuthorization({
     profile: profile.profile,
     authorizedCwd: authorized,
     personalFallback,
   });
+  if (cwd) {
+    return { cwd };
+  }
+  return { cwd: null, ...(reasonCode ? { reasonCode } : {}) };
+}
+
+export async function resolveCallerWorkspaceCwd(
+  params: Parameters<typeof resolveCallerWorkspaceCwdDetailed>[0],
+): Promise<string | null> {
+  return (await resolveCallerWorkspaceCwdDetailed(params)).cwd;
 }
 
 type ChatArchiveEntry = {
@@ -2386,11 +2446,13 @@ async function resolveChatTranscriptGovernance(params: {
   };
 }
 
-async function ensureTranscriptFile(params: {
+export async function ensureTranscriptFile(params: {
   transcriptPath: string;
   sessionId: string;
   /** Authorized workspace cwd (C17). Required for new transcripts — never process.cwd(). */
   cwd?: string | null;
+  /** Why cwd is missing. Surfaced instead of a model-shaped error. */
+  cwdDenialReason?: string | null;
   tenantId?: string | null;
   ownerUserId?: string | null;
   groupId?: string | null;
@@ -2461,7 +2523,7 @@ async function ensureTranscriptFile(params: {
 
   const cwd = typeof params.cwd === "string" ? params.cwd.trim() : "";
   if (!cwd) {
-    return { ok: false, error: "authorized workspace cwd required to create transcript" };
+    return { ok: false, error: transcriptCreateDeniedMessage(params.cwdDenialReason) };
   }
 
   let resourceId: string | null = null;
@@ -2876,7 +2938,7 @@ function appendRawTranscriptMessage(params: {
   return { ok: true, messageId: appended.messageId, message: appended.message ?? params.message };
 }
 
-async function appendUserTranscriptMessage(params: {
+export async function appendUserTranscriptMessage(params: {
   sessionId: string;
   storePath: string | undefined;
   sessionFile?: string;
@@ -2885,6 +2947,7 @@ async function appendUserTranscriptMessage(params: {
   message: Record<string, unknown>;
   /** Authorized workspace cwd for new transcript headers (C17). */
   workspaceCwd?: string | null;
+  workspaceCwdDenialReason?: string | null;
   tenantId?: string | null;
   ownerUserId?: string | null;
   groupId?: string | null;
@@ -2903,6 +2966,7 @@ async function appendUserTranscriptMessage(params: {
     transcriptPath,
     sessionId: params.sessionId,
     cwd: params.workspaceCwd,
+    cwdDenialReason: params.workspaceCwdDenialReason,
     tenantId: params.tenantId,
     ownerUserId: params.ownerUserId,
     groupId: params.groupId,
@@ -6076,12 +6140,13 @@ export const chatHandlers: GatewayRequestHandlers = {
       const clientInfo = client?.connect?.client;
       const transcriptSenderLabel = await resolveChatTranscriptSenderLabel(client);
       const transcriptGovernance = await resolveChatTranscriptGovernance({ client, cfg });
-      const callerWorkspaceCwd = await resolveCallerWorkspaceCwd({
+      const callerWorkspace = await resolveCallerWorkspaceCwdDetailed({
         cfg,
         sessionKey,
         agentId,
         client,
       });
+      const callerWorkspaceCwd = callerWorkspace.cwd;
       let taskTracking: FocusSwitchGateDecision = {
         action: "continue",
         decisionCode: "focus_clear",
@@ -6220,6 +6285,7 @@ export const chatHandlers: GatewayRequestHandlers = {
           idempotencyKey: clientRunId,
           message: userMessage,
           workspaceCwd: callerWorkspaceCwd,
+          workspaceCwdDenialReason: callerWorkspace.reasonCode,
           tenantId: transcriptGovernance.tenantId,
           ownerUserId: transcriptGovernance.ownerUserId,
           groupId: transcriptGovernance.groupId,
@@ -6293,6 +6359,7 @@ export const chatHandlers: GatewayRequestHandlers = {
               timestamp: Date.now(),
             },
             workspaceCwd: callerWorkspaceCwd,
+            workspaceCwdDenialReason: callerWorkspace.reasonCode,
             tenantId: transcriptGovernance.tenantId,
             ownerUserId: transcriptGovernance.ownerUserId,
             groupId: transcriptGovernance.groupId,

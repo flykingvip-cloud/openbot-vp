@@ -9,7 +9,7 @@ import type { GatewayClient } from "./types.js";
 const HANDLE_CWD = "/srv/authorized-handle-workspace";
 
 const cwdMock = vi.hoisted(() => ({
-  resolveAuthorizedToolCwd: vi.fn(),
+  resolveAuthorizedToolCwdDetailed: vi.fn(),
 }));
 
 vi.mock("../knowledge/context.js", async (importOriginal) => {
@@ -33,8 +33,9 @@ vi.mock("../workspace/handler-bridge.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../workspace/handler-bridge.js")>();
   return {
     ...original,
-    resolveAuthorizedToolCwd: (params: Parameters<typeof original.resolveAuthorizedToolCwd>[0]) =>
-      cwdMock.resolveAuthorizedToolCwd(params),
+    resolveAuthorizedToolCwdDetailed: (
+      params: Parameters<typeof original.resolveAuthorizedToolCwdDetailed>[0],
+    ) => cwdMock.resolveAuthorizedToolCwdDetailed(params),
   };
 });
 
@@ -75,7 +76,7 @@ beforeEach(() => {
   delete process.env.OPENCLAW_SECURITY_PROFILE;
   delete process.env.OPENBOT_DATA_MODE;
   delete process.env.OPENCLAW_DATA_MODE;
-  cwdMock.resolveAuthorizedToolCwd.mockReset();
+  cwdMock.resolveAuthorizedToolCwdDetailed.mockReset();
 });
 
 afterEach(() => {
@@ -93,13 +94,13 @@ afterEach(() => {
 });
 
 it("creates a steward transcript cwd from the Handle workspace, not the shadow helper", async () => {
-  cwdMock.resolveAuthorizedToolCwd.mockImplementation(
+  cwdMock.resolveAuthorizedToolCwdDetailed.mockImplementation(
     async (params: { stewardException?: boolean; stewardWorkspaceDir?: string | null }) => {
       // Production gate: a steward lookup without the shadow helper never reaches Handle.
       if (params.stewardException && !params.stewardWorkspaceDir?.trim()) {
-        return null;
+        return { cwd: null, reasonCode: "missing_steward_workspace" };
       }
-      return HANDLE_CWD;
+      return { cwd: HANDLE_CWD };
     },
   );
 
@@ -111,8 +112,8 @@ it("creates a steward transcript cwd from the Handle workspace, not the shadow h
   });
 
   expect(cwd).toBe(HANDLE_CWD);
-  expect(cwdMock.resolveAuthorizedToolCwd).toHaveBeenCalledTimes(1);
-  const params = cwdMock.resolveAuthorizedToolCwd.mock.calls[0]?.[0] as {
+  expect(cwdMock.resolveAuthorizedToolCwdDetailed).toHaveBeenCalledTimes(1);
+  const params = cwdMock.resolveAuthorizedToolCwdDetailed.mock.calls[0]?.[0] as {
     stewardException?: boolean;
     stewardWorkspaceDir?: string | null;
     purpose?: string;
@@ -124,7 +125,10 @@ it("creates a steward transcript cwd from the Handle workspace, not the shadow h
 });
 
 it("keeps a managed steward transcript closed when Handle denies the workspace", async () => {
-  cwdMock.resolveAuthorizedToolCwd.mockResolvedValue(null);
+  cwdMock.resolveAuthorizedToolCwdDetailed.mockResolvedValue({
+    cwd: null,
+    reasonCode: "resolver_denied",
+  });
 
   const cwd = await resolveCallerWorkspaceCwd({
     cfg: managedCfg,
