@@ -27,23 +27,31 @@ M1–M3 独立内容验收已通过（M3 受测同上；上一证据头 `ffb70ce
 
 **口径**：局部 42 PASS 与 31／266 PASS **不得**写成全库通过。扩展套件失败见下节。
 
-## 扩展 Gateway 失败（相对 Batch E 为历史／既有）
+## 扩展 Gateway 失败（归因已对照；撤回「历史／既有」笼统标签）
 
-独立验收曾指出「更大既有 Gateway 测试文件」上有两项与 M3 无关的历史断言失败。本轮对 `src/gateway/collaboration-learning` 与 `src/gateway/collaboration-dispatch` 做了更广复跑，共 **17** 项失败、跨 **9** 个测试文件。自 Batch D tip `479f9ba14` 至本 tip，**上述 9 个失败文件均无 Batch E 提交改动** → 相对本候选标为 **historical／pre-existing**，非 M3 引入。
+> **撤回**：本包曾写「9 个失败文件无 Batch E 改动 → historical／pre-existing」。测试文件未改 ≠ 实现／依赖未改；该归因在缺少基线对照时无效。独立验收亦撤回「两项历史断言失败」的无基线表述。
 
-代表性失败（完整列表见扩展日志）：
+对照报告：`t9-ext-gateway-17-fail-attribution.md`（同目录）。同命令下对失败 9 文件复跑：
 
-1. `discuss-to-task-gateway-ws.integration.test.ts` — 2 项：`expected false to be true`（WS 正式建立／双主体隔离）
-2. `r7-claim-lifecycle-trusted.gateway.test.ts` — 2 项：trusted claim 生命周期断言
-3. `todolist-acl-rpc.test.ts` — 5 项：ACL／confirm／transcript／historyReloadable
-4. `r6-wake-handler-chain.gateway.test.ts` — 3 项：wake／confirm／chat.send
-5. `r5-handler-trusted-chain.gateway.test.ts` — 1 项：`confirmation_consumed`
-6. `controlled-collab-p2-event-dispatch.test.ts` — 1 项：subprocess child exit 1
-7. `convergence-acceptance.test.ts` — 1 项：ENOENT continuity checkpoint
-8. `episode-single-beat-runtime.g2.test.ts` — 1 项：productionExecutor 字符串断言
-9. `group-task-heartbeat.test.ts` — 1 项：allowlist heartbeat 断言
+| 端 | SHA | 结果 |
+| --- | --- | --- |
+| 候选 tip | `8deb8ce4f…` | 17 FAIL／71 PASS |
+| Batch D | `479f9ba14…` | 17 FAIL／71 PASS（与候选同集合） |
+| T0 迁移前 | `efdb1b98d…` | 14 FAIL／74 PASS |
 
-合并前须按仓库整体门禁单独处置；本包不修复、不宣称全绿。
+分类：**Batch E 引入 0**；**既有（T0 同败）14**；**迁移引入（T0→D）3**（discuss-to-task×2、p2 subprocess×1）。无「归因未定」。本包仍不修复这 17 项、不宣称全绿；**最终验收仍 FAIL**。
+
+代表性失败文件（完整见归因表与扩展日志）：
+
+1. `discuss-to-task-gateway-ws.integration.test.ts` — 2（迁移引入）
+2. `r7-claim-lifecycle-trusted.gateway.test.ts` — 2（既有）
+3. `todolist-acl-rpc.test.ts` — 5（既有）
+4. `r6-wake-handler-chain.gateway.test.ts` — 3（既有）
+5. `r5-handler-trusted-chain.gateway.test.ts` — 1（既有）
+6. `controlled-collab-p2-event-dispatch.test.ts` — 1（迁移引入）
+7. `convergence-acceptance.test.ts` — 1（既有）
+8. `episode-single-beat-runtime.g2.test.ts` — 1（既有）
+9. `group-task-heartbeat.test.ts` — 1（既有）
 
 ## 组终稿投递
 
@@ -54,7 +62,7 @@ M1–M3 独立内容验收已通过（M3 受测同上；上一证据头 `ffb70ce
 - M1–M3 成员已接受成果桥（`requestAcceptedArtifactDelivery`／grant／进程内 recover）会读取 `acceptedArtifactVersion`，但是 **显式请求的成员成果外发**，与组终稿自动集成→投递→回执 **不是同一条链**；完成成员桥 **不得** 关闭组终稿验收格。
 - 生产路径中，除成员桥模块外，board 上 `acceptedArtifactVersion` 仍无组终稿 outbound 消费者。
 
-若要关闭组终稿格，需另开设计／实施：组终稿对象、授权、投递消费者与失败重投（本包不做）。
+若要关闭组终稿格，需另开设计／实施：组终稿对象、授权、投递消费者与失败重投（本包不做）。最小补链设计（仅设计）：`t9-group-final-delivery-bridge-design.md`。
 
 ## 真实运行 GAP（仍开放）
 
@@ -66,7 +74,7 @@ D0–D5（S0–S7）未开始。
 
 ## 合并／部署
 
-本包 **不授权** 合并或部署。双规发布侧已盘点未合入栈并待命；须待本最终同版本包独立验收通过后，再发合入／DIGEST 信号。Owner 当面 `PRODUCTION_GO DIGEST` 仍为部署硬门槛。
+本包 **不授权** 合并或部署。**Owner 已判定 T9 最终验收不通过**（证据可接受、最终门禁 FAIL）；禁止统一合入／DIGEST／切 LIVE。须待 17 项归因处置与组终稿链关闭后，再发合入信号。Owner 当面 `PRODUCTION_GO DIGEST` 仍为部署硬门槛。
 
 ## 结构结论（不变）
 
