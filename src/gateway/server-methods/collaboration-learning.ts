@@ -2,11 +2,13 @@ import type { CapsuleReusability } from "@openbot/collaboration-core";
 import {
   acceptedArtifactDeliveryDirs,
   issuanceFactsFromBoard,
-  readAcceptedArtifactDelivery,
   requestAcceptedArtifactDelivery,
   revokeAcceptedArtifactDelivery,
-} from "../../agent-runtime/wiring/accepted-artifact-delivery.js";
+} from "../../agent-runtime/command/accepted-artifact-delivery.js";
+import { readAcceptedArtifactDelivery } from "../../agent-runtime/state/collaboration/accepted-artifact-delivery-read.js";
+import { createOutboundSendDeps, type CliDeps } from "../../cli/deps.js";
 import { loadConfig } from "../../config/config.js";
+import type { OutboundSendDeps } from "../../infra/outbound/deliver.js";
 import { isCollabRuntimeNamespaceEnabled } from "../collaboration-dispatch/runtime-namespace.js";
 import {
   acceptCollaborationTaskHandoffContract,
@@ -237,6 +239,18 @@ function trustedDeliveryIssuerInput(
     groupId,
     groupAction: "write",
   };
+}
+
+/** Map gateway context.deps (CliDeps) or test OutboundSendDeps stubs into send deps. */
+function outboundDepsFromGatewayContext(deps: unknown): OutboundSendDeps | undefined {
+  if (!deps || typeof deps !== "object") {
+    return undefined;
+  }
+  const record = deps as Record<string, unknown>;
+  if (typeof record.sendMessageTelegram === "function") {
+    return createOutboundSendDeps(deps as CliDeps);
+  }
+  return deps as OutboundSendDeps;
 }
 
 async function loadAcceptedArtifactIssuanceFacts(params: {
@@ -1377,7 +1391,12 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       );
     }
   },
-  "collaboration.task.requestAcceptedArtifactDelivery": async ({ params, respond, client }) => {
+  "collaboration.task.requestAcceptedArtifactDelivery": async ({
+    params,
+    respond,
+    client,
+    context,
+  }) => {
     if (
       !assertValidParams(
         params,
@@ -1405,11 +1424,14 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         client,
         ctx,
       });
+      const cfg = loadConfig();
       const result = await requestAcceptedArtifactDelivery({
         issuerInput: trustedDeliveryIssuerInput(ctx, params.groupId),
         facts,
         target: params.target,
         dirs: acceptedArtifactDeliveryDirs(),
+        cfg,
+        deps: outboundDepsFromGatewayContext(context?.deps),
       });
       if (!result.ok) {
         respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
