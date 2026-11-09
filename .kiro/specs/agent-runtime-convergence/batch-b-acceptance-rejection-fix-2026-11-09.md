@@ -58,7 +58,7 @@ Before the fix, the three incomplete cases closed the conversation task. The ind
 
 - `decideWake` park/switch and `MAX_PARKED_SLOTS` stay in `focus-policy.ts`. That is the wake action, separate from eligibility. The slot cap is still not `MAX_PARKED_TASKS`.
 - Owner-constraint predicates stay in `turn-relation.ts`.
-- A crash after `transitionTask` returns and before `appendTaskCompletionNotice` returns can leave the conversation task closed without a transcript notice. The injected case was the close throw, which no longer writes the notice first.
+- A crash after `transitionTask` returns and before `appendTaskCompletionNotice` returns can leave the conversation task closed without a transcript notice. That is a supplemental reliability gap for the completion notice, not a claim that the business result was undelivered, and not a delivery receipt. No recovery system is added for it. See `t3-ownership-landing-2026-11-09.md`.
 
 ## Regressions after the four implementation commits
 
