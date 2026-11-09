@@ -30,15 +30,15 @@
 | `conversation-task/control-plane.ts` | CTR 激活控制面（SQLite） | 仍在；activation / bootstrap / degrade | 保留领域含义；不粗并会话板 | feature flags；store | **适配保留** | 保留有因 | T4 / T8 |
 | `conversation-task/ledger-binding.ts` | Conversation ledger 关闭与工具观察 | reply-completion；embedded-attempt 观察创建 | 独立权威；与板完成联动条件写清 | cron store；tool observations | **适配保留** | 保留有因 | T4 / T8 |
 | `task-orchestration/complex-task-loop.ts` | 可选四步可见报告 / shaping；默认关 | 文件在；**无生产 importer**；flags 默认 OFF | 观察不控权；不得第二关闭权 | turn-relation classify；observe-gate | **观察保留** | 保留有因 | T3 / T8 |
-| `gateway/collaboration-dispatch/effective-policy.ts` | L1 不变量、模板、权限类型 | 仍在 gateway | policy/collaboration/system-invariants | resolve / compiler | **迁移** | 未开始 | T5 |
-| `policy-compiler.ts` + sections + hash | `compileEffectiveCollaborationPolicy` 与 hash | 仍在 gateway | policy；同输入同 policyHash | effective-policy 类型 | **迁移** | 未开始 | T5 |
+| `gateway/collaboration-dispatch/effective-policy.ts` | L1 不变量、模板、权限类型 | 不变量与模板在 `policy/collaboration-rules.ts`；本文件 re-export 并保留 EffectivePolicy 类型 | policy | resolve / compiler | **迁移** | 待验收 | T5 |
+| `policy-compiler.ts` + sections + hash | `compileEffectiveCollaborationPolicy` 与 hash | `L1_DEFAULT` 在 policy 且本文件 re-export；编译与 hash 仍在 gateway | policy；同输入同 policyHash | effective-policy 类型 | **适配保留**（编译宿主）+ **迁移**（L1 默认值） | 待验收 | T5 |
 | `resolve-effective-policy.ts` | 唯一组合根（喂 operatingState/overlay） | 仍在；learning / policy-lane / round-snapshot 消费 | 迁移期薄壳可留 Gateway/command；算法进 policy | compiler | **适配保留**（壳）+ **迁移**（算法） | 未开始 | T5 |
-| `submit-review-versioning.ts` | 提交版本/空/重复规则 | 仍在 gateway | policy | claim-contract | **迁移** | 未开始 | T5 |
-| `governance-gate.ts` | 治理门纯判定 | 仍在；handoff / state-machine / task-runtime / self-advance | policy | 角色/模式 | **迁移** | 未开始 | T5 |
-| `peer-review-gate.ts` | 评审判定 + 评审事实写 | 仍在；requirePeerReview 默认 OFF；drivesAdmission=false | policy 判定 + state 事实 | claim accept | **迁移** | 未开始 | T5 / T6 |
-| `plan-gate-exec.ts` | 交付执行门 / board-todolist mapping | 仍在；delivery-exec-prompt / self-advance | policy + 计划事务 state | private todolist | **迁移** | 未开始 | T5 / T6 |
-| `claim-contract.ts` | 群 ClaimContract 状态机与锁内事务 | 仍在 gateway；claimContract 默认 OFF；learning 入口密集 | 合法边→policy；锁内 RMW→state；编排→command；fan-out 锁外 | round lock；effective policy | **迁移** | 未开始 | T5 / T6 |
-| `executor-private-todolist.ts` | 成员私有计划（非群共享板） | 仍在 gateway | **独立 state 作用域**；编排/判定分离 | claim item + owner | **迁移** | 未开始 | T6 |
+| `submit-review-versioning.ts` | 提交版本/空/重复规则 | 纯函数在 policy；本文件只 re-export | policy | claim-contract | **迁移** | 待验收 | T5 |
+| `governance-gate.ts` | 治理门纯判定 | 判定在 policy；本文件只 re-export。未改确认模式 | policy | 角色/模式 | **迁移** | 待验收 | T5 |
+| `peer-review-gate.ts` | 评审判定 + 评审事实写 | accept 计数判定在 policy；评审事实追加仍在本文件。默认仍 OFF；不驱动 Admission | policy 判定 + 现宿主事实 | claim accept | **迁移** | 待验收 | T5 / T6 |
+| `plan-gate-exec.ts` | 交付执行门 / board-todolist mapping | 状态映射在 policy；执行包组装仍在本文件。未与 ClaimContract 合并 | policy + 现宿主组装 | private todolist | **迁移** | 待验收 | T5 / T6 |
+| `claim-contract.ts` | 群 ClaimContract 状态机与锁内事务 | 合法边在 policy 且锁回调改为调用它；`withRoundLock`、revision、锁外 fan-out 仍在本文件。默认仍 OFF | 合法边→policy；锁内 RMW 暂留本宿主 | round lock；effective policy | **迁移** | 待验收 | T5 / T6 |
+| `executor-private-todolist.ts` | 成员私有计划（非群共享板） | 仍独立存储。纯不变量（非群板子记录、口头计划不成事实、confirmed 判定）在 policy 并 re-export | **独立 state 作用域**；编排/判定分离 | claim item + owner | **迁移** | 待验收 | T6 |
 | `handoff-contract.ts` | 交接分类与 apply / 责任快照 | 仍在 gateway | policy 纯分类 + state | governance-gate | **迁移** | 未开始 | T6 |
 | legacy-primary-supplement / round-runtime / decision / wake / floor* | 协作回合、发言、唤醒等现役行为 | 仍在 collaboration-dispatch 及周边 | 区分领域编排 vs adapter vs 策略；**不整目录删除**；Gateway 最终仅请求/事件/连接 | Floor / LIVE 相关 flag | **适配保留**（迁移期暂留） | 保留有因 | T6 / T8 |
 | `auto-reply/reply/get-reply-run.ts`、`agent-runner.ts` | 受控回复宿主 | 仍在；`runAdmittedTurn` 经 wiring | 保留宿主；核准无第二决策权威 | execution / command wiring | **适配保留** | 保留有因 | T1 / T8 |
