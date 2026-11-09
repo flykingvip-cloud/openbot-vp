@@ -571,3 +571,24 @@ export function isTodolistConfirmedForDelivery(
 ): boolean {
   return todolist?.status === "confirmed";
 }
+
+/** Default / flag-off ceiling: single beat only. */
+export const MULTI_BEAT_DEFAULT_MAX = 1;
+
+/** Hard ceiling aligned with SYSTEM_INVARIANTS.maxVisibleRepliesCeiling. */
+export const MULTI_BEAT_HARD_CEILING = 12;
+
+/** Clamp a raw maxBeats value the same way config resolve does. */
+export function clampMaxBeatsPerEpisode(raw: number | null | undefined): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return MULTI_BEAT_DEFAULT_MAX;
+  }
+  const floored = Math.floor(raw);
+  if (floored < MULTI_BEAT_DEFAULT_MAX) {
+    return MULTI_BEAT_DEFAULT_MAX;
+  }
+  if (floored > MULTI_BEAT_HARD_CEILING) {
+    return MULTI_BEAT_HARD_CEILING;
+  }
+  return floored;
+}
