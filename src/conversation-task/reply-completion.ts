@@ -3,6 +3,7 @@
  * receives a successful assistant reply. Never throws into dispatch.
  */
 
+import { SILENT_REPLY_TOKEN } from "../agent-runtime/contracts/delivery.js";
 import {
   consultDeliveryHoldForClose,
   type DeliveryCloseConsult,
@@ -57,6 +58,23 @@ export const CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_ENV =
   "OPENBOT_CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT";
 
 const DELIVERY_CLOSE_CONSULT_LIMIT = 32;
+const PLACEHOLDER_REPLY_RE = /^[.。…·\s]+$/u;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Blank, exact silent token, or ellipsis-only text is not completion evidence. */
+export function isSilentOrPlaceholderReply(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return true;
+  }
+  if (new RegExp(`^\\s*${escapeRegExp(SILENT_REPLY_TOKEN)}\\s*$`).test(text)) {
+    return true;
+  }
+  return PLACEHOLDER_REPLY_RE.test(trimmed);
+}
 
 const deliveryCloseConsults: ConversationTaskDeliveryCloseConsultRecord[] = [];
 
@@ -196,6 +214,51 @@ function matchesTask(
 }
 
 /**
+ * Three closes stay separate:
+ * - ConversationTask `closed` is the CTR lifecycle. It is terminal and is not
+ *   the session board or a delivery receipt.
+ * - Ledger close is acceptance evidence for that conversation task.
+ * - SessionTaskBoard completion is `recordCheckedTaskCompletion` only.
+ * A notice is returned only after the board write is newly persisted and the
+ * conversation task then transitions to `closed`. A rejected or failed board
+ * write leaves the conversation task active so a later delivered reply can retry.
+ * Delivery confirmation is not decided here.
+ */
+type SessionBoardCloseSettlement =
+  | { kind: "not_applicable" }
+  | { kind: "accepted"; notice?: string }
+  | { kind: "already_checked" }
+  | { kind: "rejected" }
+  | { kind: "unavailable" };
+
+function settleSessionBoardClose(params: {
+  sessionFile?: string;
+  binding?: TaskCompletionBinding;
+}): SessionBoardCloseSettlement {
+  const file = params.sessionFile?.trim() ?? "";
+  const taskId = params.binding?.taskId?.trim() ?? "";
+  if (!file || !taskId) {
+    return { kind: "not_applicable" };
+  }
+  try {
+    const result = recordCheckedTaskCompletion({
+      sessionFile: file,
+      closed: true,
+      binding: params.binding,
+    });
+    if (result.persisted) {
+      return { kind: "accepted", ...(result.notice ? { notice: result.notice } : {}) };
+    }
+    if (result.alreadyChecked) {
+      return { kind: "already_checked" };
+    }
+    return { kind: "rejected" };
+  } catch {
+    return { kind: "unavailable" };
+  }
+}
+
+/**
  * Mark the ConversationTask tied to this inbound turn as delivered: ledger
  * acceptance closes, task lifecycle moves to `closed`. No-op when activation is
  * off, identity is missing, or no matching active task exists.
@@ -242,6 +305,9 @@ export function observeConversationTaskReplyCompleted(
         const strictClose = isConversationTaskCloseRequiresEvidence();
         const assistantReply =
           typeof input.assistantReplyText === "string" ? input.assistantReplyText.trim() : "";
+        if (assistantReply && isSilentOrPlaceholderReply(assistantReply)) {
+          return undefined;
+        }
         if (assistantReply) {
           const alignment = assessTaskOutputAlignment({
             anchorText: task.goal,
@@ -277,23 +343,23 @@ export function observeConversationTaskReplyCompleted(
           task,
           cronStorePath: input.cronStorePath,
         });
-        const sessionFile = typeof input.sessionFile === "string" ? input.sessionFile : undefined;
         if (strictClose && !conversationLedgerClosedOnCanonicalEvidence(ledgerOutcome.ledger)) {
-          if (!ledgerOutcome.closedNow) {
-            return undefined;
-          }
-          return recordCheckedTaskCompletion({
-            sessionFile,
-            closed: true,
-            binding: completionBinding,
-          }).notice;
+          return undefined;
+        }
+        const sessionFile = typeof input.sessionFile === "string" ? input.sessionFile : undefined;
+        const settlement = settleSessionBoardClose({
+          sessionFile,
+          binding: completionBinding,
+        });
+        if (settlement.kind === "rejected" || settlement.kind === "unavailable") {
+          return undefined;
+        }
+        const current = store.getTaskById(task.id);
+        if (!current || current.lifecycle !== "active") {
+          return undefined;
         }
         store.transitionTask(task.id, "closed");
-        return recordCheckedTaskCompletion({
-          sessionFile,
-          closed: true,
-          binding: completionBinding,
-        }).notice;
+        return settlement.kind === "accepted" ? settlement.notice : undefined;
       } catch {
         // Ledger close must never surface on the reply path.
       } finally {

@@ -418,7 +418,7 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     implementation: "src/conversation-task/reply-completion.ts",
     enforcementPoints: [
       "after_reply_close",
-      "transitionTask_closed_then_recordCheckedTaskCompletion",
+      "recordCheckedTaskCompletion_then_transitionTask_closed",
     ],
     version: INVENTORY_VERSION,
     dependencies: {
@@ -431,10 +431,13 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
       ],
     },
     configuration:
-      "gated by readConversationTaskFlags().activation (env OPENBOT_CONVERSATION_TASK_ACTIVATION / conversationTask.activation.enabled); default OFF; no-op when activation is off; T4 must prove partial-success window before large moves or retirement",
-    tests: ["src/conversation-task/reply-completion.test.ts"],
+      "gated by readConversationTaskFlags().activation (env OPENBOT_CONVERSATION_TASK_ACTIVATION / conversationTask.activation.enabled); default OFF; no-op when activation is off; ConversationTask closes only after session-board settlement accepts, is already checked, or is not applicable",
+    tests: [
+      "src/conversation-task/reply-completion.test.ts",
+      "src/conversation-task/reply-completion.window.test.ts",
+    ],
     retirementCondition:
-      "orchestration may stay adapter; completion writes only via state after T4 window approval",
+      "orchestration stays the conversation-task adapter; session-board writes only via state; do not merge ConversationTask, ledger, and SessionTaskBoard",
     management: "code_required",
     disposition: "pending_migration",
   },
