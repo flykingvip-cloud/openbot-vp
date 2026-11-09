@@ -23,7 +23,11 @@ import { evaluateProjectionVisibility, visibilityScopeLabel } from "./visibility
  * rows (Code|Date|Customer|ΣQty|ΣAmount|首品) can cover ≥20 leading items rather
  * than 1–2 fat SaleDeliveryDetails blobs (#246 follow-up). */
 const FEED_PAYLOAD_EXCERPT_MAX = 3200;
-const FEED_ITEMS_PREVIEW_MAX = 20;
+/** Summary excerpt row cap. Fuller reads use pageEnterpriseFeedPayload. */
+export const ENTERPRISE_FEED_PREVIEW_MAX = 20;
+export const ENTERPRISE_FEED_PAGE_DEFAULT_LIMIT = 50;
+export const ENTERPRISE_FEED_PAGE_MAX_LIMIT = 100;
+export const ENTERPRISE_FEED_PAGE_CHAR_BUDGET = 12_000;
 /** Exact fail_closed_redact placeholder — drop from DH excerpts so plaintext Code/Name survive. */
 const MASKED_SCALAR = "***";
 const SENSITIVE_PAYLOAD_KEY_RE =
@@ -43,7 +47,9 @@ function redactFeedPayload(value: unknown, depth: number): unknown {
     return undefined;
   }
   if (Array.isArray(value)) {
-    return value.slice(0, FEED_ITEMS_PREVIEW_MAX).map((item) => redactFeedPayload(item, depth + 1));
+    return value
+      .slice(0, ENTERPRISE_FEED_PREVIEW_MAX)
+      .map((item) => redactFeedPayload(item, depth + 1));
   }
   if (!value || typeof value !== "object") {
     return value;
@@ -70,7 +76,7 @@ function dropMaskedScalars(value: unknown, depth: number): unknown {
   }
   if (Array.isArray(value)) {
     return value
-      .slice(0, FEED_ITEMS_PREVIEW_MAX)
+      .slice(0, ENTERPRISE_FEED_PREVIEW_MAX)
       .map((item) => dropMaskedScalars(item, depth + 1))
       .filter((item) => item !== undefined);
   }
@@ -326,6 +332,54 @@ export function feedPayloadExcerpt(payload: Record<string, unknown>): string {
     : text;
 }
 
+function redactPageRow(row: unknown): unknown {
+  if (!row || typeof row !== "object" || Array.isArray(row)) {
+    return row;
+  }
+  const flattened = flattenVoucherRow(row as Record<string, unknown>);
+  const projected = flattened === row ? row : projectBusinessItemKeys(flattened);
+  const redacted = redactFeedPayload(projected, 0);
+  return redacted ?? row;
+}
+
+/**
+ * One budgeted page of a materialized feed payload. The summary excerpt stays
+ * at ENTERPRISE_FEED_PREVIEW_MAX; this is the path past that preview.
+ */
+export function pageEnterpriseFeedPayload(params: {
+  payload: Record<string, unknown>;
+  offset?: number;
+  limit?: number;
+}): {
+  total: number;
+  offset: number;
+  limit: number;
+  items: unknown[];
+  truncated: boolean;
+} {
+  const all = Array.isArray(params.payload.items) ? params.payload.items : [];
+  const declared = params.payload.count;
+  const total = typeof declared === "number" && Number.isFinite(declared) ? declared : all.length;
+  const offset = Number.isFinite(params.offset) ? Math.max(0, Math.floor(params.offset ?? 0)) : 0;
+  const requested = Number.isFinite(params.limit)
+    ? Math.floor(params.limit ?? ENTERPRISE_FEED_PAGE_DEFAULT_LIMIT)
+    : ENTERPRISE_FEED_PAGE_DEFAULT_LIMIT;
+  const limit = Math.min(
+    ENTERPRISE_FEED_PAGE_MAX_LIMIT,
+    Math.max(1, requested || ENTERPRISE_FEED_PAGE_DEFAULT_LIMIT),
+  );
+  const items = all.slice(offset, offset + limit).map((row) => redactPageRow(row));
+  let truncated = offset + items.length < all.length;
+  while (items.length > 1 && JSON.stringify(items).length > ENTERPRISE_FEED_PAGE_CHAR_BUDGET) {
+    items.pop();
+    truncated = true;
+  }
+  if (JSON.stringify(items).length > ENTERPRISE_FEED_PAGE_CHAR_BUDGET) {
+    truncated = true;
+  }
+  return { total, offset, limit, items, truncated };
+}
+
 function mapProjectionKind(
   kind: EnterpriseKnowledgeProjectionSpec["objectKind"],
 ): KnowledgeObjectKind {
@@ -347,6 +401,78 @@ function findBindingForProjection(
 
 export function feedRecordObjectId(feedObjectId: string): string {
   return `obj:enterprise:feed:${feedObjectId}`;
+}
+
+export type EnterpriseFeedPageRead =
+  | { kind: "absent" }
+  | { kind: "restricted" }
+  | {
+      kind: "granted";
+      total: number;
+      offset: number;
+      limit: number;
+      items: unknown[];
+      truncated: boolean;
+      previewMax: number;
+    };
+
+/**
+ * Seat-gated page of one enterprise feed object. Restricted seats get no rows.
+ * Pack products still require a seat grant; other feeds follow the visibility policy.
+ */
+export function readEnterpriseFeedPage(params: {
+  store: EnterpriseDataStore;
+  context: KnowledgeSourceContext;
+  objectId: string;
+  offset?: number;
+  limit?: number;
+}): EnterpriseFeedPageRead {
+  if (!params.context.tenantId || !params.objectId.startsWith("obj:enterprise:feed:")) {
+    return { kind: "absent" };
+  }
+  const tenantId = params.context.tenantId;
+  const record = listKnowledgeFeedItems({ store: params.store, tenantId }).find(
+    (item) => feedRecordObjectId(item.objectId) === params.objectId,
+  );
+  if (!record) {
+    return { kind: "absent" };
+  }
+  const bindings = listEnterpriseKnowledgeProjectionBindings({
+    store: params.store,
+    tenantId,
+    enabled: true,
+  });
+  const binding = findBindingForProjection(bindings, record.projectionId);
+  const visibility = evaluateProjectionVisibility({
+    store: params.store,
+    tenantId,
+    projectionId: record.projectionId,
+    visibilityPolicyId: binding?.visibilityPolicyId,
+    context: params.context,
+  });
+  const grants = params.context.seatId
+    ? listSeatActionGrants({
+        store: params.store,
+        tenantId,
+        seatId: params.context.seatId,
+      })
+    : [];
+  const granted = autoSuppliedProductGranted({
+    store: params.store,
+    tenantId,
+    projectionId: record.projectionId,
+    context: params.context,
+    grants,
+  });
+  if (!visibility.visible || !granted || visibility.accessState !== "accessible") {
+    return { kind: "restricted" };
+  }
+  const page = pageEnterpriseFeedPayload({
+    payload: record.payload,
+    offset: params.offset,
+    limit: params.limit,
+  });
+  return { kind: "granted", ...page, previewMax: ENTERPRISE_FEED_PREVIEW_MAX };
 }
 
 export function resolveLineageIdForFeedRecord(params: {

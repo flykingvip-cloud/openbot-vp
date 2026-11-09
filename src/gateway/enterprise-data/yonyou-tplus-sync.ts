@@ -2,8 +2,10 @@
  * Incremental read for `erp-yonyou-tplus`.
  *
  * Pages the registered QueryPage / FindVoucherList handlers and stores a
- * per-source watermark plus sync-log rows on the tenant enterprise-data store.
- * A finished window advances the watermark. A failed or truncated window does not.
+ * per-source watermark, sync-log rows, and the row snapshot on the tenant
+ * enterprise-data store. A finished window advances the watermark and writes
+ * the snapshot (full windows replace, incremental windows merge). A failed or
+ * truncated window does not advance the watermark and does not replace the snapshot.
  *
  * Inventory / partner (master QueryPage): the first sync with no watermark omits
  * `UpdateDateBegin`/`UpdateDateEnd` so the full archive pages in (same idea as
@@ -12,9 +14,10 @@
  * Data[] for archives that have not changed recently, then advance the
  * watermark and permanently skip them.
  *
- * Projection materialization calls `applyYonyouTplusSyncCursorToInput` so a
- * governed read of inventory, partner, sale delivery, or sale order uses the
- * same cursor window. Warehouse Query has no documented date filter
+ * Aggregate materialization reads the snapshot when one exists, so the Feed is
+ * the accumulated pull rather than the first live page. NormalizeTemplate still
+ * calls `applyYonyouTplusSyncCursorToInput` for a governed incremental read.
+ * Warehouse Query has no documented date filter
  * (https://open.chanjet.com/docs/file/apiFile/tcloud/t+jcda/t+ck): the body is
  * `{param:{}}` or `SelectFields`, so that stream is one bounded catalog read
  * fingerprinted by Code/Name/Ts. QueryPage and FindVoucherList do not document
@@ -40,6 +43,7 @@ import {
   type YonyouTplusProbeContext,
 } from "./adapters/yonyou-tplus.js";
 import { loadCredentialSecret } from "./connector-credential-vault.js";
+import { writeConnectorSyncSnapshot } from "./connector-sync-snapshot.js";
 import type {
   ConnectorSyncCursor,
   ConnectorSyncLogEntry,
@@ -595,8 +599,9 @@ async function pullStream(params: {
   secret: DataConnectorCredentialSecret;
   context: YonyouTplusProbeContext;
   window: DateWindow;
-}): Promise<{ recordCount: number; truncated: boolean }> {
+}): Promise<{ recordCount: number; truncated: boolean; rows: unknown[] }> {
   let recordCount = 0;
+  const rows: unknown[] = [];
   const maxPages = maxPagesForWindow(params.window);
   for (let page = 0; page < maxPages; page += 1) {
     const pageIndex = params.stream.kind === "master" ? page + 1 : page;
@@ -611,20 +616,45 @@ async function pullStream(params: {
       params.context,
     );
     const body = yonyouTplusPayloadBody(result.payload);
-    const rows = rowCountFromBody(body);
-    recordCount += rows;
-    if (pageIsComplete(body, rows)) {
-      return { recordCount, truncated: false };
+    const counted = rowCountFromBody(body);
+    recordCount += counted;
+    rows.push(...extractYonyouTplusRows(result.payload));
+    if (pageIsComplete(body, counted)) {
+      return { recordCount, truncated: false, rows };
     }
   }
-  return { recordCount, truncated: true };
+  return { recordCount, truncated: true, rows };
+}
+
+function persistFinishedRows(params: {
+  store: EnterpriseDataStore;
+  tenantId: string;
+  source: DataSource;
+  stream: SyncStream;
+  rows: unknown[];
+  mode: "replace" | "merge";
+  watermark?: string;
+  nowIso: string;
+}): void {
+  writeConnectorSyncSnapshot({
+    store: params.store,
+    tenantId: params.tenantId,
+    sourceId: params.source.sourceId,
+    connectorId: params.source.connectorId,
+    streamKey: params.stream.streamKey,
+    actionKey: params.stream.actionKey,
+    rows: params.rows,
+    mode: params.mode,
+    watermark: params.watermark,
+    nowIso: params.nowIso,
+  });
 }
 
 async function pullCatalog(params: {
   stream: SyncStream;
   secret: DataConnectorCredentialSecret;
   context: YonyouTplusProbeContext;
-}): Promise<{ recordCount: number; truncated: boolean; watermark?: string }> {
+}): Promise<{ recordCount: number; truncated: boolean; watermark?: string; rows: unknown[] }> {
   const result = await executeYonyouTplusHandler(
     params.stream.handlerRef,
     {
@@ -637,12 +667,13 @@ async function pullCatalog(params: {
   );
   const rows = extractYonyouTplusRows(result.payload);
   if (rows.length > WAREHOUSE_ROW_CAP) {
-    return { recordCount: rows.length, truncated: true };
+    return { recordCount: rows.length, truncated: true, rows };
   }
   return {
     recordCount: rows.length,
     truncated: false,
     watermark: yonyouTplusCatalogWatermark(rows),
+    rows,
   };
 }
 
@@ -786,6 +817,16 @@ async function runSync(params: YonyouTplusSyncParams): Promise<YonyouTplusSyncRe
           watermark: pulled.watermark,
           nowIso,
         });
+        persistFinishedRows({
+          store: params.store,
+          tenantId: params.tenantId,
+          source,
+          stream,
+          rows: pulled.rows,
+          mode: "replace",
+          watermark: pulled.watermark,
+          nowIso,
+        });
         const detail = changed
           ? `已读取 ${pulled.recordCount} 条仓库，目录指纹更新为 ${pulled.watermark}。`
           : `已读取 ${pulled.recordCount} 条仓库，目录未变化（${pulled.watermark}）。`;
@@ -899,6 +940,16 @@ async function runSync(params: YonyouTplusSyncParams): Promise<YonyouTplusSyncRe
         tenantId: params.tenantId,
         sourceId: source.sourceId,
         streamKey: stream.streamKey,
+        watermark: range.end,
+        nowIso,
+      });
+      persistFinishedRows({
+        store: params.store,
+        tenantId: params.tenantId,
+        source,
+        stream,
+        rows: pulled.rows,
+        mode: range.mode === "full" ? "replace" : "merge",
         watermark: range.end,
         nowIso,
       });

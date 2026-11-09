@@ -3,6 +3,7 @@ import type { HealthSummary } from "../commands/health.js";
 import { cleanOldMedia } from "../media/store.js";
 import { drainUsageOutbox } from "./billing/usage-outbox-drain.js";
 import { abortChatRunById, type ChatAbortControllerEntry } from "./chat-abort.js";
+import { tickScheduledConnectorSync } from "./enterprise-data/scheduled-connector-sync.js";
 import { tickScheduledProjectionMaterialization } from "./enterprise-data/scheduled-projection-materializer.js";
 import { tickAgentKnowledgeGeneration } from "./knowledge/agent-knowledge-generation-runtime.js";
 import { tickKnowledgeGovernanceJobs } from "./knowledge/governance/runtime/gateway-tick.js";
@@ -96,6 +97,7 @@ export function startGatewayMaintenanceTimers(params: {
   let webRefreshInFlight = false;
   let agentKnowledgeGenInFlight = false;
   let scheduledProjectionsInFlight = false;
+  let connectorSyncInFlight = false;
   let usageOutboxInFlight = false;
   let meetingRemindersInFlight = false;
   const dedupeCleanup = setInterval(() => {
@@ -174,6 +176,19 @@ export function startGatewayMaintenanceTimers(params: {
         })
         .finally(() => {
           webRefreshInFlight = false;
+        });
+    }
+
+    // Connector sync before projection materialize so a due pull lands in the snapshot
+    // the same maintenance interval can publish.
+    if (!connectorSyncInFlight) {
+      connectorSyncInFlight = true;
+      void tickScheduledConnectorSync()
+        .catch((err) => {
+          params.logHealth.error(`scheduled connector sync failed: ${formatError(err)}`);
+        })
+        .finally(() => {
+          connectorSyncInFlight = false;
         });
     }
 

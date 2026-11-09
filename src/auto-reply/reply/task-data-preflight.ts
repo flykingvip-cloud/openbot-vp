@@ -52,7 +52,7 @@ const GAP_GUIDANCE: Record<TaskDataPreflightGap, string> = {
   memory_history:
     "run memory_search / read recent transcript before claiming prior work is missing; cite what was found or not found",
   enterprise_feed:
-    "answer 用友 T+ warehouse and inventory from Knowledge Universe feed objects already in context (titles such as 001-用友T+仓库 / 001-用友T+存货). If they are not in context, call knowledge_search then knowledge_get with the native tool channel and cite the object title plus the excerpt rows. Do not call browser, do not open 云电脑, and do not use data_capability action=invoke (it is knowledge-object-only and returns no connector rows).",
+    "answer 用友 T+ warehouse and inventory from Knowledge Universe feed objects already in context (titles such as 001-用友T+仓库 / 001-用友T+存货). If they are not in context, call knowledge_search then knowledge_get with the native tool channel and cite the object title plus the excerpt rows. The summary excerpt is only a preview; pass knowledge_get offset to page later materialized rows. Do not tell the user to click 立即物化 when the excerpt is short or the default product looks stale — connect and the gateway sync schedule refresh those feeds. A missing seat grant is the authorization gate. Do not call browser, do not open 云电脑, and do not use data_capability action=invoke (it is knowledge-object-only and returns no connector rows).",
 };
 
 /**

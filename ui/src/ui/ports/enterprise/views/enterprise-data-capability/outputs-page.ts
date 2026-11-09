@@ -220,8 +220,11 @@ export function renderProjectionStudioSection(params: {
       <div class="enterprise-data-capability__subsection">
         <div class="edc-section-label">供给绑定与调度（${totalBindings}）</div>
         <div class="enterprise-data-capability__hint">
-          打开知识宇宙不会自动物化。连接器包声明的默认数据产品会在测试连接或同步成功后写成供给，触发模式为定时同步。自行新建且仍为手动物化的绑定，在还没有供给记录时显示待物化；已供给表示
-          Feed 已写入，知识宇宙的新鲜度读这份记录，不是连接器实时查询。
+          打开知识宇宙不会自动物化。连接器包声明的默认数据产品在测试连接成功后会自动同步并写成供给，之后由网关定时节拍继续拉取最新数据并刷新
+          Feed，不需要再点「立即物化」。自行新建且仍为手动物化的绑定，在还没有供给记录时显示待物化。已供给表示
+          Feed
+          已写入；知识宇宙摘要只展示前面的部分行，已授权的数字人可以分页读取其余行。新鲜度读这份
+          Feed，不是打开页面时的连接器实时查询。
         </div>
         ${
           totalBindings === 0

@@ -3,7 +3,8 @@
  *
  * Successful connect or sync ensures a DataCapability, an active projection,
  * and a scheduled binding for each declared read model, then materializes any
- * binding that does not yet have a FeedItem. Seat authorization stays a
+ * binding that does not yet have a FeedItem. `forceRefresh` rematerializes
+ * even when a FeedItem already exists (post-sync). Seat authorization stays a
  * separate human gate. Opening Knowledge Universe does not call this.
  */
 
@@ -181,6 +182,7 @@ function projectionHasFeed(params: {
  * Ensure pack defaults for one DataSource and materialize bindings that have
  * no feed yet. `actionKeys` limits the run to streams that actually synced.
  * Absent `actionKeys` supplies every template the connector declares.
+ * `forceRefresh` rematerializes enabled bindings even when a FeedItem exists.
  * A disabled binding is left disabled. An existing on_demand binding for the
  * same source and action is promoted to scheduled so the maintenance tick
  * keeps refreshing it.
@@ -191,6 +193,7 @@ export async function supplyDefaultDataProducts(params: {
   sourceId: string;
   nowIso: string;
   actionKeys?: readonly string[];
+  forceRefresh?: boolean;
 }): Promise<DefaultDataProductSupplyResult> {
   const result = emptyResult();
   const source = findDataSource(params.store, params.tenantId, params.sourceId);
@@ -223,6 +226,7 @@ export async function supplyDefaultDataProducts(params: {
         connectorId,
         template,
         nowIso: params.nowIso,
+        forceRefresh: params.forceRefresh,
         result,
       });
       if (bindingId) {
@@ -274,6 +278,7 @@ function ensureOneProduct(params: {
   connectorId: string;
   template: ConnectorDefaultProductTemplate;
   nowIso: string;
+  forceRefresh?: boolean;
   result: DefaultDataProductSupplyResult;
 }): string | null {
   const ref = actionRef(params.connectorId, params.template);
@@ -370,6 +375,7 @@ function ensureOneProduct(params: {
         },
       });
   if (
+    !params.forceRefresh &&
     projectionHasFeed({
       store: params.store,
       tenantId: params.tenantId,

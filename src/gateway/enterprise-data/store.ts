@@ -22,6 +22,7 @@ import {
   type KnowledgeLineageRecord,
   type ConnectorSyncCursor,
   type ConnectorSyncLogEntry,
+  type ConnectorSyncSnapshot,
   type KnowledgeSupplyAuditEvent,
   type GovernanceApprovalRequest,
   type AccountBinding,
@@ -107,6 +108,9 @@ export function normalizeEnterpriseDataStore(
     connectorSyncCursors: normalizeRecordMap<ConnectorSyncCursor>(parsed?.connectorSyncCursors),
     connectorSyncLogEntries: normalizeRecordMap<ConnectorSyncLogEntry>(
       parsed?.connectorSyncLogEntries,
+    ),
+    connectorSyncSnapshots: normalizeRecordMap<ConnectorSyncSnapshot>(
+      parsed?.connectorSyncSnapshots,
     ),
     governanceApprovalRequests: normalizeRecordMap<GovernanceApprovalRequest>(
       parsed?.governanceApprovalRequests,

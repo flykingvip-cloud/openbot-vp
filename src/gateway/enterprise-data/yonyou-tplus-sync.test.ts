@@ -391,6 +391,7 @@ describe("yonyou tplus incremental sync", () => {
     expect(store.connectorSyncCursors?.[`${sourceId}::inventory`]?.watermark).toBe(
       "2026-10-21 00:00:00",
     );
+    expect(store.connectorSyncSnapshots?.[`${sourceId}::inventory`]).toBeUndefined();
     const logs = listConnectorSyncLogEntries({ store, tenantId, sourceId });
     expect(logs.find((entry) => entry.streamKey === "inventory")?.status).toBe("warning");
     expect(logs.find((entry) => entry.streamKey === "inventory")?.detail).toContain("未拉完");
@@ -896,6 +897,12 @@ describe("yonyou tplus master full sync page budget", () => {
     expect(store.connectorSyncCursors?.[`${sourceId}::inventory`]?.watermark).toBe(
       "2026-10-22 06:00:00",
     );
+    expect(store.connectorSyncSnapshots?.[`${sourceId}::inventory`]?.recordCount).toBe(
+      YONYOU_TPLUS_DEFAULT_PAGE_SIZE * 6 + 5,
+    );
+    expect(
+      store.connectorSyncSnapshots?.[`${sourceId}::inventory`]?.recordCount ?? 0,
+    ).toBeGreaterThan(YONYOU_TPLUS_DEFAULT_PAGE_SIZE);
   });
 
   it("honors OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MAX_PAGES_FULL when the full archive is still incomplete", async () => {

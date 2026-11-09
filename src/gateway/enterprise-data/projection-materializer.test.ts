@@ -5,6 +5,7 @@ import { EnterpriseDataStoreError } from "./connector-action-store.js";
 import { upsertDataConnectorCredential } from "./connector-credential-store.js";
 import { saveCredentialSecret } from "./connector-credential-vault.js";
 import { ensureConnectorPackage } from "./connector-packages.js";
+import { writeConnectorSyncSnapshot } from "./connector-sync-snapshot.js";
 import { upsertDataSource } from "./data-source-store.js";
 import { MATERIALIZER_SEAT_ID } from "./enterprise-data-seat-context.js";
 import {
@@ -531,5 +532,100 @@ describe("yonyou projection cursor window", () => {
     expect(query).toBeUndefined();
     expect(result.feedItem.payload.count).toBeGreaterThanOrEqual(1);
     expect(result.feedItem.title).toContain("汇总");
+  });
+
+  it("materializes an aggregate feed from the sync snapshot past one connector page", async () => {
+    fs.rmSync(yonyouVaultDir.tmpDir, { recursive: true, force: true });
+    fs.mkdirSync(yonyouVaultDir.tmpDir, { recursive: true });
+    const store = normalizeEnterpriseDataStore({});
+    ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      nowIso,
+    });
+    upsertDataSource({
+      store,
+      tenantId,
+      nowIso,
+      source: {
+        sourceId,
+        sourceKey: "yonyou-tplus",
+        displayName: "用友 T+",
+        category: "erp",
+        status: "connected",
+        connectorId: "erp-yonyou-tplus",
+      },
+    });
+    const rowCount = 130;
+    writeConnectorSyncSnapshot({
+      store,
+      tenantId,
+      sourceId,
+      connectorId: "erp-yonyou-tplus",
+      streamKey: "inventory",
+      actionKey: "erp.inventory.query_page",
+      rows: Array.from({ length: rowCount }, (_, index) => ({
+        Code: `SKU-${index}`,
+        Name: "扇子",
+      })),
+      mode: "replace",
+      nowIso,
+    });
+    const spec = upsertEnterpriseKnowledgeProjectionSpec({
+      store,
+      tenantId,
+      nowIso,
+      spec: {
+        projectionKey: "erp.inventory.snapshot",
+        displayName: "001-用友T+存货",
+        category: "inventory",
+        sourceId,
+        sourceActions: [
+          {
+            connectorId: "erp-yonyou-tplus",
+            actionKey: "erp.inventory.query_page",
+            version: "v1",
+          },
+        ],
+        objectKind: "data",
+        templateKey: "AggregateTemplate",
+        description: "存货快照",
+        outputSchema: { type: "object" },
+        lifecycle: "active",
+      },
+    });
+    const binding = upsertEnterpriseKnowledgeProjectionBinding({
+      store,
+      tenantId,
+      nowIso,
+      binding: {
+        projectionId: spec.projectionId,
+        materializationMode: "scheduled",
+        materializationTeamLabel: "京扇子",
+        enabled: true,
+        generatorVersion: "yonyou-snapshot-1",
+      },
+    });
+    const fetchMock = vi.fn(async () => {
+      throw new Error("live connector should not be called");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const result = await runProjectionMaterialization({
+        store,
+        tenantId,
+        bindingId: binding.bindingId,
+        nowIso,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.feedItem.scopeApplied).toBe("SYNC_SNAPSHOT");
+      expect(result.feedItem.payload.count).toBe(rowCount);
+      const items = result.feedItem.payload.items as Array<{ Code?: string }>;
+      expect(items).toHaveLength(rowCount);
+      expect(items[120]?.Code).toBe("SKU-120");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

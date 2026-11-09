@@ -6,6 +6,8 @@ import {
   documentNodeObjectId,
   parseDocumentObjectId,
 } from "../../gateway/knowledge/document-ego-graph.js";
+import type { EnterpriseFeedPageRead } from "../../gateway/knowledge/feed/enterprise-feed-adapter.js";
+import { readEnterpriseFeedPageForTool } from "../../gateway/knowledge/feed/enterprise-feed-page.js";
 import { parseKnowledgeEvidenceUri } from "../../gateway/knowledge/kb-retrieve.js";
 import {
   retrievalContextFromKnowledgeSourceContext,
@@ -69,6 +71,18 @@ const KnowledgeGetToolSchema = Type.Object({
   query: Type.Optional(
     Type.String({
       description: "Optional in-document query to rank chunks. Empty loads current-version chunks.",
+    }),
+  ),
+  offset: Type.Optional(
+    Type.Number({
+      description:
+        "Enterprise feed page start (default 0). The object summary is only a preview; pass offset to read later materialized rows.",
+    }),
+  ),
+  limit: Type.Optional(
+    Type.Number({
+      description:
+        "Enterprise feed page size (default 50, max 100), still under a character budget.",
     }),
   ),
 });
@@ -236,7 +250,7 @@ function getToolDescription(consumeScope: KnowledgeConsumeSearchScope): string {
   if (consumeScope.focused && consumeScope.docIds.length === 1) {
     return `Read the currently selected Knowledge Universe document (${consumeScope.docIds[0]}). Omit objectId to load that file. Refuse documents outside this selection.`;
   }
-  return "Read one Knowledge Universe object after knowledge_search. Pass objectId or ku:// sourceUri. For an enterprise feed object the summary is the materialized payload excerpt (warehouse and inventory rows). Not for memory files or live connector calls. Do not guess workspace paths, run exec find, or open 云电脑.";
+  return "Read one Knowledge Universe object after knowledge_search. Pass objectId or ku:// sourceUri. For an enterprise feed object the summary is only a preview of the materialized payload. Pass offset and limit to page the rest under a character budget. A short excerpt or a stale-looking default connector product is not a reason to tell the user to click 立即物化: connect and the gateway sync schedule refresh those feeds. A missing seat grant is the authorization gate. Not for memory files or live connector calls. Do not guess workspace paths, run exec find, or open 云电脑.";
 }
 
 async function loadScopedObject(
@@ -472,6 +486,35 @@ export function createKnowledgeSearchTool(options?: KnowledgeConsumeToolOptions)
   };
 }
 
+function enterpriseFeedPagePayload(
+  page: EnterpriseFeedPageRead | null,
+): Record<string, unknown> | null {
+  if (!page || page.kind === "absent") {
+    return null;
+  }
+  if (page.kind === "restricted") {
+    return {
+      access: "restricted",
+      items: [],
+      note: "需申请访问权限后查看完整内容。岗位授权仍是读取门槛，不要改建议为重新物化。",
+    };
+  }
+  const pastPreview = page.total > page.previewMax;
+  return {
+    access: "granted",
+    total: page.total,
+    offset: page.offset,
+    limit: page.limit,
+    items: page.items,
+    truncated: page.truncated,
+    ...(pastPreview || page.truncated
+      ? {
+          note: "摘要只覆盖前面约 20 行。feedPage 是已物化的载荷分页。默认连接器产品由接入和定时同步刷新，不要因此让用户点击「立即物化」。truncated 时用更大的 offset 继续读。",
+        }
+      : {}),
+  };
+}
+
 export function createKnowledgeGetTool(options?: KnowledgeConsumeToolOptions): AnyAgentTool {
   const consumeScope = resolveKnowledgeConsumeSearchScope(options?.consumeRefs);
   return {
@@ -524,6 +567,17 @@ export function createKnowledgeGetTool(options?: KnowledgeConsumeToolOptions): A
             fileIdFromKnowledgeObjectId(object.id) ??
             undefined)
           : undefined);
+      const offset = readNumberParam(params, "offset", { integer: true });
+      const limit = readNumberParam(params, "limit", { integer: true });
+      const feedPage =
+        object?.source === "enterprise"
+          ? await readEnterpriseFeedPageForTool({
+              client,
+              objectId: object.id,
+              ...(offset != null ? { offset } : {}),
+              ...(limit != null ? { limit } : {}),
+            })
+          : null;
       const retrievalQuery = query ?? object?.title ?? "";
       const evidence = docId
         ? await searchKnowledgeEvidence({
@@ -537,6 +591,7 @@ export function createKnowledgeGetTool(options?: KnowledgeConsumeToolOptions): A
           })
         : [];
       const { chunks, truncated } = budgetChunks(evidence);
+      const feedPagePayload = enterpriseFeedPagePayload(feedPage);
       return jsonResult({
         ok: true,
         object: object
@@ -551,6 +606,7 @@ export function createKnowledgeGetTool(options?: KnowledgeConsumeToolOptions): A
           : null,
         chunks,
         truncated,
+        ...(feedPagePayload ? { feedPage: feedPagePayload } : {}),
         ...(chunks.length === 0 && object?.source === "enterprise"
           ? { hint: "enterprise_feed" }
           : {}),

@@ -5,6 +5,7 @@ const knowledgeSearch = vi.hoisted(() => vi.fn());
 const knowledgeObject = vi.hoisted(() => vi.fn());
 const searchKnowledgeEvidence = vi.hoisted(() => vi.fn());
 const resolveKnowledgeToolGatewayClient = vi.hoisted(() => vi.fn());
+const readEnterpriseFeedPageForTool = vi.hoisted(() => vi.fn());
 
 vi.mock("../../gateway/knowledge/agent-run-gateway-client.js", () => ({
   resolveKnowledgeToolGatewayClient,
@@ -21,6 +22,10 @@ vi.mock("../../gateway/knowledge/context.js", () => ({
 vi.mock("../../gateway/knowledge/router.js", () => ({
   knowledgeSearch,
   knowledgeObject,
+}));
+
+vi.mock("../../gateway/knowledge/feed/enterprise-feed-page.js", () => ({
+  readEnterpriseFeedPageForTool,
 }));
 
 vi.mock("../../gateway/knowledge/knowledge-retrieval-runtime.js", () => ({
@@ -78,6 +83,7 @@ describe("knowledge consume tools", () => {
       summary: "优才计划信息表",
       tags: ["简历"],
     });
+    readEnterpriseFeedPageForTool.mockResolvedValue({ kind: "absent" });
     searchKnowledgeEvidence.mockResolvedValue([evidence()]);
   });
 
@@ -333,5 +339,65 @@ describe("knowledge consume tools", () => {
         fallbackToCurrentChunks: true,
       }),
     );
+  });
+
+  it("pages an enterprise feed past the summary excerpt", async () => {
+    knowledgeObject.mockResolvedValue({
+      id: "obj:enterprise:feed:feed-1",
+      title: "001-用友T+存货",
+      source: "enterprise",
+      kind: "document",
+      summary: "preview",
+      tags: ["inventory"],
+    });
+    readEnterpriseFeedPageForTool.mockResolvedValue({
+      kind: "granted",
+      total: 151,
+      offset: 20,
+      limit: 10,
+      items: [{ Code: "SKU-20" }],
+      truncated: true,
+      previewMax: 20,
+    });
+    const tool = createKnowledgeGetTool({ gatewayClientUser: "user@example.com" });
+    const details = (
+      await tool.execute("call-feed-page", {
+        objectId: "obj:enterprise:feed:feed-1",
+        offset: 20,
+        limit: 10,
+      })
+    ).details as {
+      feedPage: { items: Array<{ Code: string }>; note: string; total: number };
+    };
+    expect(readEnterpriseFeedPageForTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        objectId: "obj:enterprise:feed:feed-1",
+        offset: 20,
+        limit: 10,
+      }),
+    );
+    expect(details.feedPage.total).toBe(151);
+    expect(details.feedPage.items[0]?.Code).toBe("SKU-20");
+    expect(details.feedPage.note).toContain("立即物化");
+  });
+
+  it("hides enterprise feed pages until the seat is granted", async () => {
+    knowledgeObject.mockResolvedValue({
+      id: "obj:enterprise:feed:feed-1",
+      title: "001-用友T+存货",
+      source: "enterprise",
+      kind: "document",
+      summary: "需申请访问权限后查看完整内容",
+      tags: [],
+    });
+    readEnterpriseFeedPageForTool.mockResolvedValue({ kind: "restricted" });
+    const tool = createKnowledgeGetTool({ gatewayClientUser: "user@example.com" });
+    const details = (
+      await tool.execute("call-feed-restricted", { objectId: "obj:enterprise:feed:feed-1" })
+    ).details as { feedPage: { access: string; items: unknown[]; note: string } };
+    expect(details.feedPage.access).toBe("restricted");
+    expect(details.feedPage.items).toEqual([]);
+    expect(JSON.stringify(details.feedPage)).not.toContain("SKU-");
+    expect(details.feedPage.note).toContain("访问权限");
   });
 });
