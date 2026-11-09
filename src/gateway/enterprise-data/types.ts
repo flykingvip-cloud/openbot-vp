@@ -457,6 +457,27 @@ export type ConnectorSyncCursor = {
   updatedAt: string;
 };
 
+/**
+ * Rows captured by a finished connector sync window.
+ * Aggregate materialization reads this instead of one live connector page.
+ * A truncated window does not replace the previous snapshot.
+ */
+export type ConnectorSyncSnapshot = {
+  snapshotId: string;
+  tenantId: string;
+  sourceId: string;
+  connectorId: string;
+  streamKey: string;
+  actionKey?: string;
+  rows: unknown[];
+  /** Rows kept after the store cap. */
+  recordCount: number;
+  /** True when the pull exceeded the snapshot row cap. The sync window itself finished. */
+  truncated: boolean;
+  watermark?: string;
+  syncedAt: string;
+};
+
 export type KnowledgeSupplyAuditEventType = "materialization_success" | "materialization_failure";
 
 export type KnowledgeSupplyAuditEvent = {
@@ -983,6 +1004,11 @@ export type EnterpriseDataStore = {
    * Connector sync-log rows shown beside projection audits. Older files omit the map.
    */
   connectorSyncLogEntries?: Record<string, ConnectorSyncLogEntry>;
+  /**
+   * Paged rows from a finished connector sync, keyed by snapshotId.
+   * Older files omit the map. Not a seat grant and not a live query cache.
+   */
+  connectorSyncSnapshots?: Record<string, ConnectorSyncSnapshot>;
   governanceApprovalRequests: Record<string, GovernanceApprovalRequest>;
   dataConnectorCredentials: Record<string, DataConnectorCredential>;
   /** E1 SAR execution bridges. Keyed by bridgeId. Absent on older files. */
