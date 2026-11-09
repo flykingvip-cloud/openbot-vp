@@ -11,14 +11,13 @@ import { appendTaskConstraint } from "../agent-runtime/state/mutations/task-cons
 export { commitAdmittedSessionTask } from "../agent-runtime/state/mutations/admit-task.js";
 import { insertLatestTaskDeferringCurrent } from "../agent-runtime/state/mutations/task-focus.js";
 export { insertLatestTaskDeferringCurrent } from "../agent-runtime/state/mutations/task-focus.js";
-import { createTask, parkTask } from "../agent-runtime/state/mutations/task-record.js";
+import { parkTask } from "../agent-runtime/state/mutations/task-record.js";
 export {
   allocateTaskInstanceId,
   taskIdForText,
 } from "../agent-runtime/state/repository/task-identity.js";
 import { stripInboundStamp as stripStamp } from "../agent-runtime/policy/index.js";
 import {
-  continueResult,
   suppressCurrentTaskWake,
   cancelCurrentTask,
   pauseParkedTask,
@@ -80,7 +79,6 @@ export { formatTaskBoardFocusLine } from "../agent-runtime/context/task-focus.js
  * This record — not transcript fence markers or token overlap — decides
  * whether a turn stays on the current task or starts different work.
  */
-import fs from "node:fs";
 import type {
   TaskStop,
   ConstraintEntry,
@@ -92,10 +90,8 @@ import type {
   SessionTaskBoard,
 } from "../agent-runtime/contracts/task.js";
 import type { IncomingTurnResult } from "../agent-runtime/contracts/turn-result.js";
-import { isTaskSurfaceUtterance } from "../agents/task-surface/surface.js";
 import type { FocusSnapshot } from "./focus-policy.js";
 import {
-  classifyTurnRelation,
   isOwnerConstraintFullReplace,
   isOwnerConstraintRevision,
   shouldPersistOwnerConstraint,
@@ -115,14 +111,6 @@ export type {
 } from "../agent-runtime/contracts/task.js";
 export type { IncomingTurnResult } from "../agent-runtime/contracts/turn-result.js";
 /** Sure means new_work. amend and aside stay on the current task. */
-export function isSureDistinctWork(incoming: string, currentGoal: string): boolean {
-  const text = stripStamp(incoming);
-  const current = currentGoal.trim();
-  if (!text || !current || text.startsWith("/")) {
-    return false;
-  }
-  return classifyTurnRelation(text, current) === "new_work";
-}
 
 /** Compatibility classifier; admitted changes already carry their scope. */
 export function appendSameTaskConstraint(params: {
@@ -216,14 +204,6 @@ export function commitSameTaskConstraint(params: {
   }
 }
 
-/** Compatibility-only text control adapter; typed interaction uses runtime mutations. */
-export function applyLegacyTaskControl(sessionFile: string, prompt: string): IncomingTurnResult {
-  return mutateSessionTaskBoard(sessionFile, (board) => {
-    const result = applyIncomingUserMessage({ board, incomingText: prompt });
-    return { board: result.board, value: result };
-  });
-}
-
 export function isOwnerCurrentTaskControlUtterance(text: string): boolean {
   const incoming = stripStamp(text);
   if (!incoming || incoming.startsWith("/")) {
@@ -233,117 +213,6 @@ export function isOwnerCurrentTaskControlUtterance(text: string): boolean {
     /^(?:暂停(?:当前(?:任务)?)?|先暂停)[。.!！]?$/u.test(incoming) ||
     /^(?:取消当前(?:任务)?|取消任务)[。.!！]?$/u.test(incoming)
   );
-}
-
-export function applyIncomingUserMessage(params: {
-  board: SessionTaskBoard;
-  sessionFile?: string;
-  incomingText: string;
-  nowMs?: number;
-  workspacePaths?: string[];
-  recheck?: ResumeParkedRecheck;
-  inboundRequestId?: string;
-}): IncomingTurnResult {
-  const nowMs = params.nowMs ?? Date.now();
-  const paths = params.workspacePaths?.filter(Boolean) ?? [];
-  const incoming = stripStamp(params.incomingText);
-  const board = cloneBoardShell(params.board);
-  if (!incoming || incoming.startsWith("/")) {
-    return continueResult(board, board.current?.taskId ?? "");
-  }
-  // Hang-list and keep-only are surface commands, not a new task.
-  // The task-surface reply path mutates the board against the shown ordinals.
-  if (isTaskSurfaceUtterance(incoming)) {
-    return continueResult(board, board.current?.taskId ?? "");
-  }
-
-  // CONTINUE resumes a deferred prior task (Owner: invite CONTINUE or CLOSE).
-  const resumeMatch = incoming.match(/^(?:继续挂起|CONTINUE)\s+(\S+)/iu);
-  if (resumeMatch) {
-    return resumeParkedTask({
-      board,
-      taskId: resumeMatch[1] ?? "",
-      nowMs,
-      workspacePaths: paths,
-      recheck: params.recheck,
-    });
-  }
-  // Owner pause of the *current* unfinished task: suppress auto-continue wakes.
-  // Does not bump focusRevision (same-task control, not a focus switch).
-  if (/^(?:暂停(?:当前(?:任务)?)?|先暂停)[。.!！]?$/u.test(incoming)) {
-    return suppressCurrentTaskWake({ board, sessionFile: params.sessionFile });
-  }
-  const pauseMatch = incoming.match(/^暂停挂起\s+(\S+)/u);
-  if (pauseMatch) {
-    return pauseParkedTask({ board, taskId: pauseMatch[1] ?? "" });
-  }
-  // Cancel the *current* unfinished task (tombstone + clear current).
-  if (/^(?:取消当前(?:任务)?|取消任务)[。.!！]?$/u.test(incoming)) {
-    return cancelCurrentTask({ board, nowMs, sessionFile: params.sessionFile });
-  }
-  // CLOSE / 关闭挂起 / 取消挂起 — remove deferred item from the board entirely.
-  const cancelMatch = incoming.match(/^(?:取消挂起|关闭挂起|CLOSE)\s+(\S+)/iu);
-  if (cancelMatch) {
-    return cancelParkedTask({ board, taskId: cancelMatch[1] ?? "", nowMs });
-  }
-
-  const current = board.current;
-  if (!current) {
-    const created = createTask(incoming, nowMs, paths, {
-      inboundRequestId: params.inboundRequestId,
-      entropy: nowMs,
-    });
-    return {
-      ...continueResult({ ...board, current: created }, created.taskId),
-      focusRevision: board.focusRevision,
-    };
-  }
-  if (!current.unfinished) {
-    if (!isSureDistinctWork(incoming, current.goalText)) {
-      return { ...continueResult(board, current.taskId), focusRevision: board.focusRevision };
-    }
-    return insertLatestTaskDeferringCurrent({
-      board,
-      goalText: incoming,
-      nowMs,
-      workspacePaths: paths,
-      parkReason: "user_switch",
-      inboundRequestId: params.inboundRequestId,
-    });
-  }
-  if (!isSureDistinctWork(incoming, current.goalText)) {
-    // Same-task amend: persist full constraint via the sole board updater (no focusRevision bump).
-    let nextBoard: SessionTaskBoard = {
-      ...board,
-      current: {
-        ...current,
-        stop: {
-          ...current.stop,
-          workspacePaths: paths.length > 0 ? paths : current.stop.workspacePaths,
-        },
-      },
-    };
-    if (
-      classifyTurnRelation(incoming, current.goalText, {
-        activeConstraints: activeConstraintTexts(current),
-      }) === "amend"
-    ) {
-      nextBoard = appendSameTaskConstraint({ board: nextBoard, constraintText: incoming });
-    }
-    return {
-      ...continueResult(nextBoard, current.taskId),
-      focusRevision: board.focusRevision,
-    };
-  }
-
-  return insertLatestTaskDeferringCurrent({
-    board,
-    goalText: incoming,
-    nowMs,
-    workspacePaths: paths,
-    parkReason: "user_switch",
-    inboundRequestId: params.inboundRequestId,
-  });
 }
 
 /** Oldest-first parked slots from the session board, when that file is known. */
@@ -455,92 +324,10 @@ export type FocusSwitchDecision =
       restoredPrompt: string;
     };
 
-export function evaluateFocusSwitch(params: {
-  currentFocusText?: string;
-  incomingText: string;
-  proceed?: boolean;
-  parked?: TrackedTask[];
-  nowMs?: number;
-  workspacePaths?: string[];
-  recheck?: ResumeParkedRecheck;
-}): FocusSwitchDecision {
-  const currentText = params.currentFocusText?.trim() ?? "";
-  const board: SessionTaskBoard = {
-    current: currentText
-      ? createTask(currentText, params.nowMs ?? 0, params.workspacePaths ?? [])
-      : undefined,
-    parked: params.parked ? [...params.parked] : [],
-    focusRevision: 0,
-  };
-  if (params.proceed) {
-    return {
-      action: "continue",
-      cutContext: false,
-      taskId: board.current?.taskId ?? "",
-    };
-  }
-  const result = applyIncomingUserMessage({
-    board,
-    incomingText: params.incomingText,
-    nowMs: params.nowMs,
-    workspacePaths: params.workspacePaths,
-    recheck: params.recheck,
-  });
-  if (result.action === "resume" && result.restoredPrompt) {
-    return {
-      action: "resume",
-      cutContext: true,
-      taskId: result.taskId,
-      currentTitle: result.currentTitle ?? "",
-      incomingTitle: result.incomingTitle ?? "",
-      statusLine: result.statusLine ?? "",
-      restoredPrompt: result.restoredPrompt,
-    };
-  }
-  if (result.action !== "switch") {
-    return { action: "continue", cutContext: false, taskId: result.taskId };
-  }
-  return {
-    action: "auto_park",
-    cutContext: true,
-    taskId: result.taskId,
-    currentTitle: result.currentTitle ?? "",
-    incomingTitle: result.incomingTitle ?? "",
-    statusLine: result.statusLine ?? "",
-    ...(result.droppedTitle ? { droppedTitle: result.droppedTitle } : {}),
-    ...(result.droppedPaths ? { droppedPaths: result.droppedPaths } : {}),
-  };
-}
-
-export type FocusGateDecisionCode =
-  | "focus_clear"
-  | "focus_proceed"
-  | "focus_state_unavailable"
-  | "focus_switched";
-
-export type FocusSwitchGateDecision =
-  | {
-      action: "continue" | "cancel_parked";
-      decisionCode: Exclude<FocusGateDecisionCode, "focus_switched">;
-      cutContext: false;
-      taskId: string;
-      statusLine?: string;
-      /** Owner pause/cancel: abort in-flight via existing chat abort path. */
-      abortInFlight?: boolean;
-    }
-  | {
-      action: "auto_park" | "resume";
-      decisionCode: "focus_switched";
-      cutContext: true;
-      taskId: string;
-      currentTitle: string;
-      incomingTitle: string;
-      statusLine: string;
-      restoredPrompt?: string;
-      droppedTitle?: string;
-      droppedPaths?: string[];
-      abortInFlight?: boolean;
-    };
+export type {
+  FocusGateDecisionCode,
+  FocusSwitchGateDecision,
+} from "../agent-runtime/contracts/task-control.js";
 
 const focusDecisionCounts = new Map<string, number>();
 
@@ -554,98 +341,6 @@ export function recordFocusSwitchDecision(decisionCode: string): void {
 
 export function readFocusSwitchDecisionCount(decisionCode: string): number {
   return focusDecisionCounts.get(decisionCode) ?? 0;
-}
-
-function recordFocusDecision<T extends { decisionCode: string }>(decision: T): T {
-  recordFocusSwitchDecision(decision.decisionCode);
-  return decision;
-}
-
-export function applyFocusSwitchGate(params: {
-  proceed?: boolean;
-  sessionFile?: string;
-  incomingText: string;
-  nowMs?: number;
-  workspacePaths?: string[];
-  recheck?: ResumeParkedRecheck;
-}): FocusSwitchGateDecision {
-  if (params.proceed) {
-    const board = readSessionTaskBoard(params.sessionFile);
-    return recordFocusDecision({
-      action: "continue",
-      decisionCode: "focus_proceed",
-      cutContext: false,
-      taskId: board.current?.taskId ?? "",
-    });
-  }
-  const incoming = params.incomingText.trim();
-  if (!incoming || incoming.startsWith("/")) {
-    return recordFocusDecision({
-      action: "continue",
-      decisionCode: "focus_clear",
-      cutContext: false,
-      taskId: "",
-    });
-  }
-  const sessionFile = params.sessionFile?.trim();
-  if (!sessionFile) {
-    return recordFocusDecision({
-      action: "continue",
-      decisionCode: "focus_state_unavailable",
-      cutContext: false,
-      taskId: "",
-    });
-  }
-  try {
-    if (!fs.existsSync(sessionFile)) {
-      return recordFocusDecision({
-        action: "continue",
-        decisionCode: "focus_state_unavailable",
-        cutContext: false,
-        taskId: "",
-      });
-    }
-    const result = mutateSessionTaskBoard(sessionFile, (board) => {
-      const next = applyIncomingUserMessage({
-        board,
-        sessionFile,
-        incomingText: incoming,
-        nowMs: params.nowMs,
-        workspacePaths: params.workspacePaths,
-        recheck: params.recheck,
-      });
-      return { board: next.board, value: next };
-    });
-    if (result.action === "switch" || result.action === "resume") {
-      return recordFocusDecision({
-        action: result.action === "resume" ? "resume" : "auto_park",
-        decisionCode: "focus_switched",
-        cutContext: true,
-        taskId: result.taskId,
-        currentTitle: result.currentTitle ?? "",
-        incomingTitle: result.incomingTitle ?? "",
-        statusLine: result.statusLine ?? "",
-        ...(result.restoredPrompt ? { restoredPrompt: result.restoredPrompt } : {}),
-        ...(result.droppedTitle ? { droppedTitle: result.droppedTitle } : {}),
-        ...(result.droppedPaths ? { droppedPaths: result.droppedPaths } : {}),
-      });
-    }
-    return recordFocusDecision({
-      action: result.action === "cancel_parked" ? "cancel_parked" : "continue",
-      decisionCode: "focus_clear",
-      cutContext: false,
-      taskId: result.taskId,
-      ...(result.statusLine ? { statusLine: result.statusLine } : {}),
-      ...(result.abortInFlight ? { abortInFlight: true } : {}),
-    });
-  } catch {
-    return recordFocusDecision({
-      action: "continue",
-      decisionCode: "focus_state_unavailable",
-      cutContext: false,
-      taskId: "",
-    });
-  }
 }
 
 /** Current-task sends deliver. Owner confirmation is not a gate. */

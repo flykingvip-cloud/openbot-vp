@@ -293,6 +293,18 @@ describe("deliverAgentCommandResult", () => {
 });
 
 describe("command transport receipts", () => {
+  it("retains unknown delivery when target setup throws before transport", async () => {
+    const record = vi.fn();
+    mocks.getChannelPlugin.mockImplementationOnce(() => {
+      throw new Error("plugin setup failed");
+    });
+    await expect(dispatch(record)).rejects.toThrow("plugin setup failed");
+    expect(record).toHaveBeenLastCalledWith({
+      deliveryId: "delivery:run:command",
+      status: "delivery_unknown",
+      messageIds: [],
+    });
+  });
   async function dispatch(record: (receipt: CommandDeliveryReceipt) => void, deliver = true) {
     return deliverAgentCommandResult({
       cfg: {},

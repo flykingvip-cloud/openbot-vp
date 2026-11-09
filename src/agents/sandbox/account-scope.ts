@@ -12,6 +12,17 @@ export type AccountSandboxIdentity = {
   agentId: string;
 };
 
+/** Missing trusted identity cannot be repaired by selecting another model. */
+export function isSandboxAccountIdentityError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return (
+    message ===
+      "Managed multitenant sandbox requires a server-derived account (tenantId and userId)." ||
+    message === "Account worker request does not match the server-derived account." ||
+    /^Account sandbox (?:tenantId|userId|agentId) is missing or unsafe\.$/u.test(message)
+  );
+}
+
 /** Platform user id for the account computer. An email is not a computer key. */
 export function accountComputerObserverUserId(userId: string | undefined): string | null {
   const trimmed = userId?.trim() ?? "";

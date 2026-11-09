@@ -39,6 +39,14 @@ export async function deliverAgentCommandResult<
   const { cfg, deps, runtime, opts, outboundSession, sessionEntry, payloads, result } = params;
   const effectiveSessionKey = outboundSession?.key ?? opts.sessionKey;
   const deliver = opts.deliver === true;
+  // Persist uncertainty before target/plugin setup, which can throw before send.
+  if (deliver) {
+    params.receipt?.record({
+      deliveryId: params.receipt.deliveryId,
+      status: "delivery_unknown",
+      messageIds: [],
+    });
+  }
   const bestEffortDeliver = opts.bestEffortDeliver === true;
   const turnSourceChannel = opts.runContext?.messageChannel ?? opts.messageChannel;
   const turnSourceTo = opts.runContext?.currentChannelId ?? opts.to;

@@ -36,7 +36,12 @@ it("retains task reconciliation while delivered work still awaits acceptance", a
   const completeTask = vi.fn(() => ({ persisted: true }));
   await confirmPendingTurnDeliveryWithPorts(
     { cfg: {}, runId: "r", status: "delivered" },
-    { resolvePersistRoot: () => "/tmp/unused", completeTask, bindingCurrent: () => true },
+    {
+      resolvePersistRoot: () => "/tmp/unused",
+      completeTask,
+      bindingCurrent: () => true,
+      recordRecoveryDelivered: vi.fn(),
+    },
   );
   expect(completeTask).not.toHaveBeenCalled();
   expect(peekAwaitingDelivery("r")).toBeDefined();
@@ -64,6 +69,7 @@ it.each(["missing", "wrong-run", "wrong-delivery", "wrong-status"])(
         resolvePersistRoot: () => "/tmp/unused",
         completeTask: vi.fn(() => ({ persisted: true })),
         bindingCurrent: () => true,
+        recordRecoveryDelivered: vi.fn(),
       },
     );
     expect(peekAwaitingDelivery("r")).toBeDefined();

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { stopTaskAtGateway } from "../../agent-runtime/command/index.js";
+import type { FocusSwitchGateDecision } from "../../agent-runtime/contracts/task-control.js";
 import { sessionTaskState } from "../../agent-runtime/state/index.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
@@ -60,7 +61,6 @@ import { oguiWaitBlocksSession } from "../../config/sessions/ogui-decision-wait-
 import { projectOguiDecisionStatuses } from "../../config/sessions/ogui-decision.js";
 import { resolveSessionTranscriptsDirForAgent } from "../../config/sessions/paths.js";
 import {
-  applyFocusSwitchGate,
   recordFocusSwitchDecision,
   transcriptEntriesForInboundTurn,
 } from "../../conversation-task/focus-switch.js";
@@ -6058,7 +6058,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         agentId,
         client,
       });
-      let taskTracking: ReturnType<typeof applyFocusSwitchGate> = {
+      let taskTracking: FocusSwitchGateDecision = {
         action: "continue",
         decisionCode: "focus_clear",
         cutContext: false,

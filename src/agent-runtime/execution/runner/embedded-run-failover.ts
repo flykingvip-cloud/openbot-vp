@@ -179,6 +179,4 @@ export async function runEmbeddedRunFailover(args: {
   }
 
   return { action: "next" as const };
-
-  return { action: "next" as const };
 }

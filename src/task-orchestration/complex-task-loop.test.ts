@@ -3,13 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { sessionTaskState } from "../agent-runtime/state/index.js";
 import { resolveSubagentToolPolicy } from "../agents/pi-tools.policy.js";
 import { decideHonestEmptyReply } from "../auto-reply/reply/honest-empty-reply.js";
 import { DEFAULT_SUBAGENT_MAX_SPAWN_DEPTH } from "../config/agent-limits.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { captureTaskCompletionBinding } from "../conversation-task/session-task-board.js";
 import {
-  applyIncomingUserMessage,
   emptySessionTaskBoard,
   readSessionTaskBoard,
   seedSessionTaskBoard,
@@ -46,6 +46,21 @@ function admitEnv(): NodeJS.ProcessEnv {
 
 function joined(payloads: ReadonlyArray<{ text?: string }>): string {
   return payloads.map((payload) => payload.text ?? "").join("\n");
+}
+
+function admitFixture(sessionFile: string) {
+  seedSessionTaskBoard(sessionFile, emptySessionTaskBoard());
+  const board = readSessionTaskBoard(sessionFile);
+  const result = sessionTaskState.admitExecution({
+    sessionFile,
+    requestId: "complex-loop-fixture",
+    goal: "请分步骤做竞品分析",
+    acceptance: ["交付竞品分析"],
+    expectedFocusRevision: board.focusRevision,
+    expectedWriteEpoch: board.writeEpoch ?? 0,
+  });
+  expect(result.kind).toBe("accepted");
+  return readSessionTaskBoard(sessionFile);
 }
 
 describe("P3 complex task loop", () => {
@@ -208,12 +223,7 @@ describe("P3 complex task loop", () => {
     tempDirs.push(dir);
     const sessionFile = path.join(dir, "session.jsonl");
     fs.writeFileSync(sessionFile, "");
-    const started = applyIncomingUserMessage({
-      board: emptySessionTaskBoard(),
-      incomingText: "请分步骤做竞品分析",
-      nowMs: 1,
-    });
-    seedSessionTaskBoard(sessionFile, started.board);
+    const started = admitFixture(sessionFile);
 
     const drift = "这是一份中医诊断学教材笔记，按章节整理望闻问切知识库课程论文摘要。".repeat(3);
     const missed = applyComplexTaskLoop({
@@ -224,7 +234,7 @@ describe("P3 complex task loop", () => {
       payloads: [{ text: drift }],
       sessionFile,
       completionBinding: captureTaskCompletionBinding(sessionFile),
-      currentGoal: started.board.current?.goalText,
+      currentGoal: started.current?.goalText,
       env: admitEnv(),
     });
     const text = joined(missed.payloads);
@@ -237,14 +247,21 @@ describe("P3 complex task loop", () => {
     expect(text).not.toContain("望闻问切");
     expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
 
-    const aside = applyIncomingUserMessage({
-      board: readSessionTaskBoard(sessionFile),
-      incomingText: "请用中文回复",
-      nowMs: 2,
+    const before = readSessionTaskBoard(sessionFile);
+    const amended = sessionTaskState.applyInteractionProposal({
+      sessionFile,
+      expectedFocusRevision: before.focusRevision,
+      expectedWriteEpoch: before.writeEpoch ?? 0,
+      decision: {
+        kind: "task_change",
+        target: { taskId: before.current!.taskId, revision: String(before.writeEpoch ?? 0) },
+        text: "请用中文回复",
+        mode: "supplement",
+      },
     });
-    expect(aside.action).toBe("continue");
-    expect(aside.cutContext).toBe(false);
-    expect(aside.board.current?.unfinished).toBe(true);
+    expect(amended.kind).toBe("applied");
+    expect(readSessionTaskBoard(sessionFile).current?.taskId).toBe(before.current?.taskId);
+    expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
   });
 
   it("records the existing completion only after the acceptance check passes", () => {
@@ -252,12 +269,7 @@ describe("P3 complex task loop", () => {
     tempDirs.push(dir);
     const sessionFile = path.join(dir, "session.jsonl");
     fs.writeFileSync(sessionFile, "");
-    const started = applyIncomingUserMessage({
-      board: emptySessionTaskBoard(),
-      incomingText: "请分步骤做竞品分析",
-      nowMs: 1,
-    });
-    seedSessionTaskBoard(sessionFile, started.board);
+    admitFixture(sessionFile);
     const draft = `${"每一步都有可见结果。".repeat(12)}竞品分析已按步骤写完。`;
     expect(
       assessTaskOutputAlignment({

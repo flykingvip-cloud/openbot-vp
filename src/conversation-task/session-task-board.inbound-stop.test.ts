@@ -1,14 +1,15 @@
 /**
- * P2: stop protection through real inbound applyIncomingUserMessage + claim.
+ * Stop protection through explicit control parsing + locked state mutation + claim.
  * Also covers full (non-truncated) constraint persistence and abortInFlight signaling.
  */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { parseExplicitTaskControl } from "../agent-runtime/policy/index.js";
+import { sessionTaskState } from "../agent-runtime/state/index.js";
 import {
   activeConstraintTexts,
-  applyIncomingUserMessage,
   emptySessionTaskBoard,
   readSessionTaskBoard,
   seedSessionTaskBoard,
@@ -42,11 +43,19 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
   });
 
   it("owner 暂停 → wakeSuppress + abortInFlight → claim rejects", () => {
-    const result = applyIncomingUserMessage({
-      board: readSessionTaskBoard(sessionFile),
-      incomingText: "暂停",
+    const control = parseExplicitTaskControl("暂停");
+    if (!control) {
+      throw new Error("explicit pause must parse");
+    }
+    const result = sessionTaskState.applyExplicitControl({
+      sessionFile,
+      control,
+      recheck: { authOk: true, stopActive: false },
     });
-    seedSessionTaskBoard(sessionFile, result.board);
+    if (!result) {
+      throw new Error("explicit pause must update existing board");
+    }
+    expect(readSessionTaskBoard(sessionFile).current?.wakeSuppress).toBe(true);
     expect(result.board.current?.wakeSuppress).toBe(true);
     expect(result.abortInFlight).toBe(true);
     expect(shouldTaskParkAbortInFlight(result.cutContext, result.abortInFlight)).toBe(true);
@@ -63,11 +72,19 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
   });
 
   it("owner 取消当前 → tombstone + abortInFlight → claim rejects", () => {
-    const result = applyIncomingUserMessage({
-      board: readSessionTaskBoard(sessionFile),
-      incomingText: "取消当前",
+    const control = parseExplicitTaskControl("取消当前");
+    if (!control) {
+      throw new Error("explicit cancel must parse");
+    }
+    const result = sessionTaskState.applyExplicitControl({
+      sessionFile,
+      control,
+      recheck: { authOk: true, stopActive: false },
     });
-    seedSessionTaskBoard(sessionFile, result.board);
+    if (!result) {
+      throw new Error("explicit cancel must update existing board");
+    }
+    expect(readSessionTaskBoard(sessionFile).current).toBeUndefined();
     expect(result.board.current).toBeUndefined();
     expect(result.abortInFlight).toBe(true);
     expect(shouldTaskParkAbortInFlight(result.cutContext, result.abortInFlight)).toBe(true);
@@ -90,17 +107,26 @@ describe("inbound stop / cancel / same-task revise → claim", () => {
     const critical = "禁止引用任何海外评测站点的份额数据";
     expect(longTail.indexOf(critical)).toBeGreaterThan(47);
 
-    const result = applyIncomingUserMessage({
-      board: readSessionTaskBoard(sessionFile),
-      incomingText: longTail,
+    const before = readSessionTaskBoard(sessionFile);
+    const result = sessionTaskState.applyInteractionProposal({
+      sessionFile,
+      expectedFocusRevision: before.focusRevision,
+      expectedWriteEpoch: before.writeEpoch ?? 0,
+      decision: {
+        kind: "task_change",
+        target: { taskId: "task-a", revision: String(before.writeEpoch ?? 0) },
+        text: longTail,
+        mode: "supplement",
+      },
     });
-    seedSessionTaskBoard(sessionFile, result.board);
-    expect(result.board.focusRevision).toBe(3);
-    const stored = activeConstraintTexts(result.board.current);
+    expect(result.kind).toBe("applied");
+    const after = readSessionTaskBoard(sessionFile);
+    expect(after.focusRevision).toBe(3);
+    const stored = activeConstraintTexts(after.current);
     expect(stored.some((row) => row.includes(critical))).toBe(true);
     // Display marker may truncate, but persistence must keep the full text.
     expect(stored.join("\n")).toContain(critical);
-    expect(result.board.current?.stop.summary).toContain("约束：");
+    expect(after.current?.stop.summary).toContain("约束：");
 
     const claim = claimTaskBoardContinue({
       sessionFile,

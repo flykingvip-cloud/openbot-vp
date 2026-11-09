@@ -357,7 +357,7 @@ export function createOfficeSuite(options: {
     const current = await loadOwned(principal, request.artifactId);
     const read = await summarize(current.meta.kind, current.bytes);
     const html = previewHtml(current.meta.filename, [
-      { heading: "文本", body: boundSummary(read.summary) },
+      { heading: "文本", body: JSON.stringify(boundSummary(read.summary), null, 2) },
     ]);
     const previewFilePath = resolveInside(
       rootDir,

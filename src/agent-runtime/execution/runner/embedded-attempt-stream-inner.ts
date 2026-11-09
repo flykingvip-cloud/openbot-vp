@@ -35,6 +35,10 @@ export async function runEmbeddedAttemptStreamInner(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<void> {
+  if (!s.sessionManager) {
+    throw new Error("Attempt session must be prepared before stream-inner");
+  }
+
   // Mistral (and other strict providers) reject tool call IDs that don't match their
   // format requirements (e.g. [a-zA-Z0-9]{9}). sanitizeSessionHistory only processes
   // historical messages at attempt start, but the agent loop's internal tool call →

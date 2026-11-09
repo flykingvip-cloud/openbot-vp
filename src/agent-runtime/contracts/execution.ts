@@ -1,6 +1,16 @@
 import type { InteractionExecutionRequest } from "./interaction.js";
 import type { TaskCompletionBinding } from "./task-binding.js";
 
+/** Accounting fact shared by execution and outcome projection. */
+export type CommandCandidateChargeState =
+  | "not_attempted"
+  | "attempted_unknown"
+  | "committed"
+  | "conflict"
+  | "evidence_missing"
+  | "absent"
+  | "no_effect";
+
 /** Trusted ingress identity and revision; never accepted from model output. */
 export type ExecutionAdmissionInput = {
   requestId: string;

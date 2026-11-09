@@ -9,6 +9,10 @@ import {
   resolveAccountComputerWebRoute,
 } from "../../../agents/sandbox/account-computer-browser-routing.js";
 import { resolveEffectiveSandboxWorkspaceDir } from "../../../agents/sandbox/effective-workspace.js";
+import {
+  acquireSessionWriteLock,
+  resolveSessionLockMaxHoldFromTimeout,
+} from "../../../agents/session-write-lock.js";
 import { ensureGlobalUndiciStreamTimeouts } from "../../../infra/net/undici-global-dispatcher.js";
 import { resolveUserPath } from "../../../utils.js";
 import { resolveAttemptSandbox } from "../../capabilities/index.js";
@@ -23,6 +27,7 @@ import {
   runEmbeddedAttemptPreflight,
 } from "./embedded-attempt-preflight.js";
 import { runEmbeddedAttemptPrompt } from "./embedded-attempt-prompt.js";
+import { runEmbeddedAttemptSession } from "./embedded-attempt-session.js";
 import { runEmbeddedAttemptStreamInner } from "./embedded-attempt-stream-inner.js";
 import { runEmbeddedAttemptStream } from "./embedded-attempt-stream.js";
 import { runEmbeddedAttemptTools } from "./embedded-attempt-tools.js";
@@ -58,10 +63,17 @@ export async function runEmbeddedAttempt(
   await fs.mkdir(s.effectiveWorkspace, { recursive: true });
 
   process.chdir(s.effectiveWorkspace);
-  await runEmbeddedAttemptPreflight(params, s);
   try {
+    await runEmbeddedAttemptPreflight(params, s);
     await runEmbeddedAttemptTools(params, s);
+    s.sessionLock = await acquireSessionWriteLock({
+      sessionFile: params.sessionFile,
+      maxHoldMs: resolveSessionLockMaxHoldFromTimeout({
+        timeoutMs: params.timeoutMs,
+      }),
+    });
     try {
+      await runEmbeddedAttemptSession(params, s);
       await runEmbeddedAttemptStream(params, s);
       await runEmbeddedAttemptStreamInner(params, s);
       try {

@@ -250,6 +250,7 @@ if (mode === "write-wait") {
           appendNotice,
         }),
       bindingCurrent: (sf, b) => isTaskExecutionBindingCurrent(sf, b),
+      recordRecoveryDelivered: markAsyncWaitRecoveryDelivered,
     },
   );
   // confirm hook should mark delivered; also call explicitly for clarity in child

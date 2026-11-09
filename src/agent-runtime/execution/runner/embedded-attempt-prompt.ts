@@ -30,13 +30,15 @@ import { sessionTaskState } from "../../state/index.js";
 import type { EmbeddedAttemptState } from "./embedded-attempt-preflight.js";
 import { setActiveEmbeddedRun } from "./run-registry.js";
 
-const getAbortReason = (signal: AbortSignal): unknown => signal.reason;
-
 /** Lifecycle skill attribution, before_prompt_build, role-order repair, image load, through prompt-end log. */
 export async function runEmbeddedAttemptPrompt(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<void> {
+  if (!s.sessionManager) {
+    throw new Error("Attempt session must be prepared before prompt");
+  }
+
   s.lifecycleSkillNamesLoaded = resolveLifecycleSkillNamesLoaded(
     s.skillEntries.map((entry) => entry.skill.name),
   );
@@ -169,7 +171,7 @@ export async function runEmbeddedAttemptPrompt(
   s.messagesSnapshot = [];
   s.sessionIdUsed = s.activeSession.sessionId;
   s.onAbort = () => {
-    const reason = params.abortSignal ? getAbortReason(params.abortSignal) : undefined;
+    const reason = params.abortSignal?.reason;
     const timeout = reason ? isTimeoutError(reason) : false;
     if (
       shouldFlagCompactionTimeout({

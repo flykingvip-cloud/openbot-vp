@@ -1,6 +1,10 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { formatTaskProposalReply } from "../../agent-runtime/command/index.js";
+import {
+  formatTaskProposalReply,
+  createInteractionSourceBoundary,
+  formatRestrictedInteractionNotice,
+} from "../../agent-runtime/command/index.js";
 import {
   appendSharedTurnContext,
   appendUntrustedContext,
@@ -1430,44 +1434,86 @@ export async function runPreparedReply(
   });
   let admittedBinding = opts?.resumedTaskBinding;
   if (interactionIngress && !admittedBinding) {
+    const sources = createInteractionSourceBoundary();
     const persistOwnReply = (text: string) => {
+      const availability = sources.availability;
+      if (availability) {
+        const notice = formatRestrictedInteractionNotice(availability);
+        if (!text.includes(notice)) {
+          text = `${text}\n\n${notice}`;
+        }
+      }
       if (interactionIngress.persistOwnTranscript) {
-        replyTurnRuntime.persistInteractionMessage({
-          sessionFile,
-          sessionId: sessionIdFinal,
-          cwd: runWorkspaceDir,
-          messageId: interactionIngress.userMessageId,
-          role: "assistant",
-          text,
+        sources.read(
+          "transcript_unavailable",
+          () =>
+            replyTurnRuntime.persistInteractionMessage({
+              sessionFile,
+              sessionId: sessionIdFinal,
+              cwd: runWorkspaceDir,
+              messageId: interactionIngress.userMessageId,
+              role: "assistant",
+              text,
+            }),
+          undefined,
+        );
+      }
+      const current = sources.availability;
+      if (current && opts?.runId) {
+        emitChatInboundStage({
+          runId: opts.runId,
+          sessionKey,
+          stage: "interaction_restricted",
+          extra: { reasonCodes: current.reasons, executionAvailable: false },
         });
       }
-      return { text };
+      if (!availability && current) {
+        text = `${text}\n\n本条回复未能保存到对话记录；刚才任务操作的结果以上述回执为准。`;
+      }
+      return { text, ...(current ? { channelData: { runtimeInteraction: current } } : {}) };
     };
     if (interactionIngress.persistOwnTranscript) {
-      replyTurnRuntime.persistInteractionMessage({
-        sessionFile,
-        sessionId: sessionIdFinal,
-        cwd: runWorkspaceDir,
-        messageId: interactionIngress.userMessageId,
-        role: "user",
-        text: inboundMessage,
-      });
+      sources.read(
+        "transcript_unavailable",
+        () =>
+          replyTurnRuntime.persistInteractionMessage({
+            sessionFile,
+            sessionId: sessionIdFinal,
+            cwd: runWorkspaceDir,
+            messageId: interactionIngress.userMessageId,
+            role: "user",
+            text: inboundMessage,
+          }),
+        undefined,
+      );
     }
-    const board = replyTurnRuntime.state.read(sessionFile);
+    const board = sources.read(
+      "task_state_unavailable",
+      () => replyTurnRuntime.state.readForInteraction(sessionFile),
+      { parked: [], focusRevision: 0 },
+    );
     const captured = {
       expectedFocusRevision: board.focusRevision,
       expectedWriteEpoch: board.writeEpoch ?? 0,
       expectedTaskId: board.current?.taskId,
     };
-    const transcript = openSessionManager(sessionFile);
-    const history = transcript.buildSessionContext().messages;
-    const bootstrap = await resolveBootstrapContextForRun({
-      workspaceDir: runWorkspaceDir,
-      config: cfg,
-      sessionKey,
-      sessionId: sessionIdFinal,
-      agentId,
-    });
+    const history = sources.read(
+      "transcript_unavailable",
+      () => openSessionManager(sessionFile).buildSessionContext().messages,
+      [],
+    );
+    const bootstrap = await sources.readAsync(
+      "context_source_unavailable",
+      () =>
+        resolveBootstrapContextForRun({
+          workspaceDir: runWorkspaceDir,
+          config: cfg,
+          sessionKey,
+          sessionId: sessionIdFinal,
+          agentId,
+        }),
+      { bootstrapFiles: [], contextFiles: [] },
+    );
     const systemContext = [
       ...bootstrap.contextFiles.map((file) => `## ${file.path}\n${file.content}`),
       skillsSnapshot?.prompt,
@@ -1504,6 +1550,7 @@ export async function runPreparedReply(
       authProfileId: interactionAuthProfileId,
       timeoutMs,
       input: {
+        availability: sources.availability,
         message: prefixedCommandBody,
         images: opts?.images,
         abortSignal: opts?.abortSignal,
@@ -1544,14 +1591,19 @@ export async function runPreparedReply(
       } else {
         const applied =
           commandAuthorized && command.isAuthorizedSender
-            ? replyTurnRuntime.state.applyInteractionProposal({
-                sessionFile,
-                ...captured,
-                decision:
-                  routed.decision.kind === "task_change"
-                    ? { ...routed.decision, text: inboundMessage }
-                    : routed.decision,
-              })
+            ? sources.read(
+                "task_mutation_unconfirmed",
+                () =>
+                  replyTurnRuntime.state.applyInteractionProposal({
+                    sessionFile,
+                    ...captured,
+                    decision:
+                      routed.decision.kind === "task_change"
+                        ? { ...routed.decision, text: inboundMessage }
+                        : routed.decision,
+                  }),
+                { kind: "rejected" as const, reason: "task_mutation_unconfirmed" },
+              )
             : { kind: "rejected" as const, reason: "unauthorized" };
         if (applied.kind === "applied" && applied.abort) {
           replyTurnRuntime.interrupt(sessionIdFinal, sessionKey);
@@ -1572,6 +1624,16 @@ export async function runPreparedReply(
     }
     if (routed.kind === "execution_admission") {
       if (routed.result.kind !== "accepted") {
+        if (
+          routed.result.kind === "rejected" &&
+          routed.result.reason === "task_mutation_unconfirmed"
+        ) {
+          sources.restrict("task_mutation_unconfirmed");
+          typing.cleanup();
+          return persistOwnReply(
+            "任务请求的写入结果暂时无法确认，没有启动执行器，也没有自动重试。",
+          );
+        }
         typing.cleanup();
         return persistOwnReply(
           routed.result.kind === "duplicate"

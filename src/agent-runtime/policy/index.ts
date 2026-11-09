@@ -45,3 +45,4 @@ export { stripInboundStamp } from "./input-stamp.js";
 export { parseTaskAcceptanceChecks } from "./acceptance-checks.js";
 
 export { resolveExecutionQueueAction } from "./execution-queue.js";
+export { isRecoverableInteractionSourceError } from "./interaction-availability.js";

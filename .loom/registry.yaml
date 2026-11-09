@@ -12741,6 +12741,108 @@ tasks:
     since: 2026-11-09
     metadata: {}
 landingStreams:
+  - id: pr252-preserve250-latest-integration-20261109
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/agent-runtime-convergence/failure-closeout-review-20261109.md
+      - .kiro/specs/agent-runtime-convergence/limited-review-b92d96340-20261108.md
+      - .kiro/specs/agent-runtime-convergence/phase-split-repair-20261109.md
+      - .kiro/specs/agent-runtime-convergence/real-runtime-acceptance-20261109.md
+      - .kiro/specs/agent-runtime-convergence/restricted-interaction-20261109.md
+      - .loom/registry.yaml
+      - scripts/architecture/manifest.json
+      - src/agent-runtime/command/execution-admission.test.ts
+      - src/agent-runtime/command/execution-admission.ts
+      - src/agent-runtime/command/index.ts
+      - src/agent-runtime/command/interaction-sources.test.ts
+      - src/agent-runtime/command/interaction-sources.ts
+      - src/agent-runtime/command/route-interaction.ts
+      - src/agent-runtime/command/task-proposal-reply.ts
+      - src/agent-runtime/context/index.ts
+      - src/agent-runtime/context/sources/browser-routing.ts
+      - src/agent-runtime/context/system-prompt.ts
+      - src/agent-runtime/context/trust/sanitize-for-prompt.ts
+      - src/agent-runtime/contracts/delivery.ts
+      - src/agent-runtime/contracts/execution.ts
+      - src/agent-runtime/contracts/interaction-availability.ts
+      - src/agent-runtime/contracts/interaction.ts
+      - src/agent-runtime/contracts/prompt.ts
+      - src/agent-runtime/contracts/task-control.ts
+      - src/agent-runtime/delivery/dispatch/command-result.ts
+      - src/agent-runtime/delivery/dispatch/confirm-pending.test.ts
+      - src/agent-runtime/delivery/dispatch/confirm-pending.ts
+      - src/agent-runtime/execution/index.ts
+      - src/agent-runtime/execution/outcomes/command-outcome.ts
+      - src/agent-runtime/execution/runner/admitted-turn-recovery.ts
+      - src/agent-runtime/execution/runner/admitted-turn.test.ts
+      - src/agent-runtime/execution/runner/command-budget.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-continue.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-prompt.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-session.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream-inner.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-tools.ts
+      - src/agent-runtime/execution/runner/embedded-attempt.ts
+      - src/agent-runtime/execution/runner/embedded-result.ts
+      - src/agent-runtime/execution/runner/embedded-run-failover.ts
+      - src/agent-runtime/model/authorized-session.ts
+      - src/agent-runtime/model/command-admission-session.test.ts
+      - src/agent-runtime/model/command-admission-session.ts
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/metadata-completion.test.ts
+      - src/agent-runtime/policy/index.ts
+      - src/agent-runtime/policy/interaction-availability.ts
+      - src/agent-runtime/state/repository/interaction-board-read.test.ts
+      - src/agent-runtime/state/repository/session-task.ts
+      - src/agent-runtime/state/repository/task-board-file.ts
+      - src/agent-runtime/wiring/delivery-confirm.ts
+      - src/agent-runtime/wiring/prepared-interaction.test.ts
+      - src/agents/date-time.ts
+      - src/agents/model-fallback.sandbox-infra.test.ts
+      - src/agents/model-fallback.ts
+      - src/agents/pi-embedded-helpers/types.ts
+      - src/agents/pi-embedded-runner/run.overflow-compaction.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
+      - src/agents/sandbox/account-computer-browser-routing.ts
+      - src/agents/sandbox/account-scope.ts
+      - src/agents/sanitize-for-prompt.ts
+      - src/agents/system-prompt.context-source.test.ts
+      - src/agents/system-prompt.public-boundary.test.ts
+      - src/agents/system-prompt.ts
+      - src/agents/task-surface/surface.test.ts
+      - src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/thinking.ts
+      - src/auto-reply/tokens.ts
+      - src/commands/agent.delivery.test.ts
+      - src/commands/agent.ts
+      - src/conversation-task/async-process-lifecycle.test.ts
+      - src/conversation-task/focus-switch.test.ts
+      - src/conversation-task/focus-switch.ts
+      - src/conversation-task/session-task-board.cross-process-child.ts
+      - src/conversation-task/session-task-board.inbound-stop.test.ts
+      - src/conversation-task/session-task-board.seed-audit.test.ts
+      - src/conversation-task/session-task-board.slice3-context.test.ts
+      - src/conversation-task/session-task-board.test.ts
+      - src/conversation-task/session-task-board.ts
+      - src/conversation-task/task-board-continue.test.ts
+      - src/gateway/billing/agent-run-governance.ts
+      - src/gateway/chat-inbound-stage-events.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+      - src/gateway/collaboration-dispatch/legacy-production-executor.g8.test.ts
+      - src/gateway/server-methods/chat.resume-parked-recheck.test.ts
+      - src/gateway/server-methods/chat.ts
+      - src/office-suite/service.ts
+      - src/task-orchestration/complex-task-loop.test.ts
+      - test/fixtures/runtime-convergence/async-wait-recovery-child.ts
+      - test/fixtures/runtime-convergence/pending-delivery.restart-child.ts
+      - src/office-suite/office-suite.preview-contract.test.ts
+    canLandWith: []
+    metadata:
+      task: four-pr-merge-readiness
+      agent: codex-runtime-manager
+      purpose: Three-way registry merge preserving tasks, sessions and landing history.
+      officePreviewFix: "New main #253 passed an object to text HTML rendering; bounded JSON serialization
+        red-to-green."
   - id: pr252-main253-sync-20261109
     landingPolicy: serial
     paths:

@@ -40,6 +40,10 @@ export async function runEmbeddedAttemptContinue(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<void> {
+  if (!s.sessionManager) {
+    throw new Error("Attempt session must be prepared before continue");
+  }
+
   // Progress-only stops, a repeated 「请确认」 after GO, and an empty
   // final after successful tools otherwise end the run. Each continues
   // a small bounded number of times. Questions, permission, payment,

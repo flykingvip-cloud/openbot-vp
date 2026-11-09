@@ -30,7 +30,10 @@ export function withSessionTaskBoardLock<T>(sessionFile: string, fn: () => T): T
   return withFileLockSync(boardPath, SESSION_TASK_BOARD_LOCK_OPTIONS, fn);
 }
 
-export function readSessionTaskBoardUnlocked(sessionFile?: string): SessionTaskBoard {
+export function readSessionTaskBoardUnlocked(
+  sessionFile?: string,
+  strict = false,
+): SessionTaskBoard {
   const file = sessionFile?.trim();
   if (!file) {
     return emptySessionTaskBoard();
@@ -39,6 +42,9 @@ export function readSessionTaskBoardUnlocked(sessionFile?: string): SessionTaskB
     const raw = fs.readFileSync(sessionTaskBoardPath(file), "utf8");
     const parsed = JSON.parse(raw) as SessionTaskBoard;
     if (!parsed || !Array.isArray(parsed.parked)) {
+      if (strict) {
+        throw new SyntaxError("Task board is not a valid task-state snapshot");
+      }
       return emptySessionTaskBoard();
     }
     return {
@@ -50,7 +56,13 @@ export function readSessionTaskBoardUnlocked(sessionFile?: string): SessionTaskB
       ...(Array.isArray(parsed.archived) ? { archived: parsed.archived } : {}),
       ...(parsed.scope ? { scope: parsed.scope } : {}),
     };
-  } catch {
+  } catch (error) {
+    if (
+      strict &&
+      !(error && typeof error === "object" && "code" in error && error.code === "ENOENT")
+    ) {
+      throw error;
+    }
     return emptySessionTaskBoard();
   }
 }
@@ -77,6 +89,11 @@ export function writeSessionTaskBoardUnlocked(sessionFile: string, board: Sessio
 
 export function readSessionTaskBoard(sessionFile?: string): SessionTaskBoard {
   return readSessionTaskBoardUnlocked(sessionFile);
+}
+
+/** Interaction must distinguish unavailable/corrupt state from an absent board. No writes. */
+export function readInteractionTaskBoard(sessionFile: string): SessionTaskBoard {
+  return readSessionTaskBoardUnlocked(sessionFile, true);
 }
 
 export class StaleSessionTaskBoardWriteError extends Error {

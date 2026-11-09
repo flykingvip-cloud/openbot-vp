@@ -345,6 +345,8 @@ describe("runPreparedReply inbound depth router", () => {
     "resumed",
     "resume_denied",
     "direct_respond",
+    "corrupt_state",
+    "transcript_failure",
   ] as const)("Gateway interaction %s enters execution only after acceptance", async (kind) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-ingress-reply-"));
     const file = path.join(dir, "session.jsonl");
@@ -363,7 +365,10 @@ describe("runPreparedReply inbound depth router", () => {
     const isResume = kind === "resumed" || kind === "resume_denied";
     const executes = kind === "accepted" || kind === "resumed";
     const interaction = vi.spyOn(replyTurnRuntime, "interaction").mockResolvedValue(
-      kind === "respond" || kind === "direct_respond"
+      kind === "respond" ||
+        kind === "direct_respond" ||
+        kind === "corrupt_state" ||
+        kind === "transcript_failure"
         ? { kind: "respond", text: "你好", clarification: false }
         : isResume
           ? {
@@ -399,6 +404,20 @@ describe("runPreparedReply inbound depth router", () => {
             }
           : undefined,
     });
+    const strictRead = vi
+      .spyOn(replyTurnRuntime.state, "readForInteraction")
+      .mockImplementation(() => {
+        if (kind === "corrupt_state") {
+          throw new SyntaxError("corrupt private task");
+        }
+        return read.mock.results.at(-1)?.value ?? { focusRevision: 0, parked: [] };
+      });
+    const persist = vi.spyOn(replyTurnRuntime, "persistInteractionMessage");
+    if (kind === "transcript_failure") {
+      persist.mockImplementation(() => {
+        throw Object.assign(new Error("private path"), { code: "ENOSPC" });
+      });
+    }
     try {
       vi.mocked(runReplyAgent).mockClear();
       const result = await runPreparedReply(
@@ -448,6 +467,15 @@ describe("runPreparedReply inbound depth router", () => {
         ]),
       );
       expect(runReplyAgent).toHaveBeenCalledTimes(executes ? 1 : 0);
+      if (kind === "corrupt_state" || kind === "transcript_failure") {
+        expect(interaction.mock.calls[0]?.[0].input.availability).toMatchObject({
+          mode: "restricted",
+        });
+        expect(result).toMatchObject({
+          text: expect.stringContaining("继续对话"),
+          channelData: { runtimeInteraction: { mode: "restricted" } },
+        });
+      }
       if (executes) {
         const run = vi.mocked(runReplyAgent).mock.calls[0]?.[0].followupRun.run;
         expect(run).toMatchObject({
@@ -463,7 +491,7 @@ describe("runPreparedReply inbound depth router", () => {
       if (kind === "respond" || kind === "direct_respond") {
         expect(result).toEqual({ text: "你好" });
       }
-      if (!executes) {
+      if (!executes && kind !== "transcript_failure") {
         const entries = fs
           .readFileSync(file, "utf8")
           .trim()
@@ -478,6 +506,8 @@ describe("runPreparedReply inbound depth router", () => {
     } finally {
       interaction.mockRestore();
       read.mockRestore();
+      strictRead.mockRestore();
+      persist.mockRestore();
       vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
       fs.rmSync(dir, { recursive: true, force: true });
     }
