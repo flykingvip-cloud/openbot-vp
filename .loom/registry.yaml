@@ -10858,7 +10858,40 @@ tasks:
     ownerHistory: []
     since: 2026-11-05
     metadata: {}
+  - id: office-file-suite:cursor-jineng
+    owner: cursor-jineng
+    intent:
+      - Clean-room Office file suite for all tenants and individual users
+    paths:
+      - src/office-suite/**
+      - src/agents/tools/office-file-tool.ts
+      - src/agents/tools/office-file-tool.test.ts
+      - skills/office-file-suite/**
+      - docs/office/office-file-suite.md
+      - src/agents/openclaw-tools.office-file.test.ts
+    state: active
+    sessions:
+      - id: 7c3e1a04-9b2d-4f6a-8c15-0e4d6a8b2f11
+        taskId: office-file-suite:cursor-jineng
+        ide: cursor
+        agent: cursor-jineng
+        status: active
+        lastSignalAt: 2026-11-09T03:03:54.105Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-09
+    metadata: {}
 landingStreams:
+  - id: office-file-suite-20261109
+    landingPolicy: serial
+    paths:
+      - src/office-suite/**
+      - docs/office/**
+    canLandWith: []
+    metadata:
+      task: office-file-suite
+      owner: cursor-jineng
+      purpose: Clean-room file-mode Office create, edit, preview, and export.
   - id: auto-data-product-supply-20261108
     landingPolicy: serial
     paths:
