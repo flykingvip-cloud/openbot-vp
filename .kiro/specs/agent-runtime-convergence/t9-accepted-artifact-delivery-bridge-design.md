@@ -125,8 +125,8 @@
 
 M1 只落请求和关联。存储用已有的 `withDirectoryLock` 和 `writeJsonDurable`，目录由调用方传入，不在 `delivery-queue/` 里写 `{id}.json`。因此 `loadPendingDeliveries` 扫不到这些文件。M2 才可以把已关联且授权通过的记录改名进那条队列。现有队列表达不了「暂存但不可发送」：它的待发送集合就是顶层 `*.json`。M1 不新做队列，也不把暂存文件放进那个目录。
 
-1. **幂等身份在改名之后还在。** 同一键的锁内先读意图记录。阶段是 `staged`、`queued`、`delivered`、`unknown`、`blocked` 或 `failed_retryable` 时，返回原记录，不因为 `.bridge-staged` 已经不在就再建一条。独占创建只用于这个键还没有意图的时候。半写：暂存文件打不开或 `complete !== true`，且已有意图，则按意图把同一路径写完；没有意图时把坏文件改名为 `.bridge-partial`，键不变，下一次同一身份的提交仍用这个 hash。
-2. **`bridgeSendStarted` 不同时表示「正在发」和「永不可重试」。** 外部效果分成 `none`、`unknown`、`acknowledged`。效果已证明是 `none` 时，阶段可以是 `failed_retryable`，`retryable` 为真。效果是 `unknown` 时阶段是 `unknown`，`retryable` 为假。不是每个异常都重试，也不是第一次失败就永久停在 `unknown`。M1 的提交不把 `bridgeSendStarted` 设为真，也不发送。后来的恢复者拿锁之后必须重读意图，不能把还在锁里的正常请求看成故障。
+1. **幂等身份在改名之后还在。** 键材料是固定字段数组的 `JSON.stringify`，不用换行拼接，避免字段里的分隔符拼成另一个身份。同一键的锁内先读意图。只有 `ENOENT` 表示缺失。意图损坏、权限或 IO 错误必须拒绝，不得覆盖原文件、不得重置阶段。阶段已是 `staged`、`associated`、`delivered`、`unknown`、`blocked` 或 `failed_retryable` 时返回原记录。M1 不把改名后的阶段写成 `queued`。改名函数在源文件和目标文件都不存在时返回失败，不把 `queueId: null` 记成已入队。半写仍只修暂存正文，不重写一份坏掉的意图。
+2. **`bridgeSendStarted` 不同时表示「正在发」和「永不可重试」。** 这是 M2 的发送合同。M1 不提供写入投递结果的接口，因此不能把 `delivered` 或 `unknown` 改成 `failed_retryable`，也不能靠调用参数把 `unknown` 变成可重试。字段仍留着：`externalEffect` 为 `none` 时以后才可以重试；为 `unknown` 时隔离且不可重试。M1 提交保持 `bridgeSendStarted: false`。
 3. **窄授权没有真实依据就不是授权。** `evaluateMemberArtifactDeliveryEligibility` 在身份完整时只返回 `authorization_pending` / `outbound_auth_unwired`。它不读取 `granted`。依据仍然缺：`resolveOutboundTarget`、`operator.write`、`checkTaskActionBoundary`、`authorizeTeamGroupResourceAccess` 都不是「这份已接受成果可以外发」。M2 接上真正的 `evaluateAcceptedArtifactOutboundAuthorization` 之前，关联可以落盘，但不得改成可发送的队列 `.json`。
 
 ## 4. 失败与恢复
