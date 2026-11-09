@@ -1,3 +1,4 @@
+import { L1_DEFAULT } from "../../agent-runtime/policy/index.js";
 import {
   COLLABORATION_POLICY_PROTOCOL_VERSION,
   MODE_TEMPLATES,
@@ -12,6 +13,8 @@ import {
   type PolicyClamp,
   type PolicyValueSource,
 } from "./effective-policy.js";
+
+export { L1_DEFAULT };
 import {
   assertProvenanceCoverage100,
   compileContextSegment,
@@ -21,26 +24,6 @@ import {
   compilePresentationSegment,
   policyValue,
 } from "./policy-compiler-sections.js";
-
-export const L1_DEFAULT = {
-  collaborationMode: "discussion_driven" as CollaborationModeTemplateId,
-  openDiscussionWithoutMention: true,
-  // Decoupled from openDiscussion: analysis/task rounds may still open SUPPLEMENT_WINDOW.
-  // Owner-selected default: related members participate within a three-reply budget.
-  allowSupplementAfterPrimary: true,
-  // Distinct from COLLABORATION_DEFAULT_MAX_VISIBLE_REPLIES (missing-config fallback).
-  // New-group seed in collaboration-learning/shared.ts may differ (task_driven / maxVisible=3).
-  maxVisibleBotRepliesPerRound: 3,
-  mentionBotMustRespond: false,
-  humanStartsNewRound: true,
-  botMaySelfAdvanceWithoutHuman: false,
-  entersWaitingForHumanAfterVisibleTurnsExhausted: true,
-  coordinatorSummarizeAfterRound: false,
-  lowSignalStrategy: "one_reply" as LowSignalStrategy,
-  finalDecisionMode: "human_required" as DecisionMode,
-  allowAgentPublishProposal: true,
-  allowSecondaryTakeover: true,
-};
 
 function isModeId(value: string): value is CollaborationModeTemplateId {
   return value === "discussion_driven" || value === "task_driven" || value === "review_driven";

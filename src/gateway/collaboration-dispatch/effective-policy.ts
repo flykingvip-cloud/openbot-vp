@@ -1,91 +1,33 @@
+import type {
+  CollaborationModeTemplateId,
+  DecisionMode,
+  LowSignalStrategy,
+  ModeTemplate,
+} from "../../agent-runtime/policy/index.js";
 import type { CollaborationEventKey } from "./collaboration-event-key.js";
 /**
  * Collaboration Policy v1.1 — governance source types.
  *
  * L1/L2 are rule sources, not the runtime. The compiler emits EffectivePolicy.
- * Orchestrator / gates / ledger consume EffectivePolicy only.
+ * Hard invariants and mode templates are the policy public entry; this file re-exports them.
  *
  * docs/design/collaboration-governance-protocol-v1.1-2026-09-03.md
  */
 
-export const COLLABORATION_POLICY_PROTOCOL_VERSION = "1.1" as const;
-
-/** L1-Hard: never overridable. */
-export const SYSTEM_INVARIANTS = {
-  protocolVersion: COLLABORATION_POLICY_PROTOCOL_VERSION,
-  maxVisibleRepliesCeiling: 12,
-  mentionUnmatchedCannotDispatch: true,
-  nonMemberCannotWrite: true,
-  observerCannotWrite: true,
-  archivedCannotDispatch: true,
-  emptyEnabledSkillsMeansNoGroupRestriction: true,
-  personalSessionDoesNotInheritGroupSkillAllowlist: true,
-  groupRoundDoesNotPassInboundDepth: true,
-  cannotBypassConfidentiality: true,
-  l2CannotWidenL1: true,
-  mentionMustDispatch: true,
-  mentionMaySilentIfNoIncrement: true,
-} as const;
-
-export type SystemInvariants = typeof SYSTEM_INVARIANTS;
-
-export type CollaborationModeTemplateId = "discussion_driven" | "task_driven" | "review_driven";
-
-export type LowSignalStrategy = "one_reply" | "all_named_confirmers";
-
-export type DecisionMode = "human_required" | "delegated_low_risk";
-
-export type ObserverPermissionMatrix = {
-  canRead: true;
-  canMention: false;
-  canRespond: false;
-  canExecute: false;
-  canApprove: false;
-};
-
-export const OBSERVER_PERMISSIONS: ObserverPermissionMatrix = {
-  canRead: true,
-  canMention: false,
-  canRespond: false,
-  canExecute: false,
-  canApprove: false,
-};
-
-export type ModeTemplate = {
-  id: CollaborationModeTemplateId;
-  goal: string;
-  primaryStrength: "weak" | "owner_required" | "reviewer_required";
-  openParticipation: "high" | "on_demand" | "constrained";
-  deliverableRequired: boolean;
-  preserveConflict: boolean;
-};
-
-export const MODE_TEMPLATES: Record<CollaborationModeTemplateId, ModeTemplate> = {
-  discussion_driven: {
-    id: "discussion_driven",
-    goal: "形成认知",
-    primaryStrength: "weak",
-    openParticipation: "high",
-    deliverableRequired: false,
-    preserveConflict: false,
-  },
-  task_driven: {
-    id: "task_driven",
-    goal: "完成交付",
-    primaryStrength: "owner_required",
-    openParticipation: "on_demand",
-    deliverableRequired: true,
-    preserveConflict: false,
-  },
-  review_driven: {
-    id: "review_driven",
-    goal: "发现问题",
-    primaryStrength: "reviewer_required",
-    openParticipation: "constrained",
-    deliverableRequired: false,
-    preserveConflict: true,
-  },
-};
+export {
+  COLLABORATION_POLICY_PROTOCOL_VERSION,
+  MODE_TEMPLATES,
+  OBSERVER_PERMISSIONS,
+  SYSTEM_INVARIANTS,
+} from "../../agent-runtime/policy/index.js";
+export type {
+  CollaborationModeTemplateId,
+  DecisionMode,
+  LowSignalStrategy,
+  ModeTemplate,
+  ObserverPermissionMatrix,
+  SystemInvariants,
+} from "../../agent-runtime/policy/index.js";
 
 /** L2 group-admin input. Missing fields fall back to L1-Default. */
 export type GroupPolicyInput = {
