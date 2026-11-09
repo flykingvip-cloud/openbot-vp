@@ -301,7 +301,10 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
       artifacts: ["cutContext", "abortInFlight"],
     },
     configuration: "none",
-    tests: ["src/conversation-task/turn-relation.test.ts", "inbound-stop"],
+    tests: [
+      "src/conversation-task/turn-relation.test.ts",
+      "src/conversation-task/session-task-board.inbound-stop.test.ts",
+    ],
     retirementCondition:
       "update implementation path after moving the pure predicate into policy; never lift whole classifyTurnRelation",
     management: "code_required",
@@ -420,9 +423,15 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     version: INVENTORY_VERSION,
     dependencies: {
       rules: ["task.binding.current"],
-      artifacts: ["ConversationTask store", "ledger-binding", "SessionTaskBoard"],
+      artifacts: [
+        "ConversationTask store",
+        "ledger-binding",
+        "SessionTaskBoard",
+        "src/conversation-task/feature.ts",
+      ],
     },
-    configuration: "none; T4 must prove partial-success window before large moves",
+    configuration:
+      "gated by readConversationTaskFlags().activation (env OPENBOT_CONVERSATION_TASK_ACTIVATION / conversationTask.activation.enabled); default OFF; no-op when activation is off; T4 must prove partial-success window before large moves or retirement",
     tests: ["src/conversation-task/reply-completion.test.ts"],
     retirementCondition:
       "orchestration may stay adapter; completion writes only via state after T4 window approval",
@@ -464,7 +473,8 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     enforcementPoints: ["before_submit_review_accept"],
     version: INVENTORY_VERSION,
     dependencies: { rules: ["collab.policy.compile"], artifacts: [] },
-    configuration: "version fences in source",
+    configuration:
+      "version fences in source; feature flags stay OFF by default (LIVE/Floor out of S3 scope)",
     tests: ["src/gateway/collaboration-dispatch/collab-s3-submit-review-versioning.test.ts"],
     retirementCondition: "decision -> policy; facts -> state (T5/T6)",
     management: "code_required",
@@ -480,8 +490,9 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     enforcementPoints: ["before_governance_allow"],
     version: INVENTORY_VERSION,
     dependencies: { rules: ["collab.policy.compile"], artifacts: [] },
-    configuration: "none (code_required)",
-    tests: [],
+    configuration:
+      "enforces EffectiveCollaborationPolicy.governance only (not a third rule source); no separate product off switch",
+    tests: ["src/gateway/collaboration-dispatch/governance-gate.test.ts"],
     retirementCondition: "decision -> policy; facts -> state (T5/T6)",
     management: "code_required",
     disposition: "pending_migration",
@@ -496,7 +507,8 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     enforcementPoints: ["before_peer_review_accept"],
     version: INVENTORY_VERSION,
     dependencies: { rules: ["collab.policy.compile"], artifacts: [] },
-    configuration: "none",
+    configuration:
+      "collaboration.task.requirePeerReview (plan collab.task.requirePeerReview); default false; when true, acceptBoardItemSubmission requires ≥1 non-author peer review on the current submission; does not control peer-review fact writes (recordPeerReview remains independent of this flag)",
     tests: ["src/gateway/collaboration-dispatch/peer-review-gate.test.ts"],
     retirementCondition: "decision -> policy; facts -> state (T5/T6)",
     management: "code_required",
@@ -512,7 +524,8 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     enforcementPoints: ["before_plan_gate_exec"],
     version: INVENTORY_VERSION,
     dependencies: { rules: ["collab.policy.compile"], artifacts: [] },
-    configuration: "none",
+    configuration:
+      "platform never defaults self-advance on; LIVE/Floor/default claim|wake|challenge flips out of this gate's scope",
     tests: ["src/gateway/collaboration-dispatch/collab-s2-plan-gate-all-paths.test.ts"],
     retirementCondition: "decision -> policy; facts -> state (T5/T6)",
     management: "code_required",
