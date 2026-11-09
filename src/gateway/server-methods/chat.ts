@@ -1225,7 +1225,7 @@ function readTranscriptSessionCwd(filePath: string): string | null {
 /** Freeze pins P5:1001 / P1:1005 / P1:1819.
  * Shorten this header when imports above grow.
  */
-async function resolveCallerWorkspaceCwd(params: {
+export async function resolveCallerWorkspaceCwd(params: {
   cfg: OpenBotConfig;
   sessionKey: string;
   agentId: string;
@@ -1237,17 +1237,64 @@ async function resolveCallerWorkspaceCwd(params: {
     isEmployeeBuiltinStewardSession({ sessionKey: params.sessionKey, agentId: params.agentId }),
   );
   const profile = resolveSecurityProfile(params.cfg, process.env);
-  let authorized: string | null = null;
+  let contextTenantId = "";
+  let contextUserId = "";
   try {
     const context = await resolveKnowledgeSourceContext(params.client);
-    if (context.userId?.trim() || params.client?.platformUserId?.trim() || ownerId) {
+    contextTenantId = context.tenantId?.trim() ?? "";
+    contextUserId = context.userId?.trim() ?? "";
+  } catch {
+    // Tenant on the client is enough to name the shadow helper below.
+  }
+  const shadowTenantId = contextTenantId || params.client?.sessionEnterpriseId?.trim() || "";
+  const personalFallback = () => {
+    // Legacy locator fallback is Personal Local only (Managed has no path fallback).
+    if (stewardException && ownerId) {
+      return realpathOrSelf(
+        resolveLiveRobotWriteRoot({
+          agentId: params.agentId,
+          userId: ownerId,
+          tenantId: shadowTenantId || null,
+          sessionKey: params.sessionKey,
+          configuredDefaultWorkspace: params.cfg.agents?.defaults?.workspace,
+        }),
+      ); // resolveEmployeeBuiltinStewardWorkspaceDir
+    }
+    try {
+      // Intentionally sync-only personal fallback; client tenant adapter is not used here.
+      return realpathOrSelf(
+        resolveLiveRobotWriteRoot({
+          agentId: params.agentId,
+          configuredDefaultWorkspace: params.cfg.agents?.defaults?.workspace,
+        }),
+      ); // resolveAgentWorkspaceDir
+    } catch {
+      return null;
+    }
+  };
+  let authorized: string | null = null;
+  try {
+    const actorUserId = contextUserId || params.client?.platformUserId?.trim() || ownerId || "";
+    if (actorUserId) {
+      // resolveAuthorizedToolCwd fail-closes a steward lookup before the
+      // trusted Handle when this shadow dir is omitted. The helper is not
+      // the managed cwd; Handle still has to authorize the transcript root.
+      let stewardWorkspaceDir: string | null = null;
+      if (stewardException) {
+        try {
+          stewardWorkspaceDir = personalFallback();
+        } catch {
+          stewardWorkspaceDir = null;
+        }
+      }
       authorized = await resolveAuthorizedToolCwd({
         client: params.client,
         cfg: params.cfg,
-        userId: context.userId?.trim() || params.client?.platformUserId?.trim() || ownerId || "",
+        userId: actorUserId,
         agentId: params.agentId,
         purpose: "chat.transcript.cwd",
         stewardException,
+        stewardWorkspaceDir,
       });
     }
   } catch {
@@ -1256,30 +1303,7 @@ async function resolveCallerWorkspaceCwd(params: {
   return resolveWorkspaceDirAfterAuthorization({
     profile: profile.profile,
     authorizedCwd: authorized,
-    personalFallback: () => {
-      // Legacy locator fallback is Personal Local only (Managed has no path fallback).
-      if (stewardException && ownerId) {
-        return realpathOrSelf(
-          resolveLiveRobotWriteRoot({
-            agentId: params.agentId,
-            userId: ownerId,
-            sessionKey: params.sessionKey,
-            configuredDefaultWorkspace: params.cfg.agents?.defaults?.workspace,
-          }),
-        ); // resolveEmployeeBuiltinStewardWorkspaceDir
-      }
-      try {
-        // Intentionally sync-only personal fallback; client tenant adapter is not used here.
-        return realpathOrSelf(
-          resolveLiveRobotWriteRoot({
-            agentId: params.agentId,
-            configuredDefaultWorkspace: params.cfg.agents?.defaults?.workspace,
-          }),
-        ); // resolveAgentWorkspaceDir
-      } catch {
-        return null;
-      }
-    },
+    personalFallback,
   });
 }
 

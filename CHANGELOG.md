@@ -310,6 +310,8 @@ Docs: https://docs.openbot.love
 
 - Artifacts/PPTX: keep original Office bytes separate from HTML preview downloads and saves; render static slide layouts in a resource-limited local worker when available, retaining a labelled text fallback.
 - Enterprise data: after a 用友 T+ credential connects, and again on the gateway maintenance tick, the connector syncs and refreshes its default data products without another「立即物化」. Finished sync windows are stored and materialized past the first connector page. Granted digital humans can page the feed past the 20-row summary; a missing seat grant still hides those rows.
+- Employee/chat: a plain-language answer such as “今天是 2026 年…” stays the reply. It is no longer fed to JSON.parse and shown as `SyntaxError: … is not valid JSON`. A broken JSON decision is still rejected, and prose does not start an execution task.
+- Employee/chat: after `/new`, a builtin steward session can create its transcript when the trusted workspace Handle authorizes a directory. Managed enterprise still refuses when that Handle denies the workspace. The shadow helper path is not used as the transcript directory.
 
 ## 2026.3.8
 

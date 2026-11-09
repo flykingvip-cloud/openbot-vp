@@ -69,6 +69,49 @@ export function buildInteractionCompletionContext(
   return { systemPrompt: system.join("\n\n"), messages, tools: [] };
 }
 
+function looksLikeJsonValue(text: string): boolean {
+  const start = text.trimStart();
+  return start.startsWith("{") || start.startsWith("[");
+}
+
+/** Models often wrap the required JSON object in a markdown fence. */
+function stripOptionalJsonFence(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("```")) {
+    return trimmed;
+  }
+  const inner = trimmed
+    .replace(/^```(?:json)?[^\n]*\r?\n?/i, "")
+    .replace(/\r?\n?```$/i, "")
+    .trim();
+  return inner || trimmed;
+}
+
+/**
+ * The host protocol asks for one JSON decision. A conversational answer is
+ * still a reply: parsing it throws SyntaxError and that string is what the
+ * employee chat shows. Prose never becomes an execution request. A broken
+ * JSON document stays a protocol failure.
+ */
+function readInteractionDecisionText(text: string): unknown {
+  const candidate = stripOptionalJsonFence(text);
+  try {
+    const parsed = JSON.parse(candidate) as unknown;
+    if (typeof parsed === "string") {
+      const inner = parsed.trim();
+      if (inner && !looksLikeJsonValue(inner)) {
+        return { kind: "reply", text: inner };
+      }
+    }
+    return parsed;
+  } catch (err) {
+    if (!candidate || looksLikeJsonValue(candidate)) {
+      throw err;
+    }
+    return { kind: "reply", text: candidate };
+  }
+}
+
 /** Fixed provider adapter. No runner, task board, hooks, scheduling or history writes. */
 export async function invokeInteractionCompletion(params: {
   input: InteractionModelInput;
@@ -113,7 +156,7 @@ export async function invokeInteractionCompletion(params: {
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("");
-      return JSON.parse(text) as unknown;
+      return readInteractionDecisionText(text);
     },
   };
 }

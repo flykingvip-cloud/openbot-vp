@@ -84,6 +84,58 @@ it.each(["toolUse", "length", "error", "aborted"])(
     expect(mocks.complete).toHaveBeenCalledOnce();
   },
 );
+it("treats conversational prose as a reply instead of a JSON parse error", async () => {
+  const text = "今天是 2026 年星期一。我可以帮你查日期、整理事项，并接着往下做。";
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  const result = await invokeInteractionCompletion({
+    ...request,
+    input: { message: "你好，请告诉我今天是星期几，并简短介绍你能帮我做什么。", context: [] },
+  });
+  expect(result.readDecision()).toEqual({ kind: "reply", text });
+});
+
+it("still parses a fenced JSON reply and a real execution request", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [
+      {
+        type: "text",
+        text: '```json\n{"kind":"reply","text":"好的"}\n```',
+      },
+    ],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  expect((await invokeInteractionCompletion(request)).readDecision()).toEqual({
+    kind: "reply",
+    text: "好的",
+  });
+
+  const execution = {
+    kind: "execution_request",
+    request: { goal: "写清单", acceptance: ["包含负责人"] },
+  };
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: JSON.stringify(execution) }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  expect((await invokeInteractionCompletion(request)).readDecision()).toEqual(execution);
+});
+
+it("still rejects a broken JSON decision instead of showing it as a reply", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: '{"kind":"reply",' }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  const result = await invokeInteractionCompletion(request);
+  expect(() => result.readDecision()).toThrow(SyntaxError);
+});
+
 it("rejects a tool call even if the provider labels it finished", async () => {
   mocks.complete.mockResolvedValue({
     content: [{ type: "toolCall", name: "exec", arguments: {} }],
