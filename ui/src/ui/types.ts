@@ -50,6 +50,17 @@ export type ChannelAccountSnapshot = {
   lastInboundAt?: number | null;
   lastOutboundAt?: number | null;
   lastProbeAt?: number | null;
+  /** Feishu tenant_key from 企业通道. Not the OpenBot account id. */
+  platformEnterpriseId?: string | null;
+  enterpriseImCapability?: {
+    checkedAt: string;
+    projectGroupRead: "granted" | "missing" | "unknown" | "not_checked";
+    projectDocs: "granted" | "missing" | "unknown" | "not_checked";
+    sendAsUser: "granted" | "missing" | "unknown" | "not_checked";
+    newMessageTrigger: "granted" | "missing" | "unknown" | "not_checked";
+  } | null;
+  enterpriseImChildExecutionBlocked?: boolean;
+  enterpriseImEmployeeUiHint?: "enterprise_not_open" | "waiting_admin_scopes" | "app_can_attempt";
   mode?: string | null;
   dmPolicy?: string | null;
   allowFrom?: string[] | null;

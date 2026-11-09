@@ -1,5 +1,5 @@
 /**
- * Enterprise message channels settings surface (card gallery + config workspace).
+ * Enterprise message channels settings surface (icon switcher + config workspace).
  *
  * Uses channels.status({ tenantId, probe }), tenant-scoped config.set, and
  * channels.logout({ tenantId }) to clear saved secrets without stopping the global runtime.
@@ -8,6 +8,12 @@
  */
 
 import { html, nothing, type TemplateResult } from "lit";
+import {
+  formatFeishuEmployeeUiHint,
+  readFeishuEnterpriseChannelContract,
+  type EnterpriseImCapabilityStatus,
+  type EnterpriseImEmployeeUiHint,
+} from "../../../../../../src/gateway/enterprise-im-channel-contract.js";
 import { channelFaultMessage } from "../../../channel-fault-scope.ts";
 import { ensureImAccountWebhookPaths } from "../../../controllers/tenant-channel-config.ts";
 import {
@@ -18,7 +24,6 @@ import {
   type TenantImProbeResult,
 } from "../../../controllers/tenant-im-binding.ts";
 import type { GatewayBrowserClient } from "../../../gateway.ts";
-import { renderIcon } from "../../../icons.ts";
 import type { ChannelsStatusSnapshot } from "../../../types.ts";
 import { localizeEnterpriseGatewayThrown } from "../enterprise-connection-copy.ts";
 import {
@@ -80,23 +85,6 @@ const CARD_STATUS_LABEL: Record<CardStatus, string> = {
   test_failed: "测试未通过",
 };
 
-/** Shape + text, so status is not carried by the color dot alone. */
-const CARD_STATUS_MARK: Record<CardStatus, string> = {
-  not_added: "○",
-  draft: "△",
-  ready: "●",
-  connected: "✓",
-  test_failed: "!",
-};
-
-const CARD_CTA_LABEL: Record<CardStatus, string> = {
-  not_added: "添加并配置",
-  draft: "继续配置",
-  ready: "管理",
-  connected: "管理",
-  test_failed: "管理",
-};
-
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
 function getState(host: object, props: EnterpriseMessageChannelsSurfaceProps): SurfaceState {
@@ -154,22 +142,6 @@ function channelPresentInForm(
   return Boolean(asRecord(asRecord(form?.channels)?.[channelId]));
 }
 
-function countChannelAccounts(
-  form: Record<string, unknown> | null | undefined,
-  channelId: string,
-  snapshot: ChannelsStatusSnapshot | null,
-): number {
-  const fromSnap = snapshot?.channelAccounts?.[channelId]?.length ?? 0;
-  if (fromSnap > 0) {
-    return fromSnap;
-  }
-  const accounts = asRecord(asRecord(asRecord(form?.channels)?.[channelId])?.accounts);
-  if (accounts) {
-    return Object.keys(accounts).length;
-  }
-  return channelPresentInForm(form, channelId) ? 1 : 0;
-}
-
 function resolveCardStatus(params: {
   present: boolean;
   form: Record<string, unknown> | null;
@@ -194,25 +166,6 @@ function resolveCardStatus(params: {
     return "test_failed";
   }
   return "ready";
-}
-
-function resolveCardSummary(params: {
-  status: CardStatus;
-  accountCount: number;
-  enabled: boolean;
-}): string {
-  switch (params.status) {
-    case "not_added":
-      return "尚未接入";
-    case "draft":
-      return params.accountCount > 0 ? `${params.accountCount} 个账号 · 待填凭证` : "待填凭证";
-    case "ready":
-      return params.enabled ? "已保存 · 可测试连通" : "已停用 · 凭证已保存";
-    case "connected":
-      return params.enabled ? "已启用 · 最近测试通过" : "已停用 · 最近测试通过";
-    case "test_failed":
-      return "已保存 · 测试未通过";
-  }
 }
 
 function requestWithTimeout<T>(
@@ -302,6 +255,111 @@ function removeChannelEntry(raw: string, channelId: string): string {
   return `${JSON.stringify(parsed, null, 2)}\n`;
 }
 
+function feishuCardContract(params: {
+  form: Record<string, unknown> | null;
+  accountId?: string;
+  snapshot: ChannelsStatusSnapshot | null;
+}): {
+  childExecutionBlocked: boolean;
+  employeeUiHint: EnterpriseImEmployeeUiHint;
+  platformEnterpriseId: string | null;
+  capabilityStatus: EnterpriseImCapabilityStatus | null;
+} {
+  const stored = readFeishuEnterpriseChannelContract({
+    config: params.form,
+    accountId: params.accountId,
+  });
+  const accounts = params.snapshot?.channelAccounts?.feishu ?? [];
+  const live =
+    accounts.find((account) => account.accountId === params.accountId) ??
+    (accounts.length === 1 ? accounts[0] : undefined);
+  if (!live?.enterpriseImEmployeeUiHint && !live?.enterpriseImCapability) {
+    return stored;
+  }
+  return {
+    childExecutionBlocked: live.enterpriseImChildExecutionBlocked ?? stored.childExecutionBlocked,
+    employeeUiHint: live.enterpriseImEmployeeUiHint ?? stored.employeeUiHint,
+    platformEnterpriseId:
+      typeof live.platformEnterpriseId === "string"
+        ? live.platformEnterpriseId
+        : stored.platformEnterpriseId,
+    capabilityStatus: live.enterpriseImCapability ?? stored.capabilityStatus,
+  };
+}
+
+function feishuCapabilityStateLabel(status: string): string {
+  switch (status) {
+    case "granted":
+      return "已开通";
+    case "missing":
+      return "未开通";
+    case "unknown":
+      return "未知";
+    default:
+      return "未检查";
+  }
+}
+
+function renderFeishuEnterpriseContract(params: {
+  channelId: string;
+  form: Record<string, unknown> | null;
+  accountId?: string;
+  snapshot: ChannelsStatusSnapshot | null;
+  probe?: { tone: string; summary: string } | null;
+}): TemplateResult | typeof nothing {
+  if (params.channelId !== "feishu") {
+    return nothing;
+  }
+  const contract = feishuCardContract(params);
+  const rows = contract.capabilityStatus;
+  const capability = [
+    ["projectGroupRead", "群消息读取", rows?.projectGroupRead ?? "not_checked"],
+    ["projectDocs", "文档", rows?.projectDocs ?? "not_checked"],
+    ["sendAsUser", "以用户身份发送", rows?.sendAsUser ?? "not_checked"],
+    ["newMessageTrigger", "新消息", rows?.newMessageTrigger ?? "not_checked"],
+  ] as const;
+  const probeTone = params.probe?.tone === "ok" ? "is-ok" : params.probe ? "is-warn" : "";
+  return html`<section class="enterprise-im-status" data-feishu-enterprise-contract>
+    <div class="enterprise-im-status__head">状态</div>
+    <div class="enterprise-im-status__chips">
+      ${
+        params.probe
+          ? html`<span class="enterprise-im-status__chip ${probeTone}">${params.probe.summary}</span>`
+          : nothing
+      }
+      <span class="enterprise-im-status__chip"
+        >${formatFeishuEmployeeUiHint(contract.employeeUiHint)}</span
+      >
+    </div>
+    <div class="enterprise-im-status__row" data-feishu-enterprise-id>
+      <span class="enterprise-im-status__label">平台企业 ID</span>
+      <span class="enterprise-im-status__value">
+        ${contract.platformEnterpriseId ?? "未探测"}
+        ${
+          contract.platformEnterpriseId
+            ? nothing
+            : html`
+                <span class="enterprise-im-status__aside">不是账户 ID</span>
+              `
+        }
+      </span>
+    </div>
+    <ul class="enterprise-im-status__caps">
+      ${capability.map(
+        ([key, label, status]) => html`
+          <li class="enterprise-im-status__cap" data-capability=${key} data-status=${status}>
+            <span>${label}</span>
+            <span class="enterprise-im-status__state ${status === "granted" ? "is-ok" : status === "missing" ? "is-missing" : ""}"
+              >${feishuCapabilityStateLabel(status)}</span
+            >
+          </li>
+        `,
+      )}
+    </ul>
+    <p class="enterprise-im-status__note">连通正常不是员工授权。</p>
+  </section>`;
+}
+
 function isChannelEnabled(
   form: Record<string, unknown> | null,
   channelId: string,
@@ -345,21 +403,34 @@ async function reload(
   state.probing = probe;
   state.error = null;
   try {
-    const [snapshot, cfg] = await Promise.all([
-      requestWithTimeout<ChannelsStatusSnapshot>(
-        props.client,
-        "channels.status",
-        {
-          tenantId: props.tenantId,
-          probe,
-          timeoutMs: probe ? 12_000 : 8_000,
-        },
-        probe ? 14_000 : 10_000,
-      ),
-      loadTenantConfig(props.client, props.tenantId),
-    ]);
+    const statusPromise = requestWithTimeout<ChannelsStatusSnapshot>(
+      props.client,
+      "channels.status",
+      {
+        tenantId: props.tenantId,
+        probe,
+        timeoutMs: probe ? 12_000 : 8_000,
+      },
+      probe ? 14_000 : 10_000,
+    );
+    // A probe writes tenant_key onto the tenant config. Read that config after
+    // the status call so the card does not keep a pre-probe view.
+    let snapshot: ChannelsStatusSnapshot;
+    let cfg: { raw: string; hash: string };
+    if (probe) {
+      snapshot = await statusPromise;
+      cfg = await loadTenantConfig(props.client, props.tenantId);
+    } else {
+      [snapshot, cfg] = await Promise.all([
+        statusPromise,
+        loadTenantConfig(props.client, props.tenantId),
+      ]);
+    }
     state.snapshot = snapshot;
     state.configRaw = cfg.raw;
+    if (!snapshot) {
+      state.error = state.error ?? "通道状态加载失败，请重试。";
+    }
     state.configHash = cfg.hash;
     state.editorBaseRaw = cfg.raw;
     state.configDirty = false;
@@ -377,58 +448,98 @@ function defaultRequestUpdate(): void {
   requestEnterpriseAppRerender();
 }
 
+function renderChannelMark(channelId: EnterpriseMessageChannelId): TemplateResult {
+  if (channelId === "wecom") {
+    return html`
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <rect width="32" height="32" rx="8" fill="#07C160" />
+        <path
+          fill="#fff"
+          d="M16.8 7.4h6.4a2.5 2.5 0 0 1 2.5 2.5v3.1a2.5 2.5 0 0 1-2.5 2.5h-.7l-1.4 1.3v-1.3h-4.3a2.5 2.5 0 0 1-2.5-2.5V9.9a2.5 2.5 0 0 1 2.5-2.5z"
+        />
+        <path
+          fill="#fff"
+          d="M6.2 12.6h9.6a2.9 2.9 0 0 1 2.9 2.9v3.8a2.9 2.9 0 0 1-2.9 2.9H12l-2.1 1.7v-1.7H6.2a2.9 2.9 0 0 1-2.9-2.9v-3.8a2.9 2.9 0 0 1 2.9-2.9z"
+        />
+        <circle cx="9.1" cy="17.4" r=".75" fill="#07C160" />
+        <circle cx="12.1" cy="17.4" r=".75" fill="#07C160" />
+        <circle cx="19.2" cy="11.5" r=".6" fill="#07C160" />
+        <circle cx="21.5" cy="11.5" r=".6" fill="#07C160" />
+      </svg>
+    `;
+  }
+  if (channelId === "feishu") {
+    return html`
+      <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+        <path fill="#3370FF" d="M4.2 20.4 11.6 17l-1.6 6.2z" />
+        <path
+          fill="#3370FF"
+          d="M10.2 17.4c2.2-1.4 4.8-3.6 6.6-6.4 1-1.6 3.2-.9 3.1 1-.2 2.4-1.2 4.4-2.6 6 2.4.1 4.6-.7 6.4-2.1.8-.6 1.8.2 1.4 1.2-1.5 3.6-4.8 6.2-9.4 6.8-3.8.5-7.2-.5-9.2-2.2-.7-.6-.2-1.9.7-2.3z"
+        />
+        <path fill="#1456F0" d="M19.6 11.4 26.2 9.2 21.2 13.6z" />
+        <circle cx="17.8" cy="13.2" r=".7" fill="#fff" />
+      </svg>
+    `;
+  }
+  return html`
+    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <rect width="32" height="32" rx="8" fill="#3296FA" />
+      <circle cx="16" cy="10.4" r="3" fill="#fff" />
+      <path
+        fill="#fff"
+        d="M9.8 16.2c.5-1.3 1.8-2.1 3.2-2.1h6c1.4 0 2.7.8 3.2 2.1l1.5 5.8c.3 1.2-.6 2.3-1.8 2.3h-2.1l-1.1 3.1c-.3.8-1.4.6-1.5-.2l-.6-2.9h-2.2l-.6 2.9c-.1.8-1.2 1-1.5.2l-1.1-3.1H10c-1.2 0-2.1-1.1-1.8-2.3z"
+      />
+    </svg>
+  `;
+}
+
 function renderGalleryCard(params: {
   channelId: EnterpriseMessageChannelId;
   status: CardStatus;
-  summary: string;
   fault: string | null;
   selected: boolean;
   skeleton: boolean;
   disabled: boolean;
   onActivate: () => void;
 }): TemplateResult {
-  const { channelId, status, summary, fault, selected, skeleton, disabled, onActivate } = params;
+  const { channelId, status, fault, selected, skeleton, disabled, onActivate } = params;
   const label = ENTERPRISE_MESSAGE_CHANNEL_LABELS[channelId];
+  const statusLabel = skeleton ? "加载中…" : CARD_STATUS_LABEL[status];
+  const inactive = disabled || skeleton;
   return html`
-    <div
-      class="enterprise-channel-gallery__card enterprise-channel-gallery__card--${status} ${
+    <button
+      type="button"
+      class="enterprise-im-switcher__item enterprise-channel-gallery__card enterprise-channel-gallery__card--${status} enterprise-im-switcher__item--${status} ${
         selected ? "is-selected" : ""
       } ${skeleton ? "is-skeleton" : ""} ${disabled ? "is-disabled" : ""}"
       role="listitem"
+      aria-pressed=${selected ? "true" : "false"}
+      aria-label=${fault ? `${label}，${statusLabel}，${fault}` : `${label}，${statusLabel}`}
+      ?disabled=${inactive}
       @click=${() => {
-        if (!disabled && !skeleton) {
+        if (!inactive) {
           onActivate();
         }
       }}
     >
-      <div class="enterprise-channel-gallery__card-top">
-        <span class="enterprise-channel-gallery__brand enterprise-channel-gallery__brand--${channelId}"></span>
-        <strong class="enterprise-channel-gallery__name">${label}</strong>
-      </div>
-      <div class="enterprise-channel-gallery__badge">
-        <span class="enterprise-channel-gallery__dot" aria-hidden="true"></span>
-        ${skeleton ? "加载中…" : `${CARD_STATUS_MARK[status]} ${CARD_STATUS_LABEL[status]}`}
-      </div>
-      <p class="enterprise-channel-gallery__summary">${skeleton ? "…" : summary}</p>
-      ${
-        !skeleton && fault
-          ? html`<p class="enterprise-channel-gallery__summary" data-channel-fault>${fault}</p>`
-          : nothing
-      }
-      <button
-        type="button"
-        class="enterprise-channel-gallery__cta"
-        ?disabled=${disabled || skeleton}
-        @click=${(event: Event) => {
-          event.stopPropagation();
-          if (!disabled && !skeleton) {
-            onActivate();
-          }
-        }}
+      <span
+        class="enterprise-im-switcher__mark enterprise-im-switcher__mark--${channelId}"
+        data-brand=${channelId}
       >
-        ${skeleton ? "…" : CARD_CTA_LABEL[status]}
-      </button>
-    </div>
+        ${renderChannelMark(channelId)}
+        <span class="enterprise-im-switcher__dot" aria-hidden="true"></span>
+      </span>
+      <span class="enterprise-im-switcher__copy">
+        <span class="enterprise-im-switcher__label">${label}</span>
+        ${
+          !skeleton && fault
+            ? html`<span class="enterprise-im-switcher__status" data-channel-fault title=${fault}
+                >${fault}</span
+              >`
+            : html`<span class="enterprise-im-switcher__status">${statusLabel}</span>`
+        }
+      </span>
+    </button>
   `;
 }
 
@@ -460,9 +571,14 @@ function renderWorkspace(params: {
     : [];
   const lastProbe = state.lastProbeByChannel[channelId] ?? null;
   const credentialsReady = !describeTenantImCredentialGaps(form, channelId, { accountId });
-  const workspaceSub = showCallback
-    ? "当前为 URL 回调模式：保存后复制 Callback URL 回填开放平台；凭证仅写入当前企业租户。"
-    : "当前为长连接模式（推荐）：填写凭证并保存即可，无需公网回调；凭证仅写入当前企业租户。";
+  const workspaceSub =
+    channelId === "feishu"
+      ? showCallback
+        ? "保存后复制 Callback URL。"
+        : ""
+      : showCallback
+        ? "当前为 URL 回调模式：保存后复制 Callback URL 回填开放平台；凭证仅写入当前企业租户。"
+        : "当前为长连接模式（推荐）：填写凭证并保存即可，无需公网回调；凭证仅写入当前企业租户。";
 
   const runProbe = async () => {
     if (!props.client || !props.tenantId) {
@@ -509,19 +625,212 @@ function renderWorkspace(params: {
       state.snapshot = snapshot;
       const result = summarizeTenantImProbeFromSnapshot(channelId, snapshot);
       state.lastProbeByChannel = { ...state.lastProbeByChannel, [channelId]: result };
-      state.notice = result.tone === "ok" ? "连通测试通过" : null;
+      state.notice = result.tone === "ok" && channelId !== "feishu" ? "连通测试通过" : null;
       state.error = result.tone === "fail" ? result.summary : null;
     } finally {
       state.probing = false;
     }
   };
 
+  const formView =
+    state.configRaw && props.tenantId
+      ? renderEnterpriseImChannelForm({
+          channelId,
+          form,
+          tenantId: props.tenantId,
+          disabled,
+          onFieldChange: (field, value) => {
+            if (!state.configRaw || !props.tenantId) {
+              return;
+            }
+            const next = setEnterpriseImAccountFieldValue({
+              form: parseConfigRaw(state.configRaw),
+              channelId,
+              tenantId: props.tenantId,
+              field,
+              value,
+            });
+            state.configRaw = `${JSON.stringify(next, null, 2)}\n`;
+            state.configDirty = true;
+            state.error = null;
+            state.notice = null;
+            const { [channelId]: _cleared, ...rest } = state.lastProbeByChannel;
+            state.lastProbeByChannel = rest;
+            requestUpdate();
+          },
+        })
+      : html`
+          <div class="enterprise-channel-workspace__hint">配置未加载</div>
+        `;
+
+  const saveButton = html`
+    <div class="enterprise-form-actions">
+      <button
+        class="btn btn--primary"
+        type="button"
+        ?disabled=${disabled || !state.configDirty || !state.configRaw}
+        @click=${() =>
+          void run(
+            `save:${channelId}`,
+            async () => {
+              if (!props.client || !props.tenantId || !state.configRaw) {
+                throw new Error("配置未加载");
+              }
+              let formToSave = parseConfigRaw(state.configRaw);
+              formToSave = ensureImAccountWebhookPaths(formToSave);
+              const gap = describeTenantImCredentialGaps(formToSave, channelId, { accountId });
+              if (gap) {
+                throw new Error(`保存未通过：${gap}`);
+              }
+              const raw = `${JSON.stringify(formToSave, null, 2)}\n`;
+              const saved = await saveTenantConfigRaw(
+                props.client,
+                props.tenantId,
+                raw,
+                state.configHash,
+              );
+              state.configRaw = saved.raw;
+              state.configHash = saved.hash;
+              state.editorBaseRaw = saved.raw;
+              state.configDirty = false;
+            },
+            { skipSuccessNotice: false },
+          )}
+      >
+        ${state.busyId?.startsWith("save:") ? "保存中…" : "保存"}
+      </button>
+    </div>
+  `;
+
+  const orderHint = showCallback
+    ? "建议顺序：保存凭证 → 复制 Callback URL 回填开放平台 → 向机器人发「你好」→ 测试连通。"
+    : "建议顺序：保存凭证 → 在开放平台确认长连接/事件订阅 → 向机器人发「你好」→ 测试连通。";
+
+  const troubleshoot = html`
+    <details
+      class="enterprise-im-curated__disclosure"
+      data-testid=${channelId === "feishu" ? "enterprise-im-troubleshoot" : nothing}
+    >
+      <summary>排查</summary>
+      <p>${resolveTenantImPendingHint(channelId)}</p>
+      <p>${orderHint}</p>
+    </details>
+  `;
+
+  const callbackBlock = showCallback
+    ? html`
+        <div class="enterprise-channel-workspace__callbacks">
+          <div class="enterprise-channel-workspace__section-title">Callback URL（回填到开放平台）</div>
+          ${
+            entries.length === 0
+              ? html`
+                  <div class="enterprise-channel-workspace__hint">
+                    打开配置后会自动生成账户级回调地址；保存后复制到开放平台即可。
+                  </div>
+                `
+              : html`<ul class="enterprise-im-callback-list">
+                  ${entries.map(
+                    (entry) => html`
+                      <li class="enterprise-im-callback-list__item">
+                        <div class="enterprise-im-callback-list__meta">
+                          <strong>${entry.accountId}</strong>
+                          <code class="enterprise-im-callback-list__url">${entry.url}</code>
+                        </div>
+                        <button
+                          class="btn btn--sm"
+                          type="button"
+                          ?disabled=${disabled}
+                          @click=${() =>
+                            copyText(entry.copyText, (ok) => {
+                              state.notice = ok ? "已复制 Callback URL" : null;
+                              state.error = ok ? null : "复制失败，请手动选择地址。";
+                              requestUpdate();
+                            })}
+                        >
+                          复制
+                        </button>
+                      </li>
+                    `,
+                  )}
+                </ul>`
+          }
+        </div>
+      `
+    : nothing;
+
+  const probeButton = html`
+    <button
+      class=${channelId === "feishu" ? "btn" : "btn btn--sm"}
+      type="button"
+      data-testid="enterprise-channel-probe"
+      ?disabled=${disabled || state.probing}
+      @click=${() => {
+        void (async () => {
+          state.busyId = `probe:${channelId}`;
+          state.error = null;
+          state.notice = null;
+          requestUpdate();
+          try {
+            await runProbe();
+          } catch (error) {
+            state.notice = null;
+            state.error = localizeEnterpriseGatewayThrown(error, "测试连通失败，请重试。");
+          } finally {
+            state.busyId = null;
+            state.probing = false;
+            requestUpdate();
+          }
+        })();
+      }}
+    >
+      ${state.probing ? "测试中…" : "测试连通"}
+    </button>
+  `;
+
+  const syncButton = html`
+    <button
+      class=${channelId === "feishu" ? "btn btn--sm" : "btn btn--sm btn--primary"}
+      type="button"
+      ?disabled=${
+        disabled ||
+        props.syncBusy ||
+        state.configDirty ||
+        !credentialsReady ||
+        !props.onSyncOperationalIdentity
+      }
+      @click=${() => void props.onSyncOperationalIdentity?.(channelId)}
+    >
+      ${props.syncBusy ? "同步中…" : "同步为运营身份"}
+    </button>
+  `;
+
+  const identityButton = props.onNavigateToIdentities
+    ? html`
+        <button
+          class="btn btn--sm"
+          type="button"
+          ?disabled=${disabled}
+          @click=${props.onNavigateToIdentities}
+        >
+          打开企业身份
+        </button>
+      `
+    : nothing;
+
+  const statusCard = renderFeishuEnterpriseContract({
+    channelId,
+    form,
+    accountId,
+    snapshot: state.snapshot,
+    probe: lastProbe,
+  });
+
   return html`
     <section class="enterprise-channel-workspace enterprise-settings-panel enterprise-settings-panel--flat">
       <header class="enterprise-channel-workspace__head">
         <div>
           <div class="enterprise-channel-workspace__title">配置 · ${label}</div>
-          <div class="enterprise-channel-workspace__sub">${workspaceSub}</div>
+          ${workspaceSub ? html`<div class="enterprise-channel-workspace__sub">${workspaceSub}</div>` : nothing}
         </div>
         <div class="enterprise-channel-workspace__head-actions">
           <button
@@ -653,218 +962,63 @@ function renderWorkspace(params: {
           : nothing
       }
 
-      <div class="enterprise-channel-workspace__form">
-        ${
-          state.configRaw && props.tenantId
-            ? renderEnterpriseImChannelForm({
-                channelId,
-                form,
-                tenantId: props.tenantId,
-                disabled,
-                onFieldChange: (field, value) => {
-                  if (!state.configRaw || !props.tenantId) {
-                    return;
-                  }
-                  const next = setEnterpriseImAccountFieldValue({
-                    form: parseConfigRaw(state.configRaw),
-                    channelId,
-                    tenantId: props.tenantId,
-                    field,
-                    value,
-                  });
-                  state.configRaw = `${JSON.stringify(next, null, 2)}\n`;
-                  state.configDirty = true;
-                  state.error = null;
-                  state.notice = null;
-                  const { [channelId]: _cleared, ...rest } = state.lastProbeByChannel;
-                  state.lastProbeByChannel = rest;
-                  requestUpdate();
-                },
-              })
-            : html`
-                <div class="enterprise-channel-workspace__hint">配置未加载</div>
-              `
-        }
-      </div>
-
-      <div class="enterprise-form-actions">
-        <button
-          class="btn btn--primary"
-          type="button"
-          ?disabled=${disabled || !state.configDirty || !state.configRaw}
-          @click=${() =>
-            void run(
-              `save:${channelId}`,
-              async () => {
-                if (!props.client || !props.tenantId || !state.configRaw) {
-                  throw new Error("配置未加载");
-                }
-                let formToSave = parseConfigRaw(state.configRaw);
-                formToSave = ensureImAccountWebhookPaths(formToSave);
-                const gap = describeTenantImCredentialGaps(formToSave, channelId, { accountId });
-                if (gap) {
-                  throw new Error(`保存未通过：${gap}`);
-                }
-                const raw = `${JSON.stringify(formToSave, null, 2)}\n`;
-                const saved = await saveTenantConfigRaw(
-                  props.client,
-                  props.tenantId,
-                  raw,
-                  state.configHash,
-                );
-                state.configRaw = saved.raw;
-                state.configHash = saved.hash;
-                state.editorBaseRaw = saved.raw;
-                state.configDirty = false;
-              },
-              { skipSuccessNotice: false },
-            )}
-        >
-          ${state.busyId?.startsWith("save:") ? "保存中…" : "保存"}
-        </button>
-      </div>
-
       ${
-        showCallback
+        channelId === "feishu"
           ? html`
-              <div class="enterprise-channel-workspace__callbacks">
-                <div class="enterprise-channel-workspace__section-title">
-                  Callback URL（回填到开放平台）
+              <div class="enterprise-im-workspace__columns">
+                <div class="enterprise-im-workspace__main">
+                  <div class="enterprise-channel-workspace__form">${formView}</div>
+                  ${saveButton}
+                  ${callbackBlock}
+                  ${troubleshoot}
                 </div>
-                ${
-                  entries.length === 0
-                    ? html`
-                        <div class="enterprise-channel-workspace__hint">
-                          打开配置后会自动生成账户级回调地址；保存后复制到开放平台即可。
-                        </div>
-                      `
-                    : html`
-                        <ul class="enterprise-im-callback-list">
-                          ${entries.map(
-                            (entry) => html`
-                              <li class="enterprise-im-callback-list__item">
-                                <div class="enterprise-im-callback-list__meta">
-                                  <strong>${entry.accountId}</strong>
-                                  <code class="enterprise-im-callback-list__url">${entry.url}</code>
-                                </div>
-                                <button
-                                  class="btn btn--sm"
-                                  type="button"
-                                  ?disabled=${disabled}
-                                  @click=${() =>
-                                    copyText(entry.copyText, (ok) => {
-                                      state.notice = ok ? "已复制 Callback URL" : null;
-                                      state.error = ok ? null : "复制失败，请手动选择地址。";
-                                      requestUpdate();
-                                    })}
-                                >
-                                  复制
-                                </button>
-                              </li>
-                            `,
-                          )}
-                        </ul>
-                      `
-                }
-                <p class="enterprise-channel-workspace__hint">
-                  ${resolveTenantImPendingHint(channelId)}
-                </p>
+                <aside class="enterprise-im-workspace__side">
+                  ${statusCard}
+                  <div class="enterprise-im-workspace__actions">
+                    ${probeButton} ${syncButton} ${identityButton}
+                  </div>
+                  ${
+                    props.identityLinkHint
+                      ? html`<div class="enterprise-im-status__note">${props.identityLinkHint}</div>`
+                      : nothing
+                  }
+                </aside>
               </div>
             `
           : html`
-              <p class="enterprise-channel-workspace__hint">
-                ${resolveTenantImPendingHint(channelId)}
-              </p>
-            `
-      }
-
-      ${
-        lastProbe
-          ? html`
-              <div
-                class="enterprise-channel-workspace__result ${
-                  lastProbe.tone === "ok"
-                    ? "enterprise-channel-workspace__result--ok"
-                    : lastProbe.tone === "fail"
-                      ? "enterprise-channel-workspace__result--danger"
-                      : "enterprise-channel-workspace__result--warn"
-                }"
-              >
-                ${lastProbe.summary}
-                ${lastProbe.hint ? html`<div>${lastProbe.hint}</div>` : nothing}
-              </div>
-            `
-          : nothing
-      }
-      ${
-        props.identityLinkHint
-          ? html`<div class="enterprise-channel-workspace__result">${props.identityLinkHint}</div>`
-          : nothing
-      }
-
-      <div class="enterprise-form-actions">
-        <button
-          class="btn btn--sm"
-          type="button"
-          data-testid="enterprise-channel-probe"
-          ?disabled=${disabled || state.probing}
-          @click=${() => {
-            void (async () => {
-              state.busyId = `probe:${channelId}`;
-              state.error = null;
-              state.notice = null;
-              requestUpdate();
-              try {
-                await runProbe();
-              } catch (error) {
-                state.notice = null;
-                state.error = localizeEnterpriseGatewayThrown(error, "测试连通失败，请重试。");
-              } finally {
-                state.busyId = null;
-                state.probing = false;
-                requestUpdate();
+              <div class="enterprise-channel-workspace__form">${formView}</div>
+              ${saveButton}
+              ${callbackBlock}
+              <p class="enterprise-channel-workspace__hint">${resolveTenantImPendingHint(channelId)}</p>
+              ${
+                lastProbe
+                  ? html`
+                      <div
+                        class="enterprise-channel-workspace__result ${
+                          lastProbe.tone === "ok"
+                            ? "enterprise-channel-workspace__result--ok"
+                            : lastProbe.tone === "fail"
+                              ? "enterprise-channel-workspace__result--danger"
+                              : "enterprise-channel-workspace__result--warn"
+                        }"
+                      >
+                        ${lastProbe.summary}
+                        ${lastProbe.hint ? html`<div>${lastProbe.hint}</div>` : nothing}
+                      </div>
+                    `
+                  : nothing
               }
-            })();
-          }}
-        >
-          ${state.probing ? "测试中…" : "测试连通"}
-        </button>
-        <button
-          class="btn btn--sm btn--primary"
-          type="button"
-          ?disabled=${
-            disabled ||
-            props.syncBusy ||
-            state.configDirty ||
-            !credentialsReady ||
-            !props.onSyncOperationalIdentity
-          }
-          @click=${() => void props.onSyncOperationalIdentity?.(channelId)}
-        >
-          ${props.syncBusy ? "同步中…" : "同步为运营身份"}
-        </button>
-        ${
-          props.onNavigateToIdentities
-            ? html`
-                <button
-                  class="btn btn--sm"
-                  type="button"
-                  ?disabled=${disabled}
-                  @click=${props.onNavigateToIdentities}
-                >
-                  打开企业身份
-                </button>
-              `
-            : nothing
-        }
-      </div>
-      <p class="enterprise-channel-workspace__hint">
-        ${
-          showCallback
-            ? "建议顺序：保存凭证 → 复制 Callback URL 回填开放平台 → 向机器人发「你好」→ 测试连通。"
-            : "建议顺序：保存凭证 → 在开放平台确认长连接/事件订阅 → 向机器人发「你好」→ 测试连通。"
-        }
-      </p>
+              ${
+                props.identityLinkHint
+                  ? html`<div class="enterprise-channel-workspace__result">${props.identityLinkHint}</div>`
+                  : nothing
+              }
+              <div class="enterprise-form-actions">
+                ${probeButton} ${syncButton} ${identityButton}
+              </div>
+              <p class="enterprise-channel-workspace__hint">${orderHint}</p>
+            `
+      }
     </section>
   `;
 }
@@ -887,7 +1041,20 @@ export function renderEnterpriseMessageChannelsSurface(params: {
     props.tenantId
   ) {
     state.loading = true;
-    void reload(host, props, false).then(requestUpdate);
+    void reload(host, props, false)
+      .catch((error: unknown) => {
+        state.loading = false;
+        state.error = localizeEnterpriseGatewayThrown(error, "通道状态加载失败，请重试。");
+      })
+      .finally(() => {
+        if (state.loading) {
+          state.loading = false;
+        }
+        if (!state.snapshot && !state.error) {
+          state.error = "通道状态加载失败，请重试。";
+        }
+        requestUpdate();
+      });
   }
 
   const form = parseConfigRaw(state.configRaw);
@@ -961,25 +1128,6 @@ export function renderEnterpriseMessageChannelsSurface(params: {
 
   return html`
     <section class="enterprise-settings-section enterprise-settings-section--flat enterprise-message-channels">
-      <header class="enterprise-settings-section__header">
-        <div>
-          <div class="enterprise-settings-section__title">企业通道</div>
-          <div class="enterprise-settings-section__subtitle">
-            企业微信 / 飞书 / 钉钉 IM 通道接入与凭证配置
-          </div>
-        </div>
-        <div class="enterprise-settings-actionbar">
-          <button
-            class="btn btn--sm"
-            type="button"
-            ?disabled=${controlsDisabled}
-            @click=${() => void run("refresh", async () => undefined, { successNotice: "已刷新" })}
-          >
-            ${renderIcon("refreshCw")} ${state.loading ? "刷新中…" : "刷新"}
-          </button>
-        </div>
-      </header>
-
       ${
         state.error && !state.workspaceOpen
           ? html`<div class="enterprise-channel-workspace__result enterprise-channel-workspace__result--danger">${state.error}</div>`
@@ -991,36 +1139,40 @@ export function renderEnterpriseMessageChannelsSurface(params: {
           : nothing
       }
 
-      <div class="enterprise-channel-gallery" role="list">
-        ${ENTERPRISE_MESSAGE_CHANNELS.map((channelId) => {
-          const present = channelPresentInForm(form, channelId);
-          const channelEntry = asRecord(asRecord(form.channels)?.[channelId]);
-          const accountId = props.tenantId
-            ? resolveEnterpriseImPrimaryAccountId(
-                asRecord(channelEntry?.accounts) ?? {},
-                props.tenantId,
-              )
-            : undefined;
-          const status = resolveCardStatus({
-            present,
-            form,
-            channelId,
-            accountId,
-            lastProbe: state.lastProbeByChannel[channelId],
-          });
-          const accountCount = countChannelAccounts(form, channelId, state.snapshot);
-          const enabled = isChannelEnabled(form, channelId, state.snapshot);
-          return renderGalleryCard({
-            channelId,
-            status,
-            summary: resolveCardSummary({ status, accountCount, enabled }),
-            fault: channelFaultMessage(state.snapshot, channelId),
-            selected: state.workspaceOpen && state.selectedChannelId === channelId,
-            skeleton,
-            disabled: controlsDisabled && !skeleton,
-            onActivate: () => openWorkspace(channelId),
-          });
-        })}
+      <div class="enterprise-im-switcher">
+        <div
+          class="enterprise-im-switcher__row"
+          role="list"
+          data-testid="enterprise-im-switcher"
+          data-layout="horizontal"
+        >
+          ${ENTERPRISE_MESSAGE_CHANNELS.map((channelId) => {
+            const present = channelPresentInForm(form, channelId);
+            const channelEntry = asRecord(asRecord(form.channels)?.[channelId]);
+            const accountId = props.tenantId
+              ? resolveEnterpriseImPrimaryAccountId(
+                  asRecord(channelEntry?.accounts) ?? {},
+                  props.tenantId,
+                )
+              : undefined;
+            const status = resolveCardStatus({
+              present,
+              form,
+              channelId,
+              accountId,
+              lastProbe: state.lastProbeByChannel[channelId],
+            });
+            return renderGalleryCard({
+              channelId,
+              status,
+              fault: channelFaultMessage(state.snapshot, channelId),
+              selected: state.workspaceOpen && state.selectedChannelId === channelId,
+              skeleton,
+              disabled: controlsDisabled && !skeleton,
+              onActivate: () => openWorkspace(channelId),
+            });
+          })}
+        </div>
       </div>
 
       ${
@@ -1035,7 +1187,7 @@ export function renderEnterpriseMessageChannelsSurface(params: {
               run,
             })
           : html`
-              <p class="enterprise-channel-workspace-empty">点击上方通道卡片开始接入</p>
+              <p class="enterprise-channel-workspace-empty">选择一个通道开始配置</p>
             `
       }
     </section>

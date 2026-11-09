@@ -1,4 +1,9 @@
 import { randomUUID } from "node:crypto";
+import type { EnterpriseImAuthorizationJudgment } from "./enterprise-im-employee-authorization.js";
+import {
+  decideEnterpriseImEmployeeProxy,
+  type EnterpriseImDecisionInput,
+} from "./enterprise-im-employee-decision.js";
 import {
   defaultGrantModeForAgentScope,
   isAgentScopeAllowedByDefault,
@@ -41,6 +46,17 @@ export type ResolveUserOperationalIdentityInput = {
    * decision hard-denies before owner/grant evaluation.
    */
   enterpriseAuthorization?: EmployeeOperationalAuthorization;
+  /**
+   * Feishu employee proxy only. Loaded by the RPC/runtime from the session
+   * tenant, the seat store, and the tenant policy rows. Other providers ignore it.
+   */
+  enterpriseIm?: {
+    tenantId: string | null;
+    gate: EnterpriseImDecisionInput["gate"];
+    secretStore?: EnterpriseImDecisionInput["secretStore"];
+    authorization: EnterpriseImAuthorizationJudgment;
+    identityId?: string;
+  };
   /** @deprecated Ignored for authorization; scope is derived server-side. */
   ownedAgentIds?: string[];
   /** @deprecated Ignored for authorization; scope is derived server-side. */
@@ -110,6 +126,56 @@ export function resolveUserOperationalIdentity(
       code: "USER_IDENTITY_CONTEXT_INVALID",
       message: "provider, action, currentUserId, and currentAgentId are required.",
     };
+  }
+  if (provider === "feishu-personal") {
+    const grantCount = Object.keys(params.store.grants).length;
+    const loaded = params.enterpriseIm;
+    const decision = decideEnterpriseImEmployeeProxy({
+      store: params.store,
+      secretStore: loaded?.secretStore,
+      ownerId: currentUserId,
+      agentId: currentAgentId,
+      action,
+      tenantId: loaded?.tenantId ?? null,
+      identityId: loaded?.identityId,
+      gate: loaded?.gate ?? {
+        accountId: "",
+        employeeUiHint: "enterprise_not_open",
+        loginEnabled: false,
+        statusLabel: "企业尚未开通",
+        platformEnterpriseId: null,
+        childExecutionBlocked: true,
+      },
+      authorization: loaded?.authorization ?? {
+        ok: false,
+        code: "SEAT_MISSING",
+        message: "缺少企业席位，不能放行。",
+      },
+      nowIso: params.nowIso,
+    });
+    if (Object.keys(params.store.grants).length !== grantCount) {
+      throw new Error("enterprise IM resolve must not write a grant");
+    }
+    if (decision.outcome === "deny") {
+      return { allowed: false, code: decision.code, message: decision.message };
+    }
+    const identity = params.store.identities[decision.identityId];
+    const grant = params.store.grants[decision.grantId];
+    if (
+      !identity ||
+      identity.identityId !== decision.identityId ||
+      !grant ||
+      grant.grantId !== decision.grantId ||
+      grant.agentId !== decision.agentId ||
+      grant.status !== "active"
+    ) {
+      return {
+        allowed: false,
+        code: "DELEGATION_MISSING",
+        message: "没有员工确认的机器人授权。",
+      };
+    }
+    return { allowed: true, identity, grant };
   }
   if (!isUserOperationalIdentityPolicyAction(provider, action)) {
     return {

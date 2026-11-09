@@ -6,6 +6,8 @@ import {
   parseUserOperationalIdentityProvider,
 } from "./user-operational-identity-providers.js";
 import type {
+  EnterpriseImConfirmMode,
+  EnterpriseImResourceScope,
   UserOperationalIdentity,
   UserOperationalIdentityGrant,
   UserOperationalIdentityStore,
@@ -489,6 +491,9 @@ export function upsertUserOperationalIdentityGrant(params: {
   tenantId?: string;
   seatId?: string;
   confirmExplicit?: boolean;
+  expiresAt?: string;
+  resourceScope?: EnterpriseImResourceScope;
+  confirmMode?: EnterpriseImConfirmMode;
   nowIso: string;
 }): { ok: true; grant: UserOperationalIdentityGrant } | { ok: false; code: string; error: string } {
   const identity = getUserOperationalIdentity(params.store, params.ownerId, params.identityId);
@@ -499,7 +504,9 @@ export function upsertUserOperationalIdentityGrant(params: {
   if (!agentId) {
     return { ok: false, code: "USER_IDENTITY_AGENT_REQUIRED", error: "agentId is required." };
   }
-  if (params.agentScope === "owned" && params.grantMode !== "auto") {
+  const workplaceConfirm =
+    identity.provider === "feishu-personal" && params.grantMode === "explicit";
+  if (!workplaceConfirm && params.agentScope === "owned" && params.grantMode !== "auto") {
     return {
       ok: false,
       code: "USER_IDENTITY_GRANT_MODE_INVALID",
@@ -513,11 +520,18 @@ export function upsertUserOperationalIdentityGrant(params: {
       error: "shared/group agents must use explicit grant mode.",
     };
   }
-  if (params.agentScope !== "owned" && !params.confirmExplicit) {
+  if ((workplaceConfirm || params.agentScope !== "owned") && !params.confirmExplicit) {
     return {
       ok: false,
       code: "USER_IDENTITY_GRANT_CONFIRMATION_REQUIRED",
       error: "shared/group agent grants require explicit confirmation.",
+    };
+  }
+  if (workplaceConfirm && (!params.confirmMode || !params.resourceScope)) {
+    return {
+      ok: false,
+      code: "USER_IDENTITY_GRANT_FIELDS_REQUIRED",
+      error: "Feishu grants require a confirm mode and a resource scope.",
     };
   }
   let allowedActions = params.allowedActions
@@ -553,6 +567,12 @@ export function upsertUserOperationalIdentityGrant(params: {
     existing.status = "active";
     existing.updatedAt = params.nowIso;
     existing.confirmedAt = params.nowIso;
+    existing.expiresAt = params.expiresAt;
+    if (workplaceConfirm) {
+      existing.grantVersion = (existing.grantVersion ?? 0) + 1;
+      existing.resourceScope = params.resourceScope;
+      existing.confirmMode = params.confirmMode;
+    }
     return { ok: true, grant: existing };
   }
   const grant: UserOperationalIdentityGrant = {
@@ -569,6 +589,11 @@ export function upsertUserOperationalIdentityGrant(params: {
     createdAt: params.nowIso,
     updatedAt: params.nowIso,
     confirmedAt: params.nowIso,
+    ...(workplaceConfirm ? { grantVersion: 1 } : {}),
+    ...(params.expiresAt ? { expiresAt: params.expiresAt } : {}),
+    ...(workplaceConfirm
+      ? { resourceScope: params.resourceScope, confirmMode: params.confirmMode }
+      : {}),
   };
   params.store.grants[grant.grantId] = grant;
   return { ok: true, grant };
@@ -687,6 +712,34 @@ export function listUserOperationalIdentityLifecycleEvents(
     .slice(0, limit);
 }
 
+function feishuEnterpriseImStatusLabel(
+  link: {
+    authorizationLevel: "identity_only" | "authorized";
+    localCredentialsDeleted?: boolean;
+    platformRevokeRecorded?: boolean;
+  },
+  status: string,
+  expiresAt?: string,
+): string {
+  if (link.platformRevokeRecorded || status === "revoked") {
+    return "已停用";
+  }
+  if (link.localCredentialsDeleted) {
+    return "本地凭证已删除";
+  }
+  if (status === "reauth_required") {
+    return "需重新认证";
+  }
+  const expiresMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  if (status === "expired" || (Number.isFinite(expiresMs) && expiresMs <= Date.now())) {
+    return "已过期";
+  }
+  if (link.authorizationLevel === "identity_only") {
+    return "仅身份";
+  }
+  return "已授权";
+}
+
 export function summarizeUserOperationalIdentitySnapshot(params: {
   store: UserOperationalIdentityStore;
   ownerId: string;
@@ -710,6 +763,23 @@ export function summarizeUserOperationalIdentitySnapshot(params: {
       updatedAt: identity.updatedAt,
       lastVerifiedAt: identity.lastVerifiedAt,
       expiresAt: identity.expiresAt,
+      enterpriseIm: identity.enterpriseIm
+        ? {
+            channel: identity.enterpriseIm.channel,
+            accountId: identity.enterpriseIm.accountId,
+            platformEnterpriseId: identity.enterpriseIm.platformEnterpriseId,
+            platformUserId: identity.enterpriseIm.platformUserId,
+            userGrantedScopes: [...identity.enterpriseIm.userGrantedScopes],
+            authorizationLevel: identity.enterpriseIm.authorizationLevel,
+            localCredentialsDeleted: identity.enterpriseIm.localCredentialsDeleted === true,
+            platformRevokeRecorded: identity.enterpriseIm.platformRevokeRecorded === true,
+            statusLabel: feishuEnterpriseImStatusLabel(
+              identity.enterpriseIm,
+              identity.status,
+              identity.expiresAt,
+            ),
+          }
+        : undefined,
     };
   });
   const grants = listUserOperationalIdentityGrants(params.store, params.ownerId).map((grant) => ({
@@ -721,6 +791,10 @@ export function summarizeUserOperationalIdentitySnapshot(params: {
     grantMode: grant.grantMode,
     status: grant.status,
     confirmedAt: grant.confirmedAt,
+    grantVersion: grant.grantVersion,
+    expiresAt: grant.expiresAt,
+    resourceScope: grant.resourceScope,
+    confirmMode: grant.confirmMode,
   }));
   // Keep a per-identity window so a busy mailbox cannot starve other hubs.
   const usageHistory = identities

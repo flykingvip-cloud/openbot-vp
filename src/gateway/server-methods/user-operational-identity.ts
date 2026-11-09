@@ -1,4 +1,16 @@
 import { loadConfig } from "../../config/config.js";
+import { loadFeishuEmployeeProxyContext } from "../enterprise-im-employee-authorization.js";
+import {
+  renewPersistedFeishuEmployeeConnection,
+  startFeishuEmployeeOAuth,
+} from "../enterprise-im-employee-connection-oauth.js";
+import {
+  allowFeishuEmployeeCredentialUse,
+  disconnectFeishuEmployeeConnection,
+  feishuEmployeeRowStatusLabel,
+  loadFeishuEmployeeChannelGate,
+} from "../enterprise-im-employee-connection.js";
+import { confirmEnterpriseImRobotGrant } from "../enterprise-im-employee-decision.js";
 import { loadEnterpriseSeatAssetsStore } from "../enterprise-seat-assets-store.js";
 import { resolvePlatformAuthSmtpConfig } from "../platform-auth-email.js";
 import { loadPlatformAuthStore, resolvePlatformAuthConfig } from "../platform-auth.js";
@@ -7,6 +19,7 @@ import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { resolveQueryScope } from "../scope-attribution.js";
 import {
   resolveControlPlaneStorePathForClient,
+  resolveUserOperationalIdentitySecretsStorePathForClient,
   resolveUserOperationalIdentityStorePathForClient,
 } from "../tenant-context.js";
 import { TENANT_SEAT_ASSETS_FILE } from "../tenant-store-paths.js";
@@ -38,6 +51,7 @@ import { resolveUserOperationalIdentityGatewayEgressIp } from "../user-operation
 import { loadEmployeeOperationalAuthorization } from "../user-operational-identity-enterprise-authorization.js";
 import { listUserOperationalIdentityActivityForScope } from "../user-operational-identity-governance.js";
 import {
+  buildUserOperationalIdentityOAuthCallbackUrl,
   cancelUserOperationalIdentityOAuthSession,
   getUserOperationalIdentityOAuthSession,
   simulateCompleteUserOperationalIdentityOAuthSession,
@@ -55,6 +69,10 @@ import {
   parseUserOperationalIdentityProvider,
 } from "../user-operational-identity-providers.js";
 import { executeUserOperationalIdentityRuntimeAction } from "../user-operational-identity-runtime.js";
+import {
+  loadUserOperationalIdentityCredentialSecretStore,
+  withUserOperationalIdentityCredentialSecretStoreWriteLock,
+} from "../user-operational-identity-secrets-persistence.js";
 import { loadUserOperationalIdentityCredentialSecretForHandle } from "../user-operational-identity-secrets.js";
 import { resolveOperationalIdentityActorUserId } from "../user-operational-identity-session.js";
 import { isXiaohongshuExecutionConfigured } from "../user-operational-identity-social.js";
@@ -68,7 +86,11 @@ import {
   upsertUserOperationalIdentityGrant,
 } from "../user-operational-identity-store.js";
 import { resolveTrustedUserOperationalIdentityAgentScope } from "../user-operational-identity-trusted-agent-scope.js";
-import type { UserOperationalIdentityStore } from "../user-operational-identity-types.js";
+import type {
+  EnterpriseImConfirmMode,
+  EnterpriseImResourceScope,
+  UserOperationalIdentityStore,
+} from "../user-operational-identity-types.js";
 import {
   bindExistingWechatPersonalNativeSession,
   bindWechatPersonalIdentityFromWxid,
@@ -128,6 +150,33 @@ function parseStringArray(value: unknown): string[] {
     return [];
   }
   return value.map((entry) => String(entry).trim()).filter(Boolean);
+}
+
+function parseResourceScope(value: unknown): EnterpriseImResourceScope | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const list = (entry: unknown) => parseStringArray(entry);
+  if (
+    !Array.isArray(record.groups) ||
+    !Array.isArray(record.docs) ||
+    !Array.isArray(record.calendars)
+  ) {
+    return null;
+  }
+  return {
+    groups: list(record.groups),
+    docs: list(record.docs),
+    calendars: list(record.calendars),
+  };
+}
+
+function parseConfirmMode(value: unknown): EnterpriseImConfirmMode | null {
+  if (value === "read_only" || value === "draft_then_confirm" || value === "limited_auto") {
+    return value;
+  }
+  return null;
 }
 
 async function withActorUserOiWriteLock<T>(
@@ -199,9 +248,31 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
       ),
       resolveUserOperationalIdentityGatewayEgressIp(),
     ]);
+    const feishuEmployeeChannel = await loadFeishuEmployeeChannelGate({
+      tenantId: await resolveActorTenantId(client),
+    });
+    const identities = snapshot.identities.map((identity) => {
+      if (identity.provider !== "feishu-personal" || !identity.enterpriseIm) {
+        return identity;
+      }
+      return {
+        ...identity,
+        enterpriseIm: {
+          ...identity.enterpriseIm,
+          statusLabel: feishuEmployeeRowStatusLabel({
+            gate: feishuEmployeeChannel,
+            status: identity.status,
+            expiresAt: identity.expiresAt,
+            enterpriseIm: identity.enterpriseIm,
+          }),
+        },
+      };
+    });
     respond(true, {
       ownerId,
       ...snapshot,
+      identities,
+      feishuEmployeeChannel,
       providerCatalog: listUserOperationalIdentityProviderCatalog(),
       gatewayEgressIp,
       platformSmtpConfigured: Boolean(resolvePlatformAuthSmtpConfig()),
@@ -429,18 +500,41 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
       return;
     }
     const nowIso = new Date().toISOString();
-    const result = await withActorUserOiWriteLock(client, ownerId, (store) =>
-      revokeUserOperationalIdentity({ store, ownerId, identityId, nowIso }),
-    );
+    const result = await withActorUserOiWriteLock(client, ownerId, async (store) => {
+      const identity = getUserOperationalIdentity(store, ownerId, identityId);
+      if (identity?.provider === "feishu-personal") {
+        return withUserOperationalIdentityCredentialSecretStoreWriteLock((secretStore) =>
+          disconnectFeishuEmployeeConnection({
+            store,
+            secretStore,
+            ownerId,
+            identityId,
+            nowIso,
+          }),
+        );
+      }
+      return revokeUserOperationalIdentity({ store, ownerId, identityId, nowIso });
+    });
     if (!result.ok) {
+      const error = "error" in result ? result.error : result.message;
       respond(
         false,
         undefined,
-        errorShape(ErrorCodes.INVALID_REQUEST, result.error, { details: { code: result.code } }),
+        errorShape(ErrorCodes.INVALID_REQUEST, error, { details: { code: result.code } }),
       );
       return;
     }
-    respond(true, { ownerId, identity: result.identity });
+    if ("identity" in result) {
+      respond(true, { ownerId, identity: result.identity });
+      return;
+    }
+    respond(true, {
+      ownerId,
+      identityId: result.identityId,
+      localCredentialsDeleted: result.localCredentialsDeleted === true,
+      platformRevokeRecorded: result.platformRevokeRecorded === true,
+      message: result.message,
+    });
   },
 
   "user-operational-identity.reauthorize": async ({ client, params, respond }) => {
@@ -455,7 +549,7 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
     }
     const nowIso = new Date().toISOString();
     const actorTenantId = await resolveActorTenantId(client);
-    const result = await withActorUserOiWriteLock(client, ownerId, (store) => {
+    const result = await withActorUserOiWriteLock(client, ownerId, async (store) => {
       const identity = getUserOperationalIdentity(store, ownerId, identityId);
       if (!identity || identity.revokedAt) {
         return {
@@ -476,6 +570,37 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
           ok: true as const,
           authMode: "qr_channel" as const,
           identity,
+        };
+      }
+      if (identity.provider === "feishu-personal") {
+        const redirectUri = stringValue(params.callbackOrigin)
+          ? buildUserOperationalIdentityOAuthCallbackUrl({
+              origin: stringValue(params.callbackOrigin) || "",
+              basePath: stringValue(params.basePath) || undefined,
+            })
+          : "";
+        const started = await startFeishuEmployeeOAuth({
+          store,
+          ownerId,
+          tenantId: identity.tenantId ?? actorTenantId,
+          redirectUri,
+          displayName: identity.displayName,
+          identityId,
+          nowIso,
+        });
+        if (!started.ok) {
+          return started;
+        }
+        return {
+          ok: true as const,
+          authMode: "oauth" as const,
+          identity,
+          oauth: {
+            session: started.session,
+            authorizeUrl: started.authorizeUrl,
+            simulateAllowed: false as const,
+            callbackUrl: redirectUri || null,
+          },
         };
       }
       const oauth = startUserOperationalIdentityOAuthSession({
@@ -621,8 +746,45 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
       return;
     }
     const nowIso = new Date().toISOString();
+    const sessionTenantId = await resolveActorTenantId(client);
     const result = await withActorUserOiWriteLock(client, ownerId, async (store) => {
       const identity = getUserOperationalIdentity(store, ownerId, identityId);
+      if (identity?.provider === "feishu-personal") {
+        const resourceScope = parseResourceScope(params.resourceScope);
+        const confirmMode = parseConfirmMode(params.confirmMode);
+        if (!resourceScope || !confirmMode) {
+          return {
+            ok: false as const,
+            code: "GRANT_FIELDS_INVALID",
+            error: "飞书授权需要资源范围和确认方式。",
+          };
+        }
+        const secretStorePath =
+          await resolveUserOperationalIdentitySecretsStorePathForClient(client);
+        const secretStore = await loadUserOperationalIdentityCredentialSecretStore(secretStorePath);
+        const gate = await loadFeishuEmployeeChannelGate({ tenantId: sessionTenantId });
+        const written = confirmEnterpriseImRobotGrant({
+          store,
+          secretStore,
+          ownerId,
+          identityId,
+          agentId,
+          agentScope: trustedAgentScope,
+          allowedActions: parseStringArray(params.allowedActions),
+          gate,
+          tenantId: sessionTenantId,
+          confirmExplicit: grantMode === "explicit" && params.confirmExplicit === true,
+          resourceScope,
+          confirmMode,
+          expiresAt: stringValue(params.expiresAt) || undefined,
+          nowIso,
+        });
+        if (!("grant" in written)) {
+          return { ok: false as const, code: written.code, error: written.message };
+        }
+        refreshContinuationsInStore({ store, ownerId, nowIso, client });
+        return { ok: true as const, grant: written.grant };
+      }
       let oauthScope: string | null | undefined;
       if (identity?.provider === "x-twitter") {
         const secret = await loadUserOperationalIdentityCredentialSecretForHandle({
@@ -701,7 +863,16 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
     const nowIso = new Date().toISOString();
     // Task 3.2: apply the enterprise authorization gate here too (advisory parity
     // with the execution path); authoritative tenant/seat override untrusted params.
-    const enterpriseAuthorization = await loadEmployeeOperationalAuthorization(ownerId);
+    // Feishu does not use that helper. A missing seat there is a deny, resolved
+    // from the seat store and the tenant robot policy, not from request params.
+    const enterpriseAuthorization =
+      provider === "feishu-personal"
+        ? undefined
+        : await loadEmployeeOperationalAuthorization(ownerId);
+    const enterpriseIm =
+      provider === "feishu-personal"
+        ? await loadFeishuEmployeeProxyContext({ client, ownerId, agentId, action })
+        : undefined;
     const result = await withActorUserOiWriteLock(client, ownerId, (store) =>
       resolveUserOperationalIdentity({
         store,
@@ -710,11 +881,14 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
         currentUserId: ownerId,
         currentUserEmail: client?.user,
         currentAgentId: agentId,
-        currentSeatId: stringValue(params.seatId) || undefined,
-        tenantId: stringValue(params.tenantId) || undefined,
+        currentSeatId:
+          provider === "feishu-personal" ? undefined : stringValue(params.seatId) || undefined,
+        tenantId:
+          provider === "feishu-personal" ? undefined : stringValue(params.tenantId) || undefined,
         sessionKey: stringValue(params.sessionKey) || null,
         nowIso,
         enterpriseAuthorization,
+        enterpriseIm,
       }),
     );
     respond(true, { ownerId, ...result });
@@ -751,6 +925,9 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
         needsBinding: result.needsBinding ?? false,
         needsGrantConfirmation: result.needsGrantConfirmation ?? false,
         bindingRequestId: result.bindingRequestId ?? null,
+        grantId: result.grantId ?? null,
+        draft: result.draft ?? null,
+        auditEventId: result.auditEventId ?? null,
       });
       return;
     }
@@ -1280,8 +1457,35 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
     }
     const nowIso = new Date().toISOString();
     const actorTenantId = await resolveActorTenantId(client);
-    const result = await withActorUserOiWriteLock(client, ownerId, (store) =>
-      startUserOperationalIdentityOAuthSession({
+    const result = await withActorUserOiWriteLock(client, ownerId, async (store) => {
+      if (provider === "feishu-personal") {
+        const redirectUri = stringValue(params.callbackOrigin)
+          ? buildUserOperationalIdentityOAuthCallbackUrl({
+              origin: stringValue(params.callbackOrigin) || "",
+              basePath: stringValue(params.basePath) || undefined,
+            })
+          : "";
+        const started = await startFeishuEmployeeOAuth({
+          store,
+          ownerId,
+          tenantId: actorTenantId,
+          redirectUri,
+          displayName: stringValue(params.displayName) || undefined,
+          identityId: stringValue(params.identityId) || undefined,
+          nowIso,
+        });
+        if (!started.ok) {
+          return { ok: false as const, code: started.code, error: started.error };
+        }
+        return {
+          ok: true as const,
+          session: started.session,
+          authorizeUrl: started.authorizeUrl,
+          simulateAllowed: false,
+          callbackUrl: redirectUri || null,
+        };
+      }
+      return startUserOperationalIdentityOAuthSession({
         store,
         ownerId,
         provider,
@@ -1294,8 +1498,8 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
         callbackOrigin: stringValue(params.callbackOrigin) || undefined,
         basePath: stringValue(params.basePath) || undefined,
         nowIso,
-      }),
-    );
+      });
+    });
     if (!result.ok) {
       respond(
         false,
@@ -1392,6 +1596,103 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
       continuationCompleted: result.continuationCompleted,
       status: result.session.status,
     });
+  },
+
+  "user-operational-identity.feishu-employee.refresh": async ({ client, params, respond }) => {
+    const ownerId = await requirePlatformAuthUserId(client, respond);
+    if (!ownerId) {
+      return;
+    }
+    const identityId = stringValue(params.identityId);
+    if (!identityId) {
+      respondInvalid(respond, "identityId is required");
+      return;
+    }
+    const tenantId = await resolveActorTenantId(client);
+    if (!tenantId) {
+      respondInvalid(respond, "企业尚未开通");
+      return;
+    }
+    const [identityStorePath, secretStorePath] = await Promise.all([
+      resolveUserOperationalIdentityStorePathForClient(client),
+      resolveUserOperationalIdentitySecretsStorePathForClient(client),
+    ]);
+    const preview = await loadUserOperationalIdentityStore(identityStorePath);
+    const existing = preview.identities[identityId];
+    if (!existing || existing.ownerId !== ownerId || existing.provider !== "feishu-personal") {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "Identity not found.", {
+          details: { code: "USER_IDENTITY_NOT_FOUND" },
+        }),
+      );
+      return;
+    }
+    const result = await renewPersistedFeishuEmployeeConnection({
+      ownerId,
+      tenantId,
+      identityId,
+      nowIso: new Date().toISOString(),
+      identityStorePath,
+      secretStorePath,
+    });
+    respond(
+      result.ok,
+      result.ok ? result : undefined,
+      result.ok
+        ? undefined
+        : errorShape(ErrorCodes.INVALID_REQUEST, result.message, {
+            details: { code: result.code },
+          }),
+    );
+  },
+
+  "user-operational-identity.feishu-employee.use": async ({ client, params, respond }) => {
+    const ownerId = await requirePlatformAuthUserId(client, respond);
+    if (!ownerId) {
+      return;
+    }
+    const identityId = stringValue(params.identityId);
+    if (!identityId) {
+      respondInvalid(respond, "identityId is required");
+      return;
+    }
+    const tenantId = await resolveActorTenantId(client);
+    const gate = await loadFeishuEmployeeChannelGate({ tenantId });
+    const [identityStorePath, secretStorePath] = await Promise.all([
+      resolveUserOperationalIdentityStorePathForClient(client),
+      resolveUserOperationalIdentitySecretsStorePathForClient(client),
+    ]);
+    const [store, secretStore] = await Promise.all([
+      loadUserOperationalIdentityStore(identityStorePath),
+      loadUserOperationalIdentityCredentialSecretStore(secretStorePath),
+    ]);
+    const result = allowFeishuEmployeeCredentialUse({
+      store,
+      secretStore,
+      ownerId,
+      identityId,
+      gate,
+      nowIso: new Date().toISOString(),
+    });
+    const projected = {
+      ok: result.ok,
+      code: result.code,
+      message: result.message,
+      identityId: result.identityId,
+      authorizationLevel: result.authorizationLevel,
+      userGrantedScopes: result.userGrantedScopes,
+    };
+    respond(
+      result.ok,
+      result.ok ? projected : undefined,
+      result.ok
+        ? undefined
+        : errorShape(ErrorCodes.INVALID_REQUEST, result.message, {
+            details: { code: result.code },
+          }),
+    );
   },
 
   "user-operational-identity.oauth.cancel": async ({ client, params, respond }) => {

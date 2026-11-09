@@ -248,6 +248,8 @@ describe("pathForTab", () => {
     expect(pathForTab("enterpriseChannels", "", { tenantId: "acme" })).toBe(
       "/enterprise/acme/settings/channels",
     );
+    expect(ALL_TABS.map(String)).not.toContain("workplaceInstall");
+    expect(ALL_TABS.map(String)).not.toContain("feishuInstall");
     expect(pathForTab("platformSystemSettings")).toBe("/platform/system-settings");
     expect(pathForTab("platformAdvanced")).toBe("/platform/advanced");
     expect(pathForTab("agents")).toBe("/platform/agents");

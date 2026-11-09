@@ -62,6 +62,17 @@ export type UserOperationalIdentitySummary = {
   updatedAt: string;
   lastVerifiedAt?: string;
   expiresAt?: string;
+  enterpriseIm?: {
+    channel: "feishu";
+    authorizationLevel: "identity_only" | "authorized";
+    localCredentialsDeleted: boolean;
+    platformRevokeRecorded: boolean;
+    statusLabel: string;
+    userGrantedScopes: string[];
+    platformUserId: string;
+    platformEnterpriseId: string;
+    accountId: string;
+  };
 };
 
 export type UserOperationalIdentityProviderCatalogEntry = {
@@ -86,6 +97,10 @@ export type UserOperationalIdentityGrantSummary = {
   grantMode: "auto" | "explicit";
   status: "active" | "revoked";
   confirmedAt?: string;
+  grantVersion?: number;
+  expiresAt?: string;
+  confirmMode?: "read_only" | "draft_then_confirm" | "limited_auto";
+  resourceScope?: { groups: string[]; docs: string[]; calendars: string[] };
 };
 
 export type UserOperationalIdentityUsageSummary = {
@@ -209,6 +224,14 @@ export type UserOperationalIdentitySnapshot = {
   platformSmtpConfigured?: boolean;
   /** True when xiaohongshu-mcp sidecar is reachable from the gateway. */
   xiaohongshuApiConfigured?: boolean;
+  feishuEmployeeChannel?: {
+    accountId: string;
+    employeeUiHint: "enterprise_not_open" | "waiting_admin_scopes" | "app_can_attempt";
+    loginEnabled: boolean;
+    statusLabel: string;
+    platformEnterpriseId: string | null;
+    childExecutionBlocked: boolean;
+  } | null;
   // 按 agentId 缓存的企业运营身份库可用条目（懒加载，展开机器人授权面板时填充）。
   enterpriseAccessByAgent?: Record<string, EnterpriseAgentIdentityEntry[]>;
 };
@@ -611,7 +634,10 @@ export async function bindUserOperationalIdentityViaOAuth(
       return false;
     }
     await loadUserOperationalIdentities(host);
-    host.userOperationalIdentityNotice = "运营身份已绑定，可在下方把使用权授给旗下数字人。";
+    host.userOperationalIdentityNotice =
+      input.provider === "feishu-personal"
+        ? "飞书身份已绑定。机器人授权需另行确认，本次不会自动授权。"
+        : "运营身份已绑定，可在下方把使用权授给旗下数字人。";
     host.userOperationalIdentityOAuthSessionId = null;
     host.userOperationalIdentityNav = buildUserOperationalIdentityAddNav(input.provider);
     closeUserOperationalIdentityEditor(host);
@@ -1260,21 +1286,28 @@ export async function applyIdentityOperationalRobotGrants(
     host.userOperationalIdentityNotice = "授权未变化。";
     return true;
   }
+  if (identity.provider === "feishu-personal" && toAdd.length > 0 && toRevoke.length === 0) {
+    host.userOperationalIdentityError =
+      "飞书的动作、资源范围、确认方式和有效期在机器人「运营授权」里确认。";
+    return false;
+  }
   host.userOperationalIdentityBusy = true;
   host.userOperationalIdentityError = null;
   host.userOperationalIdentityNotice = null;
   try {
-    for (const agentId of toAdd) {
-      const agentScope = resolvePersonalGrantAgentScope(agentId, input.agentScopesById);
-      await host.client.request("user-operational-identity.grants.upsert", {
-        identityId,
-        agentId,
-        agentScope,
-        allowedActions,
-        sessionKey: input.sessionKey,
-        grantMode: agentScope === "owned" ? "auto" : "explicit",
-        confirmExplicit: agentScope !== "owned",
-      });
+    if (identity.provider !== "feishu-personal") {
+      for (const agentId of toAdd) {
+        const agentScope = resolvePersonalGrantAgentScope(agentId, input.agentScopesById);
+        await host.client.request("user-operational-identity.grants.upsert", {
+          identityId,
+          agentId,
+          agentScope,
+          allowedActions,
+          sessionKey: input.sessionKey,
+          grantMode: agentScope === "owned" ? "auto" : "explicit",
+          confirmExplicit: agentScope !== "owned",
+        });
+      }
     }
     for (const grant of toRevoke) {
       await host.client.request("user-operational-identity.grants.revoke", {
@@ -1282,7 +1315,10 @@ export async function applyIdentityOperationalRobotGrants(
       });
     }
     await loadUserOperationalIdentities(host);
-    host.userOperationalIdentityNotice = `授权已更新（新增 ${toAdd.length}、取消 ${toRevoke.length}）。`;
+    host.userOperationalIdentityNotice =
+      identity.provider === "feishu-personal" && toAdd.length > 0
+        ? `已取消 ${toRevoke.length} 个机器人。新的飞书动作请在机器人「运营授权」里确认。`
+        : `授权已更新（新增 ${toAdd.length}、取消 ${toRevoke.length}）。`;
     return true;
   } catch (error) {
     host.userOperationalIdentityError =
@@ -1302,7 +1338,13 @@ export async function applyRobotOperationalIdentityGrants(
   input: {
     agentId: string;
     agentScope: "owned" | "shared" | "group";
-    desired: Array<{ identityId: string; allowedActions: string[] }>;
+    desired: Array<{
+      identityId: string;
+      allowedActions: string[];
+      resourceScope?: { groups: string[]; docs: string[]; calendars: string[] };
+      confirmMode?: "read_only" | "draft_then_confirm" | "limited_auto";
+      expiresAt?: string;
+    }>;
     sessionKey?: string | null;
   },
 ): Promise<boolean> {
@@ -1325,10 +1367,31 @@ export async function applyRobotOperationalIdentityGrants(
       PERSONAL_IDENTITY_GRANT_SCOPES.has(grant.agentScope as "owned" | "shared"),
   );
   const desiredIds = new Set(input.desired.map((entry) => entry.identityId));
-  const currentIds = new Set(currentGrants.map((grant) => grant.identityId));
-  const toAdd = input.desired.filter((entry) => !currentIds.has(entry.identityId));
+  const providerFor = (identityId: string) =>
+    host.userOperationalIdentities?.identities.find(
+      (identity) => identity.identityId === identityId,
+    )?.provider;
+  const sameList = (left: string[] | undefined, right: string[] | undefined) =>
+    [...(left ?? [])].toSorted().join("\0") === [...(right ?? [])].toSorted().join("\0");
+  const toWrite = input.desired.filter((entry) => {
+    const current = currentGrants.find((grant) => grant.identityId === entry.identityId);
+    if (!current) {
+      return true;
+    }
+    if (providerFor(entry.identityId) !== "feishu-personal") {
+      return false;
+    }
+    return !(
+      sameList(current.allowedActions, entry.allowedActions) &&
+      current.confirmMode === entry.confirmMode &&
+      (current.expiresAt ?? "") === (entry.expiresAt ?? "") &&
+      sameList(current.resourceScope?.groups, entry.resourceScope?.groups) &&
+      sameList(current.resourceScope?.docs, entry.resourceScope?.docs) &&
+      sameList(current.resourceScope?.calendars, entry.resourceScope?.calendars)
+    );
+  });
   const toRevoke = currentGrants.filter((grant) => !desiredIds.has(grant.identityId));
-  if (toAdd.length === 0 && toRevoke.length === 0) {
+  if (toWrite.length === 0 && toRevoke.length === 0) {
     host.userOperationalIdentityNotice = "授权未变化。";
     return true;
   }
@@ -1336,15 +1399,19 @@ export async function applyRobotOperationalIdentityGrants(
   host.userOperationalIdentityError = null;
   host.userOperationalIdentityNotice = null;
   try {
-    for (const entry of toAdd) {
+    for (const entry of toWrite) {
+      const workplace = providerFor(entry.identityId) === "feishu-personal";
       await host.client.request("user-operational-identity.grants.upsert", {
         identityId: entry.identityId,
         agentId,
         agentScope: grantScope,
         allowedActions: entry.allowedActions,
+        resourceScope: entry.resourceScope,
+        confirmMode: entry.confirmMode,
+        expiresAt: entry.expiresAt,
         sessionKey: input.sessionKey,
-        grantMode: grantScope === "owned" ? "auto" : "explicit",
-        confirmExplicit: grantScope !== "owned",
+        grantMode: workplace || grantScope !== "owned" ? "explicit" : "auto",
+        confirmExplicit: workplace || grantScope !== "owned",
       });
     }
     for (const grant of toRevoke) {
@@ -1353,7 +1420,7 @@ export async function applyRobotOperationalIdentityGrants(
       });
     }
     await loadUserOperationalIdentities(host);
-    host.userOperationalIdentityNotice = `授权已更新（新增 ${toAdd.length}、取消 ${toRevoke.length}）。`;
+    host.userOperationalIdentityNotice = `授权已更新（写入 ${toWrite.length}、取消 ${toRevoke.length}）。`;
     return true;
   } catch (error) {
     host.userOperationalIdentityError =

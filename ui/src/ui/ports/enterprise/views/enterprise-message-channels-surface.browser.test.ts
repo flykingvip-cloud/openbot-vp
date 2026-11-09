@@ -112,7 +112,8 @@ describe("enterprise message channels surface (card gallery)", () => {
     renderSurface();
     await waitLoaded(container);
 
-    expect(container.textContent).toContain("企业通道");
+    expect(container.querySelector(".enterprise-settings-section__title")).toBeNull();
+    expect(container.querySelector(".enterprise-settings-section__subtitle")).toBeNull();
     expect(container.textContent).toContain("企业微信");
     expect(container.textContent).toContain("飞书");
     expect(container.textContent).toContain("钉钉");
@@ -124,7 +125,7 @@ describe("enterprise message channels surface (card gallery)", () => {
         button.textContent?.includes("添加通道"),
       ),
     ).toBe(false);
-    expect(container.textContent).toContain("点击上方通道卡片开始接入");
+    expect(container.textContent).toContain("选择一个通道开始配置");
     expect(container.textContent).toContain("未添加");
     expect(container.textContent).toContain("已保存");
   });
@@ -552,16 +553,17 @@ describe("enterprise message channels surface (card gallery)", () => {
       await Promise.resolve();
 
       expect(container.textContent).toContain("channels.status 请求超时");
-      const refreshButton = Array.from(container.querySelectorAll("button")).find((button) =>
-        button.textContent?.includes("刷新"),
-      );
-      expect(refreshButton?.disabled).toBe(false);
+      expect(
+        Array.from(container.querySelectorAll("button")).some((button) =>
+          button.textContent?.includes("刷新"),
+        ),
+      ).toBe(false);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("labels refresh as a reload and asks before disabling a channel", async () => {
+  it("loads channel status on enter and asks before disabling a channel", async () => {
     const config = {
       channels: {
         wecom: {
@@ -611,14 +613,15 @@ describe("enterprise message channels surface (card gallery)", () => {
     const wecomBefore = Array.from(
       container.querySelectorAll(".enterprise-channel-gallery__card"),
     ).find((card) => card.textContent?.includes("企业微信"));
-    expect(wecomBefore?.textContent ?? "").toMatch(/[○△●✓!]/);
-
-    const refreshButton = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("刷新"),
-    );
-    refreshButton?.click();
-    await vi.waitFor(() => expect(container.textContent).toContain("已刷新"));
-    expect(container.textContent).not.toContain("操作成功");
+    expect(wecomBefore?.textContent ?? "").toContain("已保存");
+    expect(wecomBefore?.querySelector(".enterprise-im-switcher__dot")).not.toBeNull();
+    expect(wecomBefore?.querySelector(".enterprise-im-switcher__mark--wecom")).not.toBeNull();
+    expect(wecomBefore?.querySelector("[data-brand='wecom']")?.innerHTML).toContain("#07C160");
+    expect(
+      Array.from(container.querySelectorAll("button")).some((button) =>
+        button.textContent?.includes("刷新"),
+      ),
+    ).toBe(false);
 
     const wecomCard = Array.from(
       container.querySelectorAll(".enterprise-channel-gallery__card"),
@@ -724,5 +727,127 @@ describe("enterprise message channels surface (card gallery)", () => {
     });
     expect(container.textContent).not.toContain("全局通道运行时未停止");
     confirmSpy.mockRestore();
+  });
+
+  it("clears the loading skeleton when channel status fails", async () => {
+    const request = vi.fn(async (method: string) => {
+      if (method === "channels.status") {
+        throw new Error("status down");
+      }
+      if (method === "config.get") {
+        return { raw: "{}\n", hash: "hash-1" };
+      }
+      throw new Error(`unexpected method: ${method}`);
+    });
+    const host = {};
+    const client = { request };
+    const container = document.createElement("div");
+    const renderSurface = () => {
+      render(
+        renderEnterpriseMessageChannelsSurface({
+          host,
+          props: { client: client as never, tenantId: "tenant-a" },
+          requestUpdate: renderSurface,
+        }),
+        container,
+      );
+    };
+    renderSurface();
+    await vi.waitFor(() => {
+      expect(container.textContent).not.toContain("加载中…");
+      expect(container.textContent).toContain("status down");
+    });
+    expect(
+      container.querySelectorAll(".enterprise-channel-gallery__card.is-skeleton"),
+    ).toHaveLength(0);
+  });
+
+  it("shows Feishu app capability status without a new install route", async () => {
+    const snapshot = {
+      channelOrder: ["feishu"],
+      channelAccounts: {
+        feishu: [
+          {
+            accountId: "t_tenant_a_default",
+            enabled: true,
+            platformEnterpriseId: "tenant-key-1",
+            enterpriseImEmployeeUiHint: "waiting_admin_scopes",
+            enterpriseImCapability: {
+              checkedAt: "2026-11-07T00:00:00.000Z",
+              projectGroupRead: "granted",
+              projectDocs: "missing",
+              sendAsUser: "missing",
+              newMessageTrigger: "missing",
+            },
+          },
+        ],
+      },
+    } as unknown as ChannelsStatusSnapshot;
+    const config = {
+      channels: {
+        feishu: {
+          enabled: true,
+          accounts: {
+            t_tenant_a_default: {
+              appId: "cli_a",
+              appSecret: "sec",
+              platformEnterpriseId: "tenant-key-1",
+              capabilityStatus: {
+                checkedAt: "2026-11-07T00:00:00.000Z",
+                projectGroupRead: "granted",
+                projectDocs: "missing",
+                sendAsUser: "missing",
+                newMessageTrigger: "missing",
+              },
+            },
+          },
+        },
+      },
+    };
+    const request = vi.fn(async (method: string) => {
+      if (method === "channels.status") {
+        return snapshot;
+      }
+      if (method === "config.get") {
+        return { raw: `${JSON.stringify(config, null, 2)}\n`, hash: "hash-1" };
+      }
+      if (method === "config.schema") {
+        return createSchema();
+      }
+      throw new Error(`unexpected method: ${method}`);
+    });
+    const host = {};
+    const client = { request };
+    const container = document.createElement("div");
+    const renderSurface = () => {
+      render(
+        renderEnterpriseMessageChannelsSurface({
+          host,
+          props: { client: client as never, tenantId: "tenant-a" },
+          requestUpdate: renderSurface,
+        }),
+        container,
+      );
+    };
+    renderSurface();
+    await waitLoaded(container);
+    expect(container.textContent).not.toContain("应用权限可尝试");
+    const feishuCard = Array.from(
+      container.querySelectorAll(".enterprise-channel-gallery__card"),
+    ).find((card) => card.textContent?.includes("飞书"));
+    expect(feishuCard?.querySelector(".enterprise-channel-gallery__cta")).toBeNull();
+    (feishuCard as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(container.querySelector("[data-feishu-enterprise-contract]")?.textContent).toContain(
+        "tenant-key-1",
+      );
+    });
+    expect(container.textContent).toContain("等待管理员开通权限");
+    expect(container.textContent).toContain("不是员工授权");
+    expect(container.querySelector("[data-capability='projectGroupRead']")?.textContent).toContain(
+      "已开通",
+    );
+    expect(container.querySelector("a[href*='feishu-install']")).toBeNull();
+    expect(container.querySelector("a[href*='workplace']")).toBeNull();
   });
 });

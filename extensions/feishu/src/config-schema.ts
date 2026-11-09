@@ -191,6 +191,18 @@ export const FeishuAccountConfigSchema = z
     domain: FeishuDomainSchema.optional(),
     connectionMode: FeishuConnectionModeSchema.optional(),
     webhookPath: z.string().optional(),
+    /** Feishu tenant_key observed by 企业通道 connection check. Not an account slug. */
+    platformEnterpriseId: z.string().optional(),
+    capabilityStatus: z
+      .object({
+        checkedAt: z.string(),
+        projectGroupRead: z.enum(["granted", "missing", "unknown", "not_checked"]),
+        projectDocs: z.enum(["granted", "missing", "unknown", "not_checked"]),
+        sendAsUser: z.enum(["granted", "missing", "unknown", "not_checked"]),
+        newMessageTrigger: z.enum(["granted", "missing", "unknown", "not_checked"]),
+      })
+      .strict()
+      .optional(),
     ...FeishuSharedConfigShape,
     groupSessionScope: GroupSessionScopeSchema,
     topicSessionMode: TopicSessionModeSchema,
@@ -201,6 +213,19 @@ export const FeishuConfigSchema = z
   .object({
     enabled: z.boolean().optional(),
     defaultAccount: z.string().optional(),
+    connectionAudit: z
+      .array(
+        z
+          .object({
+            at: z.string(),
+            kind: z.enum(["enable", "disable", "scope_change", "connection_check"]),
+            accountId: z.string().optional(),
+            ok: z.boolean().optional(),
+          })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
     // Top-level credentials (backward compatible for single-account mode)
     appId: z.string().optional(),
     appSecret: buildSecretInputSchema().optional(),

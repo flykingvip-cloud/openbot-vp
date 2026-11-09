@@ -3,8 +3,9 @@ import "../../../../styles/cost-budget-v2.css";
 import "../../../../styles/pricing-v3.css";
 import "../../../../styles/enterprise-identity.css";
 // Live render path is enterprise-surfaces-core (static), not the lazy CSS loader.
-// Without this import, archive footer nowrap / scroll rules never enter the UI bundle.
+// Without these imports, archive footer rules and the channel switcher never enter the UI bundle.
 import "../../../../styles/enterprise-org-archive.css";
+import "../../../../styles/enterprise-im-channels.css";
 import { html, nothing } from "lit";
 import { pathForTab } from "../../../navigation.ts";
 import { platformCreateTenantHref } from "../../platform/system-settings/route.ts";

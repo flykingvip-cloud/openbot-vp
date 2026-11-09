@@ -9,7 +9,7 @@
  * webhook-only secrets appear only when connectionMode is webhook.
  */
 
-import { html, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { defaultImWebhookPath } from "../../../controllers/tenant-im-binding.ts";
 
 export type EnterpriseImFormChannelId = "wecom" | "feishu" | "dingtalk";
@@ -597,9 +597,15 @@ function renderModeSelector(params: {
         <option value=${longValue}>${longLabel}</option>
         <option value="webhook">URL 回调（备选）</option>
       </select>
-      <span class="enterprise-im-curated__help">
-        长连接无需公网回调；仅在已有网关公网地址或必须 HTTP 推送时改用 URL 回调。
-      </span>
+      ${
+        params.channelId === "feishu"
+          ? nothing
+          : html`
+              <span class="enterprise-im-curated__help">
+                长连接无需公网回调；仅在已有网关公网地址或必须 HTTP 推送时改用 URL 回调。
+              </span>
+            `
+      }
     </label>
   `;
 }
@@ -629,6 +635,8 @@ export function renderEnterpriseImChannelForm(params: {
   const note = resolveEnterpriseImModeNote(params.channelId, mode);
   const helpHref = resolveEnterpriseImHelpHref(params.channelId);
   const helpLabel = resolveEnterpriseImHelpLabel(params.channelId);
+  const compact = params.channelId === "feishu";
+  const setup = resolveEnterpriseImSetupGuide(params.channelId, mode);
 
   return html`
     <div
@@ -648,9 +656,19 @@ export function renderEnterpriseImChannelForm(params: {
           ${helpLabel}
         </a>
       </div>
-      <div class="enterprise-im-curated__guide-bar" data-testid="enterprise-im-setup-guide">
-        <span class="enterprise-im-curated__guide-meta">${note}</span>
-      </div>
+      ${
+        compact
+          ? html`<details class="enterprise-im-curated__disclosure" data-testid="enterprise-im-setup-guide">
+              <summary>配置说明</summary>
+              <p>${note}</p>
+              <ul>
+                ${setup.flatMap((section) => section.items).map((item) => html`<li>${item}</li>`)}
+              </ul>
+            </details>`
+          : html`<div class="enterprise-im-curated__guide-bar" data-testid="enterprise-im-setup-guide">
+              <span class="enterprise-im-curated__guide-meta">${note}</span>
+            </div>`
+      }
       <div class="enterprise-im-curated__fields">
         ${renderModeSelector({
           channelId: params.channelId,
@@ -689,7 +707,7 @@ export function renderEnterpriseImChannelForm(params: {
                   params.onFieldChange(field.key, next);
                 }}
               />
-              <span class="enterprise-im-curated__help">${field.help}</span>
+              ${compact ? nothing : html`<span class="enterprise-im-curated__help">${field.help}</span>`}
             </label>
           `;
         })}

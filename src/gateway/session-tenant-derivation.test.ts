@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildAccountTenantIndex, deriveSessionTenant } from "./session-tenant-derivation.js";
+import {
+  buildAccountTenantIndex,
+  deriveOpenBotTenantForPlatformEnterprise,
+  deriveSessionTenant,
+} from "./session-tenant-derivation.js";
 import { normalizeTenantConfigStore, setTenantConfigOverride } from "./tenant-config.js";
 
 function storeWith(overrides: Array<[string, Record<string, unknown>]>) {
@@ -38,6 +42,33 @@ describe("session tenant derivation (task 2.4)", () => {
     ).toBeUndefined();
     expect(
       deriveSessionTenant({ channel: undefined, lastAccountId: "tg-a" }, index),
+    ).toBeUndefined();
+  });
+
+  it("indexes 企业通道 object-map accounts and the observed platform enterprise id", () => {
+    const objectStore = storeWith([
+      [
+        "001",
+        {
+          channels: {
+            feishu: {
+              accounts: {
+                t_001_default: { platformEnterpriseId: "tenant-key-1" },
+              },
+            },
+          },
+        },
+      ],
+    ]);
+    const objectIndex = buildAccountTenantIndex(objectStore);
+    expect(
+      deriveSessionTenant({ channel: "feishu", lastAccountId: "t_001_default" }, objectIndex),
+    ).toBe("001");
+    expect(deriveOpenBotTenantForPlatformEnterprise(objectIndex, "feishu", "tenant-key-1")).toBe(
+      "001",
+    );
+    expect(
+      deriveOpenBotTenantForPlatformEnterprise(objectIndex, "feishu", "t_001_default"),
     ).toBeUndefined();
   });
 

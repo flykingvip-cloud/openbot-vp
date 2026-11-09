@@ -63,9 +63,12 @@ function renderAuthNavItem(params: {
 
 export function renderPersonalAuthorizationPanel(settings: SettingsContract) {
   const snapshot = settings.userOperationalIdentitySnapshot;
-  const readyCatalog = sortReadyCatalog(
-    (snapshot?.providerCatalog ?? []).filter((entry) => entry.registrationReady),
-  );
+  const catalog = snapshot?.providerCatalog ?? [];
+  const readyCatalog = sortReadyCatalog(catalog.filter((entry) => entry.registrationReady));
+  const feishu = catalog.find((entry) => entry.provider === "feishu-personal");
+  if (feishu && !readyCatalog.some((entry) => entry.provider === "feishu-personal")) {
+    readyCatalog.push({ ...feishu, label: "飞书" });
+  }
   const configuredProviders = new Set(
     (snapshot?.identities ?? [])
       .filter(

@@ -24,6 +24,19 @@ export type UserOperationalIdentityAgentScope = "owned" | "shared" | "group";
 
 export type UserOperationalIdentityGrantMode = "auto" | "explicit";
 
+/**
+ * When a later send waits for a person. `read_only` cannot include send.
+ * `draft_then_confirm` may include send; the content confirm is Slice 4.
+ * `limited_auto` may include send and stays inside resource scope and policy.
+ */
+export type EnterpriseImConfirmMode = "read_only" | "draft_then_confirm" | "limited_auto";
+
+export type EnterpriseImResourceScope = {
+  groups: string[];
+  docs: string[];
+  calendars: string[];
+};
+
 export type UserOperationalIdentity = {
   identityId: string;
   ownerType: "user";
@@ -44,6 +57,21 @@ export type UserOperationalIdentity = {
   lastVerifiedAt?: string;
   expiresAt?: string;
   revokedAt?: string;
+  /**
+   * Child of an 企业通道 connection. Slice 1b Feishu only.
+   * Tokens stay in the credential secret store, not here.
+   */
+  enterpriseIm?: {
+    channel: "feishu";
+    accountId: string;
+    /** Feishu tenant_key copied from the token exchange. Not an employee-posted id. */
+    platformEnterpriseId: string;
+    platformUserId: string;
+    userGrantedScopes: string[];
+    authorizationLevel: "identity_only" | "authorized";
+    localCredentialsDeleted?: boolean;
+    platformRevokeRecorded?: boolean;
+  };
 };
 
 export type UserOperationalIdentityGrant = {
@@ -61,6 +89,13 @@ export type UserOperationalIdentityGrant = {
   updatedAt: string;
   confirmedAt?: string;
   revokedAt?: string;
+  /** Explicit confirm version for enterprise IM. Auto grants do not count. */
+  grantVersion?: number;
+  expiresAt?: string;
+  /** Named groups, docs, and calendars this robot may touch. Empty means none. */
+  resourceScope?: EnterpriseImResourceScope;
+  /** How later slices may use the grant. Slice 2 only records it. */
+  confirmMode?: EnterpriseImConfirmMode;
 };
 
 export type UserOperationalIdentityBindingRequestStatus =

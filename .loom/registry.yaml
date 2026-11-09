@@ -12719,6 +12719,28 @@ tasks:
         via: confirmed
     since: 2026-11-06
     metadata: {}
+  - id: pr249-technical-closeout
+    owner: codex-runtime-manager
+    intent: []
+    paths:
+      - src/gateway/enterprise-im-employee-authorization.ts
+      - src/gateway/enterprise-im-employee-connection.ts
+      - src/gateway/enterprise-im-employee-decision.ts
+      - src/gateway/server-methods/feishu-employee-grant.rpc.test.ts
+      - src/gateway/server-methods/feishu-employee-read.rpc.test.ts
+      - src/gateway/server-methods/feishu-employee-refresh.rpc.test.ts
+      - src/gateway/server-methods/user-operational-identity.ts
+      - ui/src/ui/ports/employee/views/my-bot-feishu-auth.node.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - ui/src/ui/ports/employee/views/workbench-feishu-employee-auth.node.test.ts
+    state: active
+    sessions:
+      - id: pr249-technical-closeout-20261109
+        taskId: pr249-technical-closeout
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-09T03:26:43.689Z
   - id: office-file-suite:cursor-jineng
     owner: cursor-jineng
     intent:
@@ -12743,6 +12765,149 @@ tasks:
     since: 2026-11-09
     metadata: {}
 landingStreams:
+  - id: pr249-main253-sync-20261109
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - CHANGELOG.md
+      - docs/office/office-file-suite.md
+      - skills/cyber-ppt/SKILL.md
+      - skills/documents/SKILL.md
+      - skills/nano-pdf/SKILL.md
+      - skills/office-automation-core/SKILL.md
+      - skills/office-file-suite/ATTRIBUTION.md
+      - skills/office-file-suite/SKILL.md
+      - skills/office-file-suite/references/capability-matrix.md
+      - skills/office-file-suite/references/openbot-delivery.md
+      - skills/pptx/SKILL.md
+      - skills/spreadsheets/SKILL.md
+      - src/agents/openclaw-tools.office-file.test.ts
+      - src/agents/openclaw-tools.ts
+      - src/agents/sandbox/constants.ts
+      - src/agents/tool-catalog.ts
+      - src/agents/tools/office-file-tool.test.ts
+      - src/agents/tools/office-file-tool.ts
+      - src/office-suite/connectors.ts
+      - src/office-suite/docx.ts
+      - src/office-suite/formula.ts
+      - src/office-suite/index.ts
+      - src/office-suite/office-suite.acceptance.test.ts
+      - src/office-suite/pdf.ts
+      - src/office-suite/pptx.ts
+      - src/office-suite/preview.ts
+      - src/office-suite/scope.ts
+      - src/office-suite/service.ts
+      - src/office-suite/ttf.ts
+      - src/office-suite/xlsx.ts
+      - src/office-suite/xml.ts
+    canLandWith: []
+    metadata:
+      task: four-pr-merge-readiness
+      agent: codex-runtime-manager
+      purpose: Only merge latest main; preserve feature gates and both registry additions.
+  - id: pr249-technical-closeout-20261109
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/enterprise-im-employee-authorization.ts
+      - src/gateway/enterprise-im-employee-connection.ts
+      - src/gateway/enterprise-im-employee-decision.ts
+      - src/gateway/server-methods/feishu-employee-grant.rpc.test.ts
+      - src/gateway/server-methods/feishu-employee-read.rpc.test.ts
+      - src/gateway/server-methods/feishu-employee-refresh.rpc.test.ts
+      - src/gateway/server-methods/user-operational-identity.ts
+      - ui/src/ui/ports/employee/views/my-bot-feishu-auth.node.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - ui/src/ui/ports/employee/views/workbench-feishu-employee-auth.node.test.ts
+    canLandWith: []
+    metadata:
+      task: pr249-technical-closeout
+      agent: codex-runtime-manager
+  - id: pr249-main-sync-20261109
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/enterprise-data/connector-default-product-marker.ts
+      - src/gateway/enterprise-data/connector-default-products.ts
+      - src/gateway/enterprise-data/data-asset-linkage.ts
+      - src/gateway/enterprise-data/default-data-product-supply.test.ts
+      - src/gateway/enterprise-data/default-data-product-supply.ts
+      - src/gateway/enterprise-data/yonyou-tplus-sync.ts
+      - src/gateway/knowledge/enterprise-data-query.ts
+      - src/gateway/knowledge/feed/enterprise-feed-adapter.ts
+      - src/gateway/server-methods/enterprise-data-m6.test.ts
+      - src/gateway/server-methods/enterprise-data-m6.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/asset-linkage.node.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/asset-linkage.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/assets-page.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/outputs-page.ts
+    canLandWith: []
+    metadata:
+      task: pr249-merge-readiness
+      agent: codex-runtime-manager
+      purpose: Preserve both registry additions while merging current main; no feature readiness claim.
+  - id: workplace-digital-colleague-slice-1a
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/design/workplace-digital-colleague-status-and-plan.md
+      - src/gateway/enterprise-im-employee-connection.ts
+      - src/gateway/enterprise-im-employee-connection.test.ts
+      - src/gateway/enterprise-im-employee-connection-oauth.ts
+      - src/gateway/enterprise-im-employee-decision.ts
+      - src/gateway/enterprise-im-employee-decision.test.ts
+      - src/gateway/enterprise-im-employee-authorization.ts
+      - src/gateway/enterprise-im-employee-read.ts
+      - src/gateway/enterprise-im-employee-read.test.ts
+      - src/gateway/enterprise-im-feishu-doc-reader.ts
+      - src/gateway/enterprise-im-feishu-doc-reader.test.ts
+      - src/gateway/server-methods/feishu-employee-read.rpc.test.ts
+      - src/gateway/server-methods/feishu-employee-grant.rpc.test.ts
+      - src/gateway/user-operational-identity-access.ts
+      - src/gateway/user-operational-identity-providers.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - ui/src/ui/ports/employee/views/my-bot-feishu-auth.node.test.ts
+      - src/gateway/user-operational-identity-types.ts
+      - src/gateway/user-operational-identity-store.ts
+      - src/gateway/user-operational-identity-oauth.ts
+      - src/gateway/user-operational-identity-runtime.ts
+      - src/gateway/server-methods/user-operational-identity.ts
+      - src/gateway/server-methods/feishu-employee-refresh.rpc.test.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/platform-auth/session-domain.ts
+      - ui/src/ui/controllers/user-operational-identity.ts
+      - ui/src/ui/ports/employee/views/workbench-operational-identity-forms.ts
+      - ui/src/ui/ports/employee/views/workbench-operational-identity-section.ts
+      - ui/src/ui/ports/employee/views/workbench-personal-authorization-panel.ts
+      - ui/src/ui/ports/employee/views/workbench-feishu-employee-auth.node.test.ts
+      - extensions/feishu/src/config-schema.ts
+      - extensions/feishu/src/probe.test.ts
+      - extensions/feishu/src/probe.ts
+      - extensions/feishu/src/types.ts
+      - src/channels/plugins/types.core.ts
+      - src/gateway/enterprise-im-channel-contract.ts
+      - src/gateway/enterprise-im-channel-contract.test.ts
+      - src/gateway/enterprise-im-channel-persist.ts
+      - src/gateway/server-methods/channels.ts
+      - src/gateway/session-tenant-derivation.ts
+      - src/gateway/session-tenant-derivation.test.ts
+      - src/gateway/tenant-config-service.ts
+      - ui/src/ui/navigation.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-im-channel-form.ts
+      - ui/src/styles/enterprise-im-channels.css
+      - ui/src/ui/ports/enterprise/views/enterprise-shell.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-shell-archive-css.node.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.browser.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-message-channels-surface.capability.test.ts
+      - ui/src/ui/types.ts
+    canLandWith: []
+    metadata:
+      task: workplace-digital-colleague-inventory
+      owner: cursor-cloud
+      purpose: Slice 1a Feishu enterprise channel plus slice 1b employee login on the existing identity
+        store.
   - id: pr252-stack-current250-20261109
     landingPolicy: serial
     paths:
@@ -31092,4 +31257,54 @@ sharedPaths:
   - glob: src/office-suite/office-suite.preview-contract.test.ts
     landerTask: agent-runtime-convergence
     reason: Human-authorized merge readiness prerequisite after current-main Office regression.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-im-employee-authorization.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-im-employee-connection.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-im-employee-decision.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/feishu-employee-grant.rpc.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/feishu-employee-read.rpc.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/feishu-employee-refresh.rpc.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/user-operational-identity.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/ports/employee/views/my-bot-feishu-auth.node.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/ports/employee/views/workbench-feishu-employee-auth.node.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
     reviewAfter: 2026-11-30

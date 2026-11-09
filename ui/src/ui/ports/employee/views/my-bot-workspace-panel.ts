@@ -77,7 +77,13 @@ export type MyBotWorkspacePanelProps = {
   onApplyRobotIdentityGrants?: (input: {
     agentId: string;
     agentScope: "owned" | "shared" | "group";
-    desired: Array<{ identityId: string; allowedActions: string[] }>;
+    desired: Array<{
+      identityId: string;
+      allowedActions: string[];
+      resourceScope?: { groups: string[]; docs: string[]; calendars: string[] };
+      confirmMode?: "read_only" | "draft_then_confirm" | "limited_auto";
+      expiresAt?: string;
+    }>;
   }) => void;
   onApplyRobotEnterpriseIdentities?: (input: {
     agentId: string;
@@ -734,7 +740,20 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
   const snapshot = props.userOperationalIdentitySnapshot;
   const busy = Boolean(props.userOperationalIdentityBusy);
   const allIdentities = snapshot?.identities ?? [];
-  const bindableIdentities = allIdentities.filter((identity) => identity.status === "active");
+  const feishuGate = snapshot?.feishuEmployeeChannel;
+  const feishuChannelOpen = Boolean(
+    feishuGate &&
+    !feishuGate.childExecutionBlocked &&
+    feishuGate.employeeUiHint !== "enterprise_not_open",
+  );
+  const feishuIdentities = feishuChannelOpen
+    ? allIdentities.filter(
+        (identity) => identity.provider === "feishu-personal" && identity.status === "active",
+      )
+    : [];
+  const bindableIdentities = allIdentities.filter(
+    (identity) => identity.status === "active" && identity.provider !== "feishu-personal",
+  );
   const catalog = snapshot?.providerCatalog ?? [];
   const grants = (snapshot?.grants ?? []).filter(
     (grant) => grant.agentId === agentId && grant.status === "active",
@@ -761,15 +780,62 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
         'input[type="checkbox"][data-identity-id]:checked',
       ) ?? [],
     );
-    const personalDesired = checked
-      .filter((checkbox) => checkbox.dataset.kind === "personal")
+    const personalDesired: Parameters<
+      NonNullable<MyBotWorkspacePanelProps["onApplyRobotIdentityGrants"]>
+    >[0]["desired"] = checked
+      .filter(
+        (checkbox) =>
+          checkbox.dataset.kind === "personal" || checkbox.dataset.provider === "feishu-personal",
+      )
       .map((checkbox) => {
         const identityId = checkbox.dataset.identityId ?? "";
-        const provider = providerByIdentity.get(identityId) ?? "";
-        return { identityId, allowedActions: actionsForProvider(provider) };
+        if (checkbox.dataset.provider === "feishu-personal") {
+          const row = checkbox.closest("li");
+          const allowedActions = Array.from(
+            row?.querySelectorAll<HTMLInputElement>("input[data-feishu-action]:checked") ?? [],
+          )
+            .map((input) => input.dataset.feishuAction ?? "")
+            .filter(Boolean);
+          const list = (selector: string) =>
+            (row?.querySelector<HTMLInputElement>(selector)?.value ?? "")
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean);
+          const confirmMode = row?.querySelector<HTMLSelectElement>(
+            "[data-feishu-confirm-mode]",
+          )?.value;
+          const expiresAt =
+            row?.querySelector<HTMLInputElement>("[data-feishu-expires]")?.value.trim() ||
+            undefined;
+          return {
+            identityId,
+            allowedActions,
+            resourceScope: {
+              groups: list("[data-feishu-groups]"),
+              docs: list("[data-feishu-docs]"),
+              calendars: list("[data-feishu-calendars]"),
+            },
+            confirmMode:
+              confirmMode === "read_only" ||
+              confirmMode === "draft_then_confirm" ||
+              confirmMode === "limited_auto"
+                ? confirmMode
+                : "draft_then_confirm",
+            expiresAt,
+          };
+        }
+        const provider = checkbox.dataset.provider || providerByIdentity.get(identityId) || "";
+        const listed = checkbox.dataset.actions?.split(",").filter(Boolean) ?? [];
+        return {
+          identityId,
+          allowedActions: listed.length > 0 ? listed : actionsForProvider(provider),
+        };
       });
     const enterpriseDesired = checked
-      .filter((checkbox) => checkbox.dataset.kind === "enterprise")
+      .filter(
+        (checkbox) =>
+          checkbox.dataset.kind === "enterprise" && checkbox.dataset.provider !== "feishu-personal",
+      )
       .map((checkbox) => checkbox.dataset.identityId ?? "")
       .filter(Boolean);
     props.onApplyRobotIdentityGrants?.({ agentId, agentScope: scope, desired: personalDesired });
@@ -792,11 +858,121 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
         "企业身份",
         enterpriseEntries === undefined
           ? renderEmpty("正在加载…")
-          : enterpriseEntries.length === 0
+          : enterpriseEntries.length === 0 && feishuIdentities.length === 0
             ? renderEmpty("企业暂未开放身份。")
             : html`
                 <ul class="wb-bots__check-list">
-                  ${enterpriseEntries.map(
+                  ${feishuIdentities.map((identity) => {
+                    const grant = grants.find((item) => item.identityId === identity.identityId);
+                    const selected = new Set(grant?.allowedActions ?? []);
+                    return html`
+                      <li>
+                        <label class="wb-bots__check-row">
+                          <input
+                            type="checkbox"
+                            data-kind="enterprise"
+                            data-provider="feishu-personal"
+                            data-identity-id=${identity.identityId}
+                            ?checked=${grantedIdentityIds.has(identity.identityId)}
+                            ?disabled=${busy}
+                          />
+                          <span class="wb-bots__check-copy">
+                            <span class="wb-bots__list-title">${identity.displayName}</span>
+                            <span class="wb-bots__list-sub">${identity.providerLabel}</span>
+                          </span>
+                        </label>
+                        <div class="wb-bots__hint">
+                          <label
+                            ><input
+                              type="checkbox"
+                              data-feishu-action="read"
+                              ?checked=${selected.has("read")}
+                              ?disabled=${busy}
+                            />
+                            读取</label
+                          >
+                          <label
+                            ><input
+                              type="checkbox"
+                              data-feishu-action="draft"
+                              ?checked=${selected.has("draft")}
+                              ?disabled=${busy}
+                            />
+                            起草</label
+                          >
+                          <label
+                            ><input
+                              type="checkbox"
+                              data-feishu-action="send"
+                              ?checked=${selected.has("send")}
+                              ?disabled=${busy}
+                            />
+                            发送</label
+                          >
+                          <label
+                            >群
+                            <input
+                              data-feishu-groups
+                              .value=${grant?.resourceScope?.groups.join(", ") ?? ""}
+                              ?disabled=${busy}
+                          /></label>
+                          <label
+                            >文档
+                            <input
+                              data-feishu-docs
+                              .value=${grant?.resourceScope?.docs.join(", ") ?? ""}
+                              ?disabled=${busy}
+                          /></label>
+                          <label
+                            >日历
+                            <input
+                              data-feishu-calendars
+                              .value=${grant?.resourceScope?.calendars.join(", ") ?? ""}
+                              ?disabled=${busy}
+                          /></label>
+                          <label
+                            >确认方式
+                            <select
+                              data-feishu-confirm-mode
+                              .value=${grant?.confirmMode ?? "draft_then_confirm"}
+                              ?disabled=${busy}
+                            >
+                              <option
+                                value="read_only"
+                                ?selected=${grant?.confirmMode === "read_only"}
+                              >
+                                只读
+                              </option>
+                              <option
+                                value="draft_then_confirm"
+                                ?selected=${
+                                  (grant?.confirmMode ?? "draft_then_confirm") ===
+                                  "draft_then_confirm"
+                                }
+                              >
+                                起草后确认
+                              </option>
+                              <option
+                                value="limited_auto"
+                                ?selected=${grant?.confirmMode === "limited_auto"}
+                              >
+                                有限自动
+                              </option>
+                            </select>
+                          </label>
+                          <label
+                            >有效期
+                            <input
+                              data-feishu-expires
+                              placeholder="可空，ISO 时间"
+                              .value=${grant?.expiresAt ?? ""}
+                              ?disabled=${busy}
+                          /></label>
+                        </div>
+                      </li>
+                    `;
+                  })}
+                  ${(enterpriseEntries ?? []).map(
                     (item) => html`
                       <li>
                         <label class="wb-bots__check-row">
@@ -860,7 +1036,13 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
 
       <div class="wb-bots__footer">
         <span class="wb-bots__hint">
-          ${scope === "owned" ? "确认后立即生效" : "确认后需二次校验"}
+          ${
+            feishuIdentities.length > 0
+              ? "确认后只写入该机器人的明确授权"
+              : scope === "owned"
+                ? "确认后立即生效"
+                : "确认后需二次校验"
+          }
         </span>
         <button type="button" class="btn btn--primary" ?disabled=${busy} @click=${submit}>
           ${busy ? "提交中…" : "确认授权"}

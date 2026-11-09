@@ -23,7 +23,16 @@ function formatTimestamp(value?: string | null): string {
   return formatRelativeTimestamp(parsed, { dateFallback: true, fallback: "—" });
 }
 
-function identityStatusLabel(status: string): { label: string; tone: "ok" | "warn" } {
+function identityStatusLabel(
+  status: string,
+  enterpriseIm?: { statusLabel?: string; authorizationLevel?: string },
+): { label: string; tone: "ok" | "warn" } {
+  if (enterpriseIm?.statusLabel) {
+    return {
+      label: enterpriseIm.statusLabel,
+      tone: enterpriseIm.authorizationLevel === "authorized" && status === "active" ? "ok" : "warn",
+    };
+  }
   if (status === "active") {
     return { label: "已连接", tone: "ok" };
   }
@@ -336,7 +345,7 @@ export function renderOperationalIdentitySection(
               </div>
             `
           : identities.map((identity) => {
-              const statusInfo = identityStatusLabel(identity.status);
+              const statusInfo = identityStatusLabel(identity.status, identity.enterpriseIm);
               const grantCount =
                 activeGrantCountByIdentity.get(identity.identityId) ?? identity.grantCount;
               const lastUsed = latestUsageByIdentity.get(identity.identityId);
@@ -620,9 +629,9 @@ export function renderOperationalIdentitySection(
           <div class="employee-workbench__identity-card-head">
             <span class="employee-workbench__identity-provider">${hubIdentity.providerLabel}</span>
             <span
-              class="employee-workbench__settings-pill employee-workbench__settings-pill--${identityStatusLabel(hubIdentity.status).tone}"
+              class="employee-workbench__settings-pill employee-workbench__settings-pill--${identityStatusLabel(hubIdentity.status, hubIdentity.enterpriseIm).tone}"
             >
-              ${identityStatusLabel(hubIdentity.status).label}
+              ${identityStatusLabel(hubIdentity.status, hubIdentity.enterpriseIm).label}
             </span>
           </div>
           <div class="employee-workbench__identity-name">${hubIdentity.displayName}</div>

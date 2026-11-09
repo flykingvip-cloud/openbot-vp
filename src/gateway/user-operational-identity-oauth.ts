@@ -4,6 +4,7 @@ import path from "node:path";
 import { loadConfig } from "../config/config.js";
 import { isSharedTenantAddressingEnabled } from "../config/data-space.js";
 import { resolveControlUiUserOperationalIdentityBasePath } from "./control-ui-contract.js";
+import { completeFeishuEmployeeOAuthFromSession } from "./enterprise-im-employee-connection-oauth.js";
 import { resolvePlatformAuthSmtpConfig } from "./platform-auth-email.js";
 import type { TenantContext } from "./tenant-context.js";
 import {
@@ -649,6 +650,15 @@ export async function completeUserOperationalIdentityOAuthCallback(params: {
           code: "USER_IDENTITY_OAUTH_MODE_INVALID",
           error: "OAuth session does not accept authorization codes.",
         };
+      }
+      if (session.provider === "feishu-personal") {
+        return completeFeishuEmployeeOAuthFromSession({
+          store,
+          session,
+          code: params.code,
+          redirectUri: params.redirectUri,
+          nowIso: params.nowIso,
+        });
       }
       try {
         let accessToken: string;

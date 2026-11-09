@@ -127,6 +127,10 @@ export async function probeFeishu(
     }
 
     const bot = response.bot || response.data?.bot;
+    const observation = await observeFeishuEnterpriseApp(client, {
+      timeoutMs,
+      abortSignal: options.abortSignal,
+    });
     return setCachedProbeResult(
       cacheKey,
       {
@@ -134,6 +138,8 @@ export async function probeFeishu(
         appId: creds.appId,
         botName: bot?.bot_name,
         botOpenId: bot?.open_id,
+        ...(observation.tenantKey ? { tenantKey: observation.tenantKey } : {}),
+        grantedScopeNames: observation.grantedScopeNames,
       },
       PROBE_SUCCESS_TTL_MS,
     );
@@ -148,6 +154,76 @@ export async function probeFeishu(
       PROBE_ERROR_TTL_MS,
     );
   }
+}
+
+type FeishuRequestClient = {
+  request: (args: {
+    method: string;
+    url: string;
+    data?: unknown;
+    timeout?: number;
+  }) => Promise<unknown>;
+};
+
+function readTenantKey(body: unknown): string | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+  const record = body as {
+    data?: { tenant?: { tenant_key?: unknown } };
+    tenant?: { tenant_key?: unknown };
+  };
+  const key = record.data?.tenant?.tenant_key ?? record.tenant?.tenant_key;
+  return typeof key === "string" && key.trim() ? key.trim() : null;
+}
+
+function readGrantedScopeNames(body: unknown): string[] | null {
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+  const record = body as { data?: { scopes?: unknown }; scopes?: unknown };
+  const scopes = record.data?.scopes ?? record.scopes;
+  if (!Array.isArray(scopes)) {
+    return null;
+  }
+  const names: string[] = [];
+  for (const scope of scopes) {
+    if (!scope || typeof scope !== "object") {
+      continue;
+    }
+    const row = scope as { scope_name?: unknown; grant_status?: unknown };
+    const granted =
+      row.grant_status === 1 || row.grant_status === "1" || row.grant_status === "granted";
+    if (granted && typeof row.scope_name === "string" && row.scope_name.trim()) {
+      names.push(row.scope_name.trim());
+    }
+  }
+  return names;
+}
+
+async function observeFeishuEnterpriseApp(
+  client: FeishuRequestClient,
+  options: { timeoutMs: number; abortSignal?: AbortSignal },
+): Promise<{ tenantKey: string | null; grantedScopeNames: string[] | null }> {
+  const read = async (url: string): Promise<unknown | null> => {
+    try {
+      const raced = await raceWithTimeoutAndAbort(
+        client.request({ method: "GET", url, data: {}, timeout: options.timeoutMs }),
+        { timeoutMs: options.timeoutMs, abortSignal: options.abortSignal },
+      );
+      return raced.status === "resolved" ? raced.value : null;
+    } catch {
+      return null;
+    }
+  };
+  const [tenantBody, scopeBody] = await Promise.all([
+    read("/open-apis/tenant/v2/tenant/query"),
+    read("/open-apis/application/v6/scopes"),
+  ]);
+  return {
+    tenantKey: readTenantKey(tenantBody),
+    grantedScopeNames: readGrantedScopeNames(scopeBody),
+  };
 }
 
 /** Clear the probe cache (for testing). */

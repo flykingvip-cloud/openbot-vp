@@ -361,6 +361,8 @@ const BASE_METHODS = [
   "user-operational-identity.wechat-personal.qr.wait",
   "user-operational-identity.oauth.simulate-complete",
   "user-operational-identity.oauth.cancel",
+  "user-operational-identity.feishu-employee.refresh",
+  "user-operational-identity.feishu-employee.use",
   "user-operational-identity.governance.overview",
   "user-modeling.get-profile",
   "user-modeling.reset-profile",

@@ -64,6 +64,10 @@ export type FeishuProbeResult = BaseProbeResult<string> & {
   appId?: string;
   botName?: string;
   botOpenId?: string;
+  /** Feishu tenant_key from the tenant query. Absent when the query did not return one. */
+  tenantKey?: string;
+  /** Null when the scope list could not be read. */
+  grantedScopeNames?: string[] | null;
 };
 
 export type FeishuMediaInfo = {

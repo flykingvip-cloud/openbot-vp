@@ -15,6 +15,14 @@ import { DEFAULT_ACCOUNT_ID } from "../../routing/session-key.js";
 import { defaultRuntime } from "../../runtime.js";
 import { requireResolvedEnterpriseTenantId } from "../enterprise-data/enterprise-data-seat-context.js";
 import {
+  presentFeishuEnterpriseObservation,
+  readFeishuEnterpriseChannelContract,
+} from "../enterprise-im-channel-contract.js";
+import {
+  readFeishuProbeObservation,
+  persistFeishuEnterpriseProbe,
+} from "../enterprise-im-channel-persist.js";
+import {
   ErrorCodes,
   errorShape,
   formatValidationErrors,
@@ -177,15 +185,17 @@ export const channelsHandlers: GatewayRequestHandlers = {
     // the platform runtime as the tenant's.
     const tenantScope = (params as { tenantId?: string }).tenantId;
     let cfg: OpenBotConfig;
+    let tenantId: string | undefined;
     if (typeof tenantScope === "string" && tenantScope.trim()) {
-      const tenantId = await requireResolvedEnterpriseTenantId({
+      const resolvedTenantId = await requireResolvedEnterpriseTenantId({
         client,
         params: params as Record<string, unknown>,
         respond,
       });
-      if (!tenantId) {
+      if (!resolvedTenantId) {
         return;
       }
+      tenantId = resolvedTenantId;
       const store = await loadTenantConfigStore();
       cfg = resolveConfigForTenant({
         platformDefault: loadConfig(),
@@ -296,6 +306,36 @@ export const channelsHandlers: GatewayRequestHandlers = {
         }
         if (lastProbeAt) {
           snapshot.lastProbeAt = lastProbeAt;
+        }
+        if (tenantId && channelId === "feishu") {
+          const stored = readFeishuEnterpriseChannelContract({
+            config: cfg as unknown as Record<string, unknown>,
+            accountId,
+          });
+          snapshot.platformEnterpriseId = stored.platformEnterpriseId;
+          snapshot.enterpriseImCapability = stored.capabilityStatus ?? undefined;
+          snapshot.enterpriseImChildExecutionBlocked = stored.childExecutionBlocked;
+          snapshot.enterpriseImEmployeeUiHint = stored.employeeUiHint;
+          const observation = readFeishuProbeObservation(probeResult);
+          if (observation) {
+            const recorded = await persistFeishuEnterpriseProbe({
+              tenantId,
+              accountId,
+              observation,
+            });
+            const presented =
+              recorded ??
+              presentFeishuEnterpriseObservation({
+                observation,
+                channelEnabled: !stored.childExecutionBlocked,
+                nowIso: new Date().toISOString(),
+                storedPlatformEnterpriseId: stored.platformEnterpriseId,
+              });
+            snapshot.platformEnterpriseId = presented.platformEnterpriseId;
+            snapshot.enterpriseImCapability = presented.capabilityStatus;
+            snapshot.enterpriseImChildExecutionBlocked = presented.childExecutionBlocked;
+            snapshot.enterpriseImEmployeeUiHint = presented.employeeUiHint;
+          }
         }
         const activity = getChannelActivity({
           channel: channelId as never,
