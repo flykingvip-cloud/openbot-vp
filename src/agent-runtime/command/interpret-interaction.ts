@@ -1,4 +1,8 @@
-import type { InteractionModelDecision, InteractionModelInput } from "../contracts/interaction.js";
+import {
+  INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  type InteractionModelDecision,
+  type InteractionModelInput,
+} from "../contracts/interaction.js";
 import { parseTaskAcceptanceChecks } from "../policy/index.js";
 
 export type InteractionInferencePort = {
@@ -59,14 +63,22 @@ function parseDecision(value: unknown): InteractionModelDecision {
     throw new Error("Invalid interaction task decision");
   }
   if (row.kind === "reply" || row.kind === "clarify") {
+    const protocolDowngrade = row.protocolDowngrade === INTERACTION_PROSE_PROTOCOL_DOWNGRADE;
+    const allowed = new Set(["kind", "text", ...(protocolDowngrade ? ["protocolDowngrade"] : [])]);
     if (
-      Object.keys(row).some((key) => key !== "kind" && key !== "text") ||
+      Object.keys(row).some((key) => !allowed.has(key)) ||
       typeof row.text !== "string" ||
       !row.text.trim()
     ) {
       throw new Error("Invalid interaction reply");
     }
-    return { kind: row.kind, text: row.text };
+    return {
+      kind: row.kind,
+      text: row.text,
+      ...(row.kind === "reply" && protocolDowngrade
+        ? { protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE }
+        : {}),
+    };
   }
   if (
     row.kind === "execution_request" &&

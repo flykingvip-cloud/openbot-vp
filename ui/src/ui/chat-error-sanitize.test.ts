@@ -1,10 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   CATALOG_PROJECTION_MISS_MESSAGE,
   CLOUD_PC_CONTROL_STARTING_BANNER,
   GENERIC_CHAT_ERROR_MESSAGE,
   MISSING_AGENT_ASSET_MESSAGE,
   MISSING_MODEL_API_KEY_MESSAGE,
+  PROTOCOL_DECISION_FAILED_MESSAGE,
+  TRANSCRIPT_IDENTITY_MISMATCH_MESSAGE,
   UNKNOWN_COLLABORATION_SPACE_MESSAGE,
   WORKSPACE_AUTHORIZATION_FAILED_MESSAGE,
   isInternalChatError,
@@ -47,6 +49,23 @@ describe("isInternalChatError", () => {
 });
 
 describe("sanitizeUserFacingChatError", () => {
+  it("hides a protocol JSON SyntaxError and keeps the raw text out of the visible string", () => {
+    const raw = `SyntaxError: Unexpected token '今', "今天是 2026 年"... is not valid JSON`;
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(sanitizeUserFacingChatError(raw)).toBe(PROTOCOL_DECISION_FAILED_MESSAGE);
+    expect(PROTOCOL_DECISION_FAILED_MESSAGE).not.toMatch(/SyntaxError|is not valid JSON/);
+    expect(error).toHaveBeenCalledWith("[chat] protocol decision failed (sanitized for UI):", raw);
+    error.mockRestore();
+  });
+
+  it("replaces an identity mismatch with a non-model refusal", () => {
+    expect(
+      sanitizeUserFacingChatError(
+        "enterprise or user identity does not match this session; transcript was not created",
+      ),
+    ).toBe(TRANSCRIPT_IDENTITY_MISMATCH_MESSAGE);
+  });
+
   it("replaces internal errors with a generic message", () => {
     expect(sanitizeUserFacingChatError("ERR_MODULE_NOT_FOUND: /dist/chunk.js")).toBe(
       GENERIC_CHAT_ERROR_MESSAGE,

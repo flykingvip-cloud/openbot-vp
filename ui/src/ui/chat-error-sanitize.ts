@@ -41,6 +41,13 @@ export const COLLABORATION_NON_MEMBER_WRITE_DENIED_MESSAGE =
 /** Calm line when cloud-PC control times out while the desktop picture is up. */
 export const CLOUD_PC_CONTROL_STARTING_BANNER =
   "云电脑还在启动，画面可以先看。这一轮先看屏幕就好。";
+/** Protocol/JSON decision failed. The raw SyntaxError stays in logs only. */
+export const PROTOCOL_DECISION_FAILED_MESSAGE =
+  "这一轮没能形成可执行的决定，没有开始任务。请换一种说法再试。";
+export const TRANSCRIPT_IDENTITY_MISMATCH_MESSAGE = "当前身份和企业会话不一致，没有写入对话记录。";
+
+const PROTOCOL_DECISION_FAILED =
+  /SyntaxError:|is not valid JSON|Invalid interaction (?:decision|reply|answer|target|task decision|acceptance checks)|Interaction did not return a final decision|Interaction target is not bound/i;
 
 const FAIL_CLOSED_CHAT_ERRORS: Array<{ pattern: RegExp; message: string }> = [
   {
@@ -75,6 +82,10 @@ const FAIL_CLOSED_CHAT_ERRORS: Array<{ pattern: RegExp; message: string }> = [
     pattern: /you may audit your bot's activity in this group/i,
     message: COLLABORATION_NON_MEMBER_WRITE_DENIED_MESSAGE,
   },
+  {
+    pattern: /enterprise or user identity does not match this session/i,
+    message: TRANSCRIPT_IDENTITY_MISMATCH_MESSAGE,
+  },
 ];
 
 export function isInternalChatError(raw: string): boolean {
@@ -104,6 +115,12 @@ export function sanitizeUserFacingChatError<T extends string | null | undefined>
   const failClosed = FAIL_CLOSED_CHAT_ERRORS.find((entry) => entry.pattern.test(text));
   if (failClosed) {
     return failClosed.message;
+  }
+  if (PROTOCOL_DECISION_FAILED.test(text)) {
+    if (typeof console !== "undefined") {
+      console.error("[chat] protocol decision failed (sanitized for UI):", text);
+    }
+    return PROTOCOL_DECISION_FAILED_MESSAGE;
   }
   if (isInternalChatError(text)) {
     if (typeof console !== "undefined") {

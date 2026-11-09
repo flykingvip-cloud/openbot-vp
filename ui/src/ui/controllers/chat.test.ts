@@ -422,6 +422,34 @@ describe("handleChatEvent", () => {
     expect(text).not.toContain("invalid_request_error");
   });
 
+  it("shows a protocol JSON failure as a short reply and not the raw SyntaxError", () => {
+    const state = createState({
+      sessionKey: "agent:main:employee:usr-ceo",
+      chatRunId: "run-protocol",
+      lastError: null,
+      chatMessages: [{ role: "user", content: "你好，请告诉我今天是星期几" }],
+    });
+    const raw = `SyntaxError: Unexpected token '今', "今天是 2026 年"... is not valid JSON`;
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(
+      handleChatEvent(state, {
+        runId: "run-protocol",
+        sessionKey: "agent:main:employee:usr-ceo",
+        state: "error",
+        errorMessage: raw,
+      }),
+    ).toBe("error");
+    expect(state.chatRunId).toBeNull();
+    expect(state.lastError).toBeNull();
+    const visible = state.chatMessages.map((message) => JSON.stringify(message)).join("\n");
+    expect(visible).toContain("没有开始任务");
+    expect(visible).not.toContain("SyntaxError");
+    expect(visible).not.toContain("is not valid JSON");
+    expect(visible).not.toContain("今天是 2026 年");
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
   it("puts an active run error in the transcript and leaves the crash rail clear", () => {
     const state = createState({
       sessionKey: "main",

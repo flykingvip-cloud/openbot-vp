@@ -1,4 +1,9 @@
-import type { InteractionModelDecision, InteractionModelInput } from "../contracts/interaction.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
+import {
+  INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  type InteractionModelDecision,
+  type InteractionModelInput,
+} from "../contracts/interaction.js";
 import {
   admitExecutionRequest,
   type ExecutionAdmissionInput,
@@ -8,8 +13,16 @@ import {
 import { formatRestrictedInteractionNotice } from "./interaction-sources.js";
 import { interpretInteraction, type InteractionInferencePort } from "./interpret-interaction.js";
 
+const interactionLog = createSubsystemLogger("agent-runtime/interaction");
+
 export type RoutedInteraction =
-  | { kind: "respond"; text: string; clarification: boolean }
+  | {
+      kind: "respond";
+      text: string;
+      clarification: boolean;
+      /** Set only when the host adapted plain text. Not an admission fact. */
+      protocolDowngrade?: typeof INTERACTION_PROSE_PROTOCOL_DOWNGRADE;
+    }
   | {
       kind: "task_proposal";
       decision: Extract<InteractionModelDecision, { kind: "task_change" | "task_control" }>;
@@ -37,8 +50,20 @@ export async function routeInteraction(
   }
   switch (decision.kind) {
     case "reply":
-    case "clarify":
-      return { kind: "respond", text: decision.text, clarification: decision.kind === "clarify" };
+    case "clarify": {
+      const protocolDowngrade = decision.kind === "reply" ? decision.protocolDowngrade : undefined;
+      if (protocolDowngrade) {
+        interactionLog.info(
+          `interaction protocol downgrade=${protocolDowngrade} admitted=false chars=${decision.text.length}`,
+        );
+      }
+      return {
+        kind: "respond",
+        text: decision.text,
+        clarification: decision.kind === "clarify",
+        ...(protocolDowngrade ? { protocolDowngrade } : {}),
+      };
+    }
     case "task_change":
     case "task_control":
       return { kind: "task_proposal", decision };
@@ -51,4 +76,22 @@ export async function routeInteraction(
         ),
       };
   }
+}
+
+/**
+ * Admission facts come only from an accepted execution admission.
+ * Reply text, including “已接纳” or “已开始”, is not a fact.
+ */
+export function interactionAdmissionFact(routed: RoutedInteraction): {
+  admitted: boolean;
+  taskId?: string;
+  protocolDowngrade?: typeof INTERACTION_PROSE_PROTOCOL_DOWNGRADE;
+} {
+  if (routed.kind === "execution_admission" && routed.result.kind === "accepted") {
+    return { admitted: true, taskId: routed.result.binding.taskId };
+  }
+  if (routed.kind === "respond" && routed.protocolDowngrade) {
+    return { admitted: false, protocolDowngrade: routed.protocolDowngrade };
+  }
+  return { admitted: false };
 }

@@ -2,6 +2,7 @@
 import { complete, type Api, type Context, type Model } from "@earendil-works/pi-ai/compat";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
 import { withTimeout } from "../../utils/with-timeout.js";
+import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../contracts/interaction.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
 
 const PROTOCOL = [
@@ -69,6 +70,47 @@ export function buildInteractionCompletionContext(
   return { systemPrompt: system.join("\n\n"), messages, tools: [] };
 }
 
+function looksLikeJsonValue(text: string): boolean {
+  const start = text.trimStart();
+  return start.startsWith("{") || start.startsWith("[");
+}
+
+/** Entire message is one fence. Tag is the info string, body is untrimmed inner. */
+const FULL_MESSAGE_FENCE = /^```([^\n`]*)\r?\n([\s\S]*?)\r?\n```[ \t]*$/;
+
+function proseDowngrade(text: string) {
+  return {
+    kind: "reply" as const,
+    text,
+    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  };
+}
+
+/**
+ * The host protocol asks for one JSON decision. Plain text, code fences, and
+ * prose that merely contains JSON stay replies. Only a whole-message JSON
+ * value, or a fence whose entire body is a JSON value, is a structured
+ * decision. Embedded execution JSON is not extracted. A broken JSON document
+ * still throws; the chat UI must not show that SyntaxError.
+ */
+function readInteractionDecisionText(text: string): unknown {
+  const trimmed = text.trim();
+  const fenced = FULL_MESSAGE_FENCE.exec(trimmed);
+  if (fenced) {
+    const tag = fenced[1].trim().toLowerCase();
+    const inner = fenced[2].trim();
+    const jsonFence = tag === "" || tag === "json";
+    if (jsonFence && looksLikeJsonValue(inner)) {
+      return JSON.parse(inner) as unknown;
+    }
+    return proseDowngrade(trimmed);
+  }
+  if (looksLikeJsonValue(trimmed)) {
+    return JSON.parse(trimmed) as unknown;
+  }
+  return proseDowngrade(trimmed);
+}
+
 /** Fixed provider adapter. No runner, task board, hooks, scheduling or history writes. */
 export async function invokeInteractionCompletion(params: {
   input: InteractionModelInput;
@@ -113,7 +155,7 @@ export async function invokeInteractionCompletion(params: {
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("");
-      return JSON.parse(text) as unknown;
+      return readInteractionDecisionText(text);
     },
   };
 }

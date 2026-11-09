@@ -12765,6 +12765,29 @@ tasks:
     since: 2026-11-09
     metadata: {}
 landingStreams:
+  - id: pack1-live-chat-defects-b670
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - CHANGELOG.md
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/interaction-completion.test.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/chat.transcript-cwd.test.ts
+      - src/gateway/server-methods/chat.transcript-authorization.test.ts
+      - src/gateway/server-methods/chat.pack1-replay.test.ts
+      - src/agent-runtime/contracts/interaction.ts
+      - src/agent-runtime/command/interpret-interaction.ts
+      - src/agent-runtime/command/route-interaction.ts
+      - src/agent-runtime/command/route-interaction.test.ts
+      - ui/src/ui/chat-error-sanitize.ts
+      - ui/src/ui/chat-error-sanitize.test.ts
+      - ui/src/ui/controllers/chat.test.ts
+    canLandWith: []
+    metadata:
+      task: pack1-live-chat-defects
+      agent: cursor-pack1-b670
+      purpose: Employee chat prose replies and steward transcript cwd after /new. No merge or deploy.
   - id: pr249-main253-sync-20261109
     landingPolicy: serial
     paths:
