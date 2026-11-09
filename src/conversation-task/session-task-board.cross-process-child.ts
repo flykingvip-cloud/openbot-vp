@@ -6,12 +6,14 @@
  *   BOARD_TASK_ID, BOARD_CONSTRAINT, BOARD_ROUNDS (constraint)
  *   BOARD_INCOMING_TEXT (switch)
  */
+import { parseExplicitTaskControl } from "../agent-runtime/policy/index.js";
+import { sessionTaskState } from "../agent-runtime/state/index.js";
 import {
-  applyIncomingUserMessage,
+  activeConstraintTexts,
   commitSameTaskConstraint,
-  mutateSessionTaskBoard,
   readSessionTaskBoard,
   recordCheckedTaskCompletion,
+  captureTaskCompletionBinding,
   writeSessionTaskBoard,
   type SessionTaskBoard,
 } from "./session-task-board.js";
@@ -73,7 +75,11 @@ if (mode === "complete") {
   let fail = 0;
   for (let i = 0; i < rounds; i += 1) {
     try {
-      const result = recordCheckedTaskCompletion({ sessionFile, closed: true });
+      const result = recordCheckedTaskCompletion({
+        sessionFile,
+        closed: true,
+        binding: captureTaskCompletionBinding(sessionFile),
+      });
       if (result.persisted) {
         ok += 1;
         break;
@@ -100,13 +106,21 @@ if (mode === "complete") {
 
 if (mode === "cancel" || mode === "pause") {
   const text = mode === "cancel" ? "取消当前任务" : "暂停";
+  const control = parseExplicitTaskControl(text);
+  if (!control) {
+    throw new Error("explicit worker control must parse");
+  }
   let applied = false;
   for (let i = 0; i < rounds; i += 1) {
     try {
-      const result = mutateSessionTaskBoard(sessionFile, (board) => {
-        const next = applyIncomingUserMessage({ board, incomingText: text });
-        return { board: next.board, value: next };
+      const result = sessionTaskState.applyExplicitControl({
+        sessionFile,
+        control,
+        recheck: { authOk: true, stopActive: false },
       });
+      if (!result) {
+        continue;
+      }
       if (mode === "cancel" && result.action === "cancel_parked") {
         applied = true;
         break;
@@ -132,14 +146,8 @@ if (mode === "cancel" || mode === "pause") {
       wakeSuppress: board.current?.wakeSuppress ?? null,
       tombstoneIds: (board.tombstones ?? []).map((row) => row.taskId),
       writeEpoch: board.writeEpoch ?? 0,
-      activeConstraints: (board.current?.effectiveConstraints ?? [])
-        .filter((row) => !row.superseded)
-        .map((row) => row.text),
-      parkedConstraints: board.parked.flatMap((row) =>
-        (row.effectiveConstraints ?? [])
-          .filter((entry) => !entry.superseded)
-          .map((entry) => entry.text),
-      ),
+      activeConstraints: activeConstraintTexts(board.current),
+      parkedConstraints: board.parked.flatMap((row) => activeConstraintTexts(row)),
     }),
   );
   process.exit(0);
@@ -150,11 +158,17 @@ if (mode === "switch") {
     incomingText || "另外帮我审查这份供应商合同，重点看违约责任和付款条款，这是完全不同的任务。";
   let switched = false;
   for (let i = 0; i < rounds; i += 1) {
-    const result = mutateSessionTaskBoard(sessionFile, (board) => {
-      const next = applyIncomingUserMessage({ board, incomingText: text });
-      return { board: next.board, value: next };
+    const board = snapshot();
+    const result = sessionTaskState.admitExecution({
+      sessionFile,
+      requestId: `cross-process-switch:${process.pid}`,
+      goal: text,
+      acceptance: ["完成合同审查并交付结果"],
+      expectedFocusRevision: board.focusRevision,
+      expectedWriteEpoch: board.writeEpoch ?? 0,
+      expectedTaskId: board.current?.taskId,
     });
-    if (result.action === "switch" || result.action === "resume") {
+    if (result.kind === "accepted" || result.kind === "duplicate") {
       switched = true;
       break;
     }
@@ -168,14 +182,8 @@ if (mode === "switch") {
       currentTaskId: board.current?.taskId ?? null,
       parkedIds: board.parked.map((row) => row.taskId),
       writeEpoch: board.writeEpoch ?? 0,
-      parkedConstraintTexts: board.parked.flatMap((row) =>
-        (row.effectiveConstraints ?? [])
-          .filter((entry) => !entry.superseded)
-          .map((entry) => entry.text),
-      ),
-      currentConstraintTexts: (board.current?.effectiveConstraints ?? [])
-        .filter((row) => !row.superseded)
-        .map((row) => row.text),
+      parkedConstraintTexts: board.parked.flatMap((row) => activeConstraintTexts(row)),
+      currentConstraintTexts: activeConstraintTexts(board.current),
     }),
   );
   process.exit(0);

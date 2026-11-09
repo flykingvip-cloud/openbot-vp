@@ -521,10 +521,14 @@ describe("hook delivery evidence propagation", () => {
         body: JSON.stringify({ message: "请做一个 canvas", name: "canary" }),
       });
       expect(response.status).toBe(200);
-      await vi.waitFor(() => {
-        expect(callGateway).toHaveBeenCalledTimes(1);
-        expect(hasDeliveryContext(task.taskId)).toBe(false);
-      });
+      // The HTTP acknowledgement precedes asynchronous model and delivery work.
+      await vi.waitFor(
+        () => {
+          expect(callGateway).toHaveBeenCalledTimes(1);
+          expect(hasDeliveryContext(task.taskId)).toBe(false);
+        },
+        { timeout: 10_000, interval: 20 },
+      );
     } finally {
       await new Promise<void>((resolve, reject) =>
         server.close((err) => (err ? reject(err) : resolve())),
@@ -532,3 +536,13 @@ describe("hook delivery evidence propagation", () => {
     }
   });
 });
+
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (...args: unknown[]) => runEmbeddedPiAgentMock(...args),
+}));
+
+// Route the HTTP adapter to the same real run implementation used by this suite.
+vi.mock("../../cron/isolated-agent.js", () => ({
+  runCronIsolatedAgentTurn: (...args: Parameters<typeof runCronIsolatedAgentTurn>) =>
+    runCronIsolatedAgentTurn(...args),
+}));

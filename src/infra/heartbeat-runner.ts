@@ -708,7 +708,7 @@ export async function runHeartbeatOnce(opts: {
     shouldNotifyHeartbeatWakeOnMainSession,
     surfaceHeartbeatParkedNotice,
   } = await import("./heartbeat-focus.runtime.js");
-  const { commitAutomaticPark, enrichFocusSnapshotWithBoard } =
+  const { enrichFocusSnapshotWithBoard } =
     await import("../conversation-task/session-task-board.js");
   const heartbeatSessionFile = readHeartbeatSessionFile({ storePath, sessionKey, agentId });
   const heartbeatFocus = decideHeartbeatMainSessionRun({
@@ -737,20 +737,13 @@ export async function runHeartbeatOnce(opts: {
               droppedPaths: decision.droppedPaths,
             }
           : {};
-      if (decision?.action === "park") {
-        commitAutomaticPark({
-          sessionFile: heartbeatSessionFile,
-          incomingTaskId: decision.taskId,
-          nowMs: startedAt,
-        });
-      }
       // Product UX: while FOCUS is busy, silently park. Do not pop a mid-flight
       // 「后台结果」card. Remind about parked prior tasks only after the current
       // task finishes (PARKED_TASK_REMINDER). Still notify when park slots are full.
       const parkReason = heartbeatFocus.kind === "reject_park_full" ? "reject_park_full" : "park";
-      if (parkReason === "park") {
-        drainSystemEventEntries(sessionKey);
-      } else {
+      // Deferral is not task admission. Preserve pending events for the next
+      // eligible turn rather than minting a parked task or dropping its facts.
+      if (parkReason !== "park") {
         const parked = await surfaceHeartbeatParkedNotice({
           sessionKey,
           reason: opts.reason,

@@ -103,6 +103,7 @@ async function useSyncHarness(): Promise<{
       name: "Owner",
       governanceRole: "owner",
       status: "active",
+      updatedAtMs: 1,
     },
     {
       memberId: "bot-c",
@@ -111,6 +112,7 @@ async function useSyncHarness(): Promise<{
       name: "Coordinator",
       governanceRole: "member",
       status: "active",
+      updatedAtMs: 1,
     },
   ]);
   return { cfg, groupId, stores };

@@ -1,11 +1,15 @@
+import { resolveProviderScopedAuthProfile } from "../../agent-runtime/execution/preparation/index.js";
+export {
+  buildEmbeddedRunBaseParams,
+  resolveEnforceFinalTag,
+  resolveProviderScopedAuthProfile,
+} from "../../agent-runtime/execution/preparation/index.js";
 import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import type { NormalizedUsage } from "../../agents/usage.js";
 import { getChannelDock } from "../../channels/dock.js";
 import type { ChannelId, ChannelThreadingToolContext } from "../../channels/plugins/types.js";
 import { normalizeAnyChannelId, normalizeChannelId } from "../../channels/registry.js";
 import type { OpenBotConfig } from "../../config/config.js";
-import { inheritExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
-import { isReasoningTagProvider } from "../../utils/provider-utils.js";
 import { estimateUsageCost, formatTokenCount, formatUsd } from "../../utils/usage-format.js";
 import type { TemplateContext } from "../templating.js";
 import type { ReplyPayload } from "../types.js";
@@ -152,9 +156,6 @@ export const appendUsageLine = (payloads: ReplyPayload[], line: string): ReplyPa
   return updated;
 };
 
-export const resolveEnforceFinalTag = (run: FollowupRun["run"], provider: string) =>
-  Boolean(run.enforceFinalTag || isReasoningTagProvider(provider));
-
 export function resolveModelFallbackOptions(run: FollowupRun["run"]) {
   return {
     cfg: run.config,
@@ -166,59 +167,6 @@ export function resolveModelFallbackOptions(run: FollowupRun["run"]) {
       agentId: run.agentId,
       sessionKey: run.sessionKey,
     }),
-  };
-}
-
-export function buildEmbeddedRunBaseParams(params: {
-  run: FollowupRun["run"];
-  provider: string;
-  model: string;
-  runId: string;
-  authProfile: ReturnType<typeof resolveProviderScopedAuthProfile>;
-  allowTransientCooldownProbe?: boolean;
-}) {
-  return {
-    sessionFile: params.run.sessionFile,
-    workspaceDir: params.run.workspaceDir,
-    agentDir: params.run.agentDir,
-    config: params.run.config,
-    skillsSnapshot: params.run.skillsSnapshot,
-    ownerNumbers: params.run.ownerNumbers,
-    inputProvenance: params.run.inputProvenance,
-    senderIsOwner: params.run.senderIsOwner,
-    enforceFinalTag: resolveEnforceFinalTag(params.run, params.provider),
-    provider: params.provider,
-    model: params.model,
-    ...params.authProfile,
-    thinkLevel: params.run.thinkLevel,
-    verboseLevel: params.run.verboseLevel,
-    reasoningLevel: params.run.reasoningLevel,
-    execOverrides: params.run.execOverrides,
-    bashElevated: params.run.bashElevated,
-    timeoutMs: params.run.timeoutMs,
-    runId: params.runId,
-    allowTransientCooldownProbe: params.allowTransientCooldownProbe,
-    ...(params.run.disableTools ? { disableTools: true } : {}),
-    ...(params.run.skillPolicy ? { skillPolicy: params.run.skillPolicy } : {}),
-    ...(params.run.inboundToolCeiling ? { inboundToolCeiling: params.run.inboundToolCeiling } : {}),
-    ...(params.run.contextLane ? { contextLane: params.run.contextLane } : {}),
-    ...(params.run.sessionEntry ? { sessionEntry: params.run.sessionEntry } : {}),
-    ...(params.run.oguiDecisionRun ? { oguiDecisionRun: params.run.oguiDecisionRun } : {}),
-    ...(params.run.knowledgeConsumeRefs?.length
-      ? { knowledgeConsumeRefs: params.run.knowledgeConsumeRefs }
-      : {}),
-    ...(params.run.mentionedPluginToolAllowlist?.length
-      ? { mentionedPluginToolAllowlist: params.run.mentionedPluginToolAllowlist }
-      : {}),
-    // Collaboration rounds set these on followupRun.run; without forwarding them,
-    // SessionManager re-persists the shared GROUP_PUBLIC user turn (live dual-write).
-    ...(params.run.skipUserTranscriptPersist === true ? { skipUserTranscriptPersist: true } : {}),
-    ...(params.run.collaborationRoundInvoked === true ? { collaborationRoundInvoked: true } : {}),
-    ...(params.run.deliveryToolSideEffect
-      ? { deliveryToolSideEffect: params.run.deliveryToolSideEffect }
-      : {}),
-    ...(params.run.privateRunBag ? { privateRunBag: params.run.privateRunBag } : {}),
-    ...inheritExecutionIdentityRunFields(params.run),
   };
 }
 
@@ -282,19 +230,5 @@ export function buildEmbeddedRunContexts(params: {
       hasRepliedRef: params.hasRepliedRef,
     }),
     senderContext: buildTemplateSenderContext(params.sessionCtx),
-  };
-}
-
-export function resolveProviderScopedAuthProfile(params: {
-  provider: string;
-  primaryProvider: string;
-  authProfileId?: string;
-  authProfileIdSource?: "auto" | "user";
-}): { authProfileId?: string; authProfileIdSource?: "auto" | "user" } {
-  const authProfileId =
-    params.provider === params.primaryProvider ? params.authProfileId : undefined;
-  return {
-    authProfileId,
-    authProfileIdSource: authProfileId ? params.authProfileIdSource : undefined,
   };
 }

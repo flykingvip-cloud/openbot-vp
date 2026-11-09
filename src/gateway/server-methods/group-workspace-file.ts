@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { patchAuthorizedPptx, artifactContentHash } from "../../agent-runtime/delivery/index.js";
 import { loadConfig } from "../../config/config.js";
 import { resolveKnowledgeSourceContext } from "../knowledge/context.js";
 import {
@@ -7,7 +8,7 @@ import {
   readGroupDeliverableManifest,
   slugifyLogicalId,
 } from "../knowledge/deliverables/group-manifest.js";
-import { parseOfficeSlidesInput, patchPptxSlideTexts } from "../office-pptx-text.js";
+import { parseOfficeSlidesInput } from "../office-pptx-text.js";
 import { renderOfficePreviewHtml } from "../office-render.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { resolveSecurityProfile } from "../security-profile.js";
@@ -317,6 +318,7 @@ async function handleGroupFileOpen(params: {
         filename,
         mimeType: inferMimeType(ext),
         byteLength: buffer.length,
+        contentHash: artifactContentHash(buffer),
         textLike: false,
         renderKind: "html",
         html: rendered.html,
@@ -333,6 +335,7 @@ async function handleGroupFileOpen(params: {
     filename,
     mimeType: inferMimeType(ext),
     byteLength: buffer.length,
+    contentHash: artifactContentHash(buffer),
     textLike: TEXT_LIKE_EXTENSIONS.has(ext),
     base64: buffer.toString("base64"),
   });
@@ -518,24 +521,29 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       return;
     }
 
-    let buffer: Buffer;
+    const expectedHash =
+      typeof record.expectedContentHash === "string" ? record.expectedContentHash : "";
+    let edited: Awaited<ReturnType<typeof patchAuthorizedPptx>>;
     try {
-      buffer = fs.readFileSync(authorized.absoluteFilePath);
+      edited = await patchAuthorizedPptx(authorized.absoluteFilePath, expectedHash, slides);
     } catch {
       respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, "group file not found"));
       return;
     }
-    const patched = await patchPptxSlideTexts(buffer, slides);
-    if (!patched) {
-      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "failed to patch pptx"));
+    if (edited.kind !== "saved") {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          edited.kind === "conflict"
+            ? "ARTIFACT_VERSION_CONFLICT: reload the latest original before editing"
+            : "expectedContentHash and valid pptx required",
+        ),
+      );
       return;
     }
-    try {
-      fs.writeFileSync(authorized.absoluteFilePath, patched);
-    } catch {
-      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, "failed to write group file"));
-      return;
-    }
+    const patched = edited.bytes;
 
     const filename = path.basename(relativePath);
     const rendered = await renderOfficePreviewHtml({ filename, buffer: patched });
@@ -545,6 +553,7 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       filename,
       mimeType: inferMimeType(path.extname(filename).toLowerCase()),
       byteLength: patched.length,
+      contentHash: edited.contentHash,
       textLike: false,
       renderKind: "html",
       html: rendered?.html,

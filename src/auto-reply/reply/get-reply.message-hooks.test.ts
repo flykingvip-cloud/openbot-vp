@@ -3,7 +3,7 @@ import type { MsgContext } from "../templating.js";
 import { registerGetReplyCommonMocks } from "./get-reply.test-mocks.js";
 
 const mocks = vi.hoisted(() => ({
-  applyMediaUnderstanding: vi.fn(async (..._args: unknown[]) => undefined),
+  applyMediaUnderstanding: vi.fn(async (..._args: unknown[]) => ({ outputs: [] })),
   applyLinkUnderstanding: vi.fn(async (..._args: unknown[]) => undefined),
   createInternalHookEvent: vi.fn(),
   triggerInternalHook: vi.fn(async (..._args: unknown[]) => undefined),
@@ -12,6 +12,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 registerGetReplyCommonMocks();
+vi.mock("../../gateway/workspace-resolver/write-roots.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../gateway/workspace-resolver/write-roots.js")>()),
+  resolveLiveRobotWriteRoot: () => "/tmp/workspace",
+}));
 
 vi.mock("../../globals.js", () => ({
   logVerbose: vi.fn(),
@@ -62,6 +66,13 @@ function buildCtx(overrides: Partial<MsgContext> = {}): MsgContext {
 }
 
 describe("getReplyFromConfig message hooks", () => {
+  it("marks an unlabelled human ingress before prepared interaction without mutating the caller", async () => {
+    const ctx = buildCtx();
+    await getReplyFromConfig(ctx, undefined, {});
+    const prepared = mocks.resolveReplyDirectives.mock.calls[0]?.[0] as { ctx: MsgContext };
+    expect(prepared.ctx.InputProvenance).toEqual({ kind: "external_user" });
+    expect(ctx.InputProvenance).toBeUndefined();
+  });
   beforeEach(() => {
     delete process.env.OPENCLAW_TEST_FAST;
     mocks.applyMediaUnderstanding.mockReset();
@@ -76,6 +87,7 @@ describe("getReplyFromConfig message hooks", () => {
       ctx.Transcript = "voice transcript";
       ctx.Body = "[Audio]\nTranscript:\nvoice transcript";
       ctx.BodyForAgent = "[Audio]\nTranscript:\nvoice transcript";
+      return { outputs: [] };
     });
     mocks.applyLinkUnderstanding.mockResolvedValue(undefined);
     mocks.createInternalHookEvent.mockImplementation(
@@ -147,6 +159,7 @@ describe("getReplyFromConfig message hooks", () => {
       ctx.Transcript = undefined;
       ctx.Body = "<media:audio>";
       ctx.BodyForAgent = "<media:audio>";
+      return { outputs: [] };
     });
 
     await getReplyFromConfig(buildCtx(), undefined, {});

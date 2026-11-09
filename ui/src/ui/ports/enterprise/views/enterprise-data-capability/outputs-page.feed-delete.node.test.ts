@@ -81,7 +81,9 @@ describe("outputs-page feed delete", () => {
     expect(container.textContent).toContain("知识对象（Feed）");
     expect(container.textContent).toContain("当前供给");
     expect(container.textContent).toContain("模拟仓库");
-    const buttons = Array.from(container.querySelectorAll('[data-testid="feed-item-delete"]'));
+    const buttons = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[data-testid="feed-item-delete"]'),
+    );
     expect(buttons.length).toBe(2);
     buttons[1].click();
     expect(onDeleteFeedItem).toHaveBeenCalledTimes(1);

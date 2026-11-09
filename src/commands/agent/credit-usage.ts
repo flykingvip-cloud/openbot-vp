@@ -18,6 +18,7 @@
  *   Unset or any other value keeps it ON.
  */
 
+import type { AgentCommandCommercialGateResult } from "../../agent-runtime/model/index.js";
 import { isCliProvider } from "../../agents/model-selection.js";
 import { hasNonzeroUsage, normalizeUsage } from "../../agents/usage.js";
 import { buildCommercialRunCreditUsageInput } from "../../auto-reply/reply/agent-run-credit-usage.js";
@@ -25,7 +26,6 @@ import type { OpenBotConfig } from "../../config/config.js";
 import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain.js";
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
 import { parseBooleanValue } from "../../utils/boolean.js";
-import type { AgentCommandCommercialGateResult } from "./commercial-run-gate.js";
 
 export const AGENT_COMMAND_CREDIT_USAGE_ENV = "OPENBOT_AGENT_COMMAND_CREDIT_USAGE";
 

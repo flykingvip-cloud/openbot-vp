@@ -13,6 +13,7 @@ export function renderPlatformPortShell(model: PlatformPortRenderModel) {
     model.state.tab === "platformCapabilities" ||
     model.state.tab === "platformModels" ||
     model.state.tab === "platformAgents" ||
+    model.state.tab === "platformObservation" ||
     model.state.tab === "platformDiagnosis" ||
     model.state.tab === "platformAdvanced" ||
     model.state.tab === "platformSystemSettings" ||
@@ -25,6 +26,7 @@ export function renderPlatformPortShell(model: PlatformPortRenderModel) {
         basePath: model.state.basePath,
         client: model.state.client,
         readModel: model.readModel,
+        observationHost: model.observationHost ?? null,
         channelsProps: model.channelsProps,
         skillsProps: model.skillsProps,
         instancesProps: model.instancesProps,

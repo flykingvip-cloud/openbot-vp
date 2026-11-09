@@ -17,6 +17,7 @@ export async function persistWorkspacePptxSlideDraft(params: {
   draft: string;
   groupId?: string | null;
   sessionKey?: string | null;
+  expectedContentHash?: string;
 }): Promise<WorkspaceFilePreviewPayload | null> {
   const filename = params.filename.trim();
   if (!params.client || !isPptxWorkspaceFilename(filename)) {
@@ -28,12 +29,16 @@ export async function persistWorkspacePptxSlideDraft(params: {
   }
   const groupId = params.groupId?.trim() || "";
   if (groupId) {
-    return patchGroupWorkspacePptx(params.client, groupId, filename, slides);
+    return patchGroupWorkspacePptx(
+      params.client,
+      groupId,
+      filename,
+      slides,
+      params.expectedContentHash,
+    );
   }
-  return patchStewardWorkspacePptx(
-    params.client,
-    filename,
-    slides,
-    params.sessionKey?.trim() ? { sessionKey: params.sessionKey.trim() } : {},
-  );
+  return patchStewardWorkspacePptx(params.client, filename, slides, {
+    ...(params.sessionKey?.trim() ? { sessionKey: params.sessionKey.trim() } : {}),
+    expectedContentHash: params.expectedContentHash,
+  });
 }

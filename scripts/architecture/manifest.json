@@ -77,5 +77,721 @@
       "src/plugins/hooks/gateway-lifecycle-events"
     ],
     "description": "plugins/hooks: event-family files must not depend on each other; the runner is the only assembler."
+  },
+  {
+    "name": "agent-runtime-context-assembly-isolation",
+    "from": "src/agent-runtime/context/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/conversation-task/**",
+      "src/auto-reply/**",
+      "src/plugins/**",
+      "src/cron/**"
+    ],
+    "description": "Pure context assembly cannot invoke runtime, task mutations, tools or scheduling; sources remain injected values."
+  },
+  {
+    "name": "agent-runtime-contracts-pure-data",
+    "from": "src/agent-runtime/contracts/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/conversation-task/**",
+      "src/auto-reply/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/context/**",
+      "src/agent-runtime/command/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/delivery/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/capabilities/**",
+      "src/agent-runtime/policy/**",
+      "src/agent-runtime/wiring/**"
+    ],
+    "description": "Cross-layer contracts own types only; they cannot depend on runtime implementations or persistence."
+  },
+  {
+    "name": "runtime-command-no-direct-execution",
+    "from": "src/agent-runtime/command/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/auto-reply/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/capabilities/**",
+      "src/conversation-task/**"
+    ],
+    "description": "Command use cases cannot directly invoke models, tools, scheduling or task persistence; effects use explicit injected ports and pure projections."
+  },
+  {
+    "name": "runtime-command-auto-reply-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts", "src/agent-runtime/command/*/**"],
+    "description": "Production entrances must use the explicit command facade, not individual use-case internals."
+  },
+  {
+    "name": "runtime-command-gateway-public-entry",
+    "from": "src/gateway/**",
+    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts", "src/agent-runtime/command/*/**"],
+    "description": "Production entrances must use the explicit command facade, not individual use-case internals."
+  },
+  {
+    "name": "runtime-recovery-no-state-side-effects",
+    "from": "src/agent-runtime/execution/recovery/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/conversation-task/**",
+      "src/auto-reply/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/state/**",
+      "src/agents/!(execution-stall-continue|protocol-violation).ts",
+      "src/agents/*/**"
+    ],
+    "description": "Bounded recovery owns loop sequencing only, not persistence, transport, task completion or scheduling."
+  },
+  {
+    "name": "runtime-recovery-public-entry",
+    "from": "src/agents/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/recovery/**"],
+    "description": "Legacy runner and adapters consume the explicit execution facade, not recovery internals."
+  },
+  {
+    "name": "runtime-preparation-no-execution-effects",
+    "from": "src/agent-runtime/execution/preparation/**",
+    "denyImportsFrom": [
+      "src/agents/**",
+      "src/conversation-task/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/gateway/!(execution-identity-context).ts",
+      "src/gateway/*/**"
+    ],
+    "description": "Legacy parameter preparation may inherit trusted identity but cannot invoke providers, task mutations or scheduling."
+  },
+  {
+    "name": "runtime-preparation-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/preparation/!(index).ts"],
+    "description": "Existing reply adapters use the explicit preparation API, not its implementation."
+  },
+  {
+    "name": "runtime-delivery-no-task-control",
+    "from": "src/agent-runtime/delivery/**",
+    "denyImportsFrom": [
+      "src/conversation-task/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/command/**",
+      "src/agents/**",
+      "src/cron/**",
+      "src/plugins/**"
+    ],
+    "description": "Candidate delivery preparation cannot mutate tasks, invoke model runners or schedule recovery."
+  },
+  {
+    "name": "runtime-delivery-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/delivery/presentation/**",
+      "src/agent-runtime/delivery/dispatch/**"
+    ],
+    "description": "Reply adapters consume the delivery public API rather than presentation or terminal delivery internals.",
+    "exemptFiles": [
+      "src/agent-runtime/delivery/index.ts",
+      "src/agent-runtime/delivery/dispatch/command-result.ts",
+      "src/agent-runtime/delivery/dispatch/complete-reply.ts",
+      "src/agent-runtime/delivery/dispatch/complete-reply.test.ts",
+      "src/agent-runtime/delivery/dispatch/confirm-pending.test.ts",
+      "src/agent-runtime/delivery/dispatch/prepare-visible.test.ts"
+    ]
+  },
+  {
+    "name": "runtime-policy-no-effects",
+    "from": "src/agent-runtime/policy/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/auto-reply/**",
+      "src/conversation-task/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/delivery/**",
+      "src/agent-runtime/command/**"
+    ],
+    "description": "Policy classification must not read/write task state, perform environment probes or initiate execution and delivery."
+  },
+  {
+    "name": "runtime-policy-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": ["src/agent-runtime/policy/!(index).ts", "src/agent-runtime/policy/*/**"],
+    "exemptFiles": [
+      "src/agent-runtime/policy/acceptance-checks.ts",
+      "src/agent-runtime/policy/blocker.test.ts",
+      "src/agent-runtime/policy/blocker.ts",
+      "src/agent-runtime/policy/catalog.test.ts",
+      "src/agent-runtime/policy/catalog.ts",
+      "src/agent-runtime/policy/constraints.ts",
+      "src/agent-runtime/policy/context-window.ts",
+      "src/agent-runtime/policy/execution-queue.test.ts",
+      "src/agent-runtime/policy/execution-queue.ts",
+      "src/agent-runtime/policy/explicit-task-control.test.ts",
+      "src/agent-runtime/policy/explicit-task-control.ts",
+      "src/agent-runtime/policy/index.ts",
+      "src/agent-runtime/policy/input-stamp.ts",
+      "src/agent-runtime/policy/prompt-mode.ts",
+      "src/agent-runtime/policy/run-limits.test.ts",
+      "src/agent-runtime/policy/run-limits.ts",
+      "src/agent-runtime/policy/task-binding.test.ts",
+      "src/agent-runtime/policy/task-binding.ts",
+      "src/agent-runtime/policy/task-board-limits.ts"
+    ],
+    "description": "Production code consumes policy through the public index facade; numeric limits and decisions share one entry. Policy internals may cross-import; listed policy sources/tests are exempt."
+  },
+  {
+    "name": "runtime-context-reply-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/context/!(index).ts", "src/agent-runtime/context/*/**"],
+    "description": "Reply host consumes context projections through the public context/index facade, not assembly/history/untrusted/aside/learning internals."
+  },
+  {
+    "name": "runtime-capabilities-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/capabilities/!(index).ts",
+      "src/agent-runtime/capabilities/*/**"
+    ],
+    "exemptFiles": [
+      "src/agent-runtime/capabilities/index.ts",
+      "src/agent-runtime/capabilities/catalog.ts",
+      "src/agent-runtime/capabilities/catalog.test.ts",
+      "src/agent-runtime/capabilities/invocation/abort.ts",
+      "src/agent-runtime/capabilities/invocation/abort.test.ts",
+      "src/agent-runtime/capabilities/invocation/before-call.ts",
+      "src/agent-runtime/capabilities/adapters/after-turn-context.ts",
+      "src/agent-runtime/capabilities/adapters/attempt-sandbox.ts",
+      "src/agent-runtime/capabilities/adapters/attempt-workspace-policy.ts",
+      "src/agent-runtime/capabilities/adapters/context-after-turn.ts",
+      "src/agent-runtime/capabilities/adapters/context-compiler.ts",
+      "src/agent-runtime/capabilities/adapters/model-resolve-hooks.ts",
+      "src/agent-runtime/capabilities/adapters/model-resolve-hooks.test.ts",
+      "src/agent-runtime/capabilities/adapters/prompt-build-hooks.ts",
+      "src/agent-runtime/capabilities/adapters/protocol-body-boundary.ts"
+    ],
+    "description": "Production code consumes capabilities through the public capabilities/index facade. Capabilities internals may cross-import; listed capabilities sources/tests are exempt."
+  },
+  {
+    "name": "runtime-model-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": ["src/agent-runtime/model/!(index).ts", "src/agent-runtime/model/*/**"],
+    "exemptFiles": [
+      "src/agent-runtime/model/admission-lease.test.ts",
+      "src/agent-runtime/model/admission-lease.ts",
+      "src/agent-runtime/model/apply-provider-credential.test.ts",
+      "src/agent-runtime/model/apply-provider-credential.ts",
+      "src/agent-runtime/model/auth-profile-candidates.test.ts",
+      "src/agent-runtime/model/auth-profile-candidates.ts",
+      "src/agent-runtime/model/auth-profile-rotation.test.ts",
+      "src/agent-runtime/model/auth-profile-rotation.ts",
+      "src/agent-runtime/model/authorized-session.test.ts",
+      "src/agent-runtime/model/authorized-session.ts",
+      "src/agent-runtime/model/auxiliary-model-governance.test.ts",
+      "src/agent-runtime/model/auxiliary-model-governance.ts",
+      "src/agent-runtime/model/cli-run-credential.ts",
+      "src/agent-runtime/model/command-admission-session.test.ts",
+      "src/agent-runtime/model/command-admission-session.ts",
+      "src/agent-runtime/model/command-commercial-gate.ts",
+      "src/agent-runtime/model/command-governance.ts",
+      "src/agent-runtime/model/copilot-token-refresh.test.ts",
+      "src/agent-runtime/model/copilot-token-refresh.ts",
+      "src/agent-runtime/model/index.ts",
+      "src/agent-runtime/model/interaction-completion.test.ts",
+      "src/agent-runtime/model/interaction-completion.ts",
+      "src/agent-runtime/model/llm-slug-auxiliary.test.ts",
+      "src/agent-runtime/model/native-tool-stream.ts",
+      "src/agent-runtime/model/ollama-context-stream.ts",
+      "src/agent-runtime/model/prepare-embedded-model.test.ts",
+      "src/agent-runtime/model/prepare-embedded-model.ts",
+      "src/agent-runtime/model/xai-arguments-stream.ts",
+      "src/executor-evidence/acceptance-fix-r8-cli.isolation.test.ts"
+    ],
+    "description": "Production code consumes model infrastructure through the public model/index facade. Model internals may cross-import; listed model sources/tests and the R8 CLI isolation test (which must bind command-commercial-gate directly) are exempt."
+  },
+  {
+    "name": "runtime-command-public-entry",
+    "from": "src/**",
+    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts", "src/agent-runtime/command/*/**"],
+    "exemptFiles": [
+      "src/agent-runtime/command/index.ts",
+      "src/agent-runtime/command/authorized-interaction.ts",
+      "src/agent-runtime/command/command-outcome-entry.ts",
+      "src/agent-runtime/command/command-outcome-entry.test.ts",
+      "src/agent-runtime/command/execution-admission.ts",
+      "src/agent-runtime/command/execution-admission.test.ts",
+      "src/agent-runtime/command/gateway-task-stop.ts",
+      "src/agent-runtime/command/gateway-task-stop.test.ts",
+      "src/agent-runtime/command/governed-interaction.ts",
+      "src/agent-runtime/command/ingress-kind.ts",
+      "src/agent-runtime/command/ingress-kind.test.ts",
+      "src/agent-runtime/command/interpret-interaction.ts",
+      "src/agent-runtime/command/interpret-interaction.test.ts",
+      "src/agent-runtime/command/prepared-interaction.ts",
+      "src/agent-runtime/command/route-interaction.ts",
+      "src/agent-runtime/command/route-interaction.test.ts",
+      "src/agent-runtime/command/scenarios/collaboration-entry.ts",
+      "src/agent-runtime/command/scenarios/collaboration-entry.test.ts",
+      "src/agent-runtime/command/task-proposal-reply.ts",
+      "src/agent-runtime/command/task-proposal-reply.test.ts",
+      "src/agent-runtime/command/task-status.ts",
+      "src/agent-runtime/command/task-status.test.ts",
+      "src/agent-runtime/command/task-status-format.test.ts"
+    ],
+    "description": "Production code consumes command use-cases through the public command/index facade. Command internals may cross-import; listed command sources/tests are exempt. Existing auto-reply and gateway entry rules remain."
+  },
+  {
+    "name": "runtime-acceptance-no-platform-effects",
+    "from": "src/agent-runtime/delivery/acceptance/**",
+    "denyImportsFrom": [
+      "src/gateway/**",
+      "src/agents/**",
+      "src/auto-reply/**",
+      "src/conversation-task/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/execution/**"
+    ],
+    "description": "Settlement orchestration uses fixed effect ports; platform I/O and lifecycle ownership remain in the adapter."
+  },
+  {
+    "name": "runtime-candidate-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/runner/!(index).ts"],
+    "description": "Reply adapters use the admitted candidate public API; internal implementation is not directly imported."
+  },
+  {
+    "name": "runtime-candidate-no-outer-execution-dependency",
+    "from": "src/agent-runtime/execution/runner/**",
+    "denyImportsFrom": ["src/auto-reply/reply/agent-runner-execution"],
+    "description": "Candidate and turn contracts must not reverse-depend on the old outer execution owner, including types."
+  },
+  {
+    "name": "runtime-outcomes-no-execution-control",
+    "from": "src/agent-runtime/execution/outcomes/**",
+    "denyImportsFrom": [
+      "src/agents/**",
+      "src/conversation-task/**",
+      "src/plugins/**",
+      "src/cron/**",
+      "src/agent-runtime/command/**",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "Outcome aggregation records original evidence only; it cannot invoke providers, mutate session tasks or restart work."
+  },
+  {
+    "name": "runtime-outcomes-public-entry",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/outcomes/!(index).ts"],
+    "description": "The original turn host uses the outcome public entry, not aggregate internals."
+  },
+  {
+    "name": "runtime-visible-delivery-no-execution-control",
+    "from": "src/agent-runtime/delivery/dispatch/**",
+    "denyImportsFrom": [
+      "src/agents/pi-embedded*",
+      "src/agents/cli-runner*",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/command/**",
+      "src/conversation-task/**"
+    ],
+    "description": "Delivery receipt preparation cannot run providers, restart work or mutate the authoritative task board."
+  },
+  {
+    "name": "runtime-terminal-delivery-no-legacy-control",
+    "from": "src/agent-runtime/delivery/dispatch/**",
+    "denyImportsFrom": [
+      "src/auto-reply/reply/agent-runner*",
+      "src/auto-reply/reply/queue*",
+      "src/auto-reply/reply/honest-empty-reply",
+      "src/auto-reply/reply/turn-reply-language",
+      "src/gateway/evolution-control/**"
+    ],
+    "description": "Terminal delivery owns settlement and projection; original queue, continuation and gap I/O are fixed host ports, never a reverse import into legacy control."
+  },
+  {
+    "name": "runtime-validation-delivery-public-entry",
+    "from": "src/agents/execution-preflight/delivery.ts",
+    "denyImportsFrom": [
+      "src/agents/execution-preflight/validation",
+      "src/agent-runtime/delivery/acceptance/!(index).ts"
+    ],
+    "description": "Production validation and delivery matching use the delivery acceptance public entry; the legacy validation module is compatibility only."
+  },
+  {
+    "name": "runtime-validation-production-validators-public-entry",
+    "from": "src/agents/execution-preflight/production-validators.ts",
+    "denyImportsFrom": [
+      "src/agents/execution-preflight/validation",
+      "src/agent-runtime/delivery/acceptance/!(index).ts"
+    ],
+    "description": "Production validation and delivery matching use the delivery acceptance public entry; the legacy validation module is compatibility only."
+  },
+  {
+    "name": "runtime-admitted-turn-public-main-entry",
+    "from": "src/auto-reply/reply/agent-runner.ts",
+    "denyImportsFrom": [
+      "src/auto-reply/reply/agent-runner-execution",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "The main reply adapter consumes the execution public API; the legacy turn module is compatibility only."
+  },
+  {
+    "name": "runtime-admitted-turn-no-platform-control-imports",
+    "from": "src/agent-runtime/execution/runner/admitted-turn.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/wiring/**",
+      "src/conversation-task/**",
+      "src/config/sessions*",
+      "src/gateway/billing/**",
+      "src/gateway/governance/spawn-snapshot-handoff",
+      "src/auto-reply/reply/agent-runner-execution"
+    ],
+    "description": "Admitted turn sequencing uses mandatory typed host capabilities for authoritative task, commercial slot, snapshot and session persistence effects; it cannot reverse-import the old orchestrator."
+  },
+  {
+    "name": "runtime-admitted-host-no-orchestration",
+    "from": "src/agent-runtime/wiring/admitted-turn-host.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/admitted-turn",
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner",
+      "src/auto-reply/reply/agent-runner-execution"
+    ],
+    "description": "The fixed host adapter binds existing effects and session recovery I/O; it cannot start another execution/provider loop."
+  },
+  {
+    "name": "runtime-reply-task-state-port",
+    "from": "src/auto-reply/reply/agent-runner.ts",
+    "denyImportsFrom": [
+      "src/conversation-task/session-task-board",
+      "src/conversation-task/turn-relation",
+      "src/auto-reply/reply/queue-policy",
+      "src/auto-reply/reply/mid-task-aside"
+    ],
+    "description": "The main reply host delegates active-turn disposition and uses the state port for board access."
+  },
+  {
+    "name": "runtime-reply-composition-boundary",
+    "from": "src/auto-reply/reply/agent-runner.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/command/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/wiring/!(reply-turn).ts"
+    ],
+    "description": "The main reply host uses the reply-turn composition for command, state and execution dependencies."
+  },
+  {
+    "name": "runtime-retired-entry-imports",
+    "from": "src/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/command/active-turn",
+      "src/auto-reply/reply/composer-plugin-mention-execute",
+      "src/auto-reply/reply/mid-task-aside",
+      "src/auto-reply/reply/agent-runner-execution",
+      "src/agents/pi-embedded-runner/run",
+      "src/agents/pi-embedded-runner/run/attempt"
+    ],
+    "description": "Retired reply and execution adapters cannot be imported by runtime sources; callers use the current command/execution entry."
+  },
+  {
+    "name": "runtime-shared-model-no-business-control",
+    "from": "src/agent-runtime/model/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/command/**",
+      "src/agent-runtime/execution/**",
+      "src/agent-runtime/delivery/**",
+      "src/agent-runtime/state/**",
+      "src/agent-runtime/wiring/**",
+      "src/conversation-task/**",
+      "src/task-outcome/**"
+    ],
+    "description": "Shared model admission has no task state, execution loop or delivery dependency. Tests may bind fixed host ports.",
+    "exemptFiles": ["src/agent-runtime/model/authorized-session.test.ts"]
+  },
+  {
+    "name": "runtime-retired-admission-lifecycle",
+    "from": "src/**",
+    "denyImportsFrom": ["src/agent-runtime/execution/lifecycle/**"],
+    "description": "Shared model admission has one owner; retired execution lifecycle paths cannot re-enter the runtime."
+  },
+  {
+    "name": "runtime-state-public-entry-wiring",
+    "from": "src/agent-runtime/wiring/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/state/repository/**",
+      "src/agent-runtime/state/mutations/**",
+      "src/agent-runtime/state/session-task",
+      "src/agent-runtime/state/resume-current"
+    ],
+    "description": "Task repository and mutations are private. Host consumers use state/index; narrow transcript/action adapters retain separate ownership."
+  },
+  {
+    "name": "runtime-state-public-entry-gateway",
+    "from": "src/gateway/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/state/repository/**",
+      "src/agent-runtime/state/mutations/**",
+      "src/agent-runtime/state/session-task",
+      "src/agent-runtime/state/resume-current"
+    ],
+    "description": "Task repository and mutations are private. Host consumers use state/index; narrow transcript/action adapters retain separate ownership."
+  },
+  {
+    "name": "runtime-state-public-entry-reply",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/state/repository/**",
+      "src/agent-runtime/state/mutations/**",
+      "src/agent-runtime/state/session-task",
+      "src/agent-runtime/state/resume-current"
+    ],
+    "description": "Task repository and mutations are private. Host consumers use state/index; narrow transcript/action adapters retain separate ownership."
+  },
+  {
+    "name": "runtime-task-state-adapter-gateway",
+    "from": "src/gateway/server-methods/chat.ts",
+    "denyImportsFrom": ["src/conversation-task/session-task-board"],
+    "description": "Migrated task-state consumers use state/index; the original board remains the sole lock and persistence adapter."
+  },
+  {
+    "name": "runtime-task-state-adapter-delivery",
+    "from": "src/agent-runtime/wiring/delivery-confirm.ts",
+    "denyImportsFrom": ["src/conversation-task/session-task-board"],
+    "description": "Migrated task-state consumers use state/index; the original board remains the sole lock and persistence adapter."
+  },
+  {
+    "name": "runtime-task-state-adapter-execution",
+    "from": "src/agent-runtime/wiring/admitted-turn-host.ts",
+    "denyImportsFrom": ["src/conversation-task/session-task-board"],
+    "description": "Migrated task-state consumers use state/index; the original board remains the sole lock and persistence adapter."
+  },
+  {
+    "name": "runtime-command-candidate-public-entry",
+    "from": "src/commands/agent.ts",
+    "denyImportsFrom": [
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner",
+      "src/agent-runtime/execution/runner/**",
+      "src/agents/pi-embedded-runner/types",
+      "src/agents/pi-embedded-runner/runs"
+    ],
+    "description": "Command orchestration invokes candidates through execution/index; direct provider execution and private runner imports cannot return."
+  },
+  {
+    "name": "runtime-model-no-command-host-contracts",
+    "from": "src/agent-runtime/model/**",
+    "denyImportsFrom": ["src/commands/**"],
+    "description": "Shared model governance consumes runtime-owned contracts, never old command-host types or implementations."
+  },
+  {
+    "name": "runtime-delivery-no-command-host-contracts",
+    "from": "src/agent-runtime/delivery/**",
+    "denyImportsFrom": ["src/commands/**"],
+    "description": "Delivery consumes its narrow runtime data contract and cannot depend on command execution options."
+  },
+  {
+    "name": "runtime-execution-no-command-host-contracts",
+    "from": "src/agent-runtime/execution/**",
+    "denyImportsFrom": ["src/commands/**"],
+    "description": "Execution consumes typed execution inputs, not command-host options or implementations."
+  },
+  {
+    "name": "runtime-no-legacy-execution-facades",
+    "from": "src/agent-runtime/**",
+    "denyImportsFrom": [
+      "src/agents/pi-embedded",
+      "src/agents/pi-embedded-runner/runs",
+      "src/agents/pi-embedded-runner/run/params",
+      "src/agents/pi-embedded-runner/types",
+      "src/agents/cli-runner"
+    ],
+    "exemptFiles": ["src/agent-runtime/execution/runner/run-registry.test.ts"],
+    "description": "Runtime implementations and wiring cannot loop through legacy execution facades; the registry compatibility test alone verifies shared identity."
+  },
+  {
+    "name": "runtime-state-no-legacy-board-facade",
+    "from": "src/agent-runtime/state/**",
+    "denyImportsFrom": ["src/conversation-task/session-task-board"],
+    "exemptFiles": ["src/agent-runtime/state/mutations/resume-current.test.ts"],
+    "description": "Runtime state authority cannot route through legacy task-board classification; only the compatibility fixture is exempt."
+  },
+  {
+    "name": "runtime-retired-semantic-routing-quarantine",
+    "from": "src/**",
+    "denyImportsFrom": [
+      "src/agent-runtime/command/interaction",
+      "src/agent-runtime/wiring/command-adapters",
+      "src/agent-runtime/command/dialogue-intent",
+      "src/auto-reply/reply/mid-task-aside-reply-lane",
+      "src/auto-reply/reply/queue-policy",
+      "src/auto-reply/reply/mid-task-dialogue",
+      "src/agent-runtime/command/amend-active-task",
+      "src/agent-runtime/command/current-task-control",
+      "src/conversation-task/focus-resume",
+      "src/agent-runtime/execution/runner/command-fallback"
+    ],
+    "description": "Archived semantic routing has no source consumers or public export; no legacy fallback may be restored."
+  },
+  {
+    "name": "runtime-mainline-no-legacy-output-shaping",
+    "from": "src/auto-reply/**",
+    "denyImportsFrom": ["src/task-orchestration/complex-task-loop"],
+    "description": "Accepted execution output cannot re-enter legacy semantic classification, synthetic planning or heuristic acceptance after delivery preparation."
+  },
+  {
+    "name": "runtime-cron-no-preadmission-tool-prefetch",
+    "from": "src/cron/isolated-agent/run.ts",
+    "denyImportsFrom": ["src/task-orchestration/**"],
+    "description": "Scheduled task preparation cannot invoke the retired orchestration prefetch path; tools execute through the admitted capability boundary."
+  },
+  {
+    "name": "runtime-supervisor-cli-public-entry",
+    "from": "src/gateway/supervisor/worker-executor.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/**",
+      "src/agent-runtime/execution/runner/controlled-execution",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/supervisor-lifecycle",
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/cli-runner",
+      "src/agents/model-fallback",
+      "src/agents/pi-embedded"
+    ],
+    "description": "Supervisor worker dispatch admits work items through execution/index createSupervisorWorkItemLifecycle and runs CLI via runCliAgent; it cannot assemble prepare/infer privately or revive legacy facades."
+  },
+  {
+    "name": "runtime-hooks-model-public-entry",
+    "from": "src/hooks/llm-slug-generator.ts",
+    "denyImportsFrom": [
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "Hook utility model calls use the execution public API; legacy embedded facades cannot return as a second entry."
+  },
+  {
+    "name": "runtime-memory-flush-public-entry",
+    "from": "src/auto-reply/reply/agent-runner-memory.ts",
+    "denyImportsFrom": [
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner",
+      "src/agent-runtime/execution/runner/**"
+    ],
+    "description": "Memory-flush model runs use the execution public API; legacy embedded facades cannot return on the reply host."
+  },
+  {
+    "name": "runtime-command-host-controlled-execution",
+    "from": "src/commands/agent.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/model-fallback",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution"
+    ],
+    "description": "Command host consumes the controlled execution use-case via execution/index lifecycle factories; it cannot assemble prepare/infer ports privately."
+  },
+  {
+    "name": "runtime-cron-host-controlled-execution",
+    "from": "src/cron/isolated-agent/run.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/model-fallback",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution"
+    ],
+    "description": "Cron host consumes createExecutionLifecycle from execution/index; it cannot skip preparation by calling model fallback directly."
+  },
+  {
+    "name": "runtime-followup-host-controlled-execution",
+    "from": "src/auto-reply/reply/followup-runner.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/model-fallback",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution"
+    ],
+    "description": "Followup host consumes createExecutionLifecycle from execution/index; it cannot assemble a parallel prepare/infer loop."
+  },
+  {
+    "name": "runtime-chat-host-controlled-execution",
+    "from": "src/auto-reply/reply/agent-runner.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/model-fallback",
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution",
+      "src/agent-runtime/execution/runner/execution-lifecycle",
+      "src/agent-runtime/execution/runner/admitted-turn"
+    ],
+    "description": "Chat host enters admitted execution through the public execution API / reply wiring; it cannot deep-import lifecycle internals or model fallback."
+  },
+  {
+    "name": "runtime-memory-flush-auxiliary-governance",
+    "from": "src/auto-reply/reply/agent-runner-memory.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution",
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session"
+    ],
+    "description": "Memory flush is auxiliary inference via shared model governance; it cannot open work-item controlled execution or commercial admission sessions."
+  },
+  {
+    "name": "runtime-hooks-slug-auxiliary-governance",
+    "from": "src/hooks/llm-slug-generator.ts",
+    "denyImportsFrom": [
+      "src/agent-runtime/execution/runner/execution-scope",
+      "src/agent-runtime/execution/runner/controlled-execution",
+      "src/agent-runtime/model/authorized-session",
+      "src/agent-runtime/model/command-admission-session",
+      "src/agents/pi-embedded",
+      "src/agents/cli-runner"
+    ],
+    "description": "Slug filename generation is auxiliary inference via shared model governance; it cannot open work-item admission or legacy embedded facades."
+  },
+  {
+    "name": "runtime-execution-no-wiring",
+    "from": "src/agent-runtime/execution/**",
+    "denyImportsFrom": ["src/agent-runtime/wiring/**"],
+    "exemptFiles": [
+      "src/agent-runtime/execution/runner/embedded-run.ts",
+      "src/agent-runtime/execution/runner/admitted-turn.attempt-host.test.ts",
+      "src/agent-runtime/execution/runner/admitted-turn.test.ts",
+      "src/agent-runtime/execution/runner/execution-lifecycle.test.ts"
+    ],
+    "description": "Execution settles with injected ports; only the embedded-run loop may bind the fixed payload formatting adapter from wiring."
+  },
+  {
+    "name": "runtime-system-prompt-renderer-source-isolation",
+    "from": "src/agent-runtime/context/system-prompt.ts",
+    "denyImportsFrom": [
+      "src/agents/identity-file",
+      "src/utils/message-channel",
+      "src/config/sessions/**",
+      "src/agents/workspace",
+      "src/agents/skills/**"
+    ],
+    "description": "Pure system prompt rendering consumes captured facts. Workspace, registry and skill source reads remain in hosts; no hidden second source compiler."
   }
 ]

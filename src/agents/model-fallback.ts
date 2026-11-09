@@ -3,6 +3,10 @@ import {
   resolveAgentModelFallbackValues,
   resolveAgentModelPrimaryValue,
 } from "../config/model-input.js";
+import {
+  observeModelCandidate,
+  type ExecutorEvidenceContext,
+} from "../executor-evidence/model-call-evidence.js";
 import { isEnterpriseRuntimeModelId } from "../gateway/enterprise-model/ids.js";
 import type { GovernanceMode } from "../gateway/governance/decision.js";
 import {
@@ -14,6 +18,7 @@ import { createSubsystemLogger } from "../logging/subsystem.js";
 import { sanitizeForLog } from "../terminal/ansi.js";
 import {
   ensureAuthProfileStore,
+  loadAuthProfileStoreForSecretsRuntime,
   getSoonestCooldownExpiry,
   isProfileInCooldown,
   resolveProfilesUnavailableReason,
@@ -44,6 +49,7 @@ import {
 } from "./model-selection.js";
 import type { FailoverReason } from "./pi-embedded-helpers.js";
 import { isLikelyContextOverflowError } from "./pi-embedded-helpers.js";
+import { isSandboxAccountIdentityError } from "./sandbox/account-scope.js";
 import { isSandboxInfraPreReplyError } from "./sandbox/docker-engine-client.js";
 
 const log = createSubsystemLogger("model-fallback");
@@ -149,6 +155,7 @@ function allowlistIsEnterpriseCatalogOnly(allowlist: readonly string[] | undefin
 
 function entitlementFilterWillApply(params: {
   governanceMode?: GovernanceMode;
+
   entitlementAllowlist?: readonly string[];
   allowlistEnforcement?: AllowlistEnforcement;
 }): boolean {
@@ -281,11 +288,36 @@ async function runFallbackCandidate<T>(params: {
   provider: string;
   model: string;
   options?: ModelFallbackRunOptions;
+  evidence?: ExecutorEvidenceContext | null;
+  attemptIndex?: number;
 }): Promise<{ ok: true; result: T } | { ok: false; error: unknown }> {
   try {
-    const result = params.options
-      ? await params.run(params.provider, params.model, params.options)
-      : await params.run(params.provider, params.model);
+    const result = await observeModelCandidate({
+      context: params.evidence,
+      attemptIndex: params.attemptIndex ?? 0,
+      provider: params.provider,
+      model: params.model,
+      classifyError: (err) => {
+        if (shouldRethrowAbort(err)) {
+          return "cancelled";
+        }
+        if (isTimeoutError(err)) {
+          return "timeout";
+        }
+        return "error";
+      },
+      usageFromResult: (value) => {
+        if (!value || typeof value !== "object") {
+          return undefined;
+        }
+        const meta = (value as { meta?: { agentMeta?: { usage?: unknown } } }).meta;
+        return meta?.agentMeta?.usage;
+      },
+      run: async () =>
+        params.options
+          ? await params.run(params.provider, params.model, params.options)
+          : await params.run(params.provider, params.model),
+    });
     return {
       ok: true,
       result,
@@ -309,12 +341,16 @@ async function runFallbackAttempt<T>(params: {
   model: string;
   attempts: FallbackAttempt[];
   options?: ModelFallbackRunOptions;
+  evidence?: ExecutorEvidenceContext | null;
+  attemptIndex?: number;
 }): Promise<{ success: ModelFallbackRunResult<T> } | { error: unknown }> {
   const runResult = await runFallbackCandidate({
     run: params.run,
     provider: params.provider,
     model: params.model,
     options: params.options,
+    evidence: params.evidence,
+    attemptIndex: params.attemptIndex,
   });
   if (runResult.ok) {
     return {
@@ -771,6 +807,11 @@ export async function runWithModelFallback<T>(params: {
   model: string;
   runId?: string;
   agentDir?: string;
+  /**
+   * When set, each fallback candidate gets its own callId before `run`.
+   * Omitted means no extra evidence collection.
+   */
+  executorEvidence?: ExecutorEvidenceContext | null;
   /** Optional explicit fallbacks list; when provided (even empty), replaces agents.defaults.model.fallbacks. */
   fallbacksOverride?: string[];
   /**
@@ -800,6 +841,9 @@ export async function runWithModelFallback<T>(params: {
    * - `enforced`: filters like `undefined` and records the decision.
    */
   governanceMode?: GovernanceMode;
+  /** Trusted host policy for metadata-only inference; never request-controlled. */
+  authStoreReadOnly?: boolean;
+
   /**
    * Controls when an allowlist hard-filters candidates (P3-1).
    * - `governance-mode` (default): filter only when `governanceMode === "enforced"`.
@@ -914,7 +958,9 @@ export async function runWithModelFallback<T>(params: {
     }
   }
   const authStore = params.cfg
-    ? ensureAuthProfileStore(params.agentDir, { allowKeychainPrompt: false })
+    ? params.authStoreReadOnly
+      ? loadAuthProfileStoreForSecretsRuntime(params.agentDir)
+      : ensureAuthProfileStore(params.agentDir, { allowKeychainPrompt: false })
     : null;
   const attempts: FallbackAttempt[] = [];
   let lastError: unknown;
@@ -1048,6 +1094,8 @@ export async function runWithModelFallback<T>(params: {
       ...candidate,
       attempts,
       options: runOptions,
+      evidence: params.executorEvidence,
+      attemptIndex: i,
     });
     if ("success" in attemptRun) {
       if (i > 0 || attempts.length > 0 || attemptedDuringCooldown) {
@@ -1099,7 +1147,7 @@ export async function runWithModelFallback<T>(params: {
       // Sandbox / 云电脑 create failures are infra, not per-model. Fail overing
       // only burns another candidate (and another create) and wraps the honest
       // 云电脑 notice as "All models failed".
-      if (isSandboxInfraPreReplyError(errMessage)) {
+      if (isSandboxInfraPreReplyError(errMessage) || isSandboxAccountIdentityError(err)) {
         throw err;
       }
       const normalized =
@@ -1179,6 +1227,7 @@ export async function runWithImageModelFallback<T>(params: {
    * `OPENBOT_GOVERNANCE_IMAGE_MODEL_MODE`.
    */
   governanceMode?: GovernanceMode;
+
   governanceContext?: ModelGovernanceContext;
   runId?: string;
   /** Same platform admission input as text fallback. Role stays orchestrator. */
@@ -1234,7 +1283,12 @@ export async function runWithImageModelFallback<T>(params: {
 
   for (let i = 0; i < candidates.length; i += 1) {
     const candidate = candidates[i];
-    const attemptRun = await runFallbackAttempt({ run: params.run, ...candidate, attempts });
+    const attemptRun = await runFallbackAttempt({
+      run: params.run,
+      ...candidate,
+      attempts,
+      attemptIndex: i,
+    });
     if ("success" in attemptRun) {
       return attemptRun.success;
     }

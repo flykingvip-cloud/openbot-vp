@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
+import { stopTaskAtGateway } from "../../agent-runtime/command/index.js";
+import type { FocusSwitchGateDecision } from "../../agent-runtime/contracts/task-control.js";
+import { sessionTaskState } from "../../agent-runtime/state/index.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import {
   extractEmployeeStewardUserIdFromSessionKey,
@@ -58,12 +61,10 @@ import { oguiWaitBlocksSession } from "../../config/sessions/ogui-decision-wait-
 import { projectOguiDecisionStatuses } from "../../config/sessions/ogui-decision.js";
 import { resolveSessionTranscriptsDirForAgent } from "../../config/sessions/paths.js";
 import {
-  applyFocusSwitchGate,
   recordFocusSwitchDecision,
   transcriptEntriesForInboundTurn,
 } from "../../conversation-task/focus-switch.js";
 import { observeConversationTaskCancelPathConsult } from "../../conversation-task/reply-completion.js";
-import { readSessionTaskBoard } from "../../conversation-task/session-task-board.js";
 import { shouldTaskParkAbortInFlight } from "../../conversation-task/turn-relation.js";
 import { resolveConversationFlags } from "../../conversations/flags.js";
 import { pageHistoryMessages } from "../../conversations/history-cursor.js";
@@ -162,7 +163,6 @@ import {
   scheduleGroupChatAclCacheRefresh,
   upsertAuthorizedGroupChatAclMember,
 } from "../chat-group-acl-cache.js";
-import { isChatInboundPersistEarlyEnabled } from "../chat-inbound-flags.js";
 import { emitChatInboundStage } from "../chat-inbound-stage-events.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import {
@@ -435,6 +435,7 @@ import {
   clearAuthoritativeTaskStop,
   clientIdentityOkForResume,
   recordAuthoritativeTaskStop,
+  resumeInterpretedCurrentTask,
   sessionStopBarrierActive,
 } from "./chat-resume-parked-recheck.js";
 import {
@@ -3165,7 +3166,7 @@ async function abortChatRunsForSessionKeyWithPartials(params: {
       return "";
     }
     try {
-      return readSessionTaskBoard(file).current?.taskId?.trim() ?? "";
+      return sessionTaskState.read(file).current?.taskId?.trim() ?? "";
     } catch {
       return "";
     }
@@ -4618,7 +4619,7 @@ export const chatHandlers: GatewayRequestHandlers = {
     // Controller is already deleted by abortChatRunById — record durable task stop.
     if (res.aborted) {
       try {
-        const boardTaskId = readSessionTaskBoard(abortSessionFile).current?.taskId?.trim() ?? "";
+        const boardTaskId = sessionTaskState.read(abortSessionFile).current?.taskId?.trim() ?? "";
         if (boardTaskId) {
           const identity = authoritativeStopIdentityFromClient(client);
           if (mode === "undo") {
@@ -6057,7 +6058,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         agentId,
         client,
       });
-      let taskTracking: ReturnType<typeof applyFocusSwitchGate> = {
+      let taskTracking: FocusSwitchGateDecision = {
         action: "continue",
         decisionCode: "focus_clear",
         cutContext: false,
@@ -6065,10 +6066,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       };
       if (!p.growthBirthTurn) {
         try {
-          // First inbound often has no sessionFile yet (session init is later in
-          // get-reply). Focus gate then returns focus_state_unavailable and skips
-          // board seed — a later aside can become current. Ensure transcript path
-          // exists so applyIncomingUserMessage can seed A before mid-task B.
+          // Establish durable conversation identity independently of task admission.
           const existingFocusFile = entry?.sessionFile?.trim() ?? "";
           if (!existingFocusFile || !fs.existsSync(existingFocusFile)) {
             const focusSessionId = entry?.sessionId?.trim() || randomUUID();
@@ -6142,24 +6140,28 @@ export const chatHandlers: GatewayRequestHandlers = {
       const ownerAbortInFlight =
         "abortInFlight" in taskTracking && taskTracking.abortInFlight === true;
       if (shouldTaskParkAbortInFlight(taskTracking.cutContext, ownerAbortInFlight)) {
-        await abortChatRunsForSessionKeyWithPartials({
-          context,
-          ops: createChatAbortOps(context),
-          sessionKey: resolvedSessionKey,
-          abortOrigin: "rpc",
-          stopReason: "task-park",
-          client,
-          sessionFile: entry?.sessionFile,
+        await stopTaskAtGateway(ownerAbortInFlight, {
+          abortChatRuns: async () => {
+            await abortChatRunsForSessionKeyWithPartials({
+              context,
+              ops: createChatAbortOps(context),
+              sessionKey: resolvedSessionKey,
+              abortOrigin: "rpc",
+              stopReason: "task-park",
+              client,
+              sessionFile: entry?.sessionFile,
+            });
+          },
+          abortEmbedded: () => {
+            const embeddedSessionId = entry?.sessionId?.trim();
+            if (embeddedSessionId) {
+              abortEmbeddedPiRun(embeddedSessionId);
+            }
+          },
+          clearPending: () => {
+            clearSessionQueues([resolvedSessionKey, sessionKey, rawSessionKey, entry?.sessionId]);
+          },
         });
-        // Mirror agent-runner pause/cancel: stop embedded run + drop pending followups
-        // so the original queue cannot continue business actions after owner stop.
-        if (ownerAbortInFlight) {
-          const embeddedSessionId = entry?.sessionId?.trim();
-          if (embeddedSessionId) {
-            abortEmbeddedPiRun(embeddedSessionId);
-          }
-          clearSessionQueues([resolvedSessionKey, sessionKey, rawSessionKey, entry?.sessionId]);
-        }
       }
       if (taskTracking.action === "cancel_parked") {
         observeConversationTaskCancelPathConsult({
@@ -6169,7 +6171,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       }
       const shouldPersistUserTranscript =
         normalizedAttachments.length > 0 ||
-        (isChatInboundPersistEarlyEnabled() && Boolean(rawMessage.trim())) ||
+        Boolean(rawMessage.trim()) ||
         (Boolean(taskStatusLine) && Boolean(rawMessage.trim())) ||
         (taskTracking.cutContext && Boolean(rawMessage.trim())) ||
         (stewardRobotMention && Boolean(rawMessage.trim()));
@@ -6472,6 +6474,97 @@ export const chatHandlers: GatewayRequestHandlers = {
         replyOptions: {
           runId: clientRunId,
           abortSignal: abortController.signal,
+          onInteractionTaskResume: async (request) => {
+            request.abortSignal?.throwIfAborted();
+            const accessDenial = await resolvePersonalWorkbenchSessionAccessDenial({
+              client,
+              sessionKey: resolvedSessionKey,
+              logGateway: context.logGateway,
+            });
+            const writeDenial = await resolveCollaborationGroupWriteDenial({
+              client,
+              rawSessionKey,
+              logGateway: context.logGateway,
+            });
+            if (accessDenial || writeDenial) {
+              return { kind: "rejected", reason: "resume_not_authorized" };
+            }
+            const live = await loadSessionEntryForClient(resolvedSessionKey, client);
+            request.abortSignal?.throwIfAborted();
+            const identity = authoritativeStopIdentityFromClient(client);
+            if (
+              live.canonicalKey !== sessionKey ||
+              live.entry?.sessionFile !== request.sessionFile
+            ) {
+              return { kind: "rejected", reason: "session_changed" };
+            }
+            return resumeInterpretedCurrentTask({
+              ...identity,
+              sessionKey: resolvedSessionKey,
+              sessionFile: request.sessionFile,
+              request,
+              recheckInputs: {
+                accessAuthorized: true,
+                clientIdentityOk: clientIdentityOkForResume(client),
+                sendPolicy: resolveSendPolicy({
+                  cfg: live.cfg,
+                  entry: live.entry,
+                  sessionKey: live.canonicalKey,
+                  channel: live.entry?.channel,
+                  chatType: live.entry?.chatType,
+                }),
+                stopActive: sessionStopBarrierActive({
+                  sessionKeys: [resolvedSessionKey, sessionKey],
+                  chatAbortControllers: context.chatAbortControllers,
+                  ...identity,
+                }),
+              },
+            });
+          },
+          onInteractionTaskEffect: async (effect) => {
+            // Stop the captured execution only. Never abort this interpreting turn
+            // or a later task which took over while the model was answering.
+            const priorRunId = effect.previousRunId;
+            if (priorRunId && priorRunId !== clientRunId) {
+              const active = context.chatAbortControllers.get(priorRunId);
+              if (active?.sessionKey === resolvedSessionKey) {
+                const partial = context.chatRunBuffers.get(priorRunId);
+                abortChatRunById(createChatAbortOps(context), {
+                  runId: priorRunId,
+                  sessionKey: resolvedSessionKey,
+                  stopReason: effect.kind === "replace" ? "task-park" : "owner-control",
+                });
+                if (partial?.trim()) {
+                  await persistAbortedPartials({
+                    context,
+                    sessionKey: resolvedSessionKey,
+                    client,
+                    snapshots: [
+                      {
+                        runId: priorRunId,
+                        sessionId: active.sessionId,
+                        text: partial,
+                        abortOrigin: "rpc",
+                      },
+                    ],
+                  });
+                }
+              }
+            }
+            if (effect.kind !== "replace" && effect.taskId) {
+              recordAuthoritativeTaskStop({
+                ...authoritativeStopIdentityFromClient(client),
+                sessionKey: resolvedSessionKey,
+                taskId: effect.taskId,
+              });
+            }
+          },
+          ...(!systemInputProvenance && !p.growthBirthTurn
+            ? { interactionIngress: { userMessageId: clientRunId } }
+            : {}),
+          ...(taskTracking.action === "resume"
+            ? { resumedTaskBinding: sessionTaskState.captureBinding(entry?.sessionFile) }
+            : {}),
           ...(p.growthBirthTurn ? { growthBirthTurn: true } : {}),
           ...(p.humanTakeoverObserved ? { humanTakeoverObserved: true } : {}),
           ...(p.contextScope ? { contextScopeRequest: p.contextScope } : {}),

@@ -1,7 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { OutcomeOutboxEvent, TaskOutcomeRecord } from "./types.js";
+import type {
+  BudgetCallBinding,
+  CommittedSpend,
+  OutcomeOutboxEvent,
+  TaskOutcomeRecord,
+} from "./types.js";
 
 export type TaskOutcomeStorePaths = {
   rootDir: string;
@@ -14,12 +19,22 @@ export type CommitBundle = {
   record: TaskOutcomeRecord;
   events: OutcomeOutboxEvent[];
   createdAt: string;
-  /** Optional command idempotency record applied in the same materialization boundary. */
+  /**
+   * Optional command idempotency record applied in the same materialization boundary.
+   * commitId is omitted on logs written before command receipts. Do not backfill it.
+   */
   commandLog?: {
     commandId: string;
     digest: string;
     taskId: string;
     outcomeVersion: number;
+    commitId?: string | null;
+    snapshotFingerprint?: string;
+    committedSpend?: CommittedSpend | null;
+    commandDisposition?: "applied" | "replayed" | "no_effect";
+    callBinding?: BudgetCallBinding | null;
+    /** Transition-only digest. The stored digest also includes callBinding. */
+    transitionDigest?: string;
   };
 };
 
@@ -208,6 +223,11 @@ export class DurableTaskOutcomeStore {
       digest: string;
       taskId: string;
       outcomeVersion: number;
+      snapshotFingerprint?: string;
+      committedSpend?: CommittedSpend | null;
+      commandDisposition?: "applied" | "replayed" | "no_effect";
+      callBinding?: BudgetCallBinding | null;
+      transitionDigest?: string;
     };
   }):
     | { ok: true; commitId: string }
@@ -226,7 +246,15 @@ export class DurableTaskOutcomeStore {
       record: input.record,
       events: input.events,
       createdAt: new Date().toISOString(),
-      ...(input.commandLog ? { commandLog: input.commandLog } : {}),
+      ...(input.commandLog
+        ? {
+            commandLog: {
+              ...input.commandLog,
+              // The id allocated for this commit. Never a guessed backfill.
+              commitId,
+            },
+          }
+        : {}),
     };
 
     const staging = path.join(this.rootDir, "commits", `${commitId}.staging.json`);
@@ -270,7 +298,58 @@ export class DurableTaskOutcomeStore {
     if (bundle.commandLog) {
       const cmdPath = this.commandLogPath(bundle.commandLog.commandId);
       if (!fs.existsSync(cmdPath)) {
-        atomicWriteJson(cmdPath, bundle.commandLog);
+        const log = bundle.commandLog;
+        const persisted: {
+          commandId: string;
+          digest: string;
+          taskId: string;
+          outcomeVersion: number;
+          commitId?: string | null;
+          snapshotFingerprint?: string;
+          committedSpend?: CommittedSpend | null;
+          commandDisposition?: "applied" | "replayed" | "no_effect";
+          callBinding?: BudgetCallBinding | null;
+          transitionDigest?: string;
+        } = {
+          commandId: log.commandId,
+          digest: log.digest,
+          taskId: log.taskId,
+          outcomeVersion: log.outcomeVersion,
+        };
+        // Only logs that recorded a commit id keep one. Missing means legacy null.
+        if (Object.prototype.hasOwnProperty.call(log, "commitId")) {
+          persisted.commitId =
+            typeof log.commitId === "string" && log.commitId ? log.commitId : null;
+        }
+        if (typeof log.snapshotFingerprint === "string" && log.snapshotFingerprint) {
+          persisted.snapshotFingerprint = log.snapshotFingerprint;
+        }
+        if (log.committedSpend) {
+          persisted.committedSpend = log.committedSpend;
+        }
+        if (
+          log.commandDisposition === "applied" ||
+          log.commandDisposition === "replayed" ||
+          log.commandDisposition === "no_effect"
+        ) {
+          persisted.commandDisposition = log.commandDisposition;
+        }
+        if (
+          log.callBinding &&
+          log.callBinding.callId &&
+          log.callBinding.evidenceId &&
+          log.callBinding.usageFingerprint
+        ) {
+          persisted.callBinding = {
+            callId: log.callBinding.callId,
+            evidenceId: log.callBinding.evidenceId,
+            usageFingerprint: log.callBinding.usageFingerprint,
+          };
+        }
+        if (typeof log.transitionDigest === "string" && log.transitionDigest) {
+          persisted.transitionDigest = log.transitionDigest;
+        }
+        atomicWriteJson(cmdPath, persisted);
       }
     }
 
@@ -436,10 +515,74 @@ export class DurableTaskOutcomeStore {
     return path.join(this.rootDir, "command-log", `${boundedOutcomePathSegment(commandId)}.json`);
   }
 
-  loadCommand(
-    commandId: string,
-  ): { digest: string; taskId: string; outcomeVersion: number } | undefined {
-    return readJson(this.commandLogPath(commandId));
+  loadCommand(commandId: string):
+    | {
+        digest: string;
+        taskId: string;
+        outcomeVersion: number;
+        /** Null when the on-disk log has no commit id. Not inferred from the tip. */
+        commitId: string | null;
+        snapshotFingerprint: string | null;
+        committedSpend: CommittedSpend | null;
+        commandDisposition: "applied" | "replayed" | "no_effect" | null;
+        callBinding: BudgetCallBinding | null;
+        transitionDigest: string | null;
+      }
+    | undefined {
+    const raw = readJson<{
+      digest?: string;
+      taskId?: string;
+      outcomeVersion?: number;
+      commitId?: string | null;
+      snapshotFingerprint?: string;
+      committedSpend?: CommittedSpend | null;
+      commandDisposition?: string;
+      callBinding?: BudgetCallBinding | null;
+      transitionDigest?: string;
+    }>(this.commandLogPath(commandId));
+    if (
+      !raw ||
+      typeof raw.digest !== "string" ||
+      typeof raw.taskId !== "string" ||
+      typeof raw.outcomeVersion !== "number"
+    ) {
+      return undefined;
+    }
+    return {
+      digest: raw.digest,
+      taskId: raw.taskId,
+      outcomeVersion: raw.outcomeVersion,
+      commitId: typeof raw.commitId === "string" && raw.commitId.length > 0 ? raw.commitId : null,
+      snapshotFingerprint:
+        typeof raw.snapshotFingerprint === "string" && raw.snapshotFingerprint
+          ? raw.snapshotFingerprint
+          : null,
+      committedSpend: raw.committedSpend ?? null,
+      commandDisposition:
+        raw.commandDisposition === "applied" ||
+        raw.commandDisposition === "replayed" ||
+        raw.commandDisposition === "no_effect"
+          ? raw.commandDisposition
+          : null,
+      callBinding:
+        raw.callBinding &&
+        typeof raw.callBinding.callId === "string" &&
+        typeof raw.callBinding.evidenceId === "string" &&
+        typeof raw.callBinding.usageFingerprint === "string"
+          ? raw.callBinding
+          : null,
+      transitionDigest:
+        typeof raw.transitionDigest === "string" && raw.transitionDigest
+          ? raw.transitionDigest
+          : null,
+    };
+  }
+
+  loadCommitBundle(commitId: string): CommitBundle | undefined {
+    if (!commitId) {
+      return undefined;
+    }
+    return readJson<CommitBundle>(path.join(this.rootDir, "commits", `${commitId}.json`));
   }
 
   saveCommand(

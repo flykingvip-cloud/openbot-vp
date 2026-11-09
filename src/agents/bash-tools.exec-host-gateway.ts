@@ -205,7 +205,7 @@ export async function processGatewayAllowlist(
         approvalId,
         preResolvedDecision,
         onFailure: () =>
-          void sendExecApprovalFollowup({
+          sendExecApprovalFollowup({
             approvalId,
             sessionKey: params.notifySessionKey,
             turnSourceChannel: params.turnSourceChannel,

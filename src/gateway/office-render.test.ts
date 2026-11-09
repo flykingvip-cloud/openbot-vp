@@ -1,5 +1,9 @@
 import JSZip from "jszip";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { renderPptxIsolatedPreview } from "./office-pptx-isolated.js";
+vi.mock("./office-pptx-isolated.js", () => ({
+  renderPptxIsolatedPreview: vi.fn().mockResolvedValue(null),
+}));
 import {
   isDocxRenderableFilename,
   isPptxRenderableFilename,
@@ -170,4 +174,21 @@ describe("renderOfficePreviewHtml", () => {
       renderOfficePreviewHtml({ filename: "notes.txt", buffer: Buffer.from("hi") }),
     ).resolves.toBeNull();
   });
+});
+
+it("prefers a rendered slide image preview and retains editable slide text and original bytes", async () => {
+  const zip = new JSZip();
+  zip.file(
+    "ppt/slides/slide1.xml",
+    '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:t>Slide title</a:t></p:sld>',
+  );
+  const buffer = await zip.generateAsync({ type: "nodebuffer" });
+  const original = Buffer.from(buffer);
+  const html = '<html><body><img src="data:image/png;base64,AAAA"/></body></html>';
+  vi.mocked(renderPptxIsolatedPreview).mockResolvedValueOnce(html);
+  const preview = await renderOfficePreviewHtml({ filename: "deck.pptx", buffer });
+  expect(preview?.html).toBe(html);
+  expect(preview?.keepBytes).toBe(true);
+  expect(preview?.slides?.[0].lines).toContain("Slide title");
+  expect(buffer).toEqual(original);
 });

@@ -21,6 +21,23 @@ export type TypingPolicy =
   | "heartbeat";
 
 export type GetReplyOptions = {
+  /** Trusted Gateway user ingress: user transcript already persisted, execution not admitted. */
+  interactionIngress?: { userMessageId: string; persistOwnTranscript?: boolean };
+  /** Explicit Gateway resume, after live authorization/stop recheck. */
+  resumedTaskBinding?: import("../agent-runtime/contracts/task-binding.js").TaskCompletionBinding;
+  /** Fixed authenticated host resumes an interpreted current-task target after live rechecks. */
+  onInteractionTaskResume?: (
+    request: import("../agent-runtime/contracts/task-binding.js").CurrentTaskResumeRequest & {
+      sessionFile: string;
+      abortSignal?: AbortSignal;
+    },
+  ) => Promise<import("../agent-runtime/contracts/task-binding.js").CurrentTaskResumeResult>;
+  /** Trusted transport cleanup after an accepted task replacement or owner control. */
+  onInteractionTaskEffect?: (effect: {
+    kind: "replace" | "pause" | "cancel";
+    taskId: string;
+    previousRunId?: string;
+  }) => Promise<void>;
   /** Override run id for agent events (defaults to random UUID). */
   runId?: string;
   /** Abort signal for the underlying agent run. */
@@ -29,6 +46,11 @@ export type GetReplyOptions = {
   images?: ImageContent[];
   /** Notifies when an agent run actually starts (useful for webchat command handling). */
   onAgentRunStart?: (runId: string) => void;
+  /** Internal host callback; never derived from model output. */
+  onTaskExecutionBound?: (
+    binding: import("../agent-runtime/contracts/task-binding.js").TaskCompletionBinding,
+    context?: { sessionFile: string },
+  ) => void;
   onReplyStart?: () => Promise<void> | void;
   /** Called when the typing controller cleans up (e.g., run ended with NO_REPLY). */
   onTypingCleanup?: () => void;

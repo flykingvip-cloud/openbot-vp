@@ -103,6 +103,7 @@ describe("retained delivery context cleanup", () => {
     noteDeliveryArtifactPath(older.taskId, older.attemptNumber, "out/output.bin");
     noteDeliveryArtifactPath(newer.taskId, newer.attemptNumber, "out/output.bin");
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: older.taskId,
       artifactPath: "out/output.bin",

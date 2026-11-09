@@ -1,7 +1,7 @@
 /**
  * Dispatch choke-point contract for Activation:
  *   flag off / hook absent => no Task store write
- *   env ON + hook initialized + control plane reopened => long-running turn creates a task
+ *   even with the legacy flag ON, human ingress cannot create a task before admission
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -14,7 +14,6 @@ import { InMemoryActivationControlPlane } from "./control-plane.js";
 import { CONVERSATION_TASK_ENV, readConversationTaskFlags } from "./feature.js";
 import { initActivationHook, resetActivationHookForTests } from "./gateway-activation-hook.js";
 import { resetShadowHookForTests, shutdownShadowHook } from "./gateway-shadow-hook.js";
-import { openTaskStore } from "./store.js";
 
 type AbortResult = { handled: boolean; aborted: boolean; stoppedSubagents?: number };
 
@@ -140,7 +139,7 @@ describe("dispatchReplyFromConfig activation wiring", () => {
     expect(fs.readdirSync(root)).toEqual([]);
   });
 
-  it("creates a ConversationTask when env activation is ON", async () => {
+  it("does not resurrect early task activation when its legacy flag is ON", async () => {
     process.env[CONVERSATION_TASK_ENV.activation] = "1";
     const controlPlane = new InMemoryActivationControlPlane({
       minReopenIntervalMs: 0,
@@ -168,9 +167,7 @@ describe("dispatchReplyFromConfig activation wiring", () => {
       cfg: emptyCfg,
       dispatcher: createDispatcher(),
     });
-    expect(statuses).toContain("activated");
-    const store = openTaskStore({ tenantId: "tenant-x", storeRoot: root, now: NOW });
-    expect(store.findActiveTasksByConversation("conv-1")).toHaveLength(1);
-    store.close();
+    expect(statuses).toEqual([]);
+    expect(fs.readdirSync(root)).toEqual([]);
   });
 });

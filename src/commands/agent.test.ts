@@ -3,7 +3,8 @@ import path from "node:path";
 import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
 import "../cron/isolated-agent.mocks.js";
-import * as cliRunnerModule from "../agents/cli-runner.js";
+import * as agentDeliveryModule from "../agent-runtime/delivery/index.js";
+import * as cliRunnerModule from "../agent-runtime/execution/runner/cli-run.js";
 import { FailoverError } from "../agents/failover-error.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import * as modelSelectionModule from "../agents/model-selection.js";
@@ -16,7 +17,6 @@ import { setActivePluginRegistry } from "../plugins/runtime.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { createOutboundTestPlugin, createTestRegistry } from "../test-utils/channel-plugins.js";
 import { agentCommand, agentCommandFromIngress } from "./agent.js";
-import * as agentDeliveryModule from "./agent/delivery.js";
 
 vi.mock("../agents/auth-profiles.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../agents/auth-profiles.js")>();
@@ -468,8 +468,8 @@ describe("agentCommand", () => {
       await agentCommand({ message: "resume me", sessionId: "session-custom-123" }, runtime);
 
       const embeddedCall = getLastEmbeddedCall();
-      expect(embeddedCall?.sessionFile).toContain(
-        `${path.sep}agents${path.sep}main${path.sep}sessions${path.sep}session-custom-123.jsonl`,
+      expect(embeddedCall?.sessionFile).toBe(
+        path.join(fs.realpathSync(customStoreDir), "session-custom-123.jsonl"),
       );
 
       const saved = readSessionStore<{ sessionFile?: string }>(store);
@@ -740,7 +740,7 @@ describe("agentCommand", () => {
         agentsList: [{ id: "ops" }],
       });
       expect(callArgs?.sessionKey).toBe("agent:ops:main");
-      expect(callArgs?.sessionFile).toContain(`${path.sep}agents${path.sep}ops${path.sep}sessions`);
+      expect(path.dirname(callArgs?.sessionFile ?? "")).toBe(fs.realpathSync(home));
     });
   });
 
@@ -777,11 +777,15 @@ describe("agentCommand", () => {
           )
           .mockRejectedValue(new Error("retry failed"));
 
-        await expect(agentCommand({ message: "hi", sessionKey }, runtime)).rejects.toThrow(
-          "retry failed",
-        );
+        const controller = new AbortController();
+        await expect(
+          agentCommand({ message: "hi", sessionKey, abortSignal: controller.signal }, runtime),
+        ).rejects.toThrow("retry failed");
 
         expect(runCliAgentSpy).toHaveBeenCalledTimes(2);
+        for (const [call] of runCliAgentSpy.mock.calls) {
+          expect(call.abortSignal).toBe(controller.signal);
+        }
         const firstCall = runCliAgentSpy.mock.calls[0]?.[0] as
           | { cliSessionId?: string }
           | undefined;

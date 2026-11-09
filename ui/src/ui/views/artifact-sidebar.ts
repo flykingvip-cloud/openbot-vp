@@ -96,13 +96,29 @@ function renderArtifactWorkspacePathChip(metadata: Record<string, unknown>) {
 
 function resolveDownloadableHref(artifact: SharedArtifact): string {
   const metadata = artifact.providerMetadata ?? {};
-  const binary = stringField(metadata.binaryDownloadUrl);
-  if (binary) {
-    return binary;
-  }
-  for (const raw of [artifact.downloadUrl, artifact.openUrl]) {
+  const filename = stringField(metadata.workspaceFilename) || artifact.title || "";
+  const officeHtml =
+    metadata.previewKind === "html" &&
+    (/\.(?:pptx?|docx?|xlsx?)$/i.test(filename) ||
+      /officedocument|msword|ms-powerpoint|ms-excel/i.test(artifact.mimeType || ""));
+  // Office HTML is a derivative, never a valid original Office download.
+  const candidates = [
+    metadata.binaryDownloadUrl,
+    artifact.downloadUrl,
+    ...(officeHtml ? [] : [artifact.openUrl]),
+  ];
+  for (const raw of candidates) {
     const value = typeof raw === "string" ? raw.trim() : "";
     if (!value) {
+      continue;
+    }
+    if (
+      officeHtml &&
+      (value === artifact.previewUrl ||
+        value === artifact.openUrl ||
+        value === stringField(metadata.htmlPreviewUrl) ||
+        /^data:text\/html/i.test(value))
+    ) {
       continue;
     }
     if (/^(?:blob:|data:)/i.test(value) || /^https?:\/\//i.test(value)) {

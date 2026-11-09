@@ -25,6 +25,7 @@ export async function prepareSessionManagerForRun(params: {
   hadSessionFile: boolean;
   sessionId: string;
   cwd: string;
+  preserveUserTranscript?: boolean;
 }): Promise<void> {
   const sm = params.sessionManager as {
     sessionId: string;
@@ -49,7 +50,7 @@ export async function prepareSessionManagerForRun(params: {
 
   if (params.hadSessionFile && header && !hasAssistant) {
     // Never wipe shared collaboration transcripts — gateway already appended the user turn.
-    if (isGroupPublicTranscriptSessionFile(params.sessionFile)) {
+    if (params.preserveUserTranscript || isGroupPublicTranscriptSessionFile(params.sessionFile)) {
       return;
     }
     // Reset so the first assistant flush includes header+user+assistant in order.

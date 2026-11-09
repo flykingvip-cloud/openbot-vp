@@ -1,7 +1,20 @@
+import fs from "node:fs";
+import path from "node:path";
+import type {
+  CurrentTaskResumeRequest,
+  CurrentTaskResumeResult,
+} from "../../agent-runtime/contracts/task-binding.js";
+import type { TaskStopScope, TaskStopRecord } from "../../agent-runtime/contracts/task-stop.js";
+import { parseExplicitTaskControl } from "../../agent-runtime/policy/index.js";
+import {
+  sessionTaskState,
+  createTaskStopRepository,
+  type ResumeParkedRecheck,
+} from "../../agent-runtime/state/index.js";
 /**
  * Live ResumeParkedRecheck for the chat.send entry path.
  *
- * applyFocusSwitchGate already fail-closes when authOk===false or stopActive===true.
+ * Typed state resume fail-closes when authOk===false or stopActive===true.
  * chat.send must resolve those flags from real send-time signals before resume
  * proceeds — never call the gate without a recheck on the user resume path.
  *
@@ -37,16 +50,15 @@
  *
  * ## Durability boundary (disclose)
  *
- * The registry is a **process-local Map**. It survives AbortController delete
- * within one gateway process for single-gateway, no-mid-restart exploratory
- * tests. It is **not** durable across process restart / multi-host; cross-
- * process stop authority remains separately unproven.
+ * Scoped stop records are durable under the runtime state root and survive
+ * process replacement. Atomic writes and compare-token clearing preserve newer
+ * records. This does not establish distributed multi-host execution ownership.
  */
 import { loadConfig } from "../../config/config.js";
+import { resolveStateDir } from "../../config/paths.js";
 import type { OpenBotConfig } from "../../config/types.js";
-import type { ResumeParkedRecheck } from "../../conversation-task/session-task-board.js";
 import {
-  applyFocusSwitchGate,
+  recordFocusSwitchDecision,
   type FocusSwitchGateDecision,
 } from "../../conversation-task/session-task-board.js";
 import { resolveSecurityProfile } from "../security-profile.js";
@@ -75,7 +87,7 @@ export type ResolveResumeParkedRecheckParams = {
 };
 
 /**
- * Build the recheck object chat.send passes into applyFocusSwitchGate.
+ * Build the recheck facts chat.send supplies to the typed state control transaction.
  * Missing optional flags stay permissive only when not explicitly false/deny;
  * stopActive is fail-closed when true.
  */
@@ -106,24 +118,9 @@ export const AUTHORITATIVE_STOP_PERSONAL_TENANT = "__personal__";
 export const AUTHORITATIVE_STOP_INTERNAL_TENANT = "__internal__";
 export const AUTHORITATIVE_STOP_INTERNAL_USER = "__internal__";
 
-export type AuthoritativeTaskStopScopeKind = "managed" | "personal" | "internal";
-
-/** Trusted scope dimensions that must bind with taskId — never taskId alone. */
-export type AuthoritativeTaskStopScope = {
-  kind: AuthoritativeTaskStopScopeKind;
-  /** Trusted tenant id (managed) or explicit personal/internal marker. */
-  tenantId: string;
-  /** Trusted user id (managed/personal) or explicit internal marker. */
-  userId: string;
-  /** Canonical trusted session key — required for every kind. */
-  sessionKey: string;
-};
-
-export type AuthoritativeTaskStopEntry = AuthoritativeTaskStopScope & {
-  taskId: string;
-  stoppedAtMs: number;
-  reason?: string;
-};
+export type AuthoritativeTaskStopScopeKind = TaskStopScope["kind"];
+export type AuthoritativeTaskStopScope = TaskStopScope;
+export type AuthoritativeTaskStopEntry = TaskStopRecord;
 
 export type AuthoritativeTaskStopScopeInput = {
   tenantId?: string | null;
@@ -142,14 +139,61 @@ export type AuthoritativeTaskStopScopeInput = {
 export type AuthoritativeTaskStopQueryResult =
   | { state: "active" }
   | { state: "inactive" }
-  | { state: "unverifiable"; reason: "incomplete_scope" | "missing_task_id" };
+  | {
+      state: "unverifiable";
+      reason: "incomplete_scope" | "missing_task_id" | "storage_unavailable";
+    };
 
 /**
- * Process-local authoritative stop registry.
+ * Durable authoritative stop storage; explicit test maps remain optional adapters.
  * Key = tenantId + userId + sessionKey + taskId (see {@link authoritativeStopRegistryKey}).
- * NOT durable across gateway restart / multi-host.
+ * Records survive process replacement on the same state root; distributed multi-host replication is not provided.
  */
-const authoritativeTaskStops = new Map<string, AuthoritativeTaskStopEntry>();
+function stopStorageRoot(): string {
+  return path.join(resolveStateDir(), "agent-runtime", "task-stops");
+}
+function stopRepository() {
+  return createTaskStopRepository(stopStorageRoot());
+}
+
+/** Explicit owner resume lifts only its scoped paused task, after the original state CAS. */
+export function resumeInterpretedCurrentTask(
+  params: AuthoritativeTaskStopScopeInput & {
+    sessionFile: string;
+    request: CurrentTaskResumeRequest;
+    recheckInputs: ResolveResumeParkedRecheckParams;
+  },
+): CurrentTaskResumeResult {
+  const scope = resolveAuthoritativeTaskStopScope(params);
+  const recheck = resolveResumeParkedRecheck(params.recheckInputs);
+  if (
+    !scope ||
+    params.recheckInputs.accessAuthorized !== true ||
+    params.recheckInputs.clientIdentityOk !== true ||
+    params.recheckInputs.sendPolicy !== "allow" ||
+    recheck.authOk !== true ||
+    recheck.stopActive
+  ) {
+    return { kind: "rejected", reason: "resume_not_authorized" };
+  }
+  // This synchronous transaction cannot interleave with a newer same-process stop.
+  // Cancelled tasks remain tombstoned and a running task cannot be resumed twice.
+  const repository = stopRepository();
+  let capturedStop: ReturnType<typeof repository.read>;
+  try {
+    capturedStop = repository.read(scope, params.request.taskId);
+  } catch {
+    return { kind: "rejected", reason: "stop_state_unavailable" };
+  }
+  const result = sessionTaskState.resumeCurrent(params.sessionFile, params.request, {
+    authOk: true,
+    stopActive: false,
+  });
+  if (result.kind === "accepted") {
+    repository.clear(scope, params.request.taskId, { token: capturedStop?.token ?? null });
+  }
+  return result;
+}
 
 function trimOrNull(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
@@ -255,7 +299,10 @@ export function authoritativeStopRegistryKey(
 }
 
 export function resetAuthoritativeTaskStopsForTest(): void {
-  authoritativeTaskStops.clear();
+  if (process.env.VITEST !== "true" && process.env.VITEST !== "1") {
+    throw new Error("Stop reset is test-only");
+  }
+  fs.rmSync(stopStorageRoot(), { recursive: true, force: true });
 }
 
 export function recordAuthoritativeTaskStop(
@@ -277,7 +324,7 @@ export function recordAuthoritativeTaskStop(
     stoppedAtMs: params.nowMs ?? Date.now(),
     ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
   };
-  authoritativeTaskStops.set(authoritativeStopRegistryKey(scope, taskId), entry);
+  stopRepository().record(entry);
   return entry;
 }
 
@@ -290,7 +337,7 @@ export function clearAuthoritativeTaskStop(
   if (!taskId || !scope) {
     return false;
   }
-  return authoritativeTaskStops.delete(authoritativeStopRegistryKey(scope, taskId));
+  return stopRepository().clear(scope, taskId);
 }
 
 /**
@@ -312,10 +359,16 @@ export function queryAuthoritativeTaskStop(
   if (!scope) {
     return { state: "unverifiable", reason: "incomplete_scope" };
   }
-  const store = params.store ?? authoritativeTaskStops;
-  return store.has(authoritativeStopRegistryKey(scope, taskId))
-    ? { state: "active" }
-    : { state: "inactive" };
+  if (params.store) {
+    return params.store.has(authoritativeStopRegistryKey(scope, taskId))
+      ? { state: "active" }
+      : { state: "inactive" };
+  }
+  try {
+    return stopRepository().read(scope, taskId) ? { state: "active" } : { state: "inactive" };
+  } catch {
+    return { state: "unverifiable", reason: "storage_unavailable" };
+  }
 }
 
 /**
@@ -353,7 +406,7 @@ export function sessionStopBarrierActive(params: {
 }): boolean {
   const taskId = trimOrNull(params.taskId) ?? "";
   if (taskId) {
-    const store = params.authoritativeStops ?? authoritativeTaskStops;
+    const store = params.authoritativeStops;
     const sessionKeyList: string[] = [];
     for (const rawKey of params.sessionKeys) {
       const trimmed = trimOrNull(rawKey);
@@ -536,12 +589,73 @@ export function applyChatFocusSwitchGateWithResumeRecheck(params: {
   proceed?: boolean;
   recheckInputs: ResolveResumeParkedRecheckParams;
 }): FocusSwitchGateDecision {
-  return applyFocusSwitchGate({
-    sessionFile: params.sessionFile,
-    incomingText: params.incomingText,
-    nowMs: params.nowMs,
-    workspacePaths: params.workspacePaths,
-    proceed: params.proceed,
-    recheck: resolveResumeParkedRecheck(params.recheckInputs),
-  });
+  // Ingress may apply explicit controls, never infer/create/switch work from chat.
+  // New work is admitted only after interaction understanding and authorization.
+  const control = parseExplicitTaskControl(params.incomingText);
+  if (!control) {
+    return {
+      action: "continue",
+      decisionCode: "focus_clear",
+      cutContext: false,
+      taskId: sessionTaskState.read(params.sessionFile).current?.taskId ?? "",
+    };
+  }
+  const record = (decision: FocusSwitchGateDecision) => {
+    recordFocusSwitchDecision(decision.decisionCode);
+    return decision;
+  };
+  if (params.proceed) {
+    return record({
+      action: "continue",
+      decisionCode: "focus_proceed",
+      cutContext: false,
+      taskId: sessionTaskState.read(params.sessionFile).current?.taskId ?? "",
+    });
+  }
+  try {
+    const result = sessionTaskState.applyExplicitControl({
+      sessionFile: params.sessionFile,
+      control,
+      nowMs: params.nowMs,
+      workspacePaths: params.workspacePaths,
+      recheck: resolveResumeParkedRecheck(params.recheckInputs),
+    });
+    if (!result) {
+      return record({
+        action: "continue",
+        decisionCode: "focus_state_unavailable",
+        cutContext: false,
+        taskId: "",
+      });
+    }
+    if (result.action === "resume") {
+      return record({
+        action: "resume",
+        decisionCode: "focus_switched",
+        cutContext: true,
+        taskId: result.taskId,
+        currentTitle: result.currentTitle ?? "",
+        incomingTitle: result.incomingTitle ?? "",
+        statusLine: result.statusLine ?? "",
+        ...(result.restoredPrompt ? { restoredPrompt: result.restoredPrompt } : {}),
+        ...(result.droppedTitle ? { droppedTitle: result.droppedTitle } : {}),
+        ...(result.droppedPaths ? { droppedPaths: result.droppedPaths } : {}),
+      });
+    }
+    return record({
+      action: result.action === "cancel_parked" ? "cancel_parked" : "continue",
+      decisionCode: "focus_clear",
+      cutContext: false,
+      taskId: result.taskId,
+      ...(result.statusLine ? { statusLine: result.statusLine } : {}),
+      ...(result.abortInFlight ? { abortInFlight: true } : {}),
+    });
+  } catch {
+    return record({
+      action: "continue",
+      decisionCode: "focus_state_unavailable",
+      cutContext: false,
+      taskId: "",
+    });
+  }
 }

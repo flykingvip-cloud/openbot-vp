@@ -1,4 +1,4 @@
-import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../agents/context-window-guard.js";
+import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../agent-runtime/policy/index.js";
 import { DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { buildModelAliasIndex, modelKey } from "../agents/model-selection.js";
 import type { OpenBotConfig } from "../config/config.js";

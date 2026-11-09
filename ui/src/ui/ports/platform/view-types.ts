@@ -42,6 +42,7 @@ export type PlatformPortRenderModel = {
   state: PlatformPortState;
   subnavProps: Parameters<typeof renderConsoleSubnav>[0];
   readModel: PlatformPortReadModel;
+  observationHost?: object | null;
   channelsProps: Parameters<typeof renderChannels>[0];
   skillsProps: SkillsProps | null;
   instancesProps: InstancesProps | null;

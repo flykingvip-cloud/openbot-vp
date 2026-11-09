@@ -1,6 +1,7 @@
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { resolveSessionAgentIds } from "../../agents/agent-scope.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
+import { resolveWorkspaceIdentityBootstrapState } from "../../agents/identity-file.js";
 import { resolveDefaultModelForAgent } from "../../agents/model-selection.js";
 import type { EmbeddedContextFile } from "../../agents/pi-embedded-helpers.js";
 import { createOpenClawCodingTools } from "../../agents/pi-tools.js";
@@ -118,6 +119,7 @@ export async function resolveCommandsSystemPromptBundle(
   });
 
   const systemPrompt = buildAgentSystemPrompt({
+    identityBootstrapState: resolveWorkspaceIdentityBootstrapState(workspaceDir),
     workspaceDir,
     defaultThinkLevel: params.resolvedThinkLevel,
     reasoningLevel: params.resolvedReasoningLevel,

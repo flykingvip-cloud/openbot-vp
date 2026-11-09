@@ -1,21 +1,25 @@
 import { expect } from "vitest";
-import { buildEmbeddedRunPayloads } from "./payloads.js";
+import { buildEmbeddedRunPayloads } from "../../../agent-runtime/delivery/index.js";
+import { embeddedPayloadFormatting } from "../../../agent-runtime/wiring/embedded-payloads.js";
 
 export type BuildPayloadParams = Parameters<typeof buildEmbeddedRunPayloads>[0];
 type RunPayloads = ReturnType<typeof buildEmbeddedRunPayloads>;
 
 export function buildPayloads(overrides: Partial<BuildPayloadParams> = {}) {
-  return buildEmbeddedRunPayloads({
-    assistantTexts: [],
-    toolMetas: [],
-    lastAssistant: undefined,
-    sessionKey: "session:telegram",
-    inlineToolResultsAllowed: false,
-    verboseLevel: "off",
-    reasoningLevel: "off",
-    toolResultFormat: "plain",
-    ...overrides,
-  });
+  return buildEmbeddedRunPayloads(
+    {
+      assistantTexts: [],
+      toolMetas: [],
+      lastAssistant: undefined,
+      sessionKey: "session:telegram",
+      inlineToolResultsAllowed: false,
+      verboseLevel: "off",
+      reasoningLevel: "off",
+      toolResultFormat: "plain",
+      ...overrides,
+    },
+    embeddedPayloadFormatting,
+  );
 }
 
 export function expectSinglePayloadText(

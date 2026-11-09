@@ -22,6 +22,8 @@ export const AgentInternalEventSchema = Type.Object(
 export const AgentEventSchema = Type.Object(
   {
     runId: NonEmptyString,
+    sourceRunId: Type.Optional(NonEmptyString),
+    sessionKey: Type.Optional(NonEmptyString),
     seq: Type.Integer({ minimum: 0 }),
     stream: NonEmptyString,
     ts: Type.Integer({ minimum: 0 }),

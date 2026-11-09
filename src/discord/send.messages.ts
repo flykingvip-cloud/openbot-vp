@@ -1,5 +1,6 @@
 import type { APIChannel, APIMessage } from "discord-api-types/v10";
 import { ChannelType, Routes } from "discord-api-types/v10";
+import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { resolveDiscordRest } from "./send.shared.js";
 import type {
   DiscordMessageEdit,
@@ -52,6 +53,12 @@ export async function editMessageDiscord(
   opts: DiscordReactOpts = {},
 ): Promise<APIMessage> {
   const rest = resolveDiscordRest(opts);
+  if (opts.taskBoundary) {
+    const refusal = checkTaskActionBoundary(opts.taskBoundary);
+    if (refusal) {
+      throw new Error(refusal);
+    }
+  }
   return (await rest.patch(Routes.channelMessage(channelId, messageId), {
     body: { content: payload.content },
   })) as APIMessage;

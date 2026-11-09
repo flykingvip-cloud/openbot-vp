@@ -1,3 +1,5 @@
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import type { TypingCallbacks } from "../../channels/typing.js";
 import type { HumanDelayConfig } from "../../config/types.js";
 import { sleep } from "../../utils.js";
@@ -6,6 +8,8 @@ import { registerDispatcher } from "./dispatcher-registry.js";
 import { normalizeReplyPayload, type NormalizeReplySkipReason } from "./normalize-reply.js";
 import type { ResponsePrefixContext } from "./response-prefix-template.js";
 import type { TypingController } from "./typing.js";
+
+export type ReplyDeliveryContext = { taskBoundary?: TaskActionBoundary };
 
 export type ReplyDispatchKind = "tool" | "block" | "final";
 
@@ -18,7 +22,7 @@ type ReplyDispatchSkipHandler = (
 
 type ReplyDispatchDeliverer = (
   payload: ReplyPayload,
-  info: { kind: ReplyDispatchKind },
+  info: { kind: ReplyDispatchKind } & ReplyDeliveryContext,
 ) => Promise<void>;
 
 /** R85e: outcome of one completed deliver() (success or throw). */
@@ -88,9 +92,9 @@ type ReplyDispatcherWithTypingResult = {
 };
 
 export type ReplyDispatcher = {
-  sendToolResult: (payload: ReplyPayload) => boolean;
-  sendBlockReply: (payload: ReplyPayload) => boolean;
-  sendFinalReply: (payload: ReplyPayload) => boolean;
+  sendToolResult: (payload: ReplyPayload, context?: ReplyDeliveryContext) => boolean;
+  sendBlockReply: (payload: ReplyPayload, context?: ReplyDeliveryContext) => boolean;
+  sendFinalReply: (payload: ReplyPayload, context?: ReplyDeliveryContext) => boolean;
   waitForIdle: () => Promise<void>;
   getQueuedCounts: () => Record<ReplyDispatchKind, number>;
   markComplete: () => void;
@@ -144,7 +148,27 @@ export function createReplyDispatcher(options: ReplyDispatcherOptions): ReplyDis
     waitForIdle: () => sendChain,
   });
 
-  const enqueue = (kind: ReplyDispatchKind, payload: ReplyPayload) => {
+  const enqueue = (
+    kind: ReplyDispatchKind,
+    payload: ReplyPayload,
+    context?: ReplyDeliveryContext,
+  ) => {
+    // Queue the captured identity, never a mutable reference to a later task.
+    const boundary = context?.taskBoundary;
+    const deliveryContext: ReplyDeliveryContext | undefined = boundary
+      ? {
+          taskBoundary: {
+            sessionFile: boundary.sessionFile,
+            binding: {
+              ...boundary.binding,
+              ...(boundary.binding.constraints
+                ? { constraints: [...boundary.binding.constraints] }
+                : {}),
+            },
+            constraints: [...boundary.constraints],
+          },
+        }
+      : undefined;
     const normalized = normalizeReplyPayloadInternal(payload, {
       responsePrefix: options.responsePrefix,
       responsePrefixContext: options.responsePrefixContext,
@@ -175,7 +199,13 @@ export function createReplyDispatcher(options: ReplyDispatcherOptions): ReplyDis
         }
         // Safe: deliver is called inside an async .then() callback, so even a synchronous
         // throw becomes a rejection that flows through .catch()/.finally(), ensuring cleanup.
-        await options.deliver(normalized, { kind });
+        if (deliveryContext?.taskBoundary) {
+          const refusal = checkTaskActionBoundary(deliveryContext.taskBoundary);
+          if (refusal) {
+            throw new Error(refusal);
+          }
+        }
+        await options.deliver(normalized, { kind, ...deliveryContext });
         const outcome: ReplyDeliveryOutcome = { kind, ok: true };
         deliveryOutcomes.push(outcome);
         try {
@@ -234,9 +264,9 @@ export function createReplyDispatcher(options: ReplyDispatcherOptions): ReplyDis
   };
 
   return {
-    sendToolResult: (payload) => enqueue("tool", payload),
-    sendBlockReply: (payload) => enqueue("block", payload),
-    sendFinalReply: (payload) => enqueue("final", payload),
+    sendToolResult: (payload, context) => enqueue("tool", payload, context),
+    sendBlockReply: (payload, context) => enqueue("block", payload, context),
+    sendFinalReply: (payload, context) => enqueue("final", payload, context),
     waitForIdle: () => sendChain,
     getQueuedCounts: () => ({ ...queuedCounts }),
     markComplete,

@@ -1,3 +1,4 @@
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
 /**
  * Provider-agnostic reply router.
  *
@@ -6,7 +7,6 @@
  * provider where the message originated, even when the main session is shared
  * across multiple providers.
  */
-
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { resolveEffectiveMessagesConfig } from "../../agents/identity.js";
 import { normalizeChannelId } from "../../channels/plugins/index.js";
@@ -38,6 +38,8 @@ export type RouteReplyParams = {
   sessionKey?: string;
   /** Execution preflight task id for this reply. Omitted ids do not select another task. */
   taskId?: string;
+  /** Host-captured identity; callers must not recapture a newer task for old output. */
+  taskBoundary?: TaskActionBoundary;
   /** Provider account id (multi-account). */
   accountId?: string;
   /** Thread id for replies (Telegram topic id or Matrix thread event id). */
@@ -153,6 +155,7 @@ export async function routeReply(params: RouteReplyParams): Promise<RouteReplyRe
       threadId: resolvedThreadId,
       session: outboundSession,
       taskId: params.taskId,
+      taskBoundary: params.taskBoundary,
       abortSignal,
       mirror:
         params.mirror !== false && params.sessionKey

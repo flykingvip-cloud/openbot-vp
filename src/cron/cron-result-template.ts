@@ -194,6 +194,8 @@ export function formatCronResultSurfaceMessage(params: {
 export function formatCronParkedNoticeMessage(params: {
   jobName: string;
   jobId: string;
+  /** Notification only; no personal task was parked. */
+  presentationOnly?: boolean;
   reason: "park" | "reject_park_full";
   droppedTaskId?: string;
   droppedTitle?: string;
@@ -209,11 +211,13 @@ export function formatCronParkedNoticeMessage(params: {
     droppedTitle: params.droppedTitle,
     droppedPaths: params.droppedPaths,
   });
-  const detail = dropped
-    ? `当前对话还在做别的事。结果已挂起，没有打断正在进行的工作。${dropped}`
-    : params.reason === "reject_park_full"
-      ? "当前对话正忙，且挂起已满。结果没有打进正在进行的工作。"
-      : "当前对话还在做别的事。结果已挂起，没有打断正在进行的工作。";
+  const detail = params.presentationOnly
+    ? "当前对话还在进行。本条仅提示定时运行已结束，未新增或调整个人待办。"
+    : dropped
+      ? `当前对话还在做别的事。结果已挂起，没有打断正在进行的工作。${dropped}`
+      : params.reason === "reject_park_full"
+        ? "当前对话正忙，且挂起已满。结果没有打进正在进行的工作。"
+        : "当前对话还在做别的事。结果已挂起，没有打断正在进行的工作。";
   return [
     `**${CRON_RESULT_TITLE_MARKER}** · ${title}`,
     "",

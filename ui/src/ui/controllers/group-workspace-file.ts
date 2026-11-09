@@ -4,6 +4,7 @@ import type { GatewayBrowserClient } from "../gateway.ts";
 
 /** Payload returned by the `workbench.group-file.read` gateway RPC. */
 export type GroupWorkspaceFilePayload = {
+  contentHash?: string;
   groupId: string;
   relativePath: string;
   filename: string;
@@ -170,6 +171,7 @@ export async function patchGroupWorkspacePptx(
   groupId: string,
   filename: string,
   slides: OfficeSlideText[],
+  expectedContentHash?: string,
 ): Promise<GroupWorkspaceFilePayload | null> {
   const trimmedGroupId = groupId.trim();
   const relativePath = resolveGroupWorkspaceReadPath(filename);
@@ -181,6 +183,7 @@ export async function patchGroupWorkspacePptx(
       groupId: trimmedGroupId,
       filename: relativePath,
       slides,
+      expectedContentHash,
     });
     if (!res || typeof res.filename !== "string") {
       return null;
@@ -189,7 +192,10 @@ export async function patchGroupWorkspacePptx(
       ...res,
       relativePath: res.relativePath || relativePath,
     };
-  } catch {
+  } catch (error) {
+    if (String(error).includes("ARTIFACT_VERSION_CONFLICT")) {
+      throw error;
+    }
     return null;
   }
 }

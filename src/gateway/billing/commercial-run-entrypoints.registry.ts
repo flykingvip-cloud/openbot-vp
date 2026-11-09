@@ -32,17 +32,19 @@ export const COMMERCIAL_RUN_ENTRYPOINTS: readonly CommercialRunEntrypoint[] = [
     id: "agent_run_embedded",
     label: "Agent Run (embedded Pi)",
     paths: [
-      "src/auto-reply/reply/agent-runner-execution.ts",
+      "src/agent-runtime/execution/runner/admitted-turn.ts",
       "src/auto-reply/reply/followup-runner.ts",
     ],
-    requiredGateSymbols: ["tryAcquireEnterpriseAgentRun"],
+    gateOwnerPaths: ["src/agent-runtime/model/authorized-session.ts"],
+    requiredGateSymbols: ["createAuthorizedModelSession", "tryAcquireEnterpriseAgentRun"],
   },
   {
     id: "chat_reply_pipeline",
     label: "Chat / message reply pipeline",
     paths: ["src/auto-reply/reply/get-reply-run.ts", "src/auto-reply/reply/agent-runner.ts"],
-    requiredGateSymbols: ["runReplyAgent", "runAgentTurnWithFallback"],
-    notes: "Chat ingress delegates to agent-runner-execution commercial gate.",
+    requiredGateSymbols: ["runReplyAgent", "runAdmittedTurn"],
+    notes:
+      "Chat ingress delegates to the admitted-turn execution API and mandatory host admission port.",
   },
   {
     id: "gateway_agent_api",
@@ -55,13 +57,15 @@ export const COMMERCIAL_RUN_ENTRYPOINTS: readonly CommercialRunEntrypoint[] = [
     id: "cron_isolated_agent",
     label: "Cron / Automation isolated agent",
     paths: ["src/cron/isolated-agent/run.ts"],
-    requiredGateSymbols: ["tryAcquireEnterpriseAgentRun"],
+    gateOwnerPaths: ["src/agent-runtime/model/authorized-session.ts"],
+    requiredGateSymbols: ["createAuthorizedModelSession", "tryAcquireEnterpriseAgentRun"],
   },
   {
     id: "resources_high_tier",
     label: "Resources API high-tier gate",
     paths: ["src/gateway/server-methods/resources.ts"],
-    requiredGateSymbols: ["authorizeCommercialRun"],
+    gateOwnerPaths: ["src/gateway/billing/billable-bot.ts"],
+    requiredGateSymbols: ["authorizeBillableBotCreate", "authorizeCommercialRun"],
   },
   {
     id: "supervisor_gateway_worker",
@@ -78,7 +82,7 @@ export const COMMERCIAL_RUN_ENTRYPOINTS: readonly CommercialRunEntrypoint[] = [
   {
     id: "cli_agent_command",
     label: "CLI agent command",
-    paths: ["src/commands/agent.ts", "src/commands/agent/commercial-run-gate.ts"],
+    paths: ["src/commands/agent.ts", "src/agent-runtime/model/command-commercial-gate.ts"],
     requiredGateSymbols: ["acquireAgentCommandCommercialRun", "tryAcquireEnterpriseAgentRun"],
   },
   {

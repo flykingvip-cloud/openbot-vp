@@ -1,10 +1,10 @@
-import fs from "node:fs/promises";
-import { observeAcpCliSteerPreflight } from "../acp/cli-steer-preflight-observe.js";
+import type { CommandDeliveryReceipt } from "../agent-runtime/contracts/delivery.js";
+import { persistAcpTurnTranscript } from "../agent-runtime/state/index.js";
+import { persistCommandSessionEntry as persistSessionEntry } from "../agent-runtime/state/index.js";
+import { assertControlledExecutionStages, createCommandOutcomeCloseout, createCommandBudget, runCommandCandidate, createCommandExecutionLifecycle, runCommandAcpTurn, type EmbeddedPiRunResult } from "../agent-runtime/execution/index.js";
+import { settleCommandBudgetForCloseout } from "../agent-runtime/execution/index.js";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
-import { resolveAcpAgentPolicyError, resolveAcpDispatchPolicyError } from "../acp/policy.js";
-import { toAcpRuntimeError } from "../acp/runtime/errors.js";
 import { resolveAcpSessionCwd } from "../acp/runtime/session-identifiers.js";
-import { openSessionManager } from "../agents/pi-sdk/session.js";
 import { LEGACY_INTERNAL_EVENT_CONTEXT_PREFIXES } from "../compat/legacy-names.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 
@@ -19,36 +19,22 @@ import {
 } from "../agents/agent-scope.js";
 import { ensureAuthProfileStore } from "../agents/auth-profiles.js";
 import { clearSessionAuthProfileOverride } from "../agents/auth-profiles/session-override.js";
-import { resolveBootstrapWarningSignaturesSeen } from "../agents/bootstrap-budget.js";
-import { resolveCredentialForRun } from "../agents/cli-backend-credential-resolve.js";
-import { recordCliBackendUsage } from "../agents/cli-backend-usage-attribution.js";
-import { runCliAgent } from "../agents/cli-runner.js";
-import { getCliSessionId, setCliSessionId } from "../agents/cli-session.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
-import { FailoverError } from "../agents/failover-error.js";
 import { formatAgentInternalEventsForPrompt } from "../agents/internal-events.js";
 import { AGENT_LANE_SUBAGENT } from "../agents/lanes.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
-import { runWithModelFallback } from "../agents/model-fallback.js";
 import {
-  buildRunModelSetSnapshot,
-  forgetRunModelSet,
   recordSubagentModelShadow,
-  rememberRunModelSet,
-  snapshotCreditReportingFromGate,
 } from "../gateway/governance/spawn-snapshot-handoff.js";
 import {
   buildAllowedModelSet,
   isCliProvider,
   modelKey,
   normalizeModelRef,
-  normalizeProviderId,
   resolveConfiguredModelRef,
   resolveDefaultModelForAgent,
   resolveThinkingDefault,
 } from "../agents/model-selection.js";
-import { prepareSessionManagerForRun } from "../agents/pi-embedded-runner/session-manager-init.js";
-import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import { buildWorkspaceSkillSnapshot } from "../agents/skills.js";
 import { getSkillsSnapshotVersion } from "../agents/skills/refresh.js";
 import { normalizeSpawnedRunMetadata } from "../agents/spawned-context.js";
@@ -61,14 +47,9 @@ import {
   normalizeThinkLevel,
   normalizeVerboseLevel,
   supportsXHighThinking,
-  type ThinkLevel,
   type VerboseLevel,
 } from "../auto-reply/thinking.js";
-import {
-  isSilentReplyPrefixText,
-  isSilentReplyText,
-  SILENT_REPLY_TOKEN,
-} from "../auto-reply/tokens.js";
+
 import { formatCliCommand } from "../cli/command-format.js";
 import { resolveCommandSecretRefsViaGateway } from "../cli/command-secret-gateway.js";
 import { getAgentRuntimeCommandSecretTargetIds } from "../cli/command-secret-targets.js";
@@ -79,16 +60,11 @@ import {
   setRuntimeConfigSnapshot,
 } from "../config/config.js";
 import {
-  mergeSessionEntry,
   resolveAgentIdFromSessionKey,
   type SessionEntry,
-  updateSessionStore,
 } from "../config/sessions.js";
 import { resolveSessionTranscriptFile } from "../config/sessions/transcript.js";
-import { resolveEnterpriseEmbeddedTransport } from "../gateway/enterprise-model/embedded-transport.js";
-import { inheritExecutionIdentityRunFields } from "../gateway/execution-identity-context.js";
 import { buildKnowledgeReplyGatewayClient } from "../gateway/knowledge/reply-gateway-client.js";
-import { resolveAgentRunEntitlementScope } from "../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { resolveSessionModelRef } from "../gateway/session-utils.js";
 import {
   resolveAgentDirForClient,
@@ -107,88 +83,24 @@ import { defaultRuntime, type RuntimeEnv } from "../runtime.js";
 import { applyVerboseOverride } from "../sessions/level-overrides.js";
 import { applyModelOverrideToSessionEntry } from "../sessions/model-overrides.js";
 import { resolveSendPolicy } from "../sessions/send-policy.js";
-import { emitSessionTranscriptUpdate } from "../sessions/transcript-events.js";
 import { resolveMessageChannel } from "../utils/message-channel.js";
 import {
-  acquireAgentCommandCommercialRun,
   type AgentCommandCommercialGateResult,
-  releaseAgentCommandCommercialRun,
-} from "./agent/commercial-run-gate.js";
-import { resolveExecutionRoutingFromCapabilityPlan } from "../gateway/model-entitlement/task-capability-plan.js";
+} from "../agent-runtime/model/index.js";
 import { recordAgentCommandCreditUsage } from "./agent/credit-usage.js";
-import { deliverAgentCommandResult } from "./agent/delivery.js";
+import { deliverAgentCommandResult } from "../agent-runtime/delivery/index.js";
 import {
-  ensureCliTurnTaskOutcome,
-  ensureGatewayAgentTurnTaskOutcome,
-  ensureSubagentTurnTaskOutcome,
-} from "../task-outcome/entrypoint-ensure.js";
-import {
-  assertRunnerTurnBudgetAllowsModelCall,
-  chargeModelCallAgainstTip,
   estimateTipBudgetCostUsdFromUsage,
-  recordRunnerTurnOutcome,
+  runnerExecutorEvidenceContext,
   TaskBudgetExceededError,
   type RunnerTurnFailureReason,
 } from "../task-outcome/runtime-from-runner.js";
-import type { Entrypoint, TrustedScope } from "../task-outcome/types.js";
-import { resolveAgentCommandModelGovernance } from "./agent/model-governance.js";
+import { openCommandOutcomeEntry } from "../agent-runtime/command/index.js";
 import { resolveAgentRunContext } from "./agent/run-context.js";
 import { updateSessionStoreAfterAgentRun } from "./agent/session-store.js";
 import { resolveSession } from "./agent/session.js";
 import { recordSubagentRunUsage } from "./agent/subagent-credit-usage.js";
 import type { AgentCommandIngressOpts, AgentCommandOpts } from "./agent/types.js";
-
-type PersistSessionEntryParams = {
-  sessionStore: Record<string, SessionEntry>;
-  sessionKey: string;
-  storePath: string;
-  entry: SessionEntry;
-};
-
-type OverrideFieldClearedByDelete =
-  | "providerOverride"
-  | "modelOverride"
-  | "authProfileOverride"
-  | "authProfileOverrideSource"
-  | "authProfileOverrideCompactionCount"
-  | "fallbackNoticeSelectedModel"
-  | "fallbackNoticeActiveModel"
-  | "fallbackNoticeReason"
-  | "claudeCliSessionId";
-
-const OVERRIDE_FIELDS_CLEARED_BY_DELETE: OverrideFieldClearedByDelete[] = [
-  "providerOverride",
-  "modelOverride",
-  "authProfileOverride",
-  "authProfileOverrideSource",
-  "authProfileOverrideCompactionCount",
-  "fallbackNoticeSelectedModel",
-  "fallbackNoticeActiveModel",
-  "fallbackNoticeReason",
-  "claudeCliSessionId",
-];
-
-async function persistSessionEntry(params: PersistSessionEntryParams): Promise<void> {
-  const persisted = await updateSessionStore(params.storePath, (store) => {
-    const merged = mergeSessionEntry(store[params.sessionKey], params.entry);
-    // Preserve explicit `delete` clears done by session override helpers.
-    for (const field of OVERRIDE_FIELDS_CLEARED_BY_DELETE) {
-      if (!Object.hasOwn(params.entry, field)) {
-        Reflect.deleteProperty(merged, field);
-      }
-    }
-    store[params.sessionKey] = merged;
-    return merged;
-  });
-  params.sessionStore[params.sessionKey] = persisted;
-}
-
-function resolveFallbackRetryPrompt(params: { body: string; isFallbackRetry: boolean }): string {
-  if (!params.isFallbackRetry) {
-    return params.body;
-  }
-  return "Continue where you left off. The previous model attempt failed or timed out.";
-}
 
 function prependInternalEventContext(
   body: string,
@@ -205,419 +117,6 @@ function prependInternalEventContext(
     return body;
   }
   return [renderedEvents, body].filter(Boolean).join("\n\n");
-}
-
-function createAcpVisibleTextAccumulator() {
-  let pendingSilentPrefix = "";
-  let visibleText = "";
-  const startsWithWordChar = (chunk: string): boolean => /^[\p{L}\p{N}]/u.test(chunk);
-
-  const resolveNextCandidate = (base: string, chunk: string): string => {
-    if (!base) {
-      return chunk;
-    }
-    if (
-      isSilentReplyText(base, SILENT_REPLY_TOKEN) &&
-      !chunk.startsWith(base) &&
-      startsWithWordChar(chunk)
-    ) {
-      return chunk;
-    }
-    // Some ACP backends emit cumulative snapshots even on text_delta-style hooks.
-    // Accept those only when they strictly extend the buffered text.
-    if (chunk.startsWith(base) && chunk.length > base.length) {
-      return chunk;
-    }
-    return `${base}${chunk}`;
-  };
-
-  const mergeVisibleChunk = (base: string, chunk: string): { text: string; delta: string } => {
-    if (!base) {
-      return { text: chunk, delta: chunk };
-    }
-    if (chunk.startsWith(base) && chunk.length > base.length) {
-      const delta = chunk.slice(base.length);
-      return { text: chunk, delta };
-    }
-    return {
-      text: `${base}${chunk}`,
-      delta: chunk,
-    };
-  };
-
-  return {
-    consume(chunk: string): { text: string; delta: string } | null {
-      if (!chunk) {
-        return null;
-      }
-
-      if (!visibleText) {
-        const leadCandidate = resolveNextCandidate(pendingSilentPrefix, chunk);
-        const trimmedLeadCandidate = leadCandidate.trim();
-        if (
-          isSilentReplyText(trimmedLeadCandidate, SILENT_REPLY_TOKEN) ||
-          isSilentReplyPrefixText(trimmedLeadCandidate, SILENT_REPLY_TOKEN)
-        ) {
-          pendingSilentPrefix = leadCandidate;
-          return null;
-        }
-        if (pendingSilentPrefix) {
-          pendingSilentPrefix = "";
-          visibleText = leadCandidate;
-          return {
-            text: visibleText,
-            delta: leadCandidate,
-          };
-        }
-      }
-
-      const nextVisible = mergeVisibleChunk(visibleText, chunk);
-      visibleText = nextVisible.text;
-      return nextVisible.delta ? nextVisible : null;
-    },
-    finalize(): string {
-      return visibleText.trim();
-    },
-    finalizeRaw(): string {
-      return visibleText;
-    },
-  };
-}
-
-const ACP_TRANSCRIPT_USAGE = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  totalTokens: 0,
-  cost: {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    total: 0,
-  },
-} as const;
-
-async function persistAcpTurnTranscript(params: {
-  body: string;
-  finalText: string;
-  sessionId: string;
-  sessionKey: string;
-  sessionEntry: SessionEntry | undefined;
-  sessionStore?: Record<string, SessionEntry>;
-  storePath?: string;
-  sessionAgentId: string;
-  threadId?: string | number;
-  sessionCwd: string;
-}): Promise<SessionEntry | undefined> {
-  const promptText = params.body;
-  const replyText = params.finalText;
-  if (!promptText && !replyText) {
-    return params.sessionEntry;
-  }
-
-  const { sessionFile, sessionEntry } = await resolveSessionTranscriptFile({
-    sessionId: params.sessionId,
-    sessionKey: params.sessionKey,
-    sessionEntry: params.sessionEntry,
-    sessionStore: params.sessionStore,
-    storePath: params.storePath,
-    agentId: params.sessionAgentId,
-    threadId: params.threadId,
-  });
-  const hadSessionFile = await fs
-    .access(sessionFile)
-    .then(() => true)
-    .catch(() => false);
-  const sessionManager = openSessionManager(sessionFile);
-  await prepareSessionManagerForRun({
-    sessionManager,
-    sessionFile,
-    hadSessionFile,
-    sessionId: params.sessionId,
-    cwd: params.sessionCwd,
-  });
-
-  if (promptText) {
-    sessionManager.appendMessage({
-      role: "user",
-      content: promptText,
-      timestamp: Date.now(),
-    });
-  }
-
-  if (replyText) {
-    sessionManager.appendMessage({
-      role: "assistant",
-      content: [{ type: "text", text: replyText }],
-      api: "openai-responses",
-      provider: "openclaw",
-      model: "acp-runtime",
-      usage: ACP_TRANSCRIPT_USAGE,
-      stopReason: "stop",
-      timestamp: Date.now(),
-    });
-  }
-
-  emitSessionTranscriptUpdate(sessionFile);
-  return sessionEntry;
-}
-
-function runAgentAttempt(params: {
-  providerOverride: string;
-  modelOverride: string;
-  cfg: ReturnType<typeof loadConfig>;
-  sessionEntry: SessionEntry | undefined;
-  sessionId: string;
-  sessionKey: string | undefined;
-  sessionAgentId: string;
-  sessionFile: string;
-  workspaceDir: string;
-  body: string;
-  isFallbackRetry: boolean;
-  resolvedThinkLevel: ThinkLevel;
-  timeoutMs: number;
-  runId: string;
-  opts: AgentCommandOpts & { senderIsOwner: boolean };
-  runContext: ReturnType<typeof resolveAgentRunContext>;
-  spawnedBy: string | undefined;
-  messageChannel: ReturnType<typeof resolveMessageChannel>;
-  skillsSnapshot: ReturnType<typeof buildWorkspaceSkillSnapshot> | undefined;
-  resolvedVerboseLevel: VerboseLevel | undefined;
-  agentDir: string;
-  onAgentEvent: (evt: { stream: string; data?: Record<string, unknown> }) => void;
-  primaryProvider: string;
-  sessionStore?: Record<string, SessionEntry>;
-  storePath?: string;
-  allowTransientCooldownProbe?: boolean;
-}) {
-  const effectivePrompt = resolveFallbackRetryPrompt({
-    body: params.body,
-    isFallbackRetry: params.isFallbackRetry,
-  });
-  const bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
-    params.sessionEntry?.systemPromptReport,
-  );
-  const bootstrapPromptWarningSignature =
-    bootstrapPromptWarningSignaturesSeen[bootstrapPromptWarningSignaturesSeen.length - 1];
-  if (isCliProvider(params.providerOverride, params.cfg)) {
-    return (async () => {
-      const cliSessionId = getCliSessionId(params.sessionEntry, params.providerOverride);
-      // CLI 后端凭证桥（Task 6/9）：本地 `openclaw agent` 运行同样按 bot 归属席位解析企业
-      // 作用域，注入个人/企业凭证并在完成后写 UsageAttribution。fail-safe → 回退主机默认 env。
-      let credentialEnv: Record<string, string> | undefined;
-      let usageAttr: { tenantId: string; userId: string; credentialId: string } | undefined;
-      try {
-        const credScope = await resolveAgentRunEntitlementScope({
-          agentId: params.sessionAgentId,
-        });
-        if (credScope) {
-          const resolved = await resolveCredentialForRun({
-            backendId: params.providerOverride,
-            model: params.modelOverride,
-            scope: {
-              tenantId: credScope.tenantId,
-              subjectId: credScope.employeeId ?? credScope.seatId,
-            },
-            config: params.cfg,
-          });
-          if (resolved) {
-            credentialEnv = resolved.env;
-            usageAttr = {
-              tenantId: credScope.tenantId,
-              userId: credScope.employeeId ?? credScope.seatId ?? "",
-              credentialId: resolved.credentialId,
-            };
-          }
-        }
-      } catch {
-        credentialEnv = undefined;
-        usageAttr = undefined;
-      }
-      const runCliWithSession = (nextCliSessionId: string | undefined) =>
-        runCliAgent({
-          sessionId: params.sessionId,
-          sessionKey: params.sessionKey,
-          agentId: params.sessionAgentId,
-          sessionFile: params.sessionFile,
-          workspaceDir: params.workspaceDir,
-          config: params.cfg,
-          prompt: effectivePrompt,
-          provider: params.providerOverride,
-          model: params.modelOverride,
-          thinkLevel: params.resolvedThinkLevel,
-          timeoutMs: params.timeoutMs,
-          runId: params.runId,
-          extraSystemPrompt: params.opts.extraSystemPrompt,
-          cliSessionId: nextCliSessionId,
-          bootstrapPromptWarningSignaturesSeen,
-          bootstrapPromptWarningSignature,
-          images: params.isFallbackRetry ? undefined : params.opts.images,
-          streamParams: params.opts.streamParams,
-          ...(credentialEnv ? { credentialEnv } : {}),
-        });
-      return runCliWithSession(cliSessionId)
-        .catch(async (err) => {
-          // Handle CLI session expired error
-          if (
-            err instanceof FailoverError &&
-            err.reason === "session_expired" &&
-            cliSessionId &&
-            params.sessionKey &&
-            params.sessionStore &&
-            params.storePath
-          ) {
-            log.warn(
-              `CLI session expired, clearing from session store: provider=${params.providerOverride} sessionKey=${params.sessionKey}`,
-            );
-
-            // Clear the expired session ID from the session store
-            const entry = params.sessionStore[params.sessionKey];
-            if (entry) {
-              const updatedEntry = { ...entry };
-              if (params.providerOverride === "claude-cli") {
-                delete updatedEntry.claudeCliSessionId;
-              }
-              if (updatedEntry.cliSessionIds) {
-                const normalizedProvider = normalizeProviderId(params.providerOverride);
-                const newCliSessionIds = { ...updatedEntry.cliSessionIds };
-                delete newCliSessionIds[normalizedProvider];
-                updatedEntry.cliSessionIds = newCliSessionIds;
-              }
-              updatedEntry.updatedAt = Date.now();
-
-              await persistSessionEntry({
-                sessionStore: params.sessionStore,
-                sessionKey: params.sessionKey,
-                storePath: params.storePath,
-                entry: updatedEntry,
-              });
-
-              // Update the session entry reference
-              params.sessionEntry = updatedEntry;
-            }
-
-            // Retry with no session ID (will create a new session)
-            return runCliWithSession(undefined).then(async (result) => {
-              // Update session store with new CLI session ID if available
-              if (
-                result.meta.agentMeta?.sessionId &&
-                params.sessionKey &&
-                params.sessionStore &&
-                params.storePath
-              ) {
-                const entry = params.sessionStore[params.sessionKey];
-                if (entry) {
-                  const updatedEntry = { ...entry };
-                  setCliSessionId(
-                    updatedEntry,
-                    params.providerOverride,
-                    result.meta.agentMeta.sessionId,
-                  );
-                  updatedEntry.updatedAt = Date.now();
-
-                  await persistSessionEntry({
-                    sessionStore: params.sessionStore,
-                    sessionKey: params.sessionKey,
-                    storePath: params.storePath,
-                    entry: updatedEntry,
-                  });
-                }
-              }
-              return result;
-            });
-          }
-          throw err;
-        })
-        .then((result) => {
-          // UsageAttribution（Task 9）：成功完成（首次或会话过期重试后）写一次归因。
-          if (usageAttr) {
-            void recordCliBackendUsage({
-              tenantId: usageAttr.tenantId,
-              userId: usageAttr.userId,
-              backendId: params.providerOverride,
-              credentialId: usageAttr.credentialId,
-              model: params.modelOverride,
-              executionId: params.runId,
-            });
-          }
-          return result;
-        });
-    })();
-  }
-
-  const authProfileId =
-    params.providerOverride === params.primaryProvider
-      ? params.sessionEntry?.authProfileOverride
-      : undefined;
-  // Remap ent/* → upstream provider + SecretRef before the embedded runner
-  // (which only understands catalog/provider models).
-  return (async () => {
-    const transport = await resolveEnterpriseEmbeddedTransport({
-      provider: params.providerOverride,
-      model: params.modelOverride,
-      tenantId: params.opts.gatewayClientSessionTenantId,
-      resolveTenantId: async () => {
-        const scope = await resolveAgentRunEntitlementScope({
-          agentId: params.sessionAgentId,
-        });
-        return scope?.tenantId;
-      },
-    });
-    const embeddedProvider = transport.provider;
-    const embeddedModel = transport.model;
-    const providerAuthOverride = transport.providerAuthOverride;
-    const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
-    return runEmbeddedPiAgent({
-      sessionId: params.sessionId,
-      sessionKey: params.sessionKey,
-      agentId: params.sessionAgentId,
-      trigger: "user",
-      messageChannel: params.messageChannel,
-      agentAccountId: params.runContext.accountId,
-      messageTo: params.opts.replyTo ?? params.opts.to,
-      messageThreadId: params.opts.threadId,
-      groupId: params.runContext.groupId,
-      groupChannel: params.runContext.groupChannel,
-      groupSpace: params.runContext.groupSpace,
-      spawnedBy: params.spawnedBy,
-      currentChannelId: params.runContext.currentChannelId,
-      currentThreadTs: params.runContext.currentThreadTs,
-      replyToMode: params.runContext.replyToMode,
-      hasRepliedRef: params.runContext.hasRepliedRef,
-      senderIsOwner: params.opts.senderIsOwner,
-      sessionFile: params.sessionFile,
-      workspaceDir: params.workspaceDir,
-      config: params.cfg,
-      skillsSnapshot: params.skillsSnapshot,
-      prompt: effectivePrompt,
-      images: params.isFallbackRetry ? undefined : params.opts.images,
-      clientTools: params.opts.clientTools,
-      provider: embeddedProvider,
-      model: embeddedModel,
-      ...(providerAuthOverride ? { providerAuthOverride } : {}),
-      ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
-      authProfileId,
-      authProfileIdSource: authProfileId
-        ? params.sessionEntry?.authProfileOverrideSource
-        : undefined,
-      thinkLevel: params.resolvedThinkLevel,
-      verboseLevel: params.resolvedVerboseLevel,
-      timeoutMs: params.timeoutMs,
-      runId: params.runId,
-      lane: params.opts.lane,
-      abortSignal: params.opts.abortSignal,
-      extraSystemPrompt: params.opts.extraSystemPrompt,
-      inputProvenance: params.opts.inputProvenance,
-      streamParams: params.opts.streamParams,
-      agentDir: params.agentDir,
-      allowTransientCooldownProbe: params.allowTransientCooldownProbe,
-      onAgentEvent: params.onAgentEvent,
-      bootstrapPromptWarningSignaturesSeen,
-      bootstrapPromptWarningSignature, ...inheritExecutionIdentityRunFields(params.opts),
-    });
-  })();
 }
 
 async function prepareAgentCommandExecution(
@@ -865,110 +364,35 @@ async function agentCommandInternal(
   let sessionEntry = prepared.sessionEntry;
   const laneRaw = typeof opts.lane === "string" ? opts.lane.trim() : "";
   const isSubagentLane = laneRaw === String(AGENT_LANE_SUBAGENT);
-  let commercialRunSlotHeld = false;
+  // Command scene adapter: commercial admission + E2/E3/E6 ports stay on the
+  // authority adapter; stage order comes only from the controlled use-case.
+  const controlledExecution = createCommandExecutionLifecycle({runId, isSubagentLane, identity: opts.executionIdentity, entry: opts.governanceEntry});
+  assertControlledExecutionStages(controlledExecution, "Command host");
   // Subagent runs take their own commercial slot (quota + concurrency).
   // Model allowlists for the child still come from the parent snapshot.
   let commercialGate: AgentCommandCommercialGateResult | undefined;
 
   // askOutcome: CLI / gateway_agent / subagent share one tip closeout.
   // Subagent persists entrypoint "subagent" (not cli/gateway) and links parentTaskId when known.
-  const agentOutcomeEntrypoint: Entrypoint = isSubagentLane
-    ? "subagent"
-    : opts.governanceEntry === "E2"
-      ? "gateway_agent"
-      : "cli";
-  let agentOutcomeTaskId: string | undefined;
-  let agentOutcomeScope: TrustedScope | undefined;
-  let agentOutcomeCloseoutDone = false;
   /** Real usage-derived USD for tip budget closeout when mid-run charge did not run. */
   let tipBudgetCostUsd: number | undefined;
   let tipBudgetChargedThisTurn = false;
-  let tipBudgetCallSeq = 0;
+  let commandDeliveryReceipt: CommandDeliveryReceipt | undefined;
   let agentOutcomeSuccess: boolean | undefined;
   let agentOutcomeFailureReason: RunnerTurnFailureReason | undefined;
   let agentOutcomeFailureDetail: string | undefined;
   const agentOutcomeStartedAt = Date.now();
-  if (agentOutcomeEntrypoint) {
-    const subjectRaw = (
-      opts.gatewayClientPlatformUserId ??
-      opts.gatewayClientUser ??
-      (agentOutcomeEntrypoint === "cli" ? "cli-operator" : "gateway-agent")
-    )
-      .toString()
-      .trim();
-    const subjectRef =
-      subjectRaw.startsWith("platform-user:") || subjectRaw.includes(":")
-        ? subjectRaw
-        : `subject:${subjectRaw}`;
-    const tenantId =
-      opts.gatewayClientSessionTenantId?.trim() ||
-      opts.executionIdentity?.enterpriseId?.trim() ||
-      undefined;
-    const opened =
-      agentOutcomeEntrypoint === "subagent"
-        ? ensureSubagentTurnTaskOutcome(cfg, {
-            agentId: sessionAgentId,
-            runId,
-            subjectRef,
-            ...(tenantId ? { tenantId } : {}),
-            ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
-          })
-        : agentOutcomeEntrypoint === "cli"
-          ? ensureCliTurnTaskOutcome(cfg, {
-              agentId: sessionAgentId,
-              runId,
-              subjectRef,
-              ...(tenantId ? { tenantId } : {}),
-            })
-          : ensureGatewayAgentTurnTaskOutcome(cfg, {
-              agentId: sessionAgentId,
-              runId,
-              subjectRef,
-              ...(tenantId ? { tenantId } : {}),
-            });
-    if (opened.ok) {
-      agentOutcomeTaskId = opened.taskId;
-      agentOutcomeScope = opened.scope;
-    }
-  }
+  const { entrypoint: agentOutcomeEntrypoint, taskId: agentOutcomeTaskId, scope: agentOutcomeScope } = openCommandOutcomeEntry({
+    config: cfg, agentId: sessionAgentId, runId, isSubagentLane, governanceEntry: opts.governanceEntry,
+    platformUserId: opts.gatewayClientPlatformUserId, gatewayUser: opts.gatewayClientUser,
+    sessionTenantId: opts.gatewayClientSessionTenantId, executionEnterpriseId: opts.executionIdentity?.enterpriseId, parentTaskId: opts.parentTaskId,
+  });
 
-  const submitAgentOutcomeCloseout = async () => {
-    if (agentOutcomeCloseoutDone || !agentOutcomeEntrypoint) {
-      return;
-    }
-    if (!agentOutcomeTaskId || !agentOutcomeScope) {
-      return;
-    }
-    if (agentOutcomeSuccess === undefined && agentOutcomeFailureReason === undefined) {
-      return;
-    }
-    agentOutcomeCloseoutDone = true;
-    const success = agentOutcomeSuccess === true;
-    try {
-      await recordRunnerTurnOutcome(cfg, sessionAgentId, {
-        success,
-        runId,
-        taskId: agentOutcomeTaskId,
-        scope: agentOutcomeScope,
-        entrypoint: agentOutcomeEntrypoint,
-        latencyMs: Math.max(0, Date.now() - agentOutcomeStartedAt),
-        ...(tipBudgetChargedThisTurn ? { skipBudgetCharge: true } : {}),
-        ...(!tipBudgetChargedThisTurn && tipBudgetCostUsd != null
-          ? { costUsd: tipBudgetCostUsd }
-          : {}),
-        ...(success
-          ? {}
-          : {
-              failureReason: agentOutcomeFailureReason ?? ("run_failed" as const),
-              ...(agentOutcomeFailureDetail ? { failureDetail: agentOutcomeFailureDetail } : {}),
-            }),
-      });
-    } catch (err) {
-      console.error(
-        `[agent] unified recordRunnerTurnOutcome failed for ${agentOutcomeEntrypoint}: ${String(err)}`,
-      );
-    }
-  };
+  const commandBudget = createCommandBudget({ config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, taskId: agentOutcomeTaskId, scope: agentOutcomeScope, parentTaskId: opts.parentTaskId, parentAgentId: opts.parentAgentId });
+  const submitAgentOutcomeCloseout = createCommandOutcomeCloseout({
+    config: cfg, agentId: sessionAgentId, runId, startedAtMs: agentOutcomeStartedAt, entrypoint: agentOutcomeEntrypoint,
+    readContext: () => ({taskId: agentOutcomeTaskId, scope: agentOutcomeScope, success: agentOutcomeSuccess, failureReason: agentOutcomeFailureReason, failureDetail: agentOutcomeFailureDetail, budgetCharged: tipBudgetChargedThisTurn, chargeState: commandBudget.chargeState, budgetChargeReasons: commandBudget.chargeReasons, costUsd: tipBudgetCostUsd, deliveryReceipt: commandDeliveryReceipt, modelCallLinks: commandBudget.modelCallLinks}),
+  });
 
   try {
     if (opts.deliver === true) {
@@ -987,157 +411,32 @@ async function agentCommandInternal(
       }
     }
 
-    commercialGate = await acquireAgentCommandCommercialRun({
+    const executionPreparation = await controlledExecution.prepare({ signal: opts.abortSignal, authorization: {
       runId,
       sessionAgentId,
       gatewayClientUser: opts.gatewayClientUser,
       enterpriseId: opts.gatewayClientSessionTenantId,
       taskText: opts.message ?? body,
       ...(isSubagentLane ? { entry: "E6" as const } : opts.governanceEntry ? { entry: opts.governanceEntry } : {}),
-    });
-    if (commercialGate.status === "denied") {
+    } });
+    if (executionPreparation.kind === "denied") {
+      commercialGate = executionPreparation.authorization;
       agentOutcomeSuccess = false;
       agentOutcomeFailureReason = "authz_denied";
-      agentOutcomeFailureDetail = commercialGate.message;
-      throw new Error(commercialGate.message);
+      agentOutcomeFailureDetail = executionPreparation.message;
+      // Denied preparation must not reach ACP/candidate backends.
+      throw new Error(executionPreparation.message);
     }
-    let commandExecutionRouting:
-      | ReturnType<typeof resolveExecutionRoutingFromCapabilityPlan>
-      | undefined;
-    if (commercialGate.status === "acquired") {
-      commercialRunSlotHeld = true;
-      if (!isSubagentLane) {
-        const modelGovernance = resolveAgentCommandModelGovernance(
-          commercialGate,
-          process.env,
-          opts.executionIdentity,
-        );
-        commandExecutionRouting = resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGovernance.entitlementAllowlist,
-          preferredModelOrder: commercialGate.modelGate?.preferredModelOrder,
-          capabilityPlan: commercialGate.modelGate?.capabilityPlan,
-        });
-        const parentSnapshot = buildRunModelSetSnapshot({
-          runId,
-          allowlist: commandExecutionRouting.allowlist,
-          governanceMode: modelGovernance.governanceMode,
-          commercialAuthorizationId: modelGovernance.governanceContext?.commercialAuthorizationId,
-          tenantId: modelGovernance.governanceContext?.tenantId,
-          actorId: modelGovernance.governanceContext?.actorId,
-          preferredModelOrder: commandExecutionRouting.preferredModelOrder,
-          // P4-1: parent billing context for child runs (this branch: gate acquired).
-          creditReporting: snapshotCreditReportingFromGate(commercialGate),
-        });
-        if (parentSnapshot) {
-          rememberRunModelSet(runId, parentSnapshot);
-        }
-      }
-    }
-
+    commercialGate = executionPreparation.authorization;
     if (acpResolution?.kind === "stale") {
       throw acpResolution.error;
     }
 
     if (acpResolution?.kind === "ready" && sessionKey) {
-      const startedAt = Date.now();
-      registerAgentRunContext(runId, {
-        sessionKey,
+      const { startedAt, stopReason, finalTextRaw, finalText } = await runCommandAcpTurn({
+        cfg, sessionKey, runId, body, agent: acpResolution.meta.agent,
+        abortSignal: opts.abortSignal, manager: acpManager,
       });
-      emitAgentEvent({
-        runId,
-        stream: "lifecycle",
-        data: {
-          phase: "start",
-          startedAt,
-        },
-      });
-
-      const visibleTextAccumulator = createAcpVisibleTextAccumulator();
-      let stopReason: string | undefined;
-      try {
-        const dispatchPolicyError = resolveAcpDispatchPolicyError(cfg);
-        if (dispatchPolicyError) {
-          throw dispatchPolicyError;
-        }
-        const acpAgent = normalizeAgentId(
-          acpResolution.meta.agent || resolveAgentIdFromSessionKey(sessionKey),
-        );
-        const agentPolicyError = resolveAcpAgentPolicyError(cfg, acpAgent);
-        if (agentPolicyError) {
-          throw agentPolicyError;
-        }
-
-        observeAcpCliSteerPreflight({
-          kind: "cli-turn",
-          cfg,
-          sessionKey,
-          agentId: acpAgent,
-        });
-
-        await acpManager.runTurn({
-          cfg,
-          sessionKey,
-          text: body,
-          mode: "prompt",
-          requestId: runId,
-          signal: opts.abortSignal,
-          onEvent: (event) => {
-            if (event.type === "done") {
-              stopReason = event.stopReason;
-              return;
-            }
-            if (event.type !== "text_delta") {
-              return;
-            }
-            if (event.stream && event.stream !== "output") {
-              return;
-            }
-            if (!event.text) {
-              return;
-            }
-            const visibleUpdate = visibleTextAccumulator.consume(event.text);
-            if (!visibleUpdate) {
-              return;
-            }
-            emitAgentEvent({
-              runId,
-              stream: "assistant",
-              data: {
-                text: visibleUpdate.text,
-                delta: visibleUpdate.delta,
-              },
-            });
-          },
-        });
-      } catch (error) {
-        const acpError = toAcpRuntimeError({
-          error,
-          fallbackCode: "ACP_TURN_FAILED",
-          fallbackMessage: "ACP turn failed before completion.",
-        });
-        emitAgentEvent({
-          runId,
-          stream: "lifecycle",
-          data: {
-            phase: "error",
-            error: acpError.message,
-            endedAt: Date.now(),
-          },
-        });
-        throw acpError;
-      }
-
-      emitAgentEvent({
-        runId,
-        stream: "lifecycle",
-        data: {
-          phase: "end",
-          endedAt: Date.now(),
-        },
-      });
-
-      const finalTextRaw = visibleTextAccumulator.finalizeRaw();
-      const finalText = visibleTextAccumulator.finalize();
       try {
         sessionEntry = await persistAcpTurnTranscript({
           body,
@@ -1172,6 +471,7 @@ async function agentCommandInternal(
 
       agentOutcomeSuccess = true;
     return await deliverAgentCommandResult({
+        receipt: { deliveryId: `delivery:${runId}:command`, record: (receipt) => { commandDeliveryReceipt = receipt; } },
         cfg,
         deps,
         runtime,
@@ -1406,7 +706,7 @@ async function agentCommandInternal(
     const startedAt = Date.now();
     let lifecycleEnded = false;
 
-    let result: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
+    let result: EmbeddedPiRunResult;
     let fallbackProvider = provider;
     let fallbackModel = model;
     try {
@@ -1429,7 +729,6 @@ async function agentCommandInternal(
 
       // Track model fallback attempts so retries on an existing session don't
       // re-inject the original prompt as a duplicate user message.
-      let fallbackAttemptIndex = 0;
       recordSubagentModelShadow({
         isSubagentLane,
         snapshot: opts.spawnGovernanceSnapshot,
@@ -1437,46 +736,23 @@ async function agentCommandInternal(
         model,
         runId,
       });
-      const commandModelGovernance = resolveAgentCommandModelGovernance(
-        isSubagentLane ? undefined : commercialGate,
-        process.env,
-        opts.executionIdentity,
-        opts.governanceEntry,
-      );
-      const fallbackResult = await runWithModelFallback({
+      const fallbackResult = await controlledExecution.infer({
         cfg,
         provider,
         model,
-        runId,
         agentDir,
         fallbacksOverride: effectiveFallbacksOverride,
-        runtimeAdmission: {
-          taskText: opts.message ?? "",
-        },
-        // legacy when the gate skipped (no enterprise scope); otherwise
-        // OPENBOT_GOVERNANCE_AGENT_COMMAND_MODEL_MODE (default shadow: record only).
-        ...commandModelGovernance,
-        ...(commandExecutionRouting?.allowlist !== undefined
-          ? { entitlementAllowlist: commandExecutionRouting.allowlist }
-          : {}),
-        ...(commandExecutionRouting?.preferredModelOrder
-          ? { preferredModelOrder: commandExecutionRouting.preferredModelOrder }
-          : {}),
-        run: (providerOverride, modelOverride, runOptions) => {
-          const isFallbackRetry = fallbackAttemptIndex > 0;
-          fallbackAttemptIndex += 1;
-          if (agentOutcomeTaskId && agentOutcomeScope) {
-            assertRunnerTurnBudgetAllowsModelCall(cfg, sessionAgentId, {
-              taskId: agentOutcomeTaskId,
-              scope: agentOutcomeScope,
-              startedAtMs: agentOutcomeStartedAt,
-              ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
-              ...(opts.parentAgentId?.trim() ? { parentAgentId: opts.parentAgentId.trim() } : {}),
-            });
-          }
-          return (async () => {
-            try {
-              const result = await runAgentAttempt({
+        taskText: opts.message ?? "",
+        signal: opts.abortSignal,
+        executorEvidence: runnerExecutorEvidenceContext(cfg, sessionAgentId, {
+          taskId: agentOutcomeTaskId,
+          scope: agentOutcomeScope,
+          runId,
+        }),
+        run: (providerOverride, modelOverride, runOptions, isFallbackRetry) => commandBudget.runCandidate({
+          provider: providerOverride,
+          model: modelOverride,
+          run: () => runCommandCandidate({
             providerOverride,
             modelOverride,
             cfg,
@@ -1512,73 +788,27 @@ async function agentCommandInternal(
                 lifecycleEnded = true;
               }
             },
-          });
-              if (agentOutcomeTaskId && agentOutcomeScope) {
-                tipBudgetCallSeq += 1;
-                const charged = chargeModelCallAgainstTip(cfg, sessionAgentId, {
-                  taskId: agentOutcomeTaskId,
-                  scope: agentOutcomeScope,
-                  runId,
-                  callSeq: tipBudgetCallSeq,
-                  usage: result.meta?.agentMeta?.usage,
-                  provider: providerOverride,
-                  model: modelOverride,
-                  ...(opts.parentTaskId?.trim() ? { parentTaskId: opts.parentTaskId.trim() } : {}),
-                  ...(opts.parentAgentId?.trim()
-                    ? { parentAgentId: opts.parentAgentId.trim() }
-                    : {}),
-                });
-                tipBudgetChargedThisTurn = true;
-                if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
-                  tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
-                }
-              }
-              return result;
-            } catch (err) {
-              if (
-                agentOutcomeTaskId &&
-                agentOutcomeScope &&
-                !(err instanceof TaskBudgetExceededError)
-              ) {
-                try {
-                  tipBudgetCallSeq += 1;
-                  chargeModelCallAgainstTip(cfg, sessionAgentId, {
-                    taskId: agentOutcomeTaskId,
-                    scope: agentOutcomeScope,
-                    runId,
-                    callSeq: tipBudgetCallSeq,
-                    provider: providerOverride,
-                    model: modelOverride,
-                    ...(opts.parentTaskId?.trim()
-                      ? { parentTaskId: opts.parentTaskId.trim() }
-                      : {}),
-                    ...(opts.parentAgentId?.trim()
-                      ? { parentAgentId: opts.parentAgentId.trim() }
-                      : {}),
-                  });
-                  tipBudgetChargedThisTurn = true;
-                } catch (chargeErr) {
-                  if (chargeErr instanceof TaskBudgetExceededError) {
-                    throw chargeErr;
-                  }
-                }
-              }
-              throw err;
-            }
-          })();
-        },
+          }),
+        }),
       });
+      const settledBudget = settleCommandBudgetForCloseout(
+        commandBudget,
+        commandBudget.chargeState === "not_attempted"
+          ? {
+              costUsd: estimateTipBudgetCostUsdFromUsage({
+                usage: fallbackResult.result.meta?.agentMeta?.usage,
+                provider: fallbackResult.provider,
+                model: fallbackResult.result.meta?.agentMeta?.model ?? fallbackResult.model,
+                config: cfg,
+              }),
+            }
+          : undefined,
+      );
+      tipBudgetChargedThisTurn = settledBudget.budgetCharged;
+      tipBudgetCostUsd = settledBudget.costUsd;
       result = fallbackResult.result;
       fallbackProvider = fallbackResult.provider;
       fallbackModel = fallbackResult.model;
-      if (!tipBudgetChargedThisTurn) {
-        tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
-          usage: result.meta?.agentMeta?.usage,
-          provider: fallbackProvider,
-          model: result.meta?.agentMeta?.model ?? fallbackModel,
-          config: cfg,
-        });
-      }
       // Enterprise credit usage. Subagent runs record against the slot they acquired.
       await recordAgentCommandCreditUsage({
         gate: commercialGate,
@@ -1665,6 +895,7 @@ async function agentCommandInternal(
     const payloads = result.payloads ?? [];
     agentOutcomeSuccess = true;
     return await deliverAgentCommandResult({
+        receipt: { deliveryId: `delivery:${runId}:command`, record: (receipt) => { commandDeliveryReceipt = receipt; } },
       cfg,
       deps,
       runtime,
@@ -1675,6 +906,14 @@ async function agentCommandInternal(
       payloads,
     });
   } catch (err) {
+    const settledBudget = settleCommandBudgetForCloseout(commandBudget);
+    if (settledBudget.chargeState === "attempted_unknown" || err instanceof TaskBudgetExceededError) {
+      tipBudgetChargedThisTurn = true;
+      tipBudgetCostUsd = undefined;
+    } else {
+      tipBudgetChargedThisTurn = tipBudgetChargedThisTurn || settledBudget.budgetCharged;
+      tipBudgetCostUsd = tipBudgetCostUsd ?? settledBudget.costUsd;
+    }
     if (agentOutcomeSuccess === undefined) {
       agentOutcomeSuccess = false;
       const msg = String(err);
@@ -1694,12 +933,12 @@ async function agentCommandInternal(
     }
     throw err;
   } finally {
-    if (commercialRunSlotHeld) {
-      void releaseAgentCommandCommercialRun(runId);
-      forgetRunModelSet(runId);
+    try {
+      await controlledExecution.dispose();
+    } finally {
+      clearAgentRunContext(runId);
+      await submitAgentOutcomeCloseout();
     }
-    clearAgentRunContext(runId);
-    await submitAgentOutcomeCloseout();
   }
 }
 

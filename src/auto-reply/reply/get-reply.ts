@@ -1,3 +1,4 @@
+import { isHumanInteractionIngress } from "../../agent-runtime/command/index.js";
 import {
   resolveAgentDir,
   resolveSessionAgentId,
@@ -85,6 +86,16 @@ export async function getReplyFromConfig(
   opts?: GetReplyOptions,
   configOverride?: OpenBotConfig,
 ): Promise<ReplyPayload | ReplyPayload[] | undefined> {
+  if (
+    !ctx.InputProvenance &&
+    isHumanInteractionIngress({
+      heartbeat: opts?.isHeartbeat,
+      birthTurn: opts?.growthBirthTurn,
+      collaborationRound: ctx.CollaborationRoundInvoked,
+    })
+  ) {
+    ctx = { ...ctx, InputProvenance: { kind: "external_user" } };
+  }
   const isFastTestEnv = process.env.OPENCLAW_TEST_FAST === "1";
   const cfg = configOverride ?? loadConfig();
   const targetSessionKey =
@@ -318,6 +329,7 @@ export async function getReplyFromConfig(
   const workspace = await ensureAgentWorkspace({
     dir: workspaceDirRaw,
     ensureBootstrapFiles: !agentCfg?.skipBootstrap && !isFastTestEnv,
+    initializeGit: false,
   });
   const workspaceDir = workspace.dir;
   // Employee steward FS is workspaceOnly — copy mark-required bundled skills

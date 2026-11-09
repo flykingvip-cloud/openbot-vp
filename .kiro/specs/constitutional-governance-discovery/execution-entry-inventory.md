@@ -601,6 +601,7 @@ HTTP `/tools/invoke` 在 P5-2 已有 `(tenantId, toolName) → allow | deny | un
 | cron-isolated | `src/cron/isolated-agent/run.ts`（参数来自 `src/agents/embedded-model-governance.ts`） | `runWithModelFallback` | `runCronIsolatedAgentTurn` | 有企业闸口时传 allowlist（preexisting 硬过滤 + 显式 mode，默认 shadow） | explicit-mode | E4 | P3 enforced（§8.4） |
 | agent-command | `src/commands/agent.ts`（参数来自 `src/commands/agent/model-governance.ts`） | `runWithModelFallback` | `agentCommandInternal` | 有企业闸口时传 allowlist（shadow 只记录，不过滤） | explicit-mode | E2 / E3 / E7 | P3 enforced（§8.4） |
 | memory-flush | `src/auto-reply/reply/agent-runner-memory.ts` | `runWithModelFallback` | `runMemoryFlushIfNeeded` | 按父 runId 查到 allowlist 才传入（shadow 只记录，不过滤；缺省 governance-mode） | explicit-mode | E1m | P3-2；P3 enforced（§8.4） |
+| llm-slug-generator | `src/hooks/llm-slug-generator.ts`（参数来自 `src/agent-runtime/model/auxiliary-model-governance.ts`） | `runWithModelFallback` | `generateSlugViaLLM` | 辅助文件名推理继承父 run 模型集合；缺父集合时记录 absentAllowlistReason 并使用配置治理模式，不创建或推进任务 | explicit-mode | E1m | 默认配置模式；不声明生产已验证 |
 | image-tool | `src/agents/tools/image-tool.ts` | `runWithImageModelFallback` | `runImagePrompt` | 按 runId 查到 allowlist 才传入 | explicit-mode | E10 | P3 default shadow |
 | pdf-tool | `src/agents/tools/pdf-tool.ts` | `runWithImageModelFallback` | `runPdfPrompt` | 按 runId 查到 allowlist 才传入 | explicit-mode | E10 | P3 default shadow |
 

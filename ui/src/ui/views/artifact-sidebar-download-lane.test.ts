@@ -347,3 +347,21 @@ describe("artifact sidebar download lane", () => {
     expect(container.textContent).not.toContain("chat.artifactWorkspacePath");
   });
 });
+
+it("never downloads an Office HTML preview under the PPTX filename when original bytes are missing", () => {
+  const workspace = binaryWorkspace({
+    filename: "deck.pptx",
+    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  });
+  workspace.artifact.openUrl = "blob:https://www.openbot.love/preview-html";
+  workspace.artifact.downloadUrl = "";
+  Object.assign(workspace.artifact.providerMetadata, {
+    previewKind: "html",
+    downloadedBinary: false,
+    binaryDownloadUrl: "",
+    htmlPreviewUrl: workspace.artifact.openUrl,
+  });
+  const header = document.createElement("div");
+  render(renderArtifactSidebarHeaderActions({ workspace }), header);
+  expect(header.querySelector('a[download="deck.pptx"]')).toBeNull();
+});
