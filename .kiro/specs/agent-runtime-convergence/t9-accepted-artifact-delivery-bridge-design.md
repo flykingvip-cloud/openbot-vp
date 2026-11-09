@@ -1,6 +1,6 @@
 # T9 已接受成果到投递层的最小补链设计
 
-状态：待核准。本文只描述设计，不实现生产代码。
+状态：方向已接受，设计未核准实施。本文只修订设计，不实现生产代码。
 
 受测生产源码仍是 `9fab5de35bfaf7dcfaab6ba15a70121c09a445d9`。审查中继测试更名在 `fc36ea82f0cb6a6e7ee154d03ca0a2e8c290801b`。T9 仍未通过。
 
@@ -22,7 +22,7 @@
 | 成员成果入库 | `finalizeMemberRunTeamDeliverable`、`submitTeamDeliverable`、`readTeamDeliverable` | `src/gateway/collaboration-learning/chat-deliverable-team-submit.ts`、`team-deliverable-submit.ts` | 评审前写入团队存储。回执字段是 `deliverableId`、`version`、`contentSha256`、`locator`。这是存储回执，不是接受后的渠道回执。接受路径不调用它们。 |
 | 个体回合待投递 | `prepareVisibleDelivery`、`confirmPendingTurnDeliveryWithPorts` | `src/agent-runtime/delivery/dispatch/prepare-visible.ts`、`confirm-pending.ts`；登记在 `src/task-outcome/pending-delivery.ts` | 按 `runId` / `deliveryId` / 会话任务绑定。确认路径可以关闭会话任务。不读 `acceptedArtifactVersion`。 |
 | 排队回复发送 | `deliverQueuedReply` | `src/agent-runtime/delivery/dispatch/queued-reply.ts` | 发送已有 `ReplyPayload`。依赖当次排队上下文，不是接受落盘后的可恢复意图。 |
-| 渠道写前队列 | `enqueueDelivery`、`deliverOutboundPayloads`、`recoverPendingDeliveries`、`failDelivery` | `src/infra/outbound/delivery-queue.ts`、`src/infra/outbound/deliver.ts` | 持久化 `channel`、`to`、`payloads`、`retryCount`、`lastError`。成功后 ack。Gateway 启动时 `src/gateway/server.impl.ts` 已调用 `recoverPendingDeliveries`。队列本身不携带 `acceptedArtifactVersion`。 |
+| 渠道写前队列 | `enqueueDelivery`、`deliverOutboundPayloads`、`recoverPendingDeliveries`、`ackDelivery`、`failDelivery`、`confirmedDeliveryMessageIds` | `src/infra/outbound/delivery-queue.ts`、`src/infra/outbound/deliver.ts`、`src/shared/delivery-receipt.ts` | `deliverOutboundPayloads` 在未传 `skipQueue` 时自己调用 `enqueueDelivery`，成功后 `ackDelivery`。恢复路径必须传 `skipQueue: true`。`ackDelivery` 把 `{id}.json` 改名为 `{id}.delivered` 再删除；`loadPendingDeliveries` 会清掉残留的 `.delivered`，这只表示不要重放，不是给补链的送达证明。没有可信 `messageId` 时，恢复把条目移到 `failed/` 并写 `delivery_unknown`，不自动再发。 |
 | 个体等待恢复 | `delivery_only` 分支 | `src/agent-runtime/state/repository/async-wait-job-recovery.ts` | 只重投已绑定载荷，不重跑业务。没有接到 board 接受字段。 |
 | 自进不代替终局 | `selfAdvanceDoesNotBypassHumanRequiredOutbound`、条件 `outbound_final_human_required` | `src/gateway/collaboration-dispatch/self-advance.ts` | 明确不代替 outbound/final。不发送已接受成果。 |
 
@@ -48,59 +48,123 @@
 
 ## 3. 最小补链设计
 
-触发点仍停在执行派发之外。`triggerPostSubmissionEventAdvance` 对 `accepted` 的停派发保持不变，补链不调用它，也不把投递塞进 `roundDispatcher`。
+触发点仍停在执行派发之外。`triggerPostSubmissionEventAdvance` 对 `accepted` 返回 `accepted_no_further_exec_schedule`。这条停派发保持不变。补链不调用它，也不把投递塞进 `roundDispatcher`。
 
-分层：
+分层仍然是：policy 判断资格，state 记录与 `accepted` 分开的投递意图，delivery 只发送和记回执。不调用 `submitTeamDeliverable`，不启动成员执行，不调用 `confirmPendingTurnDeliveryWithPorts`。
 
-- **policy** 只判断资格，不写盘、不发送。拟议纯函数读取已落盘的工作项、调用方给出的 `scope` 和 `target`。`scope=member_artifact`，且 `status=accepted`、`acceptedArtifactVersion` 与链接三元组齐全、`target` 显式存在时，资格为可投递。`scope=group_final` 一律不可投递，原因是组终稿集成缺失。没有 `target` 也不可投递。没有默认渠道，没有默认开启的开关。
-- **state** 记录受控投递意图，与 board 的 `accepted` 分开。意图键是 `groupId + taskId + itemId + acceptedSubmissionId + acceptedArtifactVersion + target`。字段至少包括链接三元组、`queueId`、状态 `requested | sending | delivered | failed | unknown`。写入走已有的 `withDirectoryLock` / durable JSON，不新做调度器。同一键再次提交返回已有意图，不追加第二次成功。
-- **delivery** 只发送和记回执。发送前用 `readTeamDeliverable` 读出正文，核对 version 与 `linkedContentSha256`。核对通过后，把这份固定正文交给已有的 `enqueueDelivery`，再由已有的 `deliverOutboundPayloads` 发送。回执写在意图状态和队列 ack 上。不调用 `submitTeamDeliverable`，不启动成员执行，不调用 `confirmPendingTurnDeliveryWithPorts`（那条确认可以关闭会话任务）。
+固定版本引用仍是 `acceptedArtifactVersion` 加上 `linkedDeliverableId`、`linkedDeliverableVersion`、`linkedContentSha256`。`scope=group_final` 一律不可投递。没有显式 `target` 也不投递。成员成果补链即使以后落地，也不关闭组终稿这一格。
 
-固定版本引用就是接受行上的 `acceptedArtifactVersion` 加上链接三元组。重试读这组字段，不重新生成版本。
+### 3.1 唯一入队者，避免双队列
 
-为了让「接受已落盘、意图尚未建立」可恢复，调用方提供的 `scope=member_artifact` 和 `target` 必须写进同一次接受追加，而不是只留在接受函数返回后的内存回调里。拟议字段名 `deliveryRequest`，挂在已接受的 board 行上，内容只有 scope、target、请求时间。它不是回执。没有这个请求，恢复扫描不发明目标，也不发送。
+现有事实：`deliverOutboundPayloads` 在 `skipQueue` 未置位时自己调用 `enqueueDelivery`，发送成功后再 `ackDelivery`。`recoverPendingDeliveries` 调用 `opts.deliver` 时传入 `skipQueue: true`，避免再入队一次；ack、失败和 unknown 收口都在 `recoverPendingDeliveries` 里，不在 `deliverOutboundPayloads` 里。
 
-进程内，接受落盘后可以立刻调用一次「按请求建立意图并入队」。崩溃后的同一职责由已有 Gateway 启动路径承担：与 `server.impl.ts` 里现有的 `recoverPendingDeliveries` 相邻调用一次扫描，不新增定时器，不新增模型环。扫描只处理带 `deliveryRequest` 且意图缺失或仍为 `requested` / `failed` / `unknown` 的已接受项。
+因此补链不得先 `enqueueDelivery`，再调用不带 `skipQueue` 的 `deliverOutboundPayloads`。那会写出第二条队列项。
+
+单一所有者：
+
+- **唯一入队者**是补链的 state 步骤。它只调用 `enqueueDelivery`。它不调用 `deliverOutboundPayloads`。
+- `enqueueDelivery` 今天每次 `generateSecureUuid()`，没有幂等键。实施时只给它加一个可选 `idempotencyKey`，键等于意图键 `groupId + taskId + itemId + acceptedSubmissionId + acceptedArtifactVersion + target`。磁盘上已有该键则返回原来的 `id`，不写第二个 `{id}.json`。这是现有队列的最小扩展，不是新队列，也不是新调度器。
+- 入队返回后、发送之前，state 把该 `id` 写入意图的 `queueId`，并把投递状态写成 `queued`。`queueId` 是意图指向队列文件的唯一指针。
+- **唯一发送者、唯一 ack 者、唯一把发送结果写回意图的人**是现有的 `recoverPendingDeliveries`。它继续用 `skipQueue: true` 调用 `deliverOutboundPayloads`。只有 `confirmedDeliveryMessageIds` 返回非空 `messageId` 时才 `ackDelivery`。写回意图发生在 `ackDelivery` 之前：把这些 `messageId` 记到意图的 `receiptMessageIds`，状态改为 `delivered`。同一组 `messageId` 再写一次保持 `delivered`，不追加第二条成功。
+- 补链自己的恢复扫描只入队或认领已有 `queueId`，不发送。Gateway 启动处现有的那一次 `recoverPendingDeliveries`（`src/gateway/server.impl.ts`）仍是发送恢复。进程内需要推进时，调用的也是这同一个函数，不是另一套发送循环。
+
+顺序和唯一认领：
+
+1. 先完成入队，并把 `queueId` 落在意图上。
+2. 然后才允许 `recoverPendingDeliveries` 看到这个 `{id}.json`。
+3. 发送前在现有恢复循环里做一次原子认领：把 `{id}.json` 改名为 `{id}.inflight` 的只有一方可以调用 `deliverOutboundPayloads`。另一方看到没有待处理的 `.json` 就跳过。这是 `recoverPendingDeliveries` 内部的最小扩展，用来挡住启动恢复和进程内同一次调用叠在一起。认领不是新调度器。
+4. `.inflight` 在崩溃后不得直接当成可重发。见第 4 节的 unknown。
+
+### 3.2 显式 target 不是发送授权
+
+接受成果和批准外发是两件决定。调用方传入 `target` 只满足「没有目标就不发送」。它不授权发送。
+
+源码里的候选入口，具体用哪一个必须在实施前由核准人拍板：
+
+| 候选 | 今天做什么 | 能不能直接当投递请求入口 |
+| --- | --- | --- |
+| `collaboration.task.acceptSubmission` | `resolveTrustedWriteContext` 把 Gateway `client` 绑成 actor，再 `authorizeTeamGroupResourceAccess` 做群写。然后 `acceptCollaborationBoardItemSubmission`。 | 不能。它授权的是接受写，不是外发。接受成功不继承为 outbound 授权。 |
+| `send`（`sendHandlers`） | `resolveOutboundTarget` 解析 `to`，然后 `deliverOutboundPayloads`。 | 不能直接用。它不走 `resolveTrustedWriteContext`，而且自己会入队。拿它当补链入口会绕过群身份，并和第 3.1 节的唯一入队者冲突。 |
+| `authorizeTeamGroupResourceAccess` | 群读/写 ACL。不信任单独传来的 tenantId。 | 只复用为群范围检查。它没有 outbound 目标授权。 |
+
+实施前要核准的入口必须同时做到：身份来自现有受控请求上的 Gateway `client`（同一套 `resolveTrustedWriteContext`），群范围走 `authorizeTeamGroupResourceAccess`，另外再做一次独立的 outbound 授权。这次授权记录在意图上，字段 `outboundAuthorization`：`granted` 或 `denied`，加上 actor、groupId、target、决定时间。`granted` 才允许入队。接受行上的 `acceptedBy` 不能填这个字段。
+
+恢复时重新做这同一次 outbound 授权，不沿用旧的 `granted`。权限已撤销则 `failDelivery` 后 `moveToFailed`，意图改为 `blocked`，原因 `outbound_authorization_revoked`。不发送。工作项保持 `accepted`。现有恢复只对 `taskBoundary` 做 `checkTaskActionBoundary`，那不是这条群外发授权，不能代替。
+
+### 3.3 请求落盘
+
+带独立 outbound 授权的投递请求必须写进同一次接受追加里的 `deliveryRequest`，而不能只留在接受函数返回后的内存里。字段是 `scope`、`target`、请求 actor、`outboundAuthorization`、请求时间。它不是回执。没有请求，或授权不是 `granted`，扫描不入队。扫描也不从群配置猜目标。
 
 ## 4. 失败与恢复
 
-接受状态和投递状态分开。工作项可以一直是 `accepted`，同时意图是 `failed` 或 `unknown`。查询投递结果读意图记录和队列的 `lastError`，不把 board 状态改回未接受，也不把它改成已送达。
+接受状态和投递状态分开。工作项可以一直是 `accepted`，同时意图是 `queued`、`failed`、`unknown` 或 `blocked`。查询投递读意图，不把 board 改成已送达，也不因为队列文件不见了就改成已送达。
 
-失败和 unknown 都可查：`failed` 来自 `failDelivery` 或正文 sha 不符；`unknown` 来自发送已开始但没有 ack。两种都不写成 `delivered`。
+四类发送结果分开，不能把 `unknown` 扫出来再自动重发：
 
-重试使用同一 `acceptedArtifactVersion`、同一链接三元组和同一 `target`。已经有 `queueId` 时，重试走该队列项的现有恢复，不再 `enqueueDelivery` 一次新的 id。没有 `queueId` 时才按意图键入队一次。重试不调用成员执行，不调用 `submitTeamDeliverable`。
+| 类 | 现有机制 | 意图状态 | 是否再发 |
+| --- | --- | --- | --- |
+| 未发出，或可重试失败 | `recoverPendingDeliveries` 在抛出且不是 `isPermanentDeliveryError` 时 `failDelivery`，`retryCount` 增加，`.json` 仍留在队列。下次按 `isEntryEligibleForRecoveryRetry` 和 `computeBackoffMs` 退避。 | `failed`，`retryable=true` | 同一 `queueId`、同一版本、同一 target。不新入队。 |
+| 已发出且有可信回执 | `confirmedDeliveryMessageIds` 要求每条都有非空 `messageId`，且不是 `"unknown"`。先把这些 id 写入意图，再 `ackDelivery`。 | `delivered`，`receiptMessageIds` 即这些 id | 不再发送，不再第二次写成成功。 |
+| 发送效果不明 | 恢复里已有两条：无可信 `messageId` 时 `lastError=delivery_unknown: transport acknowledgement missing` 并 `moveToFailed`；部分 payload 已有回执时 `partial_delivery: held for reconciliation` 并 `moveToFailed`。两条都明确不再重放整批。 | `unknown` | 不入新队，不调用 `deliverOutboundPayloads`。留作待查。渠道没有幂等或对账能力时，不准把 `unknown` 扫回可重试。 |
+| 版本或 hash 不符 | 入队前 `readTeamDeliverable` 的 version、`contentSha256` 必须等于冻结的链接。不符。 | `blocked`，原因 `content_hash_mismatch` | 不入队。不准改去发送存储里较新的正文。 |
 
-接受落盘之后、意图建立之前：恢复扫描看到持久化的 `deliveryRequest`，补写意图再入队。这条路径不依赖接受函数返回之后的那一次内存回调。若请求本身没有写进接受行，扫描找不到目标，保持不发送；这不是可恢复的投递，也不许用组成员或频道配置猜一个目标。
+队列项消失不是送达。`ackDelivery` 先把 `{id}.json` 改名为 `{id}.delivered`，再删除标记。`loadPendingDeliveries` 删除残留 `.delivered` 只是为了不再重放。补链看不到 `receiptMessageIds` 时，不得把「文件没了」推成 `delivered`，也不得立刻 `enqueueDelivery` 一条新的。意图停在 `unknown`。
 
-重复通知或重启：意图已是 `delivered` 则不再入队、不再记第二次成功。board 上第二次 `acceptBoardItemSubmission` 维持今天的失败，不重复关闭。
+两个崩溃窗：
+
+- **A。入队已成功，意图还没写下 `queueId`。** 队列里已有带同一 `idempotencyKey` 的 `{id}.json`。恢复只再次调用带该键的 `enqueueDelivery`，拿回原来的 id，写上 `queueId`。不发送，不创建第二条。若 `.json` 和 `.inflight` 都不在，且意图没有 `receiptMessageIds`，状态改为 `unknown`，仍然不新建队列项。
+- **B。外发已成功，队列已经 ack 并清理，意图还没标成 `delivered`。** 文件消失只说明队列不打算重放。没有落盘的 `receiptMessageIds` 就保持 `unknown`，不新建队列项，不重发。只有在 ack 之前已经写下的那组 `messageId` 才能把意图收成 `delivered`。
+
+接受已落盘、`deliveryRequest` 尚未写成：这次修订不把「没有请求」恢复成发送。请求必须和接受行一起落盘。没有请求就没有目标，也没有 outbound 授权，扫描不发明它们。
+
+重复通知或重启：意图已是 `delivered` 则不再入队。第二次 `acceptBoardItemSubmission` 维持今天的失败，不重复关闭组任务。
 
 ## 5. 拟议测试矩阵
 
-尚未实施。将来的消费者测试只桩模型和 `deliverOutboundPayloads` 的外边界，不手写一个已送达状态。
+尚未实施。将来的测试只桩渠道发送的最外层返回值（可信 `messageId`、失败、或没有 `messageId`）。`enqueueDelivery`、`recoverPendingDeliveries`、`ackDelivery`、`failDelivery` 和意图写入走真实逻辑。不得替换整个 `deliverOutboundPayloads` 再声称队列闭环已测到。不得手写一个已送达的意图来跳过队列。
 
 | 断言 | 拟议观察 |
 | --- | --- |
-| 未接受成果不投递 | `submitted_for_review` 且没有 `deliveryRequest` 时，扫描不调用 `enqueueDelivery`。`acceptedArtifactVersion` 仍为空。 |
-| 成员接受不提前关闭组任务 | `acceptBoardItemSubmission` 之后工作项为 `accepted`，协作任务完成态不变。不调用 `confirmPendingTurnDeliveryWithPorts`。`scope=group_final` 的请求被 policy 拒绝，不入队。 |
-| 首次失败后重试成功，版本与正文一致 | 第一次 `deliverOutboundPayloads` 失败，意图为 `failed` 或 `unknown`，board 仍为 `accepted`。重试发送的正文 sha256 等于 `linkedContentSha256`，version 等于 `linkedDeliverableVersion`。成功后意图为 `delivered`。成员执行次数不增加。 |
-| 重复通知和重启不重跑业务、不重复结算 | 第二次恢复看到同一意图键且状态已是 `delivered` 时，`enqueueDelivery` 次数不增加，不第二次把意图写成 `delivered`。接受不能再成功一次。 |
+| 未接受成果不投递 | `submitted_for_review` 且没有 `deliveryRequest` 时，不调用 `enqueueDelivery`。`acceptedArtifactVersion` 仍为空。有 `target` 但 `outboundAuthorization` 不是 `granted` 时也不入队。 |
+| 成员接受不提前关闭组任务 | 接受后工作项为 `accepted`，协作任务完成态不变。不调用 `confirmPendingTurnDeliveryWithPorts`。`scope=group_final` 被拒绝。组终稿格保持打开。 |
+| 首次可重试失败后再成功，版本与正文一致 | 第一次发送抛出可重试错误。意图为 `failed` 且 `retryable=true`，board 仍为 `accepted`。退避后的下一次仍是同一个 `queueId`。发出的正文 sha256 等于 `linkedContentSha256`。成功时 `receiptMessageIds` 来自 `confirmedDeliveryMessageIds`，之后才 ack。成员执行次数不增加。 |
+| 重复通知和重启不重跑业务、不重复结算 | 已是 `delivered` 时再跑恢复，`enqueueDelivery` 不增加，`receiptMessageIds` 不追加第二组。接受不能再成功一次。 |
+
+## 5.1 崩溃窗与双发测试计划
+
+同样尚未实施。
+
+| 场景 | 必须看到 |
+| --- | --- |
+| 双入队 | 补链入队之后，若有代码路径调用不带 `skipQueue` 的 `deliverOutboundPayloads`，测试失败。同一意图键只存在一个 `{id}.json`。`recoverPendingDeliveries` 的调用参数包含 `skipQueue: true`。 |
+| 唯一认领 | 两次重叠的 `recoverPendingDeliveries` 对同一个 id 只进入一次 `deliverOutboundPayloads`。输掉认领的一方不发送。 |
+| 窗 A | `enqueueDelivery` 已写出文件，意图尚无 `queueId`，然后中断。恢复后 `queueId` 等于已有文件的 id，队列目录里仍然只有这一条。发送次数不因这次认领而增加。 |
+| 窗 B | 渠道已返回可信 `messageId`，队列文件已被 ack 清掉，意图仍不是 `delivered`。恢复不得新建队列项。没有落盘 `receiptMessageIds` 时意图变为 `unknown`，发送次数不增加。已写下的同一组 `messageId` 才能收成 `delivered`，且只收一次。 |
+| 文件消失 | 删掉 `{id}.json` 且没有 `receiptMessageIds`。意图不得变成 `delivered`，不得出现新的队列文件。 |
+| 恢复时权限撤销 | 入队时 `outboundAuthorization=granted`。恢复前授权检查改为拒绝。`moveToFailed` 发生，意图为 `blocked`，原因 `outbound_authorization_revoked`。`deliverOutboundPayloads` 不被调用。board 仍是 `accepted`。 |
+| unknown 不盲重发 | 发送返回值没有通过 `confirmedDeliveryMessageIds`。意图为 `unknown`，条目在 `failed/`，`lastError` 含 `delivery_unknown`。再次扫描不入队、不再调用发送。部分回执走 `partial_delivery`，同样不再发整批。 |
+| hash 不符 | 存储正文 sha 与 `linkedContentSha256` 不同。意图为 `blocked`，原因 `content_hash_mismatch`。不入队，不发送较新正文。 |
 
 ## 6. 非目标
 
 - 不删除 `accepted` 的 `accepted_no_further_exec_schedule`。
 - 不把 `pendingEventRelay` 或 `roundDispatcher` 当成送达回执。
 - 不新增调度器，不新增模型执行环。
+- 不把队列文件消失当成 `delivered`，也不为消失的项立刻新建一条再发。
+- 不把 `unknown` 扫回来自动重发。
 - 本轮不接真实渠道、不重启生产、不跑真实模型、不渲染实物 PPT。
 - 不把每个已接受工作项默认当成组终稿外发。
 - 不实现本文。核准前不改生产行为。
 - 不清理 619 条 `INEFFECTIVE_DYNAMIC_IMPORT`。
 - 不开始 D0–D5。
 
-## 7. 开放问题
+## 7. 已决定与仍待核准
 
-留给核准人，本文不代为扩大范围：
+已决定，本文照此写死：
 
-1. 成员成果的 `target` 由哪一个现有调用方传入。本文只要求它在接受追加时落盘，不从群配置猜渠道。
-2. 恢复扫描挂在 `server.impl.ts` 现有 `recoverPendingDeliveries` 旁边，是否就是核准的宿主。不另起定时器。
-3. 组终稿集成仍是缺口。是否另开设计，不在这条成员成果补链里顺带定义。
-4. 第一次实现是否只做到意图和队列桩，真实 `deliverOutboundPayloads` 仍保持 GAP。本文倾向如此，直到单独授权真实渠道。
+1. `target` 必须来自现有受控请求上的可信身份。调用方自带的 target 不是发送授权。具体入口见第 3.2 节的候选表，实施前仍要核准人选；在此之前不实现。
+2. 启动恢复可以复用 Gateway 已有的 `recoverPendingDeliveries`。顺序是先入队并写下 `queueId`，再由这一处发送。唯一认领见第 3.1 节，避免双发。
+3. 组终稿集成仍是单独缺口。成员成果补链完成也不关闭 T9 的这一格。
+4. 测试只能桩渠道最外层回执。队列、恢复和意图回执走真实逻辑。不得换掉整个 `deliverOutboundPayloads` 来声称闭环。真实渠道仍是 GAP。
+
+仍不在本文里拍板的只有第 3.2 节那张表：三个候选都不能直接当成投递请求入口，核准人选定或指定另一个已有入口之前，不写生产代码。
