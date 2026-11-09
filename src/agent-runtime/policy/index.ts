@@ -214,3 +214,14 @@ export type {
   HandoffTaskView,
   HandoffLiveApplyDecision,
 } from "./collaboration-handoff.js";
+export {
+  evaluateMemberArtifactDeliveryEligibility,
+  memberArtifactDeliveryKeyMaterial,
+  normalizeDeliveryTarget,
+} from "./accepted-artifact-delivery.js";
+export type {
+  DeliveryEligibility,
+  MemberArtifactDeliveryIdentity,
+  MemberArtifactDeliveryScope,
+  NormalizedDeliveryTarget,
+} from "./accepted-artifact-delivery.js";
