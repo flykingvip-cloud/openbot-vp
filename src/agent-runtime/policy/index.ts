@@ -215,16 +215,22 @@ export type {
   HandoffLiveApplyDecision,
 } from "./collaboration-handoff.js";
 export {
+  deriveAcceptedArtifactIssuanceBasis,
+  establishTrustedDeliveryIssuer,
   evaluateAcceptedArtifactOutboundAuthorization,
   evaluateMemberArtifactDeliveryEligibility,
+  issueOutboundArtifactGrant,
   memberArtifactDeliveryKeyMaterial,
   normalizeDeliveryTarget,
 } from "./accepted-artifact-delivery.js";
 export type {
+  AcceptedArtifactIssuanceBasis,
+  AcceptedArtifactIssuanceFacts,
   DeliveryEligibility,
   MemberArtifactDeliveryIdentity,
   MemberArtifactDeliveryScope,
   NormalizedDeliveryTarget,
   OutboundAuthDecision,
   OutboundArtifactGrant,
+  TrustedDeliveryIssuer,
 } from "./accepted-artifact-delivery.js";
