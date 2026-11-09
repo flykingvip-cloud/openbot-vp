@@ -9,6 +9,7 @@ export type CollaborationInboundHistoryEntry = {
 };
 
 type TranscriptMessage = {
+  id?: string;
   role?: string;
   content?: unknown;
   timestamp?: number;
@@ -65,6 +66,8 @@ function resolveTranscriptSender(message: TranscriptMessage): string {
 export function buildCollaborationGroupInboundHistory(params: {
   messages: unknown;
   limit?: number;
+  /** Exclude the triggering message by identity, never by assuming it is last. */
+  excludeMessageId?: string;
 }): CollaborationInboundHistoryEntry[] {
   const limit = Math.max(1, Math.min(40, params.limit ?? 24));
   const history: CollaborationInboundHistoryEntry[] = [];
@@ -74,6 +77,12 @@ export function buildCollaborationGroupInboundHistory(params: {
       continue;
     }
     const message = raw as TranscriptMessage;
+    if (message.id === params.excludeMessageId && params.excludeMessageId) {
+      continue;
+    }
+    if (message.role !== "user" && message.role !== "assistant") {
+      continue;
+    }
     const body = extractTranscriptText(message.content);
     if (!body || shouldSkipInjectedHistoryBody(body)) {
       continue;
