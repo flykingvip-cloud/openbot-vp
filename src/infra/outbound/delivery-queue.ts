@@ -46,6 +46,12 @@ type QueuedDeliveryPayload = {
   mirror?: DeliveryMirrorPayload;
   /** Original host-captured task identity; never recaptured during recovery. */
   taskBoundary?: TaskActionBoundary;
+  /** Set only for accepted-artifact bridge rows. Ordinary sends omit it. */
+  bridgeMarker?: boolean;
+  /** Recoverer may claim only after association and auth made this true. */
+  associationReady?: boolean;
+  bridgeKeyHash?: string;
+  bridgeContentSha256?: string;
 };
 
 export interface QueuedDelivery extends QueuedDeliveryPayload {
@@ -66,6 +72,10 @@ export type RecoverySummary = {
 function resolveQueueDir(stateDir?: string): string {
   const base = stateDir ?? resolveStateDir();
   return path.join(base, QUEUE_DIRNAME);
+}
+
+export function resolveDeliveryQueueDir(stateDir?: string): string {
+  return resolveQueueDir(stateDir);
 }
 
 function resolveFailedDir(stateDir?: string): string {
@@ -131,6 +141,10 @@ export async function enqueueDelivery(
     silent: params.silent,
     mirror: params.mirror,
     taskBoundary: params.taskBoundary,
+    bridgeMarker: params.bridgeMarker,
+    associationReady: params.associationReady,
+    bridgeKeyHash: params.bridgeKeyHash,
+    bridgeContentSha256: params.bridgeContentSha256,
     retryCount: 0,
   };
   const filePath = path.join(queueDir, `${id}.json`);
@@ -327,6 +341,8 @@ export interface RecoveryLogger {
  * On gateway startup, scan the delivery queue and retry any pending entries.
  * Uses exponential backoff and moves entries that exceed MAX_RETRIES to failed/.
  */
+export type BridgeRecoveryOutcome = "recovered" | "failed" | "deferred";
+
 export async function recoverPendingDeliveries(opts: {
   deliver: DeliverFn;
   log: RecoveryLogger;
@@ -334,6 +350,11 @@ export async function recoverPendingDeliveries(opts: {
   stateDir?: string;
   /** Maximum wall-clock time for recovery in ms. Remaining entries are deferred to next restart. Default: 60 000. */
   maxRecoveryMs?: number;
+  /**
+   * Bridge rows only. Ordinary rows never call this.
+   * Absent: a ready bridge row is held, not sent.
+   */
+  recoverBridge?: (entry: QueuedDelivery) => Promise<BridgeRecoveryOutcome>;
 }): Promise<RecoverySummary> {
   const pending = await loadPendingDeliveries(opts.stateDir);
   if (pending.length === 0) {
@@ -378,6 +399,31 @@ export async function recoverPendingDeliveries(opts: {
       opts.log.info(
         `Delivery ${entry.id} not ready for retry yet — backoff ${retryEligibility.remainingBackoffMs}ms remaining`,
       );
+      continue;
+    }
+
+    if (entry.bridgeMarker === true) {
+      if (entry.associationReady !== true) {
+        opts.log.info(`Delivery ${entry.id} bridge association not ready — skipped`);
+        continue;
+      }
+      if (!opts.recoverBridge) {
+        opts.log.info(`Delivery ${entry.id} bridge held — auth recheck is not configured`);
+        continue;
+      }
+      try {
+        const outcome = await opts.recoverBridge(entry);
+        if (outcome === "recovered") {
+          recovered += 1;
+        } else if (outcome === "failed") {
+          failed += 1;
+        } else {
+          deferredBackoff += 1;
+        }
+      } catch (err) {
+        failed += 1;
+        opts.log.warn(`Bridge recovery failed for ${entry.id}: ${String(err)}`);
+      }
       continue;
     }
 
