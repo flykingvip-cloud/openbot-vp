@@ -33,6 +33,7 @@ triggers: pptx,ppt,演示文稿,幻灯片,路演,转成ppt,做成ppt,生成ppt,p
 
 - 终稿：工作区 `.pptx` + 渲染 PNG / side-by-side（QA）。
 - **警告：** 勿使用 Codex artifact_tool 整树、`mark_artifact_operation_started`、`:codex-file-citation`；交付工作区 `.pptx`。
+- 沙箱没有 PptxGenJS，或只需要改已有 PPTX 的部分页面并保留其余页时，用 `office_file` 做文件级创建、局部编辑和预览。这不替代本技能的咨询确认门。
 - 正式页生成引擎：PptxGenJS；禁止 python-pptx 作为 CyberPPT 终版引擎。
 - 增量参考：`references/pack-layout-qa.md`（版式/文案/终检）、`references/pptx-routing.md`（薄入口说明）、`references/dashboard-storytelling-routing.md`（仪表板/数据叙事路由；不平行 presentation-visual-core）、`ATTRIBUTION.md`。
 

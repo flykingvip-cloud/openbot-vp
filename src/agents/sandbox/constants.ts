@@ -103,6 +103,8 @@ export const DEFAULT_TOOL_ALLOW = [
   // gates injection; sandbox.mode=all must not strip it after ACL (same pattern as
   // meeting/schedule). Without this, gray-group executors never see mark/submit.
   "collaboration_board",
+  // File-mode Office create/edit. Desktop Excel live control is not this tool.
+  "office_file",
 ] as const;
 
 // Provider docking: keep sandbox policy aligned with provider tool names.

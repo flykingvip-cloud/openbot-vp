@@ -38,6 +38,7 @@ import { createKnowledgeSourceTool } from "./tools/knowledge-source-tool.js";
 import { createMeetingTool } from "./tools/meeting-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
+import { createOfficeFileTool } from "./tools/office-file-tool.js";
 import { createOperationalIdentityTool } from "./tools/operational-identity-tool.js";
 import { createOrganizationMemoryTool } from "./tools/organization-memory-tool.js";
 import { createOrganizationTasksTool } from "./tools/organization-tasks-tool.js";
@@ -490,6 +491,18 @@ export function createOpenClawTools(
     ...(stepfunImageTool ? [stepfunImageTool] : imageTool ? [imageTool] : []),
     ...(sunoMusicTool ? [sunoMusicTool] : []),
     ...(pdfTool ? [pdfTool] : []),
+    createOfficeFileTool({
+      workspaceDir,
+      tenantId: governanceTenantId ?? null,
+      userId:
+        governanceActorId ||
+        options?.gatewayClientPlatformUserId ||
+        options?.requesterSenderId ||
+        options?.agentSessionKey ||
+        "",
+      tenantAdmin: false,
+      platformAdmin: false,
+    }),
   ];
 
   const pluginTools = resolvePluginTools({
