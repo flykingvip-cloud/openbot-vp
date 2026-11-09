@@ -575,7 +575,7 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
       if (identity.provider === "feishu-personal") {
         const redirectUri = stringValue(params.callbackOrigin)
           ? buildUserOperationalIdentityOAuthCallbackUrl({
-              origin: stringValue(params.callbackOrigin),
+              origin: stringValue(params.callbackOrigin) || "",
               basePath: stringValue(params.basePath) || undefined,
             })
           : "";
@@ -1461,7 +1461,7 @@ export const userOperationalIdentityHandlers: GatewayRequestHandlers = {
       if (provider === "feishu-personal") {
         const redirectUri = stringValue(params.callbackOrigin)
           ? buildUserOperationalIdentityOAuthCallbackUrl({
-              origin: stringValue(params.callbackOrigin),
+              origin: stringValue(params.callbackOrigin) || "",
               basePath: stringValue(params.basePath) || undefined,
             })
           : "";

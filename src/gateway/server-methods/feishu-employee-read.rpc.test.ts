@@ -15,12 +15,12 @@ import { saveTenantConfigStore, type TenantConfigStore } from "../tenant-config.
 import {
   loadUserOperationalIdentityStore,
   saveUserOperationalIdentityStore,
-  type UserOperationalIdentityStore,
 } from "../user-operational-identity-persistence.js";
-import {
-  saveUserOperationalIdentityCredentialSecretStore,
-  type UserOperationalIdentityCredentialSecretStore,
-} from "../user-operational-identity-secrets-persistence.js";
+import { saveUserOperationalIdentityCredentialSecretStore } from "../user-operational-identity-secrets-persistence.js";
+import type {
+  UserOperationalIdentityStore,
+  UserOperationalIdentityCredentialSecretStore,
+} from "../user-operational-identity-types.js";
 
 const fixture = vi.hoisted(() => ({
   tenantPath: "",
@@ -224,17 +224,18 @@ describe("feishu employee read RPC (slice 3)", () => {
 
   async function execute(action: string, payload: Record<string, unknown> = {}) {
     const handler = userOperationalIdentityHandlers["user-operational-identity.execute"];
-    let captured: { ok: boolean; payload?: Record<string, unknown> } | null = null;
+    const responses: Array<{ ok: boolean; payload?: Record<string, unknown> }> = [];
     await handler({
       req: { type: "req", id: "t", method: "user-operational-identity.execute", params: {} },
       params: { provider: "feishu-personal", action, agentId: "project", payload },
       client: { platformUserId: "emp-a" } as never,
       isWebchatConnect: () => false,
       respond: (ok, body) => {
-        captured = { ok, payload: body as Record<string, unknown> };
+        responses.push({ ok, payload: body as Record<string, unknown> });
       },
       context: {} as never,
     });
+    const captured = responses[0];
     if (!captured) {
       throw new Error("execute did not respond");
     }

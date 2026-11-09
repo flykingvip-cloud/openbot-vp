@@ -41,6 +41,8 @@ export type EnterpriseImDenyCode =
 export type EnterpriseImDecision =
   | {
       outcome: "allow";
+      code?: never;
+      message?: never;
       identityId: string;
       agentId: string;
       action: string;
@@ -98,7 +100,9 @@ const MODE_ACTIONS: Record<EnterpriseImConfirmMode, ReadonlySet<string>> = {
   limited_auto: new Set(["read", "draft", "send"]),
 };
 
-function deny(code: EnterpriseImDenyCode, message?: string): EnterpriseImDecision {
+type EnterpriseImDenial = Extract<EnterpriseImDecision, { outcome: "deny" }>;
+
+function deny(code: EnterpriseImDenyCode, message?: string): EnterpriseImDenial {
   return { outcome: "deny", code, message: message ?? DENY_MESSAGE[code] };
 }
 
@@ -114,7 +118,7 @@ function connectionOpen(gate: FeishuEmployeeChannelGate): boolean {
   return !gate.childExecutionBlocked && gate.employeeUiHint === "app_can_attempt";
 }
 
-function mapCredentialDenial(code: string): EnterpriseImDecision {
+function mapCredentialDenial(code: string): EnterpriseImDenial {
   if (code === "PLATFORM_ENTERPRISE_MISMATCH") {
     return deny("ENTERPRISE_CONNECTION_MISMATCH");
   }
@@ -130,7 +134,7 @@ function mapCredentialDenial(code: string): EnterpriseImDecision {
 
 function resolveUsableFeishuIdentity(
   params: EnterpriseImDecisionInput,
-): { ok: true; identity: UserOperationalIdentity } | EnterpriseImDecision {
+): { ok: true; identity: UserOperationalIdentity } | EnterpriseImDenial {
   const tenantId = params.tenantId?.trim() || "";
   const requested = params.identityId?.trim() || "";
   const owned = Object.values(params.store.identities).filter(
@@ -143,7 +147,7 @@ function resolveUsableFeishuIdentity(
     return deny("IDENTITY_NOT_USABLE");
   }
   const usable: UserOperationalIdentity[] = [];
-  let failure: EnterpriseImDecision | null = null;
+  let failure: EnterpriseImDenial | null = null;
   for (const identity of candidates) {
     if (!identity.enterpriseIm || identity.enterpriseIm.channel !== "feishu") {
       failure = deny("IDENTITY_NOT_USABLE");
@@ -268,7 +272,7 @@ export function confirmEnterpriseImRobotGrant(params: {
   confirmMode: EnterpriseImConfirmMode;
   nowIso: string;
   expiresAt?: string;
-}): { ok: true; grant: UserOperationalIdentityGrant } | EnterpriseImDecision {
+}): { ok: true; grant: UserOperationalIdentityGrant } | EnterpriseImDenial {
   if (!params.confirmExplicit) {
     return deny("CONFIRM_REQUIRED");
   }

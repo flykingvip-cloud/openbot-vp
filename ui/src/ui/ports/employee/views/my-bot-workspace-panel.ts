@@ -780,7 +780,9 @@ function renderAuthTab(props: MyBotWorkspacePanelProps) {
         'input[type="checkbox"][data-identity-id]:checked',
       ) ?? [],
     );
-    const personalDesired = checked
+    const personalDesired: Parameters<
+      NonNullable<MyBotWorkspacePanelProps["onApplyRobotIdentityGrants"]>
+    >[0]["desired"] = checked
       .filter(
         (checkbox) =>
           checkbox.dataset.kind === "personal" || checkbox.dataset.provider === "feishu-personal",

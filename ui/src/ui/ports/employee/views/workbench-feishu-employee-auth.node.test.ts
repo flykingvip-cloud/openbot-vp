@@ -41,7 +41,7 @@ function settings(statusLabel: string, loginEnabled: boolean): SettingsContract 
         childExecutionBlocked: !loginEnabled && statusLabel === "企业尚未开通",
       },
     },
-  } as SettingsContract;
+  } as unknown as SettingsContract;
 }
 
 describe("feishu employee authorization row", () => {

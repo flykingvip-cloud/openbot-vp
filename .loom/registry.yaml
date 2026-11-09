@@ -10804,7 +10804,51 @@ tasks:
     ownerHistory: []
     since: 2026-11-05
     metadata: {}
+  - id: pr249-technical-closeout
+    owner: codex-runtime-manager
+    intent: []
+    paths:
+      - src/gateway/enterprise-im-employee-authorization.ts
+      - src/gateway/enterprise-im-employee-connection.ts
+      - src/gateway/enterprise-im-employee-decision.ts
+      - src/gateway/server-methods/feishu-employee-grant.rpc.test.ts
+      - src/gateway/server-methods/feishu-employee-read.rpc.test.ts
+      - src/gateway/server-methods/feishu-employee-refresh.rpc.test.ts
+      - src/gateway/server-methods/user-operational-identity.ts
+      - ui/src/ui/ports/employee/views/my-bot-feishu-auth.node.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - ui/src/ui/ports/employee/views/workbench-feishu-employee-auth.node.test.ts
+    state: active
+    sessions:
+      - id: pr249-technical-closeout-20261109
+        taskId: pr249-technical-closeout
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-09T03:26:43.689Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-09
+    metadata: {}
 landingStreams:
+  - id: pr249-technical-closeout-20261109
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/enterprise-im-employee-authorization.ts
+      - src/gateway/enterprise-im-employee-connection.ts
+      - src/gateway/enterprise-im-employee-decision.ts
+      - src/gateway/server-methods/feishu-employee-grant.rpc.test.ts
+      - src/gateway/server-methods/feishu-employee-read.rpc.test.ts
+      - src/gateway/server-methods/feishu-employee-refresh.rpc.test.ts
+      - src/gateway/server-methods/user-operational-identity.ts
+      - ui/src/ui/ports/employee/views/my-bot-feishu-auth.node.test.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - ui/src/ui/ports/employee/views/workbench-feishu-employee-auth.node.test.ts
+    canLandWith: []
+    metadata:
+      task: pr249-technical-closeout
+      agent: codex-runtime-manager
   - id: pr249-main-sync-20261109
     landingPolicy: serial
     paths:
@@ -25509,3 +25553,53 @@ sharedPaths:
     landerTask: computer-network-capability-architecture:kiro-convergence-registry
     reason: Tests for the convergence registry validator. Exact-file lander. Resolves incidental overlap
       with pi-sdk-family-migration-v3:cursor scripts/**. Does not transfer that glob.
+  - glob: src/gateway/enterprise-im-employee-authorization.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-im-employee-connection.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-im-employee-decision.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/feishu-employee-grant.rpc.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/feishu-employee-read.rpc.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/feishu-employee-refresh.rpc.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/user-operational-identity.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/ports/employee/views/my-bot-feishu-auth.node.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/ports/employee/views/workbench-feishu-employee-auth.node.test.ts
+    landerTask: pr249-technical-closeout
+    reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
+      owner retained.
+    reviewAfter: 2026-11-30

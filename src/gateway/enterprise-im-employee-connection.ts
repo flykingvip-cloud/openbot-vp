@@ -497,7 +497,7 @@ function refuseFeishuEmployeeBase(params: {
   ownerId: string;
   identityId: string;
   gate: FeishuEmployeeChannelGate;
-}): FeishuEmployeePublicResult | { identity: UserOperationalIdentity } {
+}): (FeishuEmployeePublicResult & { ok: false }) | { identity: UserOperationalIdentity } {
   if (params.gate.childExecutionBlocked || params.gate.employeeUiHint === "enterprise_not_open") {
     return {
       ok: false,
@@ -626,7 +626,7 @@ function readFeishuEmployeeRefreshCredential(params: {
   ownerId: string;
   identityId: string;
   gate: FeishuEmployeeChannelGate;
-}): { ok: true; refreshToken: string } | FeishuEmployeePublicResult {
+}): { ok: true; refreshToken: string } | (FeishuEmployeePublicResult & { ok: false }) {
   const base = refuseFeishuEmployeeBase(params);
   if (!("identity" in base)) {
     return base;
@@ -827,7 +827,7 @@ export function beginFeishuEmployeeOAuthSession(params: {
       authorizeUrl: string;
       simulateAllowed: false;
     }
-  | FeishuEmployeePublicResult {
+  | (FeishuEmployeePublicResult & { ok: false }) {
   if (!params.gate.loginEnabled) {
     return {
       ok: false,

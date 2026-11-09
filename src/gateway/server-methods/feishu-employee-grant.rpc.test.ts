@@ -15,12 +15,12 @@ import { resolveEmployeeOperationalAuthorization } from "../user-operational-ide
 import {
   loadUserOperationalIdentityStore,
   saveUserOperationalIdentityStore,
-  type UserOperationalIdentityStore,
 } from "../user-operational-identity-persistence.js";
-import {
-  saveUserOperationalIdentityCredentialSecretStore,
-  type UserOperationalIdentityCredentialSecretStore,
-} from "../user-operational-identity-secrets-persistence.js";
+import { saveUserOperationalIdentityCredentialSecretStore } from "../user-operational-identity-secrets-persistence.js";
+import type {
+  UserOperationalIdentityStore,
+  UserOperationalIdentityCredentialSecretStore,
+} from "../user-operational-identity-types.js";
 const fixture = vi.hoisted(() => ({
   tenantPath: "",
   identityPath: "",
@@ -174,21 +174,22 @@ async function invoke(
   params: Record<string, unknown>,
 ) {
   const handler = userOperationalIdentityHandlers[method];
-  let captured: {
+  const responses: Array<{
     ok: boolean;
     payload?: unknown;
     error?: { message?: string; details?: { code?: string } };
-  } | null = null;
+  }> = [];
   await handler({
     req: { type: "req", id: "t", method, params },
     params,
     client: { platformUserId: "emp-a" } as never,
     isWebchatConnect: () => false,
     respond: (ok, payload, error) => {
-      captured = { ok, payload, error: error as never };
+      responses.push({ ok, payload, error: error as never });
     },
     context: {} as never,
   });
+  const captured = responses[0];
   if (!captured) {
     throw new Error(`${method} did not respond`);
   }

@@ -182,13 +182,6 @@ export async function loadEnterpriseImMeasuredChecklist(
   }
 }
 
-type SeatBindingView = {
-  tenantId?: string;
-  employeeId?: string;
-  seatId?: string;
-  bindingStatus?: string;
-};
-
 /**
  * Pure over the seat store and the tenant policy rows. Callers load both on
  * the server. A `{ policyPresent: true }` flag is not an input.
@@ -211,7 +204,7 @@ export function resolveEnterpriseImSeatAndPolicy(params: {
   const activeSeatIds = [
     ...new Set(
       Object.values(params.seatStore?.bindings ?? {})
-        .filter((binding): binding is SeatBindingView => Boolean(binding))
+        .filter((binding) => Boolean(binding))
         .filter(
           (binding) =>
             binding.tenantId === tenantId &&

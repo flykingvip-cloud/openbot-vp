@@ -10,16 +10,15 @@ import {
   type FeishuEmployeeChannelGate,
 } from "../enterprise-im-employee-connection.js";
 import { saveTenantConfigStore, type TenantConfigStore } from "../tenant-config.js";
-import {
-  saveUserOperationalIdentityStore,
-  type UserOperationalIdentityStore,
-} from "../user-operational-identity-persistence.js";
+import { saveUserOperationalIdentityStore } from "../user-operational-identity-persistence.js";
 import {
   loadUserOperationalIdentityCredentialSecretStore,
   saveUserOperationalIdentityCredentialSecretStore,
-  type UserOperationalIdentityCredentialSecretStore,
 } from "../user-operational-identity-secrets-persistence.js";
-import type { GatewayRequestHandler } from "./types.js";
+import type {
+  UserOperationalIdentityStore,
+  UserOperationalIdentityCredentialSecretStore,
+} from "../user-operational-identity-types.js";
 
 const fixture = vi.hoisted(() => ({
   tenantPath: "",
@@ -91,7 +90,7 @@ function gate(): FeishuEmployeeChannelGate {
 async function invoke(ownerId: string, identityId: string) {
   const handler =
     userOperationalIdentityHandlers["user-operational-identity.feishu-employee.refresh"];
-  let captured: { ok: boolean; payload?: unknown; error?: unknown } | null = null;
+  const responses: Array<{ ok: boolean; payload?: unknown; error?: unknown }> = [];
   await handler({
     req: {
       type: "req",
@@ -103,10 +102,11 @@ async function invoke(ownerId: string, identityId: string) {
     client: { platformUserId: ownerId } as never,
     isWebchatConnect: () => false,
     respond: (ok, payload, error) => {
-      captured = { ok, payload, error };
+      responses.push({ ok, payload, error });
     },
     context: {} as never,
   });
+  const captured = responses[0];
   if (!captured) {
     throw new Error("refresh handler did not respond");
   }
