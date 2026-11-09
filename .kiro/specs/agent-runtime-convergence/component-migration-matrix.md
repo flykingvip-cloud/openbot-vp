@@ -49,8 +49,8 @@
 | `agent-runtime/state/mutations/*` + `repository/async-wait-*` + task-board-file | 会话板事务与 async-wait | **已在**；session-task-board 多为 facade | state | 文件锁 / claimToken | **已在main接续** | 通过 | T4 / T9 |
 | `agent-runtime/delivery/dispatch/confirm-pending.ts` | 投递确认权威 | **已在**；wiring + followup/dispatch 消费 | delivery | pending-delivery；completeChecked | **已在main接续** | 通过 | T4 / T9 |
 | `agent-runtime/capabilities/*` | 工具/MCP/插件目录与调用适配 | **已在**（#250） | capabilities；声明≠授权 | execution before-call | **已在main接续** | 通过 | T7 |
-| `auto-reply/reply/groups.ts`、`runtime-context-assembly.ts`、system-prompt* | 群材料与提示装配 | 部分 context 已在 agent-runtime；旧装配入口仍存 | context；个人路径不误载群材料 | Builder IO | **迁移** / 部分 **已在main接续** | 核准中 | T7 |
-| hooks transform / Lobster / OpenProse | 扩展工作流加载与恢复 | `extensions/lobster` 等存在；启用与资产未全盘 | 逐项保留或退役；证据不足不称清空 | plugin SDK；用户资产 | **证据不足** | 阻塞（相对退役断言） | T8 |
+| `auto-reply/reply/groups.ts`、`runtime-context-assembly.ts`、system-prompt* | 群材料与提示装配 | `selectContextCatalog` 只看显式协作绑定；`ChatType==="group"` 不选群目录。个体装配拒绝群层 id。协作顺序仍是 `COLLABORATION_MEMBER_CONTEXT_ORDER`。章节表仍在 `agents/system-prompt.ts` | context；个人路径不误载群材料 | Builder IO | **迁移** | 待验收 | T7 |
+| hooks transform / Lobster / OpenProse | 扩展工作流加载与恢复 | 仍保留。`retirement-disposition.md` 记录消费者、配置和恢复资产未知，不删除 | 逐项保留；证据不足不称清空 | plugin SDK；用户资产 | **证据不足** | 保留有因 | T8 |
 | Gateway `server-methods/chat.ts`（focus/control/dispatch） | 请求入口与事件转接；迁移期暂留编排副作用 | 现役主链入口；调用 park-abort / focus-switch / sessionTaskState / reply-completion consult | **最终**仅 adapter；编排归 command | 全链路 | **适配保留**（迁移期暂留，禁止写成终态） | 保留有因 | T6 / T8 |
 
 ## 与原切片覆盖（方案 §9）
