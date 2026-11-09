@@ -1,5 +1,22 @@
 import { formatDroppedParkedTaskSentence } from "../agent-runtime/context/task-focus.js";
+import {
+  evaluateWakeEligibility,
+  HEARTBEAT_FORBIDDEN_ACTIONS,
+  isHeartbeatActionAllowed,
+  WAKE_REASONS,
+  type HeartbeatForbiddenAction,
+  type WakeEligibility,
+  type WakeReason,
+} from "../agent-runtime/policy/index.js";
+
 export { formatDroppedParkedTaskSentence } from "../agent-runtime/context/task-focus.js";
+export {
+  evaluateWakeEligibility,
+  HEARTBEAT_FORBIDDEN_ACTIONS,
+  isHeartbeatActionAllowed,
+  WAKE_REASONS,
+};
+export type { HeartbeatForbiddenAction, WakeEligibility, WakeReason };
 /**
  * Focus / Parked scheduling policy (EA-B2, EA-B4, EA-B5).
  *
@@ -13,27 +30,6 @@ export const MAX_FOCUS_SLOTS = 1;
  * Not the session task board cardinality (`MAX_PARKED_TASKS`), even when both are 3.
  */
 export const MAX_PARKED_SLOTS = 3;
-
-export const WAKE_REASONS = [
-  "user_message",
-  "user_task_update",
-  "cron",
-  "heartbeat",
-  "external_event",
-  "approval_resolved",
-  "retry",
-  "resume",
-] as const;
-
-export type WakeReason = (typeof WAKE_REASONS)[number];
-
-export const HEARTBEAT_FORBIDDEN_ACTIONS = [
-  "create_identity",
-  "write_completion",
-  "replan",
-] as const;
-
-export type HeartbeatForbiddenAction = (typeof HEARTBEAT_FORBIDDEN_ACTIONS)[number];
 
 export type FocusSnapshot = {
   focusTaskId?: string;
@@ -74,49 +70,6 @@ const AUTO_PARK_TRIGGERS = new Set<WakeReason>([
   "external_event",
   "approval_resolved",
 ]);
-
-const IDENTITY_CREATE_TRIGGERS = new Set<WakeReason>(["cron", "heartbeat"]);
-
-export function isHeartbeatActionAllowed(action: string): boolean {
-  return !(HEARTBEAT_FORBIDDEN_ACTIONS as readonly string[]).includes(action);
-}
-
-export type WakeEligibility =
-  | {
-      eligible: false;
-      decision:
-        | { action: "reject_identity_create"; trigger: WakeReason }
-        | { action: "ignore_heartbeat" };
-    }
-  | { eligible: true; incomingTaskId: string };
-
-/**
- * Wake eligibility only. Park/switch choices stay in {@link decideWake}.
- * Claim and board writes stay in state. Heartbeat cannot create, replan, or complete a task.
- */
-export function evaluateWakeEligibility(params: {
-  trigger: WakeReason;
-  incomingTaskId?: string;
-  /** Wake trigger tried to mint a new ConversationTask. Always rejected for cron/heartbeat. */
-  incomingCreatesIdentity?: boolean;
-}): WakeEligibility {
-  if (params.incomingCreatesIdentity && IDENTITY_CREATE_TRIGGERS.has(params.trigger)) {
-    return {
-      eligible: false,
-      decision: { action: "reject_identity_create", trigger: params.trigger },
-    };
-  }
-  const incomingTaskId = params.incomingTaskId?.trim() ?? "";
-  if (!incomingTaskId) {
-    return params.trigger === "heartbeat"
-      ? { eligible: false, decision: { action: "ignore_heartbeat" } }
-      : {
-          eligible: false,
-          decision: { action: "reject_identity_create", trigger: params.trigger },
-        };
-  }
-  return { eligible: true, incomingTaskId };
-}
 
 function parkIncomingDroppingOldest(
   snapshot: FocusSnapshot,

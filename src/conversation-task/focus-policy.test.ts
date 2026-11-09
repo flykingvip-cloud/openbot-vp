@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as policy from "../agent-runtime/policy/index.js";
+import { evaluateWakeEligibility as policyWakeEligibility } from "../agent-runtime/policy/index.js";
 import {
   HEARTBEAT_FORBIDDEN_ACTIONS,
   MAX_FOCUS_SLOTS,
@@ -40,6 +41,8 @@ describe("EA focus policy (P0 acceptance)", () => {
     expect(isHeartbeatActionAllowed("replan")).toBe(false);
     expect(isHeartbeatActionAllowed("write_completion")).toBe(false);
     expect(HEARTBEAT_FORBIDDEN_ACTIONS).toEqual(["create_identity", "write_completion", "replan"]);
+    expect(evaluateWakeEligibility).toBe(policyWakeEligibility);
+    expect(isHeartbeatActionAllowed).toBe(policy.isHeartbeatActionAllowed);
   });
 
   it("EA-I1 / EA-B4: cron and heartbeat cannot mint a ConversationTask identity", () => {

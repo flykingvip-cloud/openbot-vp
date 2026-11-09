@@ -73,9 +73,10 @@ it("separates current ownership from target ownership for state and pending path
   expect(asyncWait?.targetOwner).toBe("state");
   expect(queueClaim?.currentOwner).toBe("state");
   expect(queueClaim?.targetOwner).toBe("state");
-  expect(park?.currentOwner).toBe("conversation-task");
+  expect(park?.currentOwner).toBe("policy");
   expect(park?.targetOwner).toBe("policy");
-  expect(park?.disposition).toBe("pending_migration");
+  expect(park?.disposition).toBe("retain");
+  expect(park?.implementation).toBe("src/agent-runtime/policy/explicit-task-control.ts");
   expect(collab?.currentOwner).toBe("gateway");
   expect(collab?.targetOwner).toBe("policy");
   expect(collab?.disposition).toBe("pending_migration");
