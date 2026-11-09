@@ -170,9 +170,11 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     tests: [
       "src/agent-runtime/policy/explicit-task-control.test.ts",
       "src/conversation-task/turn-relation.test.ts",
+      "src/conversation-task/focus-switch.test.ts",
+      "src/agent-runtime/command/task-status.test.ts",
     ],
     retirementCondition:
-      "retain this authoritative path; delete focus-switch / ForDialogue copies only after sample-equivalence proof",
+      "authoritative implementation; focus-switch re-exports it and dialogue status delegates after sample equivalence",
     management: "code_required",
     disposition: "retain",
   },
@@ -293,7 +295,7 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     currentOwner: "conversation-task",
     targetOwner: "policy",
     scope: "focus switch abort",
-    implementation: "src/conversation-task/turn-relation.ts",
+    implementation: "src/conversation-task/park-abort.ts",
     enforcementPoints: ["before_focus_switch_abort", "gateway_chat_live"],
     version: INVENTORY_VERSION,
     dependencies: {
@@ -306,7 +308,7 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
       "src/conversation-task/session-task-board.inbound-stop.test.ts",
     ],
     retirementCondition:
-      "update implementation path after moving the pure predicate into policy; never lift whole classifyTurnRelation",
+      "predicate is split from classifyTurnRelation; do not promote that classifier; move this predicate into policy/index only in a commit that does not mix landing streams",
     management: "code_required",
     disposition: "pending_migration",
   },
@@ -382,10 +384,11 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
       rules: ["execution.continuation.bounds"],
       artifacts: [],
     },
-    configuration: "MAX_PARKED_SLOTS source constant (do not hard-merge with TASKS)",
+    configuration:
+      "MAX_PARKED_SLOTS is an execution slot, not MAX_PARKED_TASKS; heartbeat cannot create_identity, write_completion, or replan",
     tests: ["src/conversation-task/focus-policy.test.ts"],
     retirementCondition:
-      "migrate wake decision to policy after slot-semantics approval; keep claim/write in state",
+      "evaluateWakeEligibility is separate from decideWake; claim and board writes stay in state; do not hard-merge slot and task caps",
     management: "reviewed_parameters",
     disposition: "pending_migration",
   },
@@ -405,7 +408,7 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     configuration: "heuristic thresholds in source",
     tests: ["src/conversation-task/focus-switch.test.ts"],
     retirementCondition:
-      "move pure decision to policy; transcript IO stays adapter; copy strip only after equivalence",
+      "stamp strip delegates to policy; title copy delegates to context; transcript IO stays in this adapter; heuristics without an external consumer stay local",
     management: "code_required",
     disposition: "pending_migration",
   },

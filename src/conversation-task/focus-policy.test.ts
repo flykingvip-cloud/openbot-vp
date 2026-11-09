@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import * as policy from "../agent-runtime/policy/index.js";
 import {
   HEARTBEAT_FORBIDDEN_ACTIONS,
   MAX_FOCUS_SLOTS,
   MAX_PARKED_SLOTS,
   decideWake,
+  evaluateWakeEligibility,
   isHeartbeatActionAllowed,
 } from "./focus-policy.js";
 
@@ -11,6 +13,33 @@ describe("EA focus policy (P0 acceptance)", () => {
   it("EA-I4 / EA-B2: slots are 1 focus + 3 parked, not a task cardinality cap", () => {
     expect(MAX_FOCUS_SLOTS).toBe(1);
     expect(MAX_PARKED_SLOTS).toBe(3);
+    expect(policy.MAX_PARKED_TASKS).toBe(3);
+    expect(policy).not.toHaveProperty("MAX_PARKED_SLOTS");
+  });
+
+  it("separates heartbeat eligibility from task creation and replanning", () => {
+    expect(
+      evaluateWakeEligibility({
+        trigger: "heartbeat",
+        incomingCreatesIdentity: true,
+        incomingTaskId: "task-new",
+      }),
+    ).toEqual({
+      eligible: false,
+      decision: { action: "reject_identity_create", trigger: "heartbeat" },
+    });
+    expect(evaluateWakeEligibility({ trigger: "heartbeat" })).toEqual({
+      eligible: false,
+      decision: { action: "ignore_heartbeat" },
+    });
+    expect(evaluateWakeEligibility({ trigger: "heartbeat", incomingTaskId: "cron:job" })).toEqual({
+      eligible: true,
+      incomingTaskId: "cron:job",
+    });
+    expect(isHeartbeatActionAllowed("create_identity")).toBe(false);
+    expect(isHeartbeatActionAllowed("replan")).toBe(false);
+    expect(isHeartbeatActionAllowed("write_completion")).toBe(false);
+    expect(HEARTBEAT_FORBIDDEN_ACTIONS).toEqual(["create_identity", "write_completion", "replan"]);
   });
 
   it("EA-I1 / EA-B4: cron and heartbeat cannot mint a ConversationTask identity", () => {

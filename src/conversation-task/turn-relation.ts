@@ -2,6 +2,7 @@ import { stripInboundStamp } from "../agent-runtime/policy/index.js";
 export { stripInboundStamp } from "../agent-runtime/policy/index.js";
 import { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
 export { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
+export { shouldTaskParkAbortInFlight } from "./park-abort.js";
 /**
  * Relation of an incoming user turn to the current session task.
  * Only `new_work` may park, cut context, and abort the in-flight run.
@@ -213,9 +214,12 @@ export type TurnRelationContext = {
 };
 
 /**
- * Classify before the task board mutates focus.
+ * Legacy semantic relation. Not a policy authority and not the live abort predicate.
+ * Production abort uses {@link shouldTaskParkAbortInFlight}. This classifier stays
+ * on the optional complex-task observer and must not be promoted to command policy.
  * `amend` and `conversation` stay on the current task. Only `new_work` may cut context.
  * Only `incoming` + `currentGoal` are scanned — never a pasted constraint history blob.
+ * Title text comes from context `titleFromGoal`; this function does not own title generation.
  */
 export function classifyTurnRelation(
   incoming: string,
@@ -290,12 +294,4 @@ export function classifyTurnRelation(
     return "new_work";
   }
   return "conversation";
-}
-
-/**
- * In-flight runs abort when the turn cuts context (task park/switch) OR when the
- * owner pauses/cancels the current task (abortInFlight from the task board).
- */
-export function shouldTaskParkAbortInFlight(cutContext: boolean, abortInFlight?: boolean): boolean {
-  return cutContext || abortInFlight === true;
 }
