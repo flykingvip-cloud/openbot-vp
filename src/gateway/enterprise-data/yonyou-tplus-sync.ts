@@ -144,6 +144,10 @@ const SYNC_STREAMS: SyncStream[] = [
   },
 ];
 
+export function yonyouTplusStreamActionKey(streamKey: string): string | undefined {
+  return SYNC_STREAMS.find((stream) => stream.streamKey === streamKey)?.actionKey;
+}
+
 export type YonyouTplusSyncStreamResult = {
   streamKey: string;
   title: string;
