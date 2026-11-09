@@ -48,6 +48,7 @@ import {
   claimBoardActionAllowed,
   oralDispatchCreatesBoardFact,
 } from "../../agent-runtime/policy/index.js";
+import { appendBoardClaimLog, mutateBoardClaimLog } from "../../agent-runtime/state/index.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { isBareChatCompletionPhrase } from "../collaboration-learning/formal-delivery-acceptance.js";
@@ -61,7 +62,6 @@ import { normalizeAgentIdentifier } from "./mention-utils.js";
 import { modeBActiveBoardItems } from "./mode-b-member-selection.js";
 import { assertPeerReviewGateForAccept } from "./peer-review-gate.js";
 import { buildCollaborationRoundPlan } from "./round-plan.js";
-import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 import { guardUnattendedAccept } from "./single-group-unattended.js";
@@ -712,26 +712,15 @@ async function mutateBoardClaimItem(
   const claimsDir = boardClaimsDir(authority);
   const logPath = boardClaimLogPath(claimsDir, taskId);
   const at = nowOf(options);
-  return withRoundLock(claimsDir, stem, async () => {
-    const lines = await readLog(logPath);
-    const current = latestItem(lines, itemId);
-    if (!current) {
-      return fail("not_found", `board claim item not found: ${itemId}`);
-    }
-    const mutated = await mutator(current);
-    if (!mutated.ok) {
-      return mutated;
-    }
-    if (mutated.skipAppend) {
-      return { ok: true, value: mutated.value };
-    }
-    await fs.mkdir(claimsDir, { recursive: true });
-    await appendJsonlDurable(logPath, {
-      kind: "board_claim",
-      at,
-      item: mutated.value,
-    } satisfies BoardClaimLogLine);
-    return { ok: true, value: mutated.value };
+  return mutateBoardClaimLog({
+    claimsDir,
+    stem,
+    logPath,
+    itemId,
+    at,
+    readLines: () => readLog(logPath),
+    currentOf: (lines) => latestItem(lines as BoardClaimLogLine[], itemId),
+    mutate: mutator,
   });
 }
 
@@ -749,14 +738,7 @@ async function appendItem(
   }
   const logPath = boardClaimLogPath(claimsDir, item.taskId);
   const at = nowOf(options);
-  await withRoundLock(claimsDir, stem, async () => {
-    await fs.mkdir(claimsDir, { recursive: true });
-    await appendJsonlDurable(logPath, {
-      kind: "board_claim",
-      at,
-      item,
-    } satisfies BoardClaimLogLine);
-  });
+  await appendBoardClaimLog({ claimsDir, stem, logPath, at, item });
 }
 
 export async function publishBoardItem(
