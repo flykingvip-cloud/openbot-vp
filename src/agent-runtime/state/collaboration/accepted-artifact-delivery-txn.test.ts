@@ -7,7 +7,6 @@ import {
   commitMemberArtifactDeliveryAssociation,
   deliveryKeyHash,
   noteAssociationRenamedAwayFromStaged,
-  recordAssociationObservation,
   recoverPartialStagedAssociation,
 } from "./accepted-artifact-delivery-txn.js";
 
@@ -85,7 +84,7 @@ describe("commitMemberArtifactDeliveryAssociation", () => {
     if (!renamed.ok) {
       return;
     }
-    expect(renamed.intent.phase).toBe("queued");
+    expect(renamed.intent.phase).toBe("associated");
     expect(renamed.intent.queueId).toBeNull();
     const again = await commitMemberArtifactDeliveryAssociation({
       rootDir: root,
@@ -98,7 +97,7 @@ describe("commitMemberArtifactDeliveryAssociation", () => {
     }
     expect(again.created).toBe(false);
     expect(again.intent.keyHash).toBe(renamed.intent.keyHash);
-    expect(again.intent.phase).toBe("queued");
+    expect(again.intent.phase).toBe("associated");
     const names = await fs.readdir(path.join(root, "staged"));
     expect(names.filter((name) => name.endsWith(".bridge-staged"))).toHaveLength(0);
     expect(names.filter((name) => name.endsWith(".bridge-associated"))).toHaveLength(1);
@@ -152,55 +151,117 @@ describe("commitMemberArtifactDeliveryAssociation", () => {
     expect(a.intent.keyHash).not.toBe(b.intent.keyHash);
   });
 
-  it("returns the same intent for unknown and does not treat a no-effect failure as unknown", async () => {
+  it("does not rebuild a corrupt intent or roll a terminal phase back", async () => {
     const root = await rootDir();
-    await commitMemberArtifactDeliveryAssociation({
+    const created = await commitMemberArtifactDeliveryAssociation({
       rootDir: root,
       identity: identity(),
       nowMs: 1,
     });
-    const unknownEffect = await recordAssociationObservation({
-      rootDir: root,
-      identity: identity(),
-      phase: "failed_retryable",
-      externalEffect: "unknown",
-    });
-    expect(unknownEffect.ok).toBe(false);
-    const retryable = await recordAssociationObservation({
-      rootDir: root,
-      identity: identity(),
-      phase: "failed_retryable",
-      externalEffect: "none",
-    });
-    expect(retryable.ok).toBe(true);
-    if (!retryable.ok) {
+    expect(created.ok).toBe(true);
+    if (!created.ok) {
       return;
     }
-    expect(retryable.intent.retryable).toBe(true);
-    expect(retryable.intent.externalEffect).toBe("none");
-    const unknown = await recordAssociationObservation({
+    const intentFile = path.join(root, "intents", `${created.intent.keyHash}.intent.json`);
+    const corrupt = "{";
+    await fs.writeFile(intentFile, corrupt, "utf8");
+    const rebuilt = await commitMemberArtifactDeliveryAssociation({
       rootDir: root,
       identity: identity(),
+      nowMs: 2,
+    });
+    expect(rebuilt).toEqual({ ok: false, reason: "intent_corrupt" });
+    expect(await fs.readFile(intentFile, "utf8")).toBe(corrupt);
+
+    const delivered = {
+      ...created.intent,
+      phase: "delivered",
+      externalEffect: "acknowledged",
+      retryable: false,
+      receiptMessageIds: ["m-1"],
+    };
+    await fs.writeFile(intentFile, `${JSON.stringify(delivered)}\n`, "utf8");
+    const before = await fs.readFile(intentFile, "utf8");
+    const kept = await commitMemberArtifactDeliveryAssociation({
+      rootDir: root,
+      identity: identity(),
+      nowMs: 3,
+    });
+    expect(kept.ok).toBe(true);
+    if (!kept.ok) {
+      return;
+    }
+    expect(kept.intent.phase).toBe("delivered");
+    expect(kept.intent.receiptMessageIds).toEqual(["m-1"]);
+    expect(await fs.readFile(intentFile, "utf8")).toBe(before);
+
+    const unknown = {
+      ...delivered,
       phase: "unknown",
       externalEffect: "unknown",
-    });
-    expect(unknown.ok).toBe(true);
-    if (!unknown.ok) {
-      return;
-    }
-    expect(unknown.intent.retryable).toBe(false);
-    const again = await commitMemberArtifactDeliveryAssociation({
+      retryable: false,
+    };
+    await fs.writeFile(intentFile, `${JSON.stringify(unknown)}\n`, "utf8");
+    const unknownBytes = await fs.readFile(intentFile, "utf8");
+    const stillUnknown = await commitMemberArtifactDeliveryAssociation({
       rootDir: root,
       identity: identity(),
-      nowMs: 9,
+      nowMs: 4,
     });
-    expect(again.ok).toBe(true);
-    if (!again.ok) {
+    expect(stillUnknown.ok).toBe(true);
+    if (!stillUnknown.ok) {
       return;
     }
-    expect(again.created).toBe(false);
-    expect(again.intent.phase).toBe("unknown");
-    expect(again.intent.keyHash).toBe(unknown.intent.keyHash);
+    expect(stillUnknown.intent.phase).toBe("unknown");
+    expect(stillUnknown.intent.retryable).toBe(false);
+    expect(await fs.readFile(intentFile, "utf8")).toBe(unknownBytes);
+  });
+
+  it("refuses the rename when both association files are missing", async () => {
+    const root = await rootDir();
+    const created = await commitMemberArtifactDeliveryAssociation({
+      rootDir: root,
+      identity: identity(),
+      nowMs: 1,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) {
+      return;
+    }
+    await fs.rm(path.join(root, "staged"), { recursive: true, force: true });
+    const renamed = await noteAssociationRenamedAwayFromStaged({
+      rootDir: root,
+      identity: identity(),
+      nowMs: 2,
+    });
+    expect(renamed).toEqual({ ok: false, reason: "association_files_missing" });
+    const raw = await fs.readFile(
+      path.join(root, "intents", `${created.intent.keyHash}.intent.json`),
+      "utf8",
+    );
+    expect(JSON.parse(raw).phase).toBe("staged");
+  });
+
+  it("does not share a key when fields contain separators", async () => {
+    const root = await rootDir();
+    const left = await commitMemberArtifactDeliveryAssociation({
+      rootDir: root,
+      identity: identity({ tenantId: "a\nb", groupId: "c" }),
+      nowMs: 1,
+    });
+    const right = await commitMemberArtifactDeliveryAssociation({
+      rootDir: root,
+      identity: identity({ tenantId: "a", groupId: "b\nc" }),
+      nowMs: 1,
+    });
+    expect(left.ok && right.ok).toBe(true);
+    if (!left.ok || !right.ok) {
+      return;
+    }
+    expect(left.intent.keyHash).not.toBe(right.intent.keyHash);
+    expect(deliveryKeyHash(identity({ tenantId: "a\nb", groupId: "c" }))).not.toBe(
+      deliveryKeyHash(identity({ tenantId: "a", groupId: "b\nc" })),
+    );
   });
 
   it("does not associate a group-final or unaccepted identity", async () => {

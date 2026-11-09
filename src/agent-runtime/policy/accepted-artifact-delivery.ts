@@ -62,11 +62,12 @@ export function normalizeDeliveryTarget(input: {
   return { channel, accountId: account.length > 0 ? account : null, to };
 }
 
+/** Fixed field array. JSON encoding keeps a separator inside one field from forming another field. */
 export function memberArtifactDeliveryKeyMaterial(
   identity: MemberArtifactDeliveryIdentity,
   target: NormalizedDeliveryTarget,
 ): string {
-  return [
+  return JSON.stringify([
     compact(identity.tenantId),
     compact(identity.groupId),
     compact(identity.taskId),
@@ -74,12 +75,12 @@ export function memberArtifactDeliveryKeyMaterial(
     compact(identity.acceptedSubmissionId),
     compact(identity.acceptedArtifactVersion),
     compact(identity.linkedDeliverableId),
-    String(identity.linkedDeliverableVersion),
+    identity.linkedDeliverableVersion ?? null,
     compact(identity.linkedContentSha256).toLowerCase(),
     target.channel,
-    target.accountId ?? "",
+    target.accountId,
     target.to,
-  ].join("\n");
+  ]);
 }
 
 export function evaluateMemberArtifactDeliveryEligibility(

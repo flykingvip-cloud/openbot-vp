@@ -58,5 +58,14 @@ describe("evaluateMemberArtifactDeliveryEligibility", () => {
     const left = memberArtifactDeliveryKeyMaterial(identity(), target!);
     const right = memberArtifactDeliveryKeyMaterial(identity({ tenantId: "ten-b" }), target!);
     expect(left).not.toBe(right);
+    const splitLeft = memberArtifactDeliveryKeyMaterial(
+      identity({ tenantId: "a\nb", groupId: "c" }),
+      target!,
+    );
+    const splitRight = memberArtifactDeliveryKeyMaterial(
+      identity({ tenantId: "a", groupId: "b\nc" }),
+      target!,
+    );
+    expect(splitLeft).not.toBe(splitRight);
   });
 });

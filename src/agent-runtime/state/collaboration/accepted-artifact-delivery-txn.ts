@@ -20,7 +20,8 @@ import { withDirectoryLock, writeJsonDurable } from "../repository/durable-json.
 export type DeliveryAssociationPhase =
   | "authorization_pending"
   | "staged"
-  | "queued"
+  /** Durable association after the staged suffix is renamed. Not an outbound queue entry. */
+  | "associated"
   | "delivered"
   | "unknown"
   | "blocked"
@@ -63,12 +64,17 @@ export type AssociationCommitResult =
 const RECOGNIZED: ReadonlySet<DeliveryAssociationPhase> = new Set([
   "authorization_pending",
   "staged",
-  "queued",
+  "associated",
   "delivered",
   "unknown",
   "blocked",
   "failed_retryable",
 ]);
+
+type IntentRead =
+  | { status: "missing" }
+  | { status: "ok"; intent: MemberArtifactDeliveryIntent }
+  | { status: "unreadable"; reason: "intent_corrupt" | "intent_unreadable" };
 
 function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
@@ -99,19 +105,34 @@ function partialPath(rootDir: string, keyHash: string): string {
   return path.join(rootDir, "staged", `bridge-${keyHash}.bridge-partial`);
 }
 
-async function readIntent(
-  rootDir: string,
-  keyHash: string,
-): Promise<MemberArtifactDeliveryIntent | null> {
+function isIntent(value: unknown, keyHash: string): value is MemberArtifactDeliveryIntent {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const parsed = value as MemberArtifactDeliveryIntent;
+  return parsed.version === 1 && parsed.keyHash === keyHash && RECOGNIZED.has(parsed.phase);
+}
+
+/** ENOENT is the only missing intent. Corrupt and IO errors must not be rebuilt. */
+async function readIntent(rootDir: string, keyHash: string): Promise<IntentRead> {
+  let raw: string;
   try {
-    const raw = await fs.readFile(intentPath(rootDir, keyHash), "utf8");
-    const parsed = JSON.parse(raw) as MemberArtifactDeliveryIntent;
-    if (parsed?.keyHash !== keyHash || !RECOGNIZED.has(parsed.phase)) {
-      return null;
+    raw = await fs.readFile(intentPath(rootDir, keyHash), "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      return { status: "missing" };
     }
-    return parsed;
+    return { status: "unreadable", reason: "intent_unreadable" };
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isIntent(parsed, keyHash)) {
+      return { status: "unreadable", reason: "intent_corrupt" };
+    }
+    return { status: "ok", intent: parsed };
   } catch {
-    return null;
+    return { status: "unreadable", reason: "intent_corrupt" };
   }
 }
 
@@ -208,7 +229,11 @@ export async function commitMemberArtifactDeliveryAssociation(params: {
     if (again.outcome === "deny") {
       return { ok: false, reason: again.reason };
     }
-    const existing = await readIntent(params.rootDir, keyHash);
+    const read = await readIntent(params.rootDir, keyHash);
+    if (read.status === "unreadable") {
+      return { ok: false, reason: read.reason };
+    }
+    const existing = read.status === "ok" ? read.intent : null;
     if (existing && existing.phase !== "authorization_pending") {
       return { ok: true, intent: existing, created: false };
     }
@@ -259,33 +284,42 @@ export async function noteAssociationRenamedAwayFromStaged(params: {
   }
   const nowMs = params.nowMs ?? Date.now();
   return withDirectoryLock(params.rootDir, keyHash, async () => {
-    const existing = await readIntent(params.rootDir, keyHash);
-    if (!existing) {
+    const read = await readIntent(params.rootDir, keyHash);
+    if (read.status === "unreadable") {
+      return { ok: false, reason: read.reason };
+    }
+    if (read.status === "missing") {
       return { ok: false, reason: "intent_missing" };
     }
-    if (existing.phase !== "staged" && existing.phase !== "queued") {
+    const existing = read.intent;
+    if (existing.phase !== "staged" && existing.phase !== "associated") {
       return { ok: true, intent: existing, created: false };
     }
     const from = stagedPath(params.rootDir, keyHash);
     const to = associatedPath(params.rootDir, keyHash);
-    try {
+    const source = await readStagedBody(from);
+    const destBefore = await readStagedBody(to);
+    if (source?.keyHash === keyHash) {
       await fs.rename(from, to);
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== "ENOENT") {
-        throw error;
-      }
+    } else if (destBefore?.keyHash !== keyHash) {
+      return { ok: false, reason: "association_files_missing" };
     }
-    const queued: MemberArtifactDeliveryIntent = {
+    const dest = await readStagedBody(to);
+    if (dest?.keyHash !== keyHash) {
+      return { ok: false, reason: "association_files_missing" };
+    }
+    if (existing.phase === "associated" && existing.stagedName === path.basename(to)) {
+      return { ok: true, intent: existing, created: false };
+    }
+    const retained: MemberArtifactDeliveryIntent = {
       ...existing,
-      phase: "queued",
+      phase: "associated",
       stagedName: path.basename(to),
       queueId: null,
-      bridgeSendStarted: false,
       updatedAtMs: nowMs,
     };
-    await writeJsonDurable(intentPath(params.rootDir, keyHash), queued);
-    return { ok: true, intent: queued, created: false };
+    await writeJsonDurable(intentPath(params.rootDir, keyHash), retained);
+    return { ok: true, intent: retained, created: false };
   });
 }
 
@@ -302,7 +336,11 @@ export async function recoverPartialStagedAssociation(params: {
   return withDirectoryLock(params.rootDir, keyHash, async () => {
     const staged = stagedPath(params.rootDir, keyHash);
     const body = await readStagedBody(staged);
-    const intent = await readIntent(params.rootDir, keyHash);
+    const read = await readIntent(params.rootDir, keyHash);
+    if (read.status === "unreadable") {
+      return { ok: false, reason: read.reason };
+    }
+    const intent = read.status === "ok" ? read.intent : null;
     if (body?.keyHash === keyHash) {
       return { ok: true, keyHash, completedFromIntent: false };
     }
@@ -319,77 +357,5 @@ export async function recoverPartialStagedAssociation(params: {
       }
     }
     return { ok: true, keyHash, completedFromIntent: false };
-  });
-}
-
-/**
- * Records a later non-send observation on an existing key.
- * Retryable failure requires `externalEffect: "none"`.
- * Effect-unknown stays `unknown` and is not retryable.
- */
-export async function recordAssociationObservation(params: {
-  rootDir: string;
-  identity: MemberArtifactDeliveryIdentity;
-  phase: "unknown" | "failed_retryable" | "delivered";
-  externalEffect: DeliveryExternalEffect;
-  receiptMessageIds?: string[];
-  nowMs?: number;
-}): Promise<AssociationCommitResult> {
-  const keyHash = deliveryKeyHash(params.identity);
-  if (!keyHash) {
-    return { ok: false, reason: "target_required" };
-  }
-  const nowMs = params.nowMs ?? Date.now();
-  return withDirectoryLock(params.rootDir, keyHash, async () => {
-    const existing = await readIntent(params.rootDir, keyHash);
-    if (!existing) {
-      return { ok: false, reason: "intent_missing" };
-    }
-    if (params.phase === "delivered") {
-      const ids = (params.receiptMessageIds ?? [])
-        .map((id) => id.trim())
-        .filter((id) => id.length > 0);
-      if (ids.length === 0 || params.externalEffect !== "acknowledged") {
-        return { ok: false, reason: "receipt_required" };
-      }
-      const delivered: MemberArtifactDeliveryIntent = {
-        ...existing,
-        phase: "delivered",
-        externalEffect: "acknowledged",
-        retryable: false,
-        receiptMessageIds: ids,
-        updatedAtMs: nowMs,
-      };
-      await writeJsonDurable(intentPath(params.rootDir, keyHash), delivered);
-      return { ok: true, intent: delivered, created: false };
-    }
-    if (params.phase === "failed_retryable") {
-      if (params.externalEffect !== "none") {
-        return { ok: false, reason: "retry_requires_no_external_effect" };
-      }
-      const retryable: MemberArtifactDeliveryIntent = {
-        ...existing,
-        phase: "failed_retryable",
-        bridgeSendStarted: true,
-        externalEffect: "none",
-        retryable: true,
-        updatedAtMs: nowMs,
-      };
-      await writeJsonDurable(intentPath(params.rootDir, keyHash), retryable);
-      return { ok: true, intent: retryable, created: false };
-    }
-    if (params.externalEffect !== "unknown") {
-      return { ok: false, reason: "unknown_requires_unknown_effect" };
-    }
-    const unknown: MemberArtifactDeliveryIntent = {
-      ...existing,
-      phase: "unknown",
-      bridgeSendStarted: true,
-      externalEffect: "unknown",
-      retryable: false,
-      updatedAtMs: nowMs,
-    };
-    await writeJsonDurable(intentPath(params.rootDir, keyHash), unknown);
-    return { ok: true, intent: unknown, created: false };
   });
 }
