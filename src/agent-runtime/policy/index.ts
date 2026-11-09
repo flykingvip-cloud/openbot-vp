@@ -128,3 +128,89 @@ export type {
   BoardTodolistDeliveryMapping,
   ClaimBoardAction,
 } from "./collaboration-rules.js";
+export {
+  MULTI_BEAT_DEFAULT_MAX,
+  MULTI_BEAT_HARD_CEILING,
+  clampMaxBeatsPerEpisode,
+} from "./collaboration-rules.js";
+export type {
+  GroupPolicyInput,
+  PolicyValueSource,
+  EffectivePolicyValue,
+  PolicyClamp,
+  EffectivePolicyProvenance,
+  EffectiveCollaborationPolicy,
+  TaskResponsibility,
+  TaskHandoff,
+  CollaborationTaskState,
+  TargetRoundState,
+  FloorOpenness,
+  FloorProtocol,
+  CollaborationReplyLanguagePreference,
+  FloorBudgets,
+  FloorTuning,
+  DispatchTuning,
+  EffectiveContextPolicy,
+  GovernanceRole,
+  ActorCapability,
+  GovernanceTaskPolicy,
+  DeepProvenance,
+} from "./collaboration-policy-model.js";
+export {
+  compileEffectiveCollaborationPolicy,
+  groupPolicyInputFromOperatingState,
+} from "./collaboration-compile.js";
+export {
+  L1_FLOOR_TUNING_DEFAULTS,
+  L1_TIER1_MERGE_DEFAULTS,
+  L1_CHEAP_GATE_DEFAULTS,
+  L1_KEYWORD_CAPS_DEFAULTS,
+  L1_TIMEOUT_DEFAULTS,
+  L1_CONTEXT_DEFAULTS,
+  L1_GOVERNANCE_CAPABILITIES,
+  policyValue,
+  resolveFloorOpenness,
+  compileParticipationSegment,
+  compileDispatchSegment,
+  compileGovernanceSegment,
+  compileContextSegment,
+  compilePresentationSegment,
+  collectSegmentLeafPaths,
+  measureProvenanceCoverage,
+  assertProvenanceCoverage100,
+} from "./collaboration-compile-sections.js";
+export type {
+  ParticipationSegment,
+  DispatchSegment,
+  GovernanceSegment,
+  PresentationSegment,
+  SegmentProvenance,
+} from "./collaboration-compile-sections.js";
+export {
+  hashEffectiveCollaborationPolicy,
+  legacyEffectivePolicySlice,
+  hashLegacyEffectivePolicySlice,
+} from "./collaboration-compile-hash.js";
+export {
+  POLICY_COMPILER_REVISION,
+  deepFreeze,
+  hashProvenanceAndClamps,
+} from "./collaboration-policy-identity.js";
+export type { DeepReadonly, FrozenEffectivePolicy } from "./collaboration-policy-identity.js";
+export {
+  resolveHandoffApproval,
+  handoffPartyLooksLikeBot,
+  responsibilityFromHandoffTask,
+  applyHandoffContractToResponsibility,
+  classifyHandoffApplyAgainstLive,
+  appendHandoffHistoryById,
+} from "./collaboration-handoff.js";
+export type {
+  HandoffResponsibilityRole,
+  HandoffKindName,
+  HandoffApprovalName,
+  HandoffPartyView,
+  HandoffContractView,
+  HandoffTaskView,
+  HandoffLiveApplyDecision,
+} from "./collaboration-handoff.js";
