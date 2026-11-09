@@ -292,10 +292,10 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
   {
     id: "task.park.abort_inflight",
     category: "invariant",
-    currentOwner: "conversation-task",
+    currentOwner: "policy",
     targetOwner: "policy",
     scope: "focus switch abort",
-    implementation: "src/conversation-task/park-abort.ts",
+    implementation: "src/agent-runtime/policy/explicit-task-control.ts",
     enforcementPoints: ["before_focus_switch_abort", "gateway_chat_live"],
     version: INVENTORY_VERSION,
     dependencies: {
@@ -304,13 +304,14 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     },
     configuration: "none",
     tests: [
+      "src/agent-runtime/policy/explicit-task-control.test.ts",
       "src/conversation-task/turn-relation.test.ts",
       "src/conversation-task/session-task-board.inbound-stop.test.ts",
     ],
     retirementCondition:
-      "predicate is split from classifyTurnRelation; do not promote that classifier; move this predicate into policy/index only in a commit that does not mix landing streams",
+      "predicate is the policy public entry; classifyTurnRelation stays out of policy; park-abort.ts and turn-relation only re-export it",
     management: "code_required",
-    disposition: "pending_migration",
+    disposition: "retain",
   },
   {
     id: "task.constraint.owner_gate",
@@ -374,10 +375,10 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
   {
     id: "task.focus.wake",
     category: "operational",
-    currentOwner: "conversation-task",
+    currentOwner: "policy",
     targetOwner: "policy",
-    scope: "focus-wake eligibility + MAX_PARKED_SLOTS",
-    implementation: "src/conversation-task/focus-policy.ts",
+    scope: "focus-wake eligibility; slot cap stays beside decideWake",
+    implementation: "src/agent-runtime/policy/explicit-task-control.ts",
     enforcementPoints: ["before_focus_wake", "parked_slot_limit"],
     version: INVENTORY_VERSION,
     dependencies: {
@@ -386,11 +387,14 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     },
     configuration:
       "MAX_PARKED_SLOTS is an execution slot, not MAX_PARKED_TASKS; heartbeat cannot create_identity, write_completion, or replan",
-    tests: ["src/conversation-task/focus-policy.test.ts"],
+    tests: [
+      "src/agent-runtime/policy/explicit-task-control.test.ts",
+      "src/conversation-task/focus-policy.test.ts",
+    ],
     retirementCondition:
-      "evaluateWakeEligibility is separate from decideWake; claim and board writes stay in state; do not hard-merge slot and task caps",
+      "eligibility is the policy public entry; decideWake and MAX_PARKED_SLOTS stay in focus-policy as the wake action; claim writes stay in state; do not hard-merge slot and task caps",
     management: "reviewed_parameters",
-    disposition: "pending_migration",
+    disposition: "retain",
   },
   {
     id: "task.focus.switch",

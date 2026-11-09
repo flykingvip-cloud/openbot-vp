@@ -2,7 +2,7 @@ import { stripInboundStamp } from "../agent-runtime/policy/index.js";
 export { stripInboundStamp } from "../agent-runtime/policy/index.js";
 import { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
 export { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
-export { shouldTaskParkAbortInFlight } from "./park-abort.js";
+export { shouldTaskParkAbortInFlight } from "../agent-runtime/policy/index.js";
 /**
  * Relation of an incoming user turn to the current session task.
  * Only `new_work` may park, cut context, and abort the in-flight run.
