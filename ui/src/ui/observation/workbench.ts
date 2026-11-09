@@ -318,9 +318,9 @@ export class OpenBotObservationWorkbench extends LitElement {
       <div class="obs-tenant-card__stats">
         <div><span>${isCurrent ? "目录调用参考" : "近 7 天调用"}</span><strong>${isCurrent ? "—" : calls}</strong></div>
         <div><span>${isCurrent ? "目录成本参考" : "近 7 天成本"}</span><strong>${isCurrent ? "—" : cost}</strong></div>
-        <div><span>${isCurrent ? "成功率（非当前事件）" : "成功率"}</span><strong>${successDisplay}</strong></div>
+        <div><span>目录成功率参考（口径/分母未供给）</span><strong>${successDisplay}</strong></div>
       </div>
-      <small>${isCurrent ? "目录健康参考 · 非本次运行事件" : `摘要时间 ${stamp}`} · 点击定位运行与改善</small>
+      <small>${isCurrent ? "目录健康参考 · 非本次运行事件" : `摘要时间 ${stamp}`} · 点击仅筛选已映射数据，不代表业务闭环关联</small>
     </button>`;
   }
   private renderCoverage(view: ObservationView) {
@@ -801,7 +801,7 @@ export class OpenBotObservationWorkbench extends LitElement {
       : undefined;
     return html`<div class="obs-workbench" id="observation-workbench" data-observation-source=${view.source} data-time-window=${this.role === "platform" ? this.timeWindow : "enterprise"} data-tenant-filter=${this.tenantFilter}>
       <div class="obs-header"><div><span class="obs-eyebrow">${this.role === "platform" ? "OBSERVABILITY" : "SELF-EVOLUTION / OBSERVABILITY"}</span><h2>${this.role === "platform" ? "实时运行与改善" : "任务质量进化中心"}</h2><p>${this.role === "platform" ? "不混淆一次成功调用与一项被验收的工作。" : "观测 → 诊断 → 候选与实验 → 效果与治理"}</p></div>
-        <div class="obs-source"><span class="obs-source-label">数据源</span><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select></div></div>
+        <div class="obs-source"><span class="obs-source-label">连接工作台数据源</span><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select><small>仅影响连接工作台，不影响独立精确任务查询。</small></div></div>
       ${
         this.role === "enterprise" && this.targets.length
           ? html`<div class="obs-session"><label>当前会话 <select aria-label="观测目标" .value=${this.sessionKey ?? ""} @change=${(

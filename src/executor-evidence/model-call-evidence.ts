@@ -7,6 +7,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { readEmbeddedFailureUsage } from "../agent-runtime/execution/runner/embedded-failure-usage.js";
 import type { TrustedScope } from "../task-outcome/types.js";
 
 export const MODEL_CALL_EVIDENCE_SCHEMA_VERSION = 1 as const;
@@ -405,12 +406,18 @@ export async function observeModelCandidate<T>(params: {
   } catch (err) {
     if (!call.finished) {
       const kind = params.classifyError?.(err) ?? "error";
+      const retained = readEmbeddedFailureUsage(err, {
+        runId: params.context.runId,
+        provider: params.provider,
+        model: params.model,
+      });
       finishModelCall(call, {
         status: kind === "cancelled" ? "cancelled" : "failed",
         terminalCause:
           kind === "timeout" ? "timeout" : kind === "cancelled" ? "cancelled" : "error",
-        usageSource: "absent",
-        usageAggregation: "per_call",
+        usage: retained?.usage,
+        usageSource: retained ? "trusted_embedded_candidate_failure" : "absent",
+        usageAggregation: retained?.aggregation ?? "provider_aggregate_internal_retries_unknown",
       });
     }
     throw err;

@@ -162,6 +162,17 @@ describe("platform tenant compare filters", () => {
     expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("42");
     expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("3.50");
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).toContain("未知");
+    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain(
+      "目录成功率参考（口径/分母未供给）",
+    );
+    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).not.toContain(
+      "任务成功率",
+    );
+    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain(
+      "点击仅筛选已映射数据，不代表业务闭环关联",
+    );
+    expect(panel.querySelector(".obs-source")?.textContent).toContain("连接工作台数据源");
+    expect(panel.querySelector(".obs-source")?.textContent).toContain("不影响独立精确任务查询");
     expect(panel.querySelector(".obs-event-scope")?.textContent).toContain(
       "下方运行证据仍是当前连接窗口",
     );

@@ -23,7 +23,6 @@ export async function runEmbeddedAttemptSession(
   params: EmbeddedRunAttemptParams,
   s: EmbeddedAttemptState,
 ): Promise<void> {
-  s.sessionManager = undefined;
   s.session = undefined;
   s.removeToolResultContextGuard = undefined;
   s.removeContextCompiler = undefined;

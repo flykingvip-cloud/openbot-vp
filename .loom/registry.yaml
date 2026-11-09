@@ -10778,6 +10778,43 @@ tasks:
     ownerHistory: []
     since: 2026-11-01
     metadata: {}
+  - id: agent-runtime-pptx-renderer-deploy
+    owner: codex-runtime-manager
+    intent: []
+    paths:
+      - Dockerfile.pptx-renderer
+      - src/gateway/office-pptx-render.ts
+      - src/gateway/office-pptx-render.test.ts
+      - scripts/pptx-renderer/worker.mts
+      - .kiro/specs/agent-runtime-pptx-renderer-deploy/**
+    state: active
+    sessions:
+      - id: 80f91749-3fdd-4eb5-bd12-6ee01028a438
+        taskId: agent-runtime-pptx-renderer-deploy
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-04T04:09:36.924Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-04
+    metadata: {}
+  - id: ensure-package-update-when-ready-20261105
+    owner: cursor-grok
+    intent:
+      - ensure package update when ready UI
+    paths:
+      - .loom/registry.yaml
+      - ui/src/i18n/locales/en.ts
+      - ui/src/i18n/locales/zh-CN.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-governance-center-surface.ts
+      - ui/src/ui/views/knowledge-universe-space-connector-bind.ts
+      - ui/src/ui/views/knowledge-universe-space-connector-bind.node.test.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-11-05
+    metadata: {}
   - id: agent-runtime-convergence
     owner: 双规发布
     intent:
@@ -12385,45 +12422,8 @@ tasks:
         via: confirmed
     since: 2026-11-03
     metadata: {}
-  - id: agent-runtime-pptx-renderer-deploy
-    owner: codex-runtime-manager
-    intent: []
-    paths:
-      - Dockerfile.pptx-renderer
-      - src/gateway/office-pptx-render.ts
-      - src/gateway/office-pptx-render.test.ts
-      - scripts/pptx-renderer/worker.mts
-      - .kiro/specs/agent-runtime-pptx-renderer-deploy/**
-    state: active
-    sessions:
-      - id: 80f91749-3fdd-4eb5-bd12-6ee01028a438
-        taskId: agent-runtime-pptx-renderer-deploy
-        ide: codex
-        agent: codex-runtime-manager
-        status: active
-        lastSignalAt: 2026-11-04T04:09:36.924Z
-        metadata: {}
-    ownerHistory: []
-    since: 2026-11-04
-    metadata: {}
-  - id: ensure-package-update-when-ready-20261105
-    owner: cursor-grok
-    intent:
-      - ensure package update when ready UI
-    paths:
-      - .loom/registry.yaml
-      - ui/src/i18n/locales/en.ts
-      - ui/src/i18n/locales/zh-CN.ts
-      - ui/src/ui/ports/enterprise/views/enterprise-data-governance-center-surface.ts
-      - ui/src/ui/views/knowledge-universe-space-connector-bind.ts
-      - ui/src/ui/views/knowledge-universe-space-connector-bind.node.test.ts
-    state: active
-    sessions: []
-    ownerHistory: []
-    since: 2026-11-05
-    metadata: {}
   - id: agent-runtime-observability:codex-observe-owner
-    owner: 双规发布
+    owner: codex-observe-owner
     intent:
       - runtime-observability-p0-p1
     paths:
@@ -12507,6 +12507,27 @@ tasks:
       - src/task-outcome/types.ts
       - .kiro/specs/agent-runtime-observability/materials-manifest.md
       - out/agent-runtime-observability-optimization-plan.md
+      - src/agent-runtime/execution/runner/embedded-attempt-preflight.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-tools.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream-inner.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-prompt.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-closeout.ts
+      - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+      - src/agent-runtime/execution/runner/embedded-run-auth.ts
+      - src/agent-runtime/execution/runner/embedded-run-result.ts
+      - src/agent-runtime/execution/runner/embedded-result.ts
+      - src/agent-runtime/execution/runner/embedded-attempt.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-continue.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-phase-state.ts
+      - src/agent-runtime/state/repository/async-wait-job-recovery.test.ts
+      - ui/src/ui/observation/workbench.ts
+      - ui/src/ui/observation/workbench.browser.test.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-embedded.ts
+      - src/agent-runtime/execution/runner/embedded-run-failover.ts
+      - src/agent-runtime/execution/runner/embedded-failure-usage.ts
+      - src/agent-runtime/execution/runner/embedded-failure-usage.test.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-failure.integration.test.ts
     state: active
     sessions:
       - id: observe-owner-20261106
@@ -12593,10 +12614,108 @@ tasks:
         status: active
         lastSignalAt: 2026-11-08T12:44:24.197Z
         metadata: {}
+      - id: acceptance-registry-merge-20261109
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-owner
+        status: active
+        lastSignalAt: 2026-11-08T23:52:26.572Z
+        metadata: {}
+      - id: acceptance-runner-types-20261109
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-backend
+        status: active
+        metadata:
+          role: contributor
+          worktree: /Users/daniel/.codex/worktrees/executor-observation-acceptance/openbot
+          paths:
+            - src/agent-runtime/execution/runner/embedded-attempt-preflight.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-tools.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-stream.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-stream-inner.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-prompt.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-closeout.ts
+            - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+            - src/agent-runtime/execution/runner/embedded-run-auth.ts
+            - src/agent-runtime/execution/runner/embedded-run-result.ts
+            - src/agent-runtime/execution/runner/embedded-result.ts
+            - src/agent-runtime/execution/runner/embedded-attempt.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-continue.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-phase-state.ts
+        lastSignalAt: 2026-11-09T00:01:06.397Z
+      - id: acceptance-platform-input-20261109
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-ui
+        status: active
+        metadata:
+          role: contributor
+          worktree: /Users/daniel/.codex/worktrees/executor-observation-acceptance/openbot
+          paths:
+            - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+            - ui/src/ui/ports/diagnosis/diagnosis-panel-observation.browser.test.ts
+        lastSignalAt: 2026-11-09T00:01:06.397Z
+      - id: acceptance-recovery-import-20261109
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-owner
+        status: active
+        metadata:
+          role: owner
+          worktree: /Users/daniel/.codex/worktrees/executor-observation-acceptance/openbot
+          paths:
+            - src/agent-runtime/state/repository/async-wait-job-recovery.test.ts
+        lastSignalAt: 2026-11-09T00:01:06.397Z
+      - id: acceptance-workbench-wording-20261109
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-ui
+        status: active
+        metadata:
+          role: contributor
+          paths:
+            - ui/src/ui/observation/workbench.ts
+            - ui/src/ui/observation/workbench.browser.test.ts
+          scope: catalog reference success wording and connection sample scope only
+        lastSignalAt: 2026-11-09T00:10:21.031Z
+      - id: acceptance-failure-usage-20261109
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-backend
+        status: active
+        metadata:
+          role: contributor
+          paths:
+            - src/agent-runtime/execution/runner/admitted-candidate-embedded.ts
+            - src/agent-runtime/execution/runner/admitted-candidate.test.ts
+            - src/agent-runtime/execution/runner/embedded-run-result.ts
+            - src/agent-runtime/execution/runner/embedded-run-failover.ts
+            - src/agent-runtime/execution/runner/embedded-failure-usage.ts
+            - src/agent-runtime/execution/runner/embedded-failure-usage.test.ts
+            - src/agent-runtime/execution/runner/admitted-candidate-failure.integration.test.ts
+          scope: candidate aggregate failure usage and terminal semantics
+        lastSignalAt: 2026-11-09T00:10:41.362Z
+      - id: acceptance-failure-evidence-20261109
+        taskId: agent-runtime-observability:codex-observe-owner
+        ide: codex
+        agent: codex-observe-backend
+        status: active
+        metadata:
+          role: contributor
+          paths:
+            - src/executor-evidence/model-call-evidence.ts
+            - src/executor-evidence/model-call-evidence.isolation.test.ts
+          scope: trusted failure usage attachment and explicit aggregate granularity only
+        lastSignalAt: 2026-11-09T00:11:34.976Z
     ownerHistory:
       - fromOwner: codex-observe-owner
         toOwner: 双规发布
         at: 2026-11-08T12:44:24.197Z
+        via: confirmed
+      - fromOwner: 双规发布
+        toOwner: codex-observe-owner
+        at: 2026-11-08T23:52:26.572Z
         via: confirmed
     since: 2026-11-06
     metadata: {}
@@ -12624,18 +12743,119 @@ tasks:
     since: 2026-11-09
     metadata: {}
 landingStreams:
-  - id: pr250-office-preview-prerequisite-20261109
+  - id: pr252-stack-current250-20261109
     landingPolicy: serial
     paths:
       - .loom/registry.yaml
+    canLandWith: []
+    metadata:
+      task: pr252-integration
+      agent: codex-runtime-manager
+      purpose: Current PR250 ancestor, all parent records preserved, only identical duplicate tasks
+        coalesced.
+  - id: pr252-preserve250-latest-integration-20261109
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/agent-runtime-convergence/failure-closeout-review-20261109.md
+      - .kiro/specs/agent-runtime-convergence/limited-review-b92d96340-20261108.md
+      - .kiro/specs/agent-runtime-convergence/phase-split-repair-20261109.md
+      - .kiro/specs/agent-runtime-convergence/real-runtime-acceptance-20261109.md
+      - .kiro/specs/agent-runtime-convergence/restricted-interaction-20261109.md
+      - .loom/registry.yaml
+      - scripts/architecture/manifest.json
+      - src/agent-runtime/command/execution-admission.test.ts
+      - src/agent-runtime/command/execution-admission.ts
+      - src/agent-runtime/command/index.ts
+      - src/agent-runtime/command/interaction-sources.test.ts
+      - src/agent-runtime/command/interaction-sources.ts
+      - src/agent-runtime/command/route-interaction.ts
+      - src/agent-runtime/command/task-proposal-reply.ts
+      - src/agent-runtime/context/index.ts
+      - src/agent-runtime/context/sources/browser-routing.ts
+      - src/agent-runtime/context/system-prompt.ts
+      - src/agent-runtime/context/trust/sanitize-for-prompt.ts
+      - src/agent-runtime/contracts/delivery.ts
+      - src/agent-runtime/contracts/execution.ts
+      - src/agent-runtime/contracts/interaction-availability.ts
+      - src/agent-runtime/contracts/interaction.ts
+      - src/agent-runtime/contracts/prompt.ts
+      - src/agent-runtime/contracts/task-control.ts
+      - src/agent-runtime/delivery/dispatch/command-result.ts
+      - src/agent-runtime/delivery/dispatch/confirm-pending.test.ts
+      - src/agent-runtime/delivery/dispatch/confirm-pending.ts
+      - src/agent-runtime/execution/index.ts
+      - src/agent-runtime/execution/outcomes/command-outcome.ts
+      - src/agent-runtime/execution/runner/admitted-turn-recovery.ts
+      - src/agent-runtime/execution/runner/admitted-turn.test.ts
+      - src/agent-runtime/execution/runner/command-budget.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-continue.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-prompt.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-session.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream-inner.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-tools.ts
+      - src/agent-runtime/execution/runner/embedded-attempt.ts
+      - src/agent-runtime/execution/runner/embedded-result.ts
+      - src/agent-runtime/execution/runner/embedded-run-failover.ts
+      - src/agent-runtime/model/authorized-session.ts
+      - src/agent-runtime/model/command-admission-session.test.ts
+      - src/agent-runtime/model/command-admission-session.ts
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/metadata-completion.test.ts
+      - src/agent-runtime/policy/index.ts
+      - src/agent-runtime/policy/interaction-availability.ts
+      - src/agent-runtime/state/repository/interaction-board-read.test.ts
+      - src/agent-runtime/state/repository/session-task.ts
+      - src/agent-runtime/state/repository/task-board-file.ts
+      - src/agent-runtime/wiring/delivery-confirm.ts
+      - src/agent-runtime/wiring/prepared-interaction.test.ts
+      - src/agents/date-time.ts
+      - src/agents/model-fallback.sandbox-infra.test.ts
+      - src/agents/model-fallback.ts
+      - src/agents/pi-embedded-helpers/types.ts
+      - src/agents/pi-embedded-runner/run.overflow-compaction.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
+      - src/agents/sandbox/account-computer-browser-routing.ts
+      - src/agents/sandbox/account-scope.ts
+      - src/agents/sanitize-for-prompt.ts
+      - src/agents/system-prompt.context-source.test.ts
+      - src/agents/system-prompt.public-boundary.test.ts
+      - src/agents/system-prompt.ts
+      - src/agents/task-surface/surface.test.ts
+      - src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/thinking.ts
+      - src/auto-reply/tokens.ts
+      - src/commands/agent.delivery.test.ts
+      - src/commands/agent.ts
+      - src/conversation-task/async-process-lifecycle.test.ts
+      - src/conversation-task/focus-switch.test.ts
+      - src/conversation-task/focus-switch.ts
+      - src/conversation-task/session-task-board.cross-process-child.ts
+      - src/conversation-task/session-task-board.inbound-stop.test.ts
+      - src/conversation-task/session-task-board.seed-audit.test.ts
+      - src/conversation-task/session-task-board.slice3-context.test.ts
+      - src/conversation-task/session-task-board.test.ts
+      - src/conversation-task/session-task-board.ts
+      - src/conversation-task/task-board-continue.test.ts
+      - src/gateway/billing/agent-run-governance.ts
+      - src/gateway/chat-inbound-stage-events.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+      - src/gateway/collaboration-dispatch/legacy-production-executor.g8.test.ts
+      - src/gateway/server-methods/chat.resume-parked-recheck.test.ts
+      - src/gateway/server-methods/chat.ts
       - src/office-suite/service.ts
+      - src/task-orchestration/complex-task-loop.test.ts
+      - test/fixtures/runtime-convergence/async-wait-recovery-child.ts
+      - test/fixtures/runtime-convergence/pending-delivery.restart-child.ts
       - src/office-suite/office-suite.preview-contract.test.ts
     canLandWith: []
     metadata:
-      task: agent-runtime-convergence
+      task: four-pr-merge-readiness
       agent: codex-runtime-manager
-      purpose: Fix confirmed current-main preview summary contract; no additional Office feature.
-  - id: pr250-main253-sync-20261109
+      purpose: Three-way registry merge preserving tasks, sessions and landing history.
+      officePreviewFix: "New main #253 passed an object to text HTML rendering; bounded JSON serialization
+        red-to-green."
+  - id: pr252-main253-sync-20261109
     landingPolicy: serial
     paths:
       - .loom/registry.yaml
@@ -12675,6 +12895,831 @@ landingStreams:
       task: four-pr-merge-readiness
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
+  - id: executor-observation-acceptance-fixed-integration-20261109
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/agent-runtime-convergence/acceptance-boundary.md
+      - .kiro/specs/agent-runtime-convergence/admitted-backend-port.md
+      - .kiro/specs/agent-runtime-convergence/admitted-turn-ownership.md
+      - .kiro/specs/agent-runtime-convergence/archive/interaction-retirement-2026-11-05.md
+      - .kiro/specs/agent-runtime-convergence/authority-map.md
+      - .kiro/specs/agent-runtime-convergence/builder-component-contract.md
+      - .kiro/specs/agent-runtime-convergence/candidate-extraction-map.md
+      - .kiro/specs/agent-runtime-convergence/candidate-invariants.md
+      - .kiro/specs/agent-runtime-convergence/command-public-api.md
+      - .kiro/specs/agent-runtime-convergence/completion-gates.md
+      - .kiro/specs/agent-runtime-convergence/context-budget-map.md
+      - .kiro/specs/agent-runtime-convergence/context-component-plan.md
+      - .kiro/specs/agent-runtime-convergence/context-source-map.md
+      - .kiro/specs/agent-runtime-convergence/core-contract-map.md
+      - .kiro/specs/agent-runtime-convergence/current-mainline-review-2026-11-05.md
+      - .kiro/specs/agent-runtime-convergence/current-mainline-review-2026-11-06.md
+      - .kiro/specs/agent-runtime-convergence/delivery-outlet-map.md
+      - .kiro/specs/agent-runtime-convergence/delivery-quality-contract-map.md
+      - .kiro/specs/agent-runtime-convergence/delivery-quality-lifecycle-plan.md
+      - .kiro/specs/agent-runtime-convergence/design.md
+      - .kiro/specs/agent-runtime-convergence/execution-five-stage-map.md
+      - .kiro/specs/agent-runtime-convergence/execution-ports-plan.md
+      - .kiro/specs/agent-runtime-convergence/expert-1-architecture-acceptance-2026-11-06.md
+      - .kiro/specs/agent-runtime-convergence/expert-2-mainline-acceptance-2026-11-06.md
+      - .kiro/specs/agent-runtime-convergence/expert-3-retirement-acceptance-2026-11-06.md
+      - .kiro/specs/agent-runtime-convergence/extension-disposition.md
+      - .kiro/specs/agent-runtime-convergence/final-convergence-plan.md
+      - .kiro/specs/agent-runtime-convergence/migration-matrix.md
+      - .kiro/specs/agent-runtime-convergence/observability-handoff-v2.md
+      - .kiro/specs/agent-runtime-convergence/onboarding-and-rule-retirement.md
+      - .kiro/specs/agent-runtime-convergence/original-intent-preservation.md
+      - .kiro/specs/agent-runtime-convergence/overall-boundary-review.md
+      - .kiro/specs/agent-runtime-convergence/overall-code-review.md
+      - .kiro/specs/agent-runtime-convergence/package6-same-sha-acceptance.md
+      - .kiro/specs/agent-runtime-convergence/pptx-preview-download-fix.md
+      - .kiro/specs/agent-runtime-convergence/retirement-gates.md
+      - .kiro/specs/agent-runtime-convergence/retirement-intent-audit.md
+      - .kiro/specs/agent-runtime-convergence/retirement-intent-contract.md
+      - .kiro/specs/agent-runtime-convergence/safe-retirements.md
+      - .kiro/specs/agent-runtime-convergence/scenario-architecture.md
+      - .kiro/specs/agent-runtime-convergence/structure-alignment.md
+      - .kiro/specs/agent-runtime-convergence/task-close-audit.md
+      - .kiro/specs/agent-runtime-convergence/tasks.md
+      - .kiro/specs/agent-runtime-convergence/transition-baseline.md
+      - .kiro/specs/agent-runtime-convergence/wiring-policy-boundaries.md
+      - .kiro/specs/agent-runtime-observability/acceptance-matrix.md
+      - .kiro/specs/agent-runtime-observability/capacity-probe.ts
+      - .kiro/specs/agent-runtime-observability/deployment-handoff-20261109.md
+      - .kiro/specs/agent-runtime-observability/evidence/p4-capacity-probe.json
+      - .kiro/specs/agent-runtime-observability/evidence/p4-retention-acceptance.md
+      - .kiro/specs/agent-runtime-observability/local-readonly-acceptance-20261108.md
+      - .kiro/specs/agent-runtime-observability/materials-manifest.md
+      - .kiro/specs/agent-runtime-observability/tasks.md
+      - .kiro/specs/constitutional-governance-discovery/execution-entry-inventory.md
+      - .kiro/specs/execution-router-phase0/shadow/artifact.ts
+      - .loom/registry.yaml
+      - CHANGELOG.md
+      - out/agent-runtime-observability-optimization-plan.md
+      - scripts/architecture/manifest.json
+      - scripts/check-architecture-manifest.ts
+      - src/agent-runtime/capabilities/adapters/after-turn-context.ts
+      - src/agent-runtime/capabilities/adapters/attempt-sandbox.ts
+      - src/agent-runtime/capabilities/adapters/attempt-workspace-policy.ts
+      - src/agent-runtime/capabilities/adapters/context-after-turn.ts
+      - src/agent-runtime/capabilities/adapters/context-compiler.ts
+      - src/agent-runtime/capabilities/adapters/model-resolve-hooks.test.ts
+      - src/agent-runtime/capabilities/adapters/model-resolve-hooks.ts
+      - src/agent-runtime/capabilities/adapters/prompt-build-hooks.ts
+      - src/agent-runtime/capabilities/adapters/protocol-body-boundary.ts
+      - src/agent-runtime/capabilities/catalog.test.ts
+      - src/agent-runtime/capabilities/catalog.ts
+      - src/agent-runtime/capabilities/index.ts
+      - src/agent-runtime/capabilities/invocation/abort.test.ts
+      - src/agent-runtime/capabilities/invocation/abort.ts
+      - src/agent-runtime/capabilities/invocation/before-call.ts
+      - src/agent-runtime/command/authorized-interaction.ts
+      - src/agent-runtime/command/command-outcome-entry.test.ts
+      - src/agent-runtime/command/command-outcome-entry.ts
+      - src/agent-runtime/command/execution-admission.test.ts
+      - src/agent-runtime/command/execution-admission.ts
+      - src/agent-runtime/command/gateway-task-stop.test.ts
+      - src/agent-runtime/command/gateway-task-stop.ts
+      - src/agent-runtime/command/governed-interaction.ts
+      - src/agent-runtime/command/index.ts
+      - src/agent-runtime/command/ingress-kind.test.ts
+      - src/agent-runtime/command/ingress-kind.ts
+      - src/agent-runtime/command/interpret-interaction.test.ts
+      - src/agent-runtime/command/interpret-interaction.ts
+      - src/agent-runtime/command/prepared-interaction.ts
+      - src/agent-runtime/command/route-interaction.test.ts
+      - src/agent-runtime/command/route-interaction.ts
+      - src/agent-runtime/command/scenarios/collaboration-entry.test.ts
+      - src/agent-runtime/command/scenarios/collaboration-entry.ts
+      - src/agent-runtime/command/task-proposal-reply.test.ts
+      - src/agent-runtime/command/task-proposal-reply.ts
+      - src/agent-runtime/command/task-status-format.test.ts
+      - src/agent-runtime/command/task-status.test.ts
+      - src/agent-runtime/command/task-status.ts
+      - src/agent-runtime/context/aside-budget.test.ts
+      - src/agent-runtime/context/aside-budget.ts
+      - src/agent-runtime/context/assembly.test.ts
+      - src/agent-runtime/context/assembly.ts
+      - src/agent-runtime/context/catalog/collaboration-member.ts
+      - src/agent-runtime/context/catalog/individual.ts
+      - src/agent-runtime/context/compilation/active-task-seed.ts
+      - src/agent-runtime/context/compilation/atomic-units.ts
+      - src/agent-runtime/context/compilation/collab-compile-strategy.ts
+      - src/agent-runtime/context/compilation/compile.ts
+      - src/agent-runtime/context/compilation/lane-budget.ts
+      - src/agent-runtime/context/compilation/message-size.ts
+      - src/agent-runtime/context/compilation/normalize-outbound.ts
+      - src/agent-runtime/context/compilation/shrink-unit.ts
+      - src/agent-runtime/context/index.ts
+      - src/agent-runtime/context/interaction-history.test.ts
+      - src/agent-runtime/context/interaction-history.ts
+      - src/agent-runtime/context/prompt-composition.ts
+      - src/agent-runtime/context/session-summary.ts
+      - src/agent-runtime/context/sources/collaboration-mission.test.ts
+      - src/agent-runtime/context/sources/collaboration-mission.ts
+      - src/agent-runtime/context/sources/identity-bootstrap.ts
+      - src/agent-runtime/context/sources/learning-recall.ts
+      - src/agent-runtime/context/sources/preserved-article.ts
+      - src/agent-runtime/context/sources/run-skills.test.ts
+      - src/agent-runtime/context/sources/run-skills.ts
+      - src/agent-runtime/context/sources/task-board-context.test.ts
+      - src/agent-runtime/context/sources/task-board-context.ts
+      - src/agent-runtime/context/sources/task-completion-notice.ts
+      - src/agent-runtime/context/sources/task-history.ts
+      - src/agent-runtime/context/sources/task-resume.ts
+      - src/agent-runtime/context/sources/task-title.ts
+      - src/agent-runtime/context/task-focus.test.ts
+      - src/agent-runtime/context/task-focus.ts
+      - src/agent-runtime/context/untrusted.test.ts
+      - src/agent-runtime/context/untrusted.ts
+      - src/agent-runtime/contracts/acceptance.ts
+      - src/agent-runtime/contracts/blocker.ts
+      - src/agent-runtime/contracts/capability.ts
+      - src/agent-runtime/contracts/command.ts
+      - src/agent-runtime/contracts/context.ts
+      - src/agent-runtime/contracts/continuation.ts
+      - src/agent-runtime/contracts/delivery.ts
+      - src/agent-runtime/contracts/execution.ts
+      - src/agent-runtime/contracts/inference.ts
+      - src/agent-runtime/contracts/interaction.ts
+      - src/agent-runtime/contracts/learning.ts
+      - src/agent-runtime/contracts/policy.ts
+      - src/agent-runtime/contracts/quality.ts
+      - src/agent-runtime/contracts/task-binding.ts
+      - src/agent-runtime/contracts/task-control.ts
+      - src/agent-runtime/contracts/task-stop.ts
+      - src/agent-runtime/contracts/task.ts
+      - src/agent-runtime/contracts/turn-result.ts
+      - src/agent-runtime/delivery/acceptance/criteria.test.ts
+      - src/agent-runtime/delivery/acceptance/criteria.ts
+      - src/agent-runtime/delivery/acceptance/index.ts
+      - src/agent-runtime/delivery/acceptance/settlement.ts
+      - src/agent-runtime/delivery/acceptance/validation.test.ts
+      - src/agent-runtime/delivery/acceptance/validation.ts
+      - src/agent-runtime/delivery/artifacts/patch-pptx.test.ts
+      - src/agent-runtime/delivery/artifacts/patch-pptx.ts
+      - src/agent-runtime/delivery/dispatch/command-result.ts
+      - src/agent-runtime/delivery/dispatch/complete-reply.test.ts
+      - src/agent-runtime/delivery/dispatch/complete-reply.ts
+      - src/agent-runtime/delivery/dispatch/confirm-pending.test.ts
+      - src/agent-runtime/delivery/dispatch/confirm-pending.ts
+      - src/agent-runtime/delivery/dispatch/pending-delivery.restart.test.ts
+      - src/agent-runtime/delivery/dispatch/prepare-visible.test.ts
+      - src/agent-runtime/delivery/dispatch/prepare-visible.ts
+      - src/agent-runtime/delivery/dispatch/queued-reply.ts
+      - src/agent-runtime/delivery/index.ts
+      - src/agent-runtime/delivery/presentation/command-output.ts
+      - src/agent-runtime/delivery/presentation/embedded-payloads.ts
+      - src/agent-runtime/delivery/presentation/empty-reply.ts
+      - src/agent-runtime/delivery/presentation/reply-payloads.ts
+      - src/agent-runtime/execution/index.ts
+      - src/agent-runtime/execution/outcomes/attempt-attribution.ts
+      - src/agent-runtime/execution/outcomes/command-outcome.test.ts
+      - src/agent-runtime/execution/outcomes/command-outcome.ts
+      - src/agent-runtime/execution/outcomes/index.ts
+      - src/agent-runtime/execution/outcomes/turn-outcome.test.ts
+      - src/agent-runtime/execution/outcomes/turn-outcome.ts
+      - src/agent-runtime/execution/outcomes/usage-summary.test.ts
+      - src/agent-runtime/execution/outcomes/usage-summary.ts
+      - src/agent-runtime/execution/preparation/embedded-parameters.ts
+      - src/agent-runtime/execution/preparation/index.ts
+      - src/agent-runtime/execution/public-entry-convergence.test.ts
+      - src/agent-runtime/execution/recovery/context-overflow.test.ts
+      - src/agent-runtime/execution/recovery/context-overflow.ts
+      - src/agent-runtime/execution/recovery/stall-continuation.test.ts
+      - src/agent-runtime/execution/recovery/stall-continuation.ts
+      - src/agent-runtime/execution/runner/acp-turn.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-cli.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-embedded.ts
+      - src/agent-runtime/execution/runner/admitted-candidate-failure.integration.test.ts
+      - src/agent-runtime/execution/runner/admitted-candidate.test.ts
+      - src/agent-runtime/execution/runner/admitted-candidate.ts
+      - src/agent-runtime/execution/runner/admitted-turn-attempt.ts
+      - src/agent-runtime/execution/runner/admitted-turn-host.ts
+      - src/agent-runtime/execution/runner/admitted-turn-recovery.ts
+      - src/agent-runtime/execution/runner/admitted-turn-state.ts
+      - src/agent-runtime/execution/runner/admitted-turn.attempt-host.test.ts
+      - src/agent-runtime/execution/runner/admitted-turn.test.ts
+      - src/agent-runtime/execution/runner/admitted-turn.ts
+      - src/agent-runtime/execution/runner/attempt-cleanup.test.ts
+      - src/agent-runtime/execution/runner/attempt-cleanup.ts
+      - src/agent-runtime/execution/runner/cli-run-spawn.ts
+      - src/agent-runtime/execution/runner/cli-run.task-boundary.test.ts
+      - src/agent-runtime/execution/runner/cli-run.ts
+      - src/agent-runtime/execution/runner/command-budget.test.ts
+      - src/agent-runtime/execution/runner/command-budget.ts
+      - src/agent-runtime/execution/runner/command-candidate.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/command-lifecycle.ts
+      - src/agent-runtime/execution/runner/controlled-execution.test.ts
+      - src/agent-runtime/execution/runner/controlled-execution.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-closeout.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-continue.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-phase-state.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-preflight.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-prompt.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream-inner.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-tools.ts
+      - src/agent-runtime/execution/runner/embedded-attempt.ts
+      - src/agent-runtime/execution/runner/embedded-cleanup.test.ts
+      - src/agent-runtime/execution/runner/embedded-cleanup.ts
+      - src/agent-runtime/execution/runner/embedded-failure-usage.test.ts
+      - src/agent-runtime/execution/runner/embedded-failure-usage.ts
+      - src/agent-runtime/execution/runner/embedded-request.ts
+      - src/agent-runtime/execution/runner/embedded-result.ts
+      - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+      - src/agent-runtime/execution/runner/embedded-run-auth.ts
+      - src/agent-runtime/execution/runner/embedded-run-failover.ts
+      - src/agent-runtime/execution/runner/embedded-run-result.ts
+      - src/agent-runtime/execution/runner/embedded-run.task-boundary.test.ts
+      - src/agent-runtime/execution/runner/embedded-run.ts
+      - src/agent-runtime/execution/runner/execution-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/execution-lifecycle.ts
+      - src/agent-runtime/execution/runner/execution-scope.test.ts
+      - src/agent-runtime/execution/runner/execution-scope.ts
+      - src/agent-runtime/execution/runner/index.ts
+      - src/agent-runtime/execution/runner/queued-candidate.pricing.test.ts
+      - src/agent-runtime/execution/runner/queued-candidate.ts
+      - src/agent-runtime/execution/runner/run-registry.test.ts
+      - src/agent-runtime/execution/runner/run-registry.ts
+      - src/agent-runtime/execution/runner/scheduled-candidate.test.ts
+      - src/agent-runtime/execution/runner/scheduled-candidate.ts
+      - src/agent-runtime/execution/runner/supervisor-lifecycle.test.ts
+      - src/agent-runtime/execution/runner/supervisor-lifecycle.ts
+      - src/agent-runtime/execution/runner/task-continuation.ts
+      - src/agent-runtime/execution/runner/turn-contract.ts
+      - src/agent-runtime/model/admission-lease.test.ts
+      - src/agent-runtime/model/admission-lease.ts
+      - src/agent-runtime/model/apply-provider-credential.test.ts
+      - src/agent-runtime/model/apply-provider-credential.ts
+      - src/agent-runtime/model/auth-profile-candidates.test.ts
+      - src/agent-runtime/model/auth-profile-candidates.ts
+      - src/agent-runtime/model/auth-profile-rotation.test.ts
+      - src/agent-runtime/model/auth-profile-rotation.ts
+      - src/agent-runtime/model/authorized-session.test.ts
+      - src/agent-runtime/model/authorized-session.ts
+      - src/agent-runtime/model/auxiliary-model-governance.test.ts
+      - src/agent-runtime/model/auxiliary-model-governance.ts
+      - src/agent-runtime/model/cli-run-credential.ts
+      - src/agent-runtime/model/command-admission-session.test.ts
+      - src/agent-runtime/model/command-admission-session.ts
+      - src/agent-runtime/model/command-commercial-gate.ts
+      - src/agent-runtime/model/command-governance.ts
+      - src/agent-runtime/model/copilot-token-refresh.test.ts
+      - src/agent-runtime/model/copilot-token-refresh.ts
+      - src/agent-runtime/model/index.ts
+      - src/agent-runtime/model/interaction-completion.test.ts
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/llm-slug-auxiliary.test.ts
+      - src/agent-runtime/model/metadata-completion.test.ts
+      - src/agent-runtime/model/metadata-completion.ts
+      - src/agent-runtime/model/native-tool-stream.ts
+      - src/agent-runtime/model/ollama-context-stream.ts
+      - src/agent-runtime/model/prepare-embedded-model.test.ts
+      - src/agent-runtime/model/prepare-embedded-model.ts
+      - src/agent-runtime/model/xai-arguments-stream.ts
+      - src/agent-runtime/policy/acceptance-checks.ts
+      - src/agent-runtime/policy/blocker.test.ts
+      - src/agent-runtime/policy/blocker.ts
+      - src/agent-runtime/policy/catalog.test.ts
+      - src/agent-runtime/policy/catalog.ts
+      - src/agent-runtime/policy/constraints.ts
+      - src/agent-runtime/policy/context-window.ts
+      - src/agent-runtime/policy/execution-queue.test.ts
+      - src/agent-runtime/policy/execution-queue.ts
+      - src/agent-runtime/policy/explicit-task-control.test.ts
+      - src/agent-runtime/policy/explicit-task-control.ts
+      - src/agent-runtime/policy/index.ts
+      - src/agent-runtime/policy/input-stamp.ts
+      - src/agent-runtime/policy/prompt-mode.ts
+      - src/agent-runtime/policy/run-limits.test.ts
+      - src/agent-runtime/policy/run-limits.ts
+      - src/agent-runtime/policy/task-binding.test.ts
+      - src/agent-runtime/policy/task-binding.ts
+      - src/agent-runtime/policy/task-board-limits.ts
+      - src/agent-runtime/state/acp-transcript.ts
+      - src/agent-runtime/state/attempt-transcript.ts
+      - src/agent-runtime/state/command-session.test.ts
+      - src/agent-runtime/state/command-session.ts
+      - src/agent-runtime/state/completion-notice.test.ts
+      - src/agent-runtime/state/completion-notice.ts
+      - src/agent-runtime/state/continuation-ticket.ts
+      - src/agent-runtime/state/index.ts
+      - src/agent-runtime/state/interaction-transcript.test.ts
+      - src/agent-runtime/state/interaction-transcript.ts
+      - src/agent-runtime/state/mutations/admit-task.ts
+      - src/agent-runtime/state/mutations/claim-queued-execution.recovery-prompt.test.ts
+      - src/agent-runtime/state/mutations/claim-queued-execution.ts
+      - src/agent-runtime/state/mutations/execution-binding.ts
+      - src/agent-runtime/state/mutations/explicit-control.ts
+      - src/agent-runtime/state/mutations/interaction-proposal.ts
+      - src/agent-runtime/state/mutations/resume-current.test.ts
+      - src/agent-runtime/state/mutations/resume-current.ts
+      - src/agent-runtime/state/mutations/resume-parked.test.ts
+      - src/agent-runtime/state/mutations/resume-parked.ts
+      - src/agent-runtime/state/mutations/task-completion.ts
+      - src/agent-runtime/state/mutations/task-constraints.ts
+      - src/agent-runtime/state/mutations/task-control.ts
+      - src/agent-runtime/state/mutations/task-focus.ts
+      - src/agent-runtime/state/mutations/task-record.ts
+      - src/agent-runtime/state/prepare-attempt-session.ts
+      - src/agent-runtime/state/repository/async-wait-job-recovery.test.ts
+      - src/agent-runtime/state/repository/async-wait-job-recovery.ts
+      - src/agent-runtime/state/repository/async-wait-job-store.ts
+      - src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts
+      - src/agent-runtime/state/repository/async-wait-job.test.ts
+      - src/agent-runtime/state/repository/async-wait-job.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-claim.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-enqueue.test.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-followup-consumer.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-scan.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-turn.ts
+      - src/agent-runtime/state/repository/async-wait-recovery.cross-process.test.ts
+      - src/agent-runtime/state/repository/async-wait-recovery.four-defects.fixture.ts
+      - src/agent-runtime/state/repository/async-wait-recovery.four-defects.reclaim.test.ts
+      - src/agent-runtime/state/repository/async-wait-recovery.four-defects.test.ts
+      - src/agent-runtime/state/repository/async-wait-recovery.package5-retire.test.ts
+      - src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts
+      - src/agent-runtime/state/repository/async-wait-stale-callback.test.ts
+      - src/agent-runtime/state/repository/session-task.ts
+      - src/agent-runtime/state/repository/task-board-file.ts
+      - src/agent-runtime/state/repository/task-identity.ts
+      - src/agent-runtime/state/repository/task-stop.restart.test.ts
+      - src/agent-runtime/state/repository/task-stop.test.ts
+      - src/agent-runtime/state/repository/task-stop.ts
+      - src/agent-runtime/state/session-compaction.ts
+      - src/agent-runtime/state/session-recovery.test.ts
+      - src/agent-runtime/state/session-recovery.ts
+      - src/agent-runtime/state/session-run-accounting.ts
+      - src/agent-runtime/state/session-usage.ts
+      - src/agent-runtime/state/task-action.ts
+      - src/agent-runtime/wiring/admitted-turn-host.ts
+      - src/agent-runtime/wiring/delivery-confirm.ts
+      - src/agent-runtime/wiring/embedded-payloads.ts
+      - src/agent-runtime/wiring/execution-admission.test.ts
+      - src/agent-runtime/wiring/execution-admission.ts
+      - src/agent-runtime/wiring/interaction-candidate.test.ts
+      - src/agent-runtime/wiring/interaction-candidate.ts
+      - src/agent-runtime/wiring/interaction-effects.ts
+      - src/agent-runtime/wiring/interaction-turn.runtime.ts
+      - src/agent-runtime/wiring/interaction-turn.ts
+      - src/agent-runtime/wiring/prepared-interaction.test.ts
+      - src/agent-runtime/wiring/reply-turn.ts
+      - src/agent-runtime/wiring/task-acceptance.test.ts
+      - src/agent-runtime/wiring/task-acceptance.ts
+      - src/agent-runtime/wiring/task-lifecycle.integration.test.ts
+      - src/agents/bash-process-registry.ts
+      - src/agents/bash-tools.exec-host-gateway.ts
+      - src/agents/bash-tools.exec-host-node.ts
+      - src/agents/bash-tools.exec-host-shared.test.ts
+      - src/agents/bash-tools.exec-host-shared.ts
+      - src/agents/bash-tools.exec-runtime.ts
+      - src/agents/bash-tools.exec-types.ts
+      - src/agents/bash-tools.exec.task-binding.test.ts
+      - src/agents/bash-tools.exec.ts
+      - src/agents/cli-runner.test.ts
+      - src/agents/cli-runner.ts
+      - src/agents/cli-runner/helpers.ts
+      - src/agents/context-compiler/active-task-seed.ts
+      - src/agents/context-compiler/atomic-units.ts
+      - src/agents/context-compiler/collab-compile-strategy.ts
+      - src/agents/context-compiler/compile.ts
+      - src/agents/context-compiler/index.ts
+      - src/agents/context-compiler/lane-budget.ts
+      - src/agents/context-compiler/model-boundary.test.ts
+      - src/agents/context-compiler/normalize-outbound.estimate.test.ts
+      - src/agents/context-compiler/normalize-outbound.ts
+      - src/agents/context-compiler/shrink-unit.ts
+      - src/agents/context-compiler/types.ts
+      - src/agents/context-window-guard.test.ts
+      - src/agents/execution-preflight/completion-attempt-lifecycle.test.ts
+      - src/agents/execution-preflight/completion-context.test.ts
+      - src/agents/execution-preflight/completion-delayed-send.test.ts
+      - src/agents/execution-preflight/completion-isolated-smoke.test.ts
+      - src/agents/execution-preflight/completion-lifecycle-release.test.ts
+      - src/agents/execution-preflight/completion-receipt-matrix.test.ts
+      - src/agents/execution-preflight/completion-send.test.ts
+      - src/agents/execution-preflight/constitutional-runtime-shadow-wiring.test.ts
+      - src/agents/execution-preflight/delivery.ts
+      - src/agents/execution-preflight/execution-preflight.integration.test.ts
+      - src/agents/execution-preflight/execution-preflight.test.ts
+      - src/agents/execution-preflight/production-validators.ts
+      - src/agents/execution-preflight/resolve.ts
+      - src/agents/execution-preflight/runtime-validation-ownership.test.ts
+      - src/agents/execution-preflight/types.ts
+      - src/agents/execution-preflight/validation.ts
+      - src/agents/execution-stall-continue-loop.test.ts
+      - src/agents/model-fallback.run-embedded.e2e.test.ts
+      - src/agents/model-fallback.ts
+      - src/agents/pi-embedded-runner.e2e.test.ts
+      - src/agents/pi-embedded-runner.run-embedded-pi-agent.auth-profile-rotation.e2e.test.ts
+      - src/agents/pi-embedded-runner.ts
+      - src/agents/pi-embedded-runner/compact.ts
+      - src/agents/pi-embedded-runner/extensions.ts
+      - src/agents/pi-embedded-runner/google.ts
+      - src/agents/pi-embedded-runner/run.overflow-compaction.loop.test.ts
+      - src/agents/pi-embedded-runner/run.overflow-compaction.mocks.shared.ts
+      - src/agents/pi-embedded-runner/run.overflow-compaction.shared-test.ts
+      - src/agents/pi-embedded-runner/run.overflow-compaction.test.ts
+      - src/agents/pi-embedded-runner/run.ts
+      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.spawn-workspace.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/execution-router-shadow.test.ts
+      - src/agents/pi-embedded-runner/run/params.ts
+      - src/agents/pi-embedded-runner/run/payloads.test-helpers.ts
+      - src/agents/pi-embedded-runner/runs.ts
+      - src/agents/pi-embedded-runner/session-manager-init.group-public.test.ts
+      - src/agents/pi-embedded-runner/session-manager-init.ts
+      - src/agents/pi-embedded-runner/system-prompt.ts
+      - src/agents/pi-embedded-runner/tool-result-char-estimator.ts
+      - src/agents/pi-embedded-runner/types.ts
+      - src/agents/pi-embedded-runner/usage-reporting.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.ts
+      - src/agents/pi-tool-definition-adapter.ts
+      - src/agents/pi-tools.abort.ts
+      - src/agents/pi-tools.before-tool-call.ts
+      - src/agents/pi-tools.task-action.test.ts
+      - src/agents/pi-tools.ts
+      - src/agents/session-tool-result-guard-wrapper.ts
+      - src/agents/session-tool-result-guard.ts
+      - src/agents/system-prompt.context-source.test.ts
+      - src/agents/system-prompt.ts
+      - src/agents/tools/collaboration-board-tool.test.ts
+      - src/agents/tools/common.ts
+      - src/agents/turn-completion/contract.test.ts
+      - src/agents/turn-completion/contract.ts
+      - src/agents/usage.ts
+      - src/agents/workspace.test.ts
+      - src/agents/workspace.ts
+      - src/auto-reply/fallback-state.ts
+      - src/auto-reply/reply/abort.test.ts
+      - src/auto-reply/reply/abort.ts
+      - src/auto-reply/reply/agent-runner-execution.byok.test.ts
+      - src/auto-reply/reply/agent-runner-execution.credit-snapshot.test.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/agent-runner-memory.governance.test.ts
+      - src/auto-reply/reply/agent-runner-memory.test.ts
+      - src/auto-reply/reply/agent-runner-memory.ts
+      - src/auto-reply/reply/agent-runner-payloads.test.ts
+      - src/auto-reply/reply/agent-runner-utils.ts
+      - src/auto-reply/reply/agent-runner.aside-reply-lane.test.ts
+      - src/auto-reply/reply/agent-runner.collect-amend-steer.test.ts
+      - src/auto-reply/reply/agent-runner.honest-empty-reply.test.ts
+      - src/auto-reply/reply/agent-runner.media-paths.test.ts
+      - src/auto-reply/reply/agent-runner.misc.runreplyagent.test.ts
+      - src/auto-reply/reply/agent-runner.run-id.test.ts
+      - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
+      - src/auto-reply/reply/agent-runner.ts
+      - src/auto-reply/reply/commands-session-abort.ts
+      - src/auto-reply/reply/commands-system-prompt.ts
+      - src/auto-reply/reply/composer-plugin-mention-execute.test.ts
+      - src/auto-reply/reply/composer-plugin-mention-execute.ts
+      - src/auto-reply/reply/dispatch-from-config.test.ts
+      - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/followup-runner.byok.test.ts
+      - src/auto-reply/reply/followup-runner.ogui-wait.test.ts
+      - src/auto-reply/reply/followup-runner.test.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
+      - src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts
+      - src/auto-reply/reply/get-reply-run.media-only.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/get-reply.message-hooks.test.ts
+      - src/auto-reply/reply/get-reply.ts
+      - src/auto-reply/reply/honest-empty-reply.ts
+      - src/auto-reply/reply/inbound-text.ts
+      - src/auto-reply/reply/knowledge-universe-context.test.ts
+      - src/auto-reply/reply/learning-recall-context.ts
+      - src/auto-reply/reply/learning-recall.ts
+      - src/auto-reply/reply/mid-task-aside-dialogue-history.ts
+      - src/auto-reply/reply/mid-task-aside-reply-lane.test.ts
+      - src/auto-reply/reply/mid-task-aside-reply-lane.ts
+      - src/auto-reply/reply/mid-task-aside.test.ts
+      - src/auto-reply/reply/mid-task-aside.ts
+      - src/auto-reply/reply/queue-policy.test.ts
+      - src/auto-reply/reply/queue-policy.ts
+      - src/auto-reply/reply/queue.ts
+      - src/auto-reply/reply/queue/drain.ts
+      - src/auto-reply/reply/queue/types.ts
+      - src/auto-reply/reply/reply-dispatcher.task-boundary.test.ts
+      - src/auto-reply/reply/reply-dispatcher.ts
+      - src/auto-reply/reply/route-reply.ts
+      - src/auto-reply/reply/runtime-context-assembly.ts
+      - src/auto-reply/reply/session-run-accounting.ts
+      - src/auto-reply/reply/session-updates.ts
+      - src/auto-reply/reply/session-usage.ts
+      - src/auto-reply/reply/slice2-mid-task-event-sequence.test.ts
+      - src/auto-reply/reply/slice3-context-event-sequence.test.ts
+      - src/auto-reply/types.ts
+      - src/channels/plugins/outbound/discord.ts
+      - src/channels/plugins/outbound/telegram.ts
+      - src/channels/plugins/types.adapters.ts
+      - src/commands/agent.acp.test.ts
+      - src/commands/agent.credit-usage.test.ts
+      - src/commands/agent.delivery.test.ts
+      - src/commands/agent.lifecycle-attribution-path.node.test.ts
+      - src/commands/agent.test.ts
+      - src/commands/agent.ts
+      - src/commands/agent/commercial-run-gate.test.ts
+      - src/commands/agent/credit-usage.ts
+      - src/commands/agent/model-governance.fallback.test.ts
+      - src/commands/agent/model-governance.test.ts
+      - src/commands/agent/session-store.ts
+      - src/commands/agent/types.ts
+      - src/commands/onboard-custom.test.ts
+      - src/commands/onboard-custom.ts
+      - src/conversation-task/async-process-lifecycle.test.ts
+      - src/conversation-task/chat-tool-observer-wiring.test.ts
+      - src/conversation-task/completion-binding.test.ts
+      - src/conversation-task/focus-policy.ts
+      - src/conversation-task/focus-resume.test.ts
+      - src/conversation-task/focus-resume.ts
+      - src/conversation-task/focus-switch.ts
+      - src/conversation-task/gateway-activation-integration.test.ts
+      - src/conversation-task/preserve-article-across-cut.test.ts
+      - src/conversation-task/preserve-article-across-cut.ts
+      - src/conversation-task/reply-completion.test.ts
+      - src/conversation-task/reply-completion.ts
+      - src/conversation-task/session-task-board.cross-process-child.ts
+      - src/conversation-task/session-task-board.slice3-context.test.ts
+      - src/conversation-task/session-task-board.test.ts
+      - src/conversation-task/session-task-board.ts
+      - src/conversation-task/task-board-continue.test.ts
+      - src/conversation-task/task-board-continue.ts
+      - src/conversation-task/turn-relation.test.ts
+      - src/conversation-task/turn-relation.ts
+      - src/cron/cron-result-template.ts
+      - src/cron/isolated-agent.mocks.ts
+      - src/cron/isolated-agent/hook-delivery-propagation.test.ts
+      - src/cron/isolated-agent/result-surfacing.test.ts
+      - src/cron/isolated-agent/result-surfacing.ts
+      - src/cron/isolated-agent/run.long-horizon-ledger.test.ts
+      - src/cron/isolated-agent/run.owner-auth.test.ts
+      - src/cron/isolated-agent/run.payload-fallbacks.test.ts
+      - src/cron/isolated-agent/run.test-harness.ts
+      - src/cron/isolated-agent/run.ts
+      - src/discord/client.ts
+      - src/discord/draft-stream.task-boundary.test.ts
+      - src/discord/draft-stream.ts
+      - src/discord/monitor/message-handler.process.ts
+      - src/discord/monitor/reply-delivery.task-boundary.test.ts
+      - src/discord/monitor/reply-delivery.ts
+      - src/discord/send.messages.ts
+      - src/discord/send.outbound.ts
+      - src/discord/send.task-boundary.test.ts
+      - src/discord/send.types.ts
+      - src/executor-evidence/acceptance-fix-r2.isolation.test.ts
+      - src/executor-evidence/acceptance-fix-r3-cron-entry.isolation.test.ts
+      - src/executor-evidence/acceptance-fix-r3.isolation.test.ts
+      - src/executor-evidence/acceptance-fix-r4.isolation.test.ts
+      - src/executor-evidence/acceptance-fix-r5.isolation.test.ts
+      - src/executor-evidence/acceptance-fix-r6.isolation.test.ts
+      - src/executor-evidence/acceptance-fix-r7.isolation.test.ts
+      - src/executor-evidence/acceptance-fix-r8-chat.isolation.test.ts
+      - src/executor-evidence/acceptance-fix-r8-cli.isolation.test.ts
+      - src/executor-evidence/acceptance-fix.isolation.test.ts
+      - src/executor-evidence/association.isolation.test.ts
+      - src/executor-evidence/association.ts
+      - src/executor-evidence/budget-charge-reason.isolation.test.ts
+      - src/executor-evidence/command-race-child.ts
+      - src/executor-evidence/command-receipt.isolation.test.ts
+      - src/executor-evidence/cost-columns.ts
+      - src/executor-evidence/evidence-write-child.ts
+      - src/executor-evidence/governed-model-entry.ts
+      - src/executor-evidence/identity.ts
+      - src/executor-evidence/index.ts
+      - src/executor-evidence/model-call-evidence.isolation.test.ts
+      - src/executor-evidence/model-call-evidence.ts
+      - src/executor-evidence/read-port.isolation.test.ts
+      - src/executor-evidence/read-port.ts
+      - src/extensionAPI.ts
+      - src/gateway/agent-growth/working-style-store.cas.test.ts
+      - src/gateway/agent-growth/working-style-store.ts
+      - src/gateway/agent-runtime-seed.ts
+      - src/gateway/agent-runtime-store.ts
+      - src/gateway/agent-runtime-telemetry.test.ts
+      - src/gateway/billing/commercial-run-entrypoints.registry.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+      - src/gateway/collaboration-dispatch/reply-language.test.ts
+      - src/gateway/collaboration-dispatch/reply-language.ts
+      - src/gateway/collaboration-learning/controlled-collab-p4-gate-repros.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-gateway-ws.integration.test.ts
+      - src/gateway/collaboration-learning/operating-deliverable-binding.test.ts
+      - src/gateway/enterprise-data/knowledge-feed-item-store.test.ts
+      - src/gateway/enterprise-data/projection-materializer.test.ts
+      - src/gateway/enterprise-data/projection-template-engine.test.ts
+      - src/gateway/evolution-control/adapters/working-dna.ts
+      - src/gateway/evolution-control/working-dna-cas.test.ts
+      - src/gateway/execution-identity-inherit-hops.test.ts
+      - src/gateway/governance/direct-model-invocation-registry.ts
+      - src/gateway/governance/execution-entry-registry.ts
+      - src/gateway/governance/governance-contract.test.ts
+      - src/gateway/governance/model-caller-registry.ts
+      - src/gateway/models/capability-admission/sync-pooled-admission.test.ts
+      - src/gateway/office-pptx-isolated.test.ts
+      - src/gateway/office-pptx-isolated.ts
+      - src/gateway/office-render.test.ts
+      - src/gateway/office-render.ts
+      - src/gateway/protocol/schema/agent.ts
+      - src/gateway/server-chat.agent-events.test.ts
+      - src/gateway/server-chat.aside-ab-run-isolation.test.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/server-methods/chat-resume-current.test.ts
+      - src/gateway/server-methods/chat-resume-parked-recheck.ts
+      - src/gateway/server-methods/chat.owner-pause-abort.test.ts
+      - src/gateway/server-methods/chat.resume-parked-recheck.test.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/diagnosis-reports.pack.test.ts
+      - src/gateway/server-methods/diagnosis-reports.pack.ts
+      - src/gateway/server-methods/group-workspace-file.test.ts
+      - src/gateway/server-methods/group-workspace-file.ts
+      - src/gateway/server-methods/packs/manifest.ts
+      - src/gateway/server-methods/steward-workspace-file.ts
+      - src/gateway/server.impl.ts
+      - src/gateway/supervisor/worker-executor.ts
+      - src/hooks/llm-slug-generator.ts
+      - src/infra/heartbeat-runner.focus.test.ts
+      - src/infra/heartbeat-runner.ts
+      - src/infra/outbound/deliver.test.ts
+      - src/infra/outbound/deliver.ts
+      - src/infra/outbound/delivery-queue.ts
+      - src/infra/outbound/outbound.test.ts
+      - src/observation/action-intent-association-recovery.test.ts
+      - src/observation/action-intent-association-recovery.ts
+      - src/observation/action-intent-control.test.ts
+      - src/observation/action-intent-control.ts
+      - src/observation/action-intent-query.test.ts
+      - src/observation/action-intent-query.ts
+      - src/observation/action-intent-recovery.test.ts
+      - src/observation/action-intent-recovery.ts
+      - src/observation/action-intent-store.test.ts
+      - src/observation/action-intent-store.ts
+      - src/observation/action-intent.test.ts
+      - src/observation/action-intent.ts
+      - src/observation/capacity-reader.test.ts
+      - src/observation/capacity-reader.ts
+      - src/observation/capacity-snapshot.test.ts
+      - src/observation/capacity-snapshot.ts
+      - src/observation/cohort-identity.test.ts
+      - src/observation/cohort-identity.ts
+      - src/observation/execution-evidence-store.test.ts
+      - src/observation/execution-evidence-store.ts
+      - src/observation/execution-journal-runtime.test.ts
+      - src/observation/execution-journal-runtime.ts
+      - src/observation/execution-journal.test.ts
+      - src/observation/execution-journal.ts
+      - src/observation/execution-projection.test.ts
+      - src/observation/execution-projection.ts
+      - src/observation/executor-technical-evidence.test.ts
+      - src/observation/executor-technical-evidence.ts
+      - src/observation/heartbeat-activity-lifecycle.test.ts
+      - src/observation/heartbeat-activity-lifecycle.ts
+      - src/observation/heartbeat-activity-query.test.ts
+      - src/observation/heartbeat-activity-query.ts
+      - src/observation/heartbeat-activity.test.ts
+      - src/observation/heartbeat-activity.ts
+      - src/observation/heartbeat-platform-integration.test.ts
+      - src/observation/metric-compare-gateway.test.ts
+      - src/observation/metric-compare-gateway.ts
+      - src/observation/metric-compare-query.test.ts
+      - src/observation/metric-compare-query.ts
+      - src/observation/metric-compare.test.ts
+      - src/observation/metric-compare.ts
+      - src/observation/metric-dict.test.ts
+      - src/observation/metric-dict.ts
+      - src/observation/outcome-reader.test.ts
+      - src/observation/outcome-reader.ts
+      - src/observation/outcome-source.test.ts
+      - src/observation/outcome-source.ts
+      - src/observation/query-gateway.test.ts
+      - src/observation/query-gateway.ts
+      - src/observation/query.test.ts
+      - src/observation/query.ts
+      - src/observation/real-gateway-network.test.ts
+      - src/observation/reasoning-gateway.test.ts
+      - src/observation/reasoning-gateway.ts
+      - src/observation/reasoning-model-resolver.test.ts
+      - src/observation/reasoning-model-resolver.ts
+      - src/observation/reasoning-pass.test.ts
+      - src/observation/reasoning-pass.ts
+      - src/observation/reasoning-query-integration.test.ts
+      - src/observation/run-cost-collector.test.ts
+      - src/observation/run-cost-collector.ts
+      - src/observation/run-cost-evidence.test.ts
+      - src/observation/run-cost-evidence.ts
+      - src/observation/runtime-evidence.test.ts
+      - src/observation/runtime-evidence.ts
+      - src/observation/sample-assembler.test.ts
+      - src/observation/sample-assembler.ts
+      - src/plugin-sdk/file-lock.liveness.test.ts
+      - src/plugin-sdk/file-lock.ts
+      - src/shared/delivery-receipt.test.ts
+      - src/shared/delivery-receipt.ts
+      - src/shared/text/normalize-newlines.ts
+      - src/shared/usage.ts
+      - src/signal/monitor.ts
+      - src/signal/monitor/event-handler.ts
+      - src/signal/monitor/event-handler.types.ts
+      - src/signal/send.task-boundary.test.ts
+      - src/signal/send.ts
+      - src/task-orchestration/complex-task-loop.test.ts
+      - src/task-orchestration/complex-task-loop.ts
+      - src/task-outcome/chat-entry.ts
+      - src/task-outcome/command-log-path.test.ts
+      - src/task-outcome/followup-closeout.test.ts
+      - src/task-outcome/late-task-completion.test.ts
+      - src/task-outcome/pending-delivery.ts
+      - src/task-outcome/r85f-proof.test.ts
+      - src/task-outcome/r90-attempt-attribution.test.ts
+      - src/task-outcome/result-service.ts
+      - src/task-outcome/runtime-from-runner.terminal.test.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/store.ts
+      - src/task-outcome/types.ts
+      - src/task-outcome/w3-task-budget.test.ts
+      - src/telegram/bot-message-dispatch.ts
+      - src/telegram/bot/delivery.replies.ts
+      - src/telegram/bot/delivery.send.ts
+      - src/telegram/bot/delivery.task-boundary.test.ts
+      - src/telegram/lane-delivery-text-deliverer.ts
+      - src/telegram/lane-delivery.task-boundary.test.ts
+      - src/telegram/reasoning-lane-coordinator.ts
+      - src/telegram/send.task-boundary.test.ts
+      - src/telegram/send.ts
+      - test/fixtures/runtime-convergence/async-wait-recovery-child.ts
+      - test/fixtures/runtime-convergence/pending-delivery.restart-child.ts
+      - test/fixtures/runtime-convergence/task-stop.restart-child.ts
+      - ui/src/i18n/locales/en.ts
+      - ui/src/i18n/locales/zh-CN.ts
+      - ui/src/styles/observation-workbench.css
+      - ui/src/ui/app-chat.node.test.ts
+      - ui/src/ui/app-gateway.ts
+      - ui/src/ui/app-render.helpers.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/app.ts
+      - ui/src/ui/controllers/chat.test.ts
+      - ui/src/ui/controllers/group-workspace-file.ts
+      - ui/src/ui/controllers/steward-workspace-file.ts
+      - ui/src/ui/gateway-subscriptions/chat.ts
+      - ui/src/ui/navigation-observation.browser.test.ts
+      - ui/src/ui/navigation.ts
+      - ui/src/ui/observation/action-intent-model.node.test.ts
+      - ui/src/ui/observation/action-intent-model.ts
+      - ui/src/ui/observation/action-intent-panel.browser.test.ts
+      - ui/src/ui/observation/action-intent-panel.ts
+      - ui/src/ui/observation/comparison-capacity-panel.browser.test.ts
+      - ui/src/ui/observation/comparison-capacity-panel.ts
+      - ui/src/ui/observation/evidence-model.node.test.ts
+      - ui/src/ui/observation/evidence-model.ts
+      - ui/src/ui/observation/evidence-panel.browser.test.ts
+      - ui/src/ui/observation/evidence-panel.ts
+      - ui/src/ui/observation/model.node.test.ts
+      - ui/src/ui/observation/model.ts
+      - ui/src/ui/observation/samples.ts
+      - ui/src/ui/observation/stream.node.test.ts
+      - ui/src/ui/observation/stream.ts
+      - ui/src/ui/observation/workbench.browser.test.ts
+      - ui/src/ui/observation/workbench.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel-observation.browser.test.ts
+      - ui/src/ui/ports/diagnosis/diagnosis-panel.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/outputs-page.feed-delete.node.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-diagnosis-observation.browser.test.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-shell.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surface-lazy.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surface-types.ts
+      - ui/src/ui/ports/enterprise/views/enterprise-surfaces-core.ts
+      - ui/src/ui/ports/platform/models/capability-admission-batch3.node.test.ts
+      - ui/src/ui/ports/platform/shared/surface.ts
+      - ui/src/ui/ports/platform/view-types.ts
+      - ui/src/ui/ports/platform/views/platform-observation-shell.browser.test.ts
+      - ui/src/ui/ports/platform/views/platform-shell.ts
+      - ui/src/ui/ports/platform/views/platform-surfaces.ts
+      - ui/src/ui/runtime-observation.test.ts
+      - ui/src/ui/runtime-observation.ts
+      - ui/src/ui/views/artifact-sidebar-download-lane.test.ts
+      - ui/src/ui/views/artifact-sidebar.ts
+      - ui/src/ui/views/knowledge-universe-space-connector-bind.node.test.ts
+      - ui/src/ui/wiring/deliverable-save.test.ts
+      - ui/src/ui/wiring/deliverable-save.ts
+      - ui/src/ui/wiring/pptx-preview-edit.test.ts
+      - ui/src/ui/wiring/pptx-preview-edit.ts
+      - ui/src/ui/wiring/workspace-file-preview.node.test.ts
+      - ui/src/ui/wiring/workspace-file-preview.ts
+    canLandWith: []
+    metadata:
+      task: agent-runtime-observability
+      owner: codex-observe-owner
+      purpose: User-authorized fixed integration of committed executor and observation changes onto fresh
+        main; exact paths only; no production authorization inferred.
+      baseCommit: b20db5861958748d2fa759ec618c61a2e283c88c
+      sourceCommit: c8a710cd2ec1c06da30f75fd78113a206ba1ea85
+      pathCount: 812
+      pathManifestSha256: 424cbadec48cc6f7ed5e98f2ec654adf299847c465ce76c0b1c781bec2e958a1
   - id: observability-r14-exact-integration
     landingPolicy: serial
     paths:
@@ -18434,7 +19479,6 @@ landingStreams:
       - INVENTORY_STAGE6_AUDIT_MODERATE_HONO_HXH3
       - INVENTORY_STAGE6_AUDIT_MODERATE_HONO_NODE_SERVER
       - ACCOUNT_COMPUTER_COLD_REATTACH
-      - LOCAL_MAC_EXEC_PERMISSION
       - INVENTORY_STAGE6_AUDIT_MODERATE_DOMPURIFY
       - INVENTORY_STAGE6_AUDIT_MODERATE_DOMPURIFY_HPCV
       - INVENTORY_STAGE6_AUDIT_MODERATE_DOMPURIFY_RP9W
@@ -26459,6 +27503,57 @@ landingStreams:
       task: office-file-suite
       owner: cursor-jineng
       purpose: Clean-room file-mode Office create, edit, preview, and export.
+  - id: pr250-office-preview-prerequisite-20261109
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/office-suite/service.ts
+      - src/office-suite/office-suite.preview-contract.test.ts
+    canLandWith: []
+    metadata:
+      task: agent-runtime-convergence
+      agent: codex-runtime-manager
+      purpose: Fix confirmed current-main preview summary contract; no additional Office feature.
+  - id: pr250-main253-sync-20261109
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - CHANGELOG.md
+      - docs/office/office-file-suite.md
+      - skills/cyber-ppt/SKILL.md
+      - skills/documents/SKILL.md
+      - skills/nano-pdf/SKILL.md
+      - skills/office-automation-core/SKILL.md
+      - skills/office-file-suite/ATTRIBUTION.md
+      - skills/office-file-suite/SKILL.md
+      - skills/office-file-suite/references/capability-matrix.md
+      - skills/office-file-suite/references/openbot-delivery.md
+      - skills/pptx/SKILL.md
+      - skills/spreadsheets/SKILL.md
+      - src/agents/openclaw-tools.office-file.test.ts
+      - src/agents/openclaw-tools.ts
+      - src/agents/sandbox/constants.ts
+      - src/agents/tool-catalog.ts
+      - src/agents/tools/office-file-tool.test.ts
+      - src/agents/tools/office-file-tool.ts
+      - src/office-suite/connectors.ts
+      - src/office-suite/docx.ts
+      - src/office-suite/formula.ts
+      - src/office-suite/index.ts
+      - src/office-suite/office-suite.acceptance.test.ts
+      - src/office-suite/pdf.ts
+      - src/office-suite/pptx.ts
+      - src/office-suite/preview.ts
+      - src/office-suite/scope.ts
+      - src/office-suite/service.ts
+      - src/office-suite/ttf.ts
+      - src/office-suite/xlsx.ts
+      - src/office-suite/xml.ts
+    canLandWith: []
+    metadata:
+      task: four-pr-merge-readiness
+      agent: codex-runtime-manager
+      purpose: Three-way registry merge preserving tasks, sessions and landing history.
 sharedPaths:
   - glob: src/agent-runtime/execution/outcomes/command-outcome.test.ts
     landerTask: agent-runtime-observability:codex-observe-owner

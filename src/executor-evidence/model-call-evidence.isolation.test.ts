@@ -6,6 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { retainEmbeddedFailureUsage } from "../agent-runtime/execution/runner/embedded-failure-usage.js";
 import { runWithModelFallback } from "../agents/model-fallback.js";
 import type { TrustedScope } from "../task-outcome/types.js";
 import { runIsolatedGovernedModelCall } from "./governed-model-entry.js";
@@ -340,4 +341,69 @@ describe("isolated governed model entry", () => {
     expect(result.applied).toBe(false);
     expect(result.taskResultWritten).toBe(false);
   });
+});
+
+it("retains trusted failed candidate aggregate usage without claiming a single API call", async () => {
+  const ctx = context();
+  let id = "";
+  const failure = new Error("failed candidate");
+  await expect(
+    observeModelCandidate({
+      context: ctx,
+      attemptIndex: 0,
+      provider: "test",
+      model: "a",
+      run: async (identity) => {
+        id = identity?.callId ?? "";
+        throw retainEmbeddedFailureUsage(
+          failure,
+          { runId: ctx.runId, provider: "test", model: "a" },
+          { input: 7, output: 3 },
+        );
+      },
+    }),
+  ).rejects.toBe(failure);
+  expect(getModelCall(id)).toMatchObject({
+    status: "failed",
+    usage: { input: 7, output: 3 },
+    usageAggregation: "provider_aggregate_internal_retries_unknown",
+  });
+});
+
+it("does not trust forged failure fields or reuse A usage for B", async () => {
+  const ctx = context();
+  let id = "";
+  const forged = Object.assign(new Error("forged"), { usage: { input: 999 } });
+  await expect(
+    observeModelCandidate({
+      context: ctx,
+      attemptIndex: 0,
+      provider: "test",
+      model: "b",
+      run: async (identity) => {
+        id = identity?.callId ?? "";
+        throw forged;
+      },
+    }),
+  ).rejects.toBe(forged);
+  expect(getModelCall(id)?.usage.input).toBeNull();
+  const bound = new Error("bound A");
+  retainEmbeddedFailureUsage(
+    bound,
+    { runId: ctx.runId, provider: "test", model: "a" },
+    { input: 7 },
+  );
+  await expect(
+    observeModelCandidate({
+      context: ctx,
+      attemptIndex: 1,
+      provider: "test",
+      model: "b",
+      run: async (identity) => {
+        id = identity?.callId ?? "";
+        throw bound;
+      },
+    }),
+  ).rejects.toBe(bound);
+  expect(getModelCall(id)?.usage.input).toBeNull();
 });

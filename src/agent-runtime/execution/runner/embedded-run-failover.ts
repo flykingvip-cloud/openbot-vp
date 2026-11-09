@@ -8,7 +8,9 @@ import {
 import { log } from "../../../agents/pi-embedded-runner/logger.js";
 import { createFailoverDecisionLogger } from "../../../agents/pi-embedded-runner/run/failover-observation.js";
 import { describeUnknownError } from "../../../agents/pi-embedded-runner/utils.js";
+import { toNormalizedUsage } from "../outcomes/usage-summary.js";
 import { buildErrorAgentMeta } from "../outcomes/usage-summary.js";
+import { retainEmbeddedFailureUsage } from "./embedded-failure-usage.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 import type { EmbeddedRunAttemptCarry } from "./embedded-run-attempt.js";
 import type { EmbeddedRunLoopState } from "./embedded-run-attempt.js";
@@ -146,18 +148,34 @@ export async function runEmbeddedRunFailover(args: {
       const status = resolveFailoverStatus(promptFailoverReason ?? "unknown");
       logPromptFailoverDecision("fallback_model", { status });
       await session.maybeBackoffBeforeOverloadFailover(promptFailoverReason);
-      throw new FailoverError(errorText, {
-        reason: promptFailoverReason ?? "unknown",
-        provider: session.provider,
-        model: session.modelId,
-        profileId: session.lastProfileId,
-        status,
-      });
+      throw retainEmbeddedFailureUsage(
+        new FailoverError(errorText, {
+          reason: promptFailoverReason ?? "unknown",
+          provider: session.provider,
+          model: session.modelId,
+          profileId: session.lastProfileId,
+          status,
+        }),
+        {
+          runId: params.runId,
+          provider: params.provider ?? session.provider,
+          model: params.model ?? session.modelId,
+        },
+        toNormalizedUsage(loop.usageAccumulator),
+      );
     }
     if (promptFailoverFailure || promptFailoverReason) {
       logPromptFailoverDecision("surface_error");
     }
-    throw promptError;
+    throw retainEmbeddedFailureUsage(
+      promptError,
+      {
+        runId: params.runId,
+        provider: params.provider ?? session.provider,
+        model: params.model ?? session.modelId,
+      },
+      toNormalizedUsage(loop.usageAccumulator),
+    );
   }
 
   return { action: "next" as const };

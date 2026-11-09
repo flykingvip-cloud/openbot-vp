@@ -56,17 +56,10 @@ import { collectConnectedPreferredNodeIds } from "../../../infra/operator-local-
 import { isSubagentSessionKey } from "../../../routing/session-key.js";
 import { resolveAttemptFsWorkspaceOnly } from "../../capabilities/index.js";
 import { renderRunSkillContext } from "../../context/index.js";
-import type { EmbeddedAttemptState } from "./embedded-attempt-state.js";
-export type { EmbeddedAttemptState } from "./embedded-attempt-state.js";
-
+import { EmbeddedAttemptPhaseState } from "./embedded-attempt-phase-state.js";
+export type EmbeddedAttemptState = EmbeddedAttemptPhaseState;
 export function createEmbeddedAttemptState(): EmbeddedAttemptState {
-  return {
-    aborted: false,
-    timedOut: false,
-    timedOutDuringCompaction: false,
-    promptError: null,
-    promptErrorSource: null,
-  } as EmbeddedAttemptState;
+  return new EmbeddedAttemptPhaseState();
 }
 
 /** Workspace, abort, image capability, sandbox, LaneMode, constitutional shadow, reaction guidance. */
@@ -339,7 +332,7 @@ export async function runEmbeddedAttemptPreflight(
   s.clientTools = filterLaneTools(
     s.providerSafeClientTools,
     s.executionPreflight,
-    (tool) => tool.function.name,
+    (tool: NonNullable<EmbeddedRunAttemptParams["clientTools"]>[number]) => tool.function.name,
   );
   s.attemptToolLanes = {
     constructed: s.toolsRaw.map((tool) => tool.name),

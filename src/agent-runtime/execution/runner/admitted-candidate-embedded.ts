@@ -24,6 +24,7 @@ import {
 } from "../../../utils/message-channel.js";
 import { buildEmbeddedRunBaseParams } from "../preparation/index.js";
 import type { AdmittedCandidateHost } from "./admitted-candidate.js";
+import { readEmbeddedFailureUsage } from "./embedded-failure-usage.js";
 import { runEmbeddedPiAgent } from "./embedded-run.js";
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
 
@@ -345,21 +346,30 @@ export function invokeAdmittedCandidateEmbedded(args: {
       host.setBootstrapWarnings(
         resolveBootstrapWarningSignaturesSeen(result.meta?.systemPromptReport),
       );
+      const terminal: CandidateExecutionTerminal =
+        params.opts?.abortSignal?.aborted || result.meta?.aborted
+          ? "cancelled"
+          : result.meta?.error || result.payloads?.some((payload) => payload.isError)
+            ? "failed"
+            : "completed";
       emitModelStage("model_finished", {
         modelMs: Date.now() - modelStartedAtMs,
-        ok: true,
+        ok: terminal === "completed",
       });
       emitModelStage("assistant_persisted", { source: "session_manager" });
       chargeEmbeddedOnce(notedEmbeddedUsage);
-      executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "completed");
+      executionTerminal.finish(terminal);
       return result;
     } catch (err) {
       emitModelStage("model_finished", {
         modelMs: Date.now() - modelStartedAtMs,
         ok: false,
       });
-      if (!(err instanceof TaskBudgetExceededError) && !isAbortError(err)) {
-        chargeEmbeddedOnce(usageRetainedForCandidateCharge(notedEmbeddedUsage, err));
+      const retained = readEmbeddedFailureUsage(err, { runId, provider, model });
+      if (!(err instanceof TaskBudgetExceededError) && (!isAbortError(err) || retained)) {
+        chargeEmbeddedOnce(
+          retained?.usage ?? usageRetainedForCandidateCharge(notedEmbeddedUsage, err),
+        );
       }
       executionTerminal.finish(params.opts?.abortSignal?.aborted ? "cancelled" : "failed");
       throw err;

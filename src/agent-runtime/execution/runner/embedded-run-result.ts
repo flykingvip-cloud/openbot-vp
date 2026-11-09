@@ -19,6 +19,7 @@ import { createFailoverDecisionLogger } from "../../../agents/pi-embedded-runner
 import { derivePromptTokens, normalizeUsage, type UsageLike } from "../../../agents/usage.js";
 import { buildEmbeddedRunPayloads, type EmbeddedPayloadFormatting } from "../../delivery/index.js";
 import { toNormalizedUsage } from "../outcomes/usage-summary.js";
+import { retainEmbeddedFailureUsage } from "./embedded-failure-usage.js";
 import type { RunEmbeddedPiAgentParams } from "./embedded-request.js";
 import type { EmbeddedPiAgentMeta } from "./embedded-result.js";
 import type { EmbeddedRunAttemptCarry } from "./embedded-run-attempt.js";
@@ -185,13 +186,21 @@ export async function runEmbeddedRunResult(args: {
         resolveFailoverStatus(assistantFailoverReason ?? "unknown") ??
         (isTimeoutErrorMessage(message) ? 408 : undefined);
       logAssistantFailoverDecision("fallback_model", { status });
-      throw new FailoverError(message, {
-        reason: assistantFailoverReason ?? "unknown",
-        provider: activeErrorContext.provider,
-        model: activeErrorContext.model,
-        profileId: session.lastProfileId,
-        status,
-      });
+      throw retainEmbeddedFailureUsage(
+        new FailoverError(message, {
+          reason: assistantFailoverReason ?? "unknown",
+          provider: activeErrorContext.provider,
+          model: activeErrorContext.model,
+          profileId: session.lastProfileId,
+          status,
+        }),
+        {
+          runId: params.runId,
+          provider: params.provider ?? session.provider,
+          model: params.model ?? session.modelId,
+        },
+        toNormalizedUsage(loop.usageAccumulator),
+      );
     }
     logAssistantFailoverDecision("surface_error");
   }

@@ -777,3 +777,151 @@ describe("explicit reasoning hypothesis UI", () => {
     panel.remove();
   });
 });
+
+describe("platform explicit task input", () => {
+  it("queries only a complete explicit version and clears partial input without falling back", async () => {
+    const request = vi.fn(async (method: string, _params?: Record<string, unknown>) =>
+      method === "diagnosis.observation.query"
+        ? {
+            schemaVersion: 1,
+            metricDictVersion: 1,
+            samples: [],
+            projectedAt: 1,
+            sourceWatermark: null,
+            window: { from: 0, to: 2 },
+            coverage: null,
+          }
+        : { items: [], authorization: { outcome: "allow" }, audit: { decision: "allow" } },
+    );
+    const panel = document.createElement("openbot-diagnosis-panel");
+    panel.role = "platform";
+    panel.client = { connected: true, request } as unknown as GatewayBrowserClient;
+    panel.scopes = ["operator.read"];
+    panel.gatewayMethods = ["diagnosis.observation.query"];
+    panel.connected = true;
+    document.body.append(panel);
+    await waitFor(() =>
+      expect(panel.querySelector('[data-testid="diagnosis-task-id"]')).not.toBeNull(),
+    );
+    const set = async (key: string, value: string) => {
+      const input = panel.querySelector<HTMLInputElement>(
+        '[data-testid="diagnosis-task-' + key + '"]',
+      )!;
+      input.value = value;
+      input.dispatchEvent(new Event("input"));
+      await panel.updateComplete;
+    };
+    const calls = () =>
+      request.mock.calls.filter(([method]) => method === "diagnosis.observation.query");
+    await set("agent", "explicit-agent");
+    await set("id", "explicit-task");
+    await set("version", "9007199254740993");
+    expect(calls()).toHaveLength(0);
+    await set("version", "2");
+    await waitFor(() => expect(calls()).toHaveLength(1));
+    expect(calls()[0][1]).toMatchObject({
+      agentId: "explicit-agent",
+      taskId: "explicit-task",
+      outcomeVersion: 2,
+    });
+    expect(panel.textContent).toContain("平台身份不代表跨租户读取授权");
+    expect(panel.textContent).toContain("不受连接工作台样例选择影响");
+    await set("id", "");
+    expect(calls()).toHaveLength(1);
+    expect(panel.querySelector('[aria-label="运行证据投影"] article')).toBeNull();
+    panel.remove();
+  });
+});
+
+describe("platform explicit input response isolation", () => {
+  const payload = (taskId: string, version: number) => ({
+    schemaVersion: 1,
+    metricDictVersion: 1,
+    samples: [
+      {
+        sampleId: taskId,
+        qualification: "outcome_only",
+        provenance: ["injected"],
+        reasons: [],
+        executionRefs: [],
+        evidence: {
+          resource: "unknown",
+          technical: "unknown",
+          execution: "unknown",
+          business: "present",
+        },
+        evidenceReasons: { resource: [], technical: [], execution: [], business: [] },
+        outcome: {
+          taskId,
+          outcomeVersion: version,
+          isCurrentTip: true,
+          taskJudgement: "success",
+          lifecycle: "closed",
+          acceptanceStatus: "passed",
+          deliveryStatus: "delivered",
+        },
+      },
+    ],
+    projectedAt: 1,
+    sourceWatermark: null,
+    window: { from: 0, to: 2 },
+    coverage: null,
+  });
+  it.each(["version", "permission"])(
+    "does not restore old evidence after %s changes",
+    async (change) => {
+      const pending: ((value: unknown) => void)[] = [];
+      const request = vi.fn((method: string, _params?: Record<string, unknown>) =>
+        method === "diagnosis.observation.query"
+          ? new Promise((resolve) => pending.push(resolve))
+          : Promise.resolve({
+              items: [],
+              authorization: { outcome: "allow" },
+              audit: { decision: "allow" },
+            }),
+      );
+      const panel = document.createElement("openbot-diagnosis-panel");
+      panel.role = "platform";
+      panel.client = { connected: true, request } as unknown as GatewayBrowserClient;
+      panel.scopes = ["operator.read"];
+      panel.gatewayMethods = ["diagnosis.observation.query"];
+      panel.connected = true;
+      document.body.append(panel);
+      await waitFor(() =>
+        expect(panel.querySelector('[data-testid="diagnosis-task-id"]')).not.toBeNull(),
+      );
+      const set = async (key: string, value: string) => {
+        const input = panel.querySelector<HTMLInputElement>(
+          '[data-testid="diagnosis-task-' + key + '"]',
+        )!;
+        input.value = value;
+        input.dispatchEvent(new Event("input"));
+        await panel.updateComplete;
+      };
+      await set("agent", "main");
+      await set("id", "explicit-task");
+      await set("version", "1");
+      await waitFor(() => expect(pending).toHaveLength(1));
+      if (change === "version") {
+        await set("version", "2");
+        await waitFor(() => expect(pending).toHaveLength(2));
+        pending[1](payload("current-result", 2));
+        await waitFor(() => expect(panel.textContent).toContain("current-result"));
+        pending[0](payload("old-secret", 1));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(panel.textContent).not.toContain("old-secret");
+        expect(panel.textContent).toContain("current-result");
+      } else {
+        pending[0](payload("old-secret", 1));
+        await waitFor(() => expect(panel.textContent).toContain("old-secret"));
+        panel.scopes = [];
+        await panel.updateComplete;
+        await waitFor(() => expect(panel.textContent).not.toContain("old-secret"));
+        await set("version", "2");
+        expect(pending).toHaveLength(1);
+        expect(panel.querySelector('[aria-label="运行证据投影"] article')).toBeNull();
+      }
+      panel.remove();
+    },
+  );
+});

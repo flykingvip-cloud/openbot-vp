@@ -4,6 +4,7 @@ import {
   createAdmittedCandidateInvoker,
   type AdmittedCandidateHost,
 } from "./admitted-candidate.js";
+import { retainEmbeddedFailureUsage } from "./embedded-failure-usage.js";
 
 const mocks = vi.hoisted(() => ({ cli: vi.fn(), embedded: vi.fn(), event: vi.fn() }));
 vi.mock("./cli-run.js", () => ({
@@ -166,5 +167,78 @@ describe("admitted candidate boundary", () => {
     mocks.cli.mockRejectedValue(error);
     await expect(invoke("codex-cli", "model-a")).rejects.toBe(error);
     expect(host.chargeTipBudgetAfterModelCall).not.toHaveBeenCalled();
+  });
+});
+
+it.each(["role_ordering", "image_size", "retry_limit", "timeout"])(
+  "marks returned %s as failed without deciding business success",
+  async (kind) => {
+    const { host, invoke } = setup();
+    const terminals: string[] = [];
+    host.observeExecution = (stage) => {
+      terminals.push(stage);
+    };
+    const result = {
+      payloads: [{ text: "failed", isError: true }],
+      meta: {
+        durationMs: 1,
+        agentMeta: { usage: { input: 7, output: 3 } },
+        ...(kind === "timeout" ? { aborted: true } : { error: { kind, message: "failed" } }),
+      },
+    };
+    mocks.embedded.mockResolvedValue(result);
+    expect(await invoke("openai", "test")).toBe(result);
+    expect(terminals.filter((stage) => stage !== "started")).toEqual([
+      kind === "timeout" ? "cancelled" : "failed",
+    ]);
+    expect(host.chargeTipBudgetAfterModelCall).toHaveBeenCalledOnce();
+    expect(host.chargeTipBudgetAfterModelCall).toHaveBeenCalledWith(
+      expect.objectContaining({ usage: { input: 7, output: 3 } }),
+    );
+    expect(result).not.toHaveProperty("taskJudgement");
+  },
+);
+
+it("charges failed A and successful B once each without exchanging candidate usage", async () => {
+  const { host, invoke } = setup();
+  const error = retainEmbeddedFailureUsage(
+    new Error("failed A"),
+    { runId: "run-a", provider: "openai", model: "a" },
+    { input: 7, output: 3 },
+  );
+  mocks.embedded.mockRejectedValueOnce(error).mockResolvedValueOnce({
+    payloads: [{ text: "ok" }],
+    meta: { agentMeta: { usage: { input: 2, output: 1 } } },
+  });
+  await expect(invoke("openai", "a")).rejects.toBe(error);
+  await invoke("openai", "b");
+  expect(host.chargeTipBudgetAfterModelCall).toHaveBeenCalledTimes(2);
+  expect(host.chargeTipBudgetAfterModelCall).toHaveBeenNthCalledWith(1, {
+    provider: "openai",
+    model: "a",
+    usage: { input: 7, output: 3 },
+  });
+  expect(host.chargeTipBudgetAfterModelCall).toHaveBeenNthCalledWith(2, {
+    provider: "openai",
+    model: "b",
+    usage: { input: 2, output: 1 },
+  });
+});
+it("retains already observed trusted usage on cancellation without a second charge", async () => {
+  const { host, invoke } = setup();
+  const error = new Error("cancelled");
+  error.name = "AbortError";
+  retainEmbeddedFailureUsage(
+    error,
+    { runId: "run-a", provider: "openai", model: "a" },
+    { input: 4, output: 1 },
+  );
+  mocks.embedded.mockRejectedValueOnce(error);
+  await expect(invoke("openai", "a")).rejects.toBe(error);
+  expect(host.chargeTipBudgetAfterModelCall).toHaveBeenCalledOnce();
+  expect(host.chargeTipBudgetAfterModelCall).toHaveBeenCalledWith({
+    provider: "openai",
+    model: "a",
+    usage: { input: 4, output: 1 },
   });
 });

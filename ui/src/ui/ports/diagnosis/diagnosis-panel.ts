@@ -743,6 +743,29 @@ export class OpenBotDiagnosisPanel extends LitElement {
     `;
   }
 
+  private renderPlatformTaskInput() {
+    return html`<fieldset aria-label="平台精确任务证据查询"><legend>精确任务结果引用</legend><p>请填写数字人、任务及结果版本；平台身份不代表跨租户读取授权。</p>${(
+      [
+        ["agent", "数字人", this.agentIdDraft],
+        ["id", "任务", this.taskIdDraft],
+        ["version", "结果版本", this.outcomeVersionDraft],
+      ] as const
+    ).map(
+      ([key, label, value]) =>
+        html`<label>${label}<input data-testid=${"diagnosis-task-" + key} .value=${value} @input=${(
+          event: Event,
+        ) => {
+          const next = (event.target as HTMLInputElement).value;
+          if (key === "agent") {
+            this.agentIdDraft = next;
+          } else if (key === "id") {
+            this.taskIdDraft = next;
+          } else {
+            this.outcomeVersionDraft = next;
+          }
+        }}></label>`,
+    )}</fieldset>`;
+  }
   render() {
     if (this.loading && !this.model) {
       return html`
@@ -788,7 +811,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
           },
         })}
         <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
-        ${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
+        <p data-testid="observation-query-scope">精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。</p>${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
         <section class="enterprise-diagnosis__panel">
           <h2>原诊断工作区</h2>
           <p class="enterprise-diagnosis__sub">下面的数据来自真实诊断接口，不受上方样例模式影响。</p>
@@ -868,8 +891,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
       `;
     }
     return html`
+      ${this.renderPlatformTaskInput()}
       <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
-      ${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
+      <p data-testid="observation-query-scope">精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。</p>${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
       <div class="toolbar">
         <button
           type="button"
