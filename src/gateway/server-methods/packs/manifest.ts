@@ -381,6 +381,7 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
         {
           id: "diagnosis-reports",
           methods: [
+            "diagnosis.observation.query",
             "diagnosis.reports.query",
             "diagnosis.reports.get",
             "diagnosis.diagnose",
@@ -401,6 +402,7 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
           ],
           scopes: {
             "operator.read": [
+              "diagnosis.observation.query",
               "diagnosis.reports.query",
               "diagnosis.reports.get",
               "diagnosis.diagnose",

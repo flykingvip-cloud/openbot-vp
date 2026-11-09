@@ -1,4 +1,11 @@
 import path from "node:path";
+import {
+  recoverAsyncWaitJobsAtGatewayBoot,
+  createAsyncWaitRecoveryContinueEnqueue,
+  setAsyncWaitRecoveryFollowupConsumerEnsure,
+  ensureAsyncWaitRecoveryFollowupConsumer,
+  setAsyncWaitRecoveryContinueEnqueue,
+} from "../agent-runtime/state/index.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { maybeProvisionBuiltinStewardAtStartup } from "../agents/builtin-steward/provision.js";
 import { getActiveEmbeddedRunCount } from "../agents/pi-embedded-runner/runs.js";
@@ -59,6 +66,9 @@ import {
 } from "../local-files/events.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
+import { createHeartbeatActivityLifecycle } from "../observation/heartbeat-activity-lifecycle.js";
+import { createObservationQueryHandlers } from "../observation/query-gateway.js";
+import { createObservationReasoningOptions } from "../observation/reasoning-model-resolver.js";
 import { getGlobalHookRunner, runGlobalGatewayStopSafely } from "../plugins/hook-runner-global.js";
 import { createEmptyPluginRegistry } from "../plugins/registry.js";
 import { createPluginRuntime } from "../plugins/runtime/index.js";
@@ -663,6 +673,10 @@ export async function startGatewayServer(
     broadcastToConnIds,
   });
   if (!minimalTestGateway) {
+    // These placeholders are replaced below; release them before losing their handles.
+    clearInterval(tickInterval);
+    clearInterval(healthInterval);
+    clearInterval(dedupeCleanup);
     ({ tickInterval, healthInterval, dedupeCleanup, mediaCleanup } = startGatewayMaintenanceTimers({
       broadcast,
       broadcastChat,
@@ -706,11 +720,13 @@ export async function startGatewayServer(
   // The disabled handle does not subscribe and does not write.
   const conversationEvaluation = minimalTestGateway ? null : startConversationEvaluation();
 
-  const heartbeatUnsub = minimalTestGateway
-    ? null
-    : onHeartbeatEvent((evt) => {
+  const heartbeatActivity = createHeartbeatActivityLifecycle({
+    minimalTestGateway,
+    subscribeBroadcast: () =>
+      onHeartbeatEvent((evt) => {
         broadcast("heartbeat", evt, { dropIfSlow: true });
-      });
+      }),
+  });
 
   let heartbeatRunner: HeartbeatRunner = minimalTestGateway
     ? {
@@ -792,6 +808,25 @@ export async function startGatewayServer(
         },
       });
     })().catch((err) => log.error(`TaskOutcome consumer recovery failed: ${String(err)}`));
+  }
+
+  // Package2: recover durable async-wait intents (pid alive → wait; exited → one bounded wake).
+  if (!minimalTestGateway) {
+    void (async () => {
+      const logRecovery = log.child("async-wait-recovery");
+      setAsyncWaitRecoveryFollowupConsumerEnsure(({ cfg, sessionKey }) => {
+        ensureAsyncWaitRecoveryFollowupConsumer({ cfg, sessionKey });
+      });
+      setAsyncWaitRecoveryContinueEnqueue(createAsyncWaitRecoveryContinueEnqueue(cfgAtStart));
+      recoverAsyncWaitJobsAtGatewayBoot({
+        cfg: cfgAtStart,
+        startRecheck: true,
+        log: {
+          info: (message) => logRecovery.info(message),
+          warn: (message) => logRecovery.warn(message),
+        },
+      });
+    })().catch((err) => log.error(`Async-wait recovery failed: ${String(err)}`));
   }
 
   const execApprovalManager = new ExecApprovalManager({
@@ -1043,6 +1078,10 @@ export async function startGatewayServer(
       ...pluginRegistry.gatewayHandlers,
       ...execApprovalHandlers,
       ...secretsHandlers,
+      ...createObservationQueryHandlers({
+        platformActivityCollector: heartbeatActivity,
+        ...createObservationReasoningOptions(process.env.OPENBOT_OBSERVATION_REASONING === "1"),
+      }),
     },
     broadcast,
     context: gatewayRequestContext,
@@ -1190,7 +1229,7 @@ export async function startGatewayServer(
     dedupeCleanup,
     mediaCleanup,
     agentUnsub,
-    heartbeatUnsub,
+    heartbeatUnsub: heartbeatActivity ? () => heartbeatActivity.stop() : null,
     chatRunState,
     clients,
     configReloader,

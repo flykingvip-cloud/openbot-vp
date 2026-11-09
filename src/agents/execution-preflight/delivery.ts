@@ -1,5 +1,9 @@
 import { readFileSync, statSync, unlinkSync } from "node:fs";
 import path from "node:path";
+import {
+  hashArtifact,
+  matchRequiredValidators,
+} from "../../agent-runtime/delivery/acceptance/index.js";
 import { EmptyWorkspaceWriteError } from "../../infra/non-empty-workspace-write.js";
 import {
   FIXED_PROGRESS_TEMPLATE,
@@ -16,7 +20,6 @@ import type {
   ExecutionPreflight,
 } from "./types.js";
 import type { DeliveryValidatorReceipt } from "./types.js";
-import { hashArtifact, matchRequiredValidators } from "./validation.js";
 
 /** Fixed hold text. Stream and blocked sends use this. It is not a completion claim. */
 export const DELIVERY_HOLD_NOTICE = FIXED_PROGRESS_TEMPLATE;

@@ -97,6 +97,8 @@ function normalizePersistedToolResultName(
 export function installSessionToolResultGuard(
   sessionManager: SessionManager,
   opts?: {
+    /** Gateway owns concurrent user/interaction leaves; rebase each write onto the persisted leaf. */
+    refreshBeforeAppend?: boolean;
     /**
      * Optional transform applied to any message before persistence.
      */
@@ -133,7 +135,16 @@ export function installSessionToolResultGuard(
   clearPendingToolResults: () => void;
   getPendingIds: () => string[];
 } {
-  const originalAppend = sessionManager.appendMessage.bind(sessionManager);
+  const appendMessage = sessionManager.appendMessage.bind(sessionManager);
+  const originalAppend: typeof sessionManager.appendMessage = (message) => {
+    if (opts?.refreshBeforeAppend) {
+      const file = sessionManager.getSessionFile();
+      if (file) {
+        sessionManager.setSessionFile(file);
+      }
+    }
+    return appendMessage(message);
+  };
   const pendingState = createPendingToolCallState();
   const persistMessage = (message: AgentMessage) => {
     const withErrorText = materializeAssistantErrorContent(message);

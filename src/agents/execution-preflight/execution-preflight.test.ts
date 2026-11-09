@@ -530,6 +530,7 @@ describe("execution preflight", () => {
   it("rejects a receipt whose path or validator version does not match", () => {
     const preflight = preflightFor("run sample-task");
     issueValidationReceipt({
+      result: "passed",
       validatorId: "sample-validator",
       taskId: preflight.taskId,
       artifactPath: "out/a.bin",
@@ -570,7 +571,7 @@ describe("execution preflight", () => {
   it("keeps chat and cron on the same embedded agent entry", () => {
     const cron = readFileSync(new URL("../../cron/isolated-agent/run.ts", import.meta.url), "utf8");
     const reply = readFileSync(
-      new URL("../../auto-reply/reply/agent-runner-execution.ts", import.meta.url),
+      new URL("../../agent-runtime/execution/runner/admitted-candidate.ts", import.meta.url),
       "utf8",
     );
     expect(cron).toContain("runEmbeddedPiAgent");

@@ -4616,6 +4616,8 @@ export const zh_CN: TranslationMap = {
     deliverableSaveCancel: "取消",
     deliverableSaveAsFilenameLabel: "另存文件名",
     deliverableSaveStale: "入库文件刚被更新，请重新选择覆盖或另存。",
+    deliverableEditStale:
+      "原文件已更新，本次未覆盖。编辑草稿已保留，请重新加载最新原文件后合并修改。",
     artifactIncubationWeakHint: "本次产出可复用，可整理为能力",
     artifactIncubationWeakAction: "可整理为能力",
     artifactIncubationSuggestTitle: "系统建议整理为能力",

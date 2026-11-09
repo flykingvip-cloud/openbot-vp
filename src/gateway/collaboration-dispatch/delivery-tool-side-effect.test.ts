@@ -256,7 +256,7 @@ describe("Residual B production call-site regression", () => {
       "utf8",
     );
     const attempt = fsSync.readFileSync(
-      path.join(process.cwd(), "src/agents/pi-embedded-runner/run/attempt.ts"),
+      path.join(process.cwd(), "src/agent-runtime/execution/runner/embedded-attempt-session.ts"),
       "utf8",
     );
     expect(adapter).toContain("runDeliveryToolSideEffect");

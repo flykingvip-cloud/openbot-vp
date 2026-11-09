@@ -25,7 +25,11 @@ import {
   submitBoardItemForReview,
 } from "../collaboration-dispatch/claim-contract.js";
 import { maybeContinueAfterRoundComplete } from "../collaboration-dispatch/continue-after-round.js";
-import { runGroupTaskHeartbeat } from "../collaboration-dispatch/group-task-heartbeat.js";
+import {
+  groupTaskHeartbeatDir,
+  groupTaskHeartbeatStatePath,
+  runGroupTaskHeartbeat,
+} from "../collaboration-dispatch/group-task-heartbeat.js";
 import { createRoundPolicySnapshot } from "../collaboration-dispatch/round-policy-snapshot.js";
 import {
   createRuntimeAuthority,
@@ -723,6 +727,19 @@ describe("P4 risk A (O4) — post-cap heartbeat must not revise-nudge original e
     expect(live?.returnCount).toBe(2);
     expect(live?.pendingEventRelay).toBeNull();
 
+    const heartbeatStateFile = groupTaskHeartbeatStatePath(
+      groupTaskHeartbeatDir(auth),
+      auth.groupId,
+    );
+    const initialHeartbeatState = JSON.parse(
+      await fs.readFile(heartbeatStateFile, "utf8").catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") {
+          return JSON.stringify({ items: {} });
+        }
+        throw error;
+      }),
+    );
+    const initialFailures = initialHeartbeatState.items[item.itemId]?.escalateFailCount ?? 0;
     let reviseExecuteToClaimant = 0;
     let escalateExecuteCount = 0;
     const dispatcher: WakeRoundDispatcher = async (req) => {
@@ -786,9 +803,53 @@ describe("P4 risk A (O4) — post-cap heartbeat must not revise-nudge original e
       reviseExecuteToClaimant,
       `revise executes to claimant; decisions=${JSON.stringify(decisionActions)}`,
     ).toBe(0);
-    // Upgrade path only: escalate and/or skip — never claimant revise nudge.
+    const state = JSON.parse(
+      await fs.readFile(
+        groupTaskHeartbeatStatePath(groupTaskHeartbeatDir(auth), auth.groupId),
+        "utf8",
+      ),
+    );
+    expect(_escalatePlanCount).toBe(2);
+    expect(state.items[item.itemId].escalateFailCount).toBe(
+      initialFailures + decisionActions.length,
+    );
+    expect(state.items[item.itemId].humanAttention).toMatchObject({
+      status: "needs_human",
+      source: "escalate_failures_exhausted",
+    });
+    expect(state.items[item.itemId].humanAttention.ownerIds).toContain(reviewer);
+    const auditFiles = (await fs.readdir(groupTaskHeartbeatDir(auth))).filter((name) =>
+      name.endsWith(".human-attention.jsonl"),
+    );
+    const auditRows = (
+      await Promise.all(
+        auditFiles.map((name) => fs.readFile(path.join(groupTaskHeartbeatDir(auth), name), "utf8")),
+      )
+    ).flatMap((text) =>
+      text
+        .trim()
+        .split(String.fromCharCode(10))
+        .filter(Boolean)
+        .map((line) => JSON.parse(line)),
+    );
     expect(
-      decisionActions.every((row) => row.startsWith("escalate:") || row.startsWith("skip:")),
+      auditRows.some(
+        (row) =>
+          row.itemId === item.itemId &&
+          row.attention?.source === "escalate_failures_exhausted" &&
+          row.attention?.status === "needs_human",
+      ),
+    ).toBe(true);
+    expect(escalateExecuteCount).toBe(0);
+    // Existing cap-triggered failures plus failed heartbeat plans lead to human handoff.
+
+    expect(
+      decisionActions.every(
+        (row) =>
+          row.startsWith("escalate:") ||
+          row.startsWith("skip:") ||
+          row.startsWith("human_todo:escalate_failures_exhausted:"),
+      ),
       `expected escalate|skip only; decisions=${JSON.stringify(decisionActions)}`,
     ).toBe(true);
   });

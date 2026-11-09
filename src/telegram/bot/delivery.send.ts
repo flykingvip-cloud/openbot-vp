@@ -1,4 +1,6 @@
 import { type Bot, GrammyError } from "grammy";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { formatErrorMessage } from "../../infra/errors.js";
 import type { RuntimeEnv } from "../../runtime.js";
 import { withTelegramApiErrorLogging } from "../api-logging.js";
@@ -35,6 +37,7 @@ function removeMessageThreadIdParam(
 }
 
 export async function sendTelegramWithThreadFallback<T>(params: {
+  taskBoundary?: TaskActionBoundary;
   operation: string;
   runtime: RuntimeEnv;
   thread?: TelegramThreadSpec | null;
@@ -42,6 +45,15 @@ export async function sendTelegramWithThreadFallback<T>(params: {
   send: (effectiveParams: Record<string, unknown>) => Promise<T>;
   shouldLog?: (err: unknown) => boolean;
 }): Promise<T> {
+  const sendChecked = (effectiveParams: Record<string, unknown>) => {
+    if (params.taskBoundary) {
+      const refusal = checkTaskActionBoundary(params.taskBoundary);
+      if (refusal) {
+        throw new Error(refusal);
+      }
+    }
+    return params.send(effectiveParams);
+  };
   const allowThreadlessRetry = params.thread?.scope === "dm";
   const hasThreadId = hasMessageThreadIdParam(params.requestParams);
   const shouldSuppressFirstErrorLog = (err: unknown) =>
@@ -55,7 +67,7 @@ export async function sendTelegramWithThreadFallback<T>(params: {
       operation: params.operation,
       runtime: params.runtime,
       shouldLog: mergedShouldLog,
-      fn: () => params.send(params.requestParams),
+      fn: () => sendChecked(params.requestParams),
     });
   } catch (err) {
     if (!allowThreadlessRetry || !hasThreadId || !isTelegramThreadNotFoundError(err)) {
@@ -68,7 +80,7 @@ export async function sendTelegramWithThreadFallback<T>(params: {
     return await withTelegramApiErrorLogging({
       operation: `${params.operation} (threadless retry)`,
       runtime: params.runtime,
-      fn: () => params.send(retryParams),
+      fn: () => sendChecked(retryParams),
     });
   }
 }
@@ -94,6 +106,7 @@ export async function sendTelegramText(
   text: string,
   runtime: RuntimeEnv,
   opts?: {
+    taskBoundary?: TaskActionBoundary;
     replyToMessageId?: number;
     replyQuoteText?: string;
     thread?: TelegramThreadSpec | null;
@@ -117,6 +130,7 @@ export async function sendTelegramText(
   const sendPlainFallback = async () => {
     const res = await sendTelegramWithThreadFallback({
       operation: "sendMessage",
+      taskBoundary: opts?.taskBoundary,
       runtime,
       thread: opts?.thread,
       requestParams: baseParams,
@@ -141,6 +155,7 @@ export async function sendTelegramText(
   try {
     const res = await sendTelegramWithThreadFallback({
       operation: "sendMessage",
+      taskBoundary: opts?.taskBoundary,
       runtime,
       thread: opts?.thread,
       requestParams: baseParams,

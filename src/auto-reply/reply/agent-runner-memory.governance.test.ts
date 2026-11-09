@@ -29,7 +29,7 @@ vi.mock("../../agents/model-selection.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../agents/pi-embedded.js", () => ({
+vi.mock("../../agent-runtime/execution/index.js", () => ({
   runEmbeddedPiAgent: vi.fn().mockResolvedValue({
     payloads: [],
     meta: { durationMs: 10 },
@@ -196,6 +196,7 @@ describe("resolveMemoryFlushModelGovernance (P3-2)", () => {
       governanceMode: "shadow",
       entitlementAllowlist: [PRIMARY],
       governanceContext: {
+        purpose: "memory_flush",
         parentRunId: "parent-turn",
         tenantId: "tenant-a",
       },
@@ -206,7 +207,7 @@ describe("resolveMemoryFlushModelGovernance (P3-2)", () => {
     expect(resolveMemoryFlushModelGovernance("missing-parent")).toEqual({
       governanceMode: "shadow",
       absentAllowlistReason: "parent-model-set-absent",
-      governanceContext: { parentRunId: "missing-parent" },
+      governanceContext: { purpose: "memory_flush", parentRunId: "missing-parent" },
     });
   });
 
@@ -214,6 +215,7 @@ describe("resolveMemoryFlushModelGovernance (P3-2)", () => {
     expect(resolveMemoryFlushModelGovernance(undefined)).toEqual({
       governanceMode: "shadow",
       absentAllowlistReason: "parent-model-set-absent",
+      governanceContext: { purpose: "memory_flush" },
     });
   });
 
@@ -226,7 +228,7 @@ describe("resolveMemoryFlushModelGovernance (P3-2)", () => {
     rememberRunModelSet("legacy-parent", snapshot!);
     expect(resolveMemoryFlushModelGovernance("legacy-parent")).toEqual({
       governanceMode: "legacy",
-      governanceContext: { parentRunId: "legacy-parent" },
+      governanceContext: { purpose: "memory_flush", parentRunId: "legacy-parent" },
     });
   });
 

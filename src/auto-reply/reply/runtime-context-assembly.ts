@@ -1,3 +1,16 @@
+import {
+  isCollaborationGroupRuntimeSession,
+  resolveCollaborationGroupIdForRun,
+} from "../../agent-runtime/command/index.js";
+export {
+  shouldUseCollaborationRuntimeAssembly,
+  isCollaborationGroupRuntimeSession,
+  resolveCollaborationGroupIdForRun,
+} from "../../agent-runtime/command/index.js";
+import {
+  assembleCollaborationMember,
+  renderCollaborationMission,
+} from "../../agent-runtime/context/index.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import {
@@ -18,64 +31,6 @@ import { buildActiveContextSystemPrompt } from "./context-budget-assembler.js";
 import { buildGroupChatContext, buildGroupIntro } from "./groups.js";
 import { buildInboundMetaSystemPrompt } from "./inbound-meta.js";
 import { buildOperationalIdentitySystemPrompt } from "./operational-identity-context.js";
-
-/**
- * Group discussion turns set CollaborationRoundInvoked even when the per-bot
- * session entry omits space/groupId. Those turns still use collaboration assembly.
- */
-export function shouldUseCollaborationRuntimeAssembly(params: {
-  collaborationGroupId?: string | null;
-  sessionEntry?: SessionEntry;
-  collaborationRoundInvoked?: boolean;
-}): boolean {
-  const groupId = params.collaborationGroupId?.trim();
-  if (params.collaborationRoundInvoked && groupId) {
-    return true;
-  }
-  return isCollaborationGroupRuntimeSession({
-    groupId,
-    sessionEntry: params.sessionEntry,
-  });
-}
-
-export function isCollaborationGroupRuntimeSession(params: {
-  groupId?: string | null;
-  sessionEntry?: SessionEntry;
-}): boolean {
-  const groupId = params.groupId?.trim();
-  if (!groupId) {
-    return false;
-  }
-  if (params.sessionEntry?.collaborationGroupProfile?.groupId?.trim() === groupId) {
-    return true;
-  }
-  return (
-    params.sessionEntry?.groupId?.trim() === groupId ||
-    params.sessionEntry?.space?.trim() === groupId
-  );
-}
-
-/** Prefer explicit CollaborationGroupId from the turn context over session-key heuristics. */
-export function resolveCollaborationGroupIdForRun(params: {
-  collaborationGroupId?: string | null;
-  groupSessionId?: string | null;
-  sessionEntry?: SessionEntry;
-}): string | undefined {
-  const explicit = params.collaborationGroupId?.trim();
-  if (explicit) {
-    return explicit;
-  }
-  const fromGroupKey = params.groupSessionId?.trim();
-  if (fromGroupKey) {
-    return fromGroupKey;
-  }
-  return (
-    params.sessionEntry?.collaborationGroupProfile?.groupId?.trim() ||
-    params.sessionEntry?.groupId?.trim() ||
-    params.sessionEntry?.space?.trim() ||
-    undefined
-  );
-}
 
 export function resolveCollaborationRunWorkspaceDir(params: {
   cfg: OpenBotConfig;
@@ -138,34 +93,7 @@ export function buildCollaborationGroupMissionPrompt(
   sessionEntry?: SessionEntry,
   resolvedProfile?: SessionEntry["collaborationGroupProfile"],
 ): string | undefined {
-  const profile = resolvedProfile ?? sessionEntry?.collaborationGroupProfile;
-  if (!profile) {
-    return undefined;
-  }
-  const lines = ["Collaboration group context:"];
-  if (profile.displayName?.trim()) {
-    lines.push(`- Group: ${profile.displayName.trim()}`);
-  }
-  if (profile.purpose?.trim()) {
-    lines.push(`- Purpose: ${profile.purpose.trim()}`);
-  }
-  if (profile.currentMission?.trim()) {
-    lines.push(`- Current mission: ${profile.currentMission.trim()}`);
-  }
-  if (profile.collaborationMode?.trim()) {
-    lines.push(`- Collaboration mode: ${profile.collaborationMode.trim()}`);
-  }
-  const criteria = (profile.successCriteria ?? []).map((entry) => entry.trim()).filter(Boolean);
-  if (criteria.length > 0) {
-    lines.push(`- Success criteria: ${criteria.join("; ")}`);
-  }
-  const instructions = (profile.systemInstructions ?? [])
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-  if (instructions.length > 0) {
-    lines.push(`- Group instructions: ${instructions.join(" | ")}`);
-  }
-  return lines.length > 1 ? lines.join("\n") : undefined;
+  return renderCollaborationMission(resolvedProfile ?? sessionEntry?.collaborationGroupProfile);
 }
 
 export type CollaborationRuntimeContextAssemblyParams = {
@@ -297,17 +225,17 @@ export async function assembleCollaborationRuntimeContextParts(
       : { ...params.sessionCtx, ThreadStarterBody: undefined },
   );
 
-  return [
-    operationalIdentityPrompt,
-    groupCharterPrompt,
-    groupMissionPrompt,
-    deliveryExecPrompt,
-    operatingPhasePrompt,
-    groupChatContext,
+  return assembleCollaborationMember({
+    operationalIdentity: operationalIdentityPrompt,
+    charter: groupCharterPrompt,
+    mission: groupMissionPrompt,
+    delivery: deliveryExecPrompt,
+    phase: operatingPhasePrompt,
+    groupContext: groupChatContext,
     groupIntro,
-    sessionContinuityPrompt,
-    collaborationCapabilityPrompt,
+    continuity: sessionContinuityPrompt,
+    capabilities: collaborationCapabilityPrompt,
     groupSystemPrompt,
-    inboundMetaPrompt,
-  ].filter((entry): entry is string => Boolean(entry?.trim()));
+    inboundMetadata: inboundMetaPrompt,
+  });
 }

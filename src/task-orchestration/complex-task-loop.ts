@@ -4,12 +4,12 @@
  * Group execution emits at most two depth-1 collab edge markers.
  * One-to-one execution never claims a child was already dispatched.
  * A failed acceptance check replaces a complete-looking draft.
- * Checked delivery calls the existing session-board completion record
- * without opening Conversation Task Runtime. User-draft acceptance does
+ * Reply shaping never closes the session task before transport confirmation.
+ * User-draft acceptance does
  * not write an evolution proposal.
  */
 import type { OpenBotConfig } from "../config/config.js";
-import { recordCheckedTaskCompletion } from "../conversation-task/session-task-board.js";
+import type { TaskCompletionBinding } from "../conversation-task/session-task-board.js";
 import { classifyTurnRelation, titleFromGoal } from "../conversation-task/turn-relation.js";
 import { assessTaskOutputAlignment } from "../cron/task-focus.js";
 import { resolveOrchestrationObserve } from "./observe-gate.js";
@@ -41,6 +41,7 @@ export type ComplexTaskLoopInput = {
   payloads?: readonly ComplexTaskReplyPayload[];
   currentGoal?: string;
   sessionFile?: string | null;
+  completionBinding?: TaskCompletionBinding;
   env?: NodeJS.ProcessEnv;
   /** Test spy. The loop never invokes it. */
   directSend?: (target: string) => void;
@@ -155,14 +156,14 @@ function edgeDirective(target: string, acceptance: string): string {
   return `[[collab_edge:handoff|to=${sanitizeField(target)}|reason=分步骤|remaining=按计划完成本步|acceptance=${sanitizeField(acceptance)}]]`;
 }
 
-function relationLabel(relation: "amend" | "aside" | "new_work"): string {
+function relationLabel(relation: "amend" | "conversation" | "new_work"): string {
   if (relation === "amend") {
     return "amend 补充纠正";
   }
   if (relation === "new_work") {
     return "new_work 新任务";
   }
-  return "aside 旁白";
+  return "conversation 对话";
 }
 
 export function applyComplexTaskLoop(input: ComplexTaskLoopInput): ComplexTaskLoopResult {
@@ -236,14 +237,9 @@ export function applyComplexTaskLoop(input: ComplexTaskLoopInput): ComplexTaskLo
     ...edges,
   ].join("\n");
 
-  let deliverableChecked = false;
-  if (aligned && input.sessionFile?.trim()) {
-    const recorded = recordCheckedTaskCompletion({
-      sessionFile: input.sessionFile,
-      closed: true,
-    });
-    deliverableChecked = recorded.persisted || Boolean(recorded.notice);
-  }
+  // Alignment is presentation evidence only. This function runs before send,
+  // and cannot certify delivery or close the task using a prepared draft.
+  const deliverableChecked = false;
 
   return {
     admitted: true,
@@ -284,6 +280,7 @@ export function shapeAdmittedComplexTaskReply<T extends ComplexTaskReplyPayload>
   surface: "group" | "direct";
   fromAgentId?: string | null;
   sessionFile?: string | null;
+  completionBinding?: TaskCompletionBinding;
   sessionKey?: string;
   cfg?: OpenBotConfig;
   disableTools?: boolean;
@@ -305,6 +302,7 @@ export function shapeAdmittedComplexTaskReply<T extends ComplexTaskReplyPayload>
       payloads: params.payloads,
       currentGoal: params.currentGoal,
       sessionFile: params.sessionFile,
+      completionBinding: params.completionBinding,
       env: params.env ?? process.env,
     });
     if (!shaped.admitted) {

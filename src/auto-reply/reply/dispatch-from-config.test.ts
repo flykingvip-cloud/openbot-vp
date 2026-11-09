@@ -10,6 +10,10 @@ import { buildTestCtx } from "./test-ctx.js";
 
 type AbortResult = { handled: boolean; aborted: boolean; stoppedSubagents?: number };
 
+const completionObserver = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("../../conversation-task/reply-completion.js", () => ({
+  observeConversationTaskReplyCompleted: completionObserver,
+}));
 const mocks = vi.hoisted(() => ({
   routeReply: vi.fn(async (_params: unknown) => ({ ok: true, messageId: "mock" })),
   tryFastAbortFromMessage: vi.fn<() => Promise<AbortResult>>(async () => ({
@@ -2167,4 +2171,56 @@ describe("dispatchReplyFromConfig B2 web-read shadow wiring", () => {
     expect(arg).not.toHaveProperty("conversationId");
     expect(arg).not.toHaveProperty("ctx");
   });
+});
+
+describe("task completion requires channel delivery evidence", () => {
+  it.each(["unknown", "failed", "delivered"] as const)(
+    "handles %s final delivery",
+    async (status) => {
+      setNoAbort();
+      completionObserver.mockClear();
+      const dispatcher = createDispatcher();
+      if (status !== "unknown") {
+        dispatcher.getDeliveryOutcomes = () => [{ kind: "final", ok: status === "delivered" }];
+      }
+      await dispatchReplyFromConfig({
+        ctx: buildTestCtx({ Provider: "slack", Surface: "slack" }),
+        cfg: emptyConfig,
+        dispatcher,
+        replyResolver: async () => ({ text: "Finished report" }),
+      });
+      expect(completionObserver).toHaveBeenCalledTimes(status === "delivered" ? 1 : 0);
+    },
+  );
+});
+
+it("carries the admitted execution session path into block and final delivery", async () => {
+  setNoAbort();
+  const dispatcher = createDispatcher();
+  const binding = {
+    taskId: "task-new-session",
+    executionAttempt: "run-new-session",
+    deliverableVersion: "version-new-session",
+    constraints: ["keep sources"],
+  };
+  const sessionFile = "/tmp/openbot-test-new-session/transcript.jsonl";
+  await dispatchReplyFromConfig({
+    ctx: buildTestCtx({ Provider: "slack", Surface: "slack" }),
+    cfg: emptyConfig,
+    dispatcher,
+    replyResolver: async (_ctx: MsgContext, options?: GetReplyOptions) => {
+      options?.onTaskExecutionBound?.(binding, { sessionFile });
+      await options?.onBlockReply?.({ text: "task stage" });
+      return { text: "task result" };
+    },
+  });
+  const context = { taskBoundary: { sessionFile, binding, constraints: binding.constraints } };
+  expect(dispatcher.sendBlockReply).toHaveBeenCalledWith(
+    expect.objectContaining({ text: "task stage" }),
+    context,
+  );
+  expect(dispatcher.sendFinalReply).toHaveBeenCalledWith(
+    expect.objectContaining({ text: "task result" }),
+    context,
+  );
 });

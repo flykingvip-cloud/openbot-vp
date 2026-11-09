@@ -471,3 +471,12 @@ describe("saveAndArchiveSidebarDeliverable", () => {
     expect(request).toHaveBeenCalledOnce();
   });
 });
+
+it("never archives Office preview HTML as the original PPTX when bytes are missing", () => {
+  const file = workspace("a1", {
+    previewKind: "html",
+    workspaceFilename: "reports/deck.pptx",
+    htmlSrcdoc: "<html><body>slide preview</body></html>",
+  });
+  expect(extractArtifactSavePayload(file)).toEqual({ content: "" });
+});

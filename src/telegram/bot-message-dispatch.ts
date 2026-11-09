@@ -1,4 +1,5 @@
 import type { Bot } from "grammy";
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import {
   findModelInCatalog,
@@ -467,9 +468,10 @@ export const dispatchTelegramMessage = async ({
     }
     return { ...payload, text };
   };
-  const sendPayload = async (payload: ReplyPayload) => {
+  const sendPayload = async (payload: ReplyPayload, taskBoundary?: TaskActionBoundary) => {
     const result = await deliverReplies({
       ...deliveryBaseOptions,
+      taskBoundary,
       replies: [payload],
       onVoiceRecording: sendRecordVoice,
     });
@@ -490,8 +492,9 @@ export const dispatchTelegramMessage = async ({
     stopDraftLane: async (lane) => {
       await lane.stream?.stop();
     },
-    editPreview: async ({ messageId, text, previewButtons }) => {
+    editPreview: async ({ messageId, text, previewButtons, taskBoundary }) => {
       await editMessageTelegram(chatId, messageId, text, {
+        taskBoundary,
         api: bot.api,
         cfg,
         accountId: route.accountId,
@@ -568,6 +571,7 @@ export const dispatchTelegramMessage = async ({
                 | undefined
             )?.buttons;
             await deliverLaneText({
+              taskBoundary: buffered.taskBoundary,
               laneName: "answer",
               text: buffered.text,
               payload: buffered.payload,
@@ -584,6 +588,7 @@ export const dispatchTelegramMessage = async ({
               reasoningStepState.shouldBufferFinalAnswer()
             ) {
               reasoningStepState.bufferFinalAnswer({
+                taskBoundary: info.taskBoundary,
                 payload,
                 text: segment.text,
               });
@@ -593,6 +598,7 @@ export const dispatchTelegramMessage = async ({
               reasoningStepState.noteReasoningHint();
             }
             const result = await deliverLaneText({
+              taskBoundary: info.taskBoundary,
               laneName: segment.lane,
               text: segment.text,
               payload,
@@ -622,7 +628,7 @@ export const dispatchTelegramMessage = async ({
             if (hasMedia) {
               const payloadWithoutSuppressedReasoning =
                 typeof payload.text === "string" ? { ...payload, text: "" } : payload;
-              await sendPayload(payloadWithoutSuppressedReasoning);
+              await sendPayload(payloadWithoutSuppressedReasoning, info.taskBoundary);
             }
             if (info.kind === "final") {
               await flushBufferedFinalAnswer();
@@ -643,7 +649,7 @@ export const dispatchTelegramMessage = async ({
             }
             return;
           }
-          await sendPayload(payload);
+          await sendPayload(payload, info.taskBoundary);
           if (info.kind === "final") {
             await flushBufferedFinalAnswer();
           }

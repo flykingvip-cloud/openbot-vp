@@ -9,6 +9,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../../config/config.js";
+import { resolveSessionFilePath } from "../../config/sessions.js";
+import {
+  mutateSessionTaskBoard,
+  emptySessionTaskBoard,
+} from "../../conversation-task/session-task-board.js";
 import { runPreparedReply } from "./get-reply-run.js";
 import { appendAsideDialogueTurn } from "./mid-task-aside-dialogue-history.js";
 
@@ -18,11 +23,12 @@ vi.mock("../../agents/auth-profiles/session-override.js", () => ({
   resolveSessionAuthProfileOverride: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../agents/pi-embedded.js", () => ({
+vi.mock("../../agent-runtime/execution/index.js", async (original) => ({
+  ...(await original<typeof import("../../agent-runtime/execution/index.js")>()),
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
+  queueEmbeddedPiMessage: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunActive: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunStreaming: vi.fn().mockReturnValue(false),
-  resolveEmbeddedSessionLane: vi.fn().mockReturnValue("session:session-key"),
 }));
 
 vi.mock("../../config/sessions.js", () => ({
@@ -32,7 +38,8 @@ vi.mock("../../config/sessions.js", () => ({
   updateSessionStore: vi.fn(),
 }));
 
-vi.mock("../../gateway/agent-growth/working-style-store.js", () => ({
+vi.mock("../../gateway/agent-growth/working-style-store.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../gateway/agent-growth/working-style-store.js")>()),
   resolveWorkingStyleInstructions: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -119,6 +126,7 @@ vi.mock("./runtime-context-assembly.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./runtime-context-assembly.js")>();
   return {
     ...actual,
+    shouldUseCollaborationRuntimeAssembly: vi.fn().mockReturnValue(false),
     assembleCollaborationRuntimeContextParts: vi.fn().mockResolvedValue([]),
     resolveCollaborationRunWorkspaceDir: vi.fn(
       ({ agentWorkspaceDir }: { agentWorkspaceDir: string }) => agentWorkspaceDir,
@@ -152,6 +160,16 @@ vi.mock("./typing-mode.js", () => ({
 }));
 
 import { runReplyAgent } from "./agent-runner.js";
+import {
+  buildInboundMetaSystemPrompt,
+  buildCurrentSpeakerUntrustedPrompt,
+} from "./inbound-meta.js";
+import { buildKnowledgeUniversePromptContext } from "./knowledge-universe-context.js";
+import {
+  assembleCollaborationRuntimeContextParts,
+  shouldUseCollaborationRuntimeAssembly,
+} from "./runtime-context-assembly.js";
+import { drainFormattedSystemEvents } from "./session-updates.js";
 
 function baseParams(
   overrides: Partial<Parameters<typeof runPreparedReply>[0]> = {},
@@ -223,8 +241,42 @@ function baseParams(
 }
 
 describe("runPreparedReply aside dialogue context (A-ended normal path)", () => {
+  it("does not promote historical conversation into an admitted task focus", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "unadmitted-focus-"));
+    tempDirs.push(dir);
+    const sessionFile = path.join(dir, "session.jsonl");
+    const historicalRequest = "UNADMITTED_FOCUS 请整理市场报告";
+    fs.writeFileSync(
+      sessionFile,
+      JSON.stringify({
+        type: "message",
+        message: { role: "user", content: [{ type: "text", text: historicalRequest }] },
+      }) + "\n",
+      "utf8",
+    );
+    vi.mocked(resolveSessionFilePath).mockReturnValue(sessionFile);
+    await runPreparedReply(
+      baseParams({
+        sessionEntry: {
+          sessionId: "no-admitted-task",
+          sessionFile,
+          updatedAt: Date.now(),
+        } as never,
+      }),
+    );
+    const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    expect(call).toBeDefined();
+    expect(call?.followupRun.run.extraSystemPrompt ?? "").not.toContain("UNADMITTED_FOCUS");
+    expect(call?.followupRun.run.taskCompletionBinding).toBeUndefined();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(resolveSessionFilePath).mockReturnValue("/tmp/session.jsonl");
+    vi.mocked(shouldUseCollaborationRuntimeAssembly).mockReturnValue(false);
+    vi.mocked(assembleCollaborationRuntimeContextParts).mockResolvedValue([]);
+    vi.mocked(buildInboundMetaSystemPrompt).mockReturnValue("");
+    vi.mocked(drainFormattedSystemEvents).mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
@@ -238,6 +290,21 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
     tempDirs.push(dir);
     const sessionFile = path.join(dir, "sess.jsonl");
     fs.writeFileSync(sessionFile, "", "utf8");
+    vi.mocked(resolveSessionFilePath).mockReturnValue(sessionFile);
+    mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...emptySessionTaskBoard(),
+        current: {
+          taskId: "request-task-a",
+          title: "解释",
+          goalText: "解释你刚才的回答",
+          unfinished: true,
+          createdAtMs: 1,
+          stop: { summary: "pending", workspacePaths: [] },
+        },
+      },
+      value: undefined,
+    }));
     appendAsideDialogueTurn(sessionFile, {
       atMs: 3_000,
       runId: "b1",
@@ -263,6 +330,7 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
     );
 
     const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+    expect(call?.followupRun.run.taskCompletionBinding?.taskId).toBe("request-task-a");
     const body = call?.commandBody ?? "";
     expect(body).toContain("Untrusted context");
     expect(body).toContain("<untrusted-text>");
@@ -273,4 +341,53 @@ describe("runPreparedReply aside dialogue context (A-ended normal path)", () => 
     expect(prompt).not.toContain("续航怎么比的");
     expect(prompt).not.toContain("官方标称续航");
   });
+
+  it.each([false, true])(
+    "preserves context order and trust at the real runner boundary (collab=%s)",
+    async (collab) => {
+      vi.mocked(shouldUseCollaborationRuntimeAssembly).mockReturnValue(collab);
+      vi.mocked(assembleCollaborationRuntimeContextParts).mockResolvedValue([
+        "  COLLAB_FIRST  ",
+        "",
+        "  ",
+        "COLLAB_SECOND",
+        "  COLLAB_FIRST  ",
+      ]);
+      vi.mocked(buildInboundMetaSystemPrompt).mockReturnValue("  DIRECT_FIRST  ");
+      vi.mocked(buildCurrentSpeakerUntrustedPrompt).mockReturnValue("UNTRUSTED_SPEAKER_SENTINEL");
+      vi.mocked(drainFormattedSystemEvents).mockResolvedValue("EVENT_LAST");
+      const params = baseParams();
+      await runPreparedReply({
+        ...params,
+        sessionCtx: {
+          ...params.sessionCtx,
+          GroupSystemPrompt: "GROUP_MIDDLE",
+          UntrustedContext: ["USER_ONLY_SENTINEL"],
+        },
+      });
+      const call = vi.mocked(runReplyAgent).mock.calls[0]?.[0];
+      expect(runReplyAgent).toHaveBeenCalledTimes(1);
+      expect(drainFormattedSystemEvents).toHaveBeenCalledTimes(1);
+      expect(buildKnowledgeUniversePromptContext).toHaveBeenCalledTimes(1);
+      const system = call?.followupRun.run.extraSystemPrompt ?? "";
+      expect(system).not.toContain("USER_ONLY_SENTINEL");
+      expect(system).not.toContain("UNTRUSTED_SPEAKER_SENTINEL");
+      expect(call?.commandBody).toContain("UNTRUSTED_SPEAKER_SENTINEL");
+      expect(call?.commandBody).toContain("USER_ONLY_SENTINEL");
+      expect(call?.commandBody).toContain("Untrusted context");
+      if (collab) {
+        expect(assembleCollaborationRuntimeContextParts).toHaveBeenCalledTimes(1);
+        expect(buildInboundMetaSystemPrompt).not.toHaveBeenCalled();
+        expect(system.startsWith("  COLLAB_FIRST  \n\nCOLLAB_SECOND\n\n  COLLAB_FIRST  ")).toBe(
+          true,
+        );
+        expect(system.indexOf("COLLAB_SECOND")).toBeLessThan(system.indexOf("EVENT_LAST"));
+      } else {
+        expect(assembleCollaborationRuntimeContextParts).not.toHaveBeenCalled();
+        expect(buildInboundMetaSystemPrompt).toHaveBeenCalledTimes(1);
+        expect(system.startsWith("  DIRECT_FIRST  ")).toBe(true);
+        expect(system).not.toContain("GROUP_MIDDLE");
+      }
+    },
+  );
 });

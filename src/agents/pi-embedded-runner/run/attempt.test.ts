@@ -2,8 +2,28 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildAfterTurnRuntimeContext } from "../../../agent-runtime/capabilities/index.js";
+import {
+  wrapStreamFnEnforceProtocolTextNonExecution,
+  enforceProtocolTextNonExecutionInMessage,
+} from "../../../agent-runtime/capabilities/index.js";
+import { resolvePromptBuildHookResult } from "../../../agent-runtime/capabilities/index.js";
+import { resolveAttemptFsWorkspaceOnly } from "../../../agent-runtime/capabilities/index.js";
+import {
+  composeSystemPromptWithHookContext,
+  prependSystemPromptAddition,
+} from "../../../agent-runtime/context/index.js";
+import { runExecutionStallContinueLoop } from "../../../agent-runtime/execution/index.js";
+import {
+  isOllamaCompatProvider,
+  resolveOllamaCompatNumCtxEnabled,
+  shouldInjectOllamaCompatNumCtx,
+  wrapOllamaCompatNumCtx,
+  decodeHtmlEntitiesInObject,
+} from "../../../agent-runtime/model/index.js";
+import { wrapStreamFnTrimToolCallNames } from "../../../agent-runtime/model/index.js";
+import { resolvePromptModeForSession } from "../../../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../../../config/config.js";
-import { runExecutionStallContinueLoop } from "../../execution-stall-continue-loop.js";
 import { PROTOCOL_FAILURE_USER_TEXT } from "../../model-output-boundary.js";
 import { resolveOllamaBaseUrlForRun } from "../../ollama-stream.js";
 import {
@@ -12,22 +32,6 @@ import {
   lastAssistantHasProtocolViolation,
   resetProtocolViolationPersistForTest,
 } from "../../protocol-violation.js";
-import {
-  buildAfterTurnRuntimeContext,
-  composeSystemPromptWithHookContext,
-  isOllamaCompatProvider,
-  prependSystemPromptAddition,
-  resolveAttemptFsWorkspaceOnly,
-  resolveOllamaCompatNumCtxEnabled,
-  resolvePromptBuildHookResult,
-  resolvePromptModeForSession,
-  shouldInjectOllamaCompatNumCtx,
-  decodeHtmlEntitiesInObject,
-  wrapOllamaCompatNumCtx,
-  wrapStreamFnEnforceProtocolTextNonExecution,
-  wrapStreamFnTrimToolCallNames,
-  enforceProtocolTextNonExecutionInMessage,
-} from "./attempt.js";
 
 function createOllamaProviderConfig(injectNumCtxForOpenAICompat: boolean): OpenBotConfig {
   return {

@@ -11,7 +11,7 @@ vi.mock("../../gateway/billing/agent-run-governance.js", () => ({
 }));
 
 const { acquireAgentCommandCommercialRun, releaseAgentCommandCommercialRun } =
-  await import("./commercial-run-gate.js");
+  await import("../../agent-runtime/model/index.js");
 
 describe("agent commercial-run-gate", () => {
   it("denies when enterprise slot unavailable", async () => {

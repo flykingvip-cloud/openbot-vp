@@ -14,7 +14,7 @@ import type { TemplateContext } from "../templating.js";
 import type { FollowupRun, QueueSettings } from "./queue.js";
 import { createMockTypingController } from "./test-helpers.js";
 
-type TurnFn = (typeof import("./agent-runner-execution.js"))["runAgentTurnWithFallback"];
+type TurnFn = (typeof import("../../agent-runtime/execution/index.js"))["runAdmittedTurn"];
 type FlushFn = (typeof import("./agent-runner-memory.js"))["runMemoryFlushIfNeeded"];
 
 const mocks = vi.hoisted(() => ({
@@ -38,15 +38,19 @@ vi.mock("../../agents/pi-embedded.js", async (importOriginal) => {
   };
 });
 
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: mocks.runEmbeddedPiAgent,
+}));
+
 vi.mock("./queue.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./queue.js")>();
   return { ...actual, enqueueFollowupRun: vi.fn(), scheduleFollowupDrain: vi.fn() };
 });
 
-vi.mock("./agent-runner-execution.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./agent-runner-execution.js")>();
-  mocks.runAgentTurnWithFallback.mockImplementation(actual.runAgentTurnWithFallback);
-  return { ...actual, runAgentTurnWithFallback: mocks.runAgentTurnWithFallback };
+vi.mock("../../agent-runtime/execution/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../agent-runtime/execution/index.js")>();
+  mocks.runAgentTurnWithFallback.mockImplementation(actual.runAdmittedTurn);
+  return { ...actual, runAdmittedTurn: mocks.runAgentTurnWithFallback };
 });
 
 vi.mock("./agent-runner-memory.js", async (importOriginal) => {
@@ -64,6 +68,7 @@ function buildParams(opts?: { runId?: string }): Parameters<typeof runReplyAgent
       prompt: "hello",
       enqueuedAt: Date.now(),
       run: {
+        inputProvenance: { kind: "internal_system" },
         agentId: "main",
         agentDir: "/tmp/agent",
         sessionId: "session",
@@ -121,6 +126,22 @@ function flushCall(): Parameters<FlushFn>[0] {
 }
 
 describe("runReplyAgent outer runId (P3-2 rework)", () => {
+  it("refuses unmarked human input without interaction admission", async () => {
+    const params = buildParams({ runId: "unmarked-human" });
+    params.followupRun.run.inputProvenance = undefined;
+    const result = await runReplyAgent(params);
+    expect(result).toMatchObject({ text: expect.stringContaining("尚未通过交互层的执行准入") });
+    expect(mocks.runEmbeddedPiAgent).not.toHaveBeenCalled();
+    expect(mocks.runMemoryFlushIfNeeded).not.toHaveBeenCalled();
+  });
+  it("refuses an admitted marker without its captured task binding", async () => {
+    const params = buildParams({ runId: "missing-binding" });
+    params.followupRun.run.executionAdmitted = true;
+    const result = await runReplyAgent(params);
+    expect(result).toMatchObject({ text: expect.stringContaining("任务身份已失效或尚未绑定") });
+    expect(mocks.runEmbeddedPiAgent).not.toHaveBeenCalled();
+    expect(mocks.runAgentTurnWithFallback).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     mocks.runAgentTurnWithFallback.mockClear();
     mocks.runMemoryFlushIfNeeded.mockClear();

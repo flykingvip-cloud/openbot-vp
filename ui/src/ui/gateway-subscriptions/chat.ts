@@ -56,6 +56,7 @@ import {
   type GrowthBirthTurnWireHost,
 } from "../ports/employee/growth-birth-turn-wire.ts";
 import { applyBackgroundWorkbenchChatEvent } from "../ports/employee/workbench-session-background-chat.ts";
+import { recordRuntimeObservation } from "../runtime-observation.ts";
 
 function handleTerminalChatEvent(
   host: GatewayHost,
@@ -236,6 +237,7 @@ export function handleChatGatewaySubscription(host: GatewayHost, evt: GatewayEve
     }
     handleAgentEvent(adaptToolStreamHost(host), evt.payload as AgentEventPayload | undefined);
     const agentPayload = evt.payload as AgentEventPayload | undefined;
+    recordRuntimeObservation(host, host.sessionKey, agentPayload, Date.now());
     applyKnowledgeReceiptsFromAgentEvent(host, agentPayload);
     if (shouldReloadHistoryForAgentToolResult(agentPayload)) {
       void reloadShellChatHistory(adaptChatHistoryHost(host), { refreshAvatar: false });

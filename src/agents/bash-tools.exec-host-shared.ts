@@ -189,7 +189,7 @@ export function resolveExecHostApprovalContext(params: {
 export async function resolveApprovalDecisionOrUndefined(params: {
   approvalId: string;
   preResolvedDecision: string | null | undefined;
-  onFailure: () => void;
+  onFailure: () => void | Promise<unknown>;
 }): Promise<string | null | undefined> {
   try {
     return await resolveRegisteredExecApprovalDecision({
@@ -197,7 +197,12 @@ export async function resolveApprovalDecisionOrUndefined(params: {
       preResolvedDecision: params.preResolvedDecision,
     });
   } catch {
-    params.onFailure();
+    // Keep notification rejection inside the detached approval worker.
+    try {
+      await params.onFailure();
+    } catch {
+      // Best-effort notification never authorizes execution.
+    }
     return undefined;
   }
 }

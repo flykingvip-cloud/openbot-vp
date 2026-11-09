@@ -1,4 +1,4 @@
-export type EmbeddedContextFile = { path: string; content: string };
+export type { EmbeddedContextFile } from "../../agent-runtime/contracts/prompt.js";
 
 export type FailoverReason =
   | "auth"

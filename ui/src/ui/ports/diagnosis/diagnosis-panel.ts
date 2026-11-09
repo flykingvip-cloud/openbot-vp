@@ -1,7 +1,24 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { createReasoningGatewayAdapter } from "../../../../../src/observation/reasoning-gateway.js";
+type ReasoningView = Extract<
+  Awaited<ReturnType<ReturnType<typeof createReasoningGatewayAdapter>>>,
+  { ok: true }
+>["reasoningPass"];
 import { createAuthorizationDecisionRefresh } from "../../../../../src/diagnosis/visualization.ts";
 import type { GatewayBrowserClient } from "../../gateway.ts";
+import { hasComparisonRefs } from "../../observation/comparison-capacity-panel.ts";
+import type {
+  CapacityView,
+  ComparisonView,
+  ComparisonRefs,
+} from "../../observation/comparison-capacity-panel.ts";
+import type { EvidenceProjection } from "../../observation/evidence-model.ts";
+import { renderObservationEvidence } from "../../observation/evidence-panel.ts";
+import {
+  renderObservationWorkbench,
+  type ObservationActionIntents,
+} from "../../observation/workbench.ts";
 import {
   diagnoseTaskOutcomeAttachNote,
   resolveDiagnoseTaskOutcome,
@@ -52,6 +69,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @property({ attribute: false }) sessionKind: string | null = null;
   @property({ attribute: false }) gatewayMethods: readonly string[] | null = null;
   @property({ type: Boolean }) connected = false;
+  @property({ attribute: false }) observationHost: object | null = null;
   /** Set only when the host already has taskId, agentId, and outcomeVersion. */
   @property({ attribute: false }) taskOutcomeRef: {
     taskId: string;
@@ -59,12 +77,17 @@ export class OpenBotDiagnosisPanel extends LitElement {
     outcomeVersion: number;
   } | null = null;
 
+  @property({ attribute: false }) comparisonRefs: ComparisonRefs | null = null;
+  @state() private capacity: CapacityView | null = null;
+  @state() private comparison: ComparisonView | null = null;
   @state() private model: DiagnosisViewModel | null = null;
   @state() private loading = false;
   @state() private diagnosing = false;
   @state() private lastDiagnose: DiagnosisRunNote | null = null;
+  @state() private focusedRunId: string | null = null;
   @state() private evolutionProjections: DiagnosisEvolutionProjection[] = [];
   @state() private selectedTargetId: string | null = null;
+  @state() private observationSessionKey: string | null = null;
   @state() private observationWindow: "24h" | "7d" = "24h";
   @state() private diagnoseMode: "TARGETED" | "FULL" = "TARGETED";
   @state() private cadence: "off" | "daily" | "tick" = "off";
@@ -86,12 +109,251 @@ export class OpenBotDiagnosisPanel extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     void this.reload();
+    this.requestUpdate("connected", !this.connected);
   }
 
   updated(changed: Map<string | number | symbol, unknown>) {
     if (changed.has("client") || changed.has("role") || changed.has("tenantId")) {
       void this.reload();
     }
+  }
+
+  @state() private observationEvidence: EvidenceProjection | null = null;
+  @state() private observationEvidenceNote = "业务结果未知 · 无可用证据";
+  @state() private actionIntents: ObservationActionIntents | null = null;
+  @state() private selectedIntent: { intentId: string; revision: number } | null = null;
+  @state() private reasoningResult: ReasoningView | null = null;
+  @state() private reasoningLoading = false;
+  @state() private reasoningNotice = "未请求推理假设；普通查询仅使用原规则与证据。";
+  private reasoningGeneration = 0;
+  private resolveReasoningRef() {
+    const ref = resolveDiagnoseTaskOutcome(
+      {
+        taskId: this.taskIdDraft,
+        agentId: this.agentIdDraft,
+        outcomeVersion: this.outcomeVersionDraft,
+      },
+      this.taskOutcomeRef,
+    );
+    return ref && Number.isSafeInteger(ref.outcomeVersion) ? ref : null;
+  }
+  private canReadReasoning() {
+    return (
+      this.connected &&
+      this.client?.connected &&
+      this.gatewayMethods?.includes("diagnosis.observation.query") &&
+      this.scopes?.some((scope) => scope === "operator.read" || scope === "operator.admin") &&
+      Boolean(this.resolveReasoningRef())
+    );
+  }
+  private clearReasoning() {
+    ++this.reasoningGeneration;
+    this.reasoningResult = null;
+    this.reasoningLoading = false;
+    this.reasoningNotice = "未请求推理假设；普通查询仅使用原规则与证据。";
+  }
+  private async readReasoning() {
+    const client = this.client;
+    const ref = this.resolveReasoningRef();
+    if (!client || !ref || !this.canReadReasoning()) {
+      this.clearReasoning();
+      return;
+    }
+    const generation = ++this.reasoningGeneration;
+    const evidenceGeneration = this.evidenceGeneration;
+    const fingerprint = this.evidenceFingerprint();
+    this.reasoningResult = null;
+    this.reasoningLoading = true;
+    this.reasoningNotice = "正在读取推理假设；规则结果保持不变。";
+    const current = () =>
+      this.isConnected &&
+      generation === this.reasoningGeneration &&
+      evidenceGeneration === this.evidenceGeneration &&
+      client === this.client &&
+      fingerprint === this.evidenceFingerprint() &&
+      this.canReadReasoning();
+    const to = Date.now();
+    try {
+      const response = await client.request<{ reasoningPass?: ReasoningView }>(
+        "diagnosis.observation.query",
+        {
+          ...ref,
+          from: to - (this.observationWindow === "7d" ? 7 : 1) * 86400000,
+          to,
+          reasoning: { requested: true },
+        },
+      );
+      if (!current()) {
+        return;
+      }
+      this.reasoningResult = response.reasoningPass ?? null;
+      this.reasoningNotice = response.reasoningPass
+        ? "旁路结果不改写规则发现、业务裁决或配置。"
+        : "推理旁路未供给；继续使用原 rule_v1 结果。";
+    } catch {
+      if (!current()) {
+        return;
+      }
+      this.reasoningNotice = "推理旁路不可用或未授权；继续使用原 rule_v1 结果。";
+    } finally {
+      if (current()) {
+        this.reasoningLoading = false;
+      }
+    }
+  }
+  private renderReasoning() {
+    const result = this.reasoningResult;
+    return html`<section aria-label="推理假设旁路"><h3>推理假设 · 只读旁路</h3><p>默认关闭，仅本次显式请求；可能产生模型用量，不代表确诊或改善验证。</p><button type="button" data-testid="observation-read-reasoning" ?disabled=${this.reasoningLoading || !this.canReadReasoning()} @click=${() => void this.readReasoning()}>读取推理假设</button><p>${this.reasoningNotice}</p>${
+      result
+        ? html`<p>来源：${result.scoringMethod} · ${result.reason}</p>${
+            result.items.length
+              ? result.items.map(
+                  (item) =>
+                    html`<article><strong>${item.kind === "hypothesis" ? "假设" : "候选建议"}</strong><p>${item.text}</p><p>来源：${item.source} · 模型：${item.modelRef} · 证据：${item.evidenceIds.join(", ")}</p></article>`,
+                )
+              : html`
+                  <p>未生成推理假设，保留原 rule_v1 结果。</p>
+                `
+          }`
+        : nothing
+    }</section>`;
+  }
+  private evidenceGeneration = 0;
+  private evidenceFingerprint() {
+    return JSON.stringify([
+      this.role,
+      this.tenantId,
+      this.scopes,
+      this.sessionKind,
+      this.taskOutcomeRef,
+      this.taskIdDraft,
+      this.agentIdDraft,
+      this.outcomeVersionDraft,
+      this.connected,
+      this.client?.connected,
+      this.gatewayMethods,
+      this.observationSessionKey,
+      this.observationWindow,
+      this.selectedIntent,
+      this.comparisonRefs,
+    ]);
+  }
+  willUpdate(changed: Map<string | number | symbol, unknown>) {
+    if (
+      [
+        "client",
+        "role",
+        "tenantId",
+        "scopes",
+        "sessionKind",
+        "taskOutcomeRef",
+        "taskIdDraft",
+        "agentIdDraft",
+        "outcomeVersionDraft",
+        "connected",
+        "gatewayMethods",
+        "observationSessionKey",
+        "observationWindow",
+        "selectedIntent",
+        "comparisonRefs",
+      ].some((key) => changed.has(key))
+    ) {
+      this.clearReasoning();
+      this.observationEvidence = null;
+      this.actionIntents = null;
+      this.capacity = null;
+      this.comparison = null;
+      if (!changed.has("selectedIntent")) {
+        this.selectedIntent = null;
+      }
+      const generation = ++this.evidenceGeneration;
+      this.observationEvidenceNote = "业务结果未知 · 缺少结果引用、读取权限或查询能力";
+      const client = this.client;
+      const resolved = resolveDiagnoseTaskOutcome(
+        {
+          taskId: this.taskIdDraft,
+          agentId: this.agentIdDraft,
+          outcomeVersion: this.outcomeVersionDraft,
+        },
+        this.taskOutcomeRef ??
+          (!this.taskIdDraft.trim() &&
+          !this.agentIdDraft.trim() &&
+          !this.outcomeVersionDraft.trim() &&
+          hasComparisonRefs(this.comparisonRefs)
+            ? this.comparisonRefs.baseline.refs[0]
+            : null),
+      );
+      const ref = resolved && Number.isSafeInteger(resolved.outcomeVersion) ? resolved : null;
+      const fingerprint = this.evidenceFingerprint();
+      if (
+        !this.connected ||
+        !client?.connected ||
+        !ref ||
+        !this.gatewayMethods?.includes("diagnosis.observation.query") ||
+        !this.scopes?.some((scope) => scope === "operator.read" || scope === "operator.admin")
+      ) {
+        return;
+      }
+      const to = Date.now();
+      const from = to - (this.observationWindow === "7d" ? 7 : 1) * 86400000;
+      this.observationEvidenceNote = "证据查询中 · 业务结果未知";
+      void client
+        .request<
+          EvidenceProjection & {
+            actionIntents?: ObservationActionIntents;
+            capacity?: CapacityView;
+            comparison?: ComparisonView;
+          }
+        >("diagnosis.observation.query", {
+          ...ref,
+          from,
+          to,
+          actionIntents: this.selectedIntent ?? {},
+          capacity: true,
+          ...(hasComparisonRefs(this.comparisonRefs) ? { comparison: this.comparisonRefs } : {}),
+        })
+        .then((result) => {
+          if (
+            generation !== this.evidenceGeneration ||
+            !this.isConnected ||
+            client !== this.client ||
+            fingerprint !== this.evidenceFingerprint()
+          ) {
+            return;
+          }
+          this.observationEvidence = result;
+          this.actionIntents = result.actionIntents ?? null;
+          this.capacity = result.capacity ?? null;
+          this.comparison = result.comparison ?? null;
+          this.observationEvidenceNote = "只读结果证据；连接流仍为 execution_only";
+        })
+        .catch(() => {
+          if (
+            generation !== this.evidenceGeneration ||
+            client !== this.client ||
+            fingerprint !== this.evidenceFingerprint()
+          ) {
+            return;
+          }
+          this.observationEvidence = null;
+          this.actionIntents = null;
+          this.capacity = null;
+          this.comparison = null;
+          this.observationEvidenceNote = "业务结果未知 · 查询失败或读取权限不可用";
+        });
+    }
+  }
+  disconnectedCallback() {
+    this.clearReasoning();
+    ++this.evidenceGeneration;
+    this.capacity = null;
+    this.comparison = null;
+    this.actionIntents = null;
+    this.observationEvidence = null;
+    super.disconnectedCallback();
+  }
+  private get selectedTarget() {
+    return this.targets.find((row) => row.sessionKey === this.observationSessionKey) ?? null;
   }
 
   private redactionProfile() {
@@ -124,6 +386,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
       return;
     }
     this.diagnosing = true;
+    const focusedRunId = this.focusedRunId;
     const draft = {
       taskId: this.taskIdDraft,
       agentId: this.agentIdDraft,
@@ -145,7 +408,13 @@ export class OpenBotDiagnosisPanel extends LitElement {
           enterpriseAdmin: this.deliverToAdmin,
           owners: this.deliverToOwners,
         },
-        ...(target ? { sessionKey: target.sessionKey, agentId: target.agentId } : {}),
+        ...(target
+          ? {
+              sessionKey: target.sessionKey,
+              agentId: target.agentId,
+              runId: focusedRunId ?? undefined,
+            }
+          : {}),
         ...(isAll
           ? {
               targets: this.targets.map((row) => ({
@@ -192,6 +461,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
         taskOutcomeEvidence: readTaskOutcomeEvidenceView(result.taskOutcomeEvidence),
       };
       this.evolutionProjections = result.evolutionProjections ?? [];
+      if (focusedRunId) {
+        this.focusedRunId = null;
+      }
       await this.reload();
     } catch (err) {
       const code =
@@ -471,6 +743,29 @@ export class OpenBotDiagnosisPanel extends LitElement {
     `;
   }
 
+  private renderPlatformTaskInput() {
+    return html`<fieldset aria-label="平台精确任务证据查询"><legend>精确任务结果引用</legend><p>请填写数字人、任务及结果版本；平台身份不代表跨租户读取授权。</p>${(
+      [
+        ["agent", "数字人", this.agentIdDraft],
+        ["id", "任务", this.taskIdDraft],
+        ["version", "结果版本", this.outcomeVersionDraft],
+      ] as const
+    ).map(
+      ([key, label, value]) =>
+        html`<label>${label}<input data-testid=${"diagnosis-task-" + key} .value=${value} @input=${(
+          event: Event,
+        ) => {
+          const next = (event.target as HTMLInputElement).value;
+          if (key === "agent") {
+            this.agentIdDraft = next;
+          } else if (key === "id") {
+            this.taskIdDraft = next;
+          } else {
+            this.outcomeVersionDraft = next;
+          }
+        }}></label>`,
+    )}</fieldset>`;
+  }
   render() {
     if (this.loading && !this.model) {
       return html`
@@ -480,6 +775,47 @@ export class OpenBotDiagnosisPanel extends LitElement {
     const model = this.model ?? diagnosisViewModelFromQuery(this.audience(), null, null);
     if (this.role === "enterprise") {
       return html`
+        ${renderObservationWorkbench({
+          role: "enterprise",
+          tenantId: this.tenantId,
+          sessionKey: this.observationSessionKey,
+          observationHost: this.observationHost,
+          basePath: "",
+          targets: this.targets,
+          onSessionKey: (sessionKey) => {
+            this.observationSessionKey = sessionKey || null;
+            this.selectedTargetId =
+              this.targets.find((row) => row.sessionKey === sessionKey)?.id ?? null;
+            this.focusedRunId = null;
+          },
+          onDiagnoseRun: ({ runId, sessionKey }) => {
+            this.focusedRunId = runId;
+            this.observationSessionKey = sessionKey;
+            this.selectedTargetId =
+              this.targets.find((row) => row.sessionKey === sessionKey)?.id ?? null;
+            void this.onDiagnoseNow().then(() => {
+              this.querySelector('[data-testid="diagnosis-evolution-projection"]')?.scrollIntoView({
+                block: "nearest",
+              });
+            });
+          },
+          connected: this.connected,
+          actionIntents: this.actionIntents,
+          capacity: this.capacity,
+          comparison: this.comparison,
+          onComparisonRefs: (refs) => {
+            this.comparisonRefs = refs;
+          },
+          onSelectActionIntent: (intentId, revision) => {
+            this.selectedIntent = { intentId, revision };
+          },
+        })}
+        <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
+        <p data-testid="observation-query-scope">精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。</p>${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
+        <section class="enterprise-diagnosis__panel">
+          <h2>原诊断工作区</h2>
+          <p class="enterprise-diagnosis__sub">下面的数据来自真实诊断接口，不受上方样例模式影响。</p>
+        </section>
         ${this.renderEvolutionProjection()}
         ${renderEnterpriseDiagnosisSurface(model, {
           onDiagnoseNow: () => void this.onDiagnoseNow(),
@@ -555,6 +891,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
       `;
     }
     return html`
+      ${this.renderPlatformTaskInput()}
+      <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
+      <p data-testid="observation-query-scope">精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。</p>${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
       <div class="toolbar">
         <button
           type="button"

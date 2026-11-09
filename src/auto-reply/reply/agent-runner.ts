@@ -1,12 +1,12 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { resolveAgentDir } from "../../agents/agent-scope.js";
+import type { ReplyDeliveryResult } from "../../agent-runtime/delivery/index.js";
+import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
 import { isCliProvider } from "../../agents/model-selection.js";
-import { abortEmbeddedPiRun, queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage } from "../../agents/usage.js";
 import {
   resolveAgentIdFromSessionKey,
@@ -19,23 +19,6 @@ import {
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
-import {
-  applyIncomingUserMessage,
-  activeConstraintTexts,
-  commitSameTaskConstraint,
-  isOwnerCurrentTaskControlUtterance,
-  mutateSessionTaskBoard,
-  readSessionTaskBoard,
-} from "../../conversation-task/session-task-board.js";
-import {
-  isTaskBoardContinueInternalPrompt,
-  scheduleTaskBoardContinueWake,
-} from "../../conversation-task/task-board-continue.js";
-import {
-  classifyTurnRelation,
-  isOwnerExecutionBarrierUtterance,
-  shouldPersistOwnerConstraint,
-} from "../../conversation-task/turn-relation.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 import { tryResolveCapabilityGapsFromUsage } from "../../gateway/evolution-control/capability-gap-ingest.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
@@ -44,17 +27,8 @@ import { generateSecureUuid } from "../../infra/secure-random.js";
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { enforceVisibleReplyLanguage } from "../../shared/text/visible-reply-language.js";
-import { shapeAdmittedComplexTaskReply } from "../../task-orchestration/complex-task-loop.js";
-import {
-  chatTurnTaskId,
-  resolveChatTurnCloseGates,
-  resolveTurnContractFromRunMeta,
-} from "../../task-outcome/chat-entry.js";
-import { registerAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
-import {
-  TASK_OUTCOME_STORE_DIRNAME,
-  type GrowthOutcomeCommitOpts,
-} from "../../task-outcome/runtime-from-runner.js";
+import { resolveTurnContractFromRunMeta } from "../../task-outcome/chat-entry.js";
+import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../utils/directive-tags.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
 import {
@@ -65,7 +39,6 @@ import {
 import type { OriginatingChannelType, TemplateContext } from "../templating.js";
 import { resolveResponseUsageMode, type VerboseLevel } from "../thinking.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
-import { runAgentTurnWithFallback } from "./agent-runner-execution.js";
 import {
   createShouldEmitToolOutput,
   createShouldEmitToolResult,
@@ -74,7 +47,6 @@ import {
   signalTypingIfNeeded,
 } from "./agent-runner-helpers.js";
 import { runMemoryFlushIfNeeded } from "./agent-runner-memory.js";
-import { buildReplyPayloads } from "./agent-runner-payloads.js";
 import {
   appendUnscheduledReminderNote,
   hasSessionRelatedCronJobs,
@@ -86,52 +58,20 @@ import { resolveEffectiveBlockStreamingConfig } from "./block-streaming.js";
 import { runCollaborationLearningBackflowSafely } from "./collaboration-learning-backflow.js";
 import { createFollowupRunner } from "./followup-runner.js";
 import {
-  classifySilentTurnGrowthOutcome,
-  decideHonestEmptyReply,
-  formatHonestEmptyReply,
   parseCapabilityGapMarker,
   recordHonestCapabilityGap,
   stripCapabilityGapMarkers,
 } from "./honest-empty-reply.js";
-import { abortMidTaskAsideLanes, runMidTaskAsideReplyLane } from "./mid-task-aside-reply-lane.js";
-import { resolveMidTaskAsideDisposition } from "./mid-task-aside.js";
-import {
-  formatAmendConstraintAck,
-  formatTaskBoardProgressReply,
-  isProgressStatusQuery,
-} from "./mid-task-dialogue.js";
 import { resolveOriginMessageProvider, resolveOriginMessageTo } from "./origin-routing.js";
 import { readPostCompactionContext } from "./post-compaction-context.js";
-import { resolveActiveRunQueueAction, shouldAttemptCollectAmendSteer } from "./queue-policy.js";
-import { clearSessionQueues } from "./queue.js";
 import { enqueueFollowupRun, type FollowupRun, type QueueSettings } from "./queue.js";
 import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
 import { createReplyToModeFilterForChannel, resolveReplyToMode } from "./reply-threading.js";
-import { incrementRunCompactionCount, persistRunSessionUsage } from "./session-run-accounting.js";
-import { formatTurnProcessPlaceholder, sanitizeTurnVisibleReply } from "./turn-reply-language.js";
+import { sanitizeTurnVisibleReply } from "./turn-reply-language.js";
 import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
 const BLOCK_REPLY_SEND_TIMEOUT_MS = 15_000;
-
-function resolveCollectAmendTurnRelation(
-  sessionFile: string | undefined,
-  prompt: string,
-): "amend" | "aside" | "new_work" | null {
-  const file = sessionFile?.trim();
-  if (!file) {
-    return null;
-  }
-  const board = readSessionTaskBoard(file);
-  const goal = board.current?.goalText?.trim() ?? "";
-  if (!goal) {
-    return null;
-  }
-  // Do not concatenate constraint history into the classified string (slice3).
-  return classifyTurnRelation(prompt, goal, {
-    activeConstraints: activeConstraintTexts(board.current),
-  });
-}
 
 export async function runReplyAgent(params: {
   commandBody: string;
@@ -169,10 +109,8 @@ export async function runReplyAgent(params: {
     followupRun,
     queueKey,
     resolvedQueue,
-    shouldSteer,
     shouldFollowup,
     isActive,
-    isStreaming,
     opts,
     typing,
     sessionEntry,
@@ -191,6 +129,7 @@ export async function runReplyAgent(params: {
     typingMode,
   } = params;
 
+  let completionBinding = followupRun.run.taskCompletionBinding;
   let activeSessionEntry = sessionEntry;
   const activeSessionStore = sessionStore;
   let activeIsNewSession = isNewSession;
@@ -275,180 +214,35 @@ export async function runReplyAgent(params: {
     }
   };
 
-  // Owner pause/cancel while A is active: reuse board control + existing abort path.
-  // Must stop new business actions on the in-flight run; wakeSuppress alone is not enough.
+  // Missing provenance is human ingress, as at the public interaction entrance.
   if (
-    isActive &&
-    isOwnerCurrentTaskControlUtterance(followupRun.prompt) &&
-    followupRun.run.sessionFile
+    replyTurnRuntime.isHumanInteractionIngress({
+      provenanceKind: followupRun.run.inputProvenance?.kind,
+      heartbeat: isHeartbeat,
+      birthTurn: opts?.growthBirthTurn === true,
+      collaborationRound: followupRun.run.collaborationRoundInvoked === true,
+    }) &&
+    !followupRun.run.executionAdmitted
   ) {
-    const sessionFile = followupRun.run.sessionFile.trim();
-    const control = mutateSessionTaskBoard(sessionFile, (board) => {
-      const result = applyIncomingUserMessage({
-        board,
-        incomingText: followupRun.prompt,
-      });
-      return { board: result.board, value: result };
-    });
-    if (control.abortInFlight) {
-      const sessionId = followupRun.run.sessionId;
-      abortEmbeddedPiRun(sessionId);
-      abortMidTaskAsideLanes(sessionId);
-      clearSessionQueues([queueKey, sessionId, followupRun.run.sessionKey]);
-    }
-    await touchActiveSessionEntry();
     typing.cleanup();
-    return [{ text: control.statusLine?.trim() || "已处理任务控制指令。" }];
+    return { text: "该请求尚未通过交互层的执行准入，本次未启动任务执行。" };
   }
 
-  // P3: progress / status asks answered from the live task board — no steer,
-  // no followup wait. Board is a projection of existing state, not a new controller.
-  if (isActive && isProgressStatusQuery(followupRun.prompt) && followupRun.run.sessionFile) {
-    const board = readSessionTaskBoard(followupRun.run.sessionFile);
-    if (board.current) {
-      const text = formatTaskBoardProgressReply(board);
-      await touchActiveSessionEntry();
-      typing.cleanup();
-      return [{ text }];
-    }
-  }
-
-  // Slice2: board_readonly = projection only; reply_lane = tools-disabled ephemeral
-  // embedded turn (distinct sessionId/file) so ordinary asides answer while A stays
-  // active — not a second task controller; never mutates the task board.
-  if (isActive && followupRun.run.sessionFile) {
-    const board = readSessionTaskBoard(followupRun.run.sessionFile);
-    if (board.current) {
-      const aside = resolveMidTaskAsideDisposition({
-        prompt: followupRun.prompt,
-        board,
+  // Interaction has already answered queries and committed changes/controls.
+  // Execution selects resources only; never classify this text a second time.
+  const queueAction = followupRun.run.executionAdmitted
+    ? "run-now"
+    : replyTurnRuntime.execution.resolveQueueAction({
+        isActive,
+        isHeartbeat,
+        shouldFollowup,
+        queueMode: resolvedQueue.mode,
       });
-      if (aside.kind === "board_readonly") {
-        await touchActiveSessionEntry();
-        typing.cleanup();
-        return [{ text: aside.reply }];
-      }
-      if (aside.kind === "reply_lane_pending") {
-        const asideRunId = opts?.runId ?? crypto.randomUUID();
-        const lane = await runMidTaskAsideReplyLane({
-          parentSessionId: followupRun.run.sessionId,
-          parentSessionFile: followupRun.run.sessionFile,
-          board,
-          userPrompt: followupRun.prompt,
-          run: followupRun.run,
-          runId: asideRunId,
-          messageId: (() => {
-            const raw = sessionCtx.MessageSidFull ?? sessionCtx.MessageSid;
-            return typeof raw === "string" ? raw : undefined;
-          })(),
-        });
-        await touchActiveSessionEntry();
-        typing.cleanup();
-        return [{ text: lane.text }];
-      }
-    }
-  }
-
-  if (shouldSteer && isStreaming) {
-    const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
-    if (steered && !shouldFollowup) {
+  if (queueAction !== "run-now") {
+    if (queueAction === "enqueue-followup") {
+      enqueueFollowupRun(queueKey, followupRun, resolvedQueue);
       await touchActiveSessionEntry();
-      typing.cleanup();
-      return undefined;
     }
-  } else if (
-    shouldAttemptCollectAmendSteer({
-      isActive,
-      isStreaming,
-      shouldSteer,
-      shouldFollowup,
-      queueMode: resolvedQueue.mode,
-      turnRelation: resolveCollectAmendTurnRelation(
-        followupRun.run.sessionFile,
-        followupRun.prompt,
-      ),
-      persistOwnerConstraint: shouldPersistOwnerConstraint(followupRun.prompt),
-    })
-  ) {
-    // P1 once-consumption: successful amend steer acknowledges immediately and
-    // must NOT also enqueue-followup (would re-apply the same constraint). Steer
-    // failure falls through so followup still carries the constraint — no drop.
-    // Constraint persistence goes through the sole board entry (not a reply-layer rewrite).
-    // Capture the receiving task id BEFORE steer so a mid-steer focus switch cannot
-    // attribute A's constraint to B; persist failure must not claim full success.
-    const sessionFile = followupRun.run.sessionFile?.trim() ?? "";
-    const expectedTaskId = sessionFile
-      ? (readSessionTaskBoard(sessionFile).current?.taskId?.trim() ?? "")
-      : "";
-    // Safety limits (先别发布 / 不要付款): persist board barrier BEFORE steer/ack
-    // so A cannot keep acting while we only say "收到".
-    const barrierFirst = isOwnerExecutionBarrierUtterance(followupRun.prompt);
-    let persistedEarly = false;
-    if (barrierFirst && sessionFile && expectedTaskId) {
-      persistedEarly = commitSameTaskConstraint({
-        sessionFile,
-        constraintText: followupRun.prompt,
-        expectedTaskId,
-      });
-      if (!persistedEarly) {
-        await touchActiveSessionEntry();
-        typing.cleanup();
-        return [
-          {
-            text: "限制未能写入原任务板（任务可能已切换或写入失败）。尚未视为生效；请重新发送该限制。",
-          },
-        ];
-      }
-    }
-    const steered = queueEmbeddedPiMessage(followupRun.run.sessionId, followupRun.prompt);
-    if (steered) {
-      const persisted =
-        persistedEarly ||
-        (Boolean(sessionFile) &&
-          Boolean(expectedTaskId) &&
-          commitSameTaskConstraint({
-            sessionFile,
-            constraintText: followupRun.prompt,
-            expectedTaskId,
-          }));
-      await touchActiveSessionEntry();
-      typing.cleanup();
-      if (!persisted) {
-        return [
-          {
-            text: "约束已尝试注入当前执行，但未能写入原任务板（任务可能已切换或写入失败）。请重新发送该补充约束；本次不视为完整成功。",
-          },
-        ];
-      }
-      return [{ text: formatAmendConstraintAck(followupRun.prompt) }];
-    }
-    // Barrier already on the board even if steer missed — surface applied vs pending.
-    if (persistedEarly) {
-      await touchActiveSessionEntry();
-      typing.cleanup();
-      return [
-        {
-          text: `限制已写入任务板并生效：${followupRun.prompt.replace(/\s+/g, " ").trim().slice(0, 60)}。注入当前执行未成功，后台仍应按板约束停止相关动作；如需确认请再发一次。`,
-        },
-      ];
-    }
-  }
-
-  const activeRunQueueAction = resolveActiveRunQueueAction({
-    isActive,
-    isHeartbeat,
-    shouldFollowup,
-    queueMode: resolvedQueue.mode,
-  });
-
-  if (activeRunQueueAction === "drop") {
-    typing.cleanup();
-    return undefined;
-  }
-
-  if (activeRunQueueAction === "enqueue-followup") {
-    enqueueFollowupRun(queueKey, followupRun, resolvedQueue);
-    await touchActiveSessionEntry();
     typing.cleanup();
     return undefined;
   }
@@ -461,6 +255,52 @@ export async function runReplyAgent(params: {
   // generated it before P3-2. Lifecycle events after the turn use `outcomeRunId`.
   const runId = opts?.runId ?? crypto.randomUUID();
 
+  const makeRunFollowupTurn = () =>
+    createFollowupRunner({
+      opts,
+      typing,
+      typingMode,
+      sessionEntry: activeSessionEntry,
+      sessionStore: activeSessionStore,
+      sessionKey,
+      storePath,
+      defaultModel,
+      agentCfgContextTokens,
+    });
+
+  const requiresTaskBinding =
+    followupRun.run.executionAdmitted === true ||
+    Boolean(completionBinding) ||
+    (!followupRun.run.collaborationRoundInvoked &&
+      !followupRun.run.privateRunBag &&
+      Boolean(replyTurnRuntime.state.read(followupRun.run.sessionFile).current));
+  if (requiresTaskBinding) {
+    try {
+      completionBinding = replyTurnRuntime.state.startExecution(
+        followupRun.run.sessionFile,
+        completionBinding,
+        runId,
+      );
+      if (!completionBinding) {
+        typing.markRunComplete();
+        typing.markDispatchIdle();
+        return finalizeWithFollowup(
+          { text: "这条请求的任务身份已失效或尚未绑定，未继续执行。请确认当前任务后重新发送。" },
+          queueKey,
+          makeRunFollowupTurn(),
+        );
+      }
+      followupRun.run.taskCompletionBinding = completionBinding;
+      opts?.onTaskExecutionBound?.(completionBinding, {
+        sessionFile: followupRun.run.sessionFile,
+      });
+    } catch (error) {
+      typing.markRunComplete();
+      typing.markDispatchIdle();
+      finalizeWithFollowup(undefined, queueKey, makeRunFollowupTurn());
+      throw error;
+    }
+  }
   activeSessionEntry = await runMemoryFlushIfNeeded({
     cfg,
     followupRun,
@@ -481,35 +321,25 @@ export async function runReplyAgent(params: {
     },
   });
 
-  const runFollowupTurn = createFollowupRunner({
-    opts,
-    typing,
-    typingMode,
-    sessionEntry: activeSessionEntry,
-    sessionStore: activeSessionStore,
-    sessionKey,
-    storePath,
-    defaultModel,
-    agentCfgContextTokens,
-  });
+  const runFollowupTurn = makeRunFollowupTurn();
 
   const maybeScheduleTaskBoardContinue = (payloads: ReplyPayload[] | undefined) => {
     if (isHeartbeat) {
       return;
     }
-    if (isTaskBoardContinueInternalPrompt(commandBody)) {
+    if (replyTurnRuntime.execution.isTaskBoardContinueInternalPrompt(commandBody)) {
       return;
     }
     const assistantText = (payloads ?? [])
       .map((payload) => (typeof payload.text === "string" ? payload.text.trim() : ""))
       .filter(Boolean)
       .join("\n\n");
-    scheduleTaskBoardContinueWake({
+    replyTurnRuntime.execution.scheduleTaskBoardContinueWake({
       sessionFile: followupRun.run.sessionFile,
       assistantText,
       isHeartbeat,
       toolsDisabled: followupRun.run.disableTools === true,
-      enqueue: (prompt, messageId) =>
+      enqueue: (prompt, messageId, ticket) =>
         enqueueFollowupRun(
           queueKey,
           {
@@ -517,6 +347,7 @@ export async function runReplyAgent(params: {
             prompt,
             messageId,
             summaryLine: "task_board_continue",
+            taskBoardContinueTicket: { taskId: ticket.taskId, focusRevision: ticket.focusRevision },
             enqueuedAt: Date.now(),
             followupItemId: undefined,
           },
@@ -546,20 +377,11 @@ export async function runReplyAgent(params: {
     }
     const prevSessionId = cleanupTranscripts ? prevEntry.sessionId : undefined;
     const nextSessionId = generateSecureUuid();
-    const nextEntry: SessionEntry = {
-      ...prevEntry,
-      sessionId: nextSessionId,
-      updatedAt: Date.now(),
-      systemSent: false,
-      abortedLastRun: false,
-      modelProvider: undefined,
-      model: undefined,
-      contextTokens: undefined,
-      systemPromptReport: undefined,
-      fallbackNoticeSelectedModel: undefined,
-      fallbackNoticeActiveModel: undefined,
-      fallbackNoticeReason: undefined,
-    };
+    const nextEntry = replyTurnRuntime.prepareReplacementSessionEntry(
+      prevEntry,
+      nextSessionId,
+      Date.now(),
+    );
     const agentId = resolveAgentIdFromSessionKey(sessionKey);
     const nextSessionFile = storePath
       ? resolveSessionTranscriptPathInDir(
@@ -630,7 +452,7 @@ export async function runReplyAgent(params: {
     : undefined;
   try {
     const runStartedAt = Date.now();
-    const runOutcome = await runAgentTurnWithFallback({
+    const runOutcome = await replyTurnRuntime.execution.runAdmittedTurn({
       commandBody,
       followupRun,
       sessionCtx,
@@ -792,7 +614,7 @@ export async function runReplyAgent(params: {
       activeSessionEntry?.contextTokens ??
       DEFAULT_CONTEXT_TOKENS;
 
-    await persistRunSessionUsage({
+    await replyTurnRuntime.state.persistRunSessionUsage({
       storePath,
       sessionKey,
       usage,
@@ -805,74 +627,50 @@ export async function runReplyAgent(params: {
       cliSessionId,
     });
 
-    // Nothing left to deliver. Private user-facing turns get an honest fallback;
-    // group / channel / collaboration / system turns may legitimately stay silent.
-    const finalizeEmptyDelivery = () => {
-      const decision = decideHonestEmptyReply({
-        isHeartbeat,
-        sessionCtx,
-        rawPayloads: payloadArray,
-        blockStreamDelivered: Boolean(blockReplyPipeline?.didStream()),
-        directlySentBlockCount: directlySentBlockKeys?.size ?? 0,
-        toolResultDelivered,
-        didSendViaMessagingTool: runResult.didSendViaMessagingTool,
-        messagingToolSentTexts: runResult.messagingToolSentTexts,
-        messagingToolSentMediaUrls: runResult.messagingToolSentMediaUrls,
-        messagingToolSentTargets: runResult.messagingToolSentTargets,
-        runAborted: Boolean(runResult.meta?.aborted),
-        reactionDelivered: Boolean(runResult.didSendReaction),
-      });
-      const growth = classifySilentTurnGrowthOutcome(decision);
-      if (decision.reason === "user_aborted") {
-        void commitGrowthOutcome(false, {
-          failureReason: "user_cancelled",
-          failureDetail: "user_aborted",
-        });
-      } else if (growth.success) {
-        // Silent success means delivery already happened in-run (messaging tool /
-        // block stream / reaction). Confirm delivered from resolved contract only.
-        const contract = resolveTurnContractFromRun();
-        const deliveryId = `delivery:${outcomeRunId}:${decision.reason}`;
-        const gates = resolveChatTurnCloseGates({
-          deliveryId,
-          contract,
-          deliveryPhase: "delivered",
-          acceptanceVerified: contract.acceptanceVerified === true,
-        });
-        void commitGrowthOutcome(true, {
-          acceptance: gates.acceptance,
-          delivery: gates.delivery,
-          deliveryId: gates.deliveryId,
-        });
-      } else {
-        void commitGrowthOutcome(false, {
-          failureReason: "run_failed",
-          failureDetail: decision.reason,
-        });
-      }
-      if (!decision.emit) {
-        return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
-      }
-      recordHonestCapabilityGap({
+    const completeDelivery = (result: ReplyDeliveryResult) =>
+      replyTurnRuntime.delivery.completeReplyDelivery(result, {
         runId: outcomeRunId,
-        agentId: followupRun.run.agentId ?? null,
-        tenantId: sessionCtx.GatewayClientSessionEnterpriseId?.trim() || null,
-        sessionKey: sessionKey ?? followupRun.run.sessionKey ?? null,
-        chatType: sessionCtx.ChatType ?? null,
-        reason: decision.reason,
-        category: "perception",
-        ownerUserId: sessionCtx.GatewayClientPlatformUserId?.trim() || null,
-        userLanguageSummary:
-          opts?.expectedReplyLanguage === "en"
-            ? "silent/empty private turn; missing actionable skill/tool or perception"
-            : "私聊静默/空回复；缺可执行技能/工具或可感知输入",
+        language: opts?.expectedReplyLanguage ?? null,
+        readContract: resolveTurnContractFromRun,
+        commitOutcome: commitGrowthOutcome,
+        recordEmptyGap: (reason) =>
+          recordHonestCapabilityGap({
+            runId: outcomeRunId,
+            agentId: followupRun.run.agentId ?? null,
+            tenantId: sessionCtx.GatewayClientSessionEnterpriseId?.trim() || null,
+            sessionKey: sessionKey ?? followupRun.run.sessionKey ?? null,
+            chatType: sessionCtx.ChatType ?? null,
+            reason,
+            category: "perception",
+            ownerUserId: sessionCtx.GatewayClientPlatformUserId?.trim() || null,
+            userLanguageSummary:
+              opts?.expectedReplyLanguage === "en"
+                ? "silent/empty private turn; missing actionable skill/tool or perception"
+                : "私聊静默/空回复；缺可执行技能/工具或可感知输入",
+          }),
+        considerContinuation: maybeScheduleTaskBoardContinue,
+        finalize: (payload) => finalizeWithFollowup(payload, queueKey, runFollowupTurn),
       });
-      return finalizeWithFollowup(
-        { text: formatHonestEmptyReply(opts?.expectedReplyLanguage ?? null) },
-        queueKey,
-        runFollowupTurn,
-      );
-    };
+
+    // Probe live delivery evidence only when the final payload path is empty.
+    const finalizeEmptyDelivery = () =>
+      completeDelivery({
+        kind: "empty",
+        probe: {
+          isHeartbeat,
+          sessionCtx,
+          rawPayloads: payloadArray,
+          blockStreamDelivered: Boolean(blockReplyPipeline?.didStream()),
+          directlySentBlockCount: directlySentBlockKeys?.size ?? 0,
+          toolResultDelivered,
+          didSendViaMessagingTool: runResult.didSendViaMessagingTool,
+          messagingToolSentTexts: runResult.messagingToolSentTexts,
+          messagingToolSentMediaUrls: runResult.messagingToolSentMediaUrls,
+          messagingToolSentTargets: runResult.messagingToolSentTargets,
+          runAborted: Boolean(runResult.meta?.aborted),
+          reactionDelivered: Boolean(runResult.didSendReaction),
+        },
+      });
 
     // Drain any late tool/block deliveries before deciding there's "nothing to send".
     // Otherwise, a late typing trigger (e.g. from a tool callback) can outlive the run and
@@ -881,7 +679,7 @@ export async function runReplyAgent(params: {
       return finalizeEmptyDelivery();
     }
 
-    const payloadResult = await buildReplyPayloads({
+    const payloadResult = await replyTurnRuntime.delivery.buildReplyPayloads({
       payloads: payloadArray,
       isHeartbeat,
       didLogHeartbeatStrip,
@@ -1010,70 +808,27 @@ export async function runReplyAgent(params: {
     }
 
     if (languageGuardedReplyPayloads.length === 0 && guardedReplyPayloads.length > 0) {
-      const fallbackText = didUseTools
-        ? formatTurnProcessPlaceholder(expectedReplyLanguage, "lookup")
-        : undefined;
-      if (!fallbackText) {
-        // Language gate filtered all replies with nothing to show — not a success, do not close gaps.
-        void commitGrowthOutcome(false, {
-          failureReason: "user_filtered",
-          failureDetail: "language_gate_empty",
-        });
-        return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
-      }
-      // Process placeholder is not final delivery — leave incomplete (no evolution positive).
-      void commitGrowthOutcome(true, { processPlaceholder: true });
-      maybeScheduleTaskBoardContinue([{ text: fallbackText }]);
-      return finalizeWithFollowup({ text: fallbackText }, queueKey, runFollowupTurn);
+      return completeDelivery({ kind: "language_filtered", didUseTools });
     }
 
-    // Visible reply prepared — acceptance from pinned contract; delivery stays
-    // awaiting until dispatch confirms the channel send (not "prepared" = delivered).
-    {
-      const contract = resolveTurnContractFromRun();
-      const deliveryId = `delivery:${outcomeRunId}:visible`;
-      const gates = resolveChatTurnCloseGates({
-        deliveryId,
-        contract,
-        deliveryPhase: "awaiting",
-        acceptanceVerified: contract.acceptanceVerified === true,
-      });
-      // Await prepare so confirm cannot race ahead of the pending write.
-      await commitGrowthOutcome(true, {
-        acceptance: gates.acceptance,
-        delivery: gates.delivery,
-        deliveryId: gates.deliveryId,
-      });
-      const growthAgentId = followupRun.run.agentId?.trim();
-      if (growthAgentId) {
-        const persistRoot = path.join(
-          resolveAgentDir(followupRun.run.config, growthAgentId),
-          TASK_OUTCOME_STORE_DIRNAME,
-        );
-        const pendingTaskId = chatTurnTaskId({
-          agentId: growthAgentId,
-          runId: outcomeRunId,
-          sessionKey,
-        });
-        registerAwaitingDelivery({
-          taskId: pendingTaskId,
-          deliveryId,
-          agentId: growthAgentId,
-          runId: outcomeRunId,
-          persistRoot,
-        });
-        // R85e: publish stable ids through shared ref so dispatch confirm
-        // can locate the task when replyOptions.runId is omitted.
-        if (opts?.pendingTurnDeliveryRef) {
-          opts.pendingTurnDeliveryRef.current = {
-            runId: outcomeRunId,
-            deliveryId,
-            taskId: pendingTaskId,
-            agentId: growthAgentId,
-          };
-        }
-      }
-    }
+    const acceptanceStatus = await replyTurnRuntime.delivery.prepareVisibleDelivery(
+      followupRun.run.config,
+      {
+        workspaceDir: followupRun.run.workspaceDir,
+        sessionFile: followupRun.run.sessionFile,
+        completionBinding,
+        agentId: followupRun.run.agentId,
+        runId: outcomeRunId,
+        sessionKey,
+        contract: resolveTurnContractFromRun(),
+        commitOutcome: commitGrowthOutcome,
+        publishPending: (identity) => {
+          if (opts?.pendingTurnDeliveryRef) {
+            opts.pendingTurnDeliveryRef.current = identity;
+          }
+        },
+      },
+    );
     try {
       const usedIds = (runResult.toolMetas ?? [])
         .map((row) => row.toolName)
@@ -1219,7 +974,7 @@ export async function runReplyAgent(params: {
     }
 
     if (autoCompactionCompleted) {
-      const count = await incrementRunCompactionCount({
+      const count = await replyTurnRuntime.state.incrementRunCompactionCount({
         sessionEntry: activeSessionEntry,
         sessionStore: activeSessionStore,
         sessionKey,
@@ -1254,33 +1009,7 @@ export async function runReplyAgent(params: {
       finalPayloads = appendUsageLine(finalPayloads, responseUsageLine);
     }
 
-    finalPayloads = shapeAdmittedComplexTaskReply({
-      payloads: finalPayloads,
-      userText: commandBody,
-      tenantId:
-        sessionCtx.GatewayClientSessionEnterpriseId?.trim() ||
-        sessionCtx.CollaborationTenantId?.trim() ||
-        null,
-      surface:
-        sessionCtx.CollaborationGroupId?.trim() ||
-        sessionCtx.ChatType === "group" ||
-        sessionCtx.GroupSubject?.trim()
-          ? "group"
-          : "direct",
-      fromAgentId: sessionCtx.CollaborationBotAgentId,
-      sessionFile: followupRun.run.sessionFile,
-      sessionKey: sessionKey ?? followupRun.run.sessionKey,
-      cfg: followupRun.run.config,
-      disableTools: followupRun.run.disableTools === true,
-      env: process.env,
-    });
-
-    maybeScheduleTaskBoardContinue(finalPayloads);
-    return finalizeWithFollowup(
-      finalPayloads.length === 1 ? finalPayloads[0] : finalPayloads,
-      queueKey,
-      runFollowupTurn,
-    );
+    return completeDelivery({ kind: "visible", payloads: finalPayloads, acceptanceStatus });
   } catch (error) {
     // Keep the followup queue moving even when an unexpected exception escapes
     // the run path; the caller still receives the original error.

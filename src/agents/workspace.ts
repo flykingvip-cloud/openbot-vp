@@ -321,6 +321,8 @@ async function ensureGitRepo(dir: string, isBrandNewWorkspace: boolean) {
 export async function ensureAgentWorkspace(params?: {
   dir?: string;
   ensureBootstrapFiles?: boolean;
+  /** Conversation bootstrap must not turn an authorized directory into a rejected Git checkout. */
+  initializeGit?: boolean;
 }): Promise<{
   dir: string;
   agentsPath?: string;
@@ -444,7 +446,9 @@ export async function ensureAgentWorkspace(params?: {
   if (stateDirty) {
     await writeWorkspaceOnboardingState(statePath, state);
   }
-  await ensureGitRepo(dir, isBrandNewWorkspace);
+  if (params?.initializeGit !== false) {
+    await ensureGitRepo(dir, isBrandNewWorkspace);
+  }
 
   return {
     dir,

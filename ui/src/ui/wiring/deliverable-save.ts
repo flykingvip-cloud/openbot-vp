@@ -183,8 +183,15 @@ export function extractArtifactSavePayload(
     return { content: "", contentBase64 };
   }
   const previewKind = typeof metadata.previewKind === "string" ? metadata.previewKind : "";
+  const filename =
+    typeof metadata.workspaceFilename === "string"
+      ? metadata.workspaceFilename
+      : workspace.artifact.title;
+  const officeFile =
+    /\.(?:pptx?|docx?|xlsx?)$/i.test(filename || "") ||
+    /officedocument|msword|ms-powerpoint|ms-excel/i.test(workspace.artifact.mimeType || "");
   const binaryKinds = new Set(["pdf", "image", "binary"]);
-  if (binaryKinds.has(previewKind)) {
+  if (binaryKinds.has(previewKind) || officeFile) {
     // Do not archive the "cannot preview" hint as the document body.
     return { content: "" };
   }

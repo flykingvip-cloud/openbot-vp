@@ -12,6 +12,10 @@ import {
   probeEffectiveWritability,
   resolveSkillSmokeSlaMs,
   settleTurnCompletion,
+  noteSkillSmokeClock,
+  readSkillSmokeClock,
+  clearSkillSmokeClock,
+  type EnvProbe,
   violatesProgressProseBan,
 } from "./contract.js";
 
@@ -32,6 +36,69 @@ function tempWorkspace(): string {
 const CONTINUE = "沙箱已经具备 Playwright 和 Node 20 这个条件了，请继续尝试";
 
 describe("turn completion contract", () => {
+  it("preserves OGUI wait before probes, side effects, writes or clock cleanup", () => {
+    const workspaceDir = tempWorkspace();
+    const sessionKey = "acceptance-order-wait";
+    noteSkillSmokeClock({ sessionKey, userText: "技能试跑", nowMs: 100 });
+    let effects = 0;
+    try {
+      const settled = settleTurnCompletion({
+        userText: "技能试跑",
+        assistantText: "正在等待主人",
+        workspaceDir,
+        sessionKey,
+        oguiWaitActive: true,
+        get envProbes(): readonly EnvProbe[] {
+          throw new Error("probes must stay lazy");
+        },
+        get sidePathFailure() {
+          effects += 1;
+          return { label: "memory/task_ledger.json", reason: "unavailable" };
+        },
+        deliverable: { relativePath: "must-not-write.md", body: "body" },
+      });
+      expect(settled.contract).toBeNull();
+      expect(settled.visibleText).toBe("正在等待主人");
+      expect(effects).toBe(0);
+      expect(fs.readdirSync(workspaceDir)).toEqual([]);
+      expect(readSkillSmokeClock(sessionKey)).toBe(100);
+    } finally {
+      clearSkillSmokeClock(sessionKey);
+    }
+  });
+
+  it("runs side-path receipt before writing a supplied artifact and clears clock after successful delivery", () => {
+    const workspaceDir = tempWorkspace();
+    const sessionKey = "acceptance-order-delivery";
+    const target = path.join(workspaceDir, "deliverables/result.md");
+    const events: string[] = [];
+    noteSkillSmokeClock({ sessionKey, userText: "技能试跑", nowMs: 100 });
+    try {
+      const settled = settleTurnCompletion({
+        userText: "技能试跑",
+        assistantText: "我继续处理",
+        workspaceDir,
+        sessionKey,
+        envProbes: [],
+        nowMs: 101,
+        get sidePathFailure() {
+          events.push("side-path");
+          expect(fs.existsSync(target)).toBe(false);
+          expect(readSkillSmokeClock(sessionKey)).toBe(100);
+          return { label: "memory/task_ledger.json", reason: "ledger unavailable" };
+        },
+        deliverable: { relativePath: "deliverables/result.md", body: "verified body" },
+      });
+      expect(events).toEqual(["side-path"]);
+      expect(fs.readFileSync(target, "utf8")).toBe("verified body\n");
+      expect(settled.contract?.state).toBe("delivered");
+      expect(settled.contract?.sidePathReceipt).toContain("side_path_bypass");
+      expect(readSkillSmokeClock(sessionKey)).toBeUndefined();
+    } finally {
+      clearSkillSmokeClock(sessionKey);
+    }
+  });
+
   it("continues after a cleared env gate into an openable degradation file", () => {
     const workspaceDir = tempWorkspace();
     const assistant =
@@ -67,12 +134,7 @@ describe("turn completion contract", () => {
       assistantText:
         "memory/task_ledger.json 只读（-r----------），写操作被拒绝，所以我不能出稿，到此结束。",
       workspaceDir,
-      sidePathLabel: "memory/task_ledger.json",
-      sidePathAttempt: () => {
-        const err = new Error("EACCES");
-        (err as NodeJS.ErrnoException).code = "EACCES";
-        throw err;
-      },
+      sidePathFailure: { label: "memory/task_ledger.json", reason: "EACCES", code: "EACCES" },
       deliverable: {
         relativePath: "deliverables/smoke.md",
         body: "# smoke\n\nopenable body\n",

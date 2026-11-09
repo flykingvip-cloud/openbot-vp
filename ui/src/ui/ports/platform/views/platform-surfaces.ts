@@ -1,15 +1,16 @@
 import { html, nothing } from "lit";
 import { renderIcon } from "../../../icons.ts";
 import { pathForTab } from "../../../navigation.ts";
+import { renderObservationWorkbench } from "../../../observation/workbench.ts";
 import { requestOpenBotAppRerender } from "../../../request-app-rerender.ts";
 import { renderPlatformAdvancedSurface } from "../advanced/page.ts";
 import { renderPlatformAgentsSurface } from "../agents/page.ts";
 import { renderPlatformCapabilitiesSurface } from "../capabilities/page.ts";
 import { renderPlatformDashboardSurface } from "../dashboard/page.ts";
 import { resolvePlatformDomainAccess } from "../domain-access.ts";
-import { renderKeyAccountSurface } from "../key-accounts/page.ts";
 import "../diagnosis/platform-diagnosis-page.ts";
 import "../monitor-task/page.ts";
+import { renderKeyAccountSurface } from "../key-accounts/page.ts";
 import { resolveKeyAccountRoute } from "../key-accounts/routes.ts";
 import { renderPlatformModelsSurface } from "../models/page.ts";
 import { renderPlatformPricingSurface } from "../pricing/page.ts";
@@ -54,6 +55,10 @@ const PLATFORM_SURFACE_HEADERS: Record<
   platformAgents: {
     title: "资产管理",
     subtitle: "能力装载 / 策略控制 / 健康 / 生命周期",
+  },
+  platformObservation: {
+    title: "运行观测",
+    subtitle: "运行证据 · 覆盖缺口 · 原控制面验证",
   },
   platformDiagnosis: {
     title: "监测任务",
@@ -326,6 +331,17 @@ export function renderPlatformSurface(props: PlatformSurfaceProps) {
       break;
     case "platformAgents":
       surface = renderPlatformAgentsSurface(props);
+      break;
+    case "platformObservation":
+      surface = renderObservationWorkbench({
+        role: "platform",
+        tenantId: null,
+        sessionKey: null,
+        connected: props.connected === true,
+        observationHost: props.observationHost ?? null,
+        basePath: props.basePath,
+        enterpriseDirectory: props.readModel.enterpriseDirectory ?? [],
+      });
       break;
     case "platformDiagnosis":
       surface = html`

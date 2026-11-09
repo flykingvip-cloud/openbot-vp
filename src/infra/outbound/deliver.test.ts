@@ -20,6 +20,7 @@ const hookMocks = vi.hoisted(() => ({
   runner: {
     hasHooks: vi.fn(() => false),
     runMessageSent: vi.fn(async () => {}),
+    runMessageSending: vi.fn(async () => undefined),
   },
 }));
 const internalHookMocks = vi.hoisted(() => ({
@@ -30,6 +31,7 @@ const queueMocks = vi.hoisted(() => ({
   enqueueDelivery: vi.fn(async () => "mock-queue-id"),
   ackDelivery: vi.fn(async () => {}),
   failDelivery: vi.fn(async () => {}),
+  moveToFailed: vi.fn(async () => {}),
 }));
 const logMocks = vi.hoisted(() => ({
   warn: vi.fn(),
@@ -55,6 +57,7 @@ vi.mock("./delivery-queue.js", () => ({
   enqueueDelivery: queueMocks.enqueueDelivery,
   ackDelivery: queueMocks.ackDelivery,
   failDelivery: queueMocks.failDelivery,
+  moveToFailed: queueMocks.moveToFailed,
 }));
 vi.mock("../../logging/subsystem.js", () => ({
   createSubsystemLogger: () => {
@@ -191,6 +194,7 @@ describe("deliverOutboundPayloads", () => {
     setActivePluginRegistry(defaultRegistry);
     hookMocks.runner.hasHooks.mockClear();
     hookMocks.runner.hasHooks.mockReturnValue(false);
+    hookMocks.runner.runMessageSending.mockReset();
     hookMocks.runner.runMessageSent.mockClear();
     hookMocks.runner.runMessageSent.mockResolvedValue(undefined);
     internalHookMocks.createInternalHookEvent.mockClear();
@@ -208,6 +212,65 @@ describe("deliverOutboundPayloads", () => {
   afterEach(() => {
     setActivePluginRegistry(emptyRegistry);
   });
+  it.each([false, true])(
+    "rechecks task identity after async sending hooks (pause=%s)",
+    async (pause) => {
+      const fs = await import("node:fs/promises");
+      const os = await import("node:os");
+      const board = await import("../../conversation-task/session-task-board.js");
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), "delivery-task-fence-"));
+      const sessionFile = path.join(root, "session.jsonl");
+      try {
+        board.mutateSessionTaskBoard(sessionFile, () => ({
+          board: {
+            ...board.emptySessionTaskBoard(),
+            current: {
+              taskId: "a",
+              title: "A",
+              goalText: "A",
+              unfinished: true,
+              createdAtMs: 1,
+              stop: { summary: "", workspacePaths: [] },
+              executionAttempt: "r",
+              deliverableVersion: "v",
+            },
+          },
+          value: undefined,
+        }));
+        const binding = board.captureTaskCompletionBinding(sessionFile)!;
+        hookMocks.runner.hasHooks.mockReturnValue(true);
+        hookMocks.runner.runMessageSending.mockImplementationOnce(async () => {
+          await Promise.resolve();
+          if (pause) {
+            board.mutateSessionTaskBoard(sessionFile, (current) => ({
+              board: { ...current, current: { ...current.current!, wakeSuppress: true } },
+              value: undefined,
+            }));
+          }
+          return undefined;
+        });
+        const sendWhatsApp = vi.fn().mockResolvedValue({ messageId: "receipt", toJid: "jid" });
+        const send = deliverOutboundPayloads({
+          cfg: {},
+          channel: "whatsapp",
+          to: "+1555",
+          payloads: [{ text: "result" }],
+          deps: { sendWhatsApp },
+          taskBoundary: { sessionFile, binding, constraints: binding.constraints ?? [] },
+        });
+        if (pause) {
+          await expect(send).rejects.toThrow("Task action refused");
+          expect(sendWhatsApp).not.toHaveBeenCalled();
+        } else {
+          await expect(send).resolves.toHaveLength(1);
+          expect(sendWhatsApp).toHaveBeenCalledOnce();
+        }
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("chunks telegram markdown and passes through accountId", async () => {
     const sendTelegram = vi.fn().mockResolvedValue({ messageId: "m1", chatId: "c1" });
     await withEnvAsync({ TELEGRAM_BOT_TOKEN: "" }, async () => {
@@ -809,6 +872,31 @@ describe("deliverOutboundPayloads", () => {
       "mock-queue-id",
       "partial delivery failure (bestEffort)",
     );
+  });
+
+  it("retains bestEffort failures without caller onError", async () => {
+    const sendWhatsApp = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("fail"))
+      .mockResolvedValueOnce({ messageId: "w2", toJid: "jid" });
+    await deliverOutboundPayloads({
+      cfg: {},
+      channel: "whatsapp",
+      to: "+1555",
+      payloads: [{ text: "a" }, { text: "b" }],
+      deps: { sendWhatsApp },
+      bestEffort: true,
+    });
+    expect(queueMocks.ackDelivery).not.toHaveBeenCalled();
+    expect(queueMocks.failDelivery).toHaveBeenCalledWith(
+      "mock-queue-id",
+      "partial delivery failure (bestEffort)",
+    );
+  });
+
+  it("holds a partially sent batch for reconciliation instead of automatic replay", async () => {
+    await runBestEffortPartialFailureDelivery();
+    expect(queueMocks.moveToFailed).toHaveBeenCalledWith("mock-queue-id");
   });
 
   it("acks the queue entry when delivery is aborted", async () => {

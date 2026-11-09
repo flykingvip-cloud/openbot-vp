@@ -11,7 +11,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { withTempHome as withTempHomeBase } from "../../test/helpers/temp-home.js";
 import "../cron/isolated-agent.mocks.js";
-import { runCliAgent } from "../agents/cli-runner.js";
+import { runCliAgent } from "../agent-runtime/execution/runner/cli-run.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import * as modelSelectionModule from "../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
@@ -54,7 +54,7 @@ vi.mock("../gateway/governance/shadow-sink.js", async (importOriginal) => ({
   appendGovernanceShadowDecision: vi.fn(async () => true),
 }));
 
-vi.mock("../agents/cli-runner.js", () => ({ runCliAgent: vi.fn() }));
+vi.mock("../agent-runtime/execution/runner/cli-run.js", () => ({ runCliAgent: vi.fn() }));
 
 vi.mock("../agents/auth-profiles.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../agents/auth-profiles.js")>()),

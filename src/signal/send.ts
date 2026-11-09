@@ -1,3 +1,5 @@
+import type { TaskActionBoundary } from "../agent-runtime/contracts/task-binding.js";
+import { checkTaskActionBoundary } from "../agent-runtime/state/index.js";
 import { loadConfig, type OpenBotConfig } from "../config/config.js";
 import { resolveMarkdownTableMode } from "../config/markdown-tables.js";
 import { kindFromMime } from "../media/mime.js";
@@ -8,6 +10,7 @@ import { markdownToSignalText, type SignalTextStyleRange } from "./format.js";
 import { resolveSignalRpcContext } from "./rpc-context.js";
 
 export type SignalSendOpts = {
+  taskBoundary?: TaskActionBoundary;
   cfg?: OpenBotConfig;
   baseUrl?: string;
   account?: string;
@@ -181,6 +184,13 @@ export async function sendMessageSignal(
   }
   Object.assign(params, targetParams);
 
+  // Media resolution may await; recheck the original task immediately before RPC.
+  if (opts.taskBoundary) {
+    const refusal = checkTaskActionBoundary(opts.taskBoundary);
+    if (refusal) {
+      throw new Error(refusal);
+    }
+  }
   const result = await signalRpcRequest<{ timestamp?: number }>("send", params, {
     baseUrl,
     timeoutMs: opts.timeoutMs,

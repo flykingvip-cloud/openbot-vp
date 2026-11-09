@@ -1,8 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
+import { snapshotIdentityFingerprint } from "../executor-evidence/identity.js";
 import { computeEvaluationEligibility } from "./eligibility.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { applyTransition, evidenceStillValid, scopeIdOf } from "./transitions.js";
 import type {
+  BudgetCallBinding,
+  CommandEvidenceGap,
+  CommandReceipt,
+  CommittedSpend,
   OutcomeOutboxEvent,
   OutcomeEventType,
   SubmitFailure,
@@ -11,6 +16,34 @@ import type {
   TaskOutcomeRecord,
   TrustedScope,
 } from "./types.js";
+
+function sameCommittedSpend(left: CommittedSpend | null, right: CommittedSpend | null): boolean {
+  if (!left && !right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.iterations === right.iterations &&
+    left.costUsd === right.costUsd &&
+    left.costEvidence === right.costEvidence
+  );
+}
+
+function sameCallBinding(left: BudgetCallBinding | null, right: BudgetCallBinding | null): boolean {
+  if (!left && !right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.callId === right.callId &&
+    left.evidenceId === right.evidenceId &&
+    left.usageFingerprint === right.usageFingerprint
+  );
+}
 
 export type ResultServiceOptions = {
   store: DurableTaskOutcomeStore;
@@ -44,6 +77,24 @@ function outboxEvent(record: TaskOutcomeRecord, eventType: OutcomeEventType): Ou
 
 function digestTransition(taskId: string, transition: SubmitTransition): string {
   return createHash("sha256").update(JSON.stringify({ taskId, transition })).digest("hex");
+}
+
+/** Idempotency digest. The same transition with a different call binding is not a replay. */
+function digestCommand(transitionDigest: string, callBinding?: BudgetCallBinding | null): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        transitionDigest,
+        callBinding: callBinding
+          ? {
+              callId: callBinding.callId,
+              evidenceId: callBinding.evidenceId,
+              usageFingerprint: callBinding.usageFingerprint,
+            }
+          : null,
+      }),
+    )
+    .digest("hex");
 }
 
 function attemptFingerprint(record: TaskOutcomeRecord): string {
@@ -128,6 +179,8 @@ export class TaskOutcomeResultService {
       requiredScope?: TrustedScope;
       /** Verified caller subject; corrections must use this as authorizedBy. */
       callerSubjectRef?: string;
+      /** Present only for a model-call budget charge. Included in the idempotency digest. */
+      callBinding?: BudgetCallBinding;
     },
   ): SubmitResult {
     return this.store.withTaskLock(taskId, () => this.submitLocked(taskId, transition, opts));
@@ -140,6 +193,7 @@ export class TaskOutcomeResultService {
       commandId?: string;
       requiredScope?: TrustedScope;
       callerSubjectRef?: string;
+      callBinding?: BudgetCallBinding;
     },
   ): SubmitResult {
     const current = this.store.loadTask(taskId);
@@ -160,24 +214,66 @@ export class TaskOutcomeResultService {
       }
     }
 
-    if (opts?.commandId) {
-      const digest = digestTransition(taskId, transition);
-      const prior = this.store.loadCommand(opts.commandId);
+    const commandId = opts?.commandId;
+    const transitionDigest = commandId ? digestTransition(taskId, transition) : undefined;
+    const requestDigest =
+      commandId && transitionDigest
+        ? digestCommand(transitionDigest, opts?.callBinding ?? null)
+        : undefined;
+    if (commandId && requestDigest && transitionDigest) {
+      const prior = this.store.loadCommand(commandId);
       if (prior) {
-        if (prior.digest !== digest) {
+        const legacySamePayload =
+          !prior.transitionDigest &&
+          !prior.callBinding &&
+          !opts?.callBinding &&
+          prior.digest === transitionDigest;
+        if (prior.digest !== requestDigest && !legacySamePayload) {
+          const sameTransition = prior.transitionDigest
+            ? prior.transitionDigest === transitionDigest
+            : prior.digest === transitionDigest;
+          const bindingConflict =
+            sameTransition && !sameCallBinding(prior.callBinding, opts?.callBinding ?? null);
           return {
             ok: false,
             code: "command_conflict",
-            message: `commandId ${opts.commandId} reused with different payload`,
+            message: bindingConflict
+              ? "call_binding_conflict"
+              : `commandId ${commandId} reused with different payload`,
             current,
+            commandConflict: {
+              commandId,
+              taskId: prior.taskId,
+              storedDigest: prior.digest,
+              requestDigest,
+              storedOutcomeVersion: prior.outcomeVersion,
+              storedCommitId: prior.commitId,
+              storedSpend: prior.committedSpend,
+              reason: bindingConflict ? "call_binding_conflict" : "payload_conflict",
+              storedCallBinding: prior.callBinding,
+            },
           };
         }
-        const historical =
-          this.store.loadTaskVersion(prior.taskId, prior.outcomeVersion) ??
-          this.store.loadTask(prior.taskId);
-        if (historical) {
-          return { ok: true, record: historical, createdEvents: [] };
+        // Exact replay uses the command's own version. Never substitute the tip.
+        const historical = this.store.loadTaskVersion(prior.taskId, prior.outcomeVersion);
+        const refused = this.refuseInconsistentReplay(commandId, prior, historical, current);
+        if (refused) {
+          return refused;
         }
+        return {
+          ok: true,
+          record: historical!,
+          createdEvents: [],
+          committedSpend: prior.committedSpend,
+          commandReceipt: this.buildCommandReceipt({
+            commandId,
+            taskId: prior.taskId,
+            outcomeVersion: prior.outcomeVersion,
+            requestDigest: prior.digest,
+            disposition: "replayed",
+            commitId: prior.commitId,
+          }),
+        };
       }
     }
 
@@ -190,7 +286,7 @@ export class TaskOutcomeResultService {
           current.outcomeVersion > transition.expectedVersion &&
           isSameEffect(current, transition)
         ) {
-          return { ok: true, record: current, createdEvents: [] };
+          return this.noEffect(current, commandId, requestDigest);
         }
         return {
           ok: false,
@@ -286,7 +382,7 @@ export class TaskOutcomeResultService {
       transition.type !== "create" &&
       attemptFingerprint(current) === attemptFingerprint(record)
     ) {
-      return { ok: true, record: current, createdEvents: [] };
+      return this.noEffect(current, commandId, requestDigest);
     }
 
     const eventType: OutcomeEventType =
@@ -305,13 +401,33 @@ export class TaskOutcomeResultService {
       expectedVersion,
       record,
       events,
-      ...(opts?.commandId
+      ...(opts?.commandId && requestDigest
         ? {
             commandLog: {
               commandId: opts.commandId,
-              digest: digestTransition(taskId, transition),
+              digest: requestDigest,
+              transitionDigest,
               taskId,
               outcomeVersion: record.outcomeVersion,
+              snapshotFingerprint: snapshotIdentityFingerprint(record),
+              commandDisposition: "applied" as const,
+              ...(opts?.callBinding ? { callBinding: opts.callBinding } : {}),
+              ...(transition.type === "accumulate_budget_spend"
+                ? {
+                    committedSpend: {
+                      iterations:
+                        typeof transition.iterations === "number" && transition.iterations > 0
+                          ? Math.floor(transition.iterations)
+                          : 0,
+                      costUsd:
+                        typeof transition.costUsd === "number" &&
+                        Number.isFinite(transition.costUsd)
+                          ? transition.costUsd
+                          : null,
+                      costEvidence: transition.costEvidence ?? null,
+                    } satisfies CommittedSpend,
+                  }
+                : {}),
             },
           }
         : {}),
@@ -325,7 +441,147 @@ export class TaskOutcomeResultService {
       };
     }
 
-    return { ok: true, record, createdEvents: events };
+    return {
+      ok: true,
+      record,
+      createdEvents: events,
+      ...(commandId && requestDigest
+        ? {
+            committedSpend:
+              transition.type === "accumulate_budget_spend"
+                ? {
+                    iterations:
+                      typeof transition.iterations === "number" && transition.iterations > 0
+                        ? Math.floor(transition.iterations)
+                        : 0,
+                    costUsd:
+                      typeof transition.costUsd === "number" && Number.isFinite(transition.costUsd)
+                        ? transition.costUsd
+                        : null,
+                    costEvidence: transition.costEvidence ?? null,
+                  }
+                : null,
+            commandReceipt: this.buildCommandReceipt({
+              commandId,
+              taskId,
+              outcomeVersion: record.outcomeVersion,
+              requestDigest,
+              disposition: "applied",
+              commitId: committed.commitId,
+            }),
+          }
+        : {}),
+    };
+  }
+
+  /** Refuse a replay whose log, snapshot body, and commit bundle disagree. */
+  private refuseInconsistentReplay(
+    commandId: string,
+    prior: {
+      digest: string;
+      taskId: string;
+      outcomeVersion: number;
+      commitId: string | null;
+      snapshotFingerprint: string | null;
+      committedSpend: CommittedSpend | null;
+      callBinding: BudgetCallBinding | null;
+    },
+    historical: TaskOutcomeRecord | undefined,
+    current: TaskOutcomeRecord | undefined,
+  ): SubmitResult | null {
+    const gap = (reason: CommandEvidenceGap["reason"], message: string): SubmitResult => ({
+      ok: false,
+      code: "evidence_missing",
+      message,
+      current,
+      evidenceGap: {
+        schemaVersion: 1,
+        commandId,
+        taskId: prior.taskId,
+        outcomeVersion: prior.outcomeVersion,
+        requestDigest: prior.digest,
+        reason,
+      },
+    });
+    if (!historical) {
+      return gap(
+        "version_snapshot_missing",
+        `command ${commandId} version ${prior.outcomeVersion} snapshot is missing`,
+      );
+    }
+    if (!prior.snapshotFingerprint) {
+      return gap(
+        "snapshot_fingerprint_absent",
+        `command ${commandId} has no snapshot fingerprint and cannot be an exact replay`,
+      );
+    }
+    if (
+      historical.taskId !== prior.taskId ||
+      historical.outcomeVersion !== prior.outcomeVersion ||
+      snapshotIdentityFingerprint(historical) !== prior.snapshotFingerprint
+    ) {
+      return gap(
+        "snapshot_identity_mismatch",
+        `command ${commandId} snapshot body does not match the committed identity`,
+      );
+    }
+    if (prior.commitId) {
+      const bundle = this.store.loadCommitBundle(prior.commitId);
+      const logged = bundle?.commandLog;
+      if (
+        !bundle ||
+        bundle.commitId !== prior.commitId ||
+        bundle.taskId !== prior.taskId ||
+        bundle.record.taskId !== prior.taskId ||
+        bundle.record.outcomeVersion !== prior.outcomeVersion ||
+        logged?.commandId !== commandId ||
+        logged?.digest !== prior.digest ||
+        snapshotIdentityFingerprint(bundle.record) !== prior.snapshotFingerprint ||
+        !sameCommittedSpend(logged?.committedSpend ?? null, prior.committedSpend) ||
+        !sameCallBinding(logged?.callBinding ?? null, prior.callBinding)
+      ) {
+        return gap(
+          "commit_identity_mismatch",
+          `command ${commandId} commit ${prior.commitId} does not match the log`,
+        );
+      }
+    }
+    return null;
+  }
+
+  private buildCommandReceipt(args: {
+    commandId: string;
+    taskId: string;
+    outcomeVersion: number;
+    requestDigest: string;
+    disposition: CommandReceipt["disposition"];
+    commitId: string | null;
+  }): CommandReceipt {
+    return { schemaVersion: 1, ...args };
+  }
+
+  /** Same observable effect, no new commit and no forged command log. */
+  private noEffect(
+    current: TaskOutcomeRecord,
+    commandId: string | undefined,
+    requestDigest: string | undefined,
+  ): SubmitResult {
+    if (!commandId || !requestDigest) {
+      return { ok: true, record: current, createdEvents: [] };
+    }
+    return {
+      ok: true,
+      record: current,
+      createdEvents: [],
+      commandReceipt: this.buildCommandReceipt({
+        commandId,
+        taskId: current.taskId,
+        outcomeVersion: current.outcomeVersion,
+        requestDigest,
+        disposition: "no_effect",
+        commitId: null,
+      }),
+    };
   }
 
   assertScope(taskId: string, scope: TrustedScope): SubmitFailure | null {
@@ -377,7 +633,15 @@ export class TaskOutcomeResultService {
         opts,
       );
     }
-    return { ok: true, record: cur, createdEvents: [] };
+    const unchanged = {
+      type: "set_acceptance" as const,
+      acceptance: { status: "pending" as const },
+      evidence: [],
+      allowRetry: true,
+      expectedVersion,
+      fencingToken,
+    };
+    return this.noEffect(cur, opts?.commandId, digestTransition(taskId, unchanged));
   }
 
   eligibility(taskId: string) {

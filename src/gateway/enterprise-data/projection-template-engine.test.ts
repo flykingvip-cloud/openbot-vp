@@ -4,11 +4,11 @@ import { applyProjectionTemplate } from "./projection-template-engine.js";
 const spec = {
   projectionKey: "yonyou_tplus_warehouse",
   displayName: "001-用友T+仓库",
-  objectKind: "aggregate" as const,
-  category: "erp" as const,
+  objectKind: "data" as const,
+  category: "inventory" as const,
 };
 
-const gatewayResponse = { maskedFields: [], scopeApplied: {} };
+const gatewayResponse = { maskedFields: [], scopeApplied: "tenant:test" };
 
 describe("applyProjectionTemplate AggregateTemplate", () => {
   it("aggregates items payloads", () => {

@@ -1,4 +1,6 @@
 import type { RequestClient } from "@buape/carbon";
+import type { TaskActionBoundary } from "../../agent-runtime/contracts/task-binding.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
 import { resolveAgentAvatar } from "../../agents/identity-avatar.js";
 import type { ChunkMode } from "../../auto-reply/chunk.js";
 import type { ReplyPayload } from "../../auto-reply/types.js";
@@ -129,6 +131,7 @@ function resolveBindingPersona(
 }
 
 async function sendDiscordChunkWithFallback(params: {
+  taskBoundary?: TaskActionBoundary;
   cfg: OpenBotConfig;
   target: string;
   text: string;
@@ -156,6 +159,7 @@ async function sendDiscordChunkWithFallback(params: {
   if (binding?.webhookId && binding?.webhookToken) {
     try {
       await sendWebhookMessageDiscord(text, {
+        taskBoundary: params.taskBoundary,
         cfg: params.cfg,
         webhookId: binding.webhookId,
         webhookToken: binding.webhookToken,
@@ -195,6 +199,7 @@ async function sendDiscordChunkWithFallback(params: {
   await sendWithRetry(
     () =>
       sendMessageDiscord(params.target, text, {
+        taskBoundary: params.taskBoundary,
         cfg: params.cfg,
         token: params.token,
         rest: params.rest,
@@ -206,6 +211,7 @@ async function sendDiscordChunkWithFallback(params: {
 }
 
 async function sendAdditionalDiscordMedia(params: {
+  taskBoundary?: TaskActionBoundary;
   cfg: OpenBotConfig;
   target: string;
   token: string;
@@ -221,6 +227,7 @@ async function sendAdditionalDiscordMedia(params: {
     await sendWithRetry(
       () =>
         sendMessageDiscord(params.target, "", {
+          taskBoundary: params.taskBoundary,
           cfg: params.cfg,
           token: params.token,
           rest: params.rest,
@@ -235,6 +242,7 @@ async function sendAdditionalDiscordMedia(params: {
 }
 
 export async function deliverDiscordReply(params: {
+  taskBoundary?: TaskActionBoundary;
   cfg: OpenBotConfig;
   replies: ReplyPayload[];
   target: string;
@@ -281,10 +289,25 @@ export async function deliverDiscordReply(params: {
   // This eliminates redundant channel-type GET requests and client creation that
   // can cause ordering issues when multiple chunks share the RequestClient queue.
   const channelId = resolveTargetChannelId(params.target);
-  const account = resolveDiscordAccount({ cfg: params.cfg, accountId: params.accountId });
+  const account = resolveDiscordAccount({
+    cfg: params.cfg,
+    accountId: params.accountId,
+  });
   const retryConfig = resolveDeliveryRetryConfig(account.config.retry);
-  const request: RetryRunner | undefined = channelId
+  const baseRequest = channelId
     ? createDiscordRetryRunner({ configRetry: account.config.retry })
+    : undefined;
+  const request: RetryRunner | undefined = baseRequest
+    ? (fn, label) =>
+        baseRequest(() => {
+          if (params.taskBoundary) {
+            const refusal = checkTaskActionBoundary(params.taskBoundary);
+            if (refusal) {
+              throw new Error(refusal);
+            }
+          }
+          return fn();
+        }, label)
     : undefined;
   let deliveredAny = false;
   for (const payload of params.replies) {
@@ -311,6 +334,7 @@ export async function deliverDiscordReply(params: {
         }
         const replyTo = resolveReplyTo();
         await sendDiscordChunkWithFallback({
+          taskBoundary: params.taskBoundary,
           cfg: params.cfg,
           target: params.target,
           text: chunk,
@@ -341,6 +365,7 @@ export async function deliverDiscordReply(params: {
     if (payload.audioAsVoice) {
       const replyTo = resolveReplyTo();
       await sendVoiceMessageDiscord(params.target, firstMedia, {
+        taskBoundary: params.taskBoundary,
         cfg: params.cfg,
         token: params.token,
         rest: params.rest,
@@ -350,6 +375,7 @@ export async function deliverDiscordReply(params: {
       deliveredAny = true;
       // Voice messages cannot include text; send remaining text separately if present.
       await sendDiscordChunkWithFallback({
+        taskBoundary: params.taskBoundary,
         cfg: params.cfg,
         target: params.target,
         text,
@@ -368,6 +394,7 @@ export async function deliverDiscordReply(params: {
       });
       // Additional media items are sent as regular attachments (voice is single-file only).
       await sendAdditionalDiscordMedia({
+        taskBoundary: params.taskBoundary,
         cfg: params.cfg,
         target: params.target,
         token: params.token,
@@ -383,6 +410,7 @@ export async function deliverDiscordReply(params: {
 
     const replyTo = resolveReplyTo();
     await sendMessageDiscord(params.target, text, {
+      taskBoundary: params.taskBoundary,
       cfg: params.cfg,
       token: params.token,
       rest: params.rest,
@@ -393,6 +421,7 @@ export async function deliverDiscordReply(params: {
     });
     deliveredAny = true;
     await sendAdditionalDiscordMedia({
+      taskBoundary: params.taskBoundary,
       cfg: params.cfg,
       target: params.target,
       token: params.token,

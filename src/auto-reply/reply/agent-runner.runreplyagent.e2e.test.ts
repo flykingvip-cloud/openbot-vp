@@ -53,7 +53,8 @@ async function getRunReplyAgent() {
   return await runReplyAgentPromise;
 }
 
-vi.mock("../../agents/model-fallback.js", () => ({
+vi.mock("../../agents/model-fallback.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../agents/model-fallback.js")>()),
   runWithModelFallback: async ({
     provider,
     model,
@@ -128,6 +129,7 @@ function createMinimalRun(params?: {
     summaryLine: "hello",
     enqueuedAt: Date.now(),
     run: {
+      inputProvenance: { kind: "internal_system" },
       sessionId: "session",
       sessionKey,
       messageProvider: "whatsapp",
@@ -197,6 +199,15 @@ async function seedSessionStore(params: {
   );
 }
 
+it("rejects an explicit external user request before legacy classification or execution when not admitted", async () => {
+  const result = await createMinimalRun({
+    runOverrides: { inputProvenance: { kind: "external_user" } },
+  }).run();
+  expect(JSON.stringify(result)).toContain("尚未通过交互层的执行准入");
+  expect(state.runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+  expect(state.runCliAgentMock).not.toHaveBeenCalled();
+});
+
 function createBaseRun(params: {
   storePath: string;
   sessionEntry: Record<string, unknown>;
@@ -216,6 +227,7 @@ function createBaseRun(params: {
     summaryLine: "hello",
     enqueuedAt: Date.now(),
     run: {
+      inputProvenance: { kind: "internal_system" },
       agentId: "main",
       agentDir: "/tmp/agent",
       sessionId: "session",
@@ -322,7 +334,8 @@ describe("runReplyAgent heartbeat followup guard", () => {
   });
 
   it("drains followup queue when an unexpected exception escapes the run path", async () => {
-    const accounting = await import("./session-run-accounting.js");
+    const { replyTurnRuntime } = await import("../../agent-runtime/wiring/reply-turn.js");
+    const accounting = replyTurnRuntime.state;
     const persistSpy = vi
       .spyOn(accounting, "persistRunSessionUsage")
       .mockRejectedValueOnce(new Error("persist exploded"));
@@ -618,7 +631,7 @@ describe("runReplyAgent typing (heartbeat)", () => {
     await run();
 
     expect(onToolResult).toHaveBeenCalledWith({
-      text: "Approval required.\n\n```txt\n/approve 117ba06d allow-once\n```",
+      text: "请批准下面这条命令",
       channelData: {
         execApproval: {
           approvalId: "117ba06d-1111-2222-3333-444444444444",
@@ -627,6 +640,29 @@ describe("runReplyAgent typing (heartbeat)", () => {
         },
       },
     });
+  });
+
+  it.each([
+    { text: "NO_REPLY", approvalId: "valid", approvalSlug: "valid" },
+    { text: "HEARTBEAT_OK", approvalId: "valid", approvalSlug: "valid" },
+    {
+      text: "Approval required.\n\n```txt\n/approve 117ba06d allow-once\n```",
+      approvalId: "",
+      approvalSlug: "",
+    },
+  ])("keeps suppressed or malformed approval results hidden ($text)", async (sample) => {
+    const onToolResult = vi.fn();
+    state.runEmbeddedPiAgentMock.mockImplementationOnce(async (params: AgentRunParams) => {
+      await params.onToolResult?.({
+        text: sample.text,
+        channelData: {
+          execApproval: { approvalId: sample.approvalId, approvalSlug: sample.approvalSlug },
+        },
+      });
+      return { payloads: [{ text: "final" }], meta: {} };
+    });
+    await createMinimalRun({ typingMode: "message", opts: { onToolResult } }).run();
+    expect(onToolResult).not.toHaveBeenCalled();
   });
 
   it("retries transient HTTP failures once with timer-driven backoff", async () => {
@@ -2078,3 +2114,55 @@ describe("runReplyAgent memory flush", () => {
   });
 });
 import type { ReplyPayload } from "../types.js";
+
+it("rejects a stale original task before memory flush or provider execution", async () => {
+  const boardApi = await import("../../conversation-task/session-task-board.js");
+  const dir = await fs.mkdtemp(path.join(tmpdir(), "normal-task-start-"));
+  try {
+    const sessionFile = path.join(dir, "session.jsonl");
+    await fs.writeFile(sessionFile, "");
+    const task = {
+      taskId: "a",
+      title: "A",
+      goalText: "hello",
+      unfinished: true,
+      createdAtMs: 1,
+      stop: { summary: "", workspacePaths: [] },
+    };
+    boardApi.mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...boardApi.emptySessionTaskBoard(),
+        current: task,
+      },
+      value: undefined,
+    }));
+    const binding = boardApi.captureTaskCompletionBinding(sessionFile);
+    boardApi.mutateSessionTaskBoard(sessionFile, (board) => ({
+      board: { ...board, current: { ...task, taskId: "b" } },
+      value: undefined,
+    }));
+    state.runEmbeddedPiAgentMock.mockClear();
+    state.runCliAgentMock.mockClear();
+    const { run, typing } = createMinimalRun({
+      runOverrides: { sessionFile, taskCompletionBinding: binding },
+    });
+    vi.mocked(scheduleFollowupDrain).mockClear();
+    const result = await run();
+    expect(JSON.stringify(result)).toContain("任务身份已失效");
+    expect(scheduleFollowupDrain).toHaveBeenCalled();
+    expect(state.runEmbeddedPiAgentMock).not.toHaveBeenCalled();
+    expect(state.runCliAgentMock).not.toHaveBeenCalled();
+    expect(boardApi.readSessionTaskBoard(sessionFile).current?.taskId).toBe("b");
+    expect(typing.markRunComplete).toHaveBeenCalled();
+    expect(typing.markDispatchIdle).toHaveBeenCalled();
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+vi.mock("../../agent-runtime/execution/runner/embedded-run.js", () => ({
+  runEmbeddedPiAgent: (params: unknown) => state.runEmbeddedPiAgentMock(params),
+}));
+vi.mock("../../agent-runtime/execution/runner/cli-run.js", () => ({
+  runCliAgent: (params: unknown) => state.runCliAgentMock(params),
+}));

@@ -11,11 +11,11 @@ vi.mock("../../agents/auth-profiles/session-override.js", () => ({
   resolveSessionAuthProfileOverride: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../agents/pi-embedded.js", () => ({
+vi.mock("../../agent-runtime/execution/index.js", async (original) => ({
+  ...(await original<typeof import("../../agent-runtime/execution/index.js")>()),
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunActive: vi.fn().mockReturnValue(false),
   isEmbeddedPiRunStreaming: vi.fn().mockReturnValue(false),
-  resolveEmbeddedSessionLane: vi.fn().mockReturnValue("session:session-key"),
 }));
 
 vi.mock("../../config/sessions.js", () => ({
@@ -437,6 +437,7 @@ describe("runPreparedReply media-only handling", () => {
   it("injects collaboration capability context into the extra system prompt when session data exists", async () => {
     await runPreparedReply(
       baseParams({
+        agentId: "bot-1",
         sessionEntry: {
           sessionId: "session-1",
           updatedAt: 1,
@@ -485,13 +486,7 @@ describe("runPreparedReply media-only handling", () => {
     const workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-collab-capabilities-"));
     tempDirs.push(workspaceDir);
 
-    const storeDir = path.join(
-      workspaceDir,
-      ".openbot",
-      "collaboration",
-      "groups",
-      encodeURIComponent("group-1"),
-    );
+    const storeDir = path.join(workspaceDir, "groups", encodeURIComponent("group-1"));
     await fs.mkdir(storeDir, { recursive: true });
     await fs.writeFile(
       path.join(storeDir, "learning-assets.json"),
@@ -519,6 +514,8 @@ describe("runPreparedReply media-only handling", () => {
     await runPreparedReply(
       baseParams({
         workspaceDir,
+        agentId: "bot-1",
+        cfg: { collaboration: { defaults: { workspace: workspaceDir } }, agents: { defaults: {} } },
         sessionEntry: {
           sessionId: "session-1",
           updatedAt: 1,

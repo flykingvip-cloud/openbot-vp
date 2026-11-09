@@ -1,11 +1,29 @@
 import crypto from "node:crypto";
+import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
+import {
+  assertControlledExecutionStages,
+  runQueuedCandidate,
+  createExecutionLifecycle,
+} from "../../agent-runtime/execution/index.js";
+import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
+import { checkTaskActionBoundary } from "../../agent-runtime/state/index.js";
+import {
+  bindAsyncWaitRecoveryTurn,
+  claimQueuedExecution,
+  readAsyncWaitJobIntent,
+  releaseAsyncWaitRecoveryTurn,
+} from "../../agent-runtime/state/index.js";
+import {
+  incrementRunCompactionCount,
+  persistRunSessionUsage,
+} from "../../agent-runtime/state/index.js";
+import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
+import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
+import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
-import { resolveEmbeddedModelGovernance } from "../../agents/embedded-model-governance.js";
-import { runWithModelFallback } from "../../agents/model-fallback.js";
-import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage, normalizeUsage } from "../../agents/usage.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import {
@@ -14,46 +32,35 @@ import {
   runWithOguiDecisionResume,
 } from "../../config/sessions/ogui-decision-engine.js";
 import type { TypingMode } from "../../config/types.js";
-import {
-  tryAcquireEnterpriseAgentRun,
-  releaseEnterpriseAgentRun,
-} from "../../gateway/billing/agent-run-governance.js";
 import { drainUsageOutboxRecord } from "../../gateway/billing/usage-outbox-drain.js";
 import { enqueueUsageOutbox } from "../../gateway/billing/usage-outbox-store.js";
-import { resolveEnterpriseEmbeddedTransport } from "../../gateway/enterprise-model/embedded-transport.js";
-import { inheritExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
-import {
-  buildRunModelSetSnapshot,
-  forgetRunModelSet,
-  rememberRunModelSet,
-  snapshotCreditReportingFromGate,
-} from "../../gateway/governance/spawn-snapshot-handoff.js";
 import {
   consumeCapabilityRoutingResult,
   formatCapabilityExecutionSurfaceLog,
 } from "../../gateway/model-entitlement/capability-entry-consume.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
-import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
-import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
+import { resolveTurnContractFromRunMeta } from "../../task-outcome/chat-entry.js";
 import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
+import { peekAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
+import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import {
   assertRunnerTurnBudgetAllowsModelCall,
   chargeModelCallAgainstTip,
   estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
+  runnerExecutorEvidenceContext,
   TaskBudgetExceededError,
+  type ModelCallCloseoutLink,
 } from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
 import type { OriginatingChannelType } from "../templating.js";
-import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import { buildCommercialRunCreditUsageInput } from "./agent-run-credit-usage.js";
-import { resolveRunAuthProfile } from "./agent-runner-utils.js";
 import {
   resolveOriginAccountId,
   resolveOriginMessageProvider,
@@ -68,7 +75,6 @@ import {
 } from "./reply-payloads.js";
 import { resolveReplyToMode } from "./reply-threading.js";
 import { isRoutableChannel, routeReply } from "./route-reply.js";
-import { incrementRunCompactionCount, persistRunSessionUsage } from "./session-run-accounting.js";
 import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
@@ -108,68 +114,163 @@ export function createFollowupRunner(params: {
    * session's current dispatcher. This ensures replies go back to
    * where the message originated.
    */
-  const sendFollowupPayloads = async (payloads: ReplyPayload[], queued: FollowupRun) => {
-    // Check if we should route to originating channel.
-    const { originatingChannel, originatingTo } = queued;
-    const shouldRouteToOriginating = isRoutableChannel(originatingChannel) && originatingTo;
-
-    if (!shouldRouteToOriginating && !opts?.onBlockReply) {
-      logVerbose("followup queue: no onBlockReply handler; dropping payloads");
-      return;
-    }
-
-    for (const payload of payloads) {
-      if (!payload?.text && !payload?.mediaUrl && !payload?.mediaUrls?.length) {
-        continue;
-      }
-      if (
-        isSilentReplyText(payload.text, SILENT_REPLY_TOKEN) &&
-        !payload.mediaUrl &&
-        !payload.mediaUrls?.length
-      ) {
-        continue;
-      }
-      await typingSignals.signalTextDelta(payload.text);
-
-      // Route to originating channel if set, otherwise fall back to dispatcher.
-      if (shouldRouteToOriginating) {
-        const result = await routeReply({
-          payload,
-          channel: originatingChannel,
-          to: originatingTo,
+  const sendFollowupPayloads = async (
+    payloads: ReplyPayload[],
+    queued: FollowupRun,
+    taskResult = false,
+  ) => {
+    return deliverQueuedReply(
+      {
+        payloads,
+        taskBoundary:
+          taskResult && queued.run.taskCompletionBinding
+            ? {
+                sessionFile: queued.run.sessionFile,
+                binding: queued.run.taskCompletionBinding,
+                constraints: queued.run.taskCompletionBinding.constraints ?? [],
+              }
+            : undefined,
+        originatingChannel: queued.originatingChannel,
+        originatingTo: queued.originatingTo,
+        originatingAccountId: queued.originatingAccountId,
+        originatingThreadId: queued.originatingThreadId,
+        run: {
           sessionKey: queued.run.sessionKey,
-          accountId: queued.originatingAccountId,
-          threadId: queued.originatingThreadId,
           cfg: queued.run.config,
-        });
-        if (!result.ok) {
-          const errorMsg = result.error ?? "unknown error";
-          logVerbose(`followup queue: route-reply failed: ${errorMsg}`);
-          // Fall back to the caller-provided dispatcher only when the
-          // originating channel matches the session's message provider.
-          // In that case onBlockReply was created by the same channel's
-          // handler and delivers to the correct destination.  For true
-          // cross-channel routing (origin !== provider), falling back
-          // would send to the wrong channel, so we drop the payload.
-          const provider = resolveOriginMessageProvider({
-            provider: queued.run.messageProvider,
-          });
-          const origin = resolveOriginMessageProvider({
-            originatingChannel,
-          });
-          if (opts?.onBlockReply && origin && origin === provider) {
-            await opts.onBlockReply(payload);
+          messageProvider: queued.run.messageProvider,
+        },
+      },
+      {
+        routeReply,
+        isRoutableChannel,
+        onBlockReply: opts?.onBlockReply,
+        signalTextDelta: (text) => typingSignals.signalTextDelta(text),
+        log: logVerbose,
+        assertTaskCurrent: (boundary) => {
+          const refusal = checkTaskActionBoundary(boundary);
+          if (refusal) {
+            throw new Error(refusal);
           }
-        }
-      } else if (opts?.onBlockReply) {
-        await opts.onBlockReply(payload);
-      }
-    }
+        },
+      },
+    );
   };
 
   return async (queued: FollowupRun) => {
     // Agent run correlation id (may differ across retries of the same queue item).
     const runId = crypto.randomUUID();
+    // Package2 delivery-only retry: skip business claim/model; resend ORIGINAL payloads.
+    if (queued.asyncWaitDeliveryOnly) {
+      try {
+        const lookupRunId =
+          queued.asyncWaitRecoveryBind?.boundRunId?.trim() ||
+          queued.run.taskCompletionBinding?.executionAttempt?.trim() ||
+          "";
+        const pending = lookupRunId
+          ? peekAwaitingDelivery({
+              runId: lookupRunId,
+              ...(queued.asyncWaitRecoveryBind?.boundDeliveryId
+                ? { deliveryId: queued.asyncWaitRecoveryBind.boundDeliveryId }
+                : {}),
+            })
+          : undefined;
+        const deliveryRunId = pending?.runId || lookupRunId || runId;
+        const deliveryId =
+          queued.asyncWaitRecoveryBind?.boundDeliveryId?.trim() ||
+          pending?.deliveryId ||
+          `delivery:${deliveryRunId}:visible`;
+        const taskId = pending?.taskId;
+        // Prefer queued payloads (from durable recovery intent); never a placeholder.
+        let retryPayloads = (queued.asyncWaitDeliveryPayloads ?? []).filter(
+          (p) => p && (p.text || p.mediaUrl || (p.mediaUrls && p.mediaUrls.length > 0)),
+        );
+        if (retryPayloads.length === 0 && queued.asyncWaitRecoveryBind?.jobId) {
+          const intent = readAsyncWaitJobIntent(
+            queued.run.sessionFile,
+            queued.asyncWaitRecoveryBind.jobId,
+          );
+          retryPayloads = (intent?.recovery?.boundPayloads ?? []).filter(
+            (p) => p && (p.text || p.mediaUrl || (p.mediaUrls && p.mediaUrls.length > 0)),
+          );
+        }
+        if (retryPayloads.length === 0) {
+          logVerbose(
+            "async-wait delivery-only retry refused: original payloads missing — not confirming delivered",
+          );
+          await confirmPendingTurnDelivery({
+            cfg: queued.run.config,
+            runId: deliveryRunId,
+            deliveryId,
+            ...(taskId ? { taskId } : {}),
+            sessionKey: queued.run.sessionKey ?? sessionKey,
+            status: "failed",
+            error: "original_payloads_missing",
+          });
+        } else {
+          const delivered = await sendFollowupPayloads(retryPayloads, queued, true);
+          let confirmStatus: "delivered" | "failed" | "delivery_unknown" =
+            delivered === "none" ? "failed" : delivered;
+          if (confirmStatus === "failed" || delivered === "none") {
+            // Keep retryable for another delivery-only attempt.
+            confirmStatus = "delivery_unknown";
+          }
+          await confirmPendingTurnDelivery({
+            cfg: queued.run.config,
+            runId: deliveryRunId,
+            deliveryId,
+            ...(taskId ? { taskId } : {}),
+            sessionKey: queued.run.sessionKey ?? sessionKey,
+            status: confirmStatus,
+          });
+        }
+      } catch (err) {
+        logVerbose(`async-wait delivery-only retry failed: ${String(err)}`);
+      } finally {
+        typing.markRunComplete();
+        typing.markDispatchIdle();
+      }
+      return;
+    }
+    // Claim the original queued task before creating outcome/admission/provider side effects.
+    // Collaboration plans retain their own admission when no session-task binding exists.
+    try {
+      const claimed = claimQueuedExecution({
+        sessionFile: queued.run.sessionFile,
+        runId,
+        prompt: queued.prompt,
+        binding: queued.run.taskCompletionBinding,
+        continuationTicket: queued.taskBoardContinueTicket,
+        asyncWaitRecovery: queued.asyncWaitRecoveryBind,
+        sessionId: queued.run.sessionId,
+        collaboration: Boolean(queued.run.collaborationRoundInvoked),
+        privatePlan: Boolean(queued.run.privateRunBag),
+      });
+      if (claimed.kind === "rejected") {
+        try {
+          if (claimed.reason === "invalid_binding") {
+            await sendFollowupPayloads(
+              [
+                {
+                  text: "这条排队请求的任务身份已失效或尚未绑定，未继续执行。请确认当前任务后重新发送。",
+                },
+              ],
+              queued,
+            );
+          }
+        } finally {
+          typing.markRunComplete();
+          typing.markDispatchIdle();
+        }
+        return;
+      }
+      queued.prompt = claimed.prompt;
+      queued.run.taskCompletionBinding = claimed.binding;
+    } catch (error) {
+      logVerbose(`followup task binding claim failed: ${String(error)}`);
+      typing.markRunComplete();
+      typing.markDispatchIdle();
+      return;
+    }
     // askOutcome W1: TaskOutcome identity is the enqueue-stable followupItemId.
     const followupItemId =
       queued.followupItemId?.trim() || (queued.followupItemId = crypto.randomUUID());
@@ -184,16 +285,21 @@ export function createFollowupRunner(params: {
       | undefined;
     let followupFailureDetail: string | undefined;
     let followupOutcomeCloseoutDone = false;
+    let preparedDelivery:
+      | { runId: string; deliveryId: string; taskId: string; agentId: string }
+      | undefined;
     /** Real usage-derived USD when the pre-call gate did not already charge this item. */
     let tipBudgetCostUsd: number | undefined;
     let followupBudgetCharged = false;
     let followupBudgetCallSeq = 0;
+    const modelCallLinks: ModelCallCloseoutLink[] = [];
     let parentTaskId: string | undefined;
     const submitFollowupOutcomeCloseout = async (overrides?: {
       success?: boolean;
       failureReason?: import("../../task-outcome/runtime-from-runner.js").RunnerTurnFailureReason;
       failureDetail?: string;
       force?: boolean;
+      outcome?: GrowthOutcomeCommitOpts;
     }) => {
       if (followupOutcomeCloseoutDone) {
         return;
@@ -223,6 +329,7 @@ export function createFollowupRunner(params: {
           taskId: followupOutcomeTaskId,
           scope: followupOutcomeScope,
           entrypoint: "chat",
+          ...overrides?.outcome,
           ...(followupBudgetCharged ? { skipBudgetCharge: true } : {}),
           ...(!followupBudgetCharged && tipBudgetCostUsd != null
             ? { costUsd: tipBudgetCostUsd }
@@ -231,6 +338,7 @@ export function createFollowupRunner(params: {
             ? { failureReason, ...(failureDetail ? { failureDetail } : {}) }
             : {}),
           ...(followupCapabilityOutcome ? { capabilityOutcome: followupCapabilityOutcome } : {}),
+          ...(modelCallLinks.length > 0 ? { modelCallLinks } : {}),
         });
       } catch (err) {
         logVerbose(`followup unified recordRunnerTurnOutcome failed: ${String(err)}`);
@@ -271,7 +379,9 @@ export function createFollowupRunner(params: {
         logVerbose(`followup task-outcome entry failed: ${opened.code} ${opened.message}`);
       }
     }
-    let followupSlotHeld = false;
+    // Followup scene adapter: queue/OGUI/delivery stay here; stage order is controlled.
+    const controlledExecution = createExecutionLifecycle(runId, bindAdmittedTurnHost());
+    assertControlledExecutionStages(controlledExecution, "Followup host");
     let oguiResume:
       | { storePath: string; sessionKey: string; decisionId: string; resumeRef: string }
       | undefined;
@@ -321,7 +431,7 @@ export function createFollowupRunner(params: {
         });
       }
       let autoCompactionCompleted = false;
-      let runResult: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
+      let runResult: EmbeddedPiRunResult;
       let fallbackProvider = queued.run.provider;
       let fallbackModel = queued.run.model;
       let modelGate: EmployeeModelGateResult | undefined;
@@ -347,223 +457,119 @@ export function createFollowupRunner(params: {
           taskText: queued.prompt,
           contextParts: runContextEstimate.contextParts,
         };
-        let followupAuthorizationId: string | undefined;
-        const runSlot = await tryAcquireEnterpriseAgentRun({
-          runId,
-          agentId: queued.run.agentId,
-          ...(queued.run.groupId ? { groupId: queued.run.groupId } : {}),
-          modelGateInput,
+        const prepared = await controlledExecution.prepare({
+          config: queued.run.config,
+          authorization: {
+            agentId: queued.run.agentId,
+            ...(queued.run.groupId ? { groupId: queued.run.groupId } : {}),
+            modelGateInput,
+          },
+          signal: opts?.abortSignal,
         });
-        if (!runSlot.skipped && !runSlot.acquired) {
-          logVerbose(`followup commercial gate blocked: ${runSlot.message}`);
+        if (prepared.kind === "denied") {
+          logVerbose(`followup commercial gate blocked: ${prepared.message}`);
           return;
         }
-        if (runSlot.acquired) {
-          if (runSlot.modelGate) {
-            modelGate = runSlot.modelGate;
-          }
-          followupSlotHeld = true;
-          followupAuthorizationId = runSlot.authorizationDecisionId;
-        }
-        const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGate?.allowlist,
-          preferredModelOrder: modelGate?.preferredModelOrder,
-          capabilityPlan: modelGate?.capabilityPlan,
-        });
-        // Structured surface: do not void outcomeClaim. Text may return; image/music stay incomplete.
-        consumedCapability = consumeCapabilityRoutingResult({
-          planFailure: executionRouting.planFailure,
-          outcomeClaim: executionRouting.outcomeClaim,
-          executionSurface: executionRouting.executionSurface,
-          capabilityPlan: executionRouting.capabilityPlan,
-        });
+        modelGate = prepared.gate;
+        consumedCapability = prepared.capability;
         logVerbose(
           `followup ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
         );
-        if (executionRouting.planFailure.kind === "no_executable_candidates") {
+        if (prepared.kind === "unavailable") {
           if (consumedCapability.capabilityOutcome) {
             followupCapabilityOutcome = consumedCapability.capabilityOutcome;
           }
           await submitFollowupOutcomeCloseout({
             success: false,
             failureReason: "prepare_failed",
-            failureDetail: executionRouting.planFailure.message,
+            failureDetail: prepared.message,
           });
-          logVerbose(`followup capability plan: ${executionRouting.planFailure.message}`);
+          logVerbose(`followup capability plan: ${prepared.message}`);
           return;
         }
-        const embeddedModelGovernance = resolveEmbeddedModelGovernance({
-          gateStatus: followupSlotHeld ? "acquired" : "skipped",
-          allowlist: executionRouting.allowlist,
-          tenantId: modelGate?.tenantId,
-          commercialAuthorizationId: followupAuthorizationId,
-        });
-        const parentSnapshot = buildRunModelSetSnapshot({
-          runId,
-          allowlist: executionRouting.allowlist,
-          governanceMode: embeddedModelGovernance.governanceMode,
-          commercialAuthorizationId: followupAuthorizationId,
-          tenantId: modelGate?.tenantId,
-          preferredModelOrder: executionRouting.preferredModelOrder,
-          platformModelsMode:
-            modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(queued.run.config),
-          ...(modelGate?.effectiveRouting?.selectorStrategy
-            ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
-            : {}),
-          // P4-1: parent billing context for child runs (acquired gate only).
-          creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
-        });
-        if (parentSnapshot) {
-          rememberRunModelSet(runId, parentSnapshot);
-        }
         const runFallback = () =>
-          runWithModelFallback({
+          controlledExecution.infer({
             cfg: queued.run.config,
             provider: queued.run.provider,
             model: queued.run.model,
-            ...embeddedModelGovernance,
-            ...(executionRouting.preferredModelOrder
-              ? { preferredModelOrder: executionRouting.preferredModelOrder }
-              : {}),
-            runtimeAdmission: {
-              taskText: queued.prompt,
-            },
-            runId,
+            taskText: queued.prompt,
+            signal: opts?.abortSignal,
             agentDir: queued.run.agentDir,
+            executorEvidence: runnerExecutorEvidenceContext(queued.run.config, queued.run.agentId, {
+              taskId: followupOutcomeTaskId,
+              scope: followupOutcomeScope,
+              runId,
+            }),
             fallbacksOverride: resolveRunModelFallbacksOverride({
               cfg: queued.run.config,
               agentId: queued.run.agentId,
               sessionKey: queued.run.sessionKey,
             }),
-            run: async (provider, model, runOptions) => {
-              const authProfile = resolveRunAuthProfile(queued.run, provider);
-              const transport = await resolveEnterpriseEmbeddedTransport({
-                provider,
-                model,
-                tenantId:
-                  modelGate?.tenantId?.trim() ||
-                  modelGate?.creditReporting?.enterpriseId?.trim() ||
-                  "",
-              });
-              const embeddedProvider = transport.provider;
-              const embeddedModel = transport.model;
-              const providerAuthOverride = transport.providerAuthOverride;
-              const enterpriseRuntimeModelId = transport.enterpriseRuntimeModelId;
-              if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
-                assertRunnerTurnBudgetAllowsModelCall(queued.run.config, queued.run.agentId, {
-                  taskId: followupOutcomeTaskId,
-                  scope: followupOutcomeScope,
-                  ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
-                });
-              }
-              const result = await runEmbeddedPiAgent({
-                sessionId: queued.run.sessionId,
-                sessionKey: queued.run.sessionKey,
-                agentId: queued.run.agentId,
-                trigger: "user",
-                messageChannel: queued.originatingChannel ?? undefined,
-                messageProvider: queued.run.messageProvider,
-                agentAccountId: queued.run.agentAccountId,
-                messageTo: queued.originatingTo,
-                messageThreadId: queued.originatingThreadId,
-                currentChannelId: queued.originatingTo,
-                currentThreadTs:
-                  queued.originatingThreadId != null
-                    ? String(queued.originatingThreadId)
-                    : undefined,
-                groupId: queued.run.groupId,
-                groupChannel: queued.run.groupChannel,
-                groupSpace: queued.run.groupSpace,
-                senderId: queued.run.senderId,
-                senderName: queued.run.senderName,
-                senderUsername: queued.run.senderUsername,
-                senderE164: queued.run.senderE164,
-                senderIsOwner: queued.run.senderIsOwner,
-                ...inheritExecutionIdentityRunFields(queued.run),
-                sessionFile: queued.run.sessionFile,
-                agentDir: queued.run.agentDir,
-                workspaceDir: queued.run.workspaceDir,
-                config: queued.run.config,
-                skillsSnapshot: queued.run.skillsSnapshot,
-                prompt: oguiModelPrompt ?? queued.prompt,
-                extraSystemPrompt: queued.run.extraSystemPrompt,
-                ...(queued.run.disableTools ? { disableTools: true } : {}),
-                ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
-                ...(queued.run.inboundToolCeiling
-                  ? { inboundToolCeiling: queued.run.inboundToolCeiling }
-                  : {}),
-                ...(queued.run.contextLane ? { contextLane: queued.run.contextLane } : {}),
-                ...(queued.run.sessionEntry ? { sessionEntry: queued.run.sessionEntry } : {}),
-                ...(queued.run.oguiDecisionRun
-                  ? { oguiDecisionRun: queued.run.oguiDecisionRun }
-                  : {}),
-                ...(queued.run.knowledgeConsumeRefs?.length
-                  ? { knowledgeConsumeRefs: queued.run.knowledgeConsumeRefs }
-                  : {}),
-                ...(queued.run.skipUserTranscriptPersist === true
-                  ? { skipUserTranscriptPersist: true }
-                  : {}),
-                ...(queued.run.collaborationRoundInvoked === true
-                  ? { collaborationRoundInvoked: true }
-                  : {}),
-                ...(queued.run.deliveryToolSideEffect
-                  ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
-                  : {}),
-                ...(queued.run.privateRunBag ? { privateRunBag: queued.run.privateRunBag } : {}),
-                ownerNumbers: queued.run.ownerNumbers,
-                enforceFinalTag: queued.run.enforceFinalTag,
-                provider: embeddedProvider,
-                model: embeddedModel,
-                ...(providerAuthOverride ? { providerAuthOverride } : {}),
-                ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
-                ...authProfile,
-                thinkLevel: queued.run.thinkLevel,
-                verboseLevel: queued.run.verboseLevel,
-                reasoningLevel: queued.run.reasoningLevel,
-                suppressToolErrorWarnings: opts?.suppressToolErrorWarnings,
-                execOverrides: queued.run.execOverrides,
-                bashElevated: queued.run.bashElevated,
-                timeoutMs: queued.run.timeoutMs,
-                runId,
-                allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
-                blockReplyBreak: queued.run.blockReplyBreak,
-                bootstrapPromptWarningSignaturesSeen,
-                bootstrapPromptWarningSignature:
-                  bootstrapPromptWarningSignaturesSeen[
-                    bootstrapPromptWarningSignaturesSeen.length - 1
-                  ],
-                onAgentEvent: (evt) => {
-                  if (evt.stream !== "compaction") {
-                    return;
-                  }
-                  const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
-                  if (phase === "end") {
-                    autoCompactionCompleted = true;
-                  }
-                },
-              });
-              bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
-                result.meta?.systemPromptReport,
-              );
-              if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
-                followupBudgetCallSeq += 1;
-                const charged = chargeModelCallAgainstTip(queued.run.config, queued.run.agentId, {
-                  taskId: followupOutcomeTaskId,
-                  scope: followupOutcomeScope,
-                  runId,
-                  callSeq: followupBudgetCallSeq,
-                  usage: result.meta?.agentMeta?.usage,
+            run: (provider, model, runOptions) =>
+              runQueuedCandidate(
+                {
+                  queued,
                   provider,
                   model,
-                  ...(parentTaskId ? { parentTaskId, parentAgentId: queued.run.agentId } : {}),
-                });
-                followupBudgetCharged = true;
-                if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
-                  tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
-                }
-              }
-              return result;
-            },
+                  runId,
+                  modelGate,
+                  runOptions,
+                  modelPrompt: oguiModelPrompt,
+                  abortSignal: opts?.abortSignal,
+                  suppressToolErrorWarnings: opts?.suppressToolErrorWarnings,
+                  bootstrapWarnings: bootstrapPromptWarningSignaturesSeen,
+                },
+                {
+                  assertBudget: () => {
+                    if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
+                      assertRunnerTurnBudgetAllowsModelCall(queued.run.config, queued.run.agentId, {
+                        taskId: followupOutcomeTaskId,
+                        scope: followupOutcomeScope,
+                        ...(parentTaskId
+                          ? { parentTaskId, parentAgentId: queued.run.agentId }
+                          : {}),
+                      });
+                    }
+                  },
+                  onCompaction: () => {
+                    autoCompactionCompleted = true;
+                  },
+                  recordWarnings: (warnings) => {
+                    bootstrapPromptWarningSignaturesSeen = warnings;
+                  },
+                  recordUsage: (identity) => {
+                    if (identity.pricingSource !== "transport") {
+                      return;
+                    }
+                    if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
+                      followupBudgetCallSeq += 1;
+                      const charged = chargeModelCallAgainstTip(
+                        queued.run.config,
+                        queued.run.agentId,
+                        {
+                          taskId: followupOutcomeTaskId,
+                          scope: followupOutcomeScope,
+                          runId,
+                          callSeq: followupBudgetCallSeq,
+                          usage: identity.usage,
+                          provider: identity.transportProvider,
+                          model: identity.transportModel,
+                          ...(parentTaskId
+                            ? { parentTaskId, parentAgentId: queued.run.agentId }
+                            : {}),
+                        },
+                      );
+                      followupBudgetCharged = true;
+                      if (charged.modelCallLink) {
+                        modelCallLinks.push(charged.modelCallLink);
+                      }
+                      if (charged.evidence === "known" && charged.costUsd && charged.costUsd > 0) {
+                        tipBudgetCostUsd = (tipBudgetCostUsd ?? 0) + charged.costUsd;
+                      }
+                    }
+                  },
+                },
+              ),
           });
         const fallbackResult = oguiResume
           ? await runWithOguiDecisionResume({
@@ -736,8 +742,74 @@ export function createFollowupRunner(params: {
         }
       }
 
-      await sendFollowupPayloads(finalPayloads, queued);
+      if (followupOutcomeTaskId && followupOutcomeScope && queued.run.agentId) {
+        await replyTurnRuntime.delivery.prepareVisibleDelivery(queued.run.config, {
+          workspaceDir: queued.run.workspaceDir,
+          agentId: queued.run.agentId,
+          runId,
+          outcomeTaskId: followupOutcomeTaskId,
+          sessionKey: queued.run.sessionKey ?? sessionKey,
+          sessionFile: queued.run.sessionFile,
+          completionBinding: queued.run.taskCompletionBinding,
+          contract: resolveTurnContractFromRunMeta(runResult.meta),
+          commitOutcome: (success, outcome) => submitFollowupOutcomeCloseout({ success, outcome }),
+          publishPending: (identity) => {
+            preparedDelivery = identity;
+            if (
+              queued.asyncWaitRecoveryBind?.jobId &&
+              queued.asyncWaitRecoveryBind?.claimToken &&
+              queued.run.taskCompletionBinding?.taskId
+            ) {
+              const bound = bindAsyncWaitRecoveryTurn({
+                sessionFile: queued.run.sessionFile,
+                taskId: queued.run.taskCompletionBinding.taskId,
+                jobId: queued.asyncWaitRecoveryBind.jobId,
+                claimToken: queued.asyncWaitRecoveryBind.claimToken,
+                runId: identity.runId,
+                sessionId: queued.run.sessionId,
+                deliveryId: identity.deliveryId,
+                outcomeTaskId: identity.taskId,
+                executionAttempt: identity.runId,
+                deliverableVersion:
+                  queued.run.taskCompletionBinding.deliverableVersion ?? identity.runId,
+                // Persist original visible payloads for delivery-only retry.
+                payloads: finalPayloads,
+              });
+              if (!bound.accepted) {
+                logVerbose(
+                  `async-wait delivery bind rejected: ${bound.reason} — payloads not recorded on intent`,
+                );
+              }
+            }
+          },
+        });
+      }
+      const delivered = await sendFollowupPayloads(finalPayloads, queued, true);
+      if (preparedDelivery) {
+        // Package2 recovery: transport failure must stay retryable (delivery_unknown),
+        // not terminal "failed" — otherwise delivery-only cannot upgrade the receipt.
+        let confirmStatus: "delivered" | "failed" | "delivery_unknown" =
+          delivered === "none" ? "failed" : delivered;
+        if (queued.asyncWaitRecoveryBind && (confirmStatus === "failed" || delivered === "none")) {
+          confirmStatus = "delivery_unknown";
+        }
+        await confirmPendingTurnDelivery({
+          cfg: queued.run.config,
+          ...preparedDelivery,
+          sessionKey: queued.run.sessionKey ?? sessionKey,
+          status: confirmStatus,
+        });
+      }
     } catch (err) {
+      if (preparedDelivery) {
+        await confirmPendingTurnDelivery({
+          cfg: queued.run.config,
+          ...preparedDelivery,
+          sessionKey: queued.run.sessionKey ?? sessionKey,
+          status: "failed",
+          error: String(err),
+        });
+      }
       followupRunSucceeded = false;
       followupFailureReason = "run_failed";
       followupFailureDetail = err instanceof Error ? err.message : String(err);
@@ -747,6 +819,32 @@ export function createFollowupRunner(params: {
       // askOutcome W1: unified closeout for ordinary success / preflight fail / exception.
       // Missing evidence → leave acceptance/delivery pending (no invent not_required).
       await submitFollowupOutcomeCloseout();
+      // Package2: if recovery turn ended without delivery, release holder so Gateway-alive
+      // PID cannot leave permanent active_exec after auth/provider/prepare failure.
+      if (
+        queued.asyncWaitRecoveryBind?.jobId?.trim() &&
+        queued.asyncWaitRecoveryBind?.claimToken?.trim()
+      ) {
+        try {
+          const liveIntent = readAsyncWaitJobIntent(
+            queued.run.sessionFile,
+            queued.asyncWaitRecoveryBind.jobId,
+          );
+          if (
+            liveIntent?.recovery?.stage === "turn_bound" &&
+            !liveIntent.recovery.boundDeliveryId
+          ) {
+            releaseAsyncWaitRecoveryTurn({
+              sessionFile: queued.run.sessionFile,
+              jobId: queued.asyncWaitRecoveryBind.jobId,
+              claimToken: queued.asyncWaitRecoveryBind.claimToken,
+              runId,
+            });
+          }
+        } catch (releaseErr) {
+          logVerbose(`async-wait recovery turn release failed: ${String(releaseErr)}`);
+        }
+      }
       if (oguiResume && !oguiResumeSettled) {
         await releaseOguiDecisionResume({
           storePath: oguiResume.storePath,
@@ -756,19 +854,19 @@ export function createFollowupRunner(params: {
           lifecycleEnabled: true,
         });
       }
-      if (followupSlotHeld) {
-        void releaseEnterpriseAgentRun(runId);
-        forgetRunModelSet(runId);
+      try {
+        await controlledExecution.dispose();
+      } finally {
+        // Both signals are required for the typing controller to clean up.
+        // The main inbound dispatch path calls markDispatchIdle() from the
+        // buffered dispatcher's finally block, but followup turns bypass the
+        // dispatcher entirely — so we must fire both signals here.  Without
+        // this, NO_REPLY / empty-payload followups leave the typing indicator
+        // stuck (the keepalive loop keeps sending "typing" to Telegram
+        // indefinitely until the TTL expires).
+        typing.markRunComplete();
+        typing.markDispatchIdle();
       }
-      // Both signals are required for the typing controller to clean up.
-      // The main inbound dispatch path calls markDispatchIdle() from the
-      // buffered dispatcher's finally block, but followup turns bypass the
-      // dispatcher entirely — so we must fire both signals here.  Without
-      // this, NO_REPLY / empty-payload followups leave the typing indicator
-      // stuck (the keepalive loop keeps sending "typing" to Telegram
-      // indefinitely until the TTL expires).
-      typing.markRunComplete();
-      typing.markDispatchIdle();
     }
   };
 }

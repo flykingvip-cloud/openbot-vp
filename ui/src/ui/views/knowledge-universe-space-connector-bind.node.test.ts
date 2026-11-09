@@ -37,8 +37,10 @@ describe("active source HTTP configuration", () => {
 
     render(renderActiveSourceBindPanel(surface), container);
 
-    expect(container.querySelector('[data-testid="ku-space-import-http-method"]')).toBeTruthy();
-    expect(container.querySelector('input[type="password"]')).toBeTruthy();
+    expect(
+      container.querySelector<HTMLButtonElement>('[data-testid="ku-space-import-http-method"]'),
+    ).toBeTruthy();
+    expect(container.querySelector<HTMLButtonElement>('input[type="password"]')).toBeTruthy();
     expect(surface.libraryWorkspaceConnectorBindDraft.authHeaderName).toBe("X-API-Key");
   });
 
@@ -126,14 +128,18 @@ describe("connector wizard ensure-package button", () => {
 
   it("shows install label when connector is not ready", () => {
     const { container } = renderWizard(false);
-    const button = container.querySelector('[data-testid="ku-space-import-ensure-package"]');
+    const button = container.querySelector<HTMLButtonElement>(
+      '[data-testid="ku-space-import-ensure-package"]',
+    );
     expect(button).toBeTruthy();
     expect(button?.textContent?.trim()).toBe("安装连接器包");
   });
 
   it("shows update label when connector is ready and still calls ensure", () => {
     const { container, ensure } = renderWizard(true);
-    const button = container.querySelector('[data-testid="ku-space-import-ensure-package"]');
+    const button = container.querySelector<HTMLButtonElement>(
+      '[data-testid="ku-space-import-ensure-package"]',
+    );
     expect(button).toBeTruthy();
     expect(button?.textContent?.trim()).toBe("更新连接器包");
     button?.click();

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "environment": "isolated_injected_local",
+  "journal": {
+    "inserted": 256,
+    "capacity": 64,
+    "retained": 64,
+    "discardedThrough": 192,
+    "bytes": 69177,
+    "ttlExpiredRetained": 0,
+    "ttlDiscardedThrough": 256,
+    "readDidNotWrite": true,
+    "restartRetained": 64,
+    "smallBudgetRejection": "journal_write_unknown",
+    "corruptRead": "unknown",
+    "partialTmpIgnored": true
+  },
+  "fabric": {
+    "inserted": 256,
+    "capacity": 64,
+    "retained": 64,
+    "restartRetained": 0,
+    "ttl": "not_implemented",
+    "watermark": "not_implemented"
+  },
+  "elapsedMs": 275.320166
+}

@@ -6,7 +6,7 @@ export {
   installContextCompilerTransform,
   simulatePiModelBoundary,
   wrapContextCompilerModelBoundary,
-} from "./install.js";
+} from "../../agent-runtime/capabilities/index.js";
 export { resolveContextLane, resolveLaneBudget } from "./lane-budget.js";
 export {
   applyPreferenceMutation,

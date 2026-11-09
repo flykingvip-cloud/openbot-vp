@@ -2674,6 +2674,7 @@ export function renderApp(state: AppViewState) {
       },
     });
   }
+  const observationHost = document.querySelector("openbot-app");
   const enterpriseRenderModel = buildEnterprisePortRenderModel({
     state: enterpriseState,
     actions: enterpriseActions,
@@ -2724,7 +2725,10 @@ export function renderApp(state: AppViewState) {
       actions: platformActions,
       configValue,
     });
-    return platformBundle.renderPlatformPortShell(platformRenderModel);
+    return platformBundle.renderPlatformPortShell({
+      ...platformRenderModel,
+      observationHost,
+    });
   })();
   const showGlobalUpdateBanner = !isPlatformSurface;
 

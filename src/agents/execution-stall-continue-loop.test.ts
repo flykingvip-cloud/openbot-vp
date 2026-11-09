@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runExecutionStallContinueLoop } from "./execution-stall-continue-loop.js";
+import { runExecutionStallContinueLoop } from "../agent-runtime/execution/index.js";
 import { PROTOCOL_VIOLATION_STOP_REASON } from "./protocol-violation.js";
 
 describe("runExecutionStallContinueLoop protocol isolation", () => {

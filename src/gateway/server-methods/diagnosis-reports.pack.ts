@@ -32,6 +32,10 @@ import {
   DIAGNOSIS_SELF_EVOLUTION_CONFIRM_METHOD,
 } from "../../diagnosis/report-query-api.js";
 import { createLiveDiagnosisReportGatewayHandlers } from "../../diagnosis/report-query-gateway.js";
+import {
+  createObservationQueryHandlers,
+  OBSERVATION_QUERY_METHOD,
+} from "../../observation/query-gateway.js";
 import { getSharedDiagnosisDelegationMachine } from "../evolution-control/delegation-service.js";
 import {
   attachDiagnosisEvolutionProjection,
@@ -48,6 +52,7 @@ function inspectLivePrescriptionGrant(grantId: string) {
 }
 
 const METHODS = [
+  OBSERVATION_QUERY_METHOD,
   ...DIAGNOSIS_REPORT_API_METHODS,
   DIAGNOSIS_DIAGNOSE_METHOD,
   DIAGNOSIS_ACTION_DISPATCH_METHOD,
@@ -62,6 +67,7 @@ export const diagnosisReportsPack = defineGatewayMethodPack({
   methods: METHODS,
   scopes: {
     "operator.read": [
+      OBSERVATION_QUERY_METHOD,
       "diagnosis.reports.query",
       "diagnosis.reports.get",
       "diagnosis.diagnose",
@@ -85,6 +91,7 @@ export const diagnosisReportsPack = defineGatewayMethodPack({
     "operator.approvals": ["diagnosis.self-evolution.confirm"],
   },
   handlers: withDiagnosisEvolutionProjection({
+    ...createObservationQueryHandlers(),
     ...createLiveDiagnosisReportGatewayHandlers({}, undefined, {
       inspectGrant: inspectLivePrescriptionGrant,
     }),

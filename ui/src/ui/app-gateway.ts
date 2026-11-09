@@ -47,6 +47,7 @@ import {
   type GatewayEventFrame,
   type GatewayHelloOk,
 } from "./gateway.ts";
+import { clearRuntimeObservations } from "./runtime-observation.ts";
 export type { GatewayHost } from "./gateway-host.ts";
 import { persistGatewayUrlIfChanged, recoverGatewayUrlForReconnect } from "./app-gateway-url.ts";
 import { shouldUseLeanGatewayConnectFanout } from "./gateway-connect-fanout.ts";
@@ -219,6 +220,7 @@ export function connectGateway(host: GatewayHost) {
         return;
       }
       host.connected = false;
+      clearRuntimeObservations(host);
       // Transient closes: client auto-reconnects. Do not sticky-banner these —
       // production flaps often surface as 1006 (TCP reset / SIGKILL / proxy) with
       // an empty reason; hello success clears state. Keep auth / policy errors visible.

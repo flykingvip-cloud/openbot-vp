@@ -2,13 +2,13 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { runEmbeddedPiAgent } from "../../agent-runtime/execution/index.js";
+import type { EmbeddedPiRunResult } from "../../agent-runtime/execution/index.js";
+import { resolveAuxiliaryModelGovernance } from "../../agent-runtime/model/index.js";
 import { resolveBootstrapWarningSignaturesSeen } from "../../agents/bootstrap-budget.js";
 import { estimateMessagesTokens } from "../../agents/compaction.js";
-import { resolveEmbeddedConfiguredModelMode } from "../../agents/embedded-model-governance.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { isCliProvider } from "../../agents/model-selection.js";
-import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
-import type { EmbeddedPiRunResult } from "../../agents/pi-embedded.js";
 import { resolveSandboxConfigForAgent, resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
 import {
   derivePromptTokens,
@@ -25,8 +25,6 @@ import {
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
 import { admitOguiDecisionTurn } from "../../config/sessions/ogui-decision-engine.js";
-import type { GovernanceMode } from "../../gateway/governance/decision.js";
-import { lookupRunModelSet } from "../../gateway/governance/spawn-snapshot-handoff.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import type { TemplateContext } from "../templating.js";
@@ -266,64 +264,19 @@ export type MemoryFlushCompletionEvent = {
 };
 
 /**
- * Memory flush inherits the parent turn's model set (P3-2).
- * `parentRunId` must be the same id `runAgentTurnWithFallback` uses for
- * `rememberRunModelSet`. Not an RPC param.
- *
- * - Parent snapshot with allowlist array → pass allowlist; mode from snapshot
- *   (else OPENBOT_GOVERNANCE_EMBEDDED_MODEL_MODE, default shadow). Default
- *   allowlistEnforcement is governance-mode: shadow records only, does not filter.
- * - Missing lookup / allowlist not an array → mode only; skipped +
- *   parent-model-set-absent.
- * - Parent snapshot mode legacy → flush legacy + skipped, no filter.
+ * Memory flush inherits the parent turn's model set (P3-2) through the shared
+ * auxiliary model governance contract. Does not create or advance business tasks.
+ * `parentRunId` must be the same id used for `rememberRunModelSet`.
  */
 export function resolveMemoryFlushModelGovernance(
   parentRunId: string | undefined,
   env: NodeJS.ProcessEnv = process.env,
-): {
-  governanceMode: GovernanceMode;
-  entitlementAllowlist?: string[];
-  absentAllowlistReason?: string;
-  governanceContext?: {
-    parentRunId?: string;
-    tenantId?: string;
-    actorId?: string;
-    commercialAuthorizationId?: string;
-  };
-} {
-  const parentSnapshot = parentRunId ? lookupRunModelSet(parentRunId) : undefined;
-  const configuredMode = resolveEmbeddedConfiguredModelMode(env);
-  const allowlist = parentSnapshot?.effectiveModelSet?.allowlist;
-  const context = {
-    ...(parentRunId ? { parentRunId } : {}),
-    ...(parentSnapshot?.tenantId ? { tenantId: parentSnapshot.tenantId } : {}),
-    ...(parentSnapshot?.actorId ? { actorId: parentSnapshot.actorId } : {}),
-    ...(parentSnapshot?.commercialAuthorizationId
-      ? { commercialAuthorizationId: parentSnapshot.commercialAuthorizationId }
-      : {}),
-  };
-  const hasContext = Object.keys(context).length > 0;
-
-  if (parentSnapshot?.governanceMode === "legacy") {
-    return {
-      governanceMode: "legacy",
-      ...(hasContext ? { governanceContext: context } : {}),
-    };
-  }
-
-  if (Array.isArray(allowlist)) {
-    return {
-      governanceMode: parentSnapshot?.governanceMode ?? configuredMode,
-      entitlementAllowlist: [...allowlist],
-      ...(hasContext ? { governanceContext: context } : {}),
-    };
-  }
-
-  return {
-    governanceMode: parentSnapshot?.governanceMode ?? configuredMode,
-    absentAllowlistReason: "parent-model-set-absent",
-    ...(hasContext ? { governanceContext: context } : {}),
-  };
+) {
+  return resolveAuxiliaryModelGovernance({
+    purpose: "memory_flush",
+    parentRunId,
+    env,
+  });
 }
 
 export async function runMemoryFlushIfNeeded(params: {
