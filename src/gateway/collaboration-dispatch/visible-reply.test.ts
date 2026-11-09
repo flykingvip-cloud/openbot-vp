@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CollaborationMemberContextBudgetError } from "./member-context.js";
 import {
   classifyCollaborationAbortIntent,
   collaborationInfraFailureDetail,
@@ -510,4 +511,12 @@ describe("collaborationSkipReasonForMissingReply", () => {
       }),
     ).toBeNull();
   });
+});
+
+it("surfaces the bounded-context refusal without pretending a member started", () => {
+  const message = formatCollaborationDispatchFailure(
+    new CollaborationMemberContextBudgetError(25000),
+  );
+  expect(message).toContain("上下文超过输入上限");
+  expect(message).toContain("尚未启动");
 });
