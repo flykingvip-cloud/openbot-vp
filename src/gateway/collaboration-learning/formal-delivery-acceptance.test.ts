@@ -418,10 +418,10 @@ describe("formal delivery acceptance (production entries)", () => {
     }
   });
 
-  it("member artifact stays unaccepted until review, and a failed group relay is not delivered twice", async () => {
+  it("review-event relay stays unknown until accept, and accept does not dispatch another review round", async () => {
     const { cfg } = await useConfig();
     const auth = authority(cfg);
-    const taskId = "task-group-delivery-loop";
+    const taskId = "task-review-relay";
     const executorA = "bot-a";
     const reviewerB = "bot-b";
     const { item } = await seedInProgress({
@@ -445,7 +445,7 @@ describe("formal delivery acceptance (production entries)", () => {
       cfg,
       relayAdvance: false,
     });
-    // Member submission is not group close, and the draft is not the accepted artifact.
+    // Review coverage only: submit is not accept. This is not artifact channel delivery.
     expect(submitted.item.status).toBe("submitted_for_review");
     expect(submitted.item.acceptedSubmissionId).toBeUndefined();
     expect(submitted.item.acceptedArtifactVersion).toBeUndefined();
@@ -465,7 +465,7 @@ describe("formal delivery acceptance (production entries)", () => {
     const afterFail = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
     expect(afterFail?.status).toBe("submitted_for_review");
     expect(afterFail?.acceptedSubmissionId).toBeUndefined();
-    // Unknown side effect is not recorded as delivered and is not auto-retried as success.
+    // unknown is the review-round relay lifecycle, not an artifact delivery receipt.
     expect(afterFail?.pendingEventRelay?.status).toBe("unknown");
 
     let relayCalls = 0;
@@ -483,6 +483,7 @@ describe("formal delivery acceptance (production entries)", () => {
       },
     });
     expect(recovered).toHaveLength(0);
+    // Zero calls means the review dispatcher was not retried. It is not a successful redelivery.
     expect(relayCalls).toBe(0);
     const stillOpen = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
     expect(stillOpen?.status).toBe("submitted_for_review");
@@ -529,7 +530,7 @@ describe("formal delivery acceptance (production entries)", () => {
       trusted,
       roundDispatcher: async () => {
         relayCalls += 1;
-        throw new Error("must not re-run member or delivery work after accept");
+        throw new Error("must not dispatch another review round after accept");
       },
     });
     expect(afterAccept.dispatched).toBe(false);
