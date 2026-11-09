@@ -145,9 +145,10 @@ export async function sendAcceptedArtifactBridge(params: {
   recordReceipt: (messageIds: string[]) => Promise<void>;
   recordUnknown: () => Promise<void>;
 }): Promise<BridgeSendOutcome> {
-  let fresh: QueuedDelivery | null = null;
+  const held: { entry: QueuedDelivery | null } = { entry: null };
   const claimed = await params.claim(async (intent) => {
-    fresh = await readQueueEntry(params.queueStateDir, params.snapshot.id);
+    const fresh = await readQueueEntry(params.queueStateDir, params.snapshot.id);
+    held.entry = fresh;
     if (!fresh || fresh.associationReady !== true || !fresh.bridgeMarker) {
       return "stop";
     }
@@ -166,6 +167,7 @@ export async function sendAcceptedArtifactBridge(params: {
       fresh.bridgeContentSha256 === intent.linkedContentSha256;
     return bound ? "proceed" : "block";
   });
+  const fresh = held.entry;
   if (!claimed.ok) {
     return "failed";
   }

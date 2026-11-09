@@ -1,15 +1,16 @@
 /**
  * Pure eligibility for an already-accepted member artifact.
- * This is not outbound authorization and it does not send.
+ * Eligibility is not outbound authorization and it does not send.
  *
- * Server-side outbound authority does not exist yet. These symbols are not a grant:
  * `resolveOutboundTarget` only shapes a channel target, `operator.write` is a gateway
  * scope, `checkTaskActionBoundary` is task pause/cancel, and
  * `authorizeTeamGroupResourceAccess` is group read/write ACL.
- * The missing basis is `evaluateAcceptedArtifactOutboundAuthorization`.
- * Until that function exists, a complete member-artifact identity stays
- * `authorization_pending`. A caller-supplied granted flag is not read.
+ * A caller-supplied granted flag is not read.
+ * A grant is issued only by `issueOutboundArtifactGrant` from a trusted write
+ * context plus the accepted artifact and its stored plain text.
  */
+
+import { createHash } from "node:crypto";
 
 export type MemberArtifactDeliveryScope = "member_artifact" | "group_final";
 
@@ -178,4 +179,153 @@ export function evaluateAcceptedArtifactOutboundAuthorization(params: {
     return { outcome: "deny", reason: "outbound_grant_mismatch" };
   }
   return { outcome: "allow", reason: "artifact_outbound_grant" };
+}
+
+/** Produced only after `resolveTrustedWriteContext` allows group write. */
+export type TrustedDeliveryIssuer = {
+  source: "resolveTrustedWriteContext";
+  tenantId: string;
+  actorId: string;
+  groupId: string;
+  groupAction: "write";
+};
+
+export type AcceptedArtifactIssuanceFacts = {
+  groupId: string;
+  taskId: string;
+  itemId: string;
+  scope: MemberArtifactDeliveryScope;
+  boardStatus: string;
+  acceptedSubmissionId?: string | null;
+  acceptedArtifactVersion?: string | null;
+  linkedDeliverableId?: string | null;
+  linkedDeliverableVersion?: number | null;
+  linkedContentSha256?: string | null;
+  deliverableId?: string | null;
+  deliverableVersion?: number | null;
+  deliverableContentSha256?: string | null;
+  plainText?: string | null;
+  /** Present only when a caller tries to smuggle media. Issuance then refuses. */
+  mediaUrl?: string | null;
+  attachment?: unknown;
+};
+
+export type AcceptedArtifactIssuanceBasis = {
+  groupId: string;
+  taskId: string;
+  itemId: string;
+  acceptedSubmissionId: string;
+  acceptedArtifactVersion: string;
+  linkedDeliverableId: string;
+  linkedDeliverableVersion: number;
+  linkedContentSha256: string;
+  plainText: string;
+};
+
+export function establishTrustedDeliveryIssuer(
+  input: {
+    source: string;
+    tenantId: string;
+    actorId: string;
+    groupId: string;
+    groupAction: string;
+  } | null,
+): TrustedDeliveryIssuer | null {
+  if (!input || input.source !== "resolveTrustedWriteContext" || input.groupAction !== "write") {
+    return null;
+  }
+  const tenantId = compact(input.tenantId);
+  const actorId = compact(input.actorId);
+  const groupId = compact(input.groupId);
+  if (!tenantId || !actorId || !groupId) {
+    return null;
+  }
+  return {
+    source: "resolveTrustedWriteContext",
+    tenantId,
+    actorId,
+    groupId,
+    groupAction: "write",
+  };
+}
+
+function digestText(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+/** Board plus stored deliverable. Request fields that are not these facts are ignored. */
+export function deriveAcceptedArtifactIssuanceBasis(
+  facts: AcceptedArtifactIssuanceFacts | null,
+): AcceptedArtifactIssuanceBasis | null {
+  if (!facts || facts.scope !== "member_artifact" || compact(facts.boardStatus) !== "accepted") {
+    return null;
+  }
+  if (compact(facts.mediaUrl) || facts.attachment != null) {
+    return null;
+  }
+  const acceptedSubmissionId = compact(facts.acceptedSubmissionId);
+  const acceptedArtifactVersion = compact(facts.acceptedArtifactVersion);
+  const linkedDeliverableId = compact(facts.linkedDeliverableId);
+  const linkedContentSha256 = compact(facts.linkedContentSha256).toLowerCase();
+  const version = facts.linkedDeliverableVersion;
+  const plainText = facts.plainText ?? "";
+  if (
+    !compact(facts.groupId) ||
+    !compact(facts.taskId) ||
+    !compact(facts.itemId) ||
+    !acceptedSubmissionId ||
+    !acceptedArtifactVersion ||
+    !linkedDeliverableId ||
+    !linkedContentSha256 ||
+    typeof version !== "number" ||
+    !Number.isFinite(version) ||
+    version <= 0 ||
+    compact(facts.deliverableId) !== linkedDeliverableId ||
+    facts.deliverableVersion !== version ||
+    compact(facts.deliverableContentSha256).toLowerCase() !== linkedContentSha256 ||
+    !plainText.trim() ||
+    digestText(plainText) !== linkedContentSha256
+  ) {
+    return null;
+  }
+  return {
+    groupId: compact(facts.groupId),
+    taskId: compact(facts.taskId),
+    itemId: compact(facts.itemId),
+    acceptedSubmissionId,
+    acceptedArtifactVersion,
+    linkedDeliverableId,
+    linkedDeliverableVersion: version,
+    linkedContentSha256,
+    plainText,
+  };
+}
+
+/**
+ * Builds a grant from the trusted issuer and the accepted artifact.
+ * There is no grant argument. A missing issuer or basis returns null.
+ */
+export function issueOutboundArtifactGrant(params: {
+  issuer: TrustedDeliveryIssuer | null;
+  basis: AcceptedArtifactIssuanceBasis | null;
+  target: { channel: string; accountId?: string | null; to: string };
+}): OutboundArtifactGrant | null {
+  const issuer = params.issuer;
+  const basis = params.basis;
+  const target = normalizeDeliveryTarget(params.target);
+  if (!issuer || !basis || !target || issuer.groupId !== basis.groupId) {
+    return null;
+  }
+  return {
+    tenantId: issuer.tenantId,
+    groupId: issuer.groupId,
+    actorId: issuer.actorId,
+    channel: target.channel,
+    accountId: target.accountId,
+    to: target.to,
+    scope: "member_artifact",
+    acceptedArtifactVersion: basis.acceptedArtifactVersion,
+    linkedContentSha256: basis.linkedContentSha256,
+    revokedAtMs: null,
+  };
 }

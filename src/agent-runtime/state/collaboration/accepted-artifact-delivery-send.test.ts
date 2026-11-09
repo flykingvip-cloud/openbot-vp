@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../../../config/config.js";
+import type { OutboundSendDeps } from "../../../infra/outbound/deliver.js";
 import {
   enqueueDelivery,
   loadPendingDeliveries,
@@ -131,7 +132,9 @@ function send(params: {
       snapshot: snapshot as never,
       queueStateDir: params.queueState,
       cfg,
-      deps: { sendTelegram: params.sendTelegram },
+      deps: {
+        sendTelegram: params.sendTelegram as NonNullable<OutboundSendDeps["sendTelegram"]>,
+      },
       claim: (recheck) =>
         claimMemberArtifactSendUnknown({
           rootDir: params.root,

@@ -79,7 +79,7 @@
 
 接受成果和批准外发是两件决定。没有 `target` 就不发送。传入 `target` 也不自动允许发送。
 
-推荐的请求是一条独立命令，实施时再挂到现有协作请求旁边，名字拟为 `collaboration.task.requestAcceptedArtifactDelivery`。本轮不添加这个方法。它复用今天接受命令已经用的身份和 ACL 边界，但是另一个命令：
+M3 把请求挂到现有 `collaborationLearningHandlers`，名字是 `collaboration.task.requestAcceptedArtifactDelivery`。撤销是 `collaboration.task.revokeAcceptedArtifactDelivery`，查询是 `collaboration.task.readAcceptedArtifactDelivery`。它们复用接受命令已经用的身份和 ACL 边界，但是独立命令：
 
 - 身份：`resolveTrustedWriteContext`（`src/gateway/server-methods/collaboration-learning.ts`）里的 `resolveDeliveryAclActor`。actor 来自 Gateway `client`，不来自请求正文。
 - 群范围：`resolveHandlerTrustedTeamContext` → `authorizeTeamGroupResourceAccess`（`src/gateway/collaboration-learning/team-resource-auth.ts`），action 为 `write`。不信任单独传来的 tenantId。
@@ -127,7 +127,7 @@ M1 只落请求和关联。存储用已有的 `withDirectoryLock` 和 `writeJson
 
 1. **幂等身份在改名之后还在。** 键材料是固定字段数组的 `JSON.stringify`。同一键的锁内先读意图。只有 `ENOENT` 表示缺失。意图还必须带齐 M1 必填字段、`queueId: null`、`bridgeSendStarted: false`，并且身份和规范化目标能重新算出同一个 `keyHash`。只有 `version` / `keyHash` / `phase` 的 JSON，或身份与键不一致，都是 `intent_corrupt`，原文件不覆盖。半写恢复只修补 `authorization_pending` 和 `staged`。阶段已是 `associated` 时只核对 `.bridge-associated`；文件缺失就拒绝，不重建 `.bridge-staged`，也不改阶段。`delivered` / `unknown` 等终态同样不重建暂存。
 2. **`bridgeSendStarted` 不同时表示「正在发」和「永不可重试」。** 这是 M2 的发送合同。M1 不提供写入投递结果的接口，因此不能把 `delivered` 或 `unknown` 改成 `failed_retryable`，也不能靠调用参数把 `unknown` 变成可重试。字段仍留着：`externalEffect` 为 `none` 时以后才可以重试；为 `unknown` 时隔离且不可重试。M1 提交保持 `bridgeSendStarted: false`。
-3. **窄授权没有真实依据就不是授权。** `evaluateAcceptedArtifactOutboundAuthorization` 只接受一份服务端落盘的 `OutboundArtifactGrant`，字段绑住 tenant、group、actor、channel、account、target、`member_artifact`、artifact version 和 content hash。记录不存在是 `authorization_pending`。撤销或不匹配是 deny。群成员资格和渠道 `allowFrom` 不是这条授权，也没有 `granted`。发送在 `src/agent-runtime/delivery/accepted-artifact-send.ts`：锁内重读队列文件，核对渠道、账号、目标和正文摘要，先把效果写成 `unknown`，再调用 `deliverOutboundPayloads({ skipQueue: true })`。渠道抛错、超时或没有可信 `messageId` 保持 `unknown`，不从异常推断「没有外部效果」。只有调用渠道之前、且 `bridgeSendStarted` 仍为 false 时，才能记 `failed_retryable`。非 telegram 目标按它自己的 channel 发送，不得改写成 telegram。state 不再调用 `deliverOutboundPayloads`。认领结果是锁内的 `send` 布尔值，不用 `updatedAtMs`。认领边界重读当前 grant，不复用发布快照；缺失则等待，撤销则 `blocked`。队列只接受一个 `text` 载荷。grant 文件不是签发链，签发链留 M3。
+3. **窄授权没有真实依据就不是授权。** `evaluateAcceptedArtifactOutboundAuthorization` 只接受一份服务端落盘的 `OutboundArtifactGrant`，字段绑住 tenant、group、actor、channel、account、target、`member_artifact`、artifact version 和 content hash。记录不存在是 `authorization_pending`。撤销或不匹配是 deny。群成员资格和渠道 `allowFrom` 不是这条授权，也没有 `granted`。发送在 `src/agent-runtime/delivery/accepted-artifact-send.ts`：锁内重读队列文件，核对渠道、账号、目标和正文摘要，先把效果写成 `unknown`，再调用 `deliverOutboundPayloads({ skipQueue: true })`。渠道抛错、超时或没有可信 `messageId` 保持 `unknown`，不从异常推断「没有外部效果」。只有调用渠道之前、且 `bridgeSendStarted` 仍为 false 时，才能记 `failed_retryable`。非 telegram 目标按它自己的 channel 发送，不得改写成 telegram。state 不再调用 `deliverOutboundPayloads`。认领结果是锁内的 `send` 布尔值，不用 `updatedAtMs`。认领边界重读当前 grant，不复用发布快照；缺失则等待，撤销则 `blocked`。队列只接受一个 `text` 载荷。M3 的签发只来自 `establishTrustedDeliveryIssuer` 和 `issueOutboundArtifactGrant`：身份是 `resolveTrustedWriteContext` 的 actor，群权限是 write，依据是 board 上已接受的成员成果加上 `readTeamDeliverable` 的正文。请求正文不能自带 grant。组终稿仍不在这条链上。
 
 ## 4. 失败与恢复
 

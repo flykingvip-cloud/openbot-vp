@@ -549,6 +549,22 @@ export async function writeServerOutboundArtifactGrant(params: {
   return { ok: true, keyHash };
 }
 
+export async function readMemberArtifactDeliveryIntent(
+  rootDir: string,
+  keyHash: string,
+): Promise<MemberArtifactDeliveryIntent | null> {
+  const read = await readIntent(rootDir, keyHash);
+  return read.status === "ok" ? read.intent : null;
+}
+
+export async function writeIssuedOutboundArtifactGrant(params: {
+  authDir: string;
+  keyHash: string;
+  grant: OutboundArtifactGrant;
+}): Promise<void> {
+  await writeJsonDurable(grantPath(params.authDir, params.keyHash), params.grant);
+}
+
 export async function readServerOutboundArtifactGrant(
   authDir: string,
   keyHash: string,
