@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assetLinkedCapabilityLabel,
   connectionHealthLabel,
   freshnessLabel,
   isCountedConnectionHealthy,
@@ -10,6 +11,25 @@ import {
 } from "./asset-linkage.ts";
 
 describe("E2 asset linkage display", () => {
+  it("shows linked data products when there is no SAR bridge", () => {
+    const item = normalizeAssetLinkage({
+      sourceId: "src-yonyou",
+      accessMethod: "credential",
+      products: [{ capabilityId: "cap-purchase", displayName: "001-用友T+ · 采购入库" }],
+      verification: {
+        status: "unknown",
+        healthy: false,
+        productionVerificationCount: 0,
+        capabilities: [],
+      },
+    });
+    expect(item?.products).toEqual([
+      { capabilityId: "cap-purchase", displayName: "001-用友T+ · 采购入库" },
+    ]);
+    expect(assetLinkedCapabilityLabel(item)).toBe("001-用友T+ · 采购入库");
+    expect(assetLinkedCapabilityLabel(undefined)).toBe("无");
+  });
+
   it("shows a healthy account and a failed capability together", () => {
     const item = normalizeAssetLinkage({
       sourceId: "src-site",

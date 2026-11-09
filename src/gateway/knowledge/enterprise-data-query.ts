@@ -19,6 +19,8 @@ export const ENTERPRISE_DATA_QUERY_TERMS = [
   "往来单位",
   "销货单",
   "销售订单",
+  "采购入库",
+  "现存量",
 ] as const;
 
 export function textMentionsEnterpriseData(text: string): boolean {
