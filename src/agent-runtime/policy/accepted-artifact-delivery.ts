@@ -6,8 +6,10 @@
  * scope, `checkTaskActionBoundary` is task pause/cancel, and
  * `authorizeTeamGroupResourceAccess` is group read/write ACL.
  * A caller-supplied granted flag is not read.
- * A grant is issued only by `issueOutboundArtifactGrant` from a trusted write
+ * A grant object is built only by `issueOutboundArtifactGrant` from a trusted write
  * context plus the accepted artifact and its stored plain text.
+ * Writing that grant also requires `evaluateChannelAccountOutboundScope` allow.
+ * Inbound channel `allowFrom` is never this outbound grant basis.
  */
 
 import { createHash } from "node:crypto";
@@ -302,8 +304,10 @@ export function deriveAcceptedArtifactIssuanceBasis(
 }
 
 /**
- * Builds a grant from the trusted issuer and the accepted artifact.
+ * Builds a grant object from the trusted issuer and the accepted artifact.
  * There is no grant argument. A missing issuer or basis returns null.
+ * Callers must still pass `evaluateChannelAccountOutboundScope` before writing
+ * the grant; group write alone is not outbound scope for an arbitrary target.
  */
 export function issueOutboundArtifactGrant(params: {
   issuer: TrustedDeliveryIssuer | null;
@@ -328,4 +332,57 @@ export function issueOutboundArtifactGrant(params: {
     linkedContentSha256: basis.linkedContentSha256,
     revokedAtMs: null,
   };
+}
+
+/**
+ * Server-configured outbound destinations for one channel account.
+ * This is NOT inbound `allowFrom`. Empty/missing destinations mean there is no
+ * outbound scope basis yet (authorization_pending), not an implicit allow-all.
+ */
+export type ChannelAccountOutboundScopeFacts = {
+  channel: string;
+  accountId: string | null;
+  accountEnabled: boolean;
+  /** Server-configured outbound destinations for this channel account (e.g. defaultTo). Empty/missing = no basis. */
+  allowedDestinations: string[];
+};
+
+/**
+ * Pure outbound-scope gate for a normalized delivery target.
+ * Group write / trusted issuer is a separate gate; this only checks channel-account
+ * outbound destinations. Never treats inbound allowFrom as permission to send.
+ */
+export function evaluateChannelAccountOutboundScope(params: {
+  target: NormalizedDeliveryTarget;
+  facts: ChannelAccountOutboundScopeFacts | null;
+}):
+  | { outcome: "allow"; reason: "channel_account_outbound_scope" }
+  | { outcome: "authorization_pending"; reason: "outbound_scope_basis_missing" }
+  | { outcome: "deny"; reason: string } {
+  const facts = params.facts;
+  if (!facts) {
+    return { outcome: "authorization_pending", reason: "outbound_scope_basis_missing" };
+  }
+  const destinations = facts.allowedDestinations
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  if (destinations.length === 0) {
+    return { outcome: "authorization_pending", reason: "outbound_scope_basis_missing" };
+  }
+  if (!facts.accountEnabled) {
+    return { outcome: "deny", reason: "channel_account_disabled" };
+  }
+  const factChannel = compact(facts.channel).toLowerCase();
+  if (!factChannel || factChannel !== params.target.channel) {
+    return { outcome: "deny", reason: "outbound_channel_mismatch" };
+  }
+  const factAccount = compact(facts.accountId);
+  const factAccountId = factAccount.length > 0 ? factAccount : null;
+  if (factAccountId !== params.target.accountId) {
+    return { outcome: "deny", reason: "outbound_account_mismatch" };
+  }
+  if (!destinations.includes(params.target.to)) {
+    return { outcome: "deny", reason: "outbound_target_out_of_scope" };
+  }
+  return { outcome: "allow", reason: "channel_account_outbound_scope" };
 }

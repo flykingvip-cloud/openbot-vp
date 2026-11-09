@@ -557,12 +557,23 @@ export async function readMemberArtifactDeliveryIntent(
   return read.status === "ok" ? read.intent : null;
 }
 
+/**
+ * Durable grant write with revoke CAS: a revoked grant must not be overwritten by a
+ * fresh non-revoked grant. Revoke and request share this lock so concurrent revoke wins.
+ */
 export async function writeIssuedOutboundArtifactGrant(params: {
   authDir: string;
   keyHash: string;
   grant: OutboundArtifactGrant;
-}): Promise<void> {
-  await writeJsonDurable(grantPath(params.authDir, params.keyHash), params.grant);
+}): Promise<{ ok: true } | { ok: false; reason: string }> {
+  return withDirectoryLock(params.authDir, params.keyHash, async () => {
+    const existing = await readServerOutboundArtifactGrant(params.authDir, params.keyHash);
+    if (existing?.revokedAtMs != null && params.grant.revokedAtMs == null) {
+      return { ok: false, reason: "outbound_authorization_revoked" };
+    }
+    await writeJsonDurable(grantPath(params.authDir, params.keyHash), params.grant);
+    return { ok: true };
+  });
 }
 
 export async function readServerOutboundArtifactGrant(

@@ -1,0 +1,14 @@
+
+ RUN  v4.0.18 /Users/daniel/AI VP/openbot
+
+ ✓ src/agent-runtime/policy/accepted-artifact-delivery.test.ts (11 tests) 4ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts (10 tests) 224ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery-entry.test.ts (3 tests) 74ms
+ ✓ src/agent-runtime/wiring/accepted-artifact-delivery.test.ts (8 tests) 540ms
+ ✓ src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts (10 tests) 674ms
+
+ Test Files  5 passed (5)
+      Tests  42 passed (42)
+   Start at  22:59:15
+   Duration  14.66s (transform 27.27s, setup 1.06s, import 40.96s, tests 1.52s, environment 0ms)
+

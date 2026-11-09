@@ -4,11 +4,13 @@ import {
   deriveAcceptedArtifactIssuanceBasis,
   establishTrustedDeliveryIssuer,
   evaluateAcceptedArtifactOutboundAuthorization,
+  evaluateChannelAccountOutboundScope,
   evaluateMemberArtifactDeliveryEligibility,
   issueOutboundArtifactGrant,
   memberArtifactDeliveryKeyMaterial,
   normalizeDeliveryTarget,
   type AcceptedArtifactIssuanceFacts,
+  type ChannelAccountOutboundScopeFacts,
   type MemberArtifactDeliveryIdentity,
 } from "./accepted-artifact-delivery.js";
 
@@ -177,5 +179,56 @@ describe("issueOutboundArtifactGrant", () => {
         target: { channel: "telegram", to: "chat-1" },
       }),
     ).toBeNull();
+  });
+});
+
+describe("evaluateChannelAccountOutboundScope", () => {
+  const target = { channel: "telegram", accountId: null, to: "chat-1" };
+  const facts: ChannelAccountOutboundScopeFacts = {
+    channel: "telegram",
+    accountId: null,
+    accountEnabled: true,
+    allowedDestinations: ["chat-1"],
+  };
+
+  it("allows only when the target matches server defaultTo scope", () => {
+    expect(evaluateChannelAccountOutboundScope({ target, facts })).toEqual({
+      outcome: "allow",
+      reason: "channel_account_outbound_scope",
+    });
+  });
+
+  it("stays pending when scope facts or destinations are missing", () => {
+    expect(evaluateChannelAccountOutboundScope({ target, facts: null })).toEqual({
+      outcome: "authorization_pending",
+      reason: "outbound_scope_basis_missing",
+    });
+    expect(
+      evaluateChannelAccountOutboundScope({
+        target,
+        facts: { ...facts, allowedDestinations: ["  ", ""] },
+      }),
+    ).toEqual({
+      outcome: "authorization_pending",
+      reason: "outbound_scope_basis_missing",
+    });
+  });
+
+  it("denies write-ok facts when the target is outside defaultTo", () => {
+    expect(
+      evaluateChannelAccountOutboundScope({
+        target: { ...target, to: "other-chat" },
+        facts,
+      }),
+    ).toEqual({ outcome: "deny", reason: "outbound_target_out_of_scope" });
+  });
+
+  it("denies a disabled channel account", () => {
+    expect(
+      evaluateChannelAccountOutboundScope({
+        target,
+        facts: { ...facts, accountEnabled: false },
+      }),
+    ).toEqual({ outcome: "deny", reason: "channel_account_disabled" });
   });
 });
