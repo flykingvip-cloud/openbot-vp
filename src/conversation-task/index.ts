@@ -272,10 +272,10 @@ export {
   WAKE_REASONS,
   decideWake,
   isHeartbeatActionAllowed,
-} from "./focus-policy.js";
+} from "../agent-runtime/policy/index.js";
 export type {
   FocusDecision,
   FocusSnapshot,
   HeartbeatForbiddenAction,
   WakeReason,
-} from "./focus-policy.js";
+} from "../agent-runtime/policy/index.js";

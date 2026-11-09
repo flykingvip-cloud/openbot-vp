@@ -316,10 +316,10 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
   {
     id: "task.constraint.owner_gate",
     category: "classification",
-    currentOwner: "conversation-task",
+    currentOwner: "policy",
     targetOwner: "policy",
     scope: "owner constraint revise/replace/persist",
-    implementation: "src/conversation-task/turn-relation.ts",
+    implementation: "src/agent-runtime/policy/constraints.ts",
     enforcementPoints: ["before_owner_constraint_persist"],
     version: INVENTORY_VERSION,
     dependencies: {
@@ -327,11 +327,14 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
       artifacts: ["session-task-board writes via state"],
     },
     configuration: "none",
-    tests: ["src/conversation-task/turn-relation.test.ts"],
+    tests: [
+      "src/agent-runtime/policy/explicit-task-control.test.ts",
+      "src/conversation-task/turn-relation.test.ts",
+    ],
     retirementCondition:
-      "small-batch move of the pure predicate into a policy file; keep board writes in state",
+      "predicates are the policy public entry; classifyTurnRelation stays out of policy; board writes stay in state",
     management: "code_required",
-    disposition: "pending_migration",
+    disposition: "retain",
   },
   {
     id: "execution.async_wait.job_transition",
@@ -377,7 +380,7 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
     category: "operational",
     currentOwner: "policy",
     targetOwner: "policy",
-    scope: "focus-wake eligibility; slot cap stays beside decideWake",
+    scope: "wake eligibility plus pure park/switch selection and the execution slot cap",
     implementation: "src/agent-runtime/policy/explicit-task-control.ts",
     enforcementPoints: ["before_focus_wake", "parked_slot_limit"],
     version: INVENTORY_VERSION,
@@ -392,7 +395,7 @@ const RULES: readonly RuntimeRuleDeclaration[] = [
       "src/conversation-task/focus-policy.test.ts",
     ],
     retirementCondition:
-      "eligibility is the policy public entry; decideWake and MAX_PARKED_SLOTS stay in focus-policy as the wake action; claim writes stay in state; do not hard-merge slot and task caps",
+      "decideWake and MAX_PARKED_SLOTS are the policy public entry; hosts claim, write, and wake; do not alias MAX_PARKED_SLOTS with MAX_PARKED_TASKS",
     management: "reviewed_parameters",
     disposition: "retain",
   },

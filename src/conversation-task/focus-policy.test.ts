@@ -15,7 +15,9 @@ describe("EA focus policy (P0 acceptance)", () => {
     expect(MAX_FOCUS_SLOTS).toBe(1);
     expect(MAX_PARKED_SLOTS).toBe(3);
     expect(policy.MAX_PARKED_TASKS).toBe(3);
-    expect(policy).not.toHaveProperty("MAX_PARKED_SLOTS");
+    expect(policy.MAX_PARKED_SLOTS).toBe(3);
+    expect(MAX_PARKED_SLOTS).toBe(policy.MAX_PARKED_SLOTS);
+    expect(decideWake).toBe(policy.decideWake);
   });
 
   it("separates heartbeat eligibility from task creation and replanning", () => {

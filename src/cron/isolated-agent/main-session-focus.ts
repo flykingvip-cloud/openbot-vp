@@ -2,7 +2,7 @@ import {
   decideWake,
   type FocusDecision,
   type FocusSnapshot,
-} from "../../conversation-task/focus-policy.js";
+} from "../../agent-runtime/policy/index.js";
 import { cronWakeIncomingTaskId } from "../wake-identity.js";
 
 /** User activity inside this window occupies the personal FOCUS slot. */
