@@ -1365,3 +1365,59 @@ test("formal admitted executor is independent of speaking limit and supplement s
     await fs.rm(roundsDir, { recursive: true, force: true });
   }
 });
+
+test.each([false, true])(
+  "public receipt %s determines speaking consumption, not dispatch count",
+  async (committed) => {
+    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-public-receipt-"));
+    const scope = createCoordinatorScope();
+    scope.operatingState!.collaborationPolicy.maxVisibleBotRepliesPerRound = 2;
+    const calls: string[] = [];
+    try {
+      await executeCollaborationRoundForTest({
+        scope,
+        roundsDir,
+        sessionKey: "space:alpha",
+        message: "请分析方案风险",
+        decision: createDecision({
+          roundId: "receipt",
+          executionBots: [botA, botB, botC],
+          roundPlan: {
+            ...createDecision().roundPlan,
+            participants: [
+              ...createDecision().roundPlan.participants,
+              {
+                agentId: "bot-b",
+                displayName: "B",
+                tier: "mention",
+                contributionRole: "supplement",
+                reasonText: "invited",
+              },
+              {
+                agentId: "bot-c",
+                displayName: "C",
+                tier: "mention",
+                contributionRole: "supplement",
+                reasonText: "invited",
+              },
+            ],
+          },
+        }),
+        policy: {
+          ...policyWithoutWrap(),
+          supplement: { ...DEFAULT_COLLABORATION_POLICY.supplement, enabled: true },
+        },
+        runBot: async ({ bot }) => {
+          calls.push(bot.agentId);
+          return {
+            text: "结论：本成员已经给出独立意见。",
+            publicReplyCommitted: bot.agentId === "bot-b" ? committed : true,
+          };
+        },
+      });
+      expect(calls).toEqual(committed ? ["bot-a", "bot-b"] : ["bot-a", "bot-b", "bot-c"]);
+    } finally {
+      await fs.rm(roundsDir, { recursive: true, force: true });
+    }
+  },
+);

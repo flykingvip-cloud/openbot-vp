@@ -8,6 +8,8 @@
  */
 
 export type SameRoundReply = {
+  /** Durable public transcript receipt, not client acknowledgment. */
+  publicReplyCommitted?: boolean;
   agentId: string;
   agentName: string;
   contributionRole: string;

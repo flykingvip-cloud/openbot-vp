@@ -133,7 +133,7 @@ export type BeatExecutionInput = {
     dispatchId: string;
     isWrapTurn: boolean;
     edge?: import("./collab-edge.js").CollabEdge;
-  }) => Promise<{ text?: string; rawText?: string } | undefined>;
+  }) => Promise<{ text?: string; rawText?: string; publicReplyCommitted?: boolean } | undefined>;
   skipRoundIds?: Iterable<string>;
   inboundDepth?: "chat" | "retrieve" | "act";
   contextScopeRequest?: import("../context-scope/types.js").ContextScopeRequest;

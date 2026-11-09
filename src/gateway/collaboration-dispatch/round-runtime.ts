@@ -89,7 +89,7 @@ export type RoundDispatchRunner = (params: {
   isWrapTurn: boolean;
   /** Same-round CollabEdge that nominated this bot (edge-target dispatches only). */
   edge?: CollabEdge;
-}) => Promise<{ text?: string; rawText?: string } | undefined>;
+}) => Promise<{ text?: string; rawText?: string; publicReplyCommitted?: boolean } | undefined>;
 
 export type RoundRecoveryDecision = {
   action: "noop" | "abort" | "timeout" | "complete";
@@ -203,7 +203,16 @@ async function recordCandidateDropped(params: {
   });
 }
 
-type RoundBotReply = { text?: string; rawText?: string };
+type RoundBotReply = { text?: string; rawText?: string; publicReplyCommitted?: boolean };
+
+/** Public transcript commit is not a client delivery acknowledgment. Legacy adapters
+ * without a receipt conservatively consume a slot for any nonempty visible body. */
+function consumesSpeakingSlot(reply: RoundBotReply | undefined): boolean {
+  if (reply?.publicReplyCommitted !== undefined) {
+    return reply.publicReplyCommitted;
+  }
+  return Boolean(reply?.text?.trim());
+}
 
 async function racePrimaryReply(params: {
   run: () => Promise<RoundBotReply | undefined>;
@@ -914,7 +923,7 @@ export async function executeCollaborationRound(
       // A real visible reply (incl. tool / execution results) always completes the
       // primary. Missing 结论/下一步 is a quality tag, never a timeout or fallback.
       primaryCompleted = true;
-      leadVisibleCount += 1;
+      leadVisibleCount += consumesSpeakingSlot(raced.reply) ? 1 : 0;
       if (completion.hasConclusion) {
         primaryHasConclusion = true;
       }
@@ -1011,7 +1020,7 @@ export async function executeCollaborationRound(
         return finishShadow(await stepRound(round, "fallback_failed", "ROUND_ABORTED", persist));
       }
       primaryCompleted = true;
-      leadVisibleCount += 1;
+      leadVisibleCount += consumesSpeakingSlot(fallbackReply) ? 1 : 0;
       primaryHasConclusion = fallbackCompletion.hasConclusion;
       primaryVisibleText = fallbackReply?.text ?? "";
       round = await stepRound(round, "fallback_completed", "FALLBACK_COMPLETED", persist, {
@@ -1198,6 +1207,7 @@ export async function executeCollaborationRound(
     );
     let kept = 0;
     let dispatched = 0;
+    let supplementVisibleCount = 0;
     const gateLog: SupplementGateEntry[] = [];
     const visibleCap = Math.min(
       COLLABORATION_ABSOLUTE_VISIBLE_TURN_LIMIT,
@@ -1265,13 +1275,16 @@ export async function executeCollaborationRound(
       }
       kept += 1;
       dispatched += 1;
-      await runBot({
+      const reply = await runBot({
         bot,
         role: "supplement",
         dispatchId,
         isWrapTurn: false,
         ...(edge ? { edge } : {}),
       });
+      if (consumesSpeakingSlot(reply)) {
+        supplementVisibleCount += 1;
+      }
     };
 
     for (const bot of supplementBots) {
@@ -1301,7 +1314,10 @@ export async function executeCollaborationRound(
             cfg: getRuntimeConfigSnapshot() ?? undefined,
           })
         : { purpose: "discussion" as const };
-      const speaking = memberSpeakingGate(admission, leadVisibleCount + dispatched >= visibleCap);
+      const speaking = memberSpeakingGate(
+        admission,
+        leadVisibleCount + supplementVisibleCount >= visibleCap,
+      );
       const invited = invitedAgentIds.has(botId);
       const gate: CheapGateResult = !speaking.allowed
         ? {
@@ -1371,7 +1387,7 @@ export async function executeCollaborationRound(
       supplementWindowReason === "conclusion" &&
       pendingLowRelevance.length > 0 &&
       effective.participation.openDiscussionWithoutMention &&
-      leadVisibleCount < visibleCap &&
+      leadVisibleCount + supplementVisibleCount < visibleCap &&
       primaryInvitesSupplementInput({
         text: primaryVisibleText,
         bots: facts.bots as CollaborationBotTarget[],
