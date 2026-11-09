@@ -16,7 +16,7 @@ description: >-
 - **例行报告**：触发、输入、变换、输出、受众、频率、owner、停止条件。
 - **PDF/文件处理**：保留原件、明确变换、校验页/记录数、检视产物（可协作 nano-pdf）。
 - **流程审计**：输入、决策、交接、系统、控制、延迟、失败模式与自动化候选。
-- 结构化跟踪 → spreadsheets；报告 → documents / cyber-ppt；技能正文禁止写凭证。
+- 结构化跟踪 → spreadsheets；报告 → documents / cyber-ppt；实际文件创建与编辑 → `office_file`。技能正文禁止写凭证。Excel 实时会话与 Google Workspace 未接入。
 
 ## 前置
 

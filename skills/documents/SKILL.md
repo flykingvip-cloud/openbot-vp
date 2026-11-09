@@ -60,6 +60,7 @@ output/documents/<doc-id>/
 - **不做**：PPT/PDF 主交付；公众号正文 HTML / 成稿（走 `wechat-article`）；未渲图宣称版式无问题；平行再建 document-writing-core。
 - **相邻**：调研证据 → research-core；战略备忘可先 strategy-core 再本文落 Word；演示 → cyber-ppt；公众号排版 → wechat-article；草稿箱 → 身份工具。
 - **警告：** 勿平行拷贝 Codex documents 专有脚本包或 `openai.yaml`；交付工作区文件。
+- **文件引擎：** 创建、局部编辑、批注、修订、预览和导出调用 `office_file`（技能 `office-file-suite`）。不要调用 Codex artifact 工具。桌面 Word 不是必需。Excel 实时会话与 Google Docs 未接入。
 
 ## 触发样例
 
