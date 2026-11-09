@@ -4182,6 +4182,7 @@ async function runGroupBotDiscussionTurn(params: {
         agentId: params.bot.agentId,
         agentName: params.bot.name,
         contributionRole: params.contributionRole ?? "supplement",
+        publicReplyCommitted: appended.ok,
         text: replyText,
         ...(collabEdgeDirectiveSource ? { rawText: collabEdgeDirectiveSource } : {}),
         ...(appended.ok && appended.messageId ? { messageId: appended.messageId } : {}),
