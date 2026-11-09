@@ -203,7 +203,6 @@ import {
   type FaultRoundVisibleOutcome,
 } from "../collaboration-dispatch/fault-round-diagnostic.js";
 import { isRosterAllowedGroupDiscussionBot } from "../collaboration-dispatch/group-discussion-roster.js";
-import { buildCollaborationGroupInboundHistory } from "../collaboration-dispatch/group-inbound-history.js";
 import {
   buildV1RollCallRosterFromExecutions,
   buildV1RollCallRosterPromptLines,
@@ -212,6 +211,7 @@ import {
   type V1RollCallRoster,
 } from "../collaboration-dispatch/hotfix-rollcall-v1.js"; // v1-only
 import { resolveProductionCollaborationExecutor } from "../collaboration-dispatch/legacy-production-executor.js";
+import { readCollaborationMemberContext } from "../collaboration-dispatch/member-context.js";
 import {
   normalizeAgentIdentifier,
   normalizeMentionIdentity,
@@ -247,7 +247,6 @@ import {
 import { buildGroupRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import type { RuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import {
-  buildSameRoundContext,
   type SameRoundContext,
   type SameRoundReply,
 } from "../collaboration-dispatch/same-round-context.js";
@@ -5399,21 +5398,6 @@ export const chatHandlers: GatewayRequestHandlers = {
         runId: clientRunId,
         log: context.logGateway,
       });
-      const groupMessagesAfterUserAppend =
-        groupSession.entry.sessionId && groupSession.storePath
-          ? readSessionMessages(
-              groupSession.entry.sessionId,
-              groupSession.storePath,
-              groupSession.entry.sessionFile,
-            )
-          : [];
-      const groupInboundHistory = buildCollaborationGroupInboundHistory({
-        messages:
-          groupMessagesAfterUserAppend.length > 0
-            ? groupMessagesAfterUserAppend.slice(0, -1)
-            : groupMessagesAfterUserAppend,
-        limit: 24,
-      });
 
       const groupCfg = (await loadSessionEntryForClient("main", client)).cfg;
       const groupTimeoutMs = resolveAgentTimeoutMs({
@@ -5532,6 +5516,21 @@ export const chatHandlers: GatewayRequestHandlers = {
                 return;
               }
               try {
+                // Read the authorized public transcript again for every member; a
+                // round-start snapshot misses human interjections during prior turns.
+                const memberContext = readCollaborationMemberContext({
+                  readMessages: () =>
+                    readSessionMessages(
+                      groupSession.entry.sessionId,
+                      groupSession.storePath,
+                      groupSession.entry.sessionFile,
+                    ),
+                  triggeringMessageId: `local-${clientRunId}`,
+                  completedReplies: sameRoundReplies,
+                });
+                if (parentAbortController.signal.aborted) {
+                  return;
+                }
                 const reply = await runGroupBotDiscussionTurn({
                   context,
                   client,
@@ -5552,9 +5551,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                   stagedMediaContext,
                   systemInputProvenance,
                   systemProvenanceReceipt,
-                  groupInboundHistory,
-                  // Only prior completed replies — never in-flight future turns.
-                  sameRoundContext: buildSameRoundContext(sameRoundReplies),
+                  ...memberContext,
                   dispatchRole: params.dispatchRole,
                   ...(params.collabEdge ? { collabEdge: params.collabEdge } : {}),
                   ...(p.contextScope ? { contextScopeRequest: p.contextScope } : {}),
