@@ -18,6 +18,7 @@ import {
   DELIVERY_EXEC_BOARD_STATUSES,
   NO_DELIVERY_SELF_ADVANCE_BOARD_STATUSES,
   s2DoesNotDefaultSelfAdvanceOn,
+  type BoardTodolistDeliveryMapping,
 } from "../../agent-runtime/policy/index.js";
 import { deliveryActorIdsEqual } from "../collaboration-learning/delivery-actor-binding.js";
 import type { GroupBoardClaimItem } from "./claim-contract.js";
