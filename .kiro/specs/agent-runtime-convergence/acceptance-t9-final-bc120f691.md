@@ -10,7 +10,7 @@ Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263
 | --- | --- |
 | 受测运行时（M3 实现 tip） | `bc120f691c5199b063c7a5ea6e86586e035ffe37` |
 | 本包提交前分支 tip／上一证据头 | `ffb70cefdbdfc1f1988cbd8e1b5ee35806de0192` |
-| 本包证据头 | （push 本文件＋日志后更新） |
+| 本包证据头 | `2e039636aef6a204b3acad8accfefa9517a248e4` |
 
 M1–M3 独立内容验收已通过（M3 受测同上；上一证据头 `ffb70cefdbdfc1f1988cbd8e1b5ee35806de0192`）。
 
