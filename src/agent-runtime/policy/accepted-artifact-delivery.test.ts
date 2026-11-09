@@ -73,38 +73,51 @@ describe("evaluateMemberArtifactDeliveryEligibility", () => {
 
 describe("evaluateAcceptedArtifactOutboundAuthorization", () => {
   const target = { channel: "telegram", accountId: null, to: "chat-1" };
+  const request = {
+    tenantId: "ten-a",
+    groupId: "grp-1",
+    actorId: "bot-b",
+    normalizedTarget: target,
+    acceptedArtifactVersion: "art-v1",
+    linkedContentSha256: "abc",
+  };
+  const grant = {
+    tenantId: "ten-a",
+    groupId: "grp-1",
+    actorId: "bot-b",
+    channel: "telegram",
+    accountId: null,
+    to: "chat-1",
+    scope: "member_artifact" as const,
+    acceptedArtifactVersion: "art-v1",
+    linkedContentSha256: "abc",
+    revokedAtMs: null,
+  };
 
-  it("does not allow a caller to pass a grant", () => {
-    const decision = evaluateAcceptedArtifactOutboundAuthorization({
-      actorId: "bot-b",
-      normalizedTarget: target,
-      facts: { factsLoaded: false },
+  it("stays pending when the server grant is missing", () => {
+    const decision = evaluateAcceptedArtifactOutboundAuthorization({ ...request, grant: null });
+    expect(decision).toEqual({
+      outcome: "authorization_pending",
+      reason: "outbound_auth_grant_missing",
     });
-    expect(decision.outcome).toBe("authorization_pending");
     expect("granted" in decision).toBe(false);
   });
 
-  it("allows only a member whose target is on the server allowlist", () => {
+  it("denies a revoked grant or a different artifact", () => {
     expect(
       evaluateAcceptedArtifactOutboundAuthorization({
-        actorId: "bot-b",
-        normalizedTarget: target,
-        facts: { factsLoaded: true, memberActorIds: ["bot-a"], allowFrom: ["chat-1"] },
+        ...request,
+        grant: { ...grant, revokedAtMs: 10 },
       }),
-    ).toEqual({ outcome: "deny", reason: "outbound_actor_not_member" });
+    ).toEqual({ outcome: "deny", reason: "outbound_authorization_revoked" });
     expect(
       evaluateAcceptedArtifactOutboundAuthorization({
-        actorId: "bot-b",
-        normalizedTarget: target,
-        facts: { factsLoaded: true, memberActorIds: ["bot-b"], allowFrom: ["other"] },
+        ...request,
+        grant: { ...grant, linkedContentSha256: "other" },
       }),
-    ).toEqual({ outcome: "deny", reason: "outbound_target_not_allowed" });
-    expect(
-      evaluateAcceptedArtifactOutboundAuthorization({
-        actorId: "bot-b",
-        normalizedTarget: target,
-        facts: { factsLoaded: true, memberActorIds: ["bot-b"], allowFrom: ["chat-1"] },
-      }).outcome,
-    ).toBe("allow");
+    ).toEqual({ outcome: "deny", reason: "outbound_grant_mismatch" });
+    expect(evaluateAcceptedArtifactOutboundAuthorization({ ...request, grant }).outcome).toBe(
+      "allow",
+    );
   });
 });

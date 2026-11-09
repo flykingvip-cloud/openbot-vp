@@ -123,49 +123,59 @@ export function evaluateMemberArtifactDeliveryEligibility(
 }
 
 /**
- * Server facts only. There is no `granted` field.
- * `memberActorIds` is the membership set behind `authorizeTeamGroupResourceAccess`.
- * `allowFrom` is the list `resolveOutboundTarget` passes to the channel plugin.
- * Missing facts stay `authorization_pending`. A caller cannot flip a boolean to allow.
+ * Durable server grant bound to tenant, group, actor, channel, account, target,
+ * and the member-artifact version plus content hash.
+ * Group membership and channel allowFrom are not this decision.
+ * There is no granted field. A missing record stays pending.
  */
-export type ServerOutboundAuthFacts = {
-  factsLoaded: boolean;
-  memberActorIds?: readonly string[];
-  allowFrom?: readonly string[];
+export type OutboundArtifactGrant = {
+  tenantId: string;
+  groupId: string;
+  actorId: string;
+  channel: string;
+  accountId: string | null;
+  to: string;
+  scope: "member_artifact";
+  acceptedArtifactVersion: string;
+  linkedContentSha256: string;
+  revokedAtMs: number | null;
 };
 
 export type OutboundAuthDecision =
-  | { outcome: "authorization_pending"; reason: "outbound_auth_facts_missing" }
+  | { outcome: "authorization_pending"; reason: "outbound_auth_grant_missing" }
   | { outcome: "deny"; reason: string }
-  | { outcome: "allow"; reason: "member_and_allowlist" };
+  | { outcome: "allow"; reason: "artifact_outbound_grant" };
 
 export function evaluateAcceptedArtifactOutboundAuthorization(params: {
+  tenantId: string;
+  groupId: string;
   actorId: string;
   normalizedTarget: NormalizedDeliveryTarget;
-  facts: ServerOutboundAuthFacts;
+  acceptedArtifactVersion: string;
+  linkedContentSha256: string;
+  grant: OutboundArtifactGrant | null;
 }): OutboundAuthDecision {
-  if (!params.facts.factsLoaded || !params.facts.memberActorIds || !params.facts.allowFrom) {
-    return { outcome: "authorization_pending", reason: "outbound_auth_facts_missing" };
+  const grant = params.grant;
+  if (!grant) {
+    return { outcome: "authorization_pending", reason: "outbound_auth_grant_missing" };
   }
-  const actor = compact(params.actorId);
-  const members = params.facts.memberActorIds
-    .map((id) => compact(id))
-    .filter((id) => id.length > 0);
-  if (!actor || !members.includes(actor)) {
-    return { outcome: "deny", reason: "outbound_actor_not_member" };
+  if (grant.revokedAtMs !== null) {
+    return { outcome: "deny", reason: "outbound_authorization_revoked" };
   }
-  const allowFrom = params.facts.allowFrom
-    .map((entry) => compact(entry))
-    .filter((entry) => entry.length > 0);
-  if (allowFrom.length === 0) {
-    return { outcome: "deny", reason: "outbound_allowlist_empty" };
+  if (grant.scope !== "member_artifact") {
+    return { outcome: "deny", reason: "outbound_scope_mismatch" };
   }
-  const to = params.normalizedTarget.to;
-  const allowed = allowFrom.some(
-    (entry) => entry === to || entry.toLowerCase() === to.toLowerCase(),
-  );
-  if (!allowed) {
-    return { outcome: "deny", reason: "outbound_target_not_allowed" };
+  const same =
+    grant.tenantId === compact(params.tenantId) &&
+    grant.groupId === compact(params.groupId) &&
+    grant.actorId === compact(params.actorId) &&
+    grant.channel === params.normalizedTarget.channel &&
+    grant.accountId === params.normalizedTarget.accountId &&
+    grant.to === params.normalizedTarget.to &&
+    grant.acceptedArtifactVersion === compact(params.acceptedArtifactVersion) &&
+    grant.linkedContentSha256 === compact(params.linkedContentSha256).toLowerCase();
+  if (!same) {
+    return { outcome: "deny", reason: "outbound_grant_mismatch" };
   }
-  return { outcome: "allow", reason: "member_and_allowlist" };
+  return { outcome: "allow", reason: "artifact_outbound_grant" };
 }

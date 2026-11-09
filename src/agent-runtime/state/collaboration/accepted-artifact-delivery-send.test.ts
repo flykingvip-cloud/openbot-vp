@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -9,18 +10,28 @@ import {
   recoverPendingDeliveries,
   resolveDeliveryQueueDir,
 } from "../../../infra/outbound/delivery-queue.js";
-import type { ServerOutboundAuthFacts } from "../../policy/accepted-artifact-delivery.js";
+import { sendAcceptedArtifactBridge } from "../../delivery/accepted-artifact-send.js";
+import { writeAcceptedArtifactQueueFile } from "../../delivery/accepted-artifact-send.js";
 import type { MemberArtifactDeliveryIdentity } from "../../policy/accepted-artifact-delivery.js";
 import {
+  claimMemberArtifactSendUnknown,
   commitMemberArtifactDeliveryAssociation,
+  markMemberArtifactQueued,
   noteAssociationRenamedAwayFromStaged,
-  publishMemberArtifactDelivery,
-  recoverMemberArtifactBridgeDelivery,
+  prepareMemberArtifactQueuePublication,
+  recordMemberArtifactReceipt,
+  writeServerOutboundArtifactGrant,
 } from "./accepted-artifact-delivery-txn.js";
 
 const roots: string[] = [];
 const log = { info() {}, warn() {}, error() {} };
 const cfg = {} as OpenBotConfig;
+
+function digest(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+const body = "member-body";
 
 async function tempDir(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "artifact-send-"));
@@ -32,7 +43,9 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
 
-function identity(): MemberArtifactDeliveryIdentity {
+function identity(
+  patch: Partial<MemberArtifactDeliveryIdentity> = {},
+): MemberArtifactDeliveryIdentity {
   return {
     tenantId: "ten-a",
     groupId: "grp-1",
@@ -45,180 +58,210 @@ function identity(): MemberArtifactDeliveryIdentity {
     acceptedArtifactVersion: "art-v1",
     linkedDeliverableId: "del-1",
     linkedDeliverableVersion: 1,
-    linkedContentSha256: "abc",
+    linkedContentSha256: digest(body),
     target: { channel: "telegram", to: "chat-1" },
+    ...patch,
   };
 }
 
-function allowFacts(): ServerOutboundAuthFacts {
-  return { factsLoaded: true, memberActorIds: ["bot-b"], allowFrom: ["chat-1"] };
+async function associated(root: string, who = identity()): Promise<void> {
+  expect(
+    (await commitMemberArtifactDeliveryAssociation({ rootDir: root, identity: who, nowMs: 1 })).ok,
+  ).toBe(true);
+  expect(
+    (await noteAssociationRenamedAwayFromStaged({ rootDir: root, identity: who, nowMs: 2 })).ok,
+  ).toBe(true);
 }
 
-async function associated(root: string): Promise<void> {
-  const created = await commitMemberArtifactDeliveryAssociation({
+async function publish(
+  root: string,
+  auth: string,
+  queueState: string,
+  who = identity(),
+  text = body,
+) {
+  await associated(root, who);
+  await writeServerOutboundArtifactGrant({ authDir: auth, identity: who });
+  const prepared = await prepareMemberArtifactQueuePublication({
     rootDir: root,
-    identity: identity(),
-    nowMs: 1,
+    authDir: auth,
+    identity: who,
+    payloadText: text,
+    nowMs: 3,
   });
-  expect(created.ok).toBe(true);
-  const renamed = await noteAssociationRenamedAwayFromStaged({
-    rootDir: root,
-    identity: identity(),
-    nowMs: 2,
+  expect(prepared.ok).toBe(true);
+  if (!prepared.ok) {
+    throw new Error(prepared.reason);
+  }
+  await writeAcceptedArtifactQueueFile({
+    queueStateDir: queueState,
+    queueId: prepared.queueId,
+    keyHash: prepared.keyHash,
+    channel: prepared.channel,
+    to: prepared.to,
+    accountId: prepared.accountId,
+    payloadText: text,
+    contentSha256: prepared.contentSha256,
+    nowMs: 4,
   });
-  expect(renamed.ok).toBe(true);
+  expect(
+    (
+      await markMemberArtifactQueued({
+        rootDir: root,
+        identity: who,
+        queueId: prepared.queueId,
+        nowMs: 5,
+      })
+    ).ok,
+  ).toBe(true);
+  return prepared;
 }
 
-describe("publishMemberArtifactDelivery", () => {
-  it("does not publish a sendable json before authorization", async () => {
+function send(params: {
+  root: string;
+  queueState: string;
+  who?: MemberArtifactDeliveryIdentity;
+  sendTelegram: ReturnType<typeof vi.fn>;
+}) {
+  const who = params.who ?? identity();
+  return async (snapshot: { id: string }) =>
+    sendAcceptedArtifactBridge({
+      snapshot: snapshot as never,
+      queueStateDir: params.queueState,
+      cfg,
+      deps: { sendTelegram: params.sendTelegram },
+      claim: (recheck) =>
+        claimMemberArtifactSendUnknown({
+          rootDir: params.root,
+          identity: who,
+          recheck,
+        }),
+      recordReceipt: async (ids) => {
+        const recorded = await recordMemberArtifactReceipt({
+          rootDir: params.root,
+          identity: who,
+          receiptMessageIds: ids,
+        });
+        if (!recorded.ok) {
+          throw new Error(recorded.reason);
+        }
+      },
+      recordUnknown: async () => {
+        // The claim already marked the effect unknown before the channel call.
+      },
+    });
+}
+
+describe("accepted artifact send boundary", () => {
+  it("does not send when the server grant is missing", async () => {
     const root = await tempDir();
+    const auth = await tempDir();
     const queueState = await tempDir();
     await associated(root);
-    const pending = await publishMemberArtifactDelivery({
+    const prepared = await prepareMemberArtifactQueuePublication({
       rootDir: root,
-      queueStateDir: queueState,
+      authDir: auth,
       identity: identity(),
-      contentSha256: "abc",
-      payloadText: "body",
-      authFacts: { factsLoaded: false },
-      nowMs: 3,
+      payloadText: body,
     });
-    expect(pending).toEqual({ ok: false, reason: "outbound_auth_facts_missing" });
+    expect(prepared).toEqual({ ok: false, reason: "outbound_auth_grant_missing" });
     await expect(fs.readdir(resolveDeliveryQueueDir(queueState))).rejects.toThrow();
   });
 
-  it("retries a failure that had no external effect", async () => {
+  it("does not send again after the effect is marked unknown", async () => {
     const root = await tempDir();
+    const auth = await tempDir();
     const queueState = await tempDir();
-    await associated(root);
-    const published = await publishMemberArtifactDelivery({
-      rootDir: root,
-      queueStateDir: queueState,
-      identity: identity(),
-      contentSha256: "abc",
-      payloadText: "body",
-      authFacts: allowFacts(),
-      nowMs: 4,
-    });
-    expect(published.ok).toBe(true);
-    if (!published.ok) {
-      return;
-    }
-    const sendTelegram = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("socket closed before send"))
-      .mockResolvedValueOnce({ messageId: "tg-1", chatId: "chat-1" });
-    const pending = await loadPendingDeliveries(queueState);
-    const entry = pending.find((row) => row.bridgeMarker === true);
-    expect(entry).toBeTruthy();
-    const failed = await recoverMemberArtifactBridgeDelivery({
-      rootDir: root,
-      queueStateDir: queueState,
-      entry: entry!,
-      authFacts: allowFacts(),
-      cfg,
-      deps: { sendTelegram },
-    });
-    expect(failed).toBe("failed");
-    expect(published.intent.phase).toBe("queued");
-    const again = await loadPendingDeliveries(queueState);
-    const retried = await recoverMemberArtifactBridgeDelivery({
-      rootDir: root,
-      queueStateDir: queueState,
-      entry: again[0],
-      authFacts: allowFacts(),
-      cfg,
-      deps: { sendTelegram },
-    });
-    expect(retried).toBe("recovered");
-    expect(sendTelegram).toHaveBeenCalledTimes(2);
-    const intentRaw = await fs.readFile(
-      path.join(root, "intents", `${published.intent.keyHash}.intent.json`),
-      "utf8",
-    );
-    expect(JSON.parse(intentRaw).phase).toBe("delivered");
-    expect(JSON.parse(intentRaw).receiptMessageIds).toEqual(["tg-1"]);
-  });
-
-  it("does not resend when the channel receipt is unknown", async () => {
-    const root = await tempDir();
-    const queueState = await tempDir();
-    await associated(root);
-    await publishMemberArtifactDelivery({
-      rootDir: root,
-      queueStateDir: queueState,
-      identity: identity(),
-      contentSha256: "abc",
-      payloadText: "body",
-      authFacts: allowFacts(),
-      nowMs: 6,
-    });
-    const sendTelegram = vi.fn().mockResolvedValue({ messageId: "unknown" });
+    const prepared = await publish(root, auth, queueState);
+    const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-1", chatId: "chat-1" });
+    const claimed = await claimMemberArtifactSendUnknown({ rootDir: root, identity: identity() });
+    expect(claimed.ok && claimed.send).toBe(true);
     const entry = (await loadPendingDeliveries(queueState))[0];
-    expect(entry).toBeTruthy();
-    await recoverMemberArtifactBridgeDelivery({
-      rootDir: root,
-      queueStateDir: queueState,
-      entry: entry,
-      authFacts: allowFacts(),
-      cfg,
-      deps: { sendTelegram },
-    });
-    await recoverMemberArtifactBridgeDelivery({
-      rootDir: root,
-      queueStateDir: queueState,
-      entry: entry,
-      authFacts: allowFacts(),
-      cfg,
-      deps: { sendTelegram },
-    });
-    expect(sendTelegram).toHaveBeenCalledTimes(1);
-    const intentRaw = await fs.readFile(
-      path.join(root, "intents", `${entry.bridgeKeyHash}.intent.json`),
-      "utf8",
+    const outcome = await send({ root, queueState, sendTelegram })(entry);
+    expect(outcome).toBe("deferred");
+    expect(sendTelegram).not.toHaveBeenCalled();
+    const raw = JSON.parse(
+      await fs.readFile(path.join(root, "intents", `${prepared.keyHash}.intent.json`), "utf8"),
     );
-    expect(JSON.parse(intentRaw).phase).toBe("unknown");
-    expect(JSON.parse(intentRaw).retryable).toBe(false);
+    expect(raw.phase).toBe("unknown");
+    expect(raw.retryable).toBe(false);
   });
 
-  it("acks only after the receipt is stored, and revocation does not send", async () => {
+  it("isolates a timeout instead of retrying", async () => {
     const root = await tempDir();
+    const auth = await tempDir();
     const queueState = await tempDir();
-    await associated(root);
-    await publishMemberArtifactDelivery({
-      rootDir: root,
-      queueStateDir: queueState,
-      identity: identity(),
-      contentSha256: "abc",
-      payloadText: "body",
-      authFacts: allowFacts(),
-      nowMs: 5,
-    });
-    const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-2", chatId: "chat-1" });
-    const revoked = await recoverPendingDeliveries({
-      cfg,
-      stateDir: queueState,
-      log,
-      deliver: async () => {
-        throw new Error("ordinary deliver must not run");
-      },
-      recoverBridge: (entry) =>
-        recoverMemberArtifactBridgeDelivery({
-          rootDir: root,
-          queueStateDir: queueState,
-          entry,
-          authFacts: { factsLoaded: true, memberActorIds: ["bot-b"], allowFrom: ["revoked"] },
-          cfg,
-          deps: { sendTelegram },
-        }),
-    });
-    expect(revoked.failed).toBe(1);
+    const prepared = await publish(root, auth, queueState);
+    const sendTelegram = vi.fn().mockRejectedValue(new Error("timeout"));
+    const entry = (await loadPendingDeliveries(queueState))[0];
+    const run = send({ root, queueState, sendTelegram });
+    expect(await run(entry)).toBe("failed");
+    expect(await run(entry)).toBe("deferred");
+    expect(sendTelegram).toHaveBeenCalledTimes(1);
+    const raw = JSON.parse(
+      await fs.readFile(path.join(root, "intents", `${prepared.keyHash}.intent.json`), "utf8"),
+    );
+    expect(raw.phase).toBe("unknown");
+    expect(raw.retryable).toBe(false);
+  });
+
+  it("blocks a tampered payload and does not send it", async () => {
+    const root = await tempDir();
+    const auth = await tempDir();
+    const queueState = await tempDir();
+    const prepared = await publish(root, auth, queueState);
+    const file = path.join(resolveDeliveryQueueDir(queueState), `${prepared.queueId}.json`);
+    const queued = JSON.parse(await fs.readFile(file, "utf8"));
+    queued.payloads = [{ text: "tampered" }];
+    await fs.writeFile(file, JSON.stringify(queued), "utf8");
+    const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-1", chatId: "chat-1" });
+    const outcome = await send({ root, queueState, sendTelegram })(queued);
+    expect(outcome).toBe("failed");
     expect(sendTelegram).not.toHaveBeenCalled();
+    const raw = JSON.parse(
+      await fs.readFile(path.join(root, "intents", `${prepared.keyHash}.intent.json`), "utf8"),
+    );
+    expect(raw.phase).toBe("blocked");
+  });
+
+  it("does not send a non-telegram target through telegram", async () => {
+    const root = await tempDir();
+    const auth = await tempDir();
+    const queueState = await tempDir();
+    const slack = identity({
+      target: { channel: "slack", to: "C123" },
+      linkedContentSha256: digest(body),
+    });
+    const prepared = await publish(root, auth, queueState, slack);
+    expect(prepared.ok && prepared.channel).toBe("slack");
+    const queued = JSON.parse(
+      await fs.readFile(
+        path.join(resolveDeliveryQueueDir(queueState), `${prepared.queueId}.json`),
+        "utf8",
+      ),
+    );
+    expect(queued.channel).toBe("slack");
+    const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-1", chatId: "chat-1" });
+    await send({ root, queueState, who: slack, sendTelegram })(queued);
+    expect(sendTelegram).not.toHaveBeenCalled();
+  });
+
+  it("does not let a stale snapshot send twice", async () => {
+    const root = await tempDir();
+    const auth = await tempDir();
+    const queueState = await tempDir();
+    await publish(root, auth, queueState);
+    const entry = (await loadPendingDeliveries(queueState))[0];
+    const sendTelegram = vi.fn().mockResolvedValue({ messageId: "tg-9", chatId: "chat-1" });
+    const run = send({ root, queueState, sendTelegram });
+    const [first, second] = await Promise.all([run(entry), run(entry)]);
+    expect([first, second].toSorted()).toEqual(["deferred", "recovered"]);
+    expect(sendTelegram).toHaveBeenCalledTimes(1);
   });
 
   it("leaves an ordinary queue entry on the existing recovery path", async () => {
     const queueState = await tempDir();
-    const ordinary = await enqueueDelivery(
+    await enqueueDelivery(
       { channel: "telegram", to: "plain", payloads: [{ text: "ordinary" }] },
       queueState,
     );
@@ -249,8 +292,6 @@ describe("publishMemberArtifactDelivery", () => {
     });
     expect(summary.recovered).toBe(1);
     expect(seen).toEqual(["plain"]);
-    expect(ordinary).toBeTruthy();
-    const left = await fs.readdir(queueDir);
-    expect(left.some((name) => name === "bridge-hold.json")).toBe(true);
+    expect((await fs.readdir(queueDir)).includes("bridge-hold.json")).toBe(true);
   });
 });
