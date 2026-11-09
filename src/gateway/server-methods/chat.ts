@@ -213,7 +213,10 @@ import {
 } from "../collaboration-dispatch/hotfix-rollcall-v1.js"; // v1-only
 import { resolveProductionCollaborationExecutor } from "../collaboration-dispatch/legacy-production-executor.js";
 import { resolveMemberAdmission } from "../collaboration-dispatch/member-admission.js";
-import { readCollaborationMemberContext } from "../collaboration-dispatch/member-context.js";
+import {
+  assertMemberContextFitsModel,
+  readCollaborationMemberContext,
+} from "../collaboration-dispatch/member-context.js";
 import {
   normalizeAgentIdentifier,
   normalizeMentionIdentity,
@@ -3562,6 +3565,20 @@ async function runGroupBotDiscussionTurn(params: {
       cfg,
       overrideMs: params.timeoutMs,
     });
+    const modelRef = resolveSessionModelRef(cfg, entry, params.bot.agentId);
+    const catalog = await params.context.loadGatewayModelCatalog();
+    const selectedModel = catalog.find(
+      (model) => model.provider === modelRef.provider && model.id === modelRef.model,
+    );
+    // The executor still owns total prompt/tool admission. This checks only the
+    // collaboration material against the currently selected member model.
+    if (selectedModel?.contextWindow) {
+      assertMemberContextFitsModel({
+        contextWindowTokens: selectedModel.contextWindow,
+        history: params.groupInboundHistory ?? [],
+        sameRoundContext: params.sameRoundContext,
+      });
+    }
     const runId = `${params.clientRunId}:${params.bot.agentId}`;
     let faultOutcome: FaultRoundVisibleOutcome = { kind: "empty", skipReason: "empty" };
     const now = Date.now();
