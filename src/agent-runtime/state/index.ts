@@ -83,7 +83,18 @@ export {
   appendBoardClaimLog,
   commitPrivateTodolistLog,
   appendPeerReviewLog,
-  withHandoffRoundLock,
-  appendHandoffLogLine,
-  writeHandoffJson,
 } from "./collaboration/round-txn.js";
+export {
+  commitProposedHandoff,
+  acceptHandoffTransaction,
+  approveHandoffTransaction,
+  applyApprovedHandoffTransaction,
+  recoverHandoffTransactions,
+} from "./collaboration/handoff-txn.js";
+export type { HandoffLedgerPort, HandoffStoredFact } from "./collaboration/handoff-txn.js";
+export {
+  DIRECTORY_LOCK_STALE_MS,
+  withDirectoryLock,
+  appendJsonlDurable,
+  writeJsonDurable,
+} from "./repository/durable-json.js";
