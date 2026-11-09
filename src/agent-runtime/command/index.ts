@@ -38,3 +38,15 @@ export {
   createInteractionSourceBoundary,
   formatRestrictedInteractionNotice,
 } from "./interaction-sources.js";
+
+export {
+  acceptedArtifactDeliveryDirs,
+  issuanceFactsFromBoard,
+  requestAcceptedArtifactDelivery,
+  revokeAcceptedArtifactDelivery,
+  resolveChannelAccountOutboundScopeFacts,
+} from "./accepted-artifact-delivery.js";
+export type {
+  AcceptedArtifactDeliveryDirs,
+  AcceptedArtifactDeliveryView,
+} from "./accepted-artifact-delivery.js";

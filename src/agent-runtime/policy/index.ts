@@ -218,6 +218,7 @@ export {
   deriveAcceptedArtifactIssuanceBasis,
   establishTrustedDeliveryIssuer,
   evaluateAcceptedArtifactOutboundAuthorization,
+  evaluateChannelAccountOutboundScope,
   evaluateMemberArtifactDeliveryEligibility,
   issueOutboundArtifactGrant,
   memberArtifactDeliveryKeyMaterial,
@@ -226,6 +227,7 @@ export {
 export type {
   AcceptedArtifactIssuanceBasis,
   AcceptedArtifactIssuanceFacts,
+  ChannelAccountOutboundScopeFacts,
   DeliveryEligibility,
   MemberArtifactDeliveryIdentity,
   MemberArtifactDeliveryScope,
