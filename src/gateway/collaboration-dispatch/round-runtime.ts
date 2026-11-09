@@ -205,7 +205,7 @@ async function racePrimaryReply(params: {
   onDeadline?: () => void;
   /**
    * Primary deadline must not drop the in-flight turn. The deadline still wins
-   * the race (budget closed: no supplement, no extra leads, no fallback while a
+   * the race (optional follow-up closed; no fallback while a
    * real body is in flight), but the same run is awaited so a late visible
    * reply is classified and delivered before the round seals. Applies to every
    * task type, not only chitchat soft-timeout. A settled empty body still
@@ -528,7 +528,7 @@ export async function executeCollaborationRound(
     policy: input.policy,
     message: input.message,
     sessionKey: input.sessionKey,
-    isAborted: input.isAborted ?? (() => Boolean(input.signal?.aborted)),
+    isAborted: () => Boolean(input.signal?.aborted) || Boolean(input.isAborted?.()),
     runBot: input.runBot as RoundDispatchRunner,
     roundsDir: input.roundsDir,
     skipRoundIds: input.skipRoundIds,
@@ -754,11 +754,15 @@ export async function executeCollaborationRound(
   let primaryHasConclusion = false;
   let primaryVisibleText = "";
   // Budget already elapsed: chitchat soft-close, or any task type whose primary
-  // settled after the deadline. Blocks supplement and extra leads.
+  // settled after the deadline. Blocks optional supplement and wrap; already
+  // invited turns retain their own admission and deadline.
   let primaryBudgetClosed = false;
   let leadVisibleCount = 0;
 
   for (let cursor = 0; cursor < leadBots.length; cursor += 1) {
+    if (cursor > 0) {
+      await sleepMs(stages.coordinationDelayMs, input.signal);
+    }
     if (params.isAborted()) {
       return finishShadow(
         (await abortPersistedRound({
@@ -806,7 +810,7 @@ export async function executeCollaborationRound(
     const raced = await racePrimaryReply({
       deadlineAt,
       onDeadline: params.onPrimaryDeadline,
-      // The budget closes supplement / fallback / extra leads. It does not
+      // The budget closes optional supplement / fallback. It does not
       // discard the in-flight primary. A reply that lands after the deadline
       // (chitchat ~8s, analysis 30s, or any other task type) is still
       // classified and delivered before ROUND_COMPLETE or ROUND_ABORTED.
@@ -835,8 +839,8 @@ export async function executeCollaborationRound(
     });
     round = { ...round, completion };
     // A late reply after the primary budget is still a visible primary, for
-    // every task type. The budget stays closed (no supplement / no extra leads
-    // / no fallback). Only a settled empty body keeps visibleReply false and
+    // every task type. Optional follow-up stays closed; explicitly queued members
+    // retain independent turns. Only a settled empty body keeps visibleReply false and
     // takes the timeout / abort path.
     const lateVisiblePrimary = raced.timedOut && completion.visibleReply;
     if ((!raced.timedOut || lateVisiblePrimary) && completion.responseStatus === "complete") {
@@ -871,9 +875,12 @@ export async function executeCollaborationRound(
         });
       }
       if (lateVisiblePrimary) {
-        // Budget already elapsed: keep the visible body, do not open more speakers.
+        // One member's soft deadline must not cancel other explicit invitations.
+        // This never advances an in-flight or empty reply, or creates new members.
         primaryBudgetClosed = true;
-        break;
+        if (params.decision.primaryMode !== "explicit_multi") {
+          break;
+        }
       }
     } else if (isChitchatRound && raced.timedOut) {
       primaryBudgetClosed = true;
@@ -966,7 +973,16 @@ export async function executeCollaborationRound(
     }
   }
 
-  await sleepMs(stages.coordinationDelayMs);
+  await sleepMs(stages.coordinationDelayMs, input.signal);
+  if (params.isAborted()) {
+    return finishShadow(
+      (await abortPersistedRound({
+        groupId: authority.groupId,
+        roundId: round.roundId,
+        ...persist,
+      })) ?? round,
+    );
+  }
 
   const leadIds = new Set(
     leadBots
@@ -1164,6 +1180,9 @@ export async function executeCollaborationRound(
     };
 
     for (const bot of supplementBots) {
+      if (dispatched > 0) {
+        await sleepMs(stages.coordinationDelayMs, input.signal);
+      }
       if (params.isAborted()) {
         return finishShadow(
           (await abortPersistedRound({
@@ -1223,6 +1242,15 @@ export async function executeCollaborationRound(
       await dispatchSupplement(bot, edgeForBot);
     }
 
+    if (params.isAborted()) {
+      return finishShadow(
+        (await abortPersistedRound({
+          groupId: authority.groupId,
+          roundId: round.roundId,
+          ...persist,
+        })) ?? round,
+      );
+    }
     // Calibration: when the open window would otherwise drop everyone for
     // low_relevance, let the single top-scoring candidate through if the group
     // runs open discussion and the primary explicitly asked for others' input.
@@ -1322,6 +1350,15 @@ export async function executeCollaborationRound(
         dispatchId,
         isWrapTurn: true,
       });
+    }
+    if (params.isAborted()) {
+      return finishShadow(
+        (await abortPersistedRound({
+          groupId: authority.groupId,
+          roundId: round.roundId,
+          ...persist,
+        })) ?? round,
+      );
     }
     if (round.state === "OPTIONAL_CLOSE") {
       round = await stepRound(round, "close_completed", "ROUND_COMPLETED", persist);

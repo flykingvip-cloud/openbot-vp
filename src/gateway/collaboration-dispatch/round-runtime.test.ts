@@ -5,6 +5,7 @@ import { describe, expect, test, vi } from "vitest";
 import { executeCollaborationRoundForTest } from "./__fixtures__/runtime-authority-test-utils.js";
 import * as completionContract from "./completion-contract.js";
 import { DEFAULT_COLLABORATION_POLICY } from "./policy.js";
+import * as roundOrchestrator from "./round-orchestrator.js";
 import {
   abortPersistedRound,
   applyRoundRecovery,
@@ -1030,7 +1031,7 @@ describe("collaboration round runtime contract", () => {
 });
 
 describe("invited member continuation after a settled primary deadline", () => {
-  test.each(["continue", "abort", "visible_limit", "optional"] as const)(
+  test.each(["continue", "abort", "abort_supplement", "visible_limit", "optional"] as const)(
     "%s retains admission and stop boundaries",
     async (scenario) => {
       const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-invited-"));
@@ -1080,12 +1081,22 @@ describe("invited member continuation after a settled primary deadline", () => {
             if (bot.agentId === "bot-a") {
               await new Promise((resolve) => setTimeout(resolve, 20));
               aborted = scenario === "abort";
+            } else if (scenario === "abort_supplement") {
+              aborted = true;
             }
             return { text: "结论：给出可验证的独立建议。下一步：核实证据。" };
           },
         });
-        expect(calls).toEqual(scenario === "continue" ? ["bot-a", "bot-b"] : ["bot-a"]);
-        expect(round.state).toBe(scenario === "abort" ? "ROUND_ABORTED" : "ROUND_COMPLETE");
+        expect(calls).toEqual(
+          scenario === "continue" || scenario === "abort_supplement"
+            ? ["bot-a", "bot-b"]
+            : ["bot-a"],
+        );
+        expect(round.state).toBe(
+          scenario === "abort" || scenario === "abort_supplement"
+            ? "ROUND_ABORTED"
+            : "ROUND_COMPLETE",
+        );
         if (scenario === "continue") {
           expect(round.policyDecision?.supplementDenialDiagnosis?.structuralGate).toMatchObject({
             primaryBudgetClosed: true,
@@ -1098,4 +1109,57 @@ describe("invited member continuation after a settled primary deadline", () => {
       }
     },
   );
+});
+
+describe("explicit member queue budgets and coordination", () => {
+  test.each(["late", "stop_between", "signal_between"] as const)("%s", async (scenario) => {
+    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-multi-"));
+    const calls: string[] = [];
+    let stopped = false;
+    const controller = new AbortController();
+    const deadline = vi
+      .spyOn(completionContract, "resolvePrimaryDeadlineMs")
+      .mockImplementation(({ startedAtMs }) => startedAtMs + (scenario === "late" ? 5 : 1000));
+    const wait = vi.spyOn(roundOrchestrator, "sleepMs").mockImplementation(async () => {
+      if (scenario === "stop_between" && calls.length === 1) {
+        stopped = true;
+      }
+      if (scenario === "signal_between" && calls.length === 1) {
+        controller.abort();
+      }
+    });
+    try {
+      const round = await executeCollaborationRoundForTest({
+        decision: createDecision({
+          roundId: "multi-continuation",
+          primaryMode: "explicit_multi",
+          mentionMode: "explicit_multi",
+          responseMode: "debate_or_brainstorm",
+          primaryQueue: ["bot-a", "bot-b"],
+          executionBots: [botA, botB],
+        }),
+        policy: policyWithoutWrap(),
+        scope: createScope(),
+        roundsDir,
+        message: "@bot-a @bot-b 分别给出建议",
+        sessionKey: "space:alpha",
+        isAborted: () => stopped,
+        signal: controller.signal,
+        runBot: async ({ bot }) => {
+          calls.push(bot.agentId);
+          if (scenario === "late") {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+          return { text: "结论：给出独立建议。下一步：核对证据。" };
+        },
+      });
+      expect(calls).toEqual(scenario === "late" ? ["bot-a", "bot-b"] : ["bot-a"]);
+      expect(round.state).toBe(scenario === "late" ? "ROUND_COMPLETE" : "ROUND_ABORTED");
+      expect(wait).toHaveBeenCalledWith(2500, controller.signal);
+    } finally {
+      wait.mockRestore();
+      deadline.mockRestore();
+      await fs.rm(roundsDir, { recursive: true, force: true });
+    }
+  });
 });
