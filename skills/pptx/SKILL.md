@@ -17,6 +17,7 @@ triggers: pptx,ppt,演示文稿,幻灯片,路演,转成ppt,做成ppt,生成ppt,p
 - 用户意图是 PPT/PPTX/演示 → 加载 **cyber-ppt** 并按其三阶段流程执行。
 - 若会话只点到了本技能：告知以 cyber-ppt 为准，然后改读该技能全文与 references。
 - 不要把 `scripts/pptx_engine.py`（若 live 树仍残留）产出标为 CyberPPT 合格终版。
+- 需要不依赖沙箱里的 PptxGenJS、并保留非目标页的文件级创建/编辑/预览时，调用 `office_file`（技能 `office-file-suite`）。咨询叙事仍以 cyber-ppt 为准。
 
 详见 `../cyber-ppt/references/pptx-routing.md`（合并进 live tree 后为 `skills/cyber-ppt/references/pptx-routing.md`）。
 
