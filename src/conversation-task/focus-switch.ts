@@ -1,11 +1,17 @@
 /**
- * User-message focus switch (EA-B1). Decision logic is pure.
- * Session-file helpers are read-only and never write Task / Ledger / chat.
+ * User-message focus switch (EA-B1).
+ * Transcript readers are the IO adapter and never write Task / Ledger / chat.
+ * Stamp stripping and title copy come from policy and context. Heuristics that
+ * have no module-external consumer stay here and are not a second policy authority.
  */
 
 import fs from "node:fs";
+import { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
+import { stripInboundStamp } from "../agent-runtime/policy/index.js";
 import { type PreserveArticleOptions } from "./preserve-article-across-cut.js";
 import { qualifyTurn } from "./qualification.js";
+
+export { stripInboundStamp } from "../agent-runtime/policy/index.js";
 
 export type { PreserveArticleOptions } from "./preserve-article-across-cut.js";
 
@@ -39,8 +45,6 @@ const GOAL_IDENTITY_NOISE = new Set([
   "openclaw",
   "daibai",
 ]);
-
-const INBOUND_STAMP_RE = /^\[[A-Za-z]{3} \d{4}-\d{2}-\d{2} [0-9:]{4,8} GMT[+-]\d+\]\s*/;
 
 export {
   readFocusSwitchDecisionCount,
@@ -170,10 +174,6 @@ export function incomingRejectsFocus(incoming: string, currentFocus: string): bo
   return false;
 }
 
-export function stripInboundStamp(text: string): string {
-  return text.replace(INBOUND_STAMP_RE, "").trim();
-}
-
 export function isCurrentWorkDeixis(text: string): boolean {
   return CURRENT_WORK_DEIXIS.test(stripInboundStamp(text));
 }
@@ -239,32 +239,9 @@ export function readLastFocusTextFromSessionFile(sessionFile: string): string | 
   return readLastFocusTextFromTranscript(readSessionFileTail(sessionFile));
 }
 
-const DECORATIVE_TITLE_LINE = /^(?:[「」『』【】（）()[\]"'“”‘’*#\-_—…·`\s])+$/u;
-
-function normalizeTitleLine(line: string): string {
-  return line
-    .replace(/^#+\s*/, "")
-    .replace(/^\*+\s*|\s*\*+$/g, "")
-    .replace(/^[「『【]\s*|\s*[」』】]$/g, "")
-    .trim();
-}
-
+/** Focus-switch title copy delegates to context. This module does not own a second title generator. */
 export function titleFromTaskText(text: string): string {
-  const cleaned = stripInboundStamp(text);
-  const first = cleaned
-    .split(/\r?\n/)
-    .map((line) => normalizeTitleLine(line))
-    .find(
-      (line) =>
-        line &&
-        !line.startsWith("[") &&
-        !DECORATIVE_TITLE_LINE.test(line) &&
-        !line.startsWith("任务目标"),
-    );
-  const compact = (first ?? normalizeTitleLine(cleaned.replace(/\s+/g, " ")))
-    .replace(/\s+/g, " ")
-    .trim();
-  return compact.length > 36 ? `${compact.slice(0, 36)}…` : compact;
+  return titleFromGoal(text);
 }
 
 export function tokenOverlapRatio(

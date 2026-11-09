@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { titleFromGoal } from "../agent-runtime/context/sources/task-title.js";
+import * as policy from "../agent-runtime/policy/index.js";
 import {
   applyFocusCancelFence,
   applyFocusParkFence,
@@ -7,7 +9,9 @@ import {
   omitParkedPriorTurns,
   readLastFocusTextFromTranscript,
   readLastUserTextFromTranscript,
+  readUserTurnTextsFromTranscript,
   stripFocusParkFence,
+  stripInboundStamp,
   titleFromTaskText,
 } from "./focus-switch.js";
 
@@ -196,5 +200,32 @@ describe("focus switch (P2 acceptance)", () => {
     ]);
     expect(cut).toHaveLength(1);
     expect(cut[0]).toMatchObject({ role: "user" });
+  });
+
+  it("uses the policy stamp strip and context title, and keeps transcript parsing local", () => {
+    const samples = [
+      "",
+      "hello",
+      "[Sat 2026-09-19 15:07 GMT+8] 请先出清单",
+      "[Wed 2026-01-01 00:00:00 GMT-5] body",
+      "not a stamp [Sat 2026-09-19 15:07 GMT+8]",
+      "[Sat 2026-09-19 15:07 GMT+8] 请先出技能来源基线清单 v1",
+    ];
+    for (const sample of samples) {
+      expect(stripInboundStamp(sample)).toBe(policy.stripInboundStamp(sample));
+      expect(titleFromTaskText(sample)).toBe(titleFromGoal(sample));
+    }
+    expect(stripInboundStamp).toBe(policy.stripInboundStamp);
+    expect(
+      readUserTurnTextsFromTranscript(
+        JSON.stringify({
+          message: { role: "user", content: "[Sat 2026-09-19 15:07 GMT+8] 交接给skill" },
+        }),
+      ),
+    ).toEqual(["交接给skill"]);
+    expect(policy).not.toHaveProperty("classifyTurnRelation");
+    expect(policy).not.toHaveProperty("isLikelyNewTask");
+    expect(policy).not.toHaveProperty("incomingRejectsFocus");
+    expect(policy).not.toHaveProperty("tokenOverlapRatio");
   });
 });
