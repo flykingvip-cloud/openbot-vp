@@ -105,7 +105,7 @@ export function formatKnowledgeContextPromptBlock(params: {
     `- Enabled sources: ${params.profile.enabledSources.join(", ")}`,
     `- Retrieval mode: ${params.profile.retrievalMode}`,
     "Consume knowledge through the Knowledge Universe layer only. Do not call external CRM/ERP/Connector APIs directly.",
-    "Search ingested documents with knowledge_search; follow objectId or ku:// sourceUri with knowledge_get. Materialized enterprise feed objects (用友 T+ 仓库/存货 and other data products) are knowledge objects too: cite their title and summary rows. memory_search is workspace/session/runtime memory only. knowledge_source is API source bind/invoke, not document body. data_capability action=invoke does not return connector rows. Do not open 云电脑 for these rows. Do not exec find or invent a local path.",
+    "Search ingested documents with knowledge_search; follow objectId or ku:// sourceUri with knowledge_get. Materialized enterprise feed objects (用友 T+ 仓库/存货 and other data products) are knowledge objects too: cite their title and summary rows. The summary is a preview; knowledge_get offset pages the rest of the materialized payload under a character budget. Do not tell the user to click 立即物化 when the excerpt is short or a default connector product looks stale — connect and the gateway sync schedule refresh those feeds. A missing seat grant is the authorization gate. memory_search is workspace/session/runtime memory only. knowledge_source is API source bind/invoke, not document body. data_capability action=invoke does not return connector rows. Do not open 云电脑 for these rows. Do not exec find or invent a local path.",
     "The same consume path applies to every robot and collaboration group. Recent-visit titles are not document body.",
   ];
 

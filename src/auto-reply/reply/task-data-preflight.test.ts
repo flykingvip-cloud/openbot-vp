@@ -26,6 +26,8 @@ describe("task-data-preflight", () => {
     expect(prompt).toContain("001-用友T+仓库");
     expect(prompt).toContain("云电脑");
     expect(prompt).toContain("data_capability");
+    expect(prompt).toContain("立即物化");
+    expect(prompt).toContain("offset");
     expect(detectTaskDataPreflightGaps("打开云电脑看用友仓库")).not.toContain("enterprise_feed");
   });
 });
