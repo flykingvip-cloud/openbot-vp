@@ -5,7 +5,7 @@
 - Baseline before this batch: `32578f9a73693008e3717f89993f262b6c635e9f` (includes accepted Batch A `591c9475fd287fad92eb38a45d9cca75c81ec263`)
 - Implementation tip: `050098bc3c318b3c76d89278d293a65d29950999` (`27e9acc6`, `ebf4f650`, `050098bc`)
 - Evidence notes follow that tip. The fixed head is the branch tip after this file.
-- Nature: implementation evidence for Batch B. Not merge approval and not a production deploy.
+- Nature: first Batch B evidence. Independent acceptance of `4ce9c442e4e2c9fc42444e76d6a9a79b37992d88` rejected it. The correction is `batch-b-acceptance-rejection-fix-2026-11-09.md`. This file is not the fixed acceptance head.
 
 ## Close meanings
 
@@ -18,7 +18,7 @@ These domains stay separate. A later delivered reply may retry a rejected board 
 | SessionTaskBoard completion | `recordCheckedTaskCompletion` persisted `deliverableChecked` for a live binding, or reported `alreadyChecked` for that same binding without rewriting the board. | The conversation task is closed, or delivery succeeded. |
 | Delivery confirmation | Only `confirmPendingTurnDelivery` after `resolveRequiredDeliveryConfirmStatus` is `delivered`. | A non-empty assistant reply. Reply completion does not call the confirm entry. |
 
-External success for this observer is the completion notice string returned to dispatch. It is returned only when this call newly persisted the board and the conversation task then transitioned to `closed`. A rejected board write, a thrown board write, a stale attempt, a binding mismatch, missing canonical evidence, or a silent/placeholder reply returns no notice.
+The observer return string is not proof that the transcript has no completion notice. At `4ce9c442` the board writer still appended the notice before ConversationTask close. That claim is withdrawn. See the rejection fix.
 
 ## Failure injection before the fix
 

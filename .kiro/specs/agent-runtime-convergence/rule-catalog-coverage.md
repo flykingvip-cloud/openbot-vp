@@ -69,9 +69,9 @@
 
 | id | current→target | implementation | 说明 |
 | --- | --- | --- | --- |
-| `task.park.abort_inflight` | conversation-task→policy | `src/conversation-task/park-abort.ts` | **仅**现役安全谓词；本批未进 policy/index；非整包分类器 |
+| `task.park.abort_inflight` | policy→policy | `src/agent-runtime/policy/explicit-task-control.ts` | 公共入口 `policy/index`；Gateway 直接消费；分类器不在此 |
 | `task.constraint.owner_gate` | conversation-task→policy | `src/conversation-task/turn-relation.ts` | REV-CONSTRAINT 谓词 |
-| `task.focus.wake` | conversation-task→policy | `src/conversation-task/focus-policy.ts` | eligibility 与 decideWake 已分开；槽位勿与 TASKS 硬合 |
+| `task.focus.wake` | policy→policy | `src/agent-runtime/policy/explicit-task-control.ts` | eligibility 在公共入口；`decideWake` 与槽位仍在 focus-policy |
 | `task.focus.switch` | conversation-task→policy | `src/conversation-task/focus-switch.ts` | stamp/title 已委托；transcript IO 留 adapter |
 | `task.reply.completion` | conversation-task→state | `src/conversation-task/reply-completion.ts` | 板结算后再关 CTR；拒绝不对外报成功；见 T4 窗口记录 |
 
