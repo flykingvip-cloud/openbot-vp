@@ -77,10 +77,10 @@ it("separates current ownership from target ownership for state and pending path
   expect(park?.targetOwner).toBe("policy");
   expect(park?.disposition).toBe("retain");
   expect(park?.implementation).toBe("src/agent-runtime/policy/explicit-task-control.ts");
-  expect(collab?.currentOwner).toBe("gateway");
+  expect(collab?.currentOwner).toBe("policy");
   expect(collab?.targetOwner).toBe("policy");
-  expect(collab?.disposition).toBe("pending_migration");
-  expect(collab?.implementation).toContain("gateway/collaboration-dispatch");
+  expect(collab?.disposition).toBe("retain");
+  expect(collab?.implementation).toBe("src/agent-runtime/policy/collaboration-compile.ts");
 });
 
 it("registers pending-migration rules at real paths without ClaimContract", () => {
