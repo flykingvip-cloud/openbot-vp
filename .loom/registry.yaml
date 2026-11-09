@@ -11348,6 +11348,8 @@ tasks:
       - src/agent-runtime/execution/runner/execution-lifecycle.ts
       - src/agent-runtime/execution/runner/command-lifecycle.ts
       - .kiro/specs/agent-runtime-convergence/context-component-plan.md
+      - src/office-suite/service.ts
+      - src/office-suite/office-suite.preview-contract.test.ts
     state: active
     sessions:
       - id: 6cce1901-02ad-4d31-aede-6013384aae12
@@ -12622,6 +12624,17 @@ tasks:
     since: 2026-11-09
     metadata: {}
 landingStreams:
+  - id: pr250-office-preview-prerequisite-20261109
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/office-suite/service.ts
+      - src/office-suite/office-suite.preview-contract.test.ts
+    canLandWith: []
+    metadata:
+      task: agent-runtime-convergence
+      agent: codex-runtime-manager
+      purpose: Fix confirmed current-main preview summary contract; no additional Office feature.
   - id: pr250-main253-sync-20261109
     landingPolicy: serial
     paths:
@@ -29976,4 +29989,12 @@ sharedPaths:
   - glob: src/cron/cron-result-template.ts
     landerTask: agent-runtime-convergence
     reason: User-authorized limited cron presentation handoff; preserve predecessor scopes and history.
+    reviewAfter: 2026-11-30
+  - glob: src/office-suite/service.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized merge readiness prerequisite after current-main Office regression.
+    reviewAfter: 2026-11-30
+  - glob: src/office-suite/office-suite.preview-contract.test.ts
+    landerTask: agent-runtime-convergence
+    reason: Human-authorized merge readiness prerequisite after current-main Office regression.
     reviewAfter: 2026-11-30
