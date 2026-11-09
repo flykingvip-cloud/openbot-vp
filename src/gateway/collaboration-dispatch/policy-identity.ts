@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import type { EffectiveCollaborationPolicy, PolicyClamp } from "./effective-policy.js";
 
 /** Compiler implementation revision. Not folded into policyHash (§2.4). */
-export const POLICY_COMPILER_REVISION = "1.2.0" as const;
+export const POLICY_COMPILER_REVISION = "1.3.0" as const;
 
 export type DeepReadonly<T> = T extends (...args: infer _A) => infer _R
   ? T

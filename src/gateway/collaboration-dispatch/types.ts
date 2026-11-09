@@ -116,7 +116,11 @@ export type CollaborationRoundPlanPayload = {
   mentionAll?: boolean;
 };
 
+/** Derived once by the decision engine; not a new policy source. */
+export type RoundVisibleReplyBudget = { kind: "ordinary" | "broadcast"; limit: number };
+
 export type ParticipationDecision = {
+  visibleReplyBudget?: RoundVisibleReplyBudget;
   roundId: string;
   responseMode: CollaborationResponseMode;
   tier0: CollaborationBotTarget[];

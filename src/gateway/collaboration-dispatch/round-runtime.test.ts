@@ -2,7 +2,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, test, vi } from "vitest";
-import { executeCollaborationRoundForTest } from "./__fixtures__/runtime-authority-test-utils.js";
+import {
+  executeCollaborationRoundForTest,
+  decideParticipantsForTest,
+} from "./__fixtures__/runtime-authority-test-utils.js";
 import * as completionContract from "./completion-contract.js";
 import { DEFAULT_COLLABORATION_POLICY } from "./policy.js";
 import * as roundOrchestrator from "./round-orchestrator.js";
@@ -1196,3 +1199,62 @@ describe("restart during a pending collaboration sequence", () => {
     },
   );
 });
+
+test.each([undefined, 4])(
+  "explicit introduction honors broad ceiling %s beyond ordinary budget",
+  async (broadCeiling) => {
+    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-intro-contract-"));
+    const bots = Array.from({ length: 8 }, (_, index) => ({
+      ...botA,
+      agentId: `member-${index}`,
+      name: `成员${index}`,
+      sessionKey: `agent:member-${index}:space:alpha`,
+    }));
+    const scope: CollaborationDispatchScope = { ...createScope(), bots };
+    if (broadCeiling !== undefined) {
+      const operating = createCoordinatorScope().operatingState!;
+      scope.operatingState = {
+        ...operating,
+        collaborationPolicy: {
+          ...operating.collaborationPolicy,
+          maxVisibleBotRepliesPerRound: 3,
+          maxVisibleBotRepliesPerRoundBroad: broadCeiling,
+        },
+      };
+    }
+    const expectedCount = broadCeiling ?? 8;
+    const decision = decideParticipantsForTest({
+      scope,
+      message: "请你们分别介绍一下自己",
+      roundId: "intro-contract",
+    });
+    expect(decision.executionBots).toHaveLength(expectedCount);
+    expect(decision.visibleReplyBudget).toEqual({ kind: "broadcast", limit: expectedCount });
+    const calls: string[] = [];
+    const wait = vi.spyOn(roundOrchestrator, "sleepMs").mockResolvedValue();
+    try {
+      const round = await executeCollaborationRoundForTest({
+        decision,
+        scope,
+        roundsDir,
+        message: "请你们分别介绍一下自己",
+        sessionKey: "space:alpha",
+        policy: {
+          ...policyWithoutWrap(),
+          supplement: { ...DEFAULT_COLLABORATION_POLICY.supplement, enabled: true },
+        },
+        runBot: async ({ bot }) => {
+          calls.push(bot.agentId);
+          return { text: `我是${bot.name}，负责提供自己专业领域的独立意见。` };
+        },
+      });
+      expect(round.state).toBe("ROUND_COMPLETE");
+      expect(calls).toHaveLength(expectedCount);
+      expect(new Set(calls)).toEqual(new Set(decision.executionBots.map((bot) => bot.agentId)));
+      expect(round.policyDecision?.visibleReplyBudget).toEqual(decision.visibleReplyBudget);
+    } finally {
+      wait.mockRestore();
+      await fs.rm(roundsDir, { recursive: true, force: true });
+    }
+  },
+);

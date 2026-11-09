@@ -1034,12 +1034,14 @@ export async function executeCollaborationRound(
   );
   // Bots the human explicitly invited (@name / @所有人 broadcast) beyond the lead.
   // decision_to_executor executors are the core of that mode, not optional extras.
+  const replyBudget = round.policyDecision?.visibleReplyBudget;
+  const broadcastBudget = replyBudget?.kind === "broadcast";
   const invitedAgentIdsBaseline = new Set(
     [
       ...params.decision.roundPlan.participants
         .filter((participant) => participant.tier === "mention")
         .map((participant) => participant.agentId),
-      ...(params.decision.responseMode === "decision_to_executor"
+      ...(broadcastBudget || params.decision.responseMode === "decision_to_executor"
         ? stages.supplement.bots.map((bot) => bot.agentId)
         : []),
     ]
@@ -1161,7 +1163,15 @@ export async function executeCollaborationRound(
     const gateLog: SupplementGateEntry[] = [];
     const visibleCap = Math.min(
       COLLABORATION_ABSOLUTE_VISIBLE_TURN_LIMIT,
-      Math.max(1, effective.participation.maxVisibleBotRepliesPerRound),
+      Math.max(
+        1,
+        broadcastBudget
+          ? Math.min(replyBudget.limit, effective.participation.rollCall.ceiling)
+          : Math.min(
+              replyBudget?.limit ?? effective.participation.maxVisibleBotRepliesPerRound,
+              effective.participation.maxVisibleBotRepliesPerRound,
+            ),
+      ),
     );
     // Only fill an empty planned queue. Same-round CollabEdges already nominate
     // targets via prioritizeSupplementBotsForEdges — do not add a third speaker.

@@ -245,6 +245,7 @@ export type SupplementGateEntry = {
 
 /** Why these bots were scheduled. Not the Collaboration Ledger. */
 export type PolicyDecisionRecord = {
+  visibleReplyBudget?: import("./types.js").RoundVisibleReplyBudget;
   roundId: string;
   protocolVersion: typeof COLLABORATION_POLICY_PROTOCOL_VERSION;
   effectivePolicyHash: string;

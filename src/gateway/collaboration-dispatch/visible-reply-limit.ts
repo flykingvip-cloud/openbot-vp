@@ -65,15 +65,10 @@ export function isRoomGreetingMessage(message: string): boolean {
   return ROOM_GREETING_RE.test(message.replace(/\s+/g, "").trim());
 }
 
-/** Presence checks always broadcast. Room greetings broadcast only on intro missions. */
-function isOnboardingIntroductionMissionForFacts(facts: RuntimeFacts): boolean {
-  const mission = `${facts.profileMission ?? ""} ${facts.activeContext.currentMission ?? ""}`;
-  return /介绍|认识|自我介绍|onboarding|introduc/i.test(mission);
-}
-
+/** Explicit presence/introduction requests broadcast; a mission alone never expands a greeting. */
 export function shouldBroadcastPresenceOrIntroduction(
   message: string,
-  facts?: RuntimeFacts,
+  _facts?: RuntimeFacts,
 ): boolean {
   if (isPresenceCheckMessage(message)) {
     return true;
@@ -86,9 +81,7 @@ export function shouldBroadcastPresenceOrIntroduction(
   ) {
     return true;
   }
-  return Boolean(
-    facts && isRoomGreetingMessage(message) && isOnboardingIntroductionMissionForFacts(facts),
-  );
+  return false;
 }
 
 export function classifyOpenDiscussionLimitMode(

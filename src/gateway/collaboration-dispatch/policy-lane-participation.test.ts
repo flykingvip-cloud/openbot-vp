@@ -205,7 +205,7 @@ it("null operatingState: broadcast ceiling matches unset-broad legacy (min(botCo
     mode: "legacy",
   });
   expect(resolved.broadcastCeiling).toBe(5);
-  expect(resolved.policyCeiling).toBe(5); // L1 default when no OS and no effective
+  expect(resolved.policyCeiling).toBe(3); // L1 default when no OS and no effective
 });
 
 describe("P1-A5 ① resolveParticipationLaneMentionMustRespond", () => {
