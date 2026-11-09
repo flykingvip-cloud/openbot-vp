@@ -226,5 +226,5 @@ export type {
   MemberArtifactDeliveryScope,
   NormalizedDeliveryTarget,
   OutboundAuthDecision,
-  ServerOutboundAuthFacts,
+  OutboundArtifactGrant,
 } from "./accepted-artifact-delivery.js";
