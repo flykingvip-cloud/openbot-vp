@@ -130,3 +130,41 @@ it("does not let nested field edits pollute the catalog", () => {
   expect(again?.dependencies.artifacts[0]).toBe(originalArtifact);
   expect(again?.tests[0]).toBe(originalTest);
 });
+
+it("records accurate configuration and tests for reviewed rules", () => {
+  const peer = getRuntimeRuleDeclaration("collab.peer.review_gate");
+  expect(peer?.configuration).toContain("collaboration.task.requirePeerReview");
+  expect(peer?.configuration).toMatch(/default false/i);
+  expect(peer?.configuration).toMatch(/does not control peer-review fact writes/i);
+  expect(peer?.configuration).toMatch(/acceptBoardItemSubmission|accept/i);
+
+  const reply = getRuntimeRuleDeclaration("task.reply.completion");
+  expect(reply?.configuration).toContain("OPENBOT_CONVERSATION_TASK_ACTIVATION");
+  expect(reply?.configuration).toMatch(/activation/i);
+  expect(reply?.configuration).toMatch(/default OFF/i);
+  expect(reply?.configuration.toLowerCase()).not.toMatch(/^none\b/);
+
+  const gov = getRuntimeRuleDeclaration("collab.governance.gate");
+  expect(gov?.tests).toContain("src/gateway/collaboration-dispatch/governance-gate.test.ts");
+  expect(gov?.tests.length).toBeGreaterThan(0);
+
+  // Other newly registered pending-migration entries keep real test paths when present.
+  for (const id of [
+    "task.focus.wake",
+    "task.focus.switch",
+    "task.reply.completion",
+    "collab.policy.compile",
+    "collab.submit.review_versioning",
+    "collab.peer.review_gate",
+    "collab.plan.gate",
+    "task.park.abort_inflight",
+  ]) {
+    const rule = getRuntimeRuleDeclaration(id);
+    expect(rule, id).toBeTruthy();
+    expect(rule!.tests.length, id).toBeGreaterThan(0);
+    for (const testPath of rule!.tests) {
+      expect(testPath.includes("/"), `${id} -> ${testPath}`).toBe(true);
+      expect(existsSync(resolve(testPath)), `${id} -> ${testPath}`).toBe(true);
+    }
+  }
+});
