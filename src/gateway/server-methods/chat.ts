@@ -196,6 +196,7 @@ import {
 } from "../collaboration-dispatch/discussion-turn-prompt.js";
 import type { EffectiveCollaborationPolicy } from "../collaboration-dispatch/effective-policy.js";
 import { runSingleBeatEpisodeAroundRound } from "../collaboration-dispatch/episode-single-beat-runtime.js";
+import { formatExecutionTaskBagForPrompt } from "../collaboration-dispatch/executor-private-todolist.js";
 import { resolveExplicitMentionTokens } from "../collaboration-dispatch/explicit-mention-tokens.js";
 import {
   emitCollabFaultRoundDiagnostic,
@@ -211,6 +212,7 @@ import {
   type V1RollCallRoster,
 } from "../collaboration-dispatch/hotfix-rollcall-v1.js"; // v1-only
 import { resolveProductionCollaborationExecutor } from "../collaboration-dispatch/legacy-production-executor.js";
+import { resolveMemberAdmission } from "../collaboration-dispatch/member-admission.js";
 import { readCollaborationMemberContext } from "../collaboration-dispatch/member-context.js";
 import {
   normalizeAgentIdentifier,
@@ -5531,7 +5533,21 @@ export const chatHandlers: GatewayRequestHandlers = {
                 if (parentAbortController.signal.aborted) {
                   return;
                 }
+                const admission = await resolveMemberAdmission({
+                  authority,
+                  agentId: params.bot.agentId,
+                  runId: `${clientRunId}:${params.bot.agentId}`,
+                  taskId: scope.operatingState?.activeContext.currentTaskId,
+                  executionRequested: params.contributionRole === "executor",
+                  cfg: groupCfg,
+                });
+                if (admission.purpose === "blocked") {
+                  throw new Error(`正式执行尚未准入：${admission.reason}`);
+                }
                 const reply = await runGroupBotDiscussionTurn({
+                  ...(admission.purpose === "formal_execution"
+                    ? { executionDeliverableBinding: admission.binding }
+                    : {}),
                   context,
                   client,
                   bot: params.bot,
@@ -5543,7 +5559,10 @@ export const chatHandlers: GatewayRequestHandlers = {
                   contributionRole:
                     params.contributionRole ?? contributionRoleByAgentId.get(params.bot.agentId),
                   isWrapTurn: params.isWrapTurn,
-                  message: transcriptMessage,
+                  message:
+                    admission.purpose === "formal_execution"
+                      ? `${transcriptMessage}\n\n${formatExecutionTaskBagForPrompt(admission.taskBag)}`
+                      : transcriptMessage,
                   thinking: p.thinking,
                   timeoutMs: p.timeoutMs,
                   deliver: p.deliver,
