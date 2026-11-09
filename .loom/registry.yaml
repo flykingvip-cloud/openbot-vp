@@ -10826,11 +10826,70 @@ tasks:
         agent: codex-runtime-manager
         status: active
         lastSignalAt: 2026-11-09T03:26:43.689Z
+  - id: office-file-suite:cursor-jineng
+    owner: cursor-jineng
+    intent:
+      - Clean-room Office file suite for all tenants and individual users
+    paths:
+      - src/office-suite/**
+      - src/agents/tools/office-file-tool.ts
+      - src/agents/tools/office-file-tool.test.ts
+      - skills/office-file-suite/**
+      - docs/office/office-file-suite.md
+      - src/agents/openclaw-tools.office-file.test.ts
+    state: active
+    sessions:
+      - id: 7c3e1a04-9b2d-4f6a-8c15-0e4d6a8b2f11
+        taskId: office-file-suite:cursor-jineng
+        ide: cursor
+        agent: cursor-jineng
+        status: active
+        lastSignalAt: 2026-11-09T03:03:54.105Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-09
     metadata: {}
 landingStreams:
+  - id: pr249-main253-sync-20261109
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - CHANGELOG.md
+      - docs/office/office-file-suite.md
+      - skills/cyber-ppt/SKILL.md
+      - skills/documents/SKILL.md
+      - skills/nano-pdf/SKILL.md
+      - skills/office-automation-core/SKILL.md
+      - skills/office-file-suite/ATTRIBUTION.md
+      - skills/office-file-suite/SKILL.md
+      - skills/office-file-suite/references/capability-matrix.md
+      - skills/office-file-suite/references/openbot-delivery.md
+      - skills/pptx/SKILL.md
+      - skills/spreadsheets/SKILL.md
+      - src/agents/openclaw-tools.office-file.test.ts
+      - src/agents/openclaw-tools.ts
+      - src/agents/sandbox/constants.ts
+      - src/agents/tool-catalog.ts
+      - src/agents/tools/office-file-tool.test.ts
+      - src/agents/tools/office-file-tool.ts
+      - src/office-suite/connectors.ts
+      - src/office-suite/docx.ts
+      - src/office-suite/formula.ts
+      - src/office-suite/index.ts
+      - src/office-suite/office-suite.acceptance.test.ts
+      - src/office-suite/pdf.ts
+      - src/office-suite/pptx.ts
+      - src/office-suite/preview.ts
+      - src/office-suite/scope.ts
+      - src/office-suite/service.ts
+      - src/office-suite/ttf.ts
+      - src/office-suite/xlsx.ts
+      - src/office-suite/xml.ts
+    canLandWith: []
+    metadata:
+      task: four-pr-merge-readiness
+      agent: codex-runtime-manager
+      purpose: Only merge latest main; preserve feature gates and both registry additions.
   - id: pr249-technical-closeout-20261109
     landingPolicy: serial
     paths:
@@ -10934,6 +10993,16 @@ landingStreams:
       owner: cursor-cloud
       purpose: Slice 1a Feishu enterprise channel plus slice 1b employee login on the existing identity
         store.
+  - id: office-file-suite-20261109
+    landingPolicy: serial
+    paths:
+      - src/office-suite/**
+      - docs/office/**
+    canLandWith: []
+    metadata:
+      task: office-file-suite
+      owner: cursor-jineng
+      purpose: Clean-room file-mode Office create, edit, preview, and export.
   - id: auto-data-product-supply-20261108
     landingPolicy: serial
     paths:

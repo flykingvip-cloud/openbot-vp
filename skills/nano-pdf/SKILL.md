@@ -28,7 +28,7 @@ metadata:
 
 # nano-pdf（PDF 创建 / 编辑 / 渲染核验）
 
-OpenBot 终端交付：**工作区文件**（`.pdf` + 可选 QA PNG）。不要依赖 Codex artifact API、`openai.yaml`、或 `:codex-file-citation`。
+OpenBot 终端交付：**工作区文件**（`.pdf` + 可选 QA PNG）。不要依赖 Codex artifact API、`openai.yaml`、或 `:codex-file-citation`。中文生成、抽取、分页和表单可调用 `office_file`（技能 `office-file-suite`）。像素验收在装有 Poppler 或 LibreOffice 时进行。
 
 ## 何时用
 
