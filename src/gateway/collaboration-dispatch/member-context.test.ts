@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { assertMemberContextFitsModel } from "./member-context.js";
 import {
   CollaborationMemberContextBudgetError,
   COLLABORATION_MEMBER_CONTEXT_MAX_CHARS,
@@ -75,4 +76,17 @@ describe("per-member public context preparation", () => {
       }),
     ).toThrow("read failed");
   });
+});
+
+test("selected model window changes admission without dropping Chinese constraints", () => {
+  const history = [{ body: "中文限制禁止发布".repeat(100) }];
+  expect(() => assertMemberContextFitsModel({ contextWindowTokens: 1024, history })).toThrow(
+    "尚未启动",
+  );
+  expect(assertMemberContextFitsModel({ contextWindowTokens: 32000, history }).budgetTokens).toBe(
+    8000,
+  );
+  expect(() => assertMemberContextFitsModel({ contextWindowTokens: NaN, history })).toThrow(
+    "窗口未知",
+  );
 });

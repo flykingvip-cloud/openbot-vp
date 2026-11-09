@@ -39,3 +39,26 @@ export function readCollaborationMemberContext(params: {
   }
   return { groupInboundHistory, sameRoundContext };
 }
+
+/** Conservative UTF-8 byte upper estimate, not an exact tokenizer. Reserve 75%
+ * of the selected model window for system/tools/current input/output. */
+export function assertMemberContextFitsModel(params: {
+  contextWindowTokens: number;
+  history: unknown;
+  sameRoundContext?: import("./same-round-context.js").SameRoundContext;
+}): { estimatedTokens: number; budgetTokens: number } {
+  if (!Number.isFinite(params.contextWindowTokens) || params.contextWindowTokens <= 0) {
+    throw new Error("协作模型上下文窗口未知，本成员尚未启动");
+  }
+  const text =
+    JSON.stringify(params.history) +
+    (params.sameRoundContext ? formatSameRoundContextForPrompt(params.sameRoundContext) : "");
+  const estimatedTokens = Buffer.byteLength(text, "utf8");
+  const budgetTokens = Math.floor(params.contextWindowTokens / 4);
+  if (estimatedTokens > budgetTokens) {
+    throw new Error(
+      `协作上下文超出当前模型分配预算（保守估计 ${estimatedTokens}/${budgetTokens} tokens），本成员尚未启动`,
+    );
+  }
+  return { estimatedTokens, budgetTokens };
+}
