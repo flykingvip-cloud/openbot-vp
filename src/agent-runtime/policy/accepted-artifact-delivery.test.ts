@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  evaluateAcceptedArtifactOutboundAuthorization,
   evaluateMemberArtifactDeliveryEligibility,
   memberArtifactDeliveryKeyMaterial,
   normalizeDeliveryTarget,
@@ -67,5 +68,43 @@ describe("evaluateMemberArtifactDeliveryEligibility", () => {
       target!,
     );
     expect(splitLeft).not.toBe(splitRight);
+  });
+});
+
+describe("evaluateAcceptedArtifactOutboundAuthorization", () => {
+  const target = { channel: "telegram", accountId: null, to: "chat-1" };
+
+  it("does not allow a caller to pass a grant", () => {
+    const decision = evaluateAcceptedArtifactOutboundAuthorization({
+      actorId: "bot-b",
+      normalizedTarget: target,
+      facts: { factsLoaded: false },
+    });
+    expect(decision.outcome).toBe("authorization_pending");
+    expect("granted" in decision).toBe(false);
+  });
+
+  it("allows only a member whose target is on the server allowlist", () => {
+    expect(
+      evaluateAcceptedArtifactOutboundAuthorization({
+        actorId: "bot-b",
+        normalizedTarget: target,
+        facts: { factsLoaded: true, memberActorIds: ["bot-a"], allowFrom: ["chat-1"] },
+      }),
+    ).toEqual({ outcome: "deny", reason: "outbound_actor_not_member" });
+    expect(
+      evaluateAcceptedArtifactOutboundAuthorization({
+        actorId: "bot-b",
+        normalizedTarget: target,
+        facts: { factsLoaded: true, memberActorIds: ["bot-b"], allowFrom: ["other"] },
+      }),
+    ).toEqual({ outcome: "deny", reason: "outbound_target_not_allowed" });
+    expect(
+      evaluateAcceptedArtifactOutboundAuthorization({
+        actorId: "bot-b",
+        normalizedTarget: target,
+        facts: { factsLoaded: true, memberActorIds: ["bot-b"], allowFrom: ["chat-1"] },
+      }).outcome,
+    ).toBe("allow");
   });
 });

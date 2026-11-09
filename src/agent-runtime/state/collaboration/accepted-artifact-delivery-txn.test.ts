@@ -176,6 +176,8 @@ describe("commitMemberArtifactDeliveryAssociation", () => {
     const delivered = {
       ...created.intent,
       phase: "delivered",
+      authorization: "allow",
+      queueId: "queue-kept",
       externalEffect: "acknowledged",
       retryable: false,
       receiptMessageIds: ["m-1"],
@@ -198,6 +200,7 @@ describe("commitMemberArtifactDeliveryAssociation", () => {
     const unknown = {
       ...delivered,
       phase: "unknown",
+      bridgeSendStarted: true,
       externalEffect: "unknown",
       retryable: false,
     };

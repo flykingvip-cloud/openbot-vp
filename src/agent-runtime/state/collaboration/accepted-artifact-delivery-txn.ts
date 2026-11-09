@@ -1,12 +1,24 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { OpenBotConfig } from "../../../config/config.js";
+import { deliverOutboundPayloads, type OutboundSendDeps } from "../../../infra/outbound/deliver.js";
 import {
+  ackDelivery,
+  failDelivery,
+  moveToFailed,
+  resolveDeliveryQueueDir,
+  type QueuedDelivery,
+} from "../../../infra/outbound/delivery-queue.js";
+import { confirmedDeliveryMessageIds } from "../../../shared/delivery-receipt.js";
+import {
+  evaluateAcceptedArtifactOutboundAuthorization,
   evaluateMemberArtifactDeliveryEligibility,
   memberArtifactDeliveryKeyMaterial,
   normalizeDeliveryTarget,
   type MemberArtifactDeliveryIdentity,
   type NormalizedDeliveryTarget,
+  type ServerOutboundAuthFacts,
 } from "../../policy/accepted-artifact-delivery.js";
 import { withDirectoryLock, writeJsonDurable } from "../repository/durable-json.js";
 
@@ -22,6 +34,8 @@ export type DeliveryAssociationPhase =
   | "staged"
   /** Durable association after the staged suffix is renamed. Not an outbound queue entry. */
   | "associated"
+  /** Real delivery-queue json exists and queueId is set. Not used before that. */
+  | "queued"
   | "delivered"
   | "unknown"
   | "blocked"
@@ -45,12 +59,12 @@ export type MemberArtifactDeliveryIntent = {
   normalizedTarget: NormalizedDeliveryTarget;
   scope: "member_artifact";
   phase: DeliveryAssociationPhase;
-  authorization: "authorization_pending";
+  authorization: "authorization_pending" | "allow";
   bridgeSendStarted: boolean;
   externalEffect: DeliveryExternalEffect;
   retryable: boolean;
-  /** M1 never publishes a delivery-queue id. */
-  queueId: null;
+  /** Null until a delivery-queue id is stored. Never a caller-supplied grant. */
+  queueId: string | null;
   receiptMessageIds: string[] | null;
   stagedName: string;
   createdAtMs: number;
@@ -65,6 +79,7 @@ const RECOGNIZED: ReadonlySet<DeliveryAssociationPhase> = new Set([
   "authorization_pending",
   "staged",
   "associated",
+  "queued",
   "delivered",
   "unknown",
   "blocked",
@@ -122,34 +137,69 @@ function isTarget(value: unknown): value is NormalizedDeliveryTarget {
 }
 
 function isFixedNonSend(parsed: MemberArtifactDeliveryIntent): boolean {
-  if (parsed.queueId !== null || parsed.bridgeSendStarted) {
+  if (parsed.scope !== "member_artifact") {
     return false;
   }
-  if (parsed.authorization !== "authorization_pending" || parsed.scope !== "member_artifact") {
+  if (parsed.queueId !== null && !nonEmpty(parsed.queueId)) {
     return false;
   }
-  if (
+  const preSend =
     parsed.phase === "authorization_pending" ||
     parsed.phase === "staged" ||
-    parsed.phase === "associated"
-  ) {
+    parsed.phase === "associated";
+  if (preSend) {
     return (
-      parsed.externalEffect === "none" && !parsed.retryable && parsed.receiptMessageIds === null
+      parsed.authorization === "authorization_pending" &&
+      parsed.queueId === null &&
+      !parsed.bridgeSendStarted &&
+      parsed.externalEffect === "none" &&
+      !parsed.retryable &&
+      parsed.receiptMessageIds === null
+    );
+  }
+  if (parsed.phase === "queued") {
+    return (
+      parsed.authorization === "allow" &&
+      nonEmpty(parsed.queueId) &&
+      parsed.externalEffect === "none" &&
+      !parsed.retryable &&
+      parsed.receiptMessageIds === null
+    );
+  }
+  if (parsed.phase === "failed_retryable") {
+    return (
+      parsed.authorization === "allow" &&
+      nonEmpty(parsed.queueId) &&
+      parsed.bridgeSendStarted &&
+      parsed.externalEffect === "none" &&
+      parsed.retryable &&
+      parsed.receiptMessageIds === null
     );
   }
   if (parsed.phase === "unknown") {
-    return parsed.externalEffect === "unknown" && !parsed.retryable;
+    return (
+      parsed.bridgeSendStarted &&
+      parsed.externalEffect === "unknown" &&
+      !parsed.retryable &&
+      nonEmpty(parsed.queueId)
+    );
   }
   if (parsed.phase === "delivered") {
     return (
       parsed.externalEffect === "acknowledged" &&
       !parsed.retryable &&
+      nonEmpty(parsed.queueId) &&
       Array.isArray(parsed.receiptMessageIds) &&
       parsed.receiptMessageIds.length > 0 &&
       parsed.receiptMessageIds.every((id) => nonEmpty(id))
     );
   }
-  return parsed.externalEffect === "none";
+  return (
+    parsed.phase === "blocked" &&
+    !parsed.retryable &&
+    parsed.externalEffect === "none" &&
+    !parsed.bridgeSendStarted
+  );
 }
 
 function intentMatchesKey(parsed: MemberArtifactDeliveryIntent): boolean {
@@ -469,5 +519,274 @@ export async function recoverPartialStagedAssociation(params: {
       }
     }
     return { ok: true, keyHash, completedFromIntent: false };
+  });
+}
+
+function queueStagedName(keyHash: string): string {
+  return `bridge-${keyHash}.bridge-staged`;
+}
+
+async function writeQueueBody(filePath: string, entry: QueuedDelivery): Promise<void> {
+  await writeJsonDurable(filePath, entry);
+}
+
+export async function publishMemberArtifactDelivery(params: {
+  rootDir: string;
+  queueStateDir: string;
+  identity: MemberArtifactDeliveryIdentity;
+  contentSha256: string;
+  payloadText: string;
+  authFacts: ServerOutboundAuthFacts;
+  nowMs?: number;
+}): Promise<AssociationCommitResult> {
+  const keyHash = deliveryKeyHash(params.identity);
+  const target = normalizeDeliveryTarget(params.identity.target);
+  if (!keyHash || !target) {
+    return { ok: false, reason: "target_required" };
+  }
+  const nowMs = params.nowMs ?? Date.now();
+  return withDirectoryLock(params.rootDir, keyHash, async () => {
+    const read = await readIntent(params.rootDir, keyHash);
+    if (read.status === "unreadable") {
+      return { ok: false, reason: read.reason };
+    }
+    if (read.status === "missing" || read.intent.phase !== "associated") {
+      if (read.status === "ok" && read.intent.phase === "queued") {
+        return { ok: true, intent: read.intent, created: false };
+      }
+      return { ok: false, reason: read.status === "missing" ? "intent_missing" : "not_associated" };
+    }
+    const existing = read.intent;
+    if (compact(params.contentSha256).toLowerCase() !== existing.linkedContentSha256) {
+      const blocked: MemberArtifactDeliveryIntent = {
+        ...existing,
+        phase: "blocked",
+        updatedAtMs: nowMs,
+      };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), blocked);
+      return { ok: false, reason: "content_hash_mismatch" };
+    }
+    const auth = evaluateAcceptedArtifactOutboundAuthorization({
+      actorId: existing.actorId,
+      normalizedTarget: existing.normalizedTarget,
+      facts: params.authFacts,
+    });
+    if (auth.outcome === "authorization_pending") {
+      return { ok: false, reason: auth.reason };
+    }
+    if (auth.outcome === "deny") {
+      const blocked: MemberArtifactDeliveryIntent = {
+        ...existing,
+        phase: "blocked",
+        updatedAtMs: nowMs,
+      };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), blocked);
+      return { ok: false, reason: auth.reason };
+    }
+    const queueDir = resolveDeliveryQueueDir(params.queueStateDir);
+    await fs.mkdir(queueDir, { recursive: true });
+    const staged = path.join(queueDir, queueStagedName(keyHash));
+    let queueId = existing.queueId;
+    if (!queueId) {
+      const created = await exclusiveCreate(staged);
+      if (created === "exists") {
+        const prior = JSON.parse(await fs.readFile(staged, "utf8")) as QueuedDelivery;
+        queueId = prior.id;
+      } else {
+        queueId = randomUUID();
+      }
+      const hidden: QueuedDelivery = {
+        id: queueId,
+        enqueuedAt: nowMs,
+        retryCount: 0,
+        channel: "telegram",
+        to: existing.normalizedTarget.to,
+        accountId: existing.normalizedTarget.accountId ?? undefined,
+        payloads: [{ text: params.payloadText }],
+        bridgeMarker: true,
+        associationReady: false,
+        bridgeKeyHash: keyHash,
+        bridgeContentSha256: existing.linkedContentSha256,
+      };
+      await writeQueueBody(staged, hidden);
+      const withId: MemberArtifactDeliveryIntent = {
+        ...existing,
+        queueId,
+        updatedAtMs: nowMs,
+      };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), withId);
+    }
+    const visible = path.join(queueDir, `${queueId}.json`);
+    const ready: QueuedDelivery = {
+      id: queueId,
+      enqueuedAt: nowMs,
+      retryCount: 0,
+      channel: "telegram",
+      to: existing.normalizedTarget.to,
+      accountId: existing.normalizedTarget.accountId ?? undefined,
+      payloads: [{ text: params.payloadText }],
+      bridgeMarker: true,
+      associationReady: true,
+      bridgeKeyHash: keyHash,
+      bridgeContentSha256: existing.linkedContentSha256,
+    };
+    await writeQueueBody(visible, ready);
+    await fs.rm(staged, { force: true });
+    const queued: MemberArtifactDeliveryIntent = {
+      ...existing,
+      phase: "queued",
+      authorization: "allow",
+      queueId,
+      bridgeSendStarted: false,
+      externalEffect: "none",
+      retryable: false,
+      receiptMessageIds: null,
+      updatedAtMs: nowMs,
+    };
+    await writeJsonDurable(intentPath(params.rootDir, keyHash), queued);
+    return { ok: true, intent: queued, created: false };
+  });
+}
+
+export async function recoverMemberArtifactBridgeDelivery(params: {
+  rootDir: string;
+  queueStateDir: string;
+  entry: QueuedDelivery;
+  authFacts: ServerOutboundAuthFacts;
+  cfg: OpenBotConfig;
+  deps: OutboundSendDeps;
+  beforeReceipt?: () => Promise<void>;
+}): Promise<"recovered" | "failed" | "deferred"> {
+  const keyHash = params.entry.bridgeKeyHash;
+  if (!keyHash || params.entry.associationReady !== true) {
+    return "deferred";
+  }
+  return withDirectoryLock(params.rootDir, keyHash, async () => {
+    const read = await readIntent(params.rootDir, keyHash);
+    if (read.status !== "ok") {
+      return "failed";
+    }
+    const existing = read.intent;
+    if (existing.queueId !== params.entry.id) {
+      return "deferred";
+    }
+    if (
+      existing.phase === "delivered" ||
+      existing.phase === "unknown" ||
+      existing.phase === "blocked"
+    ) {
+      return "deferred";
+    }
+    if (existing.bridgeSendStarted && existing.externalEffect === "unknown") {
+      return "deferred";
+    }
+    const auth = evaluateAcceptedArtifactOutboundAuthorization({
+      actorId: existing.actorId,
+      normalizedTarget: existing.normalizedTarget,
+      facts: params.authFacts,
+    });
+    if (auth.outcome === "authorization_pending") {
+      return "deferred";
+    }
+    if (auth.outcome === "deny") {
+      const blocked: MemberArtifactDeliveryIntent = {
+        ...existing,
+        phase: "blocked",
+        bridgeSendStarted: false,
+        externalEffect: "none",
+        retryable: false,
+        updatedAtMs: Date.now(),
+      };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), blocked);
+      await moveToFailed(params.entry.id, params.queueStateDir);
+      return "failed";
+    }
+    if (params.entry.bridgeContentSha256 !== existing.linkedContentSha256) {
+      const blocked: MemberArtifactDeliveryIntent = {
+        ...existing,
+        phase: "blocked",
+        updatedAtMs: Date.now(),
+      };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), blocked);
+      await moveToFailed(params.entry.id, params.queueStateDir);
+      return "failed";
+    }
+    const started: MemberArtifactDeliveryIntent = {
+      ...existing,
+      bridgeSendStarted: true,
+      externalEffect: "none",
+      retryable: false,
+      updatedAtMs: Date.now(),
+    };
+    await writeJsonDurable(intentPath(params.rootDir, keyHash), started);
+    let receipts: unknown;
+    try {
+      receipts = await deliverOutboundPayloads({
+        cfg: params.cfg,
+        channel: params.entry.channel,
+        to: params.entry.to,
+        accountId: params.entry.accountId,
+        payloads: params.entry.payloads,
+        deps: params.deps,
+        skipQueue: true,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const retryable: MemberArtifactDeliveryIntent = {
+        ...started,
+        phase: "failed_retryable",
+        bridgeSendStarted: true,
+        externalEffect: "none",
+        retryable: true,
+        updatedAtMs: Date.now(),
+      };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), retryable);
+      await failDelivery(params.entry.id, message, params.queueStateDir);
+      return "failed";
+    }
+    const messageIds = confirmedDeliveryMessageIds(receipts);
+    if (!messageIds) {
+      const unknown: MemberArtifactDeliveryIntent = {
+        ...started,
+        phase: "unknown",
+        bridgeSendStarted: true,
+        externalEffect: "unknown",
+        retryable: false,
+        updatedAtMs: Date.now(),
+      };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), unknown);
+      await moveToFailed(params.entry.id, params.queueStateDir);
+      return "failed";
+    }
+    try {
+      await params.beforeReceipt?.();
+      const delivered: MemberArtifactDeliveryIntent = {
+        ...started,
+        phase: "delivered",
+        authorization: "allow",
+        externalEffect: "acknowledged",
+        retryable: false,
+        receiptMessageIds: messageIds,
+        updatedAtMs: Date.now(),
+      };
+      await writeJsonDurable(intentPath(params.rootDir, keyHash), delivered);
+    } catch {
+      const unknown: MemberArtifactDeliveryIntent = {
+        ...started,
+        phase: "unknown",
+        externalEffect: "unknown",
+        retryable: false,
+        updatedAtMs: Date.now(),
+      };
+      try {
+        await writeJsonDurable(intentPath(params.rootDir, keyHash), unknown);
+      } catch {
+        // Receipt and unknown both failed. Still do not ack.
+      }
+      await moveToFailed(params.entry.id, params.queueStateDir);
+      return "failed";
+    }
+    await ackDelivery(params.entry.id, params.queueStateDir);
+    return "recovered";
   });
 }

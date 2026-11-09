@@ -121,3 +121,51 @@ export function evaluateMemberArtifactDeliveryEligibility(
   }
   return { outcome: "authorization_pending", reason: "outbound_auth_unwired" };
 }
+
+/**
+ * Server facts only. There is no `granted` field.
+ * `memberActorIds` is the membership set behind `authorizeTeamGroupResourceAccess`.
+ * `allowFrom` is the list `resolveOutboundTarget` passes to the channel plugin.
+ * Missing facts stay `authorization_pending`. A caller cannot flip a boolean to allow.
+ */
+export type ServerOutboundAuthFacts = {
+  factsLoaded: boolean;
+  memberActorIds?: readonly string[];
+  allowFrom?: readonly string[];
+};
+
+export type OutboundAuthDecision =
+  | { outcome: "authorization_pending"; reason: "outbound_auth_facts_missing" }
+  | { outcome: "deny"; reason: string }
+  | { outcome: "allow"; reason: "member_and_allowlist" };
+
+export function evaluateAcceptedArtifactOutboundAuthorization(params: {
+  actorId: string;
+  normalizedTarget: NormalizedDeliveryTarget;
+  facts: ServerOutboundAuthFacts;
+}): OutboundAuthDecision {
+  if (!params.facts.factsLoaded || !params.facts.memberActorIds || !params.facts.allowFrom) {
+    return { outcome: "authorization_pending", reason: "outbound_auth_facts_missing" };
+  }
+  const actor = compact(params.actorId);
+  const members = params.facts.memberActorIds
+    .map((id) => compact(id))
+    .filter((id) => id.length > 0);
+  if (!actor || !members.includes(actor)) {
+    return { outcome: "deny", reason: "outbound_actor_not_member" };
+  }
+  const allowFrom = params.facts.allowFrom
+    .map((entry) => compact(entry))
+    .filter((entry) => entry.length > 0);
+  if (allowFrom.length === 0) {
+    return { outcome: "deny", reason: "outbound_allowlist_empty" };
+  }
+  const to = params.normalizedTarget.to;
+  const allowed = allowFrom.some(
+    (entry) => entry === to || entry.toLowerCase() === to.toLowerCase(),
+  );
+  if (!allowed) {
+    return { outcome: "deny", reason: "outbound_target_not_allowed" };
+  }
+  return { outcome: "allow", reason: "member_and_allowlist" };
+}
