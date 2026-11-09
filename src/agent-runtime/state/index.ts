@@ -93,12 +93,20 @@ export {
 } from "./collaboration/handoff-txn.js";
 export type { HandoffLedgerPort, HandoffStoredFact } from "./collaboration/handoff-txn.js";
 export {
+  assignMemberArtifactQueueId,
+  claimMemberArtifactSendUnknown,
   commitMemberArtifactDeliveryAssociation,
   deliveryKeyHash,
+  markMemberArtifactQueued,
   noteAssociationRenamedAwayFromStaged,
-  publishMemberArtifactDelivery,
-  recoverMemberArtifactBridgeDelivery,
+  payloadTextDigest,
+  prepareMemberArtifactQueuePublication,
+  readServerOutboundArtifactGrant,
+  recordMemberArtifactBlocked,
+  recordMemberArtifactNotSent,
+  recordMemberArtifactReceipt,
   recoverPartialStagedAssociation,
+  writeServerOutboundArtifactGrant,
 } from "./collaboration/accepted-artifact-delivery-txn.js";
 export type {
   AssociationCommitResult,
