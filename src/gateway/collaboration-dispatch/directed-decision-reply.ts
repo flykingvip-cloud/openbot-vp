@@ -1,7 +1,5 @@
-import {
-  isLanguageAsideMessage,
-  isPriorUtteranceCorrection,
-} from "../../conversation-task/turn-relation.js";
+import { isPriorUtteranceCorrection } from "../../agent-runtime/policy/index.js";
+import { isLanguageAsideMessage } from "../../conversation-task/turn-relation.js";
 import { isOnboardingIntroductionMission } from "../collaboration-learning/mission-phase.js";
 import { normalizeAgentIdentifier, normalizeMentionIdentity } from "./mention-utils.js";
 import type { CollaborationBotTarget, CollaborationDispatchScope } from "./types.js";
