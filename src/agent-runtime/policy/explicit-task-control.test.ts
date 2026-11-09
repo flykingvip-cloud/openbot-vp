@@ -1,10 +1,20 @@
 import { expect, it } from "vitest";
 import {
+  isOwnerConstraintFullReplace,
+  isOwnerConstraintRevision,
+  isPriorUtteranceCorrection,
+  shouldPersistOwnerConstraint,
+} from "./constraints.js";
+import {
+  decideWake,
   evaluateWakeEligibility,
   isHeartbeatActionAllowed,
+  MAX_FOCUS_SLOTS,
+  MAX_PARKED_SLOTS,
   parseExplicitTaskControl,
   shouldTaskParkAbortInFlight,
 } from "./explicit-task-control.js";
+import { MAX_PARKED_TASKS } from "./task-board-limits.js";
 
 it.each([
   "你好",
@@ -56,4 +66,38 @@ it("rejects heartbeat identity creation and replanning", () => {
   expect(isHeartbeatActionAllowed("create_identity")).toBe(false);
   expect(isHeartbeatActionAllowed("replan")).toBe(false);
   expect(isHeartbeatActionAllowed("write_completion")).toBe(false);
+});
+
+it("keeps the execution slot cap separate from the session board capacity", () => {
+  expect(MAX_FOCUS_SLOTS).toBe(1);
+  expect(MAX_PARKED_SLOTS).toBe(3);
+  expect(MAX_PARKED_TASKS).toBe(3);
+});
+
+it("parks an occupied focus without writing a board", () => {
+  expect(
+    decideWake({
+      trigger: "heartbeat",
+      snapshot: { focusTaskId: "live", parkedTaskIds: ["a", "b", "c"] },
+      incomingTaskId: "cron:job",
+    }),
+  ).toMatchObject({ action: "park", taskId: "cron:job", droppedTaskId: "a" });
+  expect(
+    decideWake({
+      trigger: "user_message",
+      snapshot: { focusTaskId: "live", parkedTaskIds: [] },
+      incomingTaskId: "next",
+    }).action,
+  ).toBe("park_current_and_switch");
+});
+
+it("preserves owner constraint revise, replace, and persist decisions", () => {
+  expect(isPriorUtteranceCorrection("不对，我说的是国内")).toBe(true);
+  expect(isPriorUtteranceCorrection("另外帮我做一份竞品表")).toBe(false);
+  expect(isOwnerConstraintRevision("不对，改为只要 iOS 机型")).toBe(true);
+  expect(isOwnerConstraintRevision("补充：只要国内安卓机型")).toBe(false);
+  expect(isOwnerConstraintFullReplace("改为覆盖亚洲市场")).toBe(false);
+  expect(isOwnerConstraintFullReplace("以本条为准：只要 iOS 机型，不要安卓")).toBe(true);
+  expect(shouldPersistOwnerConstraint("请继续")).toBe(false);
+  expect(shouldPersistOwnerConstraint("补充：只要国内安卓机型")).toBe(true);
 });
