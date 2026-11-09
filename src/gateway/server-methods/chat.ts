@@ -347,6 +347,10 @@ import {
   resolveEmployeeScopedChatSessionKey,
 } from "../employee-steward-session.js";
 import {
+  PERSONAL_WORKBENCH_ACTOR_RESTORE_FAILURE,
+  restorePersonalWorkbenchActor,
+} from "../employee-workbench-actor-restore.js";
+import {
   buildEmployeeSessionVisibilityContext,
   COLLABORATION_SPACE_PERMISSIONS_DENIAL,
   CollaborationSpacePermissionsError,
@@ -444,6 +448,11 @@ import {
   resumeInterpretedCurrentTask,
   sessionStopBarrierActive,
 } from "./chat-resume-parked-recheck.js";
+import {
+  assistantTextForAbortPartial,
+  EMPTY_FINAL_ASSISTANT_TEXT,
+  transcriptHasVisibleAssistantAfterUser,
+} from "./chat-terminal-transcript.js";
 import {
   appendInjectedAssistantMessageToTranscript,
   appendInjectedPeerMessageToTranscript,
@@ -1251,6 +1260,9 @@ function workspaceDenialCode(err: unknown): string {
 
 export function transcriptCreateDeniedMessage(reason: string | null | undefined): string {
   const code = reason?.trim() || "";
+  if (code === "personal_workbench_actor_unrestored") {
+    return PERSONAL_WORKBENCH_ACTOR_RESTORE_FAILURE;
+  }
   if (code === "missing_tenant" || code === "unresolved_tenant" || code === "missing_actor") {
     return "trusted tenant context required to create transcript";
   }
@@ -1344,6 +1356,7 @@ export async function resolveCallerWorkspaceCwdDetailed(params: {
         purpose: "chat.transcript.cwd",
         stewardException,
         stewardWorkspaceDir,
+        sessionKey: params.sessionKey,
       });
       authorized = resolved.cwd;
       reasonCode = resolved.reasonCode;
@@ -3144,14 +3157,10 @@ function collectSessionAbortPartials(params: {
     if (active.sessionKey !== params.sessionKey) {
       continue;
     }
-    const text = params.chatRunBuffers.get(runId);
-    if (!text || !text.trim()) {
-      continue;
-    }
     out.push({
       runId,
       sessionId: active.sessionId,
-      text,
+      text: assistantTextForAbortPartial(params.chatRunBuffers.get(runId)),
       abortOrigin: params.abortOrigin,
     });
   }
@@ -4393,6 +4402,10 @@ export const chatHandlers: GatewayRequestHandlers = {
     // the pre-disconnect transcript (typing / missing reply).
     await webchatIdentity.hydrateWebchatGatewayClientPlatformIdentity({ client });
     await webchatIdentity.ensureGatewayClientUserFromPlatformIdentity({ client });
+    const historyRestore = await restorePersonalWorkbenchActor({
+      client,
+      sessionKey: rawSessionKey,
+    });
     const historyClient = gatewayClientForSessionOwner(client, sessionOwnerPlatformUserId);
     const sessionKey = await resolveEmployeeScopedChatSessionKey(client, rawSessionKey);
     if (employeeChatTranscriptBlocked(client, sessionKey)) {
@@ -4423,7 +4436,13 @@ export const chatHandlers: GatewayRequestHandlers = {
       logGateway: context.logGateway,
     });
     if (historyAccessDenial) {
-      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, historyAccessDenial));
+      const message =
+        !historyRestore.ok &&
+        historyRestore.reason === "unrestorable" &&
+        historyAccessDenial.includes("resolved employee actor")
+          ? historyRestore.message
+          : historyAccessDenial;
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, message));
       return;
     }
     await resolveAndBindChatTurnTenant(historyClient, sessionKey);
@@ -4622,6 +4641,10 @@ export const chatHandlers: GatewayRequestHandlers = {
       mode?: "stop" | "undo";
     };
     const mode = resolveChatAbortMode((params as { mode?: unknown }).mode);
+    await restorePersonalWorkbenchActor({
+      client,
+      sessionKey: rawSessionKey,
+    });
     const sessionKey = await resolveEmployeeScopedChatSessionKey(client, rawSessionKey);
     if (denyEmployeeGlobalStewardTranscript({ client, sessionKey, respond })) {
       return;
@@ -4708,7 +4731,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       stopReason: "rpc",
       mode,
     });
-    if (res.aborted && partialText && partialText.trim() && !(mode === "undo" && res.undone)) {
+    if (res.aborted && !(mode === "undo" && res.undone)) {
       await persistAbortedPartials({
         context,
         sessionKey,
@@ -4716,7 +4739,7 @@ export const chatHandlers: GatewayRequestHandlers = {
           {
             runId,
             sessionId: active.sessionId,
-            text: partialText,
+            text: assistantTextForAbortPartial(partialText),
             abortOrigin: "rpc",
           },
         ],
@@ -4924,6 +4947,10 @@ export const chatHandlers: GatewayRequestHandlers = {
       respond(true, stewardIntercept.payload);
       return;
     }
+    const sendRestore = await restorePersonalWorkbenchActor({
+      client,
+      sessionKey: rawSessionKey,
+    });
     const resolvedSessionKey = await resolveEmployeeScopedChatSessionKey(client, rawSessionKey);
     if (denyEmployeeGlobalStewardTranscript({ client, sessionKey: resolvedSessionKey, respond })) {
       return;
@@ -4952,7 +4979,13 @@ export const chatHandlers: GatewayRequestHandlers = {
       logGateway: context.logGateway,
     });
     if (sendAccessDenial) {
-      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, sendAccessDenial));
+      const message =
+        !sendRestore.ok &&
+        sendRestore.reason === "unrestorable" &&
+        sendAccessDenial.includes("resolved employee actor")
+          ? sendRestore.message
+          : sendAccessDenial;
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, message));
       return;
     }
     {
@@ -6659,21 +6692,19 @@ export const chatHandlers: GatewayRequestHandlers = {
                   sessionKey: resolvedSessionKey,
                   stopReason: effect.kind === "replace" ? "task-park" : "owner-control",
                 });
-                if (partial?.trim()) {
-                  await persistAbortedPartials({
-                    context,
-                    sessionKey: resolvedSessionKey,
-                    client,
-                    snapshots: [
-                      {
-                        runId: priorRunId,
-                        sessionId: active.sessionId,
-                        text: partial,
-                        abortOrigin: "rpc",
-                      },
-                    ],
-                  });
-                }
+                await persistAbortedPartials({
+                  context,
+                  sessionKey: resolvedSessionKey,
+                  client,
+                  snapshots: [
+                    {
+                      runId: priorRunId,
+                      sessionId: active.sessionId,
+                      text: assistantTextForAbortPartial(partial),
+                      abortOrigin: "rpc",
+                    },
+                  ],
+                });
               }
             }
             if (effect.kind !== "replace" && effect.taskId) {
@@ -6863,8 +6894,60 @@ export const chatHandlers: GatewayRequestHandlers = {
           } else {
             // Agent run completed (tools may have edited workspace files): create
             // a rollback checkpoint + workspace snapshot from the current state.
-            // The reply pipeline already persisted the final message + broadcast.
-            const { entry: latestEntry } = await loadSessionEntryForClient(sessionKey, client);
+            // A blank abort or empty final still has to leave an assistant bubble.
+            const { storePath: terminalStorePath, entry: latestEntry } =
+              await loadSessionEntryForClient(sessionKey, client);
+            const terminalSessionId = latestEntry?.sessionId ?? entry?.sessionId;
+            if (terminalSessionId && terminalStorePath) {
+              const priorMessages = readSessionMessages(
+                terminalSessionId,
+                terminalStorePath,
+                latestEntry?.sessionFile ?? entry?.sessionFile,
+              );
+              if (!transcriptHasVisibleAssistantAfterUser(priorMessages, clientRunId)) {
+                const visibleFinal = finalReplyParts
+                  .map((part) => part.trim())
+                  .filter(Boolean)
+                  .join("\n\n")
+                  .trim();
+                const terminalText = visibleFinal || EMPTY_FINAL_ASSISTANT_TEXT;
+                const replyGovernance = await resolveChatTranscriptGovernance({ client, cfg });
+                const appended = await appendAssistantTranscriptMessage({
+                  message: terminalText,
+                  sessionId: terminalSessionId,
+                  storePath: terminalStorePath,
+                  sessionFile: latestEntry?.sessionFile ?? entry?.sessionFile,
+                  agentId,
+                  createIfMissing: true,
+                  idempotencyKey: `${clientRunId}:assistant`,
+                  tenantId: replyGovernance.tenantId,
+                  ownerUserId: replyGovernance.ownerUserId,
+                  groupId: replyGovernance.groupId,
+                  failClosed: replyGovernance.failClosed,
+                  ...(visibleFinal
+                    ? {}
+                    : {
+                        abortMeta: {
+                          aborted: true as const,
+                          origin: "rpc" as const,
+                          runId: clientRunId,
+                        },
+                      }),
+                });
+                if (appended.ok && appended.message) {
+                  broadcastChatFinal({
+                    context,
+                    runId: clientRunId,
+                    sessionKey: resolvedSessionKey,
+                    message: appended.message,
+                  });
+                } else if (!appended.ok) {
+                  context.logGateway.warn(
+                    `webchat empty-final transcript append failed: ${appended.error ?? "unknown error"}`,
+                  );
+                }
+              }
+            }
             const { resolveContinuityWorkspaceDirForTurn } =
               await import("./chat-continuity-workspace.js");
             const turnWorkspaceDir = await resolveContinuityWorkspaceDirForTurn({

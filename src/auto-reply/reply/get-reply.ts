@@ -284,6 +284,7 @@ export async function getReplyFromConfig(
         purpose: "chat.tool.cwd",
         stewardException,
         stewardWorkspaceDir: stewardHelperCwd,
+        sessionKey: agentSessionKey,
         ...(collaborationGroupId
           ? { groupId: collaborationGroupId, authoritativeTenantId: turnTenantId }
           : {}),
