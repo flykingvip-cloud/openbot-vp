@@ -24,3 +24,74 @@ export function parseExplicitTaskControl(text: string): ExplicitTaskControl | un
   const cancel = incoming.match(/^(?:取消挂起|关闭挂起|CLOSE)\s+(\S+)/iu);
   return cancel ? { scope: "parked", action: "cancel", taskId: cancel[1] } : undefined;
 }
+
+/**
+ * Live in-flight abort predicate. Not classifyTurnRelation and not a board write.
+ * Gateway and turn-relation consume this through the policy public entry.
+ */
+export function shouldTaskParkAbortInFlight(cutContext: boolean, abortInFlight?: boolean): boolean {
+  return cutContext || abortInFlight === true;
+}
+
+export const WAKE_REASONS = [
+  "user_message",
+  "user_task_update",
+  "cron",
+  "heartbeat",
+  "external_event",
+  "approval_resolved",
+  "retry",
+  "resume",
+] as const;
+
+export type WakeReason = (typeof WAKE_REASONS)[number];
+
+export const HEARTBEAT_FORBIDDEN_ACTIONS = [
+  "create_identity",
+  "write_completion",
+  "replan",
+] as const;
+
+export type HeartbeatForbiddenAction = (typeof HEARTBEAT_FORBIDDEN_ACTIONS)[number];
+
+export function isHeartbeatActionAllowed(action: string): boolean {
+  return !(HEARTBEAT_FORBIDDEN_ACTIONS as readonly string[]).includes(action);
+}
+
+export type WakeEligibility =
+  | {
+      eligible: false;
+      decision:
+        | { action: "reject_identity_create"; trigger: WakeReason }
+        | { action: "ignore_heartbeat" };
+    }
+  | { eligible: true; incomingTaskId: string };
+
+const IDENTITY_CREATE_TRIGGERS = new Set<WakeReason>(["cron", "heartbeat"]);
+
+/**
+ * Wake eligibility only. Park/switch choices stay in decideWake.
+ * Claim and board writes stay in state. Heartbeat cannot create, replan, or complete a task.
+ */
+export function evaluateWakeEligibility(params: {
+  trigger: WakeReason;
+  incomingTaskId?: string;
+  incomingCreatesIdentity?: boolean;
+}): WakeEligibility {
+  if (params.incomingCreatesIdentity && IDENTITY_CREATE_TRIGGERS.has(params.trigger)) {
+    return {
+      eligible: false,
+      decision: { action: "reject_identity_create", trigger: params.trigger },
+    };
+  }
+  const incomingTaskId = params.incomingTaskId?.trim() ?? "";
+  if (!incomingTaskId) {
+    return params.trigger === "heartbeat"
+      ? { eligible: false, decision: { action: "ignore_heartbeat" } }
+      : {
+          eligible: false,
+          decision: { action: "reject_identity_create", trigger: params.trigger },
+        };
+  }
+  return { eligible: true, incomingTaskId };
+}

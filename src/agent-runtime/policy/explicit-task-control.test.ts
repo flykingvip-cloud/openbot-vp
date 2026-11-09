@@ -1,5 +1,10 @@
 import { expect, it } from "vitest";
-import { parseExplicitTaskControl } from "./explicit-task-control.js";
+import {
+  evaluateWakeEligibility,
+  isHeartbeatActionAllowed,
+  parseExplicitTaskControl,
+  shouldTaskParkAbortInFlight,
+} from "./explicit-task-control.js";
 
 it.each([
   "你好",
@@ -20,4 +25,35 @@ it.each([
   ["CLOSE task-a", { scope: "parked", action: "cancel", taskId: "task-a" }],
 ])("preserves explicit control scope: %s", (text, control) => {
   expect(parseExplicitTaskControl(String(text))).toEqual(control);
+});
+
+it("aborts in flight only for a context cut or an owner abort", () => {
+  expect(shouldTaskParkAbortInFlight(false)).toBe(false);
+  expect(shouldTaskParkAbortInFlight(false, false)).toBe(false);
+  expect(shouldTaskParkAbortInFlight(true, false)).toBe(true);
+  expect(shouldTaskParkAbortInFlight(false, true)).toBe(true);
+});
+
+it("rejects heartbeat identity creation and replanning", () => {
+  expect(
+    evaluateWakeEligibility({
+      trigger: "heartbeat",
+      incomingCreatesIdentity: true,
+      incomingTaskId: "task-new",
+    }),
+  ).toEqual({
+    eligible: false,
+    decision: { action: "reject_identity_create", trigger: "heartbeat" },
+  });
+  expect(evaluateWakeEligibility({ trigger: "heartbeat" })).toEqual({
+    eligible: false,
+    decision: { action: "ignore_heartbeat" },
+  });
+  expect(evaluateWakeEligibility({ trigger: "heartbeat", incomingTaskId: "cron:job" })).toEqual({
+    eligible: true,
+    incomingTaskId: "cron:job",
+  });
+  expect(isHeartbeatActionAllowed("create_identity")).toBe(false);
+  expect(isHeartbeatActionAllowed("replan")).toBe(false);
+  expect(isHeartbeatActionAllowed("write_completion")).toBe(false);
 });
