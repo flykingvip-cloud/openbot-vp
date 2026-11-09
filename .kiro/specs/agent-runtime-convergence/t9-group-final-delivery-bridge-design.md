@@ -3,7 +3,7 @@
 日期：2026-11-10（Asia/Shanghai）  
 Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263  
 分支：`cursor/runtime-authority-batch-e-bf87`  
-性质：**设计评审稿**。不授权实现、合入、部署、真实外发。
+性质：设计已批准；**最小首切片已实施**（仍不授权合入／部署／真实外发）。
 
 ## 1. 目标链（仍未闭合）
 
@@ -108,4 +108,14 @@ Draft PR：https://github.com/flykingvip-cloud/openbot-vp/pull/263
 4. 确认失败／撤销／重启窗口与成员桥同构、scope 隔离。  
 5. 确认 Non-goals；本设计通过 **不** 等于实施放行，更不等于 T9 最终验收通过。  
 
-**本设计待独立评审；通过前不实施。**
+**设计已批准并完成最小首切片实施。** 后续切片（真实渠道回执、多成员聚合、UI／RPC）未做。
+
+
+## 11. 实施记录（最小首切片）
+
+- Policy：`evaluateGroupFinalOverallAcceptance`、`evaluateGroupFinalDeliveryEligibility`；grant／basis `scope` 支持 `group_final`；成员路径仍拒绝 `group_final`。
+- State：association／intent／grant 识别 `group_final`（与 member 共用 txn，eligibility 按 scope 分支）。
+- Command：`requestGroupFinalDelivery`（整体验收＋association＋grant；**不**自动渠道 send）；`requestAcceptedArtifactDelivery` 拒绝 `group_final` 升格。
+- Delivery：recover 使用 `intent.scope`。
+- Tests：`policy/group-final-delivery.test.ts`、`command/group-final-delivery.test.ts`；既有 member／txn 回归绿。
+- 未改：`acceptBoardItemSubmission` 副作用外发；`accepted_no_further_exec_schedule` 语义。

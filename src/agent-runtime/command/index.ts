@@ -49,4 +49,5 @@ export {
 export type {
   AcceptedArtifactDeliveryDirs,
   AcceptedArtifactDeliveryView,
+  GroupFinalOverallAcceptanceFacts,
 } from "./accepted-artifact-delivery.js";

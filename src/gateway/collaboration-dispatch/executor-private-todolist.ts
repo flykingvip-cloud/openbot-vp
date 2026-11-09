@@ -21,7 +21,7 @@ import {
   isTodolistConfirmedForDelivery,
   todolistIsGroupSharedBoardSubrecord,
 } from "../../agent-runtime/policy/index.js";
-import { commitPrivateTodolistLog } from "../../agent-runtime/state/index.js";
+import { commitPrivateTodolistLog } from "../../agent-runtime/state/collaboration/round-txn.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {

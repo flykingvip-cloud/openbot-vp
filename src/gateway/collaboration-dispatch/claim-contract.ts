@@ -48,7 +48,10 @@ import {
   claimBoardActionAllowed,
   oralDispatchCreatesBoardFact,
 } from "../../agent-runtime/policy/index.js";
-import { appendBoardClaimLog, mutateBoardClaimLog } from "../../agent-runtime/state/index.js";
+import {
+  appendBoardClaimLog,
+  mutateBoardClaimLog,
+} from "../../agent-runtime/state/collaboration/round-txn.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { isBareChatCompletionPhrase } from "../collaboration-learning/formal-delivery-acceptance.js";

@@ -10,6 +10,8 @@ import {
   deriveAcceptedArtifactIssuanceBasis,
   establishTrustedDeliveryIssuer,
   evaluateChannelAccountOutboundScope,
+  evaluateGroupFinalDeliveryEligibility,
+  evaluateGroupFinalOverallAcceptance,
   issueOutboundArtifactGrant,
   normalizeDeliveryTarget,
   type AcceptedArtifactIssuanceBasis,
@@ -181,7 +183,7 @@ function identityFrom(
     taskId: basis.taskId,
     itemId: basis.itemId,
     actorId: issuer.actorId,
-    scope: "member_artifact",
+    scope: basis.scope,
     boardStatus: "accepted",
     acceptedSubmissionId: basis.acceptedSubmissionId,
     acceptedArtifactVersion: basis.acceptedArtifactVersion,
@@ -219,6 +221,9 @@ export async function requestAcceptedArtifactDelivery(params: {
   const basis = deriveAcceptedArtifactIssuanceBasis(params.facts);
   if (!issuer || !basis) {
     return { ok: false, reason: "trusted_issuance_required" };
+  }
+  if (basis.scope === "group_final") {
+    return { ok: false, reason: "group_final_not_member_artifact" };
   }
   const normalized = normalizeDeliveryTarget(params.target);
   if (!normalized) {
@@ -394,4 +399,130 @@ export async function revokeAcceptedArtifactDelivery(params: {
     return written;
   }
   return { ok: true };
+}
+
+export type GroupFinalOverallAcceptanceFacts = {
+  boardStatus?: string | null;
+  acceptanceReason?: string | null;
+  checkedAcceptanceCriteria?: readonly string[] | null;
+  boardAcceptanceCriteria?: readonly string[] | null;
+  acceptedArtifactVersion?: string | null;
+  pinnedArtifactVersion?: string | null;
+};
+
+/**
+ * Group-final delivery request (explicit). Requires overall acceptance + trusted
+ * issuance, then association and optional grant. Does not send on the first slice.
+ * Does not run from acceptBoardItemSubmission side effects.
+ */
+export async function requestGroupFinalDelivery(params: {
+  issuerInput: {
+    source: string;
+    tenantId: string;
+    actorId: string;
+    groupId: string;
+    groupAction: string;
+  } | null;
+  facts: AcceptedArtifactIssuanceFacts | null;
+  overallAcceptance: GroupFinalOverallAcceptanceFacts;
+  target: { channel: string; accountId?: string | null; to: string };
+  dirs: AcceptedArtifactDeliveryDirs;
+  cfg: OpenBotConfig;
+  scopeFacts?: ChannelAccountOutboundScopeFacts | null;
+  nowMs?: number;
+}): Promise<{ ok: true; delivery: AcceptedArtifactDeliveryView } | { ok: false; reason: string }> {
+  const overall = evaluateGroupFinalOverallAcceptance(params.overallAcceptance);
+  if (overall.outcome === "deny") {
+    return { ok: false, reason: overall.reason };
+  }
+  if (!params.facts || params.facts.scope !== "group_final") {
+    return { ok: false, reason: "group_final_scope_required" };
+  }
+  const issuer = establishTrustedDeliveryIssuer(params.issuerInput);
+  const basis = deriveAcceptedArtifactIssuanceBasis(params.facts);
+  if (!issuer || !basis || basis.scope !== "group_final") {
+    return { ok: false, reason: "trusted_issuance_required" };
+  }
+  const normalized = normalizeDeliveryTarget(params.target);
+  if (!normalized) {
+    return { ok: false, reason: "target_required" };
+  }
+  const identity = identityFrom(issuer, basis, params.target);
+  const eligibility = evaluateGroupFinalDeliveryEligibility(identity);
+  if (eligibility.outcome === "deny") {
+    return { ok: false, reason: eligibility.reason };
+  }
+
+  const scopeFacts =
+    params.scopeFacts !== undefined
+      ? params.scopeFacts
+      : resolveChannelAccountOutboundScopeFacts({ cfg: params.cfg, target: normalized });
+  const scope = evaluateChannelAccountOutboundScope({
+    target: normalized,
+    facts: scopeFacts,
+  });
+
+  const keyHash = deliveryKeyHash(identity);
+  if (!keyHash) {
+    return { ok: false, reason: "target_required" };
+  }
+  const nowMs = params.nowMs ?? Date.now();
+  const existingGrant = await readServerOutboundArtifactGrant(params.dirs.authDir, keyHash);
+  if (existingGrant?.revokedAtMs != null) {
+    return { ok: false, reason: "outbound_authorization_revoked" };
+  }
+
+  const committed = await commitMemberArtifactDeliveryAssociation({
+    rootDir: params.dirs.rootDir,
+    identity,
+    nowMs,
+  });
+  if (!committed.ok) {
+    return committed;
+  }
+  const noted = await noteAssociationRenamedAwayFromStaged({
+    rootDir: params.dirs.rootDir,
+    identity,
+    nowMs,
+  });
+  if (!noted.ok) {
+    return noted;
+  }
+  if (
+    noted.intent.phase === "unknown" ||
+    noted.intent.phase === "delivered" ||
+    noted.intent.phase === "blocked"
+  ) {
+    return { ok: true, delivery: viewAcceptedArtifactDelivery(noted.intent) };
+  }
+
+  if (scope.outcome === "authorization_pending") {
+    return { ok: false, reason: "outbound_scope_basis_missing" };
+  }
+  if (scope.outcome === "deny") {
+    return { ok: false, reason: scope.reason };
+  }
+
+  const grant = issueOutboundArtifactGrant({ issuer, basis, target: params.target });
+  if (!grant || grant.scope !== "group_final") {
+    return { ok: false, reason: "trusted_issuance_required" };
+  }
+  const written = await writeIssuedOutboundArtifactGrant({
+    authDir: params.dirs.authDir,
+    keyHash,
+    grant,
+  });
+  if (!written.ok) {
+    return written;
+  }
+  // First slice: association + grant only — no channel send.
+  const latest = await findMemberArtifactDeliveryIntent({
+    rootDir: params.dirs.rootDir,
+    tenantId: issuer.tenantId,
+    groupId: issuer.groupId,
+    taskId: basis.taskId,
+    itemId: basis.itemId,
+    target: params.target,
+  });
+  return { ok: true, delivery: viewAcceptedArtifactDelivery(latest ?? noted.intent) };
 }

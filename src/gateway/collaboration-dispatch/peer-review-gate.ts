@@ -18,7 +18,7 @@ import {
   peerReviewAcceptAllowed,
   peerReviewMustNotDriveAdmission,
 } from "../../agent-runtime/policy/index.js";
-import { appendPeerReviewLog } from "../../agent-runtime/state/index.js";
+import { appendPeerReviewLog } from "../../agent-runtime/state/collaboration/round-txn.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { recordCollaborationQualityBestEffort } from "../collaboration-ledger/writer.js";

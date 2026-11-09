@@ -12,6 +12,7 @@ export type AcceptedArtifactDeliveryView = {
   queueId: string | null;
   receiptMessageIds: string[] | null;
   keyHash: string | null;
+  scope: "member_artifact" | "group_final" | null;
 };
 
 export function viewAcceptedArtifactDelivery(
@@ -24,6 +25,7 @@ export function viewAcceptedArtifactDelivery(
       queueId: null,
       receiptMessageIds: null,
       keyHash: null,
+      scope: null,
     };
   }
   return {
@@ -32,6 +34,7 @@ export function viewAcceptedArtifactDelivery(
     queueId: intent.queueId,
     receiptMessageIds: intent.receiptMessageIds,
     keyHash: intent.keyHash,
+    scope: intent.scope,
   };
 }
 

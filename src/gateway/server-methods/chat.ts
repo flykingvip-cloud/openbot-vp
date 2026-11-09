@@ -5801,10 +5801,10 @@ export const chatHandlers: GatewayRequestHandlers = {
               executeRound: () =>
                 executeCollaborationRound(authority, facts, {
                   decision,
+                  productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg),
                   message: discussToTaskCoordinatorBinding
                     ? `${discussToTaskCoordinatorBinding}\n\n${transcriptMessage}`
                     : transcriptMessage,
-                  productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg),
                   sessionKey: rawSessionKey,
                   skipRoundIds: [clientRunId, ...context.chatAbortControllers.keys()],
                   signal: parentAbortController.signal,

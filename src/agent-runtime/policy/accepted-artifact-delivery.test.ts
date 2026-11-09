@@ -168,7 +168,9 @@ describe("issueOutboundArtifactGrant", () => {
     expect(grant?.linkedContentSha256).toBe(hash);
     expect(establishTrustedDeliveryIssuer({ ...issuerInput, groupAction: "read" })).toBeNull();
     expect(establishTrustedDeliveryIssuer(null)).toBeNull();
-    expect(deriveAcceptedArtifactIssuanceBasis({ ...facts, scope: "group_final" })).toBeNull();
+    expect(deriveAcceptedArtifactIssuanceBasis({ ...facts, scope: "group_final" })?.scope).toBe(
+      "group_final",
+    );
     expect(
       deriveAcceptedArtifactIssuanceBasis({ ...facts, mediaUrl: "https://example.invalid/a.png" }),
     ).toBeNull();

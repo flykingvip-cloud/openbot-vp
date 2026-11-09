@@ -47,7 +47,7 @@ export async function recoverAcceptedArtifactBridgeEntry(params: {
     taskId: intent.taskId,
     itemId: intent.itemId,
     actorId: intent.actorId,
-    scope: "member_artifact",
+    scope: intent.scope === "group_final" ? "group_final" : "member_artifact",
     boardStatus: "accepted",
     acceptedSubmissionId: intent.acceptedSubmissionId,
     acceptedArtifactVersion: intent.acceptedArtifactVersion,

@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   evaluateAcceptedArtifactOutboundAuthorization,
+  evaluateGroupFinalDeliveryEligibility,
   evaluateMemberArtifactDeliveryEligibility,
   memberArtifactDeliveryKeyMaterial,
   normalizeDeliveryTarget,
@@ -19,6 +20,9 @@ import { withDirectoryLock, writeJsonDurable } from "../repository/durable-json.
  * `failed_retryable` only when `externalEffect` is `none`.
  */
 
+function isDeliveryScope(value: unknown): value is "member_artifact" | "group_final" {
+  return value === "member_artifact" || value === "group_final";
+}
 export type DeliveryAssociationPhase =
   | "authorization_pending"
   | "staged"
@@ -47,7 +51,7 @@ export type MemberArtifactDeliveryIntent = {
   linkedDeliverableVersion: number;
   linkedContentSha256: string;
   normalizedTarget: NormalizedDeliveryTarget;
-  scope: "member_artifact";
+  scope: "member_artifact" | "group_final";
   phase: DeliveryAssociationPhase;
   authorization: "authorization_pending" | "allow";
   bridgeSendStarted: boolean;
@@ -127,7 +131,7 @@ function isTarget(value: unknown): value is NormalizedDeliveryTarget {
 }
 
 function isFixedNonSend(parsed: MemberArtifactDeliveryIntent): boolean {
-  if (parsed.scope !== "member_artifact") {
+  if (!isDeliveryScope(parsed.scope)) {
     return false;
   }
   if (parsed.queueId !== null && !nonEmpty(parsed.queueId)) {
@@ -216,7 +220,7 @@ function intentMatchesKey(parsed: MemberArtifactDeliveryIntent): boolean {
       taskId: parsed.taskId,
       itemId: parsed.itemId,
       actorId: parsed.actorId,
-      scope: "member_artifact",
+      scope: parsed.scope,
       boardStatus: "accepted",
       acceptedSubmissionId: parsed.acceptedSubmissionId,
       acceptedArtifactVersion: parsed.acceptedArtifactVersion,
@@ -341,7 +345,7 @@ function buildIntent(params: {
     linkedDeliverableVersion: params.identity.linkedDeliverableVersion ?? 0,
     linkedContentSha256: compact(params.identity.linkedContentSha256).toLowerCase(),
     normalizedTarget: params.target,
-    scope: "member_artifact",
+    scope: params.identity.scope,
     phase: params.phase,
     authorization: "authorization_pending",
     bridgeSendStarted: false,
@@ -359,12 +363,18 @@ async function writeCompleteStaged(filePath: string, keyHash: string): Promise<v
   await writeJsonDurable(filePath, { version: 1, keyHash, complete: true });
 }
 
+function deliveryEligibilityFor(identity: MemberArtifactDeliveryIdentity) {
+  return identity.scope === "group_final"
+    ? evaluateGroupFinalDeliveryEligibility(identity)
+    : evaluateMemberArtifactDeliveryEligibility(identity);
+}
+
 export async function commitMemberArtifactDeliveryAssociation(params: {
   rootDir: string;
   identity: MemberArtifactDeliveryIdentity;
   nowMs?: number;
 }): Promise<AssociationCommitResult> {
-  const eligibility = evaluateMemberArtifactDeliveryEligibility(params.identity);
+  const eligibility = deliveryEligibilityFor(params.identity);
   if (eligibility.outcome === "deny") {
     return { ok: false, reason: eligibility.reason };
   }
@@ -375,7 +385,7 @@ export async function commitMemberArtifactDeliveryAssociation(params: {
   }
   const nowMs = params.nowMs ?? Date.now();
   return withDirectoryLock(params.rootDir, keyHash, async () => {
-    const again = evaluateMemberArtifactDeliveryEligibility(params.identity);
+    const again = deliveryEligibilityFor(params.identity);
     if (again.outcome === "deny") {
       return { ok: false, reason: again.reason };
     }
@@ -530,7 +540,7 @@ export async function writeServerOutboundArtifactGrant(params: {
 }): Promise<{ ok: true; keyHash: string } | { ok: false; reason: string }> {
   const keyHash = deliveryKeyHash(params.identity);
   const target = normalizeDeliveryTarget(params.identity.target);
-  if (!keyHash || !target || params.identity.scope !== "member_artifact") {
+  if (!keyHash || !target || !isDeliveryScope(params.identity.scope)) {
     return { ok: false, reason: "grant_identity_incomplete" };
   }
   const grant: OutboundArtifactGrant = {
@@ -540,7 +550,7 @@ export async function writeServerOutboundArtifactGrant(params: {
     channel: target.channel,
     accountId: target.accountId,
     to: target.to,
-    scope: "member_artifact",
+    scope: params.identity.scope,
     acceptedArtifactVersion: compact(params.identity.acceptedArtifactVersion),
     linkedContentSha256: compact(params.identity.linkedContentSha256).toLowerCase(),
     revokedAtMs: params.revokedAtMs ?? null,
@@ -584,7 +594,7 @@ export async function readServerOutboundArtifactGrant(
     const parsed = JSON.parse(
       await fs.readFile(grantPath(authDir, keyHash), "utf8"),
     ) as OutboundArtifactGrant;
-    if (!parsed || parsed.scope !== "member_artifact" || typeof parsed.channel !== "string") {
+    if (!parsed || !isDeliveryScope(parsed.scope) || typeof parsed.channel !== "string") {
       return null;
     }
     return parsed;

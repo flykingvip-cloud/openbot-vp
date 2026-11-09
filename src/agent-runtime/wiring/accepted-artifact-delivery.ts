@@ -6,10 +6,12 @@ export {
   acceptedArtifactDeliveryDirs,
   issuanceFactsFromBoard,
   requestAcceptedArtifactDelivery,
+  requestGroupFinalDelivery,
   revokeAcceptedArtifactDelivery,
   resolveChannelAccountOutboundScopeFacts,
   type AcceptedArtifactDeliveryDirs,
   type AcceptedArtifactDeliveryView,
+  type GroupFinalOverallAcceptanceFacts,
 } from "../command/accepted-artifact-delivery.js";
 export { readAcceptedArtifactDelivery } from "../state/collaboration/accepted-artifact-delivery-read.js";
 export {

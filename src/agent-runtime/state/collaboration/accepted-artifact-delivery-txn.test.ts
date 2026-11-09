@@ -339,18 +339,21 @@ describe("commitMemberArtifactDeliveryAssociation", () => {
     await expect(fs.readdir(path.join(root, "staged"))).rejects.toThrow();
   });
 
-  it("does not associate a group-final or unaccepted identity", async () => {
+  it("associates group_final when accepted and still refuses unaccepted identity", async () => {
     const root = await rootDir();
     const groupFinal = await commitMemberArtifactDeliveryAssociation({
       rootDir: root,
       identity: identity({ scope: "group_final" }),
     });
+    expect(groupFinal.ok).toBe(true);
+    if (!groupFinal.ok) {
+      throw new Error(JSON.stringify(groupFinal));
+    }
+    expect(groupFinal.intent.scope).toBe("group_final");
     const open = await commitMemberArtifactDeliveryAssociation({
       rootDir: root,
       identity: identity({ boardStatus: "submitted_for_review" }),
     });
-    expect(groupFinal).toEqual({ ok: false, reason: "group_final_not_member_artifact" });
     expect(open).toEqual({ ok: false, reason: "not_accepted" });
-    await expect(fs.readdir(path.join(root, "staged"))).rejects.toThrow();
   });
 });

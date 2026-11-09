@@ -138,7 +138,7 @@ export type OutboundArtifactGrant = {
   channel: string;
   accountId: string | null;
   to: string;
-  scope: "member_artifact";
+  scope: MemberArtifactDeliveryScope;
   acceptedArtifactVersion: string;
   linkedContentSha256: string;
   revokedAtMs: number | null;
@@ -157,15 +157,19 @@ export function evaluateAcceptedArtifactOutboundAuthorization(params: {
   acceptedArtifactVersion: string;
   linkedContentSha256: string;
   grant: OutboundArtifactGrant | null;
+  /** Defaults to member_artifact for existing callers. */
+  scope?: MemberArtifactDeliveryScope;
 }): OutboundAuthDecision {
   const grant = params.grant;
+  const expectedScope: MemberArtifactDeliveryScope =
+    params.scope === "group_final" ? "group_final" : "member_artifact";
   if (!grant) {
     return { outcome: "authorization_pending", reason: "outbound_auth_grant_missing" };
   }
   if (grant.revokedAtMs !== null) {
     return { outcome: "deny", reason: "outbound_authorization_revoked" };
   }
-  if (grant.scope !== "member_artifact") {
+  if (grant.scope !== expectedScope) {
     return { outcome: "deny", reason: "outbound_scope_mismatch" };
   }
   const same =
@@ -216,6 +220,7 @@ export type AcceptedArtifactIssuanceBasis = {
   groupId: string;
   taskId: string;
   itemId: string;
+  scope: MemberArtifactDeliveryScope;
   acceptedSubmissionId: string;
   acceptedArtifactVersion: string;
   linkedDeliverableId: string;
@@ -259,7 +264,11 @@ function digestText(text: string): string {
 export function deriveAcceptedArtifactIssuanceBasis(
   facts: AcceptedArtifactIssuanceFacts | null,
 ): AcceptedArtifactIssuanceBasis | null {
-  if (!facts || facts.scope !== "member_artifact" || compact(facts.boardStatus) !== "accepted") {
+  if (
+    !facts ||
+    (facts.scope !== "member_artifact" && facts.scope !== "group_final") ||
+    compact(facts.boardStatus) !== "accepted"
+  ) {
     return null;
   }
   if (compact(facts.mediaUrl) || facts.attachment != null) {
@@ -294,6 +303,7 @@ export function deriveAcceptedArtifactIssuanceBasis(
     groupId: compact(facts.groupId),
     taskId: compact(facts.taskId),
     itemId: compact(facts.itemId),
+    scope: facts.scope,
     acceptedSubmissionId,
     acceptedArtifactVersion,
     linkedDeliverableId,
@@ -301,6 +311,96 @@ export function deriveAcceptedArtifactIssuanceBasis(
     linkedContentSha256,
     plainText,
   };
+}
+
+/**
+ * Overall acceptance gate for a pinned group-final version.
+ * Bare chat completion phrases are refused. Does not send.
+ */
+export function evaluateGroupFinalOverallAcceptance(facts: {
+  boardStatus?: string | null;
+  acceptanceReason?: string | null;
+  checkedAcceptanceCriteria?: readonly string[] | null;
+  boardAcceptanceCriteria?: readonly string[] | null;
+  acceptedArtifactVersion?: string | null;
+  pinnedArtifactVersion?: string | null;
+}):
+  | { outcome: "allow"; reason: "group_final_overall_accepted" }
+  | { outcome: "deny"; reason: string } {
+  const status = compact(facts.boardStatus);
+  if (status !== "accepted") {
+    return { outcome: "deny", reason: "not_accepted" };
+  }
+  const reason = compact(facts.acceptanceReason);
+  if (!reason) {
+    return { outcome: "deny", reason: "acceptance_reason_required" };
+  }
+  if (
+    /^(?:完成|已完成|闭环完成|任务完成|任务已完成|本轮完成|本轮已完成|done|completed)[\s。.!！…]*$/iu.test(
+      reason,
+    )
+  ) {
+    return { outcome: "deny", reason: "chat_completion_is_not_acceptance" };
+  }
+  const pinned = compact(facts.pinnedArtifactVersion);
+  const accepted = compact(facts.acceptedArtifactVersion);
+  if (!pinned || !accepted || pinned !== accepted) {
+    return { outcome: "deny", reason: "group_final_version_mismatch" };
+  }
+  const required = (facts.boardAcceptanceCriteria ?? []).map((c) => c.trim()).filter(Boolean);
+  const checked = new Set(
+    (facts.checkedAcceptanceCriteria ?? []).map((c) => c.trim()).filter(Boolean),
+  );
+  if (required.length > 0) {
+    const missing = required.filter((c) => !checked.has(c));
+    if (missing.length > 0) {
+      return { outcome: "deny", reason: "acceptance_criteria_incomplete" };
+    }
+  }
+  return { outcome: "allow", reason: "group_final_overall_accepted" };
+}
+
+/**
+ * Pure eligibility for a pinned group-final artifact.
+ * Separate from member_artifact; does not send and does not grant outbound.
+ */
+export function evaluateGroupFinalDeliveryEligibility(
+  identity: MemberArtifactDeliveryIdentity,
+): DeliveryEligibility {
+  if (identity.scope === "member_artifact") {
+    return { outcome: "deny", reason: "member_artifact_not_group_final" };
+  }
+  if (identity.scope !== "group_final") {
+    return { outcome: "deny", reason: "scope_unsupported" };
+  }
+  const target = normalizeDeliveryTarget(identity.target);
+  if (!compact(identity.target.channel) && !compact(identity.target.to)) {
+    return { outcome: "deny", reason: "target_required" };
+  }
+  if (!target) {
+    return { outcome: "deny", reason: "target_required" };
+  }
+  if (compact(identity.boardStatus) !== "accepted") {
+    return { outcome: "deny", reason: "not_accepted" };
+  }
+  const version = identity.linkedDeliverableVersion;
+  if (
+    !compact(identity.tenantId) ||
+    !compact(identity.groupId) ||
+    !compact(identity.taskId) ||
+    !compact(identity.itemId) ||
+    !compact(identity.actorId) ||
+    !compact(identity.acceptedSubmissionId) ||
+    !compact(identity.acceptedArtifactVersion) ||
+    !compact(identity.linkedDeliverableId) ||
+    !compact(identity.linkedContentSha256) ||
+    typeof version !== "number" ||
+    !Number.isFinite(version) ||
+    version <= 0
+  ) {
+    return { outcome: "deny", reason: "artifact_identity_incomplete" };
+  }
+  return { outcome: "authorization_pending", reason: "outbound_auth_unwired" };
 }
 
 /**
@@ -320,6 +420,8 @@ export function issueOutboundArtifactGrant(params: {
   if (!issuer || !basis || !target || issuer.groupId !== basis.groupId) {
     return null;
   }
+  const scope: MemberArtifactDeliveryScope =
+    basis.scope === "group_final" ? "group_final" : "member_artifact";
   return {
     tenantId: issuer.tenantId,
     groupId: issuer.groupId,
@@ -327,7 +429,7 @@ export function issueOutboundArtifactGrant(params: {
     channel: target.channel,
     accountId: target.accountId,
     to: target.to,
-    scope: "member_artifact",
+    scope,
     acceptedArtifactVersion: basis.acceptedArtifactVersion,
     linkedContentSha256: basis.linkedContentSha256,
     revokedAtMs: null,

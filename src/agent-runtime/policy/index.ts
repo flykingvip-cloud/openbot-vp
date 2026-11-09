@@ -219,6 +219,8 @@ export {
   establishTrustedDeliveryIssuer,
   evaluateAcceptedArtifactOutboundAuthorization,
   evaluateChannelAccountOutboundScope,
+  evaluateGroupFinalDeliveryEligibility,
+  evaluateGroupFinalOverallAcceptance,
   evaluateMemberArtifactDeliveryEligibility,
   issueOutboundArtifactGrant,
   memberArtifactDeliveryKeyMaterial,

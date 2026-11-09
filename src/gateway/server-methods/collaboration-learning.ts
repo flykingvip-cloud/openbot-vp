@@ -985,11 +985,12 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
     try {
       const ctx = await resolveTrustedWriteContext(client, params.groupId);
       if (!ctx.ok) {
-        respond(
-          false,
-          undefined,
-          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
-        );
+        const base = ctx.error + (ctx.detail ? `: ${ctx.detail}` : "");
+        // Confirm refusals must name 主答/lead/coordinator without leaking plan step secrets.
+        const message = base.includes("主答")
+          ? base
+          : `${base}; confirmTodolist requires 主答/lead or coordinator`;
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, message));
         return;
       }
       const todolist = await confirmCollaborationTodolist({
