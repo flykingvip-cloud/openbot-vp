@@ -18,3 +18,12 @@
 未合入main、未部署、未重启生产。已完成代码提交f4c5e2bbe并推至PR #250；其他团队observability文档与registry WIP保留。
 
 — codex-runtime-manager
+
+## 扩大矩阵与环境复核（后续）
+
+- f4c5e2bbe 独立导出候选的 runtime/协作目录联合回归：297文件，2010 PASS / 22 FAIL。不能称整体全绿。
+- 其中本机监听/tsx IPC EPERM 相关7项在允许临时本机端口的复跑后通过；9文件定向复跑为74 PASS / 14 FAIL。另一个投递源码路径断言已在dc5925e12改正，9项定向通过。不同批次不能简单合并为干净同SHA终验。
+- 14项仍涉及：连续性ledger路径、R5/R6确认重复消费与唤醒、R7认领释放、待办ACL/确认人/修订、episode源码280字符截取断言、heartbeat escalate。尚未做父提交反证，不能全部称既有红或全部归因于本轮代码。
+- PPT专用临时镜像安装超过15分钟无输出进展，apt-get处于D状态；对本轮构建PID及唯一命令核对后请求TERM停止，未重启或替换生产Gateway。原生PowerPoint UI打开自动化noWindowsAvailable/timeoutReached，未声称成功打开测试PPT。
+- 飞书根据用户后续明确指令跳过；先前收到的应用密钥未写入仓库、报告或用于外发。
+- 上线仍阻塞于上述未判清失败、PPT实物及GitHub CI账户计费。代码已推PR #250，未合入main、未部署。
