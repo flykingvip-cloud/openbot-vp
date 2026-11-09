@@ -18,11 +18,11 @@ import {
   peerReviewAcceptAllowed,
   peerReviewMustNotDriveAdmission,
 } from "../../agent-runtime/policy/index.js";
+import { appendPeerReviewLog } from "../../agent-runtime/state/index.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { recordCollaborationQualityBestEffort } from "../collaboration-ledger/writer.js";
 import { isCollabTaskClaimContractEnabled } from "./claim-contract.js";
-import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 
@@ -293,14 +293,7 @@ export async function recordPeerReview(
     return fail("invalid_input", "taskId is not a safe id");
   }
   const logPath = peerReviewLogPath(reviewsDir, taskId);
-  await withRoundLock(reviewsDir, stem, async () => {
-    await fs.mkdir(reviewsDir, { recursive: true });
-    await appendJsonlDurable(logPath, {
-      kind: "peer_review",
-      at,
-      event,
-    } satisfies PeerReviewLogLine);
-  });
+  await appendPeerReviewLog({ reviewsDir, stem, logPath, at, event });
   // RCIS observe-only: quality ledger review event (never Admission).
   recordCollaborationQualityBestEffort({
     groupId: event.groupId,
