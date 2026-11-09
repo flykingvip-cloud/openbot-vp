@@ -39,7 +39,7 @@
 | `plan-gate-exec.ts` | 交付执行门 / board-todolist mapping | 状态映射在 policy；执行包组装仍在本文件。未与 ClaimContract 合并 | policy + 现宿主组装 | private todolist | **迁移** | 待验收 | T5 / T6 |
 | `claim-contract.ts` | 群 ClaimContract 状态机与锁内事务 | 合法边在 policy。读-校验-追加由 `mutateBoardClaimLog` / `appendBoardClaimLog` 在 state 持锁完成。唤醒仍在锁外。默认仍 OFF。存储目录仍是群板，不是会话板 | 合法边→policy；锁内 RMW→state | round lock；effective policy | **迁移** | 待验收 | T5 / T6 |
 | `executor-private-todolist.ts` | 成员私有计划（非群共享板） | 仍独立目录。确认判定在 policy。propose/confirm/revise 的锁内追加走 `commitPrivateTodolistLog`，不写入群板 | **独立 state 作用域** | claim item + owner | **迁移** | 待验收 | T6 |
-| `handoff-contract.ts` | 交接分类与 apply / 责任快照 | 分类、审批要求和责任投影在 policy。锁、jsonl 和 txn 写入走 state。flag 默认、恢复顺序和锁外 wake 仍由本文件编排 | policy 纯分类 + state 事务 | governance-gate | **迁移** | 待验收 | T6 |
+| `handoff-contract.ts` | 交接分类与 apply / 责任快照 | 分类在 policy。accept/approve/apply 的锁内状态复核、事实顺序和 txn 恢复在 `state/collaboration/handoff-txn.ts`。本文件只做 flag、身份、配置和锁外 wake。存储原语在 `state/repository/durable-json.ts`，不再由 state 引用 Gateway | policy 纯分类 + state 事务 | governance-gate | **迁移** | 待验收 | T6 |
 | legacy-primary-supplement / round-runtime / decision / wake / floor* | 协作回合、发言、唤醒等现役行为 | 仍在 collaboration-dispatch 及周边 | 区分领域编排 vs adapter vs 策略；**不整目录删除**；Gateway 最终仅请求/事件/连接 | Floor / LIVE 相关 flag | **适配保留**（迁移期暂留） | 保留有因 | T6 / T8 |
 | `auto-reply/reply/get-reply-run.ts`、`agent-runner.ts` | 受控回复宿主 | 仍在；`runAdmittedTurn` 经 wiring | 保留宿主；核准无第二决策权威 | execution / command wiring | **适配保留** | 保留有因 | T1 / T8 |
 | `commands/agent.ts`、`cron/isolated-agent/run.ts`、`followup-runner.ts` | 场景入口（命令/定时/续跑） | 仍在；共用 controlled lifecycle 片段 | 保留不同受控宿主；不强并入口 | claimQueuedExecution；confirmPending | **适配保留** | 保留有因 | T1 / T9 |

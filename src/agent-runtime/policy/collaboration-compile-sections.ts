@@ -17,6 +17,9 @@ import type {
 import { OBSERVER_PERMISSIONS, SYSTEM_INVARIANTS } from "./collaboration-rules.js";
 import { clampMaxBeatsPerEpisode, MULTI_BEAT_DEFAULT_MAX } from "./collaboration-rules.js";
 /**
+ * Debt: split this file by the existing segment functions (participation, dispatch,
+ * governance, context, presentation). Not part of the current transaction move.
+ *
  * P1-A1 — EffectivePolicy capability segments (Floor Runtime v2.1 §2.6 / §5.5).
  *
  * Compiles participation / dispatch / governance / context / presentation.

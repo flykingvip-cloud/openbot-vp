@@ -1,9 +1,5 @@
 import fs from "node:fs/promises";
-import {
-  appendJsonlDurable,
-  withRoundLock,
-  writeJsonDurable,
-} from "../../../gateway/collaboration-dispatch/round-store-io.js";
+import { appendJsonlDurable, withDirectoryLock } from "../repository/durable-json.js";
 
 /**
  * Collaboration durable writes. Each store keeps its own directory and line kind.
@@ -26,7 +22,7 @@ export async function mutateBoardClaimLog<TItem>(params: {
     current: TItem,
   ) => BoardClaimMutateResult<TItem> | Promise<BoardClaimMutateResult<TItem>>;
 }): Promise<BoardClaimMutateResult<TItem>> {
-  return withRoundLock(params.claimsDir, params.stem, async () => {
+  return withDirectoryLock(params.claimsDir, params.stem, async () => {
     const lines = await params.readLines();
     const current = params.currentOf(lines);
     if (!current) {
@@ -60,7 +56,7 @@ export async function appendBoardClaimLog<TItem>(params: {
   at: number;
   item: TItem;
 }): Promise<void> {
-  await withRoundLock(params.claimsDir, params.stem, async () => {
+  await withDirectoryLock(params.claimsDir, params.stem, async () => {
     await fs.mkdir(params.claimsDir, { recursive: true });
     await appendJsonlDurable(params.logPath, {
       kind: "board_claim",
@@ -78,7 +74,7 @@ export async function commitPrivateTodolistLog<TLine, TResult extends { ok: bool
   readLines: () => Promise<TLine[]>;
   decide: (lines: TLine[]) => { result: TResult; appends?: unknown[] };
 }): Promise<TResult> {
-  return withRoundLock(params.dir, params.stem, async () => {
+  return withDirectoryLock(params.dir, params.stem, async () => {
     await fs.mkdir(params.dir, { recursive: true });
     const lines = await params.readLines();
     const outcome = params.decide(lines);
@@ -103,7 +99,7 @@ export async function appendPeerReviewLog<TEvent>(params: {
   at: number;
   event: TEvent;
 }): Promise<void> {
-  await withRoundLock(params.reviewsDir, params.stem, async () => {
+  await withDirectoryLock(params.reviewsDir, params.stem, async () => {
     await fs.mkdir(params.reviewsDir, { recursive: true });
     await appendJsonlDurable(params.logPath, {
       kind: "peer_review",
@@ -111,21 +107,4 @@ export async function appendPeerReviewLog<TEvent>(params: {
       event: params.event,
     });
   });
-}
-
-/** Handoff lock. Recovery and status checks stay in the callback; wake stays outside. */
-export function withHandoffRoundLock<T>(
-  handoffsDir: string,
-  stem: string,
-  run: () => Promise<T>,
-): Promise<T> {
-  return withRoundLock(handoffsDir, stem, run);
-}
-
-export async function appendHandoffLogLine<TLine>(logPath: string, line: TLine): Promise<void> {
-  await appendJsonlDurable(logPath, line);
-}
-
-export async function writeHandoffJson<TValue>(filePath: string, value: TValue): Promise<void> {
-  await writeJsonDurable(filePath, value);
 }
