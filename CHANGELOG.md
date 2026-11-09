@@ -313,6 +313,7 @@ Docs: https://docs.openbot.love
 - Employee/chat: a plain-language answer such as “今天是 2026 年…” stays the reply. It is no longer fed to JSON.parse and shown as `SyntaxError: … is not valid JSON`. A broken JSON decision is still rejected, and prose does not start an execution task.
 - Employee/chat: after `/new`, a builtin steward session can create its transcript when the trusted workspace Handle authorizes a directory. Managed enterprise still refuses when that Handle denies the workspace. The shadow helper path is not used as the transcript directory.
 - Employee/chat: a broken protocol decision is shown as “这一轮没能形成可执行的决定，没有开始任务。” The raw `SyntaxError` stays in the log. Plain text that sounds like work has started is recorded as a prose downgrade and does not count as task admission. A missing trusted tenant or an identity mismatch refuses transcript creation with that reason, without a model-switch error.
+- Employee/chat: a request to make or deliver a named file (for example 制作…文件名为 `onboarding-checklist.md`) is admitted as execution work even when the model answers in prose. An aborted run or an empty final leaves a visible failure message in the transcript, so a reconnect is not a blank turn. After a gateway restart, a personal workbench session restores its employee actor before chat history and the workspace locator; if that restore cannot finish, the session fails closed and asks the user to sign in again.
 
 ## 2026.3.8
 

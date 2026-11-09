@@ -249,7 +249,15 @@ describe("chat abort transcript persistence", () => {
         runId: "run-a",
       },
     });
-    expect(runBPersisted).toBeUndefined();
+    expect(runBPersisted).toMatchObject({
+      idempotencyKey: "run-b:assistant",
+      openclawAbort: {
+        aborted: true,
+        origin: "rpc",
+        runId: "run-b",
+      },
+    });
+    expect(JSON.stringify(runBPersisted)).toContain("这一轮已中止");
   });
 
   it("persists /stop partials with stop-command metadata", async () => {
@@ -298,7 +306,7 @@ describe("chat abort transcript persistence", () => {
     });
   });
 
-  it("skips run-scoped transcript persistence when partial text is blank", async () => {
+  it("persists a failure bubble when the aborted partial text is blank", async () => {
     const { transcriptPath, sessionId } = await createTranscriptFixture(
       "openclaw-chat-abort-run-blank-",
     );
@@ -320,7 +328,15 @@ describe("chat abort transcript persistence", () => {
     const persisted = lines
       .map((line) => line.message)
       .find((message) => message?.idempotencyKey === `${runId}:assistant`);
-    expect(persisted).toBeUndefined();
+    expect(persisted).toMatchObject({
+      idempotencyKey: `${runId}:assistant`,
+      openclawAbort: {
+        aborted: true,
+        origin: "rpc",
+        runId,
+      },
+    });
+    expect(JSON.stringify(persisted)).toContain("这一轮已中止");
   });
 
   it("undo skips assistant abort persistence when the run is still undoable", async () => {

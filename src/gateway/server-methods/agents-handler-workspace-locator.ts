@@ -9,7 +9,7 @@ import {
   loadExistingGovernedWorkspaceIdentity,
 } from "../data-governance/workspace-catalog-projection.js";
 import { findSeatContextForLegacyAgent } from "../data-governance/workspace-identity-repair.js";
-import { resolveEmployeeWorkbenchActor } from "../employee-workbench-scope.js";
+import { restorePersonalWorkbenchActor } from "../employee-workbench-actor-restore.js";
 import { findActiveOwnershipRecord } from "../ownership-store.js";
 import { loadPlatformAuthStore, resolvePlatformAuthConfig } from "../platform-auth.js";
 import {
@@ -370,6 +370,8 @@ export async function resolveAgentsHandlerWorkspaceLocator(params: {
   cfg: OpenBotConfig;
   agentId: string;
   purpose: string;
+  /** Employee session key used only to restore a missing actor after restart. */
+  sessionKey?: string | null;
 }): Promise<WorkspaceLocatorResult> {
   let tenantContext = null;
   try {
@@ -383,7 +385,11 @@ export async function resolveAgentsHandlerWorkspaceLocator(params: {
     return denyIncompleteLocatorQuery({ cfg: params.cfg, tenantContext: null });
   }
 
-  const actor = await resolveEmployeeWorkbenchActor(params.client ?? null);
+  const restored = await restorePersonalWorkbenchActor({
+    client: params.client ?? null,
+    sessionKey: params.sessionKey,
+  });
+  const actor = restored.ok ? restored.actor : null;
   if (!actor?.userId) {
     return denyIncompleteLocatorQuery({
       cfg: params.cfg,

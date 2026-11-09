@@ -12765,6 +12765,29 @@ tasks:
     since: 2026-11-09
     metadata: {}
 landingStreams:
+  - id: pack1-msg3-admission-abort-actor-8564
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - CHANGELOG.md
+      - src/agent-runtime/command/named-file-execution.ts
+      - src/agent-runtime/command/named-file-execution.test.ts
+      - src/agent-runtime/command/route-interaction.ts
+      - src/agent-runtime/command/route-interaction.test.ts
+      - src/auto-reply/reply/get-reply.ts
+      - src/gateway/employee-workbench-actor-restore.ts
+      - src/gateway/employee-workbench-actor-restore.test.ts
+      - src/gateway/server-methods/agents-handler-workspace-locator.ts
+      - src/gateway/server-methods/chat-terminal-transcript.ts
+      - src/gateway/server-methods/chat-terminal-transcript.test.ts
+      - src/gateway/server-methods/chat.abort-persistence.test.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/workspace/handler-bridge.ts
+    canLandWith: []
+    metadata:
+      task: pack1-msg3-admission-abort-actor
+      agent: cursor-grok-8564
+      purpose: Admit named-file delivery, persist abort/empty-final bubbles, restore employee actor after restart. Draft only.
   - id: pack1-live-chat-defects-b670
     landingPolicy: serial
     paths:

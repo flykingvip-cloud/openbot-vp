@@ -13,6 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { isSharedTenantAddressingEnabled } from "../../config/data-space.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { loadAgentRegistryStore } from "../agent-registry/store.js";
 import {
   getSharedDataGovernanceCatalog,
@@ -25,7 +26,7 @@ import {
   resolveTenantContextForSessionStore,
   type TenantContext,
 } from "../tenant-context.js";
-import { createSubsystemLogger } from "../../logging/subsystem.js";
+import { personalWorkbenchSessionNeedsActor } from "../employee-workbench-actor-restore.js";
 import { resolveAgentsHandlerWorkspaceLocator } from "../server-methods/agents-handler-workspace-locator.js";
 import { assertGroupMemberAccess } from "./group-acl.js";
 import { resolveTrustedGroupLocator } from "./group-locator.js";
@@ -610,12 +611,15 @@ export async function resolveTrustedAgentLocator(params: {
   client: GatewayClient | null;
   agentId: string;
   cfg: OpenBotConfig;
+  /** Personal workbench session key, used only to restore a missing actor. */
+  sessionKey?: string | null;
 }): Promise<string> {
   const located = await resolveAgentsHandlerWorkspaceLocator({
     client: params.client,
     cfg: params.cfg,
     agentId: params.agentId,
     purpose: "trusted.agent.locator",
+    sessionKey: params.sessionKey,
   });
   if (!located.ok) {
     logTrustedAgentLocator.warn(
@@ -972,6 +976,8 @@ export async function resolveAuthorizedToolCwdDetailed(params: {
   /** Optional group overlay after agent primary is authorized. */
   groupId?: string | null;
   authoritativeTenantId?: string | null;
+  /** Personal session key for actor restore. Not a grant. */
+  sessionKey?: string | null;
 }): Promise<AuthorizedToolCwdResolution> {
   if (!params.userId?.trim()) {
     return { cwd: null, reasonCode: "missing_actor" };
@@ -995,9 +1001,19 @@ export async function resolveAuthorizedToolCwdDetailed(params: {
       client: params.client,
       agentId: params.agentId,
       cfg: params.cfg,
+      sessionKey: params.sessionKey,
     });
   } catch (err) {
-    const reasonCode = err instanceof Error && err.message ? err.message : "locator_rejected";
+    let reasonCode = err instanceof Error && err.message ? err.message : "locator_rejected";
+    if (
+      reasonCode === "actor_optional_forbidden" &&
+      personalWorkbenchSessionNeedsActor({
+        client: params.client,
+        sessionKey: params.sessionKey,
+      })
+    ) {
+      reasonCode = "personal_workbench_actor_unrestored";
+    }
     logTrustedAgentLocator.warn(
       `resolveAuthorizedToolCwd locator rejected reasonCode=${reasonCode} agentId=${params.agentId} steward=${Boolean(params.stewardException)}`,
     );

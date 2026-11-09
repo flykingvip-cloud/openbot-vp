@@ -67,6 +67,56 @@ it("records a prose downgrade without admitting work the reply claims has starte
   expect(commit).not.toHaveBeenCalled();
 });
 
+it("admits an explicit named-file delivery even when the model would stay on prose", async () => {
+  const message = "请制作一份入职清单，文件名为 onboarding-checklist.md";
+  const infer = vi.fn(async () => ({
+    kind: "reply",
+    text: "好的，我写在对话里。",
+    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+  }));
+  const authorize = vi.fn(async () => true);
+  const commit = vi.fn(() => ({
+    kind: "accepted" as const,
+    binding: { taskId: "file-task" },
+    acceptance: ["交付文件 onboarding-checklist.md"],
+  }));
+  const routed = await routeInteraction({ message, context: [] }, captured, {
+    inference: { infer },
+    admission: { authorize, commit },
+  });
+  expect(routed.kind).toBe("execution_admission");
+  expect(interactionAdmissionFact(routed)).toEqual({ admitted: true, taskId: "file-task" });
+  expect(infer).not.toHaveBeenCalled();
+  expect(authorize).toHaveBeenCalledOnce();
+  expect(commit).toHaveBeenCalledOnce();
+  expect(commit.mock.calls[0]?.[0]).toMatchObject({
+    proposal: {
+      goal: message,
+      acceptance: ["交付文件 onboarding-checklist.md"],
+    },
+  });
+});
+
+it("does not admit a filename mention or a make request that names no file", async () => {
+  const authorize = vi.fn();
+  const commit = vi.fn();
+  for (const message of ["onboarding-checklist.md 里写了什么", "请制作一份报告"]) {
+    const routed = await routeInteraction({ message, context: [] }, captured, {
+      inference: {
+        infer: async () => ({
+          kind: "reply",
+          text: "好的",
+          protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
+        }),
+      },
+      admission: { authorize, commit },
+    });
+    expect(routed.kind).toBe("respond");
+  }
+  expect(authorize).not.toHaveBeenCalled();
+  expect(commit).not.toHaveBeenCalled();
+});
+
 it("bound changes remain proposals rather than entering new-task admission", async () => {
   const target = { taskId: "a", revision: "1" };
   const authorize = vi.fn();
