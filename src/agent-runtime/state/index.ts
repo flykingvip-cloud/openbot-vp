@@ -101,11 +101,13 @@ export {
   noteAssociationRenamedAwayFromStaged,
   payloadTextDigest,
   prepareMemberArtifactQueuePublication,
+  readMemberArtifactDeliveryIntent,
   readServerOutboundArtifactGrant,
   recordMemberArtifactBlocked,
   recordMemberArtifactNotSent,
   recordMemberArtifactReceipt,
   recoverPartialStagedAssociation,
+  writeIssuedOutboundArtifactGrant,
   writeServerOutboundArtifactGrant,
 } from "./collaboration/accepted-artifact-delivery-txn.js";
 export type {
@@ -114,6 +116,12 @@ export type {
   DeliveryExternalEffect,
   MemberArtifactDeliveryIntent,
 } from "./collaboration/accepted-artifact-delivery-txn.js";
+export {
+  findMemberArtifactDeliveryIntent,
+  readAcceptedArtifactDelivery,
+  viewAcceptedArtifactDelivery,
+} from "./collaboration/accepted-artifact-delivery-read.js";
+export type { AcceptedArtifactDeliveryView } from "./collaboration/accepted-artifact-delivery-read.js";
 export {
   DIRECTORY_LOCK_STALE_MS,
   withDirectoryLock,
