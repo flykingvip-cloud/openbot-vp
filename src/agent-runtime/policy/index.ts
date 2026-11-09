@@ -41,7 +41,19 @@ export {
   getRuntimeRuleDeclaration,
   listRuntimeRuleDeclarations,
 } from "./catalog.js";
-export { parseExplicitTaskControl } from "./explicit-task-control.js";
+export {
+  parseExplicitTaskControl,
+  shouldTaskParkAbortInFlight,
+  WAKE_REASONS,
+  HEARTBEAT_FORBIDDEN_ACTIONS,
+  isHeartbeatActionAllowed,
+  evaluateWakeEligibility,
+} from "./explicit-task-control.js";
+export type {
+  WakeReason,
+  HeartbeatForbiddenAction,
+  WakeEligibility,
+} from "./explicit-task-control.js";
 
 export { normalizeConstraintEntries, activeConstraintTexts } from "./constraints.js";
 
