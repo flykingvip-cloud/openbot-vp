@@ -127,7 +127,7 @@ M1 只落请求和关联。存储用已有的 `withDirectoryLock` 和 `writeJson
 
 1. **幂等身份在改名之后还在。** 键材料是固定字段数组的 `JSON.stringify`。同一键的锁内先读意图。只有 `ENOENT` 表示缺失。意图还必须带齐 M1 必填字段、`queueId: null`、`bridgeSendStarted: false`，并且身份和规范化目标能重新算出同一个 `keyHash`。只有 `version` / `keyHash` / `phase` 的 JSON，或身份与键不一致，都是 `intent_corrupt`，原文件不覆盖。半写恢复只修补 `authorization_pending` 和 `staged`。阶段已是 `associated` 时只核对 `.bridge-associated`；文件缺失就拒绝，不重建 `.bridge-staged`，也不改阶段。`delivered` / `unknown` 等终态同样不重建暂存。
 2. **`bridgeSendStarted` 不同时表示「正在发」和「永不可重试」。** 这是 M2 的发送合同。M1 不提供写入投递结果的接口，因此不能把 `delivered` 或 `unknown` 改成 `failed_retryable`，也不能靠调用参数把 `unknown` 变成可重试。字段仍留着：`externalEffect` 为 `none` 时以后才可以重试；为 `unknown` 时隔离且不可重试。M1 提交保持 `bridgeSendStarted: false`。
-3. **窄授权没有真实依据就不是授权。** `evaluateMemberArtifactDeliveryEligibility` 在身份完整时只返回 `authorization_pending` / `outbound_auth_unwired`。它不读取 `granted`。依据仍然缺：`resolveOutboundTarget`、`operator.write`、`checkTaskActionBoundary`、`authorizeTeamGroupResourceAccess` 都不是「这份已接受成果可以外发」。M2 接上真正的 `evaluateAcceptedArtifactOutboundAuthorization` 之前，关联可以落盘，但不得改成可发送的队列 `.json`。
+3. **窄授权没有真实依据就不是授权。** `evaluateAcceptedArtifactOutboundAuthorization` 只读两类服务端事实：`memberActorIds`（`authorizeTeamGroupResourceAccess` 背后的成员集合）和 `allowFrom`（`resolveOutboundTarget` 交给渠道插件的名单）。事实没加载完是 `authorization_pending`。actor 不在成员里，或目标不在 `allowFrom` 里，是 deny。没有 `granted` 字段。只有 `associated` 且这次判断为 allow 的记录才会写成带 `bridgeMarker` 和 `associationReady` 的 `delivery-queue/{id}.json`。`recoverPendingDeliveries` 对普通条目路径不变；桥条目没有 `associationReady` 或没有 `recoverBridge` 时不发送。发送用 `deliverOutboundPayloads({ skipQueue: true })`。抛错且没有渠道回执记 `failed_retryable`。没有可信 `messageId` 记 `unknown` 并不再发。回执写入成功之后才 `ackDelivery`。
 
 ## 4. 失败与恢复
 
