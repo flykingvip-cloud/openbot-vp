@@ -309,6 +309,7 @@ Docs: https://docs.openbot.love
 - Agents/CLI: forward host cancellation to supervised processes, handle stops during asynchronous spawn, and prevent cancelled runs from returning late success or triggering session-expired retries.
 
 - Artifacts/PPTX: keep original Office bytes separate from HTML preview downloads and saves; render static slide layouts in a resource-limited local worker when available, retaining a labelled text fallback.
+- Enterprise data: after a 用友 T+ credential connects, and again on the gateway maintenance tick, the connector syncs and refreshes its default data products without another「立即物化」. Finished sync windows are stored and materialized past the first connector page. Granted digital humans can page the feed past the 20-row summary; a missing seat grant still hides those rows.
 
 ## 2026.3.8
 
