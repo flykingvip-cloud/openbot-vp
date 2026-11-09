@@ -19,6 +19,7 @@ import {
   acceptBoardItemSubmission,
   applyClaim,
   claimBoardItem,
+  loadBoardClaimItem,
   markBoardItemInProgress,
   publishBoardItem,
   returnBoardItemSubmission,
@@ -29,10 +30,16 @@ import {
   createRuntimeAuthority,
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
+import { submitCollaborationBoardItemForReview } from "./claim-contract-entry.js";
 import {
   CHAT_COMPLETION_IS_NOT_ACCEPTANCE,
   isBareChatCompletionPhrase,
 } from "./formal-delivery-acceptance.js";
+import {
+  recoverPendingBoardEventRelays,
+  triggerPostSubmissionEventAdvance,
+} from "./post-submission-event-advance.js";
+import { trustedLocatorFromAuthority } from "./verify-linked-team-deliverable.js";
 import {
   P2_LINKED_DELIVERABLE_FIXTURE_BODY,
   seedLinkedTeamDeliverableFixture,
@@ -409,5 +416,126 @@ describe("formal delivery acceptance (production entries)", () => {
     if (!result.ok) {
       expect(result.reason).toBe(CHAT_COMPLETION_IS_NOT_ACCEPTANCE);
     }
+  });
+
+  it("member artifact stays unaccepted until review, and a failed group relay is not delivered twice", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-group-delivery-loop";
+    const executorA = "bot-a";
+    const reviewerB = "bot-b";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: executorA,
+      reviewer: reviewerB,
+    });
+    const link = await seedLink(auth, taskId, { deliverableId: "del-group-v1" });
+    const submissionId = randomUUID();
+    const submitted = await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId,
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft v1\nbody",
+      ...link,
+      actor: executorA,
+      cfg,
+      relayAdvance: false,
+    });
+    // Member submission is not group close, and the draft is not the accepted artifact.
+    expect(submitted.item.status).toBe("submitted_for_review");
+    expect(submitted.item.acceptedSubmissionId).toBeUndefined();
+    expect(submitted.item.acceptedArtifactVersion).toBeUndefined();
+
+    const trusted = trustedLocatorFromAuthority(auth);
+    const failedRelay = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: reviewerB,
+      cfg,
+      trusted,
+      roundDispatcher: async () => ({ ok: false, reason: "channel_offline" }),
+    });
+    expect(failedRelay.dispatched).toBe(false);
+    expect(failedRelay.reason).toContain("dispatch_failed");
+    const afterFail = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(afterFail?.status).toBe("submitted_for_review");
+    expect(afterFail?.acceptedSubmissionId).toBeUndefined();
+    // Unknown side effect is not recorded as delivered and is not auto-retried as success.
+    expect(afterFail?.pendingEventRelay?.status).toBe("unknown");
+
+    let relayCalls = 0;
+    const recovered = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: reviewerB,
+      items: afterFail ? [afterFail] : [],
+      cfg,
+      authority: auth,
+      trusted,
+      roundDispatcher: async () => {
+        relayCalls += 1;
+        return { ok: true, roundId: "group-review-retry" };
+      },
+    });
+    expect(recovered).toHaveLength(0);
+    expect(relayCalls).toBe(0);
+    const stillOpen = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(stillOpen?.status).toBe("submitted_for_review");
+    expect(stillOpen?.acceptedSubmissionId).toBeUndefined();
+
+    const accepted = await acceptBoardItemSubmission(
+      auth,
+      {
+        taskId,
+        itemId: item.itemId,
+        actorId: reviewerB,
+        expectedSubmissionId: submissionId,
+        reason: "meets acceptance criteria after review",
+        checkedAcceptanceCriteria: ["has title", "has body"],
+      },
+      { cfg },
+    );
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok) {
+      throw new Error(accepted.message);
+    }
+    expect(accepted.value.status).toBe("accepted");
+    expect(accepted.value.acceptedSubmissionId).toBe(submissionId);
+
+    const acceptAgain = await acceptBoardItemSubmission(
+      auth,
+      {
+        taskId,
+        itemId: item.itemId,
+        actorId: reviewerB,
+        expectedSubmissionId: submissionId,
+        reason: "meets acceptance criteria after review",
+        checkedAcceptanceCriteria: ["has title", "has body"],
+      },
+      { cfg },
+    );
+    expect(acceptAgain.ok).toBe(false);
+    const afterAccept = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: reviewerB,
+      cfg,
+      trusted,
+      roundDispatcher: async () => {
+        relayCalls += 1;
+        throw new Error("must not re-run member or delivery work after accept");
+      },
+    });
+    expect(afterAccept.dispatched).toBe(false);
+    expect(relayCalls).toBe(0);
+    const closed = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(closed?.status).toBe("accepted");
+    expect(closed?.acceptedSubmissionId).toBe(submissionId);
   });
 });
