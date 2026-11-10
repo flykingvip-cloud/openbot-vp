@@ -4,6 +4,7 @@ import {
   type InteractionModelInput,
 } from "../contracts/interaction.js";
 import { parseTaskAcceptanceChecks } from "../policy/index.js";
+import { UNBOUND_TASK_TARGET_CLARIFY } from "./host-task-target.js";
 
 export type InteractionInferencePort = {
   /** Fixed host supplies governed inference; no tools or task-state effects are exposed. */
@@ -125,8 +126,10 @@ export async function interpretInteraction(
   input.abortSignal?.throwIfAborted();
   const decision = parseDecision(proposal);
   if (decision.kind === "task_change" || decision.kind === "task_control") {
+    if (!input.taskTarget) {
+      return { kind: "clarify", text: UNBOUND_TASK_TARGET_CLARIFY };
+    }
     if (
-      !input.taskTarget ||
       input.taskTarget.taskId !== decision.target.taskId ||
       input.taskTarget.revision !== decision.target.revision
     ) {

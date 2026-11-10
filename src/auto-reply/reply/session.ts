@@ -48,6 +48,7 @@ import {
   resolveLastToRaw,
 } from "./session-delivery.js";
 import { forkSessionFromParent, resolveParentForkMaxTokens } from "./session-fork.js";
+import { unbindCurrentTaskOnSessionReset } from "../../agent-runtime/state/mutations/session-reset-focus.js";
 import { buildSessionEndHookPayload, buildSessionStartHookPayload } from "./session-hooks.js";
 
 const log = createSubsystemLogger("session-init");
@@ -243,6 +244,7 @@ export async function initSessionState(params: {
   let systemSent = false;
   let abortedLastRun = false;
   let resetTriggered = false;
+  let resetCommandSeen = false;
 
   let persistedThinking: string | undefined;
   let persistedVerbose: string | undefined;
@@ -299,10 +301,12 @@ export async function initSessionState(params: {
     }
     const triggerLower = trigger.toLowerCase();
     if (trimmedBodyLower === triggerLower || strippedForResetLower === triggerLower) {
+      resetCommandSeen = true;
       if (shouldBypassAcpResetForTrigger(triggerLower)) {
         // ACP-bound conversations handle /new and /reset in command handling
         // so the bound ACP runtime can be reset in place without rotating the
-        // normal OpenBot session/transcript.
+        // normal OpenBot session/transcript. Task focus still unbinds: an old
+        // task must not remain the default modification target of a new message.
         break;
       }
       isNewSession = true;
@@ -315,6 +319,7 @@ export async function initSessionState(params: {
       trimmedBodyLower.startsWith(triggerPrefixLower) ||
       strippedForResetLower.startsWith(triggerPrefixLower)
     ) {
+      resetCommandSeen = true;
       if (shouldBypassAcpResetForTrigger(triggerLower)) {
         break;
       }
@@ -369,6 +374,12 @@ export async function initSessionState(params: {
   // and for scheduled/daily resets where the session has become stale (!freshEntry).
   // Without this, daily-reset transcripts are left as orphaned files on disk (#35481).
   const previousSessionEntry = (resetTriggered || !freshEntry) && entry ? { ...entry } : undefined;
+  if (resetCommandSeen) {
+    const boardFile = (previousSessionEntry?.sessionFile ?? entry?.sessionFile)?.trim();
+    if (boardFile) {
+      unbindCurrentTaskOnSessionReset(boardFile);
+    }
+  }
   clearBootstrapSnapshotOnSessionRollover({
     sessionKey,
     previousSessionId: previousSessionEntry?.sessionId,

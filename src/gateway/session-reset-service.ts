@@ -23,6 +23,7 @@ import {
   normalizeAgentId,
   parseAgentSessionKey,
 } from "../routing/session-key.js";
+import { unbindCurrentTaskOnSessionReset } from "../agent-runtime/state/mutations/session-reset-focus.js";
 import { ErrorCodes, errorShape } from "./protocol/index.js";
 import type { GatewayClient } from "./server-methods/types.js";
 import {
@@ -364,6 +365,9 @@ export async function performGatewaySessionReset(params: {
     return nextEntry;
   });
 
+  if (oldSessionFile?.trim()) {
+    unbindCurrentTaskOnSessionReset(oldSessionFile);
+  }
   archiveSessionTranscriptsForSession({
     sessionId: oldSessionId,
     storePath,

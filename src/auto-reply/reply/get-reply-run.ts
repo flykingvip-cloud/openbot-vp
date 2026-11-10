@@ -1561,9 +1561,7 @@ export async function runPreparedReply(
         message: prefixedCommandBody,
         images: opts?.images,
         abortSignal: opts?.abortSignal,
-        taskTarget: board.current
-          ? { taskId: board.current.taskId, revision: String(board.writeEpoch ?? 0) }
-          : undefined,
+        taskTarget: hostBoundTaskTarget(board),
         context: [
           ...systemContext.map((content) => ({ role: "system" as const, content })),
           ...projectInteractionHistory(history, interactionIngress.userMessageId),
