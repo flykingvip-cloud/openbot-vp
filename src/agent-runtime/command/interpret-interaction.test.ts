@@ -1,5 +1,6 @@
 import { expect, it, vi } from "vitest";
 import { interpretInteraction } from "./interpret-interaction.js";
+import { UNBOUND_TASK_TARGET_CLARIFY } from "./host-task-target.js";
 
 it("preserves declarative checks and refuses executable acceptance fields", async () => {
   const check = {
@@ -151,9 +152,10 @@ it.each(["task_change", "task_control"] as const)(
     expect(
       await interpretInteraction({ message: "update", context: [], taskTarget: target }, { infer }),
     ).toEqual(decision);
-    await expect(
-      interpretInteraction({ message: "update", context: [] }, { infer }),
-    ).rejects.toThrow(/not bound/);
+    expect(await interpretInteraction({ message: "update", context: [] }, { infer })).toEqual({
+      kind: "clarify",
+      text: UNBOUND_TASK_TARGET_CLARIFY,
+    });
     await expect(
       interpretInteraction(
         { message: "update", context: [], taskTarget: { ...target, revision: "epoch-2" } },

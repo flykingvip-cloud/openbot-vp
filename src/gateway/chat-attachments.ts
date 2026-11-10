@@ -1,6 +1,17 @@
 import { estimateBase64DecodedBytes } from "../media/base64.js";
 import { extractFileContentFromSource, resolveInputFileLimits } from "../media/input-files.js";
 import { sniffMimeFromBase64 } from "../media/sniff-mime-from-base64.js";
+import {
+  isNonImageAttachmentFileName,
+  resolveAttachmentEffectiveMime,
+  sanitizeModelImageInputs,
+} from "./chat-attachment-kind.js";
+
+export {
+  isNonImageAttachmentFileName,
+  resolveAttachmentEffectiveMime,
+  sanitizeModelImageInputs,
+};
 
 export type ChatAttachment = {
   type?: string;
@@ -73,11 +84,11 @@ function isImageMime(mime?: string): boolean {
 
 function isLikelyImageAttachment(att: ChatAttachment, normalized: NormalizedAttachment): boolean {
   const mime = normalizeMime(normalized.mime);
-  if (isImageMime(mime)) {
+  if (isImageMime(mime) && !isNonImageAttachmentFileName(att.fileName)) {
     return true;
   }
   const type = typeof att.type === "string" ? att.type.trim().toLowerCase() : "";
-  return type === "image";
+  return type === "image" && !isNonImageAttachmentFileName(att.fileName);
 }
 
 const XML_ESCAPE_MAP: Record<string, string> = {
@@ -255,10 +266,16 @@ export async function parseMessageWithAttachments(
 
       const providedMime = normalizeMime(mime);
       const sniffedMime = normalizeMime(await sniffMimeFromBase64(b64));
-      const effectiveMime = sniffedMime ?? providedMime ?? mime;
+      const fileNameHint = att.fileName || label;
+      const effectiveMime =
+        resolveAttachmentEffectiveMime({
+          fileName: fileNameHint,
+          providedMime,
+          sniffedMime,
+        }) || providedMime || mime;
       if (sniffedMime && providedMime && sniffedMime !== providedMime) {
         log?.warn?.(
-          `attachment ${label}: mime mismatch (${providedMime} -> ${sniffedMime}), using sniffed`,
+          `attachment ${label}: mime mismatch (${providedMime} -> ${sniffedMime}), using ${effectiveMime}`,
         );
       }
 

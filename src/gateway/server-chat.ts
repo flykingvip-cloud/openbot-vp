@@ -14,6 +14,13 @@ import {
 import { resolveHeartbeatVisibility } from "../infra/heartbeat-visibility.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { declaredDeliverableArtifactFields } from "../shared/preview-artifact/materialize-declared-artifacts.js";
+import {
+  candidateNamedFilesFromTurn,
+  collectNamedFileReceipts,
+  mergeNamedFileReceiptArtifacts,
+  namedFileReceiptsToArtifactFields,
+} from "../agent-runtime/delivery/named-file-receipt.js";
+import { visibleAsyncWaitIdentity } from "../agent-runtime/state/repository/async-wait-visible-identity.js";
 import { stripAssistantScratchpadFromText } from "../shared/text/assistant-scratchpad.js";
 import { stripControlChannelForDisplay } from "../shared/text/control-channel-visibility.js";
 import { getRunReplyLanguage } from "../shared/text/run-reply-language.js";
@@ -80,6 +87,40 @@ function errorTextForTerminal(error: unknown): string {
     return "";
   }
   return formatForLog(error);
+}
+
+
+
+function resolveVisibleAsyncWait(sessionKey: string) {
+  try {
+    const sessionFile = loadSessionEntrySyncFallback(sessionKey).entry?.sessionFile?.trim();
+    if (!sessionFile) {
+      return undefined;
+    }
+    return visibleAsyncWaitIdentity({ sessionFile });
+  } catch {
+    return undefined;
+  }
+}
+
+function attachReceiptArtifactsForTurn(params: {
+  declared: ReturnType<typeof declaredDeliverableArtifactFields>;
+  visibleText: string;
+  hint?: TurnCompletionRunHint;
+}): ReturnType<typeof declaredDeliverableArtifactFields> {
+  const workspaceDir = params.hint?.workspaceDir?.trim();
+  if (!workspaceDir) {
+    return params.declared;
+  }
+  const relativePaths = candidateNamedFilesFromTurn([params.hint?.userText, params.visibleText]);
+  if (relativePaths.length === 0) {
+    return params.declared;
+  }
+  const receipts = collectNamedFileReceipts({ workspaceDir, relativePaths });
+  return mergeNamedFileReceiptArtifacts(
+    params.declared,
+    namedFileReceiptsToArtifactFields(receipts),
+  );
 }
 
 function resolveTurnCompletionHint(
@@ -844,6 +885,11 @@ export function createAgentEventHandler({
         finalArtifacts = declaredDeliverableArtifactFields(prepared.text, {
           timestamp: Date.now(),
         });
+        finalArtifacts = attachReceiptArtifactsForTurn({
+          declared: finalArtifacts,
+          visibleText: prepared.text,
+          hint,
+        });
         // prepareChatDeliverablePublish already strips <<DELIVERABLE>> tags from
         // outgoing text; still strip turn_completion / tool-digest leftovers.
         visibleText = stripControlChannelForDisplay(prepared.text);
@@ -851,9 +897,15 @@ export function createAgentEventHandler({
         finalArtifacts = declaredDeliverableArtifactFields(visibleText, {
           timestamp: Date.now(),
         });
+        finalArtifacts = attachReceiptArtifactsForTurn({
+          declared: finalArtifacts,
+          visibleText,
+          hint,
+        });
         visibleText = stripControlChannelForDisplay(visibleText);
       }
       const taskUpdate = resolveVisibleChatTaskUpdate(sessionKey, clientRunId);
+      const asyncWait = resolveVisibleAsyncWait(sessionKey);
       if (taskUpdate) {
         try {
           const transcriptPath =
@@ -875,6 +927,7 @@ export function createAgentEventHandler({
         state: "final" as const,
         ...(stopReason && { stopReason }),
         ...(taskUpdate ? { taskUpdate } : {}),
+        ...(asyncWait ? { asyncWait } : {}),
         message:
           visibleText && !shouldSuppressSilent
             ? {

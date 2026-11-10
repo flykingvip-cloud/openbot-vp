@@ -5,6 +5,8 @@ import {
   createInteractionSourceBoundary,
   formatRestrictedInteractionNotice,
 } from "../../agent-runtime/command/index.js";
+import { admittedTaskQueryContinuation } from "../../agent-runtime/command/admitted-task-query-continuation.js";
+import { hostBoundTaskTarget } from "../../agent-runtime/command/host-task-target.js";
 import {
   appendSharedTurnContext,
   appendUntrustedContext,
@@ -23,6 +25,7 @@ import {
   isEmbeddedPiRunStreaming,
 } from "../../agent-runtime/execution/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
+import { sanitizeModelImageInputs } from "../../gateway/chat-attachments.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
@@ -1559,22 +1562,47 @@ export async function runPreparedReply(
       input: {
         availability: sources.availability,
         message: prefixedCommandBody,
-        images: opts?.images,
+        images: sanitizeModelImageInputs(opts?.images),
         abortSignal: opts?.abortSignal,
-        taskTarget: board.current
-          ? { taskId: board.current.taskId, revision: String(board.writeEpoch ?? 0) }
-          : undefined,
+        taskTarget: hostBoundTaskTarget(board),
         context: [
           ...systemContext.map((content) => ({ role: "system" as const, content })),
           ...projectInteractionHistory(history, interactionIngress.userMessageId),
         ],
       },
     });
-    if (routed.kind === "respond") {
-      typing.cleanup();
-      return persistOwnReply(routed.text);
-    }
     let acceptedCriteria: readonly string[] = [];
+    if (routed.kind === "respond") {
+      const continuation = admittedTaskQueryContinuation({
+        board,
+        protocolDowngrade: routed.protocolDowngrade,
+      });
+      if (!continuation.shouldContinue || !board.current) {
+        typing.cleanup();
+        return persistOwnReply(routed.text);
+      }
+      // Persist the factual query answer once. The query does not schedule work.
+      const queryReply = persistOwnReply(routed.text);
+      if (isEmbeddedPiRunActive(sessionIdFinal)) {
+        typing.cleanup();
+        return queryReply;
+      }
+      admittedBinding = {
+        taskId: board.current.taskId,
+        executionAttempt: board.current.executionAttempt,
+        deliverableVersion: board.current.deliverableVersion,
+      };
+      acceptedCriteria = board.current.acceptanceCriteria ?? [];
+      extraSystemPromptParts.push(
+        [
+          "## Admitted task continues after a query",
+          "The user asked a question only. That question does not pause, replace, or reschedule the already-admitted task, and must not ask whether to start work that is already assigned.",
+          "Continue the admitted execution and deliver against the accepted criteria.",
+          `Goal: ${board.current.goalText}`,
+        ].join("\n"),
+      );
+      // Fall through to host-driven execution of the admitted binding.
+    }
     if (routed.kind === "task_proposal") {
       opts?.abortSignal?.throwIfAborted();
       if (routed.decision.kind === "task_control" && routed.decision.action === "resume") {

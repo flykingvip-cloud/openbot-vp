@@ -151,6 +151,13 @@ describe("controlledDiscussToTask real storage", () => {
     });
     expect(result.classification).toBe("needs_clarification");
     expect(result.attempted).toBe(false);
+    expect(result.userMessage).toContain("已理解：");
+    expect(result.userMessage).toContain("目标：");
+    expect(result.userMessage).toMatch(/研究/);
+    expect(result.userMessage).toContain("还缺少：交付物或验收条件");
+    expect(result.userMessage).not.toBe(
+      "委托意图尚不明确或缺少验收条件，请补充后再建立正式任务。",
+    );
     const stores = createTrustedGroupStores(trusted);
     // No task object for minted id
     const taskId = mintDiscussToTaskId({

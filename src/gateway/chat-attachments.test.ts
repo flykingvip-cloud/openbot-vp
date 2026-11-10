@@ -4,6 +4,8 @@ import {
   DEFAULT_CHAT_FILE_ATTACHMENT_MAX_BYTES,
   type ChatAttachment,
   parseMessageWithAttachments,
+  resolveAttachmentEffectiveMime,
+  sanitizeModelImageInputs,
 } from "./chat-attachments.js";
 
 const PNG_1x1 =
@@ -315,5 +317,47 @@ describe("shared attachment validation", () => {
     await expect(
       parseMessageWithAttachments("x", [att], { log: { warn: () => {} } }),
     ).rejects.toThrow(/exceeds size limit/i);
+  });
+
+  it("keeps a Markdown attachment on the file path even when the client labels it an image", async () => {
+    const markdown = Buffer.from("# 预算说明\n\n- 项目 A\n", "utf8").toString("base64");
+    const parsed = await parseMessageWithAttachments(
+      "请分析附件",
+      [
+        {
+          type: "image",
+          mimeType: "image/png",
+          fileName: "async-test-doc.md",
+          content: markdown,
+        },
+      ],
+      { log: { warn: () => {} } },
+    );
+    expect(parsed.images).toEqual([]);
+    expect(parsed.files).toHaveLength(1);
+    expect(parsed.files[0]?.fileName).toBe("async-test-doc.md");
+    expect(parsed.files[0]?.mimeType).toBe("text/markdown");
+    expect(parsed.message).toContain("async-test-doc.md");
+  });
+});
+
+describe("resolveAttachmentEffectiveMime and resume sanitization", () => {
+  it("prefers the .md suffix over a declared image MIME when bytes are not a confirmed image", () => {
+    expect(
+      resolveAttachmentEffectiveMime({
+        fileName: "async-test-doc.md",
+        providedMime: "image/png",
+        sniffedMime: undefined,
+      }),
+    ).toBe("text/markdown");
+  });
+
+  it("drops resume image parts whose suffix shows they are Markdown or other files", () => {
+    const kept = sanitizeModelImageInputs([
+      { mimeType: "image/png", fileName: "shot.png" },
+      { mimeType: "image/png", fileName: "async-test-doc.md" },
+      { mimeType: "text/markdown", fileName: "notes.md" },
+    ]);
+    expect(kept).toEqual([{ mimeType: "image/png", fileName: "shot.png" }]);
   });
 });

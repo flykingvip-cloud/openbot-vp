@@ -82,6 +82,7 @@ export function commitAdmittedSessionTask(params: {
       acceptanceCriteria: [...params.acceptance],
       ...(params.checks !== undefined ? { acceptanceChecks: parsedChecks.checks } : {}),
       admissionRequestId: params.requestId,
+      admittedGeneration: board.resetGeneration ?? 0,
     };
     writeSessionTaskBoardUnlocked(params.sessionFile, result.board);
     return { kind: "accepted", binding: { taskId: result.taskId } };

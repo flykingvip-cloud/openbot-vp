@@ -9,7 +9,10 @@ import {
   controlledDiscussToTask,
   type ControlledDiscussToTaskResult,
 } from "./controlled-discuss-to-task.js";
-import { classifyDiscussToTaskIntent } from "./discuss-to-task-classify.js";
+import {
+  classifyDiscussToTaskIntent,
+  formatDiscussToTaskClarificationMessage,
+} from "./discuss-to-task-classify.js";
 import { FORMAL_TASK_FLAG_OFF_USER_MESSAGE } from "./discuss-to-task-receipt.js";
 import { registerDiscussToTaskSourceBinding } from "./discuss-to-task-source-binding.js";
 import { stagesFromActivation } from "./discuss-to-task-stages.js";
@@ -58,7 +61,7 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
         activation: null,
         stages: emptyStages(),
         statusCode: "needs_clarification",
-        userMessage: "委托意图尚不明确或缺少验收条件，请补充后再建立正式任务。",
+        userMessage: formatDiscussToTaskClarificationMessage(classification),
         internalReason: classification.reason,
       };
     }

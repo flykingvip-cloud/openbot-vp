@@ -53,6 +53,12 @@ export type TrackedTask = {
   executionAttempt?: string;
   /** Durable automatic-continuation reservations; scoped to this task and session. */
   continuationWakeAtMs?: number[];
+  /**
+   * Reset generation in which this task was admitted.
+   * After /new, only a task whose generation matches the board may be the
+   * default modification target.
+   */
+  admittedGeneration?: number;
 };
 
 /** CLOSE tombstone — blocks wake / late results / resume resurrection (C5). */
@@ -91,6 +97,11 @@ export type SessionTaskBoard = {
    * the shared file lock on every successful write — independent of focusRevision.
    */
   writeEpoch?: number;
+  /**
+   * Increments on /new (or an equivalent session reset). Old current work is
+   * parked and must not remain the default target of a later message.
+   */
+  resetGeneration?: number;
   /** CLOSE tombstones (C5). */
   tombstones?: TaskTombstone[];
   /** Searchable archive for parked>MAX overflow (C6). */
