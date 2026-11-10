@@ -5,6 +5,8 @@ import {
   createInteractionSourceBoundary,
   formatRestrictedInteractionNotice,
 } from "../../agent-runtime/command/index.js";
+import { admittedTaskQueryContinuation } from "../../agent-runtime/command/admitted-task-query-continuation.js";
+import { hostBoundTaskTarget } from "../../agent-runtime/command/host-task-target.js";
 import {
   appendSharedTurnContext,
   appendUntrustedContext,
@@ -1568,11 +1570,38 @@ export async function runPreparedReply(
         ],
       },
     });
-    if (routed.kind === "respond") {
-      typing.cleanup();
-      return persistOwnReply(routed.text);
-    }
     let acceptedCriteria: readonly string[] = [];
+    if (routed.kind === "respond") {
+      const continuation = admittedTaskQueryContinuation({
+        board,
+        protocolDowngrade: routed.protocolDowngrade,
+      });
+      if (!continuation.shouldContinue || !board.current) {
+        typing.cleanup();
+        return persistOwnReply(routed.text);
+      }
+      // Persist the factual query answer once. The query does not schedule work.
+      const queryReply = persistOwnReply(routed.text);
+      if (isEmbeddedPiRunActive(sessionIdFinal)) {
+        typing.cleanup();
+        return queryReply;
+      }
+      admittedBinding = {
+        taskId: board.current.taskId,
+        executionAttempt: board.current.executionAttempt,
+        deliverableVersion: board.current.deliverableVersion,
+      };
+      acceptedCriteria = board.current.acceptanceCriteria ?? [];
+      extraSystemPromptParts.push(
+        [
+          "## Admitted task continues after a query",
+          "The user asked a question only. That question does not pause, replace, or reschedule the already-admitted task, and must not ask whether to start work that is already assigned.",
+          "Continue the admitted execution and deliver against the accepted criteria.",
+          `Goal: ${board.current.goalText}`,
+        ].join("\n"),
+      );
+      // Fall through to host-driven execution of the admitted binding.
+    }
     if (routed.kind === "task_proposal") {
       opts?.abortSignal?.throwIfAborted();
       if (routed.decision.kind === "task_control" && routed.decision.action === "resume") {
