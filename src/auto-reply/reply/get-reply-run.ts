@@ -25,6 +25,7 @@ import {
   isEmbeddedPiRunStreaming,
 } from "../../agent-runtime/execution/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
+import { sanitizeModelImageInputs } from "../../gateway/chat-attachments.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
@@ -1561,7 +1562,7 @@ export async function runPreparedReply(
       input: {
         availability: sources.availability,
         message: prefixedCommandBody,
-        images: opts?.images,
+        images: sanitizeModelImageInputs(opts?.images),
         abortSignal: opts?.abortSignal,
         taskTarget: hostBoundTaskTarget(board),
         context: [

@@ -20,6 +20,7 @@ import {
   mergeNamedFileReceiptArtifacts,
   namedFileReceiptsToArtifactFields,
 } from "../agent-runtime/delivery/named-file-receipt.js";
+import { visibleAsyncWaitIdentity } from "../agent-runtime/state/repository/async-wait-visible-identity.js";
 import { stripAssistantScratchpadFromText } from "../shared/text/assistant-scratchpad.js";
 import { stripControlChannelForDisplay } from "../shared/text/control-channel-visibility.js";
 import { getRunReplyLanguage } from "../shared/text/run-reply-language.js";
@@ -86,6 +87,20 @@ function errorTextForTerminal(error: unknown): string {
     return "";
   }
   return formatForLog(error);
+}
+
+
+
+function resolveVisibleAsyncWait(sessionKey: string) {
+  try {
+    const sessionFile = loadSessionEntrySyncFallback(sessionKey).entry?.sessionFile?.trim();
+    if (!sessionFile) {
+      return undefined;
+    }
+    return visibleAsyncWaitIdentity({ sessionFile });
+  } catch {
+    return undefined;
+  }
 }
 
 function attachReceiptArtifactsForTurn(params: {
@@ -890,6 +905,7 @@ export function createAgentEventHandler({
         visibleText = stripControlChannelForDisplay(visibleText);
       }
       const taskUpdate = resolveVisibleChatTaskUpdate(sessionKey, clientRunId);
+      const asyncWait = resolveVisibleAsyncWait(sessionKey);
       if (taskUpdate) {
         try {
           const transcriptPath =
@@ -911,6 +927,7 @@ export function createAgentEventHandler({
         state: "final" as const,
         ...(stopReason && { stopReason }),
         ...(taskUpdate ? { taskUpdate } : {}),
+        ...(asyncWait ? { asyncWait } : {}),
         message:
           visibleText && !shouldSuppressSilent
             ? {

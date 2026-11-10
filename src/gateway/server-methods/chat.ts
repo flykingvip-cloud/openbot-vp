@@ -158,6 +158,7 @@ import {
   type ChatFileContent,
   type ChatImageContent,
   parseMessageWithAttachments,
+  sanitizeModelImageInputs,
 } from "../chat-attachments.js";
 import { resolveClientStewardOwnerId } from "../chat-event-isolation.js";
 import {
@@ -4894,7 +4895,7 @@ export const chatHandlers: GatewayRequestHandlers = {
           log: context.logGateway,
         });
         parsedMessage = parsed.message;
-        parsedImages = parsed.images;
+        parsedImages = sanitizeModelImageInputs(parsed.images);
         parsedFiles = parsed.files;
       } catch (err) {
         respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, String(err)));
