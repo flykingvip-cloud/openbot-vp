@@ -20,6 +20,7 @@ import {
 } from "./activate-collaboration-task.js";
 import {
   classifyDiscussToTaskIntent,
+  formatDiscussToTaskClarificationMessage,
   type DiscussToTaskClassification,
 } from "./discuss-to-task-classify.js";
 import { DISCUSS_TO_TASK_OPERATION_SLOT, mintDiscussToTaskId } from "./discuss-to-task-id.js";
@@ -199,7 +200,10 @@ function finish(params: {
     activation: params.activation,
     stages: params.stages,
     statusCode: status.code,
-    userMessage: status.userMessage,
+    userMessage:
+      params.classification.kind === "needs_clarification"
+        ? formatDiscussToTaskClarificationMessage(params.classification)
+        : status.userMessage,
     ...(params.internalReason ? { internalReason: params.internalReason } : {}),
     ...(params.idempotentReplay ? { idempotentReplay: true } : {}),
     ...(params.contractConflict ? { contractConflict: true } : {}),
@@ -225,7 +229,11 @@ export async function controlledDiscussToTask(
 
   if (!sourceMessageId || !groupId || !tenantId || !actor || !message) {
     return finish({
-      classification: { kind: "needs_clarification", reason: "ambiguous_delegation" },
+      classification: {
+        kind: "needs_clarification",
+        reason: "ambiguous_delegation",
+        missingFields: ["goal"],
+      },
       attempted: false,
       taskId: null,
       activationKey: null,
@@ -296,7 +304,13 @@ export async function controlledDiscussToTask(
 
   if (acceptanceCriteria.length === 0) {
     return finish({
-      classification: { kind: "needs_clarification", reason: "missing_acceptance" },
+      classification: {
+        kind: "needs_clarification",
+        reason: "missing_acceptance",
+        titleHint: title,
+        goalHint: goal,
+        missingFields: ["deliverables_or_acceptance"],
+      },
       attempted: false,
       taskId: null,
       activationKey: null,
