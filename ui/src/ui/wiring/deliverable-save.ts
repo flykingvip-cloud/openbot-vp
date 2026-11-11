@@ -379,9 +379,9 @@ export async function saveAndArchiveSidebarDeliverable(params: {
     throw new Error("gateway client unavailable");
   }
   const title = params.workspace.artifact.title.trim() || "未命名成果";
-  const content = params.content.trim();
+  const content = params.content;
   const contentBase64 = params.contentBase64?.replace(/\s+/g, "") || "";
-  if (!content && !contentBase64) {
+  if (!content.trim() && !contentBase64) {
     throw new Error("preview content is empty");
   }
   const metadata = params.workspace.artifact.providerMetadata ?? {};

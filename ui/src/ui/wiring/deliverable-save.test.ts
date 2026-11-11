@@ -480,3 +480,22 @@ it("never archives Office preview HTML as the original PPTX when bytes are missi
   });
   expect(extractArtifactSavePayload(file)).toEqual({ content: "" });
 });
+
+it("preserves preview text bytes when saving instead of trimming the file body", async () => {
+  const request = vi.fn(async () => ({
+    deliverableId: "saved",
+    knowledgeBaseId: "kb",
+    knowledgeBaseTitle: "KB",
+  }));
+  const content = "  exact preview body with whitespace  \n";
+  await saveAndArchiveSidebarDeliverable({
+    client: { request } as never,
+    workspace: workspace("assistant-doc:bytes"),
+    sessionKey: "agent:main:main",
+    content,
+  });
+  expect(request).toHaveBeenCalledWith(
+    "knowledge.deliverables.saveAndArchive",
+    expect.objectContaining({ content }),
+  );
+});
