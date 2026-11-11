@@ -5,6 +5,10 @@
  *
  * On reload, in-flight "executing" rows are moved to "result_unverified"
  * and are never auto-retried.
+ *
+ * File stores are single-writer: one open instance per records file. Commit
+ * on a snapshot copy and replace the in-memory snapshot only after persist
+ * succeeds, so a failed disk write cannot leak an uncommitted state.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -12,6 +16,8 @@ import { diagnosisJobTenantHash16 } from "./diagnosis-job-store.js";
 import type { HandlingRecord, HandlingState } from "./handling-loop.js";
 
 export const DIAGNOSIS_HANDLING_DIR = "diagnosis-handling";
+export const DIAGNOSIS_HANDLING_SINGLE_WRITER_VIOLATION =
+  "diagnosis_handling_store_single_writer_violation" as const;
 
 export type HandlingStore = {
   get(handlingId: string): HandlingRecord | undefined;
@@ -20,9 +26,18 @@ export type HandlingStore = {
   list(filter?: { tenantId?: string; status?: HandlingState | HandlingState[] }): HandlingRecord[];
   /** Re-read durable snapshot (file store). Recovers stale executing rows. */
   reload(): void;
+  /** Release the single-writer lease for this store instance. */
+  close(): void;
 };
 
-type FileSnapshot = { records: Record<string, HandlingRecord> };
+export type HandlingFileSnapshot = { records: Record<string, HandlingRecord> };
+
+export type FileHandlingStoreOptions = {
+  /** Test hook. Defaults to an atomic write. Thrown errors must not mutate memory. */
+  writeSnapshot?: (filePath: string, snapshot: HandlingFileSnapshot) => void;
+};
+
+const fileStoreWriters = new Map<string, { closed: boolean }>();
 
 function cloneRecord(row: HandlingRecord): HandlingRecord {
   return structuredClone(row);
@@ -41,9 +56,9 @@ function recoverExecuting(row: HandlingRecord, now: string): HandlingRecord {
 }
 
 function recoverSnapshot(
-  snapshot: FileSnapshot,
+  snapshot: HandlingFileSnapshot,
   now: string,
-): { snapshot: FileSnapshot; dirty: boolean } {
+): { snapshot: HandlingFileSnapshot; dirty: boolean } {
   let dirty = false;
   const records: Record<string, HandlingRecord> = {};
   for (const [id, row] of Object.entries(snapshot.records)) {
@@ -56,16 +71,16 @@ function recoverSnapshot(
   return { snapshot: { records }, dirty };
 }
 
-function emptySnapshot(): FileSnapshot {
+function emptySnapshot(): HandlingFileSnapshot {
   return { records: {} };
 }
 
-function readFile(filePath: string): FileSnapshot {
+function readFile(filePath: string): HandlingFileSnapshot {
   if (!fs.existsSync(filePath)) {
     return emptySnapshot();
   }
   try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as Partial<FileSnapshot>;
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as Partial<HandlingFileSnapshot>;
     if (
       !parsed ||
       typeof parsed !== "object" ||
@@ -80,7 +95,10 @@ function readFile(filePath: string): FileSnapshot {
   }
 }
 
-function writeFileAtomic(filePath: string, snapshot: FileSnapshot): void {
+export function writeHandlingSnapshotAtomic(
+  filePath: string,
+  snapshot: HandlingFileSnapshot,
+): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const tmp = `${filePath}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
@@ -150,27 +168,53 @@ export function createMemoryHandlingStore(seed: readonly HandlingRecord[] = []):
     list: (filter) =>
       [...map.values()].filter((row) => matchesFilter(row, filter)).map(cloneRecord),
     reload: recover,
+    close: () => {},
   };
 }
 
-export function createFileHandlingStore(configDir: string, tenantId: string): HandlingStore {
-  const filePath = handlingStorePath(configDir, tenantId);
-  const load = (): FileSnapshot => {
+export function createFileHandlingStore(
+  configDir: string,
+  tenantId: string,
+  options: FileHandlingStoreOptions = {},
+): HandlingStore {
+  const filePath = path.resolve(handlingStorePath(configDir, tenantId));
+  if (fileStoreWriters.has(filePath)) {
+    throw new Error(DIAGNOSIS_HANDLING_SINGLE_WRITER_VIOLATION);
+  }
+  const lease = { closed: false };
+  fileStoreWriters.set(filePath, lease);
+  const writeSnapshot = options.writeSnapshot ?? writeHandlingSnapshotAtomic;
+  const assertOpen = () => {
+    if (lease.closed) {
+      throw new Error(DIAGNOSIS_HANDLING_SINGLE_WRITER_VIOLATION);
+    }
+  };
+  const load = (): HandlingFileSnapshot => {
     const now = new Date().toISOString();
     const recovered = recoverSnapshot(readFile(filePath), now);
     if (recovered.dirty) {
-      writeFileAtomic(filePath, recovered.snapshot);
+      writeSnapshot(filePath, recovered.snapshot);
     }
     return recovered.snapshot;
   };
   let snapshot = load();
-  const persist = () => writeFileAtomic(filePath, snapshot);
+  const close = () => {
+    if (lease.closed) {
+      return;
+    }
+    lease.closed = true;
+    if (fileStoreWriters.get(filePath) === lease) {
+      fileStoreWriters.delete(filePath);
+    }
+  };
   return {
     get: (handlingId) => {
+      assertOpen();
       const row = snapshot.records[handlingId];
       return row ? cloneRecord(row) : undefined;
     },
     getByIdempotency: (tenantIdValue, idempotencyKey) => {
+      assertOpen();
       for (const row of Object.values(snapshot.records)) {
         if (row.tenantId === tenantIdValue && row.idempotencyKey === idempotencyKey) {
           return cloneRecord(row);
@@ -179,29 +223,40 @@ export function createFileHandlingStore(configDir: string, tenantId: string): Ha
       return undefined;
     },
     put: (row) => {
+      assertOpen();
       const saved = cloneRecord(row);
-      snapshot.records[saved.handlingId] = saved;
-      persist();
+      const next: HandlingFileSnapshot = {
+        records: { ...snapshot.records, [saved.handlingId]: saved },
+      };
+      writeSnapshot(filePath, next);
+      snapshot = next;
       return cloneRecord(saved);
     },
-    list: (filter) =>
-      Object.values(snapshot.records)
+    list: (filter) => {
+      assertOpen();
+      return Object.values(snapshot.records)
         .filter((row) => matchesFilter(row, filter))
-        .map(cloneRecord),
+        .map(cloneRecord);
+    },
     reload: () => {
+      assertOpen();
       snapshot = load();
     },
+    close,
   };
 }
 
-export function createTenantFileHandlingStore(configDir: string): HandlingStore {
+export function createTenantFileHandlingStore(
+  configDir: string,
+  options: FileHandlingStoreOptions = {},
+): HandlingStore {
   const stores = new Map<string, HandlingStore>();
   const storeFor = (tenantId: string): HandlingStore => {
     const existing = stores.get(tenantId);
     if (existing) {
       return existing;
     }
-    const created = createFileHandlingStore(configDir, tenantId);
+    const created = createFileHandlingStore(configDir, tenantId, options);
     stores.set(tenantId, created);
     return created;
   };
@@ -232,6 +287,12 @@ export function createTenantFileHandlingStore(configDir: string): HandlingStore 
       for (const store of stores.values()) {
         store.reload();
       }
+    },
+    close: () => {
+      for (const store of stores.values()) {
+        store.close();
+      }
+      stores.clear();
     },
   };
 }

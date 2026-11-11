@@ -545,6 +545,7 @@ export {
   DIAGNOSIS_HANDLING_EXECUTION_INTERFACE,
   DIAGNOSIS_HANDLING_RECOVERY_INTERFACE,
   DIAGNOSIS_HANDLING_EVIDENCE_INTERFACE,
+  DIAGNOSIS_HANDLING_RECHECK_STANDARD,
   HANDLING_STATES,
   HANDLING_STATE_LABELS,
   buildHandlingAdminView,
@@ -552,6 +553,8 @@ export {
   createMemoryDiagnosisHandlingLoop,
   handlingStateLabel,
   isDiagnosisHandlingExecuteOpen,
+  isDiagnosisHandlingIsolationBoundary,
+  resolveHandlingRegistrationPath,
   seedPausedDiagnosisJob,
 } from "./handling-loop.js";
 export type {

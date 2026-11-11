@@ -1,10 +1,12 @@
 /**
  * Gateway surface for the first diagnosis handling-loop scenario.
- * Execute stays closed unless the caller constructed this pack with
- * isolation: true or OPENBOT_DIAGNOSIS_HANDLING_ISOLATION=1, and never
- * when OPENBOT_PRODUCTION_EXECUTION_MODE=production.
+ * The production registration path (the default, used by the live pack)
+ * always refuses execute and explicitly refuses the isolation switch,
+ * including OPENBOT_DIAGNOSIS_HANDLING_ISOLATION=1.
  *
- * Live pack registration must not pass isolation: true.
+ * Isolation execution requires registrationPath: "isolation", isolation: true,
+ * and an isolation data-directory boundary. It never opens from the env var
+ * alone. Live pack registration must not pass isolation: true.
  */
 import { ErrorCodes, errorShape } from "../gateway/protocol/index.js";
 import type { GatewayRequestHandlers } from "../gateway/server-methods/types.js";
@@ -22,7 +24,7 @@ import {
   DIAGNOSIS_HANDLING_REJECT_METHOD,
   DIAGNOSIS_HANDLING_SUBMIT_METHOD,
 } from "./handling-loop-methods.js";
-import { createTenantFileHandlingStore } from "./handling-loop-store.js";
+import { createTenantFileHandlingStore, type HandlingStore } from "./handling-loop-store.js";
 import {
   createDiagnosisHandlingLoop,
   type DiagnosisHandlingLoop,
@@ -54,8 +56,11 @@ export {
 export type DiagnosisHandlingGatewayOptions = {
   configDir?: string;
   isolation?: boolean;
+  /** Defaults to production. The live pack must keep this unset. */
+  registrationPath?: "production" | "isolation";
   env?: NodeJS.ProcessEnv;
   loop?: DiagnosisHandlingLoop;
+  store?: HandlingStore;
   resolveScopes?: (client: unknown) => readonly string[];
 };
 
@@ -135,13 +140,17 @@ export function createDiagnosisHandlingGatewayHandlers(
   options: DiagnosisHandlingGatewayOptions = {},
 ): GatewayRequestHandlers {
   const configDir = options.configDir ?? CONFIG_DIR;
+  const registrationPath = options.registrationPath ?? "production";
+  // Production registration path explicitly refuses the isolation switch.
+  const isolation = registrationPath === "isolation" && options.isolation === true;
   const loop =
     options.loop ??
     createDiagnosisHandlingLoop({
       configDir,
-      isolation: options.isolation === true,
+      isolation,
+      registrationPath,
       env: options.env,
-      store: createTenantFileHandlingStore(configDir),
+      store: options.store ?? createTenantFileHandlingStore(configDir),
     });
 
   const callerFor = async (
