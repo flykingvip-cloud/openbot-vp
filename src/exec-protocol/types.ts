@@ -200,6 +200,19 @@ export const EXEC_RECONCILE_CONCLUSIONS = [
 
 export type ExecReconcileConclusion = (typeof EXEC_RECONCILE_CONCLUSIONS)[number];
 
+/**
+ * Operator-visible A→B reconcile sync states.
+ * `pending_sync` means A has committed a conclusion ("结论已提交") but B has
+ * not confirmed the apply. `synced` means B confirmed ("B 已确认同步").
+ * `sync_conflict` is a permanent conflict that requires human attention
+ * (`needsHuman`); it is not retried automatically.
+ * These are independent of `result_unconfirmed`, which remains the task
+ * state until a closing conclusion is committed.
+ */
+export const EXEC_RECONCILE_SYNC_STATES = ["pending_sync", "synced", "sync_conflict"] as const;
+
+export type ExecReconcileSyncState = (typeof EXEC_RECONCILE_SYNC_STATES)[number];
+
 export type ExecEvidenceRef =
   | {
       kind: "artifact-verified";
@@ -229,6 +242,37 @@ export type ExecReconcileRequest = {
   evidenceRef: ExecEvidenceRef;
 };
 
+/**
+ * Durable A-side record of a committed reconcile conclusion that must be
+ * applied on B. A.stateVersion and B.stateVersion are independently owned
+ * and must never be compared to each other. `aStateVersionAtCommit` is
+ * recorded for audit only. `requestExpectedStateVersion` is the original
+ * A-side CAS identity of the operator request, not a CAS key on B.
+ */
+export type ExecReconcileSyncRecord = {
+  tenantId: string;
+  taskId: string;
+  reconcileRequestId: string;
+  conclusion: ExecReconcileConclusion;
+  conclusionDigest: string;
+  syncState: ExecReconcileSyncState;
+  aStateVersionAtCommit: number;
+  requestExpectedStateVersion: number;
+  previousAState: ExecTaskState;
+  newAState: ExecTaskState;
+  applyPayload: ExecReconcileRequest;
+  attemptCount: number;
+  committedAt: string;
+  committedAtMs: number;
+  lastAttemptAtMs?: number;
+  lastErrorCode?: ExecErrorCode;
+  lastErrorMessage?: string;
+  syncedAt?: string;
+  syncedAtMs?: number;
+  conflictReason?: string;
+  needsHuman: boolean;
+};
+
 export type ExecReconcileAudit = {
   taskId: string;
   tenantId: string;
@@ -253,6 +297,11 @@ export type ExecReconcileResponse = ExecTaskResponse & {
   newState: ExecTaskState;
   conclusion: ExecReconcileConclusion;
   reason: string;
+  conclusionDigest: string;
+  reconcileSyncState: ExecReconcileSyncState;
+  conclusionCommitted: boolean;
+  bSyncConfirmed: boolean;
+  needsHuman: boolean;
 };
 
 export type ExecRevokeRequest = {
@@ -276,6 +325,17 @@ export type ExecTaskResponse = {
   bOutcome?: BExecutionOutcome;
   stateVersion: number;
   sideEffectApplied?: boolean;
+  /**
+   * A-side operator visibility. Absent when no reconcile conclusion has
+   * been committed yet. `conclusionCommitted` is not the same as
+   * `bSyncConfirmed`.
+   */
+  reconcileRequestId?: string;
+  conclusionDigest?: string;
+  reconcileSyncState?: ExecReconcileSyncState;
+  conclusionCommitted?: boolean;
+  bSyncConfirmed?: boolean;
+  needsHuman?: boolean;
 };
 
 export type ExecArtifactResponse = {

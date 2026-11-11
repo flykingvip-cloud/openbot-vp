@@ -50,20 +50,27 @@ export class AControlServer {
 
   async start(): Promise<{ host: string; port: number }> {
     await this.plane.loadAndReconcile();
-    const server = createServer((req, res) => {
-      void this.handle(req, res);
-    });
-    this.server = server;
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(this.config.port, this.config.bind, () => resolve());
-    });
-    const addr = server.address();
-    if (!addr || typeof addr === "string") {
-      throw new ExecProtocolError("EXEC_INTERNAL", "A' server failed to bind a TCP port");
+    try {
+      const server = createServer((req, res) => {
+        void this.handle(req, res);
+      });
+      this.server = server;
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(this.config.port, this.config.bind, () => resolve());
+      });
+      const addr = server.address();
+      if (!addr || typeof addr === "string") {
+        throw new ExecProtocolError("EXEC_INTERNAL", "A' server failed to bind a TCP port");
+      }
+      this.address = { host: addr.address, port: addr.port };
+      return this.address;
+    } catch (error) {
+      this.server = undefined;
+      this.address = undefined;
+      await this.store.close();
+      throw error;
     }
-    this.address = { host: addr.address, port: addr.port };
-    return this.address;
   }
 
   get listenAddress(): { host: string; port: number } {

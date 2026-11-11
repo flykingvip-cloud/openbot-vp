@@ -33,7 +33,7 @@ export type ExecHttpClientOptions = {
   maxRequestBodyBytes: number;
 };
 
-export type RetryableOperation = "status" | "cancel" | "artifact";
+export type RetryableOperation = "status" | "cancel" | "artifact" | "reconcile-apply";
 
 const defaultRuntime: ExecClientRuntime = {
   now: () => Date.now(),
@@ -141,7 +141,14 @@ export class ExecHttpClient {
   async reconcileApply(
     body: ExecReconcileRequest,
   ): Promise<{ httpStatus: number; payload: ExecReconcileResponse }> {
-    const result = await this.requestOnce("POST", "/v1/tasks/reconcile-apply", body);
+    // Idempotent A→B apply may use the isolation transport retry policy.
+    // submit still must not auto-retry.
+    const result = await this.requestWithRetry(
+      "reconcile-apply",
+      "POST",
+      "/v1/tasks/reconcile-apply",
+      body,
+    );
     return { httpStatus: result.status, payload: result.body as unknown as ExecReconcileResponse };
   }
 

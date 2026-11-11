@@ -100,8 +100,8 @@ export async function runIsolationTask(params: {
       const probeId = task.probeId ?? task.taskId;
       if (!task.sideEffectApplied) {
         task.sideEffectApplied = true;
-        const probeCount = store.incrementProbe(probeId);
-        await store.upsertTask(task);
+        // Probe count is diagnostic-only; protocol state is the task record.
+        const probeCount = await store.commitTaskAndDiagnosticProbe(task, probeId);
         const artifact = makeArtifact(
           task,
           Buffer.from(JSON.stringify({ probeId, count: probeCount }), "utf8"),

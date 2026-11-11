@@ -20,8 +20,11 @@ import { newArtifactId, newTaskId } from "./ids.js";
 import { KeyedLock } from "./keyed-lock.js";
 import { hashLeaseToken, parseBearerToken, validateLease } from "./lease.js";
 import {
-  assertIdenticalReconcileReplay,
+  assertIdenticalApplyReplay,
+  conclusionDigest,
+  digestForReconcileRequest,
   evidenceKey,
+  isClosingReconcileConclusion,
   parseReconcileRequest,
   toReconcileResponse,
 } from "./reconcile.js";
@@ -99,6 +102,7 @@ export class BExecutionServer {
   private readonly autoStartExecution: boolean;
   private shuttingDown = false;
   private readonly submitLocks = new KeyedLock();
+  private dropReconcileApplyResponsesRemaining = 0;
 
   constructor(options: BServerOptions) {
     this.config = options.config;
@@ -112,21 +116,35 @@ export class BExecutionServer {
 
   async start(): Promise<{ host: string; port: number }> {
     await this.store.load();
-    await this.reconcileAfterRestart();
-    const server = createServer((req, res) => {
-      void this.handle(req, res);
-    });
-    this.server = server;
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(this.config.port, this.config.bind, () => resolve());
-    });
-    const addr = server.address();
-    if (!addr || typeof addr === "string") {
-      throw new ExecProtocolError("EXEC_INTERNAL", "B' server failed to bind a TCP port");
+    try {
+      await this.reconcileAfterRestart();
+      const server = createServer((req, res) => {
+        void this.handle(req, res);
+      });
+      this.server = server;
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(this.config.port, this.config.bind, () => resolve());
+      });
+      const addr = server.address();
+      if (!addr || typeof addr === "string") {
+        throw new ExecProtocolError("EXEC_INTERNAL", "B' server failed to bind a TCP port");
+      }
+      this.address = { host: addr.address, port: addr.port };
+      return this.address;
+    } catch (error) {
+      this.server = undefined;
+      this.address = undefined;
+      await this.store.close();
+      throw error;
     }
-    this.address = { host: addr.address, port: addr.port };
-    return this.address;
+  }
+
+  dropNextReconcileApplyResponses(count = 1): void {
+    if (!Number.isInteger(count) || count <= 0) {
+      throw new Error("dropNextReconcileApplyResponses count must be a positive integer");
+    }
+    this.dropReconcileApplyResponsesRemaining += count;
   }
 
   get listenAddress(): { host: string; port: number } {
@@ -598,17 +616,29 @@ export class BExecutionServer {
     res: ServerResponse,
   ): Promise<void> {
     const request = parseReconcileRequest(payload, this.config);
+    const requestDigest = digestForReconcileRequest(request);
     const existing = this.store.getReconcileIndex(request.tenantId, request.reconcileRequestId);
     if (existing) {
-      assertIdenticalReconcileReplay({ stored: existing, request });
+      const storedDigest =
+        existing.conclusionDigest ||
+        conclusionDigest({
+          taskId: existing.taskId,
+          conclusion: existing.conclusion,
+          evidenceKey: existing.evidenceKey,
+        });
+      // Identity is reconcileRequestId + conclusion digest. Do not compare
+      // request.expectedStateVersion (A's CAS identity) to B.stateVersion.
+      assertIdenticalApplyReplay({
+        stored: { taskId: existing.taskId, conclusionDigest: storedDigest },
+        request: { taskId: request.taskId, conclusionDigest: requestDigest },
+      });
       const existingTask = this.authorizeTask(
         this.store.getTask(existing.taskId),
         lease,
         request.tenantId,
       );
-      writeJson(
+      this.writeReconcileApplyResponse(
         res,
-        SUCCESS_HTTP_IDEMPOTENT_OR_READ,
         toReconcileResponse({
           task: existingTask,
           audit: {
@@ -620,6 +650,8 @@ export class BExecutionServer {
             conclusion: request.conclusion,
             reason: existing.reason,
           },
+          conclusionDigest: storedDigest,
+          applyConfirmed: true,
         }),
       );
       return;
@@ -627,11 +659,11 @@ export class BExecutionServer {
 
     const stored = this.authorizeTask(this.store.getTask(request.taskId), lease, request.tenantId);
     const task = structuredClone(stored);
+    this.assertNoOutOfOrderClosingApply(task, request);
     if (isTerminalState(task.state)) {
       if (request.conclusion !== "remain_unconfirmed" && task.state === request.conclusion) {
-        writeJson(
+        this.writeReconcileApplyResponse(
           res,
-          SUCCESS_HTTP_IDEMPOTENT_OR_READ,
           toReconcileResponse({
             task,
             audit: {
@@ -643,6 +675,8 @@ export class BExecutionServer {
               conclusion: request.conclusion,
               reason: request.reason,
             },
+            conclusionDigest: requestDigest,
+            applyConfirmed: true,
           }),
         );
         return;
@@ -726,6 +760,7 @@ export class BExecutionServer {
       conclusion: request.conclusion,
       expectedStateVersion: request.expectedStateVersion,
       evidenceKey: evidenceKey(request.evidenceRef),
+      conclusionDigest: requestDigest,
       operator: lease.subject,
       at: task.updatedAt,
       atMs: nowMs,
@@ -736,7 +771,44 @@ export class BExecutionServer {
       newStateVersion: previousStateVersion,
     };
     await this.store.commitReconcile({ task, audit, index });
-    writeJson(res, SUCCESS_HTTP_IDEMPOTENT_OR_READ, toReconcileResponse({ task, audit }));
+    this.writeReconcileApplyResponse(
+      res,
+      toReconcileResponse({
+        task,
+        audit,
+        conclusionDigest: requestDigest,
+        applyConfirmed: true,
+      }),
+    );
+  }
+
+  private writeReconcileApplyResponse(res: ServerResponse, body: unknown): void {
+    if (this.dropReconcileApplyResponsesRemaining > 0) {
+      this.dropReconcileApplyResponsesRemaining -= 1;
+      res.destroy();
+      return;
+    }
+    writeJson(res, SUCCESS_HTTP_IDEMPOTENT_OR_READ, body);
+  }
+
+  private assertNoOutOfOrderClosingApply(
+    task: ExecTaskRecord,
+    request: ReturnType<typeof parseReconcileRequest>,
+  ): void {
+    const prior = this.store
+      .listReconcileAudits(task.taskId)
+      .find((entry) => isClosingReconcileConclusion(entry.conclusion));
+    if (!prior) {
+      return;
+    }
+    if (prior.reconcileRequestId === request.reconcileRequestId) {
+      return;
+    }
+    throw new ExecProtocolError(
+      "EXEC_CONFLICT",
+      "B' rejected a stale, out-of-order, or conflicting reconcile-apply based on local preconditions",
+      { taskId: task.taskId, state: task.state },
+    );
   }
 
   private async handleRevoke(
@@ -843,6 +915,13 @@ export class BExecutionServer {
       return;
     }
     if (task.state !== "queued") {
+      return;
+    }
+    if (
+      this.store
+        .listReconcileAudits(taskId)
+        .some((entry) => isClosingReconcileConclusion(entry.conclusion))
+    ) {
       return;
     }
     const controller = new AbortController();

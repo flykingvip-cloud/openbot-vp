@@ -15,12 +15,16 @@ import { KeyedLock } from "./keyed-lock.js";
 import { assertReconcileRole } from "./lease.js";
 import {
   assertIdenticalReconcileReplay,
+  digestForReconcileRequest,
   evidenceKey,
   hasPersistedCancelledConfirmation,
   hasPersistedFailedConfirmation,
+  isClosingReconcileConclusion,
   isFailedOrTimeoutState,
+  isPermanentReconcileSyncFailure,
   parseReconcileRequest,
   toReconcileResponse,
+  withTaskSyncStatus,
 } from "./reconcile.js";
 import { reconcileTransition, transitionState } from "./state-machine.js";
 import { FileExecStore } from "./store.js";
@@ -33,7 +37,9 @@ import {
   isTerminalState,
   type ExecArtifactResponse,
   type ExecLeaseRecord,
+  type ExecReconcileRequest,
   type ExecReconcileResponse,
+  type ExecReconcileSyncRecord,
   type ExecRevocation,
   type ExecSiteDebug,
   type ExecTaskKind,
@@ -95,11 +101,25 @@ export class AControlPlane {
 
   async loadAndReconcile(): Promise<void> {
     await this.store.load();
+    await this.resumePendingReconcileSyncs();
     for (const task of this.store.listTasks()) {
       if (isTerminalState(task.state)) {
         continue;
       }
       await this.reconcileTask(task);
+    }
+  }
+
+  /**
+   * Isolation retry/scheduler hook: resume every durable pending A→B
+   * reconcile sync from the store. Called after A restarts and may also
+   * be invoked in-process after connectivity is restored. Each call runs
+   * at most one transport burst (3 attempts, waits 200 then 400).
+   * Permanent conflicts become `sync_conflict` and are not retried.
+   */
+  async resumePendingReconcileSyncs(): Promise<void> {
+    for (const record of this.store.listPendingReconcileSyncs()) {
+      await this.attemptReconcileSync(record);
     }
   }
 
@@ -194,7 +214,13 @@ export class AControlPlane {
         if (!current) {
           throw new ExecProtocolError("EXEC_NOT_FOUND", "idempotent task is missing");
         }
-        return { status: SUCCESS_HTTP_IDEMPOTENT_OR_READ, body: toTaskResponse(current) };
+        if (this.hasClosingReconcile(current.taskId)) {
+          return {
+            status: SUCCESS_HTTP_IDEMPOTENT_OR_READ,
+            body: this.toClientTask(current),
+          };
+        }
+        return { status: SUCCESS_HTTP_IDEMPOTENT_OR_READ, body: this.toClientTask(current) };
       }
       if (!existingTask || !isTerminalState(existingTask.state)) {
         throw new ExecProtocolError(
@@ -262,12 +288,12 @@ export class AControlPlane {
       if (record.bOutcome === "produced") {
         await this.tryFinalizeSuccess(record);
       }
-      return { status: SUCCESS_HTTP_NEW_ACCEPT, body: toTaskResponse(record) };
+      return { status: SUCCESS_HTTP_NEW_ACCEPT, body: this.toClientTask(record) };
     } catch (error) {
       if (isUnreachable(error)) {
         const recovered = await this.queryAfterSubmitTimeout(record);
         if (recovered) {
-          return { status: SUCCESS_HTTP_NEW_ACCEPT, body: toTaskResponse(recovered) };
+          return { status: SUCCESS_HTTP_NEW_ACCEPT, body: this.toClientTask(recovered) };
         }
         await this.store.upsertTask(record);
         throw new ExecProtocolError(
@@ -296,7 +322,7 @@ export class AControlPlane {
     const tenantId = requireField(payload, "tenantId");
     const task = this.lookupLocal(payload, lease, tenantId);
     const refreshed = await this.refreshFromB(task, { allowUnreachable: true });
-    return { status: SUCCESS_HTTP_IDEMPOTENT_OR_READ, body: toTaskResponse(refreshed) };
+    return { status: SUCCESS_HTTP_IDEMPOTENT_OR_READ, body: this.toClientTask(refreshed) };
   }
 
   async cancel(
@@ -307,7 +333,7 @@ export class AControlPlane {
     const taskId = requireField(payload, "taskId");
     const task = this.requireTask(taskId, tenantId, lease);
     if (isTerminalState(task.state) || task.state === "result_unconfirmed") {
-      return { status: SUCCESS_HTTP_IDEMPOTENT_OR_READ, body: toTaskResponse(task) };
+      return { status: SUCCESS_HTTP_IDEMPOTENT_OR_READ, body: this.toClientTask(task) };
     }
     if (task.state !== "cancel_requested") {
       task.state = transitionState(task.state, "cancel_requested", { taskId: task.taskId });
@@ -332,7 +358,7 @@ export class AControlPlane {
     }
     this.expireCancelIfNeeded(task);
     await this.store.upsertTask(task);
-    return { status: SUCCESS_HTTP_IDEMPOTENT_OR_READ, body: toTaskResponse(task) };
+    return { status: SUCCESS_HTTP_IDEMPOTENT_OR_READ, body: this.toClientTask(task) };
   }
 
   async artifact(
@@ -542,10 +568,16 @@ export class AControlPlane {
           taskId: existing.taskId,
         });
       }
+      const pending = this.store.getReconcileSync(request.tenantId, request.reconcileRequestId);
+      if (pending?.syncState === "pending_sync") {
+        await this.attemptReconcileSync(pending);
+      }
+      const sync = this.store.getReconcileSync(request.tenantId, request.reconcileRequestId);
+      const latestTask = this.store.getTask(existing.taskId) ?? existingTask;
       return {
         status: SUCCESS_HTTP_IDEMPOTENT_OR_READ,
         body: toReconcileResponse({
-          task: existingTask,
+          task: latestTask,
           audit: {
             reconcileRequestId: existing.reconcileRequestId,
             operator: existing.operator,
@@ -555,11 +587,14 @@ export class AControlPlane {
             conclusion: request.conclusion,
             reason: existing.reason,
           },
+          sync,
+          conclusionDigest: existing.conclusionDigest ?? digestForReconcileRequest(request),
         }),
       };
     }
 
     const stored = this.requireTask(request.taskId, request.tenantId, lease);
+    this.assertNoConflictingClosingReconcile(stored, request);
     const currentVersion = stored.stateVersion ?? 0;
     if (currentVersion !== request.expectedStateVersion) {
       throw new ExecProtocolError(
@@ -592,6 +627,7 @@ export class AControlPlane {
       previousStateVersion,
       newStateVersion: previousStateVersion,
     };
+    const digest = digestForReconcileRequest(request);
     const index = {
       tenantId: request.tenantId,
       reconcileRequestId: request.reconcileRequestId,
@@ -599,6 +635,7 @@ export class AControlPlane {
       conclusion: request.conclusion,
       expectedStateVersion: request.expectedStateVersion,
       evidenceKey: evidenceKey(request.evidenceRef),
+      conclusionDigest: digest,
       operator: lease.subject,
       at: task.updatedAt,
       atMs: nowMs,
@@ -608,11 +645,44 @@ export class AControlPlane {
       previousStateVersion,
       newStateVersion: previousStateVersion,
     };
-    await this.store.commitReconcile({ task, audit, index });
-    await this.syncReconcileApplyToB(request);
+    const applyPayload: ExecReconcileRequest = {
+      [EXEC_API_VERSION_FIELD]: EXEC_API_VERSION,
+      tenantId: request.tenantId,
+      taskId: request.taskId,
+      expectedStateVersion: request.expectedStateVersion,
+      reconcileRequestId: request.reconcileRequestId,
+      conclusion: request.conclusion,
+      reason: request.reason,
+      evidenceRef: request.evidenceRef,
+    };
+    const sync: ExecReconcileSyncRecord = {
+      tenantId: request.tenantId,
+      taskId: request.taskId,
+      reconcileRequestId: request.reconcileRequestId,
+      conclusion: request.conclusion,
+      conclusionDigest: digest,
+      syncState: "pending_sync",
+      aStateVersionAtCommit: previousStateVersion,
+      requestExpectedStateVersion: request.expectedStateVersion,
+      previousAState: previousState,
+      newAState: newState,
+      applyPayload,
+      attemptCount: 0,
+      committedAt: task.updatedAt,
+      committedAtMs: nowMs,
+      needsHuman: false,
+    };
+    // Conclusion and pending-sync record are written in the same persist.
+    await this.store.commitReconcile({ task, audit, index, sync });
+    const afterSync = await this.attemptReconcileSync(sync);
     return {
       status: SUCCESS_HTTP_IDEMPOTENT_OR_READ,
-      body: toReconcileResponse({ task, audit }),
+      body: toReconcileResponse({
+        task,
+        audit,
+        sync: afterSync,
+        conclusionDigest: digest,
+      }),
     };
   }
 
@@ -808,23 +878,79 @@ export class AControlPlane {
     }
   }
 
-  private async syncReconcileApplyToB(
-    request: ReturnType<typeof parseReconcileRequest>,
-  ): Promise<void> {
-    try {
-      await this.client.reconcileApply({
-        [EXEC_API_VERSION_FIELD]: EXEC_API_VERSION,
-        tenantId: request.tenantId,
-        taskId: request.taskId,
-        expectedStateVersion: request.expectedStateVersion,
-        reconcileRequestId: request.reconcileRequestId,
-        conclusion: request.conclusion,
-        reason: request.reason,
-        evidenceRef: request.evidenceRef,
-      });
-    } catch {
-      // A' is the authority for conclusions already committed with local evidence.
+  private async attemptReconcileSync(
+    record: ExecReconcileSyncRecord,
+  ): Promise<ExecReconcileSyncRecord> {
+    const latest =
+      this.store.getReconcileSync(record.tenantId, record.reconcileRequestId) ?? record;
+    if (latest.syncState !== "pending_sync") {
+      return latest;
     }
+    const nowMs = this.now();
+    const next: ExecReconcileSyncRecord = {
+      ...latest,
+      attemptCount: latest.attemptCount + 1,
+      lastAttemptAtMs: nowMs,
+    };
+    try {
+      // expectedStateVersion in applyPayload is A's original request
+      // identity, never compared to B.stateVersion.
+      await this.client.reconcileApply(next.applyPayload);
+      next.syncState = "synced";
+      next.needsHuman = false;
+      next.syncedAtMs = this.now();
+      next.syncedAt = new Date(next.syncedAtMs).toISOString();
+      next.lastErrorCode = undefined;
+      next.lastErrorMessage = undefined;
+      next.conflictReason = undefined;
+      await this.store.updateReconcileSync(next);
+      return next;
+    } catch (error) {
+      if (isPermanentReconcileSyncFailure(error)) {
+        next.syncState = "sync_conflict";
+        next.needsHuman = true;
+        next.lastErrorCode = isExecProtocolError(error) ? error.code : "EXEC_INTERNAL";
+        next.lastErrorMessage = error instanceof Error ? error.message : String(error);
+        next.conflictReason = next.lastErrorMessage;
+        await this.store.updateReconcileSync(next);
+        return next;
+      }
+      next.lastErrorCode = isExecProtocolError(error) ? error.code : "EXEC_UNREACHABLE";
+      next.lastErrorMessage = error instanceof Error ? error.message : String(error);
+      next.syncState = "pending_sync";
+      next.needsHuman = false;
+      await this.store.updateReconcileSync(next);
+      return next;
+    }
+  }
+
+  private hasClosingReconcile(taskId: string): boolean {
+    return this.store
+      .listReconcileSyncs(taskId)
+      .some((entry) => isClosingReconcileConclusion(entry.conclusion));
+  }
+
+  private assertNoConflictingClosingReconcile(
+    task: ExecTaskRecord,
+    request: ReturnType<typeof parseReconcileRequest>,
+  ): void {
+    if (!this.hasClosingReconcile(task.taskId)) {
+      return;
+    }
+    if (
+      isClosingReconcileConclusion(request.conclusion) ||
+      request.conclusion === "remain_unconfirmed"
+    ) {
+      throw new ExecProtocolError(
+        "EXEC_CONFLICT",
+        "a closing reconcile conclusion is already committed; conflicting changes are refused until human resolution if needed",
+        { taskId: task.taskId, state: task.state },
+      );
+    }
+  }
+
+  private toClientTask(task: ExecTaskRecord): ExecTaskResponse {
+    return withTaskSyncStatus(toTaskResponse(task), this.store.latestReconcileSync(task.taskId));
   }
 
   private validateLocalInput(input: ExecInput): void {
@@ -918,6 +1044,14 @@ export class AControlPlane {
     peer: ExecTaskResponse,
     opts: { accepted: boolean },
   ): void {
+    if (this.hasClosingReconcile(local.taskId) || isTerminalState(local.state)) {
+      if (opts.accepted) {
+        local.bAccepted = true;
+      }
+      // A's committed conclusion must not be overwritten by a later B pull.
+      // A.stateVersion and B.stateVersion are never compared here.
+      return;
+    }
     if (opts.accepted) {
       local.bAccepted = true;
     }
@@ -1141,6 +1275,9 @@ export class AControlPlane {
     opts: { allowUnreachable: boolean },
   ): Promise<ExecTaskRecord> {
     this.expireCancelIfNeeded(task);
+    if (this.hasClosingReconcile(task.taskId)) {
+      return task;
+    }
     if (isTerminalState(task.state) && task.state !== "succeeded") {
       await this.store.upsertTask(task);
       return task;

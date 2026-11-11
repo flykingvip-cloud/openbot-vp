@@ -1,3 +1,4 @@
+import { sha256Of } from "./checksum.js";
 import type { ExecProtocolConfig } from "./config.js";
 import { ExecProtocolError } from "./errors.js";
 import { reconcileTransition } from "./state-machine.js";
@@ -10,7 +11,9 @@ import {
   type ExecReconcileConclusion,
   type ExecReconcileRequest,
   type ExecReconcileResponse,
+  type ExecReconcileSyncRecord,
   type ExecTaskRecord,
+  type ExecTaskResponse,
   type ExecTaskState,
 } from "./types.js";
 
@@ -118,6 +121,41 @@ function assertEvidenceMatchesConclusion(
   }
 }
 
+/**
+ * Stable digest of a reconcile conclusion identity: taskId + conclusion +
+ * evidence key. Used together with reconcileRequestId for B-side idempotency.
+ * A.stateVersion / expectedStateVersion and operator reason are intentionally
+ * excluded so A and B versions are never part of the identity comparison.
+ */
+export function conclusionDigest(params: {
+  taskId: string;
+  conclusion: string;
+  evidenceKey: string;
+}): string {
+  return sha256Of(
+    Buffer.from(
+      JSON.stringify({
+        taskId: params.taskId,
+        conclusion: params.conclusion,
+        evidenceKey: params.evidenceKey,
+      }),
+      "utf8",
+    ),
+  );
+}
+
+export function digestForReconcileRequest(request: {
+  taskId: string;
+  conclusion: string;
+  evidenceRef: ExecEvidenceRef;
+}): string {
+  return conclusionDigest({
+    taskId: request.taskId,
+    conclusion: request.conclusion,
+    evidenceKey: evidenceKey(request.evidenceRef),
+  });
+}
+
 export function evidenceKey(evidenceRef: ExecEvidenceRef): string {
   if (evidenceRef.kind === "artifact-verified") {
     return JSON.stringify({
@@ -197,6 +235,71 @@ export function assertIdenticalReconcileReplay(params: {
   }
 }
 
+/**
+ * B-side apply identity: same reconcileRequestId + same conclusion digest is
+ * idempotent. A expectedStateVersion is not compared to B.stateVersion.
+ */
+export function assertIdenticalApplyReplay(params: {
+  stored: { taskId: string; conclusionDigest: string };
+  request: { taskId: string; conclusionDigest: string };
+}): void {
+  if (
+    params.stored.taskId !== params.request.taskId ||
+    params.stored.conclusionDigest !== params.request.conclusionDigest
+  ) {
+    throw new ExecProtocolError(
+      "EXEC_CONFLICT",
+      "reconcileRequestId reused with a conflicting conclusion digest",
+      { taskId: params.request.taskId },
+    );
+  }
+}
+
+export function isPermanentReconcileSyncFailure(error: unknown): boolean {
+  if (!(error instanceof ExecProtocolError)) {
+    return false;
+  }
+  return (
+    error.code === "EXEC_CONFLICT" ||
+    error.code === "EXEC_CHECKSUM_MISMATCH" ||
+    error.code === "EXEC_UNAUTHORIZED" ||
+    error.code === "EXEC_REVOKED" ||
+    error.code === "EXEC_VERSION_UNSUPPORTED"
+  );
+}
+
+export function toSyncOperatorFields(sync: ExecReconcileSyncRecord | undefined): {
+  reconcileRequestId?: string;
+  conclusionDigest?: string;
+  reconcileSyncState?: ExecReconcileSyncRecord["syncState"];
+  conclusionCommitted?: boolean;
+  bSyncConfirmed?: boolean;
+  needsHuman?: boolean;
+} {
+  if (!sync) {
+    return { conclusionCommitted: false, bSyncConfirmed: false, needsHuman: false };
+  }
+  return {
+    reconcileRequestId: sync.reconcileRequestId,
+    conclusionDigest: sync.conclusionDigest,
+    reconcileSyncState: sync.syncState,
+    conclusionCommitted: true,
+    bSyncConfirmed: sync.syncState === "synced",
+    needsHuman: sync.syncState === "sync_conflict" || sync.needsHuman,
+  };
+}
+
+export function withTaskSyncStatus<T extends ExecTaskResponse>(
+  task: T,
+  sync: ExecReconcileSyncRecord | undefined,
+): T {
+  return { ...task, ...toSyncOperatorFields(sync) };
+}
+
+export function isClosingReconcileConclusion(conclusion: string): boolean {
+  return conclusion === "succeeded" || conclusion === "failed" || conclusion === "cancelled";
+}
+
 export function nextReconcileState(
   from: ExecTaskState,
   conclusion: ExecReconcileConclusion,
@@ -217,7 +320,13 @@ export function toReconcileResponse(params: {
     | "conclusion"
     | "reason"
   >;
+  sync?: ExecReconcileSyncRecord;
+  conclusionDigest?: string;
+  applyConfirmed?: boolean;
 }): ExecReconcileResponse {
+  const fields = toSyncOperatorFields(params.sync);
+  const digest = params.conclusionDigest ?? params.sync?.conclusionDigest ?? "";
+  const synced = params.applyConfirmed === true || fields.bSyncConfirmed === true;
   return {
     [EXEC_API_VERSION_FIELD]: EXEC_API_VERSION,
     taskId: params.task.taskId,
@@ -238,6 +347,12 @@ export function toReconcileResponse(params: {
     newState: params.audit.newState,
     conclusion: params.audit.conclusion,
     reason: params.audit.reason,
+    conclusionDigest: digest,
+    reconcileSyncState:
+      fields.reconcileSyncState ?? (params.applyConfirmed ? "synced" : "pending_sync"),
+    conclusionCommitted: Boolean(params.sync) || params.applyConfirmed === true,
+    bSyncConfirmed: synced,
+    needsHuman: fields.needsHuman === true,
   };
 }
 

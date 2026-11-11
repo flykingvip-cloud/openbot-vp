@@ -62,92 +62,100 @@ export async function runExecProtocolProcess(
   const subject = env.OPENBOT_EXEC_PROTOCOL_SUBJECT!.trim();
   const store = new FileExecStore(storeDir);
   await store.load();
+  let stop: (() => Promise<void>) | undefined;
+  try {
+    const seedLease = env.OPENBOT_EXEC_PROTOCOL_SEED_LEASE?.trim();
+    if (seedLease) {
+      if (!isLeaseTokenFormat(seedLease)) {
+        throw new ExecConfigError(
+          "exec protocol process refused to start: seed lease has an invalid format",
+          ["OPENBOT_EXEC_PROTOCOL_SEED_LEASE"],
+        );
+      }
+      const nowMs = Date.now();
+      const record: ExecLeaseRecord = {
+        hash: hashLeaseToken(seedLease),
+        subject,
+        tenantId: env.OPENBOT_EXEC_PROTOCOL_SEED_LEASE_TENANT?.trim() || undefined,
+        iat: new Date(nowMs).toISOString(),
+        exp: new Date(nowMs + config.leaseTtlMs).toISOString(),
+        iatMs: nowMs,
+        expMs: nowMs + config.leaseTtlMs,
+      };
+      await store.putLease(record);
+    }
 
-  const seedLease = env.OPENBOT_EXEC_PROTOCOL_SEED_LEASE?.trim();
-  if (seedLease) {
-    if (!isLeaseTokenFormat(seedLease)) {
+    const hostCommandProbe = createHostCommandProbe();
+    let baseUrl: string;
+    let listenPort: number;
+    let processRole: "control-plane" | "execution-site";
+
+    if (role === "b") {
+      const server = new BExecutionServer({
+        config,
+        store,
+        maxRequestBodyBytes,
+        hostCommandProbe,
+      });
+      const addr = await server.start();
+      baseUrl = server.baseUrl;
+      listenPort = addr.port;
+      processRole = "execution-site";
+      stop = () => server.stop();
+    } else if (role === "a") {
+      const client = new ExecHttpClient({
+        baseUrl: env.OPENBOT_EXEC_PROTOCOL_B_URL!.trim(),
+        config,
+        leaseToken: env.OPENBOT_EXEC_PROTOCOL_CLIENT_LEASE!.trim(),
+        maxRequestBodyBytes,
+      });
+      const plane = new AControlPlane({
+        config,
+        store,
+        client,
+        maxRequestBodyBytes,
+        hostCommandProbe,
+        subject,
+      });
+      const server = new AControlServer({
+        config,
+        store,
+        plane,
+        maxRequestBodyBytes,
+        hostCommandProbe,
+      });
+      const addr = await server.start();
+      baseUrl = server.baseUrl;
+      listenPort = addr.port;
+      processRole = "control-plane";
+      stop = () => server.stop();
+    } else {
       throw new ExecConfigError(
-        "exec protocol process refused to start: seed lease has an invalid format",
-        ["OPENBOT_EXEC_PROTOCOL_SEED_LEASE"],
+        "exec protocol process refused to start: OPENBOT_EXEC_PROTOCOL_ROLE must be a or b",
+        ["OPENBOT_EXEC_PROTOCOL_ROLE"],
       );
     }
-    const nowMs = Date.now();
-    const record: ExecLeaseRecord = {
-      hash: hashLeaseToken(seedLease),
-      subject,
-      tenantId: env.OPENBOT_EXEC_PROTOCOL_SEED_LEASE_TENANT?.trim() || undefined,
-      iat: new Date(nowMs).toISOString(),
-      exp: new Date(nowMs + config.leaseTtlMs).toISOString(),
-      iatMs: nowMs,
-      expMs: nowMs + config.leaseTtlMs,
+
+    await mkdir(storeDir, { recursive: true });
+    const ready = {
+      role: processRole,
+      port: listenPort,
+      bind: config.bind,
+      baseUrl,
+      pid: process.pid,
+      envEcho: isolationConfigToEnv(config),
     };
-    await store.putLease(record);
+    await writeFile(join(storeDir, "ready.json"), `${JSON.stringify(ready, null, 2)}\n`, "utf8");
+    process.stdout.write(`EXEC_PROTOCOL_READY ${listenPort}\n`);
+    return { stop: () => (stop ? stop() : store.close()) };
+  } catch (error) {
+    if (stop) {
+      await stop();
+    } else {
+      await store.close();
+    }
+    throw error;
   }
-
-  const hostCommandProbe = createHostCommandProbe();
-  let stop: () => Promise<void>;
-  let baseUrl: string;
-  let listenPort: number;
-  let processRole: "control-plane" | "execution-site";
-
-  if (role === "b") {
-    const server = new BExecutionServer({
-      config,
-      store,
-      maxRequestBodyBytes,
-      hostCommandProbe,
-    });
-    const addr = await server.start();
-    baseUrl = server.baseUrl;
-    listenPort = addr.port;
-    processRole = "execution-site";
-    stop = () => server.stop();
-  } else if (role === "a") {
-    const client = new ExecHttpClient({
-      baseUrl: env.OPENBOT_EXEC_PROTOCOL_B_URL!.trim(),
-      config,
-      leaseToken: env.OPENBOT_EXEC_PROTOCOL_CLIENT_LEASE!.trim(),
-      maxRequestBodyBytes,
-    });
-    const plane = new AControlPlane({
-      config,
-      store,
-      client,
-      maxRequestBodyBytes,
-      hostCommandProbe,
-      subject,
-    });
-    const server = new AControlServer({
-      config,
-      store,
-      plane,
-      maxRequestBodyBytes,
-      hostCommandProbe,
-    });
-    const addr = await server.start();
-    baseUrl = server.baseUrl;
-    listenPort = addr.port;
-    processRole = "control-plane";
-    stop = () => server.stop();
-  } else {
-    throw new ExecConfigError(
-      "exec protocol process refused to start: OPENBOT_EXEC_PROTOCOL_ROLE must be a or b",
-      ["OPENBOT_EXEC_PROTOCOL_ROLE"],
-    );
-  }
-
-  await mkdir(storeDir, { recursive: true });
-  const ready = {
-    role: processRole,
-    port: listenPort,
-    bind: config.bind,
-    baseUrl,
-    pid: process.pid,
-    envEcho: isolationConfigToEnv(config),
-  };
-  await writeFile(join(storeDir, "ready.json"), `${JSON.stringify(ready, null, 2)}\n`, "utf8");
-  process.stdout.write(`EXEC_PROTOCOL_READY ${listenPort}\n`);
-  return { stop };
 }
 
 export async function main(env: NodeJS.ProcessEnv = process.env): Promise<void> {
