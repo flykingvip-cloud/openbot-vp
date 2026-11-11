@@ -12779,6 +12779,8 @@ tasks:
       - src/cron/cron-result-template.test.ts
       - src/agent-runtime/model/interaction-completion.ts
       - src/agent-runtime/model/interaction-completion.test.ts
+      - src/agent-runtime/delivery/named-file-receipt.ts
+      - src/agent-runtime/delivery/named-file-receipt.test.ts
     state: active
     sessions:
       - id: local-ui-seams-20261111
@@ -12786,7 +12788,7 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-11T04:50:48.299Z
+        lastSignalAt: 2026-11-11T05:13:50.008Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-11
