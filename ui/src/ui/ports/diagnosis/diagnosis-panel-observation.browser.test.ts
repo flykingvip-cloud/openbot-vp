@@ -973,3 +973,100 @@ it("discards a report response after switching the authorized tenant", async () 
   ).not.toBe("forbidden");
   container.remove();
 });
+
+it("shows the paused-job handling preview in admin language and never offers 立即修复", async () => {
+  const request = vi.fn(async (method: string) => {
+    if (method === "diagnosis.reports.query") {
+      return {
+        authorization: { outcome: "allow" },
+        items: [
+          {
+            reportId: "report-1",
+            generatedAt: "2026-11-11T00:00:00.000Z",
+            tenantId: "tenant-a",
+            completion: "done",
+            cases: [{ caseId: "case-1", status: "open", completion: "done" }],
+            findings: [],
+            impactScope: ["tenant-a"],
+            confidence: { findingCount: 0, acceptedCauseCount: 0, candidateCauseCount: 0 },
+          },
+        ],
+        nextCursor: null,
+        audit: { decision: "allow" },
+        redactionProfile: "user",
+      };
+    }
+    if (method === "diagnosis.reports.get") {
+      return {
+        authorization: { outcome: "allow" },
+        report: {
+          reportId: "report-1",
+          generatedAt: "2026-11-11T00:00:00.000Z",
+          tenantId: "tenant-a",
+          cases: [
+            {
+              caseId: "case-1",
+              tenantId: "tenant-a",
+              status: "open",
+              findingIds: [],
+            },
+          ],
+          findings: [],
+          evidenceRefs: [],
+          graphEdges: [],
+        },
+        audit: { decision: "allow" },
+        redactionProfile: "user",
+      };
+    }
+    if (method === "diagnosis.handling.preview") {
+      return {
+        ok: true,
+        preview: {
+          actionable: true,
+          issueId: "issue:diagnosis_job_paused:tenant-a",
+          suggestedIdempotencyKey: "diagnosis_job_paused:tenant-a:t1",
+          evidence: { paused: true, pausedAt: "2026-11-11T00:00:00.000Z", cadence: "tick" },
+        },
+        admin: {
+          whatHappened: "该租户的诊断定时任务已暂停，新的巡检运行无法启动。",
+          whoIsAffected: "租户 tenant-a 的诊断定时任务及其待执行的巡检。",
+          suggestedHandling: "经授权后调用已有受控接口 diagnosis.job.resume 恢复该任务。",
+          whoCanApprove: "持有 operator.approvals 或 operator.admin 的管理员。",
+          currentStep: "尚未立案",
+          howToConfirmRecovery: "执行后重新采集同一对象的 diagnosis.job.describe 证据。",
+        },
+      };
+    }
+    if (method === "diagnosis.handling.list") {
+      return { ok: true, records: [] };
+    }
+    throw new Error(method);
+  });
+  const container = document.createElement("div");
+  document.body.append(container);
+  const client = { connected: true, request } as unknown as GatewayBrowserClient;
+  render(
+    html`<openbot-diagnosis-panel
+      role="enterprise"
+      tenant-id="tenant-a"
+      .client=${client}
+      .scopes=${["operator.read", "operator.write"]}
+      connected
+    ></openbot-diagnosis-panel>`,
+    container,
+  );
+  const panel = container.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
+  await panel.updateComplete;
+  await waitFor(() =>
+    expect(container.querySelector("[data-testid=diagnosis-handling-card]")).not.toBeNull(),
+  );
+  expect(container.textContent).toContain("该租户的诊断定时任务已暂停");
+  expect(container.textContent).toContain("持有 operator.approvals");
+  expect(container.textContent).toContain("当前步骤：尚未立案");
+  expect(container.textContent).toContain("申请恢复任务");
+  expect(container.textContent).not.toContain("立即修复");
+  expect(container.querySelector("[data-testid=diagnosis-resolution-actions]")).not.toBeNull();
+  expect(container.textContent).toContain("交给所选数字人处理");
+  container.remove();
+});

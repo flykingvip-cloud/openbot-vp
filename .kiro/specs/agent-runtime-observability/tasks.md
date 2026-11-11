@@ -149,4 +149,5 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - [x] Fresh origin/main checkout authorized; existing untracked files preserved. — codex-observe-owner
 - [x] Report requests discard stale tenant/permission/client responses; Chromium regression added. — codex-observe-owner
 - [x] Real report cases expose scoped conversation handoff and refresh/recheck actions; requests never imply repair completion. — codex-observe-owner
-- [ ] Full production repair adapters and persistent execution/readback verification remain incomplete; isolated ActionIntent adapter is not a production executor. — codex-observe-owner
+- [ ] Full production repair adapters remain incomplete; isolated ActionIntent adapter is not a production executor. High-impact actions (auto-restart, data deletion, privilege expansion, doctor --fix, channel restart, skill disable, self-evolution) stay closed. — cursor-shuanggui-publish
+- [x] First verifiable isolated handling loop for diagnosis_job_paused: durable records, approval, existing diagnosis.job.resume executor, recapture via diagnosis.job.describe, and draft-PR acceptance tests. Not production enablement or live repair. — cursor-shuanggui-publish

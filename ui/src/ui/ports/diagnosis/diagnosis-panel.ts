@@ -59,6 +59,141 @@ import {
 } from "./diagnosis-targets.ts";
 import { diagnosisViewModelFromQuery } from "./diagnosis-view-model.ts";
 
+export type HandlingState =
+  | "pending_approval"
+  | "pending_execution"
+  | "executing"
+  | "executed_pending_recheck"
+  | "resolved"
+  | "rejected"
+  | "cancelled"
+  | "execution_failed"
+  | "result_unverified";
+
+export type HandlingAdminView = {
+  whatHappened: string;
+  whoIsAffected: string;
+  suggestedHandling: string;
+  whoCanApprove: string;
+  currentStep: string;
+  howToConfirmRecovery: string;
+};
+
+export type HandlingRecord = {
+  handlingId: string;
+  status: HandlingState;
+  issueId: string;
+  tenantId: string;
+  reportId: string | null;
+  idempotencyKey: string;
+  execution?: { taskId: string; receipt: Record<string, unknown>; applied: boolean };
+  recheck?: { met: boolean; after?: { paused?: boolean } };
+  failureReason?: string;
+};
+
+export type HandlingCommandResponse = {
+  ok: boolean;
+  reason?: string;
+  record?: HandlingRecord;
+  preview?: {
+    actionable: boolean;
+    reason?: string;
+    issueId: string;
+    suggestedIdempotencyKey: string;
+    evidence: { paused: boolean; pausedAt: string | null; cadence: string };
+  };
+  admin?: HandlingAdminView;
+  records?: HandlingRecord[];
+  details?: Record<string, unknown>;
+};
+
+async function requestHandling(
+  client: GatewayBrowserClient | null | undefined,
+  method: string,
+  params: Record<string, unknown>,
+): Promise<HandlingCommandResponse | null> {
+  if (!client?.connected) {
+    return null;
+  }
+  try {
+    return await client.request<HandlingCommandResponse>(method, params);
+  } catch {
+    return null;
+  }
+}
+
+export async function previewDiagnosisHandling(
+  client: GatewayBrowserClient | null | undefined,
+  tenantId: string | null,
+): Promise<HandlingCommandResponse | null> {
+  return requestHandling(client, "diagnosis.handling.preview", tenantId ? { tenantId } : {});
+}
+
+export async function listDiagnosisHandling(
+  client: GatewayBrowserClient | null | undefined,
+  tenantId: string | null,
+): Promise<HandlingCommandResponse | null> {
+  return requestHandling(client, "diagnosis.handling.list", tenantId ? { tenantId } : {});
+}
+
+export async function submitDiagnosisHandling(
+  client: GatewayBrowserClient | null | undefined,
+  input: { tenantId: string | null; idempotencyKey?: string; reportId?: string | null },
+): Promise<HandlingCommandResponse | null> {
+  return requestHandling(client, "diagnosis.handling.submit", {
+    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+    ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+    ...(input.reportId ? { reportId: input.reportId } : {}),
+  });
+}
+
+export async function decideDiagnosisHandling(
+  client: GatewayBrowserClient | null | undefined,
+  input: {
+    method:
+      | "diagnosis.handling.approve"
+      | "diagnosis.handling.reject"
+      | "diagnosis.handling.cancel";
+    tenantId: string | null;
+    handlingId: string;
+  },
+): Promise<HandlingCommandResponse | null> {
+  return requestHandling(client, input.method, {
+    handlingId: input.handlingId,
+    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+  });
+}
+
+export async function executeDiagnosisHandling(
+  client: GatewayBrowserClient | null | undefined,
+  input: { tenantId: string | null; handlingId: string },
+): Promise<HandlingCommandResponse | null> {
+  return requestHandling(client, "diagnosis.handling.execute", {
+    handlingId: input.handlingId,
+    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+  });
+}
+
+export async function recheckDiagnosisHandling(
+  client: GatewayBrowserClient | null | undefined,
+  input: { tenantId: string | null; handlingId: string },
+): Promise<HandlingCommandResponse | null> {
+  return requestHandling(client, "diagnosis.handling.recheck", {
+    handlingId: input.handlingId,
+    ...(input.tenantId ? { tenantId: input.tenantId } : {}),
+  });
+}
+
+export function canApproveDiagnosisHandling(scopes: readonly string[] | null | undefined): boolean {
+  return (
+    scopes?.some((scope) => scope === "operator.approvals" || scope === "operator.admin") === true
+  );
+}
+
+export function canWriteDiagnosisHandling(scopes: readonly string[] | null | undefined): boolean {
+  return scopes?.some((scope) => scope === "operator.write" || scope === "operator.admin") === true;
+}
+
 @customElement("openbot-diagnosis-panel")
 export class OpenBotDiagnosisPanel extends LitElement {
   @property({ attribute: false }) client: GatewayBrowserClient | null = null;
@@ -99,6 +234,11 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @state() private outcomeVersionDraft = "";
   @state() private taskOutcomeAttachNote: string | null = null;
   @state() private approvalNotice: { tone: "ok" | "err"; text: string } | null = null;
+  @state() private handlingPreview: HandlingCommandResponse["preview"] | null = null;
+  @state() private handlingRecord: HandlingRecord | null = null;
+  @state() private handlingAdmin: HandlingAdminView | null = null;
+  @state() private handlingNotice: string | null = null;
+  @state() private handlingBusy = false;
   private decidedGrants = new Map<string, "APPROVED" | "DENIED">();
 
   // Light DOM so enterprise-foundation.css can style the refined surface.
@@ -603,6 +743,17 @@ export class OpenBotDiagnosisPanel extends LitElement {
     this.model = this.withGrantDecisions(
       diagnosisViewModelFromQuery(this.audience(), query, getResponse),
     );
+    const preview = await previewDiagnosisHandling(client, tenantId);
+    if (!current()) {
+      return;
+    }
+    const listed = await listDiagnosisHandling(client, tenantId);
+    if (!current()) {
+      return;
+    }
+    this.handlingPreview = preview?.preview ?? null;
+    this.handlingRecord = listed?.records?.[0] ?? preview?.record ?? null;
+    this.handlingAdmin = listed?.admin ?? preview?.admin ?? null;
     this.loading = false;
   }
 
@@ -793,6 +944,172 @@ export class OpenBotDiagnosisPanel extends LitElement {
         }}></label>`,
     )}</fieldset>`;
   }
+  private async refreshHandling() {
+    const preview = await previewDiagnosisHandling(this.client, this.tenantId);
+    const listed = await listDiagnosisHandling(this.client, this.tenantId);
+    this.handlingPreview = preview?.preview ?? null;
+    this.handlingRecord = listed?.records?.[0] ?? preview?.record ?? null;
+    this.handlingAdmin = listed?.admin ?? preview?.admin ?? null;
+  }
+
+  private async onHandlingSubmit() {
+    if (this.handlingBusy || !canWriteDiagnosisHandling(this.scopes)) {
+      return;
+    }
+    this.handlingBusy = true;
+    try {
+      const result = await submitDiagnosisHandling(this.client, {
+        tenantId: this.tenantId,
+        idempotencyKey: this.handlingPreview?.suggestedIdempotencyKey,
+        reportId: this.model?.reportExport.reportId ?? null,
+      });
+      this.handlingNotice = result?.reason ?? null;
+      await this.refreshHandling();
+    } finally {
+      this.handlingBusy = false;
+    }
+  }
+
+  private async onHandlingDecide(
+    method:
+      | "diagnosis.handling.approve"
+      | "diagnosis.handling.reject"
+      | "diagnosis.handling.cancel",
+  ) {
+    const handlingId = this.handlingRecord?.handlingId;
+    if (!handlingId || this.handlingBusy) {
+      return;
+    }
+    this.handlingBusy = true;
+    try {
+      const result = await decideDiagnosisHandling(this.client, {
+        method,
+        tenantId: this.tenantId,
+        handlingId,
+      });
+      this.handlingNotice = result?.ok ? null : (result?.reason ?? "未完成");
+      await this.refreshHandling();
+    } finally {
+      this.handlingBusy = false;
+    }
+  }
+
+  private async onHandlingExecute() {
+    const handlingId = this.handlingRecord?.handlingId;
+    if (!handlingId || this.handlingBusy || !canWriteDiagnosisHandling(this.scopes)) {
+      return;
+    }
+    this.handlingBusy = true;
+    try {
+      const result = await executeDiagnosisHandling(this.client, {
+        tenantId: this.tenantId,
+        handlingId,
+      });
+      this.handlingNotice = result?.ok
+        ? result.reason === "already_executed"
+          ? "已受理过，不会重复执行"
+          : result.reason === "production_repair_closed"
+            ? "本阶段未开放生产修复；仅隔离环境可执行恢复"
+            : null
+        : result?.reason === "production_repair_closed"
+          ? "本阶段未开放生产修复；仅隔离环境可执行恢复"
+          : (result?.reason ?? "执行未完成");
+      this.handlingRecord = result?.record ?? this.handlingRecord;
+      this.handlingAdmin = result?.admin ?? this.handlingAdmin;
+      await this.refreshHandling();
+    } finally {
+      this.handlingBusy = false;
+    }
+  }
+
+  private async onHandlingRecheck() {
+    const handlingId = this.handlingRecord?.handlingId;
+    if (!handlingId || this.handlingBusy) {
+      return;
+    }
+    this.handlingBusy = true;
+    try {
+      const result = await recheckDiagnosisHandling(this.client, {
+        tenantId: this.tenantId,
+        handlingId,
+      });
+      this.handlingNotice = result?.record?.recheck?.met
+        ? "复核通过，已标记为已解决"
+        : "尚未达到恢复标准，保持待复核或失败状态";
+      this.handlingRecord = result?.record ?? this.handlingRecord;
+      this.handlingAdmin = result?.admin ?? this.handlingAdmin;
+    } finally {
+      this.handlingBusy = false;
+    }
+  }
+
+  private renderHandlingCard() {
+    const preview = this.handlingPreview;
+    const record = this.handlingRecord;
+    const admin = this.handlingAdmin;
+    if (!admin && !preview?.actionable && !record) {
+      return nothing;
+    }
+    if (!preview?.actionable && !record) {
+      return nothing;
+    }
+    const canWrite = canWriteDiagnosisHandling(this.scopes);
+    const canApprove = canApproveDiagnosisHandling(this.scopes);
+    const connected = Boolean(this.client?.connected && this.connected);
+    const status = record?.status;
+    return html`<section class="card" aria-label="诊断处理闭环" data-testid="diagnosis-handling-card">
+      <h3>诊断处理</h3>
+      <p data-testid="diagnosis-handling-what">${admin?.whatHappened ?? ""}</p>
+      <p data-testid="diagnosis-handling-who">${admin?.whoIsAffected ?? ""}</p>
+      <p data-testid="diagnosis-handling-suggestion">${admin?.suggestedHandling ?? ""}</p>
+      <p data-testid="diagnosis-handling-approver">${admin?.whoCanApprove ?? ""}</p>
+      <p data-testid="diagnosis-handling-step">当前步骤：${admin?.currentStep ?? "尚未立案"}</p>
+      <p data-testid="diagnosis-handling-recheck-standard">${admin?.howToConfirmRecovery ?? ""}</p>
+      ${
+        record
+          ? html`<details>
+            <summary>技术细节</summary>
+            <p>处理单 ${record.handlingId}</p>
+            <p>问题 ${record.issueId}</p>
+            <p>幂等键 ${record.idempotencyKey}</p>
+            ${record.execution ? html`<p>任务 ${record.execution.taskId}</p>` : nothing}
+            ${record.failureReason ? html`<p>原因码 ${record.failureReason}</p>` : nothing}
+          </details>`
+          : nothing
+      }
+      ${this.handlingNotice ? html`<p data-testid="diagnosis-handling-notice">${this.handlingNotice}</p>` : nothing}
+      ${
+        !record && preview?.actionable
+          ? html`<button type="button" data-testid="diagnosis-handling-submit" ?disabled=${this.handlingBusy || !connected || !canWrite} @click=${() => void this.onHandlingSubmit()}>申请恢复任务</button>`
+          : nothing
+      }
+      ${
+        status === "pending_approval"
+          ? html`
+            <button type="button" data-testid="diagnosis-handling-approve" ?disabled=${this.handlingBusy || !connected || !canApprove} @click=${() => void this.onHandlingDecide("diagnosis.handling.approve")}>批准</button>
+            <button type="button" data-testid="diagnosis-handling-reject" ?disabled=${this.handlingBusy || !connected || !canApprove} @click=${() => void this.onHandlingDecide("diagnosis.handling.reject")}>拒绝</button>
+            <button type="button" ?disabled=${this.handlingBusy || !connected || !canWrite} @click=${() => void this.onHandlingDecide("diagnosis.handling.cancel")}>取消</button>
+          `
+          : nothing
+      }
+      ${
+        status === "pending_execution"
+          ? html`
+            <button type="button" data-testid="diagnosis-handling-execute" ?disabled=${this.handlingBusy || !connected || !canWrite} @click=${() => void this.onHandlingExecute()}>执行恢复</button>
+            <button type="button" ?disabled=${this.handlingBusy || !connected || !canWrite} @click=${() => void this.onHandlingDecide("diagnosis.handling.cancel")}>取消</button>
+          `
+          : nothing
+      }
+      ${
+        status === "executed_pending_recheck" ||
+        status === "result_unverified" ||
+        status === "execution_failed"
+          ? html`<button type="button" data-testid="diagnosis-handling-recheck" ?disabled=${this.handlingBusy || !connected} @click=${() => void this.onHandlingRecheck()}>复核是否已恢复</button>`
+          : nothing
+      }
+    </section>`;
+  }
+
   private renderResolutionActions(model: DiagnosisViewModel) {
     const reportId = model.reportExport.reportId;
     if (!reportId || model.loadError || !["allowed", "redacted"].includes(model.permissionState)) {
@@ -836,6 +1153,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
     const model = this.model ?? diagnosisViewModelFromQuery(this.audience(), null, null);
     if (this.role === "enterprise") {
       return html`
+        ${this.renderHandlingCard()}
         ${this.renderResolutionActions(model)}
         ${renderObservationWorkbench({
           role: "enterprise",
@@ -978,7 +1296,8 @@ export class OpenBotDiagnosisPanel extends LitElement {
             </p>`
           : nothing
       }
-      ${this.renderResolutionActions(model)}
+      ${this.renderHandlingCard()}
+        ${this.renderResolutionActions(model)}
       ${renderPlatformDiagnosisSurface(
         model,
         this.approvalReady()
