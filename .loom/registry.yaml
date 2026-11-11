@@ -12773,6 +12773,10 @@ tasks:
       - ui/src/ui/views/artifact-sidebar.node.test.ts
       - ui/src/ui/views/artifact-sidebar-download-lane.test.ts
       - ui/src/ui/app-gateway.node.test.ts
+      - src/agent-runtime/delivery/dispatch/complete-reply.ts
+      - src/agent-runtime/delivery/dispatch/complete-reply.test.ts
+      - src/cron/cron-result-template.ts
+      - src/cron/cron-result-template.test.ts
     state: active
     sessions:
       - id: local-ui-seams-20261111
@@ -12780,7 +12784,7 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-11T01:57:47.098Z
+        lastSignalAt: 2026-11-11T03:10:32.501Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-11
