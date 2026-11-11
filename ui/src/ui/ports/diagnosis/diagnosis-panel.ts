@@ -12,6 +12,7 @@ import {
   hasObservationReadScope,
   preciseQueryMissCopy,
   resolveObservationAuthorized,
+  type TenantGrant,
 } from "../../observation/access-state.ts";
 import { hasComparisonRefs } from "../../observation/comparison-capacity-panel.ts";
 import type {
@@ -73,6 +74,8 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @property({ attribute: "tenant-id" }) tenantId: string | null = null;
   @property({ attribute: false }) targets: DiagnosisTargetOption[] = [];
   @property({ attribute: false }) scopes: readonly string[] | null = null;
+  /** Server-confirmed tenant grants; omitted or missing keys stay unconfirmed. */
+  @property({ attribute: false }) tenantGrants: Readonly<Record<string, TenantGrant>> | null = null;
   @property({ attribute: false }) sessionKind: string | null = null;
   @property({ attribute: false }) gatewayMethods: readonly string[] | null = null;
   @property({ type: Boolean }) connected = false;
@@ -826,6 +829,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
           connected: this.connected,
           scopes: this.scopes,
           authorized: resolveObservationAuthorized({ scopes: this.scopes }),
+          tenantGrants: this.tenantGrants,
           actionIntents: this.actionIntents,
           capacity: this.capacity,
           comparison: this.comparison,

@@ -1,6 +1,10 @@
 import { html, nothing } from "lit";
 import { renderIcon } from "../../../icons.ts";
 import { pathForTab } from "../../../navigation.ts";
+import {
+  projectObservationTenantGrants,
+  resolveObservationAuthorized,
+} from "../../../observation/access-state.ts";
 import { renderObservationWorkbench } from "../../../observation/workbench.ts";
 import { requestOpenBotAppRerender } from "../../../request-app-rerender.ts";
 import { renderPlatformAdvancedSurface } from "../advanced/page.ts";
@@ -342,6 +346,8 @@ export function renderPlatformSurface(props: PlatformSurfaceProps) {
         basePath: props.basePath,
         enterpriseDirectory: props.readModel.enterpriseDirectory ?? [],
         scopes: props.scopes ?? null,
+        authorized: resolveObservationAuthorized({ scopes: props.scopes ?? null }),
+        tenantGrants: projectObservationTenantGrants(props.readModel.enterpriseDirectory ?? null),
       });
       break;
     case "platformDiagnosis":

@@ -54,6 +54,49 @@ export function resolveTenantGrant(value: unknown): TenantGrant {
   return value === "granted" || value === "none" ? value : "unknown";
 }
 
+export type ObservationTenantGrantSource = {
+  tenantId?: string | null;
+  id?: string | null;
+  tenantGrant?: unknown;
+};
+
+/**
+ * Project server-confirmed tenant grants for the workbench display boundary.
+ * Directory presence, billing status, sample fixtures, and role are ignored.
+ * `null` / `undefined` means the server result has not arrived yet.
+ * Missing or unrecognized values stay `unknown` and must not become `none`.
+ */
+export function projectObservationTenantGrants(
+  sources:
+    | readonly ObservationTenantGrantSource[]
+    | Readonly<Record<string, unknown>>
+    | null
+    | undefined,
+): Readonly<Record<string, TenantGrant>> | null {
+  if (sources == null) {
+    return null;
+  }
+  const grants: Record<string, TenantGrant> = {};
+  if (Array.isArray(sources)) {
+    for (const row of sources) {
+      const tenantId = (row.tenantId ?? row.id)?.trim();
+      if (!tenantId) {
+        continue;
+      }
+      grants[tenantId] = resolveTenantGrant(row.tenantGrant);
+    }
+    return grants;
+  }
+  for (const [tenantId, value] of Object.entries(sources)) {
+    const id = tenantId.trim();
+    if (!id) {
+      continue;
+    }
+    grants[id] = resolveTenantGrant(value);
+  }
+  return grants;
+}
+
 export function hasObservationReadScope(scopes: readonly string[] | null | undefined): boolean {
   return Boolean(
     scopes?.some((scope) => (OBSERVATION_READ_SCOPES as readonly string[]).includes(scope)),

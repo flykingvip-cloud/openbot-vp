@@ -208,4 +208,93 @@ describe("platform read model", () => {
     expect(model.sessionsCount).toBe(0);
     expect(model.channelCount).toBe(0);
   });
+
+  it("projects only server-confirmed tenantGrant values onto the enterprise directory", () => {
+    const model = buildPlatformPortReadModel(
+      {
+        hello: { auth: { tenantId: "tenant-a", provider: "trusted-proxy", user: "ops" } },
+        platformAuthState: {
+          platformEnterprises: [
+            {
+              id: "tenant-granted",
+              name: "已授权企业",
+              tenantGrant: "granted",
+              status: "paid",
+              plan: "enterprise",
+              billingStatus: "active",
+              createdSource: "platform-created",
+              seatQuota: 1,
+              seatUsed: 0,
+              seatsRemaining: 1,
+            },
+            {
+              id: "tenant-none",
+              name: "无授权企业",
+              tenantGrant: "none",
+              status: "paid",
+              plan: "enterprise",
+              billingStatus: "active",
+              createdSource: "platform-created",
+              seatQuota: 1,
+              seatUsed: 0,
+              seatsRemaining: 1,
+            },
+            {
+              id: "tenant-unknown",
+              name: "未确认企业",
+              tenantGrant: "unknown",
+              status: "trial",
+              plan: "trial",
+              billingStatus: "ok",
+              createdSource: "self-service",
+              seatQuota: 1,
+              seatUsed: 0,
+              seatsRemaining: 1,
+            },
+            {
+              id: "tenant-omitted",
+              name: "未返回授权企业",
+              status: "paid",
+              plan: "enterprise",
+              billingStatus: "active",
+              createdSource: "platform-created",
+              seatQuota: 1,
+              seatUsed: 0,
+              seatsRemaining: 1,
+            },
+            {
+              id: "tenant-paid-status",
+              name: "仅有付费状态",
+              tenantGrant: "paid",
+              status: "paid",
+              plan: "enterprise",
+              billingStatus: "active",
+              createdSource: "platform-created",
+              seatQuota: 1,
+              seatUsed: 0,
+              seatsRemaining: 1,
+            },
+          ],
+        },
+        bootstrapAuthSession: null,
+        settings: {},
+        agentsList: null,
+        channelsSnapshot: null,
+        presenceEntries: [],
+        sessionsResult: null,
+        usageResult: null,
+      } as never,
+      null,
+    );
+    const byId = Object.fromEntries(
+      model.enterpriseDirectory.map((entry) => [entry.tenantId, entry.tenantGrant]),
+    );
+    expect(byId).toEqual({
+      "tenant-granted": "granted",
+      "tenant-none": "none",
+      "tenant-unknown": "unknown",
+      "tenant-omitted": "unknown",
+      "tenant-paid-status": "unknown",
+    });
+  });
 });

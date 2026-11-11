@@ -681,6 +681,10 @@ function buildPlatformEnterpriseDirectory(
       const contact = resolveEnterpriseDirectoryContact(store, enterprise.id);
       return {
         ...toEnterpriseSummary(enterprise),
+        // Existing canManagePlatform / grantsPlatform permission: this list is
+        // only built after that check. Stamp an explicit observation grant so
+        // the UI does not infer access from directory presence alone.
+        tenantGrant: "granted" as const,
         ...(contact ? { contact } : {}),
         contributionSummary:
           contributionByEnterprise.get(enterprise.id) ?? emptyContributionSummary(),

@@ -18,6 +18,7 @@ import {
   readDrawerRequest,
   resolveDrawerSelection,
   resolveObservationAuthorized,
+  projectObservationTenantGrants,
   resolveTenantGrant,
   stripDrawerParams,
 } from "./access-state.ts";
@@ -239,5 +240,42 @@ describe("metric list-scope hint", () => {
       "下方列表已按「活跃运行」筛选，共 1 条。顶部指标仍按原筛选集合统计，分母未改变。",
     );
     expect(metricScopeHint("all", 3)).toBeNull();
+  });
+});
+
+describe("projectObservationTenantGrants", () => {
+  it("maps only explicit granted/none results and keeps missing or unrecognized values unknown", () => {
+    expect(projectObservationTenantGrants(null)).toBeNull();
+    expect(projectObservationTenantGrants(undefined)).toBeNull();
+    expect(
+      projectObservationTenantGrants([
+        { tenantId: "tenant-a", tenantGrant: "granted" },
+        { id: "tenant-b", tenantGrant: "none" },
+        { tenantId: "tenant-c", tenantGrant: "unknown" },
+        { tenantId: "tenant-d" },
+        { tenantId: "tenant-e", tenantGrant: "paid" },
+        { tenantId: "  " },
+      ]),
+    ).toEqual({
+      "tenant-a": "granted",
+      "tenant-b": "none",
+      "tenant-c": "unknown",
+      "tenant-d": "unknown",
+      "tenant-e": "unknown",
+    });
+    expect(
+      projectObservationTenantGrants({
+        "tenant-a": "granted",
+        "tenant-b": "none",
+        "tenant-c": "unknown",
+        "tenant-d": "paid",
+      }),
+    ).toEqual({
+      "tenant-a": "granted",
+      "tenant-b": "none",
+      "tenant-c": "unknown",
+      "tenant-d": "unknown",
+    });
+    expect(projectObservationTenantGrants([])).toEqual({});
   });
 });
