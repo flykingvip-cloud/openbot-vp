@@ -36,6 +36,15 @@ describe("diagnosis-reports gateway method pack", () => {
       "diagnosis.job.report.get",
       "diagnosis.job.describe",
       "diagnosis.job.cancel",
+      "diagnosis.handling.preview",
+      "diagnosis.handling.submit",
+      "diagnosis.handling.approve",
+      "diagnosis.handling.reject",
+      "diagnosis.handling.cancel",
+      "diagnosis.handling.execute",
+      "diagnosis.handling.recheck",
+      "diagnosis.handling.get",
+      "diagnosis.handling.list",
     ]);
     expect(GATEWAY_METHOD_PACKS.find((entry) => entry.id === "diagnosis-reports")).toBeDefined();
     expect(
@@ -58,6 +67,9 @@ describe("diagnosis-reports gateway method pack", () => {
     expect(names).toContain("diagnosis.job.report.get");
     expect(names).toContain("diagnosis.job.describe");
     expect(names).toContain("diagnosis.job.cancel");
+    expect(names).toContain("diagnosis.handling.preview");
+    expect(names).toContain("diagnosis.handling.execute");
+    expect(names).toContain("diagnosis.handling.list");
     expect(typeof merged["diagnosis.reports.query"]).toBe("function");
     expect(typeof merged["diagnosis.reports.get"]).toBe("function");
     expect(typeof merged["diagnosis.diagnose"]).toBe("function");
@@ -74,6 +86,8 @@ describe("diagnosis-reports gateway method pack", () => {
     expect(coreGatewayHandlers["diagnosis.job.report.get"]).toBeDefined();
     expect(coreGatewayHandlers["diagnosis.job.describe"]).toBeDefined();
     expect(coreGatewayHandlers["diagnosis.job.cancel"]).toBeDefined();
+    expect(coreGatewayHandlers["diagnosis.handling.preview"]).toBeDefined();
+    expect(coreGatewayHandlers["diagnosis.handling.execute"]).toBeDefined();
     expect(typeof merged["chat.checkpoints.list"]).toBe("function");
     const packScopes = diagnosisReportsPack.scopes;
     expect(packScopes["operator.read"]).toContain("diagnosis.observation.query");
@@ -88,11 +102,22 @@ describe("diagnosis-reports gateway method pack", () => {
       "diagnosis.job.resume",
       "diagnosis.job.run",
       "diagnosis.job.cancel",
+      "diagnosis.handling.submit",
+      "diagnosis.handling.cancel",
+      "diagnosis.handling.execute",
+      "diagnosis.handling.recheck",
+    ]);
+    expect(packScopes["operator.approvals"]).toEqual([
+      "diagnosis.self-evolution.confirm",
+      "diagnosis.handling.approve",
+      "diagnosis.handling.reject",
     ]);
     expect(packScopes["operator.read"]).toContain("diagnosis.intervention.list");
     expect(packScopes["operator.read"]).toContain("diagnosis.intervention.get");
     expect(packScopes["operator.read"]).toContain("diagnosis.job.report.get");
     expect(packScopes["operator.read"]).toContain("diagnosis.job.describe");
+    expect(packScopes["operator.read"]).toContain("diagnosis.handling.preview");
+    expect(packScopes["operator.read"]).toContain("diagnosis.handling.list");
     const manifestEntry = GATEWAY_METHOD_PACK_MANIFEST.find(
       (entry) => entry.id === "diagnosis-reports",
     );
@@ -119,6 +144,9 @@ describe("diagnosis-reports gateway method pack", () => {
     expect(packBody).toContain(".getGrant(");
     expect(packBody).not.toContain(".inspectGrant(");
     expect(packBody).not.toContain("createDiagnosisReportGatewayHandlers()");
+    expect(packBody).toContain("createDiagnosisHandlingGatewayHandlers()");
+    expect(packBody).not.toContain("createDiagnosisHandlingGatewayHandlers({");
+    expect(packBody).not.toContain("isolation: true");
   });
 
   it("has no write side effects", () => {

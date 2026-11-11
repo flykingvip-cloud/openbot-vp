@@ -539,6 +539,40 @@ export type {
   RemediationVerdict,
 } from "./remediation.js";
 export {
+  DIAGNOSIS_HANDLING_SCHEMA_VERSION,
+  DIAGNOSIS_HANDLING_SCENARIO_ID,
+  DIAGNOSIS_HANDLING_ISOLATION_ENV,
+  DIAGNOSIS_HANDLING_EXECUTION_INTERFACE,
+  DIAGNOSIS_HANDLING_RECOVERY_INTERFACE,
+  DIAGNOSIS_HANDLING_EVIDENCE_INTERFACE,
+  DIAGNOSIS_HANDLING_RECHECK_STANDARD,
+  HANDLING_STATES,
+  HANDLING_STATE_LABELS,
+  buildHandlingAdminView,
+  createDiagnosisHandlingLoop,
+  createMemoryDiagnosisHandlingLoop,
+  handlingStateLabel,
+  isDiagnosisHandlingExecuteOpen,
+  isDiagnosisHandlingIsolationBoundary,
+  resolveHandlingRegistrationPath,
+  seedPausedDiagnosisJob,
+} from "./handling-loop.js";
+export type {
+  DiagnosisHandlingLoop,
+  HandlingActor,
+  HandlingAdminView,
+  HandlingCommandResult,
+  HandlingDetails,
+  HandlingJobEvidence,
+  HandlingPreview,
+  HandlingRecord,
+  HandlingState,
+} from "./handling-loop.js";
+export {
+  DIAGNOSIS_HANDLING_METHODS,
+  createDiagnosisHandlingGatewayHandlers,
+} from "./handling-loop-gateway.js";
+export {
   DIAGNOSIS_HEALTH_TONES,
   DIAGNOSIS_PERMISSION_STATES,
   DIAGNOSIS_TIMELINE_KINDS,
