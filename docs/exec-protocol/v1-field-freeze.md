@@ -10,17 +10,17 @@ A′ / B′ 指为此验证新建的隔离进程或容器，必须是两个节�
 
 ## 1. 已决规则（沿用 `10` 与本次指令，不另定数值）
 
-| 项 | 已决内容 |
-| --- | --- |
-| 操作 | 提交 `submit`、查询 `status`、取消 `cancel`、成果 `artifact`；查询不得触发执行 |
-| 幂等 | 同一幂等键重复提交必须返回原任务；键相同但意图不同则 `EXEC_CONFLICT`，不得开第二跑 |
-| 取消 | 取消后的任务不得重新启动 |
-| 不可达 | B 不可达时返回明确错误或保持待执行（`accepted` / `queued` / `result_unconfirmed`）；不得改标 `succeeded`，不得回落到 A 宿主执行 |
-| 成果 | 必须带完整 SHA-256（64 位十六进制，可带 `sha256:` 前缀）和字节数；任一不一致不得进入 `succeeded`，不得交付 |
-| 断线 | 传输层可重试查询、取消通知、成果字节；不得自动重放可能产生外部副作用的执行 |
-| 重启 | A′ 重启后须从控制面记录恢复任务，或明确标为待对账（`result_unconfirmed`） |
-| 关联 | `taskId`、`toolCallId`、`artifactId` 必须可互相关联 |
-| 版本失败 | 不识别或缺少版本必须失败，不得降级到本机引擎 |
+| 项             | 已决内容                                                                                                                                                          |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 操作           | 提交 `submit`、查询 `status`、取消 `cancel`、成果 `artifact`；查询不得触发执行                                                                                    |
+| 幂等           | 同一幂等键重复提交必须返回原任务；键相同但意图不同则 `EXEC_CONFLICT`，不得开第二跑                                                                                |
+| 取消           | 取消后的任务不得重新启动                                                                                                                                          |
+| 不可达         | B 不可达时返回明确错误或保持待执行（`accepted` / `queued` / `result_unconfirmed`）；不得改标 `succeeded`，不得回落到 A 宿主执行                                   |
+| 成果           | 必须带完整 SHA-256（64 位十六进制，可带 `sha256:` 前缀）和字节数；任一不一致不得进入 `succeeded`，不得交付                                                        |
+| 断线           | 传输层可重试查询、取消通知、成果字节；不得自动重放可能产生外部副作用的执行                                                                                        |
+| 重启           | A′ 重启后须从控制面记录恢复任务，或明确标为待对账（`result_unconfirmed`）                                                                                         |
+| 关联           | `taskId`、`toolCallId`、`artifactId` 必须可互相关联                                                                                                               |
+| 版本失败       | 不识别或缺少版本必须失败，不得降级到本机引擎                                                                                                                      |
 | 错误码（语义） | `EXEC_VERSION_UNSUPPORTED`、`EXEC_UNAUTHORIZED`、`EXEC_REVOKED`、`EXEC_NOT_FOUND`、`EXEC_CONFLICT`、`EXEC_UNREACHABLE`、`EXEC_CHECKSUM_MISMATCH`、`EXEC_INTERNAL` |
 
 ## 2. 最小状态机（已决名称，待签收后实现）
@@ -46,37 +46,37 @@ submit ──► accepted ──► queued ──► running ──┬──► 
 
 ## 4. 必须冻结的字段
 
-| 字段 | 提案（隔离验证，待签收） | 生产 / 未决 | 依据 |
-| --- | --- | --- | --- |
-| 监听地址与端口 | B′ 只绑定非公网地址。配置项 `OPENBOT_EXEC_PROTOCOL_BIND`、`OPENBOT_EXEC_PROTOCOL_PORT` 必填。隔离剖面：`127.0.0.1` 与端口 `18790`（A′、B′ 分节点时，A′ 通过隔离网络访问 B′ 的该端口，不得对公网开放） | 生产监听网卡、隧道或私网路径仍 **BLOCKED**（香港→A 通路未签） | 现网网关为 `18789`，隔离协议口错开为 `18790`，避免与现网入口混淆 |
-| 传输编码 | HTTP/1.1；请求与响应体为 JSON，`Content-Type: application/json; charset=utf-8`；缺少必填 JSON 字段则拒绝，不得补隐式值 | 生产是否强制 mTLS、证书字段、握手超时仍 **BLOCKED** | 与现有 TypeScript 服务栈一致；最小闭环先冻结应用层编码 |
-| 隔离认证 | 请求必须带 `Authorization: Bearer <lease>`。无令牌或令牌无效返回 `EXEC_UNAUTHORIZED`。隔离剖面不实现生产 mTLS | 生产 mTLS（或等价双向认证）的证书字段、CA、轮换、登记格式仍 **BLOCKED**，不得用「跳过 TLS」冒充已冻结 | 本阶段只允许隔离凭据；mTLS 参数未定不能假装已测 |
-| 请求 / 连接超时 | `OPENBOT_EXEC_PROTOCOL_CONNECT_TIMEOUT_MS=3000`；`OPENBOT_EXEC_PROTOCOL_REQUEST_TIMEOUT_MS=5000`。超时后必须先按幂等键查询，不得换新键重开 | 生产时限 **BLOCKED** | 隔离短超时，便于验证失败路径 |
-| 执行超时 | `OPENBOT_EXEC_PROTOCOL_EXECUTION_TIMEOUT_MS=60000`。到期后：若可确认未产生外部副作用则 `failed`，否则 `result_unconfirmed`。不得标 `succeeded` | 生产执行时限 **BLOCKED** | 隔离合成任务应在 60 秒内结束；生产窗口另签 |
-| 传输重试 | 仅查询、取消通知、成果字节可重试。`OPENBOT_EXEC_PROTOCOL_MAX_TRANSPORT_RETRIES=3`（含首次共 3 次），退避 `200ms`、`400ms`、`800ms`。执行本身（含外部副作用）不得自动重试 | 生产重试次数与间隔 **BLOCKED** | 满足「断线可恢复查询、不重放外部操作」 |
-| 幂等键格式 | UTF-8；字符集 `[A-Za-z0-9._:-]`；长度 16–128；在同一 `tenantId` 下唯一。配置项记录该规则，实现按该规则校验 | — | 可读、可截断误用空格/斜杠 |
-| 幂等键保留期 | `OPENBOT_EXEC_PROTOCOL_IDEMPOTENCY_TTL_MS=86400000`（24 小时）。保留期内重复提交返回原任务；过期后同一键视为新提交前须确认旧任务已终态，否则 `EXEC_CONFLICT` | 生产保留期 **BLOCKED** | 隔离验证窗口以日计即可 |
-| 取消传播时限 | `OPENBOT_EXEC_PROTOCOL_CANCEL_DEADLINE_MS=10000`。收到取消后进入 `cancel_requested`；B′ 须在此时限内停跑并回到 `cancelled`。超时未确认则 `result_unconfirmed`，仍不得重启 | — | 有上限，避免无限「取消中」 |
-| 撤销传播时限 | 撤销立即拒绝该范围内新提交（`EXEC_REVOKED`）。已在跑的任务按取消处理，时限同上。超时未确认则 `result_unconfirmed` | 生产撤销是否另有审计或人工流程 **BLOCKED** | 先冻结最小安全行为：停新、停在途、超时报待对账 |
-| 租约 / 令牌格式 | 隔离令牌：`exec1_` + 64 位小写十六进制（32 字节随机）。服务端保存哈希、主体（A′ 身份）、可选 `tenantId`、`exp`。不采用未冻结的 JWT 声明集。TTL：`OPENBOT_EXEC_PROTOCOL_LEASE_TTL_MS=3600000`（1 小时） | 生产租约/证书映射 **BLOCKED** | 不引入额外未签 JWT 字段 |
-| 错误码与 HTTP 映射 | 见第 5 节。未列代码不得使用 | 不得另增未签收错误码 | 补齐 `10` 中仍 BLOCKED 的 HTTP 映射 |
-| 时钟偏差 | 时间一律 UTC RFC3339。`OPENBOT_EXEC_PROTOCOL_MAX_CLOCK_SKEW_MS=30000`（30 秒）。超差令牌视为无效，返回 `EXEC_UNAUTHORIZED`，不新增错误码 | 生产若有独立时间源要求 **BLOCKED** | 覆盖短暂时钟差，又不放宽到可重放过期令牌 |
-| 协议版本 | 请求与响应必带 `exec-api-version`（JSON 字段，整数）。本剖面只承认 `1`。缺失、非整数或不为 `1` → `EXEC_VERSION_UNSUPPORTED`，不得协商降级 | 未来版本的兼容矩阵仍 **BLOCKED**，不得预先实现「尽量兼容」 | 与 `10` 已选编号一致 |
+| 字段               | 提案（隔离验证，待签收）                                                                                                                                                                               | 生产 / 未决                                                                                           | 依据                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 监听地址与端口     | B′ 只绑定非公网地址。配置项 `OPENBOT_EXEC_PROTOCOL_BIND`、`OPENBOT_EXEC_PROTOCOL_PORT` 必填。隔离剖面：`127.0.0.1` 与端口 `18790`（A′、B′ 分节点时，A′ 通过隔离网络访问 B′ 的该端口，不得对公网开放）  | 生产监听网卡、隧道或私网路径仍 **BLOCKED**（香港→A 通路未签）                                         | 现网网关为 `18789`，隔离协议口错开为 `18790`，避免与现网入口混淆 |
+| 传输编码           | HTTP/1.1；请求与响应体为 JSON，`Content-Type: application/json; charset=utf-8`；缺少必填 JSON 字段则拒绝，不得补隐式值                                                                                 | 生产是否强制 mTLS、证书字段、握手超时仍 **BLOCKED**                                                   | 与现有 TypeScript 服务栈一致；最小闭环先冻结应用层编码           |
+| 隔离认证           | 请求必须带 `Authorization: Bearer <lease>`。无令牌或令牌无效返回 `EXEC_UNAUTHORIZED`。隔离剖面不实现生产 mTLS                                                                                          | 生产 mTLS（或等价双向认证）的证书字段、CA、轮换、登记格式仍 **BLOCKED**，不得用「跳过 TLS」冒充已冻结 | 本阶段只允许隔离凭据；mTLS 参数未定不能假装已测                  |
+| 请求 / 连接超时    | `OPENBOT_EXEC_PROTOCOL_CONNECT_TIMEOUT_MS=3000`；`OPENBOT_EXEC_PROTOCOL_REQUEST_TIMEOUT_MS=5000`。超时后必须先按幂等键查询，不得换新键重开                                                             | 生产时限 **BLOCKED**                                                                                  | 隔离短超时，便于验证失败路径                                     |
+| 执行超时           | `OPENBOT_EXEC_PROTOCOL_EXECUTION_TIMEOUT_MS=60000`。到期后：若可确认未产生外部副作用则 `failed`，否则 `result_unconfirmed`。不得标 `succeeded`                                                         | 生产执行时限 **BLOCKED**                                                                              | 隔离合成任务应在 60 秒内结束；生产窗口另签                       |
+| 传输重试           | 仅查询、取消通知、成果字节可重试。`OPENBOT_EXEC_PROTOCOL_MAX_TRANSPORT_RETRIES=3`（含首次共 3 次），退避 `200ms`、`400ms`、`800ms`。执行本身（含外部副作用）不得自动重试                               | 生产重试次数与间隔 **BLOCKED**                                                                        | 满足「断线可恢复查询、不重放外部操作」                           |
+| 幂等键格式         | UTF-8；字符集 `[A-Za-z0-9._:-]`；长度 16–128；在同一 `tenantId` 下唯一。配置项记录该规则，实现按该规则校验                                                                                             | —                                                                                                     | 可读、可截断误用空格/斜杠                                        |
+| 幂等键保留期       | `OPENBOT_EXEC_PROTOCOL_IDEMPOTENCY_TTL_MS=86400000`（24 小时）。保留期内重复提交返回原任务；过期后同一键视为新提交前须确认旧任务已终态，否则 `EXEC_CONFLICT`                                           | 生产保留期 **BLOCKED**                                                                                | 隔离验证窗口以日计即可                                           |
+| 取消传播时限       | `OPENBOT_EXEC_PROTOCOL_CANCEL_DEADLINE_MS=10000`。收到取消后进入 `cancel_requested`；B′ 须在此时限内停跑并回到 `cancelled`。超时未确认则 `result_unconfirmed`，仍不得重启                              | —                                                                                                     | 有上限，避免无限「取消中」                                       |
+| 撤销传播时限       | 撤销立即拒绝该范围内新提交（`EXEC_REVOKED`）。已在跑的任务按取消处理，时限同上。超时未确认则 `result_unconfirmed`                                                                                      | 生产撤销是否另有审计或人工流程 **BLOCKED**                                                            | 先冻结最小安全行为：停新、停在途、超时报待对账                   |
+| 租约 / 令牌格式    | 隔离令牌：`exec1_` + 64 位小写十六进制（32 字节随机）。服务端保存哈希、主体（A′ 身份）、可选 `tenantId`、`exp`。不采用未冻结的 JWT 声明集。TTL：`OPENBOT_EXEC_PROTOCOL_LEASE_TTL_MS=3600000`（1 小时） | 生产租约/证书映射 **BLOCKED**                                                                         | 不引入额外未签 JWT 字段                                          |
+| 错误码与 HTTP 映射 | 见第 5 节。未列代码不得使用                                                                                                                                                                            | 不得另增未签收错误码                                                                                  | 补齐 `10` 中仍 BLOCKED 的 HTTP 映射                              |
+| 时钟偏差           | 时间一律 UTC RFC3339。`OPENBOT_EXEC_PROTOCOL_MAX_CLOCK_SKEW_MS=30000`（30 秒）。超差令牌视为无效，返回 `EXEC_UNAUTHORIZED`，不新增错误码                                                               | 生产若有独立时间源要求 **BLOCKED**                                                                    | 覆盖短暂时钟差，又不放宽到可重放过期令牌                         |
+| 协议版本           | 请求与响应必带 `exec-api-version`（JSON 字段，整数）。本剖面只承认 `1`。缺失、非整数或不为 `1` → `EXEC_VERSION_UNSUPPORTED`，不得协商降级                                                              | 未来版本的兼容矩阵仍 **BLOCKED**，不得预先实现「尽量兼容」                                            | 与 `10` 已选编号一致                                             |
 
 ## 5. 错误码与 HTTP 映射（隔离剖面，待签收）
 
-| 错误码 | HTTP | 调用方动作 |
-| --- | --- | --- |
-| （成功，新受理） | 201 | 记录 `taskId` |
-| （成功，幂等命中或查询/取消/回传成功） | 200 | 以返回状态为准，不新开任务 |
-| `EXEC_VERSION_UNSUPPORTED` | 400 | 失败，不得降级本机引擎 |
-| `EXEC_UNAUTHORIZED` | 401 | 拒绝；未认证不得区分任务是否存在 |
-| `EXEC_REVOKED` | 403 | 不得新提交；在途按取消/待对账处理 |
-| `EXEC_NOT_FOUND` | 404 | 已认证但任务不在本租户范围或不存在；不得泄漏他户 |
-| `EXEC_CONFLICT` | 409 | 先查询再对账，不得换键强开 |
-| `EXEC_UNREACHABLE` | 503 | A′ 保持待执行或失败，不对 host 回落 |
-| `EXEC_CHECKSUM_MISMATCH` | 422 | 不得 `succeeded`，不得交付 |
-| `EXEC_INTERNAL` | 500 | 记入 `failed` 或 `result_unconfirmed` |
+| 错误码                                 | HTTP | 调用方动作                                       |
+| -------------------------------------- | ---- | ------------------------------------------------ |
+| （成功，新受理）                       | 201  | 记录 `taskId`                                    |
+| （成功，幂等命中或查询/取消/回传成功） | 200  | 以返回状态为准，不新开任务                       |
+| `EXEC_VERSION_UNSUPPORTED`             | 400  | 失败，不得降级本机引擎                           |
+| `EXEC_UNAUTHORIZED`                    | 401  | 拒绝；未认证不得区分任务是否存在                 |
+| `EXEC_REVOKED`                         | 403  | 不得新提交；在途按取消/待对账处理                |
+| `EXEC_NOT_FOUND`                       | 404  | 已认证但任务不在本租户范围或不存在；不得泄漏他户 |
+| `EXEC_CONFLICT`                        | 409  | 先查询再对账，不得换键强开                       |
+| `EXEC_UNREACHABLE`                     | 503  | A′ 保持待执行或失败，不对 host 回落              |
+| `EXEC_CHECKSUM_MISMATCH`               | 422  | 不得 `succeeded`，不得交付                       |
+| `EXEC_INTERNAL`                        | 500  | 记入 `failed` 或 `result_unconfirmed`            |
 
 客户端在对端无 HTTP 响应（连接失败、超时、TLS 失败等）时，本地归类为 `EXEC_UNREACHABLE`，行为同上。
 
@@ -126,3 +126,5 @@ submit ──► accepted ──► queued ──► running ──┬──► 
 ## 11. 后续补件（本文件第 4 节重试行的澄清，以及对账入口）
 
 2026-11-11 起，传输重试的实现与验收以 `docs/exec-protocol/v1-reconcile-and-retry-freeze.md` 为准：最多 3 次尝试（含首次），等待序列为 `200ms` 再 `400ms`，不再使用第三次 `800ms` 等待。对账入口、单写入者约束与 `result_unconfirmed` 出边规则也以该补件为准。端口、超时和租约数值仍仅属于隔离验证剖面，不自动成为生产配置。
+
+同日补件第 5 节补充了 A→B 持久对账同步：操作人可见字段 `reconcileSyncState`（`pending_sync` / `synced` / `sync_conflict`）、`conclusionCommitted`、`bSyncConfirmed`、`needsHuman`、`conclusionDigest`。这些是对账同步状态，不是新的对外端点，也不改写已签收的隔离监听、超时或租约数值。A′/B′ 的 `stateVersion` 归属各自节点，禁止互相比较。

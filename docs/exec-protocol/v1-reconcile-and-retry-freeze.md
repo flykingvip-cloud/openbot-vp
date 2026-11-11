@@ -35,10 +35,10 @@ A′/B′ 提交路径必须按 `tenantId` + 幂等键串行。同一租户、�
 
 原冻结「含首次共 3 次」同时列出 `200/400/800ms` 三次退避，容易被读成还存在第四次尝试。现统一为：
 
-| 项 | 隔离剖面取值 | 含义 |
-| --- | --- | --- |
-| 传输尝试次数 `maxTransportRetries` | `3` | 最多 3 次尝试，含首次，即最多 2 次重试 |
-| 等待序列 `transportBackoffMs` | `[200, 400]` | 在失败之后、下一次尝试之前等待；长度必须等于 `maxTransportRetries - 1` |
+| 项                                 | 隔离剖面取值 | 含义                                                                   |
+| ---------------------------------- | ------------ | ---------------------------------------------------------------------- |
+| 传输尝试次数 `maxTransportRetries` | `3`          | 最多 3 次尝试，含首次，即最多 2 次重试                                 |
+| 等待序列 `transportBackoffMs`      | `[200, 400]` | 在失败之后、下一次尝试之前等待；长度必须等于 `maxTransportRetries - 1` |
 
 尝试时间线：
 
@@ -76,16 +76,16 @@ B′ 同步入口仅供 A′ 使用，不作为对外对账角色入口：
 
 请求字段（A′ 对账与 B′ 同步使用同一核心字段）：
 
-| 字段 | 规则 |
-| --- | --- |
-| `exec-api-version` | 必须为 `1` |
-| `tenantId` | 必填，且与租约租户范围一致 |
-| `taskId` | 必填 |
-| `expectedStateVersion` | 必填，正整数；必须等于当前任务的 `stateVersion` |
-| `reconcileRequestId` | 必填；字符集与幂等键相同：`[A-Za-z0-9._:-]`，长度 16–128；在租户内唯一标识一次对账请求 |
-| `conclusion` | `succeeded` \| `failed` \| `cancelled` \| `remain_unconfirmed` |
-| `reason` | 必填，1–512 个字符 |
-| `evidenceRef` | 必填，见第 3.5 节 |
+| 字段                   | 规则                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `exec-api-version`     | 必须为 `1`                                                                             |
+| `tenantId`             | 必填，且与租约租户范围一致                                                             |
+| `taskId`               | 必填                                                                                   |
+| `expectedStateVersion` | 必填，正整数；必须等于当前任务的 `stateVersion`                                        |
+| `reconcileRequestId`   | 必填；字符集与幂等键相同：`[A-Za-z0-9._:-]`，长度 16–128；在租户内唯一标识一次对账请求 |
+| `conclusion`           | `succeeded` \| `failed` \| `cancelled` \| `remain_unconfirmed`                         |
+| `reason`               | 必填，1–512 个字符                                                                     |
+| `evidenceRef`          | 必填，见第 3.5 节                                                                      |
 
 成功响应 HTTP 200，正文为任务响应，并包含 `stateVersion` 以及对账摘要：`reconcileRequestId`、操作人、时间、原状态、新状态、结论、理由。
 
@@ -141,3 +141,53 @@ B′ 同步入口仅供 A′ 使用，不作为对外对账角色入口：
 ## 4. 本补件落地范围
 
 允许在同一草稿 PR #272 中实现上述冻结。实现完成后须附：对账入口与负向测试、单写入者/跨进程存储约束证据、统一重试序列测试、以及独立复审报告。跨机验收证据在隔离双机资源就绪并另批变更单（如需安装软件或改防火墙）之后提交，本阶段先提交双机环境方案。
+
+## 5. 补件：A→B 持久对账同步、版本归属与诊断探针（隔离剖面）
+
+- 日期：2026-11-11
+- 本节省为对第 3 节的补充，不改写已签收的隔离端口、超时或租约数值。
+- 隔离剖面仍为：bind `127.0.0.1`，端口 `18790`，connect 3000 / request 5000 / execution 60000 ms；传输最多 3 次尝试，等待 `[200, 400]`；这些数值不自动成为生产配置。
+
+### 5.1 持久待同步记录与原子提交
+
+A′ 在本地提交对账结论时，必须把结论（任务新状态、审计、对账索引）和一条待同步记录写在**同一次** `persist` / 同一存储事务中。若落盘失败，两者都不出现，任务保持提交前状态。
+
+待同步记录持久化在 A′ 存储中。A′ 重启后必须从存储恢复，而不是只依赖内存队列。隔离测试与服务启动路径调用明确的调度钩子 `resumePendingReconcileSyncs()`（`loadAndReconcile()` 会先执行它）。每一次调用最多进行一轮传输突发：最多 3 次尝试，失败后等待 200ms 再 400ms。
+
+### 5.2 同步状态（操作人可见）
+
+`result_unconfirmed` 在尚未提交对账结论前仍然准确，且不是成功。提交结论之后，操作人必须能区分「结论已提交」与「B 已确认同步」：
+
+| 同步状态 `reconcileSyncState`       | 含义                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| （无；`conclusionCommitted=false`） | 尚未在 A′ 提交对账结论，任务若仍为 `result_unconfirmed` 则保持该状态 |
+| `pending_sync`                      | A′ 已提交结论（`conclusionCommitted=true`），B′ 尚未确认 apply       |
+| `synced`                            | B′ 已确认同步（`bSyncConfirmed=true`）                               |
+| `sync_conflict`                     | 永久冲突，进入人工处理（`needsHuman=true`），不再自动重试            |
+
+上述字段出现在 A′ 的任务查询响应与对账响应中。`结论已提交` ≠ `B 已确认同步`。
+
+任务状态与同步状态独立：例如 A′ 已把任务写成 `succeeded` 且 `reconcileSyncState=pending_sync`。
+
+### 5.3 重试、冲突与同步期间的禁令
+
+- 断链或暂时不可达：按现有传输重试策略重试 A′→B′ 的 `POST /v1/tasks/reconcile-apply`。该调用是幂等的，因此允许使用与 `status` / `cancel` / `artifact` 相同的 3 次尝试与 `[200, 400]` 等待。`submit` 仍不得自动重试。
+- 一轮突发用尽后，记录保持 `pending_sync`，允许随后在重启或 `resumePendingReconcileSyncs()` 中再试。
+- 永久冲突（版本/前置条件/身份冲突，重试也不会成功，包括 `EXEC_CONFLICT`、`EXEC_CHECKSUM_MISMATCH`、`EXEC_UNAUTHORIZED`、`EXEC_REVOKED`、`EXEC_VERSION_UNSUPPORTED`）进入 `sync_conflict`，不得无限重试。
+- 未完成同步前（以及已提交关闭性结论后）：不得重新执行原任务；拒绝与已提交结论冲突的对账或状态变更。`remain_unconfirmed` 不是关闭性结论，随后仍可用**新的** `reconcileRequestId` 提交关闭性结论。
+
+### 5.4 B′ 幂等与版本归属
+
+B′ 端幂等身份为 `reconcileRequestId` **加上**结论摘要 `conclusionDigest`（`taskId` + `conclusion` + 证据关键字段的稳定 SHA-256）。同一请求 ident 且同一摘要则幂等返回，不得二次执行或重复产生副作用。同一 `reconcileRequestId` 但摘要冲突则 `EXEC_CONFLICT`。
+
+**版本归属：** A′ 的 `stateVersion` 与 B′ 的 `stateVersion` 各自独立递增，**禁止互相比较**，也不得用一方的版本对另一方做 CAS。对账请求中的 `expectedStateVersion` 只表示操作人请求在 **A′** 上的条件更新身份；A′ 把它原样放入 apply 载荷仅作请求身份，B′ 不得把它与 `B.stateVersion` 比较。B′ 按**本地**前置条件与对账身份拒绝过期、冲突或越序更新：本地须为 `result_unconfirmed`（或已是相同终态则幂等）；若本地已应用另一关闭性对账，则拒绝新的冲突/越序 apply。
+
+成功确认仍不得绕过成果完整性。确认取消仍不得只依据「取消请求已发送」。`remain_unconfirmed` 保持未确认并记入审计。对账不得重新执行原任务，测试除通过文档化的崩溃/半写辅助函数注入撕毁文件外，不得直接改存储文件。
+
+### 5.5 单写入者锁的文件系统范围
+
+`store.lock.sock` 单写入者栅栏只在本地 POSIX 文件系统上验证（隔离测试会记录 `df -T` / `findmnt`）。**未在 NFS、SMB 或其他共享/网络文件系统上验证，在完成验证前不得用于这类文件系统。** 残留套接字仅在探测确认持有者已不存在时才可回收；不得删除仍存活实例的锁。写入中断后的恢复不得只覆盖「正常 `close()` 后再打开」。
+
+### 5.6 incrementProbe（仅诊断）
+
+`incrementProbe` / 存储中的 `probes` 计数只用于隔离剖面的合成副作用诊断（证明断线不重放）。它**不参与**任务状态、配额或成功/失败判定。那些判定只使用任务状态、`sideEffectApplied` 和成果校验。探针持久化失败或延迟不得单独把任务标为成功或失败，也不得单独消耗配额。
