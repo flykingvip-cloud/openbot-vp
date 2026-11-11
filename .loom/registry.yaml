@@ -12791,6 +12791,8 @@ tasks:
       - Implement and isolate-verify execution protocol v1 minimal loop (submit, status, cancel, idempotency, artifact SHA-256 and byte-count checks). If B is unreachable, stay failed or pending; never fall back to A host execution.
     paths:
       - docs/exec-protocol/v1-field-freeze.md
+      - docs/exec-protocol/v1-reconcile-and-retry-freeze.md
+      - docs/exec-protocol/v1-two-node-isolation-plan.md
       - src/exec-protocol/**
       - .loom/registry.yaml
     state: active
@@ -12810,6 +12812,8 @@ landingStreams:
     landingPolicy: serial
     paths:
       - docs/exec-protocol/v1-field-freeze.md
+      - docs/exec-protocol/v1-reconcile-and-retry-freeze.md
+      - docs/exec-protocol/v1-two-node-isolation-plan.md
       - src/exec-protocol/**
     canLandWith: []
     metadata:
@@ -27833,6 +27837,14 @@ sharedPaths:
     reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
   - glob: docs/exec-protocol/v1-field-freeze.md
+    landerTask: exec-protocol-v1-min-loop
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reviewAfter: 2026-12-31
+  - glob: docs/exec-protocol/v1-reconcile-and-retry-freeze.md
+    landerTask: exec-protocol-v1-min-loop
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reviewAfter: 2026-12-31
+  - glob: docs/exec-protocol/v1-two-node-isolation-plan.md
     landerTask: exec-protocol-v1-min-loop
     reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
