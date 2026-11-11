@@ -30,6 +30,8 @@ tasks:
       - ui/src/ui/app-render.ts
       - ui/src/ui/app-view-state-shell-slices.ts
       - ui/src/ui/views/chat.ts
+      - src/shared/text/control-channel-visibility.ts
+      - src/shared/text/control-channel-visibility.test.ts
     state: active
     sessions:
       - id: local-ui-seams-20261111
@@ -37,7 +39,7 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-11T07:15:55.472Z
+        lastSignalAt: 2026-11-11T07:41:19.334Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-11
