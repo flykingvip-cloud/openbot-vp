@@ -1,6 +1,7 @@
 export {
   EXEC_PROTOCOL_ENV,
   ISOLATION_SIGNED_VALUES,
+  assertExecProtocolIsolationOnly,
   isolationConfigToEnv,
   isolationProfile,
   loadExecProtocolConfigFromEnv,

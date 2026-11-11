@@ -4,7 +4,11 @@ import { AControlPlane } from "./a-control-plane.js";
 import { AControlServer } from "./a-server.js";
 import { BExecutionServer } from "./b-server.js";
 import { ExecHttpClient } from "./client.js";
-import { isolationConfigToEnv, loadExecProtocolConfigFromEnv } from "./config.js";
+import {
+  assertExecProtocolIsolationOnly,
+  isolationConfigToEnv,
+  loadExecProtocolConfigFromEnv,
+} from "./config.js";
 import { ExecConfigError } from "./errors.js";
 import { createHostCommandProbe } from "./host-fallback.js";
 import { hashLeaseToken, isLeaseTokenFormat } from "./lease.js";
@@ -21,6 +25,7 @@ const REQUIRED_PROCESS_ENV = [
 export async function runExecProtocolProcess(
   env: NodeJS.ProcessEnv,
 ): Promise<{ stop: () => Promise<void> }> {
+  assertExecProtocolIsolationOnly(env);
   const missing: string[] = [];
   for (const key of REQUIRED_PROCESS_ENV) {
     if (!env[key] || env[key]?.trim() === "") {

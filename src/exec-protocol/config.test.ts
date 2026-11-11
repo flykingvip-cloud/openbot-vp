@@ -81,4 +81,74 @@ describe("exec protocol isolation config", () => {
       runExecProtocolProcess({ ...isolationConfigToEnv(isolationProfile()) }),
     ).rejects.toThrow(/refused to start/);
   });
+
+  it("refuses production mode even when a complete isolation env is present and does not fall back to signed values", () => {
+    const env = {
+      ...isolationConfigToEnv(isolationProfile()),
+      OPENBOT_PRODUCTION_EXECUTION_MODE: "production",
+    };
+    expect(() => loadExecProtocolConfigFromEnv(env)).toThrow(ExecConfigError);
+    try {
+      loadExecProtocolConfigFromEnv(env);
+    } catch (error) {
+      expect(error).toBeInstanceOf(ExecConfigError);
+      expect((error as ExecConfigError).message).toMatch(/isolation-only/);
+      expect((error as ExecConfigError).message).toMatch(/production profile is not frozen/);
+      expect((error as ExecConfigError).message).not.toMatch(/missing or invalid env/);
+      expect((error as ExecConfigError).missing).toEqual(["OPENBOT_PRODUCTION_EXECUTION_MODE"]);
+    }
+  });
+
+  it("refuses production mode with partial or missing env and does not fill isolation signed values", () => {
+    const partial = {
+      OPENBOT_PRODUCTION_EXECUTION_MODE: "production",
+      [EXEC_PROTOCOL_ENV.bind]: "127.0.0.1",
+      [EXEC_PROTOCOL_ENV.port]: "18790",
+    };
+    expect(() => loadExecProtocolConfigFromEnv(partial)).toThrow(/isolation-only/);
+    expect(() =>
+      loadExecProtocolConfigFromEnv({ OPENBOT_PRODUCTION_EXECUTION_MODE: "production" }),
+    ).toThrow(/must not be applied as a fallback/);
+    expect(() => loadExecProtocolConfigFromEnv(partial)).toThrow(ExecConfigError);
+    try {
+      loadExecProtocolConfigFromEnv(partial);
+    } catch (error) {
+      expect((error as ExecConfigError).message).not.toMatch(/missing or invalid env/);
+    }
+  });
+
+  it("refuses incomplete env without production mode and does not fill isolation signed values", () => {
+    expect(() =>
+      loadExecProtocolConfigFromEnv({
+        [EXEC_PROTOCOL_ENV.bind]: "127.0.0.1",
+        [EXEC_PROTOCOL_ENV.port]: "18790",
+      }),
+    ).toThrow(/missing or invalid env/);
+    expect(() => loadExecProtocolConfigFromEnv({})).toThrow(ExecConfigError);
+  });
+
+  it("does not treat NODE_ENV or undocumented values as production enablement", () => {
+    const complete = isolationConfigToEnv(isolationProfile({ port: 19112 }));
+    const loaded = loadExecProtocolConfigFromEnv({ ...complete, NODE_ENV: "production" });
+    expect(loaded.port).toBe(19112);
+    expect(loaded.profileName).toBe("exec-protocol-v1-isolation");
+    const synonym = loadExecProtocolConfigFromEnv({
+      ...complete,
+      OPENBOT_PRODUCTION_EXECUTION_MODE: "true",
+    });
+    expect(synonym.port).toBe(19112);
+  });
+
+  it("refuses to start the process in production mode even with complete isolation process env", async () => {
+    const env = {
+      ...isolationConfigToEnv(isolationProfile()),
+      OPENBOT_PRODUCTION_EXECUTION_MODE: "production",
+      OPENBOT_EXEC_PROTOCOL_ROLE: "b",
+      OPENBOT_EXEC_PROTOCOL_STORE_DIR: "/tmp/exec-protocol-must-not-start",
+      OPENBOT_EXEC_PROTOCOL_MAX_REQUEST_BODY_BYTES: "1000",
+      OPENBOT_EXEC_PROTOCOL_SUBJECT: "a-prime",
+    };
+    await expect(runExecProtocolProcess(env)).rejects.toThrow(/isolation-only/);
+    await expect(runExecProtocolProcess(env)).rejects.toThrow(/must not be applied as a fallback/);
+  });
 });
