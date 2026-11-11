@@ -12785,7 +12785,37 @@ tasks:
     ownerHistory: []
     since: 2026-11-11
     metadata: {}
+  - id: exec-protocol-v1-min-loop
+    owner: cursor-shuanggui-publish
+    intent:
+      - Implement and isolate-verify execution protocol v1 minimal loop (submit, status, cancel, idempotency, artifact SHA-256 and byte-count checks). If B is unreachable, stay failed or pending; never fall back to A host execution.
+    paths:
+      - docs/exec-protocol/v1-field-freeze.md
+      - src/exec-protocol/**
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: e6f1056c-5aa0-4c14-8ccb-64ae9fe9ae4f
+        taskId: exec-protocol-v1-min-loop
+        ide: cursor
+        agent: cursor-shuanggui-publish
+        status: active
+        lastSignalAt: 2026-11-11T05:26:08.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-11
+    metadata: {}
 landingStreams:
+  - id: exec-protocol-v1-min-loop
+    landingPolicy: serial
+    paths:
+      - docs/exec-protocol/v1-field-freeze.md
+      - src/exec-protocol/**
+    canLandWith: []
+    metadata:
+      task: exec-protocol-v1-min-loop
+      owner: cursor-shuanggui-publish
+      intent: Isolated execution protocol v1 minimal loop
   - id: forbid-production-host-fallback
     landingPolicy: serial
     paths:
@@ -27798,6 +27828,14 @@ landingStreams:
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
 sharedPaths:
+  - glob: src/exec-protocol/**
+    landerTask: exec-protocol-v1-min-loop
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reviewAfter: 2026-12-31
+  - glob: docs/exec-protocol/v1-field-freeze.md
+    landerTask: exec-protocol-v1-min-loop
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reviewAfter: 2026-12-31
   - glob: src/agents/sandbox/docker-engine-client.ts
     landerTask: forbid-production-host-fallback
     reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
