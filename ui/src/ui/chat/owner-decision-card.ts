@@ -382,13 +382,17 @@ export function selectStickyOwnerDecisionCards(
     if (facing === "consumed" || facing === "skipped") {
       continue;
     }
-    // stale_version delivery or version-gate refusal: keep as review chrome
-    // (「旧版本已失效」) inside the terminal budget — do not re-offer Confirm.
+    // Invalid historical versions belong to history, never the action stack.
+    // Each history message may render independently, so a per-call terminal
+    // budget alone cannot prevent a wall of old cards.
     if (
       facing === "stale_version" ||
       isOwnerDecisionVersionStale(card.decisionId) ||
-      isOwnerDecisionTodolistTerminal(getOwnerDecisionTodolistStatus(card.todolistId))
+      getOwnerDecisionTodolistStatus(card.todolistId) === "superseded"
     ) {
+      continue;
+    }
+    if (isOwnerDecisionTodolistTerminal(getOwnerDecisionTodolistStatus(card.todolistId))) {
       terminals.push(card);
       continue;
     }
