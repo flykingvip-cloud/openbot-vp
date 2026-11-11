@@ -12,6 +12,11 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
+import {
+  formatProductionHostFallbackForbiddenMessage,
+  isProductionExecutionModeEnabled,
+  type ProductionExecutionModeProbe,
+} from "./production-execution-mode.js";
 import { userFacingEntitlementPreReplyFailure } from "./user-facing-entitlement-failure.js";
 
 const log = createSubsystemLogger("docker-engine");
@@ -166,11 +171,28 @@ export type AccountWorkerDockerFailureDecision =
   | { action: "visible-error"; failure: string };
 
 /**
- * Missing client and missing socket degrade to host exec so the turn can still reply.
+ * Missing client and missing socket degrade to host exec so the turn can still reply,
+ * but only when production execution mode is not explicitly enabled.
+ * Set `OPENBOT_PRODUCTION_EXECUTION_MODE=production` to forbid that host fallback
+ * and return a visible error instead. `NODE_ENV` alone never enables this gate.
  * A mounted socket that refuses the connection, and other docker start failures,
  * stay visible errors and do not run on the host.
  */
 export function decideAccountWorkerDockerFailure(
+  error: unknown,
+  probe: ProductionExecutionModeProbe = {},
+): AccountWorkerDockerFailureDecision {
+  const decision = decideAccountWorkerDockerFailureLegacy(error);
+  if (decision.action === "host" && isProductionExecutionModeEnabled(probe)) {
+    return {
+      action: "visible-error",
+      failure: formatProductionHostFallbackForbiddenMessage(decision.failure),
+    };
+  }
+  return decision;
+}
+
+function decideAccountWorkerDockerFailureLegacy(
   error: unknown,
 ): AccountWorkerDockerFailureDecision {
   if (isDockerAccountWorkerUnavailableError(error)) {
