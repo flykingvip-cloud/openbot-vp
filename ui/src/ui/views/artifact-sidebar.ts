@@ -125,6 +125,16 @@ function resolveDownloadableHref(artifact: SharedArtifact): string {
       return value;
     }
   }
+  // Only original bytes read through the authorized workspace port may back a download.
+  // Preview text may be an excerpt or a generated summary and must never substitute for a file.
+  const original = metadata.workspaceFileLoaded === true ? metadata.fileBase64 : undefined;
+  if (
+    typeof original === "string" &&
+    original.length > 0 &&
+    /^[A-Za-z0-9+/]*={0,2}$/.test(original)
+  ) {
+    return `data:application/octet-stream;base64,${original}`;
+  }
   return "";
 }
 

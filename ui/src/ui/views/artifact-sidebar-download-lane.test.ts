@@ -365,3 +365,25 @@ it("never downloads an Office HTML preview under the PPTX filename when original
   render(renderArtifactSidebarHeaderActions({ workspace }), header);
   expect(header.querySelector('a[download="deck.pptx"]')).toBeNull();
 });
+
+it("downloads authorized original workspace bytes without exporting a preview summary", () => {
+  const container = document.createElement("div");
+  const workspace = binaryWorkspace();
+  workspace.artifact.downloadUrl = "";
+  workspace.artifact.openUrl = "";
+  workspace.artifact.providerMetadata = {
+    ...workspace.artifact.providerMetadata,
+    binaryDownloadUrl: "",
+    workspaceFilename: "check.md",
+    workspaceFileLoaded: true,
+    fileBase64: "TE9DQUxfQUNDRVBURUFORUVfT0s=",
+    previewText: "summary only",
+  } as typeof workspace.artifact.providerMetadata;
+  render(renderArtifactSidebarHeaderActions({ workspace }), container);
+  expect(container.querySelector("a[download]")?.getAttribute("href")).toBe(
+    "data:application/octet-stream;base64,TE9DQUxfQUNDRVBURUFORUVfT0s=",
+  );
+  delete (workspace.artifact.providerMetadata as Record<string, unknown>).fileBase64;
+  render(renderArtifactSidebarHeaderActions({ workspace }), container);
+  expect(container.querySelector("a[download]")).toBeNull();
+});
