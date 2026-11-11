@@ -3,7 +3,7 @@
 - 日期：2026-11-11
 - 对应方案：`docs/exec-protocol/v1-two-node-isolation-plan.md`
 - 对应冻结：`docs/exec-protocol/v1-reconcile-and-retry-freeze.md`（含第 5 节同步补件与第 5.7 节持续恢复调度器）
-- 草稿 PR：https://github.com/flykingvip-cloud/openbot-vp/pull/272（必须保持草稿，本单不请求审查或合并）
+- PR：https://github.com/flykingvip-cloud/openbot-vp/pull/272（本单已取消，不作为合并或实施依据；合并申请以对本 head 的独立审核为准，不以本单或专项跨机验收为门禁）
 - 本单状态：**已取消，不得执行。** 不再等待资源分配，不再申请新节点，也不再把本单当作待分项批准的实施单。
 
 ## 0. 取消原因、现有库存与未验证范围
