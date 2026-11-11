@@ -399,6 +399,15 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
             "diagnosis.job.report.get",
             "diagnosis.job.describe",
             "diagnosis.job.cancel",
+            "diagnosis.handling.preview",
+            "diagnosis.handling.submit",
+            "diagnosis.handling.approve",
+            "diagnosis.handling.reject",
+            "diagnosis.handling.cancel",
+            "diagnosis.handling.execute",
+            "diagnosis.handling.recheck",
+            "diagnosis.handling.get",
+            "diagnosis.handling.list",
           ],
           scopes: {
             "operator.read": [
@@ -410,6 +419,9 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
               "diagnosis.intervention.get",
               "diagnosis.job.report.get",
               "diagnosis.job.describe",
+              "diagnosis.handling.preview",
+              "diagnosis.handling.get",
+              "diagnosis.handling.list",
             ],
             "operator.write": [
               "diagnosis.schedule.apply",
@@ -421,8 +433,16 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
               "diagnosis.job.resume",
               "diagnosis.job.run",
               "diagnosis.job.cancel",
+              "diagnosis.handling.submit",
+              "diagnosis.handling.cancel",
+              "diagnosis.handling.execute",
+              "diagnosis.handling.recheck",
             ],
-            "operator.approvals": ["diagnosis.self-evolution.confirm"],
+            "operator.approvals": [
+              "diagnosis.self-evolution.confirm",
+              "diagnosis.handling.approve",
+              "diagnosis.handling.reject",
+            ],
           },
         } satisfies PackManifest,
       ]

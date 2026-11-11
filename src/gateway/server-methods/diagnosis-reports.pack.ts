@@ -17,6 +17,13 @@ import {
   DIAGNOSIS_JOB_RUN_METHOD,
   createDiagnosisJobGatewayHandlers,
 } from "../../diagnosis/diagnosis-job-gateway.js";
+import {
+  DIAGNOSIS_HANDLING_METHODS,
+  DIAGNOSIS_HANDLING_APPROVAL_METHODS,
+  DIAGNOSIS_HANDLING_READ_METHODS,
+  DIAGNOSIS_HANDLING_WRITE_METHODS,
+  createDiagnosisHandlingGatewayHandlers,
+} from "../../diagnosis/handling-loop-gateway.js";
 import { createInterventionGatewayHandlers } from "../../diagnosis/intervention-gateway.js";
 import {
   DIAGNOSIS_ACTION_DISPATCH_METHOD,
@@ -60,6 +67,7 @@ const METHODS = [
   DIAGNOSIS_SCHEDULE_APPLY_METHOD,
   DIAGNOSIS_SELF_EVOLUTION_CONFIRM_METHOD,
   ...DIAGNOSIS_JOB_METHODS,
+  ...DIAGNOSIS_HANDLING_METHODS,
 ] as const;
 
 export const diagnosisReportsPack = defineGatewayMethodPack({
@@ -75,6 +83,7 @@ export const diagnosisReportsPack = defineGatewayMethodPack({
       DIAGNOSIS_INTERVENTION_GET_METHOD,
       DIAGNOSIS_JOB_REPORT_GET_METHOD,
       DIAGNOSIS_JOB_DESCRIBE_METHOD,
+      ...DIAGNOSIS_HANDLING_READ_METHODS,
     ],
     // diagnosis.action.dispatch is a write/action trigger. It stays only in operator.write.
     "operator.write": [
@@ -87,8 +96,12 @@ export const diagnosisReportsPack = defineGatewayMethodPack({
       DIAGNOSIS_JOB_RESUME_METHOD,
       DIAGNOSIS_JOB_RUN_METHOD,
       DIAGNOSIS_JOB_CANCEL_METHOD,
+      ...DIAGNOSIS_HANDLING_WRITE_METHODS,
     ],
-    "operator.approvals": ["diagnosis.self-evolution.confirm"],
+    "operator.approvals": [
+      "diagnosis.self-evolution.confirm",
+      ...DIAGNOSIS_HANDLING_APPROVAL_METHODS,
+    ],
   },
   handlers: withDiagnosisEvolutionProjection({
     ...createObservationQueryHandlers(),
@@ -108,6 +121,8 @@ export const diagnosisReportsPack = defineGatewayMethodPack({
       },
     }),
     ...createDiagnosisJobGatewayHandlers(),
+    // Production registration path: refuse the isolation switch; execute stays closed.
+    ...createDiagnosisHandlingGatewayHandlers(),
   }),
 });
 

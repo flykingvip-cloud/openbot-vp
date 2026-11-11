@@ -143,3 +143,11 @@ Registry is authoritative. Contributors: codex-observe-backend (telemetry), code
 - e326397b8 adds root cooperative logical budgets: default1000 partitions/256MiB, root→partition locks, old-file plus replacement-temp accounting, rejection without deletion. Root budgeting is implemented, but is not an OS quota and cannot constrain external bypass writers. — codex-observe-contract
 - Owner final31 files/249 tests PASS; journal targeted14 PASS; project tsgo and related lint/format PASS. Counts are separate scopes, not cumulative; documentation contributor did not rerun code tests. — codex-observe-contract
 - No power-loss guarantee, production validation or full-plan completion claim. Disable journal IO before reverting these safety gates; preserve data and other task WIP. No commit, production change, push or deployment in this update. — codex-observe-contract
+
+## Administrator diagnosis loop · 2026-11-11
+
+- [x] Fresh origin/main checkout authorized; existing untracked files preserved. — codex-observe-owner
+- [x] Report requests discard stale tenant/permission/client responses; Chromium regression added. — codex-observe-owner
+- [x] Real report cases expose scoped conversation handoff and refresh/recheck actions; requests never imply repair completion. — codex-observe-owner
+- [ ] Full production repair adapters remain incomplete; isolated ActionIntent adapter is not a production executor. High-impact actions (auto-restart, data deletion, privilege expansion, doctor --fix, channel restart, skill disable, self-evolution) stay closed. — cursor-shuanggui-publish
+- [x] First verifiable isolated handling loop for diagnosis_job_paused: durable records, approval, existing diagnosis.job.resume executor, recapture via diagnosis.job.describe, and draft-PR acceptance tests. Not production enablement or live repair. — cursor-shuanggui-publish
