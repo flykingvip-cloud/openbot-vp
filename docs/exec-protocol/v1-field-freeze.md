@@ -1,0 +1,124 @@
+# 13 执行协议 v1 字段冻结补件（隔离验证剖面）
+
+实施负责人：双规发布。依据 2026-11-11 13:21（Asia/Shanghai）Owner 指令，以及既有草稿 `10-执行协议v1与任务状态机.md`。
+
+**本文的隔离验证剖面已于 2026-11-11 13:28（Asia/Shanghai）由 Owner 签收。** 这不是生产接口冻结，也不是设计已整体冻结。实现只可使用已签收的隔离剖面值；未列入或仍标 **BLOCKED** 的字段，不得擅自填默认值当作已批准。
+
+本补件不授权：修改香港 / 生产 A / 生产 B / C 宿主，接入生产凭据或生产状态，改香港回源，写生产 ledger，启动真实外部发送或付款，开发生产发布编排。
+
+A′ / B′ 指为此验证新建的隔离进程或容器，必须是两个节点，不能用 C 单机冒充跨机，也不得使用生产 A/B。测试只用合成数据和隔离凭据。
+
+## 1. 已决规则（沿用 `10` 与本次指令，不另定数值）
+
+| 项 | 已决内容 |
+| --- | --- |
+| 操作 | 提交 `submit`、查询 `status`、取消 `cancel`、成果 `artifact`；查询不得触发执行 |
+| 幂等 | 同一幂等键重复提交必须返回原任务；键相同但意图不同则 `EXEC_CONFLICT`，不得开第二跑 |
+| 取消 | 取消后的任务不得重新启动 |
+| 不可达 | B 不可达时返回明确错误或保持待执行（`accepted` / `queued` / `result_unconfirmed`）；不得改标 `succeeded`，不得回落到 A 宿主执行 |
+| 成果 | 必须带完整 SHA-256（64 位十六进制，可带 `sha256:` 前缀）和字节数；任一不一致不得进入 `succeeded`，不得交付 |
+| 断线 | 传输层可重试查询、取消通知、成果字节；不得自动重放可能产生外部副作用的执行 |
+| 重启 | A′ 重启后须从控制面记录恢复任务，或明确标为待对账（`result_unconfirmed`） |
+| 关联 | `taskId`、`toolCallId`、`artifactId` 必须可互相关联 |
+| 版本失败 | 不识别或缺少版本必须失败，不得降级到本机引擎 |
+| 错误码（语义） | `EXEC_VERSION_UNSUPPORTED`、`EXEC_UNAUTHORIZED`、`EXEC_REVOKED`、`EXEC_NOT_FOUND`、`EXEC_CONFLICT`、`EXEC_UNREACHABLE`、`EXEC_CHECKSUM_MISMATCH`、`EXEC_INTERNAL` |
+
+## 2. 最小状态机（已决名称，待签收后实现）
+
+```
+submit ──► accepted ──► queued ──► running ──┬──► (成果校验通过) ──► succeeded
+                                            ├──► failed
+                                            ├──► cancel_requested ──► cancelled
+                                            └──► 超时/断线且无法对账 ──► result_unconfirmed
+```
+
+允许的取消来源：`accepted` / `queued` / `running`（均经 `cancel_requested`）。  
+允许的失败来源：`queued` / `running`。  
+终态：`succeeded`、`failed`、`cancelled`。`result_unconfirmed` 不是成功，禁止自动重跑外部操作。
+
+终态可否被人工改回 `result_unconfirmed`：仍为 **BLOCKED**（运维修正流程未定），隔离实现不得提供该入口。
+
+## 3. 配置纪律（签收后实现必须遵守）
+
+协议监听、超时、重试、幂等保留期、取消/撤销时限、令牌校验和时钟偏差，全部来自**显式配置**。进程启动时若隔离剖面缺任一必填项，必须拒绝启动；单次调用若缺必填项，必须失败。代码中不得再藏一套「未配置就生效」的隐式默认值。
+
+隔离验证使用命名剖面 `exec-protocol-v1-isolation`。下面的数值只适用于该剖面，不外推为生产值。
+
+## 4. 必须冻结的字段
+
+| 字段 | 提案（隔离验证，待签收） | 生产 / 未决 | 依据 |
+| --- | --- | --- | --- |
+| 监听地址与端口 | B′ 只绑定非公网地址。配置项 `OPENBOT_EXEC_PROTOCOL_BIND`、`OPENBOT_EXEC_PROTOCOL_PORT` 必填。隔离剖面：`127.0.0.1` 与端口 `18790`（A′、B′ 分节点时，A′ 通过隔离网络访问 B′ 的该端口，不得对公网开放） | 生产监听网卡、隧道或私网路径仍 **BLOCKED**（香港→A 通路未签） | 现网网关为 `18789`，隔离协议口错开为 `18790`，避免与现网入口混淆 |
+| 传输编码 | HTTP/1.1；请求与响应体为 JSON，`Content-Type: application/json; charset=utf-8`；缺少必填 JSON 字段则拒绝，不得补隐式值 | 生产是否强制 mTLS、证书字段、握手超时仍 **BLOCKED** | 与现有 TypeScript 服务栈一致；最小闭环先冻结应用层编码 |
+| 隔离认证 | 请求必须带 `Authorization: Bearer <lease>`。无令牌或令牌无效返回 `EXEC_UNAUTHORIZED`。隔离剖面不实现生产 mTLS | 生产 mTLS（或等价双向认证）的证书字段、CA、轮换、登记格式仍 **BLOCKED**，不得用「跳过 TLS」冒充已冻结 | 本阶段只允许隔离凭据；mTLS 参数未定不能假装已测 |
+| 请求 / 连接超时 | `OPENBOT_EXEC_PROTOCOL_CONNECT_TIMEOUT_MS=3000`；`OPENBOT_EXEC_PROTOCOL_REQUEST_TIMEOUT_MS=5000`。超时后必须先按幂等键查询，不得换新键重开 | 生产时限 **BLOCKED** | 隔离短超时，便于验证失败路径 |
+| 执行超时 | `OPENBOT_EXEC_PROTOCOL_EXECUTION_TIMEOUT_MS=60000`。到期后：若可确认未产生外部副作用则 `failed`，否则 `result_unconfirmed`。不得标 `succeeded` | 生产执行时限 **BLOCKED** | 隔离合成任务应在 60 秒内结束；生产窗口另签 |
+| 传输重试 | 仅查询、取消通知、成果字节可重试。`OPENBOT_EXEC_PROTOCOL_MAX_TRANSPORT_RETRIES=3`（含首次共 3 次），退避 `200ms`、`400ms`、`800ms`。执行本身（含外部副作用）不得自动重试 | 生产重试次数与间隔 **BLOCKED** | 满足「断线可恢复查询、不重放外部操作」 |
+| 幂等键格式 | UTF-8；字符集 `[A-Za-z0-9._:-]`；长度 16–128；在同一 `tenantId` 下唯一。配置项记录该规则，实现按该规则校验 | — | 可读、可截断误用空格/斜杠 |
+| 幂等键保留期 | `OPENBOT_EXEC_PROTOCOL_IDEMPOTENCY_TTL_MS=86400000`（24 小时）。保留期内重复提交返回原任务；过期后同一键视为新提交前须确认旧任务已终态，否则 `EXEC_CONFLICT` | 生产保留期 **BLOCKED** | 隔离验证窗口以日计即可 |
+| 取消传播时限 | `OPENBOT_EXEC_PROTOCOL_CANCEL_DEADLINE_MS=10000`。收到取消后进入 `cancel_requested`；B′ 须在此时限内停跑并回到 `cancelled`。超时未确认则 `result_unconfirmed`，仍不得重启 | — | 有上限，避免无限「取消中」 |
+| 撤销传播时限 | 撤销立即拒绝该范围内新提交（`EXEC_REVOKED`）。已在跑的任务按取消处理，时限同上。超时未确认则 `result_unconfirmed` | 生产撤销是否另有审计或人工流程 **BLOCKED** | 先冻结最小安全行为：停新、停在途、超时报待对账 |
+| 租约 / 令牌格式 | 隔离令牌：`exec1_` + 64 位小写十六进制（32 字节随机）。服务端保存哈希、主体（A′ 身份）、可选 `tenantId`、`exp`。不采用未冻结的 JWT 声明集。TTL：`OPENBOT_EXEC_PROTOCOL_LEASE_TTL_MS=3600000`（1 小时） | 生产租约/证书映射 **BLOCKED** | 不引入额外未签 JWT 字段 |
+| 错误码与 HTTP 映射 | 见第 5 节。未列代码不得使用 | 不得另增未签收错误码 | 补齐 `10` 中仍 BLOCKED 的 HTTP 映射 |
+| 时钟偏差 | 时间一律 UTC RFC3339。`OPENBOT_EXEC_PROTOCOL_MAX_CLOCK_SKEW_MS=30000`（30 秒）。超差令牌视为无效，返回 `EXEC_UNAUTHORIZED`，不新增错误码 | 生产若有独立时间源要求 **BLOCKED** | 覆盖短暂时钟差，又不放宽到可重放过期令牌 |
+| 协议版本 | 请求与响应必带 `exec-api-version`（JSON 字段，整数）。本剖面只承认 `1`。缺失、非整数或不为 `1` → `EXEC_VERSION_UNSUPPORTED`，不得协商降级 | 未来版本的兼容矩阵仍 **BLOCKED**，不得预先实现「尽量兼容」 | 与 `10` 已选编号一致 |
+
+## 5. 错误码与 HTTP 映射（隔离剖面，待签收）
+
+| 错误码 | HTTP | 调用方动作 |
+| --- | --- | --- |
+| （成功，新受理） | 201 | 记录 `taskId` |
+| （成功，幂等命中或查询/取消/回传成功） | 200 | 以返回状态为准，不新开任务 |
+| `EXEC_VERSION_UNSUPPORTED` | 400 | 失败，不得降级本机引擎 |
+| `EXEC_UNAUTHORIZED` | 401 | 拒绝；未认证不得区分任务是否存在 |
+| `EXEC_REVOKED` | 403 | 不得新提交；在途按取消/待对账处理 |
+| `EXEC_NOT_FOUND` | 404 | 已认证但任务不在本租户范围或不存在；不得泄漏他户 |
+| `EXEC_CONFLICT` | 409 | 先查询再对账，不得换键强开 |
+| `EXEC_UNREACHABLE` | 503 | A′ 保持待执行或失败，不对 host 回落 |
+| `EXEC_CHECKSUM_MISMATCH` | 422 | 不得 `succeeded`，不得交付 |
+| `EXEC_INTERNAL` | 500 | 记入 `failed` 或 `result_unconfirmed` |
+
+客户端在对端无 HTTP 响应（连接失败、超时、TLS 失败等）时，本地归类为 `EXEC_UNREACHABLE`，行为同上。
+
+## 6. 仍为 BLOCKED、本阶段不得当作已批准来编码的项
+
+1. 生产监听地址、公网/私网/隧道方案，以及香港→A 端到端通路。
+2. 生产 mTLS 证书字段、CA、握手超时、证书轮换、调用方登记格式。
+3. 生产执行超时、生产幂等保留期、生产传输重试参数。
+4. 输入是「A 先上传再提交」还是「提交引用由 B 拉取」的**生产存储方案**。隔离剖面采用第 7 节的最小输入方式，不预签生产对象存储。
+5. 终态的人工改写流程。
+6. 云电脑代理、三层容量、发布工具适配、跨机认证头注入、生产运行时 Docker/Podman 选型。
+
+以上任一项未签收前，相关功能不得在本协议 PR 中夹带实现。
+
+## 7. 隔离最小闭环的输入与成果（随本剖面待签收）
+
+- 提交可携带内联输入（JSON 或字节，附 SHA-256 与字节数），或引用先前在隔离通道上传的 `artifactId`。B′ 不访问生产存储。
+- B′ 是执行现场与本机成果字节的权威写入者；A′ 是控制面任务记录的权威写入者。
+- 成果回传必须包含 `taskId`、`artifactId`、完整 SHA-256、字节数；A′ 校验一致后才可登记为可交付。校验失败不得 `succeeded`。
+- 隔离任务不得发起真实外部发送、付款或其他生产副作用。需要「断线不重放」的测试时，使用带记录的合成副作用探针，只在 B′ 上计数。
+
+## 8. 验收对照（签收并实现后必须证明）
+
+- 正常任务只在 B′ 执行；A′ 上不存在对应执行容器。
+- 相同幂等键不会产生第二个任务。
+- 查询、取消、重试符合第 2 节状态机。
+- B′ 不可达时无 A 宿主执行。
+- 成果 hash 或字节数不一致时不能交付。
+- 断线恢复后不会重复外部操作（以合成探针计数为准）。
+- `taskId`、`toolCallId`、`artifactId` 可关联。
+- 测试在 A′/B′ 双节点进行，不用 C 单机冒充。
+
+## 9. 签收范围
+
+第 4、5、7 节隔离剖面已确认冻结。可以开始协议最小闭环编码与单元测试，随后在 A′/B′ 做双节点验证并提交草稿 PR。
+
+确认不等于生产接口冻结，不等于基础设施变更、生产迁移、香港回源、生产 ledger 或日常版本发布已放行。
+
+## 10. 签收记录
+
+- 状态：隔离验证剖面已签收。
+- 签收人：Owner。
+- 时间：2026-11-11 13:28（Asia/Shanghai）。
+- 范围：第 4、5、7 节隔离剖面可用于协议最小闭环编码、单元测试和 A′/B′ 隔离验证。
+- 不等于生产接口冻结，不等于基础设施变更、生产迁移、香港回源、生产 ledger 或日常版本发布已放行。
