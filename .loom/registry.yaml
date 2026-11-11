@@ -12793,6 +12793,7 @@ tasks:
       - docs/exec-protocol/v1-field-freeze.md
       - docs/exec-protocol/v1-reconcile-and-retry-freeze.md
       - docs/exec-protocol/v1-two-node-isolation-plan.md
+      - docs/exec-protocol/v1-two-node-change-ticket.md
       - src/exec-protocol/**
       - .loom/registry.yaml
     state: active
@@ -12814,6 +12815,7 @@ landingStreams:
       - docs/exec-protocol/v1-field-freeze.md
       - docs/exec-protocol/v1-reconcile-and-retry-freeze.md
       - docs/exec-protocol/v1-two-node-isolation-plan.md
+      - docs/exec-protocol/v1-two-node-change-ticket.md
       - src/exec-protocol/**
     canLandWith: []
     metadata:
@@ -27845,6 +27847,10 @@ sharedPaths:
     reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
   - glob: docs/exec-protocol/v1-two-node-isolation-plan.md
+    landerTask: exec-protocol-v1-min-loop
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reviewAfter: 2026-12-31
+  - glob: docs/exec-protocol/v1-two-node-change-ticket.md
     landerTask: exec-protocol-v1-min-loop
     reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
