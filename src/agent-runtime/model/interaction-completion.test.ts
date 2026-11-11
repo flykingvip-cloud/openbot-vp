@@ -281,3 +281,32 @@ it("places semantic work-admission guidance after shared skill context", () => {
   expect(ctx.tools).toEqual([]);
   expect(mocks.complete).not.toHaveBeenCalled();
 });
+
+it("requests JSON output on the compatible completion adapter without mutating its payload", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: '{"kind":"reply","text":"ok"}' }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  await invokeInteractionCompletion(request);
+  expect(mocks.complete).toHaveBeenCalledOnce();
+  const options = mocks.complete.mock.calls[0]?.[2] as {
+    onPayload?: (payload: unknown) => unknown;
+  };
+  expect(options.onPayload).toBeTypeOf("function");
+  const payload = { messages: [{ role: "user", content: "hello" }], max_tokens: 200 };
+  expect(options.onPayload?.(payload)).toEqual({
+    ...payload,
+    response_format: { type: "json_object" },
+  });
+  expect(payload).not.toHaveProperty("response_format");
+});
+it("rejects a blank final completion rather than producing an empty reply", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: "   " }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  const result = await invokeInteractionCompletion(request);
+  expect(() => result.readDecision()).toThrow();
+});

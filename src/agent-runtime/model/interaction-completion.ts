@@ -138,6 +138,17 @@ export async function invokeInteractionCompletion(params: {
     complete(params.model, buildInteractionCompletionContext(params.input, params.model), {
       ...(params.apiKey ? { apiKey: params.apiKey } : {}),
       signal,
+      // Interpretation is a machine protocol; authorization remains in command.
+      ...(params.model.api === "openai-completions"
+        ? {
+            onPayload: (payload: unknown) => {
+              if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+                throw new Error("Invalid interaction request payload");
+              }
+              return { ...payload, response_format: { type: "json_object" } };
+            },
+          }
+        : {}),
       timeoutMs,
       maxTokens: Math.max(1, Math.floor(Math.min(params.maxTokens, params.model.maxTokens))),
     }),
@@ -157,6 +168,9 @@ export async function invokeInteractionCompletion(params: {
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("");
+      if (!text.trim()) {
+        throw new Error("本轮未取得有效的交互决定，没有启动或修改任务。");
+      }
       return readInteractionDecisionText(text);
     },
   };
