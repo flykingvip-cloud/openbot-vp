@@ -1,5 +1,43 @@
 version: 1
 tasks:
+  - id: local-ui-seams
+    owner: codex-runtime-manager
+    intent: []
+    paths:
+      - ui/src/ui/gateway-subscriptions/chat.ts
+      - ui/src/ui/views/artifact-sidebar.ts
+      - ui/src/ui/views/artifact-sidebar.node.test.ts
+      - ui/src/ui/views/artifact-sidebar-download-lane.test.ts
+      - ui/src/ui/app-gateway.node.test.ts
+      - src/agent-runtime/delivery/dispatch/complete-reply.ts
+      - src/agent-runtime/delivery/dispatch/complete-reply.test.ts
+      - src/cron/cron-result-template.ts
+      - src/cron/cron-result-template.test.ts
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/interaction-completion.test.ts
+      - src/agent-runtime/delivery/named-file-receipt.ts
+      - src/agent-runtime/delivery/named-file-receipt.test.ts
+      - src/infra/agent-events.ts
+      - src/infra/agent-events.test.ts
+      - src/agent-runtime/execution/runner/embedded-attempt.ts
+      - ui/src/ui/wiring/workspace-file-preview.ts
+      - ui/src/ui/wiring/workspace-file-preview.node.test.ts
+      - src/gateway/knowledge/deliverables/save-and-archive.ts
+      - src/gateway/knowledge/deliverables/save-and-archive.test.ts
+      - ui/src/ui/wiring/deliverable-save.ts
+      - ui/src/ui/wiring/deliverable-save.test.ts
+    state: active
+    sessions:
+      - id: local-ui-seams-20261111
+        taskId: local-ui-seams
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-11T06:13:07.262Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-11
+    metadata: {}
   - id: ft-plan-speak-shopping-positive-admission
     owner: grok-bot
     intent:
@@ -12764,40 +12802,23 @@ tasks:
     ownerHistory: []
     since: 2026-11-09
     metadata: {}
-  - id: local-ui-seams
-    owner: codex-runtime-manager
-    intent: []
+  - id: forbid-production-host-fallback
+    owner: cursor-shuanggui-publish
+    intent:
+      - Forbid host fallback when production execution mode is explicitly enabled. Missing or unreachable Docker CLI socket or B exec service must return a clear error and must not fall back to the gateway host.
     paths:
-      - ui/src/ui/gateway-subscriptions/chat.ts
-      - ui/src/ui/views/artifact-sidebar.ts
-      - ui/src/ui/views/artifact-sidebar.node.test.ts
-      - ui/src/ui/views/artifact-sidebar-download-lane.test.ts
-      - ui/src/ui/app-gateway.node.test.ts
-      - src/agent-runtime/delivery/dispatch/complete-reply.ts
-      - src/agent-runtime/delivery/dispatch/complete-reply.test.ts
-      - src/cron/cron-result-template.ts
-      - src/cron/cron-result-template.test.ts
-      - src/agent-runtime/model/interaction-completion.ts
-      - src/agent-runtime/model/interaction-completion.test.ts
-      - src/agent-runtime/delivery/named-file-receipt.ts
-      - src/agent-runtime/delivery/named-file-receipt.test.ts
-      - src/infra/agent-events.ts
-      - src/infra/agent-events.test.ts
-      - src/agent-runtime/execution/runner/embedded-attempt.ts
-      - ui/src/ui/wiring/workspace-file-preview.ts
-      - ui/src/ui/wiring/workspace-file-preview.node.test.ts
-      - src/gateway/knowledge/deliverables/save-and-archive.ts
-      - src/gateway/knowledge/deliverables/save-and-archive.test.ts
-      - ui/src/ui/wiring/deliverable-save.ts
-      - ui/src/ui/wiring/deliverable-save.test.ts
+      - src/agents/sandbox/docker-engine-client.ts
+      - src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
+      - .loom/registry.yaml
+      - src/agents/sandbox/production-execution-mode.ts
     state: active
     sessions:
-      - id: local-ui-seams-20261111
-        taskId: local-ui-seams
-        ide: codex
-        agent: codex-runtime-manager
+      - id: be8372d4-da67-461f-abd5-7a6387333c26
+        taskId: forbid-production-host-fallback
+        ide: cursor
+        agent: cursor-shuanggui-publish
         status: active
-        lastSignalAt: 2026-11-11T06:13:07.262Z
+        lastSignalAt: 2026-11-11T05:01:44.000Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-11
@@ -12811,6 +12832,18 @@ landingStreams:
     metadata:
       task: local-ui-seams
       agent: codex-runtime-manager
+  - id: forbid-production-host-fallback
+    landingPolicy: serial
+    paths:
+      - src/agents/sandbox/docker-engine-client.ts
+      - src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
+      - src/agents/sandbox/production-execution-mode.ts
+    canLandWith:
+      - pack1-msg3-admission-abort-actor-8564
+    metadata:
+      task: forbid-production-host-fallback
+      owner: cursor-shuanggui-publish
+      intent: Forbid host fallback when production execution mode is explicitly enabled
   - id: pack1-msg3-admission-abort-actor-8564
     landingPolicy: serial
     paths:
@@ -12829,7 +12862,8 @@ landingStreams:
       - src/gateway/server-methods/chat.abort-persistence.test.ts
       - src/gateway/server-methods/chat.ts
       - src/gateway/workspace/handler-bridge.ts
-    canLandWith: []
+    canLandWith:
+      - forbid-production-host-fallback
     metadata:
       task: pack1-msg3-admission-abort-actor
       agent: cursor-grok-8564
@@ -27812,6 +27846,18 @@ landingStreams:
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
 sharedPaths:
+  - glob: src/agents/sandbox/docker-engine-client.ts
+    landerTask: forbid-production-host-fallback
+    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
+    reviewAfter: 2026-12-31
+  - glob: src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
+    landerTask: forbid-production-host-fallback
+    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
+    reviewAfter: 2026-12-31
+  - glob: src/agents/sandbox/production-execution-mode.ts
+    landerTask: forbid-production-host-fallback
+    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
+    reviewAfter: 2026-12-31
   - glob: src/agent-runtime/execution/outcomes/command-outcome.test.ts
     landerTask: agent-runtime-observability:codex-observe-owner
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.

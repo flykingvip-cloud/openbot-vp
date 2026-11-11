@@ -12,6 +12,12 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
+import {
+  formatProductionHostFallbackForbiddenMessage,
+  isExecServiceUnreachableError,
+  isProductionExecutionModeEnabled,
+  type ProductionExecutionModeProbe,
+} from "./production-execution-mode.js";
 import { userFacingEntitlementPreReplyFailure } from "./user-facing-entitlement-failure.js";
 
 const log = createSubsystemLogger("docker-engine");
@@ -94,6 +100,28 @@ export function isDockerAccountWorkerUnavailableError(error: unknown): boolean {
 }
 
 /**
+ * The docker/podman socket path is missing (ENOENT). This is not a missing
+ * CLI, and it is not "socket present but connection refused".
+ */
+export function isMissingDockerSocketError(error: unknown): boolean {
+  if (error instanceof DockerEngineUnreachableError) {
+    return false;
+  }
+  const record =
+    error && typeof error === "object" ? (error as { code?: unknown; message?: unknown }) : null;
+  const code = typeof record?.code === "string" ? record.code : "";
+  const message = errorText(error);
+  if (
+    /spawn docker ENOENT|docker command was not found|"docker" command was not found/i.test(message)
+  ) {
+    return false;
+  }
+  const mentionsSocket = /(?:docker|podman)\.sock/i.test(message);
+  const missing = code === "ENOENT" || /\bENOENT\b/i.test(message);
+  return mentionsSocket && missing;
+}
+
+/**
  * Sandbox / account-worker infra that is not a per-model failure.
  * Model fallback must rethrow these instead of burning the next candidate.
  */
@@ -166,11 +194,40 @@ export type AccountWorkerDockerFailureDecision =
   | { action: "visible-error"; failure: string };
 
 /**
- * Missing client and missing socket degrade to host exec so the turn can still reply.
+ * Missing client and missing socket degrade to host exec so the turn can still reply,
+ * but only when production execution mode is not explicitly enabled.
+ * Set `OPENBOT_PRODUCTION_EXECUTION_MODE=production` to forbid that host fallback
+ * and return a visible error instead. `NODE_ENV` alone never enables this gate.
  * A mounted socket that refuses the connection, and other docker start failures,
  * stay visible errors and do not run on the host.
  */
 export function decideAccountWorkerDockerFailure(
+  error: unknown,
+  probe: ProductionExecutionModeProbe = {},
+): AccountWorkerDockerFailureDecision {
+  const decision = decideAccountWorkerDockerFailureLegacy(error);
+  if (!isProductionExecutionModeEnabled(probe)) {
+    return decision;
+  }
+  if (decision.action === "host") {
+    return {
+      action: "visible-error",
+      failure: formatProductionHostFallbackForbiddenMessage(decision.failure),
+    };
+  }
+  if (isMissingDockerSocketError(error) || isExecServiceUnreachableError(error)) {
+    const reason =
+      (decision.action === "visible-error" ? decision.failure : errorText(error)) ||
+      "Docker CLI, engine socket, or B exec service is missing or unreachable";
+    return {
+      action: "visible-error",
+      failure: formatProductionHostFallbackForbiddenMessage(reason),
+    };
+  }
+  return decision;
+}
+
+function decideAccountWorkerDockerFailureLegacy(
   error: unknown,
 ): AccountWorkerDockerFailureDecision {
   if (isDockerAccountWorkerUnavailableError(error)) {
