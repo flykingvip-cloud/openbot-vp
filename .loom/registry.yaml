@@ -12764,7 +12764,39 @@ tasks:
     ownerHistory: []
     since: 2026-11-09
     metadata: {}
+  - id: forbid-production-host-fallback
+    owner: cursor-shuanggui-publish
+    intent:
+      - Forbid host fallback when production execution mode is explicitly enabled. Missing or unreachable Docker CLI socket or B exec service must return a clear error and must not fall back to the gateway host.
+    paths:
+      - src/agents/sandbox/docker-engine-client.ts
+      - src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
+      - .loom/registry.yaml
+      - src/agents/sandbox/production-execution-mode.ts
+    state: active
+    sessions:
+      - id: be8372d4-da67-461f-abd5-7a6387333c26
+        taskId: forbid-production-host-fallback
+        ide: cursor
+        agent: cursor-shuanggui-publish
+        status: active
+        lastSignalAt: 2026-11-11T05:01:44.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-11
+    metadata: {}
 landingStreams:
+  - id: forbid-production-host-fallback
+    landingPolicy: serial
+    paths:
+      - src/agents/sandbox/docker-engine-client.ts
+      - src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
+      - src/agents/sandbox/production-execution-mode.ts
+    canLandWith: []
+    metadata:
+      task: forbid-production-host-fallback
+      owner: cursor-shuanggui-publish
+      intent: Forbid host fallback when production execution mode is explicitly enabled
   - id: pack1-msg3-admission-abort-actor-8564
     landingPolicy: serial
     paths:
@@ -27766,6 +27798,18 @@ landingStreams:
       agent: codex-runtime-manager
       purpose: Three-way registry merge preserving tasks, sessions and landing history.
 sharedPaths:
+  - glob: src/agents/sandbox/docker-engine-client.ts
+    landerTask: forbid-production-host-fallback
+    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
+    reviewAfter: 2026-12-31
+  - glob: src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
+    landerTask: forbid-production-host-fallback
+    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
+    reviewAfter: 2026-12-31
+  - glob: src/agents/sandbox/production-execution-mode.ts
+    landerTask: forbid-production-host-fallback
+    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
+    reviewAfter: 2026-12-31
   - glob: src/agent-runtime/execution/outcomes/command-outcome.test.ts
     landerTask: agent-runtime-observability:codex-observe-owner
     reason: Human-authorized exact R14 integration takeover; prior declarations and history preserved.
