@@ -1013,7 +1013,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
             : null
         : result?.reason === "production_repair_closed"
           ? "本阶段未开放生产修复；仅隔离环境可执行恢复"
-          : (result?.reason ?? "执行未完成");
+          : result?.reason === "approved_target_conflict"
+            ? "审批对象或版本已变化，请重新预览并审批后再执行"
+            : (result?.reason ?? "执行未完成");
       this.handlingRecord = result?.record ?? this.handlingRecord;
       this.handlingAdmin = result?.admin ?? this.handlingAdmin;
       await this.refreshHandling();

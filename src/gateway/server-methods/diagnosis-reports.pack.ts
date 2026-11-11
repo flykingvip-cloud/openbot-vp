@@ -121,7 +121,7 @@ export const diagnosisReportsPack = defineGatewayMethodPack({
       },
     }),
     ...createDiagnosisJobGatewayHandlers(),
-    // isolation defaults to false: execute stays closed on the live pack.
+    // Production registration path: refuse the isolation switch; execute stays closed.
     ...createDiagnosisHandlingGatewayHandlers(),
   }),
 });
