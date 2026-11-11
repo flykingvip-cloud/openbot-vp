@@ -188,6 +188,7 @@ export class GatewayBrowserClient {
   private lastSeq: number | null = null;
   private connectNonce: string | null = null;
   private connectSent = false;
+  private authenticated = false;
   private connectTimer: number | null = null;
   private reconnectTimer: number | null = null;
   private tickTimer: number | null = null;
@@ -213,6 +214,7 @@ export class GatewayBrowserClient {
 
   stop() {
     this.closed = true;
+    this.authenticated = false;
     this.socketGeneration += 1;
     this.clearReconnectTimer();
     this.stopTickWatch();
@@ -225,7 +227,7 @@ export class GatewayBrowserClient {
   }
 
   get connected() {
-    return this.ws?.readyState === WebSocket.OPEN;
+    return this.authenticated && this.ws?.readyState === WebSocket.OPEN;
   }
 
   /** WebSocket URL used for this client (ws:// or wss://). */
@@ -246,6 +248,7 @@ export class GatewayBrowserClient {
     this.clearReconnectTimer();
     this.stopTickWatch();
     this.lastSeq = null;
+    this.authenticated = false;
     const generation = ++this.socketGeneration;
     const previous = this.ws;
     this.ws = null;
@@ -277,6 +280,7 @@ export class GatewayBrowserClient {
       const reason = String(ev.reason ?? "");
       const connectError = this.pendingConnectError;
       this.pendingConnectError = undefined;
+      this.authenticated = false;
       this.stopTickWatch();
       if (this.ws === ws) {
         this.ws = null;
@@ -381,6 +385,8 @@ export class GatewayBrowserClient {
       return;
     }
     this.connectSent = true;
+    const socket = this.ws;
+    const generation = this.socketGeneration;
     if (this.connectTimer !== null) {
       window.clearTimeout(this.connectTimer);
       this.connectTimer = null;
@@ -504,8 +510,16 @@ export class GatewayBrowserClient {
     };
     this.connectedPagePath = typeof params.pagePath === "string" ? params.pagePath : undefined;
 
+    // Identity/signing is asynchronous; an old handshake must not authenticate a replacement socket.
+    if (this.ws !== socket || generation !== this.socketGeneration || this.closed) {
+      return;
+    }
     void this.request<GatewayHelloOk>("connect", params)
       .then((hello) => {
+        if (this.ws !== socket || generation !== this.socketGeneration || this.closed) {
+          return;
+        }
+        this.authenticated = true;
         this.pendingDeviceTokenRetry = false;
         this.deviceTokenRetryBudgetUsed = false;
         if (hello?.auth?.deviceToken && deviceIdentity) {
@@ -525,6 +539,9 @@ export class GatewayBrowserClient {
         this.opts.onHello?.(hello);
       })
       .catch((err: unknown) => {
+        if (this.ws !== socket || generation !== this.socketGeneration || this.closed) {
+          return;
+        }
         const connectErrorCode =
           err instanceof GatewayRequestError ? resolveGatewayErrorDetailCode(err) : null;
         const recoveryAdvice =
@@ -637,6 +654,10 @@ export class GatewayBrowserClient {
   }
 
   request<T = unknown>(method: string, params?: unknown): Promise<T> {
+    // Transport OPEN precedes authenticated hello. Never send business traffic in that window.
+    if (method !== "connect" && !this.connected) {
+      return Promise.reject(new Error("gateway not connected"));
+    }
     if (method !== "connect" && this.needsLocalSurfaceRebind()) {
       this.scheduleReconnect();
       return Promise.reject(
