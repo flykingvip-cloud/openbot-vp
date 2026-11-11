@@ -35,6 +35,7 @@ import {
 
 describe("owner-decision-card UI", () => {
   afterEach(() => {
+    localStorage.clear();
     clearOwnerDecisionDismissalsForTest();
     clearOwnerDecisionDeliveryStateForTest();
   });
@@ -967,4 +968,11 @@ describe("confirm success continuous history receipt (dismiss kept)", () => {
       }),
     ).toMatch(/^计划已确认，但派发失败：/);
   });
+});
+
+it("remembers a deferred card after module memory is cleared", () => {
+  dismissOwnerDecisionCard("persist-decision");
+  clearOwnerDecisionDismissalsForTest(true);
+  expect(isOwnerDecisionDismissed("persist-decision")).toBe(true);
+  expect(isOwnerDecisionDismissed("other-decision")).toBe(false);
 });
