@@ -14,6 +14,7 @@ import path from "node:path";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   formatProductionHostFallbackForbiddenMessage,
+  isExecServiceUnreachableError,
   isProductionExecutionModeEnabled,
   type ProductionExecutionModeProbe,
 } from "./production-execution-mode.js";
@@ -96,6 +97,28 @@ export function isDockerAccountWorkerUnavailableError(error: unknown): boolean {
   return /DOCKER_CLI_MISSING|docker command was not found|Sandbox mode requires Docker|spawn docker ENOENT|"docker" command was not found/i.test(
     message,
   );
+}
+
+/**
+ * The docker/podman socket path is missing (ENOENT). This is not a missing
+ * CLI, and it is not "socket present but connection refused".
+ */
+export function isMissingDockerSocketError(error: unknown): boolean {
+  if (error instanceof DockerEngineUnreachableError) {
+    return false;
+  }
+  const record =
+    error && typeof error === "object" ? (error as { code?: unknown; message?: unknown }) : null;
+  const code = typeof record?.code === "string" ? record.code : "";
+  const message = errorText(error);
+  if (
+    /spawn docker ENOENT|docker command was not found|"docker" command was not found/i.test(message)
+  ) {
+    return false;
+  }
+  const mentionsSocket = /(?:docker|podman)\.sock/i.test(message);
+  const missing = code === "ENOENT" || /\bENOENT\b/i.test(message);
+  return mentionsSocket && missing;
 }
 
 /**
@@ -183,10 +206,22 @@ export function decideAccountWorkerDockerFailure(
   probe: ProductionExecutionModeProbe = {},
 ): AccountWorkerDockerFailureDecision {
   const decision = decideAccountWorkerDockerFailureLegacy(error);
-  if (decision.action === "host" && isProductionExecutionModeEnabled(probe)) {
+  if (!isProductionExecutionModeEnabled(probe)) {
+    return decision;
+  }
+  if (decision.action === "host") {
     return {
       action: "visible-error",
       failure: formatProductionHostFallbackForbiddenMessage(decision.failure),
+    };
+  }
+  if (isMissingDockerSocketError(error) || isExecServiceUnreachableError(error)) {
+    const reason =
+      (decision.action === "visible-error" ? decision.failure : errorText(error)) ||
+      "Docker CLI, engine socket, or B exec service is missing or unreachable";
+    return {
+      action: "visible-error",
+      failure: formatProductionHostFallbackForbiddenMessage(reason),
     };
   }
   return decision;

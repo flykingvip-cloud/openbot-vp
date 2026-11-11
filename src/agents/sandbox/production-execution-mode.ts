@@ -42,3 +42,34 @@ export function formatProductionHostFallbackForbiddenMessage(reason: string): st
     `（${PRODUCTION_HOST_FALLBACK_FORBIDDEN_CODE}）。失败原因：${detail}`
   );
 }
+
+export const EXEC_SERVICE_UNREACHABLE_CODE = "EXEC_SERVICE_UNREACHABLE";
+
+/**
+ * The B execution service is missing or cannot be reached.
+ * Production execution mode must surface this as EXEC_UNREACHABLE and
+ * must not fall back to the gateway host. This class is the classifier
+ * hook only; it does not implement the later execution protocol.
+ */
+export class ExecServiceUnreachableError extends Error {
+  readonly code = EXEC_SERVICE_UNREACHABLE_CODE;
+
+  constructor(
+    detail = "B exec service is unreachable (connection refused to the Path B execution endpoint)",
+  ) {
+    super(detail);
+    this.name = "ExecServiceUnreachableError";
+  }
+}
+
+export function isExecServiceUnreachableError(error: unknown): boolean {
+  if (error instanceof ExecServiceUnreachableError) {
+    return true;
+  }
+  const record =
+    error && typeof error === "object" ? (error as { code?: unknown; name?: unknown }) : null;
+  if (record?.name === "ExecServiceUnreachableError") {
+    return true;
+  }
+  return record?.code === EXEC_SERVICE_UNREACHABLE_CODE;
+}

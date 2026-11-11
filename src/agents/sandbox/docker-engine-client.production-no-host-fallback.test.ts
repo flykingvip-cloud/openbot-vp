@@ -7,6 +7,7 @@ import {
   type AccountWorkerDockerFailureDecision,
 } from "./docker-engine-client.js";
 import {
+  ExecServiceUnreachableError,
   formatProductionHostFallbackForbiddenMessage,
   isProductionExecutionModeEnabled,
   PRODUCTION_EXECUTION_MODE_ENV,
@@ -39,9 +40,11 @@ const socketRefused = new DockerEngineUnreachableError(
   "/var/run/docker.sock",
   "ECONNREFUSED: connect ECONNREFUSED",
 );
-const execServiceUnreachable = new Error(
-  "B exec service is unreachable (connection refused to the Path B execution endpoint)",
-);
+const execServiceUnreachable = new ExecServiceUnreachableError();
+const missingSocket = Object.assign(new Error("connect ENOENT /var/run/docker.sock"), {
+  code: "ENOENT",
+});
+const productionEnv = { [PRODUCTION_EXECUTION_MODE_ENV]: PRODUCTION_EXECUTION_MODE_VALUE };
 
 describe("isProductionExecutionModeEnabled", () => {
   it("enables only the explicit OPENBOT_PRODUCTION_EXECUTION_MODE=production value", () => {
@@ -184,29 +187,49 @@ describe("decideAccountWorkerDockerFailure production host-fallback gate", () =>
     expect(result.status).not.toBe("completed");
   });
 
-  it("does not treat a docker.sock ENOENT as host fallback in either mode", () => {
-    const error = Object.assign(new Error("connect ENOENT /var/run/docker.sock"), {
-      code: "ENOENT",
-    });
-    expect(decideAccountWorkerDockerFailure(error, { env: {} }).action).not.toBe("host");
-    expect(
-      decideAccountWorkerDockerFailure(error, {
-        env: { [PRODUCTION_EXECUTION_MODE_ENV]: PRODUCTION_EXECUTION_MODE_VALUE },
-      }).action,
-    ).not.toBe("host");
+  it("production execution mode: a missing docker.sock returns EXEC_UNREACHABLE and does not run a host command", () => {
+    const hostExec = vi.fn();
+    const legacy = decideAccountWorkerDockerFailure(missingSocket, { env: {} });
+    expect(legacy.action).not.toBe("host");
+    if (legacy.action === "visible-error") {
+      expect(legacy.failure).not.toContain(PRODUCTION_HOST_FALLBACK_FORBIDDEN_CODE);
+    }
+
+    const decision = decideAccountWorkerDockerFailure(missingSocket, { env: productionEnv });
+    expect(decision.action).toBe("visible-error");
+    if (decision.action === "visible-error") {
+      expect(decision.failure).toContain(PRODUCTION_HOST_FALLBACK_FORBIDDEN_CODE);
+      expect(decision.failure).toContain("ENOENT");
+      expect(decision.failure).toContain("/var/run/docker.sock");
+    }
+    const result = dispatchLikeSandboxContext(decision, hostExec);
+    expect(result.executedOnHost).toBe(false);
+    expect(hostExec).not.toHaveBeenCalled();
+    expect(result.status).toBe("failed");
+    expect(result.status).not.toBe("completed");
+    expect(result.reason).toContain(PRODUCTION_HOST_FALLBACK_FORBIDDEN_CODE);
   });
 
-  it("does not run a host command when the B exec service is unreachable", () => {
+  it("production execution mode: an unreachable B exec service returns EXEC_UNREACHABLE and does not run a host command", () => {
     const hostExec = vi.fn();
     const legacy = decideAccountWorkerDockerFailure(execServiceUnreachable, { env: {} });
-    const production = decideAccountWorkerDockerFailure(execServiceUnreachable, {
-      env: { [PRODUCTION_EXECUTION_MODE_ENV]: PRODUCTION_EXECUTION_MODE_VALUE },
-    });
+    expect(legacy.action).toBe("raise");
     expect(legacy.action).not.toBe("host");
-    expect(production.action).not.toBe("host");
-    expect(dispatchLikeSandboxContext(legacy, hostExec).executedOnHost).toBe(false);
-    expect(dispatchLikeSandboxContext(production, hostExec).executedOnHost).toBe(false);
+
+    const decision = decideAccountWorkerDockerFailure(execServiceUnreachable, {
+      env: productionEnv,
+    });
+    expect(decision.action).toBe("visible-error");
+    if (decision.action === "visible-error") {
+      expect(decision.failure).toContain(PRODUCTION_HOST_FALLBACK_FORBIDDEN_CODE);
+      expect(decision.failure).toContain("B exec service is unreachable");
+    }
+    const result = dispatchLikeSandboxContext(decision, hostExec);
+    expect(result.executedOnHost).toBe(false);
     expect(hostExec).not.toHaveBeenCalled();
+    expect(result.status).toBe("failed");
+    expect(result.status).not.toBe("completed");
+    expect(result.reason).toContain(PRODUCTION_HOST_FALLBACK_FORBIDDEN_CODE);
   });
 
   it("still raises non-docker failures instead of marking them complete on the host", () => {
