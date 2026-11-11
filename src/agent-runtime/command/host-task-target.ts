@@ -6,6 +6,7 @@
  */
 import type { InteractionTaskTarget } from "../contracts/interaction.js";
 import type { SessionTaskBoard } from "../contracts/task.js";
+import { isTaskTombstoned } from "../policy/index.js";
 import { taskMatchesResetGeneration } from "../state/mutations/session-reset-focus.js";
 
 export const UNBOUND_TASK_TARGET_CLARIFY =
@@ -13,7 +14,7 @@ export const UNBOUND_TASK_TARGET_CLARIFY =
 
 export function hostBoundTaskTarget(board: SessionTaskBoard): InteractionTaskTarget | undefined {
   const current = board.current;
-  if (!current?.unfinished || !current.taskId) {
+  if (!current?.taskId || isTaskTombstoned(board, current.taskId)) {
     return undefined;
   }
   if (!taskMatchesResetGeneration(current, board)) {
