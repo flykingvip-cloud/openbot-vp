@@ -2,8 +2,9 @@ import { html, render } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import { buildCapacitySnapshot } from "../../../../../src/observation/capacity-snapshot.js";
 import type { GatewayBrowserClient } from "../../gateway.ts";
-import { clearRuntimeObservations, recordRuntimeObservation } from "../../runtime-observation.ts";
+import type { OpenBotObservationWorkbench } from "../../observation/workbench.ts";
 import "./diagnosis-panel.ts";
+import { clearRuntimeObservations, recordRuntimeObservation } from "../../runtime-observation.ts";
 import type { OpenBotDiagnosisPanel } from "./diagnosis-panel.ts";
 
 function waitFor(assertion: () => void, at = performance.now()): Promise<void> {
@@ -69,7 +70,8 @@ describe("diagnosis panel observation origin", () => {
     render(
       html`<openbot-diagnosis-panel
       role="enterprise" tenant-id="t1"
-      .client=${client} .targets=${targets} .observationHost=${host} connected
+      .client=${client} .targets=${targets} .observationHost=${host}
+      .scopes=${["operator.read"]} connected
     ></openbot-diagnosis-panel>`,
       container,
     );
@@ -301,7 +303,7 @@ describe("platform observation boundary", () => {
       false,
     );
     panel.taskOutcomeRef = { taskId: "restricted-task", agentId: "main", outcomeVersion: 1 };
-    await waitFor(() => expect(panel.textContent).toContain("查询失败或读取权限不可用"));
+    await waitFor(() => expect(panel.textContent).toContain("当前授权范围内未找到匹配记录"));
     expect(panel.querySelector('[aria-label="运行证据投影"] article')).toBeNull();
     panel.remove();
   });
@@ -1069,4 +1071,56 @@ it("shows the paused-job handling preview in admin language and never offers 立
   expect(container.querySelector("[data-testid=diagnosis-resolution-actions]")).not.toBeNull();
   expect(container.textContent).toContain("交给所选数字人处理");
   container.remove();
+});
+
+describe("diagnosis panel tenant grant host wiring", () => {
+  it("forwards server-confirmed tenantGrants to the workbench and does not invent them when omitted", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    render(
+      html`<openbot-diagnosis-panel
+        role="enterprise"
+        tenant-id="t1"
+        .scopes=${["operator.read"]}
+        .tenantGrants=${{ t1: "granted", t2: "none", t3: "unknown" }}
+        connected
+      ></openbot-diagnosis-panel>`,
+      container,
+    );
+    await customElements.whenDefined("openbot-diagnosis-panel");
+    const panel = container.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
+    await panel.updateComplete;
+    await waitFor(() =>
+      expect(panel.querySelector("openbot-observation-workbench")).not.toBeNull(),
+    );
+    const workbench = panel.querySelector(
+      "openbot-observation-workbench",
+    ) as OpenBotObservationWorkbench;
+    await workbench.updateComplete;
+    expect(workbench.tenantGrants).toEqual({ t1: "granted", t2: "none", t3: "unknown" });
+    container.remove();
+
+    const omitted = document.createElement("div");
+    document.body.append(omitted);
+    render(
+      html`<openbot-diagnosis-panel
+        role="enterprise"
+        tenant-id="t1"
+        .scopes=${["operator.read"]}
+        connected
+      ></openbot-diagnosis-panel>`,
+      omitted,
+    );
+    const omittedPanel = omitted.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
+    await omittedPanel.updateComplete;
+    await waitFor(() =>
+      expect(omittedPanel.querySelector("openbot-observation-workbench")).not.toBeNull(),
+    );
+    const omittedWorkbench = omittedPanel.querySelector(
+      "openbot-observation-workbench",
+    ) as OpenBotObservationWorkbench;
+    await omittedWorkbench.updateComplete;
+    expect(omittedWorkbench.tenantGrants).toBeNull();
+    omitted.remove();
+  });
 });

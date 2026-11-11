@@ -12808,6 +12808,25 @@ tasks:
     ownerHistory: []
     since: 2026-11-11
     metadata: {}
+  - id: prod-adapt-1plus3
+    owner: cursor-shuanggui-publish
+    intent:
+      - Freeze then implement 1+3 production adaptation interfaces (mutual auth and tenant revocation, production config validation and failure closure, cloud-PC proxy mutex integration, three-layer capacity admission, and A/B deploy definition plus release composition). Production enablement stays refused until independent review. Does not steal deploy/production or src/browser ownership.
+    paths:
+      - docs/exec-protocol/v1-production-interface-freeze.md
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: 92b2f04f-de94-4117-a07b-b865838ddfde
+        taskId: prod-adapt-1plus3
+        ide: cursor
+        agent: cursor-shuanggui-publish
+        status: active
+        lastSignalAt: 2026-11-11T08:47:48.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-11
+    metadata: {}
 landingStreams:
   - id: exec-protocol-v1-min-loop
     landingPolicy: serial
@@ -12822,6 +12841,15 @@ landingStreams:
       task: exec-protocol-v1-min-loop
       owner: cursor-shuanggui-publish
       intent: Isolated execution protocol v1 minimal loop
+  - id: prod-adapt-1plus3
+    landingPolicy: serial
+    paths:
+      - docs/exec-protocol/v1-production-interface-freeze.md
+    canLandWith: []
+    metadata:
+      task: prod-adapt-1plus3
+      owner: cursor-shuanggui-publish
+      intent: 1+3 production adaptation interface freeze
   - id: forbid-production-host-fallback
     landingPolicy: serial
     paths:
@@ -27853,6 +27881,10 @@ sharedPaths:
   - glob: docs/exec-protocol/v1-two-node-change-ticket.md
     landerTask: exec-protocol-v1-min-loop
     reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reviewAfter: 2026-12-31
+  - glob: docs/exec-protocol/v1-production-interface-freeze.md
+    landerTask: prod-adapt-1plus3
+    reason: Human-authorized 1+3 production adaptation interface freeze. Exact-path lander is prod-adapt-1plus3 (cursor-shuanggui-publish). Does not take over deploy/production, src/browser, or exec-protocol-v1-min-loop paths.
     reviewAfter: 2026-12-31
   - glob: src/agents/sandbox/docker-engine-client.ts
     landerTask: forbid-production-host-fallback

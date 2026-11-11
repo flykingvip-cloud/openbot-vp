@@ -7,6 +7,13 @@ type ReasoningView = Extract<
 >["reasoningPass"];
 import { createAuthorizationDecisionRefresh } from "../../../../../src/diagnosis/visualization.ts";
 import type { GatewayBrowserClient } from "../../gateway.ts";
+import {
+  PRECISE_QUERY_MISS_COPY,
+  hasObservationReadScope,
+  preciseQueryMissCopy,
+  resolveObservationAuthorized,
+  type TenantGrant,
+} from "../../observation/access-state.ts";
 import { hasComparisonRefs } from "../../observation/comparison-capacity-panel.ts";
 import type {
   CapacityView,
@@ -15,6 +22,7 @@ import type {
 } from "../../observation/comparison-capacity-panel.ts";
 import type { EvidenceProjection } from "../../observation/evidence-model.ts";
 import { renderObservationEvidence } from "../../observation/evidence-panel.ts";
+import { isCurrentObservationResponse } from "../../observation/request-isolation.ts";
 import {
   renderObservationWorkbench,
   type ObservationActionIntents,
@@ -201,6 +209,8 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @property({ attribute: "tenant-id" }) tenantId: string | null = null;
   @property({ attribute: false }) targets: DiagnosisTargetOption[] = [];
   @property({ attribute: false }) scopes: readonly string[] | null = null;
+  /** Server-confirmed tenant grants; omitted or missing keys stay unconfirmed. */
+  @property({ attribute: false }) tenantGrants: Readonly<Record<string, TenantGrant>> | null = null;
   @property({ attribute: false }) sessionKind: string | null = null;
   @property({ attribute: false }) gatewayMethods: readonly string[] | null = null;
   @property({ type: Boolean }) connected = false;
@@ -384,6 +394,30 @@ export class OpenBotDiagnosisPanel extends LitElement {
       this.comparisonRefs,
     ]);
   }
+  private isObservationQueryAuthorized() {
+    return (
+      this.connected &&
+      Boolean(this.client?.connected) &&
+      Boolean(this.gatewayMethods?.includes("diagnosis.observation.query")) &&
+      hasObservationReadScope(this.scopes)
+    );
+  }
+  private isCurrentEvidenceResponse(
+    generation: number,
+    fingerprint: string,
+    client: GatewayBrowserClient | null,
+  ) {
+    return isCurrentObservationResponse(
+      { generation, fingerprint },
+      {
+        generation: this.evidenceGeneration,
+        fingerprint: this.evidenceFingerprint(),
+        connected: this.isConnected && this.connected,
+        authorized: this.isObservationQueryAuthorized(),
+        sameClient: client === this.client,
+      },
+    );
+  }
   willUpdate(changed: Map<string | number | symbol, unknown>) {
     if (
       [
@@ -459,33 +493,26 @@ export class OpenBotDiagnosisPanel extends LitElement {
           ...(hasComparisonRefs(this.comparisonRefs) ? { comparison: this.comparisonRefs } : {}),
         })
         .then((result) => {
-          if (
-            generation !== this.evidenceGeneration ||
-            !this.isConnected ||
-            client !== this.client ||
-            fingerprint !== this.evidenceFingerprint()
-          ) {
+          if (!this.isCurrentEvidenceResponse(generation, fingerprint, client)) {
             return;
           }
           this.observationEvidence = result;
           this.actionIntents = result.actionIntents ?? null;
           this.capacity = result.capacity ?? null;
           this.comparison = result.comparison ?? null;
-          this.observationEvidenceNote = "已读取任务结果；连接记录仅说明执行过程，不代表任务成功";
+          this.observationEvidenceNote = result.samples?.length
+            ? "只读结果证据；连接流仍为 execution_only"
+            : PRECISE_QUERY_MISS_COPY;
         })
-        .catch(() => {
-          if (
-            generation !== this.evidenceGeneration ||
-            client !== this.client ||
-            fingerprint !== this.evidenceFingerprint()
-          ) {
+        .catch((err: unknown) => {
+          if (!this.isCurrentEvidenceResponse(generation, fingerprint, client)) {
             return;
           }
           this.observationEvidence = null;
           this.actionIntents = null;
           this.capacity = null;
           this.comparison = null;
-          this.observationEvidenceNote = "业务结果未知 · 查询失败或读取权限不可用";
+          this.observationEvidenceNote = preciseQueryMissCopy(err) ?? "业务结果未知 · 查询失败";
         });
     }
   }
@@ -922,7 +949,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
   }
 
   private renderPlatformTaskInput() {
-    return html`<fieldset aria-label="平台精确任务证据查询"><legend>精确任务结果引用</legend><p>请填写数字人、任务及结果版本；平台身份不代表跨租户读取授权。</p>${(
+    return html`<fieldset aria-label="平台精确任务证据查询"><legend>精确任务结果引用</legend><p>请填写稳定 agentId、任务及结果版本；正式名称不用于查询关联。平台身份不代表跨租户读取授权。</p>${(
       [
         ["agent", "数字人", this.agentIdDraft],
         ["id", "任务", this.taskIdDraft],
@@ -1182,6 +1209,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
             });
           },
           connected: this.connected,
+          scopes: this.scopes,
+          authorized: resolveObservationAuthorized({ scopes: this.scopes }),
+          tenantGrants: this.tenantGrants,
           actionIntents: this.actionIntents,
           capacity: this.capacity,
           comparison: this.comparison,

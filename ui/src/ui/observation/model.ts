@@ -16,6 +16,8 @@ export type ObservationEnterpriseEntry = {
   tenantId: string;
   label: string;
   status: string;
+  /** Server-confirmed tenant authorization. Omit or use unknown until the server returns. */
+  tenantGrant?: "granted" | "none" | "unknown";
   plan?: string;
   healthSummary?: {
     label?: string;

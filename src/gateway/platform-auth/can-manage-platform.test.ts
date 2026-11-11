@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { EnterpriseSeatAssetsStore } from "../enterprise-seat-assets-store.js";
-import { canManagePlatform } from "./auth-helpers.js";
+import { canManagePlatform, canReadPlatformEnterpriseDirectory } from "./auth-helpers.js";
 import { buildPlatformAuthState } from "./session-context.js";
 import type {
+  PlatformAuthEnterprise,
   PlatformAuthSessionContext,
   PlatformAuthStore,
   PlatformAuthUser,
@@ -45,6 +46,30 @@ describe("canManagePlatform", () => {
   it("does not grant on the bare string admin scope", () => {
     expect(canManagePlatform(user({ scopes: ["admin"] }))).toBe(false);
   });
+
+  it("does not grant canManagePlatform for operator.read only", () => {
+    expect(canManagePlatform(user({ scopes: ["operator.read"] }))).toBe(false);
+  });
+});
+
+describe("canReadPlatformEnterpriseDirectory", () => {
+  it("grants operator.read without canManagePlatform or a platform role", () => {
+    const reader = user({ scopes: ["operator.read"] });
+    expect(canManagePlatform(reader)).toBe(false);
+    expect(canReadPlatformEnterpriseDirectory(reader)).toBe(true);
+  });
+
+  it("grants from session scopes when the user record omits operator.read", () => {
+    const reader = user({ scopes: [] });
+    expect(canReadPlatformEnterpriseDirectory(reader)).toBe(false);
+    expect(canReadPlatformEnterpriseDirectory(reader, ["operator.read"])).toBe(true);
+    expect(canManagePlatform(reader)).toBe(false);
+  });
+
+  it("does not invent a read grant from unrecognized scopes", () => {
+    expect(canReadPlatformEnterpriseDirectory(user({ scopes: ["admin"] }))).toBe(false);
+    expect(canReadPlatformEnterpriseDirectory(null)).toBe(false);
+  });
 });
 
 describe("buildPlatformAuthState canManagePlatform", () => {
@@ -59,11 +84,31 @@ describe("buildPlatformAuthState canManagePlatform", () => {
   };
   const seatStore = { version: 1, seats: {} } as unknown as EnterpriseSeatAssetsStore;
 
-  async function stateFor(platformUser: PlatformAuthUser) {
+  const directoryEnterprise: PlatformAuthEnterprise = {
+    id: "tenant-read",
+    name: "只读观测企业",
+    slug: "readonly",
+    status: "paid",
+    plan: "standard",
+    billingStatus: "ok",
+    seatQuota: 10,
+    seatUsed: 1,
+    createdSource: "platform-created",
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+
+  async function stateFor(
+    platformUser: PlatformAuthUser,
+    options: {
+      enterprises?: Record<string, PlatformAuthEnterprise>;
+      sessionKind?: PlatformAuthSessionContext["sessionKind"];
+    } = {},
+  ) {
     const store = {
       version: 1,
       users: { [platformUser.id]: platformUser },
-      enterprises: {},
+      enterprises: options.enterprises ?? {},
       memberships: {},
       sessions: {},
       activationCodes: {},
@@ -90,7 +135,8 @@ describe("buildPlatformAuthState canManagePlatform", () => {
         scopes: [...platformUser.scopes],
       },
       sessionKind:
-        platformUser.platformRole === "super-admin" ? "platform-super-admin" : "platform-admin",
+        options.sessionKind ??
+        (platformUser.platformRole === "super-admin" ? "platform-super-admin" : "platform-admin"),
       domain: "platform",
     } as unknown as PlatformAuthSessionContext;
     return buildPlatformAuthState({
@@ -119,5 +165,45 @@ describe("buildPlatformAuthState canManagePlatform", () => {
     const state = await stateFor(user({ platformRole: "super-admin", scopes: [] }));
     expect(state.canManagePlatform).toBe(true);
     expect(state.canManagePlatformAdmins).toBe(true);
+  });
+
+  it("emits granted tenant directory for operator.read without canManagePlatform", async () => {
+    const reader = user({ scopes: ["operator.read"] });
+    expect(canManagePlatform(reader)).toBe(false);
+    const state = await stateFor(reader, {
+      enterprises: { [directoryEnterprise.id]: directoryEnterprise },
+    });
+    expect(state.canManagePlatform).toBeUndefined();
+    expect(state.platformPolicy).toBeUndefined();
+    expect(state.trialApplications).toBeUndefined();
+    expect(state.pendingAdminActivations).toBeUndefined();
+    expect(state.platformEnterprises).toEqual([
+      expect.objectContaining({
+        id: "tenant-read",
+        name: "只读观测企业",
+        tenantGrant: "granted",
+      }),
+    ]);
+    expect(state.platformEnterprises?.some((entry) => entry.tenantGrant === "none")).toBe(false);
+  });
+
+  it("does not emit the platform directory for an employee session with operator.read", async () => {
+    const reader = user({ scopes: ["operator.read"] });
+    const state = await stateFor(reader, {
+      enterprises: { [directoryEnterprise.id]: directoryEnterprise },
+      sessionKind: "member",
+    });
+    expect(state.canManagePlatform).toBeUndefined();
+    expect(state.platformEnterprises).toBeUndefined();
+  });
+
+  it("does not invent a directory or no_grant when operator.read is absent", async () => {
+    const state = await stateFor(user({ scopes: [] }), {
+      enterprises: { [directoryEnterprise.id]: directoryEnterprise },
+    });
+    // sessionKind defaults to platform-admin here, but empty scopes and no
+    // platformRole are neither canManagePlatform nor operator.read.
+    expect(state.canManagePlatform).toBeUndefined();
+    expect(state.platformEnterprises).toBeUndefined();
   });
 });
