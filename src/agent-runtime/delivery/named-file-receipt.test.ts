@@ -103,3 +103,14 @@ describe("named file delivery receipt", () => {
     expect(namedFileReceiptsToArtifactFields(receipts).artifact).toBeTruthy();
   });
 });
+
+it("registers every requested format when an explicit name and a second filename coexist", () => {
+  const names = candidateNamedFilesFromTurn(["文件名为 guide.md 和 guide.html，保留两种格式"]);
+  expect(names).toEqual(["guide.md", "guide.html"]);
+  const workspaceDir = tempWorkspace();
+  fs.writeFileSync(path.join(workspaceDir, "guide.md"), "# Guide");
+  fs.writeFileSync(path.join(workspaceDir, "guide.html"), "<h1>Guide</h1>");
+  const receipts = collectNamedFileReceipts({ workspaceDir, relativePaths: names });
+  expect(receipts).toHaveLength(2);
+  expect(receipts.every((receipt) => receipt.accessible)).toBe(true);
+});
