@@ -3707,6 +3707,8 @@ async function runGroupBotDiscussionTurn(params: {
         MessageThreadId: messageThreadId,
         ChatType: "group",
         CommandAuthorized: true,
+        // Preserve inbound identity separately from this member execution run.
+        MessageSidFull: params.clientRunId,
         MessageSid: runId,
         SenderId: platformSenderId || clientInfo?.id,
         SenderName: platformSenderLabel,

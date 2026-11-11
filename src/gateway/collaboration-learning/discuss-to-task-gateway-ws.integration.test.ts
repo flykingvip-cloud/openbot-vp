@@ -547,9 +547,14 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         resolveDeliveryAclActor.mockResolvedValue("human:owner");
 
         let coordinatorContextOk = false;
+        const memberSources: unknown[] = [];
         replySpy.mockImplementation(async (ctx) => {
           const record = ctx as Record<string, unknown>;
           const blob = JSON.stringify(record);
+          if (record.CollaborationRoundInvoked === true) {
+            memberSources.push(record.MessageSidFull);
+            expect(record.MessageSid).not.toBe(record.MessageSidFull);
+          }
           if (
             blob.includes("正式任务入口回执") ||
             blob.includes("必须绑定") ||
@@ -636,6 +641,8 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         // Coordinator context: collaboration round bot turn ran after formal entry
         // (group + bot stamped); durable task + source binding already asserted above.
         expect(coordinatorContextOk).toBe(true);
+        expect(memberSources.length).toBeGreaterThan(0);
+        expect(memberSources.every((source) => source === idem)).toBe(true);
         expect(replySpy.mock.calls.length).toBeGreaterThan(0);
 
         collector.stop();
