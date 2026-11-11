@@ -17,6 +17,17 @@ import { pathForTab } from "../navigation.ts";
 import type { DiagnosisTargetOption } from "../ports/diagnosis/diagnosis-targets.ts";
 import { readRuntimeObservations } from "../runtime-observation.ts";
 import {
+  AUTH_INVALID_COPY,
+  accessibleRuns,
+  applyDrawerParams,
+  currentAuthorization,
+  metricScopeHint,
+  readDrawerRequest,
+  resolveDrawerSelection,
+  resolveObservationAuthorized,
+  type ObservationAccessInput,
+} from "./access-state.ts";
+import {
   emptyObservation,
   OBSERVATION_TYPES,
   reasonLabel,
@@ -25,7 +36,11 @@ import {
   type ObservationView,
 } from "./model.ts";
 import { observationSamples, SAMPLE_ENTERPRISE_DIRECTORY } from "./samples.ts";
-import { buildObservationStream, type ObservationStreamMetricKey } from "./stream.ts";
+import {
+  buildObservationStream,
+  type ObservationStreamMetricKey,
+  type ObservationStreamView,
+} from "./stream.ts";
 
 export type ObservationProps = {
   role: "platform" | "enterprise";
@@ -43,6 +58,11 @@ export type ObservationProps = {
   comparison?: ComparisonView | null;
   onComparisonRefs?: (refs: ComparisonRefs | null) => void;
   onSelectActionIntent?: (intentId: string, revision: number) => void;
+  /** Server-confirmed scopes; URL or client role never grant access. */
+  scopes?: readonly string[] | null;
+  authorized?: boolean;
+  initialRunId?: string | null;
+  initialDrawer?: boolean;
 };
 export function renderObservationWorkbench(props: ObservationProps) {
   return html`<openbot-observation-workbench
@@ -54,6 +74,8 @@ export function renderObservationWorkbench(props: ObservationProps) {
     .capacity=${props.capacity ?? null} .comparison=${props.comparison ?? null}
     .actionIntents=${props.actionIntents ?? null} .onSelectActionIntent=${props.onSelectActionIntent ?? null}
     .onDiagnoseRun=${props.onDiagnoseRun ?? null}
+    .scopes=${props.scopes ?? null} .authorized=${props.authorized ?? true}
+    .initialRunId=${props.initialRunId ?? null} .initialDrawer=${props.initialDrawer ?? false}
   ></openbot-observation-workbench>`;
 }
 
@@ -96,9 +118,18 @@ export class OpenBotObservationWorkbench extends LitElement {
   @state() private changeCount = 0;
   @state() private metricFilter = "all";
   @state() private expanded = false;
+  @state() private accessNotice: string | null = null;
+  @property({ attribute: false }) scopes: readonly string[] | null = null;
+  @property({ type: Boolean }) authorized = true;
+  @property({ attribute: false }) initialRunId: string | null = null;
+  @property({ type: Boolean }) initialDrawer = false;
   private frozenView: ObservationView | null = null;
+  private frozenStream: ObservationStreamView | null = null;
   private lastFingerprint = "";
   private pendingStreamUpdate = false;
+  private requestedRunId: string | null = null;
+  private requestedDrawer = false;
+  private drawerRequestInitialized = false;
 
   createRenderRoot() {
     return this;
@@ -106,9 +137,22 @@ export class OpenBotObservationWorkbench extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.tick = 0;
+    this.captureDrawerRequest();
     this.poll = window.setInterval(() => {
       this.tick++;
     }, 1000);
+  }
+  willUpdate(changed: Map<string | number | symbol, unknown>) {
+    // Skip the first update: every property is "changed" on connect, including
+    // a directly supplied run/drawer request that must still be access-checked.
+    if (!this.hasUpdated) {
+      return;
+    }
+    if (
+      ["role", "tenantId", "sessionKey", "scopes", "authorized"].some((key) => changed.has(key))
+    ) {
+      this.clearSensitiveObservation();
+    }
   }
   disconnectedCallback() {
     if (this.poll !== undefined) {
@@ -118,6 +162,92 @@ export class OpenBotObservationWorkbench extends LitElement {
     super.disconnectedCallback();
   }
   private poll: number | undefined;
+  private captureDrawerRequest() {
+    if (this.drawerRequestInitialized) {
+      return;
+    }
+    const fromUrl =
+      typeof window === "undefined"
+        ? { runId: null, drawer: false }
+        : readDrawerRequest(window.location.search);
+    this.requestedRunId = this.initialRunId ?? fromUrl.runId;
+    this.requestedDrawer = this.initialDrawer || fromUrl.drawer;
+    this.drawerRequestInitialized = true;
+  }
+  private isAuthorized() {
+    return resolveObservationAuthorized({ authorized: this.authorized, scopes: this.scopes });
+  }
+  private accessInput(): ObservationAccessInput {
+    return {
+      authorized: this.isAuthorized(),
+      role: this.role,
+      actorTenantId: this.tenantId,
+      tenantFilter: this.tenantFilter,
+      tenantGrant: "unknown",
+    };
+  }
+  private clearSensitiveObservation() {
+    this.selected = null;
+    this.expanded = false;
+    this.frozenView = null;
+    this.frozenStream = null;
+    this.paused = false;
+    this.pendingStreamUpdate = false;
+    this.requestedRunId = null;
+    this.requestedDrawer = false;
+    this.accessNotice = this.isAuthorized() ? null : AUTH_INVALID_COPY;
+    this.syncDrawerUrl({ runId: null, drawer: false });
+  }
+  private syncDrawerUrl(request: { runId: string | null; drawer: boolean }) {
+    if (typeof window === "undefined" || typeof window.history?.replaceState !== "function") {
+      return;
+    }
+    const next = applyDrawerParams(window.location.search, request);
+    const current = window.location.search || "";
+    if (next === current) {
+      return;
+    }
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${next}${window.location.hash}`,
+    );
+  }
+  private buildLiveStream(view: ObservationView): ObservationStreamView {
+    const unmapped = this.role === "platform" && this.tenantFilter !== "all";
+    return buildObservationStream({
+      connected: view.connected,
+      snapshot:
+        this.source === "live" && !unmapped
+          ? readRuntimeObservations(this.observationHost ?? {}, this.sessionKey ?? "")
+          : null,
+      sessionKey: view.sessionKey,
+    });
+  }
+  private streamFor(view: ObservationView): ObservationStreamView {
+    if (this.paused && this.frozenStream) {
+      return this.frozenStream;
+    }
+    return this.buildLiveStream(view);
+  }
+  private applyMetricFilter(runs: readonly ObservationRun[]): ObservationRun[] {
+    if (this.metricFilter === "sequence_or_link_gaps") {
+      return runs.filter((row) => row.reasons.length);
+    }
+    if (this.metricFilter === "active_runs") {
+      return runs.filter((row) => row.toolState === "running" || row.toolState === "waiting");
+    }
+    if (this.metricFilter === "business_acceptance") {
+      return runs.filter((row) => row.outcomeState === "accepted");
+    }
+    if (this.metricFilter === "run_completion_rate") {
+      return runs.filter((row) => row.latencyMs !== null);
+    }
+    if (this.metricFilter === "attributed_cost") {
+      return [];
+    }
+    return [...runs];
+  }
   private view(): ObservationView {
     void this.tick;
     return this.source === "sample"
@@ -158,11 +288,16 @@ export class OpenBotObservationWorkbench extends LitElement {
     if (value === "sample" || value === "live") {
       this.source = value;
       this.selected = null;
+      this.expanded = false;
       this.tenantFilter = "all";
       this.paused = false;
       this.frozenView = null;
+      this.frozenStream = null;
       this.pendingStreamUpdate = false;
       this.metricFilter = "all";
+      this.requestedRunId = null;
+      this.requestedDrawer = false;
+      this.syncDrawerUrl({ runId: null, drawer: false });
     }
   }
   private directoryEntries(view: ObservationView): readonly ObservationEnterpriseEntry[] {
@@ -184,7 +319,7 @@ export class OpenBotObservationWorkbench extends LitElement {
   private filteredRuns(view: ObservationView): ObservationRun[] {
     const scope =
       this.filter === "个人" ? "personal" : this.filter === "协作" ? "collaboration" : null;
-    return view.runs.filter((row) => {
+    const rows = view.runs.filter((row) => {
       if (scope && row.scope !== scope) {
         return false;
       }
@@ -197,6 +332,7 @@ export class OpenBotObservationWorkbench extends LitElement {
       }
       return row.tenantId === this.tenantFilter;
     });
+    return accessibleRuns(rows, this.accessInput());
   }
   private formatUnknown(value: number | undefined, format: (n: number) => string) {
     return value === undefined ? "未知" : format(value);
@@ -243,6 +379,10 @@ export class OpenBotObservationWorkbench extends LitElement {
         <label><span>工作形态</span><select aria-label="工作形态筛选" @change=${(event: Event) => {
           this.filter = (event.target as HTMLSelectElement).value as typeof this.filter;
           this.selected = null;
+          this.expanded = false;
+          this.frozenView = null;
+          this.frozenStream = null;
+          this.paused = false;
         }}>${OBSERVATION_TYPES.map((row) => html`<option value=${row} ?selected=${this.filter === row}>${row === "全部" ? "全部" : row}</option>`)}</select></label>
         <p class="obs-filters__context">筛选上下文：${typeLabel} · 当前企业</p>
       </section>`;
@@ -252,14 +392,23 @@ export class OpenBotObservationWorkbench extends LitElement {
         const value = (event.target as HTMLSelectElement).value;
         this.timeWindow = value === "current" ? "current" : "7d";
         this.selected = null;
+        this.expanded = false;
       }}><option value="7d" ?selected=${this.timeWindow === "7d"}>近 7 天</option><option value="current" ?selected=${this.timeWindow === "current"}>当前连接窗口</option></select></label>
       <label><span>租户</span><select aria-label="租户筛选" @change=${(event: Event) => {
         this.tenantFilter = (event.target as HTMLSelectElement).value || "all";
         this.selected = null;
+        this.expanded = false;
+        this.frozenView = null;
+        this.frozenStream = null;
+        this.paused = false;
       }}><option value="all" ?selected=${this.tenantFilter === "all"}>${view.source === "sample" ? "全部企业（样例）" : "全部企业"}</option>${directory.map((row) => html`<option value=${row.tenantId} ?selected=${this.tenantFilter === row.tenantId}>${row.label}</option>`)}</select></label>
       <label><span>任务类型</span><select aria-label="任务类型筛选" @change=${(event: Event) => {
         this.filter = (event.target as HTMLSelectElement).value as typeof this.filter;
         this.selected = null;
+        this.expanded = false;
+        this.frozenView = null;
+        this.frozenStream = null;
+        this.paused = false;
       }}>${OBSERVATION_TYPES.map((row) => html`<option value=${row} ?selected=${this.filter === row}>${row === "全部" ? "全部任务类型" : row}</option>`)}</select></label>
       <p class="obs-filters__context">筛选上下文：${windowLabel} · ${tenantLabel} · ${typeLabel}</p>
     </section>`;
@@ -325,7 +474,7 @@ export class OpenBotObservationWorkbench extends LitElement {
   }
   private renderCoverage(view: ObservationView) {
     return html`<div class="obs-coverage">
-      <span class="obs-status ${view.partial ? "is-partial" : "is-ok"}">${view.partial ? "部分数据" : "证据齐备"}</span>
+      <span class="obs-status ${view.partial ? "is-partial" : "is-ok"}">${view.partial ? "部分数据" : "元数据已接收"}</span>
       <span>${view.source === "sample" ? "交互验收样例 · 非生产数据" : "当前连接观察片段 · execution_only"}</span>
       ${
         view.connected
@@ -338,15 +487,7 @@ export class OpenBotObservationWorkbench extends LitElement {
     ${view.reasons.length ? html`<div class="obs-reasons">${[...new Set(view.reasons)].map(reasonLabel).map((reason) => html`<span>${reason}</span>`)}</div>` : nothing}`;
   }
   private renderPulse(view: ObservationView, runs: readonly ObservationRun[]) {
-    const unmapped = this.role === "platform" && this.tenantFilter !== "all";
-    const stream = buildObservationStream({
-      connected: view.connected,
-      snapshot:
-        this.source === "live" && !unmapped
-          ? readRuntimeObservations(this.observationHost ?? {}, this.sessionKey ?? "")
-          : null,
-      sessionKey: view.sessionKey,
-    });
+    const stream = this.streamFor(view);
     const samples = [
       {
         key: "active_runs",
@@ -413,11 +554,13 @@ export class OpenBotObservationWorkbench extends LitElement {
         <div><span class="obs-update">${view.receivedAt ? `最后事件 ${new Date(view.receivedAt).toLocaleTimeString("zh-CN", { hour12: false })}` : "尚无真实事件"}</span><button type="button" data-action="pause" class="obs-pause" @click=${() => {
           if (!this.paused) {
             this.frozenView = view;
+            this.frozenStream = this.buildLiveStream(view);
             this.paused = true;
             this.pendingStreamUpdate = false;
           } else {
             this.paused = false;
             this.frozenView = null;
+            this.frozenStream = null;
             this.pendingStreamUpdate = false;
           }
         }}>${this.paused ? "继续观测" : "暂停观测"}</button></div></header>
@@ -481,32 +624,17 @@ export class OpenBotObservationWorkbench extends LitElement {
     runs: readonly ObservationRun[],
     selected: ObservationRun | undefined,
   ) {
-    const shownRuns =
-      this.metricFilter === "sequence_or_link_gaps"
-        ? runs.filter((row) => row.reasons.length)
-        : this.metricFilter === "active_runs"
-          ? runs.filter((row) => row.toolState === "running" || row.toolState === "waiting")
-          : this.metricFilter === "tool_calls" ||
-              this.metricFilter === "event_receive_rate" ||
-              this.metricFilter === "latency_p95" ||
-              this.metricFilter === "latency_p50"
-            ? runs
-            : this.metricFilter === "business_acceptance"
-              ? runs.filter((row) => row.outcomeState === "accepted")
-              : this.metricFilter === "run_completion_rate"
-                ? runs.filter((row) => row.latencyMs !== null)
-                : this.metricFilter === "attributed_cost"
-                  ? []
-                  : runs;
+    const shownRuns = this.applyMetricFilter(runs);
+    const scopeHint = metricScopeHint(this.metricFilter, shownRuns.length);
     return html`<section class="obs-loop">
       <div class="obs-loop-runs"><header class="obs-section-head"><div><h3>${this.metricFilter === "sequence_or_link_gaps" ? "需要核实的事件" : "运行与改善对象"}</h3><p>点击一项，沿同一身份核实、诊断与回验。</p></div>${
         this.metricFilter !== "all"
-          ? html`<button type="button" @click=${() => {
+          ? html`<button type="button" data-action="clear-metric-filter" @click=${() => {
               this.metricFilter = "all";
-              this.selected = null;
-            }}>清除指标筛选</button>`
+            }}>清除列表筛选</button>`
           : nothing
       }</header>
+      ${scopeHint ? html`<p class="obs-metric-scope-hint" data-testid="obs-metric-scope-hint">${scopeHint}</p>` : nothing}
         ${
           shownRuns.length
             ? shownRuns.map(
@@ -514,6 +642,8 @@ export class OpenBotObservationWorkbench extends LitElement {
                   html`<button type="button" class="obs-run ${selected?.id === row.id ? "is-selected" : ""}" data-run-id=${row.id} @click=${() => {
                     this.selected = row;
                     this.expanded = true;
+                    this.requestedRunId = row.id;
+                    this.requestedDrawer = true;
                   }}><span><strong>${row.label}</strong><code>${row.clientRunId ?? "clientRunId 未知"}${row.sourceRunId ? ` → ${row.sourceRunId}` : ""}</code><small>${row.latencyMs === null ? "时延未知" : `${(row.latencyMs / 1000).toFixed(1)} 秒`} · ${row.eventCount} 条元数据</small></span><span class="obs-status ${row.reasons.length ? "is-partial" : "is-ok"}">${row.reasons.length ? "待核实" : "已观测"}</span></button>`,
               )
             : html`<div class="obs-empty"><strong>${this.metricFilter === "attributed_cost" ? "当前没有可归属成本" : this.role === "platform" && this.tenantFilter !== "all" && view.source === "live" ? "所选企业暂无已映射运行事件" : runs.length === 0 && this.metricFilter === "all" ? "当前会话还没有观测事件" : "当前筛选没有运行"}</strong><p>${this.metricFilter === "attributed_cost" ? "周期账单不能摊到未关联的运行。" : "没有严格匹配的事件时，不借用其他会话数据。"}</p></div>`
@@ -533,6 +663,8 @@ export class OpenBotObservationWorkbench extends LitElement {
     return html`<article class="obs-improvement" data-testid="obs-improvement">
       <header><div><span class="obs-eyebrow">同一改善对象 · ${run.tenantLabel ?? "当前会话"}</span><h3>${run.label}</h3><code>${run.clientRunId}${run.sourceRunId ? ` → ${run.sourceRunId}` : ""}</code></div><button type="button" class="obs-link" @click=${() => {
         this.expanded = true;
+        this.requestedRunId = run.id;
+        this.requestedDrawer = true;
       }}>完整运行证据</button></header>
       <ol class="obs-loop-steps"><li class="is-done"><span>01</span><strong>偏离已发现</strong><small>${run.reasons.length ? `${run.reasons.length} 类证据需核实` : "收到执行元数据"}</small></li><li><span>02</span><strong>诊断与根因</strong><small>${target ? "可携带本次 runId 做针对性诊断" : "平台当前未映射租户；请从原诊断页核验企业目标"}</small></li><li><span>03</span><strong>实验与授权</strong><small>候选来自诊断；不默认创建或下发</small></li><li><span>04</span><strong>同口径回验</strong><small>${run.outcomeState === "accepted" ? "有业务验收关联；仍可对比改善前后" : "尚缺业务验收，工具完成不算改善有效"}</small></li></ol>
       ${run.reasons.length ? html`<div class="obs-deviation"><strong>本次先核实</strong><p>${[...new Set(run.reasons)].slice(0, 3).map(reasonLabel).join("；")}</p></div>` : nothing}
@@ -571,6 +703,8 @@ export class OpenBotObservationWorkbench extends LitElement {
               ) => html`<button class="obs-run" type="button" data-run-id=${row.id} @click=${() => {
                 this.selected = row;
                 this.expanded = true;
+                this.requestedRunId = row.id;
+                this.requestedDrawer = true;
               }}>
         <span><strong>${row.label}</strong><code>${row.clientRunId ?? "clientRunId 未知"}${row.sourceRunId ? ` → ${row.sourceRunId}` : ""}${row.tenantLabel ? ` · ${row.tenantLabel}` : view.source === "live" && this.role === "platform" ? " · 未映射" : ""}</code></span>
         <span class="obs-run__state"><span>${row.scope === "personal" ? "个人" : row.scope === "collaboration" ? "协作" : "场景未知"}</span><span class="obs-status ${row.reasons.length ? "is-partial" : "is-ok"}">${row.reasons.length ? "证据不完整" : "元数据已接收"}</span></span>
@@ -729,6 +863,8 @@ export class OpenBotObservationWorkbench extends LitElement {
     }}><aside class="obs-drawer" role="dialog" aria-modal="true" aria-label="运行证据" @click=${(event: Event) => event.stopPropagation()}>
       <header><div><span class="obs-status ${run.sample ? "is-partial" : "is-ok"}">${run.sample ? "样例证据" : "实时元数据"}</span><h2>${run.label}</h2></div><button type="button" aria-label="关闭证据" @click=${() => {
         this.expanded = false;
+        this.requestedDrawer = false;
+        this.syncDrawerUrl({ runId: null, drawer: false });
       }}>×</button></header>
       <section class="obs-evidence"><h3>只读证据</h3><dl>${[
         ["clientRunId", run.clientRunId],
@@ -792,13 +928,64 @@ export class OpenBotObservationWorkbench extends LitElement {
     }
     return "当前连接窗口只读本机事件投影，不能标成 24 小时或近 7 天；目录健康仅作参考。";
   }
-  render() {
+  updated() {
     const view = this.updateStream(this.view());
     const runs = this.filteredRuns(view);
+    const resolved = resolveDrawerSelection({
+      access: this.accessInput(),
+      runs,
+      allRuns: view.runs,
+      selectedId: this.selected?.id ?? null,
+      requestedRunId: this.requestedRunId,
+      expanded: this.expanded,
+      requestedDrawer: this.requestedDrawer,
+    });
+    if (resolved.deny) {
+      if (this.selected || this.expanded || this.requestedRunId || this.requestedDrawer) {
+        this.selected = null;
+        this.expanded = false;
+        this.requestedRunId = null;
+        this.requestedDrawer = false;
+      }
+      if (this.accessNotice !== resolved.notice) {
+        this.accessNotice = resolved.notice;
+      }
+      this.syncDrawerUrl({ runId: null, drawer: false });
+      return;
+    }
+    const authorization = currentAuthorization(this.accessInput());
+    const nextNotice = authorization.ok ? null : authorization.message;
+    if (this.accessNotice !== nextNotice) {
+      this.accessNotice = nextNotice;
+    }
+    if (resolved.run && this.selected?.id !== resolved.run.id) {
+      this.selected = resolved.run;
+    }
+    if (resolved.expanded && !this.expanded) {
+      this.expanded = true;
+    }
+    this.syncDrawerUrl(resolved.url);
+  }
+  render() {
+    this.captureDrawerRequest();
+    const view = this.updateStream(this.view());
+    const runs = this.filteredRuns(view);
+    const listRuns = this.applyMetricFilter(runs);
     // Re-resolve from the current authorized projection, never a stale drawer snapshot.
-    const selected = this.selected
-      ? runs.find((row) => row.id === this.selected?.id && row.sample === this.selected.sample)
-      : undefined;
+    const resolved = resolveDrawerSelection({
+      access: this.accessInput(),
+      runs,
+      allRuns: view.runs,
+      selectedId: this.selected?.id ?? null,
+      requestedRunId: this.requestedRunId,
+      expanded: this.expanded,
+      requestedDrawer: this.requestedDrawer,
+    });
+    const selected = resolved.run;
+    const showDrawer = Boolean(selected && resolved.expanded);
+    const authorization = currentAuthorization(this.accessInput());
+    const notice =
+      this.accessNotice ?? (authorization.ok ? resolved.notice : authorization.message);
     return html`<div class="obs-workbench" id="observation-workbench" data-observation-source=${view.source} data-time-window=${this.role === "platform" ? this.timeWindow : "enterprise"} data-tenant-filter=${this.tenantFilter}>
       <div class="obs-header"><div><span class="obs-eyebrow">${this.role === "platform" ? "OBSERVABILITY" : "SELF-EVOLUTION / OBSERVABILITY"}</span><h2>${this.role === "platform" ? "实时运行与改善" : "任务质量进化中心"}</h2><p>${this.role === "platform" ? "不混淆一次成功调用与一项被验收的工作。" : "观测 → 诊断 → 候选与实验 → 效果与治理"}</p></div>
         <div class="obs-source"><span class="obs-source-label">连接工作台数据源</span><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select><small>仅影响连接工作台，不影响独立精确任务查询。</small></div></div>
@@ -810,15 +997,23 @@ export class OpenBotObservationWorkbench extends LitElement {
               this.sessionKey = (event.target as HTMLSelectElement).value || null;
               this.onSessionKey?.(this.sessionKey ?? "");
               this.selected = null;
-            }}><option value="">选择当前企业目标</option>${this.targets.map((row) => html`<option value=${row.sessionKey}>${row.label} · ${row.kind === "group" ? "协作" : "个人"}</option>`)}</select></label><span>严格按 sessionKey 接收事件，不借用其他会话。</span></div>`
+              this.expanded = false;
+              this.frozenView = null;
+              this.frozenStream = null;
+              this.paused = false;
+              this.requestedRunId = null;
+              this.requestedDrawer = false;
+              this.syncDrawerUrl({ runId: null, drawer: false });
+            }}><option value="">选择当前企业目标</option>${this.targets.map((row) => html`<option value=${row.sessionKey}>${row.label} · ${row.agentId} · ${row.kind === "group" ? "协作" : "个人"}</option>`)}</select></label><span>正式名称与稳定 agentId 分开显示；查询关联只使用稳定 agentId。严格按 sessionKey 接收事件，不借用其他会话。</span></div>`
           : nothing
       }
       ${this.renderTabs()}
       ${this.renderFilters(view)}
       ${this.renderEventScopeNote(view)}
-      ${this.renderPulse(view, this.liveRuns(view))}
-      ${this.surface === "overview" ? html`${this.renderTenantCompare(view)}${this.renderCoverage(view)}${this.renderLoop(view, runs, selected)}<div class="obs-live-note">${this.liveNote(view)}</div>` : this.surface === "analysis" ? this.renderAnalysis(view, runs) : this.renderGovernance(view)}
-      ${selected && this.expanded ? this.renderEvidence(selected) : nothing}
+      ${notice ? html`<p class="obs-access-notice" data-testid="obs-access-notice">${notice}</p>` : nothing}
+      ${this.renderPulse(view, runs)}
+      ${this.surface === "overview" ? html`${this.renderTenantCompare(view)}${this.renderCoverage(view)}${this.renderLoop(view, runs, selected)}<div class="obs-live-note">${this.liveNote(view)}</div>` : this.surface === "analysis" ? this.renderAnalysis(view, listRuns) : this.renderGovernance(view)}
+      ${showDrawer && selected ? this.renderEvidence(selected) : nothing}
     </div>`;
   }
 }

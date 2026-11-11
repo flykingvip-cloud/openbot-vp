@@ -446,7 +446,7 @@ export function buildObservationStream(input: BuildObservationStreamInput): Obse
       value: completionRate,
       display:
         completionRate === null
-          ? formatUnknownDisplay("empty")
+          ? formatUnknownDisplay("unknown")
           : `${(completionRate * 100).toFixed(0)}%`,
       unit: "ratio",
       source,

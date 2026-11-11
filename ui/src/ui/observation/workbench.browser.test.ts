@@ -507,3 +507,177 @@ describe("explicit comparison input", () => {
     container.remove();
   });
 });
+
+describe("R5 incremental wiring", () => {
+  async function mount(
+    props: Parameters<typeof renderObservationWorkbench>[0],
+  ): Promise<{ container: HTMLDivElement; panel: OpenBotObservationWorkbench }> {
+    const container = document.createElement("div");
+    document.body.append(container);
+    render(renderObservationWorkbench(props), container);
+    await customElements.whenDefined("openbot-observation-workbench");
+    const panel = container.querySelector(
+      "openbot-observation-workbench",
+    ) as OpenBotObservationWorkbench;
+    await panel.updateComplete;
+    return { container, panel };
+  }
+
+  function metricDisplays(panel: Element) {
+    return [...panel.querySelectorAll(".obs-pulse-card")].map((card) => ({
+      key: card.getAttribute("data-metric"),
+      text: card.querySelector("strong")?.textContent ?? "",
+    }));
+  }
+
+  it("keeps the top-stat denominator when a metric filters only the list", async () => {
+    const { container, panel } = await mount({
+      role: "enterprise",
+      tenantId: "demo",
+      sessionKey: "agent:one:main",
+      connected: true,
+      observationHost: {},
+    });
+    const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
+    selector.value = "sample";
+    selector.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(3);
+    const before = metricDisplays(panel);
+    panel.querySelector<HTMLButtonElement>('[data-metric="active_runs"]')!.click();
+    await panel.updateComplete;
+    expect(metricDisplays(panel)).toEqual(before);
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(1);
+    expect(panel.querySelector('[data-testid="obs-metric-scope-hint"]')?.textContent).toContain(
+      "顶部指标仍按原筛选集合统计，分母未改变",
+    );
+    panel.querySelector<HTMLButtonElement>('[data-action="clear-metric-filter"]')!.click();
+    await panel.updateComplete;
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(3);
+    expect(metricDisplays(panel)).toEqual(before);
+    expect(panel.querySelector('[data-testid="obs-metric-scope-hint"]')).toBeNull();
+    container.remove();
+  });
+
+  it("freezes metrics, list, and open evidence on the same paused slice, then clears on revoke", async () => {
+    const host = {};
+    recordRuntimeObservation(
+      host,
+      "agent:main",
+      {
+        runId: "client_pause",
+        sourceRunId: "engine_pause",
+        sessionKey: "agent:main",
+        seq: 1,
+        ts: 10,
+        stream: "lifecycle",
+        data: { phase: "start" },
+      },
+      100,
+    );
+    const { container, panel } = await mount({
+      role: "enterprise",
+      tenantId: "demo",
+      sessionKey: "agent:main",
+      connected: true,
+      observationHost: host,
+      scopes: ["operator.read"],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1050));
+    await panel.updateComplete;
+    panel.querySelector<HTMLButtonElement>("[data-run-id='client_pause@engine_pause']")!.click();
+    await panel.updateComplete;
+    expect(panel.querySelector(".obs-drawer")?.textContent).toContain("client_pause");
+    const metricsBeforePause = metricDisplays(panel);
+    const drawerBeforePause = panel.querySelector(".obs-drawer")?.textContent;
+    panel.querySelector<HTMLButtonElement>('[data-action="pause"]')!.click();
+    await panel.updateComplete;
+    recordRuntimeObservation(
+      host,
+      "agent:main",
+      {
+        runId: "client_later",
+        sourceRunId: "engine_later",
+        sessionKey: "agent:main",
+        seq: 1,
+        ts: 40,
+        stream: "lifecycle",
+        data: { phase: "start" },
+      },
+      400,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 1050));
+    await panel.updateComplete;
+    expect(metricDisplays(panel)).toEqual(metricsBeforePause);
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(1);
+    expect(panel.querySelector(".obs-drawer")?.textContent).toBe(drawerBeforePause);
+    expect(panel.textContent).not.toContain("client_later");
+    panel.scopes = [];
+    await panel.updateComplete;
+    expect(panel.querySelector(".obs-drawer")).toBeNull();
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(0);
+    expect(panel.querySelector('[data-testid="obs-access-notice"]')?.textContent).toContain(
+      "当前授权已失效",
+    );
+    expect(panel.textContent).not.toContain("client_pause");
+    expect(panel.textContent).not.toContain("client_later");
+    container.remove();
+    clearRuntimeObservations(host);
+  });
+
+  it("does not restore a denied drawer from a directly supplied URL and strips run/drawer", async () => {
+    const previous = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.history.replaceState({}, "", `${window.location.pathname}?run=sample-partial&drawer=1`);
+    const { container, panel } = await mount({
+      role: "enterprise",
+      tenantId: "demo",
+      sessionKey: "agent:one:main",
+      connected: true,
+      observationHost: {},
+      scopes: [],
+      initialRunId: "sample-partial",
+      initialDrawer: true,
+    });
+    const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
+    selector.value = "sample";
+    selector.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    expect(panel.querySelector(".obs-drawer")).toBeNull();
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(0);
+    expect(window.location.search).not.toContain("drawer=");
+    expect(window.location.search).not.toContain("run=");
+    expect(panel.querySelector('[data-testid="obs-access-notice"]')?.textContent).toContain(
+      "当前授权已失效",
+    );
+    container.remove();
+    window.history.replaceState({}, "", previous);
+  });
+
+  it("drops a stale list and drawer when switching from sample to live", async () => {
+    const { container, panel } = await mount({
+      role: "enterprise",
+      tenantId: "demo",
+      sessionKey: "agent:one:main",
+      connected: true,
+      observationHost: {},
+    });
+    const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
+    selector.value = "sample";
+    selector.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    panel.querySelector<HTMLButtonElement>("[data-run-id=sample-partial]")!.click();
+    await panel.updateComplete;
+    expect(panel.querySelector(".obs-drawer")?.textContent).toContain("投递链路复核");
+    expect(panel.querySelector(".obs-drawer")?.textContent).toContain("engine_C");
+    selector.value = "live";
+    selector.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    expect(panel.querySelector(".obs-drawer")).toBeNull();
+    expect(panel.querySelector("[data-run-id=sample-partial]")).toBeNull();
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(0);
+    expect(panel.textContent).not.toContain("投递链路复核");
+    expect(panel.textContent).not.toContain("engine_C");
+    expect(panel.querySelector('[data-observation-source="live"]')).not.toBeNull();
+    container.remove();
+  });
+});

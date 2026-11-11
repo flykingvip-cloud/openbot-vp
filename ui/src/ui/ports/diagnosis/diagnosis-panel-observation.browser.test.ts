@@ -301,7 +301,7 @@ describe("platform observation boundary", () => {
       false,
     );
     panel.taskOutcomeRef = { taskId: "restricted-task", agentId: "main", outcomeVersion: 1 };
-    await waitFor(() => expect(panel.textContent).toContain("查询失败或读取权限不可用"));
+    await waitFor(() => expect(panel.textContent).toContain("当前授权范围内未找到匹配记录"));
     expect(panel.querySelector('[aria-label="运行证据投影"] article')).toBeNull();
     panel.remove();
   });
