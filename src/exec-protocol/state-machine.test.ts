@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ExecProtocolError } from "./errors.js";
-import { canTransition, transitionState } from "./state-machine.js";
+import { canTransition, reconcileTransition, transitionState } from "./state-machine.js";
 
 describe("exec protocol state machine", () => {
   it("allows the happy path accepted -> queued -> running -> succeeded", () => {
@@ -32,5 +32,18 @@ describe("exec protocol state machine", () => {
     expect(() => transitionState("failed", "running")).toThrow(/terminal state/);
     expect(() => transitionState("cancelled", "queued")).toThrow(/terminal state/);
     expect(() => transitionState("cancelled", "running")).toThrow(ExecProtocolError);
+    expect(canTransition("result_unconfirmed", "succeeded")).toBe(false);
+    expect(() => transitionState("result_unconfirmed", "succeeded")).toThrow(ExecProtocolError);
+  });
+
+  it("allows reconcile transitions only from result_unconfirmed", () => {
+    expect(reconcileTransition("result_unconfirmed", "succeeded")).toBe("succeeded");
+    expect(reconcileTransition("result_unconfirmed", "failed")).toBe("failed");
+    expect(reconcileTransition("result_unconfirmed", "cancelled")).toBe("cancelled");
+    expect(reconcileTransition("result_unconfirmed", "remain_unconfirmed")).toBe(
+      "result_unconfirmed",
+    );
+    expect(() => reconcileTransition("running", "succeeded")).toThrow(ExecProtocolError);
+    expect(() => reconcileTransition("cancelled", "failed")).toThrow(/reconcile cannot leave/);
   });
 });

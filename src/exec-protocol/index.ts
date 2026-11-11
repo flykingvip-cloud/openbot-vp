@@ -18,6 +18,7 @@ export {
   hashLeaseToken,
   isLeaseTokenFormat,
   validateLease,
+  assertReconcileRole,
   parseBearerToken,
 } from "./lease.js";
 export {
@@ -28,7 +29,12 @@ export {
   decodeBase64Bytes,
 } from "./checksum.js";
 export { assertIdempotencyKey, canonicalizeIntent } from "./idempotency.js";
-export { canTransition, transitionState, assertCanEnterSucceeded } from "./state-machine.js";
+export {
+  canTransition,
+  transitionState,
+  assertCanEnterSucceeded,
+  reconcileTransition,
+} from "./state-machine.js";
 export { FileExecStore } from "./store.js";
 export { ExecHttpClient, createExecHttpClient } from "./client.js";
 export { BExecutionServer } from "./b-server.js";

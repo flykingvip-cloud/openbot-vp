@@ -19,7 +19,13 @@ import { assertIdempotencyKey, canonicalizeIntent } from "./idempotency.js";
 import { newArtifactId, newTaskId } from "./ids.js";
 import { KeyedLock } from "./keyed-lock.js";
 import { hashLeaseToken, parseBearerToken, validateLease } from "./lease.js";
-import { transitionState } from "./state-machine.js";
+import {
+  assertIdenticalReconcileReplay,
+  evidenceKey,
+  parseReconcileRequest,
+  toReconcileResponse,
+} from "./reconcile.js";
+import { reconcileTransition, transitionState } from "./state-machine.js";
 import { FileExecStore } from "./store.js";
 import {
   isTerminalState,
@@ -151,6 +157,7 @@ export class BExecutionServer {
         server.close((error) => (error ? reject(error) : resolve()));
       });
     }
+    await this.store.close();
   }
 
   debug(): ExecSiteDebug {
@@ -257,6 +264,10 @@ export class BExecutionServer {
       }
       if (path === "/v1/artifacts/upload") {
         await this.handleUpload(payload, lease, res);
+        return;
+      }
+      if (path === "/v1/tasks/reconcile-apply") {
+        await this.handleReconcileApply(payload, lease, res);
         return;
       }
       if (path === "/v1/revoke") {
@@ -458,6 +469,7 @@ export class BExecutionServer {
       probeId,
       sleepMs,
       bAccepted: true,
+      stateVersion: 1,
     };
     await this.store.upsertTask(record);
     await this.store.putIdempotency({
@@ -578,6 +590,153 @@ export class BExecutionServer {
       sha256: checked.sha256,
       byteCount: checked.byteCount,
     });
+  }
+
+  private async handleReconcileApply(
+    payload: Record<string, unknown>,
+    lease: ExecLeaseRecord,
+    res: ServerResponse,
+  ): Promise<void> {
+    const request = parseReconcileRequest(payload, this.config);
+    const existing = this.store.getReconcileIndex(request.tenantId, request.reconcileRequestId);
+    if (existing) {
+      assertIdenticalReconcileReplay({ stored: existing, request });
+      const existingTask = this.authorizeTask(
+        this.store.getTask(existing.taskId),
+        lease,
+        request.tenantId,
+      );
+      writeJson(
+        res,
+        SUCCESS_HTTP_IDEMPOTENT_OR_READ,
+        toReconcileResponse({
+          task: existingTask,
+          audit: {
+            reconcileRequestId: existing.reconcileRequestId,
+            operator: existing.operator,
+            at: existing.at,
+            previousState: existing.previousState as ExecTaskRecord["state"],
+            newState: existing.newState as ExecTaskRecord["state"],
+            conclusion: request.conclusion,
+            reason: existing.reason,
+          },
+        }),
+      );
+      return;
+    }
+
+    const stored = this.authorizeTask(this.store.getTask(request.taskId), lease, request.tenantId);
+    const task = structuredClone(stored);
+    if (isTerminalState(task.state)) {
+      if (request.conclusion !== "remain_unconfirmed" && task.state === request.conclusion) {
+        writeJson(
+          res,
+          SUCCESS_HTTP_IDEMPOTENT_OR_READ,
+          toReconcileResponse({
+            task,
+            audit: {
+              reconcileRequestId: request.reconcileRequestId,
+              operator: lease.subject,
+              at: task.updatedAt,
+              previousState: task.state,
+              newState: task.state,
+              conclusion: request.conclusion,
+              reason: request.reason,
+            },
+          }),
+        );
+        return;
+      }
+      throw new ExecProtocolError(
+        "EXEC_CONFLICT",
+        `B' will not overwrite terminal state ${task.state}`,
+        { taskId: task.taskId, state: task.state },
+      );
+    }
+    if (task.state !== "result_unconfirmed") {
+      throw new ExecProtocolError(
+        "EXEC_CONFLICT",
+        "B' reconcile-apply requires local state result_unconfirmed",
+        { taskId: task.taskId, state: task.state },
+      );
+    }
+    if (request.conclusion === "succeeded") {
+      if (request.evidenceRef.kind !== "artifact-verified") {
+        throw new ExecProtocolError(
+          "EXEC_CONFLICT",
+          "succeeded requires evidenceRef.kind artifact-verified",
+          { taskId: task.taskId, state: task.state },
+        );
+      }
+      const loaded = await this.store.getArtifactBytes(request.evidenceRef.artifactId);
+      if (!loaded) {
+        throw new ExecProtocolError(
+          "EXEC_CONFLICT",
+          "B' has no local artifact bytes to verify for succeeded",
+          { taskId: task.taskId, state: task.state },
+        );
+      }
+      if (loaded.meta.taskId !== task.taskId || loaded.meta.tenantId !== task.tenantId) {
+        throw new ExecProtocolError("EXEC_CONFLICT", "artifact does not belong to this task", {
+          taskId: task.taskId,
+          state: task.state,
+        });
+      }
+      try {
+        assertChecksumMatch({
+          expectedSha256: request.evidenceRef.sha256,
+          expectedByteCount: request.evidenceRef.byteCount,
+          actual: loaded.bytes,
+        });
+      } catch (error) {
+        throw new ExecProtocolError(
+          "EXEC_CHECKSUM_MISMATCH",
+          error instanceof Error ? error.message : "checksum mismatch",
+          { taskId: task.taskId, state: task.state },
+        );
+      }
+    }
+
+    const previousState = task.state;
+    const previousStateVersion = task.stateVersion ?? 0;
+    const nowMs = this.now();
+    const newState = reconcileTransition(task.state, request.conclusion, { taskId: task.taskId });
+    task.state = newState;
+    task.updatedAtMs = nowMs;
+    task.updatedAt = new Date(nowMs).toISOString();
+    const audit = {
+      taskId: task.taskId,
+      tenantId: task.tenantId,
+      operator: lease.subject,
+      at: task.updatedAt,
+      atMs: nowMs,
+      previousState,
+      newState,
+      conclusion: request.conclusion,
+      reason: request.reason,
+      evidenceRef: request.evidenceRef,
+      reconcileRequestId: request.reconcileRequestId,
+      previousStateVersion,
+      newStateVersion: previousStateVersion,
+    };
+    const index = {
+      tenantId: request.tenantId,
+      reconcileRequestId: request.reconcileRequestId,
+      taskId: request.taskId,
+      conclusion: request.conclusion,
+      expectedStateVersion: request.expectedStateVersion,
+      evidenceKey: evidenceKey(request.evidenceRef),
+      operator: lease.subject,
+      at: task.updatedAt,
+      atMs: nowMs,
+      previousState,
+      newState,
+      reason: request.reason,
+      previousStateVersion,
+      newStateVersion: previousStateVersion,
+    };
+    await this.store.commitReconcile({ task, audit, index });
+    writeJson(res, SUCCESS_HTTP_IDEMPOTENT_OR_READ, toReconcileResponse({ task, audit }));
   }
 
   private async handleRevoke(
@@ -863,6 +1022,8 @@ export function toTaskResponse(task: ExecTaskRecord): ExecTaskResponse {
     errorCode: task.errorCode,
     errorMessage: task.errorMessage,
     bOutcome: task.bOutcome,
+    stateVersion: task.stateVersion ?? 0,
+    sideEffectApplied: task.sideEffectApplied,
   };
 }
 
@@ -886,6 +1047,7 @@ function missingTask(taskId: string, tenantId: string): ExecTaskRecord {
     artifacts: [],
     errorCode: "EXEC_INTERNAL",
     errorMessage: "idempotent hit is missing its task record",
+    stateVersion: 0,
   };
 }
 

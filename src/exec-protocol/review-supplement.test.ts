@@ -1,5 +1,4 @@
-import { writeFile } from "node:fs/promises";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -228,13 +227,16 @@ describe("PR #272 review supplement: races, artifacts, and unconfirmed handling"
           }),
         (result) => result.payload.state === "succeeded",
       );
-      const reloadedA = new FileExecStore(pair.aDir);
-      const reloadedB = new FileExecStore(pair.bDir);
-      await reloadedA.load();
-      await reloadedB.load();
-      expect(reloadedA.getIdempotency(TEST_TENANT, key)?.taskId).toBe(first.payload.taskId);
-      expect(reloadedA.getTask(first.payload.taskId)?.state).toBe("succeeded");
-      expect(reloadedB.getTask(first.payload.taskId)?.idempotencyKey).toBe(key);
+      const persistedA = JSON.parse(await readFile(join(pair.aDir, "control.json"), "utf8")) as {
+        tasks: Record<string, { state: string }>;
+        idempotency: Record<string, { taskId: string }>;
+      };
+      const persistedB = JSON.parse(await readFile(join(pair.bDir, "control.json"), "utf8")) as {
+        tasks: Record<string, { idempotencyKey: string }>;
+      };
+      expect(persistedA.idempotency[`${TEST_TENANT} ${key}`]?.taskId).toBe(first.payload.taskId);
+      expect(persistedA.tasks[first.payload.taskId]?.state).toBe("succeeded");
+      expect(persistedB.tasks[first.payload.taskId]?.idempotencyKey).toBe(key);
       const second = await pair.aClient.submit(
         baseSubmitBody({
           idempotencyKey: key,
@@ -338,7 +340,7 @@ describe("PR #272 review supplement: interrupted artifact transfer", () => {
       connectTimeoutMs: 200,
       requestTimeoutMs: 400,
       maxTransportRetries: 3,
-      transportBackoffMs: [20, 20, 20],
+      transportBackoffMs: [20, 20],
     });
     const configB = isolationProfile({ port: bPort });
     const minted = mintLease({

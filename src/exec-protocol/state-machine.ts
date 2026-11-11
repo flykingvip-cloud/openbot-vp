@@ -1,5 +1,5 @@
 import { ExecProtocolError } from "./errors.js";
-import { isTerminalState, type ExecTaskState } from "./types.js";
+import { isTerminalState, type ExecReconcileConclusion, type ExecTaskState } from "./types.js";
 
 const ALLOWED_TRANSITIONS: Record<ExecTaskState, ReadonlySet<ExecTaskState>> = {
   accepted: new Set(["queued", "cancel_requested", "result_unconfirmed"]),
@@ -77,4 +77,28 @@ export function assertNotRestartable(state: ExecTaskState, taskId?: string): voi
       },
     );
   }
+}
+
+export function reconcileTransition(
+  from: ExecTaskState,
+  conclusion: ExecReconcileConclusion,
+  context?: { taskId?: string },
+): ExecTaskState {
+  if (from !== "result_unconfirmed") {
+    throw new ExecProtocolError(
+      "EXEC_CONFLICT",
+      `reconcile cannot leave ${from}; only result_unconfirmed may be reconciled`,
+      { taskId: context?.taskId, state: from },
+    );
+  }
+  if (conclusion === "remain_unconfirmed") {
+    return "result_unconfirmed";
+  }
+  if (conclusion === "succeeded" || conclusion === "failed" || conclusion === "cancelled") {
+    return conclusion;
+  }
+  throw new ExecProtocolError("EXEC_CONFLICT", "unsupported reconcile conclusion", {
+    taskId: context?.taskId,
+    state: from,
+  });
 }

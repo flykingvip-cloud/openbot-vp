@@ -12,7 +12,17 @@ import { forbidHostFallback } from "./host-fallback.js";
 import { assertIdempotencyKey, canonicalizeIntent } from "./idempotency.js";
 import { newTaskId } from "./ids.js";
 import { KeyedLock } from "./keyed-lock.js";
-import { transitionState } from "./state-machine.js";
+import { assertReconcileRole } from "./lease.js";
+import {
+  assertIdenticalReconcileReplay,
+  evidenceKey,
+  hasPersistedCancelledConfirmation,
+  hasPersistedFailedConfirmation,
+  isFailedOrTimeoutState,
+  parseReconcileRequest,
+  toReconcileResponse,
+} from "./reconcile.js";
+import { reconcileTransition, transitionState } from "./state-machine.js";
 import { FileExecStore } from "./store.js";
 import {
   EXEC_API_VERSION,
@@ -23,6 +33,7 @@ import {
   isTerminalState,
   type ExecArtifactResponse,
   type ExecLeaseRecord,
+  type ExecReconcileResponse,
   type ExecRevocation,
   type ExecSiteDebug,
   type ExecTaskKind,
@@ -62,6 +73,7 @@ export class AControlPlane {
   readonly hostCommandProbe?: HostCommandProbe;
   private executionsStarted = 0;
   private readonly submitLocks = new KeyedLock();
+  private readonly reconcileLocks = new KeyedLock();
 
   constructor(options: ControlPlaneOptions) {
     this.config = options.config;
@@ -216,6 +228,7 @@ export class AControlPlane {
       sleepMs,
       bSubmitAttempted: false,
       bAccepted: false,
+      stateVersion: 1,
     };
     await this.store.upsertTask(record);
     await this.store.putIdempotency({
@@ -501,8 +514,317 @@ export class AControlPlane {
     };
   }
 
+  async reconcile(
+    payload: Record<string, unknown>,
+    lease: ExecLeaseRecord,
+  ): Promise<{ status: number; body: ExecReconcileResponse }> {
+    assertReconcileRole(lease);
+    const request = parseReconcileRequest(payload, this.config);
+    return this.reconcileLocks.run(`${request.tenantId}\0${request.reconcileRequestId}`, () =>
+      this.reconcileSerialized(request, lease),
+    );
+  }
+
   neverRunOnHost(reason: string, taskId?: string): never {
     return forbidHostFallback(reason, taskId);
+  }
+
+  private async reconcileSerialized(
+    request: ReturnType<typeof parseReconcileRequest>,
+    lease: ExecLeaseRecord,
+  ): Promise<{ status: number; body: ExecReconcileResponse }> {
+    const existing = this.store.getReconcileIndex(request.tenantId, request.reconcileRequestId);
+    if (existing) {
+      assertIdenticalReconcileReplay({ stored: existing, request });
+      const existingTask = this.store.getTask(existing.taskId);
+      if (!existingTask) {
+        throw new ExecProtocolError("EXEC_NOT_FOUND", "reconciled task is missing", {
+          taskId: existing.taskId,
+        });
+      }
+      return {
+        status: SUCCESS_HTTP_IDEMPOTENT_OR_READ,
+        body: toReconcileResponse({
+          task: existingTask,
+          audit: {
+            reconcileRequestId: existing.reconcileRequestId,
+            operator: existing.operator,
+            at: existing.at,
+            previousState: existing.previousState as ExecTaskRecord["state"],
+            newState: existing.newState as ExecTaskRecord["state"],
+            conclusion: request.conclusion,
+            reason: existing.reason,
+          },
+        }),
+      };
+    }
+
+    const stored = this.requireTask(request.taskId, request.tenantId, lease);
+    const currentVersion = stored.stateVersion ?? 0;
+    if (currentVersion !== request.expectedStateVersion) {
+      throw new ExecProtocolError(
+        "EXEC_CONFLICT",
+        "expectedStateVersion does not match the stored task stateVersion",
+        { taskId: stored.taskId, state: stored.state },
+      );
+    }
+    const task = structuredClone(stored);
+    await this.enforceReconcileEvidence(task, request);
+    const previousState = task.state;
+    const previousStateVersion = currentVersion;
+    const nowMs = this.now();
+    const newState = reconcileTransition(task.state, request.conclusion, { taskId: task.taskId });
+    task.state = newState;
+    task.updatedAtMs = nowMs;
+    task.updatedAt = new Date(nowMs).toISOString();
+    const audit = {
+      taskId: task.taskId,
+      tenantId: task.tenantId,
+      operator: lease.subject,
+      at: task.updatedAt,
+      atMs: nowMs,
+      previousState,
+      newState,
+      conclusion: request.conclusion,
+      reason: request.reason,
+      evidenceRef: request.evidenceRef,
+      reconcileRequestId: request.reconcileRequestId,
+      previousStateVersion,
+      newStateVersion: previousStateVersion,
+    };
+    const index = {
+      tenantId: request.tenantId,
+      reconcileRequestId: request.reconcileRequestId,
+      taskId: request.taskId,
+      conclusion: request.conclusion,
+      expectedStateVersion: request.expectedStateVersion,
+      evidenceKey: evidenceKey(request.evidenceRef),
+      operator: lease.subject,
+      at: task.updatedAt,
+      atMs: nowMs,
+      previousState,
+      newState,
+      reason: request.reason,
+      previousStateVersion,
+      newStateVersion: previousStateVersion,
+    };
+    await this.store.commitReconcile({ task, audit, index });
+    await this.syncReconcileApplyToB(request);
+    return {
+      status: SUCCESS_HTTP_IDEMPOTENT_OR_READ,
+      body: toReconcileResponse({ task, audit }),
+    };
+  }
+
+  private async enforceReconcileEvidence(
+    task: ExecTaskRecord,
+    request: ReturnType<typeof parseReconcileRequest>,
+  ): Promise<void> {
+    if (request.conclusion === "remain_unconfirmed") {
+      return;
+    }
+    if (request.conclusion === "succeeded") {
+      if (request.evidenceRef.kind !== "artifact-verified") {
+        throw new ExecProtocolError(
+          "EXEC_CONFLICT",
+          "succeeded requires evidenceRef.kind artifact-verified",
+          { taskId: task.taskId, state: task.state },
+        );
+      }
+      await this.verifyReconcileArtifact(task, request.evidenceRef);
+      return;
+    }
+    if (request.conclusion === "cancelled") {
+      const confirmed = await this.bConfirmedCancelled(task);
+      if (!confirmed) {
+        throw new ExecProtocolError(
+          "EXEC_CONFLICT",
+          "cancelled requires B' confirmed cancelled state; a sent cancel request is not enough",
+          { taskId: task.taskId, state: task.state },
+        );
+      }
+      return;
+    }
+    if (request.conclusion === "failed") {
+      const confirmed = await this.bConfirmedFailed(task);
+      if (task.sideEffectApplied && !confirmed) {
+        throw new ExecProtocolError(
+          "EXEC_CONFLICT",
+          "failed is refused when a side effect was applied and B' has not confirmed failure",
+          { taskId: task.taskId, state: task.state },
+        );
+      }
+      if (!confirmed) {
+        throw new ExecProtocolError(
+          "EXEC_CONFLICT",
+          "failed requires B' to confirm failed or timeout",
+          { taskId: task.taskId, state: task.state },
+        );
+      }
+    }
+  }
+
+  private async verifyReconcileArtifact(
+    task: ExecTaskRecord,
+    evidence: Extract<
+      ReturnType<typeof parseReconcileRequest>["evidenceRef"],
+      { kind: "artifact-verified" }
+    >,
+  ): Promise<void> {
+    const local = await this.store.getArtifactBytes(evidence.artifactId);
+    if (local) {
+      if (local.meta.taskId !== task.taskId || local.meta.tenantId !== task.tenantId) {
+        throw new ExecProtocolError("EXEC_CONFLICT", "artifact does not belong to this task", {
+          taskId: task.taskId,
+          state: task.state,
+        });
+      }
+      try {
+        assertChecksumMatch({
+          expectedSha256: evidence.sha256,
+          expectedByteCount: evidence.byteCount,
+          actual: local.bytes,
+        });
+        return;
+      } catch (error) {
+        throw new ExecProtocolError(
+          "EXEC_CHECKSUM_MISMATCH",
+          error instanceof Error ? error.message : "checksum mismatch",
+          { taskId: task.taskId, state: task.state },
+        );
+      }
+    }
+    try {
+      const result = await this.client.artifact({
+        [EXEC_API_VERSION_FIELD]: EXEC_API_VERSION,
+        tenantId: task.tenantId,
+        taskId: task.taskId,
+        artifactId: evidence.artifactId,
+        includeBytes: true,
+      });
+      if (typeof result.payload.bytesBase64 !== "string") {
+        throw new ExecProtocolError(
+          "EXEC_CHECKSUM_MISMATCH",
+          "artifact bytes were not returned for verification",
+          { taskId: task.taskId, state: task.state },
+        );
+      }
+      const bytes = decodeBase64Bytes(result.payload.bytesBase64);
+      assertChecksumMatch({
+        expectedSha256: evidence.sha256,
+        expectedByteCount: evidence.byteCount,
+        actual: bytes,
+      });
+      await this.store.putArtifactBytes(
+        {
+          artifactId: evidence.artifactId,
+          taskId: task.taskId,
+          toolCallId: task.toolCallId,
+          tenantId: task.tenantId,
+          sha256: normalizeSha256(evidence.sha256),
+          byteCount: evidence.byteCount,
+          fileName: `${evidence.artifactId}.bin`,
+        },
+        bytes,
+      );
+      if (!task.artifacts.some((item) => item.artifactId === evidence.artifactId)) {
+        task.artifacts = [
+          {
+            artifactId: evidence.artifactId,
+            sha256: normalizeSha256(evidence.sha256),
+            byteCount: evidence.byteCount,
+            toolCallId: task.toolCallId,
+            taskId: task.taskId,
+          },
+        ];
+      }
+    } catch (error) {
+      if (isUnreachable(error)) {
+        throw new ExecProtocolError(
+          "EXEC_UNREACHABLE",
+          "B' is unreachable and A' has no verified artifact copy",
+          { taskId: task.taskId, state: task.state, cause: error },
+        );
+      }
+      if (isExecProtocolError(error) && error.code === "EXEC_CHECKSUM_MISMATCH") {
+        throw error;
+      }
+      if (error instanceof Error && /checksum|byte count|sha256/i.test(error.message)) {
+        throw new ExecProtocolError("EXEC_CHECKSUM_MISMATCH", error.message, {
+          taskId: task.taskId,
+          state: task.state,
+        });
+      }
+      throw error;
+    }
+  }
+
+  private async bConfirmedCancelled(task: ExecTaskRecord): Promise<boolean> {
+    if (hasPersistedCancelledConfirmation(task)) {
+      return true;
+    }
+    try {
+      const peer = await this.client.status({
+        [EXEC_API_VERSION_FIELD]: EXEC_API_VERSION,
+        tenantId: task.tenantId,
+        taskId: task.taskId,
+      });
+      return peer.payload.state === "cancelled" || peer.payload.bOutcome === "cancelled";
+    } catch (error) {
+      if (isUnreachable(error)) {
+        throw new ExecProtocolError(
+          "EXEC_UNREACHABLE",
+          "B' is unreachable; cancelled cannot be confirmed from a local cancel request",
+          { taskId: task.taskId, state: task.state, cause: error },
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async bConfirmedFailed(task: ExecTaskRecord): Promise<boolean> {
+    if (hasPersistedFailedConfirmation(task)) {
+      return true;
+    }
+    try {
+      const peer = await this.client.status({
+        [EXEC_API_VERSION_FIELD]: EXEC_API_VERSION,
+        tenantId: task.tenantId,
+        taskId: task.taskId,
+      });
+      return isFailedOrTimeoutState(peer.payload.state, peer.payload.bOutcome);
+    } catch (error) {
+      if (isUnreachable(error)) {
+        if (task.sideEffectApplied) {
+          return false;
+        }
+        throw new ExecProtocolError(
+          "EXEC_UNREACHABLE",
+          "B' is unreachable and has not confirmed failure",
+          { taskId: task.taskId, state: task.state, cause: error },
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async syncReconcileApplyToB(
+    request: ReturnType<typeof parseReconcileRequest>,
+  ): Promise<void> {
+    try {
+      await this.client.reconcileApply({
+        [EXEC_API_VERSION_FIELD]: EXEC_API_VERSION,
+        tenantId: request.tenantId,
+        taskId: request.taskId,
+        expectedStateVersion: request.expectedStateVersion,
+        reconcileRequestId: request.reconcileRequestId,
+        conclusion: request.conclusion,
+        reason: request.reason,
+        evidenceRef: request.evidenceRef,
+      });
+    } catch {
+      // A' is the authority for conclusions already committed with local evidence.
+    }
   }
 
   private validateLocalInput(input: ExecInput): void {
@@ -610,6 +932,9 @@ export class AControlPlane {
     }
     if (peer.bOutcome) {
       local.bOutcome = peer.bOutcome;
+    }
+    if (peer.sideEffectApplied) {
+      local.sideEffectApplied = true;
     }
     if (peer.errorCode) {
       local.errorCode = peer.errorCode;
@@ -876,6 +1201,7 @@ export class AControlPlane {
         idempotencyExpiresAtMs: this.now() + this.config.idempotencyTtlMs,
         artifacts: peer.payload.artifacts,
         bAccepted: true,
+        stateVersion: peer.payload.stateVersion ?? 0,
       };
       await this.store.upsertTask(local);
       return local;

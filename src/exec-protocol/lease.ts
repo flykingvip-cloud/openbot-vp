@@ -19,6 +19,7 @@ export function mintLease(params: {
   nowMs: number;
   ttlMs: number;
   tenantId?: string;
+  roles?: string[];
 }): { token: string; record: ExecLeaseRecord } {
   if (!params.subject || typeof params.subject !== "string") {
     throw new ExecProtocolError("EXEC_INTERNAL", "lease subject is required");
@@ -37,6 +38,7 @@ export function mintLease(params: {
     exp: new Date(expMs).toISOString(),
     iatMs,
     expMs,
+    roles: params.roles,
   };
   return { token, record };
 }
@@ -76,6 +78,15 @@ export function validateLease(params: {
     throw new ExecProtocolError("EXEC_UNAUTHORIZED", "execution lease does not match subject");
   }
   return record;
+}
+
+export function assertReconcileRole(lease: ExecLeaseRecord): void {
+  if (!lease.roles?.includes("reconcile")) {
+    throw new ExecProtocolError(
+      "EXEC_UNAUTHORIZED",
+      "execution lease is missing the reconcile role",
+    );
+  }
 }
 
 export function parseBearerToken(header: string | string[] | undefined): string | undefined {

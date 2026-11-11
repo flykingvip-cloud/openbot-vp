@@ -23,7 +23,7 @@ export type ExecProtocolConfig = {
   requestTimeoutMs: number;
   executionTimeoutMs: number;
   maxTransportRetries: number;
-  transportBackoffMs: readonly [number, number, number];
+  transportBackoffMs: readonly number[];
   idempotencyKeyMinLength: number;
   idempotencyKeyMaxLength: number;
   idempotencyKeyPattern: string;
@@ -43,7 +43,7 @@ export const ISOLATION_SIGNED_VALUES: ExecProtocolConfig = {
   requestTimeoutMs: 5000,
   executionTimeoutMs: 60000,
   maxTransportRetries: 3,
-  transportBackoffMs: [200, 400, 800],
+  transportBackoffMs: [200, 400],
   idempotencyKeyMinLength: 16,
   idempotencyKeyMaxLength: 128,
   idempotencyKeyPattern: "^[A-Za-z0-9._:-]+$",
@@ -170,19 +170,20 @@ export function validateExecProtocolConfig(
     );
   }
   const backoff = complete.transportBackoffMs;
+  const expectedBackoffLength = complete.maxTransportRetries - 1;
   if (
     !Array.isArray(backoff) ||
-    backoff.length !== 3 ||
+    backoff.length !== expectedBackoffLength ||
     !backoff.every((entry) => isPositiveInt(entry))
   ) {
     throw new ExecConfigError(
-      "exec protocol config refused: transportBackoffMs must be three positive integers",
+      "exec protocol config refused: transportBackoffMs must contain exactly maxTransportRetries-1 positive integers",
       ["transportBackoffMs"],
     );
   }
   return {
     ...complete,
-    transportBackoffMs: [backoff[0], backoff[1], backoff[2]] as const,
+    transportBackoffMs: [...backoff],
   };
 }
 
@@ -241,19 +242,13 @@ export function loadExecProtocolConfigFromEnv(env: NodeJS.ProcessEnv): ExecProto
   const leaseTtlMs = parseRequiredInt(env, EXEC_PROTOCOL_ENV.leaseTtlMs, missing);
   const maxClockSkewMs = parseRequiredInt(env, EXEC_PROTOCOL_ENV.maxClockSkewMs, missing);
 
-  let transportBackoffMs: [number, number, number] | undefined;
+  let transportBackoffMs: number[] | undefined;
   if (backoffRaw !== undefined) {
     const parts = backoffRaw.split(",").map((part) => part.trim());
-    if (parts.length !== 3 || parts.some((part) => !/^\d+$/.test(part))) {
-      missing.push(
-        `${EXEC_PROTOCOL_ENV.transportBackoffMs} (expected three comma-separated integers)`,
-      );
+    if (parts.length === 0 || parts.some((part) => !/^\d+$/.test(part))) {
+      missing.push(`${EXEC_PROTOCOL_ENV.transportBackoffMs} (expected comma-separated integers)`);
     } else {
-      transportBackoffMs = [
-        Number.parseInt(parts[0], 10),
-        Number.parseInt(parts[1], 10),
-        Number.parseInt(parts[2], 10),
-      ];
+      transportBackoffMs = parts.map((part) => Number.parseInt(part, 10));
     }
   }
 

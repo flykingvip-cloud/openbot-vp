@@ -87,7 +87,7 @@ export type IsolatedPair = {
 
 export async function startIsolatedPair(
   overrides: Partial<ExecProtocolConfig> = {},
-  options: { autoStartExecution?: boolean } = {},
+  options: { autoStartExecution?: boolean; leaseTenantId?: string | null } = {},
 ): Promise<IsolatedPair> {
   const aPort = await getFreePort();
   const bPort = await getFreePort();
@@ -95,11 +95,13 @@ export async function startIsolatedPair(
   const bDir = await mkdtemp(join(tmpdir(), "exec-protocol-b-"));
   const configA = isolationProfile({ ...overrides, port: aPort });
   const configB = isolationProfile({ ...overrides, port: bPort });
+  const leaseTenantId =
+    options.leaseTenantId === undefined ? TEST_TENANT : options.leaseTenantId || undefined;
   const minted = mintLease({
     subject: TEST_SUBJECT,
     nowMs: Date.now(),
     ttlMs: configA.leaseTtlMs,
-    tenantId: TEST_TENANT,
+    tenantId: leaseTenantId,
   });
   const aStore = new FileExecStore(aDir);
   const bStore = new FileExecStore(bDir);
@@ -163,6 +165,8 @@ export async function startIsolatedPair(
     stop: async () => {
       await a.stop();
       await b.stop();
+      await aStore.close();
+      await bStore.close();
       await rm(aDir, { recursive: true, force: true });
       await rm(bDir, { recursive: true, force: true });
     },
@@ -188,4 +192,33 @@ export function baseSubmitBody(params: {
     ...(params.probeId ? { probeId: params.probeId } : {}),
     ...(params.sleepMs !== undefined ? { sleepMs: params.sleepMs } : {}),
   };
+}
+
+export async function createReconcileClient(pair: IsolatedPair): Promise<{
+  token: string;
+  record: ExecLeaseRecord;
+  client: ExecHttpClient;
+}> {
+  const minted = mintLease({
+    subject: "reconcile-operator",
+    nowMs: Date.now(),
+    ttlMs: pair.configA.leaseTtlMs,
+    tenantId: pair.tenantId,
+    roles: ["reconcile"],
+  });
+  await pair.a.registerLease(minted.record);
+  return {
+    token: minted.token,
+    record: minted.record,
+    client: new ExecHttpClient({
+      baseUrl: pair.a.baseUrl,
+      config: pair.configA,
+      leaseToken: minted.token,
+      maxRequestBodyBytes: MAX_REQUEST_BODY_BYTES,
+    }),
+  };
+}
+
+export function uniqueReconcileRequestId(prefix = "recon"): string {
+  return uniqueIdempotencyKey(prefix);
 }

@@ -88,6 +88,7 @@ export class AControlServer {
         server.close((error) => (error ? reject(error) : resolve()));
       });
     }
+    await this.store.close();
   }
 
   async registerLease(record: ExecLeaseRecord): Promise<void> {
@@ -153,6 +154,11 @@ export class AControlServer {
       }
       if (path === "/v1/artifacts/upload") {
         const result = await this.plane.upload(payload, lease);
+        writeJson(res, result.status, result.body);
+        return;
+      }
+      if (path === "/v1/tasks/reconcile") {
+        const result = await this.plane.reconcile(payload, lease);
         writeJson(res, result.status, result.body);
         return;
       }

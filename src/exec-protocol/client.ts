@@ -11,6 +11,8 @@ import {
   type ExecArtifactResponse,
   type ExecCancelRequest,
   type ExecErrorCode,
+  type ExecReconcileRequest,
+  type ExecReconcileResponse,
   type ExecRevokeRequest,
   type ExecStatusRequest,
   type ExecSubmitRequest,
@@ -127,6 +129,20 @@ export class ExecHttpClient {
   ): Promise<{ httpStatus: number; payload: Record<string, unknown> }> {
     const result = await this.requestOnce("POST", "/v1/revoke", body);
     return { httpStatus: result.status, payload: result.body };
+  }
+
+  async reconcile(
+    body: ExecReconcileRequest,
+  ): Promise<{ httpStatus: number; payload: ExecReconcileResponse }> {
+    const result = await this.requestOnce("POST", "/v1/tasks/reconcile", body);
+    return { httpStatus: result.status, payload: result.body as unknown as ExecReconcileResponse };
+  }
+
+  async reconcileApply(
+    body: ExecReconcileRequest,
+  ): Promise<{ httpStatus: number; payload: ExecReconcileResponse }> {
+    const result = await this.requestOnce("POST", "/v1/tasks/reconcile-apply", body);
+    return { httpStatus: result.status, payload: result.body as unknown as ExecReconcileResponse };
   }
 
   async debug(): Promise<{ httpStatus: number; payload: Record<string, unknown> }> {

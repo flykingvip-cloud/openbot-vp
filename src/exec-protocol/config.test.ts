@@ -17,7 +17,7 @@ describe("exec protocol isolation config", () => {
     expect(config.port).toBe(18790);
     expect(config.bind).toBe("127.0.0.1");
     expect(config.maxTransportRetries).toBe(3);
-    expect(config.transportBackoffMs).toEqual([200, 400, 800]);
+    expect(config.transportBackoffMs).toEqual([200, 400]);
   });
 
   it("allows an explicit complete override for a non-public test port", () => {
@@ -62,6 +62,18 @@ describe("exec protocol isolation config", () => {
     expect(loaded.port).toBe(19111);
     expect(loaded.executionTimeoutMs).toBe(60000);
     expect(loaded.leaseTtlMs).toBe(3600000);
+  });
+
+  it("refuses a backoff array that does not equal maxTransportRetries-1", () => {
+    expect(() => isolationProfile({ transportBackoffMs: [200, 400, 800] })).toThrow(
+      /maxTransportRetries-1/,
+    );
+    expect(() =>
+      loadExecProtocolConfigFromEnv({
+        ...isolationConfigToEnv(isolationProfile()),
+        [EXEC_PROTOCOL_ENV.transportBackoffMs]: "200,400,800",
+      }),
+    ).toThrow(/maxTransportRetries-1/);
   });
 
   it("refuses to start a process when required process env is missing", async () => {

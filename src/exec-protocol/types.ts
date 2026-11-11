@@ -92,6 +92,7 @@ export type ExecLeaseRecord = {
   hash: string;
   subject: string;
   tenantId?: string;
+  roles?: string[];
   iat: string;
   exp: string;
   iatMs: number;
@@ -142,6 +143,7 @@ export type ExecTaskRecord = {
   sleepMs?: number;
   bOutcome?: BExecutionOutcome;
   failureReason?: string;
+  stateVersion: number;
 };
 
 export type ExecSubmitRequest = {
@@ -189,6 +191,70 @@ export type ExecUploadArtifactRequest = {
   byteCount: number;
 };
 
+export const EXEC_RECONCILE_CONCLUSIONS = [
+  "succeeded",
+  "failed",
+  "cancelled",
+  "remain_unconfirmed",
+] as const;
+
+export type ExecReconcileConclusion = (typeof EXEC_RECONCILE_CONCLUSIONS)[number];
+
+export type ExecEvidenceRef =
+  | {
+      kind: "artifact-verified";
+      artifactId: string;
+      sha256: string;
+      byteCount: number;
+    }
+  | {
+      kind: "b-cancelled-confirmed";
+    }
+  | {
+      kind: "b-failed-confirmed";
+    }
+  | {
+      kind: "operator-note";
+      note?: string;
+    };
+
+export type ExecReconcileRequest = {
+  [EXEC_API_VERSION_FIELD]: typeof EXEC_API_VERSION;
+  tenantId: string;
+  taskId: string;
+  expectedStateVersion: number;
+  reconcileRequestId: string;
+  conclusion: ExecReconcileConclusion;
+  reason: string;
+  evidenceRef: ExecEvidenceRef;
+};
+
+export type ExecReconcileAudit = {
+  taskId: string;
+  tenantId: string;
+  operator: string;
+  at: string;
+  atMs: number;
+  previousState: ExecTaskState;
+  newState: ExecTaskState;
+  conclusion: ExecReconcileConclusion;
+  reason: string;
+  evidenceRef: ExecEvidenceRef;
+  reconcileRequestId: string;
+  previousStateVersion: number;
+  newStateVersion: number;
+};
+
+export type ExecReconcileResponse = ExecTaskResponse & {
+  reconcileRequestId: string;
+  operator: string;
+  reconciledAt: string;
+  previousState: ExecTaskState;
+  newState: ExecTaskState;
+  conclusion: ExecReconcileConclusion;
+  reason: string;
+};
+
 export type ExecRevokeRequest = {
   [EXEC_API_VERSION_FIELD]: typeof EXEC_API_VERSION;
   tenantId?: string;
@@ -208,6 +274,8 @@ export type ExecTaskResponse = {
   errorCode?: ExecErrorCode;
   errorMessage?: string;
   bOutcome?: BExecutionOutcome;
+  stateVersion: number;
+  sideEffectApplied?: boolean;
 };
 
 export type ExecArtifactResponse = {
