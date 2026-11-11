@@ -12764,6 +12764,27 @@ tasks:
     ownerHistory: []
     since: 2026-11-09
     metadata: {}
+  - id: local-ui-seams
+    owner: codex-runtime-manager
+    intent: []
+    paths:
+      - ui/src/ui/gateway-subscriptions/chat.ts
+      - ui/src/ui/views/artifact-sidebar.ts
+      - ui/src/ui/views/artifact-sidebar.node.test.ts
+      - ui/src/ui/views/artifact-sidebar-download-lane.test.ts
+      - ui/src/ui/app-gateway.node.test.ts
+    state: active
+    sessions:
+      - id: local-ui-seams-20261111
+        taskId: local-ui-seams
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-11T01:57:47.098Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-11
+    metadata: {}
 landingStreams:
   - id: pack1-msg3-admission-abort-actor-8564
     landingPolicy: serial
