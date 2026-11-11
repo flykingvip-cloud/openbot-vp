@@ -545,6 +545,7 @@ describe("runPreparedReply inbound depth router", () => {
         });
         expect(run?.extraSystemPrompt).toContain("Acceptance criteria:");
         if (kind === "amended") {
+          expect(run?.taskCompletionBinding?.constraints).toEqual(["将补贴改为1000元并重写文件"]);
           expect(run?.extraSystemPrompt).toContain("将补贴改为1000元并重写文件");
           expect(mutate).toHaveBeenCalledOnce();
         }

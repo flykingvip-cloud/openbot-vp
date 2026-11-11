@@ -25,6 +25,7 @@ import {
   isEmbeddedPiRunStreaming,
   waitForEmbeddedPiRunEnd,
 } from "../../agent-runtime/execution/index.js";
+import { activeConstraintTexts } from "../../agent-runtime/policy/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
@@ -1592,6 +1593,7 @@ export async function runPreparedReply(
         taskId: board.current.taskId,
         executionAttempt: board.current.executionAttempt,
         deliverableVersion: board.current.deliverableVersion,
+        constraints: activeConstraintTexts(board.current),
       };
       acceptedCriteria = board.current.acceptanceCriteria ?? [];
       extraSystemPromptParts.push(
@@ -1679,6 +1681,7 @@ export async function runPreparedReply(
               taskId: updatedBoard.current.taskId,
               executionAttempt: updatedBoard.current.executionAttempt,
               deliverableVersion: updatedBoard.current.deliverableVersion,
+              constraints: activeConstraintTexts(updatedBoard.current),
             };
             acceptedCriteria = updatedBoard.current.acceptanceCriteria ?? [];
           }
