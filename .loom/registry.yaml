@@ -12781,6 +12781,9 @@ tasks:
       - src/agent-runtime/model/interaction-completion.test.ts
       - src/agent-runtime/delivery/named-file-receipt.ts
       - src/agent-runtime/delivery/named-file-receipt.test.ts
+      - src/infra/agent-events.ts
+      - src/infra/agent-events.test.ts
+      - src/agent-runtime/execution/runner/embedded-attempt.ts
     state: active
     sessions:
       - id: local-ui-seams-20261111
@@ -12788,12 +12791,20 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-11T05:13:50.008Z
+        lastSignalAt: 2026-11-11T05:27:39.528Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-11
     metadata: {}
 landingStreams:
+  - id: local-ui-seams-agent-event-regression-20261111
+    landingPolicy: serial
+    paths:
+      - src/infra/agent-events.test.ts
+    canLandWith: []
+    metadata:
+      task: local-ui-seams
+      agent: codex-runtime-manager
   - id: pack1-msg3-admission-abort-actor-8564
     landingPolicy: serial
     paths:
