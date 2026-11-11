@@ -23,6 +23,7 @@ import {
   abortEmbeddedPiRun,
   isEmbeddedPiRunActive,
   isEmbeddedPiRunStreaming,
+  waitForEmbeddedPiRunEnd,
 } from "../../agent-runtime/execution/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
@@ -1651,7 +1652,13 @@ export async function runPreparedReply(
           }
         }
         if (applied.kind === "applied" && routed.decision.kind === "task_change") {
-          const steered = replyTurnRuntime.steer(sessionIdFinal, inboundMessage);
+          // Steering alone cannot refresh an attempt's captured constraint
+          // boundary. Stop its old view, wait for cleanup, then re-read state.
+          const active = isEmbeddedPiRunActive(sessionIdFinal);
+          const drained = active
+            ? abortEmbeddedPiRun(sessionIdFinal) && (await waitForEmbeddedPiRunEnd(sessionIdFinal))
+            : true;
+          opts?.abortSignal?.throwIfAborted();
           // A persisted amendment is not an executed revision. If no run can
           // consume it, continue the original admitted task through this host.
           // Re-read after the mutation: pause, reset and focus changes must win.
@@ -1662,8 +1669,7 @@ export async function runPreparedReply(
           );
           const continuation = admittedTaskQueryContinuation({ board: updatedBoard });
           if (
-            !steered &&
-            !isEmbeddedPiRunActive(sessionIdFinal) &&
+            drained &&
             continuation.shouldContinue &&
             updatedBoard.focusRevision === captured.expectedFocusRevision &&
             updatedBoard.current?.taskId === routed.decision.target.taskId

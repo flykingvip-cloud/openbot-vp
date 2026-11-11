@@ -380,11 +380,18 @@ describe("runPreparedReply inbound depth router", () => {
     };
     const isResume = kind === "resumed" || kind === "resume_denied";
     const isAmendment = kind.startsWith("amended");
-    const executes = kind === "accepted" || kind === "resumed" || kind === "amended";
+    const executes =
+      kind === "accepted" ||
+      kind === "resumed" ||
+      kind === "amended" ||
+      kind === "amended_active" ||
+      kind === "amended_steered";
     const active = vi
       .spyOn(executionRuntime, "isEmbeddedPiRunActive")
       .mockReturnValue(kind === "amended_active");
     const steer = vi.spyOn(replyTurnRuntime, "steer").mockReturnValue(kind === "amended_steered");
+    const abort = vi.spyOn(executionRuntime, "abortEmbeddedPiRun").mockReturnValue(true);
+    const wait = vi.spyOn(executionRuntime, "waitForEmbeddedPiRunEnd").mockResolvedValue(true);
     const mutate = vi
       .spyOn(replyTurnRuntime.state, "applyInteractionProposal")
       .mockReturnValue(
@@ -516,6 +523,10 @@ describe("runPreparedReply inbound depth router", () => {
         ]),
       );
       expect(runReplyAgent).toHaveBeenCalledTimes(executes ? 1 : 0);
+      if (kind === "amended_active") {
+        expect(abort).toHaveBeenCalledWith("ingress");
+        expect(wait).toHaveBeenCalledWith("ingress");
+      }
       if (kind === "corrupt_state" || kind === "transcript_failure") {
         expect(interaction.mock.calls[0]?.[0].input.availability).toMatchObject({
           mode: "restricted",
@@ -559,6 +570,8 @@ describe("runPreparedReply inbound depth router", () => {
     } finally {
       steer.mockRestore();
       mutate.mockRestore();
+      abort.mockRestore();
+      wait.mockRestore();
       active.mockRestore();
       interaction.mockRestore();
       read.mockRestore();
