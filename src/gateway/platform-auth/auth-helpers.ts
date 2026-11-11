@@ -146,6 +146,22 @@ export function canManagePlatform(user: PlatformAuthUser | null | undefined): bo
   return user?.scopes.includes(ADMIN_SCOPE) === true;
 }
 
+/**
+ * Existing observation-read permission. operator.read may see platform
+ * directory tenant details; this does not grant canManagePlatform.
+ * Keep in sync with session-context.ts.
+ */
+export function canReadPlatformEnterpriseDirectory(
+  user: PlatformAuthUser | null | undefined,
+  sessionScopes?: readonly string[] | null,
+): boolean {
+  if (canManagePlatform(user)) {
+    return true;
+  }
+  const scopes = [...(user?.scopes ?? []), ...(sessionScopes ?? [])];
+  return scopes.includes(READ_SCOPE);
+}
+
 export function normalizePlatformAdminScopes(value: unknown): string[] {
   const scopes = Array.isArray(value) ? value : [];
   const allowed = new Set<string>(PLATFORM_ADMIN_SCOPES);

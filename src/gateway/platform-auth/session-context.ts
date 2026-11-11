@@ -11,7 +11,7 @@ import type {
 import { type EnterpriseSeatAssetsStore } from "../enterprise-seat-assets-store.js";
 import { resolveClientIpFromRequest } from "../enterprise-security/client-ip.js";
 import { applyStoredSessionControls } from "../enterprise-security/session-enforcement.js";
-import { ADMIN_SCOPE } from "../method-scopes.js";
+import { ADMIN_SCOPE, READ_SCOPE } from "../method-scopes.js";
 import { resolvePlatformAuthSmtpConfig } from "../platform-auth-email.js";
 import { resolvePlatformAuthConfig, type ResolvedPlatformAuthConfig } from "./config.js";
 import { listPendingEnterpriseCoAdminInvites } from "./enterprise-co-admin-invite.js";
@@ -415,6 +415,22 @@ function canManagePlatformAdmins(user: PlatformAuthUser | null | undefined): boo
 }
 
 /**
+ * Observation / directory read uses the existing operator.read scope (and the
+ * broader canManagePlatform admin path). This is not a new authority, and it
+ * must not grant management capabilities.
+ */
+function canReadPlatformEnterpriseDirectory(
+  user: PlatformAuthUser | null | undefined,
+  sessionScopes?: readonly string[] | null,
+): boolean {
+  if (canManagePlatform(user)) {
+    return true;
+  }
+  const scopes = [...(user?.scopes ?? []), ...(sessionScopes ?? [])];
+  return scopes.includes(READ_SCOPE);
+}
+
+/**
  * Platform capabilities are reported only when the session is NOT an employee
  * session. A super-admin signed in through the employee entry holds an
  * "employee" session, so platform management is suppressed even though the
@@ -681,9 +697,9 @@ function buildPlatformEnterpriseDirectory(
       const contact = resolveEnterpriseDirectoryContact(store, enterprise.id);
       return {
         ...toEnterpriseSummary(enterprise),
-        // Existing canManagePlatform / grantsPlatform permission: this list is
-        // only built after that check. Stamp an explicit observation grant so
-        // the UI does not infer access from directory presence alone.
+        // Existing observation-read / platform-admin permission already
+        // confirmed this identity may see these enterprises. Stamp an explicit
+        // grant so the UI does not infer access from directory presence alone.
         tenantGrant: "granted" as const,
         ...(contact ? { contact } : {}),
         contributionSummary:
@@ -731,8 +747,15 @@ export async function buildPlatformAuthState(params: {
       ? buildPlatformAdminDirectory(params)
       : undefined;
   const grantsPlatform = !employeeSession && canManagePlatform(params.context?.user);
-  const directory = grantsPlatform ? (buildPlatformEnterpriseDirectory(params.store) ?? []) : [];
-  const platformEnterprises = grantsPlatform
+  // operator.read already authorizes observation display; emit the directory
+  // and confirmed grants without promoting the session to canManagePlatform.
+  const readsPlatformDirectory =
+    !employeeSession &&
+    canReadPlatformEnterpriseDirectory(params.context?.user, params.context?.session?.scopes);
+  const directory = readsPlatformDirectory
+    ? (buildPlatformEnterpriseDirectory(params.store) ?? [])
+    : [];
+  const platformEnterprises = readsPlatformDirectory
     ? params.skipSubscriptionContracts
       ? directory
       : await attachActiveSubscriptionContracts(directory)

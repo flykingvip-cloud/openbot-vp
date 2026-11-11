@@ -25,6 +25,7 @@ function directoryEntry(
 
 async function mountObservation(options: {
   scopes?: readonly string[] | null;
+  canManagePlatform?: boolean;
   directory: readonly ReturnType<typeof directoryEntry>[];
 }) {
   const container = document.createElement("div");
@@ -36,7 +37,8 @@ async function mountObservation(options: {
       client: null,
       connected: true,
       platformAuthState: {
-        session: { provider: "trusted-proxy", user: "admin", scopes: options.scopes ?? undefined },
+        session: { provider: "trusted-proxy", user: "reader", scopes: options.scopes ?? undefined },
+        ...(options.canManagePlatform ? { canManagePlatform: true } : {}),
       },
     },
     subnavProps: {
@@ -181,6 +183,52 @@ describe("platform observation shell", () => {
       "无授权",
     );
     expect(workbench.querySelectorAll(".obs-run")).toHaveLength(0);
+    container.remove();
+  });
+
+  it("lets an operator.read-only platform session filter a granted tenant and leaves tenantFilter=all unaffected", async () => {
+    const { container, workbench } = await mountObservation({
+      scopes: ["operator.read"],
+      directory: [
+        directoryEntry("tenant-granted", "只读已授权企业", "granted"),
+        directoryEntry("tenant-unknown", "未确认企业", "unknown"),
+      ],
+    });
+    expect(workbench.authorized).toBe(true);
+    expect(workbench.scopes).toEqual(["operator.read"]);
+    expect(workbench.tenantGrants).toEqual({
+      "tenant-granted": "granted",
+      "tenant-unknown": "unknown",
+    });
+
+    const tenant = workbench.querySelector<HTMLSelectElement>("select[aria-label=租户筛选]")!;
+    expect(tenant.value).toBe("all");
+    expect(workbench.querySelector('[data-testid="obs-access-notice"]')).toBeNull();
+    expect(workbench.textContent).not.toContain("当前租户授权尚未确认");
+    tenant.value = "tenant-granted";
+    tenant.dispatchEvent(new Event("change"));
+    await workbench.updateComplete;
+    expect(workbench.querySelector('[data-testid="obs-access-notice"]')).toBeNull();
+    expect(workbench.textContent).not.toContain("当前租户授权尚未确认");
+    expect(workbench.textContent).not.toContain("当前租户筛选无授权");
+    expect(workbench.textContent).toContain("所选企业暂无已映射运行事件");
+
+    tenant.value = "tenant-unknown";
+    tenant.dispatchEvent(new Event("change"));
+    await workbench.updateComplete;
+    expect(workbench.querySelector('[data-testid="obs-access-notice"]')?.textContent).toContain(
+      "当前租户授权尚未确认",
+    );
+    expect(workbench.querySelector('[data-testid="obs-access-notice"]')?.textContent).not.toContain(
+      "无授权",
+    );
+
+    tenant.value = "all";
+    tenant.dispatchEvent(new Event("change"));
+    await workbench.updateComplete;
+    expect(workbench.querySelector('[data-testid="obs-access-notice"]')).toBeNull();
+    expect(workbench.textContent).not.toContain("当前租户授权尚未确认");
+    expect(workbench.textContent).not.toContain("当前租户筛选无授权");
     container.remove();
   });
 });
