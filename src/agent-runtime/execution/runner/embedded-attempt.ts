@@ -13,6 +13,7 @@ import {
   acquireSessionWriteLock,
   resolveSessionLockMaxHoldFromTimeout,
 } from "../../../agents/session-write-lock.js";
+import { bindAgentRunCompletionWorkspace } from "../../../infra/agent-events.js";
 import { ensureGlobalUndiciStreamTimeouts } from "../../../infra/net/undici-global-dispatcher.js";
 import { resolveUserPath } from "../../../utils.js";
 import { resolveAttemptSandbox } from "../../capabilities/index.js";
@@ -61,6 +62,7 @@ export async function runEmbeddedAttempt(
     sandbox: s.sandbox,
   });
   await fs.mkdir(s.effectiveWorkspace, { recursive: true });
+  bindAgentRunCompletionWorkspace(params.runId, s.effectiveWorkspace);
 
   process.chdir(s.effectiveWorkspace);
   try {
