@@ -12838,8 +12838,7 @@ landingStreams:
       - src/agents/sandbox/docker-engine-client.ts
       - src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
       - src/agents/sandbox/production-execution-mode.ts
-    canLandWith:
-      - pack1-msg3-admission-abort-actor-8564
+    canLandWith: []
     metadata:
       task: forbid-production-host-fallback
       owner: cursor-shuanggui-publish
@@ -12862,8 +12861,7 @@ landingStreams:
       - src/gateway/server-methods/chat.abort-persistence.test.ts
       - src/gateway/server-methods/chat.ts
       - src/gateway/workspace/handler-bridge.ts
-    canLandWith:
-      - forbid-production-host-fallback
+    canLandWith: []
     metadata:
       task: pack1-msg3-admission-abort-actor
       agent: cursor-grok-8564
