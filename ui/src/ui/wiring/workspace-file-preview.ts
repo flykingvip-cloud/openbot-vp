@@ -551,6 +551,20 @@ export function applyWorkspaceFilePreview(params: {
   extraMetadata?: Record<string, unknown>;
 }): ApplyWorkspaceFilePreviewResult {
   const { host, workspace, file, filename, extraMetadata } = params;
+  const expectedHash = workspace.artifact.providerMetadata?.artifactSha256;
+  // An initial named-file receipt identifies exact bytes, not whichever file
+  // currently occupies the same path. Later explicit edits use their CAS flow.
+  if (
+    workspace.artifact.providerMetadata?.workspaceFileLoaded !== true &&
+    typeof expectedHash === "string" &&
+    expectedHash &&
+    file.contentHash !== expectedHash
+  ) {
+    host.sidebarContent = null;
+    host.sidebarError = "成果文件版本已变化，无法展示原版本。请刷新成果后重试。";
+    host.sidebarArtifactWorkspace = null;
+    return "empty";
+  }
   clearArtifactPreviewMiss(host, workspace.artifact.artifactId);
   const relativePath = file.relativePath || filename.trim();
   const displayName =
