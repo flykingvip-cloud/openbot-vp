@@ -140,15 +140,11 @@ export class AControlPlane {
         }
         return { status: SUCCESS_HTTP_IDEMPOTENT_OR_READ, body: toTaskResponse(current) };
       }
-      if (
-        existingTask &&
-        !isTerminalState(existingTask.state) &&
-        existingTask.state !== "result_unconfirmed"
-      ) {
+      if (!existingTask || !isTerminalState(existingTask.state)) {
         throw new ExecProtocolError(
           "EXEC_CONFLICT",
           "idempotency key expired but the original task is not terminal",
-          { taskId: existing.taskId, state: existingTask.state },
+          { taskId: existing.taskId, state: existingTask?.state },
         );
       }
     }

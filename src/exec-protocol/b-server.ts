@@ -374,11 +374,11 @@ export class BExecutionServer {
         );
         return;
       }
-      if (existingTask && !isTerminalState(existingTask.state)) {
+      if (!existingTask || !isTerminalState(existingTask.state)) {
         throw new ExecProtocolError(
           "EXEC_CONFLICT",
           "idempotency key expired but the original task is not terminal",
-          { taskId: existing.taskId, state: existingTask.state },
+          { taskId: existing.taskId, state: existingTask?.state },
         );
       }
     }

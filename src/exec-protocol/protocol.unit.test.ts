@@ -322,4 +322,41 @@ describe("exec protocol HTTP unit paths", () => {
     }
     expect(probe.calls).toHaveLength(0);
   });
+
+  it("expired idempotency key conflicts when the original task is result_unconfirmed", async () => {
+    const pair = await startIsolatedPair({}, { autoStartExecution: false });
+    const key = uniqueIdempotencyKey();
+    try {
+      const first = await pair.aClient.submit(
+        baseSubmitBody({ idempotencyKey: key, input: inlineJsonInput({ ttl: true }) }) as never,
+      );
+      expect(first.httpStatus).toBe(201);
+      const task = pair.aStore.getTask(first.payload.taskId);
+      if (!task) {
+        throw new Error("expected A' to persist the accepted task");
+      }
+      task.state = "result_unconfirmed";
+      await pair.aStore.upsertTask(task);
+      const existing = pair.aStore.getIdempotency(TEST_TENANT, key);
+      if (!existing) {
+        throw new Error("expected idempotency index record");
+      }
+      await pair.aStore.putIdempotency({ ...existing, expiresAtMs: 1 });
+
+      try {
+        await pair.aClient.submit(
+          baseSubmitBody({ idempotencyKey: key, input: inlineJsonInput({ ttl: true }) }) as never,
+        );
+        throw new Error("expected EXEC_CONFLICT");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ExecProtocolError);
+        expect((error as ExecProtocolError).code).toBe("EXEC_CONFLICT");
+        expect((error as ExecProtocolError).httpStatus).toBe(409);
+      }
+      expect(pair.plane.debug().executionsStarted).toBe(0);
+      expect(pair.probe.calls).toHaveLength(0);
+    } finally {
+      await pair.stop();
+    }
+  });
 });
