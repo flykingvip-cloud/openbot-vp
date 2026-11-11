@@ -40,7 +40,6 @@ import {
   resolveLogicalId,
   upsertGroupDeliverableCanonical,
 } from "./group-manifest.js";
-import { purgePriorKnowledgeDocumentVersions } from "./purge-prior-versions.js";
 import {
   assertDeliverableSaveDecision,
   type ArchivedDeliverableRecord,
@@ -495,12 +494,8 @@ export async function saveAndArchiveWorkspaceDeliverable(params: {
   }
 
   if (decision.action === "overwrite" && attach.documentId) {
-    await purgePriorKnowledgeDocumentVersions({
-      docId: attach.documentId,
-      ownerId: params.userId,
-      tenantId: archiveKb?.tenantId,
-      indexRoot: params.indexRoot,
-    });
+    // Updating the current document must not destroy versions referenced by
+    // reviews or delivery receipts. Retention is a separate governed operation.
     syncDeliverableArchiveRawHash({
       documentId: attach.documentId,
       rawHash: proposedRawHash,
