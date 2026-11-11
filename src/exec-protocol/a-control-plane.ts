@@ -11,6 +11,7 @@ import { ExecProtocolError, isExecProtocolError } from "./errors.js";
 import { forbidHostFallback } from "./host-fallback.js";
 import { assertIdempotencyKey, canonicalizeIntent } from "./idempotency.js";
 import { newTaskId } from "./ids.js";
+import { KeyedLock } from "./keyed-lock.js";
 import { transitionState } from "./state-machine.js";
 import { FileExecStore } from "./store.js";
 import {
@@ -60,6 +61,7 @@ export class AControlPlane {
   private readonly now: () => number;
   readonly hostCommandProbe?: HostCommandProbe;
   private executionsStarted = 0;
+  private readonly submitLocks = new KeyedLock();
 
   constructor(options: ControlPlaneOptions) {
     this.config = options.config;
@@ -119,6 +121,48 @@ export class AControlPlane {
       probeId,
       sleepMs,
     });
+    return this.submitLocks.run(`${tenantId}\0${key}`, () =>
+      this.submitSerialized({
+        payload,
+        lease,
+        tenantId,
+        toolCallId,
+        kind,
+        key,
+        input,
+        probeId,
+        sleepMs,
+        subject,
+        intentCanonical,
+      }),
+    );
+  }
+
+  private async submitSerialized(params: {
+    payload: Record<string, unknown>;
+    lease: ExecLeaseRecord;
+    tenantId: string;
+    toolCallId: string;
+    kind: ExecTaskKind;
+    key: string;
+    input: ExecInput;
+    probeId?: string;
+    sleepMs?: number;
+    subject: string;
+    intentCanonical: string;
+  }): Promise<{ status: number; body: ExecTaskResponse }> {
+    const {
+      payload,
+      tenantId,
+      toolCallId,
+      kind,
+      key,
+      input,
+      probeId,
+      sleepMs,
+      subject,
+      intentCanonical,
+    } = params;
     const nowMs = this.now();
     const existing = this.store.getIdempotency(tenantId, key);
     if (existing) {

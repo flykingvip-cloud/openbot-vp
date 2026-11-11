@@ -60,6 +60,8 @@ export class FileExecStore {
   private snapshot: ExecStoreSnapshot;
   private loaded = false;
 
+  private persistChain: Promise<void> = Promise.resolve();
+
   constructor(dir: string) {
     this.dir = dir;
     this.indexPath = join(dir, "control.json");
@@ -103,11 +105,15 @@ export class FileExecStore {
   }
 
   async persist(): Promise<void> {
-    await mkdir(dirname(this.indexPath), { recursive: true });
-    const tmp = `${this.indexPath}.${process.pid}.${Date.now()}.tmp`;
-    const payload = `${JSON.stringify(this.snapshot, null, 2)}\n`;
-    await writeFile(tmp, payload, "utf8");
-    await rename(tmp, this.indexPath);
+    const run = async () => {
+      await mkdir(dirname(this.indexPath), { recursive: true });
+      const tmp = `${this.indexPath}.${process.pid}.${Date.now()}.tmp`;
+      const payload = `${JSON.stringify(this.snapshot, null, 2)}\n`;
+      await writeFile(tmp, payload, "utf8");
+      await rename(tmp, this.indexPath);
+    };
+    this.persistChain = this.persistChain.then(run, run);
+    await this.persistChain;
   }
 
   async upsertTask(record: ExecTaskRecord): Promise<void> {

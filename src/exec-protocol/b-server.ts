@@ -17,6 +17,7 @@ import {
 } from "./http-json.js";
 import { assertIdempotencyKey, canonicalizeIntent } from "./idempotency.js";
 import { newArtifactId, newTaskId } from "./ids.js";
+import { KeyedLock } from "./keyed-lock.js";
 import { hashLeaseToken, parseBearerToken, validateLease } from "./lease.js";
 import { transitionState } from "./state-machine.js";
 import { FileExecStore } from "./store.js";
@@ -91,6 +92,7 @@ export class BExecutionServer {
   private readonly hostCommandProbe?: HostCommandProbe;
   private readonly autoStartExecution: boolean;
   private shuttingDown = false;
+  private readonly submitLocks = new KeyedLock();
 
   constructor(options: BServerOptions) {
     this.config = options.config;
@@ -352,6 +354,51 @@ export class BExecutionServer {
       probeId,
       sleepMs,
     });
+    await this.submitLocks.run(`${tenantId}\0${key}`, () =>
+      this.handleSubmitSerialized({
+        payload,
+        lease,
+        tenantId,
+        toolCallId,
+        kindRaw,
+        key,
+        input,
+        probeId,
+        sleepMs,
+        subject,
+        intentCanonical,
+        res,
+      }),
+    );
+  }
+
+  private async handleSubmitSerialized(params: {
+    payload: Record<string, unknown>;
+    lease: ExecLeaseRecord;
+    tenantId: string;
+    toolCallId: string;
+    kindRaw: ExecTaskKind;
+    key: string;
+    input: ExecInput;
+    probeId?: string;
+    sleepMs?: number;
+    subject: string;
+    intentCanonical: string;
+    res: ServerResponse;
+  }): Promise<void> {
+    const {
+      payload,
+      tenantId,
+      toolCallId,
+      kindRaw,
+      key,
+      input,
+      probeId,
+      sleepMs,
+      subject,
+      intentCanonical,
+      res,
+    } = params;
     const nowMs = this.now();
     const existing = this.store.getIdempotency(tenantId, key);
     if (existing) {
