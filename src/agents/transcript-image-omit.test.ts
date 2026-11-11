@@ -111,3 +111,25 @@ describe("transcript source image projection", () => {
     expect(serialized.includes(imageData.slice(0, 80))).toBe(false);
   });
 });
+
+it("projects UI file blocks as text without changing the authoritative transcript", () => {
+  const file = {
+    type: "file",
+    fileName: "async-test-doc.md",
+    mimeType: "text/markdown",
+    assetId: "asset-test",
+    contentHash: "abc",
+  };
+  const input = [
+    { role: "user", content: [{ type: "text", text: "extracted document body" }, file] },
+  ];
+  const projected = projectTranscriptSourceImages(input);
+  expect(projected[0].content[0]).toEqual(input[0].content[0]);
+  expect(projected[0].content[1]).toMatchObject({ type: "text" });
+  expect(projected[0].content[1]).toHaveProperty(
+    "text",
+    expect.stringContaining("async-test-doc.md"),
+  );
+  expect(input[0].content[1]).toEqual(file);
+  expect(projectTranscriptSourceImages(projected)).toBe(projected);
+});
