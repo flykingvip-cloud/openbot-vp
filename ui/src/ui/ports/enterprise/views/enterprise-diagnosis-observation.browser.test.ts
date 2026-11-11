@@ -55,6 +55,7 @@ describe("enterprise diagnosis observation host wiring", () => {
     expect(panel.sessionKind).toBe("enterprise-admin");
     expect(panel.gatewayMethods).toEqual(["diagnosis.observation.query"]);
     expect(panel.taskOutcomeRef).toBeNull();
+    expect(panel.tenantGrants).toBeNull();
     expect(request.mock.calls.some((call) => call[0] === "diagnosis.observation.query")).toBe(
       false,
     );
@@ -63,6 +64,7 @@ describe("enterprise diagnosis observation host wiring", () => {
     const { panel, request } = await mount();
     expect(panel.connected).toBe(false);
     expect(panel.scopes).toBeNull();
+    expect(panel.tenantGrants).toBeNull();
     expect(panel.sessionKind).toBeNull();
     expect(panel.gatewayMethods).toBeNull();
     expect(request.mock.calls.some((call) => call[0] === "diagnosis.observation.query")).toBe(

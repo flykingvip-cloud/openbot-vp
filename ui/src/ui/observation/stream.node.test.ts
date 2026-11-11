@@ -176,6 +176,7 @@ describe("observation stream window", () => {
       expect(metric(view, "latency_p95").value).toBeNull();
       expect(metric(view, "latency_p50").display).not.toBe("0");
       expect(metric(view, "run_completion_rate").value).toBeNull();
+      expect(metric(view, "run_completion_rate").display).toBe("未知");
       expect(metric(view, "run_completion_rate").display).not.toBe("0%");
       expect(metric(view, "active_runs").value).toBe(1);
     }
