@@ -69,7 +69,8 @@ describe("diagnosis panel observation origin", () => {
     render(
       html`<openbot-diagnosis-panel
       role="enterprise" tenant-id="t1"
-      .client=${client} .targets=${targets} .observationHost=${host} connected
+      .client=${client} .targets=${targets} .observationHost=${host}
+      .scopes=${["operator.read"]} connected
     ></openbot-diagnosis-panel>`,
       container,
     );

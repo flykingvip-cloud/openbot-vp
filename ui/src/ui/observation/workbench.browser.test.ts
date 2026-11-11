@@ -19,6 +19,7 @@ describe("observation workbench interaction", () => {
         tenantId: "demo",
         sessionKey: "agent:one:main",
         connected: true,
+        authorized: true,
         observationHost: host,
       }),
       container,
@@ -81,6 +82,7 @@ describe("observation live projection", () => {
         tenantId: "demo",
         sessionKey: "agent:one:main",
         connected: true,
+        authorized: true,
         observationHost: host,
       }),
       container,
@@ -118,6 +120,11 @@ describe("platform tenant compare filters", () => {
         tenantId: null,
         sessionKey: null,
         connected: true,
+        authorized: true,
+        tenantGrants: {
+          "sample-tenant-property": "granted",
+          "sample-tenant-north": "granted",
+        },
         observationHost: {},
         enterpriseDirectory: [
           {
@@ -231,6 +238,7 @@ describe("platform tenant compare filters", () => {
         tenantId: null,
         sessionKey: null,
         connected: true,
+        authorized: true,
         observationHost: {},
         enterpriseDirectory: [],
       }),
@@ -259,6 +267,7 @@ describe("platform tenant compare filters", () => {
         tenantId: "t1",
         sessionKey: "agent:main",
         connected: true,
+        authorized: true,
         observationHost: host,
       }),
       container,
@@ -349,6 +358,7 @@ describe("platform tenant compare filters", () => {
         tenantId: null,
         sessionKey: "agent:main",
         connected: true,
+        authorized: true,
         observationHost: {},
         enterpriseDirectory: [{ tenantId: "t1", label: "企业一", status: "active" }],
       }),
@@ -385,6 +395,7 @@ describe("governance readonly intent integration", () => {
         tenantId: "t1",
         sessionKey: null,
         connected: true,
+        authorized: true,
         observationHost: null,
         onSelectActionIntent: (id) => selected.push(id),
         actionIntents: {
@@ -450,6 +461,7 @@ describe("explicit comparison input", () => {
         tenantId: "t1",
         sessionKey: null,
         connected: true,
+        authorized: true,
         observationHost: null,
         onComparisonRefs: (refs) => selections.push(refs),
       }),
@@ -536,6 +548,7 @@ describe("R5 incremental wiring", () => {
       tenantId: "demo",
       sessionKey: "agent:one:main",
       connected: true,
+      authorized: true,
       observationHost: {},
     });
     const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
@@ -659,6 +672,7 @@ describe("R5 incremental wiring", () => {
       tenantId: "demo",
       sessionKey: "agent:one:main",
       connected: true,
+      authorized: true,
       observationHost: {},
     });
     const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
@@ -678,6 +692,78 @@ describe("R5 incremental wiring", () => {
     expect(panel.textContent).not.toContain("投递链路复核");
     expect(panel.textContent).not.toContain("engine_C");
     expect(panel.querySelector('[data-observation-source="live"]')).not.toBeNull();
+    container.remove();
+  });
+
+  it("does not release run details when authorized is omitted or not yet received", async () => {
+    const { container, panel } = await mount({
+      role: "enterprise",
+      tenantId: "demo",
+      sessionKey: "agent:one:main",
+      connected: true,
+      observationHost: {},
+    });
+    const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
+    selector.value = "sample";
+    selector.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(0);
+    expect(panel.querySelector(".obs-drawer")).toBeNull();
+    expect(panel.querySelector('[data-testid="obs-access-notice"]')?.textContent).toContain(
+      "当前授权尚未确认",
+    );
+    expect(panel.querySelector('[data-testid="obs-access-notice"]')?.textContent).not.toContain(
+      "已失效",
+    );
+    container.remove();
+  });
+
+  it("uses server-confirmed tenantGrant and withholds run details while it is unknown", async () => {
+    const { container, panel } = await mount({
+      role: "platform",
+      tenantId: null,
+      sessionKey: null,
+      connected: true,
+      authorized: true,
+      observationHost: {},
+      tenantGrants: {
+        "sample-tenant-property": "unknown",
+        "sample-tenant-north": "none",
+      },
+    });
+    const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
+    selector.value = "sample";
+    selector.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+
+    const tenant = panel.querySelector<HTMLSelectElement>("select[aria-label=租户筛选]")!;
+    tenant.value = "sample-tenant-property";
+    tenant.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(0);
+    expect(panel.querySelector(".obs-drawer")).toBeNull();
+    expect(panel.querySelector('[data-testid="obs-access-notice"]')?.textContent).toContain(
+      "当前租户授权尚未确认",
+    );
+    expect(panel.querySelector('[data-testid="obs-access-notice"]')?.textContent).not.toContain(
+      "无授权",
+    );
+
+    tenant.value = "sample-tenant-north";
+    tenant.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(0);
+    expect(panel.querySelector('[data-testid="obs-access-notice"]')?.textContent).toContain(
+      "当前租户筛选无授权",
+    );
+
+    panel.tenantGrants = { "sample-tenant-property": "granted", "sample-tenant-north": "none" };
+    tenant.value = "sample-tenant-property";
+    tenant.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    expect(panel.querySelectorAll(".obs-run").length).toBeGreaterThan(0);
+    expect(panel.querySelector('[data-testid="obs-access-notice"]')).toBeNull();
+    expect(panel.textContent).toContain("周报资料整理");
     container.remove();
   });
 });

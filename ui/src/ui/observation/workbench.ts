@@ -18,6 +18,7 @@ import type { DiagnosisTargetOption } from "../ports/diagnosis/diagnosis-targets
 import { readRuntimeObservations } from "../runtime-observation.ts";
 import {
   AUTH_INVALID_COPY,
+  AUTH_UNCONFIRMED_COPY,
   accessibleRuns,
   applyDrawerParams,
   currentAuthorization,
@@ -25,7 +26,9 @@ import {
   readDrawerRequest,
   resolveDrawerSelection,
   resolveObservationAuthorized,
+  resolveTenantGrant,
   type ObservationAccessInput,
+  type TenantGrant,
 } from "./access-state.ts";
 import {
   emptyObservation,
@@ -60,7 +63,9 @@ export type ObservationProps = {
   onSelectActionIntent?: (intentId: string, revision: number) => void;
   /** Server-confirmed scopes; URL or client role never grant access. */
   scopes?: readonly string[] | null;
-  authorized?: boolean;
+  authorized?: boolean | null;
+  /** Server-confirmed grants keyed by tenantId. Missing keys stay unknown. */
+  tenantGrants?: Readonly<Record<string, TenantGrant>> | null;
   initialRunId?: string | null;
   initialDrawer?: boolean;
 };
@@ -74,7 +79,8 @@ export function renderObservationWorkbench(props: ObservationProps) {
     .capacity=${props.capacity ?? null} .comparison=${props.comparison ?? null}
     .actionIntents=${props.actionIntents ?? null} .onSelectActionIntent=${props.onSelectActionIntent ?? null}
     .onDiagnoseRun=${props.onDiagnoseRun ?? null}
-    .scopes=${props.scopes ?? null} .authorized=${props.authorized ?? true}
+    .scopes=${props.scopes ?? null} .authorized=${props.authorized ?? null}
+    .tenantGrants=${props.tenantGrants ?? null}
     .initialRunId=${props.initialRunId ?? null} .initialDrawer=${props.initialDrawer ?? false}
   ></openbot-observation-workbench>`;
 }
@@ -120,7 +126,8 @@ export class OpenBotObservationWorkbench extends LitElement {
   @state() private expanded = false;
   @state() private accessNotice: string | null = null;
   @property({ attribute: false }) scopes: readonly string[] | null = null;
-  @property({ type: Boolean }) authorized = true;
+  @property({ attribute: false }) authorized: boolean | null = null;
+  @property({ attribute: false }) tenantGrants: Readonly<Record<string, TenantGrant>> | null = null;
   @property({ attribute: false }) initialRunId: string | null = null;
   @property({ type: Boolean }) initialDrawer = false;
   private frozenView: ObservationView | null = null;
@@ -149,7 +156,9 @@ export class OpenBotObservationWorkbench extends LitElement {
       return;
     }
     if (
-      ["role", "tenantId", "sessionKey", "scopes", "authorized"].some((key) => changed.has(key))
+      ["role", "tenantId", "sessionKey", "scopes", "authorized", "tenantGrants"].some((key) =>
+        changed.has(key),
+      )
     ) {
       this.clearSensitiveObservation();
     }
@@ -177,13 +186,26 @@ export class OpenBotObservationWorkbench extends LitElement {
   private isAuthorized() {
     return resolveObservationAuthorized({ authorized: this.authorized, scopes: this.scopes });
   }
+  private currentTenantGrant(): TenantGrant {
+    if (this.role !== "platform" || this.tenantFilter === "all") {
+      return "granted";
+    }
+    const mapped = this.tenantGrants?.[this.tenantFilter];
+    if (mapped === "granted" || mapped === "none") {
+      return mapped;
+    }
+    const directory =
+      this.source === "sample" ? SAMPLE_ENTERPRISE_DIRECTORY : this.enterpriseDirectory;
+    const entry = directory.find((row) => row.tenantId === this.tenantFilter);
+    return resolveTenantGrant(entry?.tenantGrant ?? mapped);
+  }
   private accessInput(): ObservationAccessInput {
     return {
       authorized: this.isAuthorized(),
       role: this.role,
       actorTenantId: this.tenantId,
       tenantFilter: this.tenantFilter,
-      tenantGrant: "unknown",
+      tenantGrant: this.currentTenantGrant(),
     };
   }
   private clearSensitiveObservation() {
@@ -195,7 +217,9 @@ export class OpenBotObservationWorkbench extends LitElement {
     this.pendingStreamUpdate = false;
     this.requestedRunId = null;
     this.requestedDrawer = false;
-    this.accessNotice = this.isAuthorized() ? null : AUTH_INVALID_COPY;
+    const authorized = this.isAuthorized();
+    this.accessNotice =
+      authorized === true ? null : authorized === false ? AUTH_INVALID_COPY : AUTH_UNCONFIRMED_COPY;
     this.syncDrawerUrl({ runId: null, drawer: false });
   }
   private syncDrawerUrl(request: { runId: string | null; drawer: boolean }) {
@@ -984,8 +1008,9 @@ export class OpenBotObservationWorkbench extends LitElement {
     const selected = resolved.run;
     const showDrawer = Boolean(selected && resolved.expanded);
     const authorization = currentAuthorization(this.accessInput());
-    const notice =
-      this.accessNotice ?? (authorization.ok ? resolved.notice : authorization.message);
+    // Current server-confirmed state wins; a previous unconfirmed/denied notice
+    // must not linger after the tenant filter or grant result changes.
+    const notice = authorization.ok ? resolved.notice : authorization.message;
     return html`<div class="obs-workbench" id="observation-workbench" data-observation-source=${view.source} data-time-window=${this.role === "platform" ? this.timeWindow : "enterprise"} data-tenant-filter=${this.tenantFilter}>
       <div class="obs-header"><div><span class="obs-eyebrow">${this.role === "platform" ? "OBSERVABILITY" : "SELF-EVOLUTION / OBSERVABILITY"}</span><h2>${this.role === "platform" ? "实时运行与改善" : "任务质量进化中心"}</h2><p>${this.role === "platform" ? "不混淆一次成功调用与一项被验收的工作。" : "观测 → 诊断 → 候选与实验 → 效果与治理"}</p></div>
         <div class="obs-source"><span class="obs-source-label">连接工作台数据源</span><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select><small>仅影响连接工作台，不影响独立精确任务查询。</small></div></div>

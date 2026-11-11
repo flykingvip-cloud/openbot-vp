@@ -7,13 +7,21 @@ import type { ObservationRun } from "./model.ts";
 
 export const PRECISE_QUERY_MISS_COPY = "当前授权范围内未找到匹配记录";
 export const AUTH_INVALID_COPY = "当前授权已失效，不返回运行细节。";
+export const AUTH_UNCONFIRMED_COPY = "当前授权尚未确认，不返回运行细节。";
 export const NO_GRANT_COPY = "当前租户筛选无授权，不返回该租户运行细节。";
+export const TENANT_GRANT_UNCONFIRMED_COPY = "当前租户授权尚未确认，不返回该租户运行细节。";
 export const RUN_DENIED_COPY = "当前授权范围内不可打开该证据。";
 export const VERIFICATION_INELIGIBLE_COPY = "收到验证回执，资格校验未通过";
 
 export const OBSERVATION_READ_SCOPES = ["operator.read", "operator.admin"] as const;
 
-export type ObservationAccessCode = "ok" | "auth_invalid" | "no_grant" | "run_out_of_scope";
+export type ObservationAccessCode =
+  | "ok"
+  | "auth_invalid"
+  | "auth_unconfirmed"
+  | "no_grant"
+  | "grant_unconfirmed"
+  | "run_out_of_scope";
 
 export type ObservationAccessDecision = {
   ok: boolean;
@@ -21,15 +29,30 @@ export type ObservationAccessDecision = {
   message: string;
 };
 
+export type TenantGrant = "granted" | "none" | "unknown";
+
 export type ObservationAccessInput = {
-  /** Server-confirmed display boundary; never inferred from a URL or client role switcher. */
-  authorized: boolean;
+  /**
+   * Server-confirmed display boundary.
+   * `true` / `false` only after the server has returned a result.
+   * `null` means omitted or not yet received — unconfirmed, not a grant.
+   */
+  authorized: boolean | null;
   role: "platform" | "enterprise";
   actorTenantId: string | null;
   tenantFilter: string;
-  /** Platform tenant-filter grant as confirmed by the host. Unknown must not invent a denial. */
-  tenantGrant: "granted" | "none" | "unknown";
+  /**
+   * Platform tenant-filter grant as confirmed by the server.
+   * `unknown` only when the server has not yet returned a result.
+   * It must not invent a denial and must not be treated as authorized.
+   */
+  tenantGrant: TenantGrant;
 };
+
+/** Only `granted` / `none` count as a server result. Anything else stays unknown. */
+export function resolveTenantGrant(value: unknown): TenantGrant {
+  return value === "granted" || value === "none" ? value : "unknown";
+}
 
 export function hasObservationReadScope(scopes: readonly string[] | null | undefined): boolean {
   return Boolean(
@@ -38,27 +61,43 @@ export function hasObservationReadScope(scopes: readonly string[] | null | undef
 }
 
 export function resolveObservationAuthorized(input: {
-  authorized?: boolean;
+  authorized?: boolean | null;
   scopes?: readonly string[] | null;
-}): boolean {
+}): boolean | null {
   if (input.authorized === false) {
     return false;
   }
   if (input.scopes !== undefined && input.scopes !== null) {
     return hasObservationReadScope(input.scopes);
   }
-  return input.authorized !== false;
+  if (input.authorized === true) {
+    return true;
+  }
+  // Omitted, null, or not yet received: unconfirmed. Do not default to true.
+  return null;
 }
 
 export function currentAuthorization(input: ObservationAccessInput): ObservationAccessDecision {
-  if (!input.authorized) {
+  if (input.authorized === false) {
     return { ok: false, code: "auth_invalid", message: AUTH_INVALID_COPY };
+  }
+  if (input.authorized !== true) {
+    return { ok: false, code: "auth_unconfirmed", message: AUTH_UNCONFIRMED_COPY };
   }
   if (input.role === "enterprise" && !input.actorTenantId) {
     return { ok: false, code: "no_grant", message: NO_GRANT_COPY };
   }
-  if (input.role === "platform" && input.tenantFilter !== "all" && input.tenantGrant === "none") {
-    return { ok: false, code: "no_grant", message: NO_GRANT_COPY };
+  if (input.role === "platform" && input.tenantFilter !== "all") {
+    if (input.tenantGrant === "none") {
+      return { ok: false, code: "no_grant", message: NO_GRANT_COPY };
+    }
+    if (input.tenantGrant !== "granted") {
+      return {
+        ok: false,
+        code: "grant_unconfirmed",
+        message: TENANT_GRANT_UNCONFIRMED_COPY,
+      };
+    }
   }
   return { ok: true, code: "ok", message: "" };
 }

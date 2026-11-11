@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   AUTH_INVALID_COPY,
+  AUTH_UNCONFIRMED_COPY,
   NO_GRANT_COPY,
   PRECISE_QUERY_MISS_COPY,
   RUN_DENIED_COPY,
+  TENANT_GRANT_UNCONFIRMED_COPY,
   VERIFICATION_INELIGIBLE_COPY,
   accessibleRuns,
   applyDrawerParams,
@@ -16,6 +18,7 @@ import {
   readDrawerRequest,
   resolveDrawerSelection,
   resolveObservationAuthorized,
+  resolveTenantGrant,
   stripDrawerParams,
 } from "./access-state.ts";
 import type { ObservationRun } from "./model.ts";
@@ -73,36 +76,85 @@ describe("observation access decision", () => {
     expect(accessibleRuns([run(), other], granted).map((row) => row.id)).toEqual(["quote-c01"]);
   });
 
-  it("denies a platform tenant filter with no grant and does not invent a grant from unknown", () => {
+  it("denies a platform tenant filter with no grant and does not invent a denial or a grant from unknown", () => {
+    const none = currentAuthorization({
+      authorized: true,
+      role: "platform",
+      actorTenantId: null,
+      tenantFilter: "tenant-restricted",
+      tenantGrant: "none",
+    });
+    expect(none).toEqual({ ok: false, code: "no_grant", message: NO_GRANT_COPY });
+
+    const unknown = currentAuthorization({
+      authorized: true,
+      role: "platform",
+      actorTenantId: null,
+      tenantFilter: "tenant-restricted",
+      tenantGrant: "unknown",
+    });
+    expect(unknown.ok).toBe(false);
+    expect(unknown.code).toBe("grant_unconfirmed");
+    expect(unknown.message).toBe(TENANT_GRANT_UNCONFIRMED_COPY);
+    expect(unknown.message).not.toBe(NO_GRANT_COPY);
     expect(
-      currentAuthorization({
-        authorized: true,
-        role: "platform",
-        actorTenantId: null,
-        tenantFilter: "tenant-restricted",
-        tenantGrant: "none",
-      }).code,
-    ).toBe("no_grant");
-    expect(
-      currentAuthorization({
+      accessibleRuns([run()], {
         authorized: true,
         role: "platform",
         actorTenantId: null,
         tenantFilter: "tenant-restricted",
         tenantGrant: "unknown",
-      }).ok,
-    ).toBe(true);
-    expect(NO_GRANT_COPY).toContain("无授权");
+      }),
+    ).toEqual([]);
+
+    const grantedTenant = currentAuthorization({
+      authorized: true,
+      role: "platform",
+      actorTenantId: null,
+      tenantFilter: "tenant-a",
+      tenantGrant: "granted",
+    });
+    expect(grantedTenant).toEqual({ ok: true, code: "ok", message: "" });
+    expect(resolveTenantGrant(undefined)).toBe("unknown");
+    expect(resolveTenantGrant("paid")).toBe("unknown");
+    expect(resolveTenantGrant("granted")).toBe("granted");
+    expect(resolveTenantGrant("none")).toBe("none");
   });
 
-  it("treats scopes as a display boundary and never grants from a URL-supplied role", () => {
+  it("treats omitted or not-yet-received authorization as unconfirmed, not as a grant", () => {
     expect(hasObservationReadScope(["operator.read"])).toBe(true);
     expect(hasObservationReadScope([])).toBe(false);
     expect(resolveObservationAuthorized({ scopes: [] })).toBe(false);
     expect(resolveObservationAuthorized({ authorized: false, scopes: ["operator.admin"] })).toBe(
       false,
     );
-    expect(resolveObservationAuthorized({ scopes: null })).toBe(true);
+    expect(resolveObservationAuthorized({ scopes: null })).toBeNull();
+    expect(resolveObservationAuthorized({})).toBeNull();
+    expect(resolveObservationAuthorized({ authorized: null })).toBeNull();
+    expect(resolveObservationAuthorized({ authorized: true })).toBe(true);
+
+    const unconfirmed = currentAuthorization({
+      authorized: null,
+      role: "enterprise",
+      actorTenantId: "tenant-a",
+      tenantFilter: "all",
+      tenantGrant: "granted",
+    });
+    expect(unconfirmed).toEqual({
+      ok: false,
+      code: "auth_unconfirmed",
+      message: AUTH_UNCONFIRMED_COPY,
+    });
+    expect(unconfirmed.message).not.toBe(AUTH_INVALID_COPY);
+    expect(
+      accessibleRuns([run()], {
+        authorized: null,
+        role: "enterprise",
+        actorTenantId: "tenant-a",
+        tenantFilter: "all",
+        tenantGrant: "granted",
+      }),
+    ).toEqual([]);
   });
 });
 
