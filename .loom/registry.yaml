@@ -26,6 +26,10 @@ tasks:
       - src/gateway/knowledge/deliverables/save-and-archive.test.ts
       - ui/src/ui/wiring/deliverable-save.ts
       - ui/src/ui/wiring/deliverable-save.test.ts
+      - ui/src/ui/app.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/app-view-state-shell-slices.ts
+      - ui/src/ui/views/chat.ts
     state: active
     sessions:
       - id: local-ui-seams-20261111
@@ -33,7 +37,7 @@ tasks:
         ide: codex
         agent: codex-runtime-manager
         status: active
-        lastSignalAt: 2026-11-11T06:13:07.262Z
+        lastSignalAt: 2026-11-11T07:15:55.472Z
         metadata: {}
     ownerHistory: []
     since: 2026-11-11
