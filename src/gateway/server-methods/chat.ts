@@ -3529,6 +3529,8 @@ async function runGroupBotDiscussionTurn(params: {
   scope: GroupDiscussionScope;
   decision: ParticipationDecision;
   clientRunId: string;
+  /** Authenticated principal used to register the original inbound. */
+  inboundPrincipalActor?: string;
   collaborationRoundId: string;
   participationTier: ParticipationTier;
   contributionRole?: ContributionRole;
@@ -3710,7 +3712,7 @@ async function runGroupBotDiscussionTurn(params: {
         // Preserve inbound identity separately from this member execution run.
         MessageSidFull: params.clientRunId,
         MessageSid: runId,
-        SenderId: platformSenderId || clientInfo?.id,
+        SenderId: params.inboundPrincipalActor || platformSenderId || clientInfo?.id,
         SenderName: platformSenderLabel,
         SenderUsername: platformSenderLabel,
         GatewayClientScopes: params.client?.connect?.scopes,
@@ -5561,6 +5563,7 @@ export const chatHandlers: GatewayRequestHandlers = {
             let lastSkipDetail: string | undefined;
             let lastSkipAgentName: string | undefined;
 
+            let discussToTaskPrincipalActor: string | undefined;
             const runStageBot = async (params: {
               bot: GroupDiscussionBotTarget;
               isWrapTurn: boolean;
@@ -5608,6 +5611,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                   scope,
                   decision,
                   clientRunId,
+                  inboundPrincipalActor: discussToTaskPrincipalActor,
                   collaborationRoundId: clientRunId,
                   participationTier: participationTierByAgentId.get(params.bot.agentId) ?? "duty",
                   contributionRole:
@@ -5726,6 +5730,7 @@ export const chatHandlers: GatewayRequestHandlers = {
             try {
               const d2tActor =
                 (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId || "";
+              discussToTaskPrincipalActor = d2tActor;
               const d2tTurn = await runControlledDiscussToTaskChatTurn({
                 groupId: scope.groupId,
                 sourceMessageId: clientRunId,

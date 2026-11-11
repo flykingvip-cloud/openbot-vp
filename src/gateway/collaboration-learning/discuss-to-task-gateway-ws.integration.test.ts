@@ -548,11 +548,14 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
 
         let coordinatorContextOk = false;
         const memberSources: unknown[] = [];
+        const memberPrincipals: unknown[] = [];
         replySpy.mockImplementation(async (ctx) => {
           const record = ctx as Record<string, unknown>;
           const blob = JSON.stringify(record);
           if (record.CollaborationRoundInvoked === true) {
             memberSources.push(record.MessageSidFull);
+            memberPrincipals.push(record.SenderId);
+
             expect(record.MessageSid).not.toBe(record.MessageSidFull);
           }
           if (
@@ -643,6 +646,7 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         expect(coordinatorContextOk).toBe(true);
         expect(memberSources.length).toBeGreaterThan(0);
         expect(memberSources.every((source) => source === idem)).toBe(true);
+        expect(memberPrincipals).toEqual(memberSources.map(() => "human:owner"));
         expect(replySpy.mock.calls.length).toBeGreaterThan(0);
 
         collector.stop();
