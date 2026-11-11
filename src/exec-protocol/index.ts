@@ -41,6 +41,23 @@ export { BExecutionServer } from "./b-server.js";
 export { AControlPlane } from "./a-control-plane.js";
 export { AControlServer } from "./a-server.js";
 export {
+  ISOLATION_RECONCILE_SYNC_RECOVERY,
+  RECONCILE_SYNC_ALERT_PENDING_AGE_MS,
+  RECONCILE_SYNC_ALERT_WINDOW_REMAINING_MS,
+  RECONCILE_SYNC_MAX_IN_FLIGHT,
+  RECONCILE_SYNC_MAX_RECOVERY_MS,
+  RECONCILE_SYNC_RECOVERY_BACKOFF_CAP_MS,
+  RECONCILE_SYNC_RECOVERY_BACKOFF_MS,
+  RECONCILE_SYNC_SCHEDULER_TICK_MS,
+  ReconcileSyncScheduler,
+  evaluateReconcileSyncAlerts,
+  nextReconcileSyncDueAtMs,
+  reconcileSyncRecordKey,
+  type ReconcileSyncAlert,
+  type ReconcileSyncAlertKind,
+  type ReconcileSyncRecoveryOptions,
+} from "./reconcile-sync-scheduler.js";
+export {
   createHostCommandProbe,
   forbidHostFallback,
   assertNoHostCommands,

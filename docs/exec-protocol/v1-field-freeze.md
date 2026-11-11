@@ -127,4 +127,4 @@ submit ──► accepted ──► queued ──► running ──┬──► 
 
 2026-11-11 起，传输重试的实现与验收以 `docs/exec-protocol/v1-reconcile-and-retry-freeze.md` 为准：最多 3 次尝试（含首次），等待序列为 `200ms` 再 `400ms`，不再使用第三次 `800ms` 等待。对账入口、单写入者约束与 `result_unconfirmed` 出边规则也以该补件为准。端口、超时和租约数值仍仅属于隔离验证剖面，不自动成为生产配置。
 
-同日补件第 5 节补充了 A→B 持久对账同步：操作人可见字段 `reconcileSyncState`（`pending_sync` / `synced` / `sync_conflict`）、`conclusionCommitted`、`bSyncConfirmed`、`needsHuman`、`conclusionDigest`。这些是对账同步状态，不是新的对外端点，也不改写已签收的隔离监听、超时或租约数值。A′/B′ 的 `stateVersion` 归属各自节点，禁止互相比较。
+同日补件第 5 节补充了 A→B 持久对账同步：操作人可见字段 `reconcileSyncState`（`pending_sync` / `synced` / `sync_conflict`）、`conclusionCommitted`、`bSyncConfirmed`、`needsHuman`、`conclusionDigest`。这些是对账同步状态，不是新的对外端点，也不改写已签收的隔离监听、超时或租约数值。A′/B′ 的 `stateVersion` 归属各自节点，禁止互相比较。同日第 5.7 节再补充隔离剖面下的有界后台同步恢复调度器（突发间隔、最长恢复时间与告警阈值）；该调度器不是生产 mTLS/运维冻结，也不改写已签收的 bind、端口、超时、租约或每轮传输突发数值。

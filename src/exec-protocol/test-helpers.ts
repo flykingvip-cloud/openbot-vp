@@ -10,6 +10,7 @@ import { ExecHttpClient } from "./client.js";
 import { isolationProfile, type ExecProtocolConfig } from "./config.js";
 import { createHostCommandProbe } from "./host-fallback.js";
 import { mintLease } from "./lease.js";
+import type { ReconcileSyncRecoveryOptions } from "./reconcile-sync-scheduler.js";
 import { FileExecStore } from "./store.js";
 import type { ExecInput, ExecLeaseRecord, HostCommandProbe } from "./types.js";
 
@@ -87,7 +88,11 @@ export type IsolatedPair = {
 
 export async function startIsolatedPair(
   overrides: Partial<ExecProtocolConfig> = {},
-  options: { autoStartExecution?: boolean; leaseTenantId?: string | null } = {},
+  options: {
+    autoStartExecution?: boolean;
+    leaseTenantId?: string | null;
+    syncRecovery?: ReconcileSyncRecoveryOptions;
+  } = {},
 ): Promise<IsolatedPair> {
   const aPort = await getFreePort();
   const bPort = await getFreePort();
@@ -130,6 +135,7 @@ export async function startIsolatedPair(
     maxRequestBodyBytes: MAX_REQUEST_BODY_BYTES,
     hostCommandProbe: probe,
     subject: TEST_SUBJECT,
+    syncRecovery: options.syncRecovery,
   });
   const a = new AControlServer({
     config: configA,

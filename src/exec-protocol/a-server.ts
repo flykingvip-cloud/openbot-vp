@@ -50,6 +50,7 @@ export class AControlServer {
 
   async start(): Promise<{ host: string; port: number }> {
     await this.plane.loadAndReconcile();
+    this.plane.startReconcileSyncScheduler();
     try {
       const server = createServer((req, res) => {
         void this.handle(req, res);
@@ -68,6 +69,7 @@ export class AControlServer {
     } catch (error) {
       this.server = undefined;
       this.address = undefined;
+      await this.plane.stopReconcileSyncScheduler();
       await this.store.close();
       throw error;
     }
@@ -88,6 +90,7 @@ export class AControlServer {
   }
 
   async stop(): Promise<void> {
+    await this.plane.stopReconcileSyncScheduler();
     const server = this.server;
     this.server = undefined;
     if (server) {

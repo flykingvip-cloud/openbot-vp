@@ -14,6 +14,13 @@ import { newTaskId } from "./ids.js";
 import { KeyedLock } from "./keyed-lock.js";
 import { assertReconcileRole } from "./lease.js";
 import {
+  ISOLATION_RECONCILE_SYNC_RECOVERY,
+  ReconcileSyncScheduler,
+  reconcileSyncRecordKey,
+  type ReconcileSyncAlert,
+  type ReconcileSyncRecoveryOptions,
+} from "./reconcile-sync-scheduler.js";
+import {
   assertIdenticalReconcileReplay,
   digestForReconcileRequest,
   evidenceKey,
@@ -58,6 +65,7 @@ export type ControlPlaneOptions = {
   runtime?: ExecClientRuntime;
   hostCommandProbe?: HostCommandProbe;
   subject: string;
+  syncRecovery?: ReconcileSyncRecoveryOptions;
 };
 
 const TASK_KINDS: ReadonlySet<ExecTaskKind> = new Set([
@@ -80,6 +88,11 @@ export class AControlPlane {
   private executionsStarted = 0;
   private readonly submitLocks = new KeyedLock();
   private readonly reconcileLocks = new KeyedLock();
+  private readonly syncLocks = new KeyedLock();
+  private readonly syncInFlight = new Set<string>();
+  readonly syncScheduler: ReconcileSyncScheduler;
+  private readonly defaultSleep = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
 
   constructor(options: ControlPlaneOptions) {
     this.config = options.config;
@@ -88,6 +101,23 @@ export class AControlPlane {
     this.subject = options.subject;
     this.now = options.now ?? options.runtime?.now ?? (() => Date.now());
     this.hostCommandProbe = options.hostCommandProbe;
+    const recovery = options.syncRecovery ?? {};
+    this.syncScheduler = new ReconcileSyncScheduler({
+      now: () => this.now(),
+      sleep: recovery.sleep ?? options.runtime?.sleep ?? this.defaultSleep,
+      listPending: () => this.store.listPendingReconcileSyncs(),
+      attemptSync: (record) => this.attemptReconcileSync(record),
+      isSyncInFlight: (record) => this.syncInFlight.has(reconcileSyncRecordKey(record)),
+      onAlert: recovery.onAlert,
+      backoffMs: recovery.backoffMs ?? ISOLATION_RECONCILE_SYNC_RECOVERY.backoffMs,
+      maxRecoveryMs: recovery.maxRecoveryMs ?? ISOLATION_RECONCILE_SYNC_RECOVERY.maxRecoveryMs,
+      alertPendingAgeMs:
+        recovery.alertPendingAgeMs ?? ISOLATION_RECONCILE_SYNC_RECOVERY.alertPendingAgeMs,
+      alertWindowRemainingMs:
+        recovery.alertWindowRemainingMs ?? ISOLATION_RECONCILE_SYNC_RECOVERY.alertWindowRemainingMs,
+      maxInFlight: recovery.maxInFlight ?? ISOLATION_RECONCILE_SYNC_RECOVERY.maxInFlight,
+      tickMs: recovery.tickMs ?? ISOLATION_RECONCILE_SYNC_RECOVERY.tickMs,
+    });
   }
 
   debug(): ExecSiteDebug {
@@ -111,16 +141,43 @@ export class AControlPlane {
   }
 
   /**
-   * Isolation retry/scheduler hook: resume every durable pending A→B
-   * reconcile sync from the store. Called after A restarts and may also
-   * be invoked in-process after connectivity is restored. Each call runs
-   * at most one transport burst (3 attempts, waits 200 then 400).
-   * Permanent conflicts become `sync_conflict` and are not retried.
+   * Isolation retry hook: run one transport burst for every durable
+   * `pending_sync` record. Used on A' restart (`loadAndReconcile`) and as
+   * the operator entry to force a burst without waiting for the scheduler
+   * backoff. Permanent conflicts (`sync_conflict` / `needsHuman`) are not
+   * retried. Continuous recovery without a restart or this call is owned
+   * by `startReconcileSyncScheduler()`.
    */
   async resumePendingReconcileSyncs(): Promise<void> {
     for (const record of this.store.listPendingReconcileSyncs()) {
+      if (record.needsHuman || record.syncState !== "pending_sync") {
+        continue;
+      }
       await this.attemptReconcileSync(record);
     }
+  }
+
+  startReconcileSyncScheduler(): void {
+    this.syncScheduler.start();
+  }
+
+  async stopReconcileSyncScheduler(): Promise<void> {
+    await this.syncScheduler.stop();
+  }
+
+  /**
+   * Human-handling entry: durable permanent conflicts that must not be
+   * auto-retried. Operators inspect this list; the scheduler never clears
+   * `sync_conflict` or `needsHuman`.
+   */
+  listHumanReconcileConflicts(): ExecReconcileSyncRecord[] {
+    return this.store
+      .listReconcileSyncs()
+      .filter((entry) => entry.syncState === "sync_conflict" || entry.needsHuman);
+  }
+
+  listReconcileSyncAlerts(nowMs = this.now()): ReconcileSyncAlert[] {
+    return this.syncScheduler.currentAlerts(nowMs);
   }
 
   async submit(
@@ -879,6 +936,22 @@ export class AControlPlane {
   }
 
   private async attemptReconcileSync(
+    record: ExecReconcileSyncRecord,
+  ): Promise<ExecReconcileSyncRecord> {
+    const key = reconcileSyncRecordKey(record);
+    return this.syncLocks.run(key, async () => {
+      this.syncInFlight.add(key);
+      try {
+        const result = await this.attemptReconcileSyncBody(record);
+        this.syncScheduler.noteBurstResult(result);
+        return result;
+      } finally {
+        this.syncInFlight.delete(key);
+      }
+    });
+  }
+
+  private async attemptReconcileSyncBody(
     record: ExecReconcileSyncRecord,
   ): Promise<ExecReconcileSyncRecord> {
     const latest =

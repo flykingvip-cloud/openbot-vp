@@ -221,6 +221,7 @@ describe("durable A→B reconcile sync", () => {
       expect(result.payload.bSyncConfirmed).toBe(false);
       expect(result.payload.reconcileSyncState).toBe("pending_sync");
       expect(pair.bStore.getTask(unconfirmed.payload.taskId)?.state).toBe("succeeded");
+      await pair.plane.stopReconcileSyncScheduler();
       await pair.plane.resumePendingReconcileSyncs();
       const sync = pair.aStore.latestReconcileSync(unconfirmed.payload.taskId);
       expect(sync?.syncState).toBe("synced");
@@ -254,6 +255,7 @@ describe("durable A→B reconcile sync", () => {
       expect(result.payload.reconcileSyncState).toBe("sync_conflict");
       expect(result.payload.needsHuman).toBe(true);
       expect(result.payload.bSyncConfirmed).toBe(false);
+      expect(pair.plane.listHumanReconcileConflicts()).toHaveLength(1);
       const attempts =
         pair.aStore.latestReconcileSync(unconfirmed.payload.taskId)?.attemptCount ?? 0;
       await pair.plane.resumePendingReconcileSyncs();
@@ -261,6 +263,7 @@ describe("durable A→B reconcile sync", () => {
       expect(after?.syncState).toBe("sync_conflict");
       expect(after?.attemptCount).toBe(attempts);
       expect(pair.bStore.getTask(unconfirmed.payload.taskId)?.state).toBe("failed");
+      expect(pair.plane.listHumanReconcileConflicts()).toEqual([after]);
     } finally {
       await pair.stop();
     }
@@ -342,6 +345,7 @@ describe("durable A→B reconcile sync", () => {
         successRequest(unconfirmed.payload.taskId, unconfirmed.payload.stateVersion, evidence),
       );
       expect(result.payload.reconcileSyncState).toBe("pending_sync");
+      await pair.plane.stopReconcileSyncScheduler();
       const replay = await pair.aClient.submit({
         ...baseSubmitBody({
           idempotencyKey: submitted.payload.taskId ? undefined : uniqueIdempotencyKey(),
