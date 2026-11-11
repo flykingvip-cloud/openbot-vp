@@ -1575,36 +1575,10 @@ export async function runPreparedReply(
     });
     let acceptedCriteria: readonly string[] = [];
     if (routed.kind === "respond") {
-      const continuation = admittedTaskQueryContinuation({
-        board,
-        protocolDowngrade: routed.protocolDowngrade,
-      });
-      if (!continuation.shouldContinue || !board.current) {
-        typing.cleanup();
-        return persistOwnReply(routed.text);
-      }
-      // Persist the factual query answer once. The query does not schedule work.
-      const queryReply = persistOwnReply(routed.text);
-      if (isEmbeddedPiRunActive(sessionIdFinal)) {
-        typing.cleanup();
-        return queryReply;
-      }
-      admittedBinding = {
-        taskId: board.current.taskId,
-        executionAttempt: board.current.executionAttempt,
-        deliverableVersion: board.current.deliverableVersion,
-        constraints: activeConstraintTexts(board.current),
-      };
-      acceptedCriteria = board.current.acceptanceCriteria ?? [];
-      extraSystemPromptParts.push(
-        [
-          "## Admitted task continues after a query",
-          "The user asked a question only. That question does not pause, replace, or reschedule the already-admitted task, and must not ask whether to start work that is already assigned.",
-          "Continue the admitted execution and deliver against the accepted criteria.",
-          `Goal: ${board.current.goalText}`,
-        ].join("\n"),
-      );
-      // Fall through to host-driven execution of the admitted binding.
+      // Dialogue only: task progress belongs to its admitted execution lifecycle.
+      // A status query must never become an implicit recovery trigger.
+      typing.cleanup();
+      return persistOwnReply(routed.text);
     }
     if (routed.kind === "task_proposal") {
       opts?.abortSignal?.throwIfAborted();

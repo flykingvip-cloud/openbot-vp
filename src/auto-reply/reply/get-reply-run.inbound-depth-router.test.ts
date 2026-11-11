@@ -342,6 +342,7 @@ function baseParams(
 describe("runPreparedReply inbound depth router", () => {
   it.each([
     "respond",
+    "respond_with_task",
     "accepted",
     "duplicate",
     "rejected",
@@ -401,6 +402,7 @@ describe("runPreparedReply inbound depth router", () => {
       );
     const interaction = vi.spyOn(replyTurnRuntime, "interaction").mockResolvedValue(
       kind === "respond" ||
+        kind === "respond_with_task" ||
         kind === "direct_respond" ||
         kind === "corrupt_state" ||
         kind === "transcript_failure"
@@ -439,7 +441,7 @@ describe("runPreparedReply inbound depth router", () => {
       parked: [],
       resetGeneration: kind === "amended_reset" ? 1 : 0,
       current:
-        kind === "accepted" || isResume || isAmendment
+        kind === "accepted" || isResume || isAmendment || kind === "respond_with_task"
           ? {
               ...binding,
               taskId: kind === "amended_replaced" ? "replacement-task" : binding.taskId,
