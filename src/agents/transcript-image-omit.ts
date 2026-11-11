@@ -198,6 +198,7 @@ function projectMessageSourceImages(message: unknown): unknown {
               fileName: typeof record.fileName === "string" ? record.fileName : undefined,
               mimeType: typeof record.mimeType === "string" ? record.mimeType : undefined,
               assetId: typeof record.assetId === "string" ? record.assetId : undefined,
+              contentHash: typeof record.contentHash === "string" ? record.contentHash : undefined,
             })}]`,
           }
         : projectSourceImageBlock(block);

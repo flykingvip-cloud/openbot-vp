@@ -130,6 +130,10 @@ it("projects UI file blocks as text without changing the authoritative transcrip
     "text",
     expect.stringContaining("async-test-doc.md"),
   );
+  expect(projected[0].content[1]).toHaveProperty(
+    "text",
+    expect.stringContaining('"contentHash":"abc"'),
+  );
   expect(input[0].content[1]).toEqual(file);
   expect(projectTranscriptSourceImages(projected)).toBe(projected);
 });
