@@ -266,3 +266,18 @@ it("rejects a late provider answer after cancellation during inference", async (
   await expect(pending).rejects.toThrow();
   expect(mocks.complete).toHaveBeenCalledOnce();
 });
+
+it("places semantic work-admission guidance after shared skill context", () => {
+  const input = {
+    message: "请制作一份面向普通员工的企业AI助手使用指南，交付Markdown与HTML，约2000字。",
+    context: [{ role: "system" as const, content: "Answer conversationally; never output JSON." }],
+  };
+  const ctx = buildInteractionCompletionContext(input, model);
+  expect(ctx.systemPrompt).toContain("A filename is not required");
+  expect(ctx.systemPrompt).toContain("semantic decision");
+  expect(ctx.systemPrompt!.indexOf("A filename is not required")).toBeGreaterThan(
+    ctx.systemPrompt!.indexOf(input.context[0].content),
+  );
+  expect(ctx.tools).toEqual([]);
+  expect(mocks.complete).not.toHaveBeenCalled();
+});
