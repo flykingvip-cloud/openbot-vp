@@ -74,6 +74,11 @@ function handleTerminalChatEvent(
   if (runId && host.refreshSessionsAfterChat.has(runId)) {
     host.refreshSessionsAfterChat.delete(runId);
     if (state === "final") {
+      // A reset rotates the transcript while keeping the routing key. Replace,
+      // rather than merge, the old bubbles once that reset run has completed.
+      const historyState = adaptChatHistoryCapabilityState(host);
+      historyState.chatHistoryReplaceLocal = true;
+      void reloadShellChatHistory(adaptChatHistoryHost(host), { refreshAvatar: false });
       void sessionsCapability.load(adaptSessionsLoadCapabilityState(host), {
         activeMinutes: CHAT_SESSIONS_ACTIVE_MINUTES,
       });
