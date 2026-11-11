@@ -1,12 +1,12 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { admittedTaskQueryContinuation } from "../../agent-runtime/command/admitted-task-query-continuation.js";
+import { hostBoundTaskTarget } from "../../agent-runtime/command/host-task-target.js";
 import {
   formatTaskProposalReply,
   createInteractionSourceBoundary,
   formatRestrictedInteractionNotice,
 } from "../../agent-runtime/command/index.js";
-import { admittedTaskQueryContinuation } from "../../agent-runtime/command/admitted-task-query-continuation.js";
-import { hostBoundTaskTarget } from "../../agent-runtime/command/host-task-target.js";
 import {
   appendSharedTurnContext,
   appendUntrustedContext,
@@ -25,7 +25,6 @@ import {
   isEmbeddedPiRunStreaming,
 } from "../../agent-runtime/execution/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
-import { sanitizeModelImageInputs } from "../../gateway/chat-attachments.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
@@ -62,6 +61,7 @@ import {
 import { buildActiveConversationTaskFocusPrompt } from "../../conversation-task/focus-prompt.js";
 import { buildCronReplySystemPrompt } from "../../cron/cron-reply-context.js";
 import { buildGrowthBirthSystemPrompt } from "../../gateway/agent-growth/birth-context.js";
+import { sanitizeModelImageInputs } from "../../gateway/chat-attachments.js";
 import {
   isChatInboundDepthRouterEnabled,
   isChatInboundDepthShadowEnabled,
@@ -1651,10 +1651,36 @@ export async function runPreparedReply(
           }
         }
         if (applied.kind === "applied" && routed.decision.kind === "task_change") {
-          replyTurnRuntime.steer(sessionIdFinal, inboundMessage);
+          const steered = replyTurnRuntime.steer(sessionIdFinal, inboundMessage);
+          // A persisted amendment is not an executed revision. If no run can
+          // consume it, continue the original admitted task through this host.
+          // Re-read after the mutation: pause, reset and focus changes must win.
+          const updatedBoard = sources.read(
+            "task_state_unavailable",
+            () => replyTurnRuntime.state.readForInteraction(sessionFile),
+            { parked: [], focusRevision: -1 },
+          );
+          const continuation = admittedTaskQueryContinuation({ board: updatedBoard });
+          if (
+            !steered &&
+            !isEmbeddedPiRunActive(sessionIdFinal) &&
+            continuation.shouldContinue &&
+            updatedBoard.focusRevision === captured.expectedFocusRevision &&
+            updatedBoard.current?.taskId === routed.decision.target.taskId
+          ) {
+            persistOwnReply(formatTaskProposalReply(routed.decision, applied));
+            admittedBinding = {
+              taskId: updatedBoard.current.taskId,
+              executionAttempt: updatedBoard.current.executionAttempt,
+              deliverableVersion: updatedBoard.current.deliverableVersion,
+            };
+            acceptedCriteria = updatedBoard.current.acceptanceCriteria ?? [];
+          }
         }
-        typing.cleanup();
-        return persistOwnReply(formatTaskProposalReply(routed.decision, applied));
+        if (!admittedBinding) {
+          typing.cleanup();
+          return persistOwnReply(formatTaskProposalReply(routed.decision, applied));
+        }
       }
     }
     if (routed.kind === "execution_admission") {

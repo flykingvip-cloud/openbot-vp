@@ -3,6 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// Stub the run registry itself; eagerly importing its heavy public barrel
+// before reply-turn changes cyclic module initialization in this host test.
+import * as executionRuntime from "../../agent-runtime/execution/runner/run-registry.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
 import { STEWARD_REQUIRED_SKILLS } from "../../agents/builtin-steward/required-skills.js";
@@ -347,6 +350,15 @@ describe("runPreparedReply inbound depth router", () => {
     "direct_respond",
     "corrupt_state",
     "transcript_failure",
+    "amended",
+    "amended_paused",
+    "amended_active",
+    "amended_replaced",
+    "amended_rejected",
+    "amended_steered",
+    "amended_finished",
+    "amended_reset",
+    "amended_unreadable",
   ] as const)("Gateway interaction %s enters execution only after acceptance", async (kind) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "runtime-ingress-reply-"));
     const file = path.join(dir, "session.jsonl");
@@ -361,44 +373,78 @@ describe("runPreparedReply inbound depth router", () => {
       }) + "\n",
     );
     vi.mocked(resolveSessionFilePath).mockReturnValue(file);
-    const binding = { taskId: "accepted-task" };
+    const binding = {
+      taskId: "accepted-task",
+      executionAttempt: "original-attempt",
+      deliverableVersion: "original-version",
+    };
     const isResume = kind === "resumed" || kind === "resume_denied";
-    const executes = kind === "accepted" || kind === "resumed";
+    const isAmendment = kind.startsWith("amended");
+    const executes = kind === "accepted" || kind === "resumed" || kind === "amended";
+    const active = vi
+      .spyOn(executionRuntime, "isEmbeddedPiRunActive")
+      .mockReturnValue(kind === "amended_active");
+    const steer = vi.spyOn(replyTurnRuntime, "steer").mockReturnValue(kind === "amended_steered");
+    const mutate = vi
+      .spyOn(replyTurnRuntime.state, "applyInteractionProposal")
+      .mockReturnValue(
+        kind === "amended_rejected"
+          ? { kind: "rejected", reason: "revision_mismatch" }
+          : { kind: "applied", text: "要求已写入原任务板。", abort: false },
+      );
     const interaction = vi.spyOn(replyTurnRuntime, "interaction").mockResolvedValue(
       kind === "respond" ||
         kind === "direct_respond" ||
         kind === "corrupt_state" ||
         kind === "transcript_failure"
         ? { kind: "respond", text: "你好", clarification: false }
-        : isResume
+        : isAmendment
           ? {
               kind: "task_proposal",
               decision: {
-                kind: "task_control",
+                kind: "task_change",
                 target: { taskId: binding.taskId, revision: "0" },
-                action: "resume",
+                text: "将补贴改为1000元并重写文件",
+                mode: "revise",
               },
             }
-          : {
-              kind: "execution_admission",
-              result:
-                kind === "accepted"
-                  ? { kind, binding, acceptance: ["来源"] }
-                  : kind === "duplicate"
-                    ? { kind, binding }
-                    : { kind, reason: "revision_mismatch" },
-            },
+          : isResume
+            ? {
+                kind: "task_proposal",
+                decision: {
+                  kind: "task_control",
+                  target: { taskId: binding.taskId, revision: "0" },
+                  action: "resume",
+                },
+              }
+            : {
+                kind: "execution_admission",
+                result:
+                  kind === "accepted"
+                    ? { kind, binding, acceptance: ["来源"] }
+                    : kind === "duplicate"
+                      ? { kind, binding }
+                      : { kind: "rejected", reason: "revision_mismatch" },
+              },
     );
     const read = vi.spyOn(replyTurnRuntime.state, "read").mockReturnValue({
       focusRevision: 0,
       parked: [],
+      resetGeneration: kind === "amended_reset" ? 1 : 0,
       current:
-        kind === "accepted" || isResume
+        kind === "accepted" || isResume || isAmendment
           ? {
-              taskId: binding.taskId,
+              ...binding,
+              taskId: kind === "amended_replaced" ? "replacement-task" : binding.taskId,
+              wakeSuppress: kind === "amended_paused",
+              acceptanceCriteria: ["来源"],
               title: "报告",
               goalText: "生成报告",
-              unfinished: true,
+              unfinished: kind !== "amended_finished",
+              admittedGeneration: 0,
+              effectiveConstraints: isAmendment
+                ? [{ text: "将补贴改为1000元并重写文件", kind: "revise", atMs: 2 }]
+                : [],
               createdAtMs: 1,
               stop: { summary: "已接纳", workspacePaths: [] },
             }
@@ -407,7 +453,10 @@ describe("runPreparedReply inbound depth router", () => {
     const strictRead = vi
       .spyOn(replyTurnRuntime.state, "readForInteraction")
       .mockImplementation(() => {
-        if (kind === "corrupt_state") {
+        if (
+          kind === "corrupt_state" ||
+          (kind === "amended_unreadable" && strictRead.mock.calls.length > 1)
+        ) {
           throw new SyntaxError("corrupt private task");
         }
         return read.mock.results.at(-1)?.value ?? { focusRevision: 0, parked: [] };
@@ -484,6 +533,10 @@ describe("runPreparedReply inbound depth router", () => {
           skipUserTranscriptPersist: true,
         });
         expect(run?.extraSystemPrompt).toContain("Acceptance criteria:");
+        if (kind === "amended") {
+          expect(run?.extraSystemPrompt).toContain("将补贴改为1000元并重写文件");
+          expect(mutate).toHaveBeenCalledOnce();
+        }
         expect(run?.mentionedPluginToolAllowlist).toEqual(["origin"]);
         expect(run?.extraSystemPrompt).toContain("pluginId=origin");
         expect(run?.extraSystemPrompt).not.toContain("host-executed");
@@ -504,6 +557,9 @@ describe("runPreparedReply inbound depth router", () => {
         );
       }
     } finally {
+      steer.mockRestore();
+      mutate.mockRestore();
+      active.mockRestore();
       interaction.mockRestore();
       read.mockRestore();
       strictRead.mockRestore();
