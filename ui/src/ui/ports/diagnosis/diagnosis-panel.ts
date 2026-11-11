@@ -113,7 +113,13 @@ export class OpenBotDiagnosisPanel extends LitElement {
   }
 
   updated(changed: Map<string | number | symbol, unknown>) {
-    if (changed.has("client") || changed.has("role") || changed.has("tenantId")) {
+    if (
+      changed.has("client") ||
+      changed.has("role") ||
+      changed.has("tenantId") ||
+      changed.has("scopes") ||
+      changed.has("connected")
+    ) {
       void this.reload();
     }
   }
@@ -325,7 +331,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
           this.actionIntents = result.actionIntents ?? null;
           this.capacity = result.capacity ?? null;
           this.comparison = result.comparison ?? null;
-          this.observationEvidenceNote = "只读结果证据；连接流仍为 execution_only";
+          this.observationEvidenceNote = "已读取任务结果；连接记录仅说明执行过程，不代表任务成功";
         })
         .catch(() => {
           if (
@@ -556,7 +562,22 @@ export class OpenBotDiagnosisPanel extends LitElement {
     dispatchDiagnosisOpenSession(this, outcome.sessionKey);
   }
 
+  private reportGeneration = 0;
+
   async reload() {
+    const generation = ++this.reportGeneration;
+    const client = this.client;
+    const role = this.role;
+    const tenantId = this.tenantId;
+    const scopes = JSON.stringify(this.scopes);
+    const current = () =>
+      this.isConnected &&
+      generation === this.reportGeneration &&
+      client === this.client &&
+      role === this.role &&
+      tenantId === this.tenantId &&
+      scopes === JSON.stringify(this.scopes);
+    this.model = null;
     setDiagnosisApiClient(this.client);
     this.loading = true;
     const query = await queryDiagnosisReports({
@@ -565,6 +586,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
       limit: 10,
       redactionProfile: this.redactionProfile(),
     });
+    if (!current()) {
+      return;
+    }
     const first = query?.items[0];
     const getResponse = first?.reportId
       ? await getDiagnosisReport({
@@ -573,6 +597,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
           redactionProfile: this.redactionProfile(),
         })
       : null;
+    if (!current()) {
+      return;
+    }
     this.model = this.withGrantDecisions(
       diagnosisViewModelFromQuery(this.audience(), query, getResponse),
     );
@@ -766,15 +793,50 @@ export class OpenBotDiagnosisPanel extends LitElement {
         }}></label>`,
     )}</fieldset>`;
   }
-  render() {
-    if (this.loading && !this.model) {
-      return html`
-        <p class="enterprise-diagnosis__empty">诊断数据加载中…</p>
-      `;
+  private renderResolutionActions(model: DiagnosisViewModel) {
+    const reportId = model.reportExport.reportId;
+    if (!reportId || model.loadError || !["allowed", "redacted"].includes(model.permissionState)) {
+      return nothing;
     }
+    const target = findDiagnosisTarget(this.targets, this.selectedTargetId);
+    const canWrite =
+      this.scopes?.some((scope) => scope === "operator.write" || scope === "operator.admin") ===
+      true;
+    return html`<section class="card" aria-label="诊断处理" data-testid="diagnosis-resolution-actions">
+      <h3>发现问题后怎么处理</h3>
+      <p>请先选择负责的数字人，再发起处理。处理请求发出后仍需查看执行记录，并重新检查结果；不会直接标记为已解决。</p>
+      ${model.cases.map(
+        (row) => html`<div class="card-sub">
+        <span>问题记录：${row.caseId}</span>
+        <button type="button" ?disabled=${!this.client?.connected || !this.connected || !canWrite || !target || isAllDiagnosisTarget(this.selectedTargetId)}
+          @click=${() => {
+            if (!target || !canWrite || !this.client?.connected) {
+              return;
+            }
+            dispatchDiagnosisConversationAction(
+              this,
+              {
+                title: "处理诊断问题",
+                handoffChannel: "diagnosed_agent_session",
+                targetSessionKey: target.sessionKey,
+                targetAgentId: target.agentId,
+                prompt: `请处理诊断报告 ${reportId} 中的问题 ${row.caseId}。先读取当前授权范围内的原始证据，确认影响和原因；给出具体修复步骤、风险和恢复方法。需要审批的操作先申请审批。执行后返回任务身份、执行回执和复核证据；证据不足时补采或明确转交负责人，不得把建议或请求发出当成修复成功。`,
+              },
+              "panel",
+            );
+          }}>交给所选数字人处理</button>
+      </div>`,
+      )}
+      <button type="button" ?disabled=${this.loading || !this.client?.connected} @click=${() => void this.reload()}>刷新处理记录</button>
+      <button type="button" ?disabled=${this.diagnosing || !target || !this.client?.connected} @click=${() => void this.onDiagnoseNow()}>重新检查所选对象</button>
+    </section>`;
+  }
+
+  render() {
     const model = this.model ?? diagnosisViewModelFromQuery(this.audience(), null, null);
     if (this.role === "enterprise") {
       return html`
+        ${this.renderResolutionActions(model)}
         ${renderObservationWorkbench({
           role: "enterprise",
           tenantId: this.tenantId,
@@ -916,6 +978,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
             </p>`
           : nothing
       }
+      ${this.renderResolutionActions(model)}
       ${renderPlatformDiagnosisSurface(
         model,
         this.approvalReady()

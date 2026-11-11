@@ -925,3 +925,51 @@ describe("platform explicit input response isolation", () => {
     },
   );
 });
+
+it("discards a report response after switching the authorized tenant", async () => {
+  let releaseOld: ((value: unknown) => void) | undefined;
+  const request = vi.fn((method: string) => {
+    if (method !== "diagnosis.reports.query") {
+      throw new Error(method);
+    }
+    return new Promise<unknown>((resolve) => {
+      releaseOld = resolve;
+    });
+  });
+  const container = document.createElement("div");
+  document.body.append(container);
+  const client = { connected: true, request } as unknown as GatewayBrowserClient;
+  render(
+    html`<openbot-diagnosis-panel role="enterprise" tenant-id="old" .client=${client} connected></openbot-diagnosis-panel>`,
+    container,
+  );
+  const panel = container.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
+  await panel.updateComplete;
+  await waitFor(() => expect(releaseOld).toBeDefined());
+  const old = releaseOld!;
+  panel.tenantId = "new";
+  await panel.updateComplete;
+  const current = releaseOld!;
+  current({
+    authorization: { outcome: "allow" },
+    items: [],
+    nextCursor: null,
+    audit: { decision: "allow" },
+    redactionProfile: "user",
+  });
+  await waitFor(() => expect((panel as unknown as { loading: boolean }).loading).toBe(false));
+  old({
+    authorization: { outcome: "deny", reason: "old-tenant" },
+    items: [],
+    audit: { decision: "deny" },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(
+    (panel as unknown as { model: { tenantScope: string; permissionState: string } }).model
+      .tenantScope,
+  ).toBe("new");
+  expect(
+    (panel as unknown as { model: { permissionState: string } }).model.permissionState,
+  ).not.toBe("forbidden");
+  container.remove();
+});
