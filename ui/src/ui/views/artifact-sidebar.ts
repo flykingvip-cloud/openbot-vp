@@ -51,7 +51,7 @@ export type ArtifactSidebarProps = {
   onGrantIntent?: (intentId: string, artifactId: string) => void | Promise<void>;
   onRevokeGrant?: (grantId: string, artifactId: string) => void | Promise<void>;
   deliverableSaveState?: DeliverableSaveState | null;
-  onSaveDeliverable?: () => void | Promise<void>;
+  onSaveDeliverable?: (mode?: "save_as") => void | Promise<void>;
   onConfirmDeliverableOverwrite?: () => void;
   onConfirmDeliverableSaveAs?: () => void;
   onCancelDeliverableSaveDecision?: () => void;
@@ -894,7 +894,8 @@ export function renderDeliverableSaveDecision(props: ArtifactSidebarProps) {
           type="button"
           @click=${() => props.onConfirmDeliverableSaveAs?.()}
         >
-          ${t("chat.deliverableSaveAs")}
+          ${icons.copy}
+          <span class="artifact-preview-action__label">${t("chat.deliverableSaveAs")}</span>
         </button>
         <button
           class="btn btn--sm"
@@ -950,6 +951,20 @@ export function renderArtifactSidebarHeaderActions(props: ArtifactSidebarProps) 
               <span class="artifact-preview-action__label">${t("chat.saveDeliverable")}</span>
             </button>
           `
+        : nothing
+    }
+    ${
+      props.onSaveDeliverable
+        ? html`
+      <button class="btn btn--sm artifact-preview-action artifact-preview-action--icon" type="button"
+        aria-label=${t("chat.deliverableSaveAs")}
+        ?disabled=${Boolean(saveState?.busy) || Boolean(saveState?.pendingDecision)}
+        @pointerenter=${revealArtifactActionTip}
+        @pointerleave=${hideArtifactActionTip}
+        @click=${() => void props.onSaveDeliverable?.("save_as")}>
+        ${icons.copy}
+        <span class="artifact-preview-action__label">${t("chat.deliverableSaveAs")}</span>
+      </button>`
         : nothing
     }
     ${

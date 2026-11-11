@@ -26,6 +26,8 @@ export type DeliverableSaveToast = {
 };
 
 export type DeliverableSaveArchiveResult = {
+  rawHash?: string;
+  saveAction?: "create" | "noop" | "overwrite" | "save_as";
   deliverableId: string;
   knowledgeBaseId: string;
   knowledgeBaseTitle: string;
@@ -416,9 +418,17 @@ export async function saveAndArchiveSidebarDeliverable(params: {
       ...(decision?.expectedRawHash ? { expectedRawHash: decision.expectedRawHash } : {}),
       ...(decision?.saveAsFilename ? { saveAsFilename: decision.saveAsFilename } : {}),
     });
+  // Only a prior archive receipt for this same document may drive a default
+  // update. Missing receipts retain the existing explicit decision flow.
+  const priorHash =
+    metadata.saved === true &&
+    typeof metadata.savedRawHash === "string" &&
+    typeof metadata.knowledgeDocumentId === "string"
+      ? metadata.savedRawHash.trim()
+      : "";
   let decision = {
-    saveMode: params.saveMode,
-    expectedRawHash: params.expectedRawHash,
+    saveMode: params.saveMode ?? (priorHash ? ("overwrite" as const) : undefined),
+    expectedRawHash: params.expectedRawHash ?? (priorHash || undefined),
     saveAsFilename: params.saveAsFilename,
   };
   for (;;) {

@@ -1678,7 +1678,7 @@ export function renderApp(state: AppViewState) {
       onCloseSidebar: () => state.handleCloseSidebar(),
       onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
       onSaveDeliverable: state.connected
-        ? () => void state.handleSaveSidebarDeliverable()
+        ? (mode?: "save_as") => void state.handleSaveSidebarDeliverable(mode)
         : undefined,
       onConfirmDeliverableOverwrite: () => state.handleConfirmDeliverableOverwrite(),
       onConfirmDeliverableSaveAs: () => state.handleConfirmDeliverableSaveAs(),
