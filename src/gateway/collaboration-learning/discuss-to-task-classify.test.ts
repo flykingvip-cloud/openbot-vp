@@ -90,3 +90,11 @@ describe("discuss-to-task-classify (pure)", () => {
     }
   });
 });
+
+it("does not turn a read-only status query mentioning submission and review into a delegation", () => {
+  expect(
+    classifyDiscussToTaskIntent(
+      "只核对本轮P5：请区分成员生成文件、正式提交/非作者评审、组终稿三个状态，给出实际绑定及回执；不要将草案或口头声明当作已验收，不推进旧任务。",
+    ).kind,
+  ).toBe("discussion");
+});
