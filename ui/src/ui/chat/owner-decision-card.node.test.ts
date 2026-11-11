@@ -418,6 +418,9 @@ describe("owner-decision-card UI", () => {
     // Sticky pile keeps latest per board only (older versions stay in transcript
     // history, not in the confirm stack — avoids ghost walls on long threads).
     expect(container.querySelectorAll("[data-owner-decision]").length).toBe(1);
+    dismissOwnerDecisionCard("dec-new");
+    render(renderOwnerDecisionCards(messages), container);
+    expect(container.querySelectorAll("[data-owner-decision]").length).toBe(0);
     expect(container.querySelector("[data-owner-decision='dec-new']")).not.toBeNull();
     expect(container.querySelector("[data-owner-decision='dec-old']")).toBeNull();
     expect(container.querySelector("[data-owner-decision='dec-mid']")).toBeNull();

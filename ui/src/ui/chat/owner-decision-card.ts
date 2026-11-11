@@ -848,13 +848,17 @@ export function renderOwnerDecisionCards(
   // Sticky/todo/dialog: dismiss hides confirm chrome (稍后 or post-confirm fold).
   // History compact receipts ignore dismiss — they require confirmed+consumed
   // (ordinary 稍后 dismiss alone never becomes a receipt).
-  const stickyCandidates = allCards.filter((card) => !isOwnerDecisionDismissed(card.decisionId));
+  // Determine old versions before removing dismissed current versions. Otherwise
+  // deferring the newest card promotes an obsolete historical card into its slot.
+  const staleIds = staleOwnerDecisionDecisionIds(allCards);
+  const stickyCandidates = allCards.filter(
+    (card) => !isOwnerDecisionDismissed(card.decisionId) && !staleIds.has(card.decisionId),
+  );
   const cards = selectStickyOwnerDecisionCards(stickyCandidates);
   const stickyIds = new Set(cards.map((card) => card.decisionId));
   const humanReceipts = selectHumanConfirmReceiptCards(allCards).filter(
     (card) => !stickyIds.has(card.decisionId),
   );
-  const staleIds = staleOwnerDecisionDecisionIds(allCards);
   const authorityById = new Map(reads.map((row) => [row.card.decisionId, row.authority]));
   if (cards.length === 0 && humanReceipts.length === 0) {
     return nothing;
