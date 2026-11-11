@@ -9,6 +9,7 @@ import type {
   RuntimeGovernanceIssue,
   RuntimeTelemetry,
 } from "../../../capability/runtime-canonical/index.ts";
+import { resolveTenantGrant } from "../../../observation/access-state.ts";
 import type {
   PlatformAorReadModel,
   PlatformModelsManagementSnapshot,
@@ -47,6 +48,7 @@ export type PlatformPortReadModel = {
   enterpriseDirectory: Array<{
     tenantId: string;
     label: string;
+    tenantGrant?: "granted" | "none" | "unknown";
     status: "trial" | "paid" | "suspended" | "expired";
     plan: string;
     billingStatus: string;
@@ -907,6 +909,7 @@ export function buildPlatformPortReadModel(
     state.platformAuthState?.platformEnterprises?.map((enterprise) => ({
       tenantId: enterprise.id,
       label: enterprise.name,
+      tenantGrant: resolveTenantGrant(enterprise.tenantGrant),
       status: enterprise.status,
       plan: enterprise.plan,
       billingStatus: enterprise.billingStatus,

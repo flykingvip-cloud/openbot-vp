@@ -659,8 +659,11 @@ function taskOutcomeFields(handlers: EnterpriseDiagnosisHandlers): TemplateResul
         }}
       />
     </label>
+    <p class="enterprise-diagnosis__target-hint" data-testid="diagnosis-agent-official-name">
+      正式名称：${selected?.label?.trim() || "未选择"}。查询关联只使用稳定 agentId，不用正式名称。
+    </p>
     <label class="enterprise-diagnosis__control">
-      <span class="enterprise-diagnosis__target-label">数字人</span>
+      <span class="enterprise-diagnosis__target-label">稳定 agentId</span>
       <input
         class="enterprise-diagnosis__target-select"
         data-testid="diagnosis-task-agent"

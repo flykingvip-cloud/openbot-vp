@@ -159,6 +159,11 @@ function normalizePlatformAuthState(
     return {
       id,
       name,
+      ...(entry.tenantGrant === "granted" ||
+      entry.tenantGrant === "none" ||
+      entry.tenantGrant === "unknown"
+        ? { tenantGrant: entry.tenantGrant }
+        : {}),
       status: entry.status,
       plan: entry.plan,
       billingStatus: entry.billingStatus,

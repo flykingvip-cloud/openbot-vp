@@ -275,6 +275,11 @@ export type ControlUiPlatformEnterpriseContact = {
 export type ControlUiPlatformEnterpriseSummary = {
   id: string;
   name: string;
+  /**
+   * Server-confirmed observation tenant authorization for platform display.
+   * Only `granted` / `none` are results; omit or use `unknown` until confirmed.
+   */
+  tenantGrant?: "granted" | "none" | "unknown";
   status: "trial" | "paid" | "suspended" | "expired";
   plan: string;
   billingStatus: string;
