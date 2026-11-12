@@ -11,7 +11,7 @@ import {
   waitFor,
   type IsolatedPair,
 } from "../exec-protocol/test-helpers.js";
-import type { ResolvedGatewayAuth } from "./auth.js";
+import type { GatewayAuthResult, ResolvedGatewayAuth } from "./auth.js";
 import { explicitIsolationFacadeFields } from "./exec-protocol-config.js";
 import {
   EXEC_PROTOCOL_ARTIFACT_ID_HEADER,
@@ -19,6 +19,10 @@ import {
   EXEC_PROTOCOL_SHA256_HEADER,
   EXEC_PROTOCOL_TASK_ID_HEADER,
   handleExecProtocolHttpRequest,
+  safeArtifactDownloadFilename,
+  safeExecProtocolIdHeader,
+  sanitizeExecProtocolHeaderValue,
+  sessionTenantId,
 } from "./exec-protocol-http.js";
 
 const OTHER_TENANT = "tenant-isolation-2";
@@ -253,6 +257,9 @@ describe("gateway exec-protocol HTTP facade", () => {
     const headerSha = raw.headers.get(EXEC_PROTOCOL_SHA256_HEADER);
     expect(headerSha).toBe(artifact.sha256);
     expect(sha256Hex(rawBytes)).toBe(headerSha);
+    expect(raw.headers.get("content-disposition")).toBe(
+      `attachment; filename="${artifact.artifactId}.bin"`,
+    );
     expect(raw.headers.get(EXEC_PROTOCOL_ARTIFACT_ID_HEADER)).toBe(artifact.artifactId);
     expect(raw.headers.get(EXEC_PROTOCOL_TASK_ID_HEADER)).toBe(submitted.taskId);
     expect(raw.headers.get(EXEC_PROTOCOL_BYTE_COUNT_HEADER)).toBe(String(rawBytes.byteLength));
@@ -408,5 +415,193 @@ describe("gateway exec-protocol HTTP facade", () => {
     const rawBytes = new Uint8Array(await raw.arrayBuffer());
     expect(sha256Hex(rawBytes)).toBe(raw.headers.get(EXEC_PROTOCOL_SHA256_HEADER));
     expect(raw.headers.get(EXEC_PROTOCOL_SHA256_HEADER)).toBe(artifact.sha256);
+  });
+
+  it("rejects a client-supplied userId that does not match the session", async () => {
+    const pair = await startIsolatedPair();
+    pairs.push(pair);
+    const { url } = await startFacade({ pair });
+    const spoofed = await fetch(`${url}/v1/exec-protocol/tasks`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...sessionHeaders(TEST_TENANT),
+      },
+      body: JSON.stringify({
+        ...baseSubmitBody({ input: inlineJsonInput({ message: "spoof" }) }),
+        userId: "attacker@iso-t166.invalid",
+      }),
+    });
+    expect(spoofed.status).toBe(403);
+    const spoofedJson = (await spoofed.json()) as { error?: { type?: string } };
+    expect(spoofedJson.error?.type).toBe("exec_protocol_user_mismatch");
+
+    const matched = await fetch(`${url}/v1/exec-protocol/tasks`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...sessionHeaders(TEST_TENANT),
+      },
+      body: JSON.stringify({
+        ...baseSubmitBody({ input: inlineJsonInput({ message: "same-user" }) }),
+        userId: USER,
+      }),
+    });
+    expect(matched.status).toBe(201);
+  });
+
+  it("does not reveal production refusal to an unauthenticated caller, but still refuses after auth", async () => {
+    const pair = await startIsolatedPair();
+    pairs.push(pair);
+    const tokenAuth: ResolvedGatewayAuth = {
+      mode: "token",
+      token: "iso-facade-token",
+      allowTailscale: false,
+    };
+    const { url } = await startFacade({
+      pair,
+      auth: tokenAuth,
+      env: { OPENBOT_PRODUCTION_EXECUTION_MODE: "production" },
+    });
+    const unauthenticated = await fetch(`${url}/v1/exec-protocol/tasks/status`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ taskId: "tsk_dummy" }),
+    });
+    expect(unauthenticated.status).toBe(401);
+    const unauthenticatedJson = (await unauthenticated.json()) as {
+      error?: { type?: string; message?: string };
+    };
+    expect(unauthenticatedJson.error?.type).toBe("unauthorized");
+    expect(JSON.stringify(unauthenticatedJson)).not.toContain("exec_protocol_production_refused");
+    expect(JSON.stringify(unauthenticatedJson)).not.toContain("isolation-only");
+
+    const authenticated = await fetch(`${url}/v1/exec-protocol/tasks/status`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer iso-facade-token",
+        ...sessionHeaders(TEST_TENANT),
+      },
+      body: JSON.stringify({ taskId: "tsk_dummy" }),
+    });
+    expect(authenticated.status).toBe(403);
+    const authenticatedJson = (await authenticated.json()) as {
+      error?: { type?: string; message?: string };
+    };
+    expect(authenticatedJson.error?.type).toBe("exec_protocol_production_refused");
+    expect(authenticatedJson.error?.message).toMatch(/isolation-only/);
+  });
+
+  it("does not reveal config refusal to an unauthenticated caller, but still refuses after auth", async () => {
+    const pair = await startIsolatedPair();
+    pairs.push(pair);
+    const tokenAuth: ResolvedGatewayAuth = {
+      mode: "token",
+      token: "iso-facade-token",
+      allowTailscale: false,
+    };
+    const { url } = await startFacade({
+      pair,
+      auth: tokenAuth,
+      extraExecProtocol: { profileName: "not-an-isolation-profile" },
+    });
+    const unauthenticated = await fetch(`${url}/v1/exec-protocol/tasks/status`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ taskId: "tsk_dummy" }),
+    });
+    expect(unauthenticated.status).toBe(401);
+    const unauthenticatedJson = (await unauthenticated.json()) as {
+      error?: { type?: string; message?: string };
+    };
+    expect(unauthenticatedJson.error?.type).toBe("unauthorized");
+    expect(JSON.stringify(unauthenticatedJson)).not.toContain("exec_protocol_config_refused");
+
+    const authenticated = await fetch(`${url}/v1/exec-protocol/tasks/status`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer iso-facade-token",
+      },
+      body: JSON.stringify({ taskId: "tsk_dummy" }),
+    });
+    expect(authenticated.status).toBe(503);
+    const authenticatedJson = (await authenticated.json()) as {
+      error?: { type?: string };
+    };
+    expect(authenticatedJson.error?.type).toBe("exec_protocol_config_refused");
+  });
+});
+
+describe("exec-protocol facade header and tenant helpers", () => {
+  it("prefers enterpriseId when a membership is present and ignores a conflicting tenant hint", () => {
+    const membershipSession: GatewayAuthResult = {
+      ok: true,
+      user: "member@example.com",
+      trustedProxy: {
+        provider: "trusted-proxy",
+        user: "member@example.com",
+        membershipId: "membership-acme",
+        enterpriseId: "enterprise-acme",
+        tenantId: "hint-should-not-win",
+      },
+    };
+    expect(sessionTenantId(membershipSession)).toBe("enterprise-acme");
+  });
+
+  it("does not fall back to tenantId when membership is present but enterpriseId is missing", () => {
+    const incomplete: GatewayAuthResult = {
+      ok: true,
+      user: "member@example.com",
+      trustedProxy: {
+        provider: "trusted-proxy",
+        user: "member@example.com",
+        membershipId: "membership-acme",
+        tenantId: "hint-only",
+      },
+    };
+    expect(sessionTenantId(incomplete)).toBeUndefined();
+  });
+
+  it("uses tenantId for header-based trusted-proxy sessions and rejects unbound platform sessions", () => {
+    const headerSession: GatewayAuthResult = {
+      ok: true,
+      user: USER,
+      trustedProxy: {
+        provider: "trusted-proxy",
+        user: USER,
+        tenantId: TEST_TENANT,
+      },
+    };
+    expect(sessionTenantId(headerSession)).toBe(TEST_TENANT);
+
+    const unboundPlatform: GatewayAuthResult = {
+      ok: true,
+      user: "root@example.com",
+      trustedProxy: {
+        provider: "trusted-proxy",
+        user: "root@example.com",
+        domain: "platform",
+      },
+    };
+    expect(sessionTenantId(unboundPlatform)).toBeUndefined();
+  });
+
+  it("sanitizes Content-Disposition filenames and ID headers without weakening checksum checks", () => {
+    const official = "art_0123456789abcdef0123456789abcdef";
+    expect(safeArtifactDownloadFilename(official)).toBe(`${official}.bin`);
+    expect(safeExecProtocolIdHeader(official)).toBe(official);
+    expect(safeExecProtocolIdHeader("tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).toBe(
+      "tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    );
+
+    expect(sanitizeExecProtocolHeaderValue('art_x\r\n"; filename="evil.exe')).toBe(
+      "art_x; filename=evil.exe",
+    );
+    expect(safeArtifactDownloadFilename('art_x\r\n"; filename="evil.exe')).toBe("artifact.bin");
+    expect(safeExecProtocolIdHeader('art_x\r\n"; filename="evil.exe')).toBeUndefined();
+    expect(safeArtifactDownloadFilename("not a safe id")).toBe("artifact.bin");
+    expect(safeExecProtocolIdHeader("not a safe id")).toBeUndefined();
   });
 });

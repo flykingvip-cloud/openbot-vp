@@ -12,7 +12,9 @@ This is isolation wiring only. It does **not** cut 回源, does **not** change H
 
 ## Authenticated product path
 
-After a user is authenticated to the isolated gateway (platformAuth session cookie, or a trusted-proxy session including a designated entry hop), they can use these gateway HTTP routes. They are **not** the raw exec-protocol port (`:18790`) routes such as `POST /v1/tasks/artifact`.
+After a user is authenticated to the isolated gateway with a **tenant-bearing** session, they can use these gateway HTTP routes. They are **not** the raw exec-protocol port (`:18790`) routes such as `POST /v1/tasks/artifact`.
+
+A membership-scoped enterprise or employee platformAuth cookie can use the facade. A platform-super-admin (or other unbound platform) cookie session has no bound membership, even if the same user belongs to enterprises, and the facade returns `403 exec_protocol_tenant_required`. Isolation re-drill must log in through the enterprise (or otherwise membership-scoped) path, not only `/platform/login` as an unbound super-admin. There is no "super-admin may pick any tenant" bypass. Header-based trusted-proxy sessions still take `tenantId` from the tenant header (including a designated entry hop in tight mode).
 
 | Method | Gateway route                                           | Purpose                                                         |
 | ------ | ------------------------------------------------------- | --------------------------------------------------------------- |
@@ -21,7 +23,9 @@ After a user is authenticated to the isolated gateway (platformAuth session cook
 | `POST` | `/v1/exec-protocol/tasks/artifact`                      | JSON artifact metadata, optional `bytesBase64`, sha256 verified |
 | `GET`  | `/v1/exec-protocol/tasks/:taskId/artifacts/:artifactId` | Octet-stream download with `X-OpenBot-Exec-SHA256`              |
 
-The gateway talks to isolation A' with the existing `ExecHttpClient`. Tenant id is taken from the authenticated session. A client-supplied `tenantId` that does not match the session is rejected. The gateway re-verifies sha256 and byte count before returning bytes.
+The gateway talks to isolation A' with the existing `ExecHttpClient`. Tenant id is taken from the authenticated session: `enterpriseId` is authoritative when a membership is present; otherwise `tenantId` (the compatibility hint, or the trusted-proxy tenant header). A client-supplied `tenantId` that does not match the session is rejected. Submit `userId` always comes from the authenticated session; a client-supplied `userId` that does not match is rejected with `403 exec_protocol_user_mismatch`. The gateway re-verifies sha256 and byte count before returning bytes.
+
+Unauthenticated callers are not shown `exec_protocol_production_refused` or `exec_protocol_config_refused`. Those errors are returned only after authentication. `OPENBOT_PRODUCTION_EXECUTION_MODE=production` still always refuses enablement.
 
 The official image entry remains `node openbot.mjs gateway`. No separate tsx/src sidecar is required for this facade; it is mounted from the gateway HTTP stack.
 
@@ -92,7 +96,7 @@ For isolation drills, set an **off-by-default** flag:
 In tight mode:
 
 - Direct-to-gateway forged `X-Forwarded-User` from `127.0.0.1` / `::1` is **not** accepted as that user.
-- Login through the designated 模拟入口 still works via **platformAuth** session cookies.
+- Login through the designated 模拟入口 still works via a **membership-scoped** platformAuth session cookie. An unbound platform-super-admin cookie is not enough to download artifacts.
 - If the entry needs to inject identity headers, it must also present `entryHopCredential` on `entryHopHeader` (default `x-openbot-entry-hop`). Never log the credential.
 - A non-loopback address that is already in `trustedProxies` is unchanged, including default production-shaped proxy tests.
 

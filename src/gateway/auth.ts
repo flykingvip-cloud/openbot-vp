@@ -62,6 +62,16 @@ export type GatewayTrustedProxySession = {
   provider: "trusted-proxy";
   user: string;
   displayName?: string;
+  /**
+   * Exact server-validated membership; present only for scoped platform
+   * sessions. Header-only trusted-proxy sessions omit this field.
+   */
+  membershipId?: string;
+  /**
+   * Enterprise paired with `membershipId`. Authoritative tenant identity when
+   * a membership is present; `tenantId` is only a compatibility hint then.
+   */
+  enterpriseId?: string;
   tenantId?: string;
   role?: GatewayRole;
   scopes?: string[];

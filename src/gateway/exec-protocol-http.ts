@@ -1,7 +1,8 @@
 /**
  * Isolation-only authenticated gateway facade for exec-protocol A'.
  *
- * Product path (after gateway auth, including platformAuth cookies):
+ * Product path (after gateway auth, including a membership-scoped
+ * platformAuth cookie or a tenant-bearing trusted-proxy session):
  *  - POST /v1/exec-protocol/tasks
  *  - POST /v1/exec-protocol/tasks/status
  *  - POST /v1/exec-protocol/tasks/artifact
@@ -77,9 +78,48 @@ export function isExecProtocolGatewayPath(pathname: string): boolean {
   );
 }
 
-function sessionTenantId(authResult: GatewayAuthResult): string | undefined {
-  const tenantId = authResult.trustedProxy?.tenantId?.trim();
+const SAFE_EXEC_PROTOCOL_ID = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * Tenant for the exec-protocol facade. When a platform membership is present,
+ * `enterpriseId` is authoritative; `tenantId` is only a compatibility hint.
+ * Header-based trusted-proxy sessions still use `tenantId` from the tenant
+ * header. Unbound platform sessions (no membership, no tenant) return
+ * undefined and must be rejected as `exec_protocol_tenant_required`.
+ */
+export function sessionTenantId(authResult: GatewayAuthResult): string | undefined {
+  const session = authResult.trustedProxy;
+  if (!session) {
+    return undefined;
+  }
+  const membershipId = session.membershipId?.trim();
+  if (membershipId) {
+    const enterpriseId = session.enterpriseId?.trim();
+    return enterpriseId ? enterpriseId : undefined;
+  }
+  const tenantId = session.tenantId?.trim();
   return tenantId ? tenantId : undefined;
+}
+
+/** Strip CR/LF and quotes so IDs cannot break response headers. */
+export function sanitizeExecProtocolHeaderValue(value: string): string {
+  return value.replace(/[\r\n"]/g, "");
+}
+
+/**
+ * Filename for Content-Disposition. Official IDs are `art_`/`tsk_` + hex,
+ * but the GET path accepts `[^/]+`. Unsafe or interpolated values fall back
+ * to `artifact.bin`.
+ */
+export function safeArtifactDownloadFilename(artifactId: string): string {
+  const sanitized = sanitizeExecProtocolHeaderValue(artifactId);
+  return SAFE_EXEC_PROTOCOL_ID.test(sanitized) ? `${sanitized}.bin` : "artifact.bin";
+}
+
+/** Safe token for custom ID headers, or undefined when the value is unsafe. */
+export function safeExecProtocolIdHeader(value: string): string | undefined {
+  const sanitized = sanitizeExecProtocolHeaderValue(value);
+  return SAFE_EXEC_PROTOCOL_ID.test(sanitized) ? sanitized : undefined;
 }
 
 function sendExecError(res: ServerResponse, status: number, message: string, type: string) {
@@ -185,10 +225,19 @@ function sendArtifactDownload(res: ServerResponse, payload: ExecArtifactResponse
   res.statusCode = 200;
   res.setHeader("Content-Type", "application/octet-stream");
   res.setHeader("Content-Length", String(bytes.byteLength));
-  res.setHeader("Content-Disposition", `attachment; filename="${verified.artifactId}.bin"`);
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${safeArtifactDownloadFilename(verified.artifactId)}"`,
+  );
   res.setHeader(EXEC_PROTOCOL_SHA256_HEADER, verified.sha256);
-  res.setHeader(EXEC_PROTOCOL_ARTIFACT_ID_HEADER, verified.artifactId);
-  res.setHeader(EXEC_PROTOCOL_TASK_ID_HEADER, verified.taskId);
+  const artifactIdHeader = safeExecProtocolIdHeader(verified.artifactId);
+  if (artifactIdHeader) {
+    res.setHeader(EXEC_PROTOCOL_ARTIFACT_ID_HEADER, artifactIdHeader);
+  }
+  const taskIdHeader = safeExecProtocolIdHeader(verified.taskId);
+  if (taskIdHeader) {
+    res.setHeader(EXEC_PROTOCOL_TASK_ID_HEADER, taskIdHeader);
+  }
   res.setHeader(EXEC_PROTOCOL_BYTE_COUNT_HEADER, String(verified.byteCount));
   res.end(Buffer.from(bytes));
 }
@@ -204,6 +253,27 @@ export async function handleExecProtocolHttpRequest(
   const getArtifactMatch = GET_ARTIFACT_PATH.exec(url.pathname) ?? GET_ARTIFACT_PATH.exec(pathname);
   if (!isExecProtocolGatewayPath(pathname) && !getArtifactMatch) {
     return false;
+  }
+
+  // Do not advertise enablement, and do not leak production/config refusal
+  // before the caller is authenticated.
+  if (opts.execProtocol?.enabled !== true) {
+    sendExecError(res, 404, "exec protocol gateway facade is not enabled", "not_found");
+    return true;
+  }
+
+  const token = getBearerToken(req);
+  const authResult = await authorizeHttpGatewayConnect({
+    auth: opts.auth,
+    connectAuth: token ? { token, password: token } : null,
+    req,
+    trustedProxies: opts.trustedProxies,
+    allowRealIpFallback: opts.allowRealIpFallback,
+    rateLimiter: opts.rateLimiter,
+  });
+  if (!authResult.ok) {
+    sendGatewayAuthFailure(res, authResult);
+    return true;
   }
 
   const resolved = resolveFacade(opts);
@@ -227,20 +297,6 @@ export async function handleExecProtocolHttpRequest(
     return true;
   } else if (method !== "POST") {
     sendMethodNotAllowed(res, "POST");
-    return true;
-  }
-
-  const token = getBearerToken(req);
-  const authResult = await authorizeHttpGatewayConnect({
-    auth: opts.auth,
-    connectAuth: token ? { token, password: token } : null,
-    req,
-    trustedProxies: opts.trustedProxies,
-    allowRealIpFallback: opts.allowRealIpFallback,
-    rateLimiter: opts.rateLimiter,
-  });
-  if (!authResult.ok) {
-    sendGatewayAuthFailure(res, authResult);
     return true;
   }
 
@@ -285,11 +341,34 @@ export async function handleExecProtocolHttpRequest(
     }
 
     if (pathname === "/v1/exec-protocol/tasks") {
+      const sessionUserId = authResult.user?.trim();
+      if (!sessionUserId) {
+        sendExecError(
+          res,
+          403,
+          "exec protocol gateway facade requires an authenticated user identity",
+          "exec_protocol_user_required",
+        );
+        return true;
+      }
+      if (
+        typeof body.userId === "string" &&
+        body.userId.trim() &&
+        body.userId.trim() !== sessionUserId
+      ) {
+        sendExecError(
+          res,
+          403,
+          "session must not submit an exec-protocol task as another user",
+          "exec_protocol_user_mismatch",
+        );
+        return true;
+      }
       const result = await client.submit({
         ...body,
         [EXEC_API_VERSION_FIELD]: EXEC_API_VERSION,
         tenantId,
-        userId: typeof body.userId === "string" ? body.userId : authResult.user,
+        userId: sessionUserId,
       } as never);
       sendJson(res, result.httpStatus, result.payload);
       return true;

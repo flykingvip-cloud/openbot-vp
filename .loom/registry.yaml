@@ -12896,6 +12896,7 @@ landingStreams:
       - src/gateway/exec-protocol-config.test.ts
       - src/gateway/exec-protocol-config.ts
       - src/gateway/exec-protocol-http.test.ts
+      - src/gateway/exec-protocol-http.platform-auth.test.ts
       - src/gateway/exec-protocol-http.ts
       - src/gateway/server-http.ts
     canLandWith: []
