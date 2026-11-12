@@ -97,3 +97,18 @@
 本轮完成可核实的源码修复和定向验证，客户经理跨主人权限、并发回信严格关联以及真实模型私信闭环仍需明确验收；不通过改归属或隐藏阻塞伪造“链路畅通”。
 
 — codex-runtime-manager
+
+## 6. 后续真实查询收尾（2026-11-12）
+
+最终行为候选：`7d04bb22a7b79380a4f4571efc3682baa226b648`。本节与前述历史候选分开；不将后续测试倒算给旧 SHA。
+
+- 实测来源明确在 `readDecision` 的空正文分支，不是新增字段校验。DeepSeek JSON 模式下返回 94 个空白字符、51 个输出 token，输出预算2048；可排除该次预算耗尽。关闭思考后仍有空白；仅补私有信封提示的连续查询2/3通过，因此两者都没有当作终验通过。
+- 最终在共享模型适配中，对已识别的DeepSeek兼容调用采用唯一原生输出函数 `emit_interaction_decision` 序列化既有决定。此名称无执行handler、无权限、无调度。只有一个同名输出才可读取；拒绝普通工具、重复输出及混合正文；仍经原parseDecision与execution admission。其他供应商保持原路径；没有额外模型循环。
+- 原生输出旧代码反证：当前测试放到改动前父版本，3项失败／21项通过；当前代码4文件／61项通过，含未授权执行提议不提交任务。类型感知oxlint与构建通过。全仓tsgo仍为范围外既有错误，改动文件无报错，不称全仓通过。
+- 本地已加载最终候选，真实DeepSeek模型连续三次查询276G（含此前失败措辞）全部正常回复。会话记录中零业务toolCall；任务板SHA256与测试前完全一致；没有重新发送276G或旧D/F。此处协议输出不是业务工具调用，也未写入执行transcript充作动作。
+- 证据：`/tmp/openbot-real-main276-evidence/native-query-results.json`、`native-query-three-pass.png`；回归`/tmp/openbot-native-output-final-tests.log`；旧版本红例`/tmp/openbot-native-output-before.log`；构建`/tmp/openbot-native-output-candidate-build.log`。
+- 官方依据：[DeepSeek JSON Output](https://api-docs.deepseek.com/guides/json_mode/)说明非JSON可能被替换为空格；[Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)说明非思考模式支持命名函数强制输出。模型返回仍是不可信提议，不能用输出schema替代权限检查。
+
+本节仅关闭“276G既有记录的只读查询反复空白拒绝”这组已复现用例。历史作用域、并发回信严格关联、会话文件解析、协作终局、PPT视觉与下载、真实异步等待等其他开放项不借此关闭。本轮未推送、未云部署；共享登记册仍未提交。
+
+— codex-runtime-manager
