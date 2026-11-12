@@ -2,6 +2,11 @@ import { stripControlChannelForDisplay } from "./control-channel-visibility.js";
 
 /** Presentation only. Raw task facts, tool results and execution decisions remain unchanged. */
 const RUNTIME_REASONS: Readonly<Record<string, string>> = {
+  "Either sessionKey or label is required": "收件人的内部会话尚未确定",
+  "Session not visible from this sandboxed agent session": "当前会话无权访问收件人的对话",
+  sessions_send: "内部会话发送通道",
+  conversation_send: "数字人私信通道",
+  sessionKey: "内部会话标识",
   source_message_not_bound: "这条消息尚未正确关联到任务",
   execution_binding_required: "成果尚未关联到本次任务，暂不能交付",
   execution_binding_incomplete: "成果与本次任务的关联信息不完整，暂不能交付",
@@ -20,6 +25,8 @@ const STAGE_RECEIPT =
 function projectRuntimeProse(text: string, streaming: boolean): string {
   let next = text
     .replace(STAGE_RECEIPT, "")
+    .replace(/（agentId=[^（）\n]+）/g, "")
+    .replace(/\bagent:[A-Za-z0-9:_-]+\b/g, "会话")
     .replace(
       /团队成果未完成（(?:execution_binding_scope|execution_attempt_unreadable):[^）]*）。/g,
       "团队成果尚未与本次有效任务关联，暂不能提交审核。",
