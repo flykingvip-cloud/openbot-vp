@@ -8,6 +8,28 @@ vi.mock("../../gateway/call.js", () => ({
 import { readLatestAssistantReply } from "./agent-step.js";
 
 describe("readLatestAssistantReply", () => {
+  it("does not return a historical reply for a new send with no fresh output", async () => {
+    callGatewayMock.mockResolvedValue({
+      messages: [
+        { role: "assistant", timestamp: 100, content: [{ type: "text", text: "上周已完成" }] },
+        { role: "assistant", timestamp: 300, content: [] },
+      ],
+    });
+    expect(
+      await readLatestAssistantReply({ sessionKey: "agent:peer:main", afterMs: 200 }),
+    ).toBeUndefined();
+  });
+  it("accepts a fresh timestamped reply and rejects unknown freshness", async () => {
+    callGatewayMock.mockResolvedValue({
+      messages: [
+        { role: "assistant", timestamp: 300, content: [{ type: "text", text: "明天参加" }] },
+        { role: "assistant", content: [{ type: "text", text: "不明轮次" }] },
+      ],
+    });
+    expect(await readLatestAssistantReply({ sessionKey: "agent:peer:main", afterMs: 200 })).toBe(
+      "明天参加",
+    );
+  });
   beforeEach(() => {
     callGatewayMock.mockClear();
   });

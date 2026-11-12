@@ -36,6 +36,24 @@ it("forwards sanitized images only to vision candidates and discloses unseen pix
 beforeEach(() => {
   mocks.complete.mockReset();
 });
+it("recognizes individual colleagues as context without enabling tools or granting send authority", () => {
+  const context = buildInteractionCompletionContext(
+    {
+      message: "发私信",
+      context: [
+        { role: "user", content: '同一主人目录：[{"displayName":"客户经理"}]' },
+        { role: "user", content: "给客户经理发信息，明天十点开会" },
+      ],
+    },
+    model,
+  );
+  expect(context.systemPrompt).toContain("internal digital colleague");
+  expect(context.systemPrompt).toContain(
+    "interaction itself sends nothing and grants no permission",
+  );
+  expect(context.tools).toEqual([]);
+  expect(context.messages.at(-1)?.content).toBe("发私信");
+});
 it("keeps the host decision protocol after shared response guidance", () => {
   const context = buildInteractionCompletionContext(
     { message: "hello", context: [{ role: "system", content: "Reply naturally in plain text." }] },

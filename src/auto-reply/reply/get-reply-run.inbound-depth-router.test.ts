@@ -27,6 +27,7 @@ import { onAgentEvent, resetAgentRunContextForTest } from "../../infra/agent-eve
 import type { GetReplyOptions } from "../types.js";
 import { runReplyAgent } from "./agent-runner.js";
 import { buildCollaborationCapabilitySystemPrompt } from "./collaboration-capability-context.js";
+import { readConversationPeerContext } from "./conversation-peer-context.js";
 import { runPreparedReply } from "./get-reply-run.js";
 import { buildKnowledgeUniversePromptContext } from "./knowledge-universe-context.js";
 import { buildLearningRecallSystemPrompt } from "./learning-recall-context.js";
@@ -34,6 +35,9 @@ import { buildOperationalIdentitySystemPrompt } from "./operational-identity-con
 import { isCollaborationGroupRuntimeSession } from "./runtime-context-assembly.js";
 import { resolveRuntimeSkillPolicy } from "./runtime-skill-policy.js";
 import { ensureSkillSnapshot } from "./session-updates.js";
+vi.mock("./conversation-peer-context.js", () => ({
+  readConversationPeerContext: vi.fn().mockResolvedValue("同主人目录：客户经理（会话可用）"),
+}));
 
 vi.mock("../../agents/auth-profiles/session-override.js", () => ({
   resolveSessionAuthProfileOverride: vi.fn().mockResolvedValue(undefined),
@@ -518,12 +522,14 @@ describe("runPreparedReply inbound depth router", () => {
       expect(resolveBootstrapContextForRun).toHaveBeenCalled();
       expect(interaction.mock.calls[0]?.[0].input.context).toEqual(
         expect.arrayContaining([
+          expect.objectContaining({ role: "user", content: "同主人目录：客户经理（会话可用）" }),
           expect.objectContaining({
             role: "system",
             content: expect.stringContaining("shared identity"),
           }),
         ]),
       );
+      expect(readConversationPeerContext).toHaveBeenCalled();
       expect(runReplyAgent).toHaveBeenCalledTimes(executes ? 1 : 0);
       if (kind === "amended_active") {
         expect(abort).toHaveBeenCalledWith("ingress");

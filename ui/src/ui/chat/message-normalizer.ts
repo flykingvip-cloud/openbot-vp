@@ -1,9 +1,9 @@
+import { isInternalContinueHistoryMessage } from "../../../../src/auto-reply/reply/internal-continue-prompt.js";
 /**
  * Message normalization utilities for chat rendering.
  */
-
-import { isInternalContinueHistoryMessage } from "../../../../src/auto-reply/reply/internal-continue-prompt.js";
 import { stripInboundMetadata } from "../../../../src/auto-reply/reply/strip-inbound-meta.js";
+import { projectAssistantReplyForDisplay } from "../../../../src/shared/text/assistant-runtime-display.js";
 import {
   isControlChannelOnlyText,
   stripControlChannelForDisplay,
@@ -121,6 +121,7 @@ export function normalizeMessage(message: unknown): NormalizedMessage {
 
   // Hide internal continue injectors before display stripping mutates the text.
   const rawVisible = messageText(content);
+  const robotReply = provenanceSender(m).interSession;
   const hideControlOnly =
     isInternalContinueHistoryMessage({ role, content }) || isControlChannelOnlyText(rawVisible);
 
@@ -130,7 +131,7 @@ export function normalizeMessage(message: unknown): NormalizedMessage {
       if (item.type === "text" && typeof item.text === "string") {
         return {
           ...item,
-          text: stripControlChannelForDisplay(
+          text: (robotReply ? projectAssistantReplyForDisplay : stripControlChannelForDisplay)(
             stripClientAttachmentManifest(stripInboundMetadata(item.text)),
           ),
         };
@@ -143,7 +144,7 @@ export function normalizeMessage(message: unknown): NormalizedMessage {
   if (role === "assistant") {
     content = content.map((item) => {
       if (item.type === "text" && typeof item.text === "string") {
-        return { ...item, text: stripControlChannelForDisplay(item.text) };
+        return { ...item, text: projectAssistantReplyForDisplay(item.text) };
       }
       return item;
     });

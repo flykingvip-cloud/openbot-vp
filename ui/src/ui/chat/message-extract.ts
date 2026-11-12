@@ -1,5 +1,6 @@
 import { stripInboundMetadata } from "../../../../src/auto-reply/reply/strip-inbound-meta.js";
 import { stripEnvelope } from "../../../../src/shared/chat-envelope.js";
+import { projectAssistantReplyForDisplay } from "../../../../src/shared/text/assistant-runtime-display.js";
 import type { VisibleReplyLanguage } from "../../../../src/shared/text/assistant-scratchpad.js";
 import { stripControlChannelForDisplay } from "../../../../src/shared/text/control-channel-visibility.js";
 import { readTextBlock } from "../../../../src/shared/text/visible-message-text.js";
@@ -18,13 +19,13 @@ export function stripClientAttachmentManifest(text: string): string {
   return text.replace(/\n{0,2}<attachments>\s*[\s\S]*?<\/attachments>\s*/gi, "").trim();
 }
 
-function processMessageText(text: string, role: string): string {
+function processMessageText(text: string, role: string, robotReply = false): string {
   const shouldStripInboundMetadata = role.toLowerCase() === "user";
   if (role === "assistant") {
-    return stripControlChannelForDisplay(stripThinkingTags(text));
+    return projectAssistantReplyForDisplay(stripThinkingTags(text));
   }
   if (shouldStripInboundMetadata) {
-    return stripControlChannelForDisplay(
+    return (robotReply ? projectAssistantReplyForDisplay : stripControlChannelForDisplay)(
       stripClientAttachmentManifest(stripInboundMetadata(stripEnvelope(text))),
     );
   }
@@ -44,7 +45,13 @@ export function extractText(message: unknown): string | null {
   if (m.openclawPeerOutbound === true) {
     return raw;
   }
-  return processMessageText(raw, role);
+  const provenance = m.provenance;
+  const robotReply = Boolean(
+    provenance &&
+    typeof provenance === "object" &&
+    (provenance as Record<string, unknown>).kind === "inter_session",
+  );
+  return processMessageText(raw, role, robotReply);
 }
 
 export function extractTextCached(message: unknown): string | null {

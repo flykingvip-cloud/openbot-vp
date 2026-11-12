@@ -146,6 +146,7 @@ import {
 import { resolveCollaborationAwareSessionFile } from "./collaboration-session-file.js";
 import type { buildCommandContext } from "./commands.js";
 import { resolveComposerPluginMentionBindings } from "./composer-plugin-mention-bindings.js";
+import { readConversationPeerContext } from "./conversation-peer-context.js";
 import type { InlineDirectives } from "./directive-handling.js";
 import { buildActivePrimaryObjectivePrompt } from "./goal-correction-mutation.js";
 import type { buildGroupIntro } from "./groups.js";
@@ -1531,6 +1532,19 @@ export async function runPreparedReply(
       skillsSnapshot?.prompt,
       finalizeSystemContext(extraSystemPromptParts),
     ].filter((part): part is string => Boolean(part));
+    // Optional directory data supplies semantic referents, never authorization or a new router.
+    const peerContext = !useCollaborationAssembly
+      ? await readConversationPeerContext({
+          tenantId: replyGatewayTenantId,
+          ownerUserId: replyGatewayPlatformUserId,
+          client: buildKnowledgeReplyGatewayClient({
+            gatewayClientUser: replyGatewayUser,
+            gatewayClientPlatformUserId: replyGatewayPlatformUserId,
+            gatewayClientSessionDomain: ctx.GatewayClientSessionDomain,
+            gatewayClientSessionEnterpriseId: replyGatewayTenantId,
+          }),
+        }).catch(() => undefined)
+      : undefined;
     const interactionAuthProfileId = await resolveSessionAuthProfileOverride({
       cfg,
       provider,
@@ -1569,6 +1583,7 @@ export async function runPreparedReply(
         taskTarget: hostBoundTaskTarget(board),
         context: [
           ...systemContext.map((content) => ({ role: "system" as const, content })),
+          ...(peerContext ? [{ role: "user" as const, content: peerContext }] : []),
           ...projectInteractionHistory(history, interactionIngress.userMessageId),
         ],
       },

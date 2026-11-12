@@ -111,6 +111,14 @@ describe("sanitizeUserFacingChatError", () => {
     const businessError = "已达请求上限，请稍后重试";
     expect(sanitizeUserFacingChatError(businessError)).toBe(businessError);
   });
+  it("does not expose runtime property failures as assistant speech", () => {
+    expect(
+      sanitizeUserFacingChatError("Cannot read properties of undefined (reading 'length')"),
+    ).toBe(GENERIC_CHAT_ERROR_MESSAGE);
+    expect(sanitizeUserFacingChatError("TypeError: handler is not a function")).toBe(
+      GENERIC_CHAT_ERROR_MESSAGE,
+    );
+  });
 
   it("preserves null and undefined", () => {
     expect(sanitizeUserFacingChatError(null)).toBeNull();

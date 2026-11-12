@@ -109,6 +109,7 @@ import {
   attachDeclaredDeliverableArtifacts,
   declaredDeliverableArtifactFields,
 } from "../../shared/preview-artifact/materialize-declared-artifacts.js";
+import { projectAssistantReplyForDisplay } from "../../shared/text/assistant-runtime-display.js";
 import {
   isHiddenToolUseScratchpadMessage,
   type VisibleReplyLanguage,
@@ -1802,6 +1803,7 @@ function sanitizeChatHistoryContentBlock(
   block: unknown,
   expectedLanguage?: VisibleReplyLanguage | null,
   keepBody = false,
+  assistant = false,
 ): { blocks: unknown[]; changed: boolean } {
   if (!block || typeof block !== "object") {
     return { blocks: [block], changed: false };
@@ -1815,7 +1817,11 @@ function sanitizeChatHistoryContentBlock(
           gateChatHistoryText(entry.text, expectedLanguage),
           expectedLanguage,
         ).text;
-    const visible = keepBody ? gated : stripControlChannelForDisplay(gated);
+    const visible = keepBody
+      ? gated
+      : assistant
+        ? projectAssistantReplyForDisplay(gated)
+        : stripControlChannelForDisplay(gated);
     const res = truncateChatHistoryText(visible);
     changed ||= res.truncated || res.text !== entry.text;
     entry.text = res.text;
@@ -1858,6 +1864,14 @@ function sanitizeChatHistoryMessage(
   let entry = { ...(message as Record<string, unknown>) };
   let changed = false;
   const keepBody = isPeerOutboundSurfaceMessage(message);
+  const provenance = entry.provenance;
+  const robotReply =
+    entry.role === "assistant" ||
+    Boolean(
+      provenance &&
+      typeof provenance === "object" &&
+      (provenance as Record<string, unknown>).kind === "inter_session",
+    );
   // Materialize 「打开成果」 artifacts from raw <<DELIVERABLE file=>> BEFORE display strip.
   if (entry.role === "assistant" && !keepBody) {
     const beforeArtifact = entry.artifact;
@@ -1896,7 +1910,11 @@ function sanitizeChatHistoryMessage(
           gateChatHistoryText(value, expectedLanguage),
           expectedLanguage,
         ).text;
-    const visible = keepBody ? gated : stripControlChannelForDisplay(gated);
+    const visible = keepBody
+      ? gated
+      : robotReply
+        ? projectAssistantReplyForDisplay(gated)
+        : stripControlChannelForDisplay(gated);
     const res = truncateChatHistoryText(visible, truncateOpts);
     return appendToolResultExitFooter(res.text, exitFooter);
   };
@@ -1925,7 +1943,7 @@ function sanitizeChatHistoryMessage(
         return;
       }
       if (!isToolResult) {
-        const res = sanitizeChatHistoryContentBlock(block, expectedLanguage, keepBody);
+        const res = sanitizeChatHistoryContentBlock(block, expectedLanguage, keepBody, robotReply);
         contentChanged ||= res.changed;
         nextBlocks.push(...res.blocks);
         return;
@@ -4130,7 +4148,7 @@ async function runGroupBotDiscussionTurn(params: {
         deliverableArtifacts = declaredDeliverableArtifactFields(replyText, {
           timestamp: Date.now(),
         });
-        replyText = stripControlChannelForDisplay(replyText);
+        replyText = projectAssistantReplyForDisplay(replyText);
       } catch (err) {
         params.context.logGateway.warn(
           `collaboration deliverable settle failed (${params.bot.agentId}): ${formatForLog(err)}`,
@@ -6792,7 +6810,7 @@ export const chatHandlers: GatewayRequestHandlers = {
               const fallbackArtifacts = declaredDeliverableArtifactFields(prepared.text, {
                 timestamp: Date.now(),
               });
-              const replyText = stripControlChannelForDisplay(prepared.text);
+              const replyText = projectAssistantReplyForDisplay(prepared.text);
               const fallbackPublish = prepared.structured ? prepared.view : undefined;
               const appended = await appendAssistantTranscriptMessage({
                 message: replyText,

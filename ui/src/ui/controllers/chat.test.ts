@@ -468,11 +468,12 @@ describe("handleChatEvent", () => {
     expect(state.lastError).toBe("previous send failure");
     expect(state.chatRunId).toBeNull();
     expect(state.chatMessages.map((message) => JSON.stringify(message)).join("\n")).toContain(
-      "reading 'length'",
+      "服务暂时不可用",
     );
     expect(
-      state.chatMessages.filter((message) => JSON.stringify(message).includes("reading 'length'")),
+      state.chatMessages.filter((message) => JSON.stringify(message).includes("服务暂时不可用")),
     ).toHaveLength(1);
+    expect(JSON.stringify(state.chatMessages)).not.toContain("reading 'length'");
   });
 
   it("ignores NO_REPLY delta updates", () => {

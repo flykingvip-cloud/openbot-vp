@@ -133,13 +133,16 @@ export function formatTeamDeliverableUserMessage(
   outcome: ChatTeamDeliverableSubmitOutcome,
 ): string {
   if (outcome.ok) {
-    return (
-      `团队成果已提交 id=${outcome.deliverableId} v${outcome.version}` +
-      ` @ ${outcome.locator} (${outcome.relativePath})。`
-    );
+    return `团队成果已提交（第 ${outcome.version} 版），等待审核。`;
   }
-  const detail = "detail" in outcome && outcome.detail ? `: ${outcome.detail}` : "";
-  return `团队成果未完成（${outcome.reason}${detail}）。`;
+  // The caller retains the full outcome for recovery/audit; do not publish storage locators or codes.
+  if (/acl|permission|unauthorized/.test(outcome.reason)) {
+    return "团队成果未完成：当前没有提交权限。";
+  }
+  if (/execution_binding|execution_attempt|task/.test(outcome.reason)) {
+    return "团队成果未完成：成果尚未与本次有效任务关联，暂不能提交审核。";
+  }
+  return "团队成果未完成：提交校验未通过，尚未进入审核。";
 }
 
 /**

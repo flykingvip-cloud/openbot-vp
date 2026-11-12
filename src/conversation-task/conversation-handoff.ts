@@ -420,6 +420,7 @@ export async function dispatchConversationHandoff(input: {
   }
   const reply = await waitConversationReply({
     runId: result.runId,
+    afterMs: startedAt,
     targetSessionKey: result.targetSessionKey,
     sessionOwnerPlatformUserId: input.requesterUserId,
   });
@@ -450,6 +451,7 @@ export async function waitConversationReply(input: {
   targetSessionKey: string;
   timeoutMs?: number;
   sessionOwnerPlatformUserId?: string;
+  afterMs?: number;
 }): Promise<string | undefined> {
   const waitMs = Math.min(input.timeoutMs ?? 45_000, 60_000);
   try {
@@ -468,6 +470,7 @@ export async function waitConversationReply(input: {
     return await readLatestAssistantReply({
       sessionKey: input.targetSessionKey,
       sessionOwnerPlatformUserId: input.sessionOwnerPlatformUserId,
+      afterMs: input.afterMs,
     });
   } catch {
     return undefined;
@@ -510,10 +513,12 @@ function scheduleHostGuestReturn(input: {
   guestAgentId: string;
   sessionOwnerPlatformUserId?: string;
   injectReply?: boolean;
+  afterMs: number;
 }): void {
   void (async () => {
     const reply = await waitConversationReply({
       runId: input.runId,
+      afterMs: input.afterMs,
       targetSessionKey: input.guestSessionKey,
       sessionOwnerPlatformUserId: input.sessionOwnerPlatformUserId,
     });
@@ -738,6 +743,7 @@ export async function routeStewardConversationMentions(input: {
     }
     const live = resolveConversationPeer(token, reachable) ?? intended;
     const task = stripResolvedAtMentions(message, robotTokens) || message;
+    const startedAt = Date.now();
     const result = await dispatch({
       title: `对话：${live.displayName}`,
       message: task,
@@ -775,6 +781,7 @@ export async function routeStewardConversationMentions(input: {
     }).catch(() => undefined);
     scheduleHostGuestReturn({
       runId: result.runId,
+      afterMs: startedAt,
       hostSessionKey: result.requesterSessionKey ?? sessionKey,
       guestSessionKey: result.targetSessionKey,
       guestAgentId: live.agentId,

@@ -438,7 +438,10 @@ export function renderAgentSystemPrompt(params: {
     cron: "Manage cron jobs and wake events (use for reminders; when scheduling a reminder, write the systemEvent text as something that will read like a reminder when it fires, and mention that it is a reminder depending on the time gap between setting and firing; include recent context in reminder text if appropriate)",
     scheduled_task:
       "Create a system scheduled task in 我的任务 (same Gateway cron store as the client 定时任务 page). Use this instead of running `openbot cron` or writing HEARTBEAT.md. Defaults to daily 08:00 Asia/Shanghai and delivers the result to the current conversation. Only the signed-in owner of this agent can create one.",
-    message: "Send messages and channel actions",
+    conversation_send:
+      "Send an internal private message to an existing same-owner digital colleague, not an external channel or a group delegation. Resolve colleagues with agents_list; do not ask for email/phone details for a registered internal peer. Delivery is not a reply or task acceptance.",
+    message:
+      "Send messages and external channel actions (not private messages between registered digital colleagues)",
     gateway: "Restart, apply config, or run updates on the running OpenBot process",
     agents_list: acpSpawnRuntimeEnabled
       ? 'List OpenBot agent ids allowed for sessions_spawn when runtime="subagent" (not ACP harness ids)'
@@ -475,6 +478,7 @@ export function renderAgentSystemPrompt(params: {
     "message",
     "gateway",
     "agents_list",
+    "conversation_send",
     "sessions_list",
     "sessions_history",
     "sessions_send",

@@ -13,6 +13,7 @@
 
 const INTERNAL_ERROR_PATTERNS: RegExp[] = [
   /ERR_[A-Z_]+/, // node 错误码，如 ERR_MODULE_NOT_FOUND
+  /\b(?:TypeError|ReferenceError|RangeError|SyntaxError):|Cannot read (?:properties|property) of|is not a function/i,
   /cannot find module/i,
   /\/dist\//, // 构建产物 chunk 路径
   /node_modules/,

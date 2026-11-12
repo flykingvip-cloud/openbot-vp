@@ -36,10 +36,17 @@ describe("discuss-to-task-chat-receipt", () => {
     expect(view.userMessage).not.toMatch(/已派工/);
   });
 
-  it("user-visible status includes taskId and stages when present", () => {
+  it("keeps task identity and stage facts internal while showing the actual user status", () => {
     const text = formatDiscussToTaskUserVisibleStatus(stub({}));
-    expect(text).toContain("任务已建立");
-    expect(text).toContain("task-abc");
+    expect(text).toBe("任务已建立，工作项尚未发布。");
+    expect(text).not.toContain("task-abc");
+    expect(text).not.toMatch(/任务已建立=|责任已接受=|计划已确认=/);
+    const receipt = buildDiscussToTaskChatReceipt(
+      stub({ internalReason: "source_message_not_bound" }),
+    );
+    expect(receipt.coordinatorBindingText).toContain("taskId=task-abc");
+    expect(receipt.coordinatorBindingText).toContain("source_message_not_bound");
+    expect(receipt.stagesSummary).toContain("任务已建立=是");
     expect(text).not.toMatch(/已派工/);
   });
 
@@ -66,6 +73,9 @@ describe("discuss-to-task-chat-receipt", () => {
       const view = buildDiscussToTaskChatReceipt(row);
       expect(view.userMessage.length).toBeGreaterThan(0);
       expect(view.coordinatorBindingText).toContain(row.statusCode);
+      if (row.statusCode === "formal_task_needs_confirm") {
+        expect(formatDiscussToTaskUserVisibleStatus(row)).toBe("已整理任务草案，尚未开始执行。");
+      }
     }
   });
 });

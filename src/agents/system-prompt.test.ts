@@ -773,7 +773,7 @@ describe("buildAgentSystemPrompt", () => {
       toolNames: ["message"],
     });
 
-    expect(prompt).toContain("message: Send messages and channel actions");
+    expect(prompt).toContain("message: Send messages and external channel actions");
     expect(prompt).toContain("### message tool");
     expect(prompt).toContain(`respond with ONLY: ${SILENT_REPLY_TOKEN}`);
   });

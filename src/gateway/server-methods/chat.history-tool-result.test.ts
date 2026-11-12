@@ -2,6 +2,16 @@ import { describe, expect, it } from "vitest";
 import { sanitizeChatHistoryMessagesForTest } from "./chat.js";
 
 describe("chat.history toolResult sanitization", () => {
+  it("projects assistant runtime diagnostics on reload without rewriting the user message", () => {
+    const raw = "任务受阻：source_message_not_bound。";
+    const messages = sanitizeChatHistoryMessagesForTest([
+      { role: "assistant", content: [{ type: "text", text: raw }] },
+      { role: "user", content: raw },
+    ]) as Array<{ content: string | Array<{ text: string }> }>;
+    expect(JSON.stringify(messages[0])).toContain("这条消息尚未正确关联到任务");
+    expect(JSON.stringify(messages[0])).not.toContain("source_message_not_bound");
+    expect(messages[1].content).toBe(raw);
+  });
   it("keeps an outbound 1:1 sentence that a normal assistant scratchpad would drop", () => {
     const sentence = "我先查一下文档。";
     const sanitized = sanitizeChatHistoryMessagesForTest([
