@@ -21,6 +21,7 @@ export async function persistRejectedInteractionTurn(params: {
     "[interaction-rejection-source]",
     JSON.stringify({
       validation: message,
+      shape: (params.error as Error & { shape?: unknown }).shape,
       stack: (params.error as Error).stack?.split("\n").slice(1, 7),
     }),
   );
