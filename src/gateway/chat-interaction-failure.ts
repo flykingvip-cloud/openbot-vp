@@ -15,6 +15,15 @@ export async function persistRejectedInteractionTurn(params: {
   ) {
     return { persisted: false };
   }
+  // This exact gate also owns the persisted terminal. Keep diagnostics here so
+  // a host adapter cannot drop the source by converting an error between modules.
+  console.warn(
+    "[interaction-rejection-source]",
+    JSON.stringify({
+      validation: message,
+      stack: (params.error as Error).stack?.split("\n").slice(1, 7),
+    }),
+  );
   try {
     const result = await params.append(
       REJECTED_INTERACTION_TURN_TEXT,

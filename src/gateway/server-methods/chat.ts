@@ -7037,18 +7037,6 @@ export const chatHandlers: GatewayRequestHandlers = {
               error,
             },
           });
-          if (
-            err instanceof Error &&
-            /^Invalid interaction|^Interaction target is not bound/.test(err.message)
-          ) {
-            context.logGateway.warn(
-              `interaction rejection source ${JSON.stringify({
-                validation: err.message,
-                shape: (err as Error & { shape?: unknown }).shape,
-                stack: err.stack?.split("\n").slice(1, 7),
-              })}`,
-            );
-          }
           const terminal = await persistRejectedInteractionTurn({
             error: err,
             runId: clientRunId,
