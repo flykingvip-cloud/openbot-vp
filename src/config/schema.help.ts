@@ -110,10 +110,48 @@ export const FIELD_HELP: Record<string, string> = {
     "Set true to enable the sanctioned loopback operator identity. Defaults to false so the behavior is strictly opt-in.",
   "gateway.auth.trustedProxy.localOperator.user":
     "Platform-auth user email adopted for direct-loopback connections. Must be an active user with an enterprise membership in the platform-auth store, otherwise resolution fails closed to the anonymous local principal.",
+  "gateway.auth.trustedProxy.rejectDirectLoopbackIdentityHeaders":
+    "Isolation tight-path control, off by default. When true, a client that is merely from 127.0.0.1 or ::1 cannot become an arbitrary user by sending the configured userHeader (for example X-Forwarded-User). Leave this false to keep the default production trusted-proxy behavior, including loopback addresses listed in gateway.trustedProxies. Platform-auth cookie login still works in tight mode. A designated isolation entry may still present identity headers when entryHopCredential matches. Do not treat this as HK→A auth translation or a production trustedProxies change.",
+  "gateway.auth.trustedProxy.entryHopHeader":
+    "Header name the designated isolation entry uses to present the hop credential in tight mode. Default is x-openbot-entry-hop. Use this only with rejectDirectLoopbackIdentityHeaders and a configured entryHopCredential.",
+  "gateway.auth.trustedProxy.entryHopCredential":
+    "Shared hop credential the designated isolation entry presents so loopback identity headers can be trusted in tight mode. Keep this secret, never log it, and omit it to reject all direct-loopback identity headers while still allowing platform-auth sessions.",
   "gateway.trustedProxies":
     "CIDR/IP allowlist of upstream proxies permitted to provide forwarded client identity headers. Keep this list narrow so untrusted hops cannot impersonate users.",
   "gateway.allowRealIpFallback":
     "Enables x-real-ip fallback when x-forwarded-for is missing in proxy scenarios. Keep disabled unless your ingress stack requires this compatibility behavior.",
+  "gateway.execProtocol":
+    "Isolation-only gateway HTTP facade for the exec-protocol control plane (A'). Default off. Enabling this does not implement or enable a production execution profile. Provide every isolation key explicitly; signed isolation numbers are never auto-filled, and OPENBOT_PRODUCTION_EXECUTION_MODE=production must still be refused.",
+  "gateway.execProtocol.enabled":
+    "Set true to expose the authenticated /v1/exec-protocol product path on the gateway. Default false. Keep this off outside isolation drills, and never combine it with OPENBOT_PRODUCTION_EXECUTION_MODE=production.",
+  "gateway.execProtocol.leaseToken":
+    "Bearer lease token the gateway uses to call A'. Provide it explicitly in config or OPENBOT_EXEC_PROTOCOL_LEASE_TOKEN. Never log or commit this value.",
+  "gateway.execProtocol.controlPlaneUrl":
+    "Optional explicit loopback URL for A' (for example http://127.0.0.1:18790). When omitted, the facade builds the URL from the explicit isolation bind and port. Public or non-loopback URLs are refused.",
+  "gateway.execProtocol.profileName":
+    "Must be exec-protocol-v1-isolation. Provide this explicitly with the other isolation keys; the facade does not fill it from signed defaults.",
+  "gateway.execProtocol.bind":
+    "Loopback bind used to construct or validate the A' URL (127.0.0.1, ::1, or localhost). Provide it explicitly; missing values are refused rather than defaulted.",
+  "gateway.execProtocol.port":
+    "A' TCP port (1-65535). Provide it explicitly with the rest of the isolation profile. The signed isolation port 18790 is not substituted when this key is missing.",
+  "gateway.execProtocol.connectTimeoutMs":
+    "Connect timeout in milliseconds for gateway-to-A' calls. Provide this explicitly; the facade will not auto-fill the signed isolation value.",
+  "gateway.execProtocol.requestTimeoutMs":
+    "Request timeout in milliseconds for gateway-to-A' calls. Provide this explicitly; the facade will not auto-fill the signed isolation value.",
+  "gateway.execProtocol.executionTimeoutMs":
+    "Execution timeout in milliseconds forwarded as part of the isolation profile. Provide this explicitly; the facade will not auto-fill the signed isolation value.",
+  "gateway.execProtocol.maxTransportRetries":
+    "Maximum transport retries for idempotent gateway-to-A' reads such as status and artifact. Provide this explicitly; the facade will not auto-fill the signed isolation value.",
+  "gateway.execProtocol.transportBackoffMs":
+    "Backoff delays in milliseconds, with exactly maxTransportRetries-1 positive integers. Provide this explicitly as a complete array; missing values are refused.",
+  "gateway.execProtocol.idempotencyTtlMs":
+    "Idempotency TTL in milliseconds for the isolation profile. Provide this explicitly; the facade will not auto-fill the signed isolation value.",
+  "gateway.execProtocol.cancelDeadlineMs":
+    "Cancel deadline in milliseconds for the isolation profile. Provide this explicitly; the facade will not auto-fill the signed isolation value.",
+  "gateway.execProtocol.leaseTtlMs":
+    "Lease TTL in milliseconds for the isolation profile. Provide this explicitly; the facade will not auto-fill the signed isolation value.",
+  "gateway.execProtocol.maxClockSkewMs":
+    "Maximum accepted clock skew in milliseconds for lease validation. Provide this explicitly as a non-negative integer; the facade will not auto-fill the signed isolation value.",
   "gateway.tools":
     "Gateway-level tool exposure allow/deny policy that can restrict runtime tool availability independent of agent/tool profiles. Use this for coarse emergency controls and production hardening.",
   "gateway.tools.allow":

@@ -932,6 +932,9 @@ export const OpenBotSchema = z
                   })
                   .strict()
                   .optional(),
+                rejectDirectLoopbackIdentityHeaders: z.boolean().optional(),
+                entryHopHeader: z.string().optional(),
+                entryHopCredential: SecretInputSchema.optional().register(sensitive),
               })
               .strict()
               .optional(),
@@ -948,6 +951,26 @@ export const OpenBotSchema = z
           .optional(),
         trustedProxies: z.array(z.string()).optional(),
         allowRealIpFallback: z.boolean().optional(),
+        execProtocol: z
+          .object({
+            enabled: z.boolean().optional(),
+            leaseToken: SecretInputSchema.optional().register(sensitive),
+            controlPlaneUrl: z.string().optional(),
+            profileName: z.literal("exec-protocol-v1-isolation").optional(),
+            bind: z.string().optional(),
+            port: z.number().int().positive().max(65535).optional(),
+            connectTimeoutMs: z.number().int().positive().optional(),
+            requestTimeoutMs: z.number().int().positive().optional(),
+            executionTimeoutMs: z.number().int().positive().optional(),
+            maxTransportRetries: z.number().int().positive().optional(),
+            transportBackoffMs: z.array(z.number().int().positive()).optional(),
+            idempotencyTtlMs: z.number().int().positive().optional(),
+            cancelDeadlineMs: z.number().int().positive().optional(),
+            leaseTtlMs: z.number().int().positive().optional(),
+            maxClockSkewMs: z.number().int().nonnegative().optional(),
+          })
+          .strict()
+          .optional(),
         tools: z
           .object({
             deny: z.array(z.string()).optional(),

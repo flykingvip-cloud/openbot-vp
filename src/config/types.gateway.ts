@@ -180,6 +180,30 @@ export type GatewayTrustedProxyConfig = {
    * enterprise membership.
    */
   localOperator?: GatewayLoopbackOperatorConfig;
+  /**
+   * Isolation tight path (off by default). When true, a client that is merely
+   * from 127.0.0.1/::1 cannot become an arbitrary user by sending `userHeader`
+   * (for example X-Forwarded-User). Default production trusted-proxy behavior
+   * is unchanged: loopback addresses listed in `gateway.trustedProxies` may
+   * still present identity headers. Platform-auth cookie sessions continue to
+   * work. A designated entry hop may still inject identity headers if it
+   * presents `entryHopCredential`. This flag does not change or pre-approve
+   * Hong Kong LIVE `trustedProxies` or HK→A auth translation.
+   */
+  rejectDirectLoopbackIdentityHeaders?: boolean;
+  /**
+   * Header name the designated entry hop uses to present `entryHopCredential`.
+   * Default: `x-openbot-entry-hop`. Used only when
+   * `rejectDirectLoopbackIdentityHeaders` is true.
+   */
+  entryHopHeader?: string;
+  /**
+   * Shared hop credential the designated isolation entry presents so loopback
+   * identity headers can be trusted in tight mode. Never log this value.
+   * Omit to reject all direct-loopback identity headers in tight mode
+   * (platform-auth sessions still work).
+   */
+  entryHopCredential?: string;
 };
 
 /** Sanctioned loopback operator identity for direct-loopback gateway access. */
@@ -614,6 +638,38 @@ export type GatewaySecurityConfig = {
   pluginTenantAccess?: "restricted" | "unrestricted";
 };
 
+/**
+ * Isolation-only gateway facade for talking to the exec-protocol control
+ * plane (A') with the existing client. Off by default. This is not a
+ * production execution profile. Callers must pass every isolation key
+ * explicitly (config object or environment); missing keys are refused
+ * rather than filled from signed isolation defaults.
+ */
+export type GatewayExecProtocolConfig = {
+  /** Opt-in. Default false. */
+  enabled?: boolean;
+  /** Bearer lease token used to call A'. Never log this value. */
+  leaseToken?: string;
+  /**
+   * Optional explicit A' base URL (loopback only). When omitted, the
+   * facade constructs `http://{bind}:{port}` from the explicit isolation
+   * bind and port.
+   */
+  controlPlaneUrl?: string;
+  profileName?: "exec-protocol-v1-isolation";
+  bind?: string;
+  port?: number;
+  connectTimeoutMs?: number;
+  requestTimeoutMs?: number;
+  executionTimeoutMs?: number;
+  maxTransportRetries?: number;
+  transportBackoffMs?: number[];
+  idempotencyTtlMs?: number;
+  cancelDeadlineMs?: number;
+  leaseTtlMs?: number;
+  maxClockSkewMs?: number;
+};
+
 export type GatewayConfig = {
   /** Single multiplexed port for Gateway WS + HTTP (default: 18789). */
   port?: number;
@@ -711,6 +767,14 @@ export type GatewayConfig = {
    * Default: false (safer fail-closed behavior).
    */
   allowRealIpFallback?: boolean;
+  /**
+   * Isolation-only HTTP facade for the exec-protocol control plane (A').
+   * Off by default. Enabling this does not implement or enable a production
+   * execution profile. All isolation config keys must be provided explicitly;
+   * signed isolation numbers are never auto-filled. Never set
+   * OPENBOT_PRODUCTION_EXECUTION_MODE=production.
+   */
+  execProtocol?: GatewayExecProtocolConfig;
   /** Tool access restrictions for HTTP /tools/invoke endpoint. */
   tools?: GatewayToolsConfig;
   /** Platform control-plane extensions (model management mode, etc.). */
