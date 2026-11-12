@@ -112,3 +112,25 @@
 本节仅关闭“276G既有记录的只读查询反复空白拒绝”这组已复现用例。历史作用域、并发回信严格关联、会话文件解析、协作终局、PPT视觉与下载、真实异步等待等其他开放项不借此关闭。本轮未推送、未云部署；共享登记册仍未提交。
 
 — codex-runtime-manager
+
+## 7. 模型恢复后真实复测与历史引用边界
+
+受测源码与本地 Gateway：`a9cbeec4b2e45d669400412f97186b8af83c5fff`；主干 `4a786626a1e2892043f57b3832ddf2a407be284a` 为祖先。模型为真实 `deepseek-v4-flash`。以下证据不倒算给 Package6 或本报告早期候选。
+
+- 恢复后旧候选 `85af989e6` 的 S276L 回答同时包含未答历史请求 S276K，证实仅靠系统提示仍会串答。当前修复把交互的历史 user-role 内容序列化为带 `reference_context` 标记的引用数据，当前消息保持原文与最后位置。保留角色、历史内容、追问解析及原始 transcript；不删除历史、不增加模型调用、不改变准入或权限。
+- 回归先红：历史请求仍是裸用户指令，`not.toBe(previous)` 失败（24通过／1失败）。修复后交互模型、解释、历史投影、失败终局4文件／53项通过；类型感知oxlint与完整构建通过。构建时依赖缓存权限问题另行重跑后通过，不混成源码失败。证据日志：`/tmp/openbot-reference-context-{red,green,build}.log`。
+- S276M：只回复“S276M已就绪”，没有补答历史K/L。S276N：当前任务仅一次 `conversation_send`，收件人为同主人高密度分析，正文仅S276N；收件方当前会话持久化来信与“已收到S276N”；工具真实回执 `delivered=true`，发送方分别报告发出与回信。未向外部渠道发送。
+- S276O：根据已有S276N记录只读回答。新增transcript仅user与assistant两条，无业务工具调用；任务板SHA256前后一致。证据：`/tmp/openbot-real-main276-evidence/S276O-query-result.json`、`S276N-private-and-query-pass.png`。
+- 仍开放：S276N已送达并收到回信，但个人任务板仍 `unfinished=true`。`delivery/acceptance/criteria.ts` 的现有检查主要是成果文件精确字节；无检查时返回 `validator_unavailable/pending`。本轮没有用模型成功声明、聊天正文或工具名称直接关板。通讯事实通过不等于任务验收结算已闭环；并发回信严格run关联也未借本轮关闭。
+
+## 8. S276P 原生PPT生成、下载与预览分项结果
+
+同一受测源码 `a9cbeec4b`，通过前端真实提交独立3页PPT任务。模型生成文件后，实际点击成果卡与下载链接取得 `S276P-quarterly-review.pptx`：89847字节，SHA256 `7c51851e71344a545fdbb4126f3071e6766c995d5a52827fb59dc4fbc21aa672`。ZIP CRC检查通过，3个slide XML；第2页包含一个原生 `a:tbl`，数据100/70/30、120/78/42、150/90/60，合计370/238/132，均与任务一致。
+
+现有 `openbot-pptx-renderer:1` 在断网、只读、限资源容器中对实际下载文件渲染成功，输出3页PNG。已查看第2页，表格排版与数值清晰；这证明下载文件可被实际Office渲染器解析，不等同于已在PowerPoint应用中验收。
+
+**前端实物预览仍失败**：侧栏iframe存在但画面空白；下载链接可用。浏览器无采集到的错误，iframe为blob来源且保持原sandbox。不得将独立容器渲染成功称为侧栏已通过，也未为了显示而放宽sandbox。后续应继续核准服务端预览响应至iframe加载的字节、类型与生命周期。证据：`S276P-preview.png`、`S276P-isolated-render.html`、`S276P-page-{1,2,3}.png`（均在上述临时证据目录）。
+
+本轮未完成协作真实终局、长程异步、PPT修改后版本一致性或外部渠道终验；未推送、未云部署。共享 `.loom/registry.yaml` WIP保持独立。
+
+— codex-runtime-manager
