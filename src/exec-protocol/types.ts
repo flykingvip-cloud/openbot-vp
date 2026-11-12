@@ -1,8 +1,9 @@
-/** Execution protocol v1 shared types for the signed isolation profile. */
+/** Execution protocol v1 shared types for isolation and production profiles. */
 
 export const EXEC_API_VERSION = 1;
 export const EXEC_API_VERSION_FIELD = "exec-api-version";
 export const ISOLATION_PROFILE_NAME = "exec-protocol-v1-isolation";
+export const PRODUCTION_PROFILE_NAME = "exec-protocol-v1-production";
 
 export const EXEC_ERROR_CODES = [
   "EXEC_VERSION_UNSUPPORTED",
