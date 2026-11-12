@@ -820,4 +820,150 @@ describe("trusted-proxy auth", () => {
     expect(res.ok).toBe(true);
     expect(res.user).toBe("nick@example.com");
   });
+
+  it("accepts X-Forwarded-User from loopback when loopback is trusted (default production-shaped behavior)", async () => {
+    const res = await authorizeTrustedProxy({
+      trustedProxies: ["127.0.0.1", "::1"],
+      remoteAddress: "127.0.0.1",
+      headers: {
+        host: "127.0.0.1:18789",
+        "x-forwarded-user": "forged-attacker@iso-t163.invalid",
+        "x-forwarded-proto": "https",
+      },
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.method).toBe("trusted-proxy");
+    expect(res.user).toBe("forged-attacker@iso-t163.invalid");
+  });
+
+  it("tight mode rejects a direct-loopback forged X-Forwarded-User", async () => {
+    const res = await authorizeTrustedProxy({
+      auth: {
+        mode: "trusted-proxy",
+        allowTailscale: false,
+        trustedProxy: {
+          userHeader: "x-forwarded-user",
+          requiredHeaders: ["x-forwarded-proto"],
+          rejectDirectLoopbackIdentityHeaders: true,
+        },
+      },
+      trustedProxies: ["127.0.0.1", "::1"],
+      remoteAddress: "127.0.0.1",
+      headers: {
+        host: "127.0.0.1:18789",
+        "x-forwarded-user": "forged-attacker@iso-t163.invalid",
+        "x-forwarded-proto": "https",
+      },
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.user).not.toBe("forged-attacker@iso-t163.invalid");
+    expect(res.method).toBe("none");
+    expect(res.user).toBe("local");
+  });
+
+  it("tight mode still accepts identity headers from a non-loopback trusted proxy", async () => {
+    const res = await authorizeTrustedProxy({
+      auth: {
+        mode: "trusted-proxy",
+        allowTailscale: false,
+        trustedProxy: {
+          userHeader: "x-forwarded-user",
+          requiredHeaders: ["x-forwarded-proto"],
+          rejectDirectLoopbackIdentityHeaders: true,
+        },
+      },
+      headers: {
+        "x-forwarded-user": "nick@example.com",
+        "x-forwarded-proto": "https",
+      },
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.method).toBe("trusted-proxy");
+    expect(res.user).toBe("nick@example.com");
+  });
+
+  it("tight mode accepts loopback identity headers when the designated entry hop credential matches", async () => {
+    const res = await authorizeTrustedProxy({
+      auth: {
+        mode: "trusted-proxy",
+        allowTailscale: false,
+        trustedProxy: {
+          userHeader: "x-forwarded-user",
+          requiredHeaders: ["x-forwarded-proto"],
+          rejectDirectLoopbackIdentityHeaders: true,
+          entryHopCredential: "iso-entry-hop-credential",
+        },
+      },
+      trustedProxies: ["127.0.0.1", "::1"],
+      remoteAddress: "127.0.0.1",
+      headers: {
+        host: "127.0.0.1:18789",
+        "x-forwarded-user": "iso-user@example.com",
+        "x-forwarded-proto": "https",
+        "x-openbot-entry-hop": "iso-entry-hop-credential",
+      },
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.method).toBe("trusted-proxy");
+    expect(res.user).toBe("iso-user@example.com");
+  });
+
+  it("tight mode rejects loopback identity headers when the entry hop credential is wrong", async () => {
+    const res = await authorizeTrustedProxy({
+      auth: {
+        mode: "trusted-proxy",
+        allowTailscale: false,
+        trustedProxy: {
+          userHeader: "x-forwarded-user",
+          requiredHeaders: ["x-forwarded-proto"],
+          rejectDirectLoopbackIdentityHeaders: true,
+          entryHopCredential: "iso-entry-hop-credential",
+        },
+      },
+      trustedProxies: ["127.0.0.1", "::1"],
+      remoteAddress: "127.0.0.1",
+      headers: {
+        host: "127.0.0.1:18789",
+        "x-forwarded-user": "forged-attacker@iso-t163.invalid",
+        "x-forwarded-proto": "https",
+        "x-openbot-entry-hop": "wrong-hop-credential",
+      },
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.user).not.toBe("forged-attacker@iso-t163.invalid");
+    expect(res.method).toBe("none");
+    expect(res.user).toBe("local");
+  });
+
+  it("tight mode still allows a configured loopback token after rejecting a forged identity header", async () => {
+    const res = await authorizeGatewayConnect({
+      auth: {
+        mode: "trusted-proxy",
+        allowTailscale: false,
+        token: "local-operator-token",
+        trustedProxy: {
+          userHeader: "x-forwarded-user",
+          rejectDirectLoopbackIdentityHeaders: true,
+        },
+      },
+      connectAuth: { token: "local-operator-token", password: undefined },
+      trustedProxies: ["127.0.0.1", "::1"],
+      req: {
+        socket: { remoteAddress: "127.0.0.1" },
+        headers: {
+          host: "127.0.0.1:18789",
+          "x-forwarded-user": "forged-attacker@iso-t163.invalid",
+        },
+      } as never,
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.method).toBe("token");
+    expect(res.user).not.toBe("forged-attacker@iso-t163.invalid");
+  });
 });
