@@ -3743,6 +3743,9 @@ async function runGroupBotDiscussionTurn(params: {
         GatewayClientSessionEnterpriseId: params.client?.sessionEnterpriseId,
         GatewayClientSessionMembershipId: params.client?.sessionMembershipId,
         CollaborationRoundInvoked: true,
+        ...(params.executionLifecycle
+          ? { CollaborationExecutionLifecycle: params.executionLifecycle }
+          : {}),
         CollaborationBotAgentId: params.bot.agentId,
         ...(privateRunBag ? { CollaborationPrivateRunBag: privateRunBag } : {}),
         CollaborationGroupId: params.scope.groupId,

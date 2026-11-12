@@ -642,6 +642,11 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
       ).toBe(true);
       await vi.waitFor(() => expect(collector.finals().length).toBeGreaterThan(0), FAST_WAIT);
       expect(getReplyFromConfig).toHaveBeenCalled();
+      expect(
+        getReplyFromConfig.mock.calls.every(
+          ([ctx]) => ctx.CollaborationExecutionLifecycle === "turn",
+        ),
+      ).toBe(true);
       expect(groupUnderstanding).toHaveBeenCalledOnce();
       const source = peekDiscussToTaskSourceBinding({
         sourceMessageId: idem,

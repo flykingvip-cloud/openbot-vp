@@ -123,7 +123,11 @@ const seedTask = {
   status: "open",
 } as unknown as Task;
 
-async function assemble(cfg: OpenBotConfig, root: string): Promise<string> {
+async function assemble(
+  cfg: OpenBotConfig,
+  root: string,
+  context?: TemplateContext,
+): Promise<string> {
   const parts = await assembleCollaborationRuntimeContextParts({
     cfg,
     workspaceDir: path.join(root, "agent-ws"),
@@ -131,12 +135,14 @@ async function assemble(cfg: OpenBotConfig, root: string): Promise<string> {
     agentId: "bot-analyst",
     sessionKey: "agent:bot-analyst:group",
     sessionEntry: { sessionId: "bot-private", updatedAt: 1 } as SessionEntry,
-    sessionCtx: {
-      CollaborationGroupId: GROUP_ID,
-      CollaborationBotAgentId: "bot-analyst",
-      CollaborationRoundInvoked: true,
-      Provider: "webchat",
-    } as TemplateContext,
+    sessionCtx:
+      context ??
+      ({
+        CollaborationGroupId: GROUP_ID,
+        CollaborationBotAgentId: "bot-analyst",
+        CollaborationRoundInvoked: true,
+        Provider: "webchat",
+      } as TemplateContext),
     isNewSession: false,
     shouldInjectGroupIntro: false,
     defaultActivation: "mention",
@@ -226,6 +232,19 @@ describe("delivery exec prompt on the agent assembly path", () => {
     expect(prompt).toContain(STEP);
     expect(prompt).toContain("计划门禁: 已确认");
     expect(prompt).not.toContain("不得静默交付");
+
+    // A new one-shot action in the same group is not this claimant's old step.
+    const turnContext = {
+      CollaborationGroupId: GROUP_ID,
+      CollaborationBotAgentId: "bot-analyst",
+      CollaborationRoundInvoked: true,
+      CollaborationExecutionLifecycle: "turn",
+      Provider: "webchat",
+    } as TemplateContext;
+    const currentTurnPrompt = await assemble(cfg, root, turnContext);
+    expect(currentTurnPrompt).not.toContain("执行三件套");
+    expect(currentTurnPrompt).not.toContain(STEP);
+    expect(turnContext.DeliveryToolSideEffect).toBeUndefined();
 
     const loaded = await loadBoardClaimItem(auth, { taskId: TASK_ID, itemId });
     expect(loaded?.status).toBe("in_progress");
