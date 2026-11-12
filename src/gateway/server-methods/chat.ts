@@ -5187,19 +5187,6 @@ export const chatHandlers: GatewayRequestHandlers = {
             | null
             | undefined
         )?.activeContext?.currentTaskId?.trim() || undefined;
-      void recordChatSendMentionWakesBestEffort({
-        authority,
-        cfg: policySnapshotCfg,
-        groupId: scope.groupId,
-        fromAgentId: wakeFromAgentId,
-        message: mentionMessage,
-        explicitMentions: resolveExplicitMentionTokens(p.mentions),
-        explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
-        bots: scope.bots,
-        humans: facts.humans,
-        relatedId: clientRunId,
-        ...(wakeTaskId ? { taskId: wakeTaskId } : {}),
-      }).catch(() => undefined);
       // C4: best-effort OGUI→handoff projection when message carries ogui-answer.
       // Flag collaboration.task.oguiHandoffProjection OFF → no writes. No Floor live / ui.*.
       void recordChatSendOguiProjectionBestEffort({
@@ -5738,16 +5725,25 @@ export const chatHandlers: GatewayRequestHandlers = {
                   // C2/C3: observe assistant inline @; when assistantMentionDispatch
                   // ON + bots resolve, ledger outcome=dispatched (edges attach in
                   // round-runtime peer_ask path). Not Floor live / no new round.
-                  void observeAssistantReplyWakeBestEffort({
-                    authority,
-                    cfg: policySnapshotCfg,
-                    groupId: scope.groupId,
-                    fromAgentId: params.bot.agentId,
-                    text: reply.text,
-                    relatedId: clientRunId,
-                    bots: scope.bots,
-                    ...(wakeTaskId ? { taskId: wakeTaskId } : {}),
-                  }).catch(() => undefined);
+                  if (
+                    !humanWork ||
+                    (humanWork.lifecycle === "long_task" && formalTaskEstablish?.taskId)
+                  ) {
+                    void observeAssistantReplyWakeBestEffort({
+                      authority,
+                      cfg: policySnapshotCfg,
+                      groupId: scope.groupId,
+                      fromAgentId: params.bot.agentId,
+                      text: reply.text,
+                      relatedId: clientRunId,
+                      bots: scope.bots,
+                      ...(humanWork
+                        ? { taskId: formalTaskEstablish?.taskId ?? undefined }
+                        : wakeTaskId
+                          ? { taskId: wakeTaskId }
+                          : {}),
+                    }).catch(() => undefined);
+                  }
                 }
                 return reply;
               } catch (err) {
@@ -6002,6 +5998,34 @@ export const chatHandlers: GatewayRequestHandlers = {
                 `Goal: ${groupUnderstanding.decision.request.goal}`,
                 `Expected result: ${JSON.stringify(groupUnderstanding.decision.request.acceptance)}`,
               ].join("\n");
+            }
+
+            // Current-round participants already run below. Only an admitted
+            // long task (or an existing internal wake) may mint task Wake records.
+            if (
+              !groupUnderstanding ||
+              (groupUnderstanding.kind === "understood" &&
+                groupUnderstanding.decision.kind === "execution_request" &&
+                groupUnderstanding.decision.request.lifecycle === "long_task" &&
+                formalTaskEstablish?.taskId)
+            ) {
+              void recordChatSendMentionWakesBestEffort({
+                authority,
+                cfg: policySnapshotCfg,
+                groupId: scope.groupId,
+                fromAgentId: wakeFromAgentId,
+                message: mentionMessage,
+                explicitMentions: resolveExplicitMentionTokens(p.mentions),
+                explicitMentionRefs: resolveExplicitMentionRefs(p.mentions),
+                bots: scope.bots,
+                humans: facts.humans,
+                relatedId: clientRunId,
+                ...(groupUnderstanding?.kind === "understood"
+                  ? { taskId: formalTaskEstablish?.taskId ?? undefined }
+                  : wakeTaskId
+                    ? { taskId: wakeTaskId }
+                    : {}),
+              }).catch(() => undefined);
             }
 
             const completedRound = await runSingleBeatEpisodeAroundRound({

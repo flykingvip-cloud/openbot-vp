@@ -39,6 +39,20 @@ import {
 import { createTrustedGroupStores } from "./team-resource-auth.js";
 
 const groupUnderstanding = vi.hoisted(() => vi.fn());
+const mentionWakeCalls = vi.hoisted(() => vi.fn());
+vi.mock("../collaboration-dispatch/wake-contract-chat-hook.js", async (original) => {
+  const actual =
+    await original<typeof import("../collaboration-dispatch/wake-contract-chat-hook.js")>();
+  return {
+    ...actual,
+    recordChatSendMentionWakesBestEffort: (
+      ...args: Parameters<typeof actual.recordChatSendMentionWakesBestEffort>
+    ) => {
+      mentionWakeCalls(...args);
+      return actual.recordChatSendMentionWakesBestEffort(...args);
+    },
+  };
+});
 vi.mock("./group-interaction-understanding.js", () => ({
   understandGroupInteraction: groupUnderstanding,
 }));
@@ -628,6 +642,7 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         },
       });
       getReplyFromConfig.mockResolvedValue({ text: "结论：当场结果已经给出，无需后续工作。" });
+      mentionWakeCalls.mockClear();
       const collector = createCollector(ws);
       const idem = `group-small-${Date.now()}`;
       expect(
@@ -654,6 +669,7 @@ describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
         groupId,
       });
       expect(source?.lifecycle).toBe("turn");
+      expect(mentionWakeCalls).not.toHaveBeenCalled();
       expect(collector.frames.some((frame) => isDiscussToTaskStatusEvent(frame))).toBe(false);
       const roots = groupsRootForState();
       const stores = createTrustedGroupStores({
