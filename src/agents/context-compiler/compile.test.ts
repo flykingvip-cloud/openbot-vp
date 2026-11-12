@@ -161,12 +161,12 @@ describe("compileModelContext", () => {
     });
 
     expect(result.telemetry.preCompileMessageCount).toBe(source.length);
-    expect(result.telemetry.postCompileMessageCount).toBeLessThan(30);
+    expect(result.telemetry.postCompileMessageCount).toBeLessThan(source.length);
     expect(result.telemetry.postCompileEstimatedTokens).toBeLessThan(
       result.telemetry.preCompileEstimatedTokens,
     );
     expect(result.messages.some((message) => message === current)).toBe(true);
-    expect(result.messages.some((message) => message === history[0])).toBe(false);
+    expect(result.messages.some((message) => message === history[0])).toBe(true);
     const capsule = result.messages.find(
       (message) =>
         typeof (message as { content?: unknown }).content === "string" &&
@@ -296,7 +296,8 @@ describe("compileModelContext", () => {
     expect(text).toContain("action=snapshot");
     expect(text).toContain("action=click");
     expect(text).toContain("ref=e126");
-    expect(text).toContain("RESULT_HEAD");
+    expect(text).toContain("result omitted: exceeds digest budget");
+    expect(text).not.toContain("RESULT_HEAD");
     expect(text).toContain("clicked 加入购物车");
     expect(text).not.toContain(snapshotTail);
     expect(text).not.toContain(orphan);
@@ -317,40 +318,21 @@ describe("compileModelContext", () => {
     );
   });
 
-  it("never drops the previous turn user text and final reply when that turn exceeds the budget", () => {
-    const recent = user(`KEEP_RECENT_GOAL 飞燃4 39 粉色 下单 ${"Z".repeat(60_000)}`);
-    const recentReply = assistant("KEEP_RECENT_REPLY");
-    const current = user("帮我进行支付");
-    const result = compileModelContext({
-      messages: [
-        user("DROP_OLD_GOAL 请帮我订一张机票"),
-        assistant("好的"),
-        recent,
-        recentReply,
-        current,
-      ],
-      lane: "act",
-      candidates: emptyCandidates(),
-    });
-    const text = blob(result.messages);
-    expect(text).toContain("KEEP_RECENT_GOAL");
-    expect(text).toContain("KEEP_RECENT_REPLY");
-    expect(text).toContain("飞燃4");
-    expect(text).toContain("39");
-    expect(text).toContain("粉色");
-    expect(text).toContain("下单");
-    expect(text).not.toContain("DROP_OLD_GOAL");
-    expect(result.messages.some((message) => message === recent)).toBe(true);
-    expect(hasTextBlock(result.messages, "KEEP_RECENT_REPLY")).toBe(true);
-    expect(result.messages.some((message) => message === current)).toBe(true);
-    expect(result.telemetry.recallSafety.currentTurnPreserved).toBe(true);
-    expect(infoLog).toHaveBeenCalledWith(
-      expect.stringContaining("dropped"),
-      expect.objectContaining({
-        reason: "budget",
-        userText: expect.stringContaining("DROP_OLD_GOAL"),
+  it("refuses compilation rather than dropping original user requirements to meet the budget", () => {
+    const recent = user(`KEEP_RECENT_GOAL ${"Z".repeat(60_000)}`);
+    expect(() =>
+      compileModelContext({
+        messages: [
+          user("禁止发布，只有主人确认才允许"),
+          assistant("收到"),
+          recent,
+          assistant("已记录"),
+          user("继续"),
+        ],
+        lane: "act",
+        candidates: emptyCandidates(),
       }),
-    );
+    ).toThrow(/Required user history exceeds/);
   });
 
   it("does not throw reading length when history text or candidate lists are missing", () => {
@@ -528,4 +510,21 @@ describe("compileModelContext collab strategy (expert #3)", () => {
     expect(blob).toContain("风险偏高");
     expect(blob).toContain("采纳试点路径");
   });
+});
+
+it("preserves the complete multiline goal including restrictions beyond 2000 chars", () => {
+  const goal =
+    "请分析以下数据，原文如下：\n" + "数据\n".repeat(800) + "禁止发布。金额是100元，不是100美元。";
+  expect(seedActiveTaskFromMessages([{ role: "user", content: goal } as never])).toBe(goal);
+});
+
+it("keeps earlier user restrictions when the recent-turn window evicts their unit", () => {
+  const restriction = { role: "user", content: "禁止发布。金额是100元，不是美元。" } as never;
+  const current = { role: "user", content: "请继续整理数据并生成分析报告。" } as never;
+  const result = compileModelContext({
+    messages: [restriction, { role: "assistant", content: "收到" } as never, current],
+    lane: "act",
+    maxRecentTurns: 1,
+  });
+  expect(result.messages).toContain(restriction);
 });
