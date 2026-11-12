@@ -150,9 +150,14 @@ export function isGroupConversationKey(sessionKey: string): boolean {
 
 export function parseConversationAtMentions(text: string): string[] {
   const found: string[] = [];
+  // An address in user content is data, never an instruction to route to its domain.
+  const mentionText = text.replace(
+    /[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)+/gi,
+    " ",
+  );
   const re = /@([^\s@]+)/g;
   let match: RegExpExecArray | null;
-  while ((match = re.exec(text))) {
+  while ((match = re.exec(mentionText))) {
     const token = match[1]?.trim();
     if (token) {
       found.push(token);
