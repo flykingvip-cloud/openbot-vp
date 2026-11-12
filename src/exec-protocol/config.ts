@@ -4,7 +4,7 @@ import {
   isProductionExecutionModeEnabled,
 } from "../agents/sandbox/production-execution-mode.js";
 import { ExecConfigError } from "./errors.js";
-import { EXEC_API_VERSION, ISOLATION_PROFILE_NAME } from "./types.js";
+import { EXEC_API_VERSION, ISOLATION_PROFILE_NAME, PRODUCTION_PROFILE_NAME } from "./types.js";
 
 export const EXEC_PROTOCOL_ENV = {
   bind: "OPENBOT_EXEC_PROTOCOL_BIND",
@@ -21,11 +21,11 @@ export const EXEC_PROTOCOL_ENV = {
 } as const;
 
 /**
- * This protocol implementation is isolation-only until a separately frozen
- * production profile exists (it does not exist in this change). Requesting
- * production execution mode must refuse enablement and must not fall back to
- * isolation or test signed values. NODE_ENV or other undocumented values are
- * not sufficient to request production mode.
+ * The start path remains isolation-only. A production profile type may exist,
+ * but requesting production execution mode must refuse enablement until that
+ * profile is independently reviewed, and must not fall back to isolation or
+ * test signed values. NODE_ENV or other undocumented values are not
+ * sufficient to request production mode.
  */
 export function assertExecProtocolIsolationOnly(env: NodeJS.ProcessEnv): void {
   if (!isProductionExecutionModeEnabled({ env })) {
@@ -33,7 +33,8 @@ export function assertExecProtocolIsolationOnly(env: NodeJS.ProcessEnv): void {
   }
   throw new ExecConfigError(
     "exec protocol enablement refused: this implementation is isolation-only " +
-      `(${ISOLATION_PROFILE_NAME}); a production profile is not frozen. ` +
+      `(${ISOLATION_PROFILE_NAME}) until ${PRODUCTION_PROFILE_NAME} enablement ` +
+      "is independently reviewed; a production profile is not frozen for enablement. " +
       `${PRODUCTION_EXECUTION_MODE_ENV}=${PRODUCTION_EXECUTION_MODE_VALUE} ` +
       "must not enable or start the protocol, and isolation or test signed " +
       "values must not be applied as a fallback.",

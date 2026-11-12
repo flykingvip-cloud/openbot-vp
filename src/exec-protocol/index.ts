@@ -65,11 +65,19 @@ export {
 } from "./host-fallback.js";
 export { runExecProtocolProcess } from "./process-main.js";
 export {
+  SIGNED_PRODUCTION_EXEC_LISTEN,
+  validateProductionExecProtocolConfig,
+  type ProductionCapacityConfig,
+  type ProductionExecProtocolConfig,
+  type ProductionMutualAuthConfig,
+} from "./production-config.js";
+export {
   EXEC_API_VERSION,
   EXEC_API_VERSION_FIELD,
   EXEC_ERROR_CODES,
   HTTP_STATUS_BY_ERROR,
   ISOLATION_PROFILE_NAME,
+  PRODUCTION_PROFILE_NAME,
   ROLE_CONTROL_PLANE,
   ROLE_EXECUTION_SITE,
   TERMINAL_STATES,
