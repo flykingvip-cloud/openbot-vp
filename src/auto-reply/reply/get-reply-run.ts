@@ -1,12 +1,12 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import { admittedTaskQueryContinuation } from "../../agent-runtime/command/admitted-task-query-continuation.js";
+import { hostBoundTaskTarget } from "../../agent-runtime/command/host-task-target.js";
 import {
   formatTaskProposalReply,
   createInteractionSourceBoundary,
   formatRestrictedInteractionNotice,
 } from "../../agent-runtime/command/index.js";
-import { admittedTaskQueryContinuation } from "../../agent-runtime/command/admitted-task-query-continuation.js";
-import { hostBoundTaskTarget } from "../../agent-runtime/command/host-task-target.js";
 import {
   appendSharedTurnContext,
   appendUntrustedContext,
@@ -23,9 +23,10 @@ import {
   abortEmbeddedPiRun,
   isEmbeddedPiRunActive,
   isEmbeddedPiRunStreaming,
+  waitForEmbeddedPiRunEnd,
 } from "../../agent-runtime/execution/index.js";
+import { activeConstraintTexts } from "../../agent-runtime/policy/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
-import { sanitizeModelImageInputs } from "../../gateway/chat-attachments.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
 import { resolveBootstrapContextForRun } from "../../agents/bootstrap-files.js";
@@ -62,6 +63,7 @@ import {
 import { buildActiveConversationTaskFocusPrompt } from "../../conversation-task/focus-prompt.js";
 import { buildCronReplySystemPrompt } from "../../cron/cron-reply-context.js";
 import { buildGrowthBirthSystemPrompt } from "../../gateway/agent-growth/birth-context.js";
+import { sanitizeModelImageInputs } from "../../gateway/chat-attachments.js";
 import {
   isChatInboundDepthRouterEnabled,
   isChatInboundDepthShadowEnabled,
@@ -144,6 +146,7 @@ import {
 import { resolveCollaborationAwareSessionFile } from "./collaboration-session-file.js";
 import type { buildCommandContext } from "./commands.js";
 import { resolveComposerPluginMentionBindings } from "./composer-plugin-mention-bindings.js";
+import { readConversationPeerContext } from "./conversation-peer-context.js";
 import type { InlineDirectives } from "./directive-handling.js";
 import { buildActivePrimaryObjectivePrompt } from "./goal-correction-mutation.js";
 import type { buildGroupIntro } from "./groups.js";
@@ -1529,6 +1532,19 @@ export async function runPreparedReply(
       skillsSnapshot?.prompt,
       finalizeSystemContext(extraSystemPromptParts),
     ].filter((part): part is string => Boolean(part));
+    // Optional directory data supplies semantic referents, never authorization or a new router.
+    const peerContext = !useCollaborationAssembly
+      ? await readConversationPeerContext({
+          tenantId: replyGatewayTenantId,
+          ownerUserId: replyGatewayPlatformUserId,
+          client: buildKnowledgeReplyGatewayClient({
+            gatewayClientUser: replyGatewayUser,
+            gatewayClientPlatformUserId: replyGatewayPlatformUserId,
+            gatewayClientSessionDomain: ctx.GatewayClientSessionDomain,
+            gatewayClientSessionEnterpriseId: replyGatewayTenantId,
+          }),
+        }).catch(() => undefined)
+      : undefined;
     const interactionAuthProfileId = await resolveSessionAuthProfileOverride({
       cfg,
       provider,
@@ -1567,41 +1583,17 @@ export async function runPreparedReply(
         taskTarget: hostBoundTaskTarget(board),
         context: [
           ...systemContext.map((content) => ({ role: "system" as const, content })),
+          ...(peerContext ? [{ role: "user" as const, content: peerContext }] : []),
           ...projectInteractionHistory(history, interactionIngress.userMessageId),
         ],
       },
     });
     let acceptedCriteria: readonly string[] = [];
     if (routed.kind === "respond") {
-      const continuation = admittedTaskQueryContinuation({
-        board,
-        protocolDowngrade: routed.protocolDowngrade,
-      });
-      if (!continuation.shouldContinue || !board.current) {
-        typing.cleanup();
-        return persistOwnReply(routed.text);
-      }
-      // Persist the factual query answer once. The query does not schedule work.
-      const queryReply = persistOwnReply(routed.text);
-      if (isEmbeddedPiRunActive(sessionIdFinal)) {
-        typing.cleanup();
-        return queryReply;
-      }
-      admittedBinding = {
-        taskId: board.current.taskId,
-        executionAttempt: board.current.executionAttempt,
-        deliverableVersion: board.current.deliverableVersion,
-      };
-      acceptedCriteria = board.current.acceptanceCriteria ?? [];
-      extraSystemPromptParts.push(
-        [
-          "## Admitted task continues after a query",
-          "The user asked a question only. That question does not pause, replace, or reschedule the already-admitted task, and must not ask whether to start work that is already assigned.",
-          "Continue the admitted execution and deliver against the accepted criteria.",
-          `Goal: ${board.current.goalText}`,
-        ].join("\n"),
-      );
-      // Fall through to host-driven execution of the admitted binding.
+      // Dialogue only: task progress belongs to its admitted execution lifecycle.
+      // A status query must never become an implicit recovery trigger.
+      typing.cleanup();
+      return persistOwnReply(routed.text);
     }
     if (routed.kind === "task_proposal") {
       opts?.abortSignal?.throwIfAborted();
@@ -1651,10 +1643,42 @@ export async function runPreparedReply(
           }
         }
         if (applied.kind === "applied" && routed.decision.kind === "task_change") {
-          replyTurnRuntime.steer(sessionIdFinal, inboundMessage);
+          // Steering alone cannot refresh an attempt's captured constraint
+          // boundary. Stop its old view, wait for cleanup, then re-read state.
+          const active = isEmbeddedPiRunActive(sessionIdFinal);
+          const drained = active
+            ? abortEmbeddedPiRun(sessionIdFinal) && (await waitForEmbeddedPiRunEnd(sessionIdFinal))
+            : true;
+          opts?.abortSignal?.throwIfAborted();
+          // A persisted amendment is not an executed revision. If no run can
+          // consume it, continue the original admitted task through this host.
+          // Re-read after the mutation: pause, reset and focus changes must win.
+          const updatedBoard = sources.read(
+            "task_state_unavailable",
+            () => replyTurnRuntime.state.readForInteraction(sessionFile),
+            { parked: [], focusRevision: -1 },
+          );
+          const continuation = admittedTaskQueryContinuation({ board: updatedBoard });
+          if (
+            drained &&
+            continuation.shouldContinue &&
+            updatedBoard.focusRevision === captured.expectedFocusRevision &&
+            updatedBoard.current?.taskId === routed.decision.target.taskId
+          ) {
+            persistOwnReply(formatTaskProposalReply(routed.decision, applied));
+            admittedBinding = {
+              taskId: updatedBoard.current.taskId,
+              executionAttempt: updatedBoard.current.executionAttempt,
+              deliverableVersion: updatedBoard.current.deliverableVersion,
+              constraints: activeConstraintTexts(updatedBoard.current),
+            };
+            acceptedCriteria = updatedBoard.current.acceptanceCriteria ?? [];
+          }
         }
-        typing.cleanup();
-        return persistOwnReply(formatTaskProposalReply(routed.decision, applied));
+        if (!admittedBinding) {
+          typing.cleanup();
+          return persistOwnReply(formatTaskProposalReply(routed.decision, applied));
+        }
       }
     }
     if (routed.kind === "execution_admission") {

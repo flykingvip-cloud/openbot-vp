@@ -150,9 +150,14 @@ export function isGroupConversationKey(sessionKey: string): boolean {
 
 export function parseConversationAtMentions(text: string): string[] {
   const found: string[] = [];
+  // An address in user content is data, never an instruction to route to its domain.
+  const mentionText = text.replace(
+    /[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)+/gi,
+    " ",
+  );
   const re = /@([^\s@]+)/g;
   let match: RegExpExecArray | null;
-  while ((match = re.exec(text))) {
+  while ((match = re.exec(mentionText))) {
     const token = match[1]?.trim();
     if (token) {
       found.push(token);
@@ -415,6 +420,7 @@ export async function dispatchConversationHandoff(input: {
   }
   const reply = await waitConversationReply({
     runId: result.runId,
+    afterMs: startedAt,
     targetSessionKey: result.targetSessionKey,
     sessionOwnerPlatformUserId: input.requesterUserId,
   });
@@ -445,6 +451,7 @@ export async function waitConversationReply(input: {
   targetSessionKey: string;
   timeoutMs?: number;
   sessionOwnerPlatformUserId?: string;
+  afterMs?: number;
 }): Promise<string | undefined> {
   const waitMs = Math.min(input.timeoutMs ?? 45_000, 60_000);
   try {
@@ -463,6 +470,7 @@ export async function waitConversationReply(input: {
     return await readLatestAssistantReply({
       sessionKey: input.targetSessionKey,
       sessionOwnerPlatformUserId: input.sessionOwnerPlatformUserId,
+      afterMs: input.afterMs,
     });
   } catch {
     return undefined;
@@ -505,10 +513,12 @@ function scheduleHostGuestReturn(input: {
   guestAgentId: string;
   sessionOwnerPlatformUserId?: string;
   injectReply?: boolean;
+  afterMs: number;
 }): void {
   void (async () => {
     const reply = await waitConversationReply({
       runId: input.runId,
+      afterMs: input.afterMs,
       targetSessionKey: input.guestSessionKey,
       sessionOwnerPlatformUserId: input.sessionOwnerPlatformUserId,
     });
@@ -733,6 +743,7 @@ export async function routeStewardConversationMentions(input: {
     }
     const live = resolveConversationPeer(token, reachable) ?? intended;
     const task = stripResolvedAtMentions(message, robotTokens) || message;
+    const startedAt = Date.now();
     const result = await dispatch({
       title: `对话：${live.displayName}`,
       message: task,
@@ -770,6 +781,7 @@ export async function routeStewardConversationMentions(input: {
     }).catch(() => undefined);
     scheduleHostGuestReturn({
       runId: result.runId,
+      afterMs: startedAt,
       hostSessionKey: result.requesterSessionKey ?? sessionKey,
       guestSessionKey: result.targetSessionKey,
       guestAgentId: live.agentId,

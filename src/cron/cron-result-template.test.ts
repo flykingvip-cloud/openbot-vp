@@ -80,3 +80,18 @@ describe("formatCronResultSurfaceMessage template", () => {
     expect(text).toContain("这次定时运行已经结束。");
   });
 });
+
+it("shows budget failure as a task notification, never an artifact or raw exception", () => {
+  const text = formatCronResultSurfaceMessage({
+    jobName: "reminder",
+    jobId: "budget-job",
+    status: "error",
+    error:
+      "TaskBudgetExceededError: task budget exceeded (duration): elapsedMinutes 20160.00 >= maxDurationMinutes 30",
+  });
+  expect(text).toContain("## 执行问题");
+  expect(text).not.toContain("## 任务成果");
+  expect(text).not.toContain("TaskBudgetExceededError");
+  expect(text).not.toContain("elapsedMinutes");
+  expect(text).toContain("预算");
+});

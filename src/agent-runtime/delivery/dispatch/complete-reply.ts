@@ -50,10 +50,11 @@ export function completeReplyDelivery<T>(
   let considerContinuation = false;
   if (result.kind === "visible") {
     payloads = result.payloads;
-    // Verified business work waits for its delivery receipt; do not repeat it.
+    // Pending acceptance is a verification wait, not permission to repeat business work.
+    // Only a failed prepared acceptance may request the existing recovery path.
     considerContinuation =
       result.acceptanceStatus !== undefined
-        ? result.acceptanceStatus !== "passed" && result.acceptanceStatus !== "not_required"
+        ? result.acceptanceStatus === "failed"
         : ports.readContract().acceptanceVerified !== true;
   } else if (result.kind === "language_filtered") {
     const text = result.didUseTools

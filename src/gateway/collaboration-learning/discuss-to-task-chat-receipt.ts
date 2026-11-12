@@ -57,6 +57,7 @@ export function buildDiscussToTaskChatReceipt(
     `userMessage: ${result.userMessage}`,
     result.internalReason ? `internalReason=${result.internalReason}` : null,
     formalClaimLine,
+    "上述标识、状态位、内部原因及入口名仅用于执行核对，不得复制到用户正文。对用户只说明当前实际进展、影响和必要的下一步；不得将系统绑定故障说成用户授权缺失。",
     "认领须走 claimCollaborationBoardItem；计划确认后人闸不得绕过；聊天「完成」不改变 board accepted。",
     "后续工具与回复必须引用上述 taskId（若有）；不得虚构新的正式任务身份。",
   ]
@@ -77,12 +78,8 @@ export function buildDiscussToTaskChatReceipt(
 export function formatDiscussToTaskUserVisibleStatus(
   result: ControlledDiscussToTaskResult,
 ): string {
-  const view = buildDiscussToTaskChatReceipt(result);
-  const bits = [view.userMessage];
-  if (view.taskId) {
-    bits.push(`（${view.taskId}；${view.stagesSummary}）`);
-  } else {
-    bits.push(`（${view.stagesSummary}）`);
-  }
-  return bits.join(" ");
+  // Structured identity and stage facts remain in the receipt, never in chat prose.
+  return result.statusCode === "formal_task_needs_confirm"
+    ? "已整理任务草案，尚未开始执行。"
+    : result.userMessage;
 }

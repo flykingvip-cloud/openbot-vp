@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  bindAgentRunCompletionWorkspace,
   clearAgentRunContext,
   emitAgentEvent,
   getAgentRunContext,
@@ -83,4 +84,32 @@ describe("agent-events sequencing", () => {
 
     expect(receivedSessionKey).toBeUndefined();
   });
+});
+
+test("binds the actual sandbox root without replacing the captured user request or another run", () => {
+  resetAgentRunContextForTest();
+  registerAgentRunContext("resolved-root", {
+    sessionKey: "employee-a",
+    turnCompletion: {
+      userText: "create report.md",
+      workspaceDir: "/old-root",
+      smokeStartedAtMs: 12,
+    },
+  });
+  registerAgentRunContext("other-root", {
+    sessionKey: "employee-b",
+    turnCompletion: { workspaceDir: "/other-root" },
+  });
+  bindAgentRunCompletionWorkspace("resolved-root", "/authorized-account-root");
+  expect(getAgentRunContext("resolved-root")?.turnCompletion).toEqual({
+    userText: "create report.md",
+    workspaceDir: "/authorized-account-root",
+    smokeStartedAtMs: 12,
+  });
+  expect(getAgentRunContext("other-root")?.turnCompletion?.workspaceDir).toBe("/other-root");
+  bindAgentRunCompletionWorkspace("missing", "/do-not-mint");
+  expect(getAgentRunContext("missing")).toBeUndefined();
+  clearAgentRunContext("resolved-root");
+  bindAgentRunCompletionWorkspace("resolved-root", "/late-root");
+  expect(getAgentRunContext("resolved-root")).toBeUndefined();
 });

@@ -41,6 +41,10 @@ const TOOL_DIGEST_WRAPPED_INCOMPLETE_RE = /<<\s*OPENBOT_TOOL_DIGEST\b[^>]*>[\s\S
  * string. Blank lines are NOT a reply boundary (preview may contain them).
  * Mixed “digest then real answer” must use TOOL_DIGEST_*_SENTINEL wrappers.
  */
+// Provider-generated malformed sentinel seen in employee replies. Without a
+// trustworthy closing delimiter, the remaining digest body is internal.
+const TOOL_DIGEST_MALFORMED_TO_END_RE = /<{1,2}\s*OPENBOT_(?:TOOL|TOL)_DIGEST\s*>+[\s\S]*$/i;
+
 const TOOL_DIGEST_LEGACY_TO_END_RE = /[ \t]*\[tool-digest\][\s\S]*$/gi;
 /** Incomplete trailing tool-digest open (streaming). */
 const TOOL_DIGEST_INCOMPLETE_RE = /\[tool-digest\b[^\]]*$/i;
@@ -84,13 +88,14 @@ export function stripToolDigestLines(text: string): string {
   if (!text) {
     return text;
   }
-  const hasDigest = /\[tool-digest\]/i.test(text) || /OPENBOT_TOOL_DIGEST/i.test(text);
+  const hasDigest = /\[tool-digest\]/i.test(text) || /OPENBOT_(?:TOOL|TOL)_DIGEST/i.test(text);
   if (!hasDigest) {
     return text;
   }
   return text
     .replace(TOOL_DIGEST_WRAPPED_RE, "")
     .replace(TOOL_DIGEST_WRAPPED_INCOMPLETE_RE, "")
+    .replace(TOOL_DIGEST_MALFORMED_TO_END_RE, "")
     .replace(TOOL_DIGEST_LEGACY_TO_END_RE, "")
     .replace(TOOL_DIGEST_INCOMPLETE_RE, "")
     .replace(/\n{3,}/g, "\n\n")

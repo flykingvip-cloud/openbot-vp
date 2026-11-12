@@ -7,6 +7,34 @@ import {
 
 describe("message-normalizer", () => {
   describe("normalizeMessage", () => {
+    it("projects assistant diagnostics but preserves the user's quoted error and peer identity", () => {
+      const raw = "尚未发布：source_message_not_bound。";
+      const assistant = normalizeMessage({ role: "assistant", content: raw });
+      expect(assistant.content[0]?.text).toBe("尚未发布：这条消息尚未正确关联到任务。");
+      expect(normalizeMessage({ role: "user", content: raw }).content[0]?.text).toBe(raw);
+      const peer = normalizeMessage({
+        role: "user",
+        content: "收到，明天参加。",
+        provenance: {
+          kind: "inter_session",
+          sourceSenderLabel: "客户经理",
+          sourceSessionKey: "agent:account:main",
+        },
+      });
+      expect(peer.role).toBe("peer");
+      expect(peer.senderLabel).toBe("客户经理");
+      expect(peer.content[0]?.text).toBe("收到，明天参加。");
+      const blockedPeer = normalizeMessage({
+        role: "user",
+        content: raw,
+        provenance: {
+          kind: "inter_session",
+          sourceSenderLabel: "客户经理",
+        },
+      });
+      expect(blockedPeer.senderLabel).toBe("客户经理");
+      expect(blockedPeer.content[0]?.text).toBe("尚未发布：这条消息尚未正确关联到任务。");
+    });
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2024-01-01T00:00:00Z"));

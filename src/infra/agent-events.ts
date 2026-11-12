@@ -58,6 +58,15 @@ export function registerAgentRunContext(runId: string, context: AgentRunContext)
   }
 }
 
+/** Only an existing host-bound completion hint may acquire the resolved execution root. */
+export function bindAgentRunCompletionWorkspace(runId: string, workspaceDir: string): void {
+  const context = runContextById.get(runId);
+  if (!context?.turnCompletion || !workspaceDir.trim()) {
+    return;
+  }
+  context.turnCompletion = { ...context.turnCompletion, workspaceDir: workspaceDir.trim() };
+}
+
 export function getAgentRunContext(runId: string) {
   return runContextById.get(runId);
 }

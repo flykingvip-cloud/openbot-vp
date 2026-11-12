@@ -12,7 +12,6 @@ import {
 } from "./execution-admission.js";
 import { formatRestrictedInteractionNotice } from "./interaction-sources.js";
 import { interpretInteraction, type InteractionInferencePort } from "./interpret-interaction.js";
-import { hostNamedFileExecutionRequest } from "./named-file-execution.js";
 
 const interactionLog = createSubsystemLogger("agent-runtime/interaction");
 
@@ -37,18 +36,6 @@ export async function routeInteraction(
   captured: Omit<ExecutionAdmissionInput, "proposal" | "abortSignal">,
   ports: { inference: InteractionInferencePort; admission: ExecutionAdmissionPorts },
 ): Promise<RoutedInteraction> {
-  // Named-file delivery is a host rule. Model prose must not leave it unadmitted.
-  const forcedRequest =
-    input.availability?.mode === "restricted" ? null : hostNamedFileExecutionRequest(input.message);
-  if (forcedRequest) {
-    return {
-      kind: "execution_admission",
-      result: await admitExecutionRequest(
-        { ...captured, proposal: forcedRequest, abortSignal: input.abortSignal },
-        ports.admission,
-      ),
-    };
-  }
   const decision = await interpretInteraction(input, ports.inference);
   if (
     input.availability?.mode === "restricted" &&

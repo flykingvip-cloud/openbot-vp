@@ -4645,13 +4645,13 @@ export class OpenBotApp extends LitElement {
     });
   }
 
-  async handleSaveSidebarDeliverable() {
+  async handleSaveSidebarDeliverable(mode?: "save_as") {
     const workspace = this.sidebarArtifactWorkspace;
     if (!workspace || this.sidebarDeliverableSaveState?.busy) {
       return;
     }
     const savePayload = extractArtifactSavePayload(workspace);
-    const content = this.sidebarContent?.trim() || savePayload.content;
+    const content = this.sidebarContent ?? savePayload.content;
     if (!content.trim() && !savePayload.contentBase64) {
       this.showDeliverableSaveToast({
         message: t("chat.deliverableSaveFailed"),
@@ -4683,6 +4683,14 @@ export class OpenBotApp extends LitElement {
         content,
         ...(savePayload.contentBase64 ? { contentBase64: savePayload.contentBase64 } : {}),
         deliverableId: workspace.artifact.artifactId,
+        ...(mode === "save_as"
+          ? {
+              saveMode: "save_as" as const,
+              saveAsFilename: workspace.artifact.providerMetadata?.workspaceFilename as
+                | string
+                | undefined,
+            }
+          : {}),
         askSaveDecision: (prompt) =>
           new Promise((resolve) => {
             this.deliverableSaveDecisionResolve?.(null);
@@ -4711,6 +4719,7 @@ export class OpenBotApp extends LitElement {
             providerMetadata: {
               ...this.sidebarArtifactWorkspace.artifact.providerMetadata,
               saved: true,
+              savedRawHash: result.rawHash,
               savedKnowledgeBaseTitle: result.knowledgeBaseTitle,
               relatedKnowledgeBaseId: result.knowledgeBaseId,
               ...(result.documentId ? { knowledgeDocumentId: result.documentId } : {}),

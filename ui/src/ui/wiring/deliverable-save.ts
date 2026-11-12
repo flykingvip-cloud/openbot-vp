@@ -26,6 +26,8 @@ export type DeliverableSaveToast = {
 };
 
 export type DeliverableSaveArchiveResult = {
+  rawHash?: string;
+  saveAction?: "create" | "noop" | "overwrite" | "save_as";
   deliverableId: string;
   knowledgeBaseId: string;
   knowledgeBaseTitle: string;
@@ -379,9 +381,9 @@ export async function saveAndArchiveSidebarDeliverable(params: {
     throw new Error("gateway client unavailable");
   }
   const title = params.workspace.artifact.title.trim() || "未命名成果";
-  const content = params.content.trim();
+  const content = params.content;
   const contentBase64 = params.contentBase64?.replace(/\s+/g, "") || "";
-  if (!content && !contentBase64) {
+  if (!content.trim() && !contentBase64) {
     throw new Error("preview content is empty");
   }
   const metadata = params.workspace.artifact.providerMetadata ?? {};
@@ -416,9 +418,17 @@ export async function saveAndArchiveSidebarDeliverable(params: {
       ...(decision?.expectedRawHash ? { expectedRawHash: decision.expectedRawHash } : {}),
       ...(decision?.saveAsFilename ? { saveAsFilename: decision.saveAsFilename } : {}),
     });
+  // Only a prior archive receipt for this same document may drive a default
+  // update. Missing receipts retain the existing explicit decision flow.
+  const priorHash =
+    metadata.saved === true &&
+    typeof metadata.savedRawHash === "string" &&
+    typeof metadata.knowledgeDocumentId === "string"
+      ? metadata.savedRawHash.trim()
+      : "";
   let decision = {
-    saveMode: params.saveMode,
-    expectedRawHash: params.expectedRawHash,
+    saveMode: params.saveMode ?? (priorHash ? ("overwrite" as const) : undefined),
+    expectedRawHash: params.expectedRawHash ?? (priorHash || undefined),
     saveAsFilename: params.saveAsFilename,
   };
   for (;;) {

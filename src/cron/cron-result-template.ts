@@ -149,15 +149,24 @@ export function formatCronResultSurfaceMessage(params: {
       ? "这次定时运行已经结束。"
       : rawSummary;
   const visibleReason = classified.userReason || cronUserReasonFromError(params.error) || "";
-  const deliverable = emptySuccess
-    ? visibleReason
-    : effectiveStatus === "error"
-      ? params.error?.trim() || summary || "任务执行失败，未生成摘要。"
-      : summary ||
-        params.error?.trim() ||
-        (awaitingReceipt
-          ? "这次运行已经结束，还没有通过交付验收的成果。"
-          : "任务已完成，但未生成可展示的摘要。");
+  const executionFailed = effectiveStatus === "error" && !deliveryOnly;
+  const failureNotice = /TaskBudgetExceededError|task budget exceeded/i.test(params.error ?? "")
+    ? "本次定时运行因预算限制停止，未确认有可交付成果。请查看任务详情。"
+    : /ContractEndedError|合同已结束/i.test(params.error ?? "")
+      ? "本次定时运行未获服务授权，未确认有可交付成果。请查看任务详情。"
+      : "本次定时运行未成功，未确认有可交付成果。请查看任务详情。";
+  const deliverable =
+    executionFailed && classified.completion === "failed"
+      ? failureNotice
+      : emptySuccess
+        ? visibleReason
+        : effectiveStatus === "error"
+          ? params.error?.trim() || summary || "任务执行失败，未生成摘要。"
+          : summary ||
+            params.error?.trim() ||
+            (awaitingReceipt
+              ? "这次运行已经结束，还没有通过交付验收的成果。"
+              : "任务已完成，但未生成可展示的摘要。");
 
   const title = params.jobName.trim() || params.jobId;
   const briefSynopsis = buildCronBriefSynopsis(deliverable);
@@ -179,7 +188,7 @@ export function formatCronResultSurfaceMessage(params: {
     "",
     ...summaryLines,
     "",
-    CRON_RESULT_SECTION_DELIVERABLE,
+    executionFailed ? "## 执行问题" : CRON_RESULT_SECTION_DELIVERABLE,
     "",
     deliverable,
     "",

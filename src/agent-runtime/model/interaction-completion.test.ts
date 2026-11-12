@@ -36,6 +36,24 @@ it("forwards sanitized images only to vision candidates and discloses unseen pix
 beforeEach(() => {
   mocks.complete.mockReset();
 });
+it("recognizes individual colleagues as context without enabling tools or granting send authority", () => {
+  const context = buildInteractionCompletionContext(
+    {
+      message: "发私信",
+      context: [
+        { role: "user", content: '同一主人目录：[{"displayName":"客户经理"}]' },
+        { role: "user", content: "给客户经理发信息，明天十点开会" },
+      ],
+    },
+    model,
+  );
+  expect(context.systemPrompt).toContain("internal digital colleague");
+  expect(context.systemPrompt).toContain(
+    "interaction itself sends nothing and grants no permission",
+  );
+  expect(context.tools).toEqual([]);
+  expect(context.messages.at(-1)?.content).toBe("发私信");
+});
 it("keeps the host decision protocol after shared response guidance", () => {
   const context = buildInteractionCompletionContext(
     { message: "hello", context: [{ role: "system", content: "Reply naturally in plain text." }] },
@@ -265,4 +283,48 @@ it("rejects a late provider answer after cancellation during inference", async (
   release();
   await expect(pending).rejects.toThrow();
   expect(mocks.complete).toHaveBeenCalledOnce();
+});
+
+it("places semantic work-admission guidance after shared skill context", () => {
+  const input = {
+    message: "请制作一份面向普通员工的企业AI助手使用指南，交付Markdown与HTML，约2000字。",
+    context: [{ role: "system" as const, content: "Answer conversationally; never output JSON." }],
+  };
+  const ctx = buildInteractionCompletionContext(input, model);
+  expect(ctx.systemPrompt).toContain("A filename is not required");
+  expect(ctx.systemPrompt).toContain("semantic decision");
+  expect(ctx.systemPrompt!.indexOf("A filename is not required")).toBeGreaterThan(
+    ctx.systemPrompt!.indexOf(input.context[0].content),
+  );
+  expect(ctx.tools).toEqual([]);
+  expect(mocks.complete).not.toHaveBeenCalled();
+});
+
+it("requests JSON output on the compatible completion adapter without mutating its payload", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: '{"kind":"reply","text":"ok"}' }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  await invokeInteractionCompletion(request);
+  expect(mocks.complete).toHaveBeenCalledOnce();
+  const options = mocks.complete.mock.calls[0]?.[2] as {
+    onPayload?: (payload: unknown) => unknown;
+  };
+  expect(options.onPayload).toBeTypeOf("function");
+  const payload = { messages: [{ role: "user", content: "hello" }], max_tokens: 200 };
+  expect(options.onPayload?.(payload)).toEqual({
+    ...payload,
+    response_format: { type: "json_object" },
+  });
+  expect(payload).not.toHaveProperty("response_format");
+});
+it("rejects a blank final completion rather than producing an empty reply", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: "   " }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  const result = await invokeInteractionCompletion(request);
+  expect(() => result.readDecision()).toThrow();
 });

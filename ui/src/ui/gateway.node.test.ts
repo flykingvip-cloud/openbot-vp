@@ -127,6 +127,36 @@ describe("GatewayBrowserClient", () => {
     vi.unstubAllGlobals();
   });
 
+  it("rejects business requests until the current socket has completed authentication", async () => {
+    const onHello = vi.fn();
+    const client = new GatewayBrowserClient({ url: "ws://127.0.0.1:18789", onHello });
+    client.start();
+    const ws = getLatestWebSocket();
+    ws.emitOpen();
+    expect(client.connected).toBe(false);
+    await expect(client.request("asset-incubation.digest.build")).rejects.toThrow(
+      "gateway not connected",
+    );
+    expect(ws.sent).toHaveLength(0);
+    ws.emitMessage({ type: "event", event: "connect.challenge", payload: { nonce: "nonce-1" } });
+    await vi.waitFor(() => expect(ws.sent).toHaveLength(1));
+    expect(client.connected).toBe(false);
+    await expect(client.request("asset-incubation.digest.build")).rejects.toThrow(
+      "gateway not connected",
+    );
+    const connectFrame = JSON.parse(ws.sent[0]);
+    expect(connectFrame.method).toBe("connect");
+    ws.emitMessage({ type: "res", id: connectFrame.id, ok: true, payload: {} });
+    await vi.waitFor(() => expect(client.connected).toBe(true));
+    expect(onHello).toHaveBeenCalledOnce();
+    const request = client.request("asset-incubation.digest.build");
+    const businessFrame = JSON.parse(ws.sent[1]);
+    ws.emitMessage({ type: "res", id: businessFrame.id, ok: true, payload: {} });
+    await expect(request).resolves.toEqual({});
+    client.stop();
+    expect(client.connected).toBe(false);
+  });
+
   it("prefers explicit shared auth over cached device tokens", async () => {
     const client = new GatewayBrowserClient({
       url: "ws://127.0.0.1:18789",
@@ -639,6 +669,12 @@ describe("GatewayBrowserClient", () => {
     expect(ws2).not.toBe(ws1);
     expect(wsInstances).toHaveLength(2);
     ws2.emitOpen();
+    expect(client.connected).toBe(false);
+    ws2.emitMessage({ type: "event", event: "connect.challenge", payload: { nonce: "nonce-2" } });
+    await vi.advanceTimersByTimeAsync(0);
+    const connectFrame = JSON.parse(ws2.sent[0]);
+    ws2.emitMessage({ type: "res", id: connectFrame.id, ok: true, payload: {} });
+    await vi.advanceTimersByTimeAsync(0);
     expect(client.connected).toBe(true);
 
     ws1.emitClose(1006, "");

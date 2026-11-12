@@ -627,3 +627,26 @@ it("clears stale original bytes and data URLs when a newer Office preview has no
   expect(artifact.providerMetadata?.binaryDownloadUrl).toBeUndefined();
   expect(artifact.downloadUrl).toBeUndefined();
 });
+
+it("refuses a first preview whose bytes no longer match the issued artifact receipt", () => {
+  const host = createHost();
+  const workspace = buildWorkspace("report.md");
+  workspace.artifact.providerMetadata = {
+    ...workspace.artifact.providerMetadata,
+    artifactSha256: "a".repeat(64),
+  };
+  const result = applyWorkspaceFilePreview({
+    host,
+    workspace,
+    filename: "report.md",
+    file: {
+      filename: "report.md",
+      mimeType: "text/markdown",
+      textLike: true,
+      contentHash: "b".repeat(64),
+    },
+  });
+  expect(result).toBe("empty");
+  expect(host.sidebarContent).toBeNull();
+  expect(host.sidebarError).toContain("版本");
+});

@@ -187,7 +187,21 @@ function projectMessageSourceImages(message: unknown): unknown {
   }
   let changed = false;
   const content = entry.content.map((block) => {
-    const projected = projectSourceImageBlock(block);
+    const record = asRecord(block);
+    // UI attachment metadata is not a provider image/content block. Keep the
+    // extracted text and a read-time reference, without mutating SessionManager.
+    const projected =
+      record?.type === "file"
+        ? {
+            type: "text",
+            text: `[Attachment reference: ${JSON.stringify({
+              fileName: typeof record.fileName === "string" ? record.fileName : undefined,
+              mimeType: typeof record.mimeType === "string" ? record.mimeType : undefined,
+              assetId: typeof record.assetId === "string" ? record.assetId : undefined,
+              contentHash: typeof record.contentHash === "string" ? record.contentHash : undefined,
+            })}]`,
+          }
+        : projectSourceImageBlock(block);
     if (projected !== block) {
       changed = true;
     }

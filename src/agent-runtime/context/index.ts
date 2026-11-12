@@ -49,6 +49,7 @@ export { omitTaskStatusSeparators, omitParkedPriorTurns } from "./sources/task-h
 
 export { appendUntrustedContext } from "./untrusted.js";
 export { projectInteractionHistory } from "./interaction-history.js";
+export { renderConversationPeerContext } from "./sources/conversation-peers.js";
 export {
   ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS,
   ASIDE_DIALOGUE_HISTORY_TURN_CAP,

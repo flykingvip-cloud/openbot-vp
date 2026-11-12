@@ -165,3 +165,13 @@ describe("control-channel-visibility", () => {
     expect(holdBackIncompleteControlSuffix("见 <div>ok</div>")).toBe("见 <div>ok</div>");
   });
 });
+
+it("removes a malformed tool-digest sentinel observed in the employee reply", () => {
+  expect(stripToolDigestLines("<OPENBOT_TOL_DIGEST>>")).toBe("");
+  expect(stripToolDigestLines("可见回答\n<OPENBOT_TOL_DIGEST>>internal preview")).toBe("可见回答");
+  expect(
+    stripToolDigestLines(
+      "<<OPENBOT_TOOL_DIGEST>>private\n\nbody<</OPENBOT_TOOL_DIGEST>>\n真实回答",
+    ),
+  ).toBe("真实回答");
+});

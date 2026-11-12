@@ -51,7 +51,7 @@ export type ArtifactSidebarProps = {
   onGrantIntent?: (intentId: string, artifactId: string) => void | Promise<void>;
   onRevokeGrant?: (grantId: string, artifactId: string) => void | Promise<void>;
   deliverableSaveState?: DeliverableSaveState | null;
-  onSaveDeliverable?: () => void | Promise<void>;
+  onSaveDeliverable?: (mode?: "save_as") => void | Promise<void>;
   onConfirmDeliverableOverwrite?: () => void;
   onConfirmDeliverableSaveAs?: () => void;
   onCancelDeliverableSaveDecision?: () => void;
@@ -124,6 +124,16 @@ function resolveDownloadableHref(artifact: SharedArtifact): string {
     if (/^(?:blob:|data:)/i.test(value) || /^https?:\/\//i.test(value)) {
       return value;
     }
+  }
+  // Only original bytes read through the authorized workspace port may back a download.
+  // Preview text may be an excerpt or a generated summary and must never substitute for a file.
+  const original = metadata.workspaceFileLoaded === true ? metadata.fileBase64 : undefined;
+  if (
+    typeof original === "string" &&
+    original.length > 0 &&
+    /^[A-Za-z0-9+/]*={0,2}$/.test(original)
+  ) {
+    return `data:application/octet-stream;base64,${original}`;
   }
   return "";
 }
@@ -884,7 +894,8 @@ export function renderDeliverableSaveDecision(props: ArtifactSidebarProps) {
           type="button"
           @click=${() => props.onConfirmDeliverableSaveAs?.()}
         >
-          ${t("chat.deliverableSaveAs")}
+          ${icons.copy}
+          <span class="artifact-preview-action__label">${t("chat.deliverableSaveAs")}</span>
         </button>
         <button
           class="btn btn--sm"
@@ -940,6 +951,20 @@ export function renderArtifactSidebarHeaderActions(props: ArtifactSidebarProps) 
               <span class="artifact-preview-action__label">${t("chat.saveDeliverable")}</span>
             </button>
           `
+        : nothing
+    }
+    ${
+      props.onSaveDeliverable
+        ? html`
+      <button class="btn btn--sm artifact-preview-action artifact-preview-action--icon" type="button"
+        aria-label=${t("chat.deliverableSaveAs")}
+        ?disabled=${Boolean(saveState?.busy) || Boolean(saveState?.pendingDecision)}
+        @pointerenter=${revealArtifactActionTip}
+        @pointerleave=${hideArtifactActionTip}
+        @click=${() => void props.onSaveDeliverable?.("save_as")}>
+        ${icons.copy}
+        <span class="artifact-preview-action__label">${t("chat.deliverableSaveAs")}</span>
+      </button>`
         : nothing
     }
     ${

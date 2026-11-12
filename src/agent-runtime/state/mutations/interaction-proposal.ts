@@ -5,6 +5,7 @@ import {
   readSessionTaskBoardUnlocked,
   writeSessionTaskBoardUnlocked,
 } from "../repository/task-board-file.js";
+import { taskMatchesResetGeneration } from "./session-reset-focus.js";
 import { appendTaskConstraint } from "./task-constraints.js";
 import { suppressCurrentTaskWake, cancelCurrentTask } from "./task-control.js";
 
@@ -19,7 +20,9 @@ export function commitInteractionTaskProposal(params: {
     const board = readSessionTaskBoardUnlocked(params.sessionFile);
     const current = board.current;
     if (
-      !current?.unfinished ||
+      !current ||
+      (!current.unfinished && params.decision.kind !== "task_change") ||
+      !taskMatchesResetGeneration(current, board) ||
       current.taskId !== params.decision.target.taskId ||
       board.focusRevision !== params.expectedFocusRevision ||
       (board.writeEpoch ?? 0) !== params.expectedWriteEpoch ||
@@ -29,8 +32,23 @@ export function commitInteractionTaskProposal(params: {
       return { kind: "rejected", reason: "revision_mismatch" };
     }
     if (params.decision.kind === "task_change") {
+      // Completion belongs to the old attempt. A bound revision reuses the
+      // task goal but requires a fresh execution/acceptance; late old receipts
+      // cannot settle it. Paused unfinished tasks keep their owner's pause.
+      const revisionBoard = current.unfinished
+        ? board
+        : {
+            ...board,
+            current: {
+              ...current,
+              unfinished: true,
+              deliverableChecked: false,
+              executionAttempt: undefined,
+              deliverableVersion: undefined,
+            },
+          };
       const next = appendTaskConstraint({
-        board,
+        board: revisionBoard,
         constraintText: params.decision.text,
         mode: params.decision.mode,
       });

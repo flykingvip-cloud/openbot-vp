@@ -67,34 +67,57 @@ it("records a prose downgrade without admitting work the reply claims has starte
   expect(commit).not.toHaveBeenCalled();
 });
 
-it("admits an explicit named-file delivery even when the model would stay on prose", async () => {
-  const message = "请制作一份入职清单，文件名为 onboarding-checklist.md";
-  const infer = vi.fn(async () => ({
-    kind: "reply",
-    text: "好的，我写在对话里。",
-    protocolDowngrade: INTERACTION_PROSE_PROTOCOL_DOWNGRADE,
-  }));
-  const authorize = vi.fn(async () => true);
-  const commit = vi.fn(() => ({
-    kind: "accepted" as const,
-    binding: { taskId: "file-task" },
-    acceptance: ["交付文件 onboarding-checklist.md"],
-  }));
-  const routed = await routeInteraction({ message, context: [] }, captured, {
-    inference: { infer },
-    admission: { authorize, commit },
-  });
-  expect(routed.kind).toBe("execution_admission");
-  expect(interactionAdmissionFact(routed)).toEqual({ admitted: true, taskId: "file-task" });
-  expect(infer).not.toHaveBeenCalled();
-  expect(authorize).toHaveBeenCalledOnce();
-  expect(commit).toHaveBeenCalledOnce();
-  expect(commit.mock.calls[0]?.[0]).toMatchObject({
-    proposal: {
-      goal: message,
-      acceptance: ["交付文件 onboarding-checklist.md"],
+it.each(["请制作报告，文件名为 report.md", "请制作报告"])(
+  "uses the same semantic admission contract: %s",
+  async (message) => {
+    const infer = vi.fn(async () => ({
+      kind: "execution_request",
+      request: { goal: "原始完整目标", acceptance: ["准确性", "报告与CSV"] },
+    }));
+    const authorize = vi.fn(async () => true);
+    const commit = vi.fn((_input: unknown) => ({
+      kind: "accepted" as const,
+      binding: { taskId: "task" },
+      acceptance: ["准确性", "报告与CSV"],
+    }));
+    await routeInteraction({ message, context: [] }, captured, {
+      inference: { infer },
+      admission: { authorize, commit },
+    });
+    expect(infer).toHaveBeenCalledOnce();
+    expect(commit).toHaveBeenCalledOnce();
+    expect(commit.mock.calls[0]?.[0]).toMatchObject({
+      proposal: { goal: "原始完整目标", acceptance: ["准确性", "报告与CSV"] },
+    });
+  },
+);
+it.each([
+  { kind: "reply", text: "这里只回答文件名的含义" },
+  { kind: "clarify", text: "请明确目标" },
+  { kind: "task_control", target: { taskId: "a", revision: "1" }, action: "pause" },
+  {
+    kind: "task_change",
+    target: { taskId: "a", revision: "1" },
+    text: "更新原目标",
+    mode: "revise",
+  },
+])("a named filename never overrides semantic $kind", async (decision) => {
+  const infer = vi.fn(async () => decision);
+  const authorize = vi.fn();
+  const commit = vi.fn();
+  const routed = await routeInteraction(
+    {
+      message: "不要创建；暂停制作报告，文件名为 report.md",
+      context: [],
+      taskTarget: { taskId: "a", revision: "1" },
     },
-  });
+    captured,
+    { inference: { infer }, admission: { authorize, commit } },
+  );
+  expect(infer).toHaveBeenCalledOnce();
+  expect(routed.kind).not.toBe("execution_admission");
+  expect(authorize).not.toHaveBeenCalled();
+  expect(commit).not.toHaveBeenCalled();
 });
 
 it("does not admit a filename mention or a make request that names no file", async () => {

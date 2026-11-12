@@ -38,7 +38,7 @@ describe("discuss-to-task chat entry receipt (visible + coordinator-bound)", () 
     const result = asResult({});
     const receipt = buildDiscussToTaskChatReceipt(result);
     const visible = formatDiscussToTaskUserVisibleStatus(result);
-    expect(visible).toBe(`${FORMAL_TASK_FLAG_OFF_USER_MESSAGE} （${receipt.stagesSummary}）`);
+    expect(visible).toBe(FORMAL_TASK_FLAG_OFF_USER_MESSAGE);
     expect(visible).not.toMatch(/已派工/);
     expect(receipt.coordinatorBindingText).toContain("formal_task_blocked_flag_off");
     expect(receipt.coordinatorBindingText).toContain("禁止另编任务或口头宣称已派工");

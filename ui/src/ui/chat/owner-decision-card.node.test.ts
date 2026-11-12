@@ -35,6 +35,7 @@ import {
 
 describe("owner-decision-card UI", () => {
   afterEach(() => {
+    localStorage.clear();
     clearOwnerDecisionDismissalsForTest();
     clearOwnerDecisionDeliveryStateForTest();
   });
@@ -365,9 +366,9 @@ describe("owner-decision-card UI", () => {
       c2,
     );
     const stale = c2.querySelector("[data-owner-decision='dec-super']");
-    expect(stale).not.toBeNull();
+    expect(stale).toBeNull();
     expect(isOwnerDecisionDismissed("dec-super")).toBe(false);
-    expect(stale?.textContent).toContain("旧版本已失效");
+    expect(c2.textContent).not.toContain("请确认执行计划");
     expect(c2.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
     expect(c2.querySelector('[data-owner-decision-action="revise"]')).toBeNull();
   });
@@ -431,6 +432,9 @@ describe("owner-decision-card UI", () => {
     expect(collectOwnerDecisionHydrationTargets(selected).map((t) => t.todolistId)).toEqual([
       "td-new",
     ]);
+    dismissOwnerDecisionCard("dec-new");
+    render(renderOwnerDecisionCards(messages), container);
+    expect(container.querySelectorAll("[data-owner-decision]").length).toBe(0);
   });
 
   it("confirm success folds dialog away; peer residual shows compact ack only", () => {
@@ -593,8 +597,8 @@ describe("owner-decision-card UI", () => {
     expect(getOwnerDecisionTodolistStatus("td-gate-2")).toBe("superseded");
     render(renderOwnerDecisionCards([message2]), container);
     const stale = container.querySelector("[data-owner-decision='dec-gate-2']");
-    expect(stale).not.toBeNull();
-    expect(stale?.textContent).toContain("旧版本已失效");
+    expect(stale).toBeNull();
+    expect(container.textContent).not.toContain("请确认执行计划");
     expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
 
     clearOwnerDecisionDismissalsForTest();
@@ -621,8 +625,7 @@ describe("owner-decision-card UI", () => {
     expect(getOwnerDecisionTodolistStatus("td-gate-3")).toBeNull();
     render(renderOwnerDecisionCards([message3]), container);
     const mismatched = container.querySelector("[data-owner-decision='dec-gate-3']");
-    expect(mismatched?.textContent).toContain("旧版本已失效");
-    expect(mismatched?.textContent).not.toContain("计划版本不匹配");
+    expect(mismatched).toBeNull();
     expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
   });
 
@@ -967,4 +970,11 @@ describe("confirm success continuous history receipt (dismiss kept)", () => {
       }),
     ).toMatch(/^计划已确认，但派发失败：/);
   });
+});
+
+it("remembers a deferred card after module memory is cleared", () => {
+  dismissOwnerDecisionCard("persist-decision");
+  clearOwnerDecisionDismissalsForTest(true);
+  expect(isOwnerDecisionDismissed("persist-decision")).toBe(true);
+  expect(isOwnerDecisionDismissed("other-decision")).toBe(false);
 });

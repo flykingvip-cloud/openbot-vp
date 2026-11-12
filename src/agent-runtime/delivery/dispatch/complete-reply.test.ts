@@ -52,7 +52,7 @@ describe("terminal reply delivery", () => {
         ports,
       );
       expect(ports.considerContinuation).toHaveBeenCalledTimes(
-        acceptanceStatus === "passed" ? 0 : 1,
+        acceptanceStatus === "failed" ? 1 : 0,
       );
     },
   );

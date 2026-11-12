@@ -1,5 +1,49 @@
 version: 1
 tasks:
+  - id: local-ui-seams
+    owner: codex-runtime-manager
+    intent: []
+    paths:
+      - ui/src/ui/gateway-subscriptions/chat.ts
+      - ui/src/ui/views/artifact-sidebar.ts
+      - ui/src/ui/views/artifact-sidebar.node.test.ts
+      - ui/src/ui/views/artifact-sidebar-download-lane.test.ts
+      - ui/src/ui/app-gateway.node.test.ts
+      - src/agent-runtime/delivery/dispatch/complete-reply.ts
+      - src/agent-runtime/delivery/dispatch/complete-reply.test.ts
+      - src/cron/cron-result-template.ts
+      - src/cron/cron-result-template.test.ts
+      - src/agent-runtime/model/interaction-completion.ts
+      - src/agent-runtime/model/interaction-completion.test.ts
+      - src/agent-runtime/delivery/named-file-receipt.ts
+      - src/agent-runtime/delivery/named-file-receipt.test.ts
+      - src/infra/agent-events.ts
+      - src/infra/agent-events.test.ts
+      - src/agent-runtime/execution/runner/embedded-attempt.ts
+      - ui/src/ui/wiring/workspace-file-preview.ts
+      - ui/src/ui/wiring/workspace-file-preview.node.test.ts
+      - src/gateway/knowledge/deliverables/save-and-archive.ts
+      - src/gateway/knowledge/deliverables/save-and-archive.test.ts
+      - ui/src/ui/wiring/deliverable-save.ts
+      - ui/src/ui/wiring/deliverable-save.test.ts
+      - ui/src/ui/app.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/app-view-state-shell-slices.ts
+      - ui/src/ui/views/chat.ts
+      - src/shared/text/control-channel-visibility.ts
+      - src/shared/text/control-channel-visibility.test.ts
+    state: active
+    sessions:
+      - id: local-ui-seams-20261111
+        taskId: local-ui-seams
+        ide: codex
+        agent: codex-runtime-manager
+        status: active
+        lastSignalAt: 2026-11-11T07:41:19.334Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-11
+    metadata: {}
   - id: ft-plan-speak-shopping-positive-admission
     owner: grok-bot
     intent:
@@ -12767,7 +12811,9 @@ tasks:
   - id: forbid-production-host-fallback
     owner: cursor-shuanggui-publish
     intent:
-      - Forbid host fallback when production execution mode is explicitly enabled. Missing or unreachable Docker CLI socket or B exec service must return a clear error and must not fall back to the gateway host.
+      - Forbid host fallback when production execution mode is explicitly enabled. Missing or
+        unreachable Docker CLI socket or B exec service must return a clear error and must not fall
+        back to the gateway host.
     paths:
       - src/agents/sandbox/docker-engine-client.ts
       - src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
@@ -12788,7 +12834,9 @@ tasks:
   - id: exec-protocol-v1-min-loop
     owner: cursor-shuanggui-publish
     intent:
-      - Implement and isolate-verify execution protocol v1 minimal loop (submit, status, cancel, idempotency, artifact SHA-256 and byte-count checks). If B is unreachable, stay failed or pending; never fall back to A host execution.
+      - Implement and isolate-verify execution protocol v1 minimal loop (submit, status, cancel,
+        idempotency, artifact SHA-256 and byte-count checks). If B is unreachable, stay failed or
+        pending; never fall back to A host execution.
     paths:
       - docs/exec-protocol/v1-field-freeze.md
       - docs/exec-protocol/v1-reconcile-and-retry-freeze.md
@@ -12811,7 +12859,11 @@ tasks:
   - id: prod-adapt-1plus3
     owner: cursor-shuanggui-publish
     intent:
-      - Freeze then implement 1+3 production adaptation interfaces (mutual auth and tenant revocation, production config validation and failure closure, cloud-PC proxy mutex integration, three-layer capacity admission, and A/B deploy definition plus release composition). Production enablement stays refused until independent review. Does not steal deploy/production or src/browser ownership.
+      - Freeze then implement 1+3 production adaptation interfaces (mutual auth and tenant
+        revocation, production config validation and failure closure, cloud-PC proxy mutex
+        integration, three-layer capacity admission, and A/B deploy definition plus release
+        composition). Production enablement stays refused until independent review. Does not steal
+        deploy/production or src/browser ownership.
     paths:
       - docs/exec-protocol/v1-production-interface-freeze.md
       - .loom/registry.yaml
@@ -12828,6 +12880,24 @@ tasks:
     since: 2026-11-11
     metadata: {}
 landingStreams:
+  - id: local-ui-seams-baseline-registration-2b70e4494
+    landingPolicy: parallel
+    paths:
+      - .loom/registry.yaml
+    canLandWith: []
+    metadata:
+      task: local-ui-seams
+      agent: codex-runtime-manager
+      purpose: User-authorized one-time eight-stream baseline compatibility registration only; no
+        ownership changes.
+  - id: local-ui-seams-agent-event-regression-20261111
+    landingPolicy: serial
+    paths:
+      - src/infra/agent-events.test.ts
+    canLandWith: []
+    metadata:
+      task: local-ui-seams
+      agent: codex-runtime-manager
   - id: exec-protocol-v1-min-loop
     landingPolicy: serial
     paths:
@@ -12845,7 +12915,9 @@ landingStreams:
     landingPolicy: serial
     paths:
       - docs/exec-protocol/v1-production-interface-freeze.md
-    canLandWith: []
+    canLandWith:
+      - ODIAG
+      - executor-observation-acceptance-fixed-integration-20261109
     metadata:
       task: prod-adapt-1plus3
       owner: cursor-shuanggui-publish
@@ -12883,7 +12955,8 @@ landingStreams:
     metadata:
       task: pack1-msg3-admission-abort-actor
       agent: cursor-grok-8564
-      purpose: Admit named-file delivery, persist abort/empty-final bubbles, restore employee actor after restart. Draft only.
+      purpose: Admit named-file delivery, persist abort/empty-final bubbles, restore employee actor after
+        restart. Draft only.
   - id: pack1-live-chat-defects-b670
     landingPolicy: serial
     paths:
@@ -14017,7 +14090,16 @@ landingStreams:
       - ui/src/ui/wiring/pptx-preview-edit.ts
       - ui/src/ui/wiring/workspace-file-preview.node.test.ts
       - ui/src/ui/wiring/workspace-file-preview.ts
-    canLandWith: []
+    canLandWith:
+      - MRR
+      - login-surface-mismatch-zh:cursor-cloud
+      - auth-surface-recovery-audit:cursor-auth-audit
+      - GATEWAY_UI_TEST_FIXES
+      - superseded-residue-cleanup:cursor-sandra
+      - enterprise-login-session-land:cursor-cloud
+      - closed-loop-ui-wiring-20261101
+      - ODIAG
+      - prod-adapt-1plus3
     metadata:
       task: agent-runtime-observability
       owner: codex-observe-owner
@@ -15152,7 +15234,14 @@ landingStreams:
       - ui/src/ui/controllers/chat.ts
       - ui/src/ui/controllers/chat.task-update.test.ts
       - docs/audits/2026-11-01-closed-loop-auto-recheck-notify.md
-    canLandWith: []
+    canLandWith:
+      - executor-observation-acceptance-fixed-integration-20261109
+      - MRR
+      - login-surface-mismatch-zh:cursor-cloud
+      - auth-surface-recovery-audit:cursor-auth-audit
+      - GATEWAY_UI_TEST_FIXES
+      - superseded-residue-cleanup:cursor-sandra
+      - enterprise-login-session-land:cursor-cloud
     metadata:
       task: closed-loop-ui-wiring:cursor-closed-loop-490b
       owner: cursor-closed-loop-490b
@@ -17182,7 +17271,14 @@ landingStreams:
       - ui/src/ui/views/auth-home.navigation.test.ts
       - ui/src/ui/views/auth-home.ts
       - ui/src/ui/views/public-legal-nav.ts
-    canLandWith: []
+    canLandWith:
+      - executor-observation-acceptance-fixed-integration-20261109
+      - MRR
+      - auth-surface-recovery-audit:cursor-auth-audit
+      - GATEWAY_UI_TEST_FIXES
+      - superseded-residue-cleanup:cursor-sandra
+      - enterprise-login-session-land:cursor-cloud
+      - closed-loop-ui-wiring-20261101
     metadata:
       legacyTitle: Name the employee site when login surfaces disagree
       task: login-surface-mismatch-zh
@@ -17560,7 +17656,14 @@ landingStreams:
       - ui/src/ui/views/auth-home-entry-mode.ts
       - ui/src/ui/views/auth-home.password-reset.node.test.ts
       - ui/src/ui/views/auth-home.ts
-    canLandWith: []
+    canLandWith:
+      - executor-observation-acceptance-fixed-integration-20261109
+      - MRR
+      - login-surface-mismatch-zh:cursor-cloud
+      - GATEWAY_UI_TEST_FIXES
+      - superseded-residue-cleanup:cursor-sandra
+      - enterprise-login-session-land:cursor-cloud
+      - closed-loop-ui-wiring-20261101
     metadata:
       legacyTitle: Close remaining three-surface login gaps after PR 786
       task: auth-surface-recovery-audit
@@ -17611,7 +17714,14 @@ landingStreams:
       - ui/src/ui/routing/confirmed-session-land.node.test.ts
       - ui/src/ui/routing/confirmed-session-land.ts
       - ui/src/ui/views/auth-home.ts
-    canLandWith: []
+    canLandWith:
+      - executor-observation-acceptance-fixed-integration-20261109
+      - MRR
+      - login-surface-mismatch-zh:cursor-cloud
+      - auth-surface-recovery-audit:cursor-auth-audit
+      - GATEWAY_UI_TEST_FIXES
+      - superseded-residue-cleanup:cursor-sandra
+      - closed-loop-ui-wiring-20261101
     metadata:
       legacyTitle: Leave enterprise login when the admin session is already confirmed
       task: enterprise-login-session-land
@@ -17684,7 +17794,14 @@ landingStreams:
       - ui/src/ui/ports/employee/render-model-workbench-actions.ts
       - ui/src/ui/ports/employee/render-model.node.test.ts
       - ui/src/ui/ports/employee/render-model.ts
-    canLandWith: []
+    canLandWith:
+      - executor-observation-acceptance-fixed-integration-20261109
+      - MRR
+      - login-surface-mismatch-zh:cursor-cloud
+      - auth-surface-recovery-audit:cursor-auth-audit
+      - GATEWAY_UI_TEST_FIXES
+      - enterprise-login-session-land:cursor-cloud
+      - closed-loop-ui-wiring-20261101
     metadata:
       legacyTitle: Remove superseded invite, session, and preview residue
       task: superseded-residue-cleanup
@@ -23071,7 +23188,14 @@ landingStreams:
       - src/gateway/server-methods/steward-workspace-file.managed.test.ts
       - ui/src/ui/ports/platform/advanced/page.browser.test.ts
       - ui/src/ui/views/employee-model-access-section.browser.test.ts
-    canLandWith: []
+    canLandWith:
+      - executor-observation-acceptance-fixed-integration-20261109
+      - MRR
+      - login-surface-mismatch-zh:cursor-cloud
+      - auth-surface-recovery-audit:cursor-auth-audit
+      - superseded-residue-cleanup:cursor-sandra
+      - enterprise-login-session-land:cursor-cloud
+      - closed-loop-ui-wiring-20261101
     metadata:
       legacyTitle: Gateway and UI test harness fixes for main green
       task: gateway-ui-test-failures
@@ -25260,6 +25384,13 @@ landingStreams:
       - memory-safe-continuity-live-gateway-20261030
       - agent-runtime-convergence-m1
       - agent-runtime-observability-heartbeat-lifecycle
+      - executor-observation-acceptance-fixed-integration-20261109
+      - login-surface-mismatch-zh:cursor-cloud
+      - auth-surface-recovery-audit:cursor-auth-audit
+      - GATEWAY_UI_TEST_FIXES
+      - superseded-residue-cleanup:cursor-sandra
+      - enterprise-login-session-land:cursor-cloud
+      - closed-loop-ui-wiring-20261101
     metadata:
       legacyTitle: Main Recovery Routing (dangling refs)
       legacyDisposition: MERGE
@@ -27548,6 +27679,8 @@ landingStreams:
     canLandWith:
       - DDOC
       - F
+      - executor-observation-acceptance-fixed-integration-20261109
+      - prod-adapt-1plus3
     metadata:
       legacyTitle: OpenBot Diagnosis Platform
       legacyDisposition: MERGE
@@ -27864,39 +27997,60 @@ landingStreams:
 sharedPaths:
   - glob: src/exec-protocol/**
     landerTask: exec-protocol-v1-min-loop
-    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is
+      exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over
+      pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
   - glob: docs/exec-protocol/v1-field-freeze.md
     landerTask: exec-protocol-v1-min-loop
-    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is
+      exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over
+      pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
   - glob: docs/exec-protocol/v1-reconcile-and-retry-freeze.md
     landerTask: exec-protocol-v1-min-loop
-    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is
+      exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over
+      pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
   - glob: docs/exec-protocol/v1-two-node-isolation-plan.md
     landerTask: exec-protocol-v1-min-loop
-    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is
+      exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over
+      pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
   - glob: docs/exec-protocol/v1-two-node-change-ticket.md
     landerTask: exec-protocol-v1-min-loop
-    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
+    reason: Human-authorized isolated PR-B execution protocol v1 minimal loop. Exact-path lander is
+      exec-protocol-v1-min-loop (cursor-shuanggui-publish). Does not take over
+      pi-sdk-family-migration-v3 or other broad globs; their declarations remain.
     reviewAfter: 2026-12-31
   - glob: docs/exec-protocol/v1-production-interface-freeze.md
     landerTask: prod-adapt-1plus3
-    reason: Human-authorized 1+3 production adaptation interface freeze. Exact-path lander is prod-adapt-1plus3 (cursor-shuanggui-publish). Does not take over deploy/production, src/browser, or exec-protocol-v1-min-loop paths.
+    reason: Human-authorized 1+3 production adaptation interface freeze. Exact-path lander is
+      prod-adapt-1plus3 (cursor-shuanggui-publish). Does not take over deploy/production,
+      src/browser, or exec-protocol-v1-min-loop paths.
     reviewAfter: 2026-12-31
   - glob: src/agents/sandbox/docker-engine-client.ts
     landerTask: forbid-production-host-fallback
-    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
+    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is
+      forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over
+      production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain
+      declared.
     reviewAfter: 2026-12-31
   - glob: src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
     landerTask: forbid-production-host-fallback
-    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
+    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is
+      forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over
+      production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain
+      declared.
     reviewAfter: 2026-12-31
   - glob: src/agents/sandbox/production-execution-mode.ts
     landerTask: forbid-production-host-fallback
-    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain declared.
+    reason: Human-authorized isolated PR-A forbidding production host fallback. Exact-path lander is
+      forbid-production-host-fallback (cursor-shuanggui-publish). Does not take over
+      production-agent-runtime-safety or pi-sdk-family-migration-v3; their broad globs remain
+      declared.
     reviewAfter: 2026-12-31
   - glob: src/agent-runtime/execution/outcomes/command-outcome.test.ts
     landerTask: agent-runtime-observability:codex-observe-owner

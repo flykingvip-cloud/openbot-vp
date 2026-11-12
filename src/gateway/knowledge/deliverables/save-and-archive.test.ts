@@ -382,7 +382,7 @@ describe("saveAndArchiveWorkspaceDeliverable", () => {
     expect(getDeliverableArchiveRecord(first.deliverableId)?.rawHash).toBe(first.rawHash);
   });
 
-  it("overwrite keeps the same document and purges prior versions", async () => {
+  it("overwrite keeps the same document without purging historical evidence", async () => {
     const personal = ensurePersonalDeliverablesKnowledgeBase({ ownerId: "user-a" });
     const firstBody = "覆盖前的正文必须足够完整，才能作为知识库可调用的第一版成果进入个人成果。";
     const first = await saveAndArchiveWorkspaceDeliverable({
@@ -408,9 +408,7 @@ describe("saveAndArchiveWorkspaceDeliverable", () => {
     expect(second.saveAction).toBe("overwrite");
     expect(second.documentId).toBe(first.documentId);
     expect(second.rawHash).not.toBe(first.rawHash);
-    expect(purgePriorKnowledgeDocumentVersions).toHaveBeenCalledWith(
-      expect.objectContaining({ docId: first.documentId }),
-    );
+    expect(purgePriorKnowledgeDocumentVersions).not.toHaveBeenCalled();
     const attachArgs = vi.mocked(attachWorkspaceDeliverableToKnowledgeBase).mock.calls[1]?.[0];
     expect(attachArgs).toMatchObject({
       documentId: first.documentId,

@@ -99,6 +99,15 @@ describe("server-chat control-channel streaming wire", () => {
       .filter((t) => t.length > 0);
   }
 
+  it("projects runtime failure codes before streaming while leaving the model buffer unchanged", () => {
+    const h = createHarness();
+    const raw = "任务尚未发布：source_message_not_bound。";
+    emitAssistantText(h, raw);
+    expect(deltaTexts(h.broadcastChat).join("")).toContain("这条消息尚未正确关联到任务");
+    expect(JSON.stringify(h.broadcastChat.mock.calls)).not.toContain("source_message_not_bound");
+    expect(h.chatRunState.buffers.get("client-1")).toBe(raw);
+  });
+
   function allBroadcastJson(broadcastChat: ReturnType<typeof vi.fn>): string {
     return JSON.stringify(broadcastChat.mock.calls);
   }

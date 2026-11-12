@@ -8,6 +8,8 @@ export async function readLatestAssistantReply(params: {
   sessionKey: string;
   limit?: number;
   sessionOwnerPlatformUserId?: string;
+  /** Optional dispatch boundary: unknown/older timestamps cannot be a reply to this send. */
+  afterMs?: number;
 }): Promise<string | undefined> {
   const history = await callGateway<{ messages: Array<unknown> }>({
     method: "chat.history",
@@ -25,6 +27,18 @@ export async function readLatestAssistantReply(params: {
     }
     if ((candidate as { role?: unknown }).role !== "assistant") {
       continue;
+    }
+    if (params.afterMs !== undefined) {
+      const timestamp = (candidate as { timestamp?: unknown }).timestamp;
+      const ms =
+        typeof timestamp === "number"
+          ? timestamp
+          : typeof timestamp === "string"
+            ? Date.parse(timestamp)
+            : NaN;
+      if (!Number.isFinite(ms) || ms < params.afterMs) {
+        continue;
+      }
     }
     const text = extractAssistantText(candidate);
     if (!text?.trim()) {

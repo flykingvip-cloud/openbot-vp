@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GATEWAY_EVENT_UPDATE_AVAILABLE } from "../../../src/gateway/events.js";
 import { ConnectErrorDetailCodes } from "../../../src/gateway/protocol/connect-error-details.js";
+import { setChatActionsTestHooks } from "./app-chat-actions.ts";
 import {
   applySnapshot,
   connectGateway,
@@ -245,6 +246,34 @@ describe("connectGateway", () => {
       latestVersion: "2.0.0",
       channel: "latest",
     });
+  });
+
+  it("replaces local history after a successful reset run", () => {
+    const host = createHost();
+    const reload = vi.fn(async (state: { chatHistoryReplaceLocal?: boolean }) => {
+      expect(state.chatHistoryReplaceLocal).toBe(true);
+    });
+    setChatActionsTestHooks({ reloadShellChatHistory: reload });
+    try {
+      connectGateway(host);
+      Object.assign(host, { toolStreamOrder: [], toolStreamById: new Map(), chatToolMessages: [] });
+      host.sessionKey = "agent:main:main";
+      host.chatRunId = "reset-test";
+      host.refreshSessionsAfterChat.add("reset-test");
+      gatewayClientInstances[0].emitEvent({
+        event: "chat",
+        payload: {
+          runId: "reset-test",
+          sessionKey: "agent:main:main",
+          state: "final",
+          message: { role: "assistant", content: [{ type: "text", text: "new session" }] },
+        },
+      });
+      expect(reload).toHaveBeenCalled();
+      expect(host.refreshSessionsAfterChat.has("reset-test")).toBe(false);
+    } finally {
+      setChatActionsTestHooks(null);
+    }
   });
 
   it("records L2 incubation but does not open system suggestion for a single artifact session", () => {

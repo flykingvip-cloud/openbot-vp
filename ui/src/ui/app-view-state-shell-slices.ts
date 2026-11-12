@@ -1482,7 +1482,7 @@ export type AppViewShellActionsState = {
     ownedAgentIds: string[];
   }) => Promise<void>;
   handleCloseSidebar: () => void;
-  handleSaveSidebarDeliverable: () => Promise<void>;
+  handleSaveSidebarDeliverable: (mode?: "save_as") => Promise<void>;
   handleConfirmDeliverableOverwrite: () => void;
   handleConfirmDeliverableSaveAs: () => void;
   handleCancelDeliverableSaveDecision: () => void;

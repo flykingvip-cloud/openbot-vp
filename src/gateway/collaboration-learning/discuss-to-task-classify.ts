@@ -111,7 +111,11 @@ function extractBullets(message: string): string[] {
 function splitList(clause: string): string[] {
   return clause
     .split(/[，,、]|(?:\s*(?:以及|及)\s*)/)
-    .map((s) => compact(s).replace(/^(?:以及|及|和)\s*/, "").trim())
+    .map((s) =>
+      compact(s)
+        .replace(/^(?:以及|及|和)\s*/, "")
+        .trim(),
+    )
     .filter((s) => s.length >= 2);
 }
 
@@ -273,6 +277,11 @@ export function classifyDiscussToTaskIntent(message: string): DiscussToTaskClass
   const raw = message.replace(/\r\n/g, "\n");
   const text = compact(raw);
   if (!text) {
+    return { kind: "discussion", reason: "ordinary_discussion" };
+  }
+  // A declared read-only scope governs the whole query. References to past
+  // generation/submission/review (including prohibitions) are not new commands.
+  if (/^(?:请)?(?:只|仅)(?:查询|核对|查看|了解|询问)(?:[：:\s]|本轮|当前|一下)/u.test(text)) {
     return { kind: "discussion", reason: "ordinary_discussion" };
   }
   const proposal = understandDiscussToTaskProposal(raw);

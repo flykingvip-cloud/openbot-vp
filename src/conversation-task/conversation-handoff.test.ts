@@ -58,6 +58,28 @@ describe("conversation transcript reachability", () => {
 });
 
 describe("conversation 1:1 handoff", () => {
+  it("does not treat email addresses as robot mentions", async () => {
+    const text = "请引导配置个人邮箱 owner+test@example.com，暂不发邮件";
+    expect(parseConversationAtMentions(text)).toEqual([]);
+    expect(parseConversationAtMentions("请@Skill孵化 核对 owner@example.com")).toEqual([
+      "Skill孵化",
+    ]);
+    const listPeers = vi.fn();
+    const injectHostNotice = vi.fn();
+    const result = await routeStewardConversationMentions({
+      sessionKey: "agent:main:employee:u1",
+      messageText: text,
+      requesterUserId: "u1",
+      tenantId: "tenant-test",
+      tenantAdmin: false,
+      listPeers,
+      injectHostNotice,
+    });
+    expect(result.handledRobotTask).toBe(false);
+    expect(listPeers).not.toHaveBeenCalled();
+    expect(injectHostNotice).not.toHaveBeenCalled();
+  });
+
   it("resolves a unique Grok-style @mention to an existing main session", () => {
     expect(parseConversationAtMentions("将任务交给 @Skill孵化 去跑")).toEqual(["Skill孵化"]);
     expect(resolveConversationPeer("Skill孵化", peers)).toMatchObject({

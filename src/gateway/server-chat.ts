@@ -1,3 +1,10 @@
+import {
+  candidateNamedFilesFromTurn,
+  collectNamedFileReceipts,
+  mergeNamedFileReceiptArtifacts,
+  namedFileReceiptsToArtifactFields,
+} from "../agent-runtime/delivery/named-file-receipt.js";
+import { visibleAsyncWaitIdentity } from "../agent-runtime/state/repository/async-wait-visible-identity.js";
 import { resolveSessionAgentId } from "../agents/agent-scope.js";
 import { applyUserVisibleOutputGate } from "../agents/model-output-boundary.js";
 import { settleTurnCompletion } from "../agents/turn-completion/contract.js";
@@ -14,15 +21,8 @@ import {
 import { resolveHeartbeatVisibility } from "../infra/heartbeat-visibility.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { declaredDeliverableArtifactFields } from "../shared/preview-artifact/materialize-declared-artifacts.js";
-import {
-  candidateNamedFilesFromTurn,
-  collectNamedFileReceipts,
-  mergeNamedFileReceiptArtifacts,
-  namedFileReceiptsToArtifactFields,
-} from "../agent-runtime/delivery/named-file-receipt.js";
-import { visibleAsyncWaitIdentity } from "../agent-runtime/state/repository/async-wait-visible-identity.js";
+import { projectAssistantReplyForDisplay } from "../shared/text/assistant-runtime-display.js";
 import { stripAssistantScratchpadFromText } from "../shared/text/assistant-scratchpad.js";
-import { stripControlChannelForDisplay } from "../shared/text/control-channel-visibility.js";
 import { getRunReplyLanguage } from "../shared/text/run-reply-language.js";
 import { deriveThinkingProgress } from "../shared/text/thinking-progress.js";
 import {
@@ -88,8 +88,6 @@ function errorTextForTerminal(error: unknown): string {
   }
   return formatForLog(error);
 }
-
-
 
 function resolveVisibleAsyncWait(sessionKey: string) {
   try {
@@ -617,7 +615,7 @@ export function createAgentEventHandler({
     chatRunState.buffers.set(clientRunId, mergedText);
     const deliveryText = stripAssistantScratchpadFromText(mergedText, replyLanguage);
     // Wire-boundary only: keep mergedText/raw buffer intact for settle / formal submit.
-    const wireText = stripControlChannelForDisplay(deliveryText, { streaming: true });
+    const wireText = projectAssistantReplyForDisplay(deliveryText, { streaming: true });
     if (!wireText) {
       // Process channel: show structure + progress while Layer C delivery is empty
       // (or while only incomplete/complete control tokens remain on the wire).
@@ -685,7 +683,7 @@ export function createAgentEventHandler({
       replyLanguage,
     ).trim();
     // Wire-boundary strip for throttle flush; buffer stays raw for final settle.
-    const text = stripControlChannelForDisplay(scratchpadStripped, { streaming: true }).trim();
+    const text = projectAssistantReplyForDisplay(scratchpadStripped, { streaming: true }).trim();
     const shouldSuppressSilent =
       normalizedHeartbeatText.suppress || isSilentReplyText(text, SILENT_REPLY_TOKEN);
     const shouldSuppressSilentLeadFragment = isSilentReplyLeadFragment(text);
@@ -892,7 +890,7 @@ export function createAgentEventHandler({
         });
         // prepareChatDeliverablePublish already strips <<DELIVERABLE>> tags from
         // outgoing text; still strip turn_completion / tool-digest leftovers.
-        visibleText = stripControlChannelForDisplay(prepared.text);
+        visibleText = projectAssistantReplyForDisplay(prepared.text);
       } else if (visibleText) {
         finalArtifacts = declaredDeliverableArtifactFields(visibleText, {
           timestamp: Date.now(),
@@ -902,7 +900,7 @@ export function createAgentEventHandler({
           visibleText,
           hint,
         });
-        visibleText = stripControlChannelForDisplay(visibleText);
+        visibleText = projectAssistantReplyForDisplay(visibleText);
       }
       const taskUpdate = resolveVisibleChatTaskUpdate(sessionKey, clientRunId);
       const asyncWait = resolveVisibleAsyncWait(sessionKey);

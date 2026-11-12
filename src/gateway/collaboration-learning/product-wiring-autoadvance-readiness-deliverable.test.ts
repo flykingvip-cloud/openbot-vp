@@ -179,7 +179,8 @@ describe("R1 deliverable helper — empty/binary/failure surface", () => {
   it("ok:false message is 团队成果未完成, not success", () => {
     const msg = formatTeamDeliverableUserMessage({ ok: false, reason: "acl_denied" });
     expect(msg).toContain("团队成果未完成");
-    expect(msg).toContain("acl_denied");
+    expect(msg).toContain("没有提交权限");
+    expect(msg).not.toContain("acl_denied");
     expect(msg).not.toContain("已提交");
   });
 });
@@ -295,9 +296,10 @@ describe("R1 non-mock submit pipeline", () => {
     }
 
     const userMsg = formatTeamDeliverableUserMessage(submit);
-    expect(userMsg).toContain(submit.deliverableId);
-    expect(userMsg).toContain(`v${submit.version}`);
-    expect(userMsg).toContain(submit.locator);
+    expect(userMsg).toContain(`第 ${submit.version} 版`);
+    expect(userMsg).toContain("等待审核");
+    expect(userMsg).not.toContain(submit.locator);
+    expect(userMsg).not.toContain(submit.deliverableId);
   });
 });
 
@@ -1829,7 +1831,8 @@ describe("R3 run binding — no Map; unconfusable context", () => {
       expect(out.outcome.reason).toBe("execution_binding_required");
     }
     expect(out.text).toContain("团队成果未完成");
-    expect(out.text).toContain("execution_binding_required");
+    expect(out.text).toContain("暂不能提交审核");
+    expect(out.text).not.toContain("execution_binding_required");
   });
 
   it("submit failure retry still has the same run binding", async () => {

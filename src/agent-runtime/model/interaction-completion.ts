@@ -10,10 +10,13 @@ const PROTOCOL = [
   "Return one JSON object only. Never call tools or claim that a proposed action has executed.",
   'Use {"kind":"reply","text":"..."} to answer directly, or kind=clarify with text for missing information.',
   'For work use {"kind":"execution_request","request":{"goal":"...","acceptance":["..."]}}.',
+  "Make one semantic decision from the user's requested outcome, not a keyword or filename checklist. A filename is not required for execution_request. Creating a deliverable in one or several formats is work even when the user has not named files. Preserve the requested audience, length, formats and scope as acceptance requirements; do not ask for permission to begin work the user already requested.",
+  "A reply is an answer completed by this interaction alone, without claiming workspace changes or future execution. A task_change records a proposal, not rewritten artifacts. Never say files were created, reviewed, saved or made downloadable by this interpretation call. If the requested work cannot be expressed safely with the protocol, clarify the missing requirement rather than pretend it has started.",
   "Preserve the user's explicit acceptance scope. Do not invent additional criteria or split one exact-content criterion into redundant existence/newline criteria. Execution-method restrictions belong in the goal, not additional acceptance criteria. Each check must reference every criterion it actually verifies; never leave a mechanically equivalent criterion uncovered merely because the same artifact check already covers another index. Unsupported semantic criteria must remain explicit and must never be waived.",
   'When the user explicitly specifies exact text file content, request may include checks=[{"criterion":0,"validator":"artifact.text.exact.v1","artifact":"relative/path.txt","expected":"exact user-specified content"}]. Preserve exact bytes including whether a trailing newline was requested. Never invent expected content or substitute this check for semantic quality criteria; omit checks when no supported deterministic validator applies. Checks are data, never commands or scripts.',
   "For task changes use kind=task_change, target={taskId,revision}, text, and mode=supplement|revise|replace_all. Use replace_all only when the user explicitly replaces the entire previous constraint set; a local correction is revise and preserves unrelated requirements. For controls use kind=task_control, the same target, and action=pause|cancel|resume.",
   "Only the host-bound task target is valid. A new message does not complete or replace an existing task.",
+  "If an authorized individual-robot directory is supplied as context, a matching name may denote an internal digital colleague, not an external email/phone recipient. Sending a message is work: propose execution using the existing conversation_send capability; the interaction itself sends nothing and grants no permission. A short follow-up such as '发私信' refines the previous request using conversation history. Do not demand external contact details or repeat an approval already given for an internal message. Do not invent a peer when the directory is absent, ambiguous or lacks the named peer; let execution resolve/validate availability or clarify ambiguity. Internal messaging does not establish a collaboration-group task, and sending never means the recipient has replied or accepted responsibility.",
   "If the message combines a question with a task change or control, return the bound task decision with optional answer for the question. The answer must not claim that the change/control has already happened; the host supplies its actual outcome. For ambiguous or conflicting mutations, clarify instead of guessing an action.",
 ].join("\n");
 
@@ -136,6 +139,17 @@ export async function invokeInteractionCompletion(params: {
     complete(params.model, buildInteractionCompletionContext(params.input, params.model), {
       ...(params.apiKey ? { apiKey: params.apiKey } : {}),
       signal,
+      // Interpretation is a machine protocol; authorization remains in command.
+      ...(params.model.api === "openai-completions"
+        ? {
+            onPayload: (payload: unknown) => {
+              if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+                throw new Error("Invalid interaction request payload");
+              }
+              return { ...payload, response_format: { type: "json_object" } };
+            },
+          }
+        : {}),
       timeoutMs,
       maxTokens: Math.max(1, Math.floor(Math.min(params.maxTokens, params.model.maxTokens))),
     }),
@@ -155,6 +169,9 @@ export async function invokeInteractionCompletion(params: {
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("");
+      if (!text.trim()) {
+        throw new Error("本轮未取得有效的交互决定，没有启动或修改任务。");
+      }
       return readInteractionDecisionText(text);
     },
   };

@@ -191,7 +191,9 @@ export function collectNamedFileReceipts(params: {
       continue;
     }
     seen.add(normalized);
-    receipts.push(registerNamedFileReceipt({ workspaceDir: params.workspaceDir, relativePath: normalized }));
+    receipts.push(
+      registerNamedFileReceipt({ workspaceDir: params.workspaceDir, relativePath: normalized }),
+    );
   }
   return receipts;
 }
@@ -213,12 +215,18 @@ export function candidateNamedFilesFromTurn(texts: readonly (string | undefined)
     let match: RegExpExecArray | null;
     while ((match = TURN_FILENAME_RE.exec(text))) {
       const relative = match[1]?.trim();
-      if (relative && !relative.includes("..") && !relative.includes("/") && !names.includes(relative)) {
+      if (
+        relative &&
+        !relative.includes("..") &&
+        !relative.includes("/") &&
+        !names.includes(relative)
+      ) {
         names.push(relative);
       }
     }
   }
-  if (names.length === 0) {
+  {
+    // Explicit naming does not exclude additional requested file formats.
     for (const text of texts) {
       if (!text) {
         continue;
@@ -243,12 +251,8 @@ export function mergeNamedFileReceiptArtifacts(
   if (!receipts.artifact) {
     return declared;
   }
-  const declaredList = [
-    ...(declared.artifacts ?? (declared.artifact ? [declared.artifact] : [])),
-  ];
-  const receiptList = [
-    ...(receipts.artifacts ?? (receipts.artifact ? [receipts.artifact] : [])),
-  ];
+  const declaredList = [...(declared.artifacts ?? (declared.artifact ? [declared.artifact] : []))];
+  const receiptList = [...(receipts.artifacts ?? (receipts.artifact ? [receipts.artifact] : []))];
   const receiptNames = new Set(
     receiptList
       .map((item) => {

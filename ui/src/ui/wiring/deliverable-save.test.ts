@@ -480,3 +480,69 @@ it("never archives Office preview HTML as the original PPTX when bytes are missi
   });
   expect(extractArtifactSavePayload(file)).toEqual({ content: "" });
 });
+
+it("preserves preview text bytes when saving instead of trimming the file body", async () => {
+  const request = vi.fn(async () => ({
+    deliverableId: "saved",
+    knowledgeBaseId: "kb",
+    knowledgeBaseTitle: "KB",
+  }));
+  const content = "  exact preview body with whitespace  \n";
+  await saveAndArchiveSidebarDeliverable({
+    client: { request } as never,
+    workspace: workspace("assistant-doc:bytes"),
+    sessionKey: "agent:main:main",
+    content,
+  });
+  expect(request).toHaveBeenCalledWith(
+    "knowledge.deliverables.saveAndArchive",
+    expect.objectContaining({ content }),
+  );
+});
+
+it("updates the same saved document using its prior receipt hash", async () => {
+  const request = vi.fn(async () => ({
+    deliverableId: "same",
+    knowledgeBaseId: "kb",
+    knowledgeBaseTitle: "KB",
+    rawHash: "next",
+  }));
+  const item = workspace("assistant-doc:update", {
+    saved: true,
+    savedRawHash: "seen",
+    knowledgeDocumentId: "doc-1",
+  });
+  await saveAndArchiveSidebarDeliverable({
+    client: { request } as never,
+    workspace: item,
+    sessionKey: "agent:main:main",
+    content: "updated",
+  });
+  expect(request).toHaveBeenCalledWith(
+    "knowledge.deliverables.saveAndArchive",
+    expect.objectContaining({ saveMode: "overwrite", expectedRawHash: "seen" }),
+  );
+});
+it("honors explicit save-as even when a prior update receipt exists", async () => {
+  const request = vi.fn(async () => ({
+    deliverableId: "new",
+    knowledgeBaseId: "kb",
+    knowledgeBaseTitle: "KB",
+  }));
+  await saveAndArchiveSidebarDeliverable({
+    client: { request } as never,
+    workspace: workspace("assistant-doc:copy", {
+      saved: true,
+      savedRawHash: "seen",
+      knowledgeDocumentId: "doc-1",
+    }),
+    sessionKey: "agent:main:main",
+    content: "copy",
+    saveMode: "save_as",
+    saveAsFilename: "copy.md",
+  });
+  expect(request).toHaveBeenCalledWith(
+    "knowledge.deliverables.saveAndArchive",
+    expect.objectContaining({ saveMode: "save_as", saveAsFilename: "copy.md" }),
+  );
+});

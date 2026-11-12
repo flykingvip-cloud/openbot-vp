@@ -136,6 +136,16 @@ export function readOwnerDecision(message: unknown): OwnerDecisionCardView | nul
 }
 
 const dismissedDecisionIds = new Set<string>();
+const DISMISSED_DECISION_PREFIX = "openbot.owner-decision.dismissed.v1:";
+
+// Presentation preference only: never changes plan approval or task state.
+function storedDecisionDismissal(id: string): boolean {
+  try {
+    return globalThis.localStorage?.getItem(DISMISSED_DECISION_PREFIX + id) === "1";
+  } catch {
+    return false;
+  }
+}
 const actionErrorsByDecisionId = new Map<string, string>();
 /** Decision ids currently showing the in-card revise reason textarea. */
 const reviseExpandedByDecisionId = new Set<string>();
@@ -372,13 +382,17 @@ export function selectStickyOwnerDecisionCards(
     if (facing === "consumed" || facing === "skipped") {
       continue;
     }
-    // stale_version delivery or version-gate refusal: keep as review chrome
-    // (「旧版本已失效」) inside the terminal budget — do not re-offer Confirm.
+    // Invalid historical versions belong to history, never the action stack.
+    // Each history message may render independently, so a per-call terminal
+    // budget alone cannot prevent a wall of old cards.
     if (
       facing === "stale_version" ||
       isOwnerDecisionVersionStale(card.decisionId) ||
-      isOwnerDecisionTodolistTerminal(getOwnerDecisionTodolistStatus(card.todolistId))
+      getOwnerDecisionTodolistStatus(card.todolistId) === "superseded"
     ) {
+      continue;
+    }
+    if (isOwnerDecisionTodolistTerminal(getOwnerDecisionTodolistStatus(card.todolistId))) {
       terminals.push(card);
       continue;
     }
@@ -613,7 +627,19 @@ export function markOwnerDecisionHydrationAttempted(todolistId: string): void {
 }
 
 /** Test helper. */
-export function clearOwnerDecisionDismissalsForTest(): void {
+export function clearOwnerDecisionDismissalsForTest(preserveStorage = false): void {
+  if (!preserveStorage) {
+    try {
+      const storage = globalThis.localStorage;
+      for (const key of Object.keys(storage ?? {})) {
+        if (key.startsWith(DISMISSED_DECISION_PREFIX)) {
+          storage.removeItem(key);
+        }
+      }
+    } catch {
+      // Test environments may disable browser storage.
+    }
+  }
   dismissedDecisionIds.clear();
   actionErrorsByDecisionId.clear();
   reviseExpandedByDecisionId.clear();
@@ -629,6 +655,11 @@ export function dismissOwnerDecisionCard(decisionId: string): void {
   const id = decisionId.trim();
   if (id) {
     dismissedDecisionIds.add(id);
+    try {
+      globalThis.localStorage?.setItem(DISMISSED_DECISION_PREFIX + id, "1");
+    } catch {
+      // Storage may be unavailable; in-memory dismissal still works.
+    }
     actionErrorsByDecisionId.delete(id);
     reviseExpandedByDecisionId.delete(id);
     reviseDraftByDecisionId.delete(id);
@@ -670,7 +701,8 @@ export function setOwnerDecisionReviseDraft(decisionId: string, draft: string): 
 }
 
 export function isOwnerDecisionDismissed(decisionId: string): boolean {
-  return dismissedDecisionIds.has(decisionId.trim());
+  const id = decisionId.trim();
+  return dismissedDecisionIds.has(id) || storedDecisionDismissal(id);
 }
 
 export function setOwnerDecisionActionError(decisionId: string, message: string): void {
@@ -816,13 +848,17 @@ export function renderOwnerDecisionCards(
   // Sticky/todo/dialog: dismiss hides confirm chrome (稍后 or post-confirm fold).
   // History compact receipts ignore dismiss — they require confirmed+consumed
   // (ordinary 稍后 dismiss alone never becomes a receipt).
-  const stickyCandidates = allCards.filter((card) => !isOwnerDecisionDismissed(card.decisionId));
+  // Determine old versions before removing dismissed current versions. Otherwise
+  // deferring the newest card promotes an obsolete historical card into its slot.
+  const staleIds = staleOwnerDecisionDecisionIds(allCards);
+  const stickyCandidates = allCards.filter(
+    (card) => !isOwnerDecisionDismissed(card.decisionId) && !staleIds.has(card.decisionId),
+  );
   const cards = selectStickyOwnerDecisionCards(stickyCandidates);
   const stickyIds = new Set(cards.map((card) => card.decisionId));
   const humanReceipts = selectHumanConfirmReceiptCards(allCards).filter(
     (card) => !stickyIds.has(card.decisionId),
   );
-  const staleIds = staleOwnerDecisionDecisionIds(allCards);
   const authorityById = new Map(reads.map((row) => [row.card.decisionId, row.authority]));
   if (cards.length === 0 && humanReceipts.length === 0) {
     return nothing;
