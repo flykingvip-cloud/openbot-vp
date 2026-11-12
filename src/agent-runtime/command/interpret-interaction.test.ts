@@ -1,6 +1,28 @@
 import { expect, it, vi } from "vitest";
-import { interpretInteraction } from "./interpret-interaction.js";
 import { UNBOUND_TASK_TARGET_CLARIFY } from "./host-task-target.js";
+import {
+  interpretInteraction,
+  InteractionDecisionValidationError,
+} from "./interpret-interaction.js";
+
+it("retains fail-closed diagnostics without model body, arbitrary keys or target identities", async () => {
+  const infer = vi.fn(async () => ({
+    kind: "send_message",
+    text: "PRIVATE BODY",
+    private_key: "SECRET",
+  }));
+  const error = await interpretInteraction({ message: "send", context: [] }, { infer }).catch(
+    (e) => e,
+  );
+  expect(error).toBeInstanceOf(InteractionDecisionValidationError);
+  expect(error.shape).toMatchObject({
+    kind: "unsupported",
+    fields: { kind: "string", text: "string" },
+    unknownFieldCount: 1,
+  });
+  expect(JSON.stringify(error.shape)).not.toMatch(/PRIVATE|SECRET|private_key|send_message/);
+  expect(infer).toHaveBeenCalledOnce();
+});
 
 it("preserves declarative checks and refuses executable acceptance fields", async () => {
   const check = {
