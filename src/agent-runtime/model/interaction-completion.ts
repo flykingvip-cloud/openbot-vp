@@ -148,7 +148,16 @@ export async function invokeInteractionCompletion(params: {
               if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
                 throw new Error("Invalid interaction request payload");
               }
-              return { ...payload, response_format: { type: "json_object" } };
+              // DeepSeek defaults to thinking. This bounded call emits a machine
+              // decision, not an execution reasoning turn; budget is for its JSON.
+              const deepseekProtocol =
+                params.model.id.toLowerCase().startsWith("deepseek") &&
+                /(?:^|-)deepseek$/.test(params.model.provider.toLowerCase());
+              return {
+                ...payload,
+                response_format: { type: "json_object" },
+                ...(deepseekProtocol ? { thinking: { type: "disabled" } } : {}),
+              };
             },
           }
         : {}),
@@ -172,6 +181,15 @@ export async function invokeInteractionCompletion(params: {
         .map((part) => part.text)
         .join("");
       if (!text.trim()) {
+        console.warn("[interaction-completion-empty]", {
+          provider: params.model.provider,
+          model: params.model.id,
+          api: params.model.api,
+          contentTypes: response.content.map((part) => part.type),
+          textCharacters: text.length,
+          outputTokens: response.usage.output,
+          maxTokens: params.maxTokens,
+        });
         throw new Error("本轮未取得有效的交互决定，没有启动或修改任务。");
       }
       return readInteractionDecisionText(text);

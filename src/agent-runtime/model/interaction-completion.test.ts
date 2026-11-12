@@ -328,3 +328,25 @@ it("rejects a blank final completion rather than producing an empty reply", asyn
   const result = await invokeInteractionCompletion(request);
   expect(() => result.readDecision()).toThrow();
 });
+
+it("disables thinking only for the known DeepSeek machine-protocol adapter", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: '{"kind":"reply","text":"yes"}' }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  await invokeInteractionCompletion({
+    ...request,
+    model: { ...model, id: "deepseek-v4-flash", provider: "api-proxy-deepseek" },
+  });
+  const options = mocks.complete.mock.calls[0][2] as {
+    onPayload: (payload: unknown) => Record<string, unknown>;
+  };
+  const payload = { thinking: { type: "enabled" }, max_tokens: 200 };
+  expect(options.onPayload(payload)).toMatchObject({
+    thinking: { type: "disabled" },
+    response_format: { type: "json_object" },
+    max_tokens: 200,
+  });
+  expect(payload.thinking.type).toBe("enabled");
+});
