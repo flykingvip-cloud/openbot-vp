@@ -15,7 +15,7 @@ import {
   buildResumePrompt,
   buildTaskBoardContext,
   finalizeSystemContext,
-  projectInteractionHistory,
+  projectInteractionHistoryWithStatus,
   resolveContextLane,
   selectSystemContextParts,
 } from "../../agent-runtime/context/index.js";
@@ -1518,6 +1518,15 @@ export async function runPreparedReply(
       () => openSessionManager(sessionFile).buildSessionContext().messages,
       [],
     );
+    const projectedHistory = projectInteractionHistoryWithStatus(
+      history,
+      interactionIngress.userMessageId,
+    );
+    if (!projectedHistory.complete) {
+      // Reuse the existing answer/clarify-only boundary: missing historical
+      // instructions must never silently authorize a task or a mutation.
+      sources.restrict("context_source_unavailable");
+    }
     const bootstrap = await sources.readAsync(
       "context_source_unavailable",
       () =>
@@ -1587,7 +1596,7 @@ export async function runPreparedReply(
         context: [
           ...systemContext.map((content) => ({ role: "system" as const, content })),
           ...(peerContext ? [{ role: "user" as const, content: peerContext }] : []),
-          ...projectInteractionHistory(history, interactionIngress.userMessageId),
+          ...projectedHistory.context,
         ],
       },
     });
