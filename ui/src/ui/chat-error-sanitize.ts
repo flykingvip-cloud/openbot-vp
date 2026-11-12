@@ -104,6 +104,9 @@ export function sanitizeUserFacingChatError<T extends string | null | undefined>
     return raw;
   }
   const text = String(raw);
+  if (/\binsufficient[_ ]balance(?:_error)?\b/i.test(text)) {
+    return "模型服务余额不足，本轮未能生成回复。请联系管理员恢复模型额度后再试。";
+  }
   if (
     text.includes("云电脑还在启动") ||
     (/browser control service/i.test(text) && /timed out after \d+ms/i.test(text))

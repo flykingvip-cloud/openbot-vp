@@ -208,7 +208,7 @@ export async function invokeInteractionCompletion(params: {
       networkError: /fetch failed|ECONN|ENOTFOUND|network/i.test(raw),
       detail: redactSensitiveText(raw, { mode: "all" }).slice(0, 800),
     });
-    throw error;
+    throw Object.assign(error, { interactionPhase: "interpretation" as const });
   }
   return {
     response,

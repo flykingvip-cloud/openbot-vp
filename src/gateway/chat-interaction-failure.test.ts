@@ -6,9 +6,34 @@ import { projectInteractionHistory } from "../agent-runtime/context/index.js";
 import { persistInteractionMessage } from "../agent-runtime/state/index.js";
 import { openSessionManager } from "../agents/pi-sdk/session.js";
 import {
+  BILLING_BLOCKED_INTERACTION_TEXT,
   persistRejectedInteractionTurn,
   REJECTED_INTERACTION_TURN_TEXT,
 } from "./chat-interaction-failure.js";
+it("persists only governed billing failures as a pre-execution blocked interaction", async () => {
+  const append = vi.fn(async () => ({ ok: true }));
+  const error = Object.assign(new Error("402: PRIVATE PROVIDER DETAIL"), {
+    name: "FailoverError",
+    reason: "billing",
+    interactionPhase: "interpretation",
+  });
+  expect(await persistRejectedInteractionTurn({ error, runId: "billing", append })).toEqual({
+    persisted: true,
+    text: BILLING_BLOCKED_INTERACTION_TEXT,
+  });
+  expect(append).toHaveBeenCalledWith(
+    BILLING_BLOCKED_INTERACTION_TEXT,
+    "billing:interaction-rejected",
+  );
+  expect(BILLING_BLOCKED_INTERACTION_TEXT).not.toContain("PRIVATE");
+  const executionError = Object.assign(new Error("402"), {
+    name: "FailoverError",
+    reason: "billing",
+  });
+  expect(
+    await persistRejectedInteractionTurn({ error: executionError, runId: "later", append }),
+  ).toEqual({ persisted: false });
+});
 
 it("keeps the rejected turn terminal on the authoritative transcript branch after reopening", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "interaction-reject-history-"));

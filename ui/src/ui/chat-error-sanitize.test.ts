@@ -49,6 +49,13 @@ describe("isInternalChatError", () => {
 });
 
 describe("sanitizeUserFacingChatError", () => {
+  it("projects the observed provider billing error without raw JSON or request identity", () => {
+    const text = sanitizeUserFacingChatError(
+      'FailoverError: 402: {"message":"Insufficient Balance (request_id: private-id)","type":"insufficient_balance_error"}',
+    );
+    expect(text).toContain("模型服务余额不足");
+    expect(text).not.toMatch(/FailoverError|private-id|request_id|insufficient_balance_error/);
+  });
   it("hides a protocol JSON SyntaxError and keeps the raw text out of the visible string", () => {
     const raw = `SyntaxError: Unexpected token '今', "今天是 2026 年"... is not valid JSON`;
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
