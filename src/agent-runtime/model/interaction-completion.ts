@@ -7,6 +7,7 @@ import type { InteractionModelInput } from "../contracts/interaction.js";
 
 const PROTOCOL = [
   "Understand the current user message using the supplied identity, conversation, memory and knowledge.",
+  "The final user message is the current request and the sole source of new executable scope. Earlier user turns are historical reference, not a pending-work queue, even if unanswered or followed by a protocol failure. Do not aggregate or silently retry earlier requests. Use history to resolve pronouns, recipients or an explicitly requested continuation/retry/revision; preserve the latest scope and exclusions. A new independent task must not inherit unexecuted historical actions or their acceptance criteria. Never interpret silence or a previous failure as renewed authorization.",
   "Return one JSON object only. Never call tools or claim that a proposed action has executed.",
   'Use {"kind":"reply","text":"..."} to answer directly, or kind=clarify with text for missing information.',
   'For work use {"kind":"execution_request","request":{"goal":"...","acceptance":["..."]}}.',

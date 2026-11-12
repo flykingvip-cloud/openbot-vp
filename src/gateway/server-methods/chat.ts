@@ -167,6 +167,7 @@ import {
   upsertAuthorizedGroupChatAclMember,
 } from "../chat-group-acl-cache.js";
 import { emitChatInboundStage } from "../chat-inbound-stage-events.js";
+import { persistRejectedInteractionTurn } from "../chat-interaction-failure.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import {
   noteChatRunTenant,
@@ -7020,7 +7021,7 @@ export const chatHandlers: GatewayRequestHandlers = {
             },
           });
         })
-        .catch((err) => {
+        .catch(async (err) => {
           const error = errorShape(ErrorCodes.UNAVAILABLE, String(err));
           setGatewayDedupeEntry({
             dedupe: context.dedupe,
@@ -7036,11 +7037,31 @@ export const chatHandlers: GatewayRequestHandlers = {
               error,
             },
           });
+          const terminal = await persistRejectedInteractionTurn({
+            error: err,
+            runId: clientRunId,
+            append: async (message, idempotencyKey) => {
+              const governance = await resolveChatTranscriptGovernance({ client, cfg });
+              return appendAssistantTranscriptMessage({
+                message,
+                idempotencyKey,
+                sessionId: entry?.sessionId ?? clientRunId,
+                storePath,
+                sessionFile: entry?.sessionFile,
+                agentId,
+                createIfMissing: false,
+                tenantId: governance.tenantId,
+                ownerUserId: governance.ownerUserId,
+                groupId: governance.groupId,
+                failClosed: governance.failClosed,
+              });
+            },
+          });
           broadcastChatError({
             context,
             runId: clientRunId,
             sessionKey: resolvedSessionKey,
-            errorMessage: String(err),
+            errorMessage: terminal.text ?? String(err),
           });
         })
         .finally(() => {
