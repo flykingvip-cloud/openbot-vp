@@ -1615,3 +1615,13 @@ describe("ModelEntitlementEmptyError user messaging", () => {
     expect(run).not.toHaveBeenCalled();
   });
 });
+
+it("does not rotate providers to bypass context fidelity budget refusal", async () => {
+  const error = new Error("Required user history exceeds context budget");
+  error.name = "ContextFidelityBudgetError";
+  const run = vi.fn().mockRejectedValue(error);
+  await expect(
+    runWithModelFallback({ cfg: makeFallbacksOnlyCfg(), provider: "openai", model: "gpt-4o", run }),
+  ).rejects.toBe(error);
+  expect(run).toHaveBeenCalledTimes(1);
+});

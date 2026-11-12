@@ -1245,7 +1245,7 @@ describe("compaction-safeguard recent-turn preservation", () => {
       compaction?: { summary?: string };
     };
 
-    expect(result.cancel).not.toBe(true);
+    expect(result.cancel).toBe(true);
     expect(mockSummarizeInStages).toHaveBeenCalledTimes(2);
     const secondCall = mockSummarizeInStages.mock.calls[1]?.[0];
     expect(secondCall?.customInstructions).toContain("Quality check feedback");
@@ -1338,7 +1338,7 @@ describe("compaction-safeguard recent-turn preservation", () => {
     expect(secondCall?.customInstructions).toContain("latest_user_ask_not_reflected");
   });
 
-  it("keeps last successful summary when a quality retry call fails", async () => {
+  it("cancels compaction when a retry fails after an unqualified summary", async () => {
     mockSummarizeInStages.mockReset();
     mockSummarizeInStages
       .mockResolvedValueOnce("short summary missing headings")
@@ -1386,8 +1386,8 @@ describe("compaction-safeguard recent-turn preservation", () => {
       compaction?: { summary?: string };
     };
 
-    expect(result.cancel).not.toBe(true);
-    expect(result.compaction?.summary).toContain("short summary missing headings");
+    expect(result.cancel).toBe(true);
+    expect(result.compaction).toBeUndefined();
     expect(mockSummarizeInStages).toHaveBeenCalledTimes(2);
   });
 
@@ -1583,4 +1583,13 @@ describe("readWorkspaceContextForSummary", () => {
       });
     },
   );
+});
+
+it("keeps complete preserved instructions beyond the preview limit", () => {
+  const text =
+    "请分析数据\n" + "事实：尚未核实。\n".repeat(1800) + "禁止付款。只有主人确认才可以发布。";
+  const section = formatPreservedTurnsSection([
+    { role: "user", content: text, timestamp: 1 } as unknown as AgentMessage,
+  ]);
+  expect(section).toContain(text);
 });

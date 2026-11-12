@@ -392,8 +392,8 @@ function formatPreservedTurnsSection(messages: AgentMessage[]): string {
         return null;
       }
       const trimmed =
-        rendered.length > MAX_RECENT_TURN_TEXT_CHARS
-          ? `${rendered.slice(0, MAX_RECENT_TURN_TEXT_CHARS)}...`
+        message.role === "toolResult" && rendered.length > MAX_RECENT_TURN_TEXT_CHARS
+          ? "[Tool result omitted for budget; consult original result before relying on it.]"
           : rendered;
       return `- ${roleLabel}: ${trimmed}`;
     })
@@ -652,7 +652,6 @@ function auditSummaryQuality(params: {
  * Limited to 2000 chars to avoid bloating the summary.
  */
 async function readWorkspaceContextForSummary(): Promise<string> {
-  const MAX_SUMMARY_CONTEXT_CHARS = 2000;
   const workspaceDir = process.cwd();
   const agentsPath = path.join(workspaceDir, "AGENTS.md");
 
@@ -685,10 +684,10 @@ async function readWorkspaceContextForSummary(): Promise<string> {
     }
 
     const combined = sections.join("\n\n");
-    const safeContent =
-      combined.length > MAX_SUMMARY_CONTEXT_CHARS
-        ? combined.slice(0, MAX_SUMMARY_CONTEXT_CHARS) + "\n...[truncated]..."
-        : combined;
+    // Critical rules are not display previews: clipping the tail can remove
+    // a prohibition or exception. Let the existing compaction failure boundary
+    // retain history if the summarizer cannot accept the complete rules.
+    const safeContent = combined;
 
     return `\n\n<workspace-critical-rules>\n${safeContent}\n</workspace-critical-rules>`;
   } catch {
@@ -814,12 +813,19 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
                   summarizationInstructions,
                   previousSummary: preparation.previousSummary,
                 });
+                if (!droppedSummary.trim()) {
+                  log.warn(
+                    "Compaction safeguard: empty dropped-history summary; preserving original history.",
+                  );
+                  return { cancel: true };
+                }
               } catch (droppedError) {
                 log.warn(
-                  `Compaction safeguard: failed to summarize dropped messages, continuing without: ${
+                  `Compaction safeguard: failed to summarize dropped messages; preserving original history: ${
                     droppedError instanceof Error ? droppedError.message : String(droppedError)
                   }`,
                 );
+                return { cancel: true };
               }
             }
           }
@@ -914,8 +920,7 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
                   attemptError instanceof Error ? attemptError.message : String(attemptError)
                 }`,
             );
-            summary = lastSuccessfulSummary;
-            break;
+            return { cancel: true };
           }
           throw attemptError;
         }
@@ -935,8 +940,14 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
           identifierPolicy,
         });
         summary = summaryWithPreservedTurns;
-        if (quality.ok || attempt >= totalAttempts - 1) {
+        if (quality.ok) {
           break;
+        }
+        if (attempt >= totalAttempts - 1) {
+          log.warn(
+            "Compaction safeguard: summary quality checks failed; preserving original history.",
+          );
+          return { cancel: true };
         }
         const reasons = quality.reasons.join(", ");
         const qualityFeedbackInstruction =
@@ -952,6 +963,19 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
           : `${structuredInstructions}\n\n${qualityFeedbackInstruction}`;
       }
 
+      // Do not let a generated summary replace the user's actual conditions.
+      // Keep original user statements as historical data (not new instructions).
+      const originalUserStatements = [...preparation.messagesToSummarize, ...turnPrefixMessages]
+        .filter((message) => message.role === "user")
+        .map(extractMessageText)
+        .filter((text) => Boolean(text) && !summary.includes(text));
+      if (originalUserStatements.length > 0) {
+        summary = appendSummarySection(
+          summary,
+          "## Original user statements (historical data; preserve chronology and later revisions)\n" +
+            JSON.stringify(originalUserStatements),
+        );
+      }
       summary = appendSummarySection(summary, toolFailureSection);
       summary = appendSummarySection(summary, fileOpsSummary);
 
@@ -961,6 +985,17 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
         summary = appendSummarySection(summary, workspaceContext);
       }
 
+      if (
+        estimateMessagesTokens([{ role: "user", content: summary, timestamp: 0 }]) +
+          reserveTokens +
+          SUMMARIZATION_OVERHEAD_TOKENS >
+        contextWindowTokens
+      ) {
+        log.warn(
+          "Compaction safeguard: lossless user statements exceed budget; preserving original history.",
+        );
+        return { cancel: true };
+      }
       return {
         compaction: {
           summary,

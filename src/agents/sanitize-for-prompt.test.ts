@@ -83,7 +83,8 @@ describe("wrapUntrustedPromptDataBlock", () => {
       text: "abcdef",
       maxChars: 4,
     });
-    expect(block).toContain("\nabcd\n");
+    expect(block).toContain("Content omitted: exceeds context budget");
+    expect(block).not.toContain("\nabcd\n");
     expect(block).not.toContain("\nabcdef\n");
   });
 });
