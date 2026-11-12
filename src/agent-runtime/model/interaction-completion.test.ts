@@ -350,3 +350,16 @@ it("disables thinking only for the known DeepSeek machine-protocol adapter", asy
   });
   expect(payload.thinking.type).toBe("enabled");
 });
+
+it("scopes visible-reply guidance to the private reply text rather than the wire envelope", () => {
+  const ctx = buildInteractionCompletionContext(
+    {
+      message: "只回答是否收到回信",
+      context: [{ role: "system", content: "User bubbles must not contain JSON." }],
+    },
+    model,
+  );
+  expect(ctx.systemPrompt).toContain("PRIVATE HOST PROTOCOL");
+  expect(ctx.systemPrompt).toContain("applies to the text field, NOT to the private JSON envelope");
+  expect(ctx.tools).toEqual([]);
+});
