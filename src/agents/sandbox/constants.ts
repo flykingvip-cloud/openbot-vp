@@ -74,6 +74,9 @@ export const DEFAULT_TOOL_ALLOW = [
   "sessions_list",
   "sessions_history",
   "sessions_send",
+  // Host-owned internal messaging; same-owner/tenant checks remain in the tool.
+  // This is not filesystem access or permission to address arbitrary sessions.
+  "conversation_send",
   "sessions_spawn",
   "subagents",
   "session_status",
