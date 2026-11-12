@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { projectAssistantReplyForDisplay } from "./assistant-runtime-display.js";
 
 describe("assistant runtime display", () => {
+  it("projects the actual private-message routing failure without exposing RPC parameters", () => {
+    const text = projectAssistantReplyForDisplay(
+      "sessions_send：Either sessionKey or label is required；Session not visible from this sandboxed agent session。请提供sessionKey。",
+    );
+    expect(text).not.toMatch(/sessions_send|sessionKey|sandboxed/);
+    expect(text).toContain("尚未确定");
+    expect(text).toContain("无权访问");
+    expect(
+      projectAssistantReplyForDisplay(
+        "高密度分析（agentId=bot--agent）的agent:bot--agent:main尚未就绪",
+      ),
+    ).toBe("高密度分析的会话尚未就绪");
+  });
   it("projects the observed legacy receipt without its task id or boolean matrix", () => {
     const text =
       "任务草案已写入。 （d2t-abc；任务已建立=是；工作项已发布=否；责任已接受=否；计划已提出=否；计划已确认=否）";

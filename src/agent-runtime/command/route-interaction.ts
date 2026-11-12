@@ -11,7 +11,11 @@ import {
   type ExecutionAdmissionResult,
 } from "./execution-admission.js";
 import { formatRestrictedInteractionNotice } from "./interaction-sources.js";
-import { interpretInteraction, type InteractionInferencePort } from "./interpret-interaction.js";
+import {
+  interpretInteraction,
+  InteractionDecisionValidationError,
+  type InteractionInferencePort,
+} from "./interpret-interaction.js";
 
 const interactionLog = createSubsystemLogger("agent-runtime/interaction");
 
@@ -36,7 +40,18 @@ export async function routeInteraction(
   captured: Omit<ExecutionAdmissionInput, "proposal" | "abortSignal">,
   ports: { inference: InteractionInferencePort; admission: ExecutionAdmissionPorts },
 ): Promise<RoutedInteraction> {
-  const decision = await interpretInteraction(input, ports.inference);
+  let decision: InteractionModelDecision;
+  try {
+    decision = await interpretInteraction(input, ports.inference);
+  } catch (error) {
+    if (error instanceof InteractionDecisionValidationError) {
+      interactionLog.warn("interaction decision rejected", {
+        validation: error.message,
+        shape: error.shape,
+      });
+    }
+    throw error;
+  }
   if (
     input.availability?.mode === "restricted" &&
     decision.kind !== "reply" &&
@@ -89,6 +104,9 @@ export function interactionAdmissionFact(routed: RoutedInteraction): {
 } {
   if (routed.kind === "execution_admission" && routed.result.kind === "accepted") {
     return { admitted: true, taskId: routed.result.binding.taskId };
+  }
+  if (routed.kind === "execution_admission" && routed.result.kind === "accepted_turn") {
+    return { admitted: true };
   }
   if (routed.kind === "respond" && routed.protocolDowngrade) {
     return { admitted: false, protocolDowngrade: routed.protocolDowngrade };

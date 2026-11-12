@@ -11,6 +11,42 @@ export type InteractionInferencePort = {
   infer: (input: InteractionModelInput) => Promise<unknown>;
 };
 
+/** Diagnostics contain schema facts only, never model text, targets or arbitrary keys. */
+export class InteractionDecisionValidationError extends Error {
+  readonly shape: Record<string, unknown>;
+  constructor(message: string, value: unknown) {
+    super(message);
+    const row =
+      value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {};
+    const known = [
+      "kind",
+      "text",
+      "target",
+      "mode",
+      "action",
+      "answer",
+      "request",
+      "goal",
+      "acceptance",
+    ];
+    const kinds = ["reply", "clarify", "execution_request", "task_change", "task_control"];
+    const type = (v: unknown) => (v === null ? "null" : Array.isArray(v) ? "array" : typeof v);
+    this.shape = {
+      valueType: type(value),
+      kind: kinds.includes(String(row.kind)) ? row.kind : "unsupported",
+      fields: Object.fromEntries(
+        known.filter((k) => Object.hasOwn(row, k)).map((k) => [k, type(row[k])]),
+      ),
+      unknownFieldCount: Object.keys(row).filter((k) => !known.includes(k)).length,
+      mode: ["supplement", "revise", "replace_all"].includes(String(row.mode))
+        ? row.mode
+        : type(row.mode),
+    };
+  }
+}
+
 function parseDecision(value: unknown): InteractionModelDecision {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Invalid interaction decision");
@@ -90,8 +126,12 @@ function parseDecision(value: unknown): InteractionModelDecision {
       const item = request as Record<string, unknown>;
       if (
         Object.keys(item).every(
-          (key) => key === "goal" || key === "acceptance" || key === "checks",
+          (key) =>
+            key === "goal" || key === "acceptance" || key === "checks" || key === "lifecycle",
         ) &&
+        (item.lifecycle === undefined ||
+          item.lifecycle === "turn" ||
+          item.lifecycle === "long_task") &&
         typeof item.goal === "string" &&
         item.goal.trim() &&
         Array.isArray(item.acceptance) &&
@@ -107,6 +147,7 @@ function parseDecision(value: unknown): InteractionModelDecision {
           request: {
             goal: item.goal,
             acceptance: [...item.acceptance] as string[],
+            ...(item.lifecycle !== undefined ? { lifecycle: item.lifecycle } : {}),
             ...(item.checks !== undefined ? { checks: parsedChecks.checks } : {}),
           },
         };
@@ -124,7 +165,15 @@ export async function interpretInteraction(
   input.abortSignal?.throwIfAborted();
   const proposal = await port.infer(input);
   input.abortSignal?.throwIfAborted();
-  const decision = parseDecision(proposal);
+  let decision: InteractionModelDecision;
+  try {
+    decision = parseDecision(proposal);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.startsWith("Invalid interaction")) {
+      throw error;
+    }
+    throw new InteractionDecisionValidationError(error.message, proposal);
+  }
   if (decision.kind === "task_change" || decision.kind === "task_control") {
     if (!input.taskTarget) {
       return { kind: "clarify", text: UNBOUND_TASK_TARGET_CLARIFY };

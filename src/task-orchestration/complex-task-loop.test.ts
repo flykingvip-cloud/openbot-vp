@@ -52,6 +52,7 @@ function admitFixture(sessionFile: string) {
   seedSessionTaskBoard(sessionFile, emptySessionTaskBoard());
   const board = readSessionTaskBoard(sessionFile);
   const result = sessionTaskState.admitExecution({
+    lifecycle: "long_task",
     sessionFile,
     requestId: "complex-loop-fixture",
     goal: "请分步骤做竞品分析",

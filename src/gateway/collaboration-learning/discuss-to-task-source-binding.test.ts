@@ -14,6 +14,19 @@ afterEach(() => {
 });
 
 describe("discuss-to-task-source-binding (R3 non-overwrite)", () => {
+  it("does not upgrade a current-turn source to long-task scope", () => {
+    const source = {
+      sourceMessageId: "small-turn",
+      tenantId: "t1",
+      groupId: "g1",
+      principalActor: "human:a",
+    };
+    expect(registerDiscussToTaskSourceBinding({ ...source, lifecycle: "turn" }).ok).toBe(true);
+    expect(registerDiscussToTaskSourceBinding({ ...source, lifecycle: "long_task" }).ok).toBe(
+      false,
+    );
+    expect(peekDiscussToTaskSourceBinding(source)?.lifecycle).toBe("turn");
+  });
   it("rejects unbound (forged) sourceMessageId", () => {
     const r = assertDiscussToTaskSourceBinding({
       sourceMessageId: "forged-msg",

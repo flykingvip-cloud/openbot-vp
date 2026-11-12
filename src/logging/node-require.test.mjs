@@ -18,26 +18,26 @@ function evaluateResolver(sandbox) {
   return sandbox.__resolved;
 }
 
-test("Node process.getBuiltinModule returns a working require", () => {
+void test("Node process.getBuiltinModule returns a working require", () => {
   const require = resolveNodeRequireFromMeta(import.meta.url);
   assert.equal(typeof require, "function");
   const fs = require("node:fs");
   assert.equal(typeof fs.readFileSync, "function");
 });
 
-test("browser realm without process returns null and does not throw", () => {
+void test("browser realm without process returns null and does not throw", () => {
   const resolved = evaluateResolver({});
   assert.equal(resolved, null);
 });
 
-test("missing getBuiltinModule returns null", () => {
+void test("missing getBuiltinModule returns null", () => {
   const resolved = evaluateResolver({
     process: {},
   });
   assert.equal(resolved, null);
 });
 
-test("getBuiltinModule throwing returns null", () => {
+void test("getBuiltinModule throwing returns null", () => {
   const resolved = evaluateResolver({
     process: {
       getBuiltinModule() {
@@ -48,7 +48,7 @@ test("getBuiltinModule throwing returns null", () => {
   assert.equal(resolved, null);
 });
 
-test("module namespace without createRequire returns null", () => {
+void test("module namespace without createRequire returns null", () => {
   const resolved = evaluateResolver({
     process: {
       getBuiltinModule() {
@@ -59,7 +59,7 @@ test("module namespace without createRequire returns null", () => {
   assert.equal(resolved, null);
 });
 
-test("source uses globalThis.process?.getBuiltinModule and has no bare read", () => {
+void test("source uses globalThis.process?.getBuiltinModule and has no bare read", () => {
   assert.match(
     source,
     /globalThis\.process\?\.getBuiltinModule|globalThis\.process as[\s\S]*\?\.getBuiltinModule/,

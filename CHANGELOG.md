@@ -315,6 +315,8 @@ Docs: https://docs.openbot.love
 - Employee/chat: a broken protocol decision is shown as “这一轮没能形成可执行的决定，没有开始任务。” The raw `SyntaxError` stays in the log. Plain text that sounds like work has started is recorded as a prose downgrade and does not count as task admission. A missing trusted tenant or an identity mismatch refuses transcript creation with that reason, without a model-switch error.
 - Employee/chat: a request to make or deliver a named file (for example 制作…文件名为 `onboarding-checklist.md`) is admitted as execution work even when the model answers in prose. An aborted run or an empty final leaves a visible failure message in the transcript, so a reconnect is not a blank turn. After a gateway restart, a personal workbench session restores its employee actor before chat history and the workspace locator; if that restore cannot finish, the session fails closed and asks the user to sign in again.
 
+- Runtime/chat: keep ordinary tool actions out of persistent task boards and reuse the controlled executor; only planned long tasks create durable goals. Group actions no longer inherit unrelated old delivery steps or task wakes, and shared group sessions preserve the actual member's sandbox workspace. DeepSeek interaction decisions and provider failures retain their governed lifecycle without replaying failed historical requests or exposing raw errors. (#280) Thanks @flykingvip-cloud.
+
 ## 2026.3.8
 
 ### Changes

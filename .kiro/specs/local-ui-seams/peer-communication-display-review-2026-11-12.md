@@ -97,3 +97,58 @@
 本轮完成可核实的源码修复和定向验证，客户经理跨主人权限、并发回信严格关联以及真实模型私信闭环仍需明确验收；不通过改归属或隐藏阻塞伪造“链路畅通”。
 
 — codex-runtime-manager
+
+## 6. 后续真实查询收尾（2026-11-12）
+
+最终行为候选：`7d04bb22a7b79380a4f4571efc3682baa226b648`。本节与前述历史候选分开；不将后续测试倒算给旧 SHA。
+
+- 实测来源明确在 `readDecision` 的空正文分支，不是新增字段校验。DeepSeek JSON 模式下返回 94 个空白字符、51 个输出 token，输出预算2048；可排除该次预算耗尽。关闭思考后仍有空白；仅补私有信封提示的连续查询2/3通过，因此两者都没有当作终验通过。
+- 最终在共享模型适配中，对已识别的DeepSeek兼容调用采用唯一原生输出函数 `emit_interaction_decision` 序列化既有决定。此名称无执行handler、无权限、无调度。只有一个同名输出才可读取；拒绝普通工具、重复输出及混合正文；仍经原parseDecision与execution admission。其他供应商保持原路径；没有额外模型循环。
+- 原生输出旧代码反证：当前测试放到改动前父版本，3项失败／21项通过；当前代码4文件／61项通过，含未授权执行提议不提交任务。类型感知oxlint与构建通过。全仓tsgo仍为范围外既有错误，改动文件无报错，不称全仓通过。
+- 本地已加载最终候选，真实DeepSeek模型连续三次查询276G（含此前失败措辞）全部正常回复。会话记录中零业务toolCall；任务板SHA256与测试前完全一致；没有重新发送276G或旧D/F。此处协议输出不是业务工具调用，也未写入执行transcript充作动作。
+- 证据：`/tmp/openbot-real-main276-evidence/native-query-results.json`、`native-query-three-pass.png`；回归`/tmp/openbot-native-output-final-tests.log`；旧版本红例`/tmp/openbot-native-output-before.log`；构建`/tmp/openbot-native-output-candidate-build.log`。
+- 官方依据：[DeepSeek JSON Output](https://api-docs.deepseek.com/guides/json_mode/)说明非JSON可能被替换为空格；[Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)说明非思考模式支持命名函数强制输出。模型返回仍是不可信提议，不能用输出schema替代权限检查。
+
+本节仅关闭“276G既有记录的只读查询反复空白拒绝”这组已复现用例。历史作用域、并发回信严格关联、会话文件解析、协作终局、PPT视觉与下载、真实异步等待等其他开放项不借此关闭。本轮未推送、未云部署；共享登记册仍未提交。
+
+— codex-runtime-manager
+
+## 7. 模型恢复后真实复测与历史引用边界
+
+受测源码与本地 Gateway：`a9cbeec4b2e45d669400412f97186b8af83c5fff`；主干 `4a786626a1e2892043f57b3832ddf2a407be284a` 为祖先。模型为真实 `deepseek-v4-flash`。以下证据不倒算给 Package6 或本报告早期候选。
+
+- 恢复后旧候选 `85af989e6` 的 S276L 回答同时包含未答历史请求 S276K，证实仅靠系统提示仍会串答。当前修复把交互的历史 user-role 内容序列化为带 `reference_context` 标记的引用数据，当前消息保持原文与最后位置。保留角色、历史内容、追问解析及原始 transcript；不删除历史、不增加模型调用、不改变准入或权限。
+- 回归先红：历史请求仍是裸用户指令，`not.toBe(previous)` 失败（24通过／1失败）。修复后交互模型、解释、历史投影、失败终局4文件／53项通过；类型感知oxlint与完整构建通过。构建时依赖缓存权限问题另行重跑后通过，不混成源码失败。证据日志：`/tmp/openbot-reference-context-{red,green,build}.log`。
+- S276M：只回复“S276M已就绪”，没有补答历史K/L。S276N：当前任务仅一次 `conversation_send`，收件人为同主人高密度分析，正文仅S276N；收件方当前会话持久化来信与“已收到S276N”；工具真实回执 `delivered=true`，发送方分别报告发出与回信。未向外部渠道发送。
+- S276O：根据已有S276N记录只读回答。新增transcript仅user与assistant两条，无业务工具调用；任务板SHA256前后一致。证据：`/tmp/openbot-real-main276-evidence/S276O-query-result.json`、`S276N-private-and-query-pass.png`。
+- 仍开放：S276N已送达并收到回信，但个人任务板仍 `unfinished=true`。`delivery/acceptance/criteria.ts` 的现有检查主要是成果文件精确字节；无检查时返回 `validator_unavailable/pending`。本轮没有用模型成功声明、聊天正文或工具名称直接关板。通讯事实通过不等于任务验收结算已闭环；并发回信严格run关联也未借本轮关闭。
+
+## 8. S276P 原生PPT生成、下载与预览分项结果
+
+同一受测源码 `a9cbeec4b`，通过前端真实提交独立3页PPT任务。模型生成文件后，实际点击成果卡与下载链接取得 `S276P-quarterly-review.pptx`：89847字节，SHA256 `7c51851e71344a545fdbb4126f3071e6766c995d5a52827fb59dc4fbc21aa672`。ZIP CRC检查通过，3个slide XML；第2页包含一个原生 `a:tbl`，数据100/70/30、120/78/42、150/90/60，合计370/238/132，均与任务一致。
+
+现有 `openbot-pptx-renderer:1` 在断网、只读、限资源容器中对实际下载文件渲染成功，输出3页PNG。已查看第2页，表格排版与数值清晰；这证明下载文件可被实际Office渲染器解析，不等同于已在PowerPoint应用中验收。
+
+**前端实物预览仍失败**：侧栏iframe存在但画面空白；下载链接可用。浏览器无采集到的错误，iframe为blob来源且保持原sandbox。不得将独立容器渲染成功称为侧栏已通过，也未为了显示而放宽sandbox。后续应继续核准服务端预览响应至iframe加载的字节、类型与生命周期。证据：`S276P-preview.png`、`S276P-isolated-render.html`、`S276P-page-{1,2,3}.png`（均在上述临时证据目录）。
+
+本轮未完成协作真实终局、长程异步、PPT修改后版本一致性或外部渠道终验；未推送、未云部署。共享 `.loom/registry.yaml` WIP保持独立。
+
+— codex-runtime-manager
+
+## 9. 小任务与长程任务准入责任纠正
+
+用户明确：普通对话直接回答，常规小任务直接执行；只有交互理解和编排已识别为长程任务才启用看板。受测源码／本地Gateway为 `bafcd49dcef791180f6814257fb33771fb823e34`。
+
+根因跨越三个现役节点：`command/execution-admission.ts` 所有执行提议均交任务写入；`state/mutations/admit-task.ts` 默认插入新焦点并挂起旧任务；聊天宿主与 `runAdmittedTurn` 将已准入等同于必须有任务绑定。S276N 因而并非优先补通讯验收，而应修正不必要的持久任务责任。
+
+现有同一 `execution_request` 契约增加 `lifecycle=turn|long_task`，默认turn。交互模型在一次语义理解中提出生命周期；仍经宿主授权、存储版本核准和原受控执行生命周期。turn准入不写看板、不捕获旧任务绑定、不替换旧焦点、不注册看板续醒；保留独立的当前回合准入身份与控制快照，启动前重验。long_task才使用原看板、任务绑定、恢复和验收。模型／工具循环、租约、预算、回退、计费、取消、清理仍复用；内部用量／运行回执不是用户待办看板，不在本轮删除。
+
+先红证据：默认小任务与已有长任务旁的小动作均被写成accepted任务（2失败／2通过）。修复后10文件／135项通过；补验3文件／23项通过（有重叠，不累加），包括显式长程、授权拒绝、损坏存储、控制快照失效、原暂停／恢复与小任务不续醒。类型感知oxlint通过；全仓tsgo仍有范围外扩展依赖／exec-protocol错误，无改动文件错误；构建通过。日志：`/tmp/openbot-turn-{admission-red,scope-regression,scope-final-extra,scope-lint,scope-tsgo-final,scope-build}.log`（按实际文件命名查看）。
+
+真实DeepSeek S276Q：市场助手使用一次conversation_send发送本轮原文，高密度分析当前会话收到并回复“已收到S276Q”，工具回执delivered=true，最终回复如实区分送达与回信。发送与接收两个会话的任务板SHA256均与测试前一致，没有创建、替换、完成旧看板。证据：`/tmp/openbot-real-main276-evidence/S276Q-result.json`及`S276Q-no-task-board.png`。本次样本显式要求一次通讯且不持续跟踪，不能外推所有隐含复杂意图的分类精度。
+
+范围边界：协作仍由正式工作项／认领／私有计划／Wake／审查控制组责任，成员调用共用执行后端；尚未把这次个体交互lifecycle分类接到协作入口。不能宣称两种场景的生命周期分类已经统一。长程不是第二执行器，也不是仅按耗时、文件格式、工具调用或有没有文件区分。
+
+未推送、未云部署；此前S276N等测试旧看板不因本次修复自动删除或伪造完成。PPT预览用户随后确认可正常打开，此前空白作为一次观测保留，不能继续认定为持续故障。
+
+— codex-runtime-manager

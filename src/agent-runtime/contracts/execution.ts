@@ -22,5 +22,16 @@ export type ExecutionAdmissionInput = {
 };
 export type ExecutionAdmissionResult =
   | { kind: "accepted"; binding: TaskCompletionBinding; acceptance: readonly string[] }
+  | { kind: "accepted_turn"; admission: TurnExecutionAdmission }
   | { kind: "duplicate"; binding: TaskCompletionBinding }
   | { kind: "rejected"; reason: string };
+
+/** Host-authorized current-turn scope, not a task, recovery ticket or tool permission. */
+export type TurnExecutionAdmission = {
+  requestId: string;
+  sessionFile: string;
+  goal: string;
+  acceptance: readonly string[];
+  focusRevision: number;
+  writeEpoch: number;
+};

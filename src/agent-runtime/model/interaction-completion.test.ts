@@ -36,6 +36,26 @@ it("forwards sanitized images only to vision candidates and discloses unseen pix
 beforeEach(() => {
   mocks.complete.mockReset();
 });
+it("quotes unanswered historical requests as reference data without changing the current request", () => {
+  const previous = "只回复“OLD”；也可以给同事发信息";
+  const input = {
+    message: "只回复“CURRENT”",
+    context: [{ role: "user" as const, content: previous }],
+  };
+  const ctx = buildInteractionCompletionContext(input, model);
+  expect(ctx.messages[0]?.content).not.toBe(previous);
+  expect(JSON.parse(ctx.messages[0]?.content as string)).toEqual({
+    source: "reference_context",
+    content: previous,
+  });
+  expect(ctx.messages.at(-1)?.content).toBe(input.message);
+  expect(ctx.systemPrompt).toContain("reference_context");
+  // Short follow-ups must still be able to resolve the quoted recipient/request.
+  const followup = buildInteractionCompletionContext({ ...input, message: "发私信" }, model);
+  expect(followup.messages[0]?.content).toBe(ctx.messages[0]?.content);
+  expect(followup.messages.at(-1)?.content).toBe("发私信");
+  expect(input.context[0].content).toBe(previous);
+});
 it("recognizes individual colleagues as context without enabling tools or granting send authority", () => {
   const context = buildInteractionCompletionContext(
     {
@@ -91,7 +111,7 @@ it("preserves conversation roles and refuses to reorder late system content", ()
     ),
   ).toThrow(/precede/);
 });
-it.each(["toolUse", "length", "error", "aborted"])(
+it.each(["toolUse", "length", "aborted"])(
   "does not accept a non-final %s response",
   async (stopReason) => {
     mocks.complete.mockResolvedValue({
@@ -327,4 +347,116 @@ it("rejects a blank final completion rather than producing an empty reply", asyn
   });
   const result = await invokeInteractionCompletion(request);
   expect(() => result.readDecision()).toThrow();
+});
+
+it("disables thinking only for the known DeepSeek machine-protocol adapter", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "text", text: '{"kind":"reply","text":"yes"}' }],
+    stopReason: "stop",
+    usage: makeZeroUsageSnapshot(),
+  });
+  await invokeInteractionCompletion({
+    ...request,
+    model: { ...model, id: "deepseek-v4-flash", provider: "api-proxy-deepseek" },
+  });
+  const options = mocks.complete.mock.calls[0][2] as {
+    onPayload: (payload: unknown) => Record<string, unknown>;
+  };
+  const payload = { thinking: { type: "enabled" }, max_tokens: 200 };
+  expect(options.onPayload(payload)).toMatchObject({
+    thinking: { type: "disabled" },
+    tool_choice: { type: "function", function: { name: "emit_interaction_decision" } },
+    max_tokens: 200,
+  });
+  expect(payload.thinking.type).toBe("enabled");
+  const nativePayload = options.onPayload({ ...payload, response_format: { type: "json_object" } });
+  expect(nativePayload).not.toHaveProperty("response_format");
+  expect(nativePayload.tools as unknown[]).toHaveLength(1);
+});
+
+it("scopes visible-reply guidance to the private reply text rather than the wire envelope", () => {
+  const ctx = buildInteractionCompletionContext(
+    {
+      message: "只回答是否收到回信",
+      context: [{ role: "system", content: "User bubbles must not contain JSON." }],
+    },
+    model,
+  );
+  expect(ctx.systemPrompt).toContain("PRIVATE HOST PROTOCOL");
+  expect(ctx.systemPrompt).toContain("applies to the text field, NOT to the private JSON envelope");
+  expect(ctx.tools).toEqual([]);
+});
+
+it("reads only one native decision output and never executes an arbitrary tool", async () => {
+  const native = {
+    ...request,
+    model: { ...model, id: "deepseek-v4-flash", provider: "api-proxy-deepseek" },
+  };
+  const decision = { kind: "reply", text: "已收到276G" };
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "toolCall", name: "emit_interaction_decision", arguments: decision }],
+    stopReason: "toolUse",
+    usage: makeZeroUsageSnapshot(),
+  });
+  expect((await invokeInteractionCompletion(native)).readDecision()).toEqual(decision);
+  expect(mocks.complete).toHaveBeenCalledOnce();
+  for (const content of [
+    [{ type: "toolCall", name: "exec", arguments: { command: "unsafe" } }],
+    [
+      { type: "toolCall", name: "emit_interaction_decision", arguments: decision },
+      { type: "toolCall", name: "emit_interaction_decision", arguments: decision },
+    ],
+    [{ type: "text", text: "done" }],
+  ]) {
+    mocks.complete.mockResolvedValue({
+      content,
+      stopReason: "toolUse",
+      usage: makeZeroUsageSnapshot(),
+    });
+    const completion = await invokeInteractionCompletion(native);
+    expect(() => completion.readDecision()).toThrow(/final decision/);
+  }
+});
+
+it("keeps native execution proposals behind the same authorization gate", async () => {
+  const native = {
+    ...request,
+    model: { ...model, id: "deepseek-v4-flash", provider: "api-proxy-deepseek" },
+  };
+  const decision = {
+    kind: "execution_request",
+    request: { goal: "write report", acceptance: ["has sources"] },
+  };
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "toolCall", name: "emit_interaction_decision", arguments: decision }],
+    stopReason: "toolUse",
+    usage: makeZeroUsageSnapshot(),
+  });
+  const parsed = (await invokeInteractionCompletion(native)).readDecision();
+  const authorize = vi.fn(async () => false);
+  const commit = vi.fn();
+  const result = await routeInteraction(
+    { message: "write report", context: [] },
+    { requestId: "native", expectedFocusRevision: 0, expectedWriteEpoch: 0 },
+    { inference: { infer: async () => parsed }, admission: { authorize, commit } },
+  );
+  expect(result).toEqual({
+    kind: "execution_admission",
+    result: { kind: "rejected", reason: "unauthorized" },
+  });
+  expect(commit).not.toHaveBeenCalled();
+  expect(mocks.complete).toHaveBeenCalledOnce();
+});
+
+it("surfaces a provider error inside governed inference instead of returning a fake final decision", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [],
+    stopReason: "error",
+    errorMessage: "429 rate limit reached",
+    usage: makeZeroUsageSnapshot(),
+  });
+  await expect(invokeInteractionCompletion(request)).rejects.toMatchObject({
+    name: "FailoverError",
+    reason: "rate_limit",
+  });
 });

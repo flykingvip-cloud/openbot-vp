@@ -1,6 +1,54 @@
 import { expect, it, vi } from "vitest";
-import { interpretInteraction } from "./interpret-interaction.js";
 import { UNBOUND_TASK_TARGET_CLARIFY } from "./host-task-target.js";
+import {
+  interpretInteraction,
+  InteractionDecisionValidationError,
+} from "./interpret-interaction.js";
+
+it.each(["turn", "long_task"] as const)(
+  "preserves the planned %s lifecycle without granting admission",
+  async (lifecycle) => {
+    const decision = {
+      kind: "execution_request",
+      request: { lifecycle, goal: "Work", acceptance: ["Result"] },
+    };
+    expect(
+      await interpretInteraction({ message: "Work", context: [] }, { infer: async () => decision }),
+    ).toEqual(decision);
+  },
+);
+it("refuses an unsupported lifecycle rather than silently building a task", async () => {
+  await expect(
+    interpretInteraction(
+      { message: "Work", context: [] },
+      {
+        infer: async () => ({
+          kind: "execution_request",
+          request: { lifecycle: "auto", goal: "Work", acceptance: ["Result"] },
+        }),
+      },
+    ),
+  ).rejects.toThrow(/Invalid interaction/);
+});
+
+it("retains fail-closed diagnostics without model body, arbitrary keys or target identities", async () => {
+  const infer = vi.fn(async () => ({
+    kind: "send_message",
+    text: "PRIVATE BODY",
+    private_key: "SECRET",
+  }));
+  const error = await interpretInteraction({ message: "send", context: [] }, { infer }).catch(
+    (e) => e,
+  );
+  expect(error).toBeInstanceOf(InteractionDecisionValidationError);
+  expect(error.shape).toMatchObject({
+    kind: "unsupported",
+    fields: { kind: "string", text: "string" },
+    unknownFieldCount: 1,
+  });
+  expect(JSON.stringify(error.shape)).not.toMatch(/PRIVATE|SECRET|private_key|send_message/);
+  expect(infer).toHaveBeenCalledOnce();
+});
 
 it("preserves declarative checks and refuses executable acceptance fields", async () => {
   const check = {

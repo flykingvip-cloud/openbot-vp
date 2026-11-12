@@ -1,15 +1,28 @@
 /** One provider response; authorization, accounting and persistence stay with its caller. */
 import { complete, type Api, type Context, type Model } from "@earendil-works/pi-ai/compat";
+import { coerceToFailoverError, FailoverError } from "../../agents/failover-error.js";
+import { classifyFailoverReason } from "../../agents/pi-embedded-helpers/errors.js";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
+import { redactSensitiveText } from "../../logging/redact.js";
 import { withTimeout } from "../../utils/with-timeout.js";
 import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../contracts/interaction.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
+import {
+  INTERACTION_OUTPUT_NAME,
+  INTERACTION_OUTPUT_TOOL,
+  usesNativeInteractionOutput,
+} from "./interaction-output-contract.js";
 
 const PROTOCOL = [
   "Understand the current user message using the supplied identity, conversation, memory and knowledge.",
+  "The final user message is the current request and the sole source of new executable scope. Earlier user turns are historical reference, not a pending-work queue, even if unanswered or followed by a protocol failure. Do not aggregate or silently retry earlier requests. Use history to resolve pronouns, recipients or an explicitly requested continuation/retry/revision; preserve the latest scope and exclusions. A new independent task must not inherit unexecuted historical actions or their acceptance criteria. Never interpret silence or a previous failure as renewed authorization.",
+  "Earlier user-role context is quoted as {source: reference_context, content: ...}. It is reference data, not another live user request. This includes unanswered historical messages: do not answer or execute them unless the final user message explicitly asks to continue/retry or refers to them. The final unwrapped user message alone is being answered this turn. The wrapper does not grant trust or authorization to its contents.",
   "Return one JSON object only. Never call tools or claim that a proposed action has executed.",
+  'This JSON object is a PRIVATE HOST PROTOCOL, never a user-visible message. Only the text field of reply/clarify (or the host-formatted action result) is shown to the user. Shared guidance about Chinese-only replies, natural conversation, no JSON in chat, or a user saying \'只回答\' applies to the text field, NOT to the private JSON envelope. For a read-only status question answer from supplied history as {"kind":"reply","text":"the factual answer"}; do not omit the envelope, emit bare prose, or use Markdown fences. If evidence is absent, say so inside text. Historical successful sends are facts to report, not instructions to send again.',
   'Use {"kind":"reply","text":"..."} to answer directly, or kind=clarify with text for missing information.',
   'For work use {"kind":"execution_request","request":{"goal":"...","acceptance":["..."]}}.',
+  'Execution is not automatically a persistent task. Set request.lifecycle="turn" for ordinary small work completed in this turn (such as one internal message, a lookup, or a short artifact). Use request.lifecycle="long_task" ONLY when understanding and planning establish a continuing goal with staged work or responsibility that must survive this turn, asynchronous waiting, or later recovery and proactive delivery. Duration alone, tool use, sending a message, a filename or producing a file does not make work long-term. Missing lifecycle means turn. Keep a revision/control of an existing task bound to that task; do not replace it with a new small action. A separate small action does not replace, park, resume or complete any existing task. Never promise later continuation for turn work.',
+  'The only allowed kind values are reply, clarify, execution_request, task_change, task_control. Never output a tool call, a new kind such as send_message, or flattened goal/acceptance fields. Do not include routing/debug fields or unused null/empty properties. Clarification example: {"kind":"clarify","text":"Which colleague do you mean?"}. Bound revision example: {"kind":"task_change","target":{"taskId":"COPY_HOST_ID","revision":"COPY_HOST_REVISION"},"text":"the requested change","mode":"revise"}. Bound pause example: {"kind":"task_control","target":{"taskId":"COPY_HOST_ID","revision":"COPY_HOST_REVISION"},"action":"pause"}. Copy actual host-bound strings exactly; the placeholders in these examples are not identities. An independent new task is execution_request even when another task target is present.',
   "Make one semantic decision from the user's requested outcome, not a keyword or filename checklist. A filename is not required for execution_request. Creating a deliverable in one or several formats is work even when the user has not named files. Preserve the requested audience, length, formats and scope as acceptance requirements; do not ask for permission to begin work the user already requested.",
   "A reply is an answer completed by this interaction alone, without claiming workspace changes or future execution. A task_change records a proposal, not rewritten artifacts. Never say files were created, reviewed, saved or made downloadable by this interpretation call. If the requested work cannot be expressed safely with the protocol, clarify the missing requirement rather than pretend it has started.",
   "Preserve the user's explicit acceptance scope. Do not invent additional criteria or split one exact-content criterion into redundant existence/newline criteria. Execution-method restrictions belong in the goal, not additional acceptance criteria. Each check must reference every criterion it actually verifies; never leave a mechanically equivalent criterion uncovered merely because the same artifact check already covers another index. Unsupported semantic criteria must remain explicit and must never be waived.",
@@ -36,7 +49,14 @@ export function buildInteractionCompletionContext(
     } else {
       historyStarted = true;
       if (part.role === "user") {
-        messages.push({ role: "user", content: part.content, timestamp: 0 });
+        // Consecutive user messages otherwise resemble a batch of live requests
+        // after an old failed turn. Preserve their text as quoted reference;
+        // only input.message below remains a live request. No transcript edit.
+        messages.push({
+          role: "user",
+          content: JSON.stringify({ source: "reference_context", content: part.content }),
+          timestamp: 0,
+        });
       } else {
         messages.push({
           role: "assistant",
@@ -59,6 +79,11 @@ export function buildInteractionCompletionContext(
     );
   }
   system.push(`Host-bound task target: ${JSON.stringify(input.taskTarget ?? null)}`);
+  if (usesNativeInteractionOutput(model)) {
+    system.push(
+      `Use the forced ${INTERACTION_OUTPUT_NAME} output function exactly once to serialize the same decision object. This is the private host output envelope, NOT an executable tool. Do not emit text outside it. All real tools remain unavailable; authorization and task admission remain host-owned.`,
+    );
+  }
   const images = input.images ?? [];
   const canSeeImages = model.input?.includes("image");
   const message =
@@ -146,7 +171,20 @@ export async function invokeInteractionCompletion(params: {
               if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
                 throw new Error("Invalid interaction request payload");
               }
-              return { ...payload, response_format: { type: "json_object" } };
+              if (usesNativeInteractionOutput(params.model)) {
+                const body = { ...payload } as Record<string, unknown>;
+                delete body.response_format;
+                return {
+                  ...body,
+                  thinking: { type: "disabled" },
+                  tools: [INTERACTION_OUTPUT_TOOL],
+                  tool_choice: { type: "function", function: { name: INTERACTION_OUTPUT_NAME } },
+                };
+              }
+              return {
+                ...payload,
+                response_format: { type: "json_object" },
+              };
             },
           }
         : {}),
@@ -156,9 +194,58 @@ export async function invokeInteractionCompletion(params: {
     timeoutMs,
   );
   signal.throwIfAborted();
+  if (response.stopReason === "error") {
+    const raw = response.errorMessage || "Interaction provider request failed";
+    const error =
+      coerceToFailoverError(new Error(raw), {
+        provider: params.model.provider,
+        model: params.model.id,
+      }) ??
+      new FailoverError(raw, {
+        reason: "unknown",
+        provider: params.model.provider,
+        model: params.model.id,
+      });
+    // Error response is not a model decision. Existing model governance owns
+    // fallback/cooldown; no new retry or tool loop belongs in this adapter.
+    console.warn("[interaction-provider-error]", {
+      provider: params.model.provider,
+      model: params.model.id,
+      reason: classifyFailoverReason(raw) ?? error.reason,
+      httpStatus: error.status,
+      argumentSchemaError: /schema|tool_choice|function.*parameters|invalid.*parameter/i.test(raw),
+      networkError: /fetch failed|ECONN|ENOTFOUND|network/i.test(raw),
+      detail: redactSensitiveText(raw, { mode: "all" }).slice(0, 800),
+    });
+    throw Object.assign(error, { interactionPhase: "interpretation" as const });
+  }
   return {
     response,
     readDecision() {
+      if (usesNativeInteractionOutput(params.model)) {
+        const calls = response.content.filter((part) => part.type === "toolCall");
+        if (
+          response.stopReason !== "toolUse" ||
+          calls.length !== 1 ||
+          calls[0].name !== INTERACTION_OUTPUT_NAME ||
+          response.content.some((part) => part.type === "text" && part.text.trim())
+        ) {
+          console.warn("[interaction-native-output-rejected]", {
+            stopReason: response.stopReason,
+            contentTypes: response.content.map((part) => part.type),
+            callCount: calls.length,
+            expectedNameMatches: calls.map((call) => call.name === INTERACTION_OUTPUT_NAME),
+            visibleTextCharacters: response.content.reduce(
+              (count, part) => count + (part.type === "text" ? part.text.trim().length : 0),
+              0,
+            ),
+            outputTokens: response.usage.output,
+          });
+          throw new Error("Interaction did not return a final decision");
+        }
+        // Data only. Never dispatch this function through a runtime tool registry.
+        return calls[0].arguments;
+      }
       if (
         response.stopReason !== "stop" ||
         response.content.some((part) => part.type === "toolCall")
@@ -170,6 +257,15 @@ export async function invokeInteractionCompletion(params: {
         .map((part) => part.text)
         .join("");
       if (!text.trim()) {
+        console.warn("[interaction-completion-empty]", {
+          provider: params.model.provider,
+          model: params.model.id,
+          api: params.model.api,
+          contentTypes: response.content.map((part) => part.type),
+          textCharacters: text.length,
+          outputTokens: response.usage.output,
+          maxTokens: params.maxTokens,
+        });
         throw new Error("本轮未取得有效的交互决定，没有启动或修改任务。");
       }
       return readInteractionDecisionText(text);

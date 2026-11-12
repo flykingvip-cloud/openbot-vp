@@ -33,6 +33,9 @@ export async function admitExecutionRequest(
   if (
     !input.requestId.trim() ||
     !input.proposal.goal.trim() ||
+    (input.proposal.lifecycle !== undefined &&
+      input.proposal.lifecycle !== "turn" &&
+      input.proposal.lifecycle !== "long_task") ||
     !input.proposal.acceptance.length ||
     input.proposal.acceptance.some((item) => !item.trim()) ||
     !Number.isSafeInteger(input.expectedFocusRevision) ||
@@ -57,6 +60,7 @@ export function bindExecutionAdmissionPorts(params: {
     sessionFile: string;
     requestId: string;
     goal: string;
+    lifecycle?: "turn" | "long_task";
     acceptance: readonly string[];
     checks?: readonly TaskAcceptanceCheck[];
     expectedFocusRevision: number;
@@ -79,6 +83,7 @@ export function bindExecutionAdmissionPorts(params: {
           sessionFile: params.sessionFile,
           requestId: request.requestId,
           goal: request.proposal.goal,
+          lifecycle: request.proposal.lifecycle ?? "turn",
           acceptance: request.proposal.acceptance,
           ...(request.proposal.checks !== undefined ? { checks: request.proposal.checks } : {}),
           expectedFocusRevision: request.expectedFocusRevision,

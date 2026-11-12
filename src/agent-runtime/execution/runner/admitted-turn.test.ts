@@ -152,6 +152,43 @@ it("rejects an admitted request without its task binding before any execution ef
   expect(mocks.invoke).not.toHaveBeenCalled();
 });
 
+it("executes authorized current-turn work through the same lifecycle without a task binding", async () => {
+  const { host, params } = setup();
+  params.followupRun.run.executionAdmitted = true;
+  params.followupRun.run.turnExecutionAdmission = {
+    requestId: "action",
+    sessionFile: params.followupRun.run.sessionFile,
+    goal: "Send once",
+    acceptance: ["Report receipt"],
+    focusRevision: 0,
+    writeEpoch: 0,
+  };
+  host.task.isTurnExecutionAdmissionCurrent = vi.fn(() => true);
+  host.task.isTaskExecutionBindingCurrent = vi.fn();
+  expect((await runAdmittedTurn(params, host)).kind).toBe("success");
+  expect(mocks.invoke).toHaveBeenCalledOnce();
+  expect(host.task.isTaskExecutionBindingCurrent).not.toHaveBeenCalled();
+  expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
+  expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();
+});
+
+it("rejects a current-turn admission invalidated before startup without running a candidate", async () => {
+  const { host, params } = setup();
+  params.followupRun.run.executionAdmitted = true;
+  params.followupRun.run.turnExecutionAdmission = {
+    requestId: "action",
+    sessionFile: params.followupRun.run.sessionFile,
+    goal: "Send once",
+    acceptance: ["Report receipt"],
+    focusRevision: 0,
+    writeEpoch: 0,
+  };
+  host.task.isTurnExecutionAdmissionCurrent = vi.fn(() => false);
+  await expect(runAdmittedTurn(params, host)).rejects.toThrow(/admission is stale/);
+  expect(mocks.invoke).not.toHaveBeenCalled();
+  expect(host.admission.tryAcquireEnterpriseAgentRun).not.toHaveBeenCalled();
+});
+
 it("chat lifecycle factory exposes the frozen controlled execution stage order", () => {
   const host = bindAdmittedTurnHost();
   const lifecycle = createExecutionLifecycle("chat-stage-order", host);

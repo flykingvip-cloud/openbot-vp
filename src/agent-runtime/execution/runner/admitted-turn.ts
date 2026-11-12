@@ -34,7 +34,16 @@ export async function runAdmittedTurn(
 ): Promise<AgentRunLoopResult> {
   const assertOriginalTaskCurrent = () => {
     const binding = params.followupRun.run.taskCompletionBinding;
-    if (params.followupRun.run.executionAdmitted && !binding) {
+    const turn = params.followupRun.run.turnExecutionAdmission;
+    if (
+      turn &&
+      (binding ||
+        !params.followupRun.run.executionAdmitted ||
+        !host.task.isTurnExecutionAdmissionCurrent(params.followupRun.run.sessionFile, turn))
+    ) {
+      throw new Error("Current-turn execution admission is stale or conflicts with a task binding");
+    }
+    if (params.followupRun.run.executionAdmitted && !binding && !turn) {
       throw new Error("Admitted execution request requires its original task binding");
     }
     if (

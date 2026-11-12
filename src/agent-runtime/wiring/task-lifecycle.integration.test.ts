@@ -21,7 +21,11 @@ it("keeps one task across revision, pause and resume while rejecting obsolete re
         requestId: "request-a",
         expectedFocusRevision: 0,
         expectedWriteEpoch: 0,
-        proposal: { goal: "Create report", acceptance: ["Verified sources"] },
+        proposal: {
+          lifecycle: "long_task" as const,
+          goal: "Create report",
+          acceptance: ["Verified sources"],
+        },
       },
       async () => true,
     );
@@ -106,7 +110,11 @@ it("preserves full constraints and rejects stale amendments and paused wake tick
         requestId: "long-request",
         expectedFocusRevision: 0,
         expectedWriteEpoch: 0,
-        proposal: { goal: "Create report", acceptance: ["Verified sources"] },
+        proposal: {
+          lifecycle: "long_task" as const,
+          goal: "Create report",
+          acceptance: ["Verified sources"],
+        },
       },
       async () => true,
     );

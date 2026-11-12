@@ -59,6 +59,7 @@ vi.mock("./agent-runner-memory.js", async (importOriginal) => {
   return { ...actual, runMemoryFlushIfNeeded: mocks.runMemoryFlushIfNeeded };
 });
 
+import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { runReplyAgent } from "./agent-runner.js";
 
 function buildParams(opts?: { runId?: string }): Parameters<typeof runReplyAgent>[0] {
@@ -173,6 +174,33 @@ describe("runReplyAgent outer runId (P3-2 rework)", () => {
     expect(flushCall().parentRunId).toBe("run-outer-1");
     expect(mocks.runEmbeddedPiAgent).toHaveBeenCalledTimes(1);
     expect(mocks.runEmbeddedPiAgent.mock.calls[0]?.[0]).toMatchObject({ runId: "run-outer-1" });
+  });
+
+  it("runs admitted small work without task binding or task-board continuation", async () => {
+    const params = buildParams({ runId: "small-work" });
+    params.followupRun.run.inputProvenance = undefined;
+    params.followupRun.run.executionAdmitted = true;
+    params.followupRun.run.sessionFile = `/tmp/openbot-small-work-${crypto.randomUUID()}.jsonl`;
+    params.followupRun.run.turnExecutionAdmission = {
+      requestId: "small-work",
+      sessionFile: params.followupRun.run.sessionFile,
+      goal: "Send once",
+      acceptance: ["Report receipt"],
+      focusRevision: 0,
+      writeEpoch: 0,
+    };
+    const bind = vi.spyOn(replyTurnRuntime.state, "startExecution");
+    const wake = vi.spyOn(replyTurnRuntime.execution, "scheduleTaskBoardContinueWake");
+    try {
+      expect(await runReplyAgent(params)).toMatchObject({ text: "ok" });
+      expect(mocks.runEmbeddedPiAgent).toHaveBeenCalledOnce();
+      expect(turnCall().followupRun.run.taskCompletionBinding).toBeUndefined();
+      expect(bind).not.toHaveBeenCalled();
+      expect(wake).not.toHaveBeenCalled();
+    } finally {
+      bind.mockRestore();
+      wake.mockRestore();
+    }
   });
 
   it("generates one outer runId and uses it for both the flush parent and the turn", async () => {

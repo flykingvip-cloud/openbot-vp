@@ -357,6 +357,7 @@ describe("runPreparedReply inbound depth router", () => {
     "transcript_failure",
     "amended",
     "amended_paused",
+    "accepted_turn",
     "amended_active",
     "amended_replaced",
     "amended_rejected",
@@ -387,6 +388,7 @@ describe("runPreparedReply inbound depth router", () => {
     const isAmendment = kind.startsWith("amended");
     const executes =
       kind === "accepted" ||
+      kind === "accepted_turn" ||
       kind === "resumed" ||
       kind === "amended" ||
       kind === "amended_active" ||
@@ -433,11 +435,23 @@ describe("runPreparedReply inbound depth router", () => {
             : {
                 kind: "execution_admission",
                 result:
-                  kind === "accepted"
-                    ? { kind, binding, acceptance: ["来源"] }
-                    : kind === "duplicate"
-                      ? { kind, binding }
-                      : { kind: "rejected", reason: "revision_mismatch" },
+                  kind === "accepted_turn"
+                    ? {
+                        kind,
+                        admission: {
+                          requestId: "ingress-message",
+                          sessionFile: file,
+                          goal: "Send once",
+                          acceptance: ["Report receipt"],
+                          focusRevision: 0,
+                          writeEpoch: 0,
+                        },
+                      }
+                    : kind === "accepted"
+                      ? { kind, binding, acceptance: ["来源"] }
+                      : kind === "duplicate"
+                        ? { kind, binding }
+                        : { kind: "rejected", reason: "revision_mismatch" },
               },
     );
     const read = vi.spyOn(replyTurnRuntime.state, "read").mockReturnValue({
@@ -547,10 +561,17 @@ describe("runPreparedReply inbound depth router", () => {
       if (executes) {
         const run = vi.mocked(runReplyAgent).mock.calls[0]?.[0].followupRun.run;
         expect(run).toMatchObject({
-          taskCompletionBinding: binding,
+          ...(kind === "accepted_turn" ? {} : { taskCompletionBinding: binding }),
           executionAdmitted: true,
           skipUserTranscriptPersist: true,
         });
+        if (kind === "accepted_turn") {
+          expect(run?.turnExecutionAdmission?.goal).toBe("Send once");
+          expect(run?.taskCompletionBinding).toBeUndefined();
+          expect(run?.extraSystemPrompt).toContain("Current-turn work only");
+          expect(abort).not.toHaveBeenCalled();
+          expect(mutate).not.toHaveBeenCalled();
+        }
         expect(run?.extraSystemPrompt).toContain("Acceptance criteria:");
         if (kind === "amended") {
           expect(run?.taskCompletionBinding?.constraints).toEqual(["将补贴改为1000元并重写文件"]);
