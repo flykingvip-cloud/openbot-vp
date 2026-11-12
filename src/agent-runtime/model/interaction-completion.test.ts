@@ -91,7 +91,7 @@ it("preserves conversation roles and refuses to reorder late system content", ()
     ),
   ).toThrow(/precede/);
 });
-it.each(["toolUse", "length", "error", "aborted"])(
+it.each(["toolUse", "length", "aborted"])(
   "does not accept a non-final %s response",
   async (stopReason) => {
     mocks.complete.mockResolvedValue({
@@ -426,4 +426,17 @@ it("keeps native execution proposals behind the same authorization gate", async 
   });
   expect(commit).not.toHaveBeenCalled();
   expect(mocks.complete).toHaveBeenCalledOnce();
+});
+
+it("surfaces a provider error inside governed inference instead of returning a fake final decision", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [],
+    stopReason: "error",
+    errorMessage: "429 rate limit reached",
+    usage: makeZeroUsageSnapshot(),
+  });
+  await expect(invokeInteractionCompletion(request)).rejects.toMatchObject({
+    name: "FailoverError",
+    reason: "rate_limit",
+  });
 });

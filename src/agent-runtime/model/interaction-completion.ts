@@ -1,6 +1,9 @@
 /** One provider response; authorization, accounting and persistence stay with its caller. */
 import { complete, type Api, type Context, type Model } from "@earendil-works/pi-ai/compat";
+import { coerceToFailoverError, FailoverError } from "../../agents/failover-error.js";
+import { classifyFailoverReason } from "../../agents/pi-embedded-helpers/errors.js";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
+import { redactSensitiveText } from "../../logging/redact.js";
 import { withTimeout } from "../../utils/with-timeout.js";
 import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../contracts/interaction.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
@@ -182,6 +185,31 @@ export async function invokeInteractionCompletion(params: {
     timeoutMs,
   );
   signal.throwIfAborted();
+  if (response.stopReason === "error") {
+    const raw = response.errorMessage || "Interaction provider request failed";
+    const error =
+      coerceToFailoverError(new Error(raw), {
+        provider: params.model.provider,
+        model: params.model.id,
+      }) ??
+      new FailoverError(raw, {
+        reason: "unknown",
+        provider: params.model.provider,
+        model: params.model.id,
+      });
+    // Error response is not a model decision. Existing model governance owns
+    // fallback/cooldown; no new retry or tool loop belongs in this adapter.
+    console.warn("[interaction-provider-error]", {
+      provider: params.model.provider,
+      model: params.model.id,
+      reason: classifyFailoverReason(raw) ?? error.reason,
+      httpStatus: error.status,
+      argumentSchemaError: /schema|tool_choice|function.*parameters|invalid.*parameter/i.test(raw),
+      networkError: /fetch failed|ECONN|ENOTFOUND|network/i.test(raw),
+      detail: redactSensitiveText(raw, { mode: "all" }).slice(0, 800),
+    });
+    throw error;
+  }
   return {
     response,
     readDecision() {
