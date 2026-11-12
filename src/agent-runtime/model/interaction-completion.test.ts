@@ -345,10 +345,13 @@ it("disables thinking only for the known DeepSeek machine-protocol adapter", asy
   const payload = { thinking: { type: "enabled" }, max_tokens: 200 };
   expect(options.onPayload(payload)).toMatchObject({
     thinking: { type: "disabled" },
-    response_format: { type: "json_object" },
+    tool_choice: { type: "function", function: { name: "emit_interaction_decision" } },
     max_tokens: 200,
   });
   expect(payload.thinking.type).toBe("enabled");
+  const nativePayload = options.onPayload({ ...payload, response_format: { type: "json_object" } });
+  expect(nativePayload).not.toHaveProperty("response_format");
+  expect(nativePayload.tools as unknown[]).toHaveLength(1);
 });
 
 it("scopes visible-reply guidance to the private reply text rather than the wire envelope", () => {
@@ -362,4 +365,65 @@ it("scopes visible-reply guidance to the private reply text rather than the wire
   expect(ctx.systemPrompt).toContain("PRIVATE HOST PROTOCOL");
   expect(ctx.systemPrompt).toContain("applies to the text field, NOT to the private JSON envelope");
   expect(ctx.tools).toEqual([]);
+});
+
+it("reads only one native decision output and never executes an arbitrary tool", async () => {
+  const native = {
+    ...request,
+    model: { ...model, id: "deepseek-v4-flash", provider: "api-proxy-deepseek" },
+  };
+  const decision = { kind: "reply", text: "已收到276G" };
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "toolCall", name: "emit_interaction_decision", arguments: decision }],
+    stopReason: "toolUse",
+    usage: makeZeroUsageSnapshot(),
+  });
+  expect((await invokeInteractionCompletion(native)).readDecision()).toEqual(decision);
+  expect(mocks.complete).toHaveBeenCalledOnce();
+  for (const content of [
+    [{ type: "toolCall", name: "exec", arguments: { command: "unsafe" } }],
+    [
+      { type: "toolCall", name: "emit_interaction_decision", arguments: decision },
+      { type: "toolCall", name: "emit_interaction_decision", arguments: decision },
+    ],
+    [{ type: "text", text: "done" }],
+  ]) {
+    mocks.complete.mockResolvedValue({
+      content,
+      stopReason: "toolUse",
+      usage: makeZeroUsageSnapshot(),
+    });
+    const completion = await invokeInteractionCompletion(native);
+    expect(() => completion.readDecision()).toThrow(/final decision/);
+  }
+});
+
+it("keeps native execution proposals behind the same authorization gate", async () => {
+  const native = {
+    ...request,
+    model: { ...model, id: "deepseek-v4-flash", provider: "api-proxy-deepseek" },
+  };
+  const decision = {
+    kind: "execution_request",
+    request: { goal: "write report", acceptance: ["has sources"] },
+  };
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "toolCall", name: "emit_interaction_decision", arguments: decision }],
+    stopReason: "toolUse",
+    usage: makeZeroUsageSnapshot(),
+  });
+  const parsed = (await invokeInteractionCompletion(native)).readDecision();
+  const authorize = vi.fn(async () => false);
+  const commit = vi.fn();
+  const result = await routeInteraction(
+    { message: "write report", context: [] },
+    { requestId: "native", expectedFocusRevision: 0, expectedWriteEpoch: 0 },
+    { inference: { infer: async () => parsed }, admission: { authorize, commit } },
+  );
+  expect(result).toEqual({
+    kind: "execution_admission",
+    result: { kind: "rejected", reason: "unauthorized" },
+  });
+  expect(commit).not.toHaveBeenCalled();
+  expect(mocks.complete).toHaveBeenCalledOnce();
 });

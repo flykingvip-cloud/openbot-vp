@@ -4,6 +4,11 @@ import { makeZeroUsageSnapshot } from "../../agents/usage.js";
 import { withTimeout } from "../../utils/with-timeout.js";
 import { INTERACTION_PROSE_PROTOCOL_DOWNGRADE } from "../contracts/interaction.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
+import {
+  INTERACTION_OUTPUT_NAME,
+  INTERACTION_OUTPUT_TOOL,
+  usesNativeInteractionOutput,
+} from "./interaction-output-contract.js";
 
 const PROTOCOL = [
   "Understand the current user message using the supplied identity, conversation, memory and knowledge.",
@@ -62,6 +67,11 @@ export function buildInteractionCompletionContext(
     );
   }
   system.push(`Host-bound task target: ${JSON.stringify(input.taskTarget ?? null)}`);
+  if (usesNativeInteractionOutput(model)) {
+    system.push(
+      `Use the forced ${INTERACTION_OUTPUT_NAME} output function exactly once to serialize the same decision object. This is the private host output envelope, NOT an executable tool. Do not emit text outside it. All real tools remain unavailable; authorization and task admission remain host-owned.`,
+    );
+  }
   const images = input.images ?? [];
   const canSeeImages = model.input?.includes("image");
   const message =
@@ -149,15 +159,19 @@ export async function invokeInteractionCompletion(params: {
               if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
                 throw new Error("Invalid interaction request payload");
               }
-              // DeepSeek defaults to thinking. This bounded call emits a machine
-              // decision, not an execution reasoning turn; budget is for its JSON.
-              const deepseekProtocol =
-                params.model.id.toLowerCase().startsWith("deepseek") &&
-                /(?:^|-)deepseek$/.test(params.model.provider.toLowerCase());
+              if (usesNativeInteractionOutput(params.model)) {
+                const body = { ...payload } as Record<string, unknown>;
+                delete body.response_format;
+                return {
+                  ...body,
+                  thinking: { type: "disabled" },
+                  tools: [INTERACTION_OUTPUT_TOOL],
+                  tool_choice: { type: "function", function: { name: INTERACTION_OUTPUT_NAME } },
+                };
+              }
               return {
                 ...payload,
                 response_format: { type: "json_object" },
-                ...(deepseekProtocol ? { thinking: { type: "disabled" } } : {}),
               };
             },
           }
@@ -171,6 +185,19 @@ export async function invokeInteractionCompletion(params: {
   return {
     response,
     readDecision() {
+      if (usesNativeInteractionOutput(params.model)) {
+        const calls = response.content.filter((part) => part.type === "toolCall");
+        if (
+          response.stopReason !== "toolUse" ||
+          calls.length !== 1 ||
+          calls[0].name !== INTERACTION_OUTPUT_NAME ||
+          response.content.some((part) => part.type === "text" && part.text.trim())
+        ) {
+          throw new Error("Interaction did not return a final decision");
+        }
+        // Data only. Never dispatch this function through a runtime tool registry.
+        return calls[0].arguments;
+      }
       if (
         response.stopReason !== "stop" ||
         response.content.some((part) => part.type === "toolCall")
