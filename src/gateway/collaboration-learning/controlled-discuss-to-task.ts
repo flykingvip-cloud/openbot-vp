@@ -30,6 +30,7 @@ import {
   type FormalTaskUserStatusCode,
 } from "./discuss-to-task-receipt.js";
 import type { FormalTaskStageSnapshot } from "./discuss-to-task-receipt.js";
+import { peekDiscussToTaskSourceBinding } from "./discuss-to-task-source-binding.js";
 import {
   buildDiscussToTaskTags,
   readAuthoritativeDiscussToTaskStages,
@@ -243,25 +244,47 @@ export async function controlledDiscussToTask(
     });
   }
 
-  const classified = classifyDiscussToTaskIntent(message);
+  // A semantic chat decision already supplies its fields. Legacy explicit API
+  // calls without fields may still extract them, but cannot override turn scope.
+  const classified =
+    input.forceExplicit && input.acceptanceCriteria?.length
+      ? null
+      : classifyDiscussToTaskIntent(message);
   const classification: DiscussToTaskClassification = input.forceExplicit
     ? {
         kind: "explicit_delegation",
         reason: "explicit_team_task",
         titleHint:
           compact(input.title) ||
-          (classified.kind === "explicit_delegation" ? classified.titleHint : message.slice(0, 80)),
+          (classified?.kind === "explicit_delegation"
+            ? classified.titleHint
+            : message.slice(0, 80)),
         goalHint:
           compact(input.goal) ||
-          (classified.kind === "explicit_delegation" ? classified.goalHint : message.slice(0, 240)),
+          (classified?.kind === "explicit_delegation"
+            ? classified.goalHint
+            : message.slice(0, 240)),
         acceptanceHints:
           input.acceptanceCriteria && input.acceptanceCriteria.length > 0
             ? [...input.acceptanceCriteria]
-            : classified.kind === "explicit_delegation"
+            : classified?.kind === "explicit_delegation"
               ? [...classified.acceptanceHints]
               : [],
       }
-    : classified;
+    : classified!;
+
+  const inboundScope = peekDiscussToTaskSourceBinding({ sourceMessageId, tenantId, groupId });
+  if (inboundScope?.lifecycle === "turn") {
+    return finish({
+      classification,
+      attempted: false,
+      taskId: null,
+      activationKey: null,
+      activation: null,
+      stages: stagesFromActivation({ taskEnsured: false, boardPublished: false }),
+      internalReason: "current_turn_scope_only",
+    });
+  }
 
   if (classification.kind === "discussion") {
     return finish({

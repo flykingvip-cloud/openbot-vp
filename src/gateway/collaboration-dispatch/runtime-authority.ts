@@ -121,6 +121,8 @@ export type DecideInput = {
 };
 
 export type BeatExecutionInput = {
+  /** Human interaction lifecycle; absent on already-bound internal task wakes. */
+  lifecycle?: "turn" | "long_task";
   decision: import("./types.js").ParticipationDecision;
   message: string;
   sessionKey: string;

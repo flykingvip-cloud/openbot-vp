@@ -17,6 +17,7 @@ import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
+import type { InteractionModelDecision } from "../../agent-runtime/contracts/interaction.js";
 import * as claimContractMod from "../collaboration-dispatch/claim-contract.js";
 import {
   connectOk,
@@ -36,6 +37,26 @@ import {
   peekDiscussToTaskSourceBinding,
 } from "./discuss-to-task-source-binding.js";
 import { createTrustedGroupStores } from "./team-resource-auth.js";
+
+const groupUnderstanding = vi.hoisted(() => vi.fn());
+vi.mock("./group-interaction-understanding.js", () => ({
+  understandGroupInteraction: groupUnderstanding,
+}));
+function resetUnderstanding() {
+  groupUnderstanding.mockReset();
+  groupUnderstanding.mockResolvedValue({
+    kind: "understood",
+    decision: {
+      kind: "execution_request",
+      request: {
+        lifecycle: "long_task",
+        goal: "开展市场调研",
+        acceptance: ["竞品清单", "定价建议报告"],
+      },
+    } satisfies InteractionModelDecision,
+  });
+}
+resetUnderstanding();
 
 const resolveDeliveryAclActor = vi.hoisted(() =>
   vi.fn(async (_client: unknown, _groupId: unknown) => "human:owner"),
@@ -468,6 +489,7 @@ async function withGatewayWsHarness(
     resolveDeliveryAclActor.mockResolvedValue("human:owner");
     transcriptInjectControl.failReceiptPersist = false;
     claimContractControl.enabled = true;
+    resetUnderstanding();
     testState.sessionStorePath = undefined;
     ws.close();
     await server.close();
@@ -532,6 +554,112 @@ function groupsRootForState(): { groupsRoot: string; groupLocator: (id: string) 
 }
 
 describe("discuss-to-task gateway WS integration (Phase-1 final)", () => {
+  it("does not fall back to formal activation or member execution when understanding fails", async () => {
+    await withGatewayWsHarness(async ({ ws, createSessionDir, groupId }) => {
+      await connectOk(ws, { device: null });
+      await seedGroupAndSessions({ groupId, createSessionDir, claimContract: true });
+      groupUnderstanding.mockRejectedValue(new Error("interaction unavailable"));
+      getReplyFromConfig.mockClear();
+      const collector = createCollector(ws);
+      const idem = `understanding-failed-${Date.now()}`;
+      expect(
+        (
+          await rpcReq(ws, "chat.send", {
+            sessionKey: `space:${groupId}`,
+            message: EXPLICIT,
+            idempotencyKey: idem,
+            timeoutMs: 60_000,
+          })
+        ).ok,
+      ).toBe(true);
+      await vi.waitFor(
+        () => expect(collector.frames.some((frame) => frame.payload?.state === "error")).toBe(true),
+        FAST_WAIT,
+      );
+      expect(groupUnderstanding).toHaveBeenCalledOnce();
+      expect(getReplyFromConfig).not.toHaveBeenCalled();
+      expect(
+        peekDiscussToTaskSourceBinding({ sourceMessageId: idem, tenantId: "_local", groupId }),
+      ).toBeNull();
+      expect(collector.frames.some((frame) => isDiscussToTaskStatusEvent(frame))).toBe(false);
+      collector.stop();
+    });
+  });
+  it("ordinary group reply returns from interaction without member execution or formal task creation", async () => {
+    await withGatewayWsHarness(async ({ ws, createSessionDir, groupId }) => {
+      await connectOk(ws, { device: null });
+      await seedGroupAndSessions({ groupId, createSessionDir, claimContract: true });
+      groupUnderstanding.mockResolvedValue({
+        kind: "understood",
+        decision: { kind: "reply", text: "30" },
+      });
+      getReplyFromConfig.mockClear();
+      const collector = createCollector(ws);
+      const idem = `group-reply-${Date.now()}`;
+      const result = await rpcReq(ws, "chat.send", {
+        sessionKey: `space:${groupId}`,
+        message: "100减70，直接回答",
+        idempotencyKey: idem,
+        timeoutMs: 60_000,
+      });
+      expect(result.ok).toBe(true);
+      await vi.waitFor(() => expect(collector.finals().length).toBeGreaterThan(0), FAST_WAIT);
+      expect(collector.finals().some((frame) => extractText(frame.payload?.message) === "30")).toBe(
+        true,
+      );
+      expect(getReplyFromConfig).not.toHaveBeenCalled();
+      expect(groupUnderstanding).toHaveBeenCalledOnce();
+      expect(
+        peekDiscussToTaskSourceBinding({ sourceMessageId: idem, tenantId: "_local", groupId }),
+      ).toBeNull();
+      collector.stop();
+    });
+  });
+
+  it("current-turn group work reaches existing member execution without opening formal task state", async () => {
+    await withGatewayWsHarness(async ({ ws, createSessionDir, groupId }) => {
+      await connectOk(ws, { device: null });
+      await seedGroupAndSessions({ groupId, createSessionDir, claimContract: true });
+      groupUnderstanding.mockResolvedValue({
+        kind: "understood",
+        decision: {
+          kind: "execution_request",
+          request: { lifecycle: "turn", goal: "写一段当场答复", acceptance: ["立即返回结果"] },
+        },
+      });
+      getReplyFromConfig.mockResolvedValue({ text: "结论：当场结果已经给出，无需后续工作。" });
+      const collector = createCollector(ws);
+      const idem = `group-small-${Date.now()}`;
+      expect(
+        (
+          await rpcReq(ws, "chat.send", {
+            sessionKey: `space:${groupId}`,
+            message: "请团队整理三行数字，交付一段当场答复",
+            idempotencyKey: idem,
+            timeoutMs: 60_000,
+          })
+        ).ok,
+      ).toBe(true);
+      await vi.waitFor(() => expect(collector.finals().length).toBeGreaterThan(0), FAST_WAIT);
+      expect(getReplyFromConfig).toHaveBeenCalled();
+      expect(groupUnderstanding).toHaveBeenCalledOnce();
+      const source = peekDiscussToTaskSourceBinding({
+        sourceMessageId: idem,
+        tenantId: "_local",
+        groupId,
+      });
+      expect(source?.lifecycle).toBe("turn");
+      expect(collector.frames.some((frame) => isDiscussToTaskStatusEvent(frame))).toBe(false);
+      const roots = groupsRootForState();
+      const stores = createTrustedGroupStores({
+        groupsRoot: roots.groupsRoot,
+        groupLocator: roots.groupLocator(groupId),
+      });
+      const taskId = mintDiscussToTaskId({ sourceMessageId: idem, tenantId: "_local", groupId });
+      expect(await stores.objectStorage.readObject(groupId, "task", taskId)).toBeNull();
+      collector.stop();
+    });
+  });
   afterEach(() => {
     clearDiscussToTaskSourceBindingsForTests();
     getReplyFromConfig.mockReset();

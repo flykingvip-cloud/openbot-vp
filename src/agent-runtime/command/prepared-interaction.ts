@@ -3,9 +3,10 @@ import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
 import { invokeInteractionCompletion, type createAuthorizedModelSession } from "../model/index.js";
+import type { InteractionInferencePort } from "./interpret-interaction.js";
 import { routeInteraction } from "./route-interaction.js";
 
-export async function runPreparedInteraction(
+export function createPreparedInteractionInference(
   params: {
     input: InteractionModelInput;
     config: OpenBotConfig;
@@ -23,12 +24,8 @@ export async function runPreparedInteraction(
     provider: string,
     model: string,
   ) => Promise<{ model: Model<Api>; apiKey?: string }>,
-  admission: {
-    captured: Parameters<typeof routeInteraction>[1];
-    ports: Parameters<typeof routeInteraction>[2]["admission"];
-  },
-) {
-  const inference = {
+): InteractionInferencePort {
+  return {
     infer: async (input: InteractionModelInput) => {
       const started = Date.now();
       const result = await session.infer({
@@ -63,9 +60,34 @@ export async function runPreparedInteraction(
       return result.result.readDecision();
     },
   };
+}
+
+export async function runPreparedInteraction(
+  params: {
+    input: InteractionModelInput;
+    config: OpenBotConfig;
+    provider: string;
+    model: string;
+    agentDir?: string;
+    agentId?: string;
+    creditUserId?: string;
+    fallbacksOverride?: string[];
+    timeoutMs: number;
+    maxTokens: number;
+  },
+  session: ReturnType<typeof createAuthorizedModelSession>,
+  resolveCandidate: (
+    provider: string,
+    model: string,
+  ) => Promise<{ model: Model<Api>; apiKey?: string }>,
+  admission: {
+    captured: Parameters<typeof routeInteraction>[1];
+    ports: Parameters<typeof routeInteraction>[2]["admission"];
+  },
+) {
   // Route the same completion, never run a second classification inference.
   return routeInteraction(params.input, admission.captured, {
-    inference,
+    inference: createPreparedInteractionInference(params, session, resolveCandidate),
     admission: admission.ports,
   });
 }

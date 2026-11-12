@@ -1,7 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import { expect, it, vi } from "vitest";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
-import { runGovernedInteraction } from "../command/index.js";
+import { runGovernedInteraction, runGovernedUnderstanding } from "../command/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 const calls = vi.hoisted(() => ({ complete: vi.fn() }));
 vi.mock("@earendil-works/pi-ai/compat", async (original) => ({
@@ -18,6 +18,65 @@ const model = {
   maxTokens: 1000,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 } as Model<Api>;
+it.each(["turn", "long_task"] as const)(
+  "understands group %s scope once without opening personal task state",
+  async (lifecycle) => {
+    const host = bindAdmittedTurnHost();
+    host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
+      acquired: true as const,
+      skipped: false as const,
+      enterpriseId: "tenant",
+    }));
+    host.model.runWithModelFallback = vi.fn(async (p) => ({
+      result: await p.run("test", "test"),
+      provider: "test",
+      model: "test",
+      attempts: [],
+    }));
+    host.admission.releaseEnterpriseAgentRun = vi.fn(async () => {});
+    host.model.forgetRunModelSet = vi.fn();
+    host.task.ensureChatTurnTaskOutcome = vi.fn();
+    calls.complete.mockClear();
+    const decision = {
+      kind: "execution_request",
+      request: { lifecycle, goal: "Complete group work", acceptance: ["Actual result"] },
+    };
+    calls.complete.mockResolvedValue({
+      role: "assistant",
+      content: [{ type: "text", text: JSON.stringify(decision) }],
+      usage: makeZeroUsageSnapshot(),
+      stopReason: "stop",
+    });
+    expect(
+      await runGovernedUnderstanding(
+        {
+          input: { message: "group work", context: [] },
+          config: {},
+          runId: "group",
+          agentId: "bot",
+          agentDir: "/tmp/agent",
+          sessionKey: "group",
+          requestId: "group",
+          identity: {},
+          provider: "test",
+          model: "test",
+          timeoutMs: 1000,
+        },
+        {
+          modelSession: host,
+          model: host.model,
+          resolveFallbacks: () => undefined,
+          candidate: async () => ({ model }),
+        },
+      ),
+    ).toEqual({ kind: "understood", decision });
+    expect(calls.complete).toHaveBeenCalledOnce();
+    expect(calls.complete.mock.calls[0][1].tools).toEqual([]);
+    expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
+    expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
+    expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();
+  },
+);
 it("restricted interaction never bypasses a model authorization denial", async () => {
   const host = bindAdmittedTurnHost();
   host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
@@ -153,7 +212,10 @@ it.each([
     }
     expect(context.systemPrompt).toContain("identity");
     expect(context.systemPrompt).not.toContain("untrusted knowledge");
-    expect(context.messages[0]).toMatchObject({ role: "user", content: "untrusted knowledge" });
+    expect(context.messages[0]).toMatchObject({
+      role: "user",
+      content: JSON.stringify({ source: "reference_context", content: "untrusted knowledge" }),
+    });
     expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
     expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
     expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();

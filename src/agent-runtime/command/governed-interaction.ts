@@ -5,7 +5,7 @@ import {
   type ModelSessionPorts,
   type InteractionPreparationPorts,
 } from "../model/index.js";
-import { runAuthorizedInteraction } from "./authorized-interaction.js";
+import { runAuthorizedInteraction, runAuthorizedUnderstanding } from "./authorized-interaction.js";
 import { bindExecutionAdmissionPorts } from "./execution-admission.js";
 
 type ModelSession = ReturnType<typeof createAuthorizedModelSession>;
@@ -24,7 +24,11 @@ export type GovernedInteractionInput = {
     gatewayClientUser?: string | null;
     gatewayClientSessionDomain?: GateInput["gatewayClientSessionDomain"] | null;
     gatewayClientPlatformUserId?: string | null;
-    executionIdentity?: { enterpriseId?: string } | null;
+    executionIdentity?: {
+      enterpriseId?: string;
+      collaborationGroupId?: string;
+      collaborationOwnerEntitlement?: GateInput["collaborationGroupOwnerEntitlement"];
+    } | null;
   };
   authorized: boolean;
   provider: string;
@@ -43,14 +47,20 @@ export type GovernedInteractionPorts = {
   commit: Parameters<typeof bindExecutionAdmissionPorts>[0]["commit"];
 };
 
-/** Command owns interaction admission and model-policy sequencing. */
-export function runGovernedInteraction(
-  params: GovernedInteractionInput,
-  ports: GovernedInteractionPorts,
+export type GovernedUnderstandingInput = Omit<
+  GovernedInteractionInput,
+  "sessionFile" | "captured" | "authorized"
+>;
+export type GovernedUnderstandingPorts = Omit<GovernedInteractionPorts, "commit">;
+
+/** Fixed preparation and governance shared by both scene adapters. */
+function bindGovernedUnderstanding(
+  params: GovernedUnderstandingInput,
+  ports: GovernedUnderstandingPorts,
 ) {
   const session = createAuthorizedModelSession(`${params.runId}:interaction`, ports.modelSession);
-  return runAuthorizedInteraction(
-    {
+  return {
+    prepared: {
       input: params.input,
       config: params.config,
       provider: params.provider,
@@ -66,16 +76,25 @@ export function runGovernedInteraction(
         sessionKey: params.sessionKey,
       }),
     },
-    {
+    bound: {
       session,
       authorization: {
         agentId: params.agentId,
+        ...(params.identity.executionIdentity?.collaborationGroupId
+          ? { groupId: params.identity.executionIdentity.collaborationGroupId }
+          : {}),
         modelGateInput: {
           cfg: params.config,
           agentId: params.agentId,
           gatewayClientUser: params.identity.gatewayClientUser ?? undefined,
           gatewayClientSessionDomain: params.identity.gatewayClientSessionDomain ?? undefined,
           enterpriseIdHint: params.identity.executionIdentity?.enterpriseId,
+          ...(params.identity.executionIdentity?.collaborationOwnerEntitlement
+            ? {
+                collaborationGroupOwnerEntitlement:
+                  params.identity.executionIdentity.collaborationOwnerEntitlement,
+              }
+            : {}),
           taskText: params.input.message,
           contextParts: ports.model.buildRunContextEstimateParts({
             taskText: params.input.message,
@@ -90,7 +109,7 @@ export function runGovernedInteraction(
           }).contextParts,
         },
       },
-      prepare: (active) => {
+      prepare: (active: ModelSession) => {
         const gate = active.gate;
         const routing = ports.model.resolveExecutionRoutingFromCapabilityPlan({
           allowlist: gate?.allowlist,
@@ -106,14 +125,34 @@ export function runGovernedInteraction(
         });
       },
       candidate: ports.candidate,
-      admission: {
-        captured: { requestId: params.requestId, ...params.captured },
-        ports: bindExecutionAdmissionPorts({
-          sessionFile: params.sessionFile,
-          authorize: async () => params.authorized && !params.input.abortSignal?.aborted,
-          commit: ports.commit,
-        }),
-      },
     },
-  );
+  };
+}
+
+/** One governed interpretation, no personal board or execution side effects. */
+export function runGovernedUnderstanding(
+  params: GovernedUnderstandingInput,
+  ports: GovernedUnderstandingPorts,
+) {
+  const { prepared, bound } = bindGovernedUnderstanding(params, ports);
+  return runAuthorizedUnderstanding(prepared, bound);
+}
+
+/** Command owns interaction admission and model-policy sequencing. */
+export function runGovernedInteraction(
+  params: GovernedInteractionInput,
+  ports: GovernedInteractionPorts,
+) {
+  const { prepared, bound } = bindGovernedUnderstanding(params, ports);
+  return runAuthorizedInteraction(prepared, {
+    ...bound,
+    admission: {
+      captured: { requestId: params.requestId, ...params.captured },
+      ports: bindExecutionAdmissionPorts({
+        sessionFile: params.sessionFile,
+        authorize: async () => params.authorized && !params.input.abortSignal?.aborted,
+        commit: ports.commit,
+      }),
+    },
+  });
 }

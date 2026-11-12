@@ -478,6 +478,7 @@ export async function bootstrapCollaborationRound(
   facts: RuntimeFacts,
   params: {
     decision: ParticipationDecision;
+    lifecycle?: "turn" | "long_task";
     policy: CollaborationPolicyV1;
     sessionKey: string;
     inboundDepth?: "chat" | "retrieve" | "act";
@@ -488,11 +489,14 @@ export async function bootstrapCollaborationRound(
   },
 ): Promise<PersistedRound> {
   const persist = { tenantId: authority.tenantId, roundsDir: params.roundsDir };
-  const decision = await maybeExpandBoardKickoffDecision({
-    authority,
-    decision: params.decision,
-    groupBots: facts.bots as import("./types.js").CollaborationBotTarget[],
-  });
+  const decision =
+    params.lifecycle === "turn"
+      ? params.decision
+      : await maybeExpandBoardKickoffDecision({
+          authority,
+          decision: params.decision,
+          groupBots: facts.bots as import("./types.js").CollaborationBotTarget[],
+        });
   const frozenPolicy = freezeCollaborationPolicy(params.policy);
   // P1-A5 ④: context lane — default legacy keeps PolicyV1.contextPolicy and omits
   // groupConfidentiality (internal fallback). Flag shadow|effective compares / switches
@@ -575,11 +579,14 @@ export async function executeCollaborationRound(
     drivesProductionDecision: cutover.floorDrivesProductionDecision,
   });
   // Mode B board-tied kickoff: expand single @mention → intended multi (flag default OFF).
-  const expandedDecision = await maybeExpandBoardKickoffDecision({
-    authority,
-    decision: input.decision,
-    groupBots: facts.bots as import("./types.js").CollaborationBotTarget[],
-  });
+  const expandedDecision =
+    input.lifecycle === "turn"
+      ? input.decision
+      : await maybeExpandBoardKickoffDecision({
+          authority,
+          decision: input.decision,
+          groupBots: facts.bots as import("./types.js").CollaborationBotTarget[],
+        });
   const params = {
     decision: expandedDecision,
     policy: input.policy,
@@ -722,11 +729,13 @@ export async function executeCollaborationRound(
     // Platform Mode B: optional inventory-first continue after ROUND_COMPLETE.
     // Default OFF (allowlist). Fail-closed — never abort the round.
     try {
-      await maybeContinueAfterRoundComplete({
-        authority,
-        roundId: settled.roundId,
-        roundState: settled.state,
-      });
+      if (input.lifecycle !== "turn") {
+        await maybeContinueAfterRoundComplete({
+          authority,
+          roundId: settled.roundId,
+          roundState: settled.state,
+        });
+      }
     } catch {
       // continue-after-round must not abort the round.
     }
@@ -767,6 +776,7 @@ export async function executeCollaborationRound(
   await supersedeBlockedUnmatchedRounds({ groupId: authority.groupId, ...persist });
 
   let round = await bootstrapCollaborationRound(authority, facts, {
+    lifecycle: input.lifecycle,
     decision: params.decision,
     policy,
     sessionKey: params.sessionKey,
@@ -808,7 +818,7 @@ export async function executeCollaborationRound(
   // "primary carried a structural conclusion". Only the latter gates the open
   // supplement window; neither turns a real reply into a timeout.
   const formalAdmissions = new Map<string, MemberAdmission>();
-  if (params.decision.responseMode === "decision_to_executor") {
+  if (input.lifecycle !== "turn" && params.decision.responseMode === "decision_to_executor") {
     for (const bot of stages.supplement.bots) {
       formalAdmissions.set(
         bot.agentId,
@@ -940,7 +950,7 @@ export async function executeCollaborationRound(
         round,
         primaryText: raced.reply?.rawText ?? primaryReplyText,
         fromAgentId: bot.agentId,
-        taskId: facts.activeContext.currentTaskId,
+        taskId: input.lifecycle === "turn" ? undefined : facts.activeContext.currentTaskId,
         bots: facts.bots as CollaborationBotTarget[],
       });
       if (round.edges?.length) {
@@ -1032,7 +1042,7 @@ export async function executeCollaborationRound(
         round,
         primaryText: fallbackReply?.rawText ?? fallbackReply?.text ?? "",
         fromAgentId: takeoverBot.agentId,
-        taskId: facts.activeContext.currentTaskId,
+        taskId: input.lifecycle === "turn" ? undefined : facts.activeContext.currentTaskId,
         bots: facts.bots as CollaborationBotTarget[],
       });
       if (round.edges?.length) {
@@ -1309,7 +1319,7 @@ export async function executeCollaborationRound(
             authority,
             agentId: bot.agentId,
             runId: `${round.roundId}:${bot.agentId}`,
-            taskId: facts.activeContext.currentTaskId,
+            taskId: input.lifecycle === "turn" ? undefined : facts.activeContext.currentTaskId,
             executionRequested: true,
             cfg: getRuntimeConfigSnapshot() ?? undefined,
           })
