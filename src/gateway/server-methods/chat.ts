@@ -7044,6 +7044,7 @@ export const chatHandlers: GatewayRequestHandlers = {
             context.logGateway.warn(
               `interaction rejection source ${JSON.stringify({
                 validation: err.message,
+                shape: (err as Error & { shape?: unknown }).shape,
                 stack: err.stack?.split("\n").slice(1, 7),
               })}`,
             );
