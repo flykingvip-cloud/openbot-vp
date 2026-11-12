@@ -216,6 +216,7 @@ async function leaseFor(params: {
 export async function resolveEmbeddedAccountWorkerHandle(params: {
   config?: OpenBotConfig;
   sessionKey?: string;
+  agentId?: string;
   account?: { tenantId: string; userId: string };
   env?: NodeJS.ProcessEnv;
 }): Promise<AccountWorkerSandboxHandle | undefined> {
@@ -231,6 +232,7 @@ export async function resolveEmbeddedAccountWorkerHandle(params: {
   const runtimeStatus = resolveSandboxRuntimeStatus({
     cfg: params.config,
     sessionKey: params.sessionKey,
+    agentId: params.agentId,
   });
   if (!runtimeStatus.sandboxed) {
     return undefined;
@@ -272,6 +274,7 @@ export async function resolveEmbeddedRunSandboxContextParams(
   const accountWorker = await resolveEmbeddedAccountWorkerHandle({
     config: params.config,
     sessionKey: params.sessionKey,
+    agentId: params.agentId,
     account: base.account,
     env: params.env,
   });
