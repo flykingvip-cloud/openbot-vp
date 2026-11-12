@@ -109,6 +109,8 @@ export type FollowupRun = {
     taskCompletionBinding?: import("../../../agent-runtime/contracts/task-binding.js").TaskCompletionBinding;
     /** Host accepted this request; do not classify it again as ordinary dialogue. */
     executionAdmitted?: boolean;
+    /** Authorized current-turn work; never a board/recovery/acceptance binding. */
+    turnExecutionAdmission?: import("../../../agent-runtime/contracts/execution.js").TurnExecutionAdmission;
     /** Collaboration rounds: suppress SessionManager user persistence on shared transcripts. */
     skipUserTranscriptPersist?: boolean;
     collaborationRoundInvoked?: boolean;

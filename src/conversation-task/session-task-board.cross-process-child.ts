@@ -160,6 +160,7 @@ if (mode === "switch") {
   for (let i = 0; i < rounds; i += 1) {
     const board = snapshot();
     const result = sessionTaskState.admitExecution({
+      lifecycle: "long_task",
       sessionFile,
       requestId: `cross-process-switch:${process.pid}`,
       goal: text,

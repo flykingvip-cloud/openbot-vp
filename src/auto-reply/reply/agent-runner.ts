@@ -269,11 +269,12 @@ export async function runReplyAgent(params: {
     });
 
   const requiresTaskBinding =
-    followupRun.run.executionAdmitted === true ||
-    Boolean(completionBinding) ||
-    (!followupRun.run.collaborationRoundInvoked &&
-      !followupRun.run.privateRunBag &&
-      Boolean(replyTurnRuntime.state.read(followupRun.run.sessionFile).current));
+    !followupRun.run.turnExecutionAdmission &&
+    (followupRun.run.executionAdmitted === true ||
+      Boolean(completionBinding) ||
+      (!followupRun.run.collaborationRoundInvoked &&
+        !followupRun.run.privateRunBag &&
+        Boolean(replyTurnRuntime.state.read(followupRun.run.sessionFile).current)));
   if (requiresTaskBinding) {
     try {
       completionBinding = replyTurnRuntime.state.startExecution(
@@ -324,7 +325,7 @@ export async function runReplyAgent(params: {
   const runFollowupTurn = makeRunFollowupTurn();
 
   const maybeScheduleTaskBoardContinue = (payloads: ReplyPayload[] | undefined) => {
-    if (isHeartbeat) {
+    if (isHeartbeat || followupRun.run.turnExecutionAdmission) {
       return;
     }
     if (replyTurnRuntime.execution.isTaskBoardContinueInternalPrompt(commandBody)) {

@@ -135,6 +135,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-flag-off",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:owner",
       client: {},
       tenant: null,
@@ -171,6 +179,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-dup",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:alice",
       client: {},
       tenant: null,
@@ -181,6 +197,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-dup",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:bob",
       client: {},
       tenant: null,
@@ -194,6 +218,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-dup",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:alice",
       client: {},
       tenant: null,
@@ -209,6 +241,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-persist-fail",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:owner",
       client: {},
       tenant: null,
@@ -232,6 +272,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-boom",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:owner",
       client: {},
       tenant: null,
@@ -249,6 +297,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-conflict-persist",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:alice",
       client: {},
       tenant: null,
@@ -262,6 +318,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-conflict-persist",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:bob",
       client: {},
       tenant: null,
@@ -287,6 +351,14 @@ describe("runControlledDiscussToTaskChatTurn (chat handler path)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-exception-persist",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:owner",
       client: {},
       tenant: null,
@@ -314,6 +386,14 @@ describe("emitDiscussToTaskClientFeedback (real chat egress — client receives)
       groupId: "grp_chat",
       sourceMessageId: "chat-run-egress-ok",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:owner",
       client: {},
       tenant: null,
@@ -360,6 +440,14 @@ describe("emitDiscussToTaskClientFeedback (real chat egress — client receives)
       groupId: "grp_chat",
       sourceMessageId: "chat-run-egress-conflict",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:alice",
       client: {},
       tenant: null,
@@ -370,6 +458,14 @@ describe("emitDiscussToTaskClientFeedback (real chat egress — client receives)
       groupId: "grp_chat",
       sourceMessageId: "chat-run-egress-conflict",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:bob",
       client: {},
       tenant: null,
@@ -397,6 +493,14 @@ describe("emitDiscussToTaskClientFeedback (real chat egress — client receives)
       groupId: "grp_chat",
       sourceMessageId: "chat-run-egress-exception",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:owner",
       client: {},
       tenant: null,
@@ -428,6 +532,14 @@ describe("emitDiscussToTaskClientFeedback (real chat egress — client receives)
       groupId: "grp_chat",
       sourceMessageId: "chat-run-egress-persist-fail",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:owner",
       client: {},
       tenant: null,
@@ -463,6 +575,14 @@ describe("emitDiscussToTaskClientFeedback protocol schema (R7)", () => {
       groupId: "grp_chat",
       sourceMessageId: "chat-run-protocol-ok",
       message: EXPLICIT,
+      understanding: {
+        kind: "execution_request",
+        request: {
+          lifecycle: "long_task",
+          goal: "市场调研",
+          acceptance: ["竞品清单", "定价建议报告"],
+        },
+      },
       principalActor: "human:owner",
       client: {},
       tenant: null,
@@ -504,6 +624,14 @@ describe("emitDiscussToTaskClientFeedback protocol schema (R7)", () => {
         groupId: "grp_chat",
         sourceMessageId: runId,
         message: EXPLICIT,
+        understanding: {
+          kind: "execution_request",
+          request: {
+            lifecycle: "long_task",
+            goal: "市场调研",
+            acceptance: ["竞品清单", "定价建议报告"],
+          },
+        },
         principalActor: "human:owner",
         client: {},
         tenant: null,

@@ -44,7 +44,10 @@ import {
   resolveDeliveryAclActor,
   type DeliveryActorClient,
 } from "../../gateway/collaboration-learning/delivery-actor-binding.js";
-import { assertDiscussToTaskSourceBinding } from "../../gateway/collaboration-learning/discuss-to-task-source-binding.js";
+import {
+  assertDiscussToTaskSourceBinding,
+  peekDiscussToTaskSourceBinding,
+} from "../../gateway/collaboration-learning/discuss-to-task-source-binding.js";
 import {
   assertPersistedTaskNotStopped,
   TaskStoppedError,
@@ -623,6 +626,19 @@ export function createCollaborationBoardTool(options?: {
       };
 
       const taskId = readStringParam(params, "taskId");
+      const inboundScope = inboundSourceMessageId
+        ? peekDiscussToTaskSourceBinding({
+            sourceMessageId: inboundSourceMessageId,
+            groupId,
+            tenantId: team.auth?.tenantId?.trim() || team.tenant?.tenantId?.trim() || "_local",
+          })
+        : null;
+      if (isWriteAction(action) && inboundScope?.lifecycle === "turn") {
+        return failResult("current_turn_scope_only", "本轮是临时执行，不创建或推进正式组任务。", {
+          groupId,
+          action,
+        });
+      }
       const itemId =
         readStringParam(params, "itemId") || readStringParam(params, "boardItemId") || undefined;
 

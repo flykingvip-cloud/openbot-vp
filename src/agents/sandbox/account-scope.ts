@@ -145,12 +145,14 @@ export function resolveEmbeddedRunSandboxParams(
   sessionKey?: string;
   workspaceDir: string;
   account?: { tenantId: string; userId: string };
+  agentId?: string;
 } {
   const account = resolveProductionSandboxAccount(params);
   return {
     config: params.config,
     sessionKey: params.sessionKey,
     workspaceDir: params.workspaceDir,
+    ...(params.agentId ? { agentId: params.agentId } : {}),
     ...(account ? { account } : {}),
   };
 }

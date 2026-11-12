@@ -204,14 +204,21 @@ export async function assembleCollaborationRuntimeContextParts(
     params.sessionCtx.CollaborationBotAgentId?.trim() || params.agentId.trim();
   const { resolveDeliveryExecTurn } =
     await import("../../gateway/collaboration-dispatch/delivery-exec-prompt.js");
-  const deliveryTurn = groupId
-    ? await resolveDeliveryExecTurn({
-        cfg: params.cfg,
-        groupId,
-        agentId: deliveryAgentId,
-        tenantId: params.sessionCtx.CollaborationTenantId,
-      })
-    : undefined;
+  // Current-turn work must never pick a claimant's unrelated persisted step.
+  // Keep the original durable guard for actual long-task and internal wake turns.
+  const deliveryTurn =
+    groupId &&
+    params.sessionCtx.CollaborationExecutionLifecycle !== "turn" &&
+    (params.sessionCtx.CollaborationExecutionLifecycle !== "long_task" ||
+      Boolean(params.sessionCtx.CollaborationExecutionTaskId))
+      ? await resolveDeliveryExecTurn({
+          cfg: params.cfg,
+          groupId,
+          agentId: deliveryAgentId,
+          tenantId: params.sessionCtx.CollaborationTenantId,
+          taskId: params.sessionCtx.CollaborationExecutionTaskId,
+        })
+      : undefined;
   if (deliveryTurn?.sideEffect) {
     params.sessionCtx.DeliveryToolSideEffect = deliveryTurn.sideEffect;
   } else {

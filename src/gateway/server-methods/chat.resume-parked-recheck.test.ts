@@ -51,6 +51,7 @@ function parkOneTask(sessionFile: string): string {
   for (const [index, goal] of [PRICE, RESEARCH].entries()) {
     const board = readSessionTaskBoard(sessionFile);
     const admitted = sessionTaskState.admitExecution({
+      lifecycle: "long_task",
       sessionFile,
       requestId: `resume-recheck:${index}`,
       goal,

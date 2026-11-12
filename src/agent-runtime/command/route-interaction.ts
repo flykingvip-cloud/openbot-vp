@@ -105,6 +105,9 @@ export function interactionAdmissionFact(routed: RoutedInteraction): {
   if (routed.kind === "execution_admission" && routed.result.kind === "accepted") {
     return { admitted: true, taskId: routed.result.binding.taskId };
   }
+  if (routed.kind === "execution_admission" && routed.result.kind === "accepted_turn") {
+    return { admitted: true };
+  }
   if (routed.kind === "respond" && routed.protocolDowngrade) {
     return { admitted: false, protocolDowngrade: routed.protocolDowngrade };
   }

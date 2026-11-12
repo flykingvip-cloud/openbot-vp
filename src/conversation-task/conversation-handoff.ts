@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { isBuiltinStewardAgent } from "../agents/builtin-steward/identity.js";
 import { readLatestAssistantReply } from "../agents/tools/agent-step.js";
-import { loadSessionStore } from "../config/sessions.js";
+import { loadSessionStore, resolveSessionFilePath } from "../config/sessions.js";
 import {
   canDispatchDiagnoseAction,
   defaultSessionExists,
@@ -104,14 +104,14 @@ export function conversationTranscriptExists(
   if (!sessionId) {
     return false;
   }
-  const raw = entry?.sessionFile?.trim();
-  const file = raw
-    ? path.isAbsolute(raw)
-      ? raw
-      : path.resolve(path.dirname(storePath), raw)
-    : path.join(path.dirname(storePath), `${sessionId}.jsonl`);
   try {
-    return fs.existsSync(file);
+    // Match the chat reader/writer boundary. A stale/out-of-root pointer may
+    // resolve only to this current sessionId in the authorized store directory.
+    // Never treat another root's existing transcript or a directory as a peer.
+    const file = resolveSessionFilePath(sessionId, entry, {
+      sessionsDir: path.dirname(storePath),
+    });
+    return fs.statSync(file).isFile();
   } catch {
     return false;
   }

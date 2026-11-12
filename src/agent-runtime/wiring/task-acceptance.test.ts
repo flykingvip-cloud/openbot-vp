@@ -24,6 +24,7 @@ async function fixture() {
       expectedFocusRevision: 0,
       expectedWriteEpoch: 0,
       proposal: {
+        lifecycle: "long_task" as const,
         goal: "Create exact file",
         acceptance: ["Exact bytes"],
         checks: [

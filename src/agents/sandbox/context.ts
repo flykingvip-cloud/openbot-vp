@@ -235,7 +235,11 @@ function resolveAccountWorkerContainerWorkdir(
   return ACCOUNT_EXEC_WORKSPACE;
 }
 
-function resolveSandboxSession(params: { config?: OpenBotConfig; sessionKey?: string }) {
+function resolveSandboxSession(params: {
+  config?: OpenBotConfig;
+  sessionKey?: string;
+  agentId?: string;
+}) {
   const rawSessionKey = params.sessionKey?.trim();
   if (!rawSessionKey) {
     return null;
@@ -244,6 +248,7 @@ function resolveSandboxSession(params: { config?: OpenBotConfig; sessionKey?: st
   const runtime = resolveSandboxRuntimeStatus({
     cfg: params.config,
     sessionKey: rawSessionKey,
+    agentId: params.agentId,
   });
   if (!runtime.sandboxed) {
     return null;
@@ -383,6 +388,8 @@ async function startSandboxedAccountWorker(params: {
 export async function resolveSandboxContext(params: {
   config?: OpenBotConfig;
   sessionKey?: string;
+  /** Host-selected execution agent, never supplied by tool arguments. */
+  agentId?: string;
   workspaceDir?: string;
   /** Server-derived account. Model and tool parameters must not supply this. */
   account?: { tenantId: string; userId: string };

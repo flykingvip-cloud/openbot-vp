@@ -37,6 +37,35 @@ const peers: ConversationPeer[] = [
 ];
 
 describe("conversation transcript reachability", () => {
+  it("uses the same safe current-session path as chat when an explicit pointer is stale", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "conv-path-parity-"));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "conv-other-root-"));
+    const sessionId = "27600000-1111-4222-8333-123456789abc";
+    const storePath = path.join(dir, "sessions.json");
+    try {
+      const external = path.join(outside, "foreign.jsonl");
+      fs.writeFileSync(external, "{}\n");
+      expect(conversationTranscriptExists(storePath, { sessionId, sessionFile: external })).toBe(
+        false,
+      );
+      fs.writeFileSync(path.join(dir, `${sessionId}.jsonl`), "{}\n");
+      expect(conversationTranscriptExists(storePath, { sessionId, sessionFile: external })).toBe(
+        true,
+      );
+      expect(
+        conversationTranscriptExists(storePath, { sessionId, sessionFile: "../foreign.jsonl" }),
+      ).toBe(true);
+      fs.unlinkSync(path.join(dir, `${sessionId}.jsonl`));
+      fs.writeFileSync(path.join(dir, "old-session.jsonl"), "old history\n");
+      expect(conversationTranscriptExists(storePath, { sessionId })).toBe(false);
+      fs.mkdirSync(path.join(dir, `${sessionId}.jsonl`));
+      expect(conversationTranscriptExists(storePath, { sessionId })).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
   it("ignores a store pointer whose transcript file is missing", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "conv-transcript-"));
     const storePath = path.join(dir, "sessions.json");

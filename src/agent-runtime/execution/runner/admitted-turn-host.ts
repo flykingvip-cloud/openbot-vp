@@ -30,6 +30,7 @@ import type {
   chargeModelCallAgainstTip,
 } from "../../../task-outcome/runtime-from-runner.js";
 import type { normalizeTaskOutcomeSubjectRef } from "../../../task-outcome/subject-ref.js";
+import type { sessionTaskState } from "../../state/index.js";
 /** Mandatory internal host capabilities for one admitted turn. Not a plugin/configuration API. */
 import type { AgentTurnExecutionParams } from "./turn-contract.js";
 
@@ -38,6 +39,7 @@ export type AdmittedTurnHost = {
     ensureChatTurnTaskOutcome: typeof ensureChatTurnTaskOutcome;
     normalizeTaskOutcomeSubjectRef: typeof normalizeTaskOutcomeSubjectRef;
     isTaskExecutionBindingCurrent: typeof isTaskExecutionBindingCurrent;
+    isTurnExecutionAdmissionCurrent: typeof sessionTaskState.turnAdmissionCurrent;
   };
   budget: {
     assessRunnerTurnBudgetGate: typeof assessRunnerTurnBudgetGate;

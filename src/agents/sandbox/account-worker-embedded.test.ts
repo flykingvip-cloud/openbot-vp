@@ -142,6 +142,21 @@ describe("embedded account worker handle", () => {
     gatewayClientSessionEnterpriseId: "tenant-a",
   };
 
+  it("keeps the trusted executing member when the shared group session key belongs to main", async () => {
+    enableManaged(true);
+    installRuntime();
+    const resolved = await resolveEmbeddedRunSandboxContextParams({
+      ...runInput,
+      workspaceDir: root,
+      sessionKey: "agent:main:space:group-a",
+      agentId: "bot-member",
+    });
+    expect(resolved.accountWorker?.request).toMatchObject({ agentId: "bot-member" });
+    const sandbox = await resolveSandboxContext(resolved);
+    expect(sandbox?.workspaceDir).toContain(`${path.sep}bot-member${path.sep}workspace`);
+    expect(sandbox?.workspaceDir).not.toContain(`${path.sep}main${path.sep}workspace`);
+  });
+
   it("leaves the gateway docker path unchanged when the worker flag is off", async () => {
     enableManaged(false);
     runInput.workspaceDir = root;

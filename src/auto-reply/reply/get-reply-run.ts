@@ -1446,6 +1446,9 @@ export async function runPreparedReply(
     cfg,
   });
   let admittedBinding = opts?.resumedTaskBinding;
+  let turnExecutionAdmission:
+    | import("../../agent-runtime/contracts/execution.js").TurnExecutionAdmission
+    | undefined;
   if (interactionIngress && !admittedBinding) {
     const sources = createInteractionSourceBoundary();
     const persistOwnReply = (text: string) => {
@@ -1682,7 +1685,7 @@ export async function runPreparedReply(
       }
     }
     if (routed.kind === "execution_admission") {
-      if (routed.result.kind !== "accepted") {
+      if (routed.result.kind !== "accepted" && routed.result.kind !== "accepted_turn") {
         if (
           routed.result.kind === "rejected" &&
           routed.result.reason === "task_mutation_unconfirmed"
@@ -1700,20 +1703,27 @@ export async function runPreparedReply(
             : "任务状态已变化或执行未获准，本次未启动；请确认当前目标后重试。",
         );
       }
-      admittedBinding = routed.result.binding;
-      acceptedCriteria = routed.result.acceptance;
-      await opts?.onInteractionTaskEffect?.({
-        kind: "replace",
-        taskId: board.current?.taskId ?? "",
-        previousRunId: board.current?.executionAttempt,
-      });
+      if (routed.result.kind === "accepted_turn") {
+        turnExecutionAdmission = routed.result.admission;
+        acceptedCriteria = turnExecutionAdmission.acceptance;
+      } else {
+        admittedBinding = routed.result.binding;
+        acceptedCriteria = routed.result.acceptance;
+        await opts?.onInteractionTaskEffect?.({
+          kind: "replace",
+          taskId: board.current?.taskId ?? "",
+          previousRunId: board.current?.executionAttempt,
+        });
+      }
     }
-    if (!admittedBinding) {
+    if (!admittedBinding && !turnExecutionAdmission) {
       typing.cleanup();
       return persistOwnReply("执行请求缺少有效任务身份，本次未启动。");
     }
-    const acceptedTask = replyTurnRuntime.state.read(sessionFile).current;
-    if (acceptedTask?.taskId !== admittedBinding.taskId) {
+    const acceptedTask = admittedBinding
+      ? replyTurnRuntime.state.read(sessionFile).current
+      : undefined;
+    if (admittedBinding && acceptedTask?.taskId !== admittedBinding.taskId) {
       typing.cleanup();
       return persistOwnReply("任务焦点已变化，本次未启动执行。");
     }
@@ -1724,14 +1734,20 @@ export async function runPreparedReply(
       [
         "## Admitted execution request",
         "This is the authoritative accepted goal for this execution. Earlier task references are history only.",
-        buildResumePrompt(acceptedTask),
-        `Goal: ${acceptedTask.goalText}`,
+        ...(acceptedTask
+          ? [buildResumePrompt(acceptedTask)]
+          : [
+              "Current-turn work only. Do not create, update, resume or complete a task board. Report the actual result this turn; no background continuation is authorized by this scope.",
+            ]),
+        `Goal: ${acceptedTask?.goalText ?? turnExecutionAdmission?.goal}`,
         "Acceptance criteria:",
         ...acceptedCriteria.map((criterion, index) => `${index + 1}. ${criterion}`),
       ].join("\n"),
     );
     // New accepted focus supersedes the old active attempt, using the existing abort path.
-    abortEmbeddedPiRun(sessionIdFinal);
+    if (admittedBinding) {
+      abortEmbeddedPiRun(sessionIdFinal);
+    }
   }
   const collaborationRoundInvoked = sessionCtx.CollaborationRoundInvoked === true;
   // Queue body stays the user utterance (plus thread/media notes). System events
@@ -1893,9 +1909,11 @@ export async function runPreparedReply(
       senderE164: sessionCtx.SenderE164?.trim() || undefined,
       senderIsOwner: command.senderIsOwner,
       sessionFile,
-      taskCompletionBinding:
-        admittedBinding ?? replyTurnRuntime.state.captureBinding(sessionFile, inboundMessage),
-      ...(admittedBinding ? { executionAdmitted: true } : {}),
+      taskCompletionBinding: turnExecutionAdmission
+        ? undefined
+        : (admittedBinding ?? replyTurnRuntime.state.captureBinding(sessionFile, inboundMessage)),
+      ...(admittedBinding || turnExecutionAdmission ? { executionAdmitted: true } : {}),
+      ...(turnExecutionAdmission ? { turnExecutionAdmission } : {}),
       skipUserTranscriptPersist: collaborationRoundInvoked || Boolean(interactionIngress),
       collaborationRoundInvoked,
       ...(sessionCtx.DeliveryToolSideEffect

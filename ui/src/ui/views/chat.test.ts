@@ -1,7 +1,8 @@
-// @vitest-environment jsdom
 import { html, render } from "lit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n, t } from "../../i18n/index.ts";
+// @vitest-environment jsdom
+import { GENERIC_CHAT_ERROR_MESSAGE } from "../chat-error-sanitize.ts";
 import { DEFAULT_CHAT_CONTEXT_SCOPE } from "../chat/context-scope.ts";
 import { resolvePreviewArtifactRecord } from "../chat/generated-preview-artifact.ts";
 import type { ArtifactWorkspaceSidebar, SessionsListResult } from "../types.ts";
@@ -145,7 +146,9 @@ describe("chat view", () => {
     );
     render(view, container);
     expect(container.querySelector(".callout.danger")).toBeNull();
-    expect(container.textContent).toContain("reading 'length'");
+    expect(container.textContent).toContain(GENERIC_CHAT_ERROR_MESSAGE);
+    expect(container.textContent).not.toContain("reading 'length'");
+    expect(container.textContent).not.toContain("Cannot read properties");
     expect(container.textContent).toContain(essay);
   });
 

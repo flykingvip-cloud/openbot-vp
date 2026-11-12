@@ -158,6 +158,10 @@ export type MsgContext = {
   CollaborationTenantId?: string;
   /** Explicit collaboration round dispatch from gateway group discussion scheduler. */
   CollaborationRoundInvoked?: boolean;
+  /** Server-understood scope for this human round; never inherited from old group tasks. */
+  CollaborationExecutionLifecycle?: "turn" | "long_task";
+  /** Group task established for this request; never the ambient currentTaskId. */
+  CollaborationExecutionTaskId?: string;
   /** Bot agent id for collaboration rounds (space: sessionKey otherwise resolves to main). */
   CollaborationBotAgentId?: string;
   /**

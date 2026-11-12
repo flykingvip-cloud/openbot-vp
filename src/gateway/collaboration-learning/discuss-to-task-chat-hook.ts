@@ -1,3 +1,4 @@
+import type { InteractionModelDecision } from "../../agent-runtime/contracts/interaction.js";
 /**
  * Composition-root helper: classify + controlledDiscussToTask before primary discussion.
  * Failures are returned as structured results — never throw into the chat loop.
@@ -9,10 +10,6 @@ import {
   controlledDiscussToTask,
   type ControlledDiscussToTaskResult,
 } from "./controlled-discuss-to-task.js";
-import {
-  classifyDiscussToTaskIntent,
-  formatDiscussToTaskClarificationMessage,
-} from "./discuss-to-task-classify.js";
 import { FORMAL_TASK_FLAG_OFF_USER_MESSAGE } from "./discuss-to-task-receipt.js";
 import { registerDiscussToTaskSourceBinding } from "./discuss-to-task-source-binding.js";
 import { stagesFromActivation } from "./discuss-to-task-stages.js";
@@ -39,6 +36,8 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
   stampedEnterpriseId?: string | null;
   identityAliases?: string[];
   suggestedClaimantIds?: readonly string[];
+  /** Trusted host result, never accepted from chat.send request fields. */
+  understanding?: InteractionModelDecision;
 }): Promise<ControlledDiscussToTaskResult | null> {
   const message = params.message.trim();
   const sourceMessageId = params.sourceMessageId.trim();
@@ -48,26 +47,21 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
     return null;
   }
 
-  const classification = classifyDiscussToTaskIntent(message);
-  if (classification.kind !== "explicit_delegation") {
-    // Still return a lightweight result for diagnosis when clarification needed.
-    if (classification.kind === "needs_clarification") {
-      return {
-        classification: classification.kind,
-        classificationReason: classification.reason,
-        attempted: false,
-        taskId: null,
-        activationKey: null,
-        activation: null,
-        stages: emptyStages(),
-        statusCode: "needs_clarification",
-        userMessage: formatDiscussToTaskClarificationMessage(classification),
-        internalReason: classification.reason,
-      };
-    }
+  const decision = params.understanding;
+  // No lexical fallback: group work must use the same semantic lifecycle contract.
+  if (!decision) {
+    throw new Error("Group interaction understanding is required before formal task admission");
+  }
+  if (decision.kind !== "execution_request" || decision.request.lifecycle !== "long_task") {
     return null;
   }
-
+  const classification = {
+    kind: "explicit_delegation" as const,
+    reason: "explicit_team_task" as const,
+    titleHint: decision.request.goal.slice(0, 80),
+    goalHint: decision.request.goal,
+    acceptanceHints: decision.request.acceptance,
+  };
   // Flag-off before auth/bind/activate: clearly blocked, no task/board writes.
   const earlyTenantId =
     params.tenant?.tenantId?.trim() ||
@@ -167,6 +161,7 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
     goal: classification.goalHint,
     acceptanceCriteria: classification.acceptanceHints,
     suggestedClaimantIds: params.suggestedClaimantIds,
+    forceExplicit: true,
     // Phase-1: chat path never pre-confirms.
     humanConfirmed: false,
     auth: bound.auth,

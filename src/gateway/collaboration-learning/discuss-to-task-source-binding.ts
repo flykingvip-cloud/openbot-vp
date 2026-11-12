@@ -19,6 +19,8 @@ export type DiscussToTaskSourceBinding = {
   principalActor: string;
   kind: DiscussToTaskSourceKind;
   registeredAtMs: number;
+  /** Inbound turn scope, not a grant. Missing on old explicit API sources. */
+  lifecycle?: "turn" | "long_task";
 };
 
 const bindings = new Map<string, DiscussToTaskSourceBinding>();
@@ -53,6 +55,7 @@ export function registerDiscussToTaskSourceBinding(params: {
   principalActor?: string;
   kind?: DiscussToTaskSourceKind;
   nowMs?: number;
+  lifecycle?: "turn" | "long_task";
 }): SourceBindingRegisterResult {
   const now = params.nowMs ?? Date.now();
   const sourceMessageId = params.sourceMessageId.trim();
@@ -70,13 +73,23 @@ export function registerDiscussToTaskSourceBinding(params: {
   const key = bindingKey({ tenantId, groupId, sourceMessageId });
   const existing = bindings.get(key);
   if (existing) {
-    if (existing.principalActor !== principalActor) {
+    if (
+      existing.principalActor !== principalActor ||
+      (existing.lifecycle !== undefined &&
+        params.lifecycle !== undefined &&
+        existing.lifecycle !== params.lifecycle)
+    ) {
       return {
         ok: false,
         reason: "source_owner_conflict",
         detail: `sourceMessageId owned by ${existing.principalActor}; cannot reassign to ${principalActor}`,
         binding: existing,
       };
+    }
+    if (existing.lifecycle === undefined && params.lifecycle !== undefined) {
+      const scoped = { ...existing, lifecycle: params.lifecycle };
+      bindings.set(key, scoped);
+      return { ok: true, binding: scoped, created: false };
     }
     return { ok: true, binding: existing, created: false };
   }
@@ -87,6 +100,7 @@ export function registerDiscussToTaskSourceBinding(params: {
     principalActor,
     kind: "trusted_inbound",
     registeredAtMs: now,
+    ...(params.lifecycle ? { lifecycle: params.lifecycle } : {}),
   };
   bindings.set(key, row);
   return { ok: true, binding: row, created: true };

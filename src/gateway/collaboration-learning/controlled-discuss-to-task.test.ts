@@ -19,7 +19,10 @@ import { buildAcceptedTaskStopControl } from "../collaboration-dispatch/task-sto
 import { controlledDiscussToTask } from "./controlled-discuss-to-task.js";
 import { mintDiscussToTaskId } from "./discuss-to-task-id.js";
 import { FORMAL_TASK_FLAG_OFF_USER_MESSAGE } from "./discuss-to-task-receipt.js";
-import { clearDiscussToTaskSourceBindingsForTests } from "./discuss-to-task-source-binding.js";
+import {
+  clearDiscussToTaskSourceBindingsForTests,
+  registerDiscussToTaskSourceBinding,
+} from "./discuss-to-task-source-binding.js";
 import {
   readAuthoritativeDiscussToTaskStages,
   readDiscussToTaskMetaFromTags,
@@ -99,6 +102,31 @@ const EXPLICIT_MSG =
   "请两名成员协作完成短 Markdown 提纲\n验收标准：\n- 成员A写背景\n- 成员B写结论\n- 汇总不超过 400 字";
 
 describe("controlledDiscussToTask real storage", () => {
+  it("refuses formal activation from current-turn chat scope even with forceExplicit", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    registerDiscussToTaskSourceBinding({
+      sourceMessageId: "small-turn",
+      tenantId: "_local",
+      groupId: "grp_d2t",
+      principalActor: "human:owner",
+      lifecycle: "turn",
+    });
+    const result = await controlledDiscussToTask({
+      sourceMessageId: "small-turn",
+      tenantId: "_local",
+      groupId: "grp_d2t",
+      actor: "human:owner",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["Report result"],
+      cfg,
+      trusted,
+    });
+    expect(result.internalReason).toBe("current_turn_scope_only");
+    expect(result.taskId).toBeNull();
+    expect(result.activation).toBeNull();
+    expect(result.attempted).toBe(false);
+  });
   it("explicit delegation establishes formal task (needs_confirm by default)", async () => {
     const { cfg, trusted } = await useTrusted(true);
     const result = await controlledDiscussToTask({
@@ -155,9 +183,7 @@ describe("controlledDiscussToTask real storage", () => {
     expect(result.userMessage).toContain("目标：");
     expect(result.userMessage).toMatch(/研究/);
     expect(result.userMessage).toContain("还缺少：交付物或验收条件");
-    expect(result.userMessage).not.toBe(
-      "委托意图尚不明确或缺少验收条件，请补充后再建立正式任务。",
-    );
+    expect(result.userMessage).not.toBe("委托意图尚不明确或缺少验收条件，请补充后再建立正式任务。");
     const stores = createTrustedGroupStores(trusted);
     // No task object for minted id
     const taskId = mintDiscussToTaskId({

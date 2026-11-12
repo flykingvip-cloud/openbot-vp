@@ -1,3 +1,4 @@
+import type { InteractionModelDecision } from "../../agent-runtime/contracts/interaction.js";
 /**
  * Chat-handler discuss→task turn: bind trusted inbound → controlled entry →
  * persist user-visible receipt → coordinator binding text.
@@ -238,7 +239,11 @@ export async function runControlledDiscussToTaskChatTurn(params: {
   suggestedClaimantIds?: readonly string[];
   /** Persist receipt into chat transcript; failures must surface. */
   persistReceipt?: PersistReceiptFn;
+  understanding?: InteractionModelDecision;
 }): Promise<DiscussToTaskChatTurnResult> {
+  if (!params.understanding) {
+    throw new Error("Group interaction understanding is required before formal task admission");
+  }
   const sourceMessageId = params.sourceMessageId.trim();
   const principalActor = params.principalActor.trim();
   const groupId = params.groupId.trim();
@@ -254,6 +259,10 @@ export async function runControlledDiscussToTaskChatTurn(params: {
         groupId,
         principalActor,
         kind: "trusted_inbound",
+        lifecycle:
+          params.understanding.kind === "execution_request"
+            ? (params.understanding.request.lifecycle ?? "turn")
+            : "turn",
       });
       if (!bindingRegister.ok) {
         const userMessage = "正式任务来源归属冲突，无法借用他人消息身份建立任务。";
@@ -315,6 +324,7 @@ export async function runControlledDiscussToTaskChatTurn(params: {
       stampedEnterpriseId: params.stampedEnterpriseId,
       identityAliases: params.identityAliases,
       suggestedClaimantIds: params.suggestedClaimantIds,
+      understanding: params.understanding,
     });
     if (!d2tResult) {
       return { d2tResult: null, bindingRegister };

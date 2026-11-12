@@ -27,7 +27,12 @@ it("persists accepted checks and refuses changing their bytes on an idempotent r
       requestId: "checks-a",
       expectedFocusRevision: 0,
       expectedWriteEpoch: 0,
-      proposal: { goal: "Create file", acceptance: ["Exact bytes"], checks: [check] },
+      proposal: {
+        lifecycle: "long_task" as const,
+        goal: "Create file",
+        acceptance: ["Exact bytes"],
+        checks: [check],
+      },
     };
     expect((await admitSessionExecution(file, request, async () => true)).kind).toBe("accepted");
     expect(readSessionTaskBoard(file).current?.acceptanceChecks).toEqual([check]);
@@ -60,7 +65,7 @@ it("applies bound semantic amendments and refuses stale control writes", async (
         requestId: "a",
         expectedFocusRevision: 0,
         expectedWriteEpoch: 0,
-        proposal: { goal: "报告", acceptance: ["来源"] },
+        proposal: { lifecycle: "long_task" as const, goal: "报告", acceptance: ["来源"] },
       },
       async () => true,
     );
@@ -112,7 +117,7 @@ it("admits once, persists acceptance, and rejects stale or conflicting requests 
       requestId: "message-a",
       expectedFocusRevision: 0,
       expectedWriteEpoch: 0,
-      proposal: { goal: "报告", acceptance: ["可核验来源"] },
+      proposal: { lifecycle: "long_task" as const, goal: "报告", acceptance: ["可核验来源"] },
     };
     expect(await admitSessionExecution(file, request, async () => false)).toEqual({
       kind: "rejected",
@@ -164,7 +169,7 @@ it("uses explicit amendment scope instead of legacy wording to supersede constra
         requestId: "scope-a",
         expectedFocusRevision: 0,
         expectedWriteEpoch: 0,
-        proposal: { goal: "Report", acceptance: ["Sources"] },
+        proposal: { lifecycle: "long_task" as const, goal: "Report", acceptance: ["Sources"] },
       },
       async () => true,
     );

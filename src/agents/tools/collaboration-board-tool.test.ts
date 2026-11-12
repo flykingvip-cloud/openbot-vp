@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { isSideEffectingDeliveryTool } from "../../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
 import { ClaimContractEntryError } from "../../gateway/collaboration-learning/claim-contract-entry.js";
+import {
+  registerDiscussToTaskSourceBinding,
+  clearDiscussToTaskSourceBindingsForTests,
+} from "../../gateway/collaboration-learning/discuss-to-task-source-binding.js";
 import { resolveCoreToolCapability } from "../tool-catalog.js";
 import {
   COLLABORATION_BOARD_TOOL,
@@ -101,6 +105,39 @@ describe("shouldExposeCollaborationBoardTool", () => {
 });
 
 describe("collaboration_board tool", () => {
+  it("rejects formal board writes for a trusted current-turn source before effects", async () => {
+    registerDiscussToTaskSourceBinding({
+      sourceMessageId: "small-scope",
+      groupId: GROUP,
+      tenantId: "001",
+      principalActor: "human:owner",
+      lifecycle: "turn",
+    });
+    const activateTask = vi.fn();
+    const tool = createCollaborationBoardTool({
+      requesterAgentIdOverride: "bot-2",
+      agentSessionKey: SESSION,
+      agentGroupId: GROUP,
+      inboundSourceMessageId: "small-scope",
+      inboundPrincipalActor: "human:owner",
+      deps: {
+        isEnabled: () => true,
+        resolveTrustedTeam: stubTrustedTeam,
+        resolveActor: async () => "bot-2",
+        activateTask,
+      },
+    });
+    try {
+      expect(
+        detailsOf(
+          await tool.execute("small", { action: "activate_task", taskId: TASK, message: "start" }),
+        ),
+      ).toMatchObject({ ok: false, reason: "current_turn_scope_only" });
+      expect(activateTask).not.toHaveBeenCalled();
+    } finally {
+      clearDiscussToTaskSourceBindingsForTests();
+    }
+  });
   it("registers under the collaboration_board name", () => {
     const tool = createCollaborationBoardTool({
       requesterAgentIdOverride: "bot-2",

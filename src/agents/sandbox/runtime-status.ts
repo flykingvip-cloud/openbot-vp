@@ -39,7 +39,12 @@ function resolveComparableSessionKeyForSandbox(params: {
   });
 }
 
-export function resolveSandboxRuntimeStatus(params: { cfg?: OpenBotConfig; sessionKey?: string }): {
+export function resolveSandboxRuntimeStatus(params: {
+  cfg?: OpenBotConfig;
+  sessionKey?: string;
+  /** Trusted execution identity; shared group transcript keys are not the speaking agent. */
+  agentId?: string;
+}): {
   agentId: string;
   sessionKey: string;
   mainSessionKey: string;
@@ -51,6 +56,7 @@ export function resolveSandboxRuntimeStatus(params: { cfg?: OpenBotConfig; sessi
   const agentId = resolveSessionAgentId({
     sessionKey,
     config: params.cfg,
+    agentId: params.agentId,
   });
   const cfg = params.cfg;
   const sandboxCfg = resolveSandboxConfigForAgent(cfg, agentId);
