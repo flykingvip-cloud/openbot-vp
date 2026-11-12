@@ -41,6 +41,7 @@ import {
   type ControlUiRootState,
 } from "./control-ui.js";
 import { handleDevicePlatformHttpRequest } from "./device-platform-http.js";
+import { handleExecProtocolHttpRequest } from "./exec-protocol-http.js";
 import { handleFabricV1HttpRequest } from "./fabric-v1-http.js";
 import {
   parseHookJsonPayload,
@@ -760,6 +761,20 @@ export function createGatewayHttpServer(opts: {
               trustedProxies,
               allowRealIpFallback,
               rateLimiter,
+            }),
+        },
+        {
+          // Isolation-only exec-protocol product path. Off unless
+          // gateway.execProtocol.enabled is set with explicit isolation keys.
+          // Does not cut 回源 or enable a production execution profile.
+          name: "exec-protocol",
+          run: () =>
+            handleExecProtocolHttpRequest(req, res, {
+              auth: resolvedAuth,
+              trustedProxies,
+              allowRealIpFallback,
+              rateLimiter,
+              execProtocol: configSnapshot.gateway?.execProtocol,
             }),
         },
         {

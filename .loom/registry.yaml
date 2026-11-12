@@ -12880,6 +12880,30 @@ tasks:
     since: 2026-11-11
     metadata: {}
 landingStreams:
+  - id: t166-gateway-exec-artifact-auth
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .env.example
+      - docs/exec-protocol/v1-isolation-gateway-artifact-auth.md
+      - docs/gateway/trusted-proxy-auth.md
+      - src/config/schema.help.ts
+      - src/config/schema.labels.ts
+      - src/config/types.gateway.ts
+      - src/config/zod-schema.ts
+      - src/gateway/auth.test.ts
+      - src/gateway/auth.ts
+      - src/gateway/exec-protocol-config.test.ts
+      - src/gateway/exec-protocol-config.ts
+      - src/gateway/exec-protocol-http.test.ts
+      - src/gateway/exec-protocol-http.platform-auth.test.ts
+      - src/gateway/exec-protocol-http.ts
+      - src/gateway/server-http.ts
+    canLandWith: []
+    metadata:
+      task: t166-gateway-exec-artifact-auth
+      owner: cursor-shuanggui-publish
+      intent: Isolation-only gateway exec-protocol artifact path and tight loopback identity headers
   - id: local-ui-seams-baseline-registration-2b70e4494
     landingPolicy: parallel
     paths:
