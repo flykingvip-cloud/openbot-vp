@@ -4,7 +4,7 @@
 
 唯一负责人：`cursor-shuanggui-publish`（双规发布），任务 `prod-adapt-1plus3`。共享文件仍归原路径负责人，由本任务集成。隔离任务 `exec-protocol-v1-min-loop` 继续拥有 `src/exec-protocol/**`；`forbid-production-host-fallback` 继续拥有 `src/agents/sandbox/production-execution-mode.ts`。本任务新增生产剖面文档与后续生产专用文件，不抢占 `deploy/production/**`、`src/browser/**`、`account-computer-*.ts` 及其他已有路径。改动上述已有路径或隔离实现必须经既有 lander 协调集成，不得以「单独落地」提交。
 
-未签收的生产超时、证书材料、监听地址、容量数字、RPO/RTO 不以隔离数值外推，本文也不编造这些取值。标 **待签收** 的项不得当作已批准参数编码进生产默认值。`assertExecProtocolIsolationOnly` 在代码落地并经独立审核前，仍应拒绝生产启用。
+规划执行池 B（botser3，22006，`10.21.88.6`）的生产执行协议监听已签收为 `10.21.88.6:18791`，必须由调用方显式提供，不得编码为缺省值。这不是网关监听：香港到 A 的业务入口仍是隧道地址 `10.99.0.2:18789`。其余未签收的生产超时、证书材料、容量数字、RPO/RTO 不以隔离数值外推，本文也不编造这些取值。标 **待签收** 的项不得当作已批准参数编码进生产默认值。`assertExecProtocolIsolationOnly` 在代码落地并经独立审核前，仍应拒绝生产启用。
 
 依据：`docs/exec-protocol/v1-field-freeze.md`、`docs/exec-protocol/v1-reconcile-and-retry-freeze.md`、`src/exec-protocol/types.ts` 已冻结隔离目录，以及设计包 `16-生产设计冻结补件.md`。
 
@@ -12,19 +12,19 @@
 
 生产剖面沿用隔离目录（`EXEC_ERROR_CODES` / `HTTP_STATUS_BY_ERROR`），并显式扩展一项容量拒绝码。认证失败、撤销、版本不支持、不可达、容量拒绝、成果校验失败必须分码。**禁止把认证失败记成 `EXEC_UNREACHABLE`。** 未列入的错误码不得使用。
 
-| 错误码 | HTTP | 生产语义 | 调用方动作 |
-| --- | --- | --- | --- |
-| （成功，新受理） | 201 | 与隔离相同 | 记录 `taskId` |
-| （成功，幂等命中或查询/取消/回传成功） | 200 | 与隔离相同 | 以返回状态为准，不新开任务 |
-| `EXEC_VERSION_UNSUPPORTED` | 400 | 缺失、非整数或不为已承认版本 | 失败，不得降级到 A 本机执行 |
-| `EXEC_UNAUTHORIZED` | 401 | 未认证、证书无效/过期/不受信、租户授权不匹配、身份材料缺失或时钟超差 | 拒绝；未认证不得区分任务是否存在；不得改在 A 本机执行 |
-| `EXEC_REVOKED` | 403 | 范围已撤销，或证书/授权已被明确撤销 | 不得新提交；在途按第 4 节取消语义处理 |
-| `EXEC_NOT_FOUND` | 404 | 已认证但任务不在本租户范围或不存在 | 不得泄漏他户 |
-| `EXEC_CONFLICT` | 409 | 幂等键冲突、对账版本冲突等 | 先查询再对账，不得换键强开 |
-| `EXEC_CAPACITY_REJECTED` | 429 | **生产扩展**：任一容量层已达限且不能再排队 | 明确拒绝；不得 silently 在 A 执行；不得记成 `EXEC_UNREACHABLE` |
-| `EXEC_CHECKSUM_MISMATCH` | 422 | 成果 hash 或字节数不一致 | 不得 `succeeded`，不得交付 |
-| `EXEC_UNREACHABLE` | 503 | B 不可达：连接失败、无 HTTP 响应、请求超时（握手尚未完成的传输失败） | A 失败并暂停新执行；不得 host 回落，不得改走旧香港网关 |
-| `EXEC_INTERNAL` | 500 | 内部错误 | 记入 `failed` 或 `result_unconfirmed`（按第 5 节） |
+| 错误码                                 | HTTP | 生产语义                                                             | 调用方动作                                                     |
+| -------------------------------------- | ---- | -------------------------------------------------------------------- | -------------------------------------------------------------- |
+| （成功，新受理）                       | 201  | 与隔离相同                                                           | 记录 `taskId`                                                  |
+| （成功，幂等命中或查询/取消/回传成功） | 200  | 与隔离相同                                                           | 以返回状态为准，不新开任务                                     |
+| `EXEC_VERSION_UNSUPPORTED`             | 400  | 缺失、非整数或不为已承认版本                                         | 失败，不得降级到 A 本机执行                                    |
+| `EXEC_UNAUTHORIZED`                    | 401  | 未认证、证书无效/过期/不受信、租户授权不匹配、身份材料缺失或时钟超差 | 拒绝；未认证不得区分任务是否存在；不得改在 A 本机执行          |
+| `EXEC_REVOKED`                         | 403  | 范围已撤销，或证书/授权已被明确撤销                                  | 不得新提交；在途按第 4 节取消语义处理                          |
+| `EXEC_NOT_FOUND`                       | 404  | 已认证但任务不在本租户范围或不存在                                   | 不得泄漏他户                                                   |
+| `EXEC_CONFLICT`                        | 409  | 幂等键冲突、对账版本冲突等                                           | 先查询再对账，不得换键强开                                     |
+| `EXEC_CAPACITY_REJECTED`               | 429  | **生产扩展**：任一容量层已达限且不能再排队                           | 明确拒绝；不得 silently 在 A 执行；不得记成 `EXEC_UNREACHABLE` |
+| `EXEC_CHECKSUM_MISMATCH`               | 422  | 成果 hash 或字节数不一致                                             | 不得 `succeeded`，不得交付                                     |
+| `EXEC_UNREACHABLE`                     | 503  | B 不可达：连接失败、无 HTTP 响应、请求超时（握手尚未完成的传输失败） | A 失败并暂停新执行；不得 host 回落，不得改走旧香港网关         |
+| `EXEC_INTERNAL`                        | 500  | 内部错误                                                             | 记入 `failed` 或 `result_unconfirmed`（按第 5 节）             |
 
 分类禁令：
 
@@ -44,18 +44,18 @@
 
 剖面名：`exec-protocol-v1-production`。配置必须显式提供下列字段；任一缺项或为空 → 拒绝启用（配置错误，不启动协议）。**禁止**从 `ISOLATION_SIGNED_VALUES`、隔离环境变量或测试夹具回填。环境变量具体名称 **待签收**；即使将来与隔离键同名，也不得把隔离已签收值当作生产缺省。
 
-| 字段 | 类型形状 | 取值 |
-| --- | --- | --- |
-| `profileName` | `"exec-protocol-v1-production"` | 必须为此字面量 |
-| `execApiVersion` | `1` | 见第 2 节 |
-| `bind` | 非空字符串 | **待签收**。不得预先签收隔离回环 `127.0.0.1` / `::1` / 端口 `18790` 为生产默认 |
-| `port` | 整数 1–65535 | **待签收** |
-| `mutualAuth` | 见下 | 材料本身 **待签收**；缺项拒绝启用 |
-| `connectTimeoutMs` / `requestTimeoutMs` / `executionTimeoutMs` | 正整数（毫秒） | **待签收**。隔离值 3000 / 5000 / 60000 不得外推 |
-| `maxTransportRetries` / `transportBackoffMs` | 正整数；非负整数序列 | **待签收**。隔离「含首次共 3 次、退避 200,400」不得外推。重试范围仍仅限查询、取消通知、成果字节；不得对未对账的外部操作自动重跑 |
-| `cancelDeadlineMs` / `idempotencyTtlMs` / `maxClockSkewMs` | 正整数；时钟偏差为非负整数 | **待签收**。隔离值 10000 / 86400000 / 30000 不得外推 |
-| `tenantAuthSource` | 显式来源描述（见第 4 节） | 来源与表示方式 **待签收** |
-| `capacity` | 三层上限，见第 6 节 | 数字 **待签收**；缺项拒绝启用。不得使用 `PROTOTYPE_MAX_CONCURRENT=8` 或隔离测试并发 |
+| 字段                                                           | 类型形状                        | 取值                                                                                                                            |
+| -------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `profileName`                                                  | `"exec-protocol-v1-production"` | 必须为此字面量                                                                                                                  |
+| `execApiVersion`                                               | `1`                             | 见第 2 节                                                                                                                       |
+| `bind`                                                         | 非空字符串                      | 已签收：必须显式为 `10.21.88.6`。不得作为缺省值；不得使用隔离回环 `127.0.0.1` / `::1`、通配 `0.0.0.0` 或其他地址                |
+| `port`                                                         | 整数 1–65535                    | 已签收：必须显式为 `18791`，与 `bind` 成对提供。不得作为缺省值；不得使用隔离端口 `18790`                                        |
+| `mutualAuth`                                                   | 见下                            | 材料本身 **待签收**；缺项拒绝启用                                                                                               |
+| `connectTimeoutMs` / `requestTimeoutMs` / `executionTimeoutMs` | 正整数（毫秒）                  | **待签收**。隔离值 3000 / 5000 / 60000 不得外推                                                                                 |
+| `maxTransportRetries` / `transportBackoffMs`                   | 正整数；非负整数序列            | **待签收**。隔离「含首次共 3 次、退避 200,400」不得外推。重试范围仍仅限查询、取消通知、成果字节；不得对未对账的外部操作自动重跑 |
+| `cancelDeadlineMs` / `idempotencyTtlMs` / `maxClockSkewMs`     | 正整数；时钟偏差为非负整数      | **待签收**。隔离值 10000 / 86400000 / 30000 不得外推                                                                            |
+| `tenantAuthSource`                                             | 显式来源描述（见第 4 节）       | 来源与表示方式 **待签收**                                                                                                       |
+| `capacity`                                                     | 三层上限，见第 6 节             | 数字 **待签收**；缺项拒绝启用。不得使用 `PROTOTYPE_MAX_CONCURRENT=8` 或隔离测试并发                                             |
 
 `mutualAuth` 必填形状（取值全部 **待签收**，不得编造证书材料）：
 
@@ -75,11 +75,11 @@
 
 撤销范围与隔离 `ExecRevocationScope` 对应：
 
-| 生产范围 | 字段 | 隔离对应 |
-| --- | --- | --- |
-| 租户 | `{ tenantId }` | `tenantId` |
-| 账号 | `{ tenantId, userId }` | `subject` 映射为该账号主体；生产请求以 `userId` 为账号标识 |
-| 单任务 | `{ tenantId, taskId }` | `taskId` |
+| 生产范围 | 字段                   | 隔离对应                                                   |
+| -------- | ---------------------- | ---------------------------------------------------------- |
+| 租户     | `{ tenantId }`         | `tenantId`                                                 |
+| 账号     | `{ tenantId, userId }` | `subject` 映射为该账号主体；生产请求以 `userId` 为账号标识 |
+| 单任务   | `{ tenantId, taskId }` | `taskId`                                                   |
 
 生效点：
 
@@ -96,20 +96,20 @@
 
 枚举 `ExecCapabilityStatus`：
 
-| 值 | 含义 |
-| --- | --- |
-| `available` | 已启用且 B 可接受新执行 |
-| `unavailable` | 不可接受新执行（B 不可达、门禁未解除、挂载保护失败、生产剖面未启用等） |
-| `degraded` | 执行通道仍可能可用，但已声明的附属能力失败（如云电脑重连失败），必须明确降级，不得冒充成功 |
+| 值            | 含义                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------ |
+| `available`   | 已启用且 B 可接受新执行                                                                    |
+| `unavailable` | 不可接受新执行（B 不可达、门禁未解除、挂载保护失败、生产剖面未启用等）                     |
+| `degraded`    | 执行通道仍可能可用，但已声明的附属能力失败（如云电脑重连失败），必须明确降级，不得冒充成功 |
 
 响应形状：`{ "exec-api-version": 1, "status": ExecCapabilityStatus, "reason"?: string }`。`unavailable` 时入口（A 网关）可继续存活，但不得接收新的执行任务并冒充成功。生产未启用时必须报告 `unavailable`，不得报告 `available`。
 
 任务状态 `failed` 与 `result_unconfirmed`（沿用已冻结状态机，不新增终态）：
 
-| 状态 | 使用条件 | 重试 |
-| --- | --- | --- |
-| `failed` | 可确认未产生外部副作用的执行失败，或已确认的执行失败（含容量拒绝后未开跑、认证/撤销拒绝未开跑、目录互斥未写入） | 不得自动改在 A 重跑；是否允许调用方按新幂等键再提交 **待签收**，默认不得自动重开 |
-| `result_unconfirmed` | 超时、断线或取消超时，且无法对账确认终态或副作用 | **禁止自动重试**；不得标 `succeeded`；只能通过对账入口离开 |
+| 状态                 | 使用条件                                                                                                        | 重试                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `failed`             | 可确认未产生外部副作用的执行失败，或已确认的执行失败（含容量拒绝后未开跑、认证/撤销拒绝未开跑、目录互斥未写入） | 不得自动改在 A 重跑；是否允许调用方按新幂等键再提交 **待签收**，默认不得自动重开 |
+| `result_unconfirmed` | 超时、断线或取消超时，且无法对账确认终态或副作用                                                                | **禁止自动重试**；不得标 `succeeded`；只能通过对账入口离开                       |
 
 不可达、认证失败、容量拒绝、成果校验失败都必须是明确失败或待核实，禁止回落到 A 或旧香港网关。
 
@@ -159,14 +159,14 @@ P3 与 P5 只做集成，不改 `src/browser/**`、`account-computer-*.ts`、`de
 
 **发布组合记录字段**（每次发布前从当时实际运行的 A/B 与香港配置采集，不能只凭上次发布记录；B 未更新也要记录实版）：
 
-| 字段 | 含义 |
-| --- | --- |
-| `recordedAt` | 采集时间，UTC RFC3339 |
-| `aDigest` | 当时 A 实际镜像 digest（`sha256:…`） |
-| `bDigest` | 当时 B 实际镜像 digest（`sha256:…`） |
+| 字段             | 含义                                              |
+| ---------------- | ------------------------------------------------- |
+| `recordedAt`     | 采集时间，UTC RFC3339                             |
+| `aDigest`        | 当时 A 实际镜像 digest（`sha256:…`）              |
+| `bDigest`        | 当时 B 实际镜像 digest（`sha256:…`）              |
 | `aActualVersion` | 当时 A 实际运行版本（产品与精确版本，按现场采集） |
-| `bActualVersion` | 当时 B 实际运行版本；即使本轮未更新 B 也必须写入 |
-| `source` | 必须标明来自现场采集，而不是上次账本复述 |
+| `bActualVersion` | 当时 B 实际运行版本；即使本轮未更新 B 也必须写入  |
+| `source`         | 必须标明来自现场采集，而不是上次账本复述          |
 
 具体版本字符串与 digest 以现场为准，本文不编造。本任务只定义记录形状并做集成，不写 `releases.jsonl`，不改香港回源；那两项仍须单独放行。日常更新在 A 内替换容器；香港保持指向 A 的受控入口。
 
@@ -175,7 +175,7 @@ P3 与 P5 只做集成，不改 `src/browser/**`、`account-computer-*.ts`、`de
 - 改 `src/exec-protocol/**` 必须与任务 `exec-protocol-v1-min-loop` 的 lander 协调集成。
 - 改 `src/agents/sandbox/production-execution-mode.ts` 必须与任务 `forbid-production-host-fallback` 的 lander 协调集成。
 - 同一负责人不等于同一落地任务。不得以「单独落地」把生产适配改动直接打进隔离任务路径，或绕过指定 lander，或关闭检查，或提交他人未完成内容。
-- 后续骨架 PR 可以新增仍拒绝启用的生产类型，但必须保持 `OPENBOT_PRODUCTION_EXECUTION_MODE=production` 拒绝启用，且不得把隔离已签收值当作生产默认。解除门禁须分项独立审核。
+- 后续骨架 PR 可以新增仍拒绝启用的生产类型，但必须保持 `OPENBOT_PRODUCTION_EXECUTION_MODE=production` 拒绝启用，且不得把隔离已签收值当作生产默认。解除门禁须分项独立审核。t237 已增加 `validateProductionExecProtocolConfig` 与已签收监听 `10.21.88.6:18791` 的形状校验；该校验通过不等于允许启用。强制双向 mTLS 与短时租户令牌（t218）仍未实现，本骨架不把它们落地为可启用能力。
 - `.loom/registry.yaml` 如需再改，只允许外科手术式追加、零删除其他任务，并由指定所有者协调；禁止运行 `loom register` 后提交全文件重写。本补齐不修改该文件。
 
 ## P1–P5 模块边界（沿用，受上面第 1–8 节约束）
@@ -202,12 +202,12 @@ P3 与 P5 只做集成，不改 `src/browser/**`、`account-computer-*.ts`、`de
 
 ## 分组与集成
 
-| 组别 | 接口 | 开发负责人 | 共享或相邻路径 |
-| --- | --- | --- | --- |
-| P1 | 双向认证、租户授权、撤销 | cursor-shuanggui-publish | `src/exec-protocol/**` 仍由 `exec-protocol-v1-min-loop` 拥有；同负责人 ≠ 单独落地 |
-| P2 | 生产配置校验、能力状态、失败闭合 | cursor-shuanggui-publish | `src/exec-protocol/**`，`src/agents/sandbox/production-execution-mode.ts`（后者仍由 `forbid-production-host-fallback` 拥有） |
-| P3 | 云电脑代理、重发现、目录互斥 | cursor-shuanggui-publish（集成） | `src/browser/**`、`src/agents/sandbox/account-computer-*.ts` 仍归原负责人 |
-| P4 | 三层容量准入 | cursor-shuanggui-publish | 新生产配置入口；不得覆盖既有计费席位实现，除非与原负责人集成 |
-| P5 | 部署定义与发布组合 | cursor-shuanggui-publish（集成） | `deploy/production/**` 仍归原负责人；不写 ledger |
+| 组别 | 接口                             | 开发负责人                       | 共享或相邻路径                                                                                                               |
+| ---- | -------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| P1   | 双向认证、租户授权、撤销         | cursor-shuanggui-publish         | `src/exec-protocol/**` 仍由 `exec-protocol-v1-min-loop` 拥有；同负责人 ≠ 单独落地                                            |
+| P2   | 生产配置校验、能力状态、失败闭合 | cursor-shuanggui-publish         | `src/exec-protocol/**`，`src/agents/sandbox/production-execution-mode.ts`（后者仍由 `forbid-production-host-fallback` 拥有） |
+| P3   | 云电脑代理、重发现、目录互斥     | cursor-shuanggui-publish（集成） | `src/browser/**`、`src/agents/sandbox/account-computer-*.ts` 仍归原负责人                                                    |
+| P4   | 三层容量准入                     | cursor-shuanggui-publish         | 新生产配置入口；不得覆盖既有计费席位实现，除非与原负责人集成                                                                 |
+| P5   | 部署定义与发布组合               | cursor-shuanggui-publish（集成） | `deploy/production/**` 仍归原负责人；不写 ledger                                                                             |
 
 下一步：按上表分组实现，先补生产剖面的类型与校验骨架（默认仍拒绝启用），再逐项提独立审核。香港回源、生产数据迁移与 ledger 写入，仍须在候选与恢复方案齐备后单独放行。
