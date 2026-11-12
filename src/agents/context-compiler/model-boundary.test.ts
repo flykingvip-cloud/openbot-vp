@@ -39,7 +39,7 @@ describe("model-boundary probe (P0-0)", () => {
     expect(compiled.telemetry.preCompileMessageCount).toBe(source.length);
     expect(providerMessages).toHaveLength(compiled.messages.length);
     expect(providerMessages).toEqual(compiled.messages);
-    expect(providerMessages.some((message) => message === source[0])).toBe(false);
+    expect(providerMessages.some((message) => message === source[0])).toBe(true);
     expect(providerMessages.some((message) => message === source.at(-1))).toBe(true);
   });
 

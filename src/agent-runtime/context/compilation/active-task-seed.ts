@@ -3,7 +3,6 @@ import { readVisibleMessageText } from "./shrink-unit.js";
 
 const MIN_EXPLICIT_GOAL_CHARS = 12;
 const LONG_INSTRUCTION_CHARS = 24;
-const ACTIVE_TASK_SEED_MAX_CHARS = 2_000;
 
 const CONTINUATION_ONLY_RE =
   /^(?:继续|接着|然后呢?|好的?|嗯+|哦+|啊+|收到|谢谢|感谢|明白了?|可以|行|对|是的|ok|okay|hi|hello)[!！。.…?\s]*$/iu;
@@ -47,13 +46,13 @@ export function seedActiveTaskFromMessages(messages: AgentMessage[]): string {
     if (!isUserMessage(message)) {
       continue;
     }
-    const text = readVisibleMessageText(message).replace(/\s+/g, " ").trim();
+    const text = readVisibleMessageText(message).trim();
     if (!isExplicitUserGoal(text)) {
       continue;
     }
     last = text;
   }
-  return last.length > ACTIVE_TASK_SEED_MAX_CHARS
-    ? last.slice(0, ACTIVE_TASK_SEED_MAX_CHARS)
-    : last;
+  // A goal is semantic material, not a display preview. Never clip trailing
+  // constraints, exact-content requirements, or line-sensitive instructions.
+  return last;
 }

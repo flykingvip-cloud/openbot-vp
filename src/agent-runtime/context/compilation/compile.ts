@@ -307,7 +307,23 @@ export function compileModelContext(params: CompileContextParams): CompileContex
 
   const compiledUnits = asContextUnits(kept);
   const compiledTurns = flattenContextUnits(compiledUnits);
-  const compiledRaw = capsule ? [capsule, ...compiledTurns] : compiledTurns;
+  // Whole-turn eviction must not erase earlier user constraints merely because
+  // the latest explicit goal was seeded. Preserve omitted user messages verbatim.
+  const retainedMessages = new Set(compiledTurns);
+  const omittedUserMessages = source.filter(
+    (message) => (message as { role?: unknown }).role === "user" && !retainedMessages.has(message),
+  );
+  const compiledRaw = [...omittedUserMessages, ...(capsule ? [capsule] : []), ...compiledTurns];
+  if (
+    omittedUserMessages.length > 0 &&
+    conservativeTokens(estimateMessagesTokens(compiledRaw)) > budget.admissionBudgetTokens
+  ) {
+    const error = new Error(
+      "Required user history exceeds the context budget; refusing lossy compilation.",
+    );
+    error.name = "ContextFidelityBudgetError";
+    throw error;
+  }
   const currentUser = lastUserMessage(source);
   const compiledHasCurrent = compiledRaw.some((message) => sameMessage(message, currentUser));
   const compiled = normalizeCompiledMessages(compiledRaw);

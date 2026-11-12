@@ -260,14 +260,16 @@ export function buildPreservedArticleSystemMessage(
 ): Record<string, unknown> {
   const body =
     extract.text.length > maxChars
-      ? `${extract.text.slice(0, maxChars)}\n…[truncated for contextCut preserve]`
+      ? "[Article body omitted: exceeds context budget. Retrieve the original source before rewriting, quoting, or drawing conclusions.]"
       : extract.text;
   const header = [
     "[Preserved article extract from prior turn — reinjected after contextCut]",
     extract.url ? `URL: ${extract.url}` : undefined,
     extract.title ? `Title: ${extract.title}` : undefined,
     `Source: ${extract.source}`,
-    "Use this body for rewrite / follow-up; do not claim the page was only a shell if this extract is present.",
+    extract.text.length > maxChars
+      ? "The source was previously extracted, but its body is unavailable in this view. Do not invent its contents."
+      : "Use this body for rewrite / follow-up; do not claim the page was only a shell if this extract is present.",
     "---",
     body,
   ]

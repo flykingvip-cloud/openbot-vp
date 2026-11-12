@@ -50,6 +50,7 @@ export function buildResumePrompt(task: TrackedTask): string {
   return [
     `task_id: ${task.taskId}`,
     `继续任务「${task.title}」。`,
+    ...(task.goalText ? [`完整目标：\n${task.goalText}`] : []),
     `停在：${task.stop.summary}${pathLine}`,
     ...(task.acceptanceCriteria?.length
       ? [
