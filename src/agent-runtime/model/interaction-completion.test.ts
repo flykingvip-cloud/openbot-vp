@@ -36,6 +36,26 @@ it("forwards sanitized images only to vision candidates and discloses unseen pix
 beforeEach(() => {
   mocks.complete.mockReset();
 });
+it("quotes unanswered historical requests as reference data without changing the current request", () => {
+  const previous = "只回复“OLD”；也可以给同事发信息";
+  const input = {
+    message: "只回复“CURRENT”",
+    context: [{ role: "user" as const, content: previous }],
+  };
+  const ctx = buildInteractionCompletionContext(input, model);
+  expect(ctx.messages[0]?.content).not.toBe(previous);
+  expect(JSON.parse(ctx.messages[0]?.content as string)).toEqual({
+    source: "reference_context",
+    content: previous,
+  });
+  expect(ctx.messages.at(-1)?.content).toBe(input.message);
+  expect(ctx.systemPrompt).toContain("reference_context");
+  // Short follow-ups must still be able to resolve the quoted recipient/request.
+  const followup = buildInteractionCompletionContext({ ...input, message: "发私信" }, model);
+  expect(followup.messages[0]?.content).toBe(ctx.messages[0]?.content);
+  expect(followup.messages.at(-1)?.content).toBe("发私信");
+  expect(input.context[0].content).toBe(previous);
+});
 it("recognizes individual colleagues as context without enabling tools or granting send authority", () => {
   const context = buildInteractionCompletionContext(
     {
