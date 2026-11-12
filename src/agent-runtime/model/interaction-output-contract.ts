@@ -45,6 +45,7 @@ export const INTERACTION_OUTPUT_TOOL = {
           required: ["goal", "acceptance"],
           properties: {
             goal: string,
+            lifecycle: { type: "string", enum: ["turn", "long_task"] },
             acceptance: { type: "array", minItems: 1, items: string },
             checks: {
               type: "array",

@@ -7,6 +7,8 @@ import type { TaskAcceptanceCheck } from "./quality.js";
 export const INTERACTION_PROSE_PROTOCOL_DOWNGRADE = "prose_downgrade" as const;
 /** Model interpretation is a proposal. Execution admission remains a host decision. */
 export type InteractionExecutionRequest = {
+  /** Only explicit long-task planning opens the persistent task board. Omitted means turn. */
+  lifecycle?: "turn" | "long_task";
   goal: string;
   acceptance: string[];
   checks?: TaskAcceptanceCheck[];

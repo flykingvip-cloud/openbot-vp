@@ -42,6 +42,7 @@ export function bindAdmittedTurnHost(): AdmittedTurnHost {
       ensureChatTurnTaskOutcome,
       normalizeTaskOutcomeSubjectRef,
       isTaskExecutionBindingCurrent: sessionTaskState.bindingCurrent,
+      isTurnExecutionAdmissionCurrent: sessionTaskState.turnAdmissionCurrent,
     },
     budget: { assessRunnerTurnBudgetGate, chargeModelCallAgainstTip },
     admission: { tryAcquireEnterpriseAgentRun, releaseEnterpriseAgentRun },

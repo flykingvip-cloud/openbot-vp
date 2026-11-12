@@ -126,8 +126,12 @@ function parseDecision(value: unknown): InteractionModelDecision {
       const item = request as Record<string, unknown>;
       if (
         Object.keys(item).every(
-          (key) => key === "goal" || key === "acceptance" || key === "checks",
+          (key) =>
+            key === "goal" || key === "acceptance" || key === "checks" || key === "lifecycle",
         ) &&
+        (item.lifecycle === undefined ||
+          item.lifecycle === "turn" ||
+          item.lifecycle === "long_task") &&
         typeof item.goal === "string" &&
         item.goal.trim() &&
         Array.isArray(item.acceptance) &&
@@ -143,6 +147,7 @@ function parseDecision(value: unknown): InteractionModelDecision {
           request: {
             goal: item.goal,
             acceptance: [...item.acceptance] as string[],
+            ...(item.lifecycle !== undefined ? { lifecycle: item.lifecycle } : {}),
             ...(item.checks !== undefined ? { checks: parsedChecks.checks } : {}),
           },
         };

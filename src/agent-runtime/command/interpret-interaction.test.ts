@@ -5,6 +5,32 @@ import {
   InteractionDecisionValidationError,
 } from "./interpret-interaction.js";
 
+it.each(["turn", "long_task"] as const)(
+  "preserves the planned %s lifecycle without granting admission",
+  async (lifecycle) => {
+    const decision = {
+      kind: "execution_request",
+      request: { lifecycle, goal: "Work", acceptance: ["Result"] },
+    };
+    expect(
+      await interpretInteraction({ message: "Work", context: [] }, { infer: async () => decision }),
+    ).toEqual(decision);
+  },
+);
+it("refuses an unsupported lifecycle rather than silently building a task", async () => {
+  await expect(
+    interpretInteraction(
+      { message: "Work", context: [] },
+      {
+        infer: async () => ({
+          kind: "execution_request",
+          request: { lifecycle: "auto", goal: "Work", acceptance: ["Result"] },
+        }),
+      },
+    ),
+  ).rejects.toThrow(/Invalid interaction/);
+});
+
 it("retains fail-closed diagnostics without model body, arbitrary keys or target identities", async () => {
   const infer = vi.fn(async () => ({
     kind: "send_message",

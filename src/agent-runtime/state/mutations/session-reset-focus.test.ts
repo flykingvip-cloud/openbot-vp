@@ -2,15 +2,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { SessionTaskBoard, TrackedTask } from "../../contracts/task.js";
 import { hostBoundTaskTarget } from "../../command/host-task-target.js";
+import type { SessionTaskBoard, TrackedTask } from "../../contracts/task.js";
+import { seedSessionTaskBoard, readSessionTaskBoard } from "../repository/task-board-file.js";
 import { commitAdmittedSessionTask } from "./admit-task.js";
 import { commitInteractionTaskProposal } from "./interaction-proposal.js";
 import {
   SESSION_RESET_PARK_REASON,
   unbindCurrentTaskOnSessionReset,
 } from "./session-reset-focus.js";
-import { seedSessionTaskBoard, readSessionTaskBoard } from "../repository/task-board-file.js";
 
 const dirs: string[] = [];
 
@@ -71,6 +71,7 @@ describe("session reset and goal binding", () => {
     unbindCurrentTaskOnSessionReset(sessionFile, 2);
 
     const admitted = commitAdmittedSessionTask({
+      lifecycle: "long_task",
       sessionFile,
       requestId: "pack3-guide",
       goal: "撰写企业 AI 助手使用指南，普通员工，约 2000 字，交付 MD 与 HTML",
@@ -110,9 +111,9 @@ describe("session reset and goal binding", () => {
     const constraintText = JSON.stringify(constraints);
     expect(constraintText).toContain("部门主管");
     expect(after.parked.some((task) => task.taskId === "task-db-select")).toBe(true);
-    expect(after.parked.find((task) => task.taskId === "task-db-select")?.effectiveConstraints ?? []).toEqual(
-      [],
-    );
+    expect(
+      after.parked.find((task) => task.taskId === "task-db-select")?.effectiveConstraints ?? [],
+    ).toEqual([]);
 
     const rejectedOld = commitInteractionTaskProposal({
       sessionFile,

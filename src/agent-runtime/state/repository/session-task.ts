@@ -1,4 +1,7 @@
-import { commitAdmittedSessionTask } from "../mutations/admit-task.js";
+import {
+  commitAdmittedSessionTask,
+  isTurnExecutionAdmissionCurrent,
+} from "../mutations/admit-task.js";
 import {
   captureTaskCompletionBinding,
   isTaskExecutionBindingCurrent,
@@ -20,6 +23,7 @@ export const sessionTaskState = {
   bindingCurrent: isTaskExecutionBindingCurrent,
   completeChecked: recordCheckedTaskCompletion,
   admitExecution: commitAdmittedSessionTask,
+  turnAdmissionCurrent: isTurnExecutionAdmissionCurrent,
   applyInteractionProposal: commitInteractionTaskProposal,
   startExecution: startBoundTaskExecution,
 };
