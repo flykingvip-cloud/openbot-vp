@@ -421,6 +421,12 @@ If you're moving from token auth to trusted-proxy:
 5. Test WebSocket connections from the Control UI
 6. Run `openbot security audit` and review findings
 
+## Isolation tight path for loopback identity headers
+
+Default trusted-proxy behavior is unchanged: when `gateway.trustedProxies` includes loopback, a direct request to the gateway may still present `X-Forwarded-User` and be accepted as that user. Hong Kong LIVE remains on that production-shaped path (nginx zeros the client header). This page does **not** pre-approve changing production `trustedProxies` to Hong Kong private source IPs, and it does **not** solve HK→A auth translation.
+
+For isolation drills only, `gateway.auth.trustedProxy.rejectDirectLoopbackIdentityHeaders` can be set to `true`. Then a client that is merely from `127.0.0.1` or `::1` cannot become an arbitrary user by sending the identity header. Platform-auth cookie login still works. A designated isolation entry may present `entryHopCredential` on `entryHopHeader` (default `x-openbot-entry-hop`) if it needs to inject identity headers. See [Isolation gateway artifact path](/exec-protocol/v1-isolation-gateway-artifact-auth).
+
 ## Related
 
 - [Security](/gateway/security) — full security guide

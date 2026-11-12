@@ -153,6 +153,44 @@ function parseTrustedProxyScopes(value: string | undefined): string[] | undefine
 
 const TAILSCALE_TRUSTED_PROXIES = ["127.0.0.1", "::1"] as const;
 
+/** Default header used by a designated isolation entry hop in tight mode. */
+export const DEFAULT_ENTRY_HOP_HEADER = "x-openbot-entry-hop";
+
+/**
+ * Isolation tight-path check. When `rejectDirectLoopbackIdentityHeaders` is
+ * enabled, a peer that is merely loopback must not be able to assume an
+ * arbitrary user by sending `userHeader`. A matching entry hop credential
+ * is the documented exception so a designated 模拟入口 can still present
+ * identity headers. Default / production-shaped configs leave the flag
+ * unset and this function returns false.
+ */
+export function shouldRejectDirectLoopbackIdentityHeaders(params: {
+  req?: IncomingMessage;
+  trustedProxyConfig: GatewayTrustedProxyConfig;
+}): boolean {
+  if (!params.trustedProxyConfig.rejectDirectLoopbackIdentityHeaders) {
+    return false;
+  }
+  if (!params.req) {
+    return true;
+  }
+  if (!isLoopbackAddress(params.req.socket?.remoteAddress)) {
+    return false;
+  }
+  const expected = params.trustedProxyConfig.entryHopCredential;
+  if (typeof expected !== "string" || expected.length === 0) {
+    return true;
+  }
+  const headerName = (
+    params.trustedProxyConfig.entryHopHeader?.trim() || DEFAULT_ENTRY_HOP_HEADER
+  ).toLowerCase();
+  const provided = headerValue(params.req.headers[headerName]);
+  if (typeof provided !== "string" || provided.length === 0) {
+    return true;
+  }
+  return !safeEqualSecret(provided, expected);
+}
+
 function resolveTailscaleClientIp(req?: IncomingMessage): string | undefined {
   if (!req) {
     return undefined;
@@ -427,6 +465,9 @@ function authorizeTrustedProxy(params: {
   }
 
   const user = trimmedHeaderValue(req.headers, trustedProxyConfig.userHeader);
+  if (shouldRejectDirectLoopbackIdentityHeaders({ req, trustedProxyConfig }) && user) {
+    return { reason: "trusted_proxy_loopback_identity_rejected" };
+  }
   if (!user) {
     return { reason: "trusted_proxy_user_missing" };
   }
