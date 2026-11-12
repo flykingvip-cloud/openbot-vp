@@ -193,6 +193,17 @@ export async function invokeInteractionCompletion(params: {
           calls[0].name !== INTERACTION_OUTPUT_NAME ||
           response.content.some((part) => part.type === "text" && part.text.trim())
         ) {
+          console.warn("[interaction-native-output-rejected]", {
+            stopReason: response.stopReason,
+            contentTypes: response.content.map((part) => part.type),
+            callCount: calls.length,
+            expectedNameMatches: calls.map((call) => call.name === INTERACTION_OUTPUT_NAME),
+            visibleTextCharacters: response.content.reduce(
+              (count, part) => count + (part.type === "text" ? part.text.trim().length : 0),
+              0,
+            ),
+            outputTokens: response.usage.output,
+          });
           throw new Error("Interaction did not return a final decision");
         }
         // Data only. Never dispatch this function through a runtime tool registry.
