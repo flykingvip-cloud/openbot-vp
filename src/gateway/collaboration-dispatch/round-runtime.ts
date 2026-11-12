@@ -490,7 +490,7 @@ export async function bootstrapCollaborationRound(
 ): Promise<PersistedRound> {
   const persist = { tenantId: authority.tenantId, roundsDir: params.roundsDir };
   const decision =
-    params.lifecycle === "turn"
+    params.lifecycle !== undefined
       ? params.decision
       : await maybeExpandBoardKickoffDecision({
           authority,
@@ -580,7 +580,7 @@ export async function executeCollaborationRound(
   });
   // Mode B board-tied kickoff: expand single @mention → intended multi (flag default OFF).
   const expandedDecision =
-    input.lifecycle === "turn"
+    input.lifecycle !== undefined
       ? input.decision
       : await maybeExpandBoardKickoffDecision({
           authority,
@@ -729,11 +729,15 @@ export async function executeCollaborationRound(
     // Platform Mode B: optional inventory-first continue after ROUND_COMPLETE.
     // Default OFF (allowlist). Fail-closed — never abort the round.
     try {
-      if (input.lifecycle !== "turn") {
+      if (
+        input.lifecycle === undefined ||
+        (input.lifecycle === "long_task" && input.admittedTaskId)
+      ) {
         await maybeContinueAfterRoundComplete({
           authority,
           roundId: settled.roundId,
           roundState: settled.state,
+          admittedTaskId: input.admittedTaskId,
         });
       }
     } catch {
@@ -818,7 +822,10 @@ export async function executeCollaborationRound(
   // "primary carried a structural conclusion". Only the latter gates the open
   // supplement window; neither turns a real reply into a timeout.
   const formalAdmissions = new Map<string, MemberAdmission>();
-  if (input.lifecycle !== "turn" && params.decision.responseMode === "decision_to_executor") {
+  if (
+    (input.lifecycle === undefined || (input.lifecycle === "long_task" && input.admittedTaskId)) &&
+    params.decision.responseMode === "decision_to_executor"
+  ) {
     for (const bot of stages.supplement.bots) {
       formalAdmissions.set(
         bot.agentId,
@@ -826,7 +833,10 @@ export async function executeCollaborationRound(
           authority,
           agentId: bot.agentId,
           runId: `${round.roundId}:${bot.agentId}`,
-          taskId: facts.activeContext.currentTaskId,
+          taskId:
+            input.lifecycle !== undefined
+              ? input.admittedTaskId
+              : facts.activeContext.currentTaskId,
           executionRequested: true,
           cfg: getRuntimeConfigSnapshot() ?? undefined,
         }),
@@ -950,7 +960,8 @@ export async function executeCollaborationRound(
         round,
         primaryText: raced.reply?.rawText ?? primaryReplyText,
         fromAgentId: bot.agentId,
-        taskId: input.lifecycle === "turn" ? undefined : facts.activeContext.currentTaskId,
+        taskId:
+          input.lifecycle !== undefined ? input.admittedTaskId : facts.activeContext.currentTaskId,
         bots: facts.bots as CollaborationBotTarget[],
       });
       if (round.edges?.length) {
@@ -1042,7 +1053,8 @@ export async function executeCollaborationRound(
         round,
         primaryText: fallbackReply?.rawText ?? fallbackReply?.text ?? "",
         fromAgentId: takeoverBot.agentId,
-        taskId: input.lifecycle === "turn" ? undefined : facts.activeContext.currentTaskId,
+        taskId:
+          input.lifecycle !== undefined ? input.admittedTaskId : facts.activeContext.currentTaskId,
         bots: facts.bots as CollaborationBotTarget[],
       });
       if (round.edges?.length) {
@@ -1319,7 +1331,10 @@ export async function executeCollaborationRound(
             authority,
             agentId: bot.agentId,
             runId: `${round.roundId}:${bot.agentId}`,
-            taskId: input.lifecycle === "turn" ? undefined : facts.activeContext.currentTaskId,
+            taskId:
+              input.lifecycle !== undefined
+                ? input.admittedTaskId
+                : facts.activeContext.currentTaskId,
             executionRequested: true,
             cfg: getRuntimeConfigSnapshot() ?? undefined,
           })

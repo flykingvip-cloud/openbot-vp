@@ -61,6 +61,7 @@ export function decideParticipantsForTest(params: {
 
 export async function executeCollaborationRoundForTest(params: {
   lifecycle?: BeatExecutionInput["lifecycle"];
+  admittedTaskId?: string;
   scope: CollaborationDispatchScope;
   decision: ParticipationDecision;
   message: string;
@@ -87,6 +88,7 @@ export async function executeCollaborationRoundForTest(params: {
   });
   return executeCollaborationRoundAuthority(authority, facts, {
     lifecycle: params.lifecycle,
+    admittedTaskId: params.admittedTaskId,
     decision: params.decision,
     message: params.message,
     sessionKey: params.sessionKey,

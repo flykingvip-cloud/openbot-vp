@@ -3586,6 +3586,7 @@ async function runGroupBotDiscussionTurn(params: {
   /** Group runtime authority — used to resolve actor board binding + continue. */
   authority?: RuntimeAuthority | null;
   executionLifecycle?: "turn" | "long_task";
+  executionTaskId?: string;
 }): Promise<SameRoundReply | null> {
   return await groupBotQueue.enqueue(params.bot.sessionKey, async () => {
     const {
@@ -3746,6 +3747,7 @@ async function runGroupBotDiscussionTurn(params: {
         ...(params.executionLifecycle
           ? { CollaborationExecutionLifecycle: params.executionLifecycle }
           : {}),
+        ...(params.executionTaskId ? { CollaborationExecutionTaskId: params.executionTaskId } : {}),
         CollaborationBotAgentId: params.bot.agentId,
         ...(privateRunBag ? { CollaborationPrivateRunBag: privateRunBag } : {}),
         CollaborationGroupId: params.scope.groupId,
@@ -4095,13 +4097,17 @@ async function runGroupBotDiscussionTurn(params: {
           let binding = params.executionDeliverableBinding ?? null;
           // Prefer attaching a complete binding from this actor's unique active claim
           // before formal submit (discussion turns often lack wake_dispatch binding).
-          if (!binding && params.authority) {
+          if (
+            !binding &&
+            params.authority &&
+            (!params.executionLifecycle || params.executionTaskId)
+          ) {
             try {
               binding = await tryBuildChatActorExecutionDeliverableBinding({
                 authority: params.authority,
                 agentId: params.bot.agentId,
                 runId,
-                taskIdHint: groupCurrentTaskId,
+                taskIdHint: params.executionLifecycle ? params.executionTaskId : groupCurrentTaskId,
                 cfg,
               });
             } catch (bindErr) {
@@ -4136,7 +4142,7 @@ async function runGroupBotDiscussionTurn(params: {
           }
           // Keep multi-milestone auto-chain alive after formal settle (ok or reject).
           // task_board_continue skips group sessions; collaboration continue must run.
-          if (params.authority) {
+          if (params.authority && (!params.executionLifecycle || binding?.taskId)) {
             void scheduleContinueAfterDeliverableSettlement({
               authority: params.authority,
               roundId: params.collaborationRoundId || runId,
@@ -5590,6 +5596,16 @@ export const chatHandlers: GatewayRequestHandlers = {
             let groupUnderstanding:
               | Awaited<ReturnType<typeof understandGroupInteraction>>
               | undefined;
+            let formalTaskEstablish:
+              | {
+                  attempted: boolean;
+                  status?: string;
+                  taskId?: string | null;
+                  reason?: string;
+                  userMessage?: string;
+                  stagesSummary?: string;
+                }
+              | undefined;
             let discussToTaskPrincipalActor: string | undefined;
             const runStageBot = async (params: {
               bot: GroupDiscussionBotTarget;
@@ -5617,23 +5633,23 @@ export const chatHandlers: GatewayRequestHandlers = {
                 if (parentAbortController.signal.aborted) {
                   return;
                 }
+                const humanWork =
+                  groupUnderstanding?.kind === "understood" &&
+                  groupUnderstanding.decision.kind === "execution_request"
+                    ? groupUnderstanding.decision.request
+                    : undefined;
                 const admission = await resolveMemberAdmission({
                   authority,
                   agentId: params.bot.agentId,
                   runId: `${clientRunId}:${params.bot.agentId}`,
-                  taskId:
-                    groupUnderstanding?.kind === "understood" &&
-                    groupUnderstanding.decision.kind === "execution_request" &&
-                    groupUnderstanding.decision.request.lifecycle !== "long_task"
-                      ? undefined
-                      : scope.operatingState?.activeContext.currentTaskId,
+                  taskId: humanWork
+                    ? formalTaskEstablish?.taskId
+                    : scope.operatingState?.activeContext.currentTaskId,
                   executionRequested:
                     params.contributionRole === "executor" &&
-                    !(
-                      groupUnderstanding?.kind === "understood" &&
-                      groupUnderstanding.decision.kind === "execution_request" &&
-                      groupUnderstanding.decision.request.lifecycle !== "long_task"
-                    ),
+                    (!humanWork ||
+                      (humanWork.lifecycle === "long_task" &&
+                        Boolean(formalTaskEstablish?.taskId))),
                   cfg: groupCfg,
                 });
                 if (admission.purpose === "blocked") {
@@ -5669,6 +5685,9 @@ export const chatHandlers: GatewayRequestHandlers = {
                   systemInputProvenance,
                   systemProvenanceReceipt,
                   ...memberContext,
+                  ...(humanWork?.lifecycle === "long_task" && formalTaskEstablish?.taskId
+                    ? { executionTaskId: formalTaskEstablish.taskId }
+                    : {}),
                   ...(groupUnderstanding?.kind === "understood" &&
                   groupUnderstanding.decision.kind === "execution_request"
                     ? {
@@ -5865,16 +5884,6 @@ export const chatHandlers: GatewayRequestHandlers = {
             }
 
             // Phase-1 controlled discuss→task: trusted inbound → receipt → coordinator bind.
-            let formalTaskEstablish:
-              | {
-                  attempted: boolean;
-                  status?: string;
-                  taskId?: string | null;
-                  reason?: string;
-                  userMessage?: string;
-                  stagesSummary?: string;
-                }
-              | undefined;
             let discussToTaskCoordinatorBinding: string | undefined;
             try {
               const d2tActor =
@@ -6021,6 +6030,9 @@ export const chatHandlers: GatewayRequestHandlers = {
                   signal: parentAbortController.signal,
                   isAborted: () => parentAbortController.signal.aborted,
                   sourceMessageId: clientRunId,
+                  ...(groupUnderstanding?.kind === "understood"
+                    ? { admittedTaskId: formalTaskEstablish?.taskId ?? undefined }
+                    : {}),
                   ...(groupUnderstanding?.kind === "understood" &&
                   groupUnderstanding.decision.kind === "execution_request"
                     ? { lifecycle: groupUnderstanding.decision.request.lifecycle ?? "turn" }

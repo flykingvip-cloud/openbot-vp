@@ -116,6 +116,7 @@ export async function resolveDeliveryExecTurn(params: {
   groupId: string;
   agentId: string;
   tenantId?: string | null;
+  taskId?: string;
 }): Promise<DeliveryExecTurn> {
   const groupId = compact(params.groupId);
   const agentId = compact(params.agentId);
@@ -147,7 +148,11 @@ export async function resolveDeliveryExecTurn(params: {
       cfg: params.cfg,
     });
     const items = await listAllBoardClaimItems(authority);
-    const item = selectClaimantBoardItem(items, agentId, groupId);
+    const item = selectClaimantBoardItem(
+      params.taskId ? items.filter((item) => item.taskId === params.taskId) : items,
+      agentId,
+      groupId,
+    );
     if (!item) {
       return {};
     }

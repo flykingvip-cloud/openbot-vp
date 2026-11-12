@@ -172,37 +172,40 @@ function createRespondingRound(roundId: string): PersistedRound {
 }
 
 describe("collaboration round runtime contract", () => {
-  test("current-turn work never inherits board kickoff, formal admission or later inventory wake", async () => {
-    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-round-turn-only-"));
-    const wake = vi.spyOn(continueAfterRound, "maybeContinueAfterRoundComplete");
-    const kickoff = vi.spyOn(claimContract, "maybeExpandBoardKickoffDecision");
-    const formal = vi.spyOn(memberAdmission, "resolveMemberAdmission");
-    const runBot = vi.fn(async () => ({
-      text: "结论：本轮计算结果为30，已当场返回，无需后续工作。",
-    }));
-    try {
-      const round = await executeCollaborationRoundForTest({
-        lifecycle: "turn",
-        scope: createScope(),
-        decision: createDecision({ roundId: "turn-only" }),
-        message: "请当场计算并回答",
-        sessionKey: "space:alpha",
-        roundsDir,
-        policy: policyWithoutWrap(),
-        runBot,
-      });
-      expect(round.state).toBe("ROUND_COMPLETE");
-      expect(runBot).toHaveBeenCalledOnce();
-      expect(wake).not.toHaveBeenCalled();
-      expect(kickoff).not.toHaveBeenCalled();
-      expect(formal).not.toHaveBeenCalled();
-    } finally {
-      wake.mockRestore();
-      kickoff.mockRestore();
-      formal.mockRestore();
-      await fs.rm(roundsDir, { recursive: true, force: true });
-    }
-  });
+  test.each(["turn", "long_task"] as const)(
+    "unbound %s work never inherits board kickoff, formal admission or later inventory wake",
+    async (lifecycle) => {
+      const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-round-turn-only-"));
+      const wake = vi.spyOn(continueAfterRound, "maybeContinueAfterRoundComplete");
+      const kickoff = vi.spyOn(claimContract, "maybeExpandBoardKickoffDecision");
+      const formal = vi.spyOn(memberAdmission, "resolveMemberAdmission");
+      const runBot = vi.fn(async () => ({
+        text: "结论：本轮计算结果为30，已当场返回，无需后续工作。",
+      }));
+      try {
+        const round = await executeCollaborationRoundForTest({
+          lifecycle,
+          scope: createScope(),
+          decision: createDecision({ roundId: "turn-only" }),
+          message: "请当场计算并回答",
+          sessionKey: "space:alpha",
+          roundsDir,
+          policy: policyWithoutWrap(),
+          runBot,
+        });
+        expect(round.state).toBe("ROUND_COMPLETE");
+        expect(runBot).toHaveBeenCalledOnce();
+        expect(wake).not.toHaveBeenCalled();
+        expect(kickoff).not.toHaveBeenCalled();
+        expect(formal).not.toHaveBeenCalled();
+      } finally {
+        wake.mockRestore();
+        kickoff.mockRestore();
+        formal.mockRestore();
+        await fs.rm(roundsDir, { recursive: true, force: true });
+      }
+    },
+  );
   test("R1: restart at PRIMARY_RESPONDING does not re-run the primary LLM", async () => {
     const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-round-r1-"));
     const persisted = createRespondingRound("round-restart");

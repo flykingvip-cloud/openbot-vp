@@ -246,6 +246,21 @@ describe("delivery exec prompt on the agent assembly path", () => {
     expect(currentTurnPrompt).not.toContain(STEP);
     expect(turnContext.DeliveryToolSideEffect).toBeUndefined();
 
+    const newLongContext = {
+      ...turnContext,
+      CollaborationExecutionLifecycle: "long_task" as const,
+      CollaborationExecutionTaskId: "new-unrelated-long-task",
+    };
+    expect(await assemble(cfg, root, newLongContext)).not.toContain(STEP);
+    expect(newLongContext.DeliveryToolSideEffect).toBeUndefined();
+    const boundLongContext = {
+      ...turnContext,
+      CollaborationExecutionLifecycle: "long_task" as const,
+      CollaborationExecutionTaskId: TASK_ID,
+    };
+    expect(await assemble(cfg, root, boundLongContext)).toContain(STEP);
+    expect(boundLongContext.DeliveryToolSideEffect).toBeDefined();
+
     const loaded = await loadBoardClaimItem(auth, { taskId: TASK_ID, itemId });
     expect(loaded?.status).toBe("in_progress");
   });

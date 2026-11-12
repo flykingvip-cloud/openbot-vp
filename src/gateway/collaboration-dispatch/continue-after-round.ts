@@ -212,6 +212,8 @@ export async function maybeContinueAfterRoundComplete(params: {
    * When omitted under force (e.g. restart resume), whole-inventory filter still applies.
    */
   forceContinueScope?: { taskId?: string; itemId?: string };
+  /** A human long-task turn may continue only its own newly admitted task. */
+  admittedTaskId?: string;
 }): Promise<MaybeContinueAfterRoundResult> {
   const at = params.nowMs ?? Date.now();
   const authority = params.authority;
@@ -259,7 +261,9 @@ export async function maybeContinueAfterRoundComplete(params: {
       (await params.loadBoardItems?.()) ??
       ((await loadBoardClaimItemsFromDir(boardClaimsDir(authority))) as GroupBoardClaimItem[]);
 
-    let workingItems: GroupBoardClaimItem[] = [...loaded];
+    let workingItems: GroupBoardClaimItem[] = params.admittedTaskId
+      ? loaded.filter((item) => item.taskId === params.admittedTaskId)
+      : [...loaded];
     // P4/O5·O15: after deliverable settlement, do not force-continue the triggering
     // in_progress|returned item (still needs formal board submit/review). Scope to the
     // settling task/item when provided so parallel sibling tasks are not wrongly stopped.
