@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 /**
- * Isolated-Gateway consumer for S1 checkpoint B: group interaction isolation.
+ * Isolated-Gateway consumer for S1 checkpoint B and S2 mention start-right.
  *
  * Shape honesty: this test invokes the in-process chat.send / chat.history
  * handlers. It does not start a child Gateway process and does not open a
@@ -26,7 +26,10 @@ import {
 } from "../config/config.js";
 import { updateSessionStore } from "../config/sessions/store.js";
 import type { OpenBotConfig } from "../config/types.js";
+import * as gatewayCall from "../gateway/call.js";
+import * as interAgentBus from "../organization/inter-agent-bus.js";
 import * as mentionDelivery from "../organization/mention-delivery.js";
+import * as mentionStateTracker from "../organization/mention-state-tracker.js";
 import { resolvePlatformAuthConfig } from "./platform-auth/config.js";
 import { saveStore, type PlatformAuthStore } from "./platform-auth/store.js";
 
@@ -192,6 +195,7 @@ function listTaskBoardFiles(root: string): string[] {
 }
 
 const WORK_MESSAGE = "请团队正式开展市场调研并给出竞品清单";
+const LONG_TASK_MESSAGE = "请把市场调研立为长期正式任务并按计划推进";
 const GREETING_MESSAGE = "你好，在吗";
 const PROGRESS_MESSAGE = "现在进度怎么样，只读说明即可";
 const CLARIFY_MESSAGE = "你刚才说的验收标准具体指哪一条？先不要动手";
@@ -217,6 +221,16 @@ function decisionForLiveMessage(message: string): { kind: string; [k: string]: u
   if (message.includes("2加2") || message.includes("独立普通问题")) {
     return { kind: "reply", text: "4" };
   }
+  if (message.includes(LONG_TASK_MESSAGE)) {
+    return {
+      kind: "execution_request",
+      request: {
+        lifecycle: "long_task",
+        goal: "长期市场调研",
+        acceptance: ["正式计划", "竞品清单"],
+      },
+    };
+  }
   if (message.includes(WORK_MESSAGE) || message.includes("请团队继续修订计划")) {
     return {
       kind: "execution_request",
@@ -233,6 +247,7 @@ function decisionForLiveMessage(message: string): { kind: string; [k: string]: u
 async function isolateTrustedGroupGateway(options?: { tinyHistoryBudget?: boolean }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "s1b-group-isolation-"));
   dirs.push(root);
+  fs.mkdirSync(path.join(root, "workspace"), { recursive: true });
   process.env.OPENBOT_STATE_DIR = root;
   process.env.OPENCLAW_STATE_DIR = root;
   const configPath = path.join(root, "openbot.json");
@@ -269,6 +284,7 @@ async function isolateTrustedGroupGateway(options?: { tinyHistoryBudget?: boolea
     agents: {
       defaults: {
         model: { primary: "testdemo/s1b-test" },
+        workspace: path.join(root, "workspace"),
         ...(options?.tinyHistoryBudget ? { contextBudget: { enabled: true, maxTokens: 1 } } : {}),
       },
       list: [
@@ -582,7 +598,18 @@ async function sendGroupChat(params: {
   context: ReturnType<typeof createChatContext>;
   runId: string;
   message: string;
-  mentions?: Array<{ kind?: string; userId?: string; agentId?: string }>;
+  mentions?: Array<{
+    mention_id?: string;
+    kind?: string;
+    userId?: string;
+    agentId?: string;
+    displayName?: string;
+    offset?: number;
+    length?: number;
+    targetKind?: string;
+    targetId?: string;
+    target?: { kind: string; agentId?: string; userId?: string };
+  }>;
 }) {
   const respond = vi.fn();
   const started = Date.now();
@@ -639,6 +666,182 @@ async function seedSlightlyOversizeHistory(
   });
   expect(seeded.ok, `failed to seed history: ${seeded.ok ? "" : seeded.error}`).toBe(true);
   return text;
+}
+
+function listMentionArtifacts(root: string): string[] {
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    if (!fs.existsSync(dir)) {
+      return;
+    }
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (
+        entry.name === "mentions.jsonl" ||
+        entry.name === "mentions.sqlite" ||
+        entry.name.includes("mention-state")
+      ) {
+        files.push(full);
+      }
+    }
+  };
+  walk(root);
+  return files;
+}
+
+function agentGatewayCalls(callGateway: { mock: { calls: unknown[][] } }) {
+  return callGateway.mock.calls.filter((call) => {
+    const req = call[0];
+    return Boolean(
+      req &&
+      typeof req === "object" &&
+      "method" in req &&
+      (req as { method?: unknown }).method === "agent",
+    );
+  });
+}
+
+function mentionBotCoord(message: string, mentionId = "mention-bot-coord") {
+  const token = "@bot-coord";
+  const offset = message.indexOf(token);
+  return [
+    {
+      mention_id: mentionId,
+      agentId: "bot-coord",
+      displayName: "bot-coord",
+      offset: offset >= 0 ? offset : 0,
+      length: token.length,
+      targetKind: "agent" as const,
+      targetId: "bot-coord",
+      target: { kind: "agent" as const, agentId: "bot-coord" },
+    },
+  ];
+}
+
+function installMentionConsumerSpies() {
+  // External gateway effect is stubbed: a real callGateway agent turn can hang
+  // the isolated test for the mention timeout. The stub is not a successful send.
+  const callGateway = vi.spyOn(gatewayCall, "callGateway").mockImplementation(async (req) => {
+    const method =
+      typeof req === "object" && req && "method" in req ? String(req.method) : "unknown";
+    throw new Error(`test stub is not a real gateway send: ${method}`);
+  });
+  const sendAgentMention = vi
+    .spyOn(interAgentBus, "sendAgentMention")
+    .mockImplementation(async (params) => ({
+      status: "error" as const,
+      targetSessionKey: `agent:${params.targetAgentId}:org-stub`,
+      error: "test stub is not a real organization send",
+    }));
+  return {
+    callGateway,
+    sendAgentMention,
+    createMentionState: vi.spyOn(mentionStateTracker, "createMentionState"),
+    // chat.send calls MentionDelivery.deliver, not a later copy of the named export.
+    mentionDeliver: vi.spyOn(mentionDelivery.MentionDelivery, "deliver"),
+  };
+}
+
+async function settleMentionSideEffects() {
+  await new Promise((resolve) => setTimeout(resolve, 250));
+}
+
+async function expectZeroMentionBypass(
+  spies: ReturnType<typeof installMentionConsumerSpies>,
+  root: string,
+) {
+  await settleMentionSideEffects();
+  expect(
+    spies.mentionDeliver,
+    "group mention delivery started before admission",
+  ).not.toHaveBeenCalled();
+  expect(
+    spies.sendAgentMention,
+    "sendAgentMention started independent org execution",
+  ).not.toHaveBeenCalled();
+  expect(
+    spies.createMentionState,
+    "createMentionState wrote mention business state",
+  ).not.toHaveBeenCalled();
+  expect(
+    agentGatewayCalls(spies.callGateway),
+    "callGateway agent started a second org run",
+  ).toEqual([]);
+  expect(listMentionArtifacts(root), "mention journal artifacts were written").toEqual([]);
+  expect(listTaskBoardFiles(root), "task-board files were written").toEqual([]);
+}
+
+function dispatchedAgentIds(dispatchSpy: { mock: { calls: unknown[][] } }): string[] {
+  return dispatchSpy.mock.calls.map((call) => {
+    const params = call[0] as
+      | {
+          agentId?: string;
+          ctx?: {
+            AgentId?: string;
+            SessionKey?: string;
+            CollaborationBotAgentId?: string;
+            CollaborationGroupId?: string;
+          };
+        }
+      | undefined;
+    return String(
+      params?.ctx?.CollaborationBotAgentId ??
+        params?.agentId ??
+        params?.ctx?.AgentId ??
+        params?.ctx?.SessionKey ??
+        "",
+    );
+  });
+}
+
+function dispatchHasIdentity(
+  dispatchSpy: { mock: { calls: unknown[][] } },
+  params: { runId: string; groupId: string; agentId?: string },
+) {
+  const bag = JSON.stringify(dispatchSpy.mock.calls);
+  expect(bag).toContain(params.runId);
+  expect(bag).toContain(params.groupId);
+  if (params.agentId) {
+    expect(dispatchedAgentIds(dispatchSpy)).toContain(params.agentId);
+  }
+}
+
+async function sendPrivateChat(params: {
+  fixture: Awaited<ReturnType<typeof isolateTrustedGroupGateway>>;
+  context: ReturnType<typeof createChatContext>;
+  runId: string;
+  message: string;
+  mentions?: Array<{
+    kind?: string;
+    userId?: string;
+    agentId?: string;
+    mention_id?: string;
+    displayName?: string;
+    offset?: number;
+    length?: number;
+  }>;
+  sessionKey?: string;
+}) {
+  const respond = vi.fn();
+  const pending = chatHandlers["chat.send"]({
+    params: {
+      sessionKey: params.sessionKey ?? "agent:main:main",
+      message: params.message,
+      idempotencyKey: params.runId,
+      timeoutMs: 15_000,
+      ...(params.mentions ? { mentions: params.mentions } : {}),
+    },
+    respond: respond as never,
+    context: params.context as never,
+    req: {} as never,
+    // Null client keeps the authorized-peer / global session key from being
+    // remapped onto the employee steward mention router.
+    client: null as never,
+    isWebchatConnect: () => false,
+  });
+  return { respond, pending };
 }
 
 async function settleReleasedWorkTurn(params: {
@@ -1001,42 +1204,43 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     expect(mentionSpy).not.toHaveBeenCalled();
   }, 30_000);
 
-  it("7b S2 gap record: a @mention message may still start mention delivery before understanding (not fixed in B)", async () => {
+  it("S2-1: a @member reply or clarify starts zero mention business and still answers", async () => {
     const fixture = await isolateTrustedGroupGateway();
     installUnderstandingComplete();
-    const mentionSpy = vi.spyOn(mentionDelivery, "deliver");
+    const spies = installMentionConsumerSpies();
+    const dispatchSpy = vi.spyOn(dispatchModule, "dispatchInboundMessage");
     const context = createChatContext();
-    const runB = `run-s1b-mention-${path.basename(fixture.root)}`;
-    const sendB = await sendGroupChat({
+    const runReply = `run-s2-reply-${path.basename(fixture.root)}`;
+    const sendReply = await sendGroupChat({
       fixture,
       context,
-      runId: runB,
+      runId: runReply,
       message: `${GREETING_MESSAGE} @bot-coord`,
-      mentions: [{ kind: "agent", agentId: "bot-coord" }],
+      mentions: mentionBotCoord(`${GREETING_MESSAGE} @bot-coord`),
     });
-    await vi.waitFor(
-      () => {
-        expect(
-          mentionSpy.mock.calls.length > 0 ||
-            completeMock.mock.calls.some((args) =>
-              liveMessageFromCompleteArgs(args).includes(GREETING_MESSAGE),
-            ) ||
-            sendB.respond.mock.calls.length > 0,
-        ).toBe(true);
-      },
-      { timeout: 15_000 },
-    );
-    const understood = completeMock.mock.calls.some((args) =>
-      liveMessageFromCompleteArgs(args).includes(GREETING_MESSAGE),
-    );
-    // Evidence only: if mention delivery also ran, B leaves the dual-dispatch
-    // start-right to S2 and does not expand the fix.
-    const s2Gap = Boolean(understood && mentionSpy.mock.calls.length > 0);
-    fs.writeFileSync(
-      path.join(fixture.root, "s2-mention-dual-dispatch.json"),
-      `${JSON.stringify({ s2Gap, mentionCalls: mentionSpy.mock.calls.length }, null, 2)}\n`,
-    );
-    expect(typeof s2Gap).toBe("boolean");
+    await vi.waitFor(() => expect(findTerminal(context, runReply)).toBeTruthy(), {
+      timeout: 15_000,
+    });
+    await sendReply.pending;
+    expect(payloadText(findTerminal(context, runReply))).toContain(GREETING_REPLY);
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    await expectZeroMentionBypass(spies, fixture.root);
+
+    const runClarify = `run-s2-clarify-${path.basename(fixture.root)}`;
+    const sendClarify = await sendGroupChat({
+      fixture,
+      context,
+      runId: runClarify,
+      message: `${CLARIFY_MESSAGE} @bot-coord`,
+      mentions: mentionBotCoord(`${CLARIFY_MESSAGE} @bot-coord`),
+    });
+    await vi.waitFor(() => expect(findTerminal(context, runClarify)).toBeTruthy(), {
+      timeout: 15_000,
+    });
+    await sendClarify.pending;
+    expect(payloadText(findTerminal(context, runClarify))).toContain(CLARIFY_REPLY);
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    await expectZeroMentionBypass(spies, fixture.root);
   }, 30_000);
 
   it("8: incomplete group history is consumed as restricted, not a full authorization view, and an ordinary question still answers", async () => {
@@ -1292,5 +1496,304 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     expect(payloadText(findTerminal(context, runB))).toContain(GREETING_REPLY);
     expect(dispatchSpy).not.toHaveBeenCalled();
     expect(listTaskBoardFiles(fixture.root)).toEqual([]);
+  }, 30_000);
+
+  it("S2-2: restricted or denied @mention work still has zero premature business effects", async () => {
+    const fixture = await isolateTrustedGroupGateway({ tinyHistoryBudget: true });
+    await seedSlightlyOversizeHistory(fixture);
+    installUnderstandingComplete();
+    const spies = installMentionConsumerSpies();
+    const dispatchSpy = vi
+      .spyOn(dispatchModule, "dispatchInboundMessage")
+      .mockImplementation(async () => ({
+        ok: true,
+        text: "should-not-dispatch-restricted-mention",
+      }));
+    const osPath = path.join(fixture.groupDir, "operating-state.json");
+    const osBefore = fs.readFileSync(osPath, "utf8");
+    const context = createChatContext();
+    const runB = `run-s2-restricted-${path.basename(fixture.root)}`;
+    const sendB = await sendGroupChat({
+      fixture,
+      context,
+      runId: runB,
+      message: `${WORK_MESSAGE} @bot-coord`,
+      mentions: mentionBotCoord(`${WORK_MESSAGE} @bot-coord`),
+    });
+    await vi.waitFor(() => expect(findTerminal(context, runB)).toBeTruthy(), { timeout: 15_000 });
+    await sendB.pending;
+    expect(payloadText(findTerminal(context, runB))).toContain(RESTRICTED_CONTEXT_NOTICE);
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    await expectZeroMentionBypass(spies, fixture.root);
+    expectOperatingStateIdentityUnchanged(osPath, osBefore);
+  }, 30_000);
+
+  it("S2-2b: unreadable state plus @mention does not start mention or member business", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    const originalRead = collaborationShared.readGroupOperatingState;
+    let rejectOperatingState = false;
+    vi.spyOn(collaborationShared, "readGroupOperatingState").mockImplementation(async (params) => {
+      if (rejectOperatingState) {
+        throw new Error("simulated group operating state unreadable");
+      }
+      return await originalRead(params);
+    });
+    let releaseBUnderstand: ((value: unknown) => void) | undefined;
+    const spies = installMentionConsumerSpies();
+    const dispatchSpy = vi
+      .spyOn(dispatchModule, "dispatchInboundMessage")
+      .mockImplementation(async () => ({
+        ok: true,
+        text: "should-not-dispatch-unreadable-mention",
+      }));
+    completeMock.mockImplementation(async (...args: unknown[]) => {
+      const live = liveMessageFromCompleteArgs(args);
+      if (live.includes(WORK_MESSAGE)) {
+        await new Promise((resolve) => {
+          releaseBUnderstand = resolve;
+        });
+      }
+      return {
+        role: "assistant",
+        content: [{ type: "text", text: JSON.stringify(decisionForLiveMessage(live)) }],
+        usage: makeZeroUsageSnapshot(),
+        stopReason: "stop",
+      };
+    });
+    const osPath = path.join(fixture.groupDir, "operating-state.json");
+    const osBefore = fs.readFileSync(osPath, "utf8");
+    const context = createChatContext();
+    const runB = `run-s2-unreadable-${path.basename(fixture.root)}`;
+    const sendB = await sendGroupChat({
+      fixture,
+      context,
+      runId: runB,
+      message: `${WORK_MESSAGE} @bot-coord`,
+      mentions: mentionBotCoord(`${WORK_MESSAGE} @bot-coord`),
+    });
+    await vi.waitFor(() => expect(releaseBUnderstand).toBeTypeOf("function"), { timeout: 15_000 });
+    rejectOperatingState = true;
+    releaseBUnderstand?.({ ok: true });
+    await vi.waitFor(() => expect(findTerminal(context, runB)).toBeTruthy(), { timeout: 15_000 });
+    await sendB.pending;
+    expect(payloadText(findTerminal(context, runB))).toContain(UNREADABLE_GROUP_STATE_NOTICE);
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    await expectZeroMentionBypass(spies, fixture.root);
+    expectOperatingStateIdentityUnchanged(osPath, osBefore);
+  }, 30_000);
+
+  it("S2-3: admitted current-turn work with @member runs once on the official collaboration chain", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    installUnderstandingComplete();
+    const spies = installMentionConsumerSpies();
+    const dispatchSpy = vi
+      .spyOn(dispatchModule, "dispatchInboundMessage")
+      .mockImplementation(async (params) => {
+        const ctx = (params as { ctx?: { SessionKey?: string; AgentId?: string } }).ctx;
+        return {
+          ok: true,
+          text: `official-once:${String(ctx?.AgentId ?? ctx?.SessionKey ?? "member")}`,
+        };
+      });
+    const context = createChatContext();
+    const runId = `run-s2-once-${path.basename(fixture.root)}`;
+    const send = await sendGroupChat({
+      fixture,
+      context,
+      runId,
+      message: `${WORK_MESSAGE} @bot-coord`,
+      mentions: mentionBotCoord(`${WORK_MESSAGE} @bot-coord`),
+    });
+    await vi.waitFor(() => expect(findTerminal(context, runId)).toBeTruthy(), { timeout: 15_000 });
+    await send.pending;
+    await settleMentionSideEffects();
+    expect(dispatchSpy).toHaveBeenCalled();
+    expect(dispatchSpy.mock.calls.length).toBe(1);
+    dispatchHasIdentity(dispatchSpy, { runId, groupId: fixture.groupId, agentId: "bot-coord" });
+    expect(spies.mentionDeliver).not.toHaveBeenCalled();
+    expect(spies.sendAgentMention).not.toHaveBeenCalled();
+    expect(spies.createMentionState).not.toHaveBeenCalled();
+    expect(agentGatewayCalls(spies.callGateway)).toEqual([]);
+    expect(listMentionArtifacts(fixture.root)).toEqual([]);
+  }, 30_000);
+
+  it("S2-3b: a long_task @mention cannot bypass formal group responsibility or plan gates", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    installUnderstandingComplete();
+    const spies = installMentionConsumerSpies();
+    const dispatchSpy = vi
+      .spyOn(dispatchModule, "dispatchInboundMessage")
+      .mockImplementation(async (params) => {
+        const bag = JSON.stringify(params ?? {});
+        expect(bag).not.toMatch(/formal_execution|executionDeliverableBinding/);
+        return { ok: true, text: "discussion-or-blocked-not-formal-bypass" };
+      });
+    const osPath = path.join(fixture.groupDir, "operating-state.json");
+    const osBefore = fs.readFileSync(osPath, "utf8");
+    const context = createChatContext();
+    const runId = `run-s2-long-${path.basename(fixture.root)}`;
+    const send = await sendGroupChat({
+      fixture,
+      context,
+      runId,
+      message: `${LONG_TASK_MESSAGE} @bot-coord`,
+      mentions: mentionBotCoord(`${LONG_TASK_MESSAGE} @bot-coord`),
+    });
+    await vi.waitFor(() => expect(findTerminal(context, runId)).toBeTruthy(), { timeout: 15_000 });
+    await send.pending;
+    // Official discussion dispatch may still run after admission; mention bypass must stay zero.
+    await expectZeroMentionBypass(spies, fixture.root);
+    expectOperatingStateIdentityUnchanged(osPath, osBefore);
+    expect(findTerminal(context, runId)).toBeTruthy();
+    expect(dispatchSpy.mock.calls.length).toBeLessThanOrEqual(1);
+  }, 30_000);
+
+  it("S2-4: the same message and idempotencyKey do not double-dispatch, including a late replay", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    installUnderstandingComplete();
+    const spies = installMentionConsumerSpies();
+    const dispatchSpy = vi
+      .spyOn(dispatchModule, "dispatchInboundMessage")
+      .mockImplementation(async () => ({ ok: true, text: "official-idempotent-once" }));
+    const context = createChatContext();
+    const runId = `run-s2-idem-${path.basename(fixture.root)}`;
+    const first = await sendGroupChat({
+      fixture,
+      context,
+      runId,
+      message: `${WORK_MESSAGE} @bot-coord`,
+      mentions: mentionBotCoord(`${WORK_MESSAGE} @bot-coord`),
+    });
+    await vi.waitFor(() => expect(dispatchSpy).toHaveBeenCalled(), { timeout: 15_000 });
+    const during = await sendGroupChat({
+      fixture,
+      context,
+      runId,
+      message: `${WORK_MESSAGE} @bot-coord`,
+      mentions: mentionBotCoord(`${WORK_MESSAGE} @bot-coord`),
+    });
+    await during.pending;
+    const inFlightOrCached = during.respond.mock.calls.some(
+      (call) =>
+        call[3]?.cached === true || call[1]?.status === "in_flight" || call[1]?.status === "ok",
+    );
+    expect(
+      inFlightOrCached,
+      `replay mid-flight respond=${JSON.stringify(during.respond.mock.calls)}`,
+    ).toBe(true);
+    await vi.waitFor(() => expect(findTerminal(context, runId)).toBeTruthy(), { timeout: 15_000 });
+    await first.pending;
+    const after = await sendGroupChat({
+      fixture,
+      context,
+      runId,
+      message: `${WORK_MESSAGE} @bot-coord`,
+      mentions: mentionBotCoord(`${WORK_MESSAGE} @bot-coord`),
+    });
+    await after.pending;
+    expect(
+      after.respond.mock.calls.some((call) => call[3]?.cached === true || call[1]?.runId === runId),
+    ).toBe(true);
+    expect(dispatchSpy.mock.calls.length).toBe(1);
+    dispatchHasIdentity(dispatchSpy, { runId, groupId: fixture.groupId, agentId: "bot-coord" });
+    await settleMentionSideEffects();
+    expect(spies.mentionDeliver).not.toHaveBeenCalled();
+    expect(spies.sendAgentMention).not.toHaveBeenCalled();
+    expect(agentGatewayCalls(spies.callGateway)).toEqual([]);
+  }, 30_000);
+
+  it("S2-5: an individual authorized-peer mention still uses the private path and does not auto-create a board", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    installUnderstandingComplete();
+    const spies = installMentionConsumerSpies();
+    const hostDispatch = vi
+      .spyOn(dispatchModule, "dispatchInboundMessage")
+      .mockImplementation(async () => ({ ok: true, text: "private-host-stub-not-a-real-send" }));
+    const context = createChatContext();
+    const runId = `run-s2-private-${path.basename(fixture.root)}`;
+    const message = "@bot-coord 私信问好";
+    const send = await sendPrivateChat({
+      fixture,
+      context,
+      runId,
+      message,
+      mentions: mentionBotCoord(message, "mention-private-1"),
+    });
+    try {
+      await vi.waitFor(
+        () => {
+          expect(send.respond.mock.calls.length).toBeGreaterThan(0);
+          expect(
+            spies.mentionDeliver.mock.calls.length + hostDispatch.mock.calls.length,
+          ).toBeGreaterThan(0);
+        },
+        { timeout: 15_000 },
+      );
+    } catch (err) {
+      throw new Error(
+        debugSend("S2-5-private-miss", { context, respond: send.respond }) +
+          ` mentionDeliver=${spies.mentionDeliver.mock.calls.length}` +
+          ` hostDispatch=${hostDispatch.mock.calls.length}` +
+          ` sendAgentMention=${spies.sendAgentMention.mock.calls.length}`,
+        { cause: err },
+      );
+    }
+    await send.pending.catch(() => undefined);
+    expect(spies.mentionDeliver, "individual mention path regressed").toHaveBeenCalled();
+    // The test stub on callGateway is not a real send and must not be treated as delivered success.
+    const realLookingSuccess = spies.callGateway.mock.results.some(
+      (result) => result.type === "return" && result.value && typeof result.value === "object",
+    );
+    expect(realLookingSuccess, "stubbed gateway send was treated as a real delivery result").toBe(
+      false,
+    );
+    expect(listTaskBoardFiles(fixture.root), "private mention auto-created a task board").toEqual(
+      [],
+    );
+  }, 30_000);
+
+  it("S2-6: B @mention greeting still answers while A's occupancy remains and mention bypass stays closed", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    installUnderstandingComplete();
+    const spies = installMentionConsumerSpies();
+    let releaseA: ((value: unknown) => void) | undefined;
+    const dispatchHang = vi.spyOn(dispatchModule, "dispatchInboundMessage").mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseA = resolve;
+        }),
+    );
+    const context = createChatContext();
+    const runA = `run-s2-occ-a-${path.basename(fixture.root)}`;
+    const runB = `run-s2-occ-b-${path.basename(fixture.root)}`;
+    const sendA = await sendGroupChat({
+      fixture,
+      context,
+      runId: runA,
+      message: WORK_MESSAGE,
+    });
+    await vi.waitFor(() => expect(dispatchHang).toHaveBeenCalled(), { timeout: 8_000 });
+    const sendB = await sendGroupChat({
+      fixture,
+      context,
+      runId: runB,
+      message: `${GREETING_MESSAGE} @bot-coord`,
+      mentions: mentionBotCoord(`${GREETING_MESSAGE} @bot-coord`),
+    });
+    await vi.waitFor(() => expect(findTerminal(context, runB)).toBeTruthy(), { timeout: 15_000 });
+    await sendB.pending;
+    expect(payloadText(findTerminal(context, runB))).toContain(GREETING_REPLY);
+    expect(context.chatAbortControllers.has(runA)).toBe(true);
+    expect(findTerminal(context, runA)).toBeUndefined();
+    await settleMentionSideEffects();
+    expect(spies.mentionDeliver).not.toHaveBeenCalled();
+    expect(spies.sendAgentMention).not.toHaveBeenCalled();
+    expect(agentGatewayCalls(spies.callGateway)).toEqual([]);
+    await settleReleasedWorkTurn({
+      context,
+      runId: runA,
+      pending: sendA.pending,
+      release: releaseA,
+    });
   }, 30_000);
 });

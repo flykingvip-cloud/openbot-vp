@@ -2648,6 +2648,7 @@ async function deliverChatSendMentions(params: {
   client: GatewayClient | null;
 }): Promise<{ skipHostAgent: boolean }> {
   const stewardUserId = extractEmployeeStewardUserIdFromSessionKey(params.sessionKey);
+
   if (stewardUserId && !params.sessionKey.includes(":space:")) {
     try {
       const { routeStewardConversationMentions } =
@@ -5686,17 +5687,11 @@ export const chatHandlers: GatewayRequestHandlers = {
         sessionKey: rawSessionKey,
         config: groupCfg,
       });
-      void deliverChatSendMentions({
-        context,
-        cfg: groupCfg,
-        sessionEntry: groupSession.entry,
-        sessionKey: rawSessionKey,
-        messageId: clientRunId,
-        messageText: inboundMessage,
-        mentions: p.mentions,
-        sourceAgentId: groupSourceAgentId,
-        client,
-      });
+      // Group @mentions already informed decideParticipants above. They are not
+      // an execution grant: do not start independent org delivery before
+      // understanding and admission. Admitted work is dispatched once by the
+      // original collaboration scheduler (runStageBot / dispatchInboundMessage).
+      // deliverChatSendMentions stays on the individual / internal-message path.
 
       void (async () => {
         try {
