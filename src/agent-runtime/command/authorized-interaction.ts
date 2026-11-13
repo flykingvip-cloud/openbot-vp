@@ -1,8 +1,10 @@
 import type { createAuthorizedModelSession } from "../model/index.js";
 import {
+  createInteractionResourceBudget,
   formatInteractionFailureReply,
   isInteractionUserAbort,
   INTERACTION_QUEUE_TIMEOUT_TEXT,
+  raceVisibleInteraction,
 } from "../model/interaction-resource-wait.js";
 import { interpretInteraction } from "./interpret-interaction.js";
 import {
@@ -23,42 +25,85 @@ type UnderstandingPorts = {
 async function withAuthorizedInteraction<T>(
   params: Params,
   ports: UnderstandingPorts,
-  consume: () => Promise<T>,
+  consume: (bounded: Params) => Promise<T>,
 ) {
-  try {
-    params.input.abortSignal?.throwIfAborted();
+  const resourceBudget =
+    params.resourceBudget ?? createInteractionResourceBudget({ overrideMs: params.timeoutMs });
+  const remainingMs = resourceBudget.remainingMs();
+  const deadlineSignal =
+    remainingMs <= 0
+      ? AbortSignal.abort(Object.assign(new Error("timeout"), { name: "TimeoutError" }))
+      : AbortSignal.timeout(remainingMs);
+  const abortSignal = params.input.abortSignal
+    ? AbortSignal.any([params.input.abortSignal, deadlineSignal])
+    : deadlineSignal;
+  const bounded: Params = {
+    ...params,
+    input: { ...params.input, abortSignal },
+    resourceBudget,
+  };
+
+  const work = (async () => {
+    abortSignal.throwIfAborted();
     const gate = await ports.session.authorize(ports.authorization);
-    params.input.abortSignal?.throwIfAborted();
     if (!gate.acquired && !gate.skipped) {
+      // A cooperative queue wait may settle slightly after the signal
+      // due to poll interval; keep that factual gate result.
       const text =
         "reason" in gate && gate.reason === "CONCURRENCY_QUEUE_TIMEOUT"
           ? gate.message.trim() || INTERACTION_QUEUE_TIMEOUT_TEXT
           : gate.message;
       return { kind: "respond" as const, text, clarification: false };
     }
+    abortSignal.throwIfAborted();
     ports.prepare(ports.session);
-    return await consume();
+    return await consume(bounded);
+  })();
+
+  let visible: T | { kind: "respond"; text: string; clarification: false };
+  try {
+    // Race the caller's cancel/deadline signal. A cooperative queue wait
+    // already has its own bound and must be allowed to return that fact;
+    // remainingMs is only a backstop when neither a caller signal nor a
+    // queue wait bound exists. The bound signal still stops late admission.
+    const callerSignal = params.input.abortSignal;
+    const queueWaitBound = ports.authorization.queueMaxWaitMs;
+    visible = await raceVisibleInteraction(work, {
+      signal: callerSignal,
+      remainingMs:
+        callerSignal || (typeof queueWaitBound === "number" && queueWaitBound > 0)
+          ? undefined
+          : remainingMs,
+    });
   } catch (error) {
+    // Keep the background work attached so late usage/admission checks can run.
+    void work.catch(() => undefined);
     if (isInteractionUserAbort(error)) {
+      const cleanup = ports.session.dispose();
+      void cleanup.catch(() => undefined);
       throw error;
     }
-    return {
+    visible = {
       kind: "respond" as const,
       text: formatInteractionFailureReply(error),
       clarification: false,
     };
-  } finally {
-    await ports.session.dispose();
   }
+
+  // Cleanup must start now so a late acquire still releases once, but a
+  // hanging release must not block the visible receipt.
+  const cleanup = ports.session.dispose();
+  void cleanup.catch(() => undefined);
+  return visible;
 }
 
 /** Interpretation only. Group state authority must apply its own admission afterward. */
 export function runAuthorizedUnderstanding(params: Params, ports: UnderstandingPorts) {
-  return withAuthorizedInteraction(params, ports, async () => ({
+  return withAuthorizedInteraction(params, ports, async (bounded) => ({
     kind: "understood" as const,
     decision: await interpretInteraction(
-      params.input,
-      createPreparedInteractionInference(params, ports.session, ports.candidate),
+      bounded.input,
+      createPreparedInteractionInference(bounded, ports.session, ports.candidate),
     ),
   }));
 }
@@ -70,7 +115,7 @@ export function runAuthorizedInteraction(
     admission: Parameters<typeof runPreparedInteraction>[3];
   },
 ) {
-  return withAuthorizedInteraction(params, ports, () =>
-    runPreparedInteraction(params, ports.session, ports.candidate, ports.admission),
+  return withAuthorizedInteraction(params, ports, (bounded) =>
+    runPreparedInteraction(bounded, ports.session, ports.candidate, ports.admission),
   );
 }

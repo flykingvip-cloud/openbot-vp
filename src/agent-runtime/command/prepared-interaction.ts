@@ -64,6 +64,8 @@ export function createPreparedInteractionInference(
           });
         },
       });
+      // Usage must be settled even if the visible deadline has already
+      // elapsed. Late admission is still forbidden below.
       await session.recordUsage({
         provider: result.provider,
         model: result.model,
@@ -75,6 +77,10 @@ export function createPreparedInteractionInference(
         toolClasses: [],
         fallbackAttemptsRaw: result.attempts,
       });
+      input.abortSignal?.throwIfAborted();
+      if (resourceBudget.isExhausted()) {
+        throw interactionTimeoutError();
+      }
       return result.result.readDecision();
     },
   };

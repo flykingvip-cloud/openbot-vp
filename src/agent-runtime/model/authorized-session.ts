@@ -61,6 +61,7 @@ export type ModelInferenceResult<T> = Awaited<ReturnType<typeof runWithModelFall
 export function createAuthorizedModelSession(runId: string, ports: ModelSessionPorts) {
   let admitted = false;
   let disposed = false;
+  let usageSettled = false;
   let acquired: Acquired | undefined;
   let prepared:
     | {
@@ -208,34 +209,43 @@ export function createAuthorizedModelSession(runId: string, ports: ModelSessionP
       toolClasses: readonly string[];
       fallbackAttemptsRaw: unknown;
     }) {
-      if (!admitted || disposed) {
-        throw new Error("Model session has not been authorized");
-      }
       const reporting = acquired?.modelGate?.creditReporting;
       if (!reporting) {
+        if (!admitted && !acquired) {
+          throw new Error("Model session has not been authorized");
+        }
         return Promise.resolve(undefined);
       }
-      return ports.accounting.recordCreditUsage(
-        buildCommercialRunCreditUsageInput({
-          enterpriseId: reporting.enterpriseId,
-          policyId: reporting.policyId,
-          runId,
-          provider: input.provider,
-          model: input.model,
-          creditUserId: input.creditUserId,
-          agentId: input.agentId,
-          authorizationDecisionId: acquired?.authorizationDecisionId,
-          subscriptionId: acquired?.subscriptionId,
-          planId: acquired?.planId,
-          planVersionId: acquired?.planVersionId,
-          subscriptionSnapshotId: acquired?.subscriptionSnapshotId,
-          durationMs: input.durationMs,
-          toolCallCount: input.toolCallCount,
-          toolClasses: input.toolClasses,
-          fallbackAttemptsRaw: input.fallbackAttemptsRaw,
-          tokenUsage: normalizeUsage(input.usage),
-        }),
-      );
+      // A late settlement after the visible receipt may still persist usage
+      // via the existing accounting path. A second call after dispose must not.
+      if (disposed && usageSettled) {
+        throw new Error("Model session has not been authorized");
+      }
+      return Promise.resolve(
+        ports.accounting.recordCreditUsage(
+          buildCommercialRunCreditUsageInput({
+            enterpriseId: reporting.enterpriseId,
+            policyId: reporting.policyId,
+            runId,
+            provider: input.provider,
+            model: input.model,
+            creditUserId: input.creditUserId,
+            agentId: input.agentId,
+            authorizationDecisionId: acquired?.authorizationDecisionId,
+            subscriptionId: acquired?.subscriptionId,
+            planId: acquired?.planId,
+            planVersionId: acquired?.planVersionId,
+            subscriptionSnapshotId: acquired?.subscriptionSnapshotId,
+            durationMs: input.durationMs,
+            toolCallCount: input.toolCallCount,
+            toolClasses: input.toolClasses,
+            fallbackAttemptsRaw: input.fallbackAttemptsRaw,
+            tokenUsage: normalizeUsage(input.usage),
+          }),
+        ),
+      ).finally(() => {
+        usageSettled = true;
+      });
     },
     dispose() {
       disposed = true;

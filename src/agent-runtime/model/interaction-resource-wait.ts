@@ -113,6 +113,62 @@ export function isInteractionUserAbort(error: unknown): boolean {
   );
 }
 
+/**
+ * Bound the *visible* wait against the original deadline. The raced work
+ * is not cancelled; callers keep cleanup / usage responsibility.
+ */
+
+function deadlineAfter<T = never>(remainingMs: number): Promise<T> {
+  return new Promise((_, reject) => {
+    setTimeout(() => {
+      // Yield one macrotask so a cooperative waiter due on the same tick
+      // (for example a queue wait equal to this deadline) can settle first.
+      setImmediate(() => reject(interactionTimeoutError()));
+    }, remainingMs);
+  });
+}
+
+export async function raceVisibleInteraction<T>(
+  work: Promise<T>,
+  opts: { signal?: AbortSignal; remainingMs?: number },
+): Promise<T> {
+  const remaining = opts.remainingMs;
+  if (opts.signal?.aborted) {
+    throw visibleDeadlineError(opts.signal);
+  }
+  if (remaining !== undefined && remaining <= 0) {
+    throw interactionTimeoutError();
+  }
+  const racers: Promise<T>[] = [work];
+  if (opts.signal) {
+    racers.push(whenAborted(opts.signal));
+  }
+  if (remaining !== undefined) {
+    racers.push(deadlineAfter(remaining));
+  }
+  return await Promise.race(racers);
+}
+
+function whenAborted<T = never>(signal: AbortSignal): Promise<T> {
+  return new Promise((_, reject) => {
+    if (signal.aborted) {
+      reject(visibleDeadlineError(signal));
+      return;
+    }
+    signal.addEventListener("abort", () => reject(visibleDeadlineError(signal)), { once: true });
+  });
+}
+
+function visibleDeadlineError(signal: AbortSignal): Error {
+  const reason = signal.reason;
+  if (isInteractionUserAbort(reason)) {
+    return reason instanceof Error
+      ? reason
+      : new Error("The operation was aborted.", { cause: reason });
+  }
+  return interactionTimeoutError();
+}
+
 export function classifyInteractionFailure(error: unknown): InteractionFailureKind {
   const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   const name = readErrorStringField(error, "name");
