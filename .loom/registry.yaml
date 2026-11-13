@@ -14544,6 +14544,27 @@ tasks:
     ownerHistory: []
     since: 2026-11-13
     metadata: {}
+  - id: exec-chain-overblock-min
+    owner: grok-dynamic-rules
+    intent:
+      - "Limited landing of the accepted compaction-safeguard cancel-on-summary-failure fix and its
+        required regression only. Exact files only. Independent acceptance: codex-runtime-manager.
+        No merge or deploy until authorized. No A/B writes or #281 content in this landing."
+    paths:
+      - src/agents/pi-extensions/compaction-safeguard.ts
+      - src/agents/pi-extensions/compaction-safeguard.test.ts
+    state: active
+    sessions:
+      - id: 906234d4-adaa-49f4-80ee-d29e0b81ff0c
+        taskId: exec-chain-overblock-min
+        ide: grok-bot
+        agent: grok-dynamic-rules
+        status: active
+        lastSignalAt: 2026-11-13T13:08:41.592Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-13
+    metadata: {}
 landingStreams:
   - id: runtime-rule-adaptation
     landingPolicy: serial
@@ -33390,3 +33411,15 @@ sharedPaths:
       regression only. Predecessor owners, paths, and session history remain unchanged. Does not
       take over src/** or src/agents/**. Authorized by human-governor on 2026-11-13.
       Independent acceptance: codex-runtime-manager. No #281 over-block content."
+  - glob: src/agents/pi-extensions/compaction-safeguard.ts
+    landerTask: exec-chain-overblock-min
+    reason: "Human-authorized exact-file landing for the accepted compaction cancel-on-summary-failure
+      fix and required regression only. Predecessor owners, paths, and session history remain
+      unchanged. Does not take over src/** or src/agents/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No A/B or #281 content."
+  - glob: src/agents/pi-extensions/compaction-safeguard.test.ts
+    landerTask: exec-chain-overblock-min
+    reason: "Human-authorized exact-file landing for the accepted compaction cancel-on-summary-failure
+      fix and required regression only. Predecessor owners, paths, and session history remain
+      unchanged. Does not take over src/** or src/agents/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No A/B or #281 content."
