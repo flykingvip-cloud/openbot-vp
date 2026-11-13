@@ -7,6 +7,7 @@ import {
   INTERACTION_TIMEOUT_TEXT,
   classifyInteractionFailure,
 } from "../agent-runtime/model/interaction-resource-wait.js";
+import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLock } from "../infra/file-lock.js";
 import { CONFIG_DIR } from "../utils.js";
 
 export const REJECTED_INTERACTION_TURN_TEXT =
@@ -32,7 +33,11 @@ export function resolveChatTurnTerminalDir(storeDir?: string): string {
   return storeDir?.trim() || path.join(CONFIG_DIR, "openbot-chat-turn-terminals");
 }
 
-export function chatTurnTerminalPath(runId: string, storeDir?: string, sessionKey?: string): string {
+export function chatTurnTerminalPath(
+  runId: string,
+  storeDir?: string,
+  sessionKey?: string,
+): string {
   return path.join(
     resolveChatTurnTerminalDir(storeDir),
     encodeURIComponent(sessionKey?.trim() || "_"),
@@ -58,14 +63,19 @@ export function listChatTurnTerminals(
   sessionKey: string,
   storeDir?: string,
 ): ChatTurnTerminalReceipt[] {
-  const dir = path.join(resolveChatTurnTerminalDir(storeDir), encodeURIComponent(sessionKey.trim() || "_"));
+  const dir = path.join(
+    resolveChatTurnTerminalDir(storeDir),
+    encodeURIComponent(sessionKey.trim() || "_"),
+  );
   try {
     return fs
       .readdirSync(dir)
       .filter((name) => name.endsWith(".json"))
       .flatMap((name) => {
         try {
-          const parsed = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")) as ChatTurnTerminalReceipt;
+          const parsed = JSON.parse(
+            fs.readFileSync(path.join(dir, name), "utf8"),
+          ) as ChatTurnTerminalReceipt;
           return parsed?.runId ? [parsed] : [];
         } catch {
           return [];
@@ -94,28 +104,70 @@ function canUpgradeChatTurnTerminal(
   ) {
     return false;
   }
-  // Same fact: allow a persist upgrade or sidecar refresh, never a conflicting terminal.
+  // Same fact may upgrade from not-persisted to persisted, but must not
+  // downgrade a durable settlement or replace an opposite fact.
+  if (existing.persistedToTranscript && !next.persistedToTranscript) {
+    return false;
+  }
   return true;
+}
+
+function writeChatTurnTerminalRecord(receipt: ChatTurnTerminalReceipt, storeDir?: string): boolean {
+  try {
+    const dest = chatTurnTerminalPath(receipt.runId, storeDir, receipt.sessionKey);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    const existing = readChatTurnTerminal(receipt.runId, storeDir, receipt.sessionKey);
+    if (existing && !canUpgradeChatTurnTerminal(existing, receipt)) {
+      return false;
+    }
+    const tmp = `${dest}.${process.pid}.${Date.now().toString(16)}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(receipt)}\n`, { encoding: "utf8" });
+    try {
+      if (!existing) {
+        try {
+          fs.linkSync(tmp, dest);
+          fs.rmSync(tmp, { force: true });
+          return true;
+        } catch (err) {
+          if ((err as { code?: string }).code !== "EEXIST") {
+            throw err;
+          }
+          const raced = readChatTurnTerminal(receipt.runId, storeDir, receipt.sessionKey);
+          if (!raced || !canUpgradeChatTurnTerminal(raced, receipt)) {
+            fs.rmSync(tmp, { force: true });
+            return false;
+          }
+        }
+      }
+      const current = readChatTurnTerminal(receipt.runId, storeDir, receipt.sessionKey);
+      if (current && !canUpgradeChatTurnTerminal(current, receipt)) {
+        fs.rmSync(tmp, { force: true });
+        return false;
+      }
+      fs.renameSync(tmp, dest);
+      return true;
+    } catch (err) {
+      fs.rmSync(tmp, { force: true });
+      throw err;
+    }
+  } catch {
+    return false;
+  }
 }
 
 export function writeChatTurnTerminal(
   receipt: ChatTurnTerminalReceipt,
   storeDir?: string,
 ): boolean {
-  try {
-    const existing = readChatTurnTerminal(receipt.runId, storeDir, receipt.sessionKey);
-    if (existing && !canUpgradeChatTurnTerminal(existing, receipt)) {
-      return false;
-    }
-    const dest = chatTurnTerminalPath(receipt.runId, storeDir, receipt.sessionKey);
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    const tmp = `${dest}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, `${JSON.stringify(receipt)}\n`, { encoding: "utf8" });
-    fs.renameSync(tmp, dest);
-    return true;
-  } catch {
-    return false;
-  }
+  return writeChatTurnTerminalRecord(receipt, storeDir);
+}
+
+async function withChatTurnTerminalLock<T>(
+  params: { runId: string; storeDir?: string; sessionKey?: string },
+  fn: () => Promise<T>,
+): Promise<T> {
+  const dest = chatTurnTerminalPath(params.runId, params.storeDir, params.sessionKey);
+  return withFileLock(dest, SESSION_TASK_BOARD_LOCK_OPTIONS, fn);
 }
 
 export async function reconcileChatTurnTerminal(params: {
@@ -124,25 +176,27 @@ export async function reconcileChatTurnTerminal(params: {
   sessionKey?: string;
   append: (message: string, idempotencyKey: string) => Promise<{ ok: boolean }>;
 }): Promise<{ reconciled: boolean; receipt?: ChatTurnTerminalReceipt }> {
-  const receipt = readChatTurnTerminal(params.runId, params.storeDir, params.sessionKey);
-  if (!receipt || receipt.persistedToTranscript) {
-    return { reconciled: false, ...(receipt ? { receipt } : {}) };
-  }
-  try {
-    const result = await params.append(receipt.text, `${params.runId}:interaction-rejected`);
-    if (!result.ok) {
+  return withChatTurnTerminalLock(params, async () => {
+    const receipt = readChatTurnTerminal(params.runId, params.storeDir, params.sessionKey);
+    if (!receipt || receipt.persistedToTranscript) {
+      return { reconciled: false, ...(receipt ? { receipt } : {}) };
+    }
+    try {
+      const result = await params.append(receipt.text, `${params.runId}:interaction-rejected`);
+      if (!result.ok) {
+        return { reconciled: false, receipt };
+      }
+      const next = {
+        ...receipt,
+        persistedToTranscript: true,
+        recordTemporarilyUnavailable: false,
+      };
+      writeChatTurnTerminalRecord(next, params.storeDir);
+      return { reconciled: true, receipt: next };
+    } catch {
       return { reconciled: false, receipt };
     }
-    const next = {
-      ...receipt,
-      persistedToTranscript: true,
-      recordTemporarilyUnavailable: false,
-    };
-    writeChatTurnTerminal(next, params.storeDir);
-    return { reconciled: true, receipt: next };
-  } catch {
-    return { reconciled: false, receipt };
-  }
+  });
 }
 
 function isInterpretationFailure(error: unknown): boolean {
@@ -170,7 +224,10 @@ function isGovernedBillingInterpretation(error: unknown): boolean {
   );
 }
 
-export function formatChatTurnTerminalText(error: unknown): { text: string; businessExecution: "none" | "unknown" } {
+export function formatChatTurnTerminalText(error: unknown): {
+  text: string;
+  businessExecution: "none" | "unknown";
+} {
   if (isGovernedBillingInterpretation(error)) {
     return { text: BILLING_BLOCKED_INTERACTION_TEXT, businessExecution: "none" };
   }
@@ -212,7 +269,8 @@ export async function persistRejectedInteractionTurn(params: {
           ? params.error.message
           : "interaction_failure",
       shape: (params.error as Error & { shape?: unknown }).shape,
-      stack: params.error instanceof Error ? params.error.stack?.split("\n").slice(1, 7) : undefined,
+      stack:
+        params.error instanceof Error ? params.error.stack?.split("\n").slice(1, 7) : undefined,
     }),
   );
   return writeTerminalWithTranscript({
@@ -239,6 +297,17 @@ export async function persistGeneralChatTurnTerminal(params: {
 }
 
 async function writeTerminalWithTranscript(params: {
+  runId: string;
+  text: string;
+  businessExecution: "none" | "unknown";
+  append: (message: string, idempotencyKey: string) => Promise<{ ok: boolean }>;
+  sessionKey?: string;
+  storeDir?: string;
+}): Promise<{ persisted: boolean; text?: string; recordTemporarilyUnavailable?: boolean }> {
+  return withChatTurnTerminalLock(params, () => writeTerminalWithTranscriptLocked(params));
+}
+
+async function writeTerminalWithTranscriptLocked(params: {
   runId: string;
   text: string;
   businessExecution: "none" | "unknown";
@@ -279,7 +348,7 @@ async function writeTerminalWithTranscript(params: {
     recordTemporarilyUnavailable: !persisted,
     at: existing?.at ?? new Date().toISOString(),
   };
-  writeChatTurnTerminal(receipt, params.storeDir);
+  writeChatTurnTerminalRecord(receipt, params.storeDir);
   if (persisted) {
     return { persisted: true, text: params.text };
   }
@@ -298,5 +367,7 @@ export function visibleTerminalText(params: {
   if (params.text) {
     return params.text;
   }
-  return params.persisted ? params.fallback : `${params.fallback}\n\n${INTERACTION_RECORD_UNAVAILABLE_TEXT}`;
+  return params.persisted
+    ? params.fallback
+    : `${params.fallback}\n\n${INTERACTION_RECORD_UNAVAILABLE_TEXT}`;
 }

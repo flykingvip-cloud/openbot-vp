@@ -3,12 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
 import { projectInteractionHistory } from "../agent-runtime/context/index.js";
-import { persistInteractionMessage } from "../agent-runtime/state/index.js";
-import { openSessionManager } from "../agents/pi-sdk/session.js";
 import {
   CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
   INTERACTION_RECORD_UNAVAILABLE_TEXT,
+  INTERACTION_TIMEOUT_TEXT,
 } from "../agent-runtime/model/interaction-resource-wait.js";
+import { persistInteractionMessage } from "../agent-runtime/state/index.js";
+import { openSessionManager } from "../agents/pi-sdk/session.js";
 import {
   BILLING_BLOCKED_INTERACTION_TEXT,
   persistRejectedInteractionTurn,
@@ -130,5 +131,72 @@ it("does not claim durable closure when the transcript write fails", async () =>
     });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it("checkpoint A remediations: concurrent conflicting terminals keep one fact and one visible settlement", async () => {
+  const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "interaction-terminal-race-"));
+  const written: string[] = [];
+  let entered = 0;
+  let firstEntered!: () => void;
+  const firstAppendEntered = new Promise<void>((resolve) => {
+    firstEntered = resolve;
+  });
+  let proceed!: () => void;
+  const mayAppend = new Promise<void>((resolve) => {
+    proceed = resolve;
+  });
+  const append = async (text: string) => {
+    entered += 1;
+    if (entered === 1) {
+      firstEntered();
+    }
+    await mayAppend;
+    written.push(text);
+    return { ok: true };
+  };
+  try {
+    const timeoutErr = Object.assign(new Error("timeout"), {
+      interactionPhase: "interpretation" as const,
+      reason: "timeout",
+    });
+    const lateErr = new Error("tool failed after send");
+    const first = persistRejectedInteractionTurn({
+      error: timeoutErr,
+      runId: "run-race",
+      sessionKey: "sess-race",
+      storeDir,
+      append,
+    });
+    const second = persistRejectedInteractionTurn({
+      error: lateErr,
+      runId: "run-race",
+      sessionKey: "sess-race",
+      storeDir,
+      append,
+    });
+    await firstAppendEntered;
+    // If the critical section is unlocked, the peer should also reach append
+    // before either settlement is written.
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    proceed();
+    const [left, right] = await Promise.all([first, second]);
+    expect(written).toHaveLength(1);
+    const sidecar = readChatTurnTerminal("run-race", storeDir, "sess-race");
+    expect(sidecar).toBeTruthy();
+    expect([INTERACTION_TIMEOUT_TEXT, CHAT_TURN_ERROR_UNCONFIRMED_TEXT]).toContain(sidecar?.text);
+    expect(left.text).toBe(sidecar?.text);
+    expect(right.text).toBe(sidecar?.text);
+    expect(left.persisted).toBe(true);
+    expect(right.persisted).toBe(true);
+    if (sidecar?.text === INTERACTION_TIMEOUT_TEXT) {
+      expect(sidecar.businessExecution).toBe("none");
+    } else {
+      expect(sidecar?.businessExecution).toBe("unknown");
+    }
+    expect(entered).toBe(1);
+  } finally {
+    fs.rmSync(storeDir, { recursive: true, force: true });
   }
 });
