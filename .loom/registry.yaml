@@ -14496,6 +14496,53 @@ tasks:
             Official loom register was not run. Scope is limited to optional same-run cap
             pass-through and selection-block classification; production default stays closed, the
             production whitelist stays empty, and the manual /compact command path is not modified.
+  - id: exec-chain-fidelity-ab-min
+    owner: grok-dynamic-rules
+    intent:
+      - "Limited landing of the locked A/B prompt-fidelity fixes and required regression only.
+        Exact files only. Complete-message selection, explicit history-omission mark, and
+        full goal seed without 2000-character clipping. Independent acceptance: codex-runtime-manager.
+        No merge or deploy until authorized. Does not include #281 over-block logic, all-history
+        re-injection, global restrict, or C compaction files."
+    paths:
+      - src/agent-runtime/context/interaction-history.ts
+      - src/agent-runtime/context/interaction-history.test.ts
+      - src/agent-runtime/context/compilation/compile.ts
+      - src/agent-runtime/context/compilation/active-task-seed.ts
+      - src/agents/context-compiler/compile.test.ts
+    state: active
+    sessions:
+      - id: 0ba856f0-9a18-42ee-a591-e980a4cdf70a
+        taskId: exec-chain-fidelity-ab-min
+        ide: grok-bot
+        agent: grok-dynamic-rules
+        status: active
+        lastSignalAt: 2026-11-13T15:20:30.918Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-13
+    metadata: {}
+  - id: rule-adaptation-shadow-host-min
+    owner: grok-dynamic-rules
+    intent:
+      - "Limited landing of the minimal advice-only shadow host hook in runGovernedInteraction
+        and required regression only. Exact file only. Independent acceptance: codex-runtime-manager.
+        Default off, explicit trigger, advice only, no auto-activation, no production config writes.
+        No merge or deploy until authorized. Does not include A/B fidelity files or #281 content."
+    paths:
+      - src/agent-runtime/command/governed-interaction.ts
+    state: active
+    sessions:
+      - id: 15da9024-c1b4-436c-ade5-53b9495b61d5
+        taskId: rule-adaptation-shadow-host-min
+        ide: grok-bot
+        agent: grok-dynamic-rules
+        status: active
+        lastSignalAt: 2026-11-13T15:20:30.918Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-13
+    metadata: {}
 landingStreams:
   - id: runtime-rule-adaptation
     landingPolicy: serial
@@ -31969,14 +32016,18 @@ sharedPaths:
       history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/context/interaction-history.ts
-    landerTask: agent-runtime-convergence
-    reason: Human-authorized exact-file runtime convergence takeover; retain other task declarations and
-      history.
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/** or src/agent-runtime/context/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/context/interaction-history.test.ts
-    landerTask: agent-runtime-convergence
-    reason: Human-authorized exact-file runtime convergence takeover; retain other task declarations and
-      history.
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/** or src/agent-runtime/context/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/interaction-turn.ts
     landerTask: agent-runtime-convergence
@@ -32158,6 +32209,18 @@ sharedPaths:
     landerTask: agent-runtime-convergence
     reason: Human-authorized bounded autonomous capability migration; retain all other scopes and history.
     reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/context/compilation/compile.ts
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/agent-runtime/context/compilation/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
+  - glob: src/agent-runtime/context/compilation/active-task-seed.ts
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/agent-runtime/context/compilation/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
   - glob: src/agent-runtime/context/compilation/**
     landerTask: agent-runtime-convergence
     reason: Human-authorized autonomous shared-context migration; preserve all other scopes and history.
@@ -32917,9 +32980,12 @@ sharedPaths:
     reason: Authorized migration regression fixture alignment; preserve prior task ownership history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/governed-interaction.ts
-    landerTask: agent-runtime-convergence
-    reason: Authorized scoped runtime migration of interaction sequencing from wiring to command;
-      preserve predecessor history.
+    landerTask: rule-adaptation-shadow-host-min
+    reason: "Human-authorized exact-file landing for the minimal advice-only shadow host hook in
+      runGovernedInteraction and required regression only. Predecessor owners, paths, and session
+      history remain unchanged. Does not take over src/** or src/agent-runtime/command/**.
+      Authorized by human-governor on 2026-11-13. Independent acceptance: codex-runtime-manager.
+      No auto-activation or production config writes."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/execution-lifecycle.ts
     landerTask: agent-runtime-convergence
@@ -33309,3 +33375,9 @@ sharedPaths:
     reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
       owner retained.
     reviewAfter: 2026-11-30
+  - glob: src/agents/context-compiler/compile.test.ts
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/** or src/agents/**. Authorized by human-governor on 2026-11-13.
+      Independent acceptance: codex-runtime-manager. No #281 over-block content."
