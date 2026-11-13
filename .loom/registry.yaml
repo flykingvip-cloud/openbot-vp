@@ -12889,7 +12889,14 @@ tasks:
       - src/agents/pi-extensions/compaction-safeguard.ts
       - src/agents/pi-extensions/compaction-safeguard.test.ts
     state: active
-    sessions: []
+    sessions:
+      - id: 906234d4-adaa-49f4-80ee-d29e0b81ff0c
+        taskId: exec-chain-overblock-min
+        ide: grok-bot
+        agent: grok-dynamic-rules
+        status: active
+        lastSignalAt: 2026-11-13T13:08:41.592Z
+        metadata: {}
     ownerHistory: []
     since: 2026-11-13
     metadata: {}
