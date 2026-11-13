@@ -814,12 +814,19 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
                   summarizationInstructions,
                   previousSummary: preparation.previousSummary,
                 });
+                if (!droppedSummary.trim()) {
+                  log.warn(
+                    "Compaction safeguard: empty dropped-history summary; preserving original history.",
+                  );
+                  return { cancel: true };
+                }
               } catch (droppedError) {
                 log.warn(
-                  `Compaction safeguard: failed to summarize dropped messages, continuing without: ${
+                  `Compaction safeguard: failed to summarize dropped messages; preserving original history: ${
                     droppedError instanceof Error ? droppedError.message : String(droppedError)
                   }`,
                 );
+                return { cancel: true };
               }
             }
           }
@@ -919,13 +926,12 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
           }
           throw attemptError;
         }
-        lastSuccessfulSummary = summaryWithPreservedTurns;
-
         const canRegenerate =
           messagesToSummarize.length > 0 ||
           (preparation.isSplitTurn && turnPrefixMessages.length > 0);
         if (!qualityGuardEnabled || !canRegenerate) {
           summary = summaryWithPreservedTurns;
+          lastSuccessfulSummary = summaryWithPreservedTurns;
           break;
         }
         const quality = auditSummaryQuality({
@@ -934,10 +940,18 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
           latestAsk: latestUserAsk,
           identifierPolicy,
         });
-        summary = summaryWithPreservedTurns;
-        if (quality.ok || attempt >= totalAttempts - 1) {
+        if (quality.ok) {
+          summary = summaryWithPreservedTurns;
+          lastSuccessfulSummary = summaryWithPreservedTurns;
           break;
         }
+        if (attempt >= totalAttempts - 1) {
+          log.warn(
+            "Compaction safeguard: summary quality checks failed; preserving original history.",
+          );
+          return { cancel: true };
+        }
+        summary = summaryWithPreservedTurns;
         const reasons = quality.reasons.join(", ");
         const qualityFeedbackInstruction =
           identifierPolicy === "strict"

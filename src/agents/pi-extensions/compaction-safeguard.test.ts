@@ -1114,6 +1114,109 @@ describe("compaction-safeguard recent-turn preservation", () => {
     expect(droppedCall?.customInstructions).toContain("Keep security caveats.");
   });
 
+  it("cancels compaction when dropped-history summarization fails, instead of continuing without that history", async () => {
+    mockSummarizeInStages.mockReset();
+    mockSummarizeInStages.mockRejectedValueOnce(new Error("dropped summary failed"));
+
+    const sessionManager = stubSessionManager();
+    const model = createAnthropicModelFixture();
+    setCompactionSafeguardRuntime(sessionManager, {
+      model,
+      maxHistoryShare: 0.1,
+      recentTurnsPreserve: 12,
+    });
+
+    const compactionHandler = createCompactionHandler();
+    const getApiKeyMock = vi.fn().mockResolvedValue("test-key");
+    const mockContext = createCompactionContext({
+      sessionManager,
+      getApiKeyMock,
+    });
+    const messagesToSummarize: AgentMessage[] = Array.from({ length: 4 }, (_unused, index) => ({
+      role: "user",
+      content: `msg-${index}-${"x".repeat(120_000)}`,
+      timestamp: index + 1,
+    }));
+    const event = {
+      preparation: {
+        messagesToSummarize,
+        turnPrefixMessages: [],
+        firstKeptEntryId: "entry-1",
+        tokensBefore: 400_000,
+        fileOps: {
+          read: [],
+          edited: [],
+          written: [],
+        },
+        settings: { reserveTokens: 4000 },
+        previousSummary: undefined,
+        isSplitTurn: false,
+      },
+      customInstructions: "Keep security caveats.",
+      signal: new AbortController().signal,
+    };
+
+    const result = (await compactionHandler(event, mockContext)) as {
+      cancel?: boolean;
+      compaction?: { summary?: string };
+    };
+
+    expect(result).toEqual({ cancel: true });
+    expect(result.compaction).toBeUndefined();
+    expect(mockSummarizeInStages).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels compaction when dropped-history summarization returns an empty summary", async () => {
+    mockSummarizeInStages.mockReset();
+    mockSummarizeInStages.mockResolvedValueOnce("   ");
+
+    const sessionManager = stubSessionManager();
+    const model = createAnthropicModelFixture();
+    setCompactionSafeguardRuntime(sessionManager, {
+      model,
+      maxHistoryShare: 0.1,
+      recentTurnsPreserve: 12,
+    });
+
+    const compactionHandler = createCompactionHandler();
+    const getApiKeyMock = vi.fn().mockResolvedValue("test-key");
+    const mockContext = createCompactionContext({
+      sessionManager,
+      getApiKeyMock,
+    });
+    const messagesToSummarize: AgentMessage[] = Array.from({ length: 4 }, (_unused, index) => ({
+      role: "user",
+      content: `msg-${index}-${"x".repeat(120_000)}`,
+      timestamp: index + 1,
+    }));
+    const event = {
+      preparation: {
+        messagesToSummarize,
+        turnPrefixMessages: [],
+        firstKeptEntryId: "entry-1",
+        tokensBefore: 400_000,
+        fileOps: {
+          read: [],
+          edited: [],
+          written: [],
+        },
+        settings: { reserveTokens: 4000 },
+        previousSummary: undefined,
+        isSplitTurn: false,
+      },
+      customInstructions: "Keep security caveats.",
+      signal: new AbortController().signal,
+    };
+
+    const result = (await compactionHandler(event, mockContext)) as {
+      cancel?: boolean;
+      compaction?: { summary?: string };
+    };
+
+    expect(result).toEqual({ cancel: true });
+    expect(mockSummarizeInStages).toHaveBeenCalledTimes(1);
+  });
+
   it("does not retry summaries unless quality guard is explicitly enabled", async () => {
     mockSummarizeInStages.mockReset();
     mockSummarizeInStages.mockResolvedValue("summary missing headings");
@@ -1245,7 +1348,10 @@ describe("compaction-safeguard recent-turn preservation", () => {
       compaction?: { summary?: string };
     };
 
-    expect(result.cancel).not.toBe(true);
+    // Retry ran, but the last attempt was still unqualified. Do not replace
+    // original history with a failed summary.
+    expect(result.cancel).toBe(true);
+    expect(result.compaction).toBeUndefined();
     expect(mockSummarizeInStages).toHaveBeenCalledTimes(2);
     const secondCall = mockSummarizeInStages.mock.calls[1]?.[0];
     expect(secondCall?.customInstructions).toContain("Quality check feedback");
@@ -1338,7 +1444,7 @@ describe("compaction-safeguard recent-turn preservation", () => {
     expect(secondCall?.customInstructions).toContain("latest_user_ask_not_reflected");
   });
 
-  it("keeps last successful summary when a quality retry call fails", async () => {
+  it("cancels compaction when a quality retry fails after an unqualified summary", async () => {
     mockSummarizeInStages.mockReset();
     mockSummarizeInStages
       .mockResolvedValueOnce("short summary missing headings")
@@ -1386,8 +1492,8 @@ describe("compaction-safeguard recent-turn preservation", () => {
       compaction?: { summary?: string };
     };
 
-    expect(result.cancel).not.toBe(true);
-    expect(result.compaction?.summary).toContain("short summary missing headings");
+    expect(result.cancel).toBe(true);
+    expect(result.compaction).toBeUndefined();
     expect(mockSummarizeInStages).toHaveBeenCalledTimes(2);
   });
 
