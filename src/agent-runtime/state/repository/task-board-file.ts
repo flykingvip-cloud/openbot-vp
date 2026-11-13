@@ -12,6 +12,29 @@ export function sessionTaskBoardPath(sessionFile: string): string {
   return `${sessionFile}.task-board.json`;
 }
 
+function isRuntimeRuleAdaptationBoardMap(
+  value: unknown,
+): value is NonNullable<SessionTaskBoard["runtimeRuleAdaptationByTaskId"]> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function cloneRuntimeRuleAdaptationByTaskId(
+  map: NonNullable<SessionTaskBoard["runtimeRuleAdaptationByTaskId"]>,
+): NonNullable<SessionTaskBoard["runtimeRuleAdaptationByTaskId"]> {
+  const out: NonNullable<SessionTaskBoard["runtimeRuleAdaptationByTaskId"]> = {};
+  for (const [taskId, record] of Object.entries(map)) {
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+      continue;
+    }
+    const history = Array.isArray(record.history) ? [...record.history] : [];
+    out[taskId] = {
+      ...(record.current !== undefined ? { current: record.current } : {}),
+      history,
+    };
+  }
+  return out;
+}
+
 function normalizeTrackedTask(task: TrackedTask | undefined): TrackedTask | undefined {
   if (!task) {
     return undefined;
@@ -52,10 +75,17 @@ export function readSessionTaskBoardUnlocked(
       parked: parsed.parked.map((row) => normalizeTrackedTask(row) ?? row),
       focusRevision: typeof parsed.focusRevision === "number" ? parsed.focusRevision : 0,
       ...(typeof parsed.writeEpoch === "number" ? { writeEpoch: parsed.writeEpoch } : {}),
-      ...(typeof parsed.resetGeneration === "number" ? { resetGeneration: parsed.resetGeneration } : {}),
+      ...(typeof parsed.resetGeneration === "number"
+        ? { resetGeneration: parsed.resetGeneration }
+        : {}),
       ...(Array.isArray(parsed.tombstones) ? { tombstones: parsed.tombstones } : {}),
       ...(Array.isArray(parsed.archived) ? { archived: parsed.archived } : {}),
       ...(parsed.scope ? { scope: parsed.scope } : {}),
+      ...(isRuntimeRuleAdaptationBoardMap(parsed.runtimeRuleAdaptationByTaskId)
+        ? {
+            runtimeRuleAdaptationByTaskId: parsed.runtimeRuleAdaptationByTaskId,
+          }
+        : {}),
     };
   } catch (error) {
     if (
@@ -162,9 +192,18 @@ export function cloneBoardShell(board: SessionTaskBoard): SessionTaskBoard {
     parked: [...board.parked],
     focusRevision: board.focusRevision ?? 0,
     ...(typeof board.writeEpoch === "number" ? { writeEpoch: board.writeEpoch } : {}),
-    ...(typeof board.resetGeneration === "number" ? { resetGeneration: board.resetGeneration } : {}),
+    ...(typeof board.resetGeneration === "number"
+      ? { resetGeneration: board.resetGeneration }
+      : {}),
     ...(board.tombstones ? { tombstones: [...board.tombstones] } : {}),
     ...(board.archived ? { archived: [...board.archived] } : {}),
     ...(board.scope ? { scope: { ...board.scope } } : {}),
+    ...(isRuntimeRuleAdaptationBoardMap(board.runtimeRuleAdaptationByTaskId)
+      ? {
+          runtimeRuleAdaptationByTaskId: cloneRuntimeRuleAdaptationByTaskId(
+            board.runtimeRuleAdaptationByTaskId,
+          ),
+        }
+      : {}),
   };
 }

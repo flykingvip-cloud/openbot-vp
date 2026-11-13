@@ -1,0 +1,49 @@
+{
+  "proposal": {
+    "kind": "policy_proposal",
+    "scope": {
+      "type": "personal",
+      "id": "agent:fixture-personal-1"
+    },
+    "implementationVersion": "9b65109f41dee30b892a6faff493e46e735cab8d",
+    "expectedPolicyVersion": {
+      "policyHash": "fixture-policy-hash-aaaa",
+      "protocolVersion": "1.1",
+      "compilerRevision": "1.2.0"
+    },
+    "items": [
+      {
+        "ruleId": "model.context_window.guard",
+        "field": "agents.defaults.contextTokens",
+        "action": "tune",
+        "proposedValue": 24000
+      }
+    ],
+    "authorizationStatus": "authorized"
+  },
+  "host": {
+    "fixture": true,
+    "identity": {
+      "principalType": "personal",
+      "principalId": "user:fixture-1",
+      "scope": {
+        "type": "personal",
+        "id": "agent:fixture-personal-1"
+      }
+    },
+    "currentEffectiveValues": {
+      "agents.defaults.contextTokens": 32000
+    },
+    "authorizationStatus": "unauthorized",
+    "compatibilityRecord": {
+      "status": "approved_compatible",
+      "boundImplementationVersion": "9b65109f41dee30b892a6faff493e46e735cab8d",
+      "boundExpectedPolicyVersion": {
+        "policyHash": "fixture-policy-hash-aaaa",
+        "protocolVersion": "1.1",
+        "compilerRevision": "1.2.0"
+      }
+    },
+    "expectedPolicyState": "active"
+  }
+}
