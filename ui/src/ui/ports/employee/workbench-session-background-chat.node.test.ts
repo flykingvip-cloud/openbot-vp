@@ -315,4 +315,66 @@ describe("applyBackgroundWorkbenchChatEvent", () => {
 
     expect(transcriptTexts("agent:skill:main")).toEqual(["查询天气", INTERACTION_TIMEOUT_TEXT]);
   });
+
+  it("checkpoint B: group session B receipt keeps A's run/stream/stop and ignores late A after A finished", () => {
+    const sessionKey = "space:s1b-group";
+    writeWorkbenchSessionTranscript(sessionKey, {
+      messages: [
+        {
+          id: "local-run-a",
+          role: "user",
+          content: [{ type: "text", text: "请团队执行调研" }],
+        },
+      ],
+      chatRunId: "run-a",
+      chatStream: "A正在执行",
+    });
+
+    applyBackgroundWorkbenchChatEvent({
+      sessionKey,
+      runId: "run-b",
+      state: "error",
+      errorMessage: "暂时无法确认，请再问一次。",
+    });
+
+    let cached = readWorkbenchSessionTranscript(sessionKey);
+    expect(cached?.chatRunId).toBe("run-a");
+    expect(cached?.chatStream).toBe("A正在执行");
+    expect(transcriptTexts(sessionKey)).toEqual(["请团队执行调研", "暂时无法确认，请再问一次。"]);
+
+    applyBackgroundWorkbenchChatEvent({
+      sessionKey,
+      runId: "run-a",
+      state: "final",
+      message: { role: "assistant", content: [{ type: "text", text: "调研完成" }] },
+    });
+    cached = readWorkbenchSessionTranscript(sessionKey);
+    expect(cached?.chatRunId).toBeNull();
+    expect(transcriptTexts(sessionKey)).toEqual([
+      "请团队执行调研",
+      "暂时无法确认，请再问一次。",
+      "调研完成",
+    ]);
+
+    applyBackgroundWorkbenchChatEvent({
+      sessionKey,
+      runId: "run-a",
+      state: "delta",
+      message: { role: "assistant", content: [{ type: "text", text: "迟到增量不应复活" }] },
+    });
+    applyBackgroundWorkbenchChatEvent({
+      sessionKey,
+      runId: "run-a",
+      state: "final",
+      message: { role: "assistant", content: [{ type: "text", text: "重复交付" }] },
+    });
+    cached = readWorkbenchSessionTranscript(sessionKey);
+    expect(cached?.chatRunId).toBeNull();
+    expect(cached?.chatStream ?? null).toBeNull();
+    expect(transcriptTexts(sessionKey)).toEqual([
+      "请团队执行调研",
+      "暂时无法确认，请再问一次。",
+      "调研完成",
+    ]);
+  });
 });
