@@ -6,7 +6,11 @@ import {
 } from "../pi-embedded-runner/tool-result-char-estimator.js";
 import { seedActiveTaskFromMessages } from "./active-task-seed.js";
 import { assertToolTransactionIntegrity, groupContextUnits } from "./atomic-units.js";
-import { compileModelContext, COMPILED_CONTEXT_CAPSULE_MARKER } from "./compile.js";
+import {
+  compileModelContext,
+  COMPILED_CONTEXT_CAPSULE_MARKER,
+  COMPILED_HISTORY_OMISSION_NOTICE,
+} from "./compile.js";
 import { extractHighConfidencePreferenceMutation } from "./preference-mutation.js";
 import type { ContextCandidates } from "./types.js";
 
@@ -454,6 +458,109 @@ describe("seedActiveTaskFromMessages", () => {
     expect(seeded).toContain("粉色");
     expect(seeded).toContain("下单");
     expect(seeded).not.toContain("帮我进行支付");
+  });
+
+  it("preserves the complete multiline goal including trailing restrictions beyond 2000 chars", () => {
+    const goal =
+      "请分析以下数据，原文如下：\n" +
+      "数据\n".repeat(800) +
+      "禁止发布。金额是100元，不是100美元。";
+    expect(seedActiveTaskFromMessages([{ role: "user", content: goal } as never])).toBe(goal);
+    expect(goal).toContain("\n");
+    expect(goal.length).toBeGreaterThan(2000);
+  });
+
+  it("does not fold necessary newlines when seeding a goal", () => {
+    const goal = "请按下列格式输出报告：\n第一行标题\n最后一行：禁止对外发布。";
+    expect(seedActiveTaskFromMessages([user(goal)])).toBe(goal);
+  });
+});
+
+describe("compileModelContext history omission fidelity", () => {
+  it("does not refuse an independent self-contained request when unrelated history is omitted", () => {
+    const restriction = user("禁止发布。只有主人确认才允许。旧任务细节");
+    const ack = assistant("收到");
+    const current = user("请把今天上海的天气写成三句话。");
+    const source = [restriction, ack, current];
+    const snapshot = structuredClone(source);
+    Object.freeze(restriction);
+    Object.freeze(ack);
+    Object.freeze(current);
+    Object.freeze(source);
+    const result = compileModelContext({
+      messages: source,
+      lane: "act",
+      maxRecentTurns: 1,
+      candidates: emptyCandidates(),
+    });
+    const text = blob(result.messages);
+    expect(text).toContain("请把今天上海的天气写成三句话。");
+    expect(text).toContain(COMPILED_HISTORY_OMISSION_NOTICE);
+    expect(text).not.toContain("禁止发布");
+    expect(result.messages.some((message) => message === current)).toBe(true);
+    expect(result.messages.some((message) => message === restriction)).toBe(false);
+    expect(source).toHaveLength(snapshot.length);
+    expect(restriction.content).toBe(snapshot[0]?.content);
+  });
+
+  it("keeps provided authoritative task text when earlier history is omitted and does not throw", () => {
+    const authority = "当前目标：整理销售数据。验收：报表含合计行。有效约束：禁止对外发布。";
+    const current = user("请继续整理数据并生成分析报告。");
+    const result = compileModelContext({
+      messages: [
+        user("禁止发布。金额是100元，不是美元。已经失效的旧要求：必须用旧模板。"),
+        assistant("收到"),
+        current,
+      ],
+      lane: "act",
+      maxRecentTurns: 1,
+      candidates: { userProfile: [], task: authority, memory: "", evidence: "" },
+    });
+    const text = blob(result.messages);
+    expect(text).toContain(authority);
+    expect(text).toContain(COMPILED_HISTORY_OMISSION_NOTICE);
+    expect(text).toContain("请继续整理数据并生成分析报告。");
+    expect(text).not.toContain("必须用旧模板");
+    expect(result.messages.some((message) => message === current)).toBe(true);
+  });
+
+  it("marks budget-dropped earlier units incomplete without re-injecting or throwing", () => {
+    const recent = user(`KEEP_RECENT_GOAL 飞燃4 39 粉色 下单 ${"Z".repeat(60_000)}`);
+    const recentReply = assistant("KEEP_RECENT_REPLY");
+    const current = user("帮我进行支付");
+    const result = compileModelContext({
+      messages: [
+        user("DROP_OLD_GOAL 请帮我订一张机票"),
+        assistant("好的"),
+        recent,
+        recentReply,
+        current,
+      ],
+      lane: "act",
+      candidates: emptyCandidates(),
+    });
+    const text = blob(result.messages);
+    expect(text).toContain("KEEP_RECENT_GOAL");
+    expect(text).toContain(COMPILED_HISTORY_OMISSION_NOTICE);
+    expect(text).not.toContain("DROP_OLD_GOAL");
+    expect(result.messages.some((message) => message === current)).toBe(true);
+    expect(result.telemetry.recallSafety.currentTurnPreserved).toBe(true);
+  });
+
+  it("does not mutate caller input arrays or message objects during compilation", () => {
+    const current = user("请把今天上海的天气写成三句话。");
+    const source = [user("无关旧约束：禁止发布"), assistant("收到"), current];
+    const snapshot = structuredClone(source);
+    compileModelContext({
+      messages: source,
+      lane: "act",
+      maxRecentTurns: 1,
+      candidates: emptyCandidates(),
+    });
+    expect(source).toHaveLength(snapshot.length);
+    expect(source.map((message) => (message as { content?: unknown }).content)).toEqual(
+      snapshot.map((message) => (message as { content?: unknown }).content),
+    );
   });
 });
 
