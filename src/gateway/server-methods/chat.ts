@@ -167,7 +167,14 @@ import {
   upsertAuthorizedGroupChatAclMember,
 } from "../chat-group-acl-cache.js";
 import { emitChatInboundStage } from "../chat-inbound-stage-events.js";
-import { persistRejectedInteractionTurn } from "../chat-interaction-failure.js";
+import {
+  listChatTurnTerminals,
+  persistRejectedInteractionTurn,
+  reconcileChatTurnTerminal,
+  writeChatTurnTerminal,
+  readChatTurnTerminal,
+} from "../chat-interaction-failure.js";
+import { CHAT_TURN_ERROR_UNCONFIRMED_TEXT } from "../agent-runtime/model/interaction-resource-wait.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import {
   noteChatRunTenant,
@@ -3521,14 +3528,33 @@ function broadcastChatError(params: {
   runId: string;
   sessionKey: string;
   errorMessage?: string;
+  persistedToTranscript?: boolean;
+  businessExecution?: "none" | "unknown";
+  storeDir?: string;
 }) {
+  if (!readChatTurnTerminal(params.runId, params.storeDir, params.sessionKey)) {
+    writeChatTurnTerminal(
+      {
+        runId: params.runId,
+        sessionKey: params.sessionKey,
+        text: params.errorMessage?.trim() || CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
+        persistedToTranscript: params.persistedToTranscript === true,
+        businessExecution: params.businessExecution ?? "unknown",
+        recordTemporarilyUnavailable: params.persistedToTranscript !== true,
+        at: new Date().toISOString(),
+      },
+      params.storeDir,
+    );
+  }
+  const receipt = readChatTurnTerminal(params.runId, params.storeDir, params.sessionKey);
+  const errorMessage = receipt?.text ?? params.errorMessage;
   const seq = nextChatSeq({ agentRunSeq: params.context.agentRunSeq }, params.runId);
   const payload = {
     runId: params.runId,
     sessionKey: params.sessionKey,
     seq,
     state: "error" as const,
-    errorMessage: params.errorMessage,
+    errorMessage,
   };
   params.context.broadcastChat(params.sessionKey, payload, {
     runId: params.runId,
@@ -3538,7 +3564,7 @@ function broadcastChatError(params: {
   params.context.agentRunSeq.delete(params.runId);
   noteUnresolvedChatRunError({
     sessionKey: params.sessionKey,
-    errorMessage: params.errorMessage,
+    errorMessage,
   });
 }
 
@@ -4526,6 +4552,36 @@ export const chatHandlers: GatewayRequestHandlers = {
         ...oguiDecisionPayload,
       });
       return;
+    }
+    if (sessionId && storePath) {
+      for (const receipt of listChatTurnTerminals(sessionKey)) {
+        if (receipt.persistedToTranscript) {
+          continue;
+        }
+        await reconcileChatTurnTerminal({
+          runId: receipt.runId,
+          sessionKey,
+          append: async (message, idempotencyKey) => {
+            const governance = await resolveChatTranscriptGovernance({
+              client: historyClient,
+              cfg,
+            });
+            return appendAssistantTranscriptMessage({
+              message,
+              idempotencyKey,
+              sessionId,
+              storePath,
+              sessionFile: entry?.sessionFile,
+              agentId: historyAgentId,
+              createIfMissing: false,
+              tenantId: governance.tenantId,
+              ownerUserId: governance.ownerUserId,
+              groupId: governance.groupId,
+              failClosed: governance.failClosed,
+            });
+          },
+        });
+      }
     }
     const { readPagedChatHistoryMessages, resolveExistingSessionTranscriptPath } =
       await loadTranscriptHistoryHelpers();
@@ -7231,6 +7287,7 @@ export const chatHandlers: GatewayRequestHandlers = {
           const terminal = await persistRejectedInteractionTurn({
             error: err,
             runId: clientRunId,
+            sessionKey: resolvedSessionKey,
             append: async (message, idempotencyKey) => {
               const governance = await resolveChatTranscriptGovernance({ client, cfg });
               return appendAssistantTranscriptMessage({
@@ -7253,6 +7310,8 @@ export const chatHandlers: GatewayRequestHandlers = {
             runId: clientRunId,
             sessionKey: resolvedSessionKey,
             errorMessage: terminal.text ?? String(err),
+            persistedToTranscript: terminal.persisted,
+            businessExecution: terminal.persisted || terminal.text ? undefined : "unknown",
           });
         })
         .finally(() => {

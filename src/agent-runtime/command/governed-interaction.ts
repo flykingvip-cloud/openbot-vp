@@ -89,6 +89,7 @@ function bindGovernedUnderstanding(
       session,
       authorization: {
         agentId: params.agentId,
+        queueMaxWaitMs: params.timeoutMs,
         ...(params.identity.executionIdentity?.collaborationGroupId
           ? { groupId: params.identity.executionIdentity.collaborationGroupId }
           : {}),

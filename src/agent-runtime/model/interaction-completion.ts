@@ -160,7 +160,20 @@ export async function invokeInteractionCompletion(params: {
   const signal = params.input.abortSignal
     ? AbortSignal.any([params.input.abortSignal, AbortSignal.timeout(timeoutMs)])
     : AbortSignal.timeout(timeoutMs);
-  const response = await withTimeout(
+  const tagInterpretationFailure = (error: unknown): never => {
+    if (params.input.abortSignal?.aborted && !signalReasonIsTimeout(error, signal)) {
+      throw error;
+    }
+    const raw = error instanceof Error ? error : new Error(String(error ?? "timeout"));
+    const timedOut = signalReasonIsTimeout(error, signal) || raw.message === "timeout";
+    throw Object.assign(raw, {
+      interactionPhase: "interpretation" as const,
+      reason: timedOut ? "timeout" : ((raw as Error & { reason?: string }).reason ?? "unknown"),
+    });
+  };
+  let response;
+  try {
+    response = await withTimeout(
     complete(params.model, buildInteractionCompletionContext(params.input, params.model), {
       ...(params.apiKey ? { apiKey: params.apiKey } : {}),
       signal,
@@ -193,7 +206,14 @@ export async function invokeInteractionCompletion(params: {
     }),
     timeoutMs,
   );
-  signal.throwIfAborted();
+  } catch (error) {
+    tagInterpretationFailure(error);
+  }
+  try {
+    signal.throwIfAborted();
+  } catch (error) {
+    tagInterpretationFailure(error);
+  }
   if (response.stopReason === "error") {
     const raw = response.errorMessage || "Interaction provider request failed";
     const error =
@@ -241,7 +261,7 @@ export async function invokeInteractionCompletion(params: {
             ),
             outputTokens: response.usage.output,
           });
-          throw new Error("Interaction did not return a final decision");
+          throw Object.assign(new Error("Interaction did not return a final decision"), { interactionPhase: "interpretation" as const, reason: "empty" });
         }
         // Data only. Never dispatch this function through a runtime tool registry.
         return calls[0].arguments;
@@ -250,7 +270,7 @@ export async function invokeInteractionCompletion(params: {
         response.stopReason !== "stop" ||
         response.content.some((part) => part.type === "toolCall")
       ) {
-        throw new Error("Interaction did not return a final decision");
+        throw Object.assign(new Error("Interaction did not return a final decision"), { interactionPhase: "interpretation" as const, reason: "empty" });
       }
       const text = response.content
         .filter((part) => part.type === "text")
@@ -266,9 +286,21 @@ export async function invokeInteractionCompletion(params: {
           outputTokens: response.usage.output,
           maxTokens: params.maxTokens,
         });
-        throw new Error("本轮未取得有效的交互决定，没有启动或修改任务。");
+        throw Object.assign(new Error("本轮未取得有效的交互决定，没有启动或修改任务。"), { interactionPhase: "interpretation" as const, reason: "empty" });
       }
       return readInteractionDecisionText(text);
     },
   };
 }
+
+function signalReasonIsTimeout(error: unknown, signal: AbortSignal): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const name = error && typeof error === "object" && "name" in error ? String((error as { name?: unknown }).name) : "";
+  return (
+    message === "timeout" ||
+    /timed? ?out/i.test(message) ||
+    name === "TimeoutError" ||
+    (name === "AbortError" && signal.aborted && !message.includes("user"))
+  );
+}
+

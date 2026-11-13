@@ -26,6 +26,8 @@ import {
   waitForEmbeddedPiRunEnd,
 } from "../../agent-runtime/execution/index.js";
 import { activeConstraintTexts } from "../../agent-runtime/policy/index.js";
+import { resolveInteractionResourceWaitMs } from "../../agent-runtime/model/interaction-resource-wait.js";
+import { INTERACTION_RECORD_UNAVAILABLE_TEXT } from "../../agent-runtime/model/interaction-resource-wait.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
@@ -1484,7 +1486,7 @@ export async function runPreparedReply(
         });
       }
       if (!availability && current) {
-        text = `${text}\n\n本条回复未能保存到对话记录；刚才任务操作的结果以上述回执为准。`;
+        text = `${text}\n\n${INTERACTION_RECORD_UNAVAILABLE_TEXT}`;
       }
       return { text, ...(current ? { channelData: { runtimeInteraction: current } } : {}) };
     };
@@ -1558,6 +1560,7 @@ export async function runPreparedReply(
       storePath,
       isNewSession,
     });
+    const interactionTimeoutMs = resolveInteractionResourceWaitMs({ capMs: timeoutMs });
     const routed = await replyTurnRuntime.interaction({
       config: cfg,
       runId: opts?.runId ?? crypto.randomUUID(),
@@ -1577,7 +1580,7 @@ export async function runPreparedReply(
       provider,
       model,
       authProfileId: interactionAuthProfileId,
-      timeoutMs,
+      timeoutMs: interactionTimeoutMs,
       input: {
         availability: sources.availability,
         message: prefixedCommandBody,

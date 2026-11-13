@@ -1,4 +1,9 @@
 import type { createAuthorizedModelSession } from "../model/index.js";
+import {
+  formatInteractionFailureReply,
+  isInteractionUserAbort,
+  INTERACTION_QUEUE_TIMEOUT_TEXT,
+} from "../model/interaction-resource-wait.js";
 import { interpretInteraction } from "./interpret-interaction.js";
 import {
   runPreparedInteraction,
@@ -25,10 +30,23 @@ async function withAuthorizedInteraction<T>(
     const gate = await ports.session.authorize(ports.authorization);
     params.input.abortSignal?.throwIfAborted();
     if (!gate.acquired && !gate.skipped) {
-      return { kind: "respond" as const, text: gate.message, clarification: false };
+      const text =
+        "reason" in gate && gate.reason === "CONCURRENCY_QUEUE_TIMEOUT"
+          ? gate.message.trim() || INTERACTION_QUEUE_TIMEOUT_TEXT
+          : gate.message;
+      return { kind: "respond" as const, text, clarification: false };
     }
     ports.prepare(ports.session);
     return await consume();
+  } catch (error) {
+    if (isInteractionUserAbort(error)) {
+      throw error;
+    }
+    return {
+      kind: "respond" as const,
+      text: formatInteractionFailureReply(error),
+      clarification: false,
+    };
   } finally {
     await ports.session.dispose();
   }

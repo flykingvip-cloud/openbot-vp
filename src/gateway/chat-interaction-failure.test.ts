@@ -6,8 +6,13 @@ import { projectInteractionHistory } from "../agent-runtime/context/index.js";
 import { persistInteractionMessage } from "../agent-runtime/state/index.js";
 import { openSessionManager } from "../agents/pi-sdk/session.js";
 import {
+  CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
+  INTERACTION_RECORD_UNAVAILABLE_TEXT,
+} from "../agent-runtime/model/interaction-resource-wait.js";
+import {
   BILLING_BLOCKED_INTERACTION_TEXT,
   persistRejectedInteractionTurn,
+  readChatTurnTerminal,
   REJECTED_INTERACTION_TURN_TEXT,
 } from "./chat-interaction-failure.js";
 it("persists only governed billing failures as a pre-execution blocked interaction", async () => {
@@ -30,9 +35,15 @@ it("persists only governed billing failures as a pre-execution blocked interacti
     name: "FailoverError",
     reason: "billing",
   });
-  expect(
-    await persistRejectedInteractionTurn({ error: executionError, runId: "later", append }),
-  ).toEqual({ persisted: false });
+  const later = await persistRejectedInteractionTurn({
+    error: executionError,
+    runId: "later",
+    append,
+  });
+  expect(later.persisted).toBe(true);
+  expect(later.text).toBe(CHAT_TURN_ERROR_UNCONFIRMED_TEXT);
+  expect(later.text).not.toBe(BILLING_BLOCKED_INTERACTION_TEXT);
+  expect(later.text).not.toContain("没有启动新任务");
 });
 
 it("keeps the rejected turn terminal on the authoritative transcript branch after reopening", async () => {
@@ -85,25 +96,39 @@ it("persists the failed request terminal with stable identity instead of leaving
   expect(written.get("failed-D:interaction-rejected")).toContain("不会自动补做");
 });
 it("never mislabels a tool/execution failure as no execution", async () => {
-  const append = vi.fn();
-  expect(
-    await persistRejectedInteractionTurn({
-      error: new Error("tool failed after send"),
-      runId: "run",
-      append,
-    }),
-  ).toEqual({ persisted: false });
-  expect(append).not.toHaveBeenCalled();
+  const append = vi.fn(async () => ({ ok: true }));
+  const result = await persistRejectedInteractionTurn({
+    error: new Error("tool failed after send"),
+    runId: "run",
+    append,
+  });
+  expect(result).toEqual({ persisted: true, text: CHAT_TURN_ERROR_UNCONFIRMED_TEXT });
+  expect(append).toHaveBeenCalledWith(CHAT_TURN_ERROR_UNCONFIRMED_TEXT, "run:interaction-rejected");
+  expect(result.text).not.toMatch(/没有启动新任务|没有启动或修改任务/);
 });
 it("does not claim durable closure when the transcript write fails", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "interaction-reject-undurable-"));
   const append = vi.fn(async () => {
     throw new Error("disk error");
   });
-  expect(
-    await persistRejectedInteractionTurn({
+  try {
+    const result = await persistRejectedInteractionTurn({
       error: new Error("Invalid interaction task decision"),
       runId: "run",
+      sessionKey: "sess",
+      storeDir: dir,
       append,
-    }),
-  ).toEqual({ persisted: false });
+    });
+    expect(result.persisted).toBe(false);
+    expect(result.recordTemporarilyUnavailable).toBe(true);
+    expect(result.text).toContain(REJECTED_INTERACTION_TURN_TEXT);
+    expect(result.text).toContain(INTERACTION_RECORD_UNAVAILABLE_TEXT);
+    expect(readChatTurnTerminal("run", dir, "sess")).toMatchObject({
+      persistedToTranscript: false,
+      recordTemporarilyUnavailable: true,
+      businessExecution: "none",
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
