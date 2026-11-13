@@ -18,11 +18,13 @@ import path from "node:path";
  */
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as commandFacade from "../agent-runtime/command/index.js";
 import {
-  INTERACTION_MODEL_FAILURE_TEXT,
   INTERACTION_RECORD_UNAVAILABLE_TEXT,
   INTERACTION_TIMEOUT_TEXT,
 } from "../agent-runtime/model/interaction-resource-wait.js";
+import { replyTurnRuntime } from "../agent-runtime/wiring/reply-turn.js";
+import { makeZeroUsageSnapshot } from "../agents/usage.js";
 import * as dispatchModule from "../auto-reply/dispatch.js";
 import {
   clearConfigCache,
@@ -50,6 +52,7 @@ const savedEnv: Record<string, string | undefined> = {
   OPENCLAW_STATE_DIR: process.env.OPENCLAW_STATE_DIR,
   OPENBOT_CONFIG_PATH: process.env.OPENBOT_CONFIG_PATH,
   OPENCLAW_CONFIG_PATH: process.env.OPENCLAW_CONFIG_PATH,
+  OPENBOT_INTERACTION_RESOURCE_WAIT_MS: process.env.OPENBOT_INTERACTION_RESOURCE_WAIT_MS,
 };
 
 const dirs: string[] = [];
@@ -123,7 +126,20 @@ async function isolateTrustedGateway() {
   };
   const cfg = {
     gateway: { auth: { trustedProxy } },
-    agents: { list: [{ id: "main" }] },
+    models: {
+      providers: {
+        testdemo: {
+          baseUrl: "http://127.0.0.1:9",
+          api: "openai-completions",
+          apiKey: "sk-s1a-r3-not-real",
+          models: [{ id: "s1a-test", name: "s1a-test" }],
+        },
+      },
+    },
+    agents: {
+      defaults: { model: { primary: "testdemo/s1a-test" } },
+      list: [{ id: "main", model: { primary: "testdemo/s1a-test" } }],
+    },
   } as OpenBotConfig;
   fs.writeFileSync(configPath, `${JSON.stringify(cfg, null, 2)}\n`);
   setRuntimeConfigSnapshot(cfg);
@@ -233,10 +249,224 @@ async function isolateTrustedGateway() {
   return { root, sessionId, sessionKey, storePath, transcriptPath, client };
 }
 
+function collectJsonl(root: string): string[] {
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
+        files.push(full);
+      }
+    }
+  };
+  walk(root);
+  return files;
+}
+
+function turnJsonlIntoDirectories(files: string[]): void {
+  for (const file of files) {
+    fs.rmSync(file, { force: true });
+    fs.mkdirSync(file);
+  }
+}
+
+function findTerminal(context: { broadcastChat: { mock: { calls: unknown[][] } } }, runId: string) {
+  return context.broadcastChat.mock.calls
+    .map((call) => call[1] as { state?: string; runId?: string; sessionKey?: string } | undefined)
+    .filter(
+      (payload) =>
+        payload &&
+        typeof payload === "object" &&
+        (payload.state === "error" || payload.state === "final") &&
+        !String(payload.runId ?? "").endsWith(":user"),
+    )
+    .find(
+      (payload) => payload?.runId === runId || String(payload?.runId ?? "").startsWith(`${runId}:`),
+    );
+}
+
+function collectTranscriptText(root: string): string {
+  const parts: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
+        parts.push(`${full}\n${fs.readFileSync(full, "utf8")}`);
+      }
+    }
+  };
+  walk(root);
+  return parts.join("\n");
+}
+
+function sessionHeader(sessionId: string, cwd: string): string {
+  return `${JSON.stringify({
+    type: "session",
+    version: CURRENT_SESSION_VERSION,
+    id: sessionId,
+    timestamp: new Date(0).toISOString(),
+    cwd,
+  })}\n`;
+}
+
 describe("checkpoint A isolated Gateway dispatch chain (in-process handlers, real dispatch)", () => {
   beforeEach(() => {
     completeMock.mockReset();
   });
+
+  it("R3: an ordinary model reply has zero business execution and zero task-board writes", async () => {
+    const fixture = await isolateTrustedGateway();
+    const governedSpy = vi.spyOn(commandFacade, "runGovernedInteraction");
+    const interactionSpy = vi.spyOn(replyTurnRuntime, "interaction");
+    completeMock.mockImplementation(async () => ({
+      role: "assistant",
+      content: [{ type: "text", text: JSON.stringify({ kind: "reply", text: "你好，我在。" }) }],
+      usage: makeZeroUsageSnapshot(),
+      stopReason: "stop",
+    }));
+    const context = createChatContext();
+    const runId = `run-s1a-reply-${path.basename(fixture.root)}`;
+    const respond = vi.fn();
+    await chatHandlers["chat.send"]({
+      params: {
+        sessionKey: fixture.sessionKey,
+        message: "你好",
+        idempotencyKey: runId,
+        timeoutMs: 15_000,
+      },
+      respond: respond as never,
+      context: context as never,
+      req: {} as never,
+      client: fixture.client as never,
+      isWebchatConnect: () => false,
+    });
+    expect(respond.mock.calls[0]?.[0]).toBe(true);
+    await vi.waitFor(
+      () => {
+        expect(completeMock, "model complete was not reached").toHaveBeenCalled();
+        expect(findTerminal(context, runId)).toBeTruthy();
+      },
+      { timeout: 15_000 },
+    );
+    expect(
+      interactionSpy,
+      "get-reply-run did not reach replyTurnRuntime.interaction",
+    ).toHaveBeenCalled();
+    expect(governedSpy, "governed interaction was not reached").toHaveBeenCalled();
+    expect(completeMock, "model complete was not reached").toHaveBeenCalledTimes(1);
+    const terminal = findTerminal(context, runId);
+    expect(payloadText(terminal)).toContain("你好，我在。");
+    expect(payloadText(terminal)).not.toMatch(/没有启动或修改任务/);
+    const combined = collectTranscriptText(fixture.root);
+    expect(combined).toContain("你好，我在。");
+    const taskBoards: string[] = [];
+    const walkBoard = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walkBoard(full);
+        } else if (entry.name.endsWith(".task-board.json")) {
+          taskBoards.push(full);
+        }
+      }
+    };
+    walkBoard(fixture.root);
+    expect(taskBoards, `unexpected task-board writes: ${taskBoards.join(",")}`).toEqual([]);
+  }, 30_000);
+
+  it("R3: a controlled pending model trips the original timeout terminal and history", async () => {
+    const fixture = await isolateTrustedGateway();
+    const governedSpy = vi.spyOn(commandFacade, "runGovernedInteraction");
+    const interactionSpy = vi.spyOn(replyTurnRuntime, "interaction");
+    let release!: (value: unknown) => void;
+    completeMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    const context = createChatContext();
+    const runId = `run-s1a-timeout-${path.basename(fixture.root)}`;
+    const respond = vi.fn();
+    const timeoutMs = 800;
+    const previousWait = process.env.OPENBOT_INTERACTION_RESOURCE_WAIT_MS;
+    process.env.OPENBOT_INTERACTION_RESOURCE_WAIT_MS = String(timeoutMs);
+    const started = Date.now();
+    const sendDone = chatHandlers["chat.send"]({
+      params: {
+        sessionKey: fixture.sessionKey,
+        message: "你好",
+        idempotencyKey: runId,
+        timeoutMs: 15_000,
+      },
+      respond: respond as never,
+      context: context as never,
+      req: {} as never,
+      client: fixture.client as never,
+      isWebchatConnect: () => false,
+    });
+    await vi.waitFor(
+      () => {
+        expect(completeMock, "in-model path never reached complete").toHaveBeenCalled();
+      },
+      { timeout: 15_000 },
+    );
+    await sendDone;
+    const elapsed = Date.now() - started;
+    expect(interactionSpy).toHaveBeenCalled();
+    expect(governedSpy).toHaveBeenCalled();
+    expect(completeMock).toHaveBeenCalledTimes(1);
+    await vi.waitFor(
+      () => {
+        expect(findTerminal(context, runId)).toBeTruthy();
+      },
+      { timeout: 15_000 },
+    );
+    expect(elapsed, `in-model timeout visible elapsed ${elapsed}ms`).toBeLessThan(timeoutMs + 400);
+    const terminal = findTerminal(context, runId);
+    const resolvedSessionKey = String(terminal?.sessionKey ?? fixture.sessionKey);
+    const liveText = payloadText(terminal);
+    expect(liveText).toContain(INTERACTION_TIMEOUT_TEXT);
+    const sidecar =
+      readChatTurnTerminal(runId, undefined, resolvedSessionKey) ??
+      readChatTurnTerminal(runId, undefined, fixture.sessionKey) ??
+      readChatTurnTerminal(runId, undefined, "main");
+    if (sidecar) {
+      expect(sidecar).toMatchObject({
+        text: expect.stringContaining(INTERACTION_TIMEOUT_TEXT),
+        businessExecution: "none",
+      });
+    }
+    const historyRespond = vi.fn();
+    await chatHandlers["chat.history"]({
+      params: { sessionKey: resolvedSessionKey },
+      respond: historyRespond as never,
+      context: context as never,
+      req: {} as never,
+      client: fixture.client as never,
+      isWebchatConnect: () => false,
+    });
+    expect(historyRespond.mock.calls[0]?.[0]).toBe(true);
+    const combined = collectTranscriptText(fixture.root);
+    expect(combined).toContain(INTERACTION_TIMEOUT_TEXT);
+    release({
+      role: "assistant",
+      content: [{ type: "text", text: JSON.stringify({ kind: "reply", text: "迟到模型结果" }) }],
+      usage: makeZeroUsageSnapshot(),
+      stopReason: "stop",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(collectTranscriptText(fixture.root)).not.toContain("迟到模型结果");
+    if (previousWait === undefined) {
+      delete process.env.OPENBOT_INTERACTION_RESOURCE_WAIT_MS;
+    } else {
+      process.env.OPENBOT_INTERACTION_RESOURCE_WAIT_MS = previousWait;
+    }
+  }, 30_000);
 
   it("sends through real dispatchInboundMessage, records an actual append failure, and recovers via chat.history", async () => {
     const fixture = await isolateTrustedGateway();
@@ -248,12 +478,17 @@ describe("checkpoint A isolated Gateway dispatch chain (in-process handlers, rea
     expect(resolveChatTurnTerminalDir()).not.toContain(`${os.homedir()}/.openclaw`);
 
     const dispatchSpy = vi.spyOn(dispatchModule, "dispatchInboundMessage");
-    completeMock.mockImplementation(async () => {
-      throw Object.assign(new Error("timeout"), {
-        interactionPhase: "interpretation",
-        reason: "timeout",
-      });
-    });
+    const governedSpy = vi.spyOn(commandFacade, "runGovernedInteraction");
+    const interactionSpy = vi.spyOn(replyTurnRuntime, "interaction");
+    let releaseComplete!: (value: unknown) => void;
+    let enteredComplete = false;
+    completeMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          enteredComplete = true;
+          releaseComplete = resolve;
+        }),
+    );
 
     const context = createChatContext();
     const runId = `run-s1a-${path.basename(fixture.root)}`;
@@ -263,7 +498,7 @@ describe("checkpoint A isolated Gateway dispatch chain (in-process handlers, rea
         sessionKey: fixture.sessionKey,
         message: "你好",
         idempotencyKey: runId,
-        timeoutMs: 1,
+        timeoutMs: 15_000,
       },
       respond: respond as never,
       context: context as never,
@@ -277,69 +512,52 @@ describe("checkpoint A isolated Gateway dispatch chain (in-process handlers, rea
         true,
       );
     });
-    // User echo may have been persisted on a remapped employee session file.
-    // Turn every transcript jsonl under the isolated root into a directory so
-    // the production append hits a real EISDIR write failure (not chmod).
-    const jsonlFiles: string[] = [];
-    const walk = (dir: string) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          walk(full);
-        } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
-          jsonlFiles.push(full);
-        }
-      }
-    };
-    walk(fixture.root);
+    await vi.waitFor(
+      () => {
+        expect(enteredComplete, "post-execution persist test never reached model complete").toBe(
+          true,
+        );
+      },
+      { timeout: 15_000 },
+    );
+    const jsonlFiles = collectJsonl(fixture.root);
     expect(
       jsonlFiles.length,
       `expected a persisted transcript under ${fixture.root}`,
     ).toBeGreaterThan(0);
-    for (const file of jsonlFiles) {
-      fs.rmSync(file, { force: true });
-      fs.mkdirSync(file);
-    }
+    // Inject EISDIR only after the model path has been entered, so this is a
+    // post-execution persist failure rather than a pre-entry read failure.
+    turnJsonlIntoDirectories(jsonlFiles);
     fixture.transcriptPath = jsonlFiles[0] ?? fixture.transcriptPath;
+    releaseComplete({
+      role: "assistant",
+      content: [{ type: "text", text: JSON.stringify({ kind: "reply", text: "你好，我在。" }) }],
+      usage: makeZeroUsageSnapshot(),
+      stopReason: "stop",
+    });
     await sendDone;
     expect(
       respond.mock.calls[0]?.[0],
       `chat.send rejected: ${JSON.stringify(respond.mock.calls[0]?.[2] ?? respond.mock.calls[0])}`,
     ).toBe(true);
     expect(dispatchSpy).toHaveBeenCalled();
+    expect(interactionSpy).toHaveBeenCalled();
+    expect(governedSpy).toHaveBeenCalled();
+    expect(completeMock).toHaveBeenCalledTimes(1);
 
     await vi.waitFor(
       () => {
-        const terminal = context.broadcastChat.mock.calls
-          .map((call) => call[1])
-          .find(
-            (payload) =>
-              payload &&
-              typeof payload === "object" &&
-              (payload.state === "error" || payload.state === "final") &&
-              (payload.runId === runId || String(payload.runId ?? "").startsWith(`${runId}:`)),
-          );
-        expect(terminal).toBeTruthy();
+        expect(findTerminal(context, runId)).toBeTruthy();
       },
       { timeout: 15_000 },
     );
 
-    const lastTerminal = context.broadcastChat.mock.calls
-      .map((call) => call[1])
-      .filter(
-        (payload) =>
-          payload &&
-          typeof payload === "object" &&
-          (payload.state === "error" || payload.state === "final") &&
-          !String(payload.runId ?? "").endsWith(":user"),
-      )
-      .at(-1);
+    const lastTerminal = findTerminal(context, runId);
     const resolvedSessionKey = String(lastTerminal?.sessionKey ?? fixture.sessionKey);
     const liveText = payloadText(lastTerminal);
     expect(
-      liveText.includes(INTERACTION_TIMEOUT_TEXT) ||
-        liveText.includes(INTERACTION_MODEL_FAILURE_TEXT) ||
-        liveText.includes(INTERACTION_RECORD_UNAVAILABLE_TEXT),
+      liveText.includes("你好，我在。") || liveText.includes(INTERACTION_RECORD_UNAVAILABLE_TEXT),
+      `post-model persist failure text unexpected: ${liveText}`,
     ).toBe(true);
 
     const sidecarDir = resolveChatTurnTerminalDir();
@@ -368,18 +586,12 @@ describe("checkpoint A isolated Gateway dispatch chain (in-process handlers, rea
       recordTemporarilyUnavailable: true,
     });
 
-    const sessionHeader = `${JSON.stringify({
-      type: "session",
-      version: CURRENT_SESSION_VERSION,
-      id: fixture.sessionId,
-      timestamp: new Date(0).toISOString(),
-      cwd: fixture.root,
-    })}\n`;
+    const header = sessionHeader(fixture.sessionId, fixture.root);
     const restorePaths = new Set([fixture.transcriptPath, ...jsonlFiles]);
     for (const file of restorePaths) {
       fs.rmSync(file, { recursive: true, force: true });
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, sessionHeader);
+      fs.writeFileSync(file, header);
     }
     const historyRespond = vi.fn();
     await chatHandlers["chat.history"]({
@@ -396,23 +608,11 @@ describe("checkpoint A isolated Gateway dispatch chain (in-process handlers, rea
       persistedToTranscript: true,
       recordTemporarilyUnavailable: false,
     });
-    const transcripts: string[] = [];
-    const collect = (dir: string) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          collect(full);
-        } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
-          transcripts.push(`${full}\n${fs.readFileSync(full, "utf8")}`);
-        }
-      }
-    };
-    collect(fixture.root);
-    const combined = transcripts.join("\n");
+    const combined = collectTranscriptText(fixture.root);
     const recoveredFact = (recovered?.text ?? "").split("\n\n")[0] ?? "";
     expect(
-      combined.includes(INTERACTION_TIMEOUT_TEXT) ||
-        combined.includes(INTERACTION_MODEL_FAILURE_TEXT) ||
+      combined.includes("你好，我在。") ||
+        combined.includes(INTERACTION_RECORD_UNAVAILABLE_TEXT) ||
         Boolean(recoveredFact && combined.includes(recoveredFact)),
       `history recovered text missing from isolated transcripts; recovered=${JSON.stringify(recovered)}; combined=${combined.slice(0, 2000)}`,
     ).toBe(true);
