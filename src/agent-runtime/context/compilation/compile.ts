@@ -33,6 +33,10 @@ const log = createSubsystemLogger("context-compiler");
 export const COMPILED_CONTEXT_CAPSULE_MARKER =
   "[Compiled operating context — not a user utterance]";
 
+/** Factual incompleteness mark placed in compiled prompt material, not a side channel. */
+export const COMPILED_HISTORY_OMISSION_NOTICE =
+  "部分历史因窗口或预算省略，不能将本编译上下文视为完整记录。不得推断缺失内容。若当前请求依赖被省略的原文、先前授权或指代内容，应澄清，不要编造。独立且自足的新请求仍可理解与准入。当前目标、验收与有效约束以已提供的权威任务状态（如 operating capsule 中的 active_task）为准；未出现在权威状态中的历史要求不得当作仍然有效的指令恢复。";
+
 type WorkingUnit = {
   kind: ContextUnitKind;
   messages: AgentMessage[];
@@ -217,8 +221,9 @@ export function compileModelContext(params: CompileContextParams): CompileContex
     }
   }
 
-  const capsuleText = buildOperatingContextCapsule(candidates);
-  const capsule = capsuleText ? capsuleMessage(capsuleText) : undefined;
+  let capsuleText = buildOperatingContextCapsule(candidates);
+  let capsule = capsuleText ? capsuleMessage(capsuleText) : undefined;
+  let historyUnitsOmitted = units.length > windowed.length;
 
   const estimateCompiled = (kept: WorkingUnit[]): number => {
     const msgs = flattenContextUnits(asContextUnits(kept));
@@ -302,11 +307,20 @@ export function compileModelContext(params: CompileContextParams): CompileContex
     }
     noteUserRequest(dropped.messages, "dropped", { reason: "budget", phase: "drop" });
     dropReasons.push({ type: "recent_turn", reason: "budget", priority: 30 });
+    historyUnitsOmitted = true;
     kept = kept.slice(1);
   }
 
   const compiledUnits = asContextUnits(kept);
   const compiledTurns = flattenContextUnits(compiledUnits);
+  // Do not re-inject omitted user originals or refuse compilation. Mark the
+  // compiled prompt itself incomplete so callers cannot ignore the omission.
+  if (historyUnitsOmitted) {
+    capsuleText = capsuleText
+      ? `${capsuleText}\n${COMPILED_HISTORY_OMISSION_NOTICE}`
+      : `${COMPILED_CONTEXT_CAPSULE_MARKER}\n${COMPILED_HISTORY_OMISSION_NOTICE}`;
+    capsule = capsuleMessage(capsuleText);
+  }
   const compiledRaw = capsule ? [capsule, ...compiledTurns] : compiledTurns;
   const currentUser = lastUserMessage(source);
   const compiledHasCurrent = compiledRaw.some((message) => sameMessage(message, currentUser));
