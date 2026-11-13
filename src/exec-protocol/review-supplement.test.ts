@@ -39,7 +39,7 @@ async function waitForBArtifact(
   pair: Awaited<ReturnType<typeof startIsolatedPair>>,
   taskId: string,
 ) {
-  return waitFor(
+  const artifact = await waitFor(
     () => {
       const task = pair.bStore.getTask(taskId);
       return task?.artifacts[0];
@@ -47,6 +47,10 @@ async function waitForBArtifact(
     (artifact) => Boolean(artifact?.artifactId),
     4000,
   );
+  if (!artifact) {
+    throw new Error("Expected B artifact after waitFor");
+  }
+  return artifact;
 }
 
 describe("PR #272 review supplement: races, artifacts, and unconfirmed handling", () => {
@@ -443,6 +447,9 @@ describe("PR #272 review supplement: interrupted artifact transfer", () => {
         (item) => Boolean(item?.artifactId),
         4000,
       );
+      if (!artifact) {
+        throw new Error("Expected artifact after waitFor");
+      }
       let delivered = false;
       let error: unknown;
       try {
