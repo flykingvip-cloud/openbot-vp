@@ -14531,6 +14531,7 @@ tasks:
         No merge or deploy until authorized. Does not include A/B fidelity files or #281 content."
     paths:
       - src/agent-runtime/command/governed-interaction.ts
+      - src/agent-runtime/command/governed-interaction.test.ts
     state: active
     sessions:
       - id: 15da9024-c1b4-436c-ade5-53b9495b61d5
@@ -32986,6 +32987,14 @@ sharedPaths:
       history remain unchanged. Does not take over src/** or src/agent-runtime/command/**.
       Authorized by human-governor on 2026-11-13. Independent acceptance: codex-runtime-manager.
       No auto-activation or production config writes."
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/command/governed-interaction.test.ts
+    landerTask: rule-adaptation-shadow-host-min
+    reason: "Human-authorized exact-file landing for the minimal advice-only shadow host hook
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/** or src/agent-runtime/command/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No auto-activation or production
+      config writes."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/execution-lifecycle.ts
     landerTask: agent-runtime-convergence
