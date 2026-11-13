@@ -15,6 +15,7 @@ import { describeUnknownError } from "../../../agents/pi-embedded-runner/utils.j
 import { normalizeUsage, type UsageLike } from "../../../agents/usage.js";
 import type { resolveContextEngine } from "../../../context-engine/index.js";
 import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
+import { sameRunInheritedContextWindowTokens } from "../../model/rule-adaptation/context-cap-selection.js";
 import { MAX_OVERFLOW_COMPACTION_ATTEMPTS } from "../../policy/index.js";
 import {
   buildErrorAgentMeta,
@@ -91,6 +92,9 @@ export async function runEmbeddedRunAttemptIteration(args: {
     createCompactionDiagId,
     resolveActiveErrorContext,
   } = args;
+  const inheritedContextWindowTokens = sameRunInheritedContextWindowTokens(
+    session.contextCapSelection,
+  );
   const attempt = await runEmbeddedAttempt({
     sessionId: params.sessionId,
     sessionKey: params.sessionKey,
@@ -126,6 +130,7 @@ export async function runEmbeddedRunAttemptIteration(args: {
     config: params.config,
     contextEngine,
     contextTokenBudget: session.ctxInfo.tokens,
+    ...(inheritedContextWindowTokens !== undefined ? { inheritedContextWindowTokens } : {}),
     skillsSnapshot: params.skillsSnapshot,
     prompt,
     images: params.images,
@@ -299,6 +304,9 @@ export async function runEmbeddedRunAttemptIteration(args: {
               inboundToolCeiling: params.inboundToolCeiling,
               skillPolicy: params.skillPolicy,
               ...inheritExecutionIdentityRunFields(params),
+              ...(inheritedContextWindowTokens !== undefined
+                ? { inheritedContextWindowTokens }
+                : {}),
               trigger: "overflow",
               diagId,
               attempt: attemptNumber,

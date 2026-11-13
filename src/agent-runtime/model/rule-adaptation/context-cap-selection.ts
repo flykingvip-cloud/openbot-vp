@@ -85,6 +85,72 @@ export type ContextCapSelectionResult =
   | ContextCapBlockedResult;
 
 /**
+ * Existing name-based non-failover stop, in the same class as
+ * TaskBudgetExceededError: this is a policy/source block, not a model
+ * failure that another candidate could repair. Not a new failover reason
+ * and not a new global error enum.
+ */
+export const CONTEXT_CAP_SELECTION_BLOCKED_ERROR_NAME = "ContextCapSelectionBlockedError";
+export const CONTEXT_CAP_SELECTION_BLOCKED_CODE = "context_cap_selection_blocked";
+
+export class ContextCapSelectionBlockedError extends Error {
+  readonly name = CONTEXT_CAP_SELECTION_BLOCKED_ERROR_NAME;
+  readonly reason: ContextCapBlockReason;
+  readonly code = CONTEXT_CAP_SELECTION_BLOCKED_CODE;
+  readonly provider?: string;
+  readonly model?: string;
+  readonly originalTokens: number;
+
+  constructor(
+    message: string,
+    params: {
+      reason: ContextCapBlockReason;
+      originalTokens: number;
+      provider?: string;
+      model?: string;
+    },
+  ) {
+    super(message);
+    this.reason = params.reason;
+    this.originalTokens = params.originalTokens;
+    this.provider = params.provider;
+    this.model = params.model;
+  }
+}
+
+export function isContextCapSelectionBlockedError(
+  err: unknown,
+): err is ContextCapSelectionBlockedError {
+  if (!err || typeof err !== "object") {
+    return false;
+  }
+  if (err instanceof ContextCapSelectionBlockedError) {
+    return true;
+  }
+  const name = "name" in err ? String((err as { name?: unknown }).name) : "";
+  const code = "code" in err ? (err as { code?: unknown }).code : undefined;
+  return (
+    name === CONTEXT_CAP_SELECTION_BLOCKED_ERROR_NAME || code === CONTEXT_CAP_SELECTION_BLOCKED_CODE
+  );
+}
+
+/**
+ * Same-run inheritance token for official consumers.
+ * Omitted (undefined) when the port was omitted or mode is `original`,
+ * so production default / original behavior keeps re-parsing.
+ * Snapshot-mode selections that completed (applied, no_snapshot, or
+ * controlled_change) pass the prepare-time tokens so downstream cannot enlarge.
+ */
+export function sameRunInheritedContextWindowTokens(
+  selection: ContextCapSelectionResult | undefined,
+): number | undefined {
+  if (!selection || selection.mode === "original" || selection.outcome === "blocked") {
+    return undefined;
+  }
+  return selection.tokens;
+}
+
+/**
  * Independent fixture resolution port for test wiring only.
  * The host constructs read params from a trusted test identity and session
  * binding, then checks them against on-disk TaskBoardScope.

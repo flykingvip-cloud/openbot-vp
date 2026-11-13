@@ -9,6 +9,7 @@ import {
   resolveContextWindowInfo,
 } from "../policy/index.js";
 import {
+  ContextCapSelectionBlockedError,
   isContextCapSelectionBlocked,
   selectPersonalContextCap,
   type PersonalContextCapSelectionPort,
@@ -82,12 +83,15 @@ export async function prepareEmbeddedModel(input: {
     log.error(
       `blocked model (context cap selection ${contextCapSelection.reason}): ${provider}/${modelId} original=${contextCapSelection.originalTokens}`,
     );
-    throw new FailoverError(`Context cap selection blocked (${contextCapSelection.reason}).`, {
-      reason: "unknown",
-      provider,
-      model: modelId,
-      code: "context_cap_selection_blocked",
-    });
+    throw new ContextCapSelectionBlockedError(
+      `Context cap selection blocked (${contextCapSelection.reason}).`,
+      {
+        reason: contextCapSelection.reason,
+        originalTokens: contextCapSelection.originalTokens,
+        provider,
+        model: modelId,
+      },
+    );
   }
   const ctxInfo =
     contextCapSelection.tokens === originalCtxInfo.tokens

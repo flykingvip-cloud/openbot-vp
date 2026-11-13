@@ -1,6 +1,5 @@
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { FailoverError } from "../../../agents/failover-error.js";
 import { buildEmbeddedExtensionFactories } from "../../../agents/pi-embedded-runner/extensions.js";
 import { resolveModel } from "../../../agents/pi-embedded-runner/model.js";
 import { getCompactionSafeguardRuntime } from "../../../agents/pi-extensions/compaction-safeguard-runtime.js";
@@ -31,6 +30,7 @@ import {
 import { recoverContextOverflow } from "../../execution/recovery/context-overflow.js";
 import { prepareEmbeddedModel } from "../prepare-embedded-model.js";
 import {
+  ContextCapSelectionBlockedError,
   inheritSelectedContextCap,
   selectPersonalContextCap,
   type PersonalContextCapSelectionPort,
@@ -270,10 +270,11 @@ it("blocks a corrupt snapshot in snapshot mode and does not quietly become 12800
       contextCapSelection: snapshotPort(tmp.sessionFile),
     }),
   ).rejects.toSatisfy((err: unknown) => {
-    expect(err).toBeInstanceOf(FailoverError);
-    const failover = err as FailoverError;
-    expect(failover.code).toBe("context_cap_selection_blocked");
-    expect(failover).not.toMatchObject({ tokens: 128_000 });
+    expect(err).toBeInstanceOf(ContextCapSelectionBlockedError);
+    const blocked = err as ContextCapSelectionBlockedError;
+    expect(blocked.code).toBe("context_cap_selection_blocked");
+    expect(blocked.reason).toBe("snapshot_corrupt");
+    expect(blocked).not.toMatchObject({ tokens: 128_000 });
     return true;
   });
   expect(log.error).toHaveBeenCalled();
@@ -306,8 +307,9 @@ it("blocks a read failure in snapshot mode and does not quietly become 128000", 
   await expect(
     prepareEmbeddedModel({ ...prepareBase, log, contextCapSelection: port }),
   ).rejects.toSatisfy((err: unknown) => {
-    expect(err).toBeInstanceOf(FailoverError);
-    expect((err as FailoverError).code).toBe("context_cap_selection_blocked");
+    expect(err).toBeInstanceOf(ContextCapSelectionBlockedError);
+    expect((err as ContextCapSelectionBlockedError).code).toBe("context_cap_selection_blocked");
+    expect((err as ContextCapSelectionBlockedError).reason).toBe("read_failed");
     return true;
   });
 });
