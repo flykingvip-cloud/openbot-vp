@@ -166,6 +166,35 @@ export type GovernedInteractionWithShadow = {
   shadow: ShadowRunResult;
 };
 
+/** Combine the original interaction cancel with the caller-supplied shadow signal.
+ * A distinct caller signal must not weaken the original abort. */
+function bindShadowHostAbortSignal(
+  origin?: AbortSignal,
+  request?: AbortSignal,
+): AbortSignal | undefined {
+  if (!origin) {
+    return request;
+  }
+  if (!request) {
+    return origin;
+  }
+  if (origin.aborted) {
+    return origin;
+  }
+  if (request.aborted) {
+    return request;
+  }
+  return AbortSignal.any([origin, request]);
+}
+
+/** Flush already-queued work after the original interaction settles and
+ * before a shadow model call starts, so a cancel in that window is observed. */
+export const governedShadowHostBoundary = {
+  afterOriginalInteraction(): Promise<void> {
+    return Promise.resolve();
+  },
+};
+
 function isolatedHostShadowResult(
   outcomeCode: "cancelled" | "protocol_failure",
   message: string,
@@ -210,11 +239,15 @@ function isolatedHostShadowResult(
 async function attachOfficialShadowAdvice(
   interactionPromise: Promise<GovernedInteractionResult>,
   shadowHost: GovernedShadowHostInjection,
+  originAbortSignal?: AbortSignal,
 ): Promise<GovernedInteractionWithShadow> {
   const interaction = await interactionPromise;
-  // Run the original interaction first and independently. After cancel, do not
-  // start a new shadow call. Shadow failures stay in the shadow result.
-  if (shadowHost.request.signal?.aborted) {
+  await governedShadowHostBoundary.afterOriginalInteraction();
+  // Bind the original request cancel with any caller-supplied shadow signal.
+  // After the original interaction ends, do not start a new shadow call if
+  // either signal has aborted. Shadow failures stay in the shadow result.
+  const signal = bindShadowHostAbortSignal(originAbortSignal, shadowHost.request.signal);
+  if (signal?.aborted) {
     return {
       interaction,
       shadow: isolatedHostShadowResult(
@@ -224,7 +257,10 @@ async function attachOfficialShadowAdvice(
     };
   }
   try {
-    const shadow = await runOfficialShadowRuleAdaptation(shadowHost.request, shadowHost.binding);
+    const shadow = await runOfficialShadowRuleAdaptation(
+      { ...shadowHost.request, signal },
+      shadowHost.binding,
+    );
     return { interaction, shadow };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -272,5 +308,5 @@ export function runGovernedInteraction(
   if (shadowHost?.trigger !== true) {
     return interaction;
   }
-  return attachOfficialShadowAdvice(interaction, shadowHost);
+  return attachOfficialShadowAdvice(interaction, shadowHost, params.input.abortSignal);
 }
