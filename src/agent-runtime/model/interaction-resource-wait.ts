@@ -1,10 +1,28 @@
 /**
- * Explicit interaction resource budget. Reuses the existing commercial-queue
- * bound and never grants extra concurrency or skips authorization.
+ * Explicit interaction resource budget. The default covers the whole
+ * interaction chain (queue wait, candidate fallback, inference, persist).
+ * It never grants extra concurrency or skips authorization, and it does not
+ * change execution-A's business deadline.
  */
-import { resolveCommercialRunQueueMaxWaitMs } from "../../gateway/billing/agent-run-queue.js";
-
 export const INTERACTION_RESOURCE_WAIT_ENV = "OPENBOT_INTERACTION_RESOURCE_WAIT_MS";
+/** Default wall-clock budget for one interaction to answer or clearly degrade. */
+export const DEFAULT_INTERACTION_RESOURCE_WAIT_MS = 15_000;
+/**
+ * When the commercial slot is already held (e.g. execution A is hanging),
+ * interaction B must still return a deterministic blocked/degraded receipt
+ * quickly. This caps only the slot wait, not the total interaction deadline
+ * and not execution-A's timeout.
+ */
+export const INTERACTION_BLOCKED_RECEIPT_MS = 2_000;
+
+export type InteractionResourceBudget = {
+  budgetMs: number;
+  startedMs: number;
+  remainingMs(nowMs?: number): number;
+  isExhausted(nowMs?: number): boolean;
+  /** Remaining time that may be spent waiting for a commercial slot. */
+  remainingQueueWaitMs(nowMs?: number): number;
+};
 
 export function resolveInteractionResourceWaitMs(opts?: {
   overrideMs?: number;
@@ -14,7 +32,7 @@ export function resolveInteractionResourceWaitMs(opts?: {
 }): number {
   const override = finitePositive(opts?.overrideMs);
   const fromEnv = finitePositive(Number.parseInt(process.env[INTERACTION_RESOURCE_WAIT_ENV] ?? "", 10));
-  const resolved = override ?? fromEnv ?? resolveCommercialRunQueueMaxWaitMs();
+  const resolved = override ?? fromEnv ?? DEFAULT_INTERACTION_RESOURCE_WAIT_MS;
   const cap = finitePositive(opts?.capMs);
   return Math.max(1, cap === undefined ? resolved : Math.min(resolved, cap));
 }
@@ -23,15 +41,29 @@ export function createInteractionResourceBudget(opts?: {
   overrideMs?: number;
   capMs?: number;
   nowMs?: number;
-}) {
+}): InteractionResourceBudget {
   const budgetMs = resolveInteractionResourceWaitMs(opts);
   const startedMs = opts?.nowMs ?? Date.now();
+  const remainingMs = (nowMs = Date.now()): number =>
+    Math.max(0, budgetMs - Math.max(0, nowMs - startedMs));
   return {
     budgetMs,
-    remainingMs(nowMs = Date.now()): number {
-      return Math.max(1, budgetMs - Math.max(0, nowMs - startedMs));
+    startedMs,
+    remainingMs,
+    isExhausted(nowMs = Date.now()): boolean {
+      return remainingMs(nowMs) <= 0;
+    },
+    remainingQueueWaitMs(nowMs = Date.now()): number {
+      return Math.min(remainingMs(nowMs), INTERACTION_BLOCKED_RECEIPT_MS);
     },
   };
+}
+
+export function isInteractionBudgetExhausted(
+  budget: InteractionResourceBudget | undefined,
+  nowMs = Date.now(),
+): boolean {
+  return budget?.isExhausted(nowMs) === true;
 }
 
 export const INTERACTION_TIMEOUT_TEXT =
@@ -47,25 +79,32 @@ export const CHAT_TURN_ERROR_UNCONFIRMED_TEXT =
 
 export type InteractionFailureKind = "timeout" | "empty" | "model" | "queue_timeout" | "other";
 
+export function interactionTimeoutError(): Error {
+  return Object.assign(new Error("timeout"), {
+    interactionPhase: "interpretation" as const,
+    reason: "timeout",
+  });
+}
+
 export function isInteractionUserAbort(error: unknown): boolean {
   if (!error || typeof error !== "object") {
     return false;
   }
   const name = "name" in error ? String(error.name) : "";
   const message = error instanceof Error ? error.message : "";
+  if (name === "TimeoutError" || /timeout/i.test(message)) {
+    return false;
+  }
   return (
     name === "AbortError" &&
-    !/timeout/i.test(message) &&
     !("interactionPhase" in error && (error as { interactionPhase?: string }).interactionPhase)
   );
 }
 
 export function classifyInteractionFailure(error: unknown): InteractionFailureKind {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  const reason =
-    error && typeof error === "object" && "reason" in error
-      ? String((error as { reason?: unknown }).reason ?? "")
-      : "";
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const name = readErrorStringField(error, "name");
+  const reason = readErrorStringField(error, "reason");
   if (
     reason === "CONCURRENCY_QUEUE_TIMEOUT" ||
     message.includes("并发排队超时") ||
@@ -76,6 +115,7 @@ export function classifyInteractionFailure(error: unknown): InteractionFailureKi
   if (
     reason === "timeout" ||
     message === "timeout" ||
+    name === "TimeoutError" ||
     /timed? ?out/i.test(message) ||
     message.includes("本轮交互在时限内没有得到有效输出") ||
     message.includes("本轮未取得有效的交互决定")
@@ -102,6 +142,14 @@ export function formatInteractionFailureReply(error: unknown): string {
     return INTERACTION_TIMEOUT_TEXT;
   }
   return INTERACTION_MODEL_FAILURE_TEXT;
+}
+
+function readErrorStringField(error: unknown, field: "name" | "reason"): string {
+  if (!error || typeof error !== "object" || !(field in error)) {
+    return "";
+  }
+  const value = (error as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : "";
 }
 
 function finitePositive(value: unknown): number | undefined {

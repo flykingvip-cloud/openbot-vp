@@ -90,4 +90,23 @@ describe("single-turn admission lifetime", () => {
     await expect(lease.dispose()).rejects.toThrow("release error");
     expect(ports.forgetSnapshot).toHaveBeenCalledOnce();
   });
+  it("releases a late acquire after cancel once and starts no business", async () => {
+    const { events, ports, lease } = setup();
+    let releaseAcquire!: (result: { acquired: true; skipped: false; enterpriseId: string }) => void;
+    vi.mocked(ports.acquire).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseAcquire = resolve;
+        }),
+    );
+    const pending = lease.acquire({ runId: "run-late" });
+    const disposeDone = lease.dispose();
+    releaseAcquire({ acquired: true, skipped: false, enterpriseId: "tenant-a" });
+    await expect(pending).rejects.toThrow(/already disposed/);
+    await disposeDone;
+    expect(events).toEqual(["release", "forget"]);
+    expect(ports.release).toHaveBeenCalledTimes(1);
+    expect(ports.forgetSnapshot).toHaveBeenCalledTimes(1);
+    expect(lease.held).toBe(false);
+  });
 });

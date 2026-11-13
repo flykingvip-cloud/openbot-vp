@@ -31,6 +31,18 @@ export function createRunAdmissionLease<
         throw new Error("Admission lease is already disposed");
       }
       const result = await ports.acquire(input);
+      if (disposed) {
+        // Cancel raced the in-flight acquire: release once and start no business.
+        if (result.acquired) {
+          try {
+            await ports.release();
+          } finally {
+            held = false;
+            ports.forgetSnapshot();
+          }
+        }
+        throw new Error("Admission lease is already disposed");
+      }
       if (result.acquired) {
         held = true;
       }

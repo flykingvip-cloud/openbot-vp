@@ -4,6 +4,22 @@ import {
   writeWorkbenchSessionTranscript,
 } from "./workbench-session-transcript-cache.ts";
 
+/** In-memory only: finished run ids must not be revived into occupancy. */
+const finishedBackgroundRuns = new Set<string>();
+
+function sameBackgroundRun(eventRunId: string | null | undefined, openRunId: string | null | undefined): boolean {
+  const event = eventRunId?.trim() ?? "";
+  const open = openRunId?.trim() ?? "";
+  if (!event || !open) {
+    return false;
+  }
+  return event === open || event.startsWith(`${open}:`) || open.startsWith(`${event}:`);
+}
+
+export function resetFinishedBackgroundWorkbenchRunsForTests(): void {
+  finishedBackgroundRuns.clear();
+}
+
 export type BackgroundWorkbenchChatEvent = {
   runId?: string | null;
   sessionKey?: string | null;
@@ -44,8 +60,38 @@ export function applyBackgroundWorkbenchChatEvent(payload: BackgroundWorkbenchCh
   const messages = existing?.messages.slice() ?? [];
   const state = payload.state?.trim() ?? "";
   const streamText = extractText(payload.message) ?? "";
+  const eventRunId = payload.runId?.trim() || null;
+  const openRunId = existing?.chatRunId?.trim() || null;
+  if (eventRunId && finishedBackgroundRuns.has(eventRunId)) {
+    return;
+  }
+  if (openRunId && eventRunId && !sameBackgroundRun(eventRunId, openRunId)) {
+    // B's terminal or stream must not clear or overwrite A's occupancy.
+    if (state === "final" || state === "aborted" || state === "error") {
+      const assistant = asAssistantMessage(payload.message, streamText);
+      if (assistant) {
+        messages.push(assistant);
+        writeWorkbenchSessionTranscript(sessionKey, {
+          ...existing,
+          messages,
+          chatRunId: openRunId,
+          chatStream: existing?.chatStream ?? null,
+          chatStreamStartedAt: existing?.chatStreamStartedAt ?? null,
+          chatStreamSessionKey: existing?.chatStreamSessionKey ?? sessionKey,
+          chatThinkingProgress: existing?.chatThinkingProgress ?? null,
+        });
+      }
+      if (eventRunId) {
+        finishedBackgroundRuns.add(eventRunId);
+      }
+    }
+    return;
+  }
 
   if (state === "thinking") {
+    if (!openRunId && eventRunId && finishedBackgroundRuns.has(eventRunId)) {
+      return;
+    }
     writeWorkbenchSessionTranscript(sessionKey, {
       messages,
       chatHistoryNextBefore: existing?.chatHistoryNextBefore,
@@ -60,6 +106,9 @@ export function applyBackgroundWorkbenchChatEvent(payload: BackgroundWorkbenchCh
   }
 
   if (state === "delta") {
+    if (!openRunId && eventRunId && finishedBackgroundRuns.has(eventRunId)) {
+      return;
+    }
     writeWorkbenchSessionTranscript(sessionKey, {
       messages,
       chatHistoryNextBefore: existing?.chatHistoryNextBefore,
@@ -77,6 +126,9 @@ export function applyBackgroundWorkbenchChatEvent(payload: BackgroundWorkbenchCh
     const assistant = asAssistantMessage(payload.message, streamText || existing?.chatStream || "");
     if (assistant) {
       messages.push(assistant);
+    }
+    if (eventRunId) {
+      finishedBackgroundRuns.add(eventRunId);
     }
     writeWorkbenchSessionTranscript(sessionKey, {
       messages,

@@ -76,11 +76,37 @@ export function listChatTurnTerminals(
   }
 }
 
+function terminalFactKey(text: string): string {
+  const suffix = `\n\n${INTERACTION_RECORD_UNAVAILABLE_TEXT}`;
+  return text.endsWith(suffix) ? text.slice(0, -suffix.length) : text;
+}
+
+function canUpgradeChatTurnTerminal(
+  existing: ChatTurnTerminalReceipt,
+  next: ChatTurnTerminalReceipt,
+): boolean {
+  if (existing.runId !== next.runId) {
+    return false;
+  }
+  if (
+    existing.businessExecution !== next.businessExecution ||
+    terminalFactKey(existing.text) !== terminalFactKey(next.text)
+  ) {
+    return false;
+  }
+  // Same fact: allow a persist upgrade or sidecar refresh, never a conflicting terminal.
+  return true;
+}
+
 export function writeChatTurnTerminal(
   receipt: ChatTurnTerminalReceipt,
   storeDir?: string,
 ): boolean {
   try {
+    const existing = readChatTurnTerminal(receipt.runId, storeDir, receipt.sessionKey);
+    if (existing && !canUpgradeChatTurnTerminal(existing, receipt)) {
+      return false;
+    }
     const dest = chatTurnTerminalPath(receipt.runId, storeDir, receipt.sessionKey);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     const tmp = `${dest}.${process.pid}.tmp`;
@@ -220,6 +246,23 @@ async function writeTerminalWithTranscript(params: {
   sessionKey?: string;
   storeDir?: string;
 }): Promise<{ persisted: boolean; text?: string; recordTemporarilyUnavailable?: boolean }> {
+  const existing = readChatTurnTerminal(params.runId, params.storeDir, params.sessionKey);
+  if (
+    existing &&
+    (existing.businessExecution !== params.businessExecution ||
+      terminalFactKey(existing.text) !== terminalFactKey(params.text))
+  ) {
+    // Same request already has a sealed fact. A late model result must not
+    // create a conflicting terminal or start another append.
+    return {
+      persisted: existing.persistedToTranscript,
+      text: existing.text,
+      ...(existing.recordTemporarilyUnavailable ? { recordTemporarilyUnavailable: true } : {}),
+    };
+  }
+  if (existing?.persistedToTranscript) {
+    return { persisted: true, text: terminalFactKey(existing.text) };
+  }
   let persisted = false;
   try {
     const result = await params.append(params.text, `${params.runId}:interaction-rejected`);
@@ -234,9 +277,9 @@ async function writeTerminalWithTranscript(params: {
     persistedToTranscript: persisted,
     businessExecution: params.businessExecution,
     recordTemporarilyUnavailable: !persisted,
-    at: new Date().toISOString(),
+    at: existing?.at ?? new Date().toISOString(),
   };
-  const stored = writeChatTurnTerminal(receipt, params.storeDir);
+  writeChatTurnTerminal(receipt, params.storeDir);
   if (persisted) {
     return { persisted: true, text: params.text };
   }
@@ -244,7 +287,6 @@ async function writeTerminalWithTranscript(params: {
     persisted: false,
     text: receipt.text,
     recordTemporarilyUnavailable: true,
-    ...(stored ? {} : {}),
   };
 }
 

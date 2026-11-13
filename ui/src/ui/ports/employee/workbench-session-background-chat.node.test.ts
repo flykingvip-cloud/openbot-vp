@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { applyBackgroundWorkbenchChatEvent } from "./workbench-session-background-chat.ts";
+import {
+  applyBackgroundWorkbenchChatEvent,
+  resetFinishedBackgroundWorkbenchRunsForTests,
+} from "./workbench-session-background-chat.ts";
 import {
   readWorkbenchSessionTranscript,
   resetWorkbenchSessionTranscriptCacheForTests,
@@ -9,6 +12,7 @@ import {
 describe("applyBackgroundWorkbenchChatEvent", () => {
   beforeEach(() => {
     resetWorkbenchSessionTranscriptCacheForTests();
+    resetFinishedBackgroundWorkbenchRunsForTests();
   });
 
   it("stores deltas on the background session without requiring it to be open", () => {
@@ -66,5 +70,63 @@ describe("applyBackgroundWorkbenchChatEvent", () => {
       },
       { role: "assistant", content: [{ type: "text", text: "检索情况" }] },
     ]);
+  });
+
+  it("does not let B's terminal clear A's occupancy, and ignores late A events after A finished", () => {
+    writeWorkbenchSessionTranscript("agent:skill:main", {
+      messages: [
+        {
+          id: "local-run-a",
+          role: "user",
+          content: [{ type: "text", text: "执行长时间任务" }],
+        },
+      ],
+      chatRunId: "run-a",
+      chatStream: "正在执行",
+    });
+
+    applyBackgroundWorkbenchChatEvent({
+      sessionKey: "agent:skill:main",
+      runId: "run-b",
+      state: "final",
+      message: { role: "assistant", content: [{ type: "text", text: "你好，我在。" }] },
+    });
+
+    let cached = readWorkbenchSessionTranscript("agent:skill:main");
+    expect(cached?.chatRunId).toBe("run-a");
+    expect(cached?.chatStream).toBe("正在执行");
+    expect(cached?.messages.map((message) => {
+      const content = (message as { content?: Array<{ text?: string }> }).content;
+      return content?.[0]?.text;
+    })).toEqual(["执行长时间任务", "你好，我在。"]);
+
+    applyBackgroundWorkbenchChatEvent({
+      sessionKey: "agent:skill:main",
+      runId: "run-a",
+      state: "final",
+      message: { role: "assistant", content: [{ type: "text", text: "任务完成" }] },
+    });
+    cached = readWorkbenchSessionTranscript("agent:skill:main");
+    expect(cached?.chatRunId).toBeNull();
+    expect(cached?.messages.at(-1)).toMatchObject({
+      role: "assistant",
+      content: [{ type: "text", text: "任务完成" }],
+    });
+
+    applyBackgroundWorkbenchChatEvent({
+      sessionKey: "agent:skill:main",
+      runId: "run-a",
+      state: "delta",
+      message: { role: "assistant", content: [{ type: "text", text: "迟到增量" }] },
+    });
+    cached = readWorkbenchSessionTranscript("agent:skill:main");
+    expect(cached?.chatRunId).toBeNull();
+    expect(cached?.chatStream ?? null).toBeNull();
+    expect(
+      cached?.messages.some((message) => {
+        const content = (message as { content?: Array<{ text?: string }> }).content;
+        return content?.[0]?.text === "迟到增量";
+      }),
+    ).toBe(false);
   });
 });

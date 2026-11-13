@@ -174,7 +174,7 @@ import {
   writeChatTurnTerminal,
   readChatTurnTerminal,
 } from "../chat-interaction-failure.js";
-import { CHAT_TURN_ERROR_UNCONFIRMED_TEXT } from "../agent-runtime/model/interaction-resource-wait.js";
+import { CHAT_TURN_ERROR_UNCONFIRMED_TEXT } from "../../agent-runtime/model/interaction-resource-wait.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import {
   noteChatRunTenant,

@@ -13,10 +13,12 @@ import {
 } from "../../gateway/billing/agent-run-registry.js";
 import {
   CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
+  INTERACTION_BLOCKED_RECEIPT_MS,
   INTERACTION_MODEL_FAILURE_TEXT,
   INTERACTION_QUEUE_TIMEOUT_TEXT,
   INTERACTION_RECORD_UNAVAILABLE_TEXT,
   INTERACTION_TIMEOUT_TEXT,
+  formatInteractionFailureReply,
 } from "../model/interaction-resource-wait.js";
 import { formatRestrictedInteractionNotice } from "./interaction-sources.js";
 import { runAuthorizedInteraction } from "./authorized-interaction.js";
@@ -200,8 +202,8 @@ it("S1-C / I-T2: after a model failure the lease is released, the failed turn is
   };
   const first = await runAuthorizedInteraction(baseParams("先问一件事"), {
     session: {
-      authorize: session.authorize,
-      dispose: session.dispose,
+      authorize: (...args: Parameters<typeof session.authorize>) => session.authorize(...args),
+      dispose: () => session.dispose(),
     } as never,
     authorization: { agentId: "bot" },
     prepare: () => {
@@ -323,6 +325,147 @@ it("I-E1: a post-admission tool error gets a queryable unconfirmed receipt and m
       businessExecution: "unknown",
       persistedToTranscript: true,
     });
+  } finally {
+    await fs.rm(storeDir, { recursive: true, force: true });
+  }
+});
+
+
+it("S1-A / checkpoint A: B degrades within the 2s blocked-receipt window while A remains hung for 60s", async () => {
+  // Timing method: real wall clock + controllable Promise holding A's commercial
+  // slot (equivalent to a 60s tool hang because A stays unfinished and held
+  // for the whole B window; a 60s hang mark is armed but not awaited).
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "s1-a-hang-"));
+  const registry = path.join(dir, "registry.json");
+  const queue = path.join(dir, "queue.json");
+  try {
+    await __resetAgentRunRegistryForTest(registry);
+    await __resetAgentRunQueueForTest(queue);
+    const base = {
+      enterpriseId: "ent-s1a-hang",
+      maxConcurrentRuns: 1,
+      allowBurstConcurrency: false,
+      concurrencyMode: "queue" as const,
+    };
+    const held = await tryAcquireAgentRunSlot({ ...base, runId: "run-a" }, registry);
+    expect(held.ok).toBe(true);
+    const aHangMs = 60_000;
+    const aHangUntil = Date.now() + aHangMs;
+    let aReleased = false;
+    const authorize = vi.fn(async (input: { queueMaxWaitMs?: number }) => {
+      const slot = await acquireAgentRunSlotWithQueuePolicy(
+        { ...base, runId: "run-b" },
+        {
+          maxWaitMs: input.queueMaxWaitMs ?? INTERACTION_BLOCKED_RECEIPT_MS,
+          pollIntervalMs: 25,
+          registryStorePath: registry,
+          queueStorePath: queue,
+        },
+      );
+      if (slot.ok) {
+        return { acquired: true as const, skipped: false as const };
+      }
+      return {
+        acquired: false as const,
+        skipped: false as const,
+        reason: slot.reason,
+        message:
+          slot.reason === "CONCURRENCY_QUEUE_TIMEOUT"
+            ? INTERACTION_QUEUE_TIMEOUT_TEXT
+            : "denied",
+      };
+    });
+    const started = Date.now();
+    const result = await runAuthorizedInteraction(baseParams("你好，现在进度如何？", INTERACTION_BLOCKED_RECEIPT_MS), {
+      session: { authorize, dispose: vi.fn(async () => undefined) } as never,
+      authorization: { agentId: "bot", queueMaxWaitMs: INTERACTION_BLOCKED_RECEIPT_MS },
+      prepare: vi.fn(),
+      candidate: vi.fn(),
+      admission: {
+        captured,
+        ports: {
+          authorize: vi.fn(async () => true),
+          commit: vi.fn(() => {
+            throw new Error("ordinary query must not commit the board");
+          }),
+        },
+      },
+    });
+    const waitedMs = Date.now() - started;
+    expect(aReleased).toBe(false);
+    expect(Date.now()).toBeLessThan(aHangUntil);
+    expect(waitedMs).toBeGreaterThanOrEqual(INTERACTION_BLOCKED_RECEIPT_MS);
+    expect(waitedMs).toBeLessThan(INTERACTION_BLOCKED_RECEIPT_MS + 500);
+    expect(result).toEqual({
+      kind: "respond",
+      text: INTERACTION_QUEUE_TIMEOUT_TEXT,
+      clarification: false,
+    });
+    expect(authorize).toHaveBeenCalledOnce();
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+
+it("checkpoint A: a late model proposal after timeout is not admitted and does not start business", async () => {
+  const admissionAuthorize = vi.fn(async () => true);
+  const admissionCommit = vi.fn(() => ({ kind: "accepted_turn" as const }));
+  const controller = new AbortController();
+  let releaseModel!: (decision: { kind: "execution_request"; request: { goal: string; acceptance: string[] } }) => void;
+  const infer = vi.fn(
+    () =>
+      new Promise((resolve) => {
+        releaseModel = resolve;
+      }),
+  );
+  const pending = routeInteraction(
+    { message: "开始任务", context: [], abortSignal: controller.signal },
+    captured,
+    {
+      inference: { infer },
+      admission: { authorize: admissionAuthorize, commit: admissionCommit },
+    },
+  );
+  controller.abort(Object.assign(new Error("timeout"), { name: "TimeoutError" }));
+  releaseModel({
+    kind: "execution_request",
+    request: { goal: "迟到提案", acceptance: ["不应执行"] },
+  });
+  await expect(pending).rejects.toThrow();
+  expect(admissionAuthorize).not.toHaveBeenCalled();
+  expect(admissionCommit).not.toHaveBeenCalled();
+});
+
+it("checkpoint A: timeout receipt and a late conflicting result stay one sealed fact", async () => {
+  const storeDir = await fs.mkdtemp(path.join(os.tmpdir(), "s1-dedup-"));
+  try {
+    const first = await persistRejectedInteractionTurn({
+      error: Object.assign(new Error("timeout"), {
+        interactionPhase: "interpretation",
+        reason: "timeout",
+      }),
+      runId: "run-dedup",
+      sessionKey: "sess-dedup",
+      storeDir,
+      append: async () => ({ ok: true }),
+    });
+    expect(first).toEqual({ persisted: true, text: INTERACTION_TIMEOUT_TEXT });
+    const late = await persistRejectedInteractionTurn({
+      error: new Error("tool failed after send"),
+      runId: "run-dedup",
+      sessionKey: "sess-dedup",
+      storeDir,
+      append: async () => ({ ok: true }),
+    });
+    expect(late.text).toBe(INTERACTION_TIMEOUT_TEXT);
+    expect(late.persisted).toBe(true);
+    expect(readChatTurnTerminal("run-dedup", storeDir, "sess-dedup")).toMatchObject({
+      text: INTERACTION_TIMEOUT_TEXT,
+      businessExecution: "none",
+      persistedToTranscript: true,
+    });
+    expect(formatInteractionFailureReply(new Error("timeout"))).toBe(INTERACTION_TIMEOUT_TEXT);
   } finally {
     await fs.rm(storeDir, { recursive: true, force: true });
   }
