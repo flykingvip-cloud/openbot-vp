@@ -10,7 +10,7 @@ import {
   type ExecutionAdmissionPorts,
   type ExecutionAdmissionResult,
 } from "./execution-admission.js";
-import { formatRestrictedInteractionNotice } from "./interaction-sources.js";
+import { respondIfRestrictedDecision } from "./interaction-sources.js";
 import {
   interpretInteraction,
   InteractionDecisionValidationError,
@@ -52,16 +52,9 @@ export async function routeInteraction(
     }
     throw error;
   }
-  if (
-    input.availability?.mode === "restricted" &&
-    decision.kind !== "reply" &&
-    decision.kind !== "clarify"
-  ) {
-    return {
-      kind: "respond",
-      text: formatRestrictedInteractionNotice(input.availability),
-      clarification: false,
-    };
+  const restricted = respondIfRestrictedDecision(input.availability, decision.kind);
+  if (restricted) {
+    return restricted;
   }
   switch (decision.kind) {
     case "reply":

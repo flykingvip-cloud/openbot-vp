@@ -4434,6 +4434,8 @@ async function flushPendingChatRestoreForSession(params: {
 
 const STALE_GROUP_EXECUTION_PROPOSAL_TEXT =
   "当前群状态已更新，本轮未执行该提案。请基于最新状态再确认。";
+const UNREADABLE_GROUP_EXECUTION_STATE_TEXT =
+  "当前群状态暂无法核准，本次未启动。请稍后基于最新状态再确认。";
 
 type GroupExecutionProposalSnapshot = {
   authEpoch: number;
@@ -4486,22 +4488,29 @@ function isStaleGroupExecutionProposal(
   );
 }
 
+type GroupExecutionProposalRead =
+  | { kind: "ok"; snapshot: GroupExecutionProposalSnapshot }
+  | { kind: "unreadable" };
+
 async function readFreshGroupExecutionProposalSnapshot(params: {
   groupId: string;
   client: GatewayClient | null;
-}): Promise<GroupExecutionProposalSnapshot | null> {
+}): Promise<GroupExecutionProposalRead> {
   try {
     const stores = createWorkspaceCollaborationStores();
     const [operatingState, tenant] = await Promise.all([
       readGroupOperatingState({ fileStore: stores.fileStore, groupId: params.groupId }),
       resolveCollaborationTenantResolution(params.client),
     ]);
-    return captureGroupExecutionProposalSnapshot({
-      operatingState,
-      tenantId: tenant.tenantId ?? null,
-    });
+    return {
+      kind: "ok",
+      snapshot: captureGroupExecutionProposalSnapshot({
+        operatingState,
+        tenantId: tenant.tenantId ?? null,
+      }),
+    };
   } catch {
-    return null;
+    return { kind: "unreadable" };
   }
 }
 
@@ -5694,15 +5703,10 @@ export const chatHandlers: GatewayRequestHandlers = {
           if (parentAbortController.signal.aborted) {
             return;
           }
-          const groupExecutionProposalSnapshot =
-            (await readFreshGroupExecutionProposalSnapshot({
-              groupId: scope.groupId,
-              client,
-            })) ??
-            captureGroupExecutionProposalSnapshot({
-              operatingState: scope.operatingState,
-              tenantId: collabTenant?.tenantId ?? scope.tenantId ?? null,
-            });
+          const groupExecutionProposalCapture = await readFreshGroupExecutionProposalSnapshot({
+            groupId: scope.groupId,
+            client,
+          });
           const participationTierByAgentId = new Map(
             decision.roundPlan.participants.map((participant) => [
               participant.agentId,
@@ -6053,21 +6057,31 @@ export const chatHandlers: GatewayRequestHandlers = {
           };
 
           const rejectStaleGroupExecutionProposal = async (): Promise<boolean> => {
+            if (groupExecutionProposalCapture.kind !== "ok") {
+              context.logGateway.warn(
+                `group execution proposal initial version capture failed group=${scope.groupId}; not starting this turn`,
+              );
+              await emitGroupInteractionText(UNREADABLE_GROUP_EXECUTION_STATE_TEXT, "协作调度");
+              return true;
+            }
             const fresh = await readFreshGroupExecutionProposalSnapshot({
               groupId: scope.groupId,
               client,
             });
-            if (!fresh) {
+            if (fresh.kind !== "ok") {
               context.logGateway.warn(
-                `group execution proposal version re-read failed group=${scope.groupId}; not treating as stale`,
+                `group execution proposal version re-read failed group=${scope.groupId}; not starting this turn`,
               );
-              return false;
+              await emitGroupInteractionText(UNREADABLE_GROUP_EXECUTION_STATE_TEXT, "协作调度");
+              return true;
             }
-            if (!isStaleGroupExecutionProposal(groupExecutionProposalSnapshot, fresh)) {
+            if (
+              !isStaleGroupExecutionProposal(groupExecutionProposalCapture.snapshot, fresh.snapshot)
+            ) {
               return false;
             }
             context.logGateway.warn(
-              `group execution proposal rejected as stale group=${scope.groupId} expected=${JSON.stringify(groupExecutionProposalSnapshot)} fresh=${JSON.stringify(fresh)}`,
+              `group execution proposal rejected as stale group=${scope.groupId} expected=${JSON.stringify(groupExecutionProposalCapture.snapshot)} fresh=${JSON.stringify(fresh.snapshot)}`,
             );
             await emitGroupInteractionText(STALE_GROUP_EXECUTION_PROPOSAL_TEXT, "协作调度");
             return true;

@@ -38,7 +38,8 @@ vi.mock("@earendil-works/pi-ai/compat", async (original) => ({
 }));
 
 const { chatHandlers, appendUserTranscriptMessage } = await import("./server-methods/chat.js");
-const { createWorkspaceCollaborationStores } = await import("./collaboration-learning/shared.js");
+const collaborationShared = await import("./collaboration-learning/shared.js");
+const { createWorkspaceCollaborationStores } = collaborationShared;
 const { resolveGroupPublicTranscriptPath } =
   await import("./collaboration-learning/collaboration-paths.js");
 
@@ -198,6 +199,10 @@ const GREETING_REPLY = "你好，我在，群里有什么我可以先回答的�
 const PROGRESS_REPLY = "当前仍在执行先前任务，这是只读说明，没有改状态。";
 const CLARIFY_REPLY = "请补充你希望核对的验收条目，本轮不会启动新任务。";
 const STALE_PROPOSAL_NOTICE = "当前群状态已更新，本轮未执行该提案";
+const RESTRICTED_CONTEXT_NOTICE =
+  "当前可以继续对话，但部分对话记录或上下文暂时不可用；本条消息不会启动或变更任务。";
+const UNREADABLE_GROUP_STATE_NOTICE = "状态暂无法核准，本次未启动";
+const RESTRICTED_HISTORY_CHARS = 900;
 
 function decisionForLiveMessage(message: string): { kind: string; [k: string]: unknown } {
   if (message.includes(GREETING_MESSAGE)) {
@@ -598,6 +603,63 @@ async function sendGroupChat(params: {
   return { respond, pending, started };
 }
 
+function expectOperatingStateIdentityUnchanged(osPath: string, beforeRaw: string) {
+  const before = JSON.parse(beforeRaw) as {
+    authEpoch?: number;
+    activeContext?: { currentTaskId?: string; currentOperatingPhase?: string };
+  };
+  const after = JSON.parse(fs.readFileSync(osPath, "utf8")) as typeof before;
+  expect(after.authEpoch).toBe(before.authEpoch);
+  expect(after.activeContext?.currentTaskId).toBe(before.activeContext?.currentTaskId);
+  expect(after.activeContext?.currentOperatingPhase).toBe(
+    before.activeContext?.currentOperatingPhase,
+  );
+}
+
+async function seedSlightlyOversizeHistory(
+  fixture: Awaited<ReturnType<typeof isolateTrustedGroupGateway>>,
+  chars = RESTRICTED_HISTORY_CHARS,
+) {
+  const unit = "先前已授权的正式任务记录。";
+  const text = unit.repeat(Math.ceil(chars / unit.length)).slice(0, chars);
+  expect(text.length).toBe(chars);
+  expect(text.length).toBeGreaterThan(512);
+  expect(text.length).toBeLessThan(24_000);
+  const seeded = await appendUserTranscriptMessage({
+    sessionId: fixture.sessionId,
+    storePath: fixture.storePath,
+    sessionFile: fixture.transcriptPath,
+    idempotencyKey: `local-oversize-${chars}`,
+    groupId: fixture.groupId,
+    message: {
+      role: "user",
+      content: [{ type: "text", text }],
+      timestamp: 1,
+    },
+  });
+  expect(seeded.ok, `failed to seed history: ${seeded.ok ? "" : seeded.error}`).toBe(true);
+  return text;
+}
+
+async function settleReleasedWorkTurn(params: {
+  context: ReturnType<typeof createChatContext>;
+  runId: string;
+  pending: Promise<unknown>;
+  release?: ((value: unknown) => void) | undefined;
+  result?: unknown;
+}) {
+  params.release?.(params.result ?? { ok: true });
+  await Promise.all([
+    params.pending.catch(() => undefined),
+    vi.waitFor(
+      () => {
+        expect(params.context.chatAbortControllers.has(params.runId)).toBe(false);
+      },
+      { timeout: 8_000 },
+    ),
+  ]);
+}
+
 describe("checkpoint B isolated Gateway group interaction isolation", () => {
   beforeEach(() => {
     completeMock.mockReset();
@@ -658,9 +720,14 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     );
     await sendB.pending;
     expect(releaseA).toBeTypeOf("function");
-    // Leave A hanging; the test evidence is B first, A still running.
-    void sendA.pending;
-    releaseA?.({ ok: true, text: "late-A-should-not-block-B" });
+    // Evidence above is B first while A is still running. Settle A before afterEach.
+    await settleReleasedWorkTurn({
+      context,
+      runId: runA,
+      pending: sendA.pending,
+      release: releaseA,
+      result: { ok: true, text: "late-A-should-not-block-B" },
+    });
   }, 30_000);
 
   it("2: B readonly progress query does not write the board, claim, dispatch members, or resume A", async () => {
@@ -708,8 +775,12 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     // A may still be running and may touch updatedAtMs; B must not change task identity.
     expect(context.chatAbortControllers.has(runA)).toBe(true);
     expect(findTerminal(context, runA)).toBeUndefined();
-    releaseA?.({ ok: true });
-    void sendA.pending;
+    await settleReleasedWorkTurn({
+      context,
+      runId: runA,
+      pending: sendA.pending,
+      release: releaseA,
+    });
   }, 30_000);
 
   it("3: B clarify/deny-admission performs zero business actions, tasks, or mention dispatch", async () => {
@@ -750,8 +821,12 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     expect(listTaskBoardFiles(fixture.root)).toEqual([]);
     expect(mentionSpy.mock.calls.length).toBe(mentionCallsAtHang);
     expect(context.chatAbortControllers.has(runA)).toBe(true);
-    releaseA?.({ ok: true });
-    void sendA.pending;
+    await settleReleasedWorkTurn({
+      context,
+      runId: runA,
+      pending: sendA.pending,
+      release: releaseA,
+    });
   }, 30_000);
 
   it("4+5: B's visible receipt does not clear A's occupancy; late A final does not overwrite B or resurrect occupancy", async () => {
@@ -767,7 +842,7 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     const context = createChatContext();
     const runA = `run-s1b-a-occ-${path.basename(fixture.root)}`;
     const runB = `run-s1b-b-occ-${path.basename(fixture.root)}`;
-    await sendGroupChat({
+    const sendA = await sendGroupChat({
       fixture,
       context,
       runId: runA,
@@ -805,9 +880,19 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     expect(afterA).toContain(GREETING_REPLY);
     const greetingCount = afterA.split(GREETING_REPLY).length - 1;
     expect(greetingCount).toBeGreaterThanOrEqual(1);
-    expect(context.chatAbortControllers.has(runA), "A occupancy should end after A settles").toBe(
-      false,
+    // Terminal is broadcast before finally cleanup; wait for the consumer
+    // to drop A's controller, then assert occupancy.
+    await vi.waitFor(
+      () => {
+        expect(
+          context.chatAbortControllers.has(runA),
+          "A occupancy should end after consumer cleanup",
+        ).toBe(false);
+      },
+      { timeout: 8_000 },
     );
+    await sendA.pending.catch(() => undefined);
+    expect(context.chatAbortControllers.has(runA)).toBe(false);
     expect(context.chatAbortControllers.has(runB)).toBe(false);
   }, 30_000);
 
@@ -884,8 +969,12 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     expect(osAfter.activeContext.currentOperatingPhase).toBe("stopped");
     expect(listTaskBoardFiles(fixture.root)).toEqual([]);
     expect(context.chatAbortControllers.has(runA)).toBe(true);
-    releaseA?.({ ok: true });
-    void sendA.pending;
+    await settleReleasedWorkTurn({
+      context,
+      runId: runA,
+      pending: sendA.pending,
+      release: releaseA,
+    });
   }, 30_000);
 
   it("7: an ordinary message is understood once and does not start mention business dispatch", async () => {
@@ -983,6 +1072,225 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     expect(completeDump).toMatch(
       /Host restricted interaction|not a complete authorization record|Use only available context|context_source_unavailable/,
     );
+    expect(listTaskBoardFiles(fixture.root)).toEqual([]);
+  }, 30_000);
+
+  it("B-R1: a restricted history prompt still rejects a model execution_request with zero dispatch", async () => {
+    const fixture = await isolateTrustedGroupGateway({ tinyHistoryBudget: true });
+    await seedSlightlyOversizeHistory(fixture);
+    installUnderstandingComplete();
+    const dispatchSpy = vi
+      .spyOn(dispatchModule, "dispatchInboundMessage")
+      .mockImplementation(async () => ({ ok: true, text: "should-not-dispatch-restricted" }));
+    const osPath = path.join(fixture.groupDir, "operating-state.json");
+    const osBefore = fs.readFileSync(osPath, "utf8");
+    const context = createChatContext();
+    const runB = `run-s1b-r1-violate-${path.basename(fixture.root)}`;
+    const sendB = await sendGroupChat({
+      fixture,
+      context,
+      runId: runB,
+      message: WORK_MESSAGE,
+    });
+    await vi.waitFor(() => expect(findTerminal(context, runB)).toBeTruthy(), { timeout: 15_000 });
+    await sendB.pending;
+    expect(completeMock).toHaveBeenCalled();
+    const completeDump = JSON.stringify(completeMock.mock.calls);
+    expect(completeDump).toMatch(
+      /Host restricted interaction|not a complete authorization record|Use only available context|context_source_unavailable/,
+    );
+    expect(payloadText(findTerminal(context, runB))).toContain(RESTRICTED_CONTEXT_NOTICE);
+    expect(
+      dispatchSpy,
+      "restricted history must not dispatch a model-violating proposal",
+    ).not.toHaveBeenCalled();
+    expect(listTaskBoardFiles(fixture.root)).toEqual([]);
+    expectOperatingStateIdentityUnchanged(osPath, osBefore);
+  }, 30_000);
+
+  it("B-R1: restricted history still answers a clarify and does not start work", async () => {
+    const fixture = await isolateTrustedGroupGateway({ tinyHistoryBudget: true });
+    await seedSlightlyOversizeHistory(fixture);
+    installUnderstandingComplete();
+    const dispatchSpy = vi.spyOn(dispatchModule, "dispatchInboundMessage");
+    const osPath = path.join(fixture.groupDir, "operating-state.json");
+    const osBefore = fs.readFileSync(osPath, "utf8");
+    const context = createChatContext();
+    const runB = `run-s1b-r1-clarify-${path.basename(fixture.root)}`;
+    const sendB = await sendGroupChat({
+      fixture,
+      context,
+      runId: runB,
+      message: CLARIFY_MESSAGE,
+    });
+    await vi.waitFor(() => expect(findTerminal(context, runB)).toBeTruthy(), { timeout: 15_000 });
+    await sendB.pending;
+    expect(payloadText(findTerminal(context, runB))).toContain(CLARIFY_REPLY);
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    expect(listTaskBoardFiles(fixture.root)).toEqual([]);
+    expectOperatingStateIdentityUnchanged(osPath, osBefore);
+  }, 30_000);
+
+  it("B-R2: an unreadable pre-queue state re-read does not fail-open into member dispatch", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    const originalRead = collaborationShared.readGroupOperatingState;
+    let rejectOperatingState = false;
+    const readSpy = vi
+      .spyOn(collaborationShared, "readGroupOperatingState")
+      .mockImplementation(async (params) => {
+        if (rejectOperatingState) {
+          throw new Error("simulated group operating state unreadable");
+        }
+        return await originalRead(params);
+      });
+    let releaseBUnderstand: ((value: unknown) => void) | undefined;
+    const dispatchSpy = vi
+      .spyOn(dispatchModule, "dispatchInboundMessage")
+      .mockImplementation(async () => ({ ok: true, text: "should-not-dispatch-unreadable" }));
+    completeMock.mockImplementation(async (...args: unknown[]) => {
+      const live = liveMessageFromCompleteArgs(args);
+      if (live.includes(WORK_MESSAGE)) {
+        await new Promise((resolve) => {
+          releaseBUnderstand = resolve;
+        });
+      }
+      return {
+        role: "assistant",
+        content: [{ type: "text", text: JSON.stringify(decisionForLiveMessage(live)) }],
+        usage: makeZeroUsageSnapshot(),
+        stopReason: "stop",
+      };
+    });
+    const osPath = path.join(fixture.groupDir, "operating-state.json");
+    const osBefore = fs.readFileSync(osPath, "utf8");
+    const context = createChatContext();
+    const runB = `run-s1b-r2-prequeue-${path.basename(fixture.root)}`;
+    const sendB = await sendGroupChat({
+      fixture,
+      context,
+      runId: runB,
+      message: WORK_MESSAGE,
+    });
+    await vi.waitFor(() => expect(releaseBUnderstand).toBeTypeOf("function"), { timeout: 15_000 });
+    rejectOperatingState = true;
+    releaseBUnderstand?.({ ok: true });
+    await vi.waitFor(() => expect(findTerminal(context, runB)).toBeTruthy(), { timeout: 15_000 });
+    await sendB.pending;
+    const bText = payloadText(findTerminal(context, runB));
+    expect(bText).toContain(UNREADABLE_GROUP_STATE_NOTICE);
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    expect(listTaskBoardFiles(fixture.root)).toEqual([]);
+    expectOperatingStateIdentityUnchanged(osPath, osBefore);
+    const unreadableWarnings = context.logGateway.warn.mock.calls.filter((call) =>
+      String(call[0]).includes("group execution proposal version re-read failed"),
+    );
+    expect(unreadableWarnings.length).toBeGreaterThanOrEqual(1);
+    expect(JSON.stringify(unreadableWarnings)).not.toMatch(/not treating as stale/);
+    expect(readSpy).toHaveBeenCalled();
+  }, 30_000);
+
+  it("B-R2: a queued execution is rejected at the queue head when the state re-read becomes unreadable", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    const originalRead = collaborationShared.readGroupOperatingState;
+    let rejectOperatingState = false;
+    vi.spyOn(collaborationShared, "readGroupOperatingState").mockImplementation(async (params) => {
+      if (rejectOperatingState) {
+        throw new Error("simulated group operating state unreadable");
+      }
+      return await originalRead(params);
+    });
+    let releaseA: ((value: unknown) => void) | undefined;
+    const dispatchHang = vi
+      .spyOn(dispatchModule, "dispatchInboundMessage")
+      .mockImplementation(() => {
+        if (releaseA) {
+          return Promise.resolve({ ok: true, text: "should-not-dispatch-queued-B" });
+        }
+        return new Promise((resolve) => {
+          releaseA = resolve;
+        });
+      });
+    installUnderstandingComplete();
+    const osPath = path.join(fixture.groupDir, "operating-state.json");
+    const osBefore = fs.readFileSync(osPath, "utf8");
+    const context = createChatContext();
+    const runA = `run-s1b-r2-head-a-${path.basename(fixture.root)}`;
+    const runB = `run-s1b-r2-head-b-${path.basename(fixture.root)}`;
+    const sendA = await sendGroupChat({
+      fixture,
+      context,
+      runId: runA,
+      message: WORK_MESSAGE,
+    });
+    try {
+      await vi.waitFor(() => expect(dispatchHang).toHaveBeenCalled(), { timeout: 8_000 });
+    } catch {
+      throw new Error(debugSend("A-dispatch-miss", { context, respond: sendA.respond }));
+    }
+    const dispatchCountAtHang = dispatchHang.mock.calls.length;
+    const sendB = await sendGroupChat({
+      fixture,
+      context,
+      runId: runB,
+      message: "请团队继续修订计划并执行新阶段",
+    });
+    await vi.waitFor(
+      () => {
+        expect(context.chatAbortControllers.has(runB)).toBe(true);
+        expect(findTerminal(context, runB)).toBeUndefined();
+      },
+      { timeout: 15_000 },
+    );
+    rejectOperatingState = true;
+    await settleReleasedWorkTurn({
+      context,
+      runId: runA,
+      pending: sendA.pending,
+      release: releaseA,
+    });
+    await vi.waitFor(() => expect(findTerminal(context, runB)).toBeTruthy(), { timeout: 15_000 });
+    await sendB.pending;
+    expect(payloadText(findTerminal(context, runB))).toContain(UNREADABLE_GROUP_STATE_NOTICE);
+    expect(dispatchHang.mock.calls.length).toBe(dispatchCountAtHang);
+    expect(listTaskBoardFiles(fixture.root)).toEqual([]);
+    expectOperatingStateIdentityUnchanged(osPath, osBefore);
+  }, 30_000);
+
+  it("B-R2: an ordinary reply still answers when the business state re-read is unreadable", async () => {
+    const fixture = await isolateTrustedGroupGateway();
+    const originalRead = collaborationShared.readGroupOperatingState;
+    let rejectOperatingState = false;
+    vi.spyOn(collaborationShared, "readGroupOperatingState").mockImplementation(async (params) => {
+      if (rejectOperatingState) {
+        throw new Error("simulated group operating state unreadable");
+      }
+      return await originalRead(params);
+    });
+    completeMock.mockImplementation(async (...args: unknown[]) => {
+      const live = liveMessageFromCompleteArgs(args);
+      if (live.includes(GREETING_MESSAGE)) {
+        rejectOperatingState = true;
+      }
+      return {
+        role: "assistant",
+        content: [{ type: "text", text: JSON.stringify(decisionForLiveMessage(live)) }],
+        usage: makeZeroUsageSnapshot(),
+        stopReason: "stop",
+      };
+    });
+    const dispatchSpy = vi.spyOn(dispatchModule, "dispatchInboundMessage");
+    const context = createChatContext();
+    const runB = `run-s1b-r2-qa-${path.basename(fixture.root)}`;
+    const sendB = await sendGroupChat({
+      fixture,
+      context,
+      runId: runB,
+      message: GREETING_MESSAGE,
+    });
+    await vi.waitFor(() => expect(findTerminal(context, runB)).toBeTruthy(), { timeout: 15_000 });
+    await sendB.pending;
+    expect(payloadText(findTerminal(context, runB))).toContain(GREETING_REPLY);
+    expect(dispatchSpy).not.toHaveBeenCalled();
     expect(listTaskBoardFiles(fixture.root)).toEqual([]);
   }, 30_000);
 });

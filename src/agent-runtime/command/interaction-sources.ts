@@ -43,6 +43,25 @@ export function createInteractionSourceBoundary() {
   };
 }
 
+/** Host-enforced: restricted availability may only consume reply/clarify. */
+export function respondIfRestrictedDecision(
+  availability: InteractionAvailability | undefined,
+  decisionKind: string,
+): { kind: "respond"; text: string; clarification: false } | undefined {
+  if (
+    availability?.mode === "restricted" &&
+    decisionKind !== "reply" &&
+    decisionKind !== "clarify"
+  ) {
+    return {
+      kind: "respond",
+      text: formatRestrictedInteractionNotice(availability),
+      clarification: false,
+    };
+  }
+  return undefined;
+}
+
 export function formatRestrictedInteractionNotice(availability: InteractionAvailability): string {
   if (availability.reasons.includes("task_mutation_unconfirmed")) {
     return "刚才任务操作的结果暂时无法确认，未自动重试。你可以继续对话；再次执行前需要核对任务状态。";

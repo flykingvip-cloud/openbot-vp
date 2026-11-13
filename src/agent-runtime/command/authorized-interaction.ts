@@ -6,6 +6,7 @@ import {
   INTERACTION_QUEUE_TIMEOUT_TEXT,
   raceVisibleInteraction,
 } from "../model/interaction-resource-wait.js";
+import { respondIfRestrictedDecision } from "./interaction-sources.js";
 import { interpretInteraction } from "./interpret-interaction.js";
 import {
   runPreparedInteraction,
@@ -99,13 +100,17 @@ async function withAuthorizedInteraction<T>(
 
 /** Interpretation only. Group state authority must apply its own admission afterward. */
 export function runAuthorizedUnderstanding(params: Params, ports: UnderstandingPorts) {
-  return withAuthorizedInteraction(params, ports, async (bounded) => ({
-    kind: "understood" as const,
-    decision: await interpretInteraction(
+  return withAuthorizedInteraction(params, ports, async (bounded) => {
+    const decision = await interpretInteraction(
       bounded.input,
       createPreparedInteractionInference(bounded, ports.session, ports.candidate),
-    ),
-  }));
+    );
+    const restricted = respondIfRestrictedDecision(bounded.input.availability, decision.kind);
+    if (restricted) {
+      return restricted;
+    }
+    return { kind: "understood" as const, decision };
+  });
 }
 
 /** Interaction owns its model lease, but never starts an executor or a tool loop. */
