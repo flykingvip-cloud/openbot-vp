@@ -500,7 +500,9 @@ describe("compileModelContext history omission fidelity", () => {
     expect(result.messages.some((message) => message === current)).toBe(true);
     expect(result.messages.some((message) => message === restriction)).toBe(false);
     expect(source).toHaveLength(snapshot.length);
-    expect(restriction.content).toBe(snapshot[0]?.content);
+    expect((restriction as { content?: unknown }).content).toBe(
+      (snapshot[0] as { content?: unknown } | undefined)?.content,
+    );
   });
 
   it("keeps provided authoritative task text when earlier history is omitted and does not throw", () => {
