@@ -5,6 +5,10 @@
  */
 export { runShadowRuleAdaptation, type ShadowRunDependencies } from "./run.js";
 export {
+  runOfficialShadowRuleAdaptation,
+  type OfficialShadowHostBinding,
+} from "./official-shadow.js";
+export {
   createControlledCandidateEntry,
   refuseCandidateSubmission,
   CONTROLLED_CANDIDATE_ENTRY_DESIGN,
