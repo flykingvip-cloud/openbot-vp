@@ -14,6 +14,12 @@ export const DEFAULT_INTERACTION_RESOURCE_WAIT_MS = 15_000;
  * and not execution-A's timeout.
  */
 export const INTERACTION_BLOCKED_RECEIPT_MS = 2_000;
+/**
+ * Time reserved from the 2s blocked-receipt cap so polling, persist I/O, and
+ * the visible consumer can still settle within the original 2-second threshold.
+ * This does not change the user-visible deadline and does not rewrite the queue.
+ */
+export const INTERACTION_BLOCKED_RECEIPT_MARGIN_MS = 120;
 
 export type InteractionResourceBudget = {
   budgetMs: number;
@@ -31,7 +37,9 @@ export function resolveInteractionResourceWaitMs(opts?: {
   nowMs?: number;
 }): number {
   const override = finitePositive(opts?.overrideMs);
-  const fromEnv = finitePositive(Number.parseInt(process.env[INTERACTION_RESOURCE_WAIT_ENV] ?? "", 10));
+  const fromEnv = finitePositive(
+    Number.parseInt(process.env[INTERACTION_RESOURCE_WAIT_ENV] ?? "", 10),
+  );
   const resolved = override ?? fromEnv ?? DEFAULT_INTERACTION_RESOURCE_WAIT_MS;
   const cap = finitePositive(opts?.capMs);
   return Math.max(1, cap === undefined ? resolved : Math.min(resolved, cap));
@@ -54,7 +62,11 @@ export function createInteractionResourceBudget(opts?: {
       return remainingMs(nowMs) <= 0;
     },
     remainingQueueWaitMs(nowMs = Date.now()): number {
-      return Math.min(remainingMs(nowMs), INTERACTION_BLOCKED_RECEIPT_MS);
+      const cap = Math.max(
+        0,
+        INTERACTION_BLOCKED_RECEIPT_MS - INTERACTION_BLOCKED_RECEIPT_MARGIN_MS,
+      );
+      return Math.min(remainingMs(nowMs), cap);
     },
   };
 }

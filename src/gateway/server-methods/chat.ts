@@ -4,6 +4,7 @@ import path from "node:path";
 import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { stopTaskAtGateway } from "../../agent-runtime/command/index.js";
 import type { FocusSwitchGateDecision } from "../../agent-runtime/contracts/task-control.js";
+import { CHAT_TURN_ERROR_UNCONFIRMED_TEXT } from "../../agent-runtime/model/interaction-resource-wait.js";
 import { shouldTaskParkAbortInFlight } from "../../agent-runtime/policy/index.js";
 import { sessionTaskState } from "../../agent-runtime/state/index.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
@@ -174,7 +175,6 @@ import {
   writeChatTurnTerminal,
   readChatTurnTerminal,
 } from "../chat-interaction-failure.js";
-import { CHAT_TURN_ERROR_UNCONFIRMED_TEXT } from "../../agent-runtime/model/interaction-resource-wait.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import {
   noteChatRunTenant,
@@ -7133,10 +7133,36 @@ export const chatHandlers: GatewayRequestHandlers = {
                 context.logGateway.warn(
                   `webchat transcript append failed: ${appended.error ?? "unknown error"}`,
                 );
+                const terminal = await persistRejectedInteractionTurn({
+                  error: Object.assign(
+                    new Error(appended.error ?? "transcript append failed"),
+                    replyText.includes("本轮交互在时限内没有得到有效输出")
+                      ? { interactionPhase: "interpretation" as const, reason: "timeout" }
+                      : replyText.includes("本轮交互未能完成")
+                        ? { interactionPhase: "interpretation" as const, reason: "model" }
+                        : {},
+                  ),
+                  runId: clientRunId,
+                  sessionKey: resolvedSessionKey,
+                  append: async (messageText, idempotencyKey) =>
+                    appendAssistantTranscriptMessage({
+                      message: messageText,
+                      idempotencyKey,
+                      sessionId,
+                      storePath: latestStorePath,
+                      sessionFile: latestEntry?.sessionFile,
+                      agentId,
+                      createIfMissing: false,
+                      tenantId: replyGovernance.tenantId,
+                      ownerUserId: replyGovernance.ownerUserId,
+                      groupId: replyGovernance.groupId,
+                      failClosed: replyGovernance.failClosed,
+                    }),
+                });
                 const now = Date.now();
                 message = {
                   role: "assistant",
-                  content: [{ type: "text", text: replyText }],
+                  content: [{ type: "text", text: terminal.text ?? replyText }],
                   timestamp: now,
                   ...(prepared.structured ? { deliverablePublish: prepared.view } : {}),
                   ...(fallbackArtifacts.artifact ? { artifact: fallbackArtifacts.artifact } : {}),

@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   DEFAULT_INTERACTION_RESOURCE_WAIT_MS,
   INTERACTION_BLOCKED_RECEIPT_MS,
+  INTERACTION_BLOCKED_RECEIPT_MARGIN_MS,
   INTERACTION_MODEL_FAILURE_TEXT,
   INTERACTION_QUEUE_TIMEOUT_TEXT,
   INTERACTION_RESOURCE_WAIT_ENV,
@@ -52,7 +53,9 @@ it("defines remaining budget against a test clock and returns zero when exhauste
 it("caps slot wait at the blocked-receipt window without resetting the total deadline", () => {
   const budget = createInteractionResourceBudget({ overrideMs: 15_000, nowMs: 0 });
   expect(INTERACTION_BLOCKED_RECEIPT_MS).toBe(2_000);
-  expect(budget.remainingQueueWaitMs(0)).toBe(2_000);
+  expect(budget.remainingQueueWaitMs(0)).toBe(
+    INTERACTION_BLOCKED_RECEIPT_MS - INTERACTION_BLOCKED_RECEIPT_MARGIN_MS,
+  );
   expect(budget.remainingMs(0)).toBe(15_000);
   expect(budget.remainingQueueWaitMs(14_500)).toBe(500);
   expect(budget.remainingQueueWaitMs(15_000)).toBe(0);
@@ -61,7 +64,10 @@ it("caps slot wait at the blocked-receipt window without resetting the total dea
 it("classifies empty, timeout, queue, and model failures into visible replies", () => {
   expect(
     classifyInteractionFailure(
-      Object.assign(new Error("timeout"), { interactionPhase: "interpretation", reason: "timeout" }),
+      Object.assign(new Error("timeout"), {
+        interactionPhase: "interpretation",
+        reason: "timeout",
+      }),
     ),
   ).toBe("timeout");
   expect(
@@ -81,7 +87,9 @@ it("classifies empty, timeout, queue, and model failures into visible replies", 
   ).toBe("queue_timeout");
   expect(classifyInteractionFailure(new Error("provider 502"))).toBe("model");
   expect(formatInteractionFailureReply(new Error("timeout"))).toBe(INTERACTION_TIMEOUT_TEXT);
-  expect(formatInteractionFailureReply(new Error("provider 502"))).toBe(INTERACTION_MODEL_FAILURE_TEXT);
+  expect(formatInteractionFailureReply(new Error("provider 502"))).toBe(
+    INTERACTION_MODEL_FAILURE_TEXT,
+  );
   expect(formatInteractionFailureReply(new Error(INTERACTION_QUEUE_TIMEOUT_TEXT))).toBe(
     INTERACTION_QUEUE_TIMEOUT_TEXT,
   );
@@ -89,10 +97,14 @@ it("classifies empty, timeout, queue, and model failures into visible replies", 
 
 it("does not treat a timeout abort as a user cancel", () => {
   expect(
-    classifyInteractionFailure(new DOMException("The operation was aborted due to timeout", "TimeoutError")),
+    classifyInteractionFailure(
+      new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+    ),
   ).toBe("timeout");
   expect(
-    isInteractionUserAbort(new DOMException("The operation was aborted due to timeout", "TimeoutError")),
+    isInteractionUserAbort(
+      new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+    ),
   ).toBe(false);
   expect(isInteractionUserAbort(new DOMException("The operation was aborted.", "AbortError"))).toBe(
     true,

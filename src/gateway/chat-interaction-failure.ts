@@ -8,7 +8,7 @@ import {
   classifyInteractionFailure,
 } from "../agent-runtime/model/interaction-resource-wait.js";
 import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLock } from "../infra/file-lock.js";
-import { CONFIG_DIR } from "../utils.js";
+import { resolveConfigDir } from "../utils.js";
 
 export const REJECTED_INTERACTION_TURN_TEXT =
   "本轮未形成可执行的决定，没有启动新任务。本轮请求已结束，不会自动补做；如需重试，请明确提出。";
@@ -30,7 +30,7 @@ const INTERACTION_DECISION_PATTERN =
   /^(?:Invalid interaction (?:decision|reply|answer|target|task decision|acceptance checks)|Interaction target is not bound to this request|Interaction did not return a final decision|本轮未取得有效的交互决定，没有启动或修改任务。)$/;
 
 export function resolveChatTurnTerminalDir(storeDir?: string): string {
-  return storeDir?.trim() || path.join(CONFIG_DIR, "openbot-chat-turn-terminals");
+  return storeDir?.trim() || path.join(resolveConfigDir(), "openbot-chat-turn-terminals");
 }
 
 export function chatTurnTerminalPath(

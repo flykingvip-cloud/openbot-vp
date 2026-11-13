@@ -1,16 +1,20 @@
 /**
- * Checkpoint A process-level consumer: isolated Gateway chat.send → actual
- * interaction host (runGovernedInteraction) → terminal persist → chat.history.
- * Model/billing adapters are stubbed and labeled; no fake final is written
- * without going through the host, and handleChatEvent is not used.
+ * Checkpoint A helper integration (not process-level, not the real
+ * chat.send → dispatchInboundMessage → get-reply-run chain).
+ *
+ * This file replaces dispatchInboundMessage and manually calls
+ * runGovernedInteraction with identity={}, authorized=true, client=null,
+ * and session/tenant/employee-scope stubs. It remains as a host/helper
+ * seam test. A separate isolated-Gateway dispatch-chain test covers the
+ * real inbound path. Do not describe this file as process-level or as a
+ * real WebSocket / child-process Gateway.
  */
 import fs from "node:fs";
-import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
-import { makeZeroUsageSnapshot } from "../agents/usage.js";
+import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runGovernedInteraction } from "../agent-runtime/command/index.js";
 import {
   CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
@@ -18,11 +22,9 @@ import {
   INTERACTION_TIMEOUT_TEXT,
 } from "../agent-runtime/model/interaction-resource-wait.js";
 import { bindAdmittedTurnHost } from "../agent-runtime/wiring/admitted-turn-host.js";
+import { makeZeroUsageSnapshot } from "../agents/usage.js";
 import { CONFIG_DIR } from "../utils.js";
-import {
-  readChatTurnTerminal,
-  resolveChatTurnTerminalDir,
-} from "./chat-interaction-failure.js";
+import { readChatTurnTerminal, resolveChatTurnTerminalDir } from "./chat-interaction-failure.js";
 
 const completeMock = vi.hoisted(() => vi.fn());
 const dispatchInboundMessageMock = vi.hoisted(() => vi.fn());
@@ -181,7 +183,11 @@ async function createFixture(prefix: string) {
   return { dir, sessionId, sessionKey, transcriptPath, storePath };
 }
 
-async function runActualInteractionHost(params: { runId: string; message: string; timeoutMs: number }) {
+async function runActualInteractionHost(params: {
+  runId: string;
+  message: string;
+  timeoutMs: number;
+}) {
   const host = bindAdmittedTurnHost();
   host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
     acquired: true as const,
@@ -219,7 +225,7 @@ async function runActualInteractionHost(params: { runId: string; message: string
       resolveFallbacks: () => undefined,
       candidate: async () => ({ model }),
       commit: vi.fn(() => {
-        throw new Error("process-level ordinary reply must not commit");
+        throw new Error("helper-integration ordinary reply must not commit");
       }),
     },
   );
@@ -254,7 +260,8 @@ async function sendAndWait(params: {
             payload &&
             typeof payload === "object" &&
             payload.state === "error" &&
-            (payload.runId === params.runId || String(payload.runId ?? "").startsWith(`${params.runId}:`)),
+            (payload.runId === params.runId ||
+              String(payload.runId ?? "").startsWith(`${params.runId}:`)),
         );
       expect(errorForRun || params.context.dedupe.has(`chat:${params.runId}`)).toBe(true);
     },
@@ -279,10 +286,11 @@ async function readHistory(params: {
   return respond;
 }
 
-describe("checkpoint A process-level chat.send → interaction host → chat.history", () => {
+describe("checkpoint A helper integration: chat.send handler + stubbed dispatch + governed host", () => {
   it("keeps a live timeout receipt distinct from recovered history when persist fails, and seals none vs unknown", async () => {
-    // Persist failure uses a real missing transcript file (createIfMissing=false),
-    // not a fake final. Sidecars use the production CONFIG_DIR layout and are cleaned up.
+    // Helper-only persist path: this test still uses a chmod'd transcript and
+    // the default CONFIG_DIR sidecar layout. It is not the end-to-end append
+    // failure evidence; that cell is in the isolated dispatch-chain test.
     const missing = await createFixture("s1-process-missing-");
     const timeoutRunId = `run-timeout-${path.basename(missing.dir)}`;
     const unknownRunId = `run-unknown-${path.basename(missing.dir)}`;
