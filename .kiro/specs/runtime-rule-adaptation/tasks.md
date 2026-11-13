@@ -227,3 +227,10 @@ pnpm loom register \
 - 交付包：`/workspace/runtime-rule-adaptation-p3-r2/`。不覆盖 P2 冻结包、P3 设计包或 P3 r1 包。提交／推送／PR 仍未获授权。
 
 | 2026-11-12 19:46      | Owner 对 P3 r1 暂不通过。本轮将锁内事务移入 state 入口，堵住跨作用域快照泄漏，并补共享文件限定归属证据后重交。不是代码验收、合并或部署批准。 |
+
+## P4 个人主链接入设计修订与限定测试接入（追加，不改写已验收 P0–P3 规格正文）
+
+- 时间：2026-11-12 22:18（Asia/Shanghai，UTC+8）。
+- 修订设计文：`p4-personal-main-chain-integration.md`、`p4-personal-enforcement-decision-table.md`（新文件；评审包仍在 `/workspace/runtime-rule-adaptation-p4-design/`）。交付包：`/workspace/runtime-rule-adaptation-p4-r1/`。本轮不是生产生效、合并或部署批准。
+
+| 2026-11-12 22:18      | Owner（t20u）通过设计方向并锁定三项选择，修正失效快照不得静默放宽。本轮修订设计文并做个人场景限定测试接入；生产白名单仍空，不启动生产接线。 |

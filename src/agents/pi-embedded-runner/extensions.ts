@@ -1,5 +1,6 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import type { ExtensionFactory, SessionManager } from "@earendil-works/pi-coding-agent";
+import { inheritSelectedContextCap } from "../../agent-runtime/model/rule-adaptation/context-cap-selection.js";
 import { resolveContextWindowInfo } from "../../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../defaults.js";
@@ -17,14 +18,16 @@ function resolveContextWindowTokens(params: {
   provider: string;
   modelId: string;
   model: Model<Api> | undefined;
+  inheritedContextWindowTokens?: number;
 }): number {
-  return resolveContextWindowInfo({
+  const resolved = resolveContextWindowInfo({
     cfg: params.cfg,
     provider: params.provider,
     modelId: params.modelId,
     modelContextWindow: params.model?.contextWindow,
     defaultTokens: DEFAULT_CONTEXT_TOKENS,
   }).tokens;
+  return inheritSelectedContextCap(resolved, params.inheritedContextWindowTokens);
 }
 
 function buildContextPruningFactory(params: {
@@ -33,6 +36,7 @@ function buildContextPruningFactory(params: {
   provider: string;
   modelId: string;
   model: Model<Api> | undefined;
+  inheritedContextWindowTokens?: number;
 }): ExtensionFactory | undefined {
   const raw = params.cfg?.agents?.defaults?.contextPruning;
   if (raw?.mode !== "cache-ttl") {
@@ -67,6 +71,8 @@ export function buildEmbeddedExtensionFactories(params: {
   provider: string;
   modelId: string;
   model: Model<Api> | undefined;
+  /** Same-run cap inherited from model prepare; omitted keeps original re-parse. */
+  inheritedContextWindowTokens?: number;
 }): ExtensionFactory[] {
   const factories: ExtensionFactory[] = [];
   if (resolveCompactionMode(params.cfg) === "safeguard") {
@@ -81,7 +87,10 @@ export function buildEmbeddedExtensionFactories(params: {
     });
     setCompactionSafeguardRuntime(params.sessionManager, {
       maxHistoryShare: compactionCfg?.maxHistoryShare,
-      contextWindowTokens: contextWindowInfo.tokens,
+      contextWindowTokens: inheritSelectedContextCap(
+        contextWindowInfo.tokens,
+        params.inheritedContextWindowTokens,
+      ),
       identifierPolicy: compactionCfg?.identifierPolicy,
       identifierInstructions: compactionCfg?.identifierInstructions,
       qualityGuardEnabled: qualityGuardCfg?.enabled ?? false,

@@ -8,6 +8,11 @@ import {
   evaluateContextWindowGuard,
   resolveContextWindowInfo,
 } from "../policy/index.js";
+import {
+  isContextCapSelectionBlocked,
+  selectPersonalContextCap,
+  type PersonalContextCapSelectionPort,
+} from "./rule-adaptation/context-cap-selection.js";
 /** Resolve a model and its effective context limit before credentials or execution. */
 export async function prepareEmbeddedModel(input: {
   config?: OpenBotConfig;
@@ -16,6 +21,12 @@ export async function prepareEmbeddedModel(input: {
   agentDir: string;
   providerAuthOverride?: { apiKey: string; source?: string; baseUrl?: string; protocol?: string };
   log: { warn: (message: string) => void; error: (message: string) => void };
+  /**
+   * Host-injected personal context-cap selection port.
+   * Omitted or mode `original` keeps the original prepare behavior completely.
+   * Production default path must omit this port (production path stays closed).
+   */
+  contextCapSelection?: PersonalContextCapSelectionPort;
 }) {
   const { provider, modelId, agentDir, log } = input;
   const { model, error, authStorage, modelRegistry } = await resolveModel(
@@ -56,13 +67,32 @@ export async function prepareEmbeddedModel(input: {
   }
   const modelForRun = resolvedModel;
 
-  const ctxInfo = resolveContextWindowInfo({
+  const originalCtxInfo = resolveContextWindowInfo({
     cfg: input.config,
     provider,
     modelId,
     modelContextWindow: modelForRun.contextWindow,
     defaultTokens: DEFAULT_CONTEXT_TOKENS,
   });
+  const contextCapSelection = selectPersonalContextCap({
+    original: originalCtxInfo,
+    port: input.contextCapSelection,
+  });
+  if (isContextCapSelectionBlocked(contextCapSelection)) {
+    log.error(
+      `blocked model (context cap selection ${contextCapSelection.reason}): ${provider}/${modelId} original=${contextCapSelection.originalTokens}`,
+    );
+    throw new FailoverError(`Context cap selection blocked (${contextCapSelection.reason}).`, {
+      reason: "unknown",
+      provider,
+      model: modelId,
+      code: "context_cap_selection_blocked",
+    });
+  }
+  const ctxInfo =
+    contextCapSelection.tokens === originalCtxInfo.tokens
+      ? originalCtxInfo
+      : { ...originalCtxInfo, tokens: contextCapSelection.tokens };
   // Apply contextTokens cap to model so pi-coding-agent's auto-compaction
   // threshold uses the effective limit, not the native context window.
   const effectiveModel =
@@ -89,5 +119,5 @@ export async function prepareEmbeddedModel(input: {
     );
   }
 
-  return { authStorage, modelRegistry, authOverride, ctxInfo, effectiveModel };
+  return { authStorage, modelRegistry, authOverride, ctxInfo, effectiveModel, contextCapSelection };
 }

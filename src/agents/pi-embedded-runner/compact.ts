@@ -6,6 +6,7 @@ import {
   DefaultResourceLoader,
   estimateTokens,
 } from "@earendil-works/pi-coding-agent";
+import { inheritSelectedContextCap } from "../../agent-runtime/model/rule-adaptation/context-cap-selection.js";
 import { resolveContextWindowInfo } from "../../agent-runtime/policy/index.js";
 import { resolveHeartbeatPrompt } from "../../auto-reply/heartbeat.js";
 import type { ReasoningLevel, ThinkLevel } from "../../auto-reply/thinking.js";
@@ -137,6 +138,11 @@ export type CompactEmbeddedPiSessionParams = {
   bashElevated?: ExecElevatedDefaults;
   customInstructions?: string;
   tokenBudget?: number;
+  /**
+   * Same-run cap inherited from model prepare (coverage C).
+   * Optional. The manual `/compact` command path does not pass this field.
+   */
+  inheritedContextWindowTokens?: number;
   force?: boolean;
   trigger?: "overflow" | "manual";
   diagId?: string;
@@ -435,13 +441,20 @@ export async function compactEmbeddedPiSessionDirect(
     });
     // Apply contextTokens cap to model so pi-coding-agent's auto-compaction
     // threshold uses the effective limit, not the native context window.
-    const ctxInfo = resolveContextWindowInfo({
+    const resolvedCtxInfo = resolveContextWindowInfo({
       cfg: params.config,
       provider,
       modelId,
       modelContextWindow: model.contextWindow,
       defaultTokens: DEFAULT_CONTEXT_TOKENS,
     });
+    const ctxInfo = {
+      ...resolvedCtxInfo,
+      tokens: inheritSelectedContextCap(
+        resolvedCtxInfo.tokens,
+        params.inheritedContextWindowTokens,
+      ),
+    };
     const effectiveModel =
       ctxInfo.tokens < (model.contextWindow ?? Infinity)
         ? { ...model, contextWindow: ctxInfo.tokens }
