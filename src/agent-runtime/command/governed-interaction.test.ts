@@ -9,6 +9,7 @@ import {
 } from "../model/authorized-session.js";
 import { bindAdmittedTurnHost } from "../wiring/admitted-turn-host.js";
 import {
+  governedShadowHostBoundary,
   runGovernedInteraction,
   type GovernedInteractionInput,
   type GovernedInteractionPorts,
@@ -17,6 +18,7 @@ import * as activate from "./rule-adaptation/activate.js";
 import {
   fixtureHost,
   fixtureRequest,
+  hangingModel,
   messageStep,
   proposalOutput,
   tightenProposal,
@@ -327,5 +329,188 @@ it("honors an explicit shadow budget boundary without changing the original inte
   expect(wrapped.shadow.outcomeCode).toBe("budget_exhausted");
   expect(complete).not.toHaveBeenCalled();
   expect(board.mutations()).toEqual([]);
+  expect(commit).not.toHaveBeenCalled();
+});
+
+it("does not start a shadow call when the original request is cancelled after it finishes and before shadow starts", async () => {
+  const { params, ports, commit } = bindReplyPorts();
+  const origin = new AbortController();
+  params.input = { ...params.input, abortSignal: origin.signal };
+  let releaseBoundary!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    releaseBoundary = resolve;
+  });
+  const boundary = vi
+    .spyOn(governedShadowHostBoundary, "afterOriginalInteraction")
+    .mockImplementation(() => hold);
+  const complete = vi.fn(async () => messageStep(proposalOutput(tightenProposal(24000))));
+  const { host: shadow } = fixtureHost();
+  try {
+    const pending = runGovernedInteraction(params, ports, {
+      trigger: true,
+      request: fixtureRequest({ requestId: "governed-shadow-origin-cancel-before-start" }),
+      binding: {
+        view: shadow.view,
+        controlBoard: shadow.controlBoard,
+        now: shadow.now,
+        model: {
+          runId: "governed-shadow-origin-cancel-before-start",
+          sessionPorts: stubShadowPorts(),
+          config: {},
+          env: {},
+          complete,
+        },
+      },
+    });
+    await vi.waitFor(() => expect(boundary).toHaveBeenCalled());
+    origin.abort();
+    releaseBoundary();
+    const wrapped = await pending;
+    expect(wrapped.interaction).toEqual({ kind: "respond", text: "你好", clarification: false });
+    expect(complete).not.toHaveBeenCalled();
+    expect(wrapped.shadow.outcomeCode).toBe("cancelled");
+    expect(wrapped.shadow.cancelled).toBe(true);
+    expect(wrapped.shadow.usage.modelCalls).toBe(0);
+    expect(commit).not.toHaveBeenCalled();
+  } finally {
+    boundary.mockRestore();
+  }
+});
+
+it("stops waiting for an in-flight shadow call on original cancel and does not overwrite the original result", async () => {
+  const { params, ports, commit } = bindReplyPorts();
+  const origin = new AbortController();
+  params.input = { ...params.input, abortSignal: origin.signal };
+  const hanging = hangingModel();
+  let shadowStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    shadowStarted = resolve;
+  });
+  const complete = vi.fn(async (input: Parameters<typeof hanging.complete>[0]) => {
+    shadowStarted();
+    return hanging.complete(input);
+  });
+  const { host: shadow } = fixtureHost();
+  const pending = runGovernedInteraction(params, ports, {
+    trigger: true,
+    request: fixtureRequest({
+      requestId: "governed-shadow-origin-cancel-in-flight",
+      budget: { maxDurationMs: 5_000 },
+    }),
+    binding: {
+      view: shadow.view,
+      controlBoard: shadow.controlBoard,
+      now: shadow.now,
+      model: {
+        runId: "governed-shadow-origin-cancel-in-flight",
+        sessionPorts: stubShadowPorts(),
+        config: {},
+        env: {},
+        complete,
+      },
+    },
+  });
+  await started;
+  origin.abort();
+  const wrapped = await pending;
+  expect(wrapped.interaction).toEqual({ kind: "respond", text: "你好", clarification: false });
+  expect(complete).toHaveBeenCalled();
+  expect(wrapped.shadow.outcomeCode).toBe("cancelled");
+  expect(wrapped.shadow.cancelled).toBe(true);
+  expect(commit).not.toHaveBeenCalled();
+});
+
+it("does not weaken original cancel when the caller supplies a different unaborted shadow signal", async () => {
+  const { params, ports, commit } = bindReplyPorts();
+  const origin = new AbortController();
+  const other = new AbortController();
+  params.input = { ...params.input, abortSignal: origin.signal };
+  let releaseBoundary!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    releaseBoundary = resolve;
+  });
+  const boundary = vi
+    .spyOn(governedShadowHostBoundary, "afterOriginalInteraction")
+    .mockImplementation(() => hold);
+  const complete = vi.fn(async () => messageStep(proposalOutput(tightenProposal(24000))));
+  const { host: shadow } = fixtureHost();
+  try {
+    const pending = runGovernedInteraction(params, ports, {
+      trigger: true,
+      request: fixtureRequest({
+        requestId: "governed-shadow-distinct-signal-does-not-weaken",
+        signal: other.signal,
+      }),
+      binding: {
+        view: shadow.view,
+        controlBoard: shadow.controlBoard,
+        now: shadow.now,
+        model: {
+          runId: "governed-shadow-distinct-signal-does-not-weaken",
+          sessionPorts: stubShadowPorts(),
+          config: {},
+          env: {},
+          complete,
+        },
+      },
+    });
+    await vi.waitFor(() => expect(boundary).toHaveBeenCalled());
+    origin.abort();
+    releaseBoundary();
+    const wrapped = await pending;
+    expect(other.signal.aborted).toBe(false);
+    expect(wrapped.interaction).toEqual({ kind: "respond", text: "你好", clarification: false });
+    expect(complete).not.toHaveBeenCalled();
+    expect(wrapped.shadow.outcomeCode).toBe("cancelled");
+    expect(wrapped.shadow.cancelled).toBe(true);
+    expect(wrapped.shadow.usage.modelCalls).toBe(0);
+    expect(commit).not.toHaveBeenCalled();
+  } finally {
+    boundary.mockRestore();
+  }
+});
+
+it("still honors a caller-supplied shadow signal when the original request is not cancelled", async () => {
+  const { params, ports, commit } = bindReplyPorts();
+  const origin = new AbortController();
+  const other = new AbortController();
+  params.input = { ...params.input, abortSignal: origin.signal };
+  const hanging = hangingModel();
+  let shadowStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    shadowStarted = resolve;
+  });
+  const complete = vi.fn(async (input: Parameters<typeof hanging.complete>[0]) => {
+    shadowStarted();
+    return hanging.complete(input);
+  });
+  const { host: shadow } = fixtureHost();
+  const pending = runGovernedInteraction(params, ports, {
+    trigger: true,
+    request: fixtureRequest({
+      requestId: "governed-shadow-caller-signal-still-cancels",
+      signal: other.signal,
+      budget: { maxDurationMs: 5_000 },
+    }),
+    binding: {
+      view: shadow.view,
+      controlBoard: shadow.controlBoard,
+      now: shadow.now,
+      model: {
+        runId: "governed-shadow-caller-signal-still-cancels",
+        sessionPorts: stubShadowPorts(),
+        config: {},
+        env: {},
+        complete,
+      },
+    },
+  });
+  await started;
+  other.abort();
+  const wrapped = await pending;
+  expect(origin.signal.aborted).toBe(false);
+  expect(wrapped.interaction).toEqual({ kind: "respond", text: "你好", clarification: false });
+  expect(wrapped.shadow.outcomeCode).toBe("cancelled");
+  expect(wrapped.shadow.cancelled).toBe(true);
   expect(commit).not.toHaveBeenCalled();
 });
