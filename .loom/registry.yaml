@@ -12879,6 +12879,20 @@ tasks:
     ownerHistory: []
     since: 2026-11-11
     metadata: {}
+  - id: exec-chain-overblock-min
+    owner: grok-dynamic-rules
+    intent:
+      - "Limited landing of the accepted compaction-safeguard cancel-on-summary-failure fix and its
+        required regression only. Exact files only. Independent acceptance: codex-runtime-manager.
+        No merge or deploy until authorized. No A/B writes or #281 content in this landing."
+    paths:
+      - src/agents/pi-extensions/compaction-safeguard.ts
+      - src/agents/pi-extensions/compaction-safeguard.test.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-11-13
+    metadata: {}
 landingStreams:
   - id: t166-gateway-exec-artifact-auth
     landingPolicy: serial
@@ -31664,3 +31678,15 @@ sharedPaths:
     reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
       owner retained.
     reviewAfter: 2026-11-30
+  - glob: src/agents/pi-extensions/compaction-safeguard.ts
+    landerTask: exec-chain-overblock-min
+    reason: "Human-authorized exact-file landing for the accepted compaction cancel-on-summary-failure
+      fix and required regression only. Predecessor owners, paths, and session history remain
+      unchanged. Does not take over src/** or src/agents/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No A/B or #281 content."
+  - glob: src/agents/pi-extensions/compaction-safeguard.test.ts
+    landerTask: exec-chain-overblock-min
+    reason: "Human-authorized exact-file landing for the accepted compaction cancel-on-summary-failure
+      fix and required regression only. Predecessor owners, paths, and session history remain
+      unchanged. Does not take over src/** or src/agents/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No A/B or #281 content."
