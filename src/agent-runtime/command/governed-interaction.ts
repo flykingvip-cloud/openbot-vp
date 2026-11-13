@@ -7,6 +7,15 @@ import {
 } from "../model/index.js";
 import { runAuthorizedInteraction, runAuthorizedUnderstanding } from "./authorized-interaction.js";
 import { bindExecutionAdmissionPorts } from "./execution-admission.js";
+import {
+  DEFAULT_SHADOW_BUDGET_LIMITS,
+  emptyControlSnapshot,
+  runOfficialShadowRuleAdaptation,
+  type OfficialShadowHostBinding,
+  type ShadowRunRequest,
+  type ShadowRunResult,
+} from "./rule-adaptation/index.js";
+import { buildShadowResult, reason } from "./rule-adaptation/result.js";
 
 type ModelSession = ReturnType<typeof createAuthorizedModelSession>;
 type GateInput = NonNullable<Parameters<ModelSession["authorize"]>[0]["modelGateInput"]>;
@@ -138,11 +147,98 @@ export function runGovernedUnderstanding(
   return runAuthorizedUnderstanding(prepared, bound);
 }
 
-/** Command owns interaction admission and model-policy sequencing. */
-export function runGovernedInteraction(
-  params: GovernedInteractionInput,
-  ports: GovernedInteractionPorts,
-) {
+/**
+ * Optional, default-off host injection for the official advice-only shadow entry.
+ * `trigger` must be exactly true to start an additional governed shadow call.
+ * Rule view and trusted facts come from the host binding; this hook does not
+ * invent a catalog, change admission, write the task board, or activate policy.
+ */
+export type GovernedShadowHostInjection = {
+  trigger: boolean;
+  request: ShadowRunRequest;
+  binding: OfficialShadowHostBinding;
+};
+
+export type GovernedInteractionResult = Awaited<ReturnType<typeof runAuthorizedInteraction>>;
+
+export type GovernedInteractionWithShadow = {
+  interaction: GovernedInteractionResult;
+  shadow: ShadowRunResult;
+};
+
+function isolatedHostShadowResult(
+  outcomeCode: "cancelled" | "protocol_failure",
+  message: string,
+): ShadowRunResult {
+  const control = emptyControlSnapshot();
+  const cancelled = outcomeCode === "cancelled";
+  return buildShadowResult({
+    outcomeCode,
+    reasons: [reason(outcomeCode, message, "governed-interaction.shadow")],
+    usage: {
+      modelCalls: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      revisions: 0,
+      durationMs: 0,
+      cost: 0,
+      cancelled,
+      ...(cancelled ? { cancelReason: "signal_aborted_before_start" } : {}),
+    },
+    limits: { ...DEFAULT_SHADOW_BUDGET_LIMITS },
+    exhausted: [],
+    preEnforcedExhausted: [],
+    postAccountedExhausted: [],
+    deadlineCleanupFailed: false,
+    sessionDisposeFailed: false,
+    usageKnown: true,
+    underlyingRequestStopped: true,
+    usageAccountingAttempted: false,
+    usageAccountingStatus: "not_attempted",
+    governanceOccupancyReady: false,
+    controlBefore: control,
+    controlAfter: control,
+    controlUnchanged: true,
+    toolsInvoked: [],
+    rejectedTools: [],
+    businessAttempts: [],
+    candidateToolInvoked: false,
+    diagnosedBeforeRetrieval: false,
+  });
+}
+
+async function attachOfficialShadowAdvice(
+  interactionPromise: Promise<GovernedInteractionResult>,
+  shadowHost: GovernedShadowHostInjection,
+): Promise<GovernedInteractionWithShadow> {
+  const interaction = await interactionPromise;
+  // Run the original interaction first and independently. After cancel, do not
+  // start a new shadow call. Shadow failures stay in the shadow result.
+  if (shadowHost.request.signal?.aborted) {
+    return {
+      interaction,
+      shadow: isolatedHostShadowResult(
+        "cancelled",
+        "Cancelled before the shadow host call started. No additional model call was started.",
+      ),
+    };
+  }
+  try {
+    const shadow = await runOfficialShadowRuleAdaptation(shadowHost.request, shadowHost.binding);
+    return { interaction, shadow };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      interaction,
+      shadow: isolatedHostShadowResult(
+        "protocol_failure",
+        `Shadow host isolation: official shadow entry failed; original interaction is unchanged. ${detail}`,
+      ),
+    };
+  }
+}
+
+function bindGovernedAdmission(params: GovernedInteractionInput, ports: GovernedInteractionPorts) {
   const { prepared, bound } = bindGovernedUnderstanding(params, ports);
   return runAuthorizedInteraction(prepared, {
     ...bound,
@@ -155,4 +251,26 @@ export function runGovernedInteraction(
       }),
     },
   });
+}
+
+/** Command owns interaction admission and model-policy sequencing. */
+export function runGovernedInteraction(
+  params: GovernedInteractionInput,
+  ports: GovernedInteractionPorts,
+): ReturnType<typeof runAuthorizedInteraction>;
+export function runGovernedInteraction(
+  params: GovernedInteractionInput,
+  ports: GovernedInteractionPorts,
+  shadowHost: GovernedShadowHostInjection,
+): Promise<GovernedInteractionWithShadow>;
+export function runGovernedInteraction(
+  params: GovernedInteractionInput,
+  ports: GovernedInteractionPorts,
+  shadowHost?: GovernedShadowHostInjection,
+) {
+  const interaction = bindGovernedAdmission(params, ports);
+  if (shadowHost?.trigger !== true) {
+    return interaction;
+  }
+  return attachOfficialShadowAdvice(interaction, shadowHost);
 }
