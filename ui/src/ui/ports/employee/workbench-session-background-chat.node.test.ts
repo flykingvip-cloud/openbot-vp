@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { INTERACTION_TIMEOUT_TEXT } from "../../../../../src/agent-runtime/model/interaction-resource-wait.ts";
+import {
+  CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
+  INTERACTION_TIMEOUT_TEXT,
+} from "../../../../../src/agent-runtime/model/interaction-resource-wait.ts";
 import { GENERIC_CHAT_ERROR_MESSAGE } from "../../chat-error-sanitize.ts";
 import {
   applyBackgroundWorkbenchChatEvent,
@@ -254,7 +257,7 @@ describe("applyBackgroundWorkbenchChatEvent", () => {
     expect(cached?.chatStream ?? null).toBeNull();
     expect(transcriptTexts("agent:skill:main")).toEqual([
       "执行长时间任务",
-      INTERACTION_TIMEOUT_TEXT,
+      CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
     ]);
 
     applyBackgroundWorkbenchChatEvent({
@@ -269,7 +272,47 @@ describe("applyBackgroundWorkbenchChatEvent", () => {
     expect(cached?.chatStream ?? null).toBeNull();
     expect(transcriptTexts("agent:skill:main")).toEqual([
       "执行长时间任务",
-      INTERACTION_TIMEOUT_TEXT,
+      CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
     ]);
+  });
+
+  it("R2: occupying empty abort after a business action must not claim no task was started", () => {
+    seedOccupiedSessionA();
+
+    applyBackgroundWorkbenchChatEvent({
+      sessionKey: "agent:skill:main",
+      runId: "run-a",
+      state: "aborted",
+    });
+
+    expect(transcriptTexts("agent:skill:main")).toEqual([
+      "执行长时间任务",
+      CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
+    ]);
+    expect(transcriptTexts("agent:skill:main").join("\n")).not.toMatch(
+      /没有启动新任务|没有启动或修改任务/,
+    );
+  });
+
+  it("R2: occupying empty timeout may still use the pre-admission timeout text when the host attests none", () => {
+    writeWorkbenchSessionTranscript("agent:skill:main", {
+      messages: [
+        {
+          id: "local-run-a",
+          role: "user",
+          content: [{ type: "text", text: "查询天气" }],
+        },
+      ],
+      chatRunId: "run-a",
+    });
+
+    applyBackgroundWorkbenchChatEvent({
+      sessionKey: "agent:skill:main",
+      runId: "run-a",
+      state: "error",
+      businessExecution: "none",
+    });
+
+    expect(transcriptTexts("agent:skill:main")).toEqual(["查询天气", INTERACTION_TIMEOUT_TEXT]);
   });
 });

@@ -3555,6 +3555,7 @@ function broadcastChatError(params: {
     seq,
     state: "error" as const,
     errorMessage,
+    ...(receipt?.businessExecution ? { businessExecution: receipt.businessExecution } : {}),
   };
   params.context.broadcastChat(params.sessionKey, payload, {
     runId: params.runId,

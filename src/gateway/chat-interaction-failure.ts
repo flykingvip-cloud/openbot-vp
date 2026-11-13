@@ -204,6 +204,12 @@ function isInterpretationFailure(error: unknown): boolean {
     return false;
   }
   const phase = (error as { interactionPhase?: string }).interactionPhase;
+  // Trusted host phase is the admission fact. Do not infer "never executed"
+  // from timeout keywords once execution may have started, or when the
+  // phase is absent.
+  if (phase === "execution") {
+    return false;
+  }
   if (phase === "interpretation") {
     return true;
   }
@@ -212,7 +218,7 @@ function isInterpretationFailure(error: unknown): boolean {
     return true;
   }
   const kind = classifyInteractionFailure(error);
-  return kind === "timeout" || kind === "empty" || kind === "queue_timeout";
+  return kind === "queue_timeout";
 }
 
 function isGovernedBillingInterpretation(error: unknown): boolean {

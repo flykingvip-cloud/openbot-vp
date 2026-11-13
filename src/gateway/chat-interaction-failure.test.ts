@@ -200,3 +200,84 @@ it("checkpoint A remediations: concurrent conflicting terminals keep one fact an
     fs.rmSync(storeDir, { recursive: true, force: true });
   }
 });
+
+it("R2: an execution-phase tool timeout is not attested as no business, and history/sidecar keep that fact", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "r2-exec-timeout-"));
+  const sessionFile = path.join(dir, "session.jsonl");
+  const storeDir = path.join(dir, "terminals");
+  const common = { sessionFile, sessionId: "test", cwd: dir };
+  try {
+    persistInteractionMessage({ ...common, messageId: "U", role: "user", text: "修改任务" });
+    const append = async (text: string, key: string) => {
+      persistInteractionMessage({ ...common, messageId: key, role: "assistant", text });
+      return { ok: true };
+    };
+    const error = Object.assign(new Error("tool timed out after an external write"), {
+      interactionPhase: "execution",
+      reason: "timeout",
+    });
+    const result = await persistRejectedInteractionTurn({
+      error,
+      runId: "run-exec-timeout",
+      sessionKey: "sess-exec-timeout",
+      storeDir,
+      append,
+    });
+    expect(result.persisted).toBe(true);
+    expect(result.text).toBe(CHAT_TURN_ERROR_UNCONFIRMED_TEXT);
+    expect(result.text).not.toMatch(/没有启动新任务|没有启动或修改任务/);
+    expect(readChatTurnTerminal("run-exec-timeout", storeDir, "sess-exec-timeout")).toMatchObject({
+      businessExecution: "unknown",
+      persistedToTranscript: true,
+      text: CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
+    });
+    const messages = openSessionManager(sessionFile).buildSessionContext().messages;
+    const history = projectInteractionHistory(messages, "next");
+    expect(history).toEqual([
+      { role: "user", content: "修改任务" },
+      { role: "assistant", content: CHAT_TURN_ERROR_UNCONFIRMED_TEXT },
+    ]);
+    expect(fs.existsSync(`${sessionFile}.task-board.json`)).toBe(false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it("R2: a tool or process timeout without phase information cannot be guaranteed as no business", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "r2-nophase-timeout-"));
+  const sessionFile = path.join(dir, "session.jsonl");
+  const storeDir = path.join(dir, "terminals");
+  const common = { sessionFile, sessionId: "test", cwd: dir };
+  try {
+    persistInteractionMessage({ ...common, messageId: "U", role: "user", text: "继续执行" });
+    const append = async (text: string, key: string) => {
+      persistInteractionMessage({ ...common, messageId: key, role: "assistant", text });
+      return { ok: true };
+    };
+    const result = await persistRejectedInteractionTurn({
+      error: Object.assign(new Error("process timed out after 30s"), { reason: "timeout" }),
+      runId: "run-nophase-timeout",
+      sessionKey: "sess-nophase-timeout",
+      storeDir,
+      append,
+    });
+    expect(result.persisted).toBe(true);
+    expect(result.text).toBe(CHAT_TURN_ERROR_UNCONFIRMED_TEXT);
+    expect(result.text).not.toMatch(/没有启动新任务|没有启动或修改任务/);
+    expect(
+      readChatTurnTerminal("run-nophase-timeout", storeDir, "sess-nophase-timeout"),
+    ).toMatchObject({
+      businessExecution: "unknown",
+      persistedToTranscript: true,
+      text: CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
+    });
+    const messages = openSessionManager(sessionFile).buildSessionContext().messages;
+    const history = projectInteractionHistory(messages, "next");
+    expect(history).toEqual([
+      { role: "user", content: "继续执行" },
+      { role: "assistant", content: CHAT_TURN_ERROR_UNCONFIRMED_TEXT },
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

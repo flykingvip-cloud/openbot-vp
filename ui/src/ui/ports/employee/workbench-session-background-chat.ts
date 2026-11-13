@@ -1,6 +1,9 @@
 import {
+  CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
   classifyInteractionFailure,
   formatInteractionFailureReply,
+  INTERACTION_MODEL_FAILURE_TEXT,
+  INTERACTION_QUEUE_TIMEOUT_TEXT,
   INTERACTION_TIMEOUT_TEXT,
 } from "../../../../../src/agent-runtime/model/interaction-resource-wait.ts";
 import { sanitizeUserFacingChatError } from "../../chat-error-sanitize.ts";
@@ -44,6 +47,8 @@ export type BackgroundWorkbenchChatEvent = {
   message?: unknown;
   /** Production error events put the body here, not necessarily on message. */
   errorMessage?: string | null;
+  /** Existing terminal protocol fact when the host provided one. */
+  businessExecution?: "none" | "unknown";
   thinking?: unknown;
 };
 
@@ -68,12 +73,36 @@ function asAssistantMessage(message: unknown, fallbackText: string): unknown {
   };
 }
 
-function visibleFailureText(raw: string): string {
-  const kind = classifyInteractionFailure(raw);
-  if (kind === "timeout" || kind === "empty" || kind === "queue_timeout") {
+function isHostPreAdmissionTerminal(raw: string): boolean {
+  return (
+    raw === INTERACTION_TIMEOUT_TEXT ||
+    raw === INTERACTION_MODEL_FAILURE_TEXT ||
+    raw === INTERACTION_QUEUE_TIMEOUT_TEXT
+  );
+}
+
+function visibleFailureText(raw: string, businessExecution?: "none" | "unknown"): string {
+  if (businessExecution === "unknown") {
+    return raw === CHAT_TURN_ERROR_UNCONFIRMED_TEXT
+      ? raw
+      : String(sanitizeUserFacingChatError(raw)).trim() || CHAT_TURN_ERROR_UNCONFIRMED_TEXT;
+  }
+  if (businessExecution === "none" || isHostPreAdmissionTerminal(raw)) {
     return formatInteractionFailureReply(raw);
   }
+  const kind = classifyInteractionFailure(raw);
+  if (kind === "queue_timeout") {
+    return formatInteractionFailureReply(raw);
+  }
+  if (kind === "timeout" || kind === "empty") {
+    // Timeout keywords alone cannot prove that admission never happened.
+    return CHAT_TURN_ERROR_UNCONFIRMED_TEXT;
+  }
   return String(sanitizeUserFacingChatError(raw)).trim() || raw;
+}
+
+function occupyingEmptyFallback(businessExecution?: "none" | "unknown"): string {
+  return businessExecution === "none" ? INTERACTION_TIMEOUT_TEXT : CHAT_TURN_ERROR_UNCONFIRMED_TEXT;
 }
 
 /**
@@ -92,10 +121,13 @@ function projectBackgroundTerminalAssistant(
   if (state === "error" || errorRaw) {
     const raw = errorRaw || messageText;
     if (raw) {
-      return asAssistantMessage(payload.message, visibleFailureText(raw));
+      return asAssistantMessage(
+        payload.message,
+        visibleFailureText(raw, payload.businessExecution),
+      );
     }
     if (opts.occupyingRun) {
-      return asAssistantMessage(undefined, INTERACTION_TIMEOUT_TEXT);
+      return asAssistantMessage(undefined, occupyingEmptyFallback(payload.businessExecution));
     }
     return undefined;
   }
@@ -105,7 +137,7 @@ function projectBackgroundTerminalAssistant(
       return asAssistantMessage(payload.message, messageText);
     }
     if (opts.occupyingRun) {
-      return asAssistantMessage(undefined, INTERACTION_TIMEOUT_TEXT);
+      return asAssistantMessage(undefined, occupyingEmptyFallback(payload.businessExecution));
     }
     return undefined;
   }
@@ -119,7 +151,7 @@ function projectBackgroundTerminalAssistant(
     return asAssistantMessage(undefined, stream);
   }
   if (opts.occupyingRun) {
-    return asAssistantMessage(undefined, INTERACTION_TIMEOUT_TEXT);
+    return asAssistantMessage(undefined, occupyingEmptyFallback(payload.businessExecution));
   }
   return undefined;
 }
