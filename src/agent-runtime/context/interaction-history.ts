@@ -7,7 +7,11 @@ export type InteractionHistoryProjection = {
 
 /**
  * Factual omission notice placed in the projected prompt material itself so
- * callers cannot ignore incompleteness. Not a task decision and not a restrict.
+ * callers cannot ignore incompleteness. Projected as user-role reference data
+ * so a later host-assembled user-role prefix (such as peerContext) cannot
+ * place a system message after history has started. The completion builder
+ * quotes earlier user-role context as {source: reference_context}. Not a task
+ * decision and not a restrict.
  */
 export const INTERACTION_HISTORY_OMISSION_NOTICE =
   "部分历史因预算省略，不能将本段视为完整记录。不得推断缺失内容。若当前请求依赖被省略的原文、先前授权或指代内容，应澄清，不要编造。独立且自足的新请求仍可理解与准入。当前目标、验收与有效约束以任务板等权威状态为准。";
@@ -63,9 +67,11 @@ export function projectInteractionHistoryWithStatus(
     remaining -= text.length;
   }
   const history = selected.toReversed();
+  // User-role keeps the notice in the existing reference-context contract and
+  // preserves message order when the reply host prepends peerContext.
   const context: InteractionModelInput["context"] = complete
     ? history
-    : [{ role: "system", content: INTERACTION_HISTORY_OMISSION_NOTICE }, ...history];
+    : [{ role: "user", content: INTERACTION_HISTORY_OMISSION_NOTICE }, ...history];
   return { context, complete };
 }
 
