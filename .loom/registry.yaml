@@ -3065,293 +3065,24 @@ tasks:
     intent: []
     paths:
       - .kiro/specs/production-agent-runtime-safety/**
-      - src/agents/acp-binding-architecture.guardrail.test.ts
-      - src/agents/acp-spawn-parent-stream.test.ts
-      - src/agents/acp-spawn-parent-stream.ts
-      - src/agents/acp-spawn.test.ts
-      - src/agents/acp-spawn.ts
-      - src/agents/agent-paths.test.ts
-      - src/agents/agent-paths.ts
-      - src/agents/agent-scope.test.ts
-      - src/agents/agent-scope.ts
-      - src/agents/announce-idempotency.ts
-      - src/agents/anthropic-payload-log.test.ts
-      - src/agents/anthropic-payload-log.ts
-      - src/agents/anthropic.setup-token.live.test.ts
-      - src/agents/api-key-rotation.ts
-      - src/agents/apply-patch-update.ts
-      - src/agents/apply-patch.test.ts
-      - src/agents/apply-patch.ts
-      - src/agents/auth-health.test.ts
-      - src/agents/auth-health.ts
-      - src/agents/auth-profiles.chutes.test.ts
-      - src/agents/auth-profiles.cooldown-auto-expiry.test.ts
-      - src/agents/auth-profiles.ensureauthprofilestore.test.ts
-      - src/agents/auth-profiles.getsoonestcooldownexpiry.test.ts
-      - src/agents/auth-profiles.markauthprofilefailure.test.ts
-      - src/agents/auth-profiles.readonly-sync.test.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.does-not-prioritize-lastgood-round-robin-ordering.test.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.fixtures.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.normalizes-z-ai-aliases-auth-order.test.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.orders-by-lastused-no-explicit-order-exists.test.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.uses-stored-profiles-no-config-exists.test.ts
-      - src/agents/auth-profiles.runtime-snapshot-save.test.ts
-      - src/agents/auth-profiles.store.save.test.ts
-      - src/agents/auth-profiles.ts
-      - src/agents/auth-profiles/constants.ts
-      - src/agents/auth-profiles/credential-state.test.ts
-      - src/agents/auth-profiles/credential-state.ts
-      - src/agents/auth-profiles/display.ts
-      - src/agents/auth-profiles/doctor.ts
-      - src/agents/auth-profiles/external-cli-sync.ts
-      - src/agents/auth-profiles/oauth.fallback-to-main-agent.test.ts
-      - src/agents/auth-profiles/oauth.openai-codex-refresh-fallback.test.ts
-      - src/agents/auth-profiles/oauth.test.ts
-      - src/agents/auth-profiles/oauth.ts
-      - src/agents/auth-profiles/order.test.ts
-      - src/agents/auth-profiles/order.ts
-      - src/agents/auth-profiles/paths.ts
-      - src/agents/auth-profiles/profiles.ts
-      - src/agents/auth-profiles/repair.ts
-      - src/agents/auth-profiles/session-override.test.ts
-      - src/agents/auth-profiles/session-override.ts
-      - src/agents/auth-profiles/state-observation.test.ts
-      - src/agents/auth-profiles/state-observation.ts
-      - src/agents/auth-profiles/store.ts
-      - src/agents/auth-profiles/types.ts
-      - src/agents/auth-profiles/usage.test.ts
-      - src/agents/auth-profiles/usage.ts
-      - src/agents/bash-process-registry.test-helpers.ts
-      - src/agents/bash-process-registry.test.ts
-      - src/agents/bash-process-registry.ts
-      - src/agents/bash-tools.build-docker-exec-args.test.ts
-      - src/agents/bash-tools.exec-approval-followup.test.ts
-      - src/agents/bash-tools.exec-approval-followup.ts
-      - src/agents/bash-tools.exec-approval-request.test.ts
-      - src/agents/bash-tools.exec-approval-request.ts
-      - src/agents/bash-tools.exec-ceiling.ts
-      - src/agents/bash-tools.exec-host-gateway.ts
-      - src/agents/bash-tools.exec-host-node.ts
-      - src/agents/bash-tools.exec-host-shared.test.ts
-      - src/agents/bash-tools.exec-host-shared.ts
-      - src/agents/bash-tools.exec-node-target.test.ts
-      - src/agents/bash-tools.exec-node-target.ts
-      - src/agents/bash-tools.exec-policy-provenance.test.ts
-      - src/agents/bash-tools.exec-policy-provenance.ts
-      - src/agents/bash-tools.exec-runtime.test.ts
-      - src/agents/bash-tools.exec-runtime.ts
-      - src/agents/bash-tools.exec-types.ts
-      - src/agents/bash-tools.exec-workdir-clamp.test.ts
-      - src/agents/bash-tools.exec.approval-id.test.ts
-      - src/agents/bash-tools.exec.background-abort.test.ts
-      - src/agents/bash-tools.exec.path.test.ts
-      - src/agents/bash-tools.exec.pty-cleanup.test.ts
-      - src/agents/bash-tools.exec.pty-fallback-failure.test.ts
-      - src/agents/bash-tools.exec.pty-fallback.test.ts
-      - src/agents/bash-tools.exec.pty.test.ts
-      - src/agents/bash-tools.exec.sandbox-workspace-write.test.ts
-      - src/agents/bash-tools.exec.script-preflight.test.ts
-      - src/agents/bash-tools.exec.task-binding.test.ts
-      - src/agents/bash-tools.process.poll-timeout.test.ts
-      - src/agents/bash-tools.process.send-keys.test.ts
-      - src/agents/bash-tools.process.supervisor.test.ts
-      - src/agents/bash-tools.process.ts
-      - src/agents/bash-tools.shared.test.ts
-      - src/agents/bash-tools.shared.ts
-      - src/agents/bash-tools.test.ts
-      - src/agents/bash-tools.ts
-      - src/agents/bedrock-discovery.test.ts
-      - src/agents/bedrock-discovery.ts
-      - src/agents/bootstrap-budget.test.ts
-      - src/agents/bootstrap-budget.ts
-      - src/agents/bootstrap-cache.test.ts
-      - src/agents/bootstrap-cache.ts
-      - src/agents/bootstrap-files.test.ts
-      - src/agents/bootstrap-files.ts
-      - src/agents/bootstrap-hooks.test.ts
-      - src/agents/bootstrap-hooks.ts
-      - src/agents/builtin-steward/behavior-rules.test.ts
-      - src/agents/builtin-steward/behavior-rules.ts
-      - src/agents/builtin-steward/employee-isolation.test.ts
-      - src/agents/builtin-steward/employee-isolation.ts
-      - src/agents/builtin-steward/identity.test.ts
-      - src/agents/builtin-steward/identity.ts
-      - src/agents/builtin-steward/provision.test.ts
-      - src/agents/builtin-steward/provision.ts
-      - src/agents/builtin-steward/required-skills.test.ts
-      - src/agents/builtin-steward/required-skills.ts
-      - src/agents/builtin-steward/steward-skills-sync.test.ts
-      - src/agents/builtin-steward/steward-skills-sync.ts
-      - src/agents/byteplus-models.ts
-      - src/agents/byteplus.live.test.ts
-      - src/agents/cache-trace.test.ts
-      - src/agents/cache-trace.ts
-      - src/agents/channel-tools.test.ts
-      - src/agents/channel-tools.ts
-      - src/agents/chutes-oauth.flow.test.ts
-      - src/agents/chutes-oauth.test.ts
-      - src/agents/chutes-oauth.ts
-      - src/agents/claude-cli-runner.test.ts
-      - src/agents/claude-cli-runner.ts
-      - src/agents/cli-backend-admin.test.ts
-      - src/agents/cli-backend-admin.ts
-      - src/agents/cli-backend-credential-guidance.test.ts
-      - src/agents/cli-backend-credential-guidance.ts
-      - src/agents/cli-backend-credential-resolve.test.ts
-      - src/agents/cli-backend-credential-resolve.ts
-      - src/agents/cli-backend-credential-store.test.ts
-      - src/agents/cli-backend-credential-store.ts
-      - src/agents/cli-backend-probe.ts
-      - src/agents/cli-backend-usage-attribution.test.ts
-      - src/agents/cli-backend-usage-attribution.ts
-      - src/agents/cli-backend-worker.test.ts
-      - src/agents/cli-backend-worker.ts
-      - src/agents/cli-backends.test.ts
-      - src/agents/cli-backends.ts
-      - src/agents/cli-credentials.test.ts
-      - src/agents/cli-credentials.ts
-      - src/agents/cli-runner.test.ts
-      - src/agents/cli-runner.ts
-      - src/agents/cli-runner/helpers.ts
-      - src/agents/cli-runner/reliability.ts
-      - src/agents/cli-session.ts
-      - src/agents/cli-watchdog-defaults.ts
-      - src/agents/cloudflare-ai-gateway.ts
-      - src/agents/command-poll-backoff.runtime.ts
-      - src/agents/command-poll-backoff.test.ts
-      - src/agents/command-poll-backoff.ts
-      - src/agents/compaction.identifier-policy.test.ts
-      - src/agents/compaction.identifier-preservation.test.ts
-      - src/agents/compaction.retry.test.ts
-      - src/agents/compaction.test.ts
-      - src/agents/compaction.token-sanitize.test.ts
-      - src/agents/compaction.tool-result-details.test.ts
-      - src/agents/compaction.ts
-      - src/agents/confirmation-tiers.test.ts
-      - src/agents/confirmation-tiers.ts
-      - src/agents/content-blocks.test.ts
-      - src/agents/content-blocks.ts
-      - src/agents/context-compiler/active-task-seed.ts
-      - src/agents/context-compiler/atomic-units.ts
-      - src/agents/context-compiler/candidates.ts
-      - src/agents/context-compiler/collab-compile-strategy.test.ts
-      - src/agents/context-compiler/collab-compile-strategy.ts
-      - src/agents/context-compiler/compile.test.ts
-      - src/agents/context-compiler/compile.ts
-      - src/agents/context-compiler/flag.ts
-      - src/agents/context-compiler/group-task-stable-summary.test.ts
-      - src/agents/context-compiler/group-task-stable-summary.ts
-      - src/agents/context-compiler/index.ts
-      - src/agents/context-compiler/lane-budget.test.ts
-      - src/agents/context-compiler/lane-budget.ts
-      - src/agents/context-compiler/model-boundary.test.ts
-      - src/agents/context-compiler/normalize-outbound.estimate.test.ts
-      - src/agents/context-compiler/normalize-outbound.ts
-      - src/agents/context-compiler/preference-mutation.test.ts
-      - src/agents/context-compiler/preference-mutation.ts
-      - src/agents/context-compiler/shrink-unit.ts
-      - src/agents/context-compiler/telemetry.ts
-      - src/agents/context-compiler/types.ts
-      - src/agents/context-compiler/user-profile-store.ts
-      - src/agents/context-window-guard.test.ts
-      - src/agents/context.lookup.test.ts
-      - src/agents/context.test.ts
-      - src/agents/context.ts
-      - src/agents/current-time.ts
-      - src/agents/custom-api-registry.test.ts
-      - src/agents/custom-api-registry.ts
-      - src/agents/date-time.ts
-      - src/agents/defaults.ts
-      - src/agents/docs-path.ts
-      - src/agents/doubao-models.ts
-      - src/agents/embedded-model-governance.test.ts
-      - src/agents/embedded-model-governance.ts
-      - src/agents/execution-preflight/allowed-entry-disposition.test.ts
-      - src/agents/execution-preflight/allowed-entry-disposition.ts
-      - src/agents/execution-preflight/completion-attempt-lifecycle.test.ts
-      - src/agents/execution-preflight/completion-claim.ts
-      - src/agents/execution-preflight/completion-context.test.ts
-      - src/agents/execution-preflight/completion-delayed-send.test.ts
-      - src/agents/execution-preflight/completion-hold.ts
-      - src/agents/execution-preflight/completion-isolated-smoke.test.ts
-      - src/agents/execution-preflight/completion-lifecycle-release.test.ts
-      - src/agents/execution-preflight/completion-receipt-matrix.test.ts
-      - src/agents/execution-preflight/completion-send.test.ts
-      - src/agents/execution-preflight/confirmation-gate.test.ts
-      - src/agents/execution-preflight/confirmation-gate.ts
-      - src/agents/execution-preflight/constitutional-runtime-facade.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-facade.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-deps.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-gate.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-gate.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-observe.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-observe.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-projection.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-projection.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-sink.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-sink.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-wiring.test.ts
-      - src/agents/execution-preflight/ctr-close-consult-lock.test.ts
-      - src/agents/execution-preflight/delivery.ts
-      - src/agents/execution-preflight/execution-preflight.integration.test.ts
-      - src/agents/execution-preflight/execution-preflight.test.ts
-      - src/agents/execution-preflight/failure.ts
-      - src/agents/execution-preflight/hook-delivery.ts
-      - src/agents/execution-preflight/index.ts
-      - src/agents/execution-preflight/json-canvas-canary.test.ts
-      - src/agents/execution-preflight/json-canvas-validator.ts
-      - src/agents/execution-preflight/observability.test.ts
-      - src/agents/execution-preflight/observability.ts
-      - src/agents/execution-preflight/production-validators.test.ts
-      - src/agents/execution-preflight/production-validators.ts
-      - src/agents/execution-preflight/resolve.ts
-      - src/agents/execution-preflight/reuse-observe-helper-lock.test.ts
-      - src/agents/execution-preflight/runtime-validation-ownership.test.ts
-      - src/agents/execution-preflight/skill-contract.ts
-      - src/agents/execution-preflight/skill-contract.ui.test.ts
-      - src/agents/execution-preflight/trace.ts
-      - src/agents/execution-preflight/types.ts
-      - src/agents/execution-preflight/validation.ts
-      - src/agents/execution-stall-continue-loop.test.ts
-      - src/agents/execution-stall-continue.test.ts
-      - src/agents/execution-stall-continue.ts
-      - src/agents/failover-error.test.ts
-      - src/agents/failover-error.ts
-      - src/agents/glob-pattern.ts
-      - src/agents/google-gemini-switch.live.test.ts
-      - src/agents/huggingface-models.test.ts
-      - src/agents/huggingface-models.ts
-      - src/agents/identity-avatar.test.ts
-      - src/agents/identity-avatar.ts
-      - src/agents/identity-file.test.ts
-      - src/agents/identity-file.ts
-      - src/agents/identity.human-delay.test.ts
-      - src/agents/identity.per-channel-prefix.test.ts
-      - src/agents/identity.test.ts
-      - src/agents/identity.ts
-      - src/agents/image-generation-models.test.ts
-      - src/agents/image-generation-models.ts
-      - src/agents/image-sanitization.test.ts
-      - src/agents/image-sanitization.ts
-      - src/agents/inbound-media-grants.test.ts
-      - src/agents/inbound-media-grants.ts
-      - src/agents/inbound-tool-policy.test.ts
-      - src/agents/inbound-tool-policy.ts
-      - src/agents/internal-events.ts
-      - src/agents/kilocode-models.test.ts
-      - src/agents/kilocode-models.ts
-      - src/agents/lanes.test.ts
-      - src/agents/lanes.ts
-      - src/agents/live-auth-keys.ts
-      - src/agents/live-model-errors.test.ts
-      - src/agents/live-model-errors.ts
-      - src/agents/live-model-filter.ts
-      - src/agents/live-test-helpers.ts
-      - src/agents/memory-search.test.ts
-      - src/agents/memory-search.ts
-      - src/agents/minimax-vlm.normalizes-api-key.test.ts
-      - src/agents/minimax-vlm.ts
-      - src/agents/minimax.live.test.ts
+      - src/agents/a*
+      - src/agents/auth-profiles/**
+      - src/agents/b*
+      - src/agents/builtin-steward/**
+      - src/agents/c*
+      - src/agents/cli-runner/**
+      - src/agents/context-compiler/**
+      - src/agents/d*
+      - src/agents/e*
+      - src/agents/execution-preflight/**
+      - src/agents/f*
+      - src/agents/g*
+      - src/agents/h*
+      - src/agents/i*
+      - src/agents/k*
+      - src/agents/l*
+      - src/agents/me*
+      - src/agents/mi*
       - src/agents/model-alias-lines.ts
       - src/agents/model-auth-env-vars.ts
       - src/agents/model-auth-label.test.ts
@@ -3431,52 +3162,10 @@ tasks:
       - src/agents/models-config.write-serialization.test.ts
       - src/agents/models.profiles.live.test.ts
       - src/agents/moonshot.live.test.ts
-      - src/agents/music-generation-models.test.ts
-      - src/agents/music-generation-models.ts
-      - src/agents/ollama-stream.test.ts
-      - src/agents/ollama-stream.ts
-      - src/agents/openai-responses.reasoning-replay.test.ts
-      - src/agents/openai-ws-connection.test.ts
-      - src/agents/openai-ws-connection.ts
-      - src/agents/openai-ws-stream.e2e.test.ts
-      - src/agents/openai-ws-stream.test.ts
-      - src/agents/openai-ws-stream.ts
-      - src/agents/openclaw-gateway-tool.test.ts
-      - src/agents/openclaw-tools.agents.test.ts
-      - src/agents/openclaw-tools.camera.test.ts
-      - src/agents/openclaw-tools.knowledge-consume.test.ts
-      - src/agents/openclaw-tools.knowledge-source.test.ts
-      - src/agents/openclaw-tools.office-file.test.ts
-      - src/agents/openclaw-tools.pdf-registration.test.ts
-      - src/agents/openclaw-tools.plugin-context.test.ts
-      - src/agents/openclaw-tools.session-status.test.ts
-      - src/agents/openclaw-tools.sessions-visibility.test.ts
-      - src/agents/openclaw-tools.sessions.test.ts
-      - src/agents/openclaw-tools.subagents.scope.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn-applies-thinking-default.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn-default-timeout-absent.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn-default-timeout.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn-depth-limits.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.allowlist.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.cron-note.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.lifecycle.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.model.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.test-harness.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.workspace.test.ts
-      - src/agents/openclaw-tools.subagents.steer-failure-clears-suppression.test.ts
-      - src/agents/openclaw-tools.subagents.test-harness.ts
-      - src/agents/openclaw-tools.ts
-      - src/agents/openclaw-tools.web-runtime.test.ts
-      - src/agents/opencode-zen-models.test.ts
-      - src/agents/opencode-zen-models.ts
-      - src/agents/owner-display.test.ts
-      - src/agents/owner-display.ts
-      - src/agents/path-policy.test.ts
-      - src/agents/path-policy.ts
-      - src/agents/payload-redaction.ts
-      - src/agents/personal-mail-assistant/identity.test.ts
-      - src/agents/personal-mail-assistant/identity.ts
-      - src/agents/personal-mail-assistant/provision.ts
+      - src/agents/mu*
+      - src/agents/o*
+      - src/agents/pa*
+      - src/agents/personal-mail-assistant/**
       - src/agents/pi-auth-credentials.ts
       - src/agents/pi-auth-json.test.ts
       - src/agents/pi-auth-json.ts
@@ -3492,17 +3181,7 @@ tasks:
       - src/agents/pi-embedded-helpers.scratchpad-sanitize.node.test.ts
       - src/agents/pi-embedded-helpers.ts
       - src/agents/pi-embedded-helpers.validate-turns.test.ts
-      - src/agents/pi-embedded-helpers/bootstrap.ts
-      - src/agents/pi-embedded-helpers/errors.ts
-      - src/agents/pi-embedded-helpers/failover-matches.ts
-      - src/agents/pi-embedded-helpers/google.ts
-      - src/agents/pi-embedded-helpers/images.ts
-      - src/agents/pi-embedded-helpers/messaging-dedupe.ts
-      - src/agents/pi-embedded-helpers/openai.ts
-      - src/agents/pi-embedded-helpers/thinking.test.ts
-      - src/agents/pi-embedded-helpers/thinking.ts
-      - src/agents/pi-embedded-helpers/turns.ts
-      - src/agents/pi-embedded-helpers/types.ts
+      - src/agents/pi-embedded-helpers/**
       - src/agents/pi-embedded-messaging.ts
       - src/agents/pi-embedded-payloads.ts
       - src/agents/pi-embedded-runner-extraparams.live.test.ts
@@ -3526,10 +3205,8 @@ tasks:
       - src/agents/pi-embedded-runner.sanitize-session-history.test.ts
       - src/agents/pi-embedded-runner.splitsdktools.test.ts
       - src/agents/pi-embedded-runner.ts
-      - src/agents/pi-embedded-runner/abort.ts
-      - src/agents/pi-embedded-runner/anthropic-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/cache-ttl.test.ts
-      - src/agents/pi-embedded-runner/cache-ttl.ts
+      - src/agents/pi-embedded-runner/a*
+      - src/agents/pi-embedded-runner/ca*
       - src/agents/pi-embedded-runner/compact.hooks.test.ts
       - src/agents/pi-embedded-runner/compact.runtime.ts
       - src/agents/pi-embedded-runner/compaction-safety-timeout.ts
@@ -3539,90 +3216,19 @@ tasks:
       - src/agents/pi-embedded-runner/extra-params.openrouter-cache-control.test.ts
       - src/agents/pi-embedded-runner/extra-params.ts
       - src/agents/pi-embedded-runner/extra-params.zai-tool-stream.test.ts
-      - src/agents/pi-embedded-runner/google.test.ts
-      - src/agents/pi-embedded-runner/google.ts
-      - src/agents/pi-embedded-runner/history.ts
-      - src/agents/pi-embedded-runner/kilocode.test.ts
-      - src/agents/pi-embedded-runner/lanes.ts
-      - src/agents/pi-embedded-runner/logger.ts
-      - src/agents/pi-embedded-runner/model.forward-compat.test.ts
-      - src/agents/pi-embedded-runner/model.provider-normalization.test.ts
-      - src/agents/pi-embedded-runner/model.provider-normalization.ts
-      - src/agents/pi-embedded-runner/model.test-harness.ts
-      - src/agents/pi-embedded-runner/model.test.ts
-      - src/agents/pi-embedded-runner/model.ts
-      - src/agents/pi-embedded-runner/moonshot-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/openai-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/proxy-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/reply-language-reminder.test.ts
-      - src/agents/pi-embedded-runner/reply-language-reminder.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.fixture.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.loop.test.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.mocks.shared.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.shared-test.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.spawn-workspace.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.test.ts
-      - src/agents/pi-embedded-runner/run/compaction-retry-aggregate-timeout.test.ts
-      - src/agents/pi-embedded-runner/run/compaction-retry-aggregate-timeout.ts
-      - src/agents/pi-embedded-runner/run/compaction-timeout.test.ts
-      - src/agents/pi-embedded-runner/run/compaction-timeout.ts
-      - src/agents/pi-embedded-runner/run/execution-preference-hint.test.ts
-      - src/agents/pi-embedded-runner/run/execution-preference-hint.ts
-      - src/agents/pi-embedded-runner/run/execution-router-baselines.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-baselines.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow-cli.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow-identity.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow-revalidate.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow.test.ts
-      - src/agents/pi-embedded-runner/run/failover-observation.test.ts
-      - src/agents/pi-embedded-runner/run/failover-observation.ts
-      - src/agents/pi-embedded-runner/run/history-image-prune.test.ts
-      - src/agents/pi-embedded-runner/run/history-image-prune.ts
-      - src/agents/pi-embedded-runner/run/image-parts.test.ts
-      - src/agents/pi-embedded-runner/run/image-parts.ts
-      - src/agents/pi-embedded-runner/run/images.test.ts
-      - src/agents/pi-embedded-runner/run/images.ts
-      - src/agents/pi-embedded-runner/run/params.ts
-      - src/agents/pi-embedded-runner/run/payloads.errors.test.ts
-      - src/agents/pi-embedded-runner/run/payloads.test-helpers.ts
-      - src/agents/pi-embedded-runner/run/payloads.test.ts
-      - src/agents/pi-embedded-runner/run/resolve-embedded-tools.test.ts
-      - src/agents/pi-embedded-runner/run/resolve-embedded-tools.ts
-      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
-      - src/agents/pi-embedded-runner/run/types.ts
-      - src/agents/pi-embedded-runner/runs.test.ts
-      - src/agents/pi-embedded-runner/runs.ts
-      - src/agents/pi-embedded-runner/sandbox-info.ts
-      - src/agents/pi-embedded-runner/sanitize-session-history.tool-result-details.test.ts
-      - src/agents/pi-embedded-runner/session-manager-cache.ts
-      - src/agents/pi-embedded-runner/session-manager-init.eexist.test.ts
-      - src/agents/pi-embedded-runner/session-manager-init.group-public.test.ts
-      - src/agents/pi-embedded-runner/session-manager-init.ts
-      - src/agents/pi-embedded-runner/skills-runtime.integration.test.ts
-      - src/agents/pi-embedded-runner/skills-runtime.node-import.test.ts
-      - src/agents/pi-embedded-runner/skills-runtime.test.ts
-      - src/agents/pi-embedded-runner/skills-runtime.ts
-      - src/agents/pi-embedded-runner/stream-api-key.test.ts
-      - src/agents/pi-embedded-runner/stream-api-key.ts
-      - src/agents/pi-embedded-runner/system-prompt.test.ts
-      - src/agents/pi-embedded-runner/system-prompt.ts
-      - src/agents/pi-embedded-runner/thinking.test.ts
-      - src/agents/pi-embedded-runner/thinking.ts
-      - src/agents/pi-embedded-runner/tool-name-allowlist.ts
-      - src/agents/pi-embedded-runner/tool-result-char-estimator.test.ts
-      - src/agents/pi-embedded-runner/tool-result-char-estimator.ts
-      - src/agents/pi-embedded-runner/tool-result-context-guard.test.ts
-      - src/agents/pi-embedded-runner/tool-result-context-guard.ts
-      - src/agents/pi-embedded-runner/tool-result-truncation.test.ts
-      - src/agents/pi-embedded-runner/tool-result-truncation.ts
-      - src/agents/pi-embedded-runner/tool-split.ts
-      - src/agents/pi-embedded-runner/types.ts
-      - src/agents/pi-embedded-runner/usage-reporting.test.ts
-      - src/agents/pi-embedded-runner/utils.ts
-      - src/agents/pi-embedded-runner/wait-for-idle-before-flush.ts
+      - src/agents/pi-embedded-runner/g*
+      - src/agents/pi-embedded-runner/h*
+      - src/agents/pi-embedded-runner/k*
+      - src/agents/pi-embedded-runner/l*
+      - src/agents/pi-embedded-runner/m*
+      - src/agents/pi-embedded-runner/o*
+      - src/agents/pi-embedded-runner/p*
+      - src/agents/pi-embedded-runner/r*
+      - src/agents/pi-embedded-runner/run/**
+      - src/agents/pi-embedded-runner/s*
+      - src/agents/pi-embedded-runner/t*
+      - src/agents/pi-embedded-runner/u*
+      - src/agents/pi-embedded-runner/w*
       - src/agents/pi-embedded-subscribe.block-reply-rejections.test.ts
       - src/agents/pi-embedded-subscribe.code-span-awareness.test.ts
       - src/agents/pi-embedded-subscribe.e2e-harness.ts
@@ -3670,32 +3276,14 @@ tasks:
       - src/agents/pi-embedded-utils.test.ts
       - src/agents/pi-embedded-utils.ts
       - src/agents/pi-embedded.ts
-      - src/agents/pi-extensions/compaction-safeguard-runtime.ts
-      - src/agents/pi-extensions/compaction-safeguard.test.ts
-      - src/agents/pi-extensions/compaction-safeguard.ts
-      - src/agents/pi-extensions/context-pruning.test.ts
-      - src/agents/pi-extensions/context-pruning.ts
-      - src/agents/pi-extensions/context-pruning/extension.ts
-      - src/agents/pi-extensions/context-pruning/pruner.test.ts
-      - src/agents/pi-extensions/context-pruning/pruner.ts
-      - src/agents/pi-extensions/context-pruning/runtime.ts
-      - src/agents/pi-extensions/context-pruning/settings.ts
-      - src/agents/pi-extensions/context-pruning/tools.ts
-      - src/agents/pi-extensions/session-manager-runtime-registry.ts
+      - src/agents/pi-extensions/**
       - src/agents/pi-model-discovery-runtime.ts
       - src/agents/pi-model-discovery.auth.test.ts
       - src/agents/pi-model-discovery.compat.e2e.test.ts
       - src/agents/pi-model-discovery.ts
       - src/agents/pi-project-settings.test.ts
       - src/agents/pi-project-settings.ts
-      - src/agents/pi-sdk/auth-storage.test.ts
-      - src/agents/pi-sdk/auth-storage.ts
-      - src/agents/pi-sdk/coding-tools.test.ts
-      - src/agents/pi-sdk/coding-tools.ts
-      - src/agents/pi-sdk/model-runtime.ts
-      - src/agents/pi-sdk/oauth.ts
-      - src/agents/pi-sdk/session.test.ts
-      - src/agents/pi-sdk/session.ts
+      - src/agents/pi-sdk/**
       - src/agents/pi-settings.test.ts
       - src/agents/pi-settings.ts
       - src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
@@ -3737,545 +3325,24 @@ tasks:
       - src/agents/pi-tools.whatsapp-login-gating.test.ts
       - src/agents/pi-tools.workspace-only-false.test.ts
       - src/agents/pi-tools.workspace-paths.test.ts
-      - src/agents/protocol-violation.test.ts
-      - src/agents/protocol-violation.ts
-      - src/agents/provider-capabilities.test.ts
-      - src/agents/provider-capabilities.ts
-      - src/agents/provider-tool-name-stream.test.ts
-      - src/agents/provider-tool-name-stream.ts
-      - src/agents/provider-tool-names.ts
-      - src/agents/pty-dsr.ts
-      - src/agents/pty-keys.test.ts
-      - src/agents/pty-keys.ts
-      - src/agents/queued-file-writer.ts
-      - src/agents/recoverable-tool-failure.test.ts
-      - src/agents/recoverable-tool-failure.ts
-      - src/agents/resolve-context-budget.test.ts
-      - src/agents/resolve-context-budget.ts
-      - src/agents/runtime-plugins.ts
-      - src/agents/sandbox-agent-config.agent-specific-sandbox-config.e2e.test.ts
-      - src/agents/sandbox-create-args.test.ts
-      - src/agents/sandbox-explain.test.ts
-      - src/agents/sandbox-media-paths.test.ts
-      - src/agents/sandbox-media-paths.ts
-      - src/agents/sandbox-merge.test.ts
-      - src/agents/sandbox-paths.test.ts
-      - src/agents/sandbox-paths.ts
-      - src/agents/sandbox-skills.test.ts
-      - src/agents/sandbox-tool-policy.ts
-      - src/agents/sandbox.resolveSandboxContext.test.ts
-      - src/agents/sandbox.ts
-      - src/agents/sandbox/ACCOUNT_WORKER_SANDBOX_IMAGES.md
-      - src/agents/sandbox/account-cdp-release.test.ts
-      - src/agents/sandbox/account-cdp-resolve.test.ts
-      - src/agents/sandbox/account-cdp-resolve.ts
-      - src/agents/sandbox/account-computer-browser-routing.test.ts
-      - src/agents/sandbox/account-computer-browser-routing.ts
-      - src/agents/sandbox/account-computer-browser-tools.test.ts
-      - src/agents/sandbox/account-computer-cn-qr-sms-handoff.test.ts
-      - src/agents/sandbox/account-computer-live-login.test.ts
-      - src/agents/sandbox/account-computer-login-classify.test.ts
-      - src/agents/sandbox/account-computer-login-classify.ts
-      - src/agents/sandbox/account-computer-login-golden-path.test.ts
-      - src/agents/sandbox/account-computer-login-policy-store.ts
-      - src/agents/sandbox/account-computer-login-policy.test.ts
-      - src/agents/sandbox/account-computer-login-vault.ts
-      - src/agents/sandbox/account-computer-login-wait.ts
-      - src/agents/sandbox/account-computer-running-attach.test.ts
-      - src/agents/sandbox/account-computer-running-attach.ts
-      - src/agents/sandbox/account-computer-stream.reattach.test.ts
-      - src/agents/sandbox/account-computer-stream.test.ts
-      - src/agents/sandbox/account-computer-stream.ts
-      - src/agents/sandbox/account-computer-worker-live-login.test.ts
-      - src/agents/sandbox/account-computer-zhihu-login.test.ts
-      - src/agents/sandbox/account-dir-snapshot.ts
-      - src/agents/sandbox/account-file-transfer.test.ts
-      - src/agents/sandbox/account-file-transfer.ts
-      - src/agents/sandbox/account-mounts.ts
-      - src/agents/sandbox/account-production-create.test.ts
-      - src/agents/sandbox/account-sandbox-startup.ts
-      - src/agents/sandbox/account-scope.ts
-      - src/agents/sandbox/account-shared-browser-migration.ts
-      - src/agents/sandbox/account-shared-mounts.test.ts
-      - src/agents/sandbox/account-shared-mounts.ts
-      - src/agents/sandbox/account-worker-browser-bridge.test.ts
-      - src/agents/sandbox/account-worker-browser-bridge.ts
-      - src/agents/sandbox/account-worker-driver.test.ts
-      - src/agents/sandbox/account-worker-driver.ts
-      - src/agents/sandbox/account-worker-embedded.test.ts
-      - src/agents/sandbox/account-worker-embedded.ts
-      - src/agents/sandbox/account-worker-flags.ts
-      - src/agents/sandbox/account-worker-gateway.soft-renew.test.ts
-      - src/agents/sandbox/account-worker-gateway.ts
-      - src/agents/sandbox/account-worker-lifecycle.test.ts
-      - src/agents/sandbox/account-worker-lifecycle.ts
-      - src/agents/sandbox/account-worker-shared-browser.test.ts
-      - src/agents/sandbox/account-worker.test.ts
-      - src/agents/sandbox/account-worker.ts
-      - src/agents/sandbox/account-workspace-session.test.ts
-      - src/agents/sandbox/bind-spec.test.ts
-      - src/agents/sandbox/bind-spec.ts
-      - src/agents/sandbox/browser-bridges.ts
-      - src/agents/sandbox/browser.create.test.ts
-      - src/agents/sandbox/browser.novnc-url.test.ts
-      - src/agents/sandbox/browser.ts
-      - src/agents/sandbox/config-hash.test.ts
-      - src/agents/sandbox/config-hash.ts
-      - src/agents/sandbox/config.ts
-      - src/agents/sandbox/constants.test.ts
-      - src/agents/sandbox/constants.ts
-      - src/agents/sandbox/context.ts
-      - src/agents/sandbox/context.user-fallback.test.ts
-      - src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
-      - src/agents/sandbox/docker-engine-client.test.ts
-      - src/agents/sandbox/docker-engine-client.ts
-      - src/agents/sandbox/docker.config-hash-recreate.test.ts
-      - src/agents/sandbox/docker.execDockerRaw.enoent.test.ts
-      - src/agents/sandbox/docker.ts
-      - src/agents/sandbox/docker.windows.test.ts
-      - src/agents/sandbox/effective-workspace.test.ts
-      - src/agents/sandbox/effective-workspace.ts
-      - src/agents/sandbox/fs-bridge-mutation-helper.test.ts
-      - src/agents/sandbox/fs-bridge-mutation-helper.ts
-      - src/agents/sandbox/fs-bridge-mutation-python-source.ts
-      - src/agents/sandbox/fs-bridge-path-safety.ts
-      - src/agents/sandbox/fs-bridge-shell-command-plans.ts
-      - src/agents/sandbox/fs-bridge.anchored-ops.test.ts
-      - src/agents/sandbox/fs-bridge.boundary.test.ts
-      - src/agents/sandbox/fs-bridge.e2e-docker.test.ts
-      - src/agents/sandbox/fs-bridge.shell.test.ts
-      - src/agents/sandbox/fs-bridge.test-helpers.ts
-      - src/agents/sandbox/fs-bridge.ts
-      - src/agents/sandbox/fs-paths.test.ts
-      - src/agents/sandbox/fs-paths.ts
-      - src/agents/sandbox/gateway-docker-probe.test.ts
-      - src/agents/sandbox/gateway-docker-probe.ts
-      - src/agents/sandbox/hash.ts
-      - src/agents/sandbox/host-engine-bind-path.test.ts
-      - src/agents/sandbox/host-engine-bind-path.ts
-      - src/agents/sandbox/host-paths.test.ts
-      - src/agents/sandbox/host-paths.ts
-      - src/agents/sandbox/manage.ts
-      - src/agents/sandbox/network-mode.ts
-      - src/agents/sandbox/novnc-auth.ts
-      - src/agents/sandbox/path-utils.ts
-      - src/agents/sandbox/production-execution-mode.ts
-      - src/agents/sandbox/prune.ts
-      - src/agents/sandbox/registry.test.ts
-      - src/agents/sandbox/registry.ts
-      - src/agents/sandbox/runtime-controller.test.ts
-      - src/agents/sandbox/runtime-controller.ts
-      - src/agents/sandbox/runtime-status.ts
-      - src/agents/sandbox/sandbox-runtime-ownership.test.ts
-      - src/agents/sandbox/sandbox-runtime-ownership.ts
-      - src/agents/sandbox/sanitize-env-vars.test.ts
-      - src/agents/sandbox/sanitize-env-vars.ts
-      - src/agents/sandbox/secure-form-fill-host.test.ts
-      - src/agents/sandbox/secure-form-fill-host.ts
-      - src/agents/sandbox/secure-form-fill.ts
-      - src/agents/sandbox/secure-form-handoff-gate-probe.ts
-      - src/agents/sandbox/secure-form-handoff-gate.test.ts
-      - src/agents/sandbox/secure-form-handoff-gate.ts
-      - src/agents/sandbox/secure-form-handoff-wait.test.ts
-      - src/agents/sandbox/secure-form-handoff-wait.ts
-      - src/agents/sandbox/secure-form-store.ts
-      - src/agents/sandbox/secure-form-types.ts
-      - src/agents/sandbox/secure-form.test.ts
-      - src/agents/sandbox/shared.ts
-      - src/agents/sandbox/test-args.ts
-      - src/agents/sandbox/test-fixtures.ts
-      - src/agents/sandbox/tool-policy.ts
-      - src/agents/sandbox/types.docker.ts
-      - src/agents/sandbox/types.ts
-      - src/agents/sandbox/user-facing-entitlement-failure.test.ts
-      - src/agents/sandbox/user-facing-entitlement-failure.ts
-      - src/agents/sandbox/validate-sandbox-security.test.ts
-      - src/agents/sandbox/validate-sandbox-security.ts
-      - src/agents/sandbox/workspace-mounts.test.ts
-      - src/agents/sandbox/workspace-mounts.ts
-      - src/agents/sandbox/workspace.test.ts
-      - src/agents/sandbox/workspace.ts
-      - src/agents/sanitize-for-prompt.test.ts
-      - src/agents/sanitize-for-prompt.ts
-      - src/agents/schema/clean-for-gemini.test.ts
-      - src/agents/schema/clean-for-gemini.ts
-      - src/agents/schema/clean-for-xai.test.ts
-      - src/agents/schema/clean-for-xai.ts
-      - src/agents/schema/typebox.ts
-      - src/agents/session-dirs.ts
-      - src/agents/session-file-repair.test.ts
-      - src/agents/session-file-repair.ts
-      - src/agents/session-slug.test.ts
-      - src/agents/session-slug.ts
-      - src/agents/session-tool-result-guard-wrapper.ts
-      - src/agents/session-tool-result-guard.test.ts
-      - src/agents/session-tool-result-guard.tool-result-persist-hook.test.ts
-      - src/agents/session-tool-result-guard.ts
-      - src/agents/session-tool-result-state.ts
-      - src/agents/session-transcript-entry.test.ts
-      - src/agents/session-transcript-entry.ts
-      - src/agents/session-transcript-repair.attachments.test.ts
-      - src/agents/session-transcript-repair.test.ts
-      - src/agents/session-transcript-repair.ts
-      - src/agents/session-write-lock.test.ts
-      - src/agents/session-write-lock.ts
-      - src/agents/sessions-spawn-hooks.test.ts
-      - src/agents/sessions-spawn-threadid.test.ts
-      - src/agents/shared-fs-resource-policy.test.ts
-      - src/agents/shared-fs-resource-policy.ts
-      - src/agents/shell-utils.test.ts
-      - src/agents/shell-utils.ts
-      - src/agents/skill-gates/__fixtures__/stall-continue-claim-worker.mjs
-      - src/agents/skill-gates/glossary.test.ts
-      - src/agents/skill-gates/glossary.ts
-      - src/agents/skill-gates/smoke-sla.test.ts
-      - src/agents/skill-gates/stall-continue-ledger.test.ts
-      - src/agents/skill-gates/stall-continue-ledger.ts
-      - src/agents/skill-gates/trial-gate.test.ts
-      - src/agents/skill-gates/trial-gate.ts
-      - src/agents/skills-install-download.ts
-      - src/agents/skills-install-extract.ts
-      - src/agents/skills-install-fallback.test.ts
-      - src/agents/skills-install-output.ts
-      - src/agents/skills-install-tar-verbose.ts
-      - src/agents/skills-install.download-test-utils.ts
-      - src/agents/skills-install.download.test.ts
-      - src/agents/skills-install.test-mocks.ts
-      - src/agents/skills-install.test.ts
-      - src/agents/skills-install.ts
-      - src/agents/skills-status.test.ts
-      - src/agents/skills-status.ts
-      - src/agents/skills.agents-skills-directory.test.ts
-      - src/agents/skills.browser-scan-proxy.test.ts
-      - src/agents/skills.build-workspace-skills-prompt.applies-bundled-allowlist-without-affecting-workspace-skills.test.ts
-      - src/agents/skills.build-workspace-skills-prompt.prefers-workspace-skills-managed-skills.test.ts
-      - src/agents/skills.build-workspace-skills-prompt.syncs-merged-skills-into-target-workspace.test.ts
-      - src/agents/skills.buildworkspaceskillsnapshot.test.ts
-      - src/agents/skills.buildworkspaceskillstatus.test.ts
-      - src/agents/skills.compact-skill-paths.test.ts
-      - src/agents/skills.e2e-test-helpers.test.ts
-      - src/agents/skills.e2e-test-helpers.ts
-      - src/agents/skills.enterprise-ai-skills.trigger-corpus.test.ts
-      - src/agents/skills.loadworkspaceskillentries.test.ts
-      - src/agents/skills.resolveskillspromptforrun.test.ts
-      - src/agents/skills.sherpa-onnx-tts-bin.test.ts
-      - src/agents/skills.summarize-skill-description.test.ts
-      - src/agents/skills.test-helpers.ts
-      - src/agents/skills.test.ts
-      - src/agents/skills.ts
-      - src/agents/skills.web-research.test.ts
-      - src/agents/skills.wechat-official-credential.test.ts
-      - src/agents/skills.workflow-gates.test.ts
-      - src/agents/skills/bundled-context.ts
-      - src/agents/skills/bundled-dir.test.ts
-      - src/agents/skills/bundled-dir.ts
-      - src/agents/skills/config.ts
-      - src/agents/skills/env-overrides.runtime.ts
-      - src/agents/skills/env-overrides.ts
-      - src/agents/skills/filter.test.ts
-      - src/agents/skills/filter.ts
-      - src/agents/skills/frontmatter.test.ts
-      - src/agents/skills/frontmatter.ts
-      - src/agents/skills/plugin-skills.test.ts
-      - src/agents/skills/plugin-skills.ts
-      - src/agents/skills/refresh.test.ts
-      - src/agents/skills/refresh.ts
-      - src/agents/skills/serialize.ts
-      - src/agents/skills/skill-gate-composer-boundary.test.ts
-      - src/agents/skills/skill-policy-intersect-union.contract.test.ts
-      - src/agents/skills/skill-policy.test.ts
-      - src/agents/skills/skill-policy.ts
-      - src/agents/skills/tools-dir.ts
-      - src/agents/skills/types.ts
-      - src/agents/skills/workspace.prompt-rank.test.ts
-      - src/agents/skills/workspace.ts
-      - src/agents/spawned-context.test.ts
-      - src/agents/spawned-context.ts
-      - src/agents/stable-stringify.ts
-      - src/agents/steward-sandbox-tools.test.ts
-      - src/agents/stream-message-shared.ts
-      - src/agents/subagent-announce-dispatch.test.ts
-      - src/agents/subagent-announce-dispatch.ts
-      - src/agents/subagent-announce-queue.test.ts
-      - src/agents/subagent-announce-queue.ts
-      - src/agents/subagent-announce.capture-completion-reply.test.ts
-      - src/agents/subagent-announce.format.e2e.test.ts
-      - src/agents/subagent-announce.timeout.test.ts
-      - src/agents/subagent-announce.ts
-      - src/agents/subagent-attachments.ts
-      - src/agents/subagent-capabilities.ts
-      - src/agents/subagent-control.ts
-      - src/agents/subagent-depth.test.ts
-      - src/agents/subagent-depth.ts
-      - src/agents/subagent-lifecycle-events.ts
-      - src/agents/subagent-registry-cleanup.test.ts
-      - src/agents/subagent-registry-cleanup.ts
-      - src/agents/subagent-registry-completion.test.ts
-      - src/agents/subagent-registry-completion.ts
-      - src/agents/subagent-registry-queries.test.ts
-      - src/agents/subagent-registry-queries.ts
-      - src/agents/subagent-registry-runtime.ts
-      - src/agents/subagent-registry-state.ts
-      - src/agents/subagent-registry.announce-loop-guard.test.ts
-      - src/agents/subagent-registry.archive.e2e.test.ts
-      - src/agents/subagent-registry.context-engine.test.ts
-      - src/agents/subagent-registry.lifecycle-retry-grace.e2e.test.ts
-      - src/agents/subagent-registry.mocks.shared.ts
-      - src/agents/subagent-registry.nested.e2e.test.ts
-      - src/agents/subagent-registry.persistence.test.ts
-      - src/agents/subagent-registry.steer-restart.test.ts
-      - src/agents/subagent-registry.store.ts
-      - src/agents/subagent-registry.ts
-      - src/agents/subagent-registry.types.ts
-      - src/agents/subagent-spawn.attachments.test.ts
-      - src/agents/subagent-spawn.objective-shadow.test.ts
-      - src/agents/subagent-spawn.ts
-      - src/agents/synthetic-models.ts
-      - src/agents/system-prompt-params.test.ts
-      - src/agents/system-prompt-params.ts
-      - src/agents/system-prompt-report.test.ts
-      - src/agents/system-prompt-report.ts
-      - src/agents/system-prompt-stability.test.ts
-      - src/agents/system-prompt.context-source.test.ts
-      - src/agents/system-prompt.public-boundary.test.ts
-      - src/agents/system-prompt.test.ts
-      - src/agents/system-prompt.ts
-      - src/agents/task-surface/apply.ts
-      - src/agents/task-surface/surface.test.ts
-      - src/agents/task-surface/surface.ts
-      - src/agents/test-helpers/agent-message-fixtures.ts
-      - src/agents/test-helpers/assistant-message-fixtures.ts
-      - src/agents/test-helpers/fast-coding-tools.ts
-      - src/agents/test-helpers/fast-core-tools.ts
-      - src/agents/test-helpers/fast-tool-stubs.ts
-      - src/agents/test-helpers/host-sandbox-fs-bridge.ts
-      - src/agents/test-helpers/model-fallback-config-fixture.ts
-      - src/agents/test-helpers/pi-tool-stubs.ts
-      - src/agents/test-helpers/pi-tools-fs-helpers.ts
-      - src/agents/test-helpers/pi-tools-sandbox-context.test.ts
-      - src/agents/test-helpers/pi-tools-sandbox-context.ts
-      - src/agents/test-helpers/sandbox-agent-config-fixtures.ts
-      - src/agents/test-helpers/session-config.ts
-      - src/agents/test-helpers/skill-plugin-fixtures.ts
-      - src/agents/test-helpers/unsafe-mounted-sandbox.ts
-      - src/agents/test-helpers/usage-fixtures.ts
-      - src/agents/timeout.ts
-      - src/agents/together-models.ts
-      - src/agents/tool-call-id.test.ts
-      - src/agents/tool-call-id.ts
-      - src/agents/tool-catalog.ts
-      - src/agents/tool-display-common.ts
-      - src/agents/tool-display-overrides.json
-      - src/agents/tool-display.test.ts
-      - src/agents/tool-display.ts
-      - src/agents/tool-fs-policy.test.ts
-      - src/agents/tool-fs-policy.ts
-      - src/agents/tool-images.log.test.ts
-      - src/agents/tool-images.test.ts
-      - src/agents/tool-images.ts
-      - src/agents/tool-loop-detection.test.ts
-      - src/agents/tool-loop-detection.ts
-      - src/agents/tool-mutation.test.ts
-      - src/agents/tool-mutation.ts
-      - src/agents/tool-policy-pipeline.test.ts
-      - src/agents/tool-policy-pipeline.ts
-      - src/agents/tool-policy-shared.ts
-      - src/agents/tool-policy.conformance.ts
-      - src/agents/tool-policy.plugin-only-allowlist.test.ts
-      - src/agents/tool-policy.test.ts
-      - src/agents/tool-policy.ts
-      - src/agents/tool-summaries.ts
-      - src/agents/tools/account-browser-scope.ts
-      - src/agents/tools/account-computer-login-tool.ts
-      - src/agents/tools/agent-step.test.ts
-      - src/agents/tools/agent-step.ts
-      - src/agents/tools/agents-list-tool.ts
-      - src/agents/tools/browser-tool.account-scope.test.ts
-      - src/agents/tools/browser-tool.account-serial.test.ts
-      - src/agents/tools/browser-tool.account-serial.ts
-      - src/agents/tools/browser-tool.actions.ts
-      - src/agents/tools/browser-tool.plan-once.test.ts
-      - src/agents/tools/browser-tool.schema.ts
-      - src/agents/tools/browser-tool.secure-form-guard.test.ts
-      - src/agents/tools/browser-tool.test.ts
-      - src/agents/tools/browser-tool.ts
-      - src/agents/tools/canvas-tool.ts
-      - src/agents/tools/collaboration-board-discuss-to-task.injection.test.ts
-      - src/agents/tools/collaboration-board-discuss-to-task.turn.test.ts
-      - src/agents/tools/collaboration-board-tool.test.ts
-      - src/agents/tools/collaboration-board-tool.ts
-      - src/agents/tools/collaboration-board-trusted-locator.test.ts
-      - src/agents/tools/common.params.test.ts
-      - src/agents/tools/common.test.ts
-      - src/agents/tools/common.ts
-      - src/agents/tools/confirm-diagnose-evolution-tool.test.ts
-      - src/agents/tools/confirm-diagnose-evolution-tool.ts
-      - src/agents/tools/conversation-send-dispatch.test.ts
-      - src/agents/tools/conversation-send-dispatch.ts
-      - src/agents/tools/conversation-send-tool.test.ts
-      - src/agents/tools/conversation-send-tool.ts
-      - src/agents/tools/cron-tool.flat-params.test.ts
-      - src/agents/tools/cron-tool.test.ts
-      - src/agents/tools/cron-tool.ts
-      - src/agents/tools/data-capability-tool.test.ts
-      - src/agents/tools/data-capability-tool.ts
-      - src/agents/tools/diagnose-tool.test.ts
-      - src/agents/tools/diagnose-tool.ts
-      - src/agents/tools/discord-actions-guild.ts
-      - src/agents/tools/discord-actions-messaging.ts
-      - src/agents/tools/discord-actions-moderation-shared.ts
-      - src/agents/tools/discord-actions-moderation.authz.test.ts
-      - src/agents/tools/discord-actions-moderation.ts
-      - src/agents/tools/discord-actions-presence.test.ts
-      - src/agents/tools/discord-actions-presence.ts
-      - src/agents/tools/discord-actions-shared.ts
-      - src/agents/tools/discord-actions.test.ts
-      - src/agents/tools/discord-actions.ts
-      - src/agents/tools/evolution-perception-tool.ts
-      - src/agents/tools/gateway-tool.ts
-      - src/agents/tools/gateway.test.ts
-      - src/agents/tools/gateway.ts
-      - src/agents/tools/guidance-event-tool.test.ts
-      - src/agents/tools/guidance-event-tool.ts
-      - src/agents/tools/image-tool.helpers.ts
-      - src/agents/tools/image-tool.test.ts
-      - src/agents/tools/image-tool.ts
-      - src/agents/tools/knowledge-consume-scope.test.ts
-      - src/agents/tools/knowledge-consume-scope.ts
-      - src/agents/tools/knowledge-consume-tool.test.ts
-      - src/agents/tools/knowledge-consume-tool.ts
-      - src/agents/tools/knowledge-source-tool.test.ts
-      - src/agents/tools/knowledge-source-tool.ts
-      - src/agents/tools/local-file-tool-registration.test.ts
-      - src/agents/tools/local-file-tool-registration.ts
-      - src/agents/tools/local-file-tool.test.ts
-      - src/agents/tools/local-file-tool.ts
-      - src/agents/tools/media-tool-shared.ts
-      - src/agents/tools/meeting-tool-minutes.test.ts
-      - src/agents/tools/meeting-tool-minutes.ts
-      - src/agents/tools/meeting-tool.test.ts
-      - src/agents/tools/meeting-tool.ts
-      - src/agents/tools/memory-tool.citations.test.ts
-      - src/agents/tools/memory-tool.test.ts
-      - src/agents/tools/memory-tool.ts
-      - src/agents/tools/message-tool.test.ts
-      - src/agents/tools/message-tool.ts
-      - src/agents/tools/model-config.helpers.ts
-      - src/agents/tools/nodes-tool.test.ts
-      - src/agents/tools/nodes-tool.ts
-      - src/agents/tools/nodes-utils.test.ts
-      - src/agents/tools/nodes-utils.ts
-      - src/agents/tools/office-file-tool.test.ts
-      - src/agents/tools/office-file-tool.ts
-      - src/agents/tools/operational-identity-tool.test.ts
-      - src/agents/tools/operational-identity-tool.ts
-      - src/agents/tools/organization-authz.test.ts
-      - src/agents/tools/organization-authz.ts
-      - src/agents/tools/organization-memory-tool.test.ts
-      - src/agents/tools/organization-memory-tool.ts
-      - src/agents/tools/organization-tasks-tool.notify.test.ts
-      - src/agents/tools/organization-tasks-tool.test.ts
-      - src/agents/tools/organization-tasks-tool.ts
-      - src/agents/tools/pdf-native-providers.ts
-      - src/agents/tools/pdf-tool.helpers.ts
-      - src/agents/tools/pdf-tool.test.ts
-      - src/agents/tools/pdf-tool.ts
-      - src/agents/tools/schedule-tool.test.ts
-      - src/agents/tools/schedule-tool.ts
-      - src/agents/tools/scheduled-task-tool.test.ts
-      - src/agents/tools/scheduled-task-tool.ts
-      - src/agents/tools/secure-form-tool.ts
-      - src/agents/tools/session-status-tool.ts
-      - src/agents/tools/sessions-access.test.ts
-      - src/agents/tools/sessions-access.ts
-      - src/agents/tools/sessions-announce-target.ts
-      - src/agents/tools/sessions-helpers.ts
-      - src/agents/tools/sessions-history-tool.image-omit.test.ts
-      - src/agents/tools/sessions-history-tool.ts
-      - src/agents/tools/sessions-list-tool.ts
-      - src/agents/tools/sessions-resolution.test.ts
-      - src/agents/tools/sessions-resolution.ts
-      - src/agents/tools/sessions-send-helpers.ts
-      - src/agents/tools/sessions-send-tool.a2a.ts
-      - src/agents/tools/sessions-send-tool.ts
-      - src/agents/tools/sessions-spawn-tool.test.ts
-      - src/agents/tools/sessions-spawn-tool.ts
-      - src/agents/tools/sessions.test.ts
-      - src/agents/tools/site-capability-tools.ts
-      - src/agents/tools/skill-asset-save-tool.test.ts
-      - src/agents/tools/skill-asset-save-tool.ts
-      - src/agents/tools/slack-actions.test.ts
-      - src/agents/tools/slack-actions.ts
-      - src/agents/tools/stepfun-image-tool.helpers.ts
-      - src/agents/tools/stepfun-image-tool.test.ts
-      - src/agents/tools/stepfun-image-tool.ts
-      - src/agents/tools/subagents-tool.ts
-      - src/agents/tools/suno-music-tool.helpers.ts
-      - src/agents/tools/suno-music-tool.test.ts
-      - src/agents/tools/suno-music-tool.ts
-      - src/agents/tools/telegram-actions.test.ts
-      - src/agents/tools/telegram-actions.ts
-      - src/agents/tools/tenant-user-notify-tool.ts
-      - src/agents/tools/tool-runtime.helpers.ts
-      - src/agents/tools/tts-tool.test.ts
-      - src/agents/tools/tts-tool.ts
-      - src/agents/tools/user-operational-identity-tool.test.ts
-      - src/agents/tools/user-operational-identity-tool.ts
-      - src/agents/tools/web-fetch-utils.ts
-      - src/agents/tools/web-fetch-visibility.test.ts
-      - src/agents/tools/web-fetch-visibility.ts
-      - src/agents/tools/web-fetch.cf-markdown.test.ts
-      - src/agents/tools/web-fetch.ssrf.test.ts
-      - src/agents/tools/web-fetch.test-harness.ts
-      - src/agents/tools/web-fetch.test-mocks.ts
-      - src/agents/tools/web-fetch.ts
-      - src/agents/tools/web-fetch.weixin.test.ts
-      - src/agents/tools/web-guarded-fetch.test.ts
-      - src/agents/tools/web-guarded-fetch.ts
-      - src/agents/tools/web-search-citation-redirect.ts
-      - src/agents/tools/web-search.redirect.test.ts
-      - src/agents/tools/web-search.test.ts
-      - src/agents/tools/web-search.ts
-      - src/agents/tools/web-shared.ts
-      - src/agents/tools/web-tools.enabled-defaults.test.ts
-      - src/agents/tools/web-tools.fetch.test.ts
-      - src/agents/tools/web-tools.readability.test.ts
-      - src/agents/tools/web-tools.ts
-      - src/agents/tools/weixin-extract.test.ts
-      - src/agents/tools/weixin-extract.ts
-      - src/agents/tools/whatsapp-actions.test.ts
-      - src/agents/tools/whatsapp-actions.ts
-      - src/agents/tools/whatsapp-target-auth.ts
-      - src/agents/trace-base.ts
-      - src/agents/transcript-image-omit.test.ts
-      - src/agents/transcript-image-omit.ts
-      - src/agents/transcript-policy.policy.test.ts
-      - src/agents/transcript-policy.test.ts
-      - src/agents/transcript-policy.ts
-      - src/agents/turn-completion/contract.test.ts
-      - src/agents/turn-completion/contract.ts
-      - src/agents/turn-completion/ogui-wait-settle.test.ts
-      - src/agents/usage.normalization.test.ts
-      - src/agents/usage.test.ts
-      - src/agents/usage.ts
-      - src/agents/venice-models.test.ts
-      - src/agents/venice-models.ts
-      - src/agents/vercel-ai-gateway.ts
-      - src/agents/volc-models.shared.ts
-      - src/agents/workspace-dir.ts
-      - src/agents/workspace-dirs.ts
-      - src/agents/workspace-run.test.ts
-      - src/agents/workspace-run.ts
-      - src/agents/workspace-templates.test.ts
-      - src/agents/workspace-templates.ts
-      - src/agents/workspace.bootstrap-cache.test.ts
-      - src/agents/workspace.defaults.test.ts
-      - src/agents/workspace.load-extra-bootstrap-files.test.ts
-      - src/agents/workspace.test.ts
-      - src/agents/workspace.ts
-      - src/agents/write-side-retry-gate.test.ts
-      - src/agents/write-side-retry-gate.ts
-      - src/agents/zai.live.test.ts
+      - src/agents/pr*
+      - src/agents/pt*
+      - src/agents/q*
+      - src/agents/r*
+      - src/agents/s*
+      - src/agents/sandbox/**
+      - src/agents/schema/**
+      - src/agents/skill-gates/**
+      - src/agents/skills/**
+      - src/agents/t*
+      - src/agents/task-surface/**
+      - src/agents/test-helpers/**
+      - src/agents/tools/**
+      - src/agents/turn-completion/**
+      - src/agents/u*
+      - src/agents/v*
+      - src/agents/w*
+      - src/agents/z*
       - deploy/production/**
       - src/agents/bash-tools.exec.ts
       - src/agents/bash-tools.exec-protected-process.ts
@@ -4308,16 +3375,14 @@ tasks:
             - src/agents/pi-embedded-runner/extensions.ts
             - src/agents/pi-embedded-runner/compact.ts
             - src/agents/model-fallback.ts
-          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run. The covering
-            pattern(s) src/agents/** were expanded into the existing files, excluding only the
-            released paths. After the broad wildcard was expanded into the existing directories and
-            files, current file coverage can be preserved, but future new paths will no longer
-            automatically belong to the original task. Subsequent new components must be
-            re-registered; the expanded per-item declarations must not continue to be claimed as
-            fully equivalent to the original glob.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
   - id: repository-wide-branch-convergence
     owner: grok-evolution-closure
     intent:
@@ -7916,116 +6981,48 @@ tasks:
       - src/account-computer/**
       - src/acp/**
       - src/agent-runtime/capabilities/**
-      - src/agent-runtime/command/accepted-artifact-delivery.ts
-      - src/agent-runtime/command/admitted-task-query-continuation.test.ts
-      - src/agent-runtime/command/admitted-task-query-continuation.ts
-      - src/agent-runtime/command/authorized-interaction.ts
-      - src/agent-runtime/command/command-outcome-entry.test.ts
-      - src/agent-runtime/command/command-outcome-entry.ts
-      - src/agent-runtime/command/execution-admission.test.ts
-      - src/agent-runtime/command/execution-admission.ts
-      - src/agent-runtime/command/gateway-task-stop.test.ts
-      - src/agent-runtime/command/gateway-task-stop.ts
-      - src/agent-runtime/command/governed-interaction.ts
-      - src/agent-runtime/command/group-final-delivery.test.ts
-      - src/agent-runtime/command/host-task-target.ts
-      - src/agent-runtime/command/index.ts
-      - src/agent-runtime/command/ingress-kind.test.ts
-      - src/agent-runtime/command/ingress-kind.ts
-      - src/agent-runtime/command/interaction-sources.test.ts
-      - src/agent-runtime/command/interaction-sources.ts
-      - src/agent-runtime/command/interpret-interaction.test.ts
-      - src/agent-runtime/command/interpret-interaction.ts
-      - src/agent-runtime/command/named-file-execution.test.ts
-      - src/agent-runtime/command/named-file-execution.ts
-      - src/agent-runtime/command/prepared-interaction.ts
-      - src/agent-runtime/command/route-interaction.test.ts
-      - src/agent-runtime/command/route-interaction.ts
+      - src/agent-runtime/command/a*
+      - src/agent-runtime/command/c*
+      - src/agent-runtime/command/e*
+      - src/agent-runtime/command/g*
+      - src/agent-runtime/command/h*
+      - src/agent-runtime/command/i*
+      - src/agent-runtime/command/n*
+      - src/agent-runtime/command/p*
+      - src/agent-runtime/command/ro*
       - src/agent-runtime/command/scenarios/**
-      - src/agent-runtime/command/task-proposal-reply.test.ts
-      - src/agent-runtime/command/task-proposal-reply.ts
-      - src/agent-runtime/command/task-status-format.test.ts
-      - src/agent-runtime/command/task-status.test.ts
-      - src/agent-runtime/command/task-status.ts
-      - src/agent-runtime/context/aside-budget.test.ts
-      - src/agent-runtime/context/aside-budget.ts
-      - src/agent-runtime/context/assembly.test.ts
-      - src/agent-runtime/context/assembly.ts
+      - src/agent-runtime/command/t*
+      - src/agent-runtime/context/a*
       - src/agent-runtime/context/catalog/**
       - src/agent-runtime/context/compilation/**
-      - src/agent-runtime/context/index.ts
-      - src/agent-runtime/context/interaction-history.test.ts
-      - src/agent-runtime/context/interaction-history.ts
-      - src/agent-runtime/context/prompt-composition.ts
-      - src/agent-runtime/context/session-summary.ts
+      - src/agent-runtime/context/i*
+      - src/agent-runtime/context/p*
+      - src/agent-runtime/context/s*
       - src/agent-runtime/context/sources/**
-      - src/agent-runtime/context/system-prompt.ts
-      - src/agent-runtime/context/task-focus.test.ts
-      - src/agent-runtime/context/task-focus.ts
+      - src/agent-runtime/context/t*
       - src/agent-runtime/context/trust/**
-      - src/agent-runtime/context/untrusted.test.ts
-      - src/agent-runtime/context/untrusted.ts
-      - src/agent-runtime/contracts/acceptance.ts
-      - src/agent-runtime/contracts/blocker.ts
-      - src/agent-runtime/contracts/capability.ts
-      - src/agent-runtime/contracts/command.ts
-      - src/agent-runtime/contracts/context.ts
-      - src/agent-runtime/contracts/continuation.ts
-      - src/agent-runtime/contracts/delivery.ts
-      - src/agent-runtime/contracts/execution.ts
-      - src/agent-runtime/contracts/inference.ts
-      - src/agent-runtime/contracts/interaction-availability.ts
-      - src/agent-runtime/contracts/interaction.ts
-      - src/agent-runtime/contracts/learning.ts
-      - src/agent-runtime/contracts/policy.ts
-      - src/agent-runtime/contracts/prompt.ts
-      - src/agent-runtime/contracts/quality.ts
+      - src/agent-runtime/context/u*
+      - src/agent-runtime/contracts/a*
+      - src/agent-runtime/contracts/b*
+      - src/agent-runtime/contracts/c*
+      - src/agent-runtime/contracts/d*
+      - src/agent-runtime/contracts/e*
+      - src/agent-runtime/contracts/i*
+      - src/agent-runtime/contracts/l*
+      - src/agent-runtime/contracts/p*
+      - src/agent-runtime/contracts/q*
       - src/agent-runtime/contracts/task-binding.ts
       - src/agent-runtime/contracts/task-control.ts
       - src/agent-runtime/contracts/task-stop.ts
-      - src/agent-runtime/contracts/turn-result.ts
+      - src/agent-runtime/contracts/tu*
       - src/agent-runtime/delivery/**
-      - src/agent-runtime/execution/index.ts
-      - src/agent-runtime/execution/outcomes/attempt-attribution.ts
-      - src/agent-runtime/execution/outcomes/command-outcome.test.ts
-      - src/agent-runtime/execution/outcomes/command-outcome.ts
-      - src/agent-runtime/execution/outcomes/index.ts
-      - src/agent-runtime/execution/outcomes/turn-outcome.test.ts
-      - src/agent-runtime/execution/outcomes/turn-outcome.ts
-      - src/agent-runtime/execution/outcomes/usage-summary.test.ts
-      - src/agent-runtime/execution/outcomes/usage-summary.ts
-      - src/agent-runtime/execution/preparation/embedded-parameters.ts
-      - src/agent-runtime/execution/preparation/index.ts
-      - src/agent-runtime/execution/public-entry-convergence.test.ts
-      - src/agent-runtime/execution/recovery/context-overflow.test.ts
-      - src/agent-runtime/execution/recovery/context-overflow.ts
-      - src/agent-runtime/execution/recovery/stall-continuation.test.ts
-      - src/agent-runtime/execution/recovery/stall-continuation.ts
-      - src/agent-runtime/execution/runner/acp-turn.ts
-      - src/agent-runtime/execution/runner/admitted-candidate-cli.ts
-      - src/agent-runtime/execution/runner/admitted-candidate-embedded.ts
-      - src/agent-runtime/execution/runner/admitted-candidate-failure.integration.test.ts
-      - src/agent-runtime/execution/runner/admitted-candidate.test.ts
-      - src/agent-runtime/execution/runner/admitted-candidate.ts
-      - src/agent-runtime/execution/runner/admitted-turn-attempt.ts
-      - src/agent-runtime/execution/runner/admitted-turn-host.ts
-      - src/agent-runtime/execution/runner/admitted-turn-recovery.ts
-      - src/agent-runtime/execution/runner/admitted-turn-state.ts
-      - src/agent-runtime/execution/runner/admitted-turn.attempt-host.test.ts
-      - src/agent-runtime/execution/runner/admitted-turn.test.ts
-      - src/agent-runtime/execution/runner/admitted-turn.ts
-      - src/agent-runtime/execution/runner/attempt-cleanup.test.ts
-      - src/agent-runtime/execution/runner/attempt-cleanup.ts
-      - src/agent-runtime/execution/runner/cli-run-spawn.ts
-      - src/agent-runtime/execution/runner/cli-run.task-boundary.test.ts
-      - src/agent-runtime/execution/runner/cli-run.ts
-      - src/agent-runtime/execution/runner/command-budget.test.ts
-      - src/agent-runtime/execution/runner/command-budget.ts
-      - src/agent-runtime/execution/runner/command-candidate.ts
-      - src/agent-runtime/execution/runner/command-lifecycle.test.ts
-      - src/agent-runtime/execution/runner/command-lifecycle.ts
-      - src/agent-runtime/execution/runner/controlled-execution.test.ts
-      - src/agent-runtime/execution/runner/controlled-execution.ts
+      - src/agent-runtime/execution/i*
+      - src/agent-runtime/execution/outcomes/**
+      - src/agent-runtime/execution/p*
+      - src/agent-runtime/execution/preparation/**
+      - src/agent-runtime/execution/recovery/**
+      - src/agent-runtime/execution/runner/a*
+      - src/agent-runtime/execution/runner/c*
       - src/agent-runtime/execution/runner/embedded-attempt-closeout.ts
       - src/agent-runtime/execution/runner/embedded-attempt-continue.ts
       - src/agent-runtime/execution/runner/embedded-attempt-phase-state.ts
@@ -8045,441 +7042,72 @@ tasks:
       - src/agent-runtime/execution/runner/embedded-run-result.ts
       - src/agent-runtime/execution/runner/embedded-run.task-boundary.test.ts
       - src/agent-runtime/execution/runner/embedded-run.ts
-      - src/agent-runtime/execution/runner/execution-lifecycle.test.ts
-      - src/agent-runtime/execution/runner/execution-lifecycle.ts
-      - src/agent-runtime/execution/runner/execution-scope.test.ts
-      - src/agent-runtime/execution/runner/execution-scope.ts
-      - src/agent-runtime/execution/runner/index.ts
-      - src/agent-runtime/execution/runner/queued-candidate.pricing.test.ts
-      - src/agent-runtime/execution/runner/queued-candidate.ts
-      - src/agent-runtime/execution/runner/run-registry.test.ts
-      - src/agent-runtime/execution/runner/run-registry.ts
-      - src/agent-runtime/execution/runner/scheduled-candidate.test.ts
-      - src/agent-runtime/execution/runner/scheduled-candidate.ts
-      - src/agent-runtime/execution/runner/supervisor-lifecycle.test.ts
-      - src/agent-runtime/execution/runner/supervisor-lifecycle.ts
-      - src/agent-runtime/execution/runner/task-continuation.ts
-      - src/agent-runtime/execution/runner/turn-contract.ts
-      - src/agent-runtime/model/admission-lease.test.ts
-      - src/agent-runtime/model/admission-lease.ts
-      - src/agent-runtime/model/apply-provider-credential.test.ts
-      - src/agent-runtime/model/apply-provider-credential.ts
-      - src/agent-runtime/model/auth-profile-candidates.test.ts
-      - src/agent-runtime/model/auth-profile-candidates.ts
-      - src/agent-runtime/model/auth-profile-rotation.test.ts
-      - src/agent-runtime/model/auth-profile-rotation.ts
-      - src/agent-runtime/model/authorized-session.test.ts
-      - src/agent-runtime/model/authorized-session.ts
-      - src/agent-runtime/model/auxiliary-model-governance.test.ts
-      - src/agent-runtime/model/auxiliary-model-governance.ts
-      - src/agent-runtime/model/cli-run-credential.ts
-      - src/agent-runtime/model/command-admission-session.test.ts
-      - src/agent-runtime/model/command-admission-session.ts
-      - src/agent-runtime/model/command-commercial-gate.ts
-      - src/agent-runtime/model/command-governance.ts
-      - src/agent-runtime/model/copilot-token-refresh.test.ts
-      - src/agent-runtime/model/copilot-token-refresh.ts
-      - src/agent-runtime/model/index.ts
-      - src/agent-runtime/model/interaction-completion.test.ts
-      - src/agent-runtime/model/interaction-completion.ts
-      - src/agent-runtime/model/llm-slug-auxiliary.test.ts
-      - src/agent-runtime/model/metadata-completion.test.ts
-      - src/agent-runtime/model/metadata-completion.ts
-      - src/agent-runtime/model/native-tool-stream.ts
-      - src/agent-runtime/model/ollama-context-stream.ts
+      - src/agent-runtime/execution/runner/ex*
+      - src/agent-runtime/execution/runner/i*
+      - src/agent-runtime/execution/runner/q*
+      - src/agent-runtime/execution/runner/r*
+      - src/agent-runtime/execution/runner/s*
+      - src/agent-runtime/execution/runner/t*
+      - src/agent-runtime/model/a*
+      - src/agent-runtime/model/c*
+      - src/agent-runtime/model/i*
+      - src/agent-runtime/model/l*
+      - src/agent-runtime/model/m*
+      - src/agent-runtime/model/n*
+      - src/agent-runtime/model/o*
       - src/agent-runtime/model/prepare-embedded-model.test.ts
-      - src/agent-runtime/model/xai-arguments-stream.ts
-      - src/agent-runtime/policy/acceptance-checks.ts
-      - src/agent-runtime/policy/accepted-artifact-delivery.test.ts
-      - src/agent-runtime/policy/accepted-artifact-delivery.ts
-      - src/agent-runtime/policy/blocker.test.ts
-      - src/agent-runtime/policy/blocker.ts
-      - src/agent-runtime/policy/catalog.test.ts
-      - src/agent-runtime/policy/catalog.ts
-      - src/agent-runtime/policy/collaboration-compile-hash.ts
-      - src/agent-runtime/policy/collaboration-compile-sections.ts
-      - src/agent-runtime/policy/collaboration-compile.ts
-      - src/agent-runtime/policy/collaboration-handoff.ts
-      - src/agent-runtime/policy/collaboration-policy-identity.ts
-      - src/agent-runtime/policy/collaboration-policy-model.ts
-      - src/agent-runtime/policy/collaboration-rules.test.ts
-      - src/agent-runtime/policy/collaboration-rules.ts
-      - src/agent-runtime/policy/constraints.ts
-      - src/agent-runtime/policy/context-window.ts
-      - src/agent-runtime/policy/execution-queue.test.ts
-      - src/agent-runtime/policy/execution-queue.ts
-      - src/agent-runtime/policy/explicit-task-control.test.ts
-      - src/agent-runtime/policy/explicit-task-control.ts
-      - src/agent-runtime/policy/group-final-delivery.test.ts
-      - src/agent-runtime/policy/index.ts
-      - src/agent-runtime/policy/input-stamp.ts
-      - src/agent-runtime/policy/interaction-availability.ts
-      - src/agent-runtime/policy/prompt-mode.ts
+      - src/agent-runtime/model/x*
+      - src/agent-runtime/policy/a*
+      - src/agent-runtime/policy/b*
+      - src/agent-runtime/policy/c*
+      - src/agent-runtime/policy/e*
+      - src/agent-runtime/policy/g*
+      - src/agent-runtime/policy/i*
+      - src/agent-runtime/policy/p*
       - src/agent-runtime/policy/run-limits.test.ts
       - src/agent-runtime/policy/run-limits.ts
-      - src/agent-runtime/policy/task-binding.test.ts
-      - src/agent-runtime/policy/task-binding.ts
-      - src/agent-runtime/policy/task-board-limits.ts
-      - src/agent-runtime/state/acp-transcript.ts
-      - src/agent-runtime/state/attempt-transcript.ts
-      - src/agent-runtime/state/collaboration/accepted-artifact-delivery-read.ts
-      - src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts
-      - src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts
-      - src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.ts
-      - src/agent-runtime/state/collaboration/handoff-txn.ts
-      - src/agent-runtime/state/collaboration/round-txn.ts
-      - src/agent-runtime/state/command-session.test.ts
-      - src/agent-runtime/state/command-session.ts
-      - src/agent-runtime/state/completion-notice.test.ts
-      - src/agent-runtime/state/completion-notice.ts
-      - src/agent-runtime/state/continuation-ticket.ts
-      - src/agent-runtime/state/index.ts
-      - src/agent-runtime/state/interaction-transcript.test.ts
-      - src/agent-runtime/state/interaction-transcript.ts
-      - src/agent-runtime/state/mutations/admit-task.ts
-      - src/agent-runtime/state/mutations/claim-queued-execution.recovery-prompt.test.ts
-      - src/agent-runtime/state/mutations/claim-queued-execution.ts
-      - src/agent-runtime/state/mutations/execution-binding.ts
-      - src/agent-runtime/state/mutations/explicit-control.ts
-      - src/agent-runtime/state/mutations/interaction-proposal.ts
-      - src/agent-runtime/state/mutations/interaction-revision.test.ts
-      - src/agent-runtime/state/mutations/resume-current.test.ts
-      - src/agent-runtime/state/mutations/resume-current.ts
-      - src/agent-runtime/state/mutations/resume-parked.test.ts
-      - src/agent-runtime/state/mutations/resume-parked.ts
-      - src/agent-runtime/state/mutations/session-reset-focus.test.ts
-      - src/agent-runtime/state/mutations/session-reset-focus.ts
-      - src/agent-runtime/state/mutations/task-completion.ts
-      - src/agent-runtime/state/mutations/task-constraints.ts
-      - src/agent-runtime/state/mutations/task-control.ts
-      - src/agent-runtime/state/mutations/task-focus.ts
-      - src/agent-runtime/state/mutations/task-record.ts
-      - src/agent-runtime/state/prepare-attempt-session.ts
-      - src/agent-runtime/state/repository/async-wait-job-recovery.test.ts
-      - src/agent-runtime/state/repository/async-wait-job-recovery.ts
-      - src/agent-runtime/state/repository/async-wait-job-store.ts
-      - src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts
-      - src/agent-runtime/state/repository/async-wait-job.test.ts
-      - src/agent-runtime/state/repository/async-wait-job.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-claim.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-enqueue.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-followup-consumer.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-scan.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-turn.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.cross-process.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.four-defects.fixture.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.four-defects.reclaim.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.four-defects.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.package5-retire.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts
-      - src/agent-runtime/state/repository/async-wait-stale-callback.test.ts
-      - src/agent-runtime/state/repository/async-wait-visible-identity.test.ts
-      - src/agent-runtime/state/repository/async-wait-visible-identity.ts
-      - src/agent-runtime/state/repository/durable-json.ts
-      - src/agent-runtime/state/repository/interaction-board-read.test.ts
-      - src/agent-runtime/state/repository/session-task.ts
+      - src/agent-runtime/policy/t*
+      - src/agent-runtime/state/a*
+      - src/agent-runtime/state/c*
+      - src/agent-runtime/state/collaboration/**
+      - src/agent-runtime/state/i*
+      - src/agent-runtime/state/mutations/a*
+      - src/agent-runtime/state/mutations/c*
+      - src/agent-runtime/state/mutations/e*
+      - src/agent-runtime/state/mutations/i*
+      - src/agent-runtime/state/mutations/re*
+      - src/agent-runtime/state/mutations/s*
+      - src/agent-runtime/state/mutations/t*
+      - src/agent-runtime/state/p*
+      - src/agent-runtime/state/repository/a*
+      - src/agent-runtime/state/repository/d*
+      - src/agent-runtime/state/repository/i*
+      - src/agent-runtime/state/repository/s*
       - src/agent-runtime/state/repository/task-identity.ts
       - src/agent-runtime/state/repository/task-stop.restart.test.ts
       - src/agent-runtime/state/repository/task-stop.test.ts
       - src/agent-runtime/state/repository/task-stop.ts
-      - src/agent-runtime/state/session-compaction.ts
-      - src/agent-runtime/state/session-recovery.test.ts
-      - src/agent-runtime/state/session-recovery.ts
-      - src/agent-runtime/state/session-run-accounting.ts
-      - src/agent-runtime/state/session-usage.ts
-      - src/agent-runtime/state/task-action.ts
+      - src/agent-runtime/state/s*
+      - src/agent-runtime/state/t*
       - src/agent-runtime/wiring/**
-      - src/agents/acp-binding-architecture.guardrail.test.ts
-      - src/agents/acp-spawn-parent-stream.test.ts
-      - src/agents/acp-spawn-parent-stream.ts
-      - src/agents/acp-spawn.test.ts
-      - src/agents/acp-spawn.ts
-      - src/agents/agent-paths.test.ts
-      - src/agents/agent-paths.ts
-      - src/agents/agent-scope.test.ts
-      - src/agents/agent-scope.ts
-      - src/agents/announce-idempotency.ts
-      - src/agents/anthropic-payload-log.test.ts
-      - src/agents/anthropic-payload-log.ts
-      - src/agents/anthropic.setup-token.live.test.ts
-      - src/agents/api-key-rotation.ts
-      - src/agents/apply-patch-update.ts
-      - src/agents/apply-patch.test.ts
-      - src/agents/apply-patch.ts
-      - src/agents/auth-health.test.ts
-      - src/agents/auth-health.ts
-      - src/agents/auth-profiles.chutes.test.ts
-      - src/agents/auth-profiles.cooldown-auto-expiry.test.ts
-      - src/agents/auth-profiles.ensureauthprofilestore.test.ts
-      - src/agents/auth-profiles.getsoonestcooldownexpiry.test.ts
-      - src/agents/auth-profiles.markauthprofilefailure.test.ts
-      - src/agents/auth-profiles.readonly-sync.test.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.does-not-prioritize-lastgood-round-robin-ordering.test.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.fixtures.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.normalizes-z-ai-aliases-auth-order.test.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.orders-by-lastused-no-explicit-order-exists.test.ts
-      - src/agents/auth-profiles.resolve-auth-profile-order.uses-stored-profiles-no-config-exists.test.ts
-      - src/agents/auth-profiles.runtime-snapshot-save.test.ts
-      - src/agents/auth-profiles.store.save.test.ts
-      - src/agents/auth-profiles.ts
-      - src/agents/auth-profiles/constants.ts
-      - src/agents/auth-profiles/credential-state.test.ts
-      - src/agents/auth-profiles/credential-state.ts
-      - src/agents/auth-profiles/display.ts
-      - src/agents/auth-profiles/doctor.ts
-      - src/agents/auth-profiles/external-cli-sync.ts
-      - src/agents/auth-profiles/oauth.fallback-to-main-agent.test.ts
-      - src/agents/auth-profiles/oauth.openai-codex-refresh-fallback.test.ts
-      - src/agents/auth-profiles/oauth.test.ts
-      - src/agents/auth-profiles/oauth.ts
-      - src/agents/auth-profiles/order.test.ts
-      - src/agents/auth-profiles/order.ts
-      - src/agents/auth-profiles/paths.ts
-      - src/agents/auth-profiles/profiles.ts
-      - src/agents/auth-profiles/repair.ts
-      - src/agents/auth-profiles/session-override.test.ts
-      - src/agents/auth-profiles/session-override.ts
-      - src/agents/auth-profiles/state-observation.test.ts
-      - src/agents/auth-profiles/state-observation.ts
-      - src/agents/auth-profiles/store.ts
-      - src/agents/auth-profiles/types.ts
-      - src/agents/auth-profiles/usage.test.ts
-      - src/agents/auth-profiles/usage.ts
-      - src/agents/bash-process-registry.test-helpers.ts
-      - src/agents/bash-process-registry.test.ts
-      - src/agents/bash-process-registry.ts
-      - src/agents/bash-tools.build-docker-exec-args.test.ts
-      - src/agents/bash-tools.exec-approval-followup.test.ts
-      - src/agents/bash-tools.exec-approval-followup.ts
-      - src/agents/bash-tools.exec-approval-request.test.ts
-      - src/agents/bash-tools.exec-approval-request.ts
-      - src/agents/bash-tools.exec-ceiling.ts
-      - src/agents/bash-tools.exec-host-gateway.ts
-      - src/agents/bash-tools.exec-host-node.ts
-      - src/agents/bash-tools.exec-host-shared.test.ts
-      - src/agents/bash-tools.exec-host-shared.ts
-      - src/agents/bash-tools.exec-node-target.test.ts
-      - src/agents/bash-tools.exec-node-target.ts
-      - src/agents/bash-tools.exec-policy-provenance.test.ts
-      - src/agents/bash-tools.exec-policy-provenance.ts
-      - src/agents/bash-tools.exec-protected-process.test.ts
-      - src/agents/bash-tools.exec-protected-process.ts
-      - src/agents/bash-tools.exec-runtime.test.ts
-      - src/agents/bash-tools.exec-runtime.ts
-      - src/agents/bash-tools.exec-types.ts
-      - src/agents/bash-tools.exec-workdir-clamp.test.ts
-      - src/agents/bash-tools.exec.approval-id.test.ts
-      - src/agents/bash-tools.exec.background-abort.test.ts
-      - src/agents/bash-tools.exec.path.test.ts
-      - src/agents/bash-tools.exec.pty-cleanup.test.ts
-      - src/agents/bash-tools.exec.pty-fallback-failure.test.ts
-      - src/agents/bash-tools.exec.pty-fallback.test.ts
-      - src/agents/bash-tools.exec.pty.test.ts
-      - src/agents/bash-tools.exec.sandbox-workspace-write.test.ts
-      - src/agents/bash-tools.exec.script-preflight.test.ts
-      - src/agents/bash-tools.exec.task-binding.test.ts
-      - src/agents/bash-tools.exec.ts
-      - src/agents/bash-tools.process.poll-timeout.test.ts
-      - src/agents/bash-tools.process.send-keys.test.ts
-      - src/agents/bash-tools.process.supervisor.test.ts
-      - src/agents/bash-tools.process.ts
-      - src/agents/bash-tools.shared.test.ts
-      - src/agents/bash-tools.shared.ts
-      - src/agents/bash-tools.test.ts
-      - src/agents/bash-tools.ts
-      - src/agents/bedrock-discovery.test.ts
-      - src/agents/bedrock-discovery.ts
-      - src/agents/bootstrap-budget.test.ts
-      - src/agents/bootstrap-budget.ts
-      - src/agents/bootstrap-cache.test.ts
-      - src/agents/bootstrap-cache.ts
-      - src/agents/bootstrap-files.test.ts
-      - src/agents/bootstrap-files.ts
-      - src/agents/bootstrap-hooks.test.ts
-      - src/agents/bootstrap-hooks.ts
-      - src/agents/builtin-steward/behavior-rules.test.ts
-      - src/agents/builtin-steward/behavior-rules.ts
-      - src/agents/builtin-steward/employee-isolation.test.ts
-      - src/agents/builtin-steward/employee-isolation.ts
-      - src/agents/builtin-steward/identity.test.ts
-      - src/agents/builtin-steward/identity.ts
-      - src/agents/builtin-steward/provision.test.ts
-      - src/agents/builtin-steward/provision.ts
-      - src/agents/builtin-steward/required-skills.test.ts
-      - src/agents/builtin-steward/required-skills.ts
-      - src/agents/builtin-steward/steward-skills-sync.test.ts
-      - src/agents/builtin-steward/steward-skills-sync.ts
-      - src/agents/byteplus-models.ts
-      - src/agents/byteplus.live.test.ts
-      - src/agents/cache-trace.test.ts
-      - src/agents/cache-trace.ts
-      - src/agents/channel-tools.test.ts
-      - src/agents/channel-tools.ts
-      - src/agents/chutes-oauth.flow.test.ts
-      - src/agents/chutes-oauth.test.ts
-      - src/agents/chutes-oauth.ts
-      - src/agents/claude-cli-runner.test.ts
-      - src/agents/claude-cli-runner.ts
-      - src/agents/cli-backend-admin.test.ts
-      - src/agents/cli-backend-admin.ts
-      - src/agents/cli-backend-credential-guidance.test.ts
-      - src/agents/cli-backend-credential-guidance.ts
-      - src/agents/cli-backend-credential-resolve.test.ts
-      - src/agents/cli-backend-credential-resolve.ts
-      - src/agents/cli-backend-credential-store.test.ts
-      - src/agents/cli-backend-credential-store.ts
-      - src/agents/cli-backend-probe.ts
-      - src/agents/cli-backend-usage-attribution.test.ts
-      - src/agents/cli-backend-usage-attribution.ts
-      - src/agents/cli-backend-worker.test.ts
-      - src/agents/cli-backend-worker.ts
-      - src/agents/cli-backends.test.ts
-      - src/agents/cli-backends.ts
-      - src/agents/cli-credentials.test.ts
-      - src/agents/cli-credentials.ts
-      - src/agents/cli-runner.test.ts
-      - src/agents/cli-runner.ts
-      - src/agents/cli-runner/helpers.ts
-      - src/agents/cli-runner/reliability.ts
-      - src/agents/cli-session.ts
-      - src/agents/cli-watchdog-defaults.ts
-      - src/agents/cloudflare-ai-gateway.ts
-      - src/agents/command-poll-backoff.runtime.ts
-      - src/agents/command-poll-backoff.test.ts
-      - src/agents/command-poll-backoff.ts
-      - src/agents/compaction.identifier-policy.test.ts
-      - src/agents/compaction.identifier-preservation.test.ts
-      - src/agents/compaction.retry.test.ts
-      - src/agents/compaction.test.ts
-      - src/agents/compaction.token-sanitize.test.ts
-      - src/agents/compaction.tool-result-details.test.ts
-      - src/agents/compaction.ts
-      - src/agents/confirmation-tiers.test.ts
-      - src/agents/confirmation-tiers.ts
-      - src/agents/content-blocks.test.ts
-      - src/agents/content-blocks.ts
-      - src/agents/context-compiler/active-task-seed.ts
-      - src/agents/context-compiler/atomic-units.ts
-      - src/agents/context-compiler/candidates.ts
-      - src/agents/context-compiler/collab-compile-strategy.test.ts
-      - src/agents/context-compiler/collab-compile-strategy.ts
-      - src/agents/context-compiler/compile.test.ts
-      - src/agents/context-compiler/compile.ts
-      - src/agents/context-compiler/flag.ts
-      - src/agents/context-compiler/group-task-stable-summary.test.ts
-      - src/agents/context-compiler/group-task-stable-summary.ts
-      - src/agents/context-compiler/index.ts
-      - src/agents/context-compiler/lane-budget.test.ts
-      - src/agents/context-compiler/lane-budget.ts
-      - src/agents/context-compiler/model-boundary.test.ts
-      - src/agents/context-compiler/normalize-outbound.estimate.test.ts
-      - src/agents/context-compiler/normalize-outbound.ts
-      - src/agents/context-compiler/preference-mutation.test.ts
-      - src/agents/context-compiler/preference-mutation.ts
-      - src/agents/context-compiler/shrink-unit.ts
-      - src/agents/context-compiler/telemetry.ts
-      - src/agents/context-compiler/types.ts
-      - src/agents/context-compiler/user-profile-store.ts
-      - src/agents/context-window-guard.test.ts
-      - src/agents/context.lookup.test.ts
-      - src/agents/context.test.ts
-      - src/agents/context.ts
-      - src/agents/current-time.ts
-      - src/agents/custom-api-registry.test.ts
-      - src/agents/custom-api-registry.ts
-      - src/agents/date-time.ts
-      - src/agents/defaults.ts
-      - src/agents/docs-path.ts
-      - src/agents/doubao-models.ts
-      - src/agents/embedded-model-governance.test.ts
-      - src/agents/embedded-model-governance.ts
-      - src/agents/execution-preflight/allowed-entry-disposition.test.ts
-      - src/agents/execution-preflight/allowed-entry-disposition.ts
-      - src/agents/execution-preflight/completion-attempt-lifecycle.test.ts
-      - src/agents/execution-preflight/completion-claim.ts
-      - src/agents/execution-preflight/completion-context.test.ts
-      - src/agents/execution-preflight/completion-delayed-send.test.ts
-      - src/agents/execution-preflight/completion-hold.ts
-      - src/agents/execution-preflight/completion-isolated-smoke.test.ts
-      - src/agents/execution-preflight/completion-lifecycle-release.test.ts
-      - src/agents/execution-preflight/completion-receipt-matrix.test.ts
-      - src/agents/execution-preflight/completion-send.test.ts
-      - src/agents/execution-preflight/confirmation-gate.test.ts
-      - src/agents/execution-preflight/confirmation-gate.ts
-      - src/agents/execution-preflight/constitutional-runtime-facade.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-facade.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-deps.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-gate.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-gate.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-observe.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-observe.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-projection.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-projection.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-sink.test.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-sink.ts
-      - src/agents/execution-preflight/constitutional-runtime-shadow-wiring.test.ts
-      - src/agents/execution-preflight/ctr-close-consult-lock.test.ts
-      - src/agents/execution-preflight/delivery.ts
-      - src/agents/execution-preflight/execution-preflight.integration.test.ts
-      - src/agents/execution-preflight/execution-preflight.test.ts
-      - src/agents/execution-preflight/failure.ts
-      - src/agents/execution-preflight/hook-delivery.ts
-      - src/agents/execution-preflight/index.ts
-      - src/agents/execution-preflight/json-canvas-canary.test.ts
-      - src/agents/execution-preflight/json-canvas-validator.ts
-      - src/agents/execution-preflight/observability.test.ts
-      - src/agents/execution-preflight/observability.ts
-      - src/agents/execution-preflight/production-validators.test.ts
-      - src/agents/execution-preflight/production-validators.ts
-      - src/agents/execution-preflight/resolve.ts
-      - src/agents/execution-preflight/reuse-observe-helper-lock.test.ts
-      - src/agents/execution-preflight/runtime-validation-ownership.test.ts
-      - src/agents/execution-preflight/skill-contract.ts
-      - src/agents/execution-preflight/skill-contract.ui.test.ts
-      - src/agents/execution-preflight/trace.ts
-      - src/agents/execution-preflight/types.ts
-      - src/agents/execution-preflight/validation.ts
-      - src/agents/execution-stall-continue-loop.test.ts
-      - src/agents/execution-stall-continue.test.ts
-      - src/agents/execution-stall-continue.ts
-      - src/agents/failover-error.test.ts
-      - src/agents/failover-error.ts
-      - src/agents/glob-pattern.ts
-      - src/agents/google-gemini-switch.live.test.ts
-      - src/agents/huggingface-models.test.ts
-      - src/agents/huggingface-models.ts
-      - src/agents/identity-avatar.test.ts
-      - src/agents/identity-avatar.ts
-      - src/agents/identity-file.test.ts
-      - src/agents/identity-file.ts
-      - src/agents/identity.human-delay.test.ts
-      - src/agents/identity.per-channel-prefix.test.ts
-      - src/agents/identity.test.ts
-      - src/agents/identity.ts
-      - src/agents/image-generation-models.test.ts
-      - src/agents/image-generation-models.ts
-      - src/agents/image-sanitization.test.ts
-      - src/agents/image-sanitization.ts
-      - src/agents/inbound-media-grants.test.ts
-      - src/agents/inbound-media-grants.ts
-      - src/agents/inbound-tool-policy.test.ts
-      - src/agents/inbound-tool-policy.ts
-      - src/agents/internal-events.ts
-      - src/agents/kilocode-models.test.ts
-      - src/agents/kilocode-models.ts
-      - src/agents/lanes.test.ts
-      - src/agents/lanes.ts
-      - src/agents/live-auth-keys.ts
-      - src/agents/live-model-errors.test.ts
-      - src/agents/live-model-errors.ts
-      - src/agents/live-model-filter.ts
-      - src/agents/live-test-helpers.ts
-      - src/agents/memory-search.test.ts
-      - src/agents/memory-search.ts
-      - src/agents/minimax-vlm.normalizes-api-key.test.ts
-      - src/agents/minimax-vlm.ts
-      - src/agents/minimax.live.test.ts
+      - src/agents/a*
+      - src/agents/auth-profiles/**
+      - src/agents/b*
+      - src/agents/builtin-steward/**
+      - src/agents/c*
+      - src/agents/cli-runner/**
+      - src/agents/context-compiler/**
+      - src/agents/d*
+      - src/agents/e*
+      - src/agents/execution-preflight/**
+      - src/agents/f*
+      - src/agents/g*
+      - src/agents/h*
+      - src/agents/i*
+      - src/agents/k*
+      - src/agents/l*
+      - src/agents/me*
+      - src/agents/mi*
       - src/agents/model-alias-lines.ts
       - src/agents/model-auth-env-vars.ts
       - src/agents/model-auth-label.test.ts
@@ -8559,52 +7187,10 @@ tasks:
       - src/agents/models-config.write-serialization.test.ts
       - src/agents/models.profiles.live.test.ts
       - src/agents/moonshot.live.test.ts
-      - src/agents/music-generation-models.test.ts
-      - src/agents/music-generation-models.ts
-      - src/agents/ollama-stream.test.ts
-      - src/agents/ollama-stream.ts
-      - src/agents/openai-responses.reasoning-replay.test.ts
-      - src/agents/openai-ws-connection.test.ts
-      - src/agents/openai-ws-connection.ts
-      - src/agents/openai-ws-stream.e2e.test.ts
-      - src/agents/openai-ws-stream.test.ts
-      - src/agents/openai-ws-stream.ts
-      - src/agents/openclaw-gateway-tool.test.ts
-      - src/agents/openclaw-tools.agents.test.ts
-      - src/agents/openclaw-tools.camera.test.ts
-      - src/agents/openclaw-tools.knowledge-consume.test.ts
-      - src/agents/openclaw-tools.knowledge-source.test.ts
-      - src/agents/openclaw-tools.office-file.test.ts
-      - src/agents/openclaw-tools.pdf-registration.test.ts
-      - src/agents/openclaw-tools.plugin-context.test.ts
-      - src/agents/openclaw-tools.session-status.test.ts
-      - src/agents/openclaw-tools.sessions-visibility.test.ts
-      - src/agents/openclaw-tools.sessions.test.ts
-      - src/agents/openclaw-tools.subagents.scope.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn-applies-thinking-default.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn-default-timeout-absent.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn-default-timeout.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn-depth-limits.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.allowlist.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.cron-note.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.lifecycle.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.model.test.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.test-harness.ts
-      - src/agents/openclaw-tools.subagents.sessions-spawn.workspace.test.ts
-      - src/agents/openclaw-tools.subagents.steer-failure-clears-suppression.test.ts
-      - src/agents/openclaw-tools.subagents.test-harness.ts
-      - src/agents/openclaw-tools.ts
-      - src/agents/openclaw-tools.web-runtime.test.ts
-      - src/agents/opencode-zen-models.test.ts
-      - src/agents/opencode-zen-models.ts
-      - src/agents/owner-display.test.ts
-      - src/agents/owner-display.ts
-      - src/agents/path-policy.test.ts
-      - src/agents/path-policy.ts
-      - src/agents/payload-redaction.ts
-      - src/agents/personal-mail-assistant/identity.test.ts
-      - src/agents/personal-mail-assistant/identity.ts
-      - src/agents/personal-mail-assistant/provision.ts
+      - src/agents/mu*
+      - src/agents/o*
+      - src/agents/pa*
+      - src/agents/personal-mail-assistant/**
       - src/agents/pi-auth-credentials.ts
       - src/agents/pi-auth-json.test.ts
       - src/agents/pi-auth-json.ts
@@ -8620,17 +7206,7 @@ tasks:
       - src/agents/pi-embedded-helpers.scratchpad-sanitize.node.test.ts
       - src/agents/pi-embedded-helpers.ts
       - src/agents/pi-embedded-helpers.validate-turns.test.ts
-      - src/agents/pi-embedded-helpers/bootstrap.ts
-      - src/agents/pi-embedded-helpers/errors.ts
-      - src/agents/pi-embedded-helpers/failover-matches.ts
-      - src/agents/pi-embedded-helpers/google.ts
-      - src/agents/pi-embedded-helpers/images.ts
-      - src/agents/pi-embedded-helpers/messaging-dedupe.ts
-      - src/agents/pi-embedded-helpers/openai.ts
-      - src/agents/pi-embedded-helpers/thinking.test.ts
-      - src/agents/pi-embedded-helpers/thinking.ts
-      - src/agents/pi-embedded-helpers/turns.ts
-      - src/agents/pi-embedded-helpers/types.ts
+      - src/agents/pi-embedded-helpers/**
       - src/agents/pi-embedded-messaging.ts
       - src/agents/pi-embedded-payloads.ts
       - src/agents/pi-embedded-runner-extraparams.live.test.ts
@@ -8654,10 +7230,8 @@ tasks:
       - src/agents/pi-embedded-runner.sanitize-session-history.test.ts
       - src/agents/pi-embedded-runner.splitsdktools.test.ts
       - src/agents/pi-embedded-runner.ts
-      - src/agents/pi-embedded-runner/abort.ts
-      - src/agents/pi-embedded-runner/anthropic-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/cache-ttl.test.ts
-      - src/agents/pi-embedded-runner/cache-ttl.ts
+      - src/agents/pi-embedded-runner/a*
+      - src/agents/pi-embedded-runner/ca*
       - src/agents/pi-embedded-runner/compact.hooks.test.ts
       - src/agents/pi-embedded-runner/compact.runtime.ts
       - src/agents/pi-embedded-runner/compaction-safety-timeout.ts
@@ -8667,90 +7241,19 @@ tasks:
       - src/agents/pi-embedded-runner/extra-params.openrouter-cache-control.test.ts
       - src/agents/pi-embedded-runner/extra-params.ts
       - src/agents/pi-embedded-runner/extra-params.zai-tool-stream.test.ts
-      - src/agents/pi-embedded-runner/google.test.ts
-      - src/agents/pi-embedded-runner/google.ts
-      - src/agents/pi-embedded-runner/history.ts
-      - src/agents/pi-embedded-runner/kilocode.test.ts
-      - src/agents/pi-embedded-runner/lanes.ts
-      - src/agents/pi-embedded-runner/logger.ts
-      - src/agents/pi-embedded-runner/model.forward-compat.test.ts
-      - src/agents/pi-embedded-runner/model.provider-normalization.test.ts
-      - src/agents/pi-embedded-runner/model.provider-normalization.ts
-      - src/agents/pi-embedded-runner/model.test-harness.ts
-      - src/agents/pi-embedded-runner/model.test.ts
-      - src/agents/pi-embedded-runner/model.ts
-      - src/agents/pi-embedded-runner/moonshot-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/openai-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/proxy-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/reply-language-reminder.test.ts
-      - src/agents/pi-embedded-runner/reply-language-reminder.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.fixture.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.loop.test.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.mocks.shared.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.shared-test.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.spawn-workspace.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.test.ts
-      - src/agents/pi-embedded-runner/run/compaction-retry-aggregate-timeout.test.ts
-      - src/agents/pi-embedded-runner/run/compaction-retry-aggregate-timeout.ts
-      - src/agents/pi-embedded-runner/run/compaction-timeout.test.ts
-      - src/agents/pi-embedded-runner/run/compaction-timeout.ts
-      - src/agents/pi-embedded-runner/run/execution-preference-hint.test.ts
-      - src/agents/pi-embedded-runner/run/execution-preference-hint.ts
-      - src/agents/pi-embedded-runner/run/execution-router-baselines.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-baselines.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow-cli.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow-identity.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow-revalidate.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow.test.ts
-      - src/agents/pi-embedded-runner/run/failover-observation.test.ts
-      - src/agents/pi-embedded-runner/run/failover-observation.ts
-      - src/agents/pi-embedded-runner/run/history-image-prune.test.ts
-      - src/agents/pi-embedded-runner/run/history-image-prune.ts
-      - src/agents/pi-embedded-runner/run/image-parts.test.ts
-      - src/agents/pi-embedded-runner/run/image-parts.ts
-      - src/agents/pi-embedded-runner/run/images.test.ts
-      - src/agents/pi-embedded-runner/run/images.ts
-      - src/agents/pi-embedded-runner/run/params.ts
-      - src/agents/pi-embedded-runner/run/payloads.errors.test.ts
-      - src/agents/pi-embedded-runner/run/payloads.test-helpers.ts
-      - src/agents/pi-embedded-runner/run/payloads.test.ts
-      - src/agents/pi-embedded-runner/run/resolve-embedded-tools.test.ts
-      - src/agents/pi-embedded-runner/run/resolve-embedded-tools.ts
-      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
-      - src/agents/pi-embedded-runner/run/types.ts
-      - src/agents/pi-embedded-runner/runs.test.ts
-      - src/agents/pi-embedded-runner/runs.ts
-      - src/agents/pi-embedded-runner/sandbox-info.ts
-      - src/agents/pi-embedded-runner/sanitize-session-history.tool-result-details.test.ts
-      - src/agents/pi-embedded-runner/session-manager-cache.ts
-      - src/agents/pi-embedded-runner/session-manager-init.eexist.test.ts
-      - src/agents/pi-embedded-runner/session-manager-init.group-public.test.ts
-      - src/agents/pi-embedded-runner/session-manager-init.ts
-      - src/agents/pi-embedded-runner/skills-runtime.integration.test.ts
-      - src/agents/pi-embedded-runner/skills-runtime.node-import.test.ts
-      - src/agents/pi-embedded-runner/skills-runtime.test.ts
-      - src/agents/pi-embedded-runner/skills-runtime.ts
-      - src/agents/pi-embedded-runner/stream-api-key.test.ts
-      - src/agents/pi-embedded-runner/stream-api-key.ts
-      - src/agents/pi-embedded-runner/system-prompt.test.ts
-      - src/agents/pi-embedded-runner/system-prompt.ts
-      - src/agents/pi-embedded-runner/thinking.test.ts
-      - src/agents/pi-embedded-runner/thinking.ts
-      - src/agents/pi-embedded-runner/tool-name-allowlist.ts
-      - src/agents/pi-embedded-runner/tool-result-char-estimator.test.ts
-      - src/agents/pi-embedded-runner/tool-result-char-estimator.ts
-      - src/agents/pi-embedded-runner/tool-result-context-guard.test.ts
-      - src/agents/pi-embedded-runner/tool-result-context-guard.ts
-      - src/agents/pi-embedded-runner/tool-result-truncation.test.ts
-      - src/agents/pi-embedded-runner/tool-result-truncation.ts
-      - src/agents/pi-embedded-runner/tool-split.ts
-      - src/agents/pi-embedded-runner/types.ts
-      - src/agents/pi-embedded-runner/usage-reporting.test.ts
-      - src/agents/pi-embedded-runner/utils.ts
-      - src/agents/pi-embedded-runner/wait-for-idle-before-flush.ts
+      - src/agents/pi-embedded-runner/g*
+      - src/agents/pi-embedded-runner/h*
+      - src/agents/pi-embedded-runner/k*
+      - src/agents/pi-embedded-runner/l*
+      - src/agents/pi-embedded-runner/m*
+      - src/agents/pi-embedded-runner/o*
+      - src/agents/pi-embedded-runner/p*
+      - src/agents/pi-embedded-runner/r*
+      - src/agents/pi-embedded-runner/run/**
+      - src/agents/pi-embedded-runner/s*
+      - src/agents/pi-embedded-runner/t*
+      - src/agents/pi-embedded-runner/u*
+      - src/agents/pi-embedded-runner/w*
       - src/agents/pi-embedded-subscribe.block-reply-rejections.test.ts
       - src/agents/pi-embedded-subscribe.code-span-awareness.test.ts
       - src/agents/pi-embedded-subscribe.e2e-harness.ts
@@ -8798,32 +7301,14 @@ tasks:
       - src/agents/pi-embedded-utils.test.ts
       - src/agents/pi-embedded-utils.ts
       - src/agents/pi-embedded.ts
-      - src/agents/pi-extensions/compaction-safeguard-runtime.ts
-      - src/agents/pi-extensions/compaction-safeguard.test.ts
-      - src/agents/pi-extensions/compaction-safeguard.ts
-      - src/agents/pi-extensions/context-pruning.test.ts
-      - src/agents/pi-extensions/context-pruning.ts
-      - src/agents/pi-extensions/context-pruning/extension.ts
-      - src/agents/pi-extensions/context-pruning/pruner.test.ts
-      - src/agents/pi-extensions/context-pruning/pruner.ts
-      - src/agents/pi-extensions/context-pruning/runtime.ts
-      - src/agents/pi-extensions/context-pruning/settings.ts
-      - src/agents/pi-extensions/context-pruning/tools.ts
-      - src/agents/pi-extensions/session-manager-runtime-registry.ts
+      - src/agents/pi-extensions/**
       - src/agents/pi-model-discovery-runtime.ts
       - src/agents/pi-model-discovery.auth.test.ts
       - src/agents/pi-model-discovery.compat.e2e.test.ts
       - src/agents/pi-model-discovery.ts
       - src/agents/pi-project-settings.test.ts
       - src/agents/pi-project-settings.ts
-      - src/agents/pi-sdk/auth-storage.test.ts
-      - src/agents/pi-sdk/auth-storage.ts
-      - src/agents/pi-sdk/coding-tools.test.ts
-      - src/agents/pi-sdk/coding-tools.ts
-      - src/agents/pi-sdk/model-runtime.ts
-      - src/agents/pi-sdk/oauth.ts
-      - src/agents/pi-sdk/session.test.ts
-      - src/agents/pi-sdk/session.ts
+      - src/agents/pi-sdk/**
       - src/agents/pi-settings.test.ts
       - src/agents/pi-settings.ts
       - src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
@@ -8865,548 +7350,28 @@ tasks:
       - src/agents/pi-tools.whatsapp-login-gating.test.ts
       - src/agents/pi-tools.workspace-only-false.test.ts
       - src/agents/pi-tools.workspace-paths.test.ts
-      - src/agents/protocol-violation.test.ts
-      - src/agents/protocol-violation.ts
-      - src/agents/provider-capabilities.test.ts
-      - src/agents/provider-capabilities.ts
-      - src/agents/provider-tool-name-stream.test.ts
-      - src/agents/provider-tool-name-stream.ts
-      - src/agents/provider-tool-names.ts
-      - src/agents/pty-dsr.ts
-      - src/agents/pty-keys.test.ts
-      - src/agents/pty-keys.ts
-      - src/agents/queued-file-writer.ts
-      - src/agents/recoverable-tool-failure.test.ts
-      - src/agents/recoverable-tool-failure.ts
-      - src/agents/resolve-context-budget.test.ts
-      - src/agents/resolve-context-budget.ts
-      - src/agents/runtime-plugins.ts
-      - src/agents/sandbox-agent-config.agent-specific-sandbox-config.e2e.test.ts
-      - src/agents/sandbox-create-args.test.ts
-      - src/agents/sandbox-explain.test.ts
-      - src/agents/sandbox-media-paths.test.ts
-      - src/agents/sandbox-media-paths.ts
-      - src/agents/sandbox-merge.test.ts
-      - src/agents/sandbox-paths.test.ts
-      - src/agents/sandbox-paths.ts
-      - src/agents/sandbox-skills.test.ts
-      - src/agents/sandbox-tool-policy.ts
-      - src/agents/sandbox.resolveSandboxContext.test.ts
-      - src/agents/sandbox.ts
-      - src/agents/sandbox/ACCOUNT_WORKER_SANDBOX_IMAGES.md
-      - src/agents/sandbox/account-cdp-release.test.ts
-      - src/agents/sandbox/account-cdp-resolve.test.ts
-      - src/agents/sandbox/account-cdp-resolve.ts
-      - src/agents/sandbox/account-computer-browser-routing.test.ts
-      - src/agents/sandbox/account-computer-browser-routing.ts
-      - src/agents/sandbox/account-computer-browser-tools.test.ts
-      - src/agents/sandbox/account-computer-cn-qr-sms-handoff.test.ts
-      - src/agents/sandbox/account-computer-live-login.test.ts
-      - src/agents/sandbox/account-computer-login-classify.test.ts
-      - src/agents/sandbox/account-computer-login-classify.ts
-      - src/agents/sandbox/account-computer-login-golden-path.test.ts
-      - src/agents/sandbox/account-computer-login-policy-store.ts
-      - src/agents/sandbox/account-computer-login-policy.test.ts
-      - src/agents/sandbox/account-computer-login-vault.ts
-      - src/agents/sandbox/account-computer-login-wait.ts
-      - src/agents/sandbox/account-computer-running-attach.test.ts
-      - src/agents/sandbox/account-computer-running-attach.ts
-      - src/agents/sandbox/account-computer-stream.reattach.test.ts
-      - src/agents/sandbox/account-computer-stream.test.ts
-      - src/agents/sandbox/account-computer-stream.ts
-      - src/agents/sandbox/account-computer-worker-live-login.test.ts
-      - src/agents/sandbox/account-computer-zhihu-login.test.ts
-      - src/agents/sandbox/account-dir-snapshot.ts
-      - src/agents/sandbox/account-file-transfer.test.ts
-      - src/agents/sandbox/account-file-transfer.ts
-      - src/agents/sandbox/account-mounts.ts
-      - src/agents/sandbox/account-production-create.test.ts
-      - src/agents/sandbox/account-sandbox-startup.ts
-      - src/agents/sandbox/account-scope.ts
-      - src/agents/sandbox/account-shared-browser-migration.ts
-      - src/agents/sandbox/account-shared-mounts.test.ts
-      - src/agents/sandbox/account-shared-mounts.ts
-      - src/agents/sandbox/account-worker-browser-bridge.test.ts
-      - src/agents/sandbox/account-worker-browser-bridge.ts
-      - src/agents/sandbox/account-worker-driver.test.ts
-      - src/agents/sandbox/account-worker-driver.ts
-      - src/agents/sandbox/account-worker-embedded.test.ts
-      - src/agents/sandbox/account-worker-embedded.ts
-      - src/agents/sandbox/account-worker-flags.ts
-      - src/agents/sandbox/account-worker-gateway.soft-renew.test.ts
-      - src/agents/sandbox/account-worker-gateway.ts
-      - src/agents/sandbox/account-worker-lifecycle.test.ts
-      - src/agents/sandbox/account-worker-lifecycle.ts
-      - src/agents/sandbox/account-worker-shared-browser.test.ts
-      - src/agents/sandbox/account-worker.test.ts
-      - src/agents/sandbox/account-worker.ts
-      - src/agents/sandbox/account-workspace-session.test.ts
-      - src/agents/sandbox/bind-spec.test.ts
-      - src/agents/sandbox/bind-spec.ts
-      - src/agents/sandbox/browser-bridges.ts
-      - src/agents/sandbox/browser.create.test.ts
-      - src/agents/sandbox/browser.novnc-url.test.ts
-      - src/agents/sandbox/browser.ts
-      - src/agents/sandbox/config-hash.test.ts
-      - src/agents/sandbox/config-hash.ts
-      - src/agents/sandbox/config.ts
-      - src/agents/sandbox/constants.test.ts
-      - src/agents/sandbox/constants.ts
-      - src/agents/sandbox/context.ts
-      - src/agents/sandbox/context.user-fallback.test.ts
-      - src/agents/sandbox/docker-engine-client.production-no-host-fallback.test.ts
-      - src/agents/sandbox/docker-engine-client.test.ts
-      - src/agents/sandbox/docker-engine-client.ts
-      - src/agents/sandbox/docker.config-hash-recreate.test.ts
-      - src/agents/sandbox/docker.execDockerRaw.enoent.test.ts
-      - src/agents/sandbox/docker.ts
-      - src/agents/sandbox/docker.windows.test.ts
-      - src/agents/sandbox/effective-workspace.test.ts
-      - src/agents/sandbox/effective-workspace.ts
-      - src/agents/sandbox/fs-bridge-mutation-helper.test.ts
-      - src/agents/sandbox/fs-bridge-mutation-helper.ts
-      - src/agents/sandbox/fs-bridge-mutation-python-source.ts
-      - src/agents/sandbox/fs-bridge-path-safety.ts
-      - src/agents/sandbox/fs-bridge-shell-command-plans.ts
-      - src/agents/sandbox/fs-bridge.anchored-ops.test.ts
-      - src/agents/sandbox/fs-bridge.boundary.test.ts
-      - src/agents/sandbox/fs-bridge.e2e-docker.test.ts
-      - src/agents/sandbox/fs-bridge.shell.test.ts
-      - src/agents/sandbox/fs-bridge.test-helpers.ts
-      - src/agents/sandbox/fs-bridge.ts
-      - src/agents/sandbox/fs-paths.test.ts
-      - src/agents/sandbox/fs-paths.ts
-      - src/agents/sandbox/gateway-docker-probe.test.ts
-      - src/agents/sandbox/gateway-docker-probe.ts
-      - src/agents/sandbox/hash.ts
-      - src/agents/sandbox/host-engine-bind-path.test.ts
-      - src/agents/sandbox/host-engine-bind-path.ts
-      - src/agents/sandbox/host-paths.test.ts
-      - src/agents/sandbox/host-paths.ts
-      - src/agents/sandbox/manage.ts
-      - src/agents/sandbox/network-mode.ts
-      - src/agents/sandbox/novnc-auth.ts
-      - src/agents/sandbox/path-utils.ts
-      - src/agents/sandbox/production-execution-mode.ts
-      - src/agents/sandbox/prune.ts
-      - src/agents/sandbox/registry.test.ts
-      - src/agents/sandbox/registry.ts
-      - src/agents/sandbox/runtime-controller.test.ts
-      - src/agents/sandbox/runtime-controller.ts
-      - src/agents/sandbox/runtime-status.ts
-      - src/agents/sandbox/sandbox-runtime-ownership.test.ts
-      - src/agents/sandbox/sandbox-runtime-ownership.ts
-      - src/agents/sandbox/sanitize-env-vars.test.ts
-      - src/agents/sandbox/sanitize-env-vars.ts
-      - src/agents/sandbox/secure-form-fill-host.test.ts
-      - src/agents/sandbox/secure-form-fill-host.ts
-      - src/agents/sandbox/secure-form-fill.ts
-      - src/agents/sandbox/secure-form-handoff-gate-probe.ts
-      - src/agents/sandbox/secure-form-handoff-gate.test.ts
-      - src/agents/sandbox/secure-form-handoff-gate.ts
-      - src/agents/sandbox/secure-form-handoff-wait.test.ts
-      - src/agents/sandbox/secure-form-handoff-wait.ts
-      - src/agents/sandbox/secure-form-store.ts
-      - src/agents/sandbox/secure-form-types.ts
-      - src/agents/sandbox/secure-form.test.ts
-      - src/agents/sandbox/shared.ts
-      - src/agents/sandbox/test-args.ts
-      - src/agents/sandbox/test-fixtures.ts
-      - src/agents/sandbox/tool-policy.ts
-      - src/agents/sandbox/types.docker.ts
-      - src/agents/sandbox/types.ts
-      - src/agents/sandbox/user-facing-entitlement-failure.test.ts
-      - src/agents/sandbox/user-facing-entitlement-failure.ts
-      - src/agents/sandbox/validate-sandbox-security.test.ts
-      - src/agents/sandbox/validate-sandbox-security.ts
-      - src/agents/sandbox/workspace-mounts.test.ts
-      - src/agents/sandbox/workspace-mounts.ts
-      - src/agents/sandbox/workspace.test.ts
-      - src/agents/sandbox/workspace.ts
-      - src/agents/sanitize-for-prompt.test.ts
-      - src/agents/sanitize-for-prompt.ts
-      - src/agents/schema/clean-for-gemini.test.ts
-      - src/agents/schema/clean-for-gemini.ts
-      - src/agents/schema/clean-for-xai.test.ts
-      - src/agents/schema/clean-for-xai.ts
-      - src/agents/schema/typebox.ts
-      - src/agents/session-dirs.ts
-      - src/agents/session-file-repair.test.ts
-      - src/agents/session-file-repair.ts
-      - src/agents/session-slug.test.ts
-      - src/agents/session-slug.ts
-      - src/agents/session-tool-result-guard-wrapper.ts
-      - src/agents/session-tool-result-guard.test.ts
-      - src/agents/session-tool-result-guard.tool-result-persist-hook.test.ts
-      - src/agents/session-tool-result-guard.ts
-      - src/agents/session-tool-result-state.ts
-      - src/agents/session-transcript-entry.test.ts
-      - src/agents/session-transcript-entry.ts
-      - src/agents/session-transcript-repair.attachments.test.ts
-      - src/agents/session-transcript-repair.test.ts
-      - src/agents/session-transcript-repair.ts
-      - src/agents/session-write-lock.test.ts
-      - src/agents/session-write-lock.ts
-      - src/agents/sessions-spawn-hooks.test.ts
-      - src/agents/sessions-spawn-threadid.test.ts
-      - src/agents/shared-fs-resource-policy.test.ts
-      - src/agents/shared-fs-resource-policy.ts
-      - src/agents/shell-utils.test.ts
-      - src/agents/shell-utils.ts
-      - src/agents/skill-gates/__fixtures__/stall-continue-claim-worker.mjs
-      - src/agents/skill-gates/glossary.test.ts
-      - src/agents/skill-gates/glossary.ts
-      - src/agents/skill-gates/smoke-sla.test.ts
-      - src/agents/skill-gates/stall-continue-ledger.test.ts
-      - src/agents/skill-gates/stall-continue-ledger.ts
-      - src/agents/skill-gates/trial-gate.test.ts
-      - src/agents/skill-gates/trial-gate.ts
-      - src/agents/skills-install-download.ts
-      - src/agents/skills-install-extract.ts
-      - src/agents/skills-install-fallback.test.ts
-      - src/agents/skills-install-output.ts
-      - src/agents/skills-install-tar-verbose.ts
-      - src/agents/skills-install.download-test-utils.ts
-      - src/agents/skills-install.download.test.ts
-      - src/agents/skills-install.test-mocks.ts
-      - src/agents/skills-install.test.ts
-      - src/agents/skills-install.ts
-      - src/agents/skills-status.test.ts
-      - src/agents/skills-status.ts
-      - src/agents/skills.agents-skills-directory.test.ts
-      - src/agents/skills.browser-scan-proxy.test.ts
-      - src/agents/skills.build-workspace-skills-prompt.applies-bundled-allowlist-without-affecting-workspace-skills.test.ts
-      - src/agents/skills.build-workspace-skills-prompt.prefers-workspace-skills-managed-skills.test.ts
-      - src/agents/skills.build-workspace-skills-prompt.syncs-merged-skills-into-target-workspace.test.ts
-      - src/agents/skills.buildworkspaceskillsnapshot.test.ts
-      - src/agents/skills.buildworkspaceskillstatus.test.ts
-      - src/agents/skills.compact-skill-paths.test.ts
-      - src/agents/skills.e2e-test-helpers.test.ts
-      - src/agents/skills.e2e-test-helpers.ts
-      - src/agents/skills.enterprise-ai-skills.trigger-corpus.test.ts
-      - src/agents/skills.loadworkspaceskillentries.test.ts
-      - src/agents/skills.resolveskillspromptforrun.test.ts
-      - src/agents/skills.sherpa-onnx-tts-bin.test.ts
-      - src/agents/skills.summarize-skill-description.test.ts
-      - src/agents/skills.test-helpers.ts
-      - src/agents/skills.test.ts
-      - src/agents/skills.ts
-      - src/agents/skills.web-research.test.ts
-      - src/agents/skills.wechat-official-credential.test.ts
-      - src/agents/skills.workflow-gates.test.ts
-      - src/agents/skills/bundled-context.ts
-      - src/agents/skills/bundled-dir.test.ts
-      - src/agents/skills/bundled-dir.ts
-      - src/agents/skills/config.ts
-      - src/agents/skills/env-overrides.runtime.ts
-      - src/agents/skills/env-overrides.ts
-      - src/agents/skills/filter.test.ts
-      - src/agents/skills/filter.ts
-      - src/agents/skills/frontmatter.test.ts
-      - src/agents/skills/frontmatter.ts
-      - src/agents/skills/plugin-skills.test.ts
-      - src/agents/skills/plugin-skills.ts
-      - src/agents/skills/refresh.test.ts
-      - src/agents/skills/refresh.ts
-      - src/agents/skills/serialize.ts
-      - src/agents/skills/skill-gate-composer-boundary.test.ts
-      - src/agents/skills/skill-policy-intersect-union.contract.test.ts
-      - src/agents/skills/skill-policy.test.ts
-      - src/agents/skills/skill-policy.ts
-      - src/agents/skills/tools-dir.ts
-      - src/agents/skills/types.ts
-      - src/agents/skills/workspace.prompt-rank.test.ts
-      - src/agents/skills/workspace.ts
-      - src/agents/spawned-context.test.ts
-      - src/agents/spawned-context.ts
-      - src/agents/stable-stringify.ts
-      - src/agents/steward-sandbox-tools.test.ts
-      - src/agents/stream-message-shared.ts
-      - src/agents/subagent-announce-dispatch.test.ts
-      - src/agents/subagent-announce-dispatch.ts
-      - src/agents/subagent-announce-queue.test.ts
-      - src/agents/subagent-announce-queue.ts
-      - src/agents/subagent-announce.capture-completion-reply.test.ts
-      - src/agents/subagent-announce.format.e2e.test.ts
-      - src/agents/subagent-announce.timeout.test.ts
-      - src/agents/subagent-announce.ts
-      - src/agents/subagent-attachments.ts
-      - src/agents/subagent-capabilities.ts
-      - src/agents/subagent-control.ts
-      - src/agents/subagent-depth.test.ts
-      - src/agents/subagent-depth.ts
-      - src/agents/subagent-lifecycle-events.ts
-      - src/agents/subagent-registry-cleanup.test.ts
-      - src/agents/subagent-registry-cleanup.ts
-      - src/agents/subagent-registry-completion.test.ts
-      - src/agents/subagent-registry-completion.ts
-      - src/agents/subagent-registry-queries.test.ts
-      - src/agents/subagent-registry-queries.ts
-      - src/agents/subagent-registry-runtime.ts
-      - src/agents/subagent-registry-state.ts
-      - src/agents/subagent-registry.announce-loop-guard.test.ts
-      - src/agents/subagent-registry.archive.e2e.test.ts
-      - src/agents/subagent-registry.context-engine.test.ts
-      - src/agents/subagent-registry.lifecycle-retry-grace.e2e.test.ts
-      - src/agents/subagent-registry.mocks.shared.ts
-      - src/agents/subagent-registry.nested.e2e.test.ts
-      - src/agents/subagent-registry.persistence.test.ts
-      - src/agents/subagent-registry.steer-restart.test.ts
-      - src/agents/subagent-registry.store.ts
-      - src/agents/subagent-registry.ts
-      - src/agents/subagent-registry.types.ts
-      - src/agents/subagent-spawn.attachments.test.ts
-      - src/agents/subagent-spawn.objective-shadow.test.ts
-      - src/agents/subagent-spawn.ts
-      - src/agents/synthetic-models.ts
-      - src/agents/system-prompt-params.test.ts
-      - src/agents/system-prompt-params.ts
-      - src/agents/system-prompt-report.test.ts
-      - src/agents/system-prompt-report.ts
-      - src/agents/system-prompt-stability.test.ts
-      - src/agents/system-prompt.context-source.test.ts
-      - src/agents/system-prompt.public-boundary.test.ts
-      - src/agents/system-prompt.test.ts
-      - src/agents/system-prompt.ts
-      - src/agents/task-surface/apply.ts
-      - src/agents/task-surface/surface.test.ts
-      - src/agents/task-surface/surface.ts
-      - src/agents/test-helpers/agent-message-fixtures.ts
-      - src/agents/test-helpers/assistant-message-fixtures.ts
-      - src/agents/test-helpers/fast-coding-tools.ts
-      - src/agents/test-helpers/fast-core-tools.ts
-      - src/agents/test-helpers/fast-tool-stubs.ts
-      - src/agents/test-helpers/host-sandbox-fs-bridge.ts
-      - src/agents/test-helpers/model-fallback-config-fixture.ts
-      - src/agents/test-helpers/pi-tool-stubs.ts
-      - src/agents/test-helpers/pi-tools-fs-helpers.ts
-      - src/agents/test-helpers/pi-tools-sandbox-context.test.ts
-      - src/agents/test-helpers/pi-tools-sandbox-context.ts
-      - src/agents/test-helpers/sandbox-agent-config-fixtures.ts
-      - src/agents/test-helpers/session-config.ts
-      - src/agents/test-helpers/skill-plugin-fixtures.ts
-      - src/agents/test-helpers/unsafe-mounted-sandbox.ts
-      - src/agents/test-helpers/usage-fixtures.ts
-      - src/agents/timeout.ts
-      - src/agents/together-models.ts
-      - src/agents/tool-call-id.test.ts
-      - src/agents/tool-call-id.ts
-      - src/agents/tool-catalog.ts
-      - src/agents/tool-display-common.ts
-      - src/agents/tool-display-overrides.json
-      - src/agents/tool-display.test.ts
-      - src/agents/tool-display.ts
-      - src/agents/tool-fs-policy.test.ts
-      - src/agents/tool-fs-policy.ts
-      - src/agents/tool-images.log.test.ts
-      - src/agents/tool-images.test.ts
-      - src/agents/tool-images.ts
-      - src/agents/tool-loop-detection.test.ts
-      - src/agents/tool-loop-detection.ts
-      - src/agents/tool-mutation.test.ts
-      - src/agents/tool-mutation.ts
-      - src/agents/tool-policy-pipeline.test.ts
-      - src/agents/tool-policy-pipeline.ts
-      - src/agents/tool-policy-shared.ts
-      - src/agents/tool-policy.conformance.ts
-      - src/agents/tool-policy.plugin-only-allowlist.test.ts
-      - src/agents/tool-policy.test.ts
-      - src/agents/tool-policy.ts
-      - src/agents/tool-summaries.ts
-      - src/agents/tools/account-browser-scope.ts
-      - src/agents/tools/account-computer-login-tool.ts
-      - src/agents/tools/agent-step.test.ts
-      - src/agents/tools/agent-step.ts
-      - src/agents/tools/agents-list-tool.ts
-      - src/agents/tools/browser-tool.account-scope.test.ts
-      - src/agents/tools/browser-tool.account-serial.test.ts
-      - src/agents/tools/browser-tool.account-serial.ts
-      - src/agents/tools/browser-tool.actions.ts
-      - src/agents/tools/browser-tool.plan-once.test.ts
-      - src/agents/tools/browser-tool.schema.ts
-      - src/agents/tools/browser-tool.secure-form-guard.test.ts
-      - src/agents/tools/browser-tool.test.ts
-      - src/agents/tools/browser-tool.ts
-      - src/agents/tools/canvas-tool.ts
-      - src/agents/tools/collaboration-board-discuss-to-task.injection.test.ts
-      - src/agents/tools/collaboration-board-discuss-to-task.turn.test.ts
-      - src/agents/tools/collaboration-board-tool.test.ts
-      - src/agents/tools/collaboration-board-tool.ts
-      - src/agents/tools/collaboration-board-trusted-locator.test.ts
-      - src/agents/tools/common.params.test.ts
-      - src/agents/tools/common.test.ts
-      - src/agents/tools/common.ts
-      - src/agents/tools/confirm-diagnose-evolution-tool.test.ts
-      - src/agents/tools/confirm-diagnose-evolution-tool.ts
-      - src/agents/tools/conversation-send-dispatch.test.ts
-      - src/agents/tools/conversation-send-dispatch.ts
-      - src/agents/tools/conversation-send-tool.test.ts
-      - src/agents/tools/conversation-send-tool.ts
-      - src/agents/tools/cron-tool.flat-params.test.ts
-      - src/agents/tools/cron-tool.test.ts
-      - src/agents/tools/cron-tool.ts
-      - src/agents/tools/data-capability-tool.test.ts
-      - src/agents/tools/data-capability-tool.ts
-      - src/agents/tools/diagnose-tool.test.ts
-      - src/agents/tools/diagnose-tool.ts
-      - src/agents/tools/discord-actions-guild.ts
-      - src/agents/tools/discord-actions-messaging.ts
-      - src/agents/tools/discord-actions-moderation-shared.ts
-      - src/agents/tools/discord-actions-moderation.authz.test.ts
-      - src/agents/tools/discord-actions-moderation.ts
-      - src/agents/tools/discord-actions-presence.test.ts
-      - src/agents/tools/discord-actions-presence.ts
-      - src/agents/tools/discord-actions-shared.ts
-      - src/agents/tools/discord-actions.test.ts
-      - src/agents/tools/discord-actions.ts
-      - src/agents/tools/evolution-perception-tool.ts
-      - src/agents/tools/gateway-tool.ts
-      - src/agents/tools/gateway.test.ts
-      - src/agents/tools/gateway.ts
-      - src/agents/tools/guidance-event-tool.test.ts
-      - src/agents/tools/guidance-event-tool.ts
-      - src/agents/tools/image-tool.helpers.ts
-      - src/agents/tools/image-tool.test.ts
-      - src/agents/tools/image-tool.ts
-      - src/agents/tools/knowledge-consume-scope.test.ts
-      - src/agents/tools/knowledge-consume-scope.ts
-      - src/agents/tools/knowledge-consume-tool.test.ts
-      - src/agents/tools/knowledge-consume-tool.ts
-      - src/agents/tools/knowledge-source-tool.test.ts
-      - src/agents/tools/knowledge-source-tool.ts
-      - src/agents/tools/local-file-tool-registration.test.ts
-      - src/agents/tools/local-file-tool-registration.ts
-      - src/agents/tools/local-file-tool.test.ts
-      - src/agents/tools/local-file-tool.ts
-      - src/agents/tools/media-tool-shared.ts
-      - src/agents/tools/meeting-tool-minutes.test.ts
-      - src/agents/tools/meeting-tool-minutes.ts
-      - src/agents/tools/meeting-tool.test.ts
-      - src/agents/tools/meeting-tool.ts
-      - src/agents/tools/memory-tool.citations.test.ts
-      - src/agents/tools/memory-tool.test.ts
-      - src/agents/tools/memory-tool.ts
-      - src/agents/tools/message-tool.test.ts
-      - src/agents/tools/message-tool.ts
-      - src/agents/tools/model-config.helpers.ts
-      - src/agents/tools/nodes-tool.test.ts
-      - src/agents/tools/nodes-tool.ts
-      - src/agents/tools/nodes-utils.test.ts
-      - src/agents/tools/nodes-utils.ts
-      - src/agents/tools/office-file-tool.test.ts
-      - src/agents/tools/office-file-tool.ts
-      - src/agents/tools/operational-identity-tool.test.ts
-      - src/agents/tools/operational-identity-tool.ts
-      - src/agents/tools/organization-authz.test.ts
-      - src/agents/tools/organization-authz.ts
-      - src/agents/tools/organization-memory-tool.test.ts
-      - src/agents/tools/organization-memory-tool.ts
-      - src/agents/tools/organization-tasks-tool.notify.test.ts
-      - src/agents/tools/organization-tasks-tool.test.ts
-      - src/agents/tools/organization-tasks-tool.ts
-      - src/agents/tools/pdf-native-providers.ts
-      - src/agents/tools/pdf-tool.helpers.ts
-      - src/agents/tools/pdf-tool.test.ts
-      - src/agents/tools/pdf-tool.ts
-      - src/agents/tools/schedule-tool.test.ts
-      - src/agents/tools/schedule-tool.ts
-      - src/agents/tools/scheduled-task-tool.test.ts
-      - src/agents/tools/scheduled-task-tool.ts
-      - src/agents/tools/secure-form-tool.ts
-      - src/agents/tools/session-status-tool.ts
-      - src/agents/tools/sessions-access.test.ts
-      - src/agents/tools/sessions-access.ts
-      - src/agents/tools/sessions-announce-target.ts
-      - src/agents/tools/sessions-helpers.ts
-      - src/agents/tools/sessions-history-tool.image-omit.test.ts
-      - src/agents/tools/sessions-history-tool.ts
-      - src/agents/tools/sessions-list-tool.ts
-      - src/agents/tools/sessions-resolution.test.ts
-      - src/agents/tools/sessions-resolution.ts
-      - src/agents/tools/sessions-send-helpers.ts
-      - src/agents/tools/sessions-send-tool.a2a.ts
-      - src/agents/tools/sessions-send-tool.ts
-      - src/agents/tools/sessions-spawn-tool.test.ts
-      - src/agents/tools/sessions-spawn-tool.ts
-      - src/agents/tools/sessions.test.ts
-      - src/agents/tools/site-capability-tools.ts
-      - src/agents/tools/skill-asset-save-tool.test.ts
-      - src/agents/tools/skill-asset-save-tool.ts
-      - src/agents/tools/slack-actions.test.ts
-      - src/agents/tools/slack-actions.ts
-      - src/agents/tools/stepfun-image-tool.helpers.ts
-      - src/agents/tools/stepfun-image-tool.test.ts
-      - src/agents/tools/stepfun-image-tool.ts
-      - src/agents/tools/subagents-tool.ts
-      - src/agents/tools/suno-music-tool.helpers.ts
-      - src/agents/tools/suno-music-tool.test.ts
-      - src/agents/tools/suno-music-tool.ts
-      - src/agents/tools/telegram-actions.test.ts
-      - src/agents/tools/telegram-actions.ts
-      - src/agents/tools/tenant-user-notify-tool.ts
-      - src/agents/tools/tool-runtime.helpers.ts
-      - src/agents/tools/tts-tool.test.ts
-      - src/agents/tools/tts-tool.ts
-      - src/agents/tools/user-operational-identity-tool.test.ts
-      - src/agents/tools/user-operational-identity-tool.ts
-      - src/agents/tools/web-fetch-utils.ts
-      - src/agents/tools/web-fetch-visibility.test.ts
-      - src/agents/tools/web-fetch-visibility.ts
-      - src/agents/tools/web-fetch.cf-markdown.test.ts
-      - src/agents/tools/web-fetch.ssrf.test.ts
-      - src/agents/tools/web-fetch.test-harness.ts
-      - src/agents/tools/web-fetch.test-mocks.ts
-      - src/agents/tools/web-fetch.ts
-      - src/agents/tools/web-fetch.weixin.test.ts
-      - src/agents/tools/web-guarded-fetch.test.ts
-      - src/agents/tools/web-guarded-fetch.ts
-      - src/agents/tools/web-search-citation-redirect.ts
-      - src/agents/tools/web-search.redirect.test.ts
-      - src/agents/tools/web-search.test.ts
-      - src/agents/tools/web-search.ts
-      - src/agents/tools/web-shared.ts
-      - src/agents/tools/web-tools.enabled-defaults.test.ts
-      - src/agents/tools/web-tools.fetch.test.ts
-      - src/agents/tools/web-tools.readability.test.ts
-      - src/agents/tools/web-tools.ts
-      - src/agents/tools/weixin-extract.test.ts
-      - src/agents/tools/weixin-extract.ts
-      - src/agents/tools/whatsapp-actions.test.ts
-      - src/agents/tools/whatsapp-actions.ts
-      - src/agents/tools/whatsapp-target-auth.ts
-      - src/agents/trace-base.ts
-      - src/agents/transcript-image-omit.test.ts
-      - src/agents/transcript-image-omit.ts
-      - src/agents/transcript-policy.policy.test.ts
-      - src/agents/transcript-policy.test.ts
-      - src/agents/transcript-policy.ts
-      - src/agents/turn-completion/contract.test.ts
-      - src/agents/turn-completion/contract.ts
-      - src/agents/turn-completion/ogui-wait-settle.test.ts
-      - src/agents/usage.normalization.test.ts
-      - src/agents/usage.test.ts
-      - src/agents/usage.ts
-      - src/agents/venice-models.test.ts
-      - src/agents/venice-models.ts
-      - src/agents/vercel-ai-gateway.ts
-      - src/agents/volc-models.shared.ts
-      - src/agents/workspace-dir.ts
-      - src/agents/workspace-dirs.ts
-      - src/agents/workspace-run.test.ts
-      - src/agents/workspace-run.ts
-      - src/agents/workspace-templates.test.ts
-      - src/agents/workspace-templates.ts
-      - src/agents/workspace.bootstrap-cache.test.ts
-      - src/agents/workspace.defaults.test.ts
-      - src/agents/workspace.load-extra-bootstrap-files.test.ts
-      - src/agents/workspace.test.ts
-      - src/agents/workspace.ts
-      - src/agents/write-side-retry-gate.test.ts
-      - src/agents/write-side-retry-gate.ts
-      - src/agents/zai.live.test.ts
+      - src/agents/pr*
+      - src/agents/pt*
+      - src/agents/q*
+      - src/agents/r*
+      - src/agents/s*
+      - src/agents/sandbox/**
+      - src/agents/schema/**
+      - src/agents/skill-gates/**
+      - src/agents/skills/**
+      - src/agents/t*
+      - src/agents/task-surface/**
+      - src/agents/test-helpers/**
+      - src/agents/tools/**
+      - src/agents/turn-completion/**
+      - src/agents/u*
+      - src/agents/v*
+      - src/agents/w*
+      - src/agents/z*
       - src/artifact-grant/**
       - src/auto-reply/**
       - src/browser/**
+      - src/c*
       - src/canvas-host/**
       - src/capability-risk/**
       - src/capability-taxonomy/**
@@ -9421,40 +7386,47 @@ tasks:
       - src/conversation-task/**
       - src/conversations/**
       - src/cron/**
+      - src/d*
       - src/daemon/**
       - src/data/**
       - src/diagnosis/**
       - src/digital-employee-creation/**
       - src/discord/**
       - src/docs/**
+      - src/e*
       - src/exec-protocol/**
       - src/executor-evidence/**
       - src/fabric/**
+      - src/g*
       - src/gateway/**
       - src/hooks/**
+      - src/i*
       - src/i18n/**
       - src/imessage/**
       - src/infra/**
       - src/integrations/**
+      - src/l*
       - src/line/**
       - src/link-understanding/**
       - src/local-files/**
       - src/logging/**
       - src/markdown/**
-      - src/media/**
       - src/media-understanding/**
+      - src/media/**
       - src/memory/**
       - src/node-host/**
       - src/objective-shadow/**
       - src/observation/**
       - src/office-suite/**
       - src/organization/**
+      - src/p*
       - src/pairing/**
       - src/plugin-sdk/**
       - src/plugins/**
       - src/process/**
       - src/progress-ledger/**
       - src/providers/**
+      - src/r*
       - src/retrieval/**
       - src/routing/**
       - src/scripts/**
@@ -9475,35 +7447,14 @@ tasks:
       - src/tts/**
       - src/tui/**
       - src/types/**
+      - src/u*
       - src/utils/**
+      - src/v*
       - src/vault-sync/**
       - src/web/**
       - src/whatsapp/**
       - src/wizard/**
       - src/workspaces/**
-      - src/channel-web.ts
-      - src/docker-build-cache.test.ts
-      - src/docker-image-digests.test.ts
-      - src/docker-setup.e2e.test.ts
-      - src/dockerfile.test.ts
-      - src/entry.ts
-      - src/entry.version-fast-path.test.ts
-      - src/extensionAPI.ts
-      - src/globals.ts
-      - src/index.ts
-      - src/install-sh-version.test.ts
-      - src/logger.test.ts
-      - src/logger.ts
-      - src/logging.ts
-      - src/poll-params.test.ts
-      - src/poll-params.ts
-      - src/polls.test.ts
-      - src/polls.ts
-      - src/runtime.ts
-      - src/utils.test.ts
-      - src/utils.ts
-      - src/version.test.ts
-      - src/version.ts
       - .pi/extensions/**
       - scripts/**
       - test/setup.ts
@@ -9557,13 +7508,14 @@ tasks:
             paths:
               - src/agent-runtime/contracts/rule-adaptation.ts
               - src/agent-runtime/policy/rule-adaptation/**
-            note: src/** was narrowed only to complete exclusive ownership of those two ranges;
-              other src ranges and all session history remain with this task.
-              After the broad wildcard was expanded into the existing directories and files, current
-              file coverage can be preserved, but future new paths will no longer automatically
-              belong to the original task. Subsequent new components must be re-registered; the
-              expanded per-item declarations must not continue to be claimed as fully equivalent to
-              the original src/**.
+            note: Limited exclusive source-path release. Predecessor owner and
+              existing sessions remain unchanged. Authorization is from the
+              repository owner (human-governor). No predecessor personal
+              sign-off is claimed. Official loom register was not run. Covering
+              globs were replaced with residual directory globs that do not
+              cover the released paths, instead of enumerating every existing
+              file. Remaining ranges stay with this task; future files under
+              those residual directory globs continue to belong to this task.
       - id: path-release-rule-adaptation-p2-r2-20261112-pi-sdk
         taskId: pi-sdk-family-migration-v3:cursor
         ide: cursor
@@ -9582,13 +7534,14 @@ tasks:
               - src/agent-runtime/command/rule-adaptation/**
               - src/agent-runtime/context/rule-adaptation/**
               - src/agent-runtime/model/rule-adaptation/**
-            note: command/**, context/**, and model/** were narrowed only to complete exclusive ownership of the
-              rule-adaptation ranges; other ranges and all session history remain with this task. After the broad
-              wildcards were expanded into the existing directories and files, current file coverage can be
-              preserved, but future new paths will no longer automatically belong to the original task. Subsequent
-              new components must be re-registered; the expanded per-item declarations must not continue to be
-              claimed as fully equivalent to the original src/agent-runtime/command/**,
-              src/agent-runtime/context/**, and src/agent-runtime/model/**.
+            note: Limited exclusive source-path release. Predecessor owner and
+              existing sessions remain unchanged. Authorization is from the
+              repository owner (human-governor). No predecessor personal
+              sign-off is claimed. Official loom register was not run. Covering
+              globs were replaced with residual directory globs that do not
+              cover the released paths, instead of enumerating every existing
+              file. Remaining ranges stay with this task; future files under
+              those residual directory globs continue to belong to this task.
       - id: path-release-rule-adaptation-p3-r3-20261112-pi-sdk
         taskId: pi-sdk-family-migration-v3:cursor
         ide: cursor
@@ -9606,13 +7559,14 @@ tasks:
               - src/agent-runtime/contracts/task.ts
               - src/agent-runtime/state/repository/task-board-file.ts
               - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
-            note: state/** was narrowed and contracts/task.ts was released only to complete exclusive
-              ownership of the three listed paths; other ranges and all session history remain with this task.
-              After the broad wildcard was expanded into the existing directories and files, current file
-              coverage can be preserved, but future new paths will no longer automatically belong to the
-              original task. Subsequent new components must be re-registered; the expanded per-item
-              declarations must not continue to be claimed as fully equivalent to the original
-              src/agent-runtime/state/**.
+            note: Limited exclusive source-path release. Predecessor owner and
+              existing sessions remain unchanged. Authorization is from the
+              repository owner (human-governor). No predecessor personal
+              sign-off is claimed. Official loom register was not run. Covering
+              globs were replaced with residual directory globs that do not
+              cover the released paths, instead of enumerating every existing
+              file. Remaining ranges stay with this task; future files under
+              those residual directory globs continue to belong to this task.
     ownerHistory: []
     since: 2026-08-29
     metadata:
@@ -9634,13 +7588,14 @@ tasks:
           paths:
             - src/agent-runtime/contracts/rule-adaptation.ts
             - src/agent-runtime/policy/rule-adaptation/**
-          note: src/** was narrowed only to complete exclusive ownership of those two ranges;
-            other src ranges and all session history remain with this task.
-            After the broad wildcard was expanded into the existing directories and files, current
-            file coverage can be preserved, but future new paths will no longer automatically belong
-            to the original task. Subsequent new components must be re-registered; the expanded
-            per-item declarations must not continue to be claimed as fully equivalent to the
-            original src/**.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: cursor
@@ -9652,13 +7607,14 @@ tasks:
             - src/agent-runtime/command/rule-adaptation/**
             - src/agent-runtime/context/rule-adaptation/**
             - src/agent-runtime/model/rule-adaptation/**
-          note: command/**, context/**, and model/** were narrowed only to complete exclusive ownership of the
-            rule-adaptation ranges; other ranges and all session history remain with this task. After the broad
-            wildcards were expanded into the existing directories and files, current file coverage can be
-            preserved, but future new paths will no longer automatically belong to the original task. Subsequent
-            new components must be re-registered; the expanded per-item declarations must not continue to be
-            claimed as fully equivalent to the original src/agent-runtime/command/**,
-            src/agent-runtime/context/**, and src/agent-runtime/model/**.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: cursor
@@ -9669,12 +7625,14 @@ tasks:
             - src/agent-runtime/contracts/task.ts
             - src/agent-runtime/state/repository/task-board-file.ts
             - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
-          note: state/** was narrowed and contracts/task.ts was released only to complete exclusive ownership
-            of the three listed paths; other ranges and all session history remain with this task. After the
-            broad wildcard was expanded into the existing directories and files, current file coverage can be
-            preserved, but future new paths will no longer automatically belong to the original task.
-            Subsequent new components must be re-registered; the expanded per-item declarations must not
-            continue to be claimed as fully equivalent to the original src/agent-runtime/state/**.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: cursor
@@ -9689,16 +7647,14 @@ tasks:
             - src/agents/pi-embedded-runner/extensions.ts
             - src/agents/pi-embedded-runner/compact.ts
             - src/agents/model-fallback.ts
-          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run. The covering
-            pattern(s) src/agent-runtime/execution/**, src/agents/** were expanded into the existing
-            files, excluding only the released paths. After the broad wildcard was expanded into the
-            existing directories and files, current file coverage can be preserved, but future new
-            paths will no longer automatically belong to the original task. Subsequent new
-            components must be re-registered; the expanded per-item declarations must not continue
-            to be claimed as fully equivalent to the original glob.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
   - id: cursor-s01-r6-replay-v2
     owner: cursor
     intent:
@@ -10893,10 +8849,8 @@ tasks:
     intent: []
     paths:
       - src/agents/execution-preflight/**
-      - src/agents/pi-embedded-runner/abort.ts
-      - src/agents/pi-embedded-runner/anthropic-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/cache-ttl.test.ts
-      - src/agents/pi-embedded-runner/cache-ttl.ts
+      - src/agents/pi-embedded-runner/a*
+      - src/agents/pi-embedded-runner/ca*
       - src/agents/pi-embedded-runner/compact.hooks.test.ts
       - src/agents/pi-embedded-runner/compact.runtime.ts
       - src/agents/pi-embedded-runner/compaction-safety-timeout.ts
@@ -10906,90 +8860,19 @@ tasks:
       - src/agents/pi-embedded-runner/extra-params.openrouter-cache-control.test.ts
       - src/agents/pi-embedded-runner/extra-params.ts
       - src/agents/pi-embedded-runner/extra-params.zai-tool-stream.test.ts
-      - src/agents/pi-embedded-runner/google.test.ts
-      - src/agents/pi-embedded-runner/google.ts
-      - src/agents/pi-embedded-runner/history.ts
-      - src/agents/pi-embedded-runner/kilocode.test.ts
-      - src/agents/pi-embedded-runner/lanes.ts
-      - src/agents/pi-embedded-runner/logger.ts
-      - src/agents/pi-embedded-runner/model.forward-compat.test.ts
-      - src/agents/pi-embedded-runner/model.provider-normalization.test.ts
-      - src/agents/pi-embedded-runner/model.provider-normalization.ts
-      - src/agents/pi-embedded-runner/model.test-harness.ts
-      - src/agents/pi-embedded-runner/model.test.ts
-      - src/agents/pi-embedded-runner/model.ts
-      - src/agents/pi-embedded-runner/moonshot-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/openai-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/proxy-stream-wrappers.ts
-      - src/agents/pi-embedded-runner/reply-language-reminder.test.ts
-      - src/agents/pi-embedded-runner/reply-language-reminder.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.fixture.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.loop.test.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.mocks.shared.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.shared-test.ts
-      - src/agents/pi-embedded-runner/run.overflow-compaction.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.spawn-workspace.test.ts
-      - src/agents/pi-embedded-runner/run/attempt.test.ts
-      - src/agents/pi-embedded-runner/run/compaction-retry-aggregate-timeout.test.ts
-      - src/agents/pi-embedded-runner/run/compaction-retry-aggregate-timeout.ts
-      - src/agents/pi-embedded-runner/run/compaction-timeout.test.ts
-      - src/agents/pi-embedded-runner/run/compaction-timeout.ts
-      - src/agents/pi-embedded-runner/run/execution-preference-hint.test.ts
-      - src/agents/pi-embedded-runner/run/execution-preference-hint.ts
-      - src/agents/pi-embedded-runner/run/execution-router-baselines.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-baselines.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow-cli.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow-identity.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow-revalidate.test.ts
-      - src/agents/pi-embedded-runner/run/execution-router-shadow.test.ts
-      - src/agents/pi-embedded-runner/run/failover-observation.test.ts
-      - src/agents/pi-embedded-runner/run/failover-observation.ts
-      - src/agents/pi-embedded-runner/run/history-image-prune.test.ts
-      - src/agents/pi-embedded-runner/run/history-image-prune.ts
-      - src/agents/pi-embedded-runner/run/image-parts.test.ts
-      - src/agents/pi-embedded-runner/run/image-parts.ts
-      - src/agents/pi-embedded-runner/run/images.test.ts
-      - src/agents/pi-embedded-runner/run/images.ts
-      - src/agents/pi-embedded-runner/run/params.ts
-      - src/agents/pi-embedded-runner/run/payloads.errors.test.ts
-      - src/agents/pi-embedded-runner/run/payloads.test-helpers.ts
-      - src/agents/pi-embedded-runner/run/payloads.test.ts
-      - src/agents/pi-embedded-runner/run/resolve-embedded-tools.test.ts
-      - src/agents/pi-embedded-runner/run/resolve-embedded-tools.ts
-      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
-      - src/agents/pi-embedded-runner/run/types.ts
-      - src/agents/pi-embedded-runner/runs.test.ts
-      - src/agents/pi-embedded-runner/runs.ts
-      - src/agents/pi-embedded-runner/sandbox-info.ts
-      - src/agents/pi-embedded-runner/sanitize-session-history.tool-result-details.test.ts
-      - src/agents/pi-embedded-runner/session-manager-cache.ts
-      - src/agents/pi-embedded-runner/session-manager-init.eexist.test.ts
-      - src/agents/pi-embedded-runner/session-manager-init.group-public.test.ts
-      - src/agents/pi-embedded-runner/session-manager-init.ts
-      - src/agents/pi-embedded-runner/skills-runtime.integration.test.ts
-      - src/agents/pi-embedded-runner/skills-runtime.node-import.test.ts
-      - src/agents/pi-embedded-runner/skills-runtime.test.ts
-      - src/agents/pi-embedded-runner/skills-runtime.ts
-      - src/agents/pi-embedded-runner/stream-api-key.test.ts
-      - src/agents/pi-embedded-runner/stream-api-key.ts
-      - src/agents/pi-embedded-runner/system-prompt.test.ts
-      - src/agents/pi-embedded-runner/system-prompt.ts
-      - src/agents/pi-embedded-runner/thinking.test.ts
-      - src/agents/pi-embedded-runner/thinking.ts
-      - src/agents/pi-embedded-runner/tool-name-allowlist.ts
-      - src/agents/pi-embedded-runner/tool-result-char-estimator.test.ts
-      - src/agents/pi-embedded-runner/tool-result-char-estimator.ts
-      - src/agents/pi-embedded-runner/tool-result-context-guard.test.ts
-      - src/agents/pi-embedded-runner/tool-result-context-guard.ts
-      - src/agents/pi-embedded-runner/tool-result-truncation.test.ts
-      - src/agents/pi-embedded-runner/tool-result-truncation.ts
-      - src/agents/pi-embedded-runner/tool-split.ts
-      - src/agents/pi-embedded-runner/types.ts
-      - src/agents/pi-embedded-runner/usage-reporting.test.ts
-      - src/agents/pi-embedded-runner/utils.ts
-      - src/agents/pi-embedded-runner/wait-for-idle-before-flush.ts
+      - src/agents/pi-embedded-runner/g*
+      - src/agents/pi-embedded-runner/h*
+      - src/agents/pi-embedded-runner/k*
+      - src/agents/pi-embedded-runner/l*
+      - src/agents/pi-embedded-runner/m*
+      - src/agents/pi-embedded-runner/o*
+      - src/agents/pi-embedded-runner/p*
+      - src/agents/pi-embedded-runner/r*
+      - src/agents/pi-embedded-runner/run/**
+      - src/agents/pi-embedded-runner/s*
+      - src/agents/pi-embedded-runner/t*
+      - src/agents/pi-embedded-runner/u*
+      - src/agents/pi-embedded-runner/w*
       - src/cron/**
       - src/agents/subagent-announce*
       - src/infra/outbound/deliver.ts
@@ -11032,16 +8915,14 @@ tasks:
           paths:
             - src/agents/pi-embedded-runner/extensions.ts
             - src/agents/pi-embedded-runner/compact.ts
-          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run. The covering
-            pattern(s) src/agents/pi-embedded-runner/** were expanded into the existing files,
-            excluding only the released paths. After the broad wildcard was expanded into the
-            existing directories and files, current file coverage can be preserved, but future new
-            paths will no longer automatically belong to the original task. Subsequent new
-            components must be re-registered; the expanded per-item declarations must not continue
-            to be claimed as fully equivalent to the original glob.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
   - id: hook-session-delivery-closure
     owner: cursor-grok
     intent: []
@@ -14039,33 +11920,14 @@ tasks:
       - src/agent-runtime/model/interaction-completion.test.ts
       - src/agent-runtime/wiring/prepared-interaction.test.ts
       - src/gateway/governance/direct-model-invocation-registry.ts
-      - src/agent-runtime/model/admission-lease.test.ts
-      - src/agent-runtime/model/admission-lease.ts
-      - src/agent-runtime/model/apply-provider-credential.test.ts
-      - src/agent-runtime/model/apply-provider-credential.ts
-      - src/agent-runtime/model/auth-profile-candidates.test.ts
-      - src/agent-runtime/model/auth-profile-candidates.ts
-      - src/agent-runtime/model/auth-profile-rotation.test.ts
-      - src/agent-runtime/model/auth-profile-rotation.ts
-      - src/agent-runtime/model/authorized-session.test.ts
-      - src/agent-runtime/model/authorized-session.ts
-      - src/agent-runtime/model/auxiliary-model-governance.test.ts
-      - src/agent-runtime/model/auxiliary-model-governance.ts
-      - src/agent-runtime/model/cli-run-credential.ts
-      - src/agent-runtime/model/command-admission-session.test.ts
-      - src/agent-runtime/model/command-admission-session.ts
-      - src/agent-runtime/model/command-commercial-gate.ts
-      - src/agent-runtime/model/command-governance.ts
-      - src/agent-runtime/model/copilot-token-refresh.test.ts
-      - src/agent-runtime/model/copilot-token-refresh.ts
-      - src/agent-runtime/model/index.ts
-      - src/agent-runtime/model/llm-slug-auxiliary.test.ts
-      - src/agent-runtime/model/metadata-completion.test.ts
-      - src/agent-runtime/model/metadata-completion.ts
-      - src/agent-runtime/model/native-tool-stream.ts
-      - src/agent-runtime/model/ollama-context-stream.ts
-      - src/agent-runtime/model/prepare-embedded-model.test.ts
-      - src/agent-runtime/model/xai-arguments-stream.ts
+      - src/agent-runtime/model/a*
+      - src/agent-runtime/model/c*
+      - src/agent-runtime/model/i*
+      - src/agent-runtime/model/l*
+      - src/agent-runtime/model/m*
+      - src/agent-runtime/model/n*
+      - src/agent-runtime/model/o*
+      - src/agent-runtime/model/x*
       - src/auto-reply/fallback-state.ts
       - src/gateway/governance/execution-entry-registry.ts
       - src/gateway/governance/governance-contract.test.ts
@@ -14099,68 +11961,40 @@ tasks:
       - src/task-orchestration/complex-task-loop.ts
       - src/task-orchestration/complex-task-loop.test.ts
       - src/agent-runtime/wiring/**
-      - src/agent-runtime/state/collaboration/accepted-artifact-delivery-read.ts
-      - src/agent-runtime/state/collaboration/accepted-artifact-delivery-send.test.ts
-      - src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.test.ts
-      - src/agent-runtime/state/collaboration/accepted-artifact-delivery-txn.ts
-      - src/agent-runtime/state/collaboration/handoff-txn.ts
-      - src/agent-runtime/state/collaboration/round-txn.ts
-      - src/agent-runtime/state/mutations/claim-queued-execution.recovery-prompt.test.ts
-      - src/agent-runtime/state/mutations/explicit-control.ts
-      - src/agent-runtime/state/mutations/interaction-revision.test.ts
-      - src/agent-runtime/state/mutations/resume-parked.test.ts
-      - src/agent-runtime/state/mutations/resume-parked.ts
-      - src/agent-runtime/state/mutations/session-reset-focus.test.ts
-      - src/agent-runtime/state/mutations/session-reset-focus.ts
-      - src/agent-runtime/state/repository/async-wait-job-recovery.test.ts
-      - src/agent-runtime/state/repository/async-wait-job-recovery.ts
-      - src/agent-runtime/state/repository/async-wait-job-store.ts
-      - src/agent-runtime/state/repository/async-wait-job.claim-fence.test.ts
-      - src/agent-runtime/state/repository/async-wait-job.test.ts
-      - src/agent-runtime/state/repository/async-wait-job.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-claim.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-enqueue.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-followup-consumer.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-scan.ts
-      - src/agent-runtime/state/repository/async-wait-recovery-turn.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.cross-process.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.four-defects.fixture.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.four-defects.reclaim.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.four-defects.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.package5-retire.test.ts
-      - src/agent-runtime/state/repository/async-wait-recovery.production-path.test.ts
-      - src/agent-runtime/state/repository/async-wait-stale-callback.test.ts
-      - src/agent-runtime/state/repository/async-wait-visible-identity.test.ts
-      - src/agent-runtime/state/repository/async-wait-visible-identity.ts
-      - src/agent-runtime/state/repository/durable-json.ts
-      - src/agent-runtime/state/repository/interaction-board-read.test.ts
+      - src/agent-runtime/state/a*
+      - src/agent-runtime/state/c*
+      - src/agent-runtime/state/collaboration/**
+      - src/agent-runtime/state/i*
+      - src/agent-runtime/state/mutations/a*
+      - src/agent-runtime/state/mutations/c*
+      - src/agent-runtime/state/mutations/e*
+      - src/agent-runtime/state/mutations/i*
+      - src/agent-runtime/state/mutations/re*
+      - src/agent-runtime/state/mutations/s*
+      - src/agent-runtime/state/mutations/t*
+      - src/agent-runtime/state/p*
+      - src/agent-runtime/state/repository/a*
+      - src/agent-runtime/state/repository/d*
+      - src/agent-runtime/state/repository/i*
+      - src/agent-runtime/state/repository/s*
       - src/agent-runtime/state/repository/task-stop.test.ts
       - src/agent-runtime/state/repository/task-stop.ts
+      - src/agent-runtime/state/s*
+      - src/agent-runtime/state/t*
       - src/agents/execution-stall-continue-loop.test.ts
       - src/agents/pi-embedded-runner/run/attempt.test.ts
       - src/auto-reply/reply/agent-runner-payloads.test.ts
       - src/agent-runtime/contracts/acceptance.ts
       - src/agent-runtime/contracts/blocker.ts
       - src/agents/turn-completion/contract.test.ts
-      - src/agent-runtime/policy/accepted-artifact-delivery.test.ts
-      - src/agent-runtime/policy/accepted-artifact-delivery.ts
-      - src/agent-runtime/policy/blocker.test.ts
-      - src/agent-runtime/policy/blocker.ts
-      - src/agent-runtime/policy/collaboration-compile-hash.ts
-      - src/agent-runtime/policy/collaboration-compile-sections.ts
-      - src/agent-runtime/policy/collaboration-compile.ts
-      - src/agent-runtime/policy/collaboration-handoff.ts
-      - src/agent-runtime/policy/collaboration-policy-identity.ts
-      - src/agent-runtime/policy/collaboration-policy-model.ts
-      - src/agent-runtime/policy/collaboration-rules.test.ts
-      - src/agent-runtime/policy/collaboration-rules.ts
-      - src/agent-runtime/policy/execution-queue.test.ts
-      - src/agent-runtime/policy/execution-queue.ts
-      - src/agent-runtime/policy/explicit-task-control.test.ts
-      - src/agent-runtime/policy/explicit-task-control.ts
-      - src/agent-runtime/policy/group-final-delivery.test.ts
-      - src/agent-runtime/policy/interaction-availability.ts
+      - src/agent-runtime/policy/a*
+      - src/agent-runtime/policy/b*
+      - src/agent-runtime/policy/c*
+      - src/agent-runtime/policy/e*
+      - src/agent-runtime/policy/g*
+      - src/agent-runtime/policy/i*
+      - src/agent-runtime/policy/p*
+      - src/agent-runtime/policy/t*
       - src/agents/turn-completion/contract.ts
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
@@ -14191,23 +12025,13 @@ tasks:
       - src/auto-reply/reply/agent-runner-payloads.ts
       - src/auto-reply/reply/agent-runner-utils.ts
       - src/auto-reply/reply/agent-runner-execution.ts
-      - src/agent-runtime/execution/outcomes/index.ts
-      - src/agent-runtime/execution/outcomes/turn-outcome.test.ts
-      - src/agent-runtime/execution/outcomes/turn-outcome.ts
-      - src/agent-runtime/execution/preparation/embedded-parameters.ts
-      - src/agent-runtime/execution/preparation/index.ts
-      - src/agent-runtime/execution/recovery/stall-continuation.test.ts
-      - src/agent-runtime/execution/recovery/stall-continuation.ts
-      - src/agent-runtime/execution/runner/admitted-candidate-cli.ts
-      - src/agent-runtime/execution/runner/admitted-candidate-embedded.ts
-      - src/agent-runtime/execution/runner/admitted-candidate-failure.integration.test.ts
-      - src/agent-runtime/execution/runner/admitted-turn-attempt.ts
-      - src/agent-runtime/execution/runner/admitted-turn-host.ts
-      - src/agent-runtime/execution/runner/admitted-turn-recovery.ts
-      - src/agent-runtime/execution/runner/admitted-turn-state.ts
-      - src/agent-runtime/execution/runner/admitted-turn.attempt-host.test.ts
-      - src/agent-runtime/execution/runner/cli-run-spawn.ts
-      - src/agent-runtime/execution/runner/command-lifecycle.test.ts
+      - src/agent-runtime/execution/i*
+      - src/agent-runtime/execution/outcomes/**
+      - src/agent-runtime/execution/p*
+      - src/agent-runtime/execution/preparation/**
+      - src/agent-runtime/execution/recovery/**
+      - src/agent-runtime/execution/runner/a*
+      - src/agent-runtime/execution/runner/c*
       - src/agent-runtime/execution/runner/embedded-attempt-closeout.ts
       - src/agent-runtime/execution/runner/embedded-attempt-continue.ts
       - src/agent-runtime/execution/runner/embedded-attempt-phase-state.ts
@@ -14220,14 +12044,12 @@ tasks:
       - src/agent-runtime/execution/runner/embedded-failure-usage.ts
       - src/agent-runtime/execution/runner/embedded-run-failover.ts
       - src/agent-runtime/execution/runner/embedded-run-result.ts
-      - src/agent-runtime/execution/runner/execution-lifecycle.test.ts
-      - src/agent-runtime/execution/runner/execution-scope.test.ts
-      - src/agent-runtime/execution/runner/execution-scope.ts
-      - src/agent-runtime/execution/runner/index.ts
-      - src/agent-runtime/execution/runner/queued-candidate.pricing.test.ts
-      - src/agent-runtime/execution/runner/supervisor-lifecycle.test.ts
-      - src/agent-runtime/execution/runner/supervisor-lifecycle.ts
-      - src/agent-runtime/execution/runner/turn-contract.ts
+      - src/agent-runtime/execution/runner/ex*
+      - src/agent-runtime/execution/runner/i*
+      - src/agent-runtime/execution/runner/q*
+      - src/agent-runtime/execution/runner/r*
+      - src/agent-runtime/execution/runner/s*
+      - src/agent-runtime/execution/runner/t*
       - src/conversation-task/async-process-lifecycle.test.ts
       - src/conversation-task/task-board-continue.ts
       - src/conversation-task/task-board-continue.test.ts
@@ -14239,45 +12061,33 @@ tasks:
       - src/agents/execution-stall-continue-loop.ts
       - src/agents/pi-embedded-runner/run/attempt.ts
       - src/gateway/server-methods/chat.ts
-      - src/agent-runtime/command/accepted-artifact-delivery.ts
-      - src/agent-runtime/command/admitted-task-query-continuation.test.ts
-      - src/agent-runtime/command/admitted-task-query-continuation.ts
-      - src/agent-runtime/command/authorized-interaction.ts
-      - src/agent-runtime/command/command-outcome-entry.test.ts
-      - src/agent-runtime/command/command-outcome-entry.ts
-      - src/agent-runtime/command/execution-admission.test.ts
-      - src/agent-runtime/command/execution-admission.ts
-      - src/agent-runtime/command/gateway-task-stop.test.ts
-      - src/agent-runtime/command/gateway-task-stop.ts
-      - src/agent-runtime/command/governed-interaction.ts
-      - src/agent-runtime/command/group-final-delivery.test.ts
-      - src/agent-runtime/command/host-task-target.ts
-      - src/agent-runtime/command/index.ts
-      - src/agent-runtime/command/ingress-kind.test.ts
-      - src/agent-runtime/command/ingress-kind.ts
-      - src/agent-runtime/command/interaction-sources.test.ts
-      - src/agent-runtime/command/interaction-sources.ts
-      - src/agent-runtime/command/interpret-interaction.test.ts
-      - src/agent-runtime/command/interpret-interaction.ts
-      - src/agent-runtime/command/named-file-execution.test.ts
-      - src/agent-runtime/command/named-file-execution.ts
-      - src/agent-runtime/command/route-interaction.test.ts
-      - src/agent-runtime/command/route-interaction.ts
+      - src/agent-runtime/command/a*
+      - src/agent-runtime/command/c*
+      - src/agent-runtime/command/e*
+      - src/agent-runtime/command/g*
+      - src/agent-runtime/command/h*
+      - src/agent-runtime/command/i*
+      - src/agent-runtime/command/n*
+      - src/agent-runtime/command/p*
+      - src/agent-runtime/command/ro*
       - src/agent-runtime/command/scenarios/**
-      - src/agent-runtime/command/task-proposal-reply.test.ts
-      - src/agent-runtime/command/task-proposal-reply.ts
-      - src/agent-runtime/command/task-status-format.test.ts
-      - src/agent-runtime/command/task-status.test.ts
-      - src/agent-runtime/command/task-status.ts
+      - src/agent-runtime/command/t*
       - src/auto-reply/reply/agent-runner.ts
       - src/auto-reply/reply/mid-task-aside.ts
       - src/auto-reply/reply/mid-task-dialogue.ts
-      - src/agent-runtime/contracts/interaction-availability.ts
-      - src/agent-runtime/contracts/prompt.ts
+      - src/agent-runtime/contracts/a*
+      - src/agent-runtime/contracts/b*
+      - src/agent-runtime/contracts/c*
+      - src/agent-runtime/contracts/d*
+      - src/agent-runtime/contracts/e*
+      - src/agent-runtime/contracts/i*
+      - src/agent-runtime/contracts/l*
+      - src/agent-runtime/contracts/p*
+      - src/agent-runtime/contracts/q*
       - src/agent-runtime/contracts/task-binding.ts
       - src/agent-runtime/contracts/task-control.ts
       - src/agent-runtime/contracts/task-stop.ts
-      - src/agent-runtime/contracts/turn-result.ts
+      - src/agent-runtime/contracts/tu*
       - src/conversation-task/session-task-board.ts
       - src/auto-reply/reply/runtime-context-assembly.ts
       - src/auto-reply/reply/mid-task-aside-dialogue-history.ts
@@ -14285,26 +12095,21 @@ tasks:
       - src/auto-reply/reply/untrusted-context.ts
       - src/shared/text/normalize-newlines.ts
       - .kiro/specs/agent-runtime-convergence/**
-      - src/agent-runtime/context/aside-budget.test.ts
-      - src/agent-runtime/context/aside-budget.ts
-      - src/agent-runtime/context/assembly.test.ts
-      - src/agent-runtime/context/assembly.ts
+      - src/agent-runtime/context/a*
       - src/agent-runtime/context/catalog/**
-      - src/agent-runtime/context/compilation/**
-      - src/agent-runtime/context/index.ts
-      - src/agent-runtime/context/interaction-history.test.ts
-      - src/agent-runtime/context/interaction-history.ts
-      - src/agent-runtime/context/prompt-composition.ts
-      - src/agent-runtime/context/session-summary.ts
+      - src/agent-runtime/context/i*
+      - src/agent-runtime/context/p*
+      - src/agent-runtime/context/s*
       - src/agent-runtime/context/sources/**
-      - src/agent-runtime/context/system-prompt.ts
-      - src/agent-runtime/context/task-focus.test.ts
+      - src/agent-runtime/context/t*
       - src/agent-runtime/context/trust/**
-      - src/agent-runtime/context/untrusted.test.ts
-      - src/agent-runtime/context/untrusted.ts
+      - src/agent-runtime/context/u*
       - src/auto-reply/reply/get-reply-run.ts
       - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
       - scripts/architecture/manifest.json
+      - src/agent-runtime/command/authorized-interaction.ts
+      - src/agent-runtime/context/interaction-history.ts
+      - src/agent-runtime/context/interaction-history.test.ts
       - src/agent-runtime/wiring/interaction-turn.ts
       - src/agent-runtime/wiring/interaction-turn.runtime.ts
       - src/agents/pi-embedded-runner/session-manager-init.ts
@@ -14337,6 +12142,8 @@ tasks:
       - src/agent-runtime/contracts/capability.ts
       - src/agents/pi-embedded-subscribe.handlers.tools.ts
       - src/agents/tools/common.ts
+      - src/agent-runtime/context/compilation/**
+      - src/agent-runtime/context/index.ts
       - src/agent-runtime/contracts/context.ts
       - src/agents/context-compiler/active-task-seed.ts
       - src/agents/context-compiler/atomic-units.ts
@@ -14352,6 +12159,8 @@ tasks:
       - src/agent-runtime/context/sources/learning-recall.ts
       - src/auto-reply/reply/learning-recall.ts
       - src/auto-reply/reply/learning-recall-context.ts
+      - src/agent-runtime/command/ingress-kind.ts
+      - src/agent-runtime/command/ingress-kind.test.ts
       - src/agent-runtime/state/interaction-transcript.ts
       - src/agent-runtime/state/interaction-transcript.test.ts
       - src/auto-reply/reply/composer-plugin-mention-execute.ts
@@ -14432,6 +12241,7 @@ tasks:
       - ui/src/ui/ports/enterprise/views/enterprise-data-capability/outputs-page.feed-delete.node.test.ts
       - ui/src/ui/ports/platform/models/capability-admission-batch3.node.test.ts
       - ui/src/ui/views/knowledge-universe-space-connector-bind.node.test.ts
+      - src/agent-runtime/model/command-commercial-gate.ts
       - src/commands/agent/commercial-run-gate.ts
       - src/commands/agent/commercial-run-gate.test.ts
       - src/commands/agent/model-governance.ts
@@ -14439,11 +12249,18 @@ tasks:
       - src/agent-runtime/contracts/delivery.ts
       - src/agent-runtime/delivery/dispatch/pending-delivery.restart.test.ts
       - src/agent-runtime/delivery/dispatch/pending-delivery.restart-child.ts
+      - src/agent-runtime/command/execution-admission.ts
+      - src/agent-runtime/command/index.ts
       - src/agent-runtime/wiring/execution-admission.ts
       - src/agent-runtime/wiring/reply-turn.ts
       - test/fixtures/runtime-convergence/pending-delivery.restart-child.ts
+      - src/agent-runtime/command/command-outcome-entry.ts
+      - src/agent-runtime/command/command-outcome-entry.test.ts
       - src/agent-runtime/capabilities/catalog.ts
       - src/agent-runtime/capabilities/catalog.test.ts
+      - src/agent-runtime/model/command-admission-session.ts
+      - src/agent-runtime/model/command-admission-session.test.ts
+      - src/agent-runtime/model/command-governance.ts
       - src/agent-runtime/context/sources/run-skills.ts
       - src/agent-runtime/context/sources/run-skills.test.ts
       - src/commands/agent/model-governance.test.ts
@@ -14471,6 +12288,13 @@ tasks:
       - src/agents/context-window-guard.test.ts
       - src/agents/pi-embedded-runner/run.overflow-compaction.mocks.shared.ts
       - src/commands/onboard-custom.test.ts
+      - src/agent-runtime/model/auth-profile-candidates.ts
+      - src/agent-runtime/model/auth-profile-candidates.test.ts
+      - src/agent-runtime/model/auth-profile-rotation.ts
+      - src/agent-runtime/model/auth-profile-rotation.test.ts
+      - src/agent-runtime/model/copilot-token-refresh.ts
+      - src/agent-runtime/model/copilot-token-refresh.test.ts
+      - src/agent-runtime/model/prepare-embedded-model.test.ts
       - src/agent-runtime/policy/run-limits.ts
       - src/agent-runtime/policy/run-limits.test.ts
       - src/agent-runtime/delivery/presentation/embedded-payloads.ts
@@ -14485,6 +12309,13 @@ tasks:
       - src/agent-runtime/execution/runner/embedded-cleanup.test.ts
       - src/agent-runtime/execution/outcomes/attempt-attribution.ts
       - src/task-outcome/r90-attempt-attribution.test.ts
+      - src/agent-runtime/model/native-tool-stream.ts
+      - src/agent-runtime/model/ollama-context-stream.ts
+      - src/agent-runtime/model/xai-arguments-stream.ts
+      - src/agent-runtime/context/prompt-composition.ts
+      - src/agent-runtime/model/admission-lease.ts
+      - src/agent-runtime/model/admission-lease.test.ts
+      - src/agent-runtime/model/authorized-session.ts
       - src/agent-runtime/contracts/inference.ts
       - src/agent-runtime/capabilities/adapters/prompt-build-hooks.ts
       - src/cron/isolated-agent/run.payload-fallbacks.test.ts
@@ -14492,10 +12323,13 @@ tasks:
       - src/cron/isolated-agent/run.test-harness.ts
       - src/agent-runtime/capabilities/adapters/model-resolve-hooks.ts
       - src/agent-runtime/capabilities/adapters/model-resolve-hooks.test.ts
+      - src/agent-runtime/model/apply-provider-credential.ts
+      - src/agent-runtime/model/apply-provider-credential.test.ts
       - src/agent-runtime/execution/runner/embedded-run.ts
       - src/agents/pi-embedded-runner.ts
       - src/agent-runtime/capabilities/adapters/protocol-body-boundary.ts
       - src/agent-runtime/capabilities/adapters/attempt-sandbox.ts
+      - src/agent-runtime/context/session-summary.ts
       - src/agent-runtime/context/session-summary.test.ts
       - src/agent-runtime/capabilities/adapters/context-after-turn.ts
       - src/agent-runtime/capabilities/adapters/context-after-turn.test.ts
@@ -14514,6 +12348,7 @@ tasks:
       - src/task-outcome/followup-closeout.test.ts
       - src/agent-runtime/state/mutations/claim-queued-execution.ts
       - src/agent-runtime/execution/runner/queued-candidate.ts
+      - src/agent-runtime/model/cli-run-credential.ts
       - src/agent-runtime/model/cli-run-credential.test.ts
       - src/agent-runtime/state/attempt-transcript.ts
       - src/agent-runtime/state/attempt-transcript.test.ts
@@ -14620,6 +12455,8 @@ tasks:
       - src/agent-runtime/command/interaction.ts
       - src/agent-runtime/wiring/interaction.test.ts
       - src/agent-runtime/contracts/interaction.ts
+      - src/agent-runtime/command/interpret-interaction.ts
+      - src/agent-runtime/command/interpret-interaction.test.ts
       - src/auto-reply/reply/agent-runner.aside-reply-lane.test.ts
       - src/gateway/server-chat.aside-ab-run-isolation.test.ts
       - src/auto-reply/reply/mid-task-dialogue.test.ts
@@ -15717,13 +13554,14 @@ tasks:
               - src/agent-runtime/command/rule-adaptation/**
               - src/agent-runtime/context/rule-adaptation/**
               - src/agent-runtime/model/rule-adaptation/**
-            note: command/**, context/**, and model/** were narrowed only to complete exclusive ownership of the
-              rule-adaptation ranges; other ranges and all session history remain with this task. After the broad
-              wildcards were expanded into the existing directories and files, current file coverage can be
-              preserved, but future new paths will no longer automatically belong to the original task. Subsequent
-              new components must be re-registered; the expanded per-item declarations must not continue to be
-              claimed as fully equivalent to the original src/agent-runtime/command/**,
-              src/agent-runtime/context/**, and src/agent-runtime/model/**.
+            note: Limited exclusive source-path release. Predecessor owner and
+              existing sessions remain unchanged. Authorization is from the
+              repository owner (human-governor). No predecessor personal
+              sign-off is claimed. Official loom register was not run. Covering
+              globs were replaced with residual directory globs that do not
+              cover the released paths, instead of enumerating every existing
+              file. Remaining ranges stay with this task; future files under
+              those residual directory globs continue to belong to this task.
     ownerHistory:
       - fromOwner: codex-runtime-manager
         toOwner: grok-bot
@@ -15745,13 +13583,14 @@ tasks:
           paths:
             - src/agent-runtime/contracts/rule-adaptation.ts
             - src/agent-runtime/policy/rule-adaptation/**
-          note: Removed policy/** and contracts/** only to complete exclusive ownership of the
-            two rule-adaptation ranges; remaining policy and contracts files stay with this task.
-            After the broad wildcards were expanded into the existing directories and files, current
-            file coverage can be preserved, but future new paths will no longer automatically belong
-            to the original task. Subsequent new components must be re-registered; the expanded
-            per-item declarations must not continue to be claimed as fully equivalent to the
-            original src/agent-runtime/policy/** and src/agent-runtime/contracts/**.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: 双规发布
@@ -15763,13 +13602,14 @@ tasks:
             - src/agent-runtime/command/rule-adaptation/**
             - src/agent-runtime/context/rule-adaptation/**
             - src/agent-runtime/model/rule-adaptation/**
-          note: command/**, context/**, and model/** were narrowed only to complete exclusive ownership of the
-            rule-adaptation ranges; other ranges and all session history remain with this task. After the broad
-            wildcards were expanded into the existing directories and files, current file coverage can be
-            preserved, but future new paths will no longer automatically belong to the original task. Subsequent
-            new components must be re-registered; the expanded per-item declarations must not continue to be
-            claimed as fully equivalent to the original src/agent-runtime/command/**,
-            src/agent-runtime/context/**, and src/agent-runtime/model/**.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: 双规发布
@@ -15780,13 +13620,14 @@ tasks:
             - src/agent-runtime/contracts/task.ts
             - src/agent-runtime/state/repository/task-board-file.ts
             - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
-          note: state/** was narrowed and the exact contracts/task.ts and state/repository/task-board-file.ts
-            declarations were removed only to complete exclusive ownership of the three listed paths; other
-            ranges and all session history remain with this task. After the broad wildcard was expanded into
-            the existing directories and files, current file coverage can be preserved, but future new paths
-            will no longer automatically belong to the original task. Subsequent new components must be
-            re-registered; the expanded per-item declarations must not continue to be claimed as fully
-            equivalent to the original src/agent-runtime/state/**.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
         - toTask: runtime-rule-adaptation
           toOwner: grok-dynamic-rules
           fromOwner: 双规发布
@@ -15800,16 +13641,14 @@ tasks:
             - src/agent-runtime/execution/runner/embedded-run-attempt.ts
             - src/agents/pi-embedded-runner/compact.ts
             - src/agents/pi-embedded-runner/extensions.ts
-          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
-            selection-block landing paths. Predecessor owner and sessions remain unchanged.
-            Authorization is from the repository owner in t21u (human-governor). No predecessor
-            personal sign-off is claimed. Official loom register was not run. The covering
-            pattern(s) src/agent-runtime/execution/** were expanded into the existing files,
-            excluding only the released paths. After the broad wildcard was expanded into the
-            existing directories and files, current file coverage can be preserved, but future new
-            paths will no longer automatically belong to the original task. Subsequent new
-            components must be re-registered; the expanded per-item declarations must not continue
-            to be claimed as fully equivalent to the original glob.
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
   - id: agent-runtime-observability:codex-observe-owner
     owner: codex-observe-owner
     intent:
