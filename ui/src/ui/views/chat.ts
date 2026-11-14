@@ -76,6 +76,11 @@ import {
 } from "../chat/paste-as-attachment.ts";
 import { foldPeerExchangeThread } from "../chat/peer-exchange.ts";
 import type { ChatQuoteDraft } from "../chat/quote-draft.ts";
+import {
+  renderRuleAdaptationAdviceButton,
+  renderRuleAdaptationAdvicePanel,
+  type RuleAdaptationAdvicePanelModel,
+} from "../chat/rule-adaptation-advice-panel.ts";
 import { presentChatScopedRunFailure } from "../chat/run-failure-transcript.ts";
 import {
   resolveSpaceAwareAssistantIdentity,
@@ -387,6 +392,10 @@ export type ChatProps = {
   onCancelRestoreCheckpoint?: () => void;
   onQueueRemove: (id: string) => void;
   onNewSession: () => void;
+  /** Explicit employee-side rule adaptation advice; never auto-triggered by chat.send. */
+  ruleAdaptationAdvice?: RuleAdaptationAdvicePanelModel | null;
+  onRequestRuleAdaptationAdvice?: () => void;
+  onCancelRuleAdaptationAdvice?: () => void;
   onOpenSidebar?: (content: string) => void;
   onCloseSidebar?: () => void;
   onOpenArtifact?: (artifactId: string) => void;
@@ -2328,6 +2337,13 @@ export function renderChatCompose(props: ChatProps) {
                 >
                   ${icons.paperclip}
                 </button>
+                ${renderRuleAdaptationAdviceButton({
+                  advice: props.ruleAdaptationAdvice,
+                  onRequest: props.onRequestRuleAdaptationAdvice,
+                  onCancel: props.onCancelRuleAdaptationAdvice,
+                  connected: props.connected,
+                  compact: true,
+                })}
               </div>
             `
             : nothing
@@ -2438,6 +2454,12 @@ export function renderChatCompose(props: ChatProps) {
             `
             : html`
               <div class="chat-compose__actions">
+                ${renderRuleAdaptationAdviceButton({
+                  advice: props.ruleAdaptationAdvice,
+                  onRequest: props.onRequestRuleAdaptationAdvice,
+                  onCancel: props.onCancelRuleAdaptationAdvice,
+                  connected: props.connected,
+                })}
                 <button
                   class="btn"
                   ?disabled=${!props.connected || (!canAbort && props.sending)}
@@ -2468,6 +2490,13 @@ export function renderChatCompose(props: ChatProps) {
     ${expansionBanner}
     ${composeHint}
     ${renderQuoteChip(props)}
+    ${renderRuleAdaptationAdvicePanel({
+      advice: props.ruleAdaptationAdvice,
+      onRequest: props.onRequestRuleAdaptationAdvice,
+      onCancel: props.onCancelRuleAdaptationAdvice,
+      connected: props.connected,
+      compact: compactWorkbenchMode,
+    })}
     ${composeRow}
   `;
 
