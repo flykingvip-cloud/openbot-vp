@@ -3,7 +3,12 @@ import {
   resolveChatTurnCloseGates,
   type ResolvedTurnTaskContract,
 } from "../../../task-outcome/chat-entry.js";
-import { registerAwaitingDelivery } from "../../../task-outcome/pending-delivery.js";
+import {
+  persistAwaitingDeliveryIntent,
+  registerAwaitingDelivery,
+  type PendingVisiblePayload,
+  type PendingVisibleTarget,
+} from "../../../task-outcome/pending-delivery.js";
 import type { GrowthOutcomeCommitOpts } from "../../../task-outcome/runtime-from-runner.js";
 import type { TaskAcceptanceEvaluation } from "../../contracts/quality.js";
 import type { TaskCompletionBinding } from "../../contracts/task-binding.js";
@@ -28,6 +33,10 @@ export async function prepareVisibleDelivery(params: {
   >;
   commitOutcome: (success: boolean, opts: GrowthOutcomeCommitOpts) => unknown;
   publishPending: (identity: PendingIdentity) => void;
+  /** Original visible payloads; persisted before commit so recovery can send without a model rerun. */
+  payloads?: readonly PendingVisiblePayload[];
+  /** Trusted delivery target for the original payloads. */
+  target?: PendingVisibleTarget;
 }): Promise<"passed" | "failed" | "pending" | "not_required"> {
   const deliveryId = `delivery:${params.runId}:visible`;
   const gates = resolveChatTurnCloseGates({
@@ -53,22 +62,14 @@ export async function prepareVisibleDelivery(params: {
   if (checked) {
     gates.acceptance = { status: matches ? checked.evaluation.status : "pending" };
   }
-  // Persist preparation before exposing the identity to a potentially immediate send receipt.
-  await params.commitOutcome(true, {
-    acceptance: gates.acceptance,
-    delivery: gates.delivery,
-    deliveryId: gates.deliveryId,
-    ...(checked ? { acceptanceEvidence: matches ? checked.evidence : [] } : {}),
-  });
   const agentId = params.agentId?.trim();
-  if (!agentId) {
-    return gates.acceptance.status;
-  }
-  const persistRoot = params.resolvePersistRoot(agentId);
-  const taskId =
-    params.outcomeTaskId ??
-    chatTurnTaskId({ agentId, runId: params.runId, sessionKey: params.sessionKey });
-  const identity = { runId: params.runId, deliveryId, taskId, agentId };
+  const persistRoot = agentId ? params.resolvePersistRoot(agentId) : "";
+  const taskId = agentId
+    ? (params.outcomeTaskId ??
+      chatTurnTaskId({ agentId, runId: params.runId, sessionKey: params.sessionKey }))
+    : undefined;
+  const identity =
+    agentId && taskId ? { runId: params.runId, deliveryId, taskId, agentId } : undefined;
   const checkedTask =
     params.sessionFile &&
     binding?.taskId &&
@@ -76,7 +77,36 @@ export async function prepareVisibleDelivery(params: {
     binding.deliverableVersion
       ? { sessionFile: params.sessionFile, binding: { ...binding } }
       : undefined;
-  registerAwaitingDelivery({ ...identity, persistRoot, ...(checkedTask ? { checkedTask } : {}) });
+  // Persist identity, binding, payload and target before commit. This intent is
+  // not a confirmable registration and does not imply the result is committed
+  // or delivered. Official register + publish still wait for a successful commit.
+  if (identity && persistRoot) {
+    persistAwaitingDeliveryIntent({
+      ...identity,
+      persistRoot,
+      ...(checkedTask ? { checkedTask } : {}),
+      ...(params.payloads ? { payloads: [...params.payloads] } : {}),
+      ...(params.target ? { target: params.target } : {}),
+      sendDisposition: "not_attempted",
+    });
+  }
+  await params.commitOutcome(true, {
+    acceptance: gates.acceptance,
+    delivery: gates.delivery,
+    deliveryId: gates.deliveryId,
+    ...(checked ? { acceptanceEvidence: matches ? checked.evidence : [] } : {}),
+  });
+  if (!identity || !persistRoot) {
+    return gates.acceptance.status;
+  }
+  registerAwaitingDelivery({
+    ...identity,
+    persistRoot,
+    ...(checkedTask ? { checkedTask } : {}),
+    ...(params.payloads ? { payloads: [...params.payloads] } : {}),
+    ...(params.target ? { target: params.target } : {}),
+    sendDisposition: "handed_off",
+  });
   params.publishPending(identity);
   return gates.acceptance.status;
 }

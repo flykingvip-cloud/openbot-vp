@@ -812,6 +812,10 @@ export async function runReplyAgent(params: {
       return completeDelivery({ kind: "language_filtered", didUseTools });
     }
 
+    const visibleTargetTo = resolveOriginMessageTo({
+      originatingTo: sessionCtx.OriginatingTo,
+      to: sessionCtx.To,
+    });
     const acceptanceStatus = await replyTurnRuntime.delivery.prepareVisibleDelivery(
       followupRun.run.config,
       {
@@ -823,6 +827,16 @@ export async function runReplyAgent(params: {
         sessionKey,
         contract: resolveTurnContractFromRun(),
         commitOutcome: commitGrowthOutcome,
+        payloads: languageGuardedReplyPayloads,
+        ...(replyToChannel && visibleTargetTo
+          ? {
+              target: {
+                channel: replyToChannel,
+                to: visibleTargetTo,
+                ...(sessionCtx.AccountId ? { accountId: sessionCtx.AccountId } : {}),
+              },
+            }
+          : {}),
         publishPending: (identity) => {
           if (opts?.pendingTurnDeliveryRef) {
             opts.pendingTurnDeliveryRef.current = identity;

@@ -8,6 +8,28 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { TaskCompletionBinding } from "../agent-runtime/contracts/task-binding.js";
+
+export type PendingVisiblePayload = {
+  text?: string;
+  mediaUrl?: string;
+  mediaUrls?: string[];
+  replyToId?: string;
+  audioAsVoice?: boolean;
+  isError?: boolean;
+  channelData?: Record<string, unknown>;
+};
+
+export type PendingVisibleTarget = {
+  channel: string;
+  to: string;
+  accountId?: string;
+  threadId?: string | number | null;
+  replyToId?: string | null;
+};
+
+/** not_attempted: persist intent before handoff; only this may be auto-sent on recovery. */
+export type AwaitingDeliverySendDisposition = "not_attempted" | "handed_off" | "unknown";
+
 export type AwaitingDeliveryRegistration = {
   taskId: string;
   deliveryId: string;
@@ -15,6 +37,9 @@ export type AwaitingDeliveryRegistration = {
   runId: string;
   registeredAtMs: number;
   checkedTask?: { sessionFile: string; binding: TaskCompletionBinding };
+  payloads?: PendingVisiblePayload[];
+  target?: PendingVisibleTarget;
+  sendDisposition?: AwaitingDeliverySendDisposition;
 };
 
 const byRunId = new Map<string, AwaitingDeliveryRegistration>();
@@ -48,13 +73,113 @@ function fileForRun(persistRoot: string, runId: string): string {
   return path.join(pendingDir(persistRoot), `${encodeURIComponent(runId)}.json`);
 }
 
-function writeDurable(persistRoot: string, reg: AwaitingDeliveryRegistration): void {
-  const dir = pendingDir(persistRoot);
-  fs.mkdirSync(dir, { recursive: true });
-  const target = fileForRun(persistRoot, reg.runId);
-  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
+function intentFileForRun(persistRoot: string, runId: string): string {
+  return path.join(pendingDir(persistRoot), `${encodeURIComponent(runId)}.intent`);
+}
+
+function sanitizePendingVisiblePayloads(
+  payloads: readonly PendingVisiblePayload[] | undefined,
+): PendingVisiblePayload[] | undefined {
+  if (!payloads?.length) {
+    return undefined;
+  }
+  const out: PendingVisiblePayload[] = [];
+  for (const payload of payloads) {
+    if (!payload || typeof payload !== "object") {
+      continue;
+    }
+    const next: PendingVisiblePayload = {};
+    if (typeof payload.text === "string") {
+      next.text = payload.text;
+    }
+    if (typeof payload.mediaUrl === "string" && payload.mediaUrl.trim()) {
+      next.mediaUrl = payload.mediaUrl;
+    }
+    if (Array.isArray(payload.mediaUrls) && payload.mediaUrls.length > 0) {
+      next.mediaUrls = payload.mediaUrls.filter((u) => typeof u === "string" && u.trim());
+    }
+    if (typeof payload.replyToId === "string") {
+      next.replyToId = payload.replyToId;
+    }
+    if (payload.audioAsVoice === true) {
+      next.audioAsVoice = true;
+    }
+    if (payload.isError === true) {
+      next.isError = true;
+    }
+    if (payload.channelData && typeof payload.channelData === "object") {
+      next.channelData = { ...payload.channelData };
+    }
+    if (next.text || next.mediaUrl || (next.mediaUrls && next.mediaUrls.length > 0)) {
+      out.push(next);
+    }
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+function sanitizePendingVisibleTarget(
+  target: PendingVisibleTarget | undefined,
+): PendingVisibleTarget | undefined {
+  const channel = target?.channel?.trim();
+  const to = target?.to?.trim();
+  if (!channel || channel === "none" || !to) {
+    return undefined;
+  }
+  const accountId = target?.accountId?.trim();
+  const replyToId =
+    typeof target?.replyToId === "string"
+      ? target.replyToId
+      : target?.replyToId === null
+        ? null
+        : undefined;
+  const threadId = target?.threadId;
+  return {
+    channel,
+    to,
+    ...(accountId ? { accountId } : {}),
+    ...(threadId !== undefined ? { threadId } : {}),
+    ...(replyToId !== undefined ? { replyToId } : {}),
+  };
+}
+
+function sanitizeSendDisposition(value: unknown): AwaitingDeliverySendDisposition | undefined {
+  return value === "not_attempted" || value === "handed_off" || value === "unknown"
+    ? value
+    : undefined;
+}
+
+function optionalDeliveryMaterials(raw: {
+  checkedTask?: AwaitingDeliveryRegistration["checkedTask"];
+  payloads?: PendingVisiblePayload[];
+  target?: PendingVisibleTarget;
+  sendDisposition?: AwaitingDeliverySendDisposition;
+}): Pick<AwaitingDeliveryRegistration, "checkedTask" | "payloads" | "target" | "sendDisposition"> {
+  const payloads = sanitizePendingVisiblePayloads(raw.payloads);
+  const target = sanitizePendingVisibleTarget(raw.target);
+  const sendDisposition = sanitizeSendDisposition(raw.sendDisposition);
+  return {
+    ...(raw.checkedTask &&
+    typeof raw.checkedTask.sessionFile === "string" &&
+    typeof raw.checkedTask.binding?.taskId === "string" &&
+    typeof raw.checkedTask.binding.executionAttempt === "string" &&
+    typeof raw.checkedTask.binding.deliverableVersion === "string"
+      ? { checkedTask: raw.checkedTask }
+      : {}),
+    ...(payloads ? { payloads } : {}),
+    ...(target ? { target } : {}),
+    ...(sendDisposition ? { sendDisposition } : {}),
+  };
+}
+
+function writeRegistrationFile(filePath: string, reg: AwaitingDeliveryRegistration): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(reg, null, 2)}\n`, "utf8");
-  fs.renameSync(tmp, target);
+  fs.renameSync(tmp, filePath);
+}
+
+function writeDurable(persistRoot: string, reg: AwaitingDeliveryRegistration): void {
+  writeRegistrationFile(fileForRun(persistRoot, reg.runId), reg);
 }
 
 function removeDurable(persistRoot: string, runId: string): void {
@@ -79,13 +204,7 @@ function readDurableFile(filePath: string): AwaitingDeliveryRegistration | undef
         deliveryId: raw.deliveryId,
         agentId: raw.agentId,
         runId: raw.runId,
-        ...(raw.checkedTask &&
-        typeof raw.checkedTask.sessionFile === "string" &&
-        typeof raw.checkedTask.binding?.taskId === "string" &&
-        typeof raw.checkedTask.binding.executionAttempt === "string" &&
-        typeof raw.checkedTask.binding.deliverableVersion === "string"
-          ? { checkedTask: raw.checkedTask }
-          : {}),
+        ...optionalDeliveryMaterials(raw),
         registeredAtMs:
           typeof raw.registeredAtMs === "number" && Number.isFinite(raw.registeredAtMs)
             ? raw.registeredAtMs
@@ -144,6 +263,109 @@ export function hydrateAwaitingDeliveriesFromDisk(persistRoot: string): number {
   return n;
 }
 
+/**
+ * Persist identity, binding, payload and target before commit/register.
+ * This is not a confirmable registration: peek/hydrate ignore `.intent` files.
+ */
+export function persistAwaitingDeliveryIntent(
+  reg: Omit<AwaitingDeliveryRegistration, "registeredAtMs"> & { persistRoot: string },
+): void {
+  const runId = reg.runId.trim();
+  const taskId = reg.taskId.trim();
+  const deliveryId = reg.deliveryId.trim();
+  const agentId = reg.agentId.trim();
+  const persistRoot = reg.persistRoot.trim();
+  if (!runId || !taskId || !deliveryId || !agentId || !persistRoot) {
+    return;
+  }
+  const full: AwaitingDeliveryRegistration = {
+    taskId,
+    deliveryId,
+    agentId,
+    runId,
+    registeredAtMs: Date.now(),
+    ...optionalDeliveryMaterials({
+      ...reg,
+      sendDisposition: reg.sendDisposition ?? "not_attempted",
+    }),
+  };
+  writeRegistrationFile(intentFileForRun(persistRoot, runId), full);
+}
+
+export function listPendingDeliveryIntents(persistRoot: string): AwaitingDeliveryRegistration[] {
+  const root = persistRoot.trim();
+  if (!root) {
+    return [];
+  }
+  const dir = pendingDir(root);
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+  const out: AwaitingDeliveryRegistration[] = [];
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith(".intent")) {
+      continue;
+    }
+    const reg = readDurableFile(path.join(dir, name));
+    if (reg) {
+      out.push(reg);
+    }
+  }
+  return out;
+}
+
+export function clearPendingDeliveryIntent(persistRoot: string, runId: string): void {
+  const root = persistRoot.trim();
+  const id = runId.trim();
+  if (!root || !id) {
+    return;
+  }
+  try {
+    fs.unlinkSync(intentFileForRun(root, id));
+  } catch {
+    // ignore missing
+  }
+}
+
+export function listDurableAwaitingDeliveries(persistRoot: string): AwaitingDeliveryRegistration[] {
+  const root = persistRoot.trim();
+  if (!root) {
+    return [];
+  }
+  const dir = pendingDir(root);
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+  const out: AwaitingDeliveryRegistration[] = [];
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith(".json")) {
+      continue;
+    }
+    const reg = readDurableFile(path.join(dir, name));
+    if (reg) {
+      out.push(reg);
+    }
+  }
+  return out;
+}
+
+export function markAwaitingDeliverySendDisposition(
+  lookup: AwaitingDeliveryLookup & { persistRoot?: string },
+  disposition: AwaitingDeliverySendDisposition,
+): AwaitingDeliveryRegistration | undefined {
+  const got = peekAwaitingDelivery(lookup);
+  if (!got) {
+    return undefined;
+  }
+  const next: AwaitingDeliveryRegistration = { ...got, sendDisposition: disposition };
+  indexMemory(next);
+  const persistRoot = lookup.persistRoot?.trim();
+  if (persistRoot) {
+    writeDurable(persistRoot, next);
+  }
+  return next;
+}
+
 export function registerAwaitingDelivery(
   reg: Omit<AwaitingDeliveryRegistration, "registeredAtMs"> & {
     /** TaskOutcome store root — when set, intent survives process restart. */
@@ -163,19 +385,13 @@ export function registerAwaitingDelivery(
     agentId,
     runId,
     registeredAtMs: Date.now(),
-    ...(reg.checkedTask
-      ? {
-          checkedTask: {
-            sessionFile: reg.checkedTask.sessionFile,
-            binding: { ...reg.checkedTask.binding },
-          },
-        }
-      : {}),
+    ...optionalDeliveryMaterials(reg),
   };
   indexMemory(full);
   const persistRoot = reg.persistRoot?.trim();
   if (persistRoot) {
     writeDurable(persistRoot, full);
+    clearPendingDeliveryIntent(persistRoot, full.runId);
   }
 }
 

@@ -1,8 +1,13 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { prepareVisibleDelivery } from "./prepare-visible.js";
-const mocks = vi.hoisted(() => ({ register: vi.fn(), root: vi.fn(() => "/tmp/agent-a") }));
+const mocks = vi.hoisted(() => ({
+  register: vi.fn(),
+  persistIntent: vi.fn(),
+  root: vi.fn(() => "/tmp/agent-a"),
+}));
 vi.mock("../../../task-outcome/pending-delivery.js", () => ({
   registerAwaitingDelivery: mocks.register,
+  persistAwaitingDeliveryIntent: mocks.persistIntent,
 }));
 const contract = {
   id: "code-v1",
@@ -37,6 +42,7 @@ it("awaits preparation before registration and publishes the same stable receipt
       deliveryId: "delivery:run-a:visible",
     }),
   );
+  expect(mocks.persistIntent).toHaveBeenCalledOnce();
   expect(mocks.register).not.toHaveBeenCalled();
   expect(publish).not.toHaveBeenCalled();
   release();

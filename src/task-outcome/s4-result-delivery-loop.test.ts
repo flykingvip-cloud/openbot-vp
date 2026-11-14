@@ -170,8 +170,13 @@ describe("S4 result persist → notify → delivery receipt", () => {
     const persisted = new DurableTaskOutcomeStore(storeRoot).loadTask(taskId);
     expect(persisted?.delivery.status).toBe("pending");
     expect(persisted?.deliveryId).toBe(deliveryId);
+    // Pre-commit intent is not a confirmable registration.
     expect(peekAwaitingDelivery({ deliveryId, persistRoot: storeRoot })).toBeUndefined();
-    expect(fs.existsSync(path.join(storeRoot, "pending-deliveries"))).toBe(false);
+    expect(
+      fs.existsSync(
+        path.join(storeRoot, "pending-deliveries", `${encodeURIComponent(runId)}.json`),
+      ),
+    ).toBe(false);
 
     const boot = await recoverTaskOutcomeConsumersAtGatewayBoot({
       cfg,
@@ -273,5 +278,209 @@ describe("S4 result persist → notify → delivery receipt", () => {
       "delivered",
     );
     expect(closes).toBe(0);
+  });
+
+  function seedBoundBoard(
+    sessionFile: string,
+    binding: {
+      taskId: string;
+      executionAttempt: string;
+      deliverableVersion: string;
+    },
+    title = "S4 send",
+  ) {
+    fs.writeFileSync(sessionFile, "");
+    mutateSessionTaskBoard(sessionFile, () => ({
+      board: {
+        ...emptySessionTaskBoard(),
+        current: {
+          ...binding,
+          title,
+          goalText: title,
+          unfinished: true,
+          createdAtMs: 1,
+          stop: { summary: "waiting", workspacePaths: [] },
+        },
+      },
+      value: undefined,
+    }));
+  }
+
+  async function persistThenCrash(params: {
+    runId: string;
+    taskId: string;
+    sessionFile: string;
+    binding: {
+      taskId: string;
+      executionAttempt: string;
+      deliverableVersion: string;
+    };
+    payloads: { text: string }[];
+    target: { channel: string; to: string; accountId?: string };
+  }) {
+    const prepareArgs = {
+      resolvePersistRoot: () => storeRoot,
+      agentId: "bot",
+      runId: params.runId,
+      outcomeTaskId: params.taskId,
+      sessionKey: "agent:bot:main",
+      sessionFile: params.sessionFile,
+      completionBinding: params.binding,
+      contract: {
+        id: "report-v1",
+        version: "1",
+        kind: "document" as const,
+        requiredValidators: ["check"],
+        acceptanceVerified: true,
+      },
+      payloads: params.payloads,
+      target: params.target,
+      commitOutcome: async (
+        _success: boolean,
+        opts: { acceptance?: unknown; delivery?: unknown; deliveryId?: string },
+      ) => {
+        await recordRunnerTurnOutcome(cfg, "bot", {
+          success: true,
+          runId: params.runId,
+          taskId: params.taskId,
+          scope,
+          acceptance: opts.acceptance as never,
+          delivery: opts.delivery as never,
+          deliveryId: opts.deliveryId,
+        });
+        throw new Error("crash after persist before notify");
+      },
+      publishPending: () => {
+        throw new Error("publish must not run when persist notify crashes");
+      },
+    };
+    await expect(prepareVisibleDelivery(prepareArgs)).rejects.toThrow(
+      "crash after persist before notify",
+    );
+    expect(new DurableTaskOutcomeStore(storeRoot).loadTask(params.taskId)?.delivery.status).toBe(
+      "pending",
+    );
+    expect(new DurableTaskOutcomeStore(storeRoot).loadTask(params.taskId)?.acceptance.status).toBe(
+      "passed",
+    );
+  }
+
+  it("proactively sends the original result after a persist-before-register crash and confirms from a channel receipt", async () => {
+    const runId = "s4-run-send";
+    const taskId = "s4-task-send";
+    const deliveryId = "delivery:s4-run-send:visible";
+    const sessionFile = path.join(agentDir, "session-send.jsonl");
+    const binding = {
+      taskId: "board-s4-send",
+      executionAttempt: runId,
+      deliverableVersion: "v1",
+    };
+    const payloads = [{ text: "original result v1" }];
+    const target = { channel: "telegram", to: "111" };
+    seedBoundBoard(sessionFile, binding);
+    await persistThenCrash({ runId, taskId, sessionFile, binding, payloads, target });
+
+    let sendCalls = 0;
+    const sendPendingVisible = async (input: {
+      payloads?: { text?: string }[];
+      target?: { channel?: string; to?: string };
+    }) => {
+      sendCalls += 1;
+      expect(input.payloads).toEqual(payloads);
+      expect(input.target).toMatchObject(target);
+      return [{ messageId: "tg-msg-1" }];
+    };
+    const bootArgs = { cfg, startRuntimeDrain: false as const, sendPendingVisible };
+    const boot = await recoverTaskOutcomeConsumersAtGatewayBoot(bootArgs);
+    expect(boot.agentsScanned).toBe(1);
+    expect(boot.hydrated).toBeGreaterThanOrEqual(1);
+    expect(sendCalls).toBe(1);
+    expect(new DurableTaskOutcomeStore(storeRoot).loadTask(taskId)?.delivery.status).toBe(
+      "delivered",
+    );
+    expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(false);
+    expect(peekAwaitingDelivery({ deliveryId, persistRoot: storeRoot })).toBeUndefined();
+
+    await recoverTaskOutcomeConsumersAtGatewayBoot(bootArgs);
+    expect(sendCalls).toBe(1);
+  });
+
+  it("refuses proactive send when the bound task version is no longer current", async () => {
+    const runId = "s4-run-version";
+    const taskId = "s4-task-version";
+    const deliveryId = "delivery:s4-run-version:visible";
+    const sessionFile = path.join(agentDir, "session-version.jsonl");
+    const binding = {
+      taskId: "board-s4-version",
+      executionAttempt: runId,
+      deliverableVersion: "v1",
+    };
+    const payloads = [{ text: "original result v1" }];
+    const target = { channel: "telegram", to: "111" };
+    seedBoundBoard(sessionFile, binding);
+    await persistThenCrash({ runId, taskId, sessionFile, binding, payloads, target });
+    mutateSessionTaskBoard(sessionFile, (board) => ({
+      board: {
+        ...board,
+        current: board.current
+          ? { ...board.current, deliverableVersion: "v2", executionAttempt: "later-run" }
+          : board.current,
+      },
+      value: undefined,
+    }));
+
+    let sendCalls = 0;
+    const bootArgs = {
+      cfg,
+      startRuntimeDrain: false as const,
+      sendPendingVisible: async () => {
+        sendCalls += 1;
+        return [{ messageId: "must-not-send" }];
+      },
+    };
+    await recoverTaskOutcomeConsumersAtGatewayBoot(bootArgs);
+    expect(sendCalls).toBe(0);
+    expect(new DurableTaskOutcomeStore(storeRoot).loadTask(taskId)?.delivery.status).toBe(
+      "pending",
+    );
+    expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
+    expect(readSessionTaskBoard(sessionFile).current?.deliverableVersion).toBe("v2");
+    expect(peekAwaitingDelivery({ deliveryId, persistRoot: storeRoot })).toBeDefined();
+  });
+
+  it("keeps delivery unknown and does not resend when the channel returns no receipt", async () => {
+    const runId = "s4-run-unknown";
+    const taskId = "s4-task-unknown";
+    const deliveryId = "delivery:s4-run-unknown:visible";
+    const sessionFile = path.join(agentDir, "session-unknown.jsonl");
+    const binding = {
+      taskId: "board-s4-unknown",
+      executionAttempt: runId,
+      deliverableVersion: "v1",
+    };
+    const payloads = [{ text: "original result v1" }];
+    const target = { channel: "telegram", to: "111" };
+    seedBoundBoard(sessionFile, binding);
+    await persistThenCrash({ runId, taskId, sessionFile, binding, payloads, target });
+
+    let sendCalls = 0;
+    const bootArgs = {
+      cfg,
+      startRuntimeDrain: false as const,
+      sendPendingVisible: async () => {
+        sendCalls += 1;
+        return [{ messageId: "unknown" }];
+      },
+    };
+    await recoverTaskOutcomeConsumersAtGatewayBoot(bootArgs);
+    expect(sendCalls).toBe(1);
+    expect(new DurableTaskOutcomeStore(storeRoot).loadTask(taskId)?.delivery.status).toBe(
+      "delivery_unknown",
+    );
+    expect(readSessionTaskBoard(sessionFile).current?.unfinished).toBe(true);
+    expect(peekAwaitingDelivery({ deliveryId, persistRoot: storeRoot })).toBeDefined();
+
+    await recoverTaskOutcomeConsumersAtGatewayBoot(bootArgs);
+    expect(sendCalls).toBe(1);
   });
 });

@@ -753,6 +753,21 @@ export function createFollowupRunner(params: {
           completionBinding: queued.run.taskCompletionBinding,
           contract: resolveTurnContractFromRunMeta(runResult.meta),
           commitOutcome: (success, outcome) => submitFollowupOutcomeCloseout({ success, outcome }),
+          payloads: finalPayloads,
+          ...(queued.originatingChannel && queued.originatingTo
+            ? {
+                target: {
+                  channel: queued.originatingChannel,
+                  to: queued.originatingTo,
+                  ...(queued.originatingAccountId
+                    ? { accountId: queued.originatingAccountId }
+                    : {}),
+                  ...(queued.originatingThreadId !== undefined
+                    ? { threadId: queued.originatingThreadId }
+                    : {}),
+                },
+              }
+            : {}),
           publishPending: (identity) => {
             preparedDelivery = identity;
             if (
