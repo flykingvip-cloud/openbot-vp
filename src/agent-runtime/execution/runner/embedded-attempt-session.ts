@@ -3,6 +3,10 @@ import { buildEmbeddedExtensionFactories } from "../../../agents/pi-embedded-run
 import { log } from "../../../agents/pi-embedded-runner/logger.js";
 import { observeAttemptToolPreparation } from "../../../agents/pi-embedded-runner/run/execution-router-baselines.js";
 import type { EmbeddedRunAttemptParams } from "../../../agents/pi-embedded-runner/run/types.js";
+
+type AttemptParamsWithInheritedCap = EmbeddedRunAttemptParams & {
+  inheritedContextWindowTokens?: number;
+};
 import {
   applyEmbeddedCustomToolPolicy,
   splitSdkTools,
@@ -20,7 +24,7 @@ import type { EmbeddedAttemptState } from "./embedded-attempt-preflight.js";
 
 /** Open the attempt session after the write lock is held. */
 export async function runEmbeddedAttemptSession(
-  params: EmbeddedRunAttemptParams,
+  params: AttemptParamsWithInheritedCap,
   s: EmbeddedAttemptState,
 ): Promise<void> {
   s.session = undefined;
@@ -82,6 +86,7 @@ export async function runEmbeddedAttemptSession(
     provider: params.provider,
     modelId: params.modelId,
     model: params.model,
+    inheritedContextWindowTokens: params.inheritedContextWindowTokens,
   });
   // Only create an explicit resource loader when there are extension factories
   // to register; otherwise let createAgentSession use its built-in default.

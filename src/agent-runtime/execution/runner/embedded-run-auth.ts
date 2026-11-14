@@ -24,6 +24,7 @@ import {
   prepareEmbeddedModel,
   resolveRunAuthProfileCandidates,
 } from "../../model/index.js";
+import type { PersonalContextCapSelectionPort } from "../../model/rule-adaptation/index.js";
 import {
   OVERLOAD_FAILOVER_BACKOFF_POLICY,
   resolveMaxRunRetryIterations,
@@ -46,6 +47,7 @@ export type EmbeddedRunSession = {
   authOverride: EmbeddedModelPrep["authOverride"];
   ctxInfo: EmbeddedModelPrep["ctxInfo"];
   effectiveModel: EmbeddedModelPrep["effectiveModel"];
+  contextCapSelection: EmbeddedModelPrep["contextCapSelection"];
   authStore: ReturnType<typeof ensureAuthProfileStore>;
   lockedProfileId: string | undefined;
   profileCandidates: ReturnType<typeof resolveRunAuthProfileCandidates>["profileCandidates"];
@@ -80,6 +82,12 @@ export async function prepareEmbeddedRunAuth(args: {
   fallbackConfigured: boolean;
   resolvedWorkspace: string;
   workspaceAgentId: string;
+  /**
+   * Host-injected personal context-cap selection port.
+   * Omitted or mode `original` keeps the original prepare behavior completely.
+   * Production default embedded run must omit this port.
+   */
+  contextCapSelection?: PersonalContextCapSelectionPort;
 }): Promise<EmbeddedRunSession> {
   const params = args.params;
   const agentDir = args.agentDir;
@@ -124,7 +132,7 @@ export async function prepareEmbeddedRunAuth(args: {
     log.info(`[hooks] model overridden to ${session.modelId}`);
   }
 
-  const { authStorage, modelRegistry, authOverride, ctxInfo, effectiveModel } =
+  const { authStorage, modelRegistry, authOverride, ctxInfo, effectiveModel, contextCapSelection } =
     await prepareEmbeddedModel({
       config: params.config,
       provider: session.provider,
@@ -132,6 +140,7 @@ export async function prepareEmbeddedRunAuth(args: {
       agentDir,
       providerAuthOverride: params.providerAuthOverride,
       log,
+      contextCapSelection: args.contextCapSelection,
     });
 
   const authStore = ensureAuthProfileStore(agentDir, { allowKeychainPrompt: false });
@@ -375,6 +384,7 @@ export async function prepareEmbeddedRunAuth(args: {
   session.authOverride = authOverride;
   session.ctxInfo = ctxInfo;
   session.effectiveModel = effectiveModel;
+  session.contextCapSelection = contextCapSelection;
   session.authStore = authStore;
   session.lockedProfileId = lockedProfileId;
   session.profileCandidates = profileCandidates;

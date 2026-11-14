@@ -525,13 +525,14 @@ export class AControlPlane {
     const tenantId = requireField(payload, "tenantId");
     this.assertNotRevoked({ tenantId, subject: lease.subject ?? this.subject });
     try {
-      return await this.client.upload({
+      const uploaded = await this.client.upload({
         [EXEC_API_VERSION_FIELD]: EXEC_API_VERSION,
         tenantId,
         bytesBase64: requireField(payload, "bytesBase64"),
         sha256: requireField(payload, "sha256"),
         byteCount: optionalNum(payload, "byteCount") as number,
       });
+      return { status: uploaded.httpStatus, body: uploaded.payload };
     } catch (error) {
       if (isUnreachable(error)) {
         throw new ExecProtocolError(

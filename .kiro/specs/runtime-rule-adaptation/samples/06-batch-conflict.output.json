@@ -1,0 +1,38 @@
+{
+  "resultKind": "blocked",
+  "activationAllowed": false,
+  "authorizationAssessment": "host_unauthorized",
+  "reasons": [
+    {
+      "code": "structural_duplicate_field",
+      "message": "Field agents.defaults.contextTokens is repeated in proposal.items with conflicting values 24000 and 20000. The whole proposal is blocked (structural_duplicate_field). A missing host compatibility record is not evaluated and must not produce needs_information. Partial adoption is forbidden.",
+      "path": "proposal.items"
+    }
+  ],
+  "items": [
+    {
+      "ruleId": "model.context_window.guard",
+      "field": "agents.defaults.contextTokens",
+      "resultKind": "blocked",
+      "reasons": [
+        {
+          "code": "structural_duplicate_field",
+          "message": "Whole-proposal reject because this field is repeated with a conflicting value; item 0 proposedValue=24000 is not adopted.",
+          "path": "proposal.items[0]"
+        }
+      ]
+    },
+    {
+      "ruleId": "model.context_window.guard",
+      "field": "agents.defaults.contextTokens",
+      "resultKind": "blocked",
+      "reasons": [
+        {
+          "code": "structural_duplicate_field",
+          "message": "Whole-proposal reject because this field is repeated with a conflicting value; item 1 proposedValue=20000 is not adopted.",
+          "path": "proposal.items[1]"
+        }
+      ]
+    }
+  ]
+}

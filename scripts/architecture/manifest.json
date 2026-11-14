@@ -125,6 +125,10 @@
       "src/agent-runtime/capabilities/**",
       "src/conversation-task/**"
     ],
+    "exemptFiles": [
+      "src/agent-runtime/command/governed-interaction.test.ts",
+      "src/agent-runtime/command/rule-adaptation/official-shadow.test.ts"
+    ],
     "description": "Command use cases cannot directly invoke models, tools, scheduling or task persistence; effects use explicit injected ports and pure projections."
   },
   {
@@ -224,12 +228,18 @@
       "src/agent-runtime/delivery/**",
       "src/agent-runtime/command/**"
     ],
+    "exemptFiles": ["src/agent-runtime/policy/rule-adaptation/activation-precheck.test.ts"],
     "description": "Policy classification must not read/write task state, perform environment probes or initiate execution and delivery."
   },
   {
     "name": "runtime-policy-public-entry",
     "from": "src/**",
-    "denyImportsFrom": ["src/agent-runtime/policy/!(index).ts", "src/agent-runtime/policy/*/**"],
+    "exceptFrom": ["src/agent-runtime/policy/rule-adaptation/**"],
+    "denyImportsFrom": [
+      "src/agent-runtime/policy/!(index).ts",
+      "src/agent-runtime/policy/*/!(index).ts",
+      "src/agent-runtime/policy/*/*/**"
+    ],
     "exemptFiles": [
       "src/agent-runtime/policy/acceptance-checks.ts",
       "src/agent-runtime/policy/blocker.test.ts",
@@ -257,9 +267,12 @@
       "src/agent-runtime/policy/run-limits.ts",
       "src/agent-runtime/policy/task-binding.test.ts",
       "src/agent-runtime/policy/task-binding.ts",
-      "src/agent-runtime/policy/task-board-limits.ts"
+      "src/agent-runtime/policy/task-board-limits.ts",
+      "src/agent-runtime/command/rule-adaptation/activation-test-support.ts",
+      "src/agent-runtime/command/rule-adaptation/run.cases.test.ts",
+      "src/agent-runtime/command/rule-adaptation/test-support.ts"
     ],
-    "description": "Production code consumes policy through the public index facade; numeric limits and decisions share one entry. Policy internals may cross-import; listed policy sources/tests are exempt."
+    "description": "Production code consumes policy through the public index facade or a first-level policy/*/index.ts module barrel; numeric limits and decisions share one entry. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed policy sources/tests and the exact-path command test fixtures that must import policy test-support remain exempt."
   },
   {
     "name": "runtime-context-reply-public-entry",
@@ -296,7 +309,12 @@
   {
     "name": "runtime-model-public-entry",
     "from": "src/**",
-    "denyImportsFrom": ["src/agent-runtime/model/!(index).ts", "src/agent-runtime/model/*/**"],
+    "exceptFrom": ["src/agent-runtime/model/rule-adaptation/**"],
+    "denyImportsFrom": [
+      "src/agent-runtime/model/!(index).ts",
+      "src/agent-runtime/model/*/!(index).ts",
+      "src/agent-runtime/model/*/*/**"
+    ],
     "exemptFiles": [
       "src/agent-runtime/model/admission-lease.test.ts",
       "src/agent-runtime/model/admission-lease.ts",
@@ -326,14 +344,20 @@
       "src/agent-runtime/model/prepare-embedded-model.test.ts",
       "src/agent-runtime/model/prepare-embedded-model.ts",
       "src/agent-runtime/model/xai-arguments-stream.ts",
-      "src/executor-evidence/acceptance-fix-r8-cli.isolation.test.ts"
+      "src/executor-evidence/acceptance-fix-r8-cli.isolation.test.ts",
+      "src/agent-runtime/context/interaction-history.test.ts"
     ],
-    "description": "Production code consumes model infrastructure through the public model/index facade. Model internals may cross-import; listed model sources/tests and the R8 CLI isolation test (which must bind command-commercial-gate directly) are exempt."
+    "description": "Production code consumes model infrastructure through the public model/index facade or a first-level model/*/index.ts module barrel. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed model sources/tests and the R8 CLI isolation test (which must bind command-commercial-gate directly) are exempt. The interaction-history unit test must call buildInteractionCompletionContext directly to assert assembled message order, so that test file is also exempt."
   },
   {
     "name": "runtime-command-public-entry",
     "from": "src/**",
-    "denyImportsFrom": ["src/agent-runtime/command/!(index).ts", "src/agent-runtime/command/*/**"],
+    "exceptFrom": ["src/agent-runtime/command/rule-adaptation/**"],
+    "denyImportsFrom": [
+      "src/agent-runtime/command/!(index).ts",
+      "src/agent-runtime/command/*/!(index).ts",
+      "src/agent-runtime/command/*/*/**"
+    ],
     "exemptFiles": [
       "src/agent-runtime/command/index.ts",
       "src/agent-runtime/command/authorized-interaction.ts",
@@ -357,9 +381,15 @@
       "src/agent-runtime/command/task-proposal-reply.test.ts",
       "src/agent-runtime/command/task-status.ts",
       "src/agent-runtime/command/task-status.test.ts",
-      "src/agent-runtime/command/task-status-format.test.ts"
+      "src/agent-runtime/command/task-status-format.test.ts",
+      "src/agent-runtime/command/governed-interaction.test.ts",
+      "src/agent-runtime/model/rule-adaptation/context-cap-consumer-chain.test.ts",
+      "src/agent-runtime/model/rule-adaptation/context-cap-selection.test.ts",
+      "src/agent-runtime/model/rule-adaptation/model-port.test.ts",
+      "src/agent-runtime/model/rule-adaptation/occupancy.test.ts",
+      "src/agent-runtime/policy/rule-adaptation/activation-precheck.test.ts"
     ],
-    "description": "Production code consumes command use-cases through the public command/index facade. Command internals may cross-import; listed command sources/tests are exempt. Existing auto-reply and gateway entry rules remain."
+    "description": "Production code consumes command use-cases through the public command/index facade or a first-level command/*/index.ts module barrel. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed command sources/tests and the exact-path test files that must bind official command test fixtures remain exempt. Existing auto-reply and gateway entry rules remain."
   },
   {
     "name": "runtime-acceptance-no-platform-effects",
@@ -530,7 +560,13 @@
       "src/task-outcome/**"
     ],
     "description": "Shared model admission has no task state, execution loop or delivery dependency. Tests may bind fixed host ports.",
-    "exemptFiles": ["src/agent-runtime/model/authorized-session.test.ts"]
+    "exemptFiles": [
+      "src/agent-runtime/model/authorized-session.test.ts",
+      "src/agent-runtime/model/rule-adaptation/context-cap-consumer-chain.test.ts",
+      "src/agent-runtime/model/rule-adaptation/context-cap-selection.test.ts",
+      "src/agent-runtime/model/rule-adaptation/model-port.test.ts",
+      "src/agent-runtime/model/rule-adaptation/occupancy.test.ts"
+    ]
   },
   {
     "name": "runtime-retired-admission-lifecycle",

@@ -1808,7 +1808,6 @@ tasks:
       - src/auto-reply/reply/get-reply.ts
       - src/agents/pi-tools.ts
       - src/agents/pi-embedded-runner/run/attempt.ts
-      - src/agents/pi-embedded-runner/compact.ts
       - src/agents/skills/workspace.ts
       - src/gateway/evolution-governance/tick-pipeline.ts
       - src/gateway/skill-invocation/record.ts
@@ -1863,6 +1862,18 @@ tasks:
           at: 2026-09-06 10:54:00+00:00
           paths:
             - src/agents/pi-embedded-runner/run/attempt.ts
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: kiro-daibai
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/pi-embedded-runner/compact.ts
+          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run.
   - id: daibai-super-steward:codex-daibai
     owner: codex-daibai
     intent: []
@@ -3054,7 +3065,284 @@ tasks:
     intent: []
     paths:
       - .kiro/specs/production-agent-runtime-safety/**
-      - src/agents/**
+      - src/agents/a*
+      - src/agents/auth-profiles/**
+      - src/agents/b*
+      - src/agents/builtin-steward/**
+      - src/agents/c*
+      - src/agents/cli-runner/**
+      - src/agents/context-compiler/**
+      - src/agents/d*
+      - src/agents/e*
+      - src/agents/execution-preflight/**
+      - src/agents/f*
+      - src/agents/g*
+      - src/agents/h*
+      - src/agents/i*
+      - src/agents/k*
+      - src/agents/l*
+      - src/agents/me*
+      - src/agents/mi*
+      - src/agents/model-alias-lines.ts
+      - src/agents/model-auth-env-vars.ts
+      - src/agents/model-auth-label.test.ts
+      - src/agents/model-auth-label.ts
+      - src/agents/model-auth-markers.test.ts
+      - src/agents/model-auth-markers.ts
+      - src/agents/model-auth.credential-catalog.test.ts
+      - src/agents/model-auth.credential-source.property.test.ts
+      - src/agents/model-auth.profiles.test.ts
+      - src/agents/model-auth.test.ts
+      - src/agents/model-auth.ts
+      - src/agents/model-catalog.test-harness.ts
+      - src/agents/model-catalog.test.ts
+      - src/agents/model-catalog.ts
+      - src/agents/model-compat.test.ts
+      - src/agents/model-compat.ts
+      - src/agents/model-credential-source.ts
+      - src/agents/model-fallback-governance.ts
+      - src/agents/model-fallback-observation.ts
+      - src/agents/model-fallback.aor-order.test.ts
+      - src/agents/model-fallback.entitlement.test.ts
+      - src/agents/model-fallback.governance.test.ts
+      - src/agents/model-fallback.p2g-loopback-http.test.ts
+      - src/agents/model-fallback.p2g-outbound.test.ts
+      - src/agents/model-fallback.probe.test.ts
+      - src/agents/model-fallback.run-embedded.e2e.test.ts
+      - src/agents/model-fallback.sandbox-infra.test.ts
+      - src/agents/model-fallback.test.ts
+      - src/agents/model-fallback.types.ts
+      - src/agents/model-forward-compat.ts
+      - src/agents/model-output-boundary.test.ts
+      - src/agents/model-output-boundary.ts
+      - src/agents/model-ref-profile.test.ts
+      - src/agents/model-ref-profile.ts
+      - src/agents/model-scan.test.ts
+      - src/agents/model-scan.ts
+      - src/agents/model-selection.test.ts
+      - src/agents/model-selection.ts
+      - src/agents/model-tool-support.test.ts
+      - src/agents/model-tool-support.ts
+      - src/agents/models-config.applies-config-env-vars.test.ts
+      - src/agents/models-config.auto-injects-github-copilot-provider-token-is.test.ts
+      - src/agents/models-config.e2e-harness.ts
+      - src/agents/models-config.falls-back-default-baseurl-token-exchange-fails.test.ts
+      - src/agents/models-config.file-mode.test.ts
+      - src/agents/models-config.fills-missing-provider-apikey-from-env-var.test.ts
+      - src/agents/models-config.merge.test.ts
+      - src/agents/models-config.merge.ts
+      - src/agents/models-config.normalizes-gemini-3-ids-preview-google-providers.test.ts
+      - src/agents/models-config.plan.ts
+      - src/agents/models-config.preserves-explicit-reasoning-override.test.ts
+      - src/agents/models-config.providers.auth-provenance.test.ts
+      - src/agents/models-config.providers.cloudflare-ai-gateway.test.ts
+      - src/agents/models-config.providers.discovery-auth.test.ts
+      - src/agents/models-config.providers.discovery.ts
+      - src/agents/models-config.providers.google-antigravity.test.ts
+      - src/agents/models-config.providers.kilocode.test.ts
+      - src/agents/models-config.providers.kimi-coding.test.ts
+      - src/agents/models-config.providers.matrix.test.ts
+      - src/agents/models-config.providers.minimax.test.ts
+      - src/agents/models-config.providers.modelstudio.test.ts
+      - src/agents/models-config.providers.normalize-keys.test.ts
+      - src/agents/models-config.providers.nvidia.test.ts
+      - src/agents/models-config.providers.ollama-autodiscovery.test.ts
+      - src/agents/models-config.providers.ollama.test.ts
+      - src/agents/models-config.providers.openai-codex.test.ts
+      - src/agents/models-config.providers.qianfan.test.ts
+      - src/agents/models-config.providers.static.ts
+      - src/agents/models-config.providers.ts
+      - src/agents/models-config.providers.vercel-ai-gateway.test.ts
+      - src/agents/models-config.providers.volcengine-byteplus.test.ts
+      - src/agents/models-config.runtime-source-snapshot.test.ts
+      - src/agents/models-config.skips-writing-models-json-no-env-token.test.ts
+      - src/agents/models-config.test-utils.ts
+      - src/agents/models-config.ts
+      - src/agents/models-config.uses-first-github-copilot-profile-env-tokens.test.ts
+      - src/agents/models-config.write-serialization.test.ts
+      - src/agents/models.profiles.live.test.ts
+      - src/agents/moonshot.live.test.ts
+      - src/agents/mu*
+      - src/agents/o*
+      - src/agents/pa*
+      - src/agents/personal-mail-assistant/**
+      - src/agents/pi-auth-credentials.ts
+      - src/agents/pi-auth-json.test.ts
+      - src/agents/pi-auth-json.ts
+      - src/agents/pi-embedded-block-chunker.test.ts
+      - src/agents/pi-embedded-block-chunker.ts
+      - src/agents/pi-embedded-error-observation.test.ts
+      - src/agents/pi-embedded-error-observation.ts
+      - src/agents/pi-embedded-helpers.buildbootstrapcontextfiles.test.ts
+      - src/agents/pi-embedded-helpers.formatassistanterrortext.test.ts
+      - src/agents/pi-embedded-helpers.isbillingerrormessage.test.ts
+      - src/agents/pi-embedded-helpers.sanitize-session-messages-images.removes-empty-assistant-text-blocks-but-preserves.test.ts
+      - src/agents/pi-embedded-helpers.sanitizeuserfacingtext.test.ts
+      - src/agents/pi-embedded-helpers.scratchpad-sanitize.node.test.ts
+      - src/agents/pi-embedded-helpers.ts
+      - src/agents/pi-embedded-helpers.validate-turns.test.ts
+      - src/agents/pi-embedded-helpers/**
+      - src/agents/pi-embedded-messaging.ts
+      - src/agents/pi-embedded-payloads.ts
+      - src/agents/pi-embedded-runner-extraparams.live.test.ts
+      - src/agents/pi-embedded-runner-extraparams.test.ts
+      - src/agents/pi-embedded-runner.applygoogleturnorderingfix.test.ts
+      - src/agents/pi-embedded-runner.buildembeddedsandboxinfo.test.ts
+      - src/agents/pi-embedded-runner.compaction-safety-timeout.test.ts
+      - src/agents/pi-embedded-runner.createsystempromptoverride.test.ts
+      - src/agents/pi-embedded-runner.e2e.test.ts
+      - src/agents/pi-embedded-runner.get-dm-history-limit-from-session-key.falls-back-provider-default-per-dm-not.test.ts
+      - src/agents/pi-embedded-runner.get-dm-history-limit-from-session-key.returns-undefined-sessionkey-is-undefined.test.ts
+      - src/agents/pi-embedded-runner.guard.test.ts
+      - src/agents/pi-embedded-runner.guard.waitforidle-before-flush.test.ts
+      - src/agents/pi-embedded-runner.history-limit-from-session-key.test.ts
+      - src/agents/pi-embedded-runner.limithistoryturns.test.ts
+      - src/agents/pi-embedded-runner.openai-tool-id-preservation.test.ts
+      - src/agents/pi-embedded-runner.resolvesessionagentids.test.ts
+      - src/agents/pi-embedded-runner.run-embedded-pi-agent.auth-profile-rotation.e2e.test.ts
+      - src/agents/pi-embedded-runner.sanitize-session-history.policy.test.ts
+      - src/agents/pi-embedded-runner.sanitize-session-history.test-harness.ts
+      - src/agents/pi-embedded-runner.sanitize-session-history.test.ts
+      - src/agents/pi-embedded-runner.splitsdktools.test.ts
+      - src/agents/pi-embedded-runner.ts
+      - src/agents/pi-embedded-runner/a*
+      - src/agents/pi-embedded-runner/ca*
+      - src/agents/pi-embedded-runner/compact.hooks.test.ts
+      - src/agents/pi-embedded-runner/compact.runtime.ts
+      - src/agents/pi-embedded-runner/compaction-safety-timeout.ts
+      - src/agents/pi-embedded-runner/extensions.test.ts
+      - src/agents/pi-embedded-runner/extra-params.cache-retention-default.test.ts
+      - src/agents/pi-embedded-runner/extra-params.kilocode.test.ts
+      - src/agents/pi-embedded-runner/extra-params.openrouter-cache-control.test.ts
+      - src/agents/pi-embedded-runner/extra-params.ts
+      - src/agents/pi-embedded-runner/extra-params.zai-tool-stream.test.ts
+      - src/agents/pi-embedded-runner/g*
+      - src/agents/pi-embedded-runner/h*
+      - src/agents/pi-embedded-runner/k*
+      - src/agents/pi-embedded-runner/l*
+      - src/agents/pi-embedded-runner/m*
+      - src/agents/pi-embedded-runner/o*
+      - src/agents/pi-embedded-runner/p*
+      - src/agents/pi-embedded-runner/r*
+      - src/agents/pi-embedded-runner/run/**
+      - src/agents/pi-embedded-runner/s*
+      - src/agents/pi-embedded-runner/t*
+      - src/agents/pi-embedded-runner/u*
+      - src/agents/pi-embedded-runner/w*
+      - src/agents/pi-embedded-subscribe.block-reply-rejections.test.ts
+      - src/agents/pi-embedded-subscribe.code-span-awareness.test.ts
+      - src/agents/pi-embedded-subscribe.e2e-harness.ts
+      - src/agents/pi-embedded-subscribe.flush-pending-compaction-end.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.compaction.ts
+      - src/agents/pi-embedded-subscribe.handlers.lifecycle.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.lifecycle.ts
+      - src/agents/pi-embedded-subscribe.handlers.messages.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.messages.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.media.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.ts
+      - src/agents/pi-embedded-subscribe.handlers.ts
+      - src/agents/pi-embedded-subscribe.handlers.types.ts
+      - src/agents/pi-embedded-subscribe.lifecycle-billing-error.test.ts
+      - src/agents/pi-embedded-subscribe.plan-speak-outlet.test.ts
+      - src/agents/pi-embedded-subscribe.protocol-leak.test.ts
+      - src/agents/pi-embedded-subscribe.raw-stream.ts
+      - src/agents/pi-embedded-subscribe.reply-tags.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.calls-onblockreplyflush-before-tool-execution-start-preserve.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.does-not-append-text-end-content-is.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.does-not-call-onblockreplyflush-callback-is-not.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.does-not-duplicate-text-end-repeats-full.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.does-not-emit-duplicate-block-replies-text.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.emits-block-replies-text-end-does-not.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.emits-reasoning-as-separate-message-enabled.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.filters-final-suppresses-output-without-start-tag.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.includes-canvas-action-metadata-tool-summaries.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.keeps-assistanttexts-final-answer-block-replies-are.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.keeps-indented-fenced-blocks-intact.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.reopens-fenced-blocks-splitting-inside-them.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.splits-long-single-line-fenced-blocks-reopen.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.streams-soft-chunks-paragraph-preference.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.subscribeembeddedpisession.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.suppresses-message-end-block-replies-message-tool.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.waits-multiple-compaction-retries-before-resolving.test.ts
+      - src/agents/pi-embedded-subscribe.tool-use-progress.test.ts
+      - src/agents/pi-embedded-subscribe.tools.extract.test.ts
+      - src/agents/pi-embedded-subscribe.tools.media.test.ts
+      - src/agents/pi-embedded-subscribe.tools.test.ts
+      - src/agents/pi-embedded-subscribe.tools.ts
+      - src/agents/pi-embedded-subscribe.ts
+      - src/agents/pi-embedded-subscribe.types.ts
+      - src/agents/pi-embedded-utils.strip-model-special-tokens.test.ts
+      - src/agents/pi-embedded-utils.test.ts
+      - src/agents/pi-embedded-utils.ts
+      - src/agents/pi-embedded.ts
+      - src/agents/pi-extensions/**
+      - src/agents/pi-model-discovery-runtime.ts
+      - src/agents/pi-model-discovery.auth.test.ts
+      - src/agents/pi-model-discovery.compat.e2e.test.ts
+      - src/agents/pi-model-discovery.ts
+      - src/agents/pi-project-settings.test.ts
+      - src/agents/pi-project-settings.ts
+      - src/agents/pi-sdk/**
+      - src/agents/pi-settings.test.ts
+      - src/agents/pi-settings.ts
+      - src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
+      - src/agents/pi-tool-definition-adapter.after-tool-call.test.ts
+      - src/agents/pi-tool-definition-adapter.test.ts
+      - src/agents/pi-tool-definition-adapter.ts
+      - src/agents/pi-tool-handler-state.test-helpers.ts
+      - src/agents/pi-tools-agent-config.test.ts
+      - src/agents/pi-tools.abort.ts
+      - src/agents/pi-tools.before-tool-call.e2e.test.ts
+      - src/agents/pi-tools.before-tool-call.integration.e2e.test.ts
+      - src/agents/pi-tools.before-tool-call.ogui-wait.test.ts
+      - src/agents/pi-tools.before-tool-call.provenance.test.ts
+      - src/agents/pi-tools.before-tool-call.runtime.ts
+      - src/agents/pi-tools.before-tool-call.ts
+      - src/agents/pi-tools.create-openclaw-coding-tools.adds-claude-style-aliases-schemas-without-dropping-b.test.ts
+      - src/agents/pi-tools.create-openclaw-coding-tools.adds-claude-style-aliases-schemas-without-dropping-d.test.ts
+      - src/agents/pi-tools.create-openclaw-coding-tools.adds-claude-style-aliases-schemas-without-dropping-f.test.ts
+      - src/agents/pi-tools.create-openclaw-coding-tools.adds-claude-style-aliases-schemas-without-dropping.test.ts
+      - src/agents/pi-tools.desktop-save.test.ts
+      - src/agents/pi-tools.fs-exec-capability-boundary.test.ts
+      - src/agents/pi-tools.host-edit.ts
+      - src/agents/pi-tools.message-provider-policy.test.ts
+      - src/agents/pi-tools.model-provider-collision.test.ts
+      - src/agents/pi-tools.params.ts
+      - src/agents/pi-tools.policy.test.ts
+      - src/agents/pi-tools.policy.ts
+      - src/agents/pi-tools.read.host-edit-access.test.ts
+      - src/agents/pi-tools.read.host-edit-recovery.test.ts
+      - src/agents/pi-tools.read.ts
+      - src/agents/pi-tools.read.workspace-root-guard.test.ts
+      - src/agents/pi-tools.safe-bins.test.ts
+      - src/agents/pi-tools.sandbox-mounted-paths.workspace-only.test.ts
+      - src/agents/pi-tools.schema.tool-name.test.ts
+      - src/agents/pi-tools.schema.ts
+      - src/agents/pi-tools.task-action.test.ts
+      - src/agents/pi-tools.ts
+      - src/agents/pi-tools.types.ts
+      - src/agents/pi-tools.whatsapp-login-gating.test.ts
+      - src/agents/pi-tools.workspace-only-false.test.ts
+      - src/agents/pi-tools.workspace-paths.test.ts
+      - src/agents/pr*
+      - src/agents/pt*
+      - src/agents/q*
+      - src/agents/r*
+      - src/agents/s*
+      - src/agents/sandbox/**
+      - src/agents/schema/**
+      - src/agents/skill-gates/**
+      - src/agents/skills/**
+      - src/agents/t*
+      - src/agents/task-surface/**
+      - src/agents/test-helpers/**
+      - src/agents/tools/**
+      - src/agents/turn-completion/**
+      - src/agents/u*
+      - src/agents/v*
+      - src/agents/w*
+      - src/agents/z*
       - deploy/production/**
       - src/agents/bash-tools.exec.ts
       - src/agents/bash-tools.exec-protected-process.ts
@@ -3075,7 +3363,26 @@ tasks:
         metadata: {}
     ownerHistory: []
     since: 2026-07-19
-    metadata: {}
+    metadata:
+      pathReleases:
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: codex-runtime-safety
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/pi-embedded-runner/extensions.ts
+            - src/agents/pi-embedded-runner/compact.ts
+            - src/agents/model-fallback.ts
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
   - id: repository-wide-branch-convergence
     owner: grok-evolution-closure
     intent:
@@ -6671,7 +6978,483 @@ tasks:
       - extensions/matrix/src/tool-actions.ts
       - extensions/tlon/index.ts
       - extensions/voice-call/index.ts
-      - src/**
+      - src/account-computer/**
+      - src/acp/**
+      - src/agent-runtime/capabilities/**
+      - src/agent-runtime/command/a*
+      - src/agent-runtime/command/c*
+      - src/agent-runtime/command/e*
+      - src/agent-runtime/command/g*
+      - src/agent-runtime/command/h*
+      - src/agent-runtime/command/i*
+      - src/agent-runtime/command/n*
+      - src/agent-runtime/command/p*
+      - src/agent-runtime/command/ro*
+      - src/agent-runtime/command/scenarios/**
+      - src/agent-runtime/command/t*
+      - src/agent-runtime/context/a*
+      - src/agent-runtime/context/catalog/**
+      - src/agent-runtime/context/compilation/**
+      - src/agent-runtime/context/i*
+      - src/agent-runtime/context/p*
+      - src/agent-runtime/context/s*
+      - src/agent-runtime/context/sources/**
+      - src/agent-runtime/context/t*
+      - src/agent-runtime/context/trust/**
+      - src/agent-runtime/context/u*
+      - src/agent-runtime/contracts/a*
+      - src/agent-runtime/contracts/b*
+      - src/agent-runtime/contracts/c*
+      - src/agent-runtime/contracts/d*
+      - src/agent-runtime/contracts/e*
+      - src/agent-runtime/contracts/i*
+      - src/agent-runtime/contracts/l*
+      - src/agent-runtime/contracts/p*
+      - src/agent-runtime/contracts/q*
+      - src/agent-runtime/contracts/task-binding.ts
+      - src/agent-runtime/contracts/task-control.ts
+      - src/agent-runtime/contracts/task-stop.ts
+      - src/agent-runtime/contracts/tu*
+      - src/agent-runtime/delivery/**
+      - src/agent-runtime/execution/i*
+      - src/agent-runtime/execution/outcomes/**
+      - src/agent-runtime/execution/p*
+      - src/agent-runtime/execution/preparation/**
+      - src/agent-runtime/execution/recovery/**
+      - src/agent-runtime/execution/runner/a*
+      - src/agent-runtime/execution/runner/c*
+      - src/agent-runtime/execution/runner/embedded-attempt-closeout.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-continue.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-phase-state.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-preflight.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-prompt.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream-inner.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-tools.ts
+      - src/agent-runtime/execution/runner/embedded-attempt.ts
+      - src/agent-runtime/execution/runner/embedded-cleanup.test.ts
+      - src/agent-runtime/execution/runner/embedded-cleanup.ts
+      - src/agent-runtime/execution/runner/embedded-failure-usage.test.ts
+      - src/agent-runtime/execution/runner/embedded-failure-usage.ts
+      - src/agent-runtime/execution/runner/embedded-request.ts
+      - src/agent-runtime/execution/runner/embedded-result.ts
+      - src/agent-runtime/execution/runner/embedded-run-failover.ts
+      - src/agent-runtime/execution/runner/embedded-run-result.ts
+      - src/agent-runtime/execution/runner/embedded-run.task-boundary.test.ts
+      - src/agent-runtime/execution/runner/embedded-run.ts
+      - src/agent-runtime/execution/runner/ex*
+      - src/agent-runtime/execution/runner/i*
+      - src/agent-runtime/execution/runner/q*
+      - src/agent-runtime/execution/runner/r*
+      - src/agent-runtime/execution/runner/s*
+      - src/agent-runtime/execution/runner/t*
+      - src/agent-runtime/model/a*
+      - src/agent-runtime/model/c*
+      - src/agent-runtime/model/i*
+      - src/agent-runtime/model/l*
+      - src/agent-runtime/model/m*
+      - src/agent-runtime/model/n*
+      - src/agent-runtime/model/o*
+      - src/agent-runtime/model/prepare-embedded-model.test.ts
+      - src/agent-runtime/model/x*
+      - src/agent-runtime/policy/a*
+      - src/agent-runtime/policy/b*
+      - src/agent-runtime/policy/c*
+      - src/agent-runtime/policy/e*
+      - src/agent-runtime/policy/g*
+      - src/agent-runtime/policy/i*
+      - src/agent-runtime/policy/p*
+      - src/agent-runtime/policy/run-limits.test.ts
+      - src/agent-runtime/policy/run-limits.ts
+      - src/agent-runtime/policy/t*
+      - src/agent-runtime/state/a*
+      - src/agent-runtime/state/c*
+      - src/agent-runtime/state/collaboration/**
+      - src/agent-runtime/state/i*
+      - src/agent-runtime/state/mutations/a*
+      - src/agent-runtime/state/mutations/c*
+      - src/agent-runtime/state/mutations/e*
+      - src/agent-runtime/state/mutations/i*
+      - src/agent-runtime/state/mutations/re*
+      - src/agent-runtime/state/mutations/s*
+      - src/agent-runtime/state/mutations/t*
+      - src/agent-runtime/state/p*
+      - src/agent-runtime/state/repository/a*
+      - src/agent-runtime/state/repository/d*
+      - src/agent-runtime/state/repository/i*
+      - src/agent-runtime/state/repository/s*
+      - src/agent-runtime/state/repository/task-identity.ts
+      - src/agent-runtime/state/repository/task-stop.restart.test.ts
+      - src/agent-runtime/state/repository/task-stop.test.ts
+      - src/agent-runtime/state/repository/task-stop.ts
+      - src/agent-runtime/state/s*
+      - src/agent-runtime/state/t*
+      - src/agent-runtime/wiring/**
+      - src/agents/a*
+      - src/agents/auth-profiles/**
+      - src/agents/b*
+      - src/agents/builtin-steward/**
+      - src/agents/c*
+      - src/agents/cli-runner/**
+      - src/agents/context-compiler/**
+      - src/agents/d*
+      - src/agents/e*
+      - src/agents/execution-preflight/**
+      - src/agents/f*
+      - src/agents/g*
+      - src/agents/h*
+      - src/agents/i*
+      - src/agents/k*
+      - src/agents/l*
+      - src/agents/me*
+      - src/agents/mi*
+      - src/agents/model-alias-lines.ts
+      - src/agents/model-auth-env-vars.ts
+      - src/agents/model-auth-label.test.ts
+      - src/agents/model-auth-label.ts
+      - src/agents/model-auth-markers.test.ts
+      - src/agents/model-auth-markers.ts
+      - src/agents/model-auth.credential-catalog.test.ts
+      - src/agents/model-auth.credential-source.property.test.ts
+      - src/agents/model-auth.profiles.test.ts
+      - src/agents/model-auth.test.ts
+      - src/agents/model-auth.ts
+      - src/agents/model-catalog.test-harness.ts
+      - src/agents/model-catalog.test.ts
+      - src/agents/model-catalog.ts
+      - src/agents/model-compat.test.ts
+      - src/agents/model-compat.ts
+      - src/agents/model-credential-source.ts
+      - src/agents/model-fallback-governance.ts
+      - src/agents/model-fallback-observation.ts
+      - src/agents/model-fallback.aor-order.test.ts
+      - src/agents/model-fallback.entitlement.test.ts
+      - src/agents/model-fallback.governance.test.ts
+      - src/agents/model-fallback.p2g-loopback-http.test.ts
+      - src/agents/model-fallback.p2g-outbound.test.ts
+      - src/agents/model-fallback.probe.test.ts
+      - src/agents/model-fallback.run-embedded.e2e.test.ts
+      - src/agents/model-fallback.sandbox-infra.test.ts
+      - src/agents/model-fallback.test.ts
+      - src/agents/model-fallback.types.ts
+      - src/agents/model-forward-compat.ts
+      - src/agents/model-output-boundary.test.ts
+      - src/agents/model-output-boundary.ts
+      - src/agents/model-ref-profile.test.ts
+      - src/agents/model-ref-profile.ts
+      - src/agents/model-scan.test.ts
+      - src/agents/model-scan.ts
+      - src/agents/model-selection.test.ts
+      - src/agents/model-selection.ts
+      - src/agents/model-tool-support.test.ts
+      - src/agents/model-tool-support.ts
+      - src/agents/models-config.applies-config-env-vars.test.ts
+      - src/agents/models-config.auto-injects-github-copilot-provider-token-is.test.ts
+      - src/agents/models-config.e2e-harness.ts
+      - src/agents/models-config.falls-back-default-baseurl-token-exchange-fails.test.ts
+      - src/agents/models-config.file-mode.test.ts
+      - src/agents/models-config.fills-missing-provider-apikey-from-env-var.test.ts
+      - src/agents/models-config.merge.test.ts
+      - src/agents/models-config.merge.ts
+      - src/agents/models-config.normalizes-gemini-3-ids-preview-google-providers.test.ts
+      - src/agents/models-config.plan.ts
+      - src/agents/models-config.preserves-explicit-reasoning-override.test.ts
+      - src/agents/models-config.providers.auth-provenance.test.ts
+      - src/agents/models-config.providers.cloudflare-ai-gateway.test.ts
+      - src/agents/models-config.providers.discovery-auth.test.ts
+      - src/agents/models-config.providers.discovery.ts
+      - src/agents/models-config.providers.google-antigravity.test.ts
+      - src/agents/models-config.providers.kilocode.test.ts
+      - src/agents/models-config.providers.kimi-coding.test.ts
+      - src/agents/models-config.providers.matrix.test.ts
+      - src/agents/models-config.providers.minimax.test.ts
+      - src/agents/models-config.providers.modelstudio.test.ts
+      - src/agents/models-config.providers.normalize-keys.test.ts
+      - src/agents/models-config.providers.nvidia.test.ts
+      - src/agents/models-config.providers.ollama-autodiscovery.test.ts
+      - src/agents/models-config.providers.ollama.test.ts
+      - src/agents/models-config.providers.openai-codex.test.ts
+      - src/agents/models-config.providers.qianfan.test.ts
+      - src/agents/models-config.providers.static.ts
+      - src/agents/models-config.providers.ts
+      - src/agents/models-config.providers.vercel-ai-gateway.test.ts
+      - src/agents/models-config.providers.volcengine-byteplus.test.ts
+      - src/agents/models-config.runtime-source-snapshot.test.ts
+      - src/agents/models-config.skips-writing-models-json-no-env-token.test.ts
+      - src/agents/models-config.test-utils.ts
+      - src/agents/models-config.ts
+      - src/agents/models-config.uses-first-github-copilot-profile-env-tokens.test.ts
+      - src/agents/models-config.write-serialization.test.ts
+      - src/agents/models.profiles.live.test.ts
+      - src/agents/moonshot.live.test.ts
+      - src/agents/mu*
+      - src/agents/o*
+      - src/agents/pa*
+      - src/agents/personal-mail-assistant/**
+      - src/agents/pi-auth-credentials.ts
+      - src/agents/pi-auth-json.test.ts
+      - src/agents/pi-auth-json.ts
+      - src/agents/pi-embedded-block-chunker.test.ts
+      - src/agents/pi-embedded-block-chunker.ts
+      - src/agents/pi-embedded-error-observation.test.ts
+      - src/agents/pi-embedded-error-observation.ts
+      - src/agents/pi-embedded-helpers.buildbootstrapcontextfiles.test.ts
+      - src/agents/pi-embedded-helpers.formatassistanterrortext.test.ts
+      - src/agents/pi-embedded-helpers.isbillingerrormessage.test.ts
+      - src/agents/pi-embedded-helpers.sanitize-session-messages-images.removes-empty-assistant-text-blocks-but-preserves.test.ts
+      - src/agents/pi-embedded-helpers.sanitizeuserfacingtext.test.ts
+      - src/agents/pi-embedded-helpers.scratchpad-sanitize.node.test.ts
+      - src/agents/pi-embedded-helpers.ts
+      - src/agents/pi-embedded-helpers.validate-turns.test.ts
+      - src/agents/pi-embedded-helpers/**
+      - src/agents/pi-embedded-messaging.ts
+      - src/agents/pi-embedded-payloads.ts
+      - src/agents/pi-embedded-runner-extraparams.live.test.ts
+      - src/agents/pi-embedded-runner-extraparams.test.ts
+      - src/agents/pi-embedded-runner.applygoogleturnorderingfix.test.ts
+      - src/agents/pi-embedded-runner.buildembeddedsandboxinfo.test.ts
+      - src/agents/pi-embedded-runner.compaction-safety-timeout.test.ts
+      - src/agents/pi-embedded-runner.createsystempromptoverride.test.ts
+      - src/agents/pi-embedded-runner.e2e.test.ts
+      - src/agents/pi-embedded-runner.get-dm-history-limit-from-session-key.falls-back-provider-default-per-dm-not.test.ts
+      - src/agents/pi-embedded-runner.get-dm-history-limit-from-session-key.returns-undefined-sessionkey-is-undefined.test.ts
+      - src/agents/pi-embedded-runner.guard.test.ts
+      - src/agents/pi-embedded-runner.guard.waitforidle-before-flush.test.ts
+      - src/agents/pi-embedded-runner.history-limit-from-session-key.test.ts
+      - src/agents/pi-embedded-runner.limithistoryturns.test.ts
+      - src/agents/pi-embedded-runner.openai-tool-id-preservation.test.ts
+      - src/agents/pi-embedded-runner.resolvesessionagentids.test.ts
+      - src/agents/pi-embedded-runner.run-embedded-pi-agent.auth-profile-rotation.e2e.test.ts
+      - src/agents/pi-embedded-runner.sanitize-session-history.policy.test.ts
+      - src/agents/pi-embedded-runner.sanitize-session-history.test-harness.ts
+      - src/agents/pi-embedded-runner.sanitize-session-history.test.ts
+      - src/agents/pi-embedded-runner.splitsdktools.test.ts
+      - src/agents/pi-embedded-runner.ts
+      - src/agents/pi-embedded-runner/a*
+      - src/agents/pi-embedded-runner/ca*
+      - src/agents/pi-embedded-runner/compact.hooks.test.ts
+      - src/agents/pi-embedded-runner/compact.runtime.ts
+      - src/agents/pi-embedded-runner/compaction-safety-timeout.ts
+      - src/agents/pi-embedded-runner/extensions.test.ts
+      - src/agents/pi-embedded-runner/extra-params.cache-retention-default.test.ts
+      - src/agents/pi-embedded-runner/extra-params.kilocode.test.ts
+      - src/agents/pi-embedded-runner/extra-params.openrouter-cache-control.test.ts
+      - src/agents/pi-embedded-runner/extra-params.ts
+      - src/agents/pi-embedded-runner/extra-params.zai-tool-stream.test.ts
+      - src/agents/pi-embedded-runner/g*
+      - src/agents/pi-embedded-runner/h*
+      - src/agents/pi-embedded-runner/k*
+      - src/agents/pi-embedded-runner/l*
+      - src/agents/pi-embedded-runner/m*
+      - src/agents/pi-embedded-runner/o*
+      - src/agents/pi-embedded-runner/p*
+      - src/agents/pi-embedded-runner/r*
+      - src/agents/pi-embedded-runner/run/**
+      - src/agents/pi-embedded-runner/s*
+      - src/agents/pi-embedded-runner/t*
+      - src/agents/pi-embedded-runner/u*
+      - src/agents/pi-embedded-runner/w*
+      - src/agents/pi-embedded-subscribe.block-reply-rejections.test.ts
+      - src/agents/pi-embedded-subscribe.code-span-awareness.test.ts
+      - src/agents/pi-embedded-subscribe.e2e-harness.ts
+      - src/agents/pi-embedded-subscribe.flush-pending-compaction-end.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.compaction.ts
+      - src/agents/pi-embedded-subscribe.handlers.lifecycle.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.lifecycle.ts
+      - src/agents/pi-embedded-subscribe.handlers.messages.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.messages.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.media.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.ts
+      - src/agents/pi-embedded-subscribe.handlers.ts
+      - src/agents/pi-embedded-subscribe.handlers.types.ts
+      - src/agents/pi-embedded-subscribe.lifecycle-billing-error.test.ts
+      - src/agents/pi-embedded-subscribe.plan-speak-outlet.test.ts
+      - src/agents/pi-embedded-subscribe.protocol-leak.test.ts
+      - src/agents/pi-embedded-subscribe.raw-stream.ts
+      - src/agents/pi-embedded-subscribe.reply-tags.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.calls-onblockreplyflush-before-tool-execution-start-preserve.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.does-not-append-text-end-content-is.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.does-not-call-onblockreplyflush-callback-is-not.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.does-not-duplicate-text-end-repeats-full.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.does-not-emit-duplicate-block-replies-text.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.emits-block-replies-text-end-does-not.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.emits-reasoning-as-separate-message-enabled.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.filters-final-suppresses-output-without-start-tag.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.includes-canvas-action-metadata-tool-summaries.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.keeps-assistanttexts-final-answer-block-replies-are.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.keeps-indented-fenced-blocks-intact.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.reopens-fenced-blocks-splitting-inside-them.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.splits-long-single-line-fenced-blocks-reopen.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.streams-soft-chunks-paragraph-preference.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.subscribeembeddedpisession.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.suppresses-message-end-block-replies-message-tool.test.ts
+      - src/agents/pi-embedded-subscribe.subscribe-embedded-pi-session.waits-multiple-compaction-retries-before-resolving.test.ts
+      - src/agents/pi-embedded-subscribe.tool-use-progress.test.ts
+      - src/agents/pi-embedded-subscribe.tools.extract.test.ts
+      - src/agents/pi-embedded-subscribe.tools.media.test.ts
+      - src/agents/pi-embedded-subscribe.tools.test.ts
+      - src/agents/pi-embedded-subscribe.tools.ts
+      - src/agents/pi-embedded-subscribe.ts
+      - src/agents/pi-embedded-subscribe.types.ts
+      - src/agents/pi-embedded-utils.strip-model-special-tokens.test.ts
+      - src/agents/pi-embedded-utils.test.ts
+      - src/agents/pi-embedded-utils.ts
+      - src/agents/pi-embedded.ts
+      - src/agents/pi-extensions/**
+      - src/agents/pi-model-discovery-runtime.ts
+      - src/agents/pi-model-discovery.auth.test.ts
+      - src/agents/pi-model-discovery.compat.e2e.test.ts
+      - src/agents/pi-model-discovery.ts
+      - src/agents/pi-project-settings.test.ts
+      - src/agents/pi-project-settings.ts
+      - src/agents/pi-sdk/**
+      - src/agents/pi-settings.test.ts
+      - src/agents/pi-settings.ts
+      - src/agents/pi-tool-definition-adapter.after-tool-call.fires-once.test.ts
+      - src/agents/pi-tool-definition-adapter.after-tool-call.test.ts
+      - src/agents/pi-tool-definition-adapter.test.ts
+      - src/agents/pi-tool-definition-adapter.ts
+      - src/agents/pi-tool-handler-state.test-helpers.ts
+      - src/agents/pi-tools-agent-config.test.ts
+      - src/agents/pi-tools.abort.ts
+      - src/agents/pi-tools.before-tool-call.e2e.test.ts
+      - src/agents/pi-tools.before-tool-call.integration.e2e.test.ts
+      - src/agents/pi-tools.before-tool-call.ogui-wait.test.ts
+      - src/agents/pi-tools.before-tool-call.provenance.test.ts
+      - src/agents/pi-tools.before-tool-call.runtime.ts
+      - src/agents/pi-tools.before-tool-call.ts
+      - src/agents/pi-tools.create-openclaw-coding-tools.adds-claude-style-aliases-schemas-without-dropping-b.test.ts
+      - src/agents/pi-tools.create-openclaw-coding-tools.adds-claude-style-aliases-schemas-without-dropping-d.test.ts
+      - src/agents/pi-tools.create-openclaw-coding-tools.adds-claude-style-aliases-schemas-without-dropping-f.test.ts
+      - src/agents/pi-tools.create-openclaw-coding-tools.adds-claude-style-aliases-schemas-without-dropping.test.ts
+      - src/agents/pi-tools.desktop-save.test.ts
+      - src/agents/pi-tools.fs-exec-capability-boundary.test.ts
+      - src/agents/pi-tools.host-edit.ts
+      - src/agents/pi-tools.message-provider-policy.test.ts
+      - src/agents/pi-tools.model-provider-collision.test.ts
+      - src/agents/pi-tools.params.ts
+      - src/agents/pi-tools.policy.test.ts
+      - src/agents/pi-tools.policy.ts
+      - src/agents/pi-tools.read.host-edit-access.test.ts
+      - src/agents/pi-tools.read.host-edit-recovery.test.ts
+      - src/agents/pi-tools.read.ts
+      - src/agents/pi-tools.read.workspace-root-guard.test.ts
+      - src/agents/pi-tools.safe-bins.test.ts
+      - src/agents/pi-tools.sandbox-mounted-paths.workspace-only.test.ts
+      - src/agents/pi-tools.schema.tool-name.test.ts
+      - src/agents/pi-tools.schema.ts
+      - src/agents/pi-tools.task-action.test.ts
+      - src/agents/pi-tools.ts
+      - src/agents/pi-tools.types.ts
+      - src/agents/pi-tools.whatsapp-login-gating.test.ts
+      - src/agents/pi-tools.workspace-only-false.test.ts
+      - src/agents/pi-tools.workspace-paths.test.ts
+      - src/agents/pr*
+      - src/agents/pt*
+      - src/agents/q*
+      - src/agents/r*
+      - src/agents/s*
+      - src/agents/sandbox/**
+      - src/agents/schema/**
+      - src/agents/skill-gates/**
+      - src/agents/skills/**
+      - src/agents/t*
+      - src/agents/task-surface/**
+      - src/agents/test-helpers/**
+      - src/agents/tools/**
+      - src/agents/turn-completion/**
+      - src/agents/u*
+      - src/agents/v*
+      - src/agents/w*
+      - src/agents/z*
+      - src/artifact-grant/**
+      - src/auto-reply/**
+      - src/browser/**
+      - src/c*
+      - src/canvas-host/**
+      - src/capability-risk/**
+      - src/capability-taxonomy/**
+      - src/channels/**
+      - src/chat/**
+      - src/cli/**
+      - src/commands/**
+      - src/compat/**
+      - src/config/**
+      - src/context-engine/**
+      - src/conversation-evaluation/**
+      - src/conversation-task/**
+      - src/conversations/**
+      - src/cron/**
+      - src/d*
+      - src/daemon/**
+      - src/data/**
+      - src/diagnosis/**
+      - src/digital-employee-creation/**
+      - src/discord/**
+      - src/docs/**
+      - src/e*
+      - src/exec-protocol/**
+      - src/executor-evidence/**
+      - src/fabric/**
+      - src/g*
+      - src/gateway/**
+      - src/hooks/**
+      - src/i*
+      - src/i18n/**
+      - src/imessage/**
+      - src/infra/**
+      - src/integrations/**
+      - src/l*
+      - src/line/**
+      - src/link-understanding/**
+      - src/local-files/**
+      - src/logging/**
+      - src/markdown/**
+      - src/media-understanding/**
+      - src/media/**
+      - src/memory/**
+      - src/node-host/**
+      - src/objective-shadow/**
+      - src/observation/**
+      - src/office-suite/**
+      - src/organization/**
+      - src/p*
+      - src/pairing/**
+      - src/plugin-sdk/**
+      - src/plugins/**
+      - src/process/**
+      - src/progress-ledger/**
+      - src/providers/**
+      - src/r*
+      - src/retrieval/**
+      - src/routing/**
+      - src/scripts/**
+      - src/secrets/**
+      - src/security/**
+      - src/sessions/**
+      - src/shared/**
+      - src/signal/**
+      - src/site-capability/**
+      - src/slack/**
+      - src/support-cases/**
+      - src/task-orchestration/**
+      - src/task-outcome/**
+      - src/telegram/**
+      - src/terminal/**
+      - src/test-helpers/**
+      - src/test-utils/**
+      - src/tts/**
+      - src/tui/**
+      - src/types/**
+      - src/u*
+      - src/utils/**
+      - src/v*
+      - src/vault-sync/**
+      - src/web/**
+      - src/whatsapp/**
+      - src/wizard/**
+      - src/workspaces/**
       - .pi/extensions/**
       - scripts/**
       - test/setup.ts
@@ -6709,6 +7492,81 @@ tasks:
               - src/agents/pi-embedded-runner/run/attempt.ts
             note: Exact-file Phase 0 observation wiring. src/** declaration unchanged. No dirty WIP on
               attempt.ts.
+      - id: path-release-rule-adaptation-20261112-pi-sdk
+        taskId: pi-sdk-family-migration-v3:cursor
+        ide: cursor
+        agent: cursor
+        status: done
+        lastSignalAt: 2026-11-12T07:59:01.000Z
+        metadata:
+          pathRelease:
+            toTask: runtime-rule-adaptation
+            toOwner: grok-dynamic-rules
+            via: verified
+            authorizedBy: human-governor
+            at: 2026-11-12T07:59:01.000Z
+            paths:
+              - src/agent-runtime/contracts/rule-adaptation.ts
+              - src/agent-runtime/policy/rule-adaptation/**
+            note: Limited exclusive source-path release. Predecessor owner and
+              existing sessions remain unchanged. Authorization is from the
+              repository owner (human-governor). No predecessor personal
+              sign-off is claimed. Official loom register was not run. Covering
+              globs were replaced with residual directory globs that do not
+              cover the released paths, instead of enumerating every existing
+              file. Remaining ranges stay with this task; future files under
+              those residual directory globs continue to belong to this task.
+      - id: path-release-rule-adaptation-p2-r2-20261112-pi-sdk
+        taskId: pi-sdk-family-migration-v3:cursor
+        ide: cursor
+        agent: cursor
+        status: done
+        lastSignalAt: 2026-11-12T09:00:00.000Z
+        metadata:
+          pathRelease:
+            toTask: runtime-rule-adaptation
+            toOwner: grok-dynamic-rules
+            via: verified
+            authorizedBy: human-governor
+            at: 2026-11-12T09:00:00.000Z
+            paths:
+              - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+              - src/agent-runtime/command/rule-adaptation/**
+              - src/agent-runtime/context/rule-adaptation/**
+              - src/agent-runtime/model/rule-adaptation/**
+            note: Limited exclusive source-path release. Predecessor owner and
+              existing sessions remain unchanged. Authorization is from the
+              repository owner (human-governor). No predecessor personal
+              sign-off is claimed. Official loom register was not run. Covering
+              globs were replaced with residual directory globs that do not
+              cover the released paths, instead of enumerating every existing
+              file. Remaining ranges stay with this task; future files under
+              those residual directory globs continue to belong to this task.
+      - id: path-release-rule-adaptation-p3-r3-20261112-pi-sdk
+        taskId: pi-sdk-family-migration-v3:cursor
+        ide: cursor
+        agent: cursor
+        status: done
+        lastSignalAt: 2026-11-12T12:40:00.000Z
+        metadata:
+          pathRelease:
+            toTask: runtime-rule-adaptation
+            toOwner: grok-dynamic-rules
+            via: verified
+            authorizedBy: human-governor
+            at: 2026-11-12T12:40:00.000Z
+            paths:
+              - src/agent-runtime/contracts/task.ts
+              - src/agent-runtime/state/repository/task-board-file.ts
+              - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
+            note: Limited exclusive source-path release. Predecessor owner and
+              existing sessions remain unchanged. Authorization is from the
+              repository owner (human-governor). No predecessor personal
+              sign-off is claimed. Official loom register was not run. Covering
+              globs were replaced with residual directory globs that do not
+              cover the released paths, instead of enumerating every existing
+              file. Remaining ranges stay with this task; future files under
+              those residual directory globs continue to belong to this task.
     ownerHistory: []
     since: 2026-08-29
     metadata:
@@ -6721,6 +7579,82 @@ tasks:
           at: 2026-09-06 10:54:00+00:00
           paths:
             - src/agents/pi-embedded-runner/run/attempt.ts
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: cursor
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T07:59:01.000Z
+          paths:
+            - src/agent-runtime/contracts/rule-adaptation.ts
+            - src/agent-runtime/policy/rule-adaptation/**
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: cursor
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T09:00:00.000Z
+          paths:
+            - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+            - src/agent-runtime/command/rule-adaptation/**
+            - src/agent-runtime/context/rule-adaptation/**
+            - src/agent-runtime/model/rule-adaptation/**
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: cursor
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T12:40:00.000Z
+          paths:
+            - src/agent-runtime/contracts/task.ts
+            - src/agent-runtime/state/repository/task-board-file.ts
+            - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: cursor
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agent-runtime/execution/runner/embedded-run-auth.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-session.ts
+            - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+            - src/agent-runtime/model/prepare-embedded-model.ts
+            - src/agents/pi-embedded-runner/extensions.ts
+            - src/agents/pi-embedded-runner/compact.ts
+            - src/agents/model-fallback.ts
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
   - id: cursor-s01-r6-replay-v2
     owner: cursor
     intent:
@@ -7915,7 +8849,30 @@ tasks:
     intent: []
     paths:
       - src/agents/execution-preflight/**
-      - src/agents/pi-embedded-runner/**
+      - src/agents/pi-embedded-runner/a*
+      - src/agents/pi-embedded-runner/ca*
+      - src/agents/pi-embedded-runner/compact.hooks.test.ts
+      - src/agents/pi-embedded-runner/compact.runtime.ts
+      - src/agents/pi-embedded-runner/compaction-safety-timeout.ts
+      - src/agents/pi-embedded-runner/extensions.test.ts
+      - src/agents/pi-embedded-runner/extra-params.cache-retention-default.test.ts
+      - src/agents/pi-embedded-runner/extra-params.kilocode.test.ts
+      - src/agents/pi-embedded-runner/extra-params.openrouter-cache-control.test.ts
+      - src/agents/pi-embedded-runner/extra-params.ts
+      - src/agents/pi-embedded-runner/extra-params.zai-tool-stream.test.ts
+      - src/agents/pi-embedded-runner/g*
+      - src/agents/pi-embedded-runner/h*
+      - src/agents/pi-embedded-runner/k*
+      - src/agents/pi-embedded-runner/l*
+      - src/agents/pi-embedded-runner/m*
+      - src/agents/pi-embedded-runner/o*
+      - src/agents/pi-embedded-runner/p*
+      - src/agents/pi-embedded-runner/r*
+      - src/agents/pi-embedded-runner/run/**
+      - src/agents/pi-embedded-runner/s*
+      - src/agents/pi-embedded-runner/t*
+      - src/agents/pi-embedded-runner/u*
+      - src/agents/pi-embedded-runner/w*
       - src/cron/**
       - src/agents/subagent-announce*
       - src/infra/outbound/deliver.ts
@@ -7947,7 +8904,25 @@ tasks:
         metadata: {}
     ownerHistory: []
     since: 2026-09-23
-    metadata: {}
+    metadata:
+      pathReleases:
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: cursor-grok
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/pi-embedded-runner/extensions.ts
+            - src/agents/pi-embedded-runner/compact.ts
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
   - id: hook-session-delivery-closure
     owner: cursor-grok
     intent: []
@@ -9036,7 +10011,6 @@ tasks:
       - docs/design/account-sandbox-skills-visibility-2026-10-15.md
       - skills/openbot-platform-ops/references/skill-asset-incubation.md
       - src/agents/builtin-steward/behavior-rules.ts
-      - src/agents/pi-embedded-runner/compact.ts
       - src/agents/pi-embedded-runner/run/attempt.ts
       - src/agents/sandbox/account-shared-mounts.ts
       - src/agents/sandbox/account-shared-mounts.test.ts
@@ -9050,7 +10024,20 @@ tasks:
     sessions: []
     ownerHistory: []
     since: 2026-10-15
-    metadata: {}
+    metadata:
+      pathReleases:
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: grok-bot
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/pi-embedded-runner/compact.ts
+          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run.
   - id: cn-office-capability-approval-mvp
     owner: cursor-grok
     intent: []
@@ -10651,7 +11638,6 @@ tasks:
       - src/gateway/models/capability-admission/index.ts
       - src/gateway/models/capability-admission/store.ts
       - src/gateway/models/capability-admission/types.ts
-      - src/agents/model-fallback.ts
       - src/agents/tools/stepfun-image-tool.ts
       - src/agents/tools/stepfun-image-tool.test.ts
       - src/agents/tools/suno-music-tool.ts
@@ -10678,7 +11664,20 @@ tasks:
         metadata: {}
     ownerHistory: []
     since: 2026-11-01
-    metadata: {}
+    metadata:
+      pathReleases:
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: 智能模型路由
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/model-fallback.ts
+          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run.
   - id: p1-fix-20261101:全栈验收
     owner: grok-bot
     intent: []
@@ -10892,7 +11891,6 @@ tasks:
       - src/agent-runtime/context/sources/task-completion-notice.ts
       - src/agent-runtime/state/mutations/task-completion.ts
       - src/agent-runtime/state/mutations/execution-binding.ts
-      - src/agent-runtime/state/repository/task-board-file.ts
       - src/agent-runtime/policy/constraints.ts
       - src/agent-runtime/context/sources/task-resume.ts
       - src/task-outcome/r85f-proof.test.ts
@@ -10922,7 +11920,14 @@ tasks:
       - src/agent-runtime/model/interaction-completion.test.ts
       - src/agent-runtime/wiring/prepared-interaction.test.ts
       - src/gateway/governance/direct-model-invocation-registry.ts
-      - src/agent-runtime/model/**
+      - src/agent-runtime/model/a*
+      - src/agent-runtime/model/c*
+      - src/agent-runtime/model/i*
+      - src/agent-runtime/model/l*
+      - src/agent-runtime/model/m*
+      - src/agent-runtime/model/n*
+      - src/agent-runtime/model/o*
+      - src/agent-runtime/model/x*
       - src/auto-reply/fallback-state.ts
       - src/gateway/governance/execution-entry-registry.ts
       - src/gateway/governance/governance-contract.test.ts
@@ -10956,14 +11961,40 @@ tasks:
       - src/task-orchestration/complex-task-loop.ts
       - src/task-orchestration/complex-task-loop.test.ts
       - src/agent-runtime/wiring/**
-      - src/agent-runtime/state/**
+      - src/agent-runtime/state/a*
+      - src/agent-runtime/state/c*
+      - src/agent-runtime/state/collaboration/**
+      - src/agent-runtime/state/i*
+      - src/agent-runtime/state/mutations/a*
+      - src/agent-runtime/state/mutations/c*
+      - src/agent-runtime/state/mutations/e*
+      - src/agent-runtime/state/mutations/i*
+      - src/agent-runtime/state/mutations/re*
+      - src/agent-runtime/state/mutations/s*
+      - src/agent-runtime/state/mutations/t*
+      - src/agent-runtime/state/p*
+      - src/agent-runtime/state/repository/a*
+      - src/agent-runtime/state/repository/d*
+      - src/agent-runtime/state/repository/i*
+      - src/agent-runtime/state/repository/s*
+      - src/agent-runtime/state/repository/task-stop.test.ts
+      - src/agent-runtime/state/repository/task-stop.ts
+      - src/agent-runtime/state/s*
+      - src/agent-runtime/state/t*
       - src/agents/execution-stall-continue-loop.test.ts
       - src/agents/pi-embedded-runner/run/attempt.test.ts
       - src/auto-reply/reply/agent-runner-payloads.test.ts
       - src/agent-runtime/contracts/acceptance.ts
       - src/agent-runtime/contracts/blocker.ts
       - src/agents/turn-completion/contract.test.ts
-      - src/agent-runtime/policy/**
+      - src/agent-runtime/policy/a*
+      - src/agent-runtime/policy/b*
+      - src/agent-runtime/policy/c*
+      - src/agent-runtime/policy/e*
+      - src/agent-runtime/policy/g*
+      - src/agent-runtime/policy/i*
+      - src/agent-runtime/policy/p*
+      - src/agent-runtime/policy/t*
       - src/agents/turn-completion/contract.ts
       - CHANGELOG.md
       - src/auto-reply/reply/agent-runner.runreplyagent.e2e.test.ts
@@ -10994,7 +12025,31 @@ tasks:
       - src/auto-reply/reply/agent-runner-payloads.ts
       - src/auto-reply/reply/agent-runner-utils.ts
       - src/auto-reply/reply/agent-runner-execution.ts
-      - src/agent-runtime/execution/**
+      - src/agent-runtime/execution/i*
+      - src/agent-runtime/execution/outcomes/**
+      - src/agent-runtime/execution/p*
+      - src/agent-runtime/execution/preparation/**
+      - src/agent-runtime/execution/recovery/**
+      - src/agent-runtime/execution/runner/a*
+      - src/agent-runtime/execution/runner/c*
+      - src/agent-runtime/execution/runner/embedded-attempt-closeout.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-continue.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-phase-state.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-preflight.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-prompt.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream-inner.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-stream.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-tools.ts
+      - src/agent-runtime/execution/runner/embedded-failure-usage.test.ts
+      - src/agent-runtime/execution/runner/embedded-failure-usage.ts
+      - src/agent-runtime/execution/runner/embedded-run-failover.ts
+      - src/agent-runtime/execution/runner/embedded-run-result.ts
+      - src/agent-runtime/execution/runner/ex*
+      - src/agent-runtime/execution/runner/i*
+      - src/agent-runtime/execution/runner/q*
+      - src/agent-runtime/execution/runner/r*
+      - src/agent-runtime/execution/runner/s*
+      - src/agent-runtime/execution/runner/t*
       - src/conversation-task/async-process-lifecycle.test.ts
       - src/conversation-task/task-board-continue.ts
       - src/conversation-task/task-board-continue.test.ts
@@ -11006,11 +12061,33 @@ tasks:
       - src/agents/execution-stall-continue-loop.ts
       - src/agents/pi-embedded-runner/run/attempt.ts
       - src/gateway/server-methods/chat.ts
-      - src/agent-runtime/command/**
+      - src/agent-runtime/command/a*
+      - src/agent-runtime/command/c*
+      - src/agent-runtime/command/e*
+      - src/agent-runtime/command/g*
+      - src/agent-runtime/command/h*
+      - src/agent-runtime/command/i*
+      - src/agent-runtime/command/n*
+      - src/agent-runtime/command/p*
+      - src/agent-runtime/command/ro*
+      - src/agent-runtime/command/scenarios/**
+      - src/agent-runtime/command/t*
       - src/auto-reply/reply/agent-runner.ts
       - src/auto-reply/reply/mid-task-aside.ts
       - src/auto-reply/reply/mid-task-dialogue.ts
-      - src/agent-runtime/contracts/**
+      - src/agent-runtime/contracts/a*
+      - src/agent-runtime/contracts/b*
+      - src/agent-runtime/contracts/c*
+      - src/agent-runtime/contracts/d*
+      - src/agent-runtime/contracts/e*
+      - src/agent-runtime/contracts/i*
+      - src/agent-runtime/contracts/l*
+      - src/agent-runtime/contracts/p*
+      - src/agent-runtime/contracts/q*
+      - src/agent-runtime/contracts/task-binding.ts
+      - src/agent-runtime/contracts/task-control.ts
+      - src/agent-runtime/contracts/task-stop.ts
+      - src/agent-runtime/contracts/tu*
       - src/conversation-task/session-task-board.ts
       - src/auto-reply/reply/runtime-context-assembly.ts
       - src/auto-reply/reply/mid-task-aside-dialogue-history.ts
@@ -11018,7 +12095,15 @@ tasks:
       - src/auto-reply/reply/untrusted-context.ts
       - src/shared/text/normalize-newlines.ts
       - .kiro/specs/agent-runtime-convergence/**
-      - src/agent-runtime/context/**
+      - src/agent-runtime/context/a*
+      - src/agent-runtime/context/catalog/**
+      - src/agent-runtime/context/i*
+      - src/agent-runtime/context/p*
+      - src/agent-runtime/context/s*
+      - src/agent-runtime/context/sources/**
+      - src/agent-runtime/context/t*
+      - src/agent-runtime/context/trust/**
+      - src/agent-runtime/context/u*
       - src/auto-reply/reply/get-reply-run.ts
       - src/auto-reply/reply/get-reply-run.aside-dialogue-context.test.ts
       - scripts/architecture/manifest.json
@@ -11199,8 +12284,6 @@ tasks:
       - src/shared/delivery-receipt.test.ts
       - src/agent-runtime/policy/context-window.ts
       - src/agents/context-window-guard.ts
-      - src/agents/pi-embedded-runner/compact.ts
-      - src/agents/pi-embedded-runner/extensions.ts
       - src/commands/onboard-custom.ts
       - src/agents/context-window-guard.test.ts
       - src/agents/pi-embedded-runner/run.overflow-compaction.mocks.shared.ts
@@ -11211,7 +12294,6 @@ tasks:
       - src/agent-runtime/model/auth-profile-rotation.test.ts
       - src/agent-runtime/model/copilot-token-refresh.ts
       - src/agent-runtime/model/copilot-token-refresh.test.ts
-      - src/agent-runtime/model/prepare-embedded-model.ts
       - src/agent-runtime/model/prepare-embedded-model.test.ts
       - src/agent-runtime/policy/run-limits.ts
       - src/agent-runtime/policy/run-limits.test.ts
@@ -11277,7 +12359,6 @@ tasks:
       - src/agents/context-compiler/model-boundary.test.ts
       - src/agents/context-compiler/normalize-outbound.estimate.test.ts
       - src/auto-reply/reply/route-reply.ts
-      - src/agent-runtime/contracts/task.ts
       - src/auto-reply/reply/reply-dispatcher.ts
       - src/auto-reply/reply/reply-dispatcher.task-boundary.test.ts
       - src/agent-runtime/capabilities/invocation/abort.ts
@@ -12455,6 +13536,32 @@ tasks:
         status: active
         lastSignalAt: 2026-11-08T12:44:03.407Z
         metadata: {}
+      - id: path-release-rule-adaptation-p2-r2-20261112-convergence
+        taskId: agent-runtime-convergence
+        ide: cursor
+        agent: 双规发布
+        status: done
+        lastSignalAt: 2026-11-12T09:00:00.000Z
+        metadata:
+          pathRelease:
+            toTask: runtime-rule-adaptation
+            toOwner: grok-dynamic-rules
+            via: verified
+            authorizedBy: human-governor
+            at: 2026-11-12T09:00:00.000Z
+            paths:
+              - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+              - src/agent-runtime/command/rule-adaptation/**
+              - src/agent-runtime/context/rule-adaptation/**
+              - src/agent-runtime/model/rule-adaptation/**
+            note: Limited exclusive source-path release. Predecessor owner and
+              existing sessions remain unchanged. Authorization is from the
+              repository owner (human-governor). No predecessor personal
+              sign-off is claimed. Official loom register was not run. Covering
+              globs were replaced with residual directory globs that do not
+              cover the released paths, instead of enumerating every existing
+              file. Remaining ranges stay with this task; future files under
+              those residual directory globs continue to belong to this task.
     ownerHistory:
       - fromOwner: codex-runtime-manager
         toOwner: grok-bot
@@ -12465,7 +13572,83 @@ tasks:
         at: 2026-11-08T12:44:03.407Z
         via: confirmed
     since: 2026-11-03
-    metadata: {}
+    metadata:
+      pathReleases:
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: 双规发布
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T07:59:01.000Z
+          paths:
+            - src/agent-runtime/contracts/rule-adaptation.ts
+            - src/agent-runtime/policy/rule-adaptation/**
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: 双规发布
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T09:00:00.000Z
+          paths:
+            - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+            - src/agent-runtime/command/rule-adaptation/**
+            - src/agent-runtime/context/rule-adaptation/**
+            - src/agent-runtime/model/rule-adaptation/**
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: 双规发布
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T12:40:00.000Z
+          paths:
+            - src/agent-runtime/contracts/task.ts
+            - src/agent-runtime/state/repository/task-board-file.ts
+            - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: 双规发布
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agent-runtime/model/prepare-embedded-model.ts
+            - src/agent-runtime/execution/runner/embedded-run-auth.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-session.ts
+            - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+            - src/agents/pi-embedded-runner/compact.ts
+            - src/agents/pi-embedded-runner/extensions.ts
+          note: Limited exclusive source-path release. Predecessor owner and
+            existing sessions remain unchanged. Authorization is from the
+            repository owner (human-governor). No predecessor personal sign-off
+            is claimed. Official loom register was not run. Covering globs were
+            replaced with residual directory globs that do not cover the
+            released paths, instead of enumerating every existing file.
+            Remaining ranges stay with this task; future files under those
+            residual directory globs continue to belong to this task.
   - id: agent-runtime-observability:codex-observe-owner
     owner: codex-observe-owner
     intent:
@@ -12516,7 +13699,6 @@ tasks:
       - src/agent-runtime/execution/runner/scheduled-candidate.ts
       - src/agent-runtime/model/authorized-session.ts
       - src/agent-runtime/state/command-session.ts
-      - src/agents/model-fallback.ts
       - src/auto-reply/reply/followup-runner.ts
       - src/commands/agent.ts
       - src/cron/isolated-agent/run.ts
@@ -12557,8 +13739,6 @@ tasks:
       - src/agent-runtime/execution/runner/embedded-attempt-stream-inner.ts
       - src/agent-runtime/execution/runner/embedded-attempt-prompt.ts
       - src/agent-runtime/execution/runner/embedded-attempt-closeout.ts
-      - src/agent-runtime/execution/runner/embedded-run-attempt.ts
-      - src/agent-runtime/execution/runner/embedded-run-auth.ts
       - src/agent-runtime/execution/runner/embedded-run-result.ts
       - src/agent-runtime/execution/runner/embedded-result.ts
       - src/agent-runtime/execution/runner/embedded-attempt.ts
@@ -12762,7 +13942,22 @@ tasks:
         at: 2026-11-08T23:52:26.572Z
         via: confirmed
     since: 2026-11-06
-    metadata: {}
+    metadata:
+      pathReleases:
+        - toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          fromOwner: codex-observe-owner
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/model-fallback.ts
+            - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+            - src/agent-runtime/execution/runner/embedded-run-auth.ts
+          note: Limited exclusive source-path release for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run.
   - id: pr249-technical-closeout
     owner: codex-runtime-manager
     intent: []
@@ -12879,7 +14074,527 @@ tasks:
     ownerHistory: []
     since: 2026-11-11
     metadata: {}
+  - id: runtime-rule-adaptation
+    owner: grok-dynamic-rules
+    intent:
+      - P0 wrap-up and P1 contract design (specs only)
+      - P1 typed contracts and pure validator path ownership
+      - Exclusive limited ownership of the rule-adaptation contract and policy source paths
+      - P2 shadow layering relocation and actual completion limit enforcement
+      - Limited exclusive ownership of three official P3 activation landing paths without claiming remaining state or contracts
+      - Limited exclusive ownership of official P4 personal-context-cap consumer-chain and selection-block landing paths without claiming remaining agent, execution, or compact-command scope
+    paths:
+      - .kiro/specs/runtime-rule-adaptation/**
+      - src/agent-runtime/contracts/rule-adaptation.ts
+      - src/agent-runtime/policy/rule-adaptation/**
+      - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+      - src/agent-runtime/contracts/rule-adaptation-activation.ts
+      - src/agent-runtime/command/rule-adaptation/**
+      - src/agent-runtime/context/rule-adaptation/**
+      - src/agent-runtime/model/rule-adaptation/**
+      - src/agent-runtime/contracts/task.ts
+      - src/agent-runtime/state/repository/task-board-file.ts
+      - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
+      - src/agent-runtime/model/prepare-embedded-model.ts
+      - src/agents/pi-embedded-runner/extensions.ts
+      - src/agents/pi-embedded-runner/compact.ts
+      - src/agent-runtime/execution/runner/embedded-run-auth.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-session.ts
+      - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+      - src/agents/model-fallback.ts
+    state: active
+    sessions:
+      - id: 7c3e1d2a-9b54-4f10-8e6c-21a0d4f8b917
+        taskId: runtime-rule-adaptation
+        ide: cursor
+        agent: grok-dynamic-rules
+        status: active
+        lastSignalAt: 2026-11-12T03:47:53.529Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-12
+    metadata:
+      pathReceipts:
+        - fromTask: pi-sdk-family-migration-v3:cursor
+          fromOwner: cursor
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T07:59:01.000Z
+          paths:
+            - src/agent-runtime/contracts/rule-adaptation.ts
+            - src/agent-runtime/policy/rule-adaptation/**
+          note: Limited exclusive source-path receipt. Predecessor owner and sessions remain unchanged.
+            After the broad wildcard was expanded into the existing directories and files, current
+            file coverage can be preserved, but future new paths will no longer automatically belong
+            to the original task. Subsequent new components must be re-registered; the expanded
+            per-item declarations must not continue to be claimed as fully equivalent to the
+            original src/**.
+        - fromTask: agent-runtime-convergence
+          fromOwner: 双规发布
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T07:59:01.000Z
+          paths:
+            - src/agent-runtime/contracts/rule-adaptation.ts
+            - src/agent-runtime/policy/rule-adaptation/**
+          note: Limited exclusive source-path receipt. Predecessor owner and sessions remain unchanged.
+            After the broad wildcards were expanded into the existing directories and files, current
+            file coverage can be preserved, but future new paths will no longer automatically belong
+            to the original task. Subsequent new components must be re-registered; the expanded
+            per-item declarations must not continue to be claimed as fully equivalent to the
+            original src/agent-runtime/policy/** and src/agent-runtime/contracts/**.
+        - fromTask: pi-sdk-family-migration-v3:cursor
+          fromOwner: cursor
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T09:00:00.000Z
+          paths:
+            - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+            - src/agent-runtime/command/rule-adaptation/**
+            - src/agent-runtime/context/rule-adaptation/**
+            - src/agent-runtime/model/rule-adaptation/**
+          note: Limited exclusive source-path receipt for the P2 shadow layering paths. Predecessor owner and
+            sessions remain unchanged. After the broad wildcards were expanded into the existing directories and
+            files, current file coverage can be preserved, but future new paths will no longer automatically
+            belong to the original task. Subsequent new components must be re-registered; the expanded per-item
+            declarations must not continue to be claimed as fully equivalent to the original
+            src/agent-runtime/command/**, src/agent-runtime/context/**, and src/agent-runtime/model/**.
+        - fromTask: agent-runtime-convergence
+          fromOwner: 双规发布
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T09:00:00.000Z
+          paths:
+            - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+            - src/agent-runtime/command/rule-adaptation/**
+            - src/agent-runtime/context/rule-adaptation/**
+            - src/agent-runtime/model/rule-adaptation/**
+          note: Limited exclusive source-path receipt for the P2 shadow layering paths. Predecessor owner and
+            sessions remain unchanged. After the broad wildcards were expanded into the existing directories and
+            files, current file coverage can be preserved, but future new paths will no longer automatically
+            belong to the original task. Subsequent new components must be re-registered; the expanded per-item
+            declarations must not continue to be claimed as fully equivalent to the original
+            src/agent-runtime/command/**, src/agent-runtime/context/**, and src/agent-runtime/model/**.
+        - fromTask: agent-runtime-convergence
+          fromOwner: 双规发布
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T11:18:00.000Z
+          paths:
+            - src/agent-runtime/contracts/rule-adaptation-activation.ts
+          note: Limited exclusive source-path receipt for the P3 activation contract file only.
+            Coordinated surgical edits to contracts/task.ts and state/repository/task-board-file.ts
+            are not claimed as exclusive ownership. Official loom register was not run.
+        - fromTask: pi-sdk-family-migration-v3:cursor
+          fromOwner: cursor
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T12:40:00.000Z
+          paths:
+            - src/agent-runtime/contracts/task.ts
+            - src/agent-runtime/state/repository/task-board-file.ts
+            - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
+          note: Limited exclusive source-path receipt for the three personal-scenario P3 activation landing
+            paths. Predecessor owner and sessions remain unchanged. After the broad wildcard was expanded into
+            the existing directories and files, current file coverage can be preserved, but future new paths
+            will no longer automatically belong to the original task. Subsequent new components must be
+            re-registered; the expanded per-item declarations must not continue to be claimed as fully
+            equivalent to the original src/agent-runtime/state/**.
+        - fromTask: agent-runtime-convergence
+          fromOwner: 双规发布
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T12:40:00.000Z
+          paths:
+            - src/agent-runtime/contracts/task.ts
+            - src/agent-runtime/state/repository/task-board-file.ts
+            - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
+          note: Limited exclusive source-path receipt for the three personal-scenario P3 activation landing
+            paths. Predecessor owner and sessions remain unchanged. After the broad wildcard was expanded into
+            the existing directories and files, current file coverage can be preserved, but future new paths
+            will no longer automatically belong to the original task. Subsequent new components must be
+            re-registered; the expanded per-item declarations must not continue to be claimed as fully
+            equivalent to the original src/agent-runtime/state/**.
+        - fromTask: daibai-super-steward:kiro-daibai
+          fromOwner: kiro-daibai
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/pi-embedded-runner/compact.ts
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run.
+        - fromTask: production-agent-runtime-safety:codex-runtime-safety
+          fromOwner: codex-runtime-safety
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/pi-embedded-runner/extensions.ts
+            - src/agents/pi-embedded-runner/compact.ts
+            - src/agents/model-fallback.ts
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. The covering
+            pattern(s) src/agents/** were expanded into the existing files, excluding only the
+            released paths. After the broad wildcard was expanded into the existing directories and
+            files, current file coverage can be preserved, but future new paths will no longer
+            automatically belong to the original task. Subsequent new components must be
+            re-registered; the expanded per-item declarations must not continue to be claimed as
+            fully equivalent to the original glob.
+        - fromTask: pi-sdk-family-migration-v3:cursor
+          fromOwner: cursor
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agent-runtime/execution/runner/embedded-run-auth.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-session.ts
+            - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+            - src/agent-runtime/model/prepare-embedded-model.ts
+            - src/agents/pi-embedded-runner/extensions.ts
+            - src/agents/pi-embedded-runner/compact.ts
+            - src/agents/model-fallback.ts
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. The covering
+            pattern(s) src/agent-runtime/execution/**, src/agents/** were expanded into the existing
+            files, excluding only the released paths. After the broad wildcard was expanded into the
+            existing directories and files, current file coverage can be preserved, but future new
+            paths will no longer automatically belong to the original task. Subsequent new
+            components must be re-registered; the expanded per-item declarations must not continue
+            to be claimed as fully equivalent to the original glob.
+        - fromTask: execution-delivery-context-lifecycle
+          fromOwner: cursor-grok
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/pi-embedded-runner/extensions.ts
+            - src/agents/pi-embedded-runner/compact.ts
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. The covering
+            pattern(s) src/agents/pi-embedded-runner/** were expanded into the existing files,
+            excluding only the released paths. After the broad wildcard was expanded into the
+            existing directories and files, current file coverage can be preserved, but future new
+            paths will no longer automatically belong to the original task. Subsequent new
+            components must be re-registered; the expanded per-item declarations must not continue
+            to be claimed as fully equivalent to the original glob.
+        - fromTask: account-sandbox-skills-mount
+          fromOwner: grok-bot
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/pi-embedded-runner/compact.ts
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run.
+        - fromTask: smart-model-routing-runtime-admission:智能模型路由
+          fromOwner: 智能模型路由
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/model-fallback.ts
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run.
+        - fromTask: agent-runtime-convergence
+          fromOwner: 双规发布
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agent-runtime/model/prepare-embedded-model.ts
+            - src/agent-runtime/execution/runner/embedded-run-auth.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-session.ts
+            - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+            - src/agents/pi-embedded-runner/compact.ts
+            - src/agents/pi-embedded-runner/extensions.ts
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run. The covering
+            pattern(s) src/agent-runtime/execution/** were expanded into the existing files,
+            excluding only the released paths. After the broad wildcard was expanded into the
+            existing directories and files, current file coverage can be preserved, but future new
+            paths will no longer automatically belong to the original task. Subsequent new
+            components must be re-registered; the expanded per-item declarations must not continue
+            to be claimed as fully equivalent to the original glob.
+        - fromTask: agent-runtime-observability:codex-observe-owner
+          fromOwner: codex-observe-owner
+          toTask: runtime-rule-adaptation
+          toOwner: grok-dynamic-rules
+          via: verified
+          authorizedBy: human-governor
+          at: 2026-11-12T14:40:00.000Z
+          paths:
+            - src/agents/model-fallback.ts
+            - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+            - src/agent-runtime/execution/runner/embedded-run-auth.ts
+          note: Limited exclusive source-path receipt for P4 r2 official consumer-chain and
+            selection-block landing paths. Predecessor owner and sessions remain unchanged.
+            Authorization is from the repository owner in t21u (human-governor). No predecessor
+            personal sign-off is claimed. Official loom register was not run.
+      limitedLandings:
+        - at: 2026-11-12T11:45:54.000Z
+          kind: coordinated-surgical-extension
+          exclusive: false
+          officialLoomRegister: false
+          humanOwnerSignOff: not-claimed
+          paths:
+            - src/agent-runtime/contracts/task.ts
+            - src/agent-runtime/state/repository/task-board-file.ts
+            - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
+          currentOpenOwners:
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+              state: active
+              coveringPatterns:
+                - src/agent-runtime/contracts/task.ts
+                - src/agent-runtime/state/**
+            - taskId: agent-runtime-convergence
+              owner: 双规发布
+              state: active
+              coveringPatterns:
+                - src/agent-runtime/contracts/task.ts
+                - src/agent-runtime/state/repository/task-board-file.ts
+                - src/agent-runtime/state/**
+          note: Limited landing registration only, not exclusive ownership. These official files
+            are not added to this task's exclusive paths. Evidence is registry metadata plus this
+            record; no human or agent owner sign-off is claimed. Official diffs versus clean HEAD
+            are the additive optional runtimeRuleAdaptationByTaskId field, its preserve and clone
+            helpers, and a dedicated state mutation entry that wraps the existing board lock and
+            writeEpoch semantics. Other tasks' WIP was not overwritten.
+        - at: 2026-11-12T12:40:00.000Z
+          kind: exclusive-limited-takeover
+          exclusive: true
+          officialLoomRegister: false
+          authorizedBy: human-governor
+          supersedes: 2026-11-12T11:45:54.000Z
+          paths:
+            - src/agent-runtime/contracts/task.ts
+            - src/agent-runtime/state/repository/task-board-file.ts
+            - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
+          note: The r2 limitedLandings record remains as a historical self-registration that was not
+            exclusive. Exclusive limited takeover of these three paths is now completed via pathReleases and
+            pathReceipts. Authorization is from the repository owner in t15u following the established
+            path-release pattern used in P1 and P2. fromOwner remains the registered owners. No separate
+            personal sign-off from cursor or 双规发布 is claimed. Official loom register was not run.
+        - at: 2026-11-12T14:18:00.000Z
+          kind: coordinated-surgical-extension
+          exclusive: false
+          officialLoomRegister: false
+          humanOwnerSignOff: not-claimed
+          authorizedBy: human-governor
+          paths:
+            - src/agent-runtime/model/prepare-embedded-model.ts
+            - src/agents/pi-embedded-runner/extensions.ts
+            - src/agents/pi-embedded-runner/compact.ts
+          currentOpenOwners:
+            - taskId: pi-sdk-family-migration-v3:cursor
+              owner: cursor
+              state: active
+              coveringPatterns:
+                - src/agent-runtime/model/prepare-embedded-model.ts
+                - src/agents/**
+            - taskId: agent-runtime-convergence
+              owner: 双规发布
+              state: active
+              coveringPatterns:
+                - src/agent-runtime/model/prepare-embedded-model.ts
+                - src/agents/pi-embedded-runner/extensions.ts
+                - src/agents/pi-embedded-runner/compact.ts
+            - taskId: production-agent-runtime-safety:codex-runtime-safety
+              owner: codex-runtime-safety
+              state: active
+              coveringPatterns:
+                - src/agents/**
+            - taskId: execution-delivery-context-lifecycle
+              owner: cursor-grok
+              state: active
+              coveringPatterns:
+                - src/agents/pi-embedded-runner/**
+            - taskId: daibai-super-steward:kiro-daibai
+              owner: kiro-daibai
+              state: active
+              coveringPatterns:
+                - src/agents/pi-embedded-runner/compact.ts
+            - taskId: account-sandbox-skills-mount
+              owner: grok-bot
+              state: active
+              coveringPatterns:
+                - src/agents/pi-embedded-runner/compact.ts
+          note: P4 r1 limited test wiring only, not exclusive ownership and not a path
+            takeover. These official files are not added to this task's exclusive paths.
+            Authorization is from the repository owner in t20u (human-governor). No
+            predecessor personal sign-off is claimed. Official loom register was not
+            run. Hunks are limited to an optional host-injected context-cap port on
+            prepareEmbeddedModel (default / omitted keeps original behavior), and an
+            optional inheritedContextWindowTokens hook on extensions and
+            compactEmbeddedPiSessionDirect so same-run consumers cannot re-parse and
+            enlarge. The manual /compact command path (compactEmbeddedPiSession) is
+            not modified. Production default embedded run still omits the port;
+            production whitelist stays empty; mainChainWired stays false.
+
+        - at: 2026-11-12T14:40:00.000Z
+          kind: exclusive-limited-takeover
+          exclusive: true
+          officialLoomRegister: false
+          authorizedBy: human-governor
+          supersedes: 2026-11-12T14:18:00.000Z
+          paths:
+            - src/agent-runtime/model/prepare-embedded-model.ts
+            - src/agents/pi-embedded-runner/extensions.ts
+            - src/agents/pi-embedded-runner/compact.ts
+            - src/agent-runtime/execution/runner/embedded-run-auth.ts
+            - src/agent-runtime/execution/runner/embedded-attempt-session.ts
+            - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+            - src/agents/model-fallback.ts
+          note: The r1 limitedLandings record remains as a historical self-registration that was not
+            exclusive. Exclusive limited takeover of these official P4 paths is now completed via
+            pathReleases and pathReceipts. Authorization is from the repository owner in t21u
+            following the established path-release pattern used in P1, P2, and P3. fromOwner remains
+            the registered owners. No separate personal sign-off from predecessor owners is claimed.
+            Official loom register was not run. Scope is limited to optional same-run cap
+            pass-through and selection-block classification; production default stays closed, the
+            production whitelist stays empty, and the manual /compact command path is not modified.
+  - id: exec-chain-fidelity-ab-min
+    owner: grok-dynamic-rules
+    intent:
+      - "Limited landing of the locked A/B prompt-fidelity fixes and required regression only.
+        Exact files only. Complete-message selection, explicit history-omission mark, and
+        full goal seed without 2000-character clipping. Independent acceptance: codex-runtime-manager.
+        No merge or deploy until authorized. Does not include #281 over-block logic, all-history
+        re-injection, global restrict, or C compaction files."
+    paths:
+      - src/agent-runtime/context/interaction-history.ts
+      - src/agent-runtime/context/interaction-history.test.ts
+      - src/agent-runtime/context/compilation/compile.ts
+      - src/agent-runtime/context/compilation/active-task-seed.ts
+      - src/agents/context-compiler/compile.test.ts
+      - scripts/architecture/manifest.json
+    state: active
+    sessions:
+      - id: 0ba856f0-9a18-42ee-a591-e980a4cdf70a
+        taskId: exec-chain-fidelity-ab-min
+        ide: grok-bot
+        agent: grok-dynamic-rules
+        status: active
+        lastSignalAt: 2026-11-13T15:20:30.918Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-13
+    metadata: {}
+  - id: rule-adaptation-shadow-host-min
+    owner: grok-dynamic-rules
+    intent:
+      - "Limited landing of the minimal advice-only shadow host hook in runGovernedInteraction
+        and required regression only. Exact file only. Independent acceptance: codex-runtime-manager.
+        Default off, explicit trigger, advice only, no auto-activation, no production config writes.
+        No merge or deploy until authorized. Does not include A/B fidelity files or #281 content."
+    paths:
+      - src/agent-runtime/command/governed-interaction.ts
+      - src/agent-runtime/command/governed-interaction.test.ts
+    state: active
+    sessions:
+      - id: 15da9024-c1b4-436c-ade5-53b9495b61d5
+        taskId: rule-adaptation-shadow-host-min
+        ide: grok-bot
+        agent: grok-dynamic-rules
+        status: active
+        lastSignalAt: 2026-11-13T15:20:30.918Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-13
+    metadata: {}
+  - id: exec-chain-overblock-min
+    owner: grok-dynamic-rules
+    intent:
+      - "Limited landing of the accepted compaction-safeguard cancel-on-summary-failure fix and its
+        required regression only. Exact files only. Independent acceptance: codex-runtime-manager.
+        No merge or deploy until authorized. No A/B writes or #281 content in this landing."
+    paths:
+      - src/agents/pi-extensions/compaction-safeguard.ts
+      - src/agents/pi-extensions/compaction-safeguard.test.ts
+    state: active
+    sessions:
+      - id: 906234d4-adaa-49f4-80ee-d29e0b81ff0c
+        taskId: exec-chain-overblock-min
+        ide: grok-bot
+        agent: grok-dynamic-rules
+        status: active
+        lastSignalAt: 2026-11-13T13:08:41.592Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-11-13
+    metadata: {}
 landingStreams:
+  - id: runtime-rule-adaptation
+    landingPolicy: serial
+    paths:
+      - .kiro/specs/runtime-rule-adaptation/**
+      - src/agent-runtime/contracts/rule-adaptation.ts
+      - src/agent-runtime/policy/rule-adaptation/**
+      - src/agent-runtime/contracts/rule-adaptation-shadow.ts
+      - src/agent-runtime/contracts/rule-adaptation-activation.ts
+      - src/agent-runtime/command/rule-adaptation/**
+      - src/agent-runtime/context/rule-adaptation/**
+      - src/agent-runtime/model/rule-adaptation/**
+      - src/agent-runtime/contracts/task.ts
+      - src/agent-runtime/state/repository/task-board-file.ts
+      - src/agent-runtime/state/mutations/runtime-rule-adaptation.ts
+      - src/agent-runtime/model/prepare-embedded-model.ts
+      - src/agents/pi-embedded-runner/extensions.ts
+      - src/agents/pi-embedded-runner/compact.ts
+      - src/agent-runtime/execution/runner/embedded-run-auth.ts
+      - src/agent-runtime/execution/runner/embedded-attempt-session.ts
+      - src/agent-runtime/execution/runner/embedded-run-attempt.ts
+      - src/agents/model-fallback.ts
+    canLandWith: []
+    metadata:
+      task: runtime-rule-adaptation
+      owner: grok-dynamic-rules
+      intent: Limited exclusive landing of accepted P1–P4 personal runtime-rule-adaptation
+        paths. Does not include .loom/registry.yaml. Does not enable production, open
+        the whitelist, or authorize deploy.
   - id: t166-gateway-exec-artifact-auth
     landingPolicy: serial
     paths:
@@ -28749,6 +30464,22 @@ sharedPaths:
     reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller
       migration.
     reviewAfter: 2026-11-30
+  - glob: scripts/check-architecture-manifest.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t55u 2026-11-14 dependency-boundary close-out. Exact-file sharedPath only; predecessor owners, paths, and session history remain declared. Does not take over scripts/** or change that directory lander."
+    reviewAfter: 2026-11-30
+  - glob: scripts/architecture/manifest.json
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t55u 2026-11-14 dependency-boundary close-out. Exact-file sharedPath only; predecessor owners, paths, session history, and the later exact sharedPaths on exec-chain-fidelity-ab-min and agent-runtime-convergence remain declared. Does not take over scripts/architecture/** or change that directory lander."
+    reviewAfter: 2026-11-30
+  - glob: scripts/architecture/manifest.json
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Owner t54u 于 2026-11-14 同意仅对 src/agent-runtime/context/interaction-history.test.ts
+      的 runtime-model-public-entry 增加例外，不扩目录、不豁免生产代码。Exact-file sharedPath
+      only; predecessor owners, paths, session history, and the later exact sharedPath on
+      agent-runtime-convergence remain declared. Does not take over scripts/architecture/**
+      or change that directory lander. Independent acceptance: codex-runtime-manager."
+    reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
     landerTask: agent-runtime-convergence
     reason: Human-authorized runtime migration guard for retired entry paths; retain prior ownership
@@ -30324,14 +32055,18 @@ sharedPaths:
       history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/context/interaction-history.ts
-    landerTask: agent-runtime-convergence
-    reason: Human-authorized exact-file runtime convergence takeover; retain other task declarations and
-      history.
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/** or src/agent-runtime/context/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/context/interaction-history.test.ts
-    landerTask: agent-runtime-convergence
-    reason: Human-authorized exact-file runtime convergence takeover; retain other task declarations and
-      history.
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/** or src/agent-runtime/context/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/wiring/interaction-turn.ts
     landerTask: agent-runtime-convergence
@@ -30513,6 +32248,18 @@ sharedPaths:
     landerTask: agent-runtime-convergence
     reason: Human-authorized bounded autonomous capability migration; retain all other scopes and history.
     reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/context/compilation/compile.ts
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/agent-runtime/context/compilation/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
+  - glob: src/agent-runtime/context/compilation/active-task-seed.ts
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/agent-runtime/context/compilation/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No #281 over-block content."
   - glob: src/agent-runtime/context/compilation/**
     landerTask: agent-runtime-convergence
     reason: Human-authorized autonomous shared-context migration; preserve all other scopes and history.
@@ -31272,9 +33019,20 @@ sharedPaths:
     reason: Authorized migration regression fixture alignment; preserve prior task ownership history.
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/command/governed-interaction.ts
-    landerTask: agent-runtime-convergence
-    reason: Authorized scoped runtime migration of interaction sequencing from wiring to command;
-      preserve predecessor history.
+    landerTask: rule-adaptation-shadow-host-min
+    reason: "Human-authorized exact-file landing for the minimal advice-only shadow host hook in
+      runGovernedInteraction and required regression only. Predecessor owners, paths, and session
+      history remain unchanged. Does not take over src/** or src/agent-runtime/command/**.
+      Authorized by human-governor on 2026-11-13. Independent acceptance: codex-runtime-manager.
+      No auto-activation or production config writes."
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/command/governed-interaction.test.ts
+    landerTask: rule-adaptation-shadow-host-min
+    reason: "Human-authorized exact-file landing for the minimal advice-only shadow host hook
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/** or src/agent-runtime/command/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No auto-activation or production
+      config writes."
     reviewAfter: 2026-11-30
   - glob: src/agent-runtime/execution/runner/execution-lifecycle.ts
     landerTask: agent-runtime-convergence
@@ -31664,3 +33422,21 @@ sharedPaths:
     reason: Human-authorized PR249 technical merge readiness fixes only; original feature/acceptance
       owner retained.
     reviewAfter: 2026-11-30
+  - glob: src/agents/context-compiler/compile.test.ts
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Human-authorized exact-file landing for the locked A/B prompt-fidelity fix and required
+      regression only. Predecessor owners, paths, and session history remain unchanged. Does not
+      take over src/** or src/agents/**. Authorized by human-governor on 2026-11-13.
+      Independent acceptance: codex-runtime-manager. No #281 over-block content."
+  - glob: src/agents/pi-extensions/compaction-safeguard.ts
+    landerTask: exec-chain-overblock-min
+    reason: "Human-authorized exact-file landing for the accepted compaction cancel-on-summary-failure
+      fix and required regression only. Predecessor owners, paths, and session history remain
+      unchanged. Does not take over src/** or src/agents/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No A/B or #281 content."
+  - glob: src/agents/pi-extensions/compaction-safeguard.test.ts
+    landerTask: exec-chain-overblock-min
+    reason: "Human-authorized exact-file landing for the accepted compaction cancel-on-summary-failure
+      fix and required regression only. Predecessor owners, paths, and session history remain
+      unchanged. Does not take over src/** or src/agents/**. Authorized by human-governor on
+      2026-11-13. Independent acceptance: codex-runtime-manager. No A/B or #281 content."

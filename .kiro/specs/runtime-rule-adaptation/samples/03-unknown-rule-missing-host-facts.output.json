@@ -1,0 +1,26 @@
+{
+  "resultKind": "blocked",
+  "activationAllowed": false,
+  "authorizationAssessment": "assessment_unavailable",
+  "reasons": [
+    {
+      "code": "unknown_rule_id",
+      "message": "Rule id 'collab.policy.unknown' is not in the known catalog. This is an independently decidable reject (unknown_rule_id). Missing host facts are not evaluated and must not produce needs_information.",
+      "path": "proposal.items[0].ruleId"
+    }
+  ],
+  "items": [
+    {
+      "ruleId": "collab.policy.unknown",
+      "field": "agents.defaults.contextTokens",
+      "resultKind": "blocked",
+      "reasons": [
+        {
+          "code": "unknown_rule_id",
+          "message": "Rule id 'collab.policy.unknown' is not in the known catalog. This is an independently decidable reject (unknown_rule_id). Missing host facts are not evaluated and must not produce needs_information.",
+          "path": "proposal.items[0].ruleId"
+        }
+      ]
+    }
+  ]
+}

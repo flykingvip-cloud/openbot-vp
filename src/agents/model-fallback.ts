@@ -1,3 +1,4 @@
+import { isContextCapSelectionBlockedError } from "../agent-runtime/model/rule-adaptation/index.js";
 import type { OpenBotConfig } from "../config/config.js";
 import {
   resolveAgentModelFallbackValues,
@@ -326,6 +327,12 @@ async function runFallbackCandidate<T>(params: {
     // Budget exhaustion is a task stop, not a provider failover. Trying the next
     // model would be another call the tip gate already refused.
     if (err instanceof Error && err.name === "TaskBudgetExceededError") {
+      throw err;
+    }
+    // Context-cap selection source blocks (identity, corrupt snapshot, or
+    // production path closed) are policy stops, not unknown model failures.
+    // Another candidate cannot repair them; do not rotate to the next model.
+    if (isContextCapSelectionBlockedError(err)) {
       throw err;
     }
     if (shouldRethrowAbort(err)) {

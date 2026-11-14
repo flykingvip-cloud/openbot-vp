@@ -1,0 +1,26 @@
+{
+  "resultKind": "blocked",
+  "activationAllowed": false,
+  "authorizationAssessment": "host_unauthorized",
+  "reasons": [
+    {
+      "code": "cancelled_or_tombstone",
+      "message": "Host expectedPolicyState is cancelled. This is an independently decidable reject (cancelled_or_tombstone). A missing compatibility record must not produce needs_information, and the cancelled task must not be revived.",
+      "path": "host.expectedPolicyState"
+    }
+  ],
+  "items": [
+    {
+      "ruleId": "model.context_window.guard",
+      "field": "agents.defaults.contextTokens",
+      "resultKind": "blocked",
+      "reasons": [
+        {
+          "code": "cancelled_or_tombstone",
+          "message": "Host expectedPolicyState is cancelled. This is an independently decidable reject (cancelled_or_tombstone). A missing compatibility record must not produce needs_information, and the cancelled task must not be revived.",
+          "path": "host.expectedPolicyState"
+        }
+      ]
+    }
+  ]
+}

@@ -1,12 +1,20 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { matchesGlob, normalizeRepoPath } from "./architecture/glob-match.js";
 
-type ManifestRule = {
+export type ManifestRule = {
   name: string;
   from: string;
+  /**
+   * Suppress a deny hit only when BOTH the importer and the resolved target
+   * match the same glob. This allows intra-component internal references
+   * (e.g. files under one rule-adaptation tree importing each other) without
+   * taking that tree out of the rule. Imports of any other component's
+   * internals are still checked. Unconfigured rules keep prior behavior.
+   */
+  exceptFrom?: string[];
   denyImportsFrom: string[];
   description: string;
   exemptFiles?: string[];
@@ -73,31 +81,76 @@ function collectImports(filePath: string): string[] {
   return imports;
 }
 
-function main(): void {
-  const rules = loadManifest();
-  const files = gitLsFilesAll();
+/** True only when importer and target both sit in the same exceptFrom glob. */
+export function isSameComponentInternal(
+  fromFile: string,
+  resolved: string,
+  exceptFrom: string[] | undefined,
+): boolean {
+  return (exceptFrom ?? []).some(
+    (glob) => matchesGlob(fromFile, glob) && matchesGlob(resolved, glob),
+  );
+}
+
+export type ResolvedImport = {
+  specifier: string;
+  resolved: string | null;
+};
+
+/**
+ * Evaluate architecture rules against a provided file list and import resolver.
+ * `exceptFrom` does not remove the importer from scope; it only suppresses a
+ * deny hit when both ends of the edge belong to the same listed component.
+ */
+export function collectArchitectureViolations(params: {
+  rules: ManifestRule[];
+  files: string[];
+  importsOf: (file: string) => ResolvedImport[];
+}): string[] {
   const violations: string[] = [];
 
-  for (const rule of rules) {
+  for (const rule of params.rules) {
     const exempt = new Set((rule.exemptFiles ?? []).map(normalizeRepoPath));
-    const scopedFiles = files.filter((file) => matchesGlob(file, rule.from) && !exempt.has(file));
+    const scopedFiles = params.files.filter(
+      (file) => matchesGlob(file, rule.from) && !exempt.has(file),
+    );
 
     for (const file of scopedFiles) {
-      for (const specifier of collectImports(file)) {
-        const resolved = resolveImportSpecifier({ fromFile: file, specifier });
+      for (const { specifier, resolved } of params.importsOf(file)) {
         if (!resolved) {
           continue;
         }
+        const normalizedResolved = normalizeRepoPath(resolved);
         for (const deny of rule.denyImportsFrom) {
-          if (matchesGlob(resolved, deny)) {
-            violations.push(
-              `${rule.name}: ${file} imports ${specifier} → ${resolved} (denied by ${deny})`,
-            );
+          if (!matchesGlob(normalizedResolved, deny)) {
+            continue;
           }
+          if (isSameComponentInternal(file, normalizedResolved, rule.exceptFrom)) {
+            continue;
+          }
+          violations.push(
+            `${rule.name}: ${file} imports ${specifier} → ${normalizedResolved} (denied by ${deny})`,
+          );
         }
       }
     }
   }
+
+  return violations;
+}
+
+function main(): void {
+  const rules = loadManifest();
+  const files = gitLsFilesAll();
+  const violations = collectArchitectureViolations({
+    rules,
+    files,
+    importsOf: (file) =>
+      collectImports(file).map((specifier) => ({
+        specifier,
+        resolved: resolveImportSpecifier({ fromFile: file, specifier }),
+      })),
+  });
 
   if (violations.length > 0) {
     console.error("Architecture manifest violations:");
@@ -112,4 +165,9 @@ function main(): void {
   );
 }
 
-main();
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+if (invokedDirectly) {
+  main();
+}

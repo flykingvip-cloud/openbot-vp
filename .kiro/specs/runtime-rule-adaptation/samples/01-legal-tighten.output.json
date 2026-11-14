@@ -1,0 +1,26 @@
+{
+  "resultKind": "shadow_accepted",
+  "activationAllowed": false,
+  "authorizationAssessment": "host_authorized",
+  "reasons": [
+    {
+      "code": "shadow_legal",
+      "message": "Proposed value 24000 is a legal tightening of currentEffectiveValue 32000 under hardMin 16000. P1 does not activate; activationAllowed remains false.",
+      "path": "proposal.items[0]"
+    }
+  ],
+  "items": [
+    {
+      "ruleId": "model.context_window.guard",
+      "field": "agents.defaults.contextTokens",
+      "resultKind": "shadow_accepted",
+      "reasons": [
+        {
+          "code": "shadow_legal",
+          "message": "Proposed value 24000 is a legal tightening of currentEffectiveValue 32000 under hardMin 16000. P1 does not activate; activationAllowed remains false.",
+          "path": "proposal.items[0]"
+        }
+      ]
+    }
+  ]
+}
