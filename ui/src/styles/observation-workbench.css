@@ -968,3 +968,187 @@ select {
   margin: 0 0 12px;
   border: 1px solid #e2e6ee;
 }
+
+/* Platform observation first screen (R5 平台观测). Kept incremental and
+ * scoped; does not restyle the rest of the platform shell. */
+.obs-plat-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 16px;
+}
+.obs-plat-toolbar .obs-source {
+  margin-left: auto;
+}
+.obs-plat-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.obs-plat-card {
+  border: 1px solid var(--obs-line);
+  border-radius: 12px;
+  background: var(--obs-bg);
+  padding: 16px 18px 18px;
+}
+.obs-plat-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.obs-plat-card__head h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.obs-plat-card__head p {
+  margin: 0;
+  color: var(--obs-muted);
+  line-height: 1.6;
+}
+.obs-cap-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.obs-cap-item {
+  border: 1px solid var(--obs-line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--obs-bg);
+}
+.obs-cap-item h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.obs-cap-item .obs-cap-val {
+  font-size: 16px;
+  font-weight: 600;
+}
+.obs-cap-item .obs-cap-den,
+.obs-cap-item .obs-cap-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--obs-muted);
+  line-height: 1.6;
+}
+.obs-query-scope {
+  margin: 0 0 10px;
+}
+.obs-query-box {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.obs-query-box .field {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 220px;
+}
+.obs-query-box .field > span {
+  font-size: 12px;
+  color: var(--obs-muted);
+}
+.obs-query-box input {
+  font: inherit;
+  color: inherit;
+  background: var(--obs-bg);
+  border: 1px solid var(--obs-line);
+  border-radius: 5px;
+  padding: 7px 9px;
+  min-height: 34px;
+  width: 100%;
+}
+.obs-query-submit {
+  border: 1px solid #263f70;
+  background: #263f70;
+  color: #fff;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font: inherit;
+  min-height: 34px;
+  cursor: pointer;
+}
+.obs-query-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.obs-query-result {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--obs-line);
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+.obs-query-result h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.obs-query-result code {
+  font-size: 12px;
+}
+.obs-tenant-table-wrap {
+  overflow: auto;
+}
+.obs-tenant-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.obs-tenant-table th,
+.obs-tenant-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--obs-line);
+  vertical-align: top;
+}
+.obs-tenant-table th {
+  font-size: 12px;
+  color: var(--obs-muted);
+  font-weight: 500;
+}
+.obs-tenant-table code {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--obs-muted);
+}
+.obs-grant-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  background: #f6f7f9;
+  color: #334155;
+}
+.obs-grant-chip.is-none,
+.obs-grant-chip.is-unknown {
+  background: #fff6e0;
+  color: #8b5e00;
+}
+.obs-plat-footnote {
+  margin: 10px 0 0;
+  color: var(--obs-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (max-width: 960px) {
+  .obs-plat-grid,
+  .obs-cap-grid {
+    grid-template-columns: 1fr;
+  }
+  .obs-plat-toolbar {
+    flex-direction: column;
+  }
+  .obs-plat-toolbar .obs-source {
+    margin-left: 0;
+  }
+}

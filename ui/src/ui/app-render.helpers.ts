@@ -216,10 +216,10 @@ export const PLATFORM_NAV_SECTIONS: PlatformNavSection[] = [
   },
   {
     id: "platform-observation",
-    label: "运行观测",
+    label: "平台观测",
     icon: "activity",
     entries: [
-      { id: "observation", label: "运行观测", tab: "platformObservation", activeOnTab: true },
+      { id: "observation", label: "平台观测", tab: "platformObservation", activeOnTab: true },
     ],
   },
   {

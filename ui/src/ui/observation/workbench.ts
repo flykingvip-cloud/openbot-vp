@@ -19,8 +19,10 @@ import { readRuntimeObservations } from "../runtime-observation.ts";
 import {
   AUTH_INVALID_COPY,
   AUTH_UNCONFIRMED_COPY,
+  PRECISE_QUERY_MISS_COPY,
   accessibleRuns,
   applyDrawerParams,
+  canAccessRun,
   currentAuthorization,
   metricScopeHint,
   readDrawerRequest,
@@ -30,6 +32,15 @@ import {
   type ObservationAccessInput,
   type TenantGrant,
 } from "./access-state.ts";
+import {
+  censusTenantGrants,
+  exactRunMatches,
+  formatGrantCensus,
+  formatHeartbeat,
+  formatLinkCoverage,
+  formatTenantCoverage,
+  tenantGrantNote,
+} from "./platform-overview.ts";
 import {
   emptyObservation,
   OBSERVATION_TYPES,
@@ -125,6 +136,12 @@ export class OpenBotObservationWorkbench extends LitElement {
   @state() private metricFilter = "all";
   @state() private expanded = false;
   @state() private accessNotice: string | null = null;
+  @state() private queryInput = "";
+  @state() private queryResult: {
+    status: "hit" | "miss" | "denied";
+    message?: string;
+    run?: ObservationRun;
+  } | null = null;
   @property({ attribute: false }) scopes: readonly string[] | null = null;
   @property({ attribute: false }) authorized: boolean | null = null;
   @property({ attribute: false }) tenantGrants: Readonly<Record<string, TenantGrant>> | null = null;
@@ -217,6 +234,8 @@ export class OpenBotObservationWorkbench extends LitElement {
     this.pendingStreamUpdate = false;
     this.requestedRunId = null;
     this.requestedDrawer = false;
+    this.queryInput = "";
+    this.queryResult = null;
     const authorized = this.isAuthorized();
     this.accessNotice =
       authorized === true ? null : authorized === false ? AUTH_INVALID_COPY : AUTH_UNCONFIRMED_COPY;
@@ -321,6 +340,8 @@ export class OpenBotObservationWorkbench extends LitElement {
       this.metricFilter = "all";
       this.requestedRunId = null;
       this.requestedDrawer = false;
+      this.queryInput = "";
+      this.queryResult = null;
       this.syncDrawerUrl({ runId: null, drawer: false });
     }
   }
@@ -368,9 +389,66 @@ export class OpenBotObservationWorkbench extends LitElement {
     return new Date(updatedAt).toLocaleString("zh-CN", { hour12: false });
   }
   private selectTenant(tenantId: string) {
-    this.tenantFilter = tenantId;
+    this.setTenantFilter(tenantId);
     this.surface = "overview";
+  }
+  private setTenantFilter(tenantId: string) {
+    this.tenantFilter = tenantId || "all";
     this.selected = null;
+    this.expanded = false;
+    this.frozenView = null;
+    this.frozenStream = null;
+    this.paused = false;
+    this.queryResult = null;
+  }
+  private submitPreciseQuery(view: ObservationView) {
+    const identifier = this.queryInput.trim();
+    const authorization = currentAuthorization(this.accessInput());
+    if (!authorization.ok) {
+      this.queryResult = { status: "denied", message: authorization.message };
+      this.selected = null;
+      this.expanded = false;
+      this.requestedRunId = null;
+      this.requestedDrawer = false;
+      this.syncDrawerUrl({ runId: null, drawer: false });
+      return;
+    }
+    if (!identifier) {
+      this.queryResult = null;
+      return;
+    }
+    const matches = exactRunMatches(this.filteredRuns(view), identifier);
+    if (matches.length !== 1) {
+      this.queryResult = { status: "miss", message: PRECISE_QUERY_MISS_COPY };
+      this.selected = null;
+      this.expanded = false;
+      this.requestedRunId = null;
+      this.requestedDrawer = false;
+      this.syncDrawerUrl({ runId: null, drawer: false });
+      return;
+    }
+    const run = matches[0];
+    const access = canAccessRun({ ...this.accessInput(), run });
+    if (!access.ok) {
+      this.queryResult = {
+        status: access.code === "run_out_of_scope" ? "miss" : "denied",
+        message: access.code === "run_out_of_scope" ? PRECISE_QUERY_MISS_COPY : access.message,
+      };
+      this.selected = null;
+      this.expanded = false;
+      this.requestedRunId = null;
+      this.requestedDrawer = false;
+      this.syncDrawerUrl({ runId: null, drawer: false });
+      return;
+    }
+    this.queryResult = { status: "hit", run };
+  }
+  private entryGrant(entry: ObservationEnterpriseEntry): TenantGrant {
+    const mapped = this.tenantGrants?.[entry.tenantId];
+    if (mapped === "granted" || mapped === "none") {
+      return mapped;
+    }
+    return resolveTenantGrant(entry.tenantGrant ?? mapped);
   }
   private renderTabs() {
     return html`<nav class="obs-tabs" aria-label="观测视图" role="tablist">
@@ -419,12 +497,7 @@ export class OpenBotObservationWorkbench extends LitElement {
         this.expanded = false;
       }}><option value="7d" ?selected=${this.timeWindow === "7d"}>近 7 天</option><option value="current" ?selected=${this.timeWindow === "current"}>当前连接窗口</option></select></label>
       <label><span>租户</span><select aria-label="租户筛选" @change=${(event: Event) => {
-        this.tenantFilter = (event.target as HTMLSelectElement).value || "all";
-        this.selected = null;
-        this.expanded = false;
-        this.frozenView = null;
-        this.frozenStream = null;
-        this.paused = false;
+        this.setTenantFilter((event.target as HTMLSelectElement).value || "all");
       }}><option value="all" ?selected=${this.tenantFilter === "all"}>${view.source === "sample" ? "全部企业（样例）" : "全部企业"}</option>${directory.map((row) => html`<option value=${row.tenantId} ?selected=${this.tenantFilter === row.tenantId}>${row.label}</option>`)}</select></label>
       <label><span>任务类型</span><select aria-label="任务类型筛选" @change=${(event: Event) => {
         this.filter = (event.target as HTMLSelectElement).value as typeof this.filter;
@@ -990,6 +1063,152 @@ export class OpenBotObservationWorkbench extends LitElement {
     }
     this.syncDrawerUrl(resolved.url);
   }
+
+  private renderSourceSwitch(view: ObservationView) {
+    return html`<div class="obs-source"><span class="obs-source-label">连接工作台数据源</span><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select><small>仅影响连接工作台，不影响独立精确任务查询。</small></div>`;
+  }
+  private renderPlatformHealth(view: ObservationView) {
+    const coverage = formatLinkCoverage(null);
+    const heartbeat = formatHeartbeat(null);
+    const census = formatGrantCensus(
+      censusTenantGrants(this.directoryEntries(view), this.tenantGrants),
+    );
+    const unmappedLive = this.role === "platform" && view.source === "live" && this.tenantFilter !== "all";
+    const unmapped = {
+      value: "不计入企业",
+      detail:
+        view.source === "live"
+          ? "execution_only 连接事件无租户映射"
+          : "样例运行按已授权租户投影，未映射事件不计入企业",
+      note: unmappedLive
+        ? "所选企业暂无已映射运行事件。execution_only 投影不含租户标签，不能把本机事件算到某个企业。"
+        : "不能把未映射事件分配给某个企业。",
+    };
+    const cards = [
+      { title: "关联覆盖率", ...coverage },
+      { title: "心跳时效", ...heartbeat },
+      { title: "租户授权", ...census },
+      { title: "未映射事件", ...unmapped },
+    ];
+    return html`<section class="obs-plat-card" data-testid="obs-platform-health" aria-label="平台健康与覆盖">
+      <div class="obs-plat-card__head"><div><h3>平台健康与覆盖</h3><p>覆盖率必须带分子分母；不足则为未知。</p></div></div>
+      <div class="obs-cap-grid">${cards.map((card) => html`<div class="obs-cap-item" data-testid=${`obs-health-${card.title}`}>
+        <h4>${card.title}</h4>
+        <div class="obs-cap-val">${card.value}</div>
+        <div class="obs-cap-den">${card.detail}</div>
+        <p class="obs-cap-note">${card.note}</p>
+      </div>`)}</div>
+    </section>`;
+  }
+  private renderPreciseQuery(view: ObservationView) {
+    const directory = this.directoryEntries(view);
+    const authorization = currentAuthorization(this.accessInput());
+    const disabled = !authorization.ok;
+    const tenantLabel =
+      this.tenantFilter === "all"
+        ? view.source === "sample"
+          ? "全部企业（样例）"
+          : "全部企业"
+        : (directory.find((row) => row.tenantId === this.tenantFilter)?.label ?? this.tenantFilter);
+    const result = this.queryResult;
+    return html`<section class="obs-plat-card" data-testid="obs-precise-query" aria-label="精确任务查询">
+      <div class="obs-plat-card__head"><div><h3>精确任务查询</h3><p>必须输入精确的任务或运行标识，不借用近似结果。此区域独立，不随连接工作台筛选切换。</p></div></div>
+      <label class="field obs-query-scope"><span>租户筛选</span>
+        <select aria-label="租户筛选" ?disabled=${this.isAuthorized() === false} @change=${(event: Event) => {
+          this.setTenantFilter((event.target as HTMLSelectElement).value || "all");
+        }}>
+          <option value="all" ?selected=${this.tenantFilter === "all"}>${view.source === "sample" ? "全部企业（样例）" : "全部企业"}</option>
+          ${directory.map((row) => {
+            const grant = this.entryGrant(row);
+            const suffix = grant === "none" ? " · 无授权" : grant === "unknown" ? " · 尚未确认" : "";
+            return html`<option value=${row.tenantId} ?selected=${this.tenantFilter === row.tenantId}>${row.label}（${row.tenantId}）${suffix}</option>`;
+          })}
+        </select>
+      </label>
+      <p class="obs-plat-footnote">只影响精确查询、当前租户投影和证据下钻，不改写平台身份域，也不与连接工作台筛选混用。当前租户投影：${tenantLabel}。</p>
+      <form class="obs-query-box" @submit=${(event: Event) => {
+        event.preventDefault();
+        this.submitPreciseQuery(view);
+      }}>
+        <label class="field"><span>精确任务 / 运行标识</span>
+          <input aria-label="精确任务或运行标识" placeholder="例如 run-id、clientRunId 或 taskId@版本" .value=${this.queryInput} ?disabled=${disabled} @input=${(event: Event) => {
+            this.queryInput = (event.target as HTMLInputElement).value;
+          }} />
+        </label>
+        <button class="obs-query-submit" type="button" ?disabled=${disabled} @click=${() => this.submitPreciseQuery(view)}>精确查询</button>
+      </form>
+      <p class="obs-plat-footnote">不支持模糊检索或“相似任务”借用。${disabled ? authorization.message : "只在当前租户筛选的已授权范围内按精确标识解析。"}</p>
+      ${
+        !result
+          ? html`<p class="obs-plat-footnote" data-testid="obs-query-empty">尚未执行精确查询。</p>`
+          : result.status === "denied"
+            ? html`<div class="obs-query-result" data-testid="obs-query-result"><strong>无授权</strong><p>${result.message}</p></div>`
+            : result.status === "miss"
+              ? html`<div class="obs-query-result" data-testid="obs-query-result"><strong>未找到匹配记录</strong><p>${result.message}</p></div>`
+              : result.run
+                ? html`<div class="obs-query-result" data-testid="obs-query-result">
+                    <h4>${result.run.label}</h4>
+                    <code>${result.run.clientRunId ?? result.run.id}</code>
+                    <p class="obs-plat-footnote">租户：${result.run.tenantLabel ?? (result.run.tenantId ? result.run.tenantId : "未映射（不计入企业）")} · 不随连接工作台筛选切换</p>
+                    <div class="obs-loop-actions"><button type="button" class="obs-primary" data-testid="obs-query-open" @click=${() => {
+                      const run = result.run;
+                      if (!run) {
+                        return;
+                      }
+                      this.selected = run;
+                      this.expanded = true;
+                      this.requestedRunId = run.id;
+                      this.requestedDrawer = true;
+                    }}>打开完整证据</button></div>
+                  </div>`
+                : nothing
+      }
+    </section>`;
+  }
+  private renderTenantGrantTable(view: ObservationView) {
+    const rows = this.directoryEntries(view);
+    const isSample = view.source === "sample";
+    if (!rows.length) {
+      return html`<section class="obs-plat-card obs-tenant-compare" data-testid="obs-tenant-compare" aria-label="租户隔离与授权">
+        <div class="obs-plat-card__head"><div><h3>租户隔离与授权</h3><p>租户之间隔离；无授权租户不可查询。</p></div></div>
+        <div class="obs-empty obs-tenant-empty"><strong>${isSample ? "样例企业未启用" : "暂无企业目录摘要"}</strong><p>${isSample ? "切换到样例验收后应出现明确标注的样例企业。" : "近 7 天跨租户视图依赖目录摘要，不是事件回放。"}</p></div>
+        <p class="obs-plat-footnote">${this.liveNote(view)}</p>
+      </section>`;
+    }
+    return html`<section class="obs-plat-card obs-tenant-compare" data-testid="obs-tenant-compare" aria-label="租户隔离与授权">
+      <div class="obs-plat-card__head"><div><h3>租户隔离与授权</h3><p>租户之间隔离；无授权租户不可查询。</p></div></div>
+      <div class="obs-tenant-table-wrap">
+        <table class="obs-tenant-table">
+          <thead><tr><th>租户</th><th>授权</th><th>覆盖</th><th>说明</th></tr></thead>
+          <tbody>
+            ${rows.map((entry) => {
+              const grant = this.entryGrant(entry);
+              const grantLabel = grant === "granted" ? "已授权" : grant === "none" ? "无授权" : "尚未确认";
+              return html`<tr data-tenant-id=${entry.tenantId}>
+                <td>${entry.label}<code>${entry.tenantId}</code></td>
+                <td><span class="obs-grant-chip is-${grant}">${grantLabel}</span></td>
+                <td>${formatTenantCoverage(grant)}</td>
+                <td class="obs-plat-footnote">${tenantGrantNote(grant, isSample)}</td>
+              </tr>`;
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p class="obs-plat-footnote">切换租户筛选不会改变平台身份域；未映射的连接事件仍不计入任何企业。${this.liveNote(view) ? ` ${this.liveNote(view)}` : ""}</p>
+    </section>`;
+  }
+  private renderPlatformOverview(view: ObservationView, notice: string | null) {
+    return html`
+      <div class="obs-plat-toolbar">${this.renderSourceSwitch(view)}</div>
+      ${notice ? html`<p class="obs-access-notice" data-testid="obs-access-notice">${notice}</p>` : nothing}
+      ${view.source === "sample" ? html`<p class="obs-plat-footnote" data-testid="obs-sample-note">交互验收样例 · 样例验收已启用，不代表生产健康或改善结果。</p>` : nothing}
+      <div class="obs-plat-grid">
+        ${this.renderPlatformHealth(view)}
+        ${this.renderPreciseQuery(view)}
+      </div>
+      ${this.renderTenantGrantTable(view)}
+    `;
+  }
   render() {
     this.captureDrawerRequest();
     const view = this.updateStream(this.view());
@@ -1011,6 +1230,12 @@ export class OpenBotObservationWorkbench extends LitElement {
     // Current server-confirmed state wins; a previous unconfirmed/denied notice
     // must not linger after the tenant filter or grant result changes.
     const notice = authorization.ok ? resolved.notice : authorization.message;
+    if (this.role === "platform") {
+      return html`<div class="obs-workbench" id="observation-workbench" data-observation-source=${view.source} data-time-window=${this.timeWindow} data-tenant-filter=${this.tenantFilter}>
+        ${this.renderPlatformOverview(view, notice)}
+        ${showDrawer && selected ? this.renderEvidence(selected) : nothing}
+      </div>`;
+    }
     return html`<div class="obs-workbench" id="observation-workbench" data-observation-source=${view.source} data-time-window=${this.role === "platform" ? this.timeWindow : "enterprise"} data-tenant-filter=${this.tenantFilter}>
       <div class="obs-header"><div><span class="obs-eyebrow">${this.role === "platform" ? "OBSERVABILITY" : "SELF-EVOLUTION / OBSERVABILITY"}</span><h2>${this.role === "platform" ? "实时运行与改善" : "任务质量进化中心"}</h2><p>${this.role === "platform" ? "不混淆一次成功调用与一项被验收的工作。" : "观测 → 诊断 → 候选与实验 → 效果与治理"}</p></div>
         <div class="obs-source"><span class="obs-source-label">连接工作台数据源</span><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select><small>仅影响连接工作台，不影响独立精确任务查询。</small></div></div>

@@ -111,7 +111,7 @@ describe("observation live projection", () => {
 });
 
 describe("platform tenant compare filters", () => {
-  it("wires directory summaries, sample switch, tenant filter, and keeps three tabs", async () => {
+  it("renders the R5 platform first screen with health, exact query, and grant table", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     render(
@@ -122,8 +122,8 @@ describe("platform tenant compare filters", () => {
         connected: true,
         authorized: true,
         tenantGrants: {
-          "sample-tenant-property": "granted",
-          "sample-tenant-north": "granted",
+          "tenant-a": "granted",
+          "tenant-b": "unknown",
         },
         observationHost: {},
         enterpriseDirectory: [
@@ -132,6 +132,7 @@ describe("platform tenant compare filters", () => {
             label: "华东正式企业",
             status: "paid",
             plan: "标准",
+            tenantGrant: "granted",
             healthSummary: {
               label: "运行平稳",
               tone: "ok",
@@ -160,29 +161,39 @@ describe("platform tenant compare filters", () => {
     ) as OpenBotObservationWorkbench;
     await panel.updateComplete;
 
-    expect(panel.querySelectorAll('[role="tablist"][aria-label="观测视图"] button')).toHaveLength(
-      3,
+    expect(panel.querySelector('[data-testid="obs-platform-health"]')?.textContent).toContain(
+      "平台健康与覆盖",
     );
+    expect(
+      panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-cap-val')?.textContent,
+    ).toBe("未知");
+    expect(
+      panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
+    ).toBe("未知");
+    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).toContain("1 已授权");
+    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).toContain("1 尚未确认");
+    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).not.toMatch(/0 无授权/);
+    expect(panel.querySelector('[data-testid="obs-health-未映射事件"]')?.textContent).toContain(
+      "不计入企业",
+    );
+    expect(panel.querySelector('[data-testid="obs-precise-query"]')?.textContent).toContain(
+      "精确任务查询",
+    );
+    expect(panel.querySelector(".obs-pulse-grid")).toBeNull();
+    expect(panel.querySelector('[role="tablist"][aria-label="观测视图"]')).toBeNull();
+    expect(panel.querySelector(".obs-header h2")?.textContent ?? "").not.toContain("运行观测");
+    expect(panel.querySelector(".obs-header h2")?.textContent ?? "").not.toContain("实时运行与改善");
+
     expect(panel.querySelector('[data-testid="obs-tenant-compare"]')?.textContent).toContain(
-      "华东正式企业",
+      "租户隔离与授权",
     );
-    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("42");
-    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("3.50");
-    expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).toContain("未知");
-    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain(
-      "目录成功率参考（口径/分母未供给）",
-    );
-    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).not.toContain(
-      "任务成功率",
-    );
-    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain(
-      "点击仅筛选已映射数据，不代表业务闭环关联",
-    );
+    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("华东正式企业");
+    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("已授权");
+    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("未知");
+    expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).toContain("尚未确认");
+    expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).not.toContain("无授权");
     expect(panel.querySelector(".obs-source")?.textContent).toContain("连接工作台数据源");
     expect(panel.querySelector(".obs-source")?.textContent).toContain("不影响独立精确任务查询");
-    expect(panel.querySelector(".obs-event-scope")?.textContent).toContain(
-      "下方运行证据仍是当前连接窗口",
-    );
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).not.toMatch(
       /近 7 天调用[\s\S]*\b0\b/,
     );
@@ -193,38 +204,15 @@ describe("platform tenant compare filters", () => {
     await panel.updateComplete;
     expect(panel.textContent).toContain("物业示例（样例）");
     expect(panel.textContent).toContain("华北示例（样例）");
-    expect(panel.querySelectorAll(".obs-tenant-card")).toHaveLength(2);
+    expect(panel.textContent).toContain("交互验收样例");
+    expect(panel.querySelectorAll("[data-tenant-id]")).toHaveLength(2);
 
     const tenant = panel.querySelector<HTMLSelectElement>("select[aria-label=租户筛选]")!;
     tenant.value = "sample-tenant-property";
     tenant.dispatchEvent(new Event("change"));
     await panel.updateComplete;
-    expect(panel.querySelectorAll(".obs-tenant-card")).toHaveLength(1);
     expect(panel.querySelector("[data-tenant-filter]")?.getAttribute("data-tenant-filter")).toBe(
       "sample-tenant-property",
-    );
-
-    panel.querySelector<HTMLButtonElement>('[data-tenant-id="sample-tenant-property"]')!.click();
-    await panel.updateComplete;
-    expect(panel.querySelector('[aria-selected="true"]')?.textContent).toContain("态势总览");
-    expect(panel.querySelectorAll(".obs-run").length).toBeGreaterThan(0);
-    expect(panel.textContent).toContain("物业示例（样例）");
-    expect(panel.textContent).not.toContain("华北示例（样例） ·");
-
-    const tabs = [
-      ...panel.querySelectorAll<HTMLButtonElement>(
-        '[role="tablist"][aria-label="观测视图"] button',
-      ),
-    ];
-    tabs[2].click();
-    await panel.updateComplete;
-    expect(panel.textContent).toContain("从发现到验证");
-    expect(panel.querySelector(".obs-filters")).not.toBeNull();
-    expect(panel.querySelector(".obs-filters")?.textContent).toContain("物业示例（样例）");
-    tabs[0].click();
-    await panel.updateComplete;
-    expect(panel.querySelectorAll('[role="tablist"][aria-label="观测视图"] button')).toHaveLength(
-      3,
     );
     container.remove();
   });
@@ -252,8 +240,9 @@ describe("platform tenant compare filters", () => {
     expect(panel.querySelector('[data-testid="obs-tenant-compare"]')?.textContent).toContain(
       "暂无企业目录摘要",
     );
-    expect(panel.querySelectorAll(".obs-tenant-card")).toHaveLength(0);
+    expect(panel.querySelectorAll("[data-tenant-id]")).toHaveLength(0);
     expect(panel.textContent).toContain("暂无跨租户历史聚合查询能力");
+    expect(panel.querySelector(".obs-pulse-grid")).toBeNull();
     container.remove();
   });
 
@@ -374,12 +363,12 @@ describe("platform tenant compare filters", () => {
     select.value = "t1";
     select.dispatchEvent(new Event("change"));
     await panel.updateComplete;
-    expect(
-      [...panel.querySelectorAll(".obs-pulse-card strong")].every(
-        (el) => el.textContent?.includes("未知") || el.textContent?.includes("—"),
-      ),
-    ).toBe(true);
-    expect(panel.querySelector(".obs-empty")?.textContent).toContain("所选企业暂无已映射运行事件");
+    expect(panel.querySelector('[data-testid="obs-health-关联覆盖率"]')?.textContent).toContain("未知");
+    expect(panel.querySelector('[data-testid="obs-health-心跳时效"]')?.textContent).toContain("未知");
+    expect(panel.querySelector('[data-testid="obs-health-未映射事件"]')?.textContent).toContain(
+      "所选企业暂无已映射运行事件",
+    );
+    expect(panel.querySelector(".obs-pulse-grid")).toBeNull();
     container.remove();
   });
 });
@@ -761,9 +750,65 @@ describe("R5 incremental wiring", () => {
     tenant.value = "sample-tenant-property";
     tenant.dispatchEvent(new Event("change"));
     await panel.updateComplete;
-    expect(panel.querySelectorAll(".obs-run").length).toBeGreaterThan(0);
     expect(panel.querySelector('[data-testid="obs-access-notice"]')).toBeNull();
-    expect(panel.textContent).toContain("周报资料整理");
+    const input = panel.querySelector<HTMLInputElement>('[aria-label="精确任务或运行标识"]')!;
+    input.value = "sample-personal";
+    input.dispatchEvent(new Event("input"));
+    panel.querySelector<HTMLButtonElement>(".obs-query-submit")!.click();
+    await panel.updateComplete;
+    expect(panel.querySelector('[data-testid="obs-query-result"]')?.textContent).toContain(
+      "周报资料整理",
+    );
+    expect(panel.querySelectorAll(".obs-run")).toHaveLength(0);
+
+    input.value = "sample-collaboration";
+    input.dispatchEvent(new Event("input"));
+    panel.querySelector<HTMLButtonElement>(".obs-query-submit")!.click();
+    await panel.updateComplete;
+    expect(panel.querySelector('[data-testid="obs-query-result"]')?.textContent).toContain(
+      "当前授权范围内未找到匹配记录",
+    );
+    expect(panel.querySelector('[data-testid="obs-query-result"]')?.textContent).not.toContain(
+      "华北示例",
+    );
+    container.remove();
+  });
+
+  it("uses the same miss copy for an unknown identifier and does not hint at another tenant", async () => {
+    const { container, panel } = await mount({
+      role: "platform",
+      tenantId: null,
+      sessionKey: null,
+      connected: true,
+      authorized: true,
+      observationHost: {},
+      tenantGrants: {
+        "sample-tenant-property": "granted",
+        "sample-tenant-north": "granted",
+      },
+    });
+    const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
+    selector.value = "sample";
+    selector.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    const tenant = panel.querySelector<HTMLSelectElement>("select[aria-label=租户筛选]")!;
+    tenant.value = "sample-tenant-property";
+    tenant.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    const input = panel.querySelector<HTMLInputElement>('[aria-label="精确任务或运行标识"]')!;
+    for (const identifier of ["does-not-exist", "sample-collaboration", "SAMPLE-PERSONAL"]) {
+      input.value = identifier;
+      input.dispatchEvent(new Event("input"));
+      panel.querySelector<HTMLButtonElement>(".obs-query-submit")!.click();
+      await panel.updateComplete;
+      expect(panel.querySelector('[data-testid="obs-query-result"]')?.textContent).toContain(
+        "当前授权范围内未找到匹配记录",
+      );
+      expect(panel.querySelector('[data-testid="obs-query-result"]')?.textContent).not.toContain(
+        "华北示例",
+      );
+      expect(panel.querySelector(".obs-drawer")).toBeNull();
+    }
     container.remove();
   });
 });
