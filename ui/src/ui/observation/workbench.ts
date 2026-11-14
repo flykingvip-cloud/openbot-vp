@@ -592,7 +592,6 @@ export class OpenBotObservationWorkbench extends LitElement {
         }}>${OBSERVATION_TYPES.map((row) => html`<option value=${row} ?selected=${this.filter === row}>${row === "全部" ? "全部类型" : row}</option>`)}</select></label>
         <label class="obs-source"><span>数据源</span><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${this.source === "live"}>真实连接</option><option value="sample" ?selected=${this.source === "sample"}>样例验收</option></select></label>
       </div>
-      <p class="obs-filters__context">四个筛选项为独立维度，位于视图标签之下。数据源仅影响连接工作台，不影响独立精确任务查询。</p>
     </section>`;
   }
   private renderStatusRow(view: ObservationView) {
@@ -738,14 +737,6 @@ export class OpenBotObservationWorkbench extends LitElement {
   }
   private renderFilters(view: ObservationView) {
     const directory = this.directoryEntries(view);
-    const tenantLabel =
-      this.tenantFilter === "all"
-        ? view.source === "sample"
-          ? "全部企业（样例）"
-          : "全部企业"
-        : (directory.find((row) => row.tenantId === this.tenantFilter)?.label ?? this.tenantFilter);
-    const windowLabel = this.timeWindow === "7d" ? "近 7 天" : "当前连接窗口";
-    const typeLabel = this.filter === "全部" ? "全部任务类型" : this.filter;
     if (this.role === "enterprise") {
       return this.renderEnterpriseFilters(view);
     }
@@ -767,7 +758,6 @@ export class OpenBotObservationWorkbench extends LitElement {
         this.frozenStream = null;
         this.paused = false;
       }}>${OBSERVATION_TYPES.map((row) => html`<option value=${row} ?selected=${this.filter === row}>${row === "全部" ? "全部任务类型" : row}</option>`)}</select></label>
-      <p class="obs-filters__context">筛选上下文：${windowLabel} · ${tenantLabel} · ${typeLabel}</p>
     </section>`;
   }
   private renderTenantCompare(view: ObservationView) {
@@ -1281,21 +1271,6 @@ export class OpenBotObservationWorkbench extends LitElement {
       <footer>此面板不改写任务板或业务状态。工具结束 ≠ 任务成功，投递 ≠ 场景验收。</footer>
     </aside></div>`;
   }
-  private renderEventScopeNote(view: ObservationView) {
-    if (
-      view.source === "sample" ||
-      !this.enterpriseDirectory.length ||
-      this.timeWindow === "current"
-    ) {
-      return nothing;
-    }
-    return html`
-      <p class="obs-event-scope">
-        下方运行证据仍是当前连接窗口的只读事件；时间窗只作用于上方企业目录摘要，不筛选本地事件历史。
-      </p>
-    `;
-  }
-
   private liveNote(view: ObservationView) {
     if (this.role !== "platform" || view.source !== "live") {
       return "";
@@ -1347,7 +1322,7 @@ export class OpenBotObservationWorkbench extends LitElement {
   }
 
   private renderSourceSwitch(view: ObservationView) {
-    return html`<div class="obs-source"><span class="obs-source-label">连接工作台数据源</span><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select><small>仅影响连接工作台，不影响独立精确任务查询。</small></div>`;
+    return html`<div class="obs-source"><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select></div>`;
   }
   private renderPlatformHealth(view: ObservationView) {
     const coverage = formatLinkCoverage(null);
@@ -1531,11 +1506,10 @@ export class OpenBotObservationWorkbench extends LitElement {
       </div>`;
     }
     return html`<div class="obs-workbench" id="observation-workbench" data-observation-source=${view.source} data-time-window=${this.role === "platform" ? this.timeWindow : "enterprise"} data-tenant-filter=${this.tenantFilter}>
-      <div class="obs-header"><div><span class="obs-eyebrow">智能诊断</span><h2>智能诊断</h2><p>态势总览、运行分析与治理验证共用同一授权投影；观测是展示边界，不改写业务状态。</p></div></div>
+      <div class="obs-header"><div><h2>智能诊断</h2></div></div>
       ${this.renderTabs()}
       ${this.renderFilters(view)}
       ${this.renderStatusRow(view)}
-      ${this.renderEventScopeNote(view)}
       ${notice ? html`<p class="obs-access-notice" data-testid="obs-access-notice">${notice}</p>` : nothing}
       ${this.surface === "overview" ? this.renderEnterpriseOverview(view, runs, selected) : this.surface === "analysis" ? this.renderAnalysis(view, listRuns) : this.renderGovernance(view)}
       ${showDrawer && selected ? this.renderEvidence(selected) : nothing}

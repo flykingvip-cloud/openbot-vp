@@ -37,8 +37,14 @@ describe("observation workbench interaction", () => {
     );
     expect(panel.querySelector(".obs-empty")?.textContent).toContain("当前筛选下没有可观测事件");
     expect(panel.querySelector(".obs-header h2")?.textContent).toBe("智能诊断");
+    expect(panel.querySelector(".obs-header .obs-eyebrow")).toBeNull();
+    expect(panel.querySelector(".obs-header p")).toBeNull();
+    expect(panel.textContent).not.toContain("态势总览、运行分析与治理验证共用同一授权投影");
     expect(panel.textContent).not.toContain("任务质量进化中心");
     expect(panel.querySelector('[aria-label="连接工作台筛选"]')?.textContent).toContain("连接工作台筛选");
+    expect(panel.textContent).not.toContain("四个筛选项为独立维度");
+    expect(panel.textContent).not.toContain("筛选上下文：");
+    expect(panel.textContent).not.toContain("下方运行证据仍是当前连接窗口");
     expect(panel.querySelector('[aria-label="观测对象筛选"]')).not.toBeNull();
     expect(panel.querySelector('[aria-label="会话筛选"]')).not.toBeNull();
     expect(panel.querySelector('[aria-label="运行类型筛选"]')).not.toBeNull();
@@ -221,8 +227,13 @@ describe("platform tenant compare filters", () => {
     expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("未知");
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).toContain("尚未确认");
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).not.toContain("无授权");
-    expect(panel.querySelector(".obs-source")?.textContent).toContain("连接工作台数据源");
-    expect(panel.querySelector(".obs-source")?.textContent).toContain("不影响独立精确任务查询");
+    expect(panel.querySelector("select[aria-label=观测数据源]")).not.toBeNull();
+    expect(panel.querySelector(".obs-source")?.textContent).toContain("真实连接");
+    expect(panel.querySelector(".obs-source")?.textContent).toContain("样例验收");
+    expect(panel.querySelector(".obs-source")?.textContent).not.toContain("连接工作台数据源");
+    expect(panel.querySelector(".obs-source")?.textContent).not.toContain("不影响独立精确任务查询");
+    expect(panel.querySelector(".obs-source-label")).toBeNull();
+    expect(panel.querySelector(".obs-source small")).toBeNull();
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).not.toMatch(
       /近 7 天调用[\s\S]*\b0\b/,
     );
