@@ -32,7 +32,7 @@ import { createUsageAccumulator } from "../../execution/outcomes/usage-summary.j
 import { runEmbeddedAttempt } from "../../execution/runner/embedded-attempt.js";
 import { runEmbeddedRunAttemptIteration } from "../../execution/runner/embedded-run-attempt.js";
 import { prepareEmbeddedRunAuth } from "../../execution/runner/embedded-run-auth.js";
-import { prepareEmbeddedModel } from "../prepare-embedded-model.js";
+import { prepareEmbeddedModel } from "../index.js";
 import {
   ContextCapSelectionBlockedError,
   isContextCapSelectionBlockedError,

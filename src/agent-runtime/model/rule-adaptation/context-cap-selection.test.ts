@@ -28,7 +28,7 @@ import {
   type RuntimeRuleAdaptationReadBinding,
 } from "../../contracts/rule-adaptation-activation.js";
 import { recoverContextOverflow } from "../../execution/recovery/context-overflow.js";
-import { prepareEmbeddedModel } from "../prepare-embedded-model.js";
+import { prepareEmbeddedModel } from "../index.js";
 import {
   ContextCapSelectionBlockedError,
   inheritSelectedContextCap,

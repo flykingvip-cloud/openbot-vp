@@ -43,7 +43,7 @@ import {
   resolveDefaultAgentRunRegistryStorePath,
   tryAcquireAgentRunSlot,
 } from "../../../gateway/billing/agent-run-registry.js";
-import type { ModelSessionPorts } from "../authorized-session.js";
+import type { ModelSessionPorts } from "../index.js";
 
 export type ShadowHeldSession = {
   dispose: () => Promise<void> | void;

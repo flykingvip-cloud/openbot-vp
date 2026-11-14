@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { resolveEmbeddedModelGovernance } from "../../../agents/embedded-model-governance.js";
 import { resolveDefaultAgentRunRegistryStorePath } from "../../../gateway/billing/agent-run-registry.js";
 import { fixtureUsage, noChangeOutput } from "../../command/rule-adaptation/test-support.js";
-import { createAuthorizedModelSession, type ModelSessionPorts } from "../authorized-session.js";
+import { createAuthorizedModelSession, type ModelSessionPorts } from "../index.js";
 import { createGovernedShadowModelPort } from "./model-port.js";
 import { createShadowRegistryOccupancy } from "./occupancy.js";
 
