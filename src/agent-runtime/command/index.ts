@@ -54,6 +54,7 @@ export {
   sanitizeEmployeeAdviceClientInput,
   buildEmployeeAdviceView,
   resolveTrustedEffectiveContextTokens,
+  readOfficialEmployeeAdviceTaskBoard,
 } from "./rule-adaptation/employee-advice.js";
 export type {
   EmployeeAdviceView,
