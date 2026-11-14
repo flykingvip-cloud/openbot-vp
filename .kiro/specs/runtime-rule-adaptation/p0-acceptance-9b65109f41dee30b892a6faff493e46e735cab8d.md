@@ -8,41 +8,41 @@
 
 ## 1. 固定验收 SHA / 工作树状态
 
-| 项 | 值 |
-| --- | --- |
-| 盘点 / 行号 / 本文件名基线 SHA（inventory baseline） | `9b65109f41dee30b892a6faff493e46e735cab8d` |
-| 当前工作树 HEAD（登记用，可晚于盘点 SHA） | `4a786626a1e2892043f57b3832ddf2a407be284a` |
-| 分支 | `main` |
-| 远程跟踪 | 再 fetch 后 `origin/main` = `4a786626a1e2892043f57b3832ddf2a407be284a`，且 `9b65109f…` 是其祖先（快进关系成立） |
-| 工作树路径 | `/workspace/openbot-vp-runtime-rule-adaptation` |
-| 克隆来源 | 自 `https://github.com/flykingvip-cloud/openbot-vp` 的 origin/main 新建，未复用其他任务工作树 |
-| 开工时工作树 | 干净，HEAD 当时等于盘点 SHA `9b65109f…` |
-| 快进 | 已快进 `9b65109f…` → `4a786626…`（#277 `feat(gateway): 隔离网关执行协议成果下载与回环身份头收紧`）。未跟踪的 P0 规格在快进中保留 |
-| #277 与政策路径 | **无重叠**。#277 只改 gateway 执行协议/身份头、相关 config/docs 与 `.loom/registry.yaml`，未触及 `src/agent-runtime/policy/**`、`src/agent-runtime/contracts/policy.ts` 及相关规则强制执行。因此盘点行号仍钉在 `9b65109f…`，与当前 HEAD 在政策实现上兼容 |
-| 交付后工作树 | 规格文档（四份 P0 纠正 + 两份 P1 规格，均未跟踪）+ `.loom/registry.yaml` 外科插入 18 行（已修改、未提交）。**未改运行时代码** |
-| 提交 / PR / 部署 | 未获授权，未执行 |
+| 项                                                   | 值                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 盘点 / 行号 / 本文件名基线 SHA（inventory baseline） | `9b65109f41dee30b892a6faff493e46e735cab8d`                                                                                                                                                                                                               |
+| 当前工作树 HEAD（登记用，可晚于盘点 SHA）            | `4a786626a1e2892043f57b3832ddf2a407be284a`                                                                                                                                                                                                               |
+| 分支                                                 | `main`                                                                                                                                                                                                                                                   |
+| 远程跟踪                                             | 再 fetch 后 `origin/main` = `4a786626a1e2892043f57b3832ddf2a407be284a`，且 `9b65109f…` 是其祖先（快进关系成立）                                                                                                                                          |
+| 工作树路径                                           | `/workspace/openbot-vp-runtime-rule-adaptation`                                                                                                                                                                                                          |
+| 克隆来源                                             | 自 `https://github.com/flykingvip-cloud/openbot-vp` 的 origin/main 新建，未复用其他任务工作树                                                                                                                                                            |
+| 开工时工作树                                         | 干净，HEAD 当时等于盘点 SHA `9b65109f…`                                                                                                                                                                                                                  |
+| 快进                                                 | 已快进 `9b65109f…` → `4a786626…`（#277 `feat(gateway): 隔离网关执行协议成果下载与回环身份头收紧`）。未跟踪的 P0 规格在快进中保留                                                                                                                         |
+| #277 与政策路径                                      | **无重叠**。#277 只改 gateway 执行协议/身份头、相关 config/docs 与 `.loom/registry.yaml`，未触及 `src/agent-runtime/policy/**`、`src/agent-runtime/contracts/policy.ts` 及相关规则强制执行。因此盘点行号仍钉在 `9b65109f…`，与当前 HEAD 在政策实现上兼容 |
+| 交付后工作树                                         | 规格文档（四份 P0 纠正 + 两份 P1 规格，均未跟踪）+ `.loom/registry.yaml` 外科插入 18 行（已修改、未提交）。**未改运行时代码**                                                                                                                            |
+| 提交 / PR / 部署                                     | 未获授权，未执行                                                                                                                                                                                                                                         |
 
 `git fetch origin` 已在开工时与快进前、写入前再次执行。盘点 SHA 的 `git log -1`：`fix: local UI seams, peer display, and interaction admission (#276)`。当前 HEAD 的 `git log -1`：`feat(gateway): 隔离网关执行协议成果下载与回环身份头收紧 (#277)`。
 
 ## 2. 盘点规则数量及分类
 
-| 集合 | 数量 |
-| --- | --- |
-| 目录已登记 | 27 |
-| 目录 `retain` | 25 |
-| 目录 `pending_migration` | 2（`task.focus.switch`，`task.reply.completion`） |
-| 现役未登记（临时 `INV-P0-001`…`005`） | 5 |
-| 明确不升格 / 观察保留 | 见 `current-rule-map.md` §3（含 prompt-mode、ClaimContract、`classifyTurnRelation`、cron 同名 helper） |
+| 集合                                  | 数量                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 目录已登记                            | 27                                                                                                     |
+| 目录 `retain`                         | 25                                                                                                     |
+| 目录 `pending_migration`              | 2（`task.focus.switch`，`task.reply.completion`）                                                      |
+| 现役未登记（临时 `INV-P0-001`…`005`） | 5                                                                                                      |
+| 明确不升格 / 观察保留                 | 见 `current-rule-map.md` §3（含 prompt-mode、ClaimContract、`classifyTurnRelation`、cron 同名 helper） |
 
 已登记条目按本盘点**主性质**：
 
-| 主性质 | 数量 |
-| --- | --- |
-| 硬约束 | 13 |
-| 条件强制 | 9 |
-| 有界参数（常与硬下限并存） | 5 |
-| 偏好（作为目录主标签） | 0 |
-| 兼容/待迁（目录 disposition，与上表交叉） | 2 |
+| 主性质                                    | 数量 |
+| ----------------------------------------- | ---- |
+| 硬约束                                    | 13   |
+| 条件强制                                  | 9    |
+| 有界参数（常与硬下限并存）                | 5    |
+| 偏好（作为目录主标签）                    | 0    |
+| 兼容/待迁（目录 disposition，与上表交叉） | 2    |
 
 字段级混合（例如 `collab.policy.compile` 内含不变量与偏好）以规则地图和决策表为准，不重复计数为第二套目录。
 
@@ -73,10 +73,10 @@
 
 详细字段见 `first-scope-decision-table.md` §6。两个候选都是覆盖已有配置字段的 **shadow-proposal 候选**；动态调整授权尚未建立；它们**不是**运行时白名单。独立验收前**不生效**，运行时白名单**未修改**。配置来源 ≠ 调整授权。
 
-| 场景 | 候选 | 建议允许操作 |
-| --- | --- | --- |
-| 个人 | `model.context_window.guard` | 仅对已有 `agents.defaults.contextTokens` 做有界收紧的 shadow 提案。合约：`16000 ≤ proposedValue ≤ currentEffectiveValue`。上限是含已有帽的当前有效窗口，不只是模型窗口。例：有效 32000，提案 64000 必须拒绝。删除帽或恢复更高值属放宽，须单独授权并重核，不是普通收紧。删除参数不是合法回退。有效值未知或低于 hardMin 时，不生成可执行调参提案。 |
-| 协作 | `collab.policy.compile` 的字段 `maxVisibleBotRepliesPerRound` | 仅对该字段做有界收紧的 shadow 提案：`1 ≤ proposedValue ≤ currentEffectiveValue`（且 ≤ 12）。例：当前有效上限 3，提案 5 必须拒绝。不得把整个 compile 包当作可任意调参。非法提案须显式拒绝，不得用编译器钳制冒充原提案通过。不改 lane，不建立第二套参数权威。 |
+| 场景 | 候选                                                          | 建议允许操作                                                                                                                                                                                                                                                                                                                                     |
+| ---- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 个人 | `model.context_window.guard`                                  | 仅对已有 `agents.defaults.contextTokens` 做有界收紧的 shadow 提案。合约：`16000 ≤ proposedValue ≤ currentEffectiveValue`。上限是含已有帽的当前有效窗口，不只是模型窗口。例：有效 32000，提案 64000 必须拒绝。删除帽或恢复更高值属放宽，须单独授权并重核，不是普通收紧。删除参数不是合法回退。有效值未知或低于 hardMin 时，不生成可执行调参提案。 |
+| 协作 | `collab.policy.compile` 的字段 `maxVisibleBotRepliesPerRound` | 仅对该字段做有界收紧的 shadow 提案：`1 ≤ proposedValue ≤ currentEffectiveValue`（且 ≤ 12）。例：当前有效上限 3，提案 5 必须拒绝。不得把整个 compile 包当作可任意调参。非法提案须显式拒绝，不得用编译器钳制冒充原提案通过。不改 lane，不建立第二套参数权威。                                                                                      |
 
 未入选（避免发明可调权限或触碰强制边界）：`requirePeerReview`、自进与决策模式放宽、外发授权、租户隔离、取消围栏、`replyLanguage`（lane 默认 legacy，执行证据不足）、`maxBeatsPerEpisode` 上调、无运行时授权主体的源码常量限额、`prompt-mode`。自进/决策/密级默认属「语义及授权边界待核准」，不得自动写成硬约束违反，但首期仍不开放。
 

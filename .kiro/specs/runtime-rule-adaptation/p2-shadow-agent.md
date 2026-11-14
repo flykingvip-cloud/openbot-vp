@@ -11,13 +11,13 @@
 
 不能为了复用已登记路径而把模型编排放进 policy。职责如下：
 
-| 内容 | 归属 |
-| --- | --- |
-| P1 纯校验器、字段适配描述 | `src/agent-runtime/policy/rule-adaptation/`（已冻结，r2 未改源码） |
-| Agent 用例、影子调用流程、工具分派、候选受控入口设计存根 | `src/agent-runtime/command/rule-adaptation/` |
-| 模型治理适配、预算/限额执行、把剩余额度与超时信号传给实际 completion | `src/agent-runtime/model/rule-adaptation/` |
-| 系统提示词、规则资料装配/过滤 | `src/agent-runtime/context/rule-adaptation/` |
-| 跨层 I/O、预算类型、结果类型 | `src/agent-runtime/contracts/rule-adaptation-shadow.ts`（不改冻结的 P1 `contracts/rule-adaptation.ts`） |
+| 内容                                                                 | 归属                                                                                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| P1 纯校验器、字段适配描述                                            | `src/agent-runtime/policy/rule-adaptation/`（已冻结，r2 未改源码）                                      |
+| Agent 用例、影子调用流程、工具分派、候选受控入口设计存根             | `src/agent-runtime/command/rule-adaptation/`                                                            |
+| 模型治理适配、预算/限额执行、把剩余额度与超时信号传给实际 completion | `src/agent-runtime/model/rule-adaptation/`                                                              |
+| 系统提示词、规则资料装配/过滤                                        | `src/agent-runtime/context/rule-adaptation/`                                                            |
+| 跨层 I/O、预算类型、结果类型                                         | `src/agent-runtime/contracts/rule-adaptation-shadow.ts`（不改冻结的 P1 `contracts/rule-adaptation.ts`） |
 
 `policy/rule-adaptation/shadow/` 已删除，policy 中不再保留编排门面。复用当前实现归位，不复制第二套平行实现。
 
@@ -76,22 +76,22 @@ runShadowRuleAdaptation(request, { host, model, validate?, candidateEntry? })
 
 ## 结果映射（影子 outcome ← 校验器）
 
-| 影子 `outcomeCode` | 主要来源 |
-| --- | --- |
-| `no_change_needed` | 结构化 intent 或校验器 `no_change` |
-| `insufficient_sources` | intent，或校验器 `needs_information` + `missing_host_fact` |
-| `tool_unavailable` | 只读工具不可用后的结构化 intent |
-| `insufficient_permission` | 读权限拒绝，或校验器 `unauthorized_action` |
-| `hard_rule_conflict` | `below_hard_min` / `above_hard_ceiling` / `above_current_effective` / `hard_boundary_conflict` / `delete_or_relax_as_tighten` |
-| `budget_exhausted` | 预先强制门闩或事后核算超额 |
-| `malicious_material_rejected` | 禁止字段或协议覆盖企图；校验器 `structural_forbidden_field` |
-| `fabricated_rule_id` | 校验器 `unknown_rule_id` |
-| `unknown_parameter` | 校验器 `non_candidate_field` / `structural_unknown_field` |
-| `candidate_validated_not_recorded` | 校验器 `candidate_validated`（不等于已登记） |
-| `cancelled` | 取消信号、超时或模型端口取消 |
-| `protocol_failure` | 散文、坏 JSON、端口协议失败 |
-| `shadow_recorded` | 校验器 `shadow_accepted`（仍不生效） |
-| `validator_blocked` / `needs_information` | 其他校验器拒绝或待补事实 |
+| 影子 `outcomeCode`                        | 主要来源                                                                                                                      |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `no_change_needed`                        | 结构化 intent 或校验器 `no_change`                                                                                            |
+| `insufficient_sources`                    | intent，或校验器 `needs_information` + `missing_host_fact`                                                                    |
+| `tool_unavailable`                        | 只读工具不可用后的结构化 intent                                                                                               |
+| `insufficient_permission`                 | 读权限拒绝，或校验器 `unauthorized_action`                                                                                    |
+| `hard_rule_conflict`                      | `below_hard_min` / `above_hard_ceiling` / `above_current_effective` / `hard_boundary_conflict` / `delete_or_relax_as_tighten` |
+| `budget_exhausted`                        | 预先强制门闩或事后核算超额                                                                                                    |
+| `malicious_material_rejected`             | 禁止字段或协议覆盖企图；校验器 `structural_forbidden_field`                                                                   |
+| `fabricated_rule_id`                      | 校验器 `unknown_rule_id`                                                                                                      |
+| `unknown_parameter`                       | 校验器 `non_candidate_field` / `structural_unknown_field`                                                                     |
+| `candidate_validated_not_recorded`        | 校验器 `candidate_validated`（不等于已登记）                                                                                  |
+| `cancelled`                               | 取消信号、超时或模型端口取消                                                                                                  |
+| `protocol_failure`                        | 散文、坏 JSON、端口协议失败                                                                                                   |
+| `shadow_recorded`                         | 校验器 `shadow_accepted`（仍不生效）                                                                                          |
+| `validator_blocked` / `needs_information` | 其他校验器拒绝或待补事实                                                                                                      |
 
 决策以稳定 `code` / `path` 为准，不以 `message` 文案作为业务判定依据。
 
