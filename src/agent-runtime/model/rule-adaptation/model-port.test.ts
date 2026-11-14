@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { resolveEmbeddedModelGovernance } from "../../../agents/embedded-model-governance.js";
 import { fixtureUsage, noChangeOutput } from "../../command/rule-adaptation/test-support.js";
-import { createAuthorizedModelSession, type ModelSessionPorts } from "../authorized-session.js";
+import { createAuthorizedModelSession, type ModelSessionPorts } from "../index.js";
 import {
   createGovernedShadowModelPort,
   resolveShadowRuleAdaptationGovernance,

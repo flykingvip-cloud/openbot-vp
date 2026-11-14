@@ -4,9 +4,11 @@
  * and does not change compile or enforcement behavior.
  */
 import type { RuntimeRuleDeclaration } from "../../contracts/policy.js";
-import { getRuntimeRuleDeclaration } from "../catalog.js";
-import { SYSTEM_INVARIANTS } from "../collaboration-rules.js";
-import { CONTEXT_WINDOW_HARD_MIN_TOKENS } from "../context-window.js";
+import {
+  CONTEXT_WINDOW_HARD_MIN_TOKENS,
+  getRuntimeRuleDeclaration,
+  SYSTEM_INVARIANTS,
+} from "../index.js";
 
 export type P1ShadowFieldAdapter = {
   ruleId: string;
