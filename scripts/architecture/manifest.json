@@ -326,9 +326,10 @@
       "src/agent-runtime/model/prepare-embedded-model.test.ts",
       "src/agent-runtime/model/prepare-embedded-model.ts",
       "src/agent-runtime/model/xai-arguments-stream.ts",
-      "src/executor-evidence/acceptance-fix-r8-cli.isolation.test.ts"
+      "src/executor-evidence/acceptance-fix-r8-cli.isolation.test.ts",
+      "src/agent-runtime/context/interaction-history.test.ts"
     ],
-    "description": "Production code consumes model infrastructure through the public model/index facade. Model internals may cross-import; listed model sources/tests and the R8 CLI isolation test (which must bind command-commercial-gate directly) are exempt."
+    "description": "Production code consumes model infrastructure through the public model/index facade. Model internals may cross-import; listed model sources/tests and the R8 CLI isolation test (which must bind command-commercial-gate directly) are exempt. The interaction-history unit test must call buildInteractionCompletionContext directly to assert assembled message order, so that test file is also exempt."
   },
   {
     "name": "runtime-command-public-entry",
