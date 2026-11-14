@@ -1,8 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { INVENTORY_PIN } from "../../agent-runtime/contracts/rule-adaptation-shadow.js";
 import {
   createEmployeeAdvicePolicyFactSource,
+  createOfficialEmployeeAdvicePolicyFactSource,
   resolveEmployeeAdviceProductionFacts,
+  resolveEmployeeAdviceSessionFile,
 } from "./runtime-rule-adaptation-advice-facts.ts";
 import {
   createEmployeeAdviceAbortRegistry,
@@ -391,23 +396,26 @@ describe("production fact resolver on the gateway handler", () => {
     expect(advice.modelCalled).toBe(true);
   });
 
-  it("returns 需补信息 and does not call the model when the readable fact source has no record", async () => {
+  it("returns 需补信息 and does not call the model when the effective window is missing", async () => {
     const runShadow = vi.fn();
     const advice = await handleRuntimeRuleAdaptationAdvice(
       { question: "上下文窗口太大", targetRef: { agentId: "personal-bot" } },
       client(),
       {
-        loadConfig: () => configWithKnownAgent(),
+        loadConfig: () =>
+          ({
+            agents: { defaults: { contextTokens: 32000 }, list: [{ id: "personal-bot" }] },
+          }) as never,
         resolveTrustedContext: async () => seatedContext,
         resolveOfficialModel: () => official,
         checkAgentAccess: viewOnlyAccess(),
-        policyFactSource: createEmployeeAdvicePolicyFactSource([]),
         runShadow,
       },
     );
     expect(runShadow).not.toHaveBeenCalled();
     expect(advice.state).toBe("needs_information");
     expect(advice.modelCalled).toBe(false);
+    expect(advice.summary).toMatch(/模型窗口/);
     expect(JSON.stringify(advice)).not.toContain("approved_compatible");
   });
 
@@ -607,5 +615,225 @@ describe("createEmployeeAdviceAbortRegistry", () => {
       registry.register({ tenantId: "  ", employeeId: "e", requestId: "r1" }, controller),
     ).toEqual({ accepted: false, reason: "missing_identity" });
     expect(registry.cancel({ tenantId: "", employeeId: "e", requestId: "r1" })).toBe(false);
+  });
+});
+
+describe("default handler with official board facts and HTTP boundary only", () => {
+  const tmpDirs: string[] = [];
+  const previousStateDir = process.env.OPENBOT_STATE_DIR;
+  const previousOperatorId = process.env.OPENBOT_OPERATOR_ID;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    if (previousStateDir === undefined) {
+      delete process.env.OPENBOT_STATE_DIR;
+    } else {
+      process.env.OPENBOT_STATE_DIR = previousStateDir;
+    }
+    if (previousOperatorId === undefined) {
+      delete process.env.OPENBOT_OPERATOR_ID;
+    } else {
+      process.env.OPENBOT_OPERATOR_ID = previousOperatorId;
+    }
+    for (const dir of tmpDirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  function isolateStateDir(): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "t66-advice-state-"));
+    tmpDirs.push(dir);
+    process.env.OPENBOT_STATE_DIR = dir;
+    delete process.env.OPENBOT_OPERATOR_ID;
+    return dir;
+  }
+
+  function taskBoardPath(sessionFile: string): string {
+    return `${sessionFile}.task-board.json`;
+  }
+
+  function writeTaskBoard(sessionFile: string, board: unknown): void {
+    fs.writeFileSync(taskBoardPath(sessionFile), `${JSON.stringify(board, null, 2)}\n`, "utf8");
+  }
+
+  function officialProposalOutput(): string {
+    return JSON.stringify({
+      protocolVersion: "runtime-rule-adaptation-shadow/v1",
+      intent: "policy_proposal",
+      proposal: {
+        kind: "policy_proposal",
+        scope: { type: "personal", id: "personal-bot" },
+        implementationVersion: "9b65109f41dee30b892a6faff493e46e735cab8d",
+        expectedPolicyVersion: {
+          policyHash: "board-policy-hash-aaaa",
+          protocolVersion: "1.1",
+          compilerRevision: "1.2.0",
+        },
+        items: [
+          {
+            ruleId: "model.context_window.guard",
+            field: "agents.defaults.contextTokens",
+            action: "tune",
+            proposedValue: 24000,
+          },
+        ],
+      },
+    });
+  }
+
+  function stubOfficialHttp(): ReturnType<typeof vi.fn> {
+    const fetchMock = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: officialProposalOutput() } }],
+          usage: { prompt_tokens: 10, completion_tokens: 20 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  const BOARD_POLICY_VERSION = {
+    policyHash: "board-policy-hash-aaaa",
+    protocolVersion: "1.1",
+    compilerRevision: "1.2.0",
+  };
+
+  it("returns a consultative suggestion when official board records are readable, without inventing approval", async () => {
+    isolateStateDir();
+    const sessionKey = "agent:personal-bot:chat";
+    const sessionFile = resolveEmployeeAdviceSessionFile({
+      agentId: "personal-bot",
+      sessionKey,
+    });
+    expect(sessionFile).toBeTruthy();
+    fs.mkdirSync(path.dirname(sessionFile!), { recursive: true });
+    fs.writeFileSync(sessionFile!, "", "utf8");
+    const boardBefore = {
+      current: {
+        taskId: "task:existing-1",
+        title: "Existing work",
+        goalText: "Already admitted",
+        unfinished: true,
+        stop: { summary: "stop", workspacePaths: [] },
+        createdAtMs: 1,
+      },
+      parked: [],
+      focusRevision: 1,
+      writeEpoch: 3,
+      scope: { tenantId: "tenant-1", userId: "employee-server", sessionId: "chat" },
+      runtimeRuleAdaptationByTaskId: {
+        "task:existing-1": {
+          current: {
+            status: "effective",
+            operation: "activate",
+            taskId: "task:existing-1",
+            policyHash: BOARD_POLICY_VERSION.policyHash,
+            protocolVersion: BOARD_POLICY_VERSION.protocolVersion,
+            compilerRevision: BOARD_POLICY_VERSION.compilerRevision,
+            implementationVersion: "9b65109f41dee30b892a6faff493e46e735cab8d",
+          },
+          history: [],
+        },
+      },
+    };
+    writeTaskBoard(sessionFile!, boardBefore);
+    const boardBytes = fs.readFileSync(taskBoardPath(sessionFile!), "utf8");
+    const fetchMock = stubOfficialHttp();
+
+    const officialFacts = createOfficialEmployeeAdvicePolicyFactSource();
+    const copied = await officialFacts.read({
+      tenantId: "tenant-1",
+      employeeId: "employee-server",
+      agentId: "personal-bot",
+      sessionKey,
+    });
+    expect(copied?.expectedPolicyVersion).toEqual(BOARD_POLICY_VERSION);
+    expect(copied?.compatibilityRecord).toBeUndefined();
+    expect(copied?.expectedPolicyState).toBeUndefined();
+
+    const advice = await handleRuntimeRuleAdaptationAdvice(
+      { question: "上下文窗口太大，请在硬下限之上收紧", targetRef: { sessionKey } },
+      client(),
+      {
+        loadConfig: () => configWithKnownAgent(),
+        resolveTrustedContext: async () => seatedContext,
+        resolveOfficialModel: () => official,
+        checkAgentAccess: viewOnlyAccess(),
+        env: { DEEPSEEK_API_KEY: "host-key", DEEPSEEK_BASE_URL: "https://api.deepseek.com" },
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalled();
+    const [, request] = fetchMock.mock.calls[0] as unknown as [string, { body?: string }];
+    expect(String(request.body)).toContain("board-policy-hash-aaaa");
+    expect(String(request.body)).not.toContain("approved_compatible");
+    expect(advice.modelCalled).toBe(true);
+    expect(advice.activationAllowed).toBe(false);
+    expect(advice.notEffective).toBe(true);
+    expect(advice.proposalFullyValidated).toBe(false);
+    expect(advice.taskApplicability).toBe("unbound");
+    expect(advice.state).toBe("adjustment_suggested");
+    expect(advice.summary).toContain("不承诺任务适用性的规则解释");
+    expect(advice.summary).toContain("尚未完整校验");
+    expect(JSON.stringify(advice)).not.toContain("approved_compatible");
+    expect(fs.readFileSync(taskBoardPath(sessionFile!), "utf8")).toBe(boardBytes);
+  });
+
+  it("does not create a task for an unbound consultation when no board record exists", async () => {
+    isolateStateDir();
+    const sessionKey = "agent:personal-bot:chat";
+    const sessionFile = resolveEmployeeAdviceSessionFile({
+      agentId: "personal-bot",
+      sessionKey,
+    });
+    expect(sessionFile).toBeTruthy();
+    const fetchMock = stubOfficialHttp();
+    const advice = await handleRuntimeRuleAdaptationAdvice(
+      {
+        question: "上下文窗口太大，请在硬下限之上收紧",
+        targetRef: { sessionKey, agentId: "personal-bot" },
+      },
+      client(),
+      {
+        loadConfig: () => configWithKnownAgent(),
+        resolveTrustedContext: async () => seatedContext,
+        resolveOfficialModel: () => official,
+        checkAgentAccess: viewOnlyAccess(),
+        env: { DEEPSEEK_API_KEY: "host-key", DEEPSEEK_BASE_URL: "https://api.deepseek.com" },
+      },
+    );
+    expect(fetchMock).toHaveBeenCalled();
+    expect(advice.modelCalled).toBe(true);
+    expect(advice.taskApplicability).toBe("unbound");
+    expect(advice.proposalFullyValidated).toBe(false);
+    expect(advice.state).toBe("adjustment_suggested");
+    expect(advice.activationAllowed).toBe(false);
+    expect(sessionFile && fs.existsSync(taskBoardPath(sessionFile))).toBe(false);
+  });
+
+  it("returns 需补信息 and does not call the model when required window facts are missing", async () => {
+    isolateStateDir();
+    const fetchMock = stubOfficialHttp();
+    const advice = await handleRuntimeRuleAdaptationAdvice(
+      { question: "上下文窗口太大", targetRef: { agentId: "personal-bot" } },
+      client(),
+      {
+        loadConfig: () =>
+          ({
+            agents: { defaults: { contextTokens: 32000 }, list: [{ id: "personal-bot" }] },
+          }) as never,
+        resolveTrustedContext: async () => seatedContext,
+        resolveOfficialModel: () => official,
+        checkAgentAccess: viewOnlyAccess(),
+        env: { DEEPSEEK_API_KEY: "host-key", DEEPSEEK_BASE_URL: "https://api.deepseek.com" },
+      },
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(advice.state).toBe("needs_information");
+    expect(advice.modelCalled).toBe(false);
+    expect(advice.summary).toMatch(/模型窗口/);
   });
 });

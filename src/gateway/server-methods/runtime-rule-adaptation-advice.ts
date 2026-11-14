@@ -27,6 +27,7 @@ import { loadConfig, type OpenBotConfig } from "../../config/config.js";
 import { resolveTrustedEnterpriseDataExecutionContext } from "../enterprise-data/enterprise-data-seat-context.js";
 import { respondUnavailable } from "./billing-helpers.js";
 import {
+  createOfficialEmployeeAdvicePolicyFactSource,
   officialEmployeeAdviceAgentAccessCheck,
   resolveEmployeeAdviceApprovedTarget,
   resolveEmployeeAdviceProductionFacts,
@@ -301,7 +302,7 @@ export async function handleRuntimeRuleAdaptationAdvice(
           config: cfg,
           client,
           officialModel: official,
-          policyFactSource: deps.policyFactSource,
+          policyFactSource: deps.policyFactSource ?? createOfficialEmployeeAdvicePolicyFactSource(),
           checkAgentAccess: deps.checkAgentAccess ?? officialEmployeeAdviceAgentAccessCheck,
         })
       : {};

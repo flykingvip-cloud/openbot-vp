@@ -1,4 +1,26 @@
-import { resolveTrustedEffectiveContextTokens } from "../../agent-runtime/command/index.js";
+/**
+ * Production fact resolution for employee rule-adaptation advice.
+ *
+ * Reuses existing target access checks and model-window resolution. The
+ * official policy fact source reads SessionTaskBoard through
+ * readOfficialEmployeeAdviceTaskBoard and copies only fields that already exist
+ * on an activated snapshot (policyHash / protocolVersion / compilerRevision).
+ * This module never invents approved_compatible, active, or any other
+ * constant approval, and it does not create a task to obtain those facts.
+ * Seat membership is not target-rule authorization. View-and-request-advice
+ * access is sufficient; activation or rule-modification rights are not
+ * required and are not granted here.
+ *
+ * HostCompatibilityRecord and HostExpectedPolicyState are not persisted on
+ * ActivatedRuntimeRulePolicySnapshot or elsewhere in this repository; they
+ * exist only as ephemeral activation-binding fields. When those records are
+ * absent, facts stay unset and the advice path must not pretend they were
+ * approved.
+ */
+import {
+  readOfficialEmployeeAdviceTaskBoard,
+  resolveTrustedEffectiveContextTokens,
+} from "../../agent-runtime/command/index.js";
 import type {
   TrustedEmployeeAdviceFacts,
   TrustedEmployeeAdviceHost,
@@ -11,18 +33,9 @@ import {
   CONTEXT_WINDOW_HARD_MIN_TOKENS,
   resolveContextWindowInfo,
 } from "../../agent-runtime/policy/index.js";
-/**
- * Production fact resolution for employee rule-adaptation advice.
- *
- * Reuses existing target access checks and model-window resolution. Policy
- * compatibility and expected policy state are read from a trusted fact source
- * when present; this module never invents approved_compatible, active, or any
- * other constant approval. Seat membership is not target-rule authorization.
- * View-and-request-advice access is sufficient; activation or rule-modification
- * rights are not required and are not granted here.
- */
 import { listAgentIds } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
+import { resolveSessionFilePath } from "../../config/sessions/paths.js";
 import {
   isValidAgentId,
   normalizeAgentId,
@@ -97,6 +110,15 @@ export type EmployeeAdviceProductionFacts = TrustedEmployeeAdviceFacts;
 
 const UNIT = "\u001f";
 
+type EmployeeAdviceTaskBoard = {
+  current?: { taskId?: string; [key: string]: unknown };
+  scope?: { tenantId?: string; userId?: string; [key: string]: unknown };
+  runtimeRuleAdaptationByTaskId?: {
+    [taskId: string]: { current?: unknown; history?: unknown[] };
+  };
+  [key: string]: unknown;
+};
+
 function nonEmpty(value: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -156,11 +178,172 @@ export function employeeAdvicePolicyFactKey(input: {
     : `${input.tenantId}${UNIT}${input.agentId}`;
 }
 
-/** Empty production default: missing facts stay missing. Never invents records. */
+/**
+ * Explicit empty source for tests that need a missing-record fixture.
+ * Not the production default. Official handlers must assemble
+ * createOfficialEmployeeAdvicePolicyFactSource().
+ */
 export function createEmptyEmployeeAdvicePolicyFactSource(): EmployeeAdvicePolicyFactSource {
   return {
     read() {
       return undefined;
+    },
+  };
+}
+
+/**
+ * Locate the session transcript whose companion task board is the
+ * authoritative record for this advice request. Read-only: does not create
+ * a session or a task. Returns undefined when the request has no session key
+ * that can be parsed to a session id.
+ */
+export function resolveEmployeeAdviceSessionFile(input: {
+  agentId: string;
+  sessionKey?: string;
+  sessionsDir?: string;
+}): string | undefined {
+  const sessionKey = nonEmpty(input.sessionKey);
+  if (!sessionKey) {
+    return undefined;
+  }
+  const parsed = parseAgentSessionKey(sessionKey);
+  const sessionId = nonEmpty(parsed?.rest);
+  if (!sessionId) {
+    return undefined;
+  }
+  const agentId = explicitAgentId(input.agentId) ?? explicitAgentId(parsed?.agentId);
+  if (!agentId) {
+    return undefined;
+  }
+  try {
+    return resolveSessionFilePath(sessionId, undefined, {
+      agentId,
+      ...(input.sessionsDir ? { sessionsDir: input.sessionsDir } : {}),
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function copyExpectedPolicyVersion(value: unknown): EmployeeAdvicePolicyVersion | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  const policyHash = nonEmpty(record.policyHash);
+  const protocolVersion = nonEmpty(record.protocolVersion);
+  const compilerRevision = nonEmpty(record.compilerRevision);
+  if (!policyHash || !protocolVersion || !compilerRevision) {
+    return undefined;
+  }
+  return { policyHash, protocolVersion, compilerRevision };
+}
+
+function boardScopeAllowsRead(
+  board: EmployeeAdviceTaskBoard,
+  tenantId: string,
+  employeeId: string,
+): boolean {
+  const scope = board.scope;
+  if (!scope) {
+    return true;
+  }
+  const scopeTenant = nonEmpty(scope.tenantId);
+  const scopeUser = nonEmpty(scope.userId);
+  if (scopeTenant && scopeTenant !== tenantId) {
+    return false;
+  }
+  if (scopeUser && scopeUser !== employeeId) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Copy policy facts that already exist on the official SessionTaskBoard.
+ * Only snapshot policy version fields are copied. Compatibility records and
+ * expectedPolicyState are not stored on the snapshot and are never invented
+ * as approved_compatible or active. Does not create or bind a new task.
+ */
+export function copyEmployeeAdvicePolicyFactsFromBoard(
+  board: EmployeeAdviceTaskBoard,
+  input: { tenantId: string; employeeId: string },
+): EmployeeAdvicePolicyFacts | undefined {
+  if (!boardScopeAllowsRead(board, input.tenantId, input.employeeId)) {
+    return undefined;
+  }
+  const taskId = nonEmpty(board.current?.taskId);
+  if (!taskId) {
+    return undefined;
+  }
+  const snapshot = board.runtimeRuleAdaptationByTaskId?.[taskId]?.current;
+  const expectedPolicyVersion = copyExpectedPolicyVersion(snapshot);
+  if (!expectedPolicyVersion) {
+    return undefined;
+  }
+  return { expectedPolicyVersion };
+}
+
+/**
+ * Official read of the existing SessionTaskBoard. Missing or unreadable
+ * boards yield undefined; this function does not create files or tasks.
+ */
+export function readEmployeeAdviceAuthoritativeBoard(input: {
+  tenantId: string;
+  employeeId: string;
+  agentId: string;
+  sessionKey?: string;
+  sessionsDir?: string;
+}): EmployeeAdviceTaskBoard | undefined {
+  const sessionFile = resolveEmployeeAdviceSessionFile({
+    agentId: input.agentId,
+    ...(input.sessionKey ? { sessionKey: input.sessionKey } : {}),
+    ...(input.sessionsDir ? { sessionsDir: input.sessionsDir } : {}),
+  });
+  if (!sessionFile) {
+    return undefined;
+  }
+  try {
+    return readOfficialEmployeeAdviceTaskBoard(sessionFile);
+  } catch {
+    return undefined;
+  }
+}
+
+export type OfficialEmployeeAdvicePolicyFactSourceOptions = {
+  sessionsDir?: string;
+  readBoard?: typeof readEmployeeAdviceAuthoritativeBoard;
+};
+
+/**
+ * Production policy fact source. Assembled by the official handler.
+ * Reads existing SessionTaskBoard records through the official board IO
+ * and copies only fields that are already stored. Never fills compatibility
+ * or policy-state constants, and never creates a task to obtain them.
+ */
+export function createOfficialEmployeeAdvicePolicyFactSource(
+  options: OfficialEmployeeAdvicePolicyFactSourceOptions = {},
+): EmployeeAdvicePolicyFactSource {
+  const readBoard = options.readBoard ?? readEmployeeAdviceAuthoritativeBoard;
+  return {
+    read(input) {
+      const tenantId = nonEmpty(input.tenantId);
+      const employeeId = nonEmpty(input.employeeId);
+      const agentId = explicitAgentId(input.agentId);
+      if (!tenantId || !employeeId || !agentId) {
+        return undefined;
+      }
+      const board = readBoard({
+        tenantId,
+        employeeId,
+        agentId,
+        ...(input.sessionKey ? { sessionKey: input.sessionKey } : {}),
+        ...(options.sessionsDir ? { sessionsDir: options.sessionsDir } : {}),
+      });
+      if (!board) {
+        return undefined;
+      }
+      return copyEmployeeAdvicePolicyFactsFromBoard(board, { tenantId, employeeId });
     },
   };
 }
@@ -404,8 +587,9 @@ function resolveEffectiveContextFacts(
 
 /**
  * Production resolver used by the gateway handler. Reads target access,
- * the actual model window, and policy facts from existing chains / a
- * readable source. Never fills compatibility or policy-state constants.
+ * the actual model window, and policy facts from the official authoritative
+ * board source unless a caller injects a source. Never fills compatibility
+ * or policy-state constants, and never defaults to the empty test source.
  */
 export async function resolveEmployeeAdviceProductionFacts(
   input: ResolveEmployeeAdviceProductionFactsInput,
@@ -430,7 +614,7 @@ export async function resolveEmployeeAdviceProductionFacts(
 
   const tenantId = nonEmpty(input.identity.tenantId);
   const employeeId = nonEmpty(input.identity.employeeId);
-  const source = input.policyFactSource ?? createEmptyEmployeeAdvicePolicyFactSource();
+  const source = input.policyFactSource ?? createOfficialEmployeeAdvicePolicyFactSource();
   if (
     target.targetAuthorization === "approved" &&
     target.approvedTarget &&

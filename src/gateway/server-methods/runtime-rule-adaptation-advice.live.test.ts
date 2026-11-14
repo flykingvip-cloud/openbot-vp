@@ -1,26 +1,20 @@
 /**
- * Live verification that official DeepSeek is reached through the production
- * fact resolver (readable fixture facts + view access), not by stuffing
- * approved/compatibility/policy state onto the host and skipping the resolver.
- * Test-only. Does not read production machine config or log credentials.
+ * Live verification that official DeepSeek is reached through the default
+ * handler assembly and the official authoritative board source, replacing
+ * only the real HTTP call (no policyFactSource / compatibility / policy-state
+ * injection). An unbound consultation must not invent approved_compatible or
+ * active, and must not claim full P1 validation. Test-only. Does not read
+ * production machine config or log credentials.
  */
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 import { PRODUCTION_RUNTIME_RULE_WHITELIST } from "../../agent-runtime/contracts/rule-adaptation-activation.js";
-import { INVENTORY_PIN } from "../../agent-runtime/contracts/rule-adaptation-shadow.js";
 import { resolveOfficialDeepSeekCredential } from "../../agent-runtime/model/rule-adaptation/index.js";
-import { createEmployeeAdvicePolicyFactSource } from "./runtime-rule-adaptation-advice-facts.ts";
 import { handleRuntimeRuleAdaptationAdvice } from "./runtime-rule-adaptation-advice.ts";
 import type { GatewayRequestHandlerOptions } from "./types.ts";
 
-const EVIDENCE_DIR = "/workspace/t65-employee-advice-fact-resolution/logs";
-
-const POLICY_VERSION = {
-  policyHash: "fixture-policy-hash-aaaa",
-  protocolVersion: "1.1",
-  compilerRevision: "1.2.0",
-};
+const EVIDENCE_DIR = "/workspace/t66-employee-advice-policy-facts/logs";
 
 const seatedContext = {
   tenantId: "tenant-1",
@@ -69,7 +63,7 @@ it("records that the production-resolver live path uses DEEPSEEK_API_KEY and the
 });
 
 liveIt(
-  "reaches official DeepSeek after the production resolver reads fixture facts and view access",
+  "reaches official DeepSeek through the default handler without injecting policy facts",
   async () => {
     if (!liveCred) {
       throw new Error("live credential unexpectedly missing");
@@ -77,7 +71,7 @@ liveIt(
     const advice = await handleRuntimeRuleAdaptationAdvice(
       {
         question:
-          "This personal agent spends too much on long prompts. Tighten agents.defaults.contextTokens from the current 32000 down to 24000, staying at or above the 16000 hard minimum. Do not widen, do not publish a new rule, and do not activate policy. The final JSON proposal must use kind policy_proposal with an items array, bind implementationVersion and expectedPolicyVersion from knownFacts, and must not include currentEffectiveValue or other host/authorization fields.",
+          "This personal agent spends too much on long prompts. Tighten agents.defaults.contextTokens from the current 32000 down to 24000, staying at or above the 16000 hard minimum. Do not widen, do not publish a new rule, and do not activate policy. The final JSON proposal must use kind policy_proposal with an items array, bind implementationVersion from knownFacts, and must not include currentEffectiveValue or other host/authorization fields. This is an unbound consultation and must not claim a task was fully validated.",
         targetRef: { sessionKey: "agent:personal-bot:chat", agentId: "personal-bot" },
         identity: { principalId: "user:forged" },
         apiKey: "sk-forged",
@@ -107,49 +101,20 @@ liveIt(
           userId: "employee-server",
           activationAuthorized: false,
         }),
-        policyFactSource: createEmployeeAdvicePolicyFactSource([
-          {
-            tenantId: "tenant-1",
-            agentId: "personal-bot",
-            sessionKey: "agent:personal-bot:chat",
-            facts: {
-              compatibilityRecord: {
-                status: "approved_compatible",
-                boundImplementationVersion: INVENTORY_PIN,
-                boundExpectedPolicyVersion: POLICY_VERSION,
-              },
-              expectedPolicyState: "active",
-              expectedPolicyVersion: POLICY_VERSION,
-              hardMinContextTokens: 16000,
-              activationAuthorized: false,
-              requiredProposalShape: {
-                kind: "policy_proposal",
-                scope: { type: "personal", id: "personal-bot" },
-                implementationVersion: INVENTORY_PIN,
-                expectedPolicyVersion: POLICY_VERSION,
-                items: [
-                  {
-                    ruleId: "model.context_window.guard",
-                    field: "agents.defaults.contextTokens",
-                    action: "tune",
-                    proposedValue: 24000,
-                  },
-                ],
-              },
-            },
-          },
-        ]),
       },
     );
 
-    const evidence = await writeEvidence("15-production-resolver-deepseek-live-summary.json", {
-      path: "production-resolver",
-      skippedResolver: false,
+    const evidence = await writeEvidence("16-default-handler-deepseek-live-summary.json", {
+      path: "default-handler-official-source",
+      injectedPolicyFactSource: false,
+      inventedApprovalConstants: false,
       state: advice.state,
       label: advice.label,
       notEffective: advice.notEffective,
       notEffectiveLabel: advice.notEffectiveLabel,
       activationAllowed: advice.activationAllowed,
+      proposalFullyValidated: advice.proposalFullyValidated ?? null,
+      taskApplicability: advice.taskApplicability ?? null,
       outcomeCode: advice.outcomeCode,
       summary: advice.summary,
       reasons: advice.reasons,
@@ -167,23 +132,12 @@ liveIt(
     expect(advice.notEffective).toBe(true);
     expect(advice.activationAllowed).toBe(false);
     expect(advice.notEffectiveLabel).toBe("尚未生效");
+    expect(advice.proposalFullyValidated).toBe(false);
+    expect(advice.taskApplicability).toBe("unbound");
     expect(PRODUCTION_RUNTIME_RULE_WHITELIST).toEqual([]);
     expect(evidence.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(advice.modelCalled).toBe(true);
-    expect(advice.state).toBe("adjustment_suggested");
-    expect(advice.label).toBe("建议调整");
-    expect(advice.outcomeCode).toBe("shadow_recorded");
-    expect(advice.proposal).toMatchObject({
-      kind: "policy_proposal",
-      items: [
-        {
-          ruleId: "model.context_window.guard",
-          field: "agents.defaults.contextTokens",
-          action: "tune",
-          proposedValue: 24000,
-        },
-      ],
-    });
+    expect(JSON.stringify(advice)).not.toContain("approved_compatible");
   },
   90_000,
 );
