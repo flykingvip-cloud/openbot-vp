@@ -237,8 +237,8 @@ export function createGovernedShadowModelPort(
                     void reason;
                     retained = usage;
                     const outcome = await session.recordUsage({
-                      provider: deps.provider ?? "shadow-fixture",
-                      model: deps.model ?? "shadow-fixture",
+                      provider: selectedProvider,
+                      model: selectedModel,
                       usage,
                       durationMs,
                       toolCallCount: 0,

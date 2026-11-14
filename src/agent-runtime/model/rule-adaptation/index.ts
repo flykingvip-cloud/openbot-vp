@@ -51,3 +51,13 @@ export {
   type ComplexRuleDecisionMode,
   type ComplexRuleDecisionProvider,
 } from "./complex-rule-decision.js";
+
+export {
+  OFFICIAL_DEEPSEEK_BASE_URL,
+  OFFICIAL_DEEPSEEK_MODEL,
+  OFFICIAL_DEEPSEEK_PROVIDER,
+  isOfficialDeepSeekApiBaseUrl,
+  resolveOfficialDeepSeekCredential,
+  createOfficialDeepSeekShadowCompletion,
+  type OfficialDeepSeekCredential,
+} from "./official-deepseek-complete.js";
