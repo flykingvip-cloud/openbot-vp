@@ -1,14 +1,19 @@
 import { resolveRunModelFallbacksOverride } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { ExecutionIdentityRunFields } from "../../gateway/execution-identity-context.js";
-import { runGovernedInteraction, runGovernedUnderstanding } from "../command/index.js";
+import {
+  runGovernedInteraction,
+  runGovernedUnderstanding,
+  type GovernedInteractionWithShadow,
+  type GovernedShadowHostInjection,
+} from "../command/index.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
 import { sessionTaskState } from "../state/index.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 import { bindInteractionCandidate } from "./interaction-candidate.js";
 
 /** Fixed bindings only; command owns policy sequencing. */
-type GatewayInteractionParams = {
+export type GatewayInteractionParams = {
   config: OpenBotConfig;
   runId: string;
   agentId: string;
@@ -46,11 +51,26 @@ function bindGatewayUnderstanding(
   };
 }
 
-export function runGatewayInteraction(params: GatewayInteractionParams) {
-  return runGovernedInteraction(params, {
+export function runGatewayInteraction(
+  params: GatewayInteractionParams,
+  shadowHost: GovernedShadowHostInjection,
+): Promise<GovernedInteractionWithShadow>;
+export function runGatewayInteraction(
+  params: GatewayInteractionParams,
+): ReturnType<typeof runGovernedInteraction>;
+/** Trusted host may pass official shadow injection; omitted or trigger !== true stays default-off. */
+export function runGatewayInteraction(
+  params: GatewayInteractionParams,
+  shadowHost?: GovernedShadowHostInjection,
+) {
+  const ports = {
     ...bindGatewayUnderstanding(params),
     commit: sessionTaskState.admitExecution,
-  });
+  };
+  if (shadowHost?.trigger === true) {
+    return runGovernedInteraction(params, ports, shadowHost);
+  }
+  return runGovernedInteraction(params, ports);
 }
 
 /** Shared governed understanding without binding a group's work to a personal task board. */
