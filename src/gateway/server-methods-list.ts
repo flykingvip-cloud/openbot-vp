@@ -835,6 +835,7 @@ const BASE_METHODS = [
   "chat.restore",
   "chat.send",
   "runtime-rule-adaptation.advice",
+  "runtime-rule-adaptation.advice.cancel",
   "chat.guide.append",
   // Conversation lifecycle (Catalog / archive / search / purge)
   "conversations.create",
