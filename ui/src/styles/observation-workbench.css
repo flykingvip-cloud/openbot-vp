@@ -1152,3 +1152,233 @@ select {
     margin-left: 0;
   }
 }
+
+/* Enterprise 智能诊断 first screen and remaining R5 views */
+.obs-wb-filters {
+  border: 1px solid var(--obs-line);
+  border-radius: 12px;
+  background: var(--obs-bg);
+  padding: 12px 14px 14px;
+  margin-bottom: 12px;
+}
+.obs-wb-filters__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.obs-wb-filters__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.obs-wb-filters label,
+.obs-query-scope {
+  display: grid;
+  gap: 6px;
+}
+.obs-wb-filters label > span,
+.obs-query-scope > span {
+  font-size: 12px;
+  color: var(--obs-muted);
+}
+.obs-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--obs-muted);
+}
+.obs-status-row__left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+}
+.obs-pause.is-paused {
+  background: #fff6e0;
+  border-color: #e6d9cc;
+}
+.obs-issue-board {
+  border: 1px solid var(--obs-line);
+  border-radius: 12px;
+  background: var(--obs-bg);
+  padding: 14px 16px 8px;
+  margin-bottom: 16px;
+}
+.obs-issue-board__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.obs-issue-board__head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.obs-issue-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.obs-issue-chips button {
+  border: 1px solid var(--obs-line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+.obs-issue-chips button.is-on {
+  border-color: #c44536;
+  color: #c44536;
+}
+.obs-issue-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.obs-issue-table th,
+.obs-issue-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-top: 1px solid var(--obs-line);
+  vertical-align: top;
+}
+.obs-issue-table th {
+  font-size: 12px;
+  color: var(--obs-muted);
+  font-weight: 500;
+  border-top: 0;
+}
+.obs-issue-table .obs-run {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.obs-issue-gap,
+.obs-issue-impact {
+  margin: 4px 0 0;
+  color: var(--obs-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.obs-guide {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--obs-line);
+  border-radius: 12px;
+  background: var(--obs-bg);
+}
+.obs-guide h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.obs-guide ol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.obs-guide li {
+  color: var(--obs-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.obs-guide li strong {
+  color: inherit;
+}
+.obs-metrics-block {
+  margin: 16px 0 0;
+}
+.obs-metrics-compact {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+.obs-metrics-compact .obs-pulse-card {
+  text-align: left;
+  padding: 12px 12px 10px;
+}
+.obs-plat-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  border-bottom: 1px solid var(--obs-line);
+  margin: 0 0 16px;
+}
+.obs-plat-subnav button {
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--obs-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.obs-plat-subnav button.is-active {
+  color: var(--text, #172033);
+  border-bottom-color: var(--accent, #4263eb);
+  font-weight: 600;
+}
+.obs-layer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+.obs-layer {
+  border: 1px solid var(--obs-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fbfcfe;
+}
+.obs-layer .k {
+  font-size: 12px;
+  color: var(--obs-muted);
+}
+.obs-layer .v {
+  margin-top: 4px;
+  font-size: 13px;
+}
+.obs-gov-banner {
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f6f7f9;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.55;
+}
+@media (max-width: 1100px) {
+  .obs-wb-filters__grid,
+  .obs-metrics-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .obs-guide ol,
+  .obs-layer-grid,
+  .obs-metrics-compact,
+  .obs-wb-filters__grid {
+    grid-template-columns: 1fr;
+  }
+}

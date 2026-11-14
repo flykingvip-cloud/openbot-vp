@@ -163,6 +163,8 @@ export type EnterpriseDiagnosisHandlers = {
   onRunConversationAction?: (action: DiagnoseReportActionChip) => void;
   daibaiDeliveryEnabled?: boolean;
   decisionNote?: string | null;
+  /** When true, hide the module header so the shared workbench stays the only first screen. */
+  embedded?: boolean;
 };
 
 const LAYER_LABEL: Record<DiagnosisViewModel["drilldown"][number]["layer"], string> = {
@@ -1188,7 +1190,10 @@ export function renderEnterpriseDiagnosisSurface(
       data-tenant-scope=${model.tenantScope ?? ""}
       data-redaction-profile=${model.redactionProfile}
     >
-      ${renderEnterpriseModuleHeader({
+      ${
+        handlers.embedded
+          ? nothing
+          : renderEnterpriseModuleHeader({
         title: t("tabs.enterpriseDiagnosis"),
         refresh: handlers.onRefresh
           ? { onRefresh: handlers.onRefresh, pending: handlers.refreshing }
@@ -1250,6 +1255,7 @@ export function renderEnterpriseDiagnosisSurface(
         `,
       })}
       <div class="enterprise-page__content enterprise-page__content--narrow">
+        ${handlers.embedded ? html`<div class="enterprise-diagnosis__embedded-tools">${targetPicker(handlers)}</div>` : nothing}
         ${statusBanner}
         ${
           handlers.lastDiagnose?.reportText

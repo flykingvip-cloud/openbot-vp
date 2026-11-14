@@ -1230,6 +1230,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
         </section>
         ${this.renderEvolutionProjection()}
         ${renderEnterpriseDiagnosisSurface(model, {
+          embedded: true,
           onDiagnoseNow: () => void this.onDiagnoseNow(),
           diagnosing: this.diagnosing,
           lastDiagnose: this.lastDiagnose,

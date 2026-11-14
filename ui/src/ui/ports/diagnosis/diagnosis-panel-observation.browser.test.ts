@@ -78,8 +78,8 @@ describe("diagnosis panel observation origin", () => {
     await customElements.whenDefined("openbot-diagnosis-panel");
     const component = container.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
     await component.updateComplete;
-    await waitFor(() => expect(component.querySelector('[aria-label="观测目标"]')).not.toBeNull());
-    const select = component.querySelector<HTMLSelectElement>('[aria-label="观测目标"]')!;
+    await waitFor(() => expect(component.querySelector('[aria-label="会话筛选"]')).not.toBeNull());
+    const select = component.querySelector<HTMLSelectElement>('[aria-label="会话筛选"]')!;
     expect(select).not.toBeNull();
     select.value = "agent:main:main";
     select.dispatchEvent(new Event("change"));

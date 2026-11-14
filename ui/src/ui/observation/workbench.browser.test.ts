@@ -35,7 +35,28 @@ describe("observation workbench interaction", () => {
     expect(panel.querySelectorAll('[role="tablist"][aria-label="观测视图"] button')).toHaveLength(
       3,
     );
-    expect(panel.querySelector(".obs-empty")?.textContent).toContain("当前会话还没有观测事件");
+    expect(panel.querySelector(".obs-empty")?.textContent).toContain("当前筛选下没有可观测事件");
+    expect(panel.querySelector(".obs-header h2")?.textContent).toBe("智能诊断");
+    expect(panel.textContent).not.toContain("任务质量进化中心");
+    expect(panel.querySelector('[aria-label="连接工作台筛选"]')?.textContent).toContain("连接工作台筛选");
+    expect(panel.querySelector('[aria-label="观测对象筛选"]')).not.toBeNull();
+    expect(panel.querySelector('[aria-label="会话筛选"]')).not.toBeNull();
+    expect(panel.querySelector('[aria-label="运行类型筛选"]')).not.toBeNull();
+    expect(panel.querySelector('[aria-label="需要关注的运行"]')?.textContent).toContain("需要关注的运行");
+    expect(panel.querySelector('[aria-label="观测闭环说明"]')?.textContent).toContain("观测闭环说明");
+    expect([...panel.querySelectorAll(".obs-pulse-card")].map((card) => card.textContent)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("活跃运行"),
+        expect.stringContaining("事件计数"),
+        expect.stringContaining("执行生命周期完成率"),
+        expect.stringContaining("延迟 P50"),
+        expect.stringContaining("延迟 P95"),
+        expect.stringContaining("工具调用"),
+      ]),
+    );
+    const issueBoard = panel.querySelector('[aria-label="需要关注的运行"]');
+    const metrics = panel.querySelector(".obs-metrics-block");
+    expect(issueBoard && metrics && (issueBoard.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
     const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
     selector.value = "sample";
     selector.dispatchEvent(new Event("change"));
@@ -48,6 +69,11 @@ describe("observation workbench interaction", () => {
       "成本未知 · 未伪造为零或把周期账单摊到单任务",
     );
     expect(panel.querySelector(".obs-drawer")?.textContent).toContain("工具结束 ≠ 任务成功");
+    expect(panel.querySelector(".obs-drawer")?.textContent).toContain("资格未供给");
+    expect(panel.querySelector(".obs-drawer")?.textContent).toContain("improvementEligible：false");
+    expect(panel.querySelector(".obs-drawer")?.textContent).toContain("运行标识与状态");
+    expect(panel.querySelector('[aria-label="四层证据"]')?.textContent).toContain("未供给");
+    expect(panel.querySelector('[aria-label="四层证据"]')?.textContent).not.toContain("已验证");
     expect(panel.querySelectorAll(".obs-drawer input, .obs-drawer textarea, form")).toHaveLength(0);
     container.remove();
   });
@@ -181,6 +207,9 @@ describe("platform tenant compare filters", () => {
     );
     expect(panel.querySelector(".obs-pulse-grid")).toBeNull();
     expect(panel.querySelector('[role="tablist"][aria-label="观测视图"]')).toBeNull();
+    expect(
+      [...panel.querySelectorAll('[aria-label="平台观测视图"] button')].map((row) => row.textContent),
+    ).toEqual(["平台总览", "精确任务查询", "租户与授权", "覆盖与容量"]);
     expect(panel.querySelector(".obs-header h2")?.textContent ?? "").not.toContain("运行观测");
     expect(panel.querySelector(".obs-header h2")?.textContent ?? "").not.toContain("实时运行与改善");
 
@@ -214,6 +243,21 @@ describe("platform tenant compare filters", () => {
     expect(panel.querySelector("[data-tenant-filter]")?.getAttribute("data-tenant-filter")).toBe(
       "sample-tenant-property",
     );
+    panel.querySelector<HTMLButtonElement>('[data-platform-page="capacity"]')!.click();
+    await panel.updateComplete;
+    const capacity = panel.querySelector('[data-testid="obs-platform-capacity"]');
+    expect(capacity?.textContent).toContain("覆盖与容量");
+    expect(capacity?.textContent).toContain("采样覆盖");
+    expect(capacity?.textContent).toContain("心跳时效");
+    expect(capacity?.textContent).toContain("登记并发");
+    expect(capacity?.textContent).toContain("额度");
+    const values = [...capacity!.querySelectorAll(".obs-cap-val")].map((node) => node.textContent);
+    expect(values).toEqual(["未知", "未知", "未知", "未知"]);
+    expect(values.some((value) => value?.includes("0%"))).toBe(false);
+    panel.querySelector<HTMLButtonElement>('[data-platform-page="overview"]')!.click();
+    await panel.updateComplete;
+    expect(panel.querySelector('[data-testid="obs-platform-health"]')).not.toBeNull();
+    expect(panel.querySelector('[data-testid="obs-precise-query"]')).not.toBeNull();
     container.remove();
   });
 
@@ -324,17 +368,14 @@ describe("platform tenant compare filters", () => {
     panel.querySelector<HTMLButtonElement>('[data-action="pause"]')!.click();
     await panel.updateComplete;
     expect(panel.querySelectorAll(".obs-run")).toHaveLength(2);
-    panel.querySelector<HTMLButtonElement>('[data-metric="sequence_or_link_gaps"]')!.click();
-    await panel.updateComplete;
-    expect(panel.querySelector(".obs-improvement")?.textContent).toContain("client_next");
-    expect(panel.querySelector(".obs-drawer")).toBeNull();
-    panel.querySelector<HTMLButtonElement>(".obs-improvement .obs-link")!.click();
+    panel.querySelector<HTMLButtonElement>("[data-run-id='client_next@engine_next']")!.click();
     await panel.updateComplete;
     expect(panel.querySelector(".obs-drawer")?.textContent).toContain("client_next");
+    expect(panel.querySelector(".obs-drawer")?.textContent).toContain("improvementEligible：false");
     panel.querySelector<HTMLButtonElement>('[aria-label="关闭证据"]')!.click();
     await panel.updateComplete;
     expect(panel.querySelector(".obs-drawer")).toBeNull();
-    expect(panel.querySelector(".obs-improvement")).not.toBeNull();
+    expect(panel.querySelector("[data-run-id='client_next@engine_next']")).not.toBeNull();
     clearRuntimeObservations(host);
     container.remove();
   });
@@ -425,6 +466,9 @@ describe("governance readonly intent integration", () => {
     tabs[2].click();
     await panel.updateComplete;
     expect(panel.textContent).toContain("记录状态：effective");
+    expect(panel.textContent).toContain("改善记录与显式任务版本对照独立于连接工作台筛选");
+    expect(panel.textContent).toContain("improvementEligible 保持为 false");
+    expect(panel.querySelector('[aria-label="显式对照查询"]')).not.toBeNull();
     panel.querySelector<HTMLButtonElement>('[data-intent-id="intent-test"]')!.click();
     expect(selected).toEqual(["intent-test"]);
     panel.source = "sample";
