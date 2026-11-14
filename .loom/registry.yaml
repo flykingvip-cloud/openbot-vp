@@ -14510,6 +14510,7 @@ tasks:
       - src/agent-runtime/context/compilation/compile.ts
       - src/agent-runtime/context/compilation/active-task-seed.ts
       - src/agents/context-compiler/compile.test.ts
+      - scripts/architecture/manifest.json
     state: active
     sessions:
       - id: 0ba856f0-9a18-42ee-a591-e980a4cdf70a
@@ -30462,6 +30463,14 @@ sharedPaths:
     landerTask: agent-runtime-convergence
     reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller
       migration.
+    reviewAfter: 2026-11-30
+  - glob: scripts/architecture/manifest.json
+    landerTask: exec-chain-fidelity-ab-min
+    reason: "Owner t54u 于 2026-11-14 同意仅对 src/agent-runtime/context/interaction-history.test.ts
+      的 runtime-model-public-entry 增加例外，不扩目录、不豁免生产代码。Exact-file sharedPath
+      only; predecessor owners, paths, session history, and the later exact sharedPath on
+      agent-runtime-convergence remain declared. Does not take over scripts/architecture/**
+      or change that directory lander. Independent acceptance: codex-runtime-manager."
     reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
     landerTask: agent-runtime-convergence
