@@ -15,12 +15,12 @@ P1 公开校验器 `validateRuntimeRuleProposal(proposal, hostFacts)`（`src/age
 
 P3 另设受控、由宿主调用的激活用例，名称定为：
 
-| 用例 | 设计名称 | 调用方 | 作用 |
-| --- | --- | --- | --- |
-| 激活 | `activateApprovedRuntimeRuleProposal` | 测试入口或明确审批的宿主，不是模型，不是影子编排 | 在确定性校验之后，经 state CAS 写入不可变生效快照 |
-| 撤销 | `revokeActivatedRuntimeRulePolicy` | 同上 | 撤回授权、目录下架或停用后，按当前授权处理生效快照 |
-| 回退 | `rollbackActivatedRuntimeRulePolicy` | 同上 | 一次**新的版本变更**，按**当前**授权重核后写入新快照 |
-| 读取 | `readActivatedRuntimeRulePolicy` | 宿主／未来消费者；P3 只定义读契约，不接线主链 | 读取 state 已持久化的生效快照；不是影子内存结果 |
+| 用例 | 设计名称                              | 调用方                                           | 作用                                                 |
+| ---- | ------------------------------------- | ------------------------------------------------ | ---------------------------------------------------- |
+| 激活 | `activateApprovedRuntimeRuleProposal` | 测试入口或明确审批的宿主，不是模型，不是影子编排 | 在确定性校验之后，经 state CAS 写入不可变生效快照    |
+| 撤销 | `revokeActivatedRuntimeRulePolicy`    | 同上                                             | 撤回授权、目录下架或停用后，按当前授权处理生效快照   |
+| 回退 | `rollbackActivatedRuntimeRulePolicy`  | 同上                                             | 一次**新的版本变更**，按**当前**授权重核后写入新快照 |
+| 读取 | `readActivatedRuntimeRulePolicy`      | 宿主／未来消费者；P3 只定义读契约，不接线主链    | 读取 state 已持久化的生效快照；不是影子内存结果      |
 
 上述名称是本阶段的设计符号，尚未在源码中实现，不得被写成已经存在的导出函数。实现阶段不得把这些入口挂到 `validateRuntimeRuleProposal` 或 `runShadowRuleAdaptation` 的返回路径上，也不得因为影子跑通而自动调用。
 
@@ -52,12 +52,12 @@ P3 另设受控、由宿主调用的激活用例，名称定为：
 
 ### 2.2 映射到计划原文“task／claim／plan／策略版本”
 
-| 计划用语 | 本仓库对应事实 | P3 绑定要求 |
-| --- | --- | --- |
-| task 版本 | `taskId` + `SessionTaskBoard.writeEpoch`（`revision = String(writeEpoch)`）；并核对其 `resetGeneration`／墓碑／取消状态 | 激活请求必须带 `expectedWriteEpoch`，缺失则结构性拒绝。CAS 比较磁盘 `writeEpoch`，冲突不得覆盖较新写入 |
-| 策略版本 | 已有 `expectedPolicyVersion`：`policyHash` + `protocolVersion` + `compilerRevision` | 必须与提案内已绑定值及**当前**编译／生效内容身份一致；过期或未知版本拒绝 |
-| claim 版本 | 若存在活的 `executionAttempt`（及适用时的 `claimToken`），比较该身份；不另造字段 | 请求必须显式声明预期执行身份或封闭的“无活认领”哨兵。活认领与预期不符 → 冲突或拒绝。哨兵的精确字面量待核准，但必须是封闭枚举，不得省略后默认“无所谓” |
-| plan 版本 | 协作：既有 `episodeId`／`beatId` 与（若已存在）`policySnapshotId`，外加 `policyHash`／`compilerRevision`。个人任务板**没有**独立的 work-plan 版本字段 | 个人场景不发明 plan 版本轴。协作必须绑定真实 episode／beat／已有快照身份；不得把商业 `planVersionId` 塞进绑定 |
+| 计划用语   | 本仓库对应事实                                                                                                                                        | P3 绑定要求                                                                                                                                         |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| task 版本  | `taskId` + `SessionTaskBoard.writeEpoch`（`revision = String(writeEpoch)`）；并核对其 `resetGeneration`／墓碑／取消状态                               | 激活请求必须带 `expectedWriteEpoch`，缺失则结构性拒绝。CAS 比较磁盘 `writeEpoch`，冲突不得覆盖较新写入                                              |
+| 策略版本   | 已有 `expectedPolicyVersion`：`policyHash` + `protocolVersion` + `compilerRevision`                                                                   | 必须与提案内已绑定值及**当前**编译／生效内容身份一致；过期或未知版本拒绝                                                                            |
+| claim 版本 | 若存在活的 `executionAttempt`（及适用时的 `claimToken`），比较该身份；不另造字段                                                                      | 请求必须显式声明预期执行身份或封闭的“无活认领”哨兵。活认领与预期不符 → 冲突或拒绝。哨兵的精确字面量待核准，但必须是封闭枚举，不得省略后默认“无所谓” |
+| plan 版本  | 协作：既有 `episodeId`／`beatId` 与（若已存在）`policySnapshotId`，外加 `policyHash`／`compilerRevision`。个人任务板**没有**独立的 work-plan 版本字段 | 个人场景不发明 plan 版本轴。协作必须绑定真实 episode／beat／已有快照身份；不得把商业 `planVersionId` 塞进绑定                                       |
 
 ### 2.3 快照落点（待核准，但边界已封闭）
 
@@ -125,12 +125,12 @@ P0 决策表 §6 已明确：`model.context_window.guard`（`agents.defaults.con
 
 ### 5.1 结果种类（设计；尚未实现类型）
 
-| `resultKind` | 含义 | 既有生效快照 |
-| --- | --- | --- |
-| `activated` | CAS 成功，新快照已持久化且在返回前冻结 | 被新快照取代（旧快照只作为历史，不是不可撤销权利） |
-| `conflict` | CAS 未命中（并发更新、预期 `writeEpoch`／执行身份过期） | 保持不变 |
-| `rejected` | 结构、绑定、未核准、白名单空、授权、下架、过期、身份隔离等 | 保持不变 |
-| `persist_failed` | 比较通过但持久化失败或锁／I/O 失败 | 保持不变；不得出现部分激活 |
+| `resultKind`     | 含义                                                       | 既有生效快照                                       |
+| ---------------- | ---------------------------------------------------------- | -------------------------------------------------- |
+| `activated`      | CAS 成功，新快照已持久化且在返回前冻结                     | 被新快照取代（旧快照只作为历史，不是不可撤销权利） |
+| `conflict`       | CAS 未命中（并发更新、预期 `writeEpoch`／执行身份过期）    | 保持不变                                           |
+| `rejected`       | 结构、绑定、未核准、白名单空、授权、下架、过期、身份隔离等 | 保持不变                                           |
+| `persist_failed` | 比较通过但持久化失败或锁／I/O 失败                         | 保持不变；不得出现部分激活                         |
 
 激活结果对象在返回时冻结。晚到的磁盘状态或重试不得改写调用方已经拿到的快照（与 P2 已返回结果纪律一致）。P1／P2 的 `activationAllowed` 字段不出现在本结果里，更不得回写到校验器或影子结果上把它变成 `true`。
 

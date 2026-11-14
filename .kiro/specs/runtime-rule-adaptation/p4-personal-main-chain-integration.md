@@ -31,13 +31,13 @@ P3 快照落点已锁定：既有 `SessionTaskBoard.runtimeRuleAdaptationByTaskI
 
 ### 2.1 定义（唯一解析与守卫实现）
 
-| 符号 | 位置 | 角色 |
-| --- | --- | --- |
-| `CONTEXT_WINDOW_HARD_MIN_TOKENS = 16_000` | `src/agent-runtime/policy/context-window.ts` 第 3 行 | 硬下限常量。不可由适配下调。 |
-| `CONTEXT_WINDOW_WARN_BELOW_TOKENS = 32_000` | 同文件第 4 行 | 告警阈，只记日志，不阻断。 |
-| `ContextWindowSource` | 同文件第 6 行 | `"modelsConfig" \| "model" \| "default" \| "agentContextTokens"`。这是原解析来源标签，不是任务快照权威。 |
-| `resolveContextWindowInfo` | 同文件第 21–50 行 | **当前有效窗口的原权威解析**。 |
-| `evaluateContextWindowGuard` | 同文件第 57–74 行 | 硬门禁与告警判定。`shouldBlock` 当 `tokens > 0 && tokens < hardMin`。未传入阈值时回退到上述源码常量。 |
+| 符号                                        | 位置                                                 | 角色                                                                                                     |
+| ------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `CONTEXT_WINDOW_HARD_MIN_TOKENS = 16_000`   | `src/agent-runtime/policy/context-window.ts` 第 3 行 | 硬下限常量。不可由适配下调。                                                                             |
+| `CONTEXT_WINDOW_WARN_BELOW_TOKENS = 32_000` | 同文件第 4 行                                        | 告警阈，只记日志，不阻断。                                                                               |
+| `ContextWindowSource`                       | 同文件第 6 行                                        | `"modelsConfig" \| "model" \| "default" \| "agentContextTokens"`。这是原解析来源标签，不是任务快照权威。 |
+| `resolveContextWindowInfo`                  | 同文件第 21–50 行                                    | **当前有效窗口的原权威解析**。                                                                           |
+| `evaluateContextWindowGuard`                | 同文件第 57–74 行                                    | 硬门禁与告警判定。`shouldBlock` 当 `tokens > 0 && tokens < hardMin`。未传入阈值时回退到上述源码常量。    |
 
 解析顺序（当前实现，不得在设计中改写）：
 
@@ -50,11 +50,11 @@ P3 快照落点已锁定：既有 `SessionTaskBoard.runtimeRuleAdaptationByTaskI
 
 ### 2.2 配置与默认（值来源，不是调整授权）
 
-| 名称 | 位置 | 性质 |
-| --- | --- | --- |
-| `DEFAULT_CONTEXT_TOKENS = 200_000` | `src/agents/defaults.ts` 第 6 行 | 模型元数据不可用时的保守回退。定义在 agents 默认模块，不是 policy 常量。 |
-| `agents.defaults.contextTokens` | 类型：`src/config/types.agent-defaults.ts` 第 232–233 行；zod：`src/config/zod-schema.agent-defaults.ts` 第 53 行（`z.number().int().positive().optional()`） | 可选配置帽。**值来源**。能读到配置 ≠ 动态调整授权已建立。生产现值未知。 |
-| `SessionEntry.contextTokens` | `src/config/sessions/types.ts` 第 164 行 | 会话上的运行时估计／状态展示字段，**不是**本规则的策略权威，不得当作第二套帽来源。 |
+| 名称                               | 位置                                                                                                                                                          | 性质                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `DEFAULT_CONTEXT_TOKENS = 200_000` | `src/agents/defaults.ts` 第 6 行                                                                                                                              | 模型元数据不可用时的保守回退。定义在 agents 默认模块，不是 policy 常量。           |
+| `agents.defaults.contextTokens`    | 类型：`src/config/types.agent-defaults.ts` 第 232–233 行；zod：`src/config/zod-schema.agent-defaults.ts` 第 53 行（`z.number().int().positive().optional()`） | 可选配置帽。**值来源**。能读到配置 ≠ 动态调整授权已建立。生产现值未知。            |
+| `SessionEntry.contextTokens`       | `src/config/sessions/types.ts` 第 164 行                                                                                                                      | 会话上的运行时估计／状态展示字段，**不是**本规则的策略权威，不得当作第二套帽来源。 |
 
 无效或非正整数帽由 `normalizePositiveInt` 忽略，等同未设帽。这是既有解析行为，不得冒充「提案通过」。
 
@@ -84,15 +84,15 @@ P3 快照落点已锁定：既有 `SessionTaskBoard.runtimeRuleAdaptationByTaskI
 
 ### 2.5 再导出、测试与旁路
 
-| 类别 | 位置 | 说明 |
-| --- | --- | --- |
-| 再导出 | `src/agent-runtime/policy/index.ts` 第 20–24、26–29 行；`src/agent-runtime/model/index.ts` 第 29 行 | 再导出不是第二套实现。 |
-| 目录声明 | `src/agent-runtime/policy/catalog.ts` 第 258–275 行，`enforcementPoints: ["before_model_context_use"]`，`version` 仍为 `INVENTORY_VERSION`（历史 inventory pin，不单独使实现无效） | 目录不是参数权威。 |
-| P1 字段适配 | `src/agent-runtime/policy/rule-adaptation/descriptors.ts` 第 21–22、44–51 行 | 只声明 `ruleId`／`field`／`hardMin`，不改解析或强制。 |
-| 测试 | `src/agents/context-window-guard.test.ts`、`src/agent-runtime/model/prepare-embedded-model.test.ts`、`src/commands/onboard-custom.test.ts`、以及 P1／P3 夹具 | 测试与夹具不是生产权威。目录 `tests: []` 仍未登记已有测试（历史遗留）。 |
-| 动态 import／替身 | `src/agents/pi-embedded-runner/run.overflow-compaction.mocks.shared.ts` 等 | 测试替身，不得当作生产来源。 |
-| 旁路常量使用 | `src/commands/onboard-custom.ts` 用 `CONTEXT_WINDOW_HARD_MIN_TOKENS` 作为自定义模型登记默认窗口 | 引导／登记路径，不是个人任务策略强制，也不是本候选消费者。 |
-| 协作旁路 | `src/gateway/server-methods/chat.ts` 约第 3603–3610 行用目录 `selectedModel.contextWindow` 做成员上下文体积断言 | 协作路径，本轮范围外。不得借个人帽改写该检查。 |
+| 类别              | 位置                                                                                                                                                                               | 说明                                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 再导出            | `src/agent-runtime/policy/index.ts` 第 20–24、26–29 行；`src/agent-runtime/model/index.ts` 第 29 行                                                                                | 再导出不是第二套实现。                                                  |
+| 目录声明          | `src/agent-runtime/policy/catalog.ts` 第 258–275 行，`enforcementPoints: ["before_model_context_use"]`，`version` 仍为 `INVENTORY_VERSION`（历史 inventory pin，不单独使实现无效） | 目录不是参数权威。                                                      |
+| P1 字段适配       | `src/agent-runtime/policy/rule-adaptation/descriptors.ts` 第 21–22、44–51 行                                                                                                       | 只声明 `ruleId`／`field`／`hardMin`，不改解析或强制。                   |
+| 测试              | `src/agents/context-window-guard.test.ts`、`src/agent-runtime/model/prepare-embedded-model.test.ts`、`src/commands/onboard-custom.test.ts`、以及 P1／P3 夹具                       | 测试与夹具不是生产权威。目录 `tests: []` 仍未登记已有测试（历史遗留）。 |
+| 动态 import／替身 | `src/agents/pi-embedded-runner/run.overflow-compaction.mocks.shared.ts` 等                                                                                                         | 测试替身，不得当作生产来源。                                            |
+| 旁路常量使用      | `src/commands/onboard-custom.ts` 用 `CONTEXT_WINDOW_HARD_MIN_TOKENS` 作为自定义模型登记默认窗口                                                                                    | 引导／登记路径，不是个人任务策略强制，也不是本候选消费者。              |
+| 协作旁路          | `src/gateway/server-methods/chat.ts` 约第 3603–3610 行用目录 `selectedModel.contextWindow` 做成员上下文体积断言                                                                    | 协作路径，本轮范围外。不得借个人帽改写该检查。                          |
 
 硬门禁的权威是源码常量加上 `evaluateContextWindowGuard`，不是函数参数里可能被传入的更低 `hardMinTokens`（P0 已记 API 风险）。未来消费者必须像 `prepareEmbeddedModel` 一样传入源码常量。
 
@@ -100,12 +100,12 @@ P3 快照落点已锁定：既有 `SessionTaskBoard.runtimeRuleAdaptationByTaskI
 
 P3 已提供、必须复用的官方入口：
 
-| 入口 | 位置 | 作用 |
-| --- | --- | --- |
-| `readRuntimeRuleAdaptationBoard` | `src/agent-runtime/state/mutations/runtime-rule-adaptation.ts` 第 37–42 行 | 经官方 `readSessionTaskBoard` 读板；不是新 store。 |
-| `precheckRuntimeRuleRead` | `src/agent-runtime/policy/rule-adaptation/activation-precheck.ts` 第 1939 行起 | 只做读预检：封闭键、身份、个人 scope、完整 `boardScope` 与活板一致。协作 scope 以 `collaboration_path_unwired` 拒绝。 |
-| `activationAccessScopeVerified` | 同文件第 1030–1061 行 | 身份与 `TaskBoardScope` 未验证时，不得暴露快照／历史／`boardWriteEpoch`。 |
-| `readActivatedRuntimeRulePolicy` | `src/agent-runtime/command/rule-adaptation/activate.ts` 第 609–638 行；由 `command/rule-adaptation/index.ts` 再导出 | 宿主／未来消费者的读契约。`found`／`not_found`／`rejected`。 |
+| 入口                             | 位置                                                                                                                | 作用                                                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `readRuntimeRuleAdaptationBoard` | `src/agent-runtime/state/mutations/runtime-rule-adaptation.ts` 第 37–42 行                                          | 经官方 `readSessionTaskBoard` 读板；不是新 store。                                                                    |
+| `precheckRuntimeRuleRead`        | `src/agent-runtime/policy/rule-adaptation/activation-precheck.ts` 第 1939 行起                                      | 只做读预检：封闭键、身份、个人 scope、完整 `boardScope` 与活板一致。协作 scope 以 `collaboration_path_unwired` 拒绝。 |
+| `activationAccessScopeVerified`  | 同文件第 1030–1061 行                                                                                               | 身份与 `TaskBoardScope` 未验证时，不得暴露快照／历史／`boardWriteEpoch`。                                             |
+| `readActivatedRuntimeRulePolicy` | `src/agent-runtime/command/rule-adaptation/activate.ts` 第 609–638 行；由 `command/rule-adaptation/index.ts` 再导出 | 宿主／未来消费者的读契约。`found`／`not_found`／`rejected`。                                                          |
 
 读绑定已锁定为 `RuntimeRuleAdaptationReadBinding`：`identity`、`taskBinding`（`taskId` + `boardScope`），可选 `fixture`。不得携带 `FORBIDDEN_ACTIVATION_KEYS`（包括 `OpenBotConfig`、`operatingState`、`policySnapshot`、`activationAllowed` 等）。
 
@@ -132,9 +132,9 @@ P3 已提供、必须复用的官方入口：
 
 为个人候选设单一选择源，互斥两态，不得并行裁定：
 
-| 状态 | 含义 |
-| --- | --- |
-| `original` | **默认**。只使用 §2 的原解析。即使板上已有 `status=effective` 的快照，生产消费者也不读它作为有效帽。 |
+| 状态                          | 含义                                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `original`                    | **默认**。只使用 §2 的原解析。即使板上已有 `status=effective` 的快照，生产消费者也不读它作为有效帽。                                       |
 | `personal_activated_snapshot` | 在身份与作用域已验证的前提下，按 §3 读取官方快照；仅当快照合法且为收紧时，以 `min(原解析, 快照参数)` 作为待守卫的 tokens。原解析仍先执行。 |
 
 回退开关：把选择源切回 `original`。立即生效于之后每一次经该选择源的读取；板上快照与历史不删除、不改写；硬门禁不变。回退不是把磁盘倒回旧字节，也不是删除 `contextTokens` 让窗口变宽。**切回 `original` 可能解除任务帽，必须由受控宿主授权切换，不能作为任意错误（损坏、不兼容、读取失败、来源不合法）的兜底。** 若还要把某任务的生效帽撤回，仍走既有 `revokeActivatedRuntimeRulePolicy`／`rollbackActivatedRuntimeRulePolicy`（按**当前**授权重核的新版本变更）。
@@ -169,20 +169,20 @@ P3 已提供、必须复用的官方入口：
 
 ## 6. 衔接规则摘要
 
-| 节点或条件 | 权威 | 行为 |
-| --- | --- | --- |
-| 选择源 = `original`（默认） | 仅 `resolveContextWindowInfo` | 完全保持原行为。不读快照作帽。硬门禁照常。夹具损坏不得改变该模式。 |
-| 选择源 = `personal_activated_snapshot`，身份已验证，快照 `effective` 且合法 | 原解析与快照收紧帽的 `min`，然后守卫 | 只能更紧或持平；持平即原窗口。配置此后更紧则配置胜出。 |
-| 确实没有快照（`not_found`／无 `current`） | 原解析 | `outcome=no_snapshot`。仅此情形可把「无快照」当作原解析。 |
-| 合法撤销／回退已完成 | 该受控变更的明确结果 | `outcome=controlled_change`（若当前无生效帽，tokens 跟随原解析，但不得称为「无快照」）。不得使用已撤销快照作帽。回退后的新 `effective` 快照按上一行收紧。 |
-| 存在快照但损坏、不兼容、来源不合法，或读取失败 | **阻断本次模型准备** | `outcome=blocked`。不得回退到原解析，不得静默扩大窗口。非法快照不得钳制后生效。 |
-| 夹具快照（`whitelistSource=fixture`）出现在生产选择源 | **阻断**（生产路径保持关闭） | 不得当作生产生效帽。E-04／夹具端口成功只证明测试路径。 |
-| 身份／作用域失败 | 不得使用快照 | 已绑定且选择源为快照模式：阻断本次模型准备。未绑定：原解析。不泄露 board 状态。不得根据板内 `scope` 反向证明调用者身份。个人任务也可以有租户，不得把 `scope=personal` 理解成没有租户。 |
-| 硬下限 | 源码常量 + `evaluateContextWindowGuard` | 任何选择源均不可绕过。低于 hardMin 的非法快照在快照模式下阻断，而不是应用后再「顺便」放宽。 |
-| 选择源回退为 `original` | 原解析 | 可能解除任务帽，必须由受控宿主授权切换，不能作为任意错误的兜底。不删除快照；不绕过硬门禁。 |
-| Agent／影子不可用 | 已持久化且仍合法的当前策略（若模式为 `original`，即原解析；若为快照模式且快照仍 effective 且合法，则按 §3；若读取失败或快照损坏，则阻断本次准备） | 不自动激活；不「全部失败继续」；不「冻结所有聊天」。强制事实不足则阻止相关动作或等待。 |
-| 任务取消／墓碑 | 既有任务围栏 | 放宽或历史快照不得复活任务。恢复须走原状态入口。 |
-| 必要授权 | 入站即生效的既有授权／任务绑定 | 适配只做具体执行前的可选策略准备，禁止「动作已启动再补必要授权」。 |
+| 节点或条件                                                                  | 权威                                                                                                                                              | 行为                                                                                                                                                                                   |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 选择源 = `original`（默认）                                                 | 仅 `resolveContextWindowInfo`                                                                                                                     | 完全保持原行为。不读快照作帽。硬门禁照常。夹具损坏不得改变该模式。                                                                                                                     |
+| 选择源 = `personal_activated_snapshot`，身份已验证，快照 `effective` 且合法 | 原解析与快照收紧帽的 `min`，然后守卫                                                                                                              | 只能更紧或持平；持平即原窗口。配置此后更紧则配置胜出。                                                                                                                                 |
+| 确实没有快照（`not_found`／无 `current`）                                   | 原解析                                                                                                                                            | `outcome=no_snapshot`。仅此情形可把「无快照」当作原解析。                                                                                                                              |
+| 合法撤销／回退已完成                                                        | 该受控变更的明确结果                                                                                                                              | `outcome=controlled_change`（若当前无生效帽，tokens 跟随原解析，但不得称为「无快照」）。不得使用已撤销快照作帽。回退后的新 `effective` 快照按上一行收紧。                              |
+| 存在快照但损坏、不兼容、来源不合法，或读取失败                              | **阻断本次模型准备**                                                                                                                              | `outcome=blocked`。不得回退到原解析，不得静默扩大窗口。非法快照不得钳制后生效。                                                                                                        |
+| 夹具快照（`whitelistSource=fixture`）出现在生产选择源                       | **阻断**（生产路径保持关闭）                                                                                                                      | 不得当作生产生效帽。E-04／夹具端口成功只证明测试路径。                                                                                                                                 |
+| 身份／作用域失败                                                            | 不得使用快照                                                                                                                                      | 已绑定且选择源为快照模式：阻断本次模型准备。未绑定：原解析。不泄露 board 状态。不得根据板内 `scope` 反向证明调用者身份。个人任务也可以有租户，不得把 `scope=personal` 理解成没有租户。 |
+| 硬下限                                                                      | 源码常量 + `evaluateContextWindowGuard`                                                                                                           | 任何选择源均不可绕过。低于 hardMin 的非法快照在快照模式下阻断，而不是应用后再「顺便」放宽。                                                                                            |
+| 选择源回退为 `original`                                                     | 原解析                                                                                                                                            | 可能解除任务帽，必须由受控宿主授权切换，不能作为任意错误的兜底。不删除快照；不绕过硬门禁。                                                                                             |
+| Agent／影子不可用                                                           | 已持久化且仍合法的当前策略（若模式为 `original`，即原解析；若为快照模式且快照仍 effective 且合法，则按 §3；若读取失败或快照损坏，则阻断本次准备） | 不自动激活；不「全部失败继续」；不「冻结所有聊天」。强制事实不足则阻止相关动作或等待。                                                                                                 |
+| 任务取消／墓碑                                                              | 既有任务围栏                                                                                                                                      | 放宽或历史快照不得复活任务。恢复须走原状态入口。                                                                                                                                       |
+| 必要授权                                                                    | 入站即生效的既有授权／任务绑定                                                                                                                    | 适配只做具体执行前的可选策略准备，禁止「动作已启动再补必要授权」。                                                                                                                     |
 
 快照参数若因常量或实现变更变得低于 hardMin：视为不兼容／非法，在快照选择模式下**阻断本次模型准备**，不得回退原解析以致静默扩大窗口。
 
