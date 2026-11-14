@@ -48,6 +48,7 @@ export const EMPLOYEE_ADVICE_STATES = [
   "needs_information",
   "blocked",
   "adjustment_suggested",
+  "interpretation_pending",
   "failed",
 ] as const;
 
@@ -58,6 +59,7 @@ export const EMPLOYEE_ADVICE_STATE_LABELS: Record<EmployeeAdviceState, string> =
   needs_information: "需补信息",
   blocked: "被阻止",
   adjustment_suggested: "建议调整",
+  interpretation_pending: "规则解释／待核验",
   failed: "建议失败",
 };
 
@@ -270,6 +272,9 @@ export function mapShadowOutcomeToEmployeeAdviceState(
   }
 }
 
+const UNBOUND_CONSULTATION_MESSAGE =
+  "这是不承诺任务适用性的规则解释。因缺少任务绑定或完整策略事实，提案尚未完整校验。建议尚未生效。";
+
 function defaultSummary(state: EmployeeAdviceState, fallback: string): string {
   if (fallback.trim()) {
     return fallback;
@@ -283,6 +288,8 @@ function defaultSummary(state: EmployeeAdviceState, fallback: string): string {
       return "本次建议被阻止。建议尚未生效。";
     case "adjustment_suggested":
       return "已生成规则适配建议，但尚未生效。";
+    case "interpretation_pending":
+      return UNBOUND_CONSULTATION_MESSAGE;
     case "failed":
       return "本次建议请求失败，不影响已有聊天或原任务。建议尚未生效。";
   }
@@ -318,11 +325,89 @@ export function buildEmployeeAdviceView(input: {
   };
 }
 
-const UNBOUND_CONSULTATION_MESSAGE =
-  "这是不承诺任务适用性的规则解释。因缺少任务绑定或完整策略事实，提案尚未完整校验。建议尚未生效。";
-
 function hasTrustedTaskPolicyFacts(facts: TrustedEmployeeAdviceFacts): boolean {
   return Boolean(facts.compatibilityRecord && facts.expectedPolicyState);
+}
+
+/**
+ * Outcomes that stay 被阻止／失败 even if a proposal object is present.
+ * A missing task binding or compatibility record is not enough to keep these
+ * as a pending interpretation.
+ */
+const EXPLICIT_ADVICE_REJECTION_OUTCOMES = new Set<
+  ShadowOutcomeCode | "client_rejected" | "soft_failure"
+>([
+  "protocol_failure",
+  "cancelled",
+  "budget_exhausted",
+  "client_rejected",
+  "insufficient_permission",
+  "hard_rule_conflict",
+  "malicious_material_rejected",
+  "fabricated_rule_id",
+  "unknown_parameter",
+  "tool_unavailable",
+  "soft_failure",
+]);
+
+/**
+ * Reason codes that independently prove a structural violation, unknown rule,
+ * out-of-bounds parameter, or other decidable reject. Missing-binding and
+ * missing-host-fact codes are excluded: those are the consultative gap, not
+ * a reason to call the proposal a suggested adjustment, and not by themselves
+ * a reason to hide a later explicit reject.
+ */
+const EXPLICIT_ADVICE_REJECTION_REASON_CODES = new Set<string>([
+  "structural_non_plain_object",
+  "structural_circular_reference",
+  "structural_input_too_deep",
+  "structural_forbidden_field",
+  "structural_unknown_field",
+  "structural_invalid_type",
+  "structural_mixed_input_kinds",
+  "structural_duplicate_field",
+  "structural_unusable_host_value",
+  "identity_scope_mismatch",
+  "unknown_rule_id",
+  "non_candidate_field",
+  "cancelled_or_tombstone",
+  "below_hard_min",
+  "above_hard_ceiling",
+  "above_current_effective",
+  "delete_or_relax_as_tighten",
+  "unauthorized_action",
+  "hard_boundary_conflict",
+  "compatibility_not_approved",
+  "current_below_hard_min",
+  "validator_must_not_create_candidate",
+  "malicious_material_rejected",
+  "fabricated_rule_id",
+  "unknown_parameter",
+  "hard_rule_conflict",
+  "protocol_failure",
+  "insufficient_permission",
+]);
+
+function isExplicitAdviceRejection(
+  outcomeCode: ShadowOutcomeCode | "client_rejected" | "soft_failure",
+  reasons: ReadonlyArray<{ code: string }>,
+): boolean {
+  if (EXPLICIT_ADVICE_REJECTION_OUTCOMES.has(outcomeCode)) {
+    return true;
+  }
+  return reasons.some((reason) => EXPLICIT_ADVICE_REJECTION_REASON_CODES.has(reason.code));
+}
+
+function consultativeAdviceState(shadow: ShadowRunResult): EmployeeAdviceState {
+  if (isExplicitAdviceRejection(shadow.outcomeCode, shadow.reasons)) {
+    return mapShadowOutcomeToEmployeeAdviceState(shadow.outcomeCode);
+  }
+  if (shadow.outcomeCode === "no_change_needed") {
+    return "no_change";
+  }
+  // Missing task binding or compatibility facts: never promote a proposal to
+  // 建议调整, and never rewrite validator_blocked as shadow_recorded.
+  return "interpretation_pending";
 }
 
 function consultativeAdviceView(
@@ -339,14 +424,19 @@ function consultativeAdviceView(
     })),
   ];
   const hasProposal = shadow.proposal !== undefined;
+  const state = consultativeAdviceState(shadow);
+  const rejected = isExplicitAdviceRejection(shadow.outcomeCode, shadow.reasons);
   return buildEmployeeAdviceView({
     requestId,
     outcomeCode: shadow.outcomeCode,
     reasons,
     ...(hasProposal ? { proposal: shadow.proposal } : {}),
-    summary: UNBOUND_CONSULTATION_MESSAGE,
+    // The unbound hint stays in reasons. It must not replace a reject summary.
+    summary: rejected
+      ? defaultSummary(state, shadow.reasons[0]?.message ?? "")
+      : UNBOUND_CONSULTATION_MESSAGE,
     modelCalled,
-    ...(hasProposal ? { state: "adjustment_suggested" } : {}),
+    state,
     taskApplicability: "unbound",
     proposalFullyValidated: false,
   });

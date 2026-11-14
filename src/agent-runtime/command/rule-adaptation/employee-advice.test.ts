@@ -514,7 +514,10 @@ describe("runEmployeeRuleAdaptationAdvice", () => {
     expect(view.modelCalled).toBe(true);
     expect(view.taskApplicability).toBe("unbound");
     expect(view.proposalFullyValidated).toBe(false);
-    expect(view.state).toBe("adjustment_suggested");
+    expect(view.state).toBe("interpretation_pending");
+    expect(view.label).toBe("规则解释／待核验");
+    expect(view.state).not.toBe("adjustment_suggested");
+    expect(view.label).not.toBe("建议调整");
     expect(view.summary).toContain("不承诺任务适用性的规则解释");
     expect(view.summary).toContain("尚未完整校验");
     expect(view.activationAllowed).toBe(false);
@@ -523,6 +526,144 @@ describe("runEmployeeRuleAdaptationAdvice", () => {
       kind: "policy_proposal",
       items: [{ field: "agents.defaults.contextTokens", proposedValue: 24000 }],
     });
+  });
+
+  it("does not show 建议调整 for a structurally illegal proposal when facts are missing", async () => {
+    const view = await runEmployeeRuleAdaptationAdvice(
+      { question: "上下文窗口太大，请在硬下限之上收紧" },
+      authorizedHost({
+        facts: completeFacts({
+          compatibilityRecord: undefined,
+          expectedPolicyState: undefined,
+          expectedPolicyVersion: undefined,
+        }),
+        runShadow: vi.fn(async () =>
+          shadowResult({
+            outcomeCode: "validator_blocked",
+            reasons: [
+              {
+                code: "structural_invalid_type",
+                message: "action is not a defined enum value.",
+                path: "proposal.items[0].action",
+              },
+              {
+                code: "structural_missing_binding",
+                message: "policy_proposal must bind expectedPolicyVersion.",
+                path: "proposal.expectedPolicyVersion",
+              },
+            ],
+          }),
+        ),
+      }),
+    );
+    expect(view.state).toBe("blocked");
+    expect(view.label).toBe("被阻止");
+    expect(view.state).not.toBe("adjustment_suggested");
+    expect(view.label).not.toBe("建议调整");
+    expect(view.state).not.toBe("interpretation_pending");
+    expect(view.outcomeCode).toBe("validator_blocked");
+    expect(view.proposalFullyValidated).toBe(false);
+    expect(view.activationAllowed).toBe(false);
+    expect(view.summary).toContain("action is not a defined enum value");
+    expect(view.reasons.some((reason) => reason.code === "unbound_consultation")).toBe(true);
+    expect(view.proposal).toMatchObject({
+      kind: "policy_proposal",
+      items: [{ field: "agents.defaults.contextTokens", proposedValue: 24000 }],
+    });
+  });
+
+  it("does not show 建议调整 for an unknown rule when facts are missing", async () => {
+    const view = await runEmployeeRuleAdaptationAdvice(
+      { question: "上下文窗口太大，请在硬下限之上收紧" },
+      authorizedHost({
+        facts: completeFacts({
+          compatibilityRecord: undefined,
+          expectedPolicyState: undefined,
+          expectedPolicyVersion: undefined,
+        }),
+        runShadow: vi.fn(async () =>
+          shadowResult({
+            outcomeCode: "fabricated_rule_id",
+            reasons: [
+              {
+                code: "unknown_rule_id",
+                message: "Rule id 'invented.rule' is not in the known catalog.",
+                path: "proposal.items[0].ruleId",
+              },
+            ],
+          }),
+        ),
+      }),
+    );
+    expect(view.state).toBe("blocked");
+    expect(view.label).toBe("被阻止");
+    expect(view.state).not.toBe("adjustment_suggested");
+    expect(view.label).not.toBe("建议调整");
+    expect(view.outcomeCode).toBe("fabricated_rule_id");
+    expect(view.proposalFullyValidated).toBe(false);
+    expect(view.activationAllowed).toBe(false);
+  });
+
+  it("does not show 建议调整 for an out-of-bounds parameter when facts are missing", async () => {
+    const view = await runEmployeeRuleAdaptationAdvice(
+      { question: "上下文窗口太大，请在硬下限之上收紧" },
+      authorizedHost({
+        facts: completeFacts({
+          compatibilityRecord: undefined,
+          expectedPolicyState: undefined,
+          expectedPolicyVersion: undefined,
+        }),
+        runShadow: vi.fn(async () =>
+          shadowResult({
+            outcomeCode: "hard_rule_conflict",
+            reasons: [
+              {
+                code: "below_hard_min",
+                message: "proposedValue 1000 is below hardMin 16000.",
+                path: "proposal.items[0].proposedValue",
+              },
+            ],
+          }),
+        ),
+      }),
+    );
+    expect(view.state).toBe("blocked");
+    expect(view.label).toBe("被阻止");
+    expect(view.state).not.toBe("adjustment_suggested");
+    expect(view.label).not.toBe("建议调整");
+    expect(view.outcomeCode).toBe("hard_rule_conflict");
+    expect(view.proposalFullyValidated).toBe(false);
+    expect(view.activationAllowed).toBe(false);
+  });
+
+  it("keeps a protocol failure as 建议失败 even when a proposal object is present", async () => {
+    const view = await runEmployeeRuleAdaptationAdvice(
+      { question: "上下文窗口太大，请在硬下限之上收紧" },
+      authorizedHost({
+        facts: completeFacts({
+          compatibilityRecord: undefined,
+          expectedPolicyState: undefined,
+          expectedPolicyVersion: undefined,
+        }),
+        runShadow: vi.fn(async () =>
+          shadowResult({
+            outcomeCode: "protocol_failure",
+            reasons: [
+              {
+                code: "protocol_failure",
+                message: "Official completion returned an unusable payload.",
+              },
+            ],
+          }),
+        ),
+      }),
+    );
+    expect(view.state).toBe("failed");
+    expect(view.label).toBe("建议失败");
+    expect(view.state).not.toBe("adjustment_suggested");
+    expect(view.label).not.toBe("建议调整");
+    expect(view.outcomeCode).toBe("protocol_failure");
+    expect(view.activationAllowed).toBe(false);
   });
 
   it("isolates a shadow failure to the advice result and does not throw into the caller", async () => {
