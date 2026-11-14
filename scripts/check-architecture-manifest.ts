@@ -7,6 +7,8 @@ import { matchesGlob, normalizeRepoPath } from "./architecture/glob-match.js";
 type ManifestRule = {
   name: string;
   from: string;
+  /** Globs excluded from the rule's check scope (component boundary calibration). */
+  exceptFrom?: string[];
   denyImportsFrom: string[];
   description: string;
   exemptFiles?: string[];
@@ -80,7 +82,13 @@ function main(): void {
 
   for (const rule of rules) {
     const exempt = new Set((rule.exemptFiles ?? []).map(normalizeRepoPath));
-    const scopedFiles = files.filter((file) => matchesGlob(file, rule.from) && !exempt.has(file));
+    const exceptFrom = rule.exceptFrom ?? [];
+    const scopedFiles = files.filter(
+      (file) =>
+        matchesGlob(file, rule.from) &&
+        !exempt.has(file) &&
+        !exceptFrom.some((glob) => matchesGlob(file, glob)),
+    );
 
     for (const file of scopedFiles) {
       for (const specifier of collectImports(file)) {
