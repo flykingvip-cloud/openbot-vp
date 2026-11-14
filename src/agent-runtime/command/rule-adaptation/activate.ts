@@ -21,7 +21,7 @@ import type { PolicyProposalInput } from "../../contracts/rule-adaptation.js";
  * activate / revoke / rollback transactions. Policy stays a pure precheck.
  */
 import type { SessionTaskBoard } from "../../contracts/task.js";
-import { getRuntimeRuleDeclaration } from "../../policy/catalog.js";
+import { getRuntimeRuleDeclaration } from "../../policy/index.js";
 import {
   activationAccessScopeVerified,
   activationReason,
@@ -32,8 +32,8 @@ import {
   precheckRuntimeRuleRollback,
   resolveActivationWhitelist,
   whitelistHit,
-} from "../../policy/rule-adaptation/activation-precheck.js";
-import { isKnownCatalogRuleId } from "../../policy/rule-adaptation/descriptors.js";
+  isKnownCatalogRuleId,
+} from "../../policy/rule-adaptation/index.js";
 import {
   mutateRuntimeRuleAdaptationBoard,
   officialRuntimeRuleAdaptationBoardIo,

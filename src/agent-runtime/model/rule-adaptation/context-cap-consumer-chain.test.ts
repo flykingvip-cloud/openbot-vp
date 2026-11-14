@@ -9,7 +9,6 @@ import { getCompactionSafeguardRuntime } from "../../../agents/pi-extensions/com
 import { makeModelFallbackCfg } from "../../../agents/test-helpers/model-fallback-config-fixture.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { LegacyContextEngine } from "../../../context-engine/legacy.js";
-import { activateApprovedRuntimeRuleProposal } from "../../command/rule-adaptation/activate.js";
 import {
   FIXTURE_BOARD_SCOPE,
   FIXTURE_POLICY_VERSION,
@@ -20,7 +19,10 @@ import {
   openTempSession,
   seedFixtureBoard,
 } from "../../command/rule-adaptation/activation-test-support.js";
-import { createOfficialFixtureContextCapPort } from "../../command/rule-adaptation/fixture-context-cap-port.js";
+import {
+  activateApprovedRuntimeRuleProposal,
+  createOfficialFixtureContextCapPort,
+} from "../../command/rule-adaptation/index.js";
 import {
   NO_LIVE_EXECUTION_CLAIM,
   PRODUCTION_RUNTIME_RULE_WHITELIST,

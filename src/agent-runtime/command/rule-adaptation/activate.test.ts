@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { NO_LIVE_EXECUTION_CLAIM } from "../../contracts/rule-adaptation-activation.js";
-import { validateRuntimeRuleProposal } from "../../policy/rule-adaptation/validate.js";
+import { validateRuntimeRuleProposal } from "../../policy/rule-adaptation/index.js";
 import { cloneBoardShell, readSessionTaskBoard } from "../../state/repository/task-board-file.js";
 import {
   activateApprovedRuntimeRuleProposal,

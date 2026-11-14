@@ -6,7 +6,7 @@ import {
   DefaultResourceLoader,
   estimateTokens,
 } from "@earendil-works/pi-coding-agent";
-import { inheritSelectedContextCap } from "../../agent-runtime/model/rule-adaptation/context-cap-selection.js";
+import { inheritSelectedContextCap } from "../../agent-runtime/model/rule-adaptation/index.js";
 import { resolveContextWindowInfo } from "../../agent-runtime/policy/index.js";
 import { resolveHeartbeatPrompt } from "../../auto-reply/heartbeat.js";
 import type { ReasoningLevel, ThinkLevel } from "../../auto-reply/thinking.js";

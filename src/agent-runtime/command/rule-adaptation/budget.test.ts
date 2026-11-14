@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { createBudgetTracker } from "../../model/rule-adaptation/budget.js";
+import { createBudgetTracker } from "../../model/rule-adaptation/index.js";
 import { runShadowRuleAdaptation } from "./run.js";
 import {
   fixtureHost,
