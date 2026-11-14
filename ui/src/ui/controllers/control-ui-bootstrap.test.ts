@@ -394,6 +394,50 @@ describe("loadControlUiBootstrapConfig", () => {
     vi.unstubAllGlobals();
   });
 
+  it("sends the current page path when loading bootstrap config", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+    const original = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: {
+        ...original,
+        pathname: "/enterprise/001/overview",
+        href: "http://127.0.0.1:18789/enterprise/001/overview",
+        host: "127.0.0.1:18789",
+        hostname: "127.0.0.1",
+      },
+    });
+
+    const state = {
+      basePath: "",
+      assistantName: "Assistant",
+      assistantAvatar: null,
+      assistantAgentId: null,
+      serverVersion: null,
+      bootstrapAuthMode: null,
+      bootstrapAuthSession: null,
+      platformAuthState: null,
+    };
+
+    await loadControlUiBootstrapConfig(state);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      CONTROL_UI_BOOTSTRAP_CONFIG_PATH,
+      expect.objectContaining({
+        method: "GET",
+        credentials: "same-origin",
+        referrerPolicy: "same-origin",
+        headers: expect.objectContaining({
+          "x-openbot-page-path": "/enterprise/001/overview",
+        }),
+      }),
+    );
+
+    Object.defineProperty(window, "location", { configurable: true, value: original });
+    vi.unstubAllGlobals();
+  });
+
   it("recognizes the current page host as the active gateway target", () => {
     expect(
       isCurrentControlUiGatewayTarget({
