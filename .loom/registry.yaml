@@ -30442,6 +30442,14 @@ sharedPaths:
     reason: Human-authorized legacy execution adapter retirement with actual owner evidence and caller
       migration.
     reviewAfter: 2026-11-30
+  - glob: scripts/check-architecture-manifest.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t55u 2026-11-14 dependency-boundary close-out. Exact-file sharedPath only; predecessor owners, paths, and session history remain declared. Does not take over scripts/** or change that directory lander."
+    reviewAfter: 2026-11-30
+  - glob: scripts/architecture/manifest.json
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t55u 2026-11-14 dependency-boundary close-out. Exact-file sharedPath only; predecessor owners, paths, session history, and the later exact sharedPath on agent-runtime-convergence remain declared. Does not take over scripts/architecture/** or change that directory lander."
+    reviewAfter: 2026-11-30
   - glob: scripts/architecture/manifest.json
     landerTask: agent-runtime-convergence
     reason: Human-authorized runtime migration guard for retired entry paths; retain prior ownership
