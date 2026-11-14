@@ -4,6 +4,7 @@ import { admittedTaskQueryContinuation } from "../../agent-runtime/command/admit
 import { hostBoundTaskTarget } from "../../agent-runtime/command/host-task-target.js";
 import {
   formatTaskProposalReply,
+  queryCurrentTaskStatus,
   createInteractionSourceBoundary,
   formatRestrictedInteractionNotice,
 } from "../../agent-runtime/command/index.js";
@@ -25,9 +26,9 @@ import {
   isEmbeddedPiRunStreaming,
   waitForEmbeddedPiRunEnd,
 } from "../../agent-runtime/execution/index.js";
-import { activeConstraintTexts } from "../../agent-runtime/policy/index.js";
 import { resolveInteractionResourceWaitMs } from "../../agent-runtime/model/interaction-resource-wait.js";
 import { INTERACTION_RECORD_UNAVAILABLE_TEXT } from "../../agent-runtime/model/interaction-resource-wait.js";
+import { activeConstraintTexts } from "../../agent-runtime/policy/index.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
@@ -1510,6 +1511,13 @@ export async function runPreparedReply(
       () => replyTurnRuntime.state.readForInteraction(sessionFile),
       { parked: [], focusRevision: 0 },
     );
+    // Read-only progress asks return recorded board facts and must not
+    // enter interaction, resume, or execution admission.
+    const statusReply = queryCurrentTaskStatus(inboundMessage, () => board);
+    if (statusReply) {
+      typing.cleanup();
+      return persistOwnReply(statusReply);
+    }
     const captured = {
       expectedFocusRevision: board.focusRevision,
       expectedWriteEpoch: board.writeEpoch ?? 0,
@@ -1651,11 +1659,31 @@ export async function runPreparedReply(
         if (applied.kind === "applied" && routed.decision.kind === "task_change") {
           // Steering alone cannot refresh an attempt's captured constraint
           // boundary. Stop its old view, wait for cleanup, then re-read state.
-          const active = isEmbeddedPiRunActive(sessionIdFinal);
-          const drained = active
-            ? abortEmbeddedPiRun(sessionIdFinal) && (await waitForEmbeddedPiRunEnd(sessionIdFinal))
-            : true;
+          // abort=false may mean the run ended between the check and the
+          // cancel; that is completion-continuation, not a failed drain.
+          const wasActive = isEmbeddedPiRunActive(sessionIdFinal);
+          let oldAttemptGone = !wasActive;
+          let oldAttemptUnconfirmed = false;
+          if (wasActive) {
+            const aborted = abortEmbeddedPiRun(sessionIdFinal);
+            if (aborted) {
+              oldAttemptGone = await waitForEmbeddedPiRunEnd(sessionIdFinal);
+              oldAttemptUnconfirmed = !oldAttemptGone;
+            } else {
+              oldAttemptGone = !isEmbeddedPiRunActive(sessionIdFinal);
+              oldAttemptUnconfirmed = !oldAttemptGone;
+            }
+          }
           opts?.abortSignal?.throwIfAborted();
+          if (oldAttemptUnconfirmed) {
+            typing.cleanup();
+            return persistOwnReply(
+              formatTaskProposalReply(routed.decision, {
+                kind: "unconfirmed",
+                text: "要求已写入原任务板，但未能确认旧执行已停止，本次未启动新执行。",
+              }),
+            );
+          }
           // A persisted amendment is not an executed revision. If no run can
           // consume it, continue the original admitted task through this host.
           // Re-read after the mutation: pause, reset and focus changes must win.
@@ -1666,7 +1694,7 @@ export async function runPreparedReply(
           );
           const continuation = admittedTaskQueryContinuation({ board: updatedBoard });
           if (
-            drained &&
+            oldAttemptGone &&
             continuation.shouldContinue &&
             updatedBoard.focusRevision === captured.expectedFocusRevision &&
             updatedBoard.current?.taskId === routed.decision.target.taskId

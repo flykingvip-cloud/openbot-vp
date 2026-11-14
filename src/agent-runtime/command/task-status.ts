@@ -35,13 +35,22 @@ function truncateDisplay(text: string, max: number): string {
  * Progress answer from the task-board projection only.
  * unfinished ≠ "正在推进"; never echo internal fields such as wakeSuppress.
  */
-export function formatTaskBoardProgressReply(board: SessionTaskBoard): string {
+export function formatTaskBoardProgressReply(
+  board: SessionTaskBoard,
+  nowMs: number = Date.now(),
+): string {
   const current = board.current;
   const focus = formatTaskBoardFocusLine(board);
+  const observedAt = new Date(nowMs).toISOString();
   if (!current) {
-    return `${focus}。任务板最近记录：没有未完成任务可汇报。`;
+    return `${focus}。来源：任务板。时点：${observedAt}。任务板最近记录：没有未完成任务可汇报。`;
   }
-  const parts = [focus, `任务板最近记录：${current.unfinished ? "未完成" : "已结束待核对"}`];
+  const parts = [
+    focus,
+    "来源：任务板",
+    `时点：${observedAt}`,
+    `任务板最近记录：${current.unfinished ? "未完成" : "已结束待核对"}`,
+  ];
   if (current.wakeSuppress === true) {
     parts.push("主人已暂停自动续跑");
   }
@@ -59,10 +68,11 @@ export function formatTaskBoardProgressReply(board: SessionTaskBoard): string {
 export function queryCurrentTaskStatus(
   prompt: string,
   readBoard: () => SessionTaskBoard,
+  nowMs: number = Date.now(),
 ): string | undefined {
   if (!isProgressStatusQuery(prompt)) {
     return undefined;
   }
   const board = readBoard();
-  return board.current ? formatTaskBoardProgressReply(board) : undefined;
+  return board.current ? formatTaskBoardProgressReply(board, nowMs) : undefined;
 }

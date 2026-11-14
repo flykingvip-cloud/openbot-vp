@@ -34,6 +34,8 @@ describe("current task status query", () => {
     const read = vi.fn(() => board);
     const reply = queryCurrentTaskStatus("进度如何？", read);
     expect(reply).toContain("任务板最近记录：未完成");
+    expect(reply).toContain("来源：任务板");
+    expect(reply).toContain("时点：");
     expect(reply).toContain("主人已暂停自动续跑");
     expect(reply).not.toContain("正在推进");
     expect(read).toHaveBeenCalledTimes(1);
