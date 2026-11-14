@@ -8,7 +8,7 @@ import {
 } from "../../contracts/rule-adaptation-activation.js";
 import type { RuntimeRuleAdaptationExpectedPolicyVersion } from "../../contracts/rule-adaptation.js";
 import type { SessionTaskBoard } from "../../contracts/task.js";
-import { hashCanonicalJson } from "../../policy/rule-adaptation/activation-precheck.js";
+import { hashCanonicalJson } from "../../policy/rule-adaptation/index.js";
 import {
   legalPersonalHost,
   legalPersonalProposal,

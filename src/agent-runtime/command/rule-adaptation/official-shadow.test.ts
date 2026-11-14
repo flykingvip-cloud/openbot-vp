@@ -1,10 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { resolveEmbeddedModelGovernance } from "../../../agents/embedded-model-governance.js";
 import { PRODUCTION_RUNTIME_RULE_WHITELIST } from "../../contracts/rule-adaptation-activation.js";
-import {
-  createAuthorizedModelSession,
-  type ModelSessionPorts,
-} from "../../model/authorized-session.js";
+import { createAuthorizedModelSession, type ModelSessionPorts } from "../../model/index.js";
 import { validateRuntimeRuleProposal } from "../../policy/rule-adaptation/index.js";
 import * as activate from "./activate.js";
 import { runOfficialShadowRuleAdaptation } from "./official-shadow.js";

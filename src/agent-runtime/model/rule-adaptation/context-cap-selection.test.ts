@@ -5,11 +5,6 @@ import { resolveModel } from "../../../agents/pi-embedded-runner/model.js";
 import { getCompactionSafeguardRuntime } from "../../../agents/pi-extensions/compaction-safeguard-runtime.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import {
-  activateApprovedRuntimeRuleProposal,
-  revokeActivatedRuntimeRulePolicy,
-  readActivatedRuntimeRulePolicy,
-} from "../../command/rule-adaptation/activate.js";
-import {
   FIXTURE_BOARD_SCOPE,
   FIXTURE_POLICY_VERSION,
   FIXTURE_TASK_ID,
@@ -19,7 +14,12 @@ import {
   openTempSession,
   seedFixtureBoard,
 } from "../../command/rule-adaptation/activation-test-support.js";
-import { createOfficialFixtureContextCapPort } from "../../command/rule-adaptation/fixture-context-cap-port.js";
+import {
+  activateApprovedRuntimeRuleProposal,
+  createOfficialFixtureContextCapPort,
+  readActivatedRuntimeRulePolicy,
+  revokeActivatedRuntimeRulePolicy,
+} from "../../command/rule-adaptation/index.js";
 import {
   NO_LIVE_EXECUTION_CLAIM,
   PRODUCTION_RUNTIME_RULE_WHITELIST,

@@ -18,12 +18,8 @@ import {
  * mainChainWired remains false on production/default paths.
  */
 import type { TaskBoardScope } from "../../contracts/task.js";
-import {
-  CONTEXT_WINDOW_HARD_MIN_TOKENS,
-  type ContextWindowInfo,
-} from "../../policy/context-window.js";
-import { boardScopesEqual } from "../../policy/rule-adaptation/activation-precheck.js";
-import { isSafeIntegerNumber } from "../../policy/rule-adaptation/inspect.js";
+import { CONTEXT_WINDOW_HARD_MIN_TOKENS, type ContextWindowInfo } from "../../policy/index.js";
+import { boardScopesEqual, isSafeIntegerNumber } from "../../policy/rule-adaptation/index.js";
 
 export const CONTEXT_CAP_SELECTION_MODES = ["original", "personal_activated_snapshot"] as const;
 export type ContextCapSelectionMode = (typeof CONTEXT_CAP_SELECTION_MODES)[number];

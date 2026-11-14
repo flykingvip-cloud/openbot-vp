@@ -7,7 +7,7 @@ import type {
 import {
   createGovernedShadowModelPort,
   type GovernedShadowModelPortDeps,
-} from "../../model/rule-adaptation/model-port.js";
+} from "../../model/rule-adaptation/index.js";
 /**
  * Thin official host binding for the read-only shadow rule-adaptation entry.
  *

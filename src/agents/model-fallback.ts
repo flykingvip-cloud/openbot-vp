@@ -1,4 +1,4 @@
-import { isContextCapSelectionBlockedError } from "../agent-runtime/model/rule-adaptation/context-cap-selection.js";
+import { isContextCapSelectionBlockedError } from "../agent-runtime/model/rule-adaptation/index.js";
 import type { OpenBotConfig } from "../config/config.js";
 import {
   resolveAgentModelFallbackValues,

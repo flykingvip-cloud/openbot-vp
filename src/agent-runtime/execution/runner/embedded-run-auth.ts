@@ -24,7 +24,7 @@ import {
   prepareEmbeddedModel,
   resolveRunAuthProfileCandidates,
 } from "../../model/index.js";
-import type { PersonalContextCapSelectionPort } from "../../model/rule-adaptation/context-cap-selection.js";
+import type { PersonalContextCapSelectionPort } from "../../model/rule-adaptation/index.js";
 import {
   OVERLOAD_FAILOVER_BACKOFF_POLICY,
   resolveMaxRunRetryIterations,

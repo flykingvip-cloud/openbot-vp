@@ -11,8 +11,11 @@ import type {
   ShadowUsageAccountingStatus,
 } from "../../contracts/rule-adaptation-shadow.js";
 import type { RuntimeRuleAdaptationValidationResult } from "../../contracts/rule-adaptation.js";
-import { createBudgetTracker, type BudgetTracker } from "../../model/rule-adaptation/budget.js";
-import { invokeLimitedCompletion } from "../../model/rule-adaptation/completion-limits.js";
+import {
+  createBudgetTracker,
+  invokeLimitedCompletion,
+  type BudgetTracker,
+} from "../../model/rule-adaptation/index.js";
 import { validateRuntimeRuleProposal } from "../../policy/rule-adaptation/index.js";
 import type { ControlledCandidateEntry } from "./candidate-entry.js";
 import { buildShadowDiff } from "./compare.js";
