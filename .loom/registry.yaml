@@ -14496,6 +14496,70 @@ tasks:
             Official loom register was not run. Scope is limited to optional same-run cap
             pass-through and selection-block classification; production default stays closed, the
             production whitelist stays empty, and the manual /compact command path is not modified.
+        - at: 2026-11-14T03:42:00.000Z
+          kind: coordinated-surgical-extension
+          exclusive: false
+          officialLoomRegister: false
+          humanOwnerSignOff: not-claimed
+          authorizedBy: human-governor
+          paths:
+            - src/gateway/server-methods/runtime-rule-adaptation-advice.ts
+            - src/gateway/server-methods/runtime-rule-adaptation-advice.test.ts
+            - src/gateway/server-methods.ts
+            - src/gateway/server-methods-list.ts
+            - src/gateway/method-scopes.ts
+            - ui/src/ui/chat/rule-adaptation-advice-panel.ts
+            - ui/src/ui/chat/rule-adaptation-advice-panel.node.test.ts
+            - ui/src/ui/controllers/rule-adaptation-advice.ts
+            - ui/src/ui/controllers/rule-adaptation-advice.node.test.ts
+            - ui/src/styles/chat/rule-adaptation-advice.css
+            - ui/src/styles/chat.css
+            - ui/src/ui/views/chat.ts
+            - ui/src/ui/app-render.ts
+            - ui/src/i18n/locales/zh-CN.ts
+            - ui/src/i18n/locales/en.ts
+          currentOpenOwners:
+            - taskId: GWSV
+              owner: Gateway Supervisor And Protocol Extensions
+              state: active
+              coveringPatterns:
+                - src/gateway/server-methods/**
+            - taskId: EDGSC
+              owner: Enterprise Data Governance And Knowledge Universe M6
+              state: active
+              coveringPatterns:
+                - src/gateway/server-methods.ts
+                - src/gateway/server-methods-list.ts
+                - src/gateway/method-scopes.ts
+            - taskId: EUI
+              owner: Enterprise UI And Platform Views
+              state: active
+              coveringPatterns:
+                - ui/**
+            - taskId: A
+              owner: Workbench And Employee UI Recovery
+              state: active
+              coveringPatterns:
+                - ui/src/i18n/**
+                - ui/src/styles/**
+                - ui/src/ui/**
+            - taskId: ft-dedupe-thinking-progress-ui-20261102
+              owner: cursor-grok
+              state: active
+              coveringPatterns:
+                - ui/src/ui/views/chat.ts
+            - taskId: local-ui-seams
+              owner: codex-runtime-manager
+              state: active
+              coveringPatterns:
+                - ui/src/ui/app-render.ts
+                - ui/src/ui/views/chat.ts
+          note: Limited landing registration only, not exclusive ownership. Owner t63u 2026-11-14
+            authorized a minimal employee-advice entry, trusted server binding, and result display.
+            These exact files are not added to this task's exclusive paths. Predecessor owners,
+            covering globs, session history, and CONFLICT records remain declared and are not
+            shrunk. command/index.ts, interaction-turn.ts, and reply-turn.ts are not taken over.
+            Official loom register was not run. No predecessor personal sign-off is claimed.
   - id: exec-chain-fidelity-ab-min
     owner: grok-dynamic-rules
     intent:
@@ -33569,3 +33633,108 @@ sharedPaths:
       fix and required regression only. Predecessor owners, paths, and session history remain
       unchanged. Does not take over src/** or src/agents/**. Authorized by human-governor on
       2026-11-13. Independent acceptance: codex-runtime-manager. No A/B or #281 content."
+  - glob: src/gateway/server-methods/runtime-rule-adaptation-advice.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/runtime-rule-adaptation-advice.test.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods-list.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/method-scopes.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/chat/rule-adaptation-advice-panel.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/chat/rule-adaptation-advice-panel.node.test.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/controllers/rule-adaptation-advice.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/controllers/rule-adaptation-advice.node.test.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/styles/chat/rule-adaptation-advice.css
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/styles/chat.css
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/views/chat.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/ui/app-render.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/i18n/locales/zh-CN.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: ui/src/i18n/locales/en.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t63u 2026-11-14 employee advice entry. Exact-file sharedPath only; predecessor
+      owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
+      and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
+      was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
