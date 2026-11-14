@@ -14,6 +14,7 @@ import {
   BILLING_BLOCKED_INTERACTION_TEXT,
   persistRejectedInteractionTurn,
   readChatTurnTerminal,
+  reconcileChatTurnTerminal,
   REJECTED_INTERACTION_TURN_TEXT,
 } from "./chat-interaction-failure.js";
 it("persists only governed billing failures as a pre-execution blocked interaction", async () => {
@@ -279,5 +280,281 @@ it("R2: a tool or process timeout without phase information cannot be guaranteed
     ]);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it("keeps only the first sealed fact when a second persist arrives after the first append has entered", async () => {
+  const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "interaction-terminal-reentry-"));
+  const written: string[] = [];
+  let firstEntered!: () => void;
+  const firstAppendEntered = new Promise<void>((resolve) => {
+    firstEntered = resolve;
+  });
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const append = async (text: string) => {
+    firstEntered();
+    await barrier;
+    written.push(text);
+    return { ok: true };
+  };
+  const common = {
+    storeDir,
+    sessionKey: "sess-reentry",
+    runId: "run-reentry",
+    append,
+  };
+  try {
+    const first = persistRejectedInteractionTurn({
+      ...common,
+      error: Object.assign(new Error("timeout"), {
+        interactionPhase: "interpretation" as const,
+        reason: "timeout",
+      }),
+    });
+    await firstAppendEntered;
+    const second = persistRejectedInteractionTurn({
+      ...common,
+      error: Object.assign(new Error("tool timeout after send"), {
+        interactionPhase: "execution" as const,
+        reason: "timeout",
+      }),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    release();
+    const [left, right] = await Promise.all([first, second]);
+    expect(written).toHaveLength(1);
+    expect(written[0]).toBe(INTERACTION_TIMEOUT_TEXT);
+    const sidecar = readChatTurnTerminal("run-reentry", storeDir, "sess-reentry");
+    expect(sidecar).toMatchObject({
+      text: INTERACTION_TIMEOUT_TEXT,
+      businessExecution: "none",
+      persistedToTranscript: true,
+    });
+    expect(left.text).toBe(INTERACTION_TIMEOUT_TEXT);
+    expect(right.text).toBe(INTERACTION_TIMEOUT_TEXT);
+    expect(left.persisted).toBe(true);
+    expect(right.persisted).toBe(true);
+  } finally {
+    fs.rmSync(storeDir, { recursive: true, force: true });
+  }
+});
+
+it("appends a concurrent same-fact persist only once after the first append has entered", async () => {
+  const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "interaction-terminal-same-fact-"));
+  const written: string[] = [];
+  let firstEntered!: () => void;
+  const firstAppendEntered = new Promise<void>((resolve) => {
+    firstEntered = resolve;
+  });
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const append = async (text: string) => {
+    firstEntered();
+    await barrier;
+    written.push(text);
+    return { ok: true };
+  };
+  const error = Object.assign(new Error("timeout"), {
+    interactionPhase: "interpretation" as const,
+    reason: "timeout",
+  });
+  const common = {
+    storeDir,
+    sessionKey: "sess-same-fact",
+    runId: "run-same-fact",
+    error,
+    append,
+  };
+  try {
+    const first = persistRejectedInteractionTurn(common);
+    await firstAppendEntered;
+    const second = persistRejectedInteractionTurn(common);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    release();
+    const [left, right] = await Promise.all([first, second]);
+    expect(written).toHaveLength(1);
+    expect(written[0]).toBe(INTERACTION_TIMEOUT_TEXT);
+    expect(left).toEqual({ persisted: true, text: INTERACTION_TIMEOUT_TEXT });
+    expect(right).toEqual({ persisted: true, text: INTERACTION_TIMEOUT_TEXT });
+    expect(readChatTurnTerminal("run-same-fact", storeDir, "sess-same-fact")).toMatchObject({
+      text: INTERACTION_TIMEOUT_TEXT,
+      persistedToTranscript: true,
+      businessExecution: "none",
+    });
+  } finally {
+    fs.rmSync(storeDir, { recursive: true, force: true });
+  }
+});
+
+it("releases the terminal path lock after an append failure so a later same-fact persist can retry", async () => {
+  const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "interaction-terminal-lock-release-"));
+  const error = Object.assign(new Error("timeout"), {
+    interactionPhase: "interpretation" as const,
+    reason: "timeout",
+  });
+  try {
+    const first = await persistRejectedInteractionTurn({
+      error,
+      runId: "run-lock-release",
+      sessionKey: "sess-lock-release",
+      storeDir,
+      append: async () => {
+        throw new Error("disk error");
+      },
+    });
+    expect(first.persisted).toBe(false);
+    expect(first.recordTemporarilyUnavailable).toBe(true);
+    const retried: string[] = [];
+    const second = await persistRejectedInteractionTurn({
+      error,
+      runId: "run-lock-release",
+      sessionKey: "sess-lock-release",
+      storeDir,
+      append: async (text: string) => {
+        retried.push(text);
+        return { ok: true };
+      },
+    });
+    expect(retried).toEqual([INTERACTION_TIMEOUT_TEXT]);
+    expect(second).toEqual({ persisted: true, text: INTERACTION_TIMEOUT_TEXT });
+    expect(readChatTurnTerminal("run-lock-release", storeDir, "sess-lock-release")).toMatchObject({
+      text: INTERACTION_TIMEOUT_TEXT,
+      persistedToTranscript: true,
+      recordTemporarilyUnavailable: false,
+    });
+  } finally {
+    fs.rmSync(storeDir, { recursive: true, force: true });
+  }
+});
+
+it("lets a different run enter append while another run still holds its terminal critical section", async () => {
+  const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "interaction-terminal-independent-run-"));
+  const error = Object.assign(new Error("timeout"), {
+    interactionPhase: "interpretation" as const,
+    reason: "timeout",
+  });
+  let firstEntered!: () => void;
+  const firstAppendEntered = new Promise<void>((resolve) => {
+    firstEntered = resolve;
+  });
+  let releaseFirst!: () => void;
+  const holdFirst = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  let secondEntered!: () => void;
+  const secondAppendEntered = new Promise<void>((resolve) => {
+    secondEntered = resolve;
+  });
+  try {
+    const first = persistRejectedInteractionTurn({
+      error,
+      runId: "run-independent-a",
+      sessionKey: "sess-independent",
+      storeDir,
+      append: async (_text: string) => {
+        firstEntered();
+        await holdFirst;
+        return { ok: true };
+      },
+    });
+    await firstAppendEntered;
+    const second = persistRejectedInteractionTurn({
+      error,
+      runId: "run-independent-b",
+      sessionKey: "sess-independent",
+      storeDir,
+      append: async (_text: string) => {
+        secondEntered();
+        return { ok: true };
+      },
+    });
+    await Promise.race([
+      secondAppendEntered,
+      new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error("independent run was blocked by another run's terminal lock"));
+        }, 1000);
+      }),
+    ]);
+    releaseFirst();
+    const [left, right] = await Promise.all([first, second]);
+    expect(left).toEqual({ persisted: true, text: INTERACTION_TIMEOUT_TEXT });
+    expect(right).toEqual({ persisted: true, text: INTERACTION_TIMEOUT_TEXT });
+    expect(readChatTurnTerminal("run-independent-a", storeDir, "sess-independent")).toBeTruthy();
+    expect(readChatTurnTerminal("run-independent-b", storeDir, "sess-independent")).toBeTruthy();
+  } finally {
+    fs.rmSync(storeDir, { recursive: true, force: true });
+  }
+});
+
+it("serializes reconcile and persist on the same terminal path so a late conflict cannot append", async () => {
+  const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "interaction-terminal-reconcile-mutex-"));
+  const written: string[] = [];
+  let firstEntered!: () => void;
+  const firstAppendEntered = new Promise<void>((resolve) => {
+    firstEntered = resolve;
+  });
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    const first = persistRejectedInteractionTurn({
+      error: Object.assign(new Error("timeout"), {
+        interactionPhase: "interpretation" as const,
+        reason: "timeout",
+      }),
+      runId: "run-reconcile-mutex",
+      sessionKey: "sess-reconcile-mutex",
+      storeDir,
+      append: async (text: string) => {
+        firstEntered();
+        await barrier;
+        written.push(text);
+        return { ok: true };
+      },
+    });
+    await firstAppendEntered;
+    let reconcileSettledBeforeRelease = false;
+    const reconciled = reconcileChatTurnTerminal({
+      runId: "run-reconcile-mutex",
+      sessionKey: "sess-reconcile-mutex",
+      storeDir,
+      append: async (text: string) => {
+        written.push(text);
+        return { ok: true };
+      },
+    }).then((result) => {
+      reconcileSettledBeforeRelease = true;
+      return result;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(reconcileSettledBeforeRelease).toBe(false);
+    expect(written).toHaveLength(0);
+    release();
+    const [left, recovered] = await Promise.all([first, reconciled]);
+    expect(written).toEqual([INTERACTION_TIMEOUT_TEXT]);
+    expect(left).toEqual({ persisted: true, text: INTERACTION_TIMEOUT_TEXT });
+    expect(reconcileSettledBeforeRelease).toBe(true);
+    expect(recovered.reconciled).toBe(false);
+    expect(recovered.receipt).toMatchObject({
+      text: INTERACTION_TIMEOUT_TEXT,
+      businessExecution: "none",
+      persistedToTranscript: true,
+    });
+    expect(
+      readChatTurnTerminal("run-reconcile-mutex", storeDir, "sess-reconcile-mutex"),
+    ).toMatchObject({
+      text: INTERACTION_TIMEOUT_TEXT,
+      businessExecution: "none",
+      persistedToTranscript: true,
+    });
+  } finally {
+    fs.rmSync(storeDir, { recursive: true, force: true });
   }
 });

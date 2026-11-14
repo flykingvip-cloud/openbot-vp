@@ -8,6 +8,7 @@ import {
   classifyInteractionFailure,
 } from "../agent-runtime/model/interaction-resource-wait.js";
 import { SESSION_TASK_BOARD_LOCK_OPTIONS, withFileLock } from "../infra/file-lock.js";
+import { createAsyncLock } from "../infra/json-files.js";
 import { resolveConfigDir } from "../utils.js";
 
 export const REJECTED_INTERACTION_TURN_TEXT =
@@ -162,12 +163,39 @@ export function writeChatTurnTerminal(
   return writeChatTurnTerminalRecord(receipt, storeDir);
 }
 
+const chatTurnTerminalPathLocks = new Map<string, ReturnType<typeof createAsyncLock>>();
+
+function resolveChatTurnTerminalLockPath(
+  runId: string,
+  storeDir?: string,
+  sessionKey?: string,
+): string {
+  return path.resolve(chatTurnTerminalPath(runId, storeDir, sessionKey));
+}
+
+function lockForChatTurnTerminalPath(dest: string): ReturnType<typeof createAsyncLock> {
+  const existing = chatTurnTerminalPathLocks.get(dest);
+  if (existing) {
+    return existing;
+  }
+  const created = createAsyncLock();
+  chatTurnTerminalPathLocks.set(dest, created);
+  return created;
+}
+
 async function withChatTurnTerminalLock<T>(
   params: { runId: string; storeDir?: string; sessionKey?: string },
   fn: () => Promise<T>,
 ): Promise<T> {
-  const dest = chatTurnTerminalPath(params.runId, params.storeDir, params.sessionKey);
-  return withFileLock(dest, SESSION_TASK_BOARD_LOCK_OPTIONS, fn);
+  const dest = resolveChatTurnTerminalLockPath(params.runId, params.storeDir, params.sessionKey);
+  // In-process path lock first: withFileLock reenters when the same process
+  // already holds the path, which lets a second independent request read an
+  // unsealed receipt during the first append. Persist and reconcile share this
+  // resolved-path identity. createAsyncLock is not reentrant; callers of this
+  // helper do not nest on the same path.
+  return lockForChatTurnTerminalPath(dest)(() =>
+    withFileLock(dest, SESSION_TASK_BOARD_LOCK_OPTIONS, fn),
+  );
 }
 
 export async function reconcileChatTurnTerminal(params: {
