@@ -128,7 +128,9 @@
     "exemptFiles": [
       "src/agent-runtime/command/governed-interaction.test.ts",
       "src/agent-runtime/command/rule-adaptation/official-shadow.test.ts",
-      "src/agent-runtime/command/interaction-terminal.s1.test.ts"
+      "src/agent-runtime/command/interaction-terminal.s1.test.ts",
+      "src/agent-runtime/command/rule-adaptation/host-trigger-passthrough.test.ts",
+      "src/agent-runtime/command/rule-adaptation/host-trigger-passthrough.live.test.ts"
     ],
     "description": "Command use cases cannot directly invoke models, tools, scheduling or task persistence; effects use explicit injected ports and pure projections.",
     "exemptReasons": {
