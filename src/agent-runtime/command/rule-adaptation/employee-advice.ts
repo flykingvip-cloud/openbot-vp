@@ -5,8 +5,6 @@
  * effective. Does not activate policy, write configuration, or publish rules.
  */
 import { randomUUID } from "node:crypto";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { PRODUCTION_RUNTIME_RULE_WHITELIST } from "../../contracts/rule-adaptation-activation.js";
 import {
@@ -17,14 +15,22 @@ import {
   type ShadowRunRequest,
   type ShadowRunResult,
 } from "../../contracts/rule-adaptation-shadow.js";
+import type {
+  HostCompatibilityRecord,
+  HostExpectedPolicyState,
+} from "../../contracts/rule-adaptation.js";
 import { createAuthorizedModelSession, type ModelSessionPorts } from "../../model/index.js";
 import type { GovernedShadowModelPortDeps } from "../../model/rule-adaptation/index.js";
 import { validateRuntimeRuleProposal } from "../../policy/rule-adaptation/index.js";
-import type { GovernedInteractionWithShadow, GovernedShadowHostInjection } from "../index.js";
 import { emptyControlSnapshot } from "./control-snapshot.js";
-import type { OfficialShadowHostBinding } from "./official-shadow.js";
+import {
+  bindShadowHostAbortSignal,
+  runOfficialShadowRuleAdaptation,
+  type OfficialShadowHostBinding,
+} from "./official-shadow.js";
 
 export const EMPLOYEE_ADVICE_METHOD = "runtime-rule-adaptation.advice" as const;
+export const EMPLOYEE_ADVICE_CANCEL_METHOD = "runtime-rule-adaptation.advice.cancel" as const;
 export const EMPLOYEE_ADVICE_NOT_EFFECTIVE_LABEL = "尚未生效" as const;
 
 export const EMPLOYEE_ADVICE_STATES = [
@@ -49,6 +55,8 @@ export const EMPLOYEE_ADVICE_STATE_LABELS: Record<EmployeeAdviceState, string> =
 export type EmployeeAdviceClientFields = {
   question?: unknown;
   targetRef?: unknown;
+  /** Client correlation id used only to cancel this advice request. */
+  requestId?: unknown;
 };
 
 export type SanitizedEmployeeAdviceTargetRef = {
@@ -59,6 +67,7 @@ export type SanitizedEmployeeAdviceTargetRef = {
 export type SanitizedEmployeeAdviceRequest = {
   question: string;
   targetRef: SanitizedEmployeeAdviceTargetRef;
+  requestId?: string;
 };
 
 export type EmployeeAdviceReasonView = {
@@ -91,7 +100,24 @@ export type TrustedEmployeeAdviceIdentity = {
 };
 
 export type TrustedEmployeeAdviceFacts = {
+  /**
+   * Effective context-token value after comparing the actual model window
+   * with any config cap. Must not be the config cap alone.
+   */
   currentContextTokens?: number;
+  currentContextTokenSource?: "model" | "modelsConfig" | "agentContextTokens";
+  modelContextWindow?: number;
+  configContextTokenCap?: number;
+  approvedTarget?: {
+    agentId: string;
+    sessionKey?: string;
+    scopeId: string;
+  };
+  /** Seat authorization is not target-rule authorization. */
+  targetAuthorization?: "approved" | "denied" | "unknown";
+  targetAuthorizationReason?: string;
+  compatibilityRecord?: HostCompatibilityRecord;
+  expectedPolicyState?: HostExpectedPolicyState;
   expectedPolicyVersion?: {
     policyHash: string;
     protocolVersion: string;
@@ -102,31 +128,10 @@ export type TrustedEmployeeAdviceFacts = {
   requiredProposalShape?: unknown;
 };
 
-export type IsolatedAdviceInteractionParams = {
-  config: OpenBotConfig;
-  runId: string;
-  agentId: string;
-  agentDir: string;
-  sessionKey: string;
-  sessionFile: string;
-  requestId: string;
-  input: {
-    message: string;
-    context: readonly { role: "system" | "user" | "assistant"; content: string }[];
-    abortSignal?: AbortSignal;
-  };
-  captured: { expectedFocusRevision: number; expectedWriteEpoch: number };
-  identity: { gatewayClientPlatformUserId: string };
-  authorized: boolean;
-  provider: string;
-  model: string;
-  timeoutMs: number;
-};
-
-export type EmployeeAdviceInteract = (
-  params: IsolatedAdviceInteractionParams,
-  shadowHost: GovernedShadowHostInjection,
-) => Promise<GovernedInteractionWithShadow>;
+export type EmployeeAdviceRunShadow = (
+  request: ShadowRunRequest,
+  binding: OfficialShadowHostBinding,
+) => Promise<ShadowRunResult>;
 
 export type TrustedEmployeeAdviceHost = {
   identity: TrustedEmployeeAdviceIdentity;
@@ -137,11 +142,9 @@ export type TrustedEmployeeAdviceHost = {
     complete: GovernedShadowModelPortDeps["complete"];
     sessionPorts: ModelSessionPorts;
   };
-  interact: EmployeeAdviceInteract;
+  runShadow?: EmployeeAdviceRunShadow;
   now?: () => number;
   config?: OpenBotConfig | Record<string, never>;
-  agentDir?: string;
-  isolatedSessionFile?: string;
   signal?: AbortSignal;
 };
 
@@ -204,7 +207,8 @@ export function sanitizeEmployeeAdviceClientInput(
     ...(nonEmptyString(rawRef.sessionKey) ? { sessionKey: nonEmptyString(rawRef.sessionKey) } : {}),
     ...(nonEmptyString(rawRef.agentId) ? { agentId: nonEmptyString(rawRef.agentId) } : {}),
   };
-  const request = { question, targetRef };
+  const requestId = nonEmptyString(source.requestId);
+  const request = { question, targetRef, ...(requestId ? { requestId } : {}) };
   if (!question) {
     return {
       ok: false,
@@ -289,19 +293,85 @@ export function buildEmployeeAdviceView(input: {
   };
 }
 
-function personalScopeId(
-  request: SanitizedEmployeeAdviceRequest,
-  identity: TrustedEmployeeAdviceIdentity,
-) {
-  return request.targetRef.agentId?.trim() || `agent:${identity.employeeId}`;
+export function resolveTrustedEffectiveContextTokens(input: {
+  modelWindow?: number;
+  configCap?: number;
+}):
+  | { ok: true; tokens: number; source: "model" | "agentContextTokens" }
+  | { ok: false; reason: string } {
+  const modelWindow =
+    typeof input.modelWindow === "number" &&
+    Number.isFinite(input.modelWindow) &&
+    input.modelWindow > 0
+      ? Math.floor(input.modelWindow)
+      : undefined;
+  if (modelWindow === undefined) {
+    return {
+      ok: false,
+      reason: "宿主缺少实际模型窗口，不能把配置帽当作 currentEffectiveValue。",
+    };
+  }
+  const configCap =
+    typeof input.configCap === "number" && Number.isFinite(input.configCap) && input.configCap > 0
+      ? Math.floor(input.configCap)
+      : undefined;
+  if (configCap !== undefined && configCap < modelWindow) {
+    return { ok: true, tokens: configCap, source: "agentContextTokens" };
+  }
+  return { ok: true, tokens: modelWindow, source: "model" };
+}
+
+function hasTrustedEffectiveValue(facts: TrustedEmployeeAdviceFacts): boolean {
+  if (
+    typeof facts.currentContextTokens !== "number" ||
+    !Number.isFinite(facts.currentContextTokens)
+  ) {
+    return false;
+  }
+  if (
+    facts.currentContextTokenSource === "model" ||
+    facts.currentContextTokenSource === "modelsConfig"
+  ) {
+    return true;
+  }
+  if (facts.currentContextTokenSource === "agentContextTokens") {
+    return typeof facts.modelContextWindow === "number" && facts.modelContextWindow > 0;
+  }
+  return false;
+}
+
+function approvedScopeId(facts: TrustedEmployeeAdviceFacts): string | undefined {
+  return facts.targetAuthorization === "approved"
+    ? facts.approvedTarget?.scopeId?.trim()
+    : undefined;
 }
 
 export function buildTrustedEmployeeHostView(
   identity: TrustedEmployeeAdviceIdentity,
   facts: TrustedEmployeeAdviceFacts,
-  request: SanitizedEmployeeAdviceRequest,
+  _request: SanitizedEmployeeAdviceRequest,
 ): RuleAdaptationHostView {
-  const current = facts.currentContextTokens;
+  const current = hasTrustedEffectiveValue(facts) ? facts.currentContextTokens : undefined;
+  const scopeId = approvedScopeId(facts);
+  const hostFacts: Record<string, unknown> = {
+    identity: {
+      principalType: "personal",
+      principalId: identity.principalId,
+      ...(scopeId ? { scope: { type: "personal", id: scopeId } } : {}),
+    },
+    authorizationStatus: identity.authorizationStatus,
+  };
+  if (typeof current === "number") {
+    hostFacts.currentEffectiveValues = { "agents.defaults.contextTokens": current };
+  }
+  // Only attach compatibility and policy state when the trusted host supplied them.
+  // Never invent approved_compatible or active.
+  if (facts.compatibilityRecord) {
+    hostFacts.compatibilityRecord = facts.compatibilityRecord;
+  }
+  if (facts.expectedPolicyState) {
+    hostFacts.expectedPolicyState = facts.expectedPolicyState;
+  }
   return {
     rules: [
       {
@@ -325,25 +395,7 @@ export function buildTrustedEmployeeHostView(
             },
           ]
         : [],
-    hostFacts: {
-      identity: {
-        principalType: "personal",
-        principalId: identity.principalId,
-        scope: { type: "personal", id: personalScopeId(request, identity) },
-      },
-      ...(typeof current === "number"
-        ? { currentEffectiveValues: { "agents.defaults.contextTokens": current } }
-        : {}),
-      authorizationStatus: identity.authorizationStatus,
-      compatibilityRecord: {
-        status: "approved_compatible",
-        boundImplementationVersion: INVENTORY_PIN,
-        ...(facts.expectedPolicyVersion
-          ? { boundExpectedPolicyVersion: facts.expectedPolicyVersion }
-          : {}),
-      },
-      expectedPolicyState: "active",
-    },
+    hostFacts,
     ruleViewVersion: `inventory:${INVENTORY_PIN}`,
     ...(identity.tenantId ? { tenantId: identity.tenantId } : {}),
   };
@@ -359,7 +411,7 @@ export function buildTrustedEmployeeShadowRequest(input: {
   const knownFacts: Record<string, unknown> = {
     implementationVersion: INVENTORY_PIN,
   };
-  if (typeof input.facts.currentContextTokens === "number") {
+  if (hasTrustedEffectiveValue(input.facts)) {
     knownFacts.currentEffectiveValue = input.facts.currentContextTokens;
   }
   const hardMin =
@@ -375,54 +427,17 @@ export function buildTrustedEmployeeShadowRequest(input: {
   if (input.facts.requiredProposalShape) {
     knownFacts.requiredProposalShape = input.facts.requiredProposalShape;
   }
+  const scopeId = approvedScopeId(input.facts);
   return {
     requestId: input.requestId,
     situation: {
       summary: input.request.question,
       symptoms: [input.request.question],
-      scope: { type: "personal", id: personalScopeId(input.request, input.identity) },
+      ...(scopeId ? { scope: { type: "personal" as const, id: scopeId } } : {}),
       knownFacts,
     },
     budget: { ...DEFAULT_SHADOW_BUDGET_LIMITS, maxDurationMs: 45_000 },
     ...(input.signal ? { signal: input.signal } : {}),
-  };
-}
-
-export function buildIsolatedAdviceInteractionParams(input: {
-  requestId: string;
-  identity: TrustedEmployeeAdviceIdentity;
-  request: SanitizedEmployeeAdviceRequest;
-  provider: string;
-  model: string;
-  config?: OpenBotConfig | Record<string, never>;
-  agentDir?: string;
-  isolatedSessionFile?: string;
-  signal?: AbortSignal;
-}): IsolatedAdviceInteractionParams {
-  const sessionFile =
-    input.isolatedSessionFile ??
-    join(tmpdir(), `openbot-rule-adaptation-advice-${input.requestId}.jsonl`);
-  return {
-    config: (input.config ?? {}) as IsolatedAdviceInteractionParams["config"],
-    runId: `rule-adaptation-advice:${input.requestId}`,
-    agentId: input.request.targetRef.agentId?.trim() || "bot",
-    agentDir: input.agentDir ?? join(tmpdir(), `openbot-rule-adaptation-advice-${input.requestId}`),
-    sessionKey: `runtime-rule-adaptation-advice:${input.requestId}`,
-    sessionFile,
-    requestId: `message-rule-adaptation-advice:${input.requestId}`,
-    captured: { expectedFocusRevision: 0, expectedWriteEpoch: 0 },
-    authorized: input.identity.authorizationStatus === "authorized",
-    identity: {
-      gatewayClientPlatformUserId: input.identity.employeeId,
-    },
-    provider: input.provider,
-    model: input.model,
-    timeoutMs: 20_000,
-    input: {
-      message: "规则适配建议对照回合，不写入原对话。",
-      context: [],
-      ...(input.signal ? { abortSignal: input.signal } : {}),
-    },
   };
 }
 
@@ -448,8 +463,8 @@ export async function runEmployeeRuleAdaptationAdvice(
     // Read-only assertion for this entry: never treat a non-empty compiled
     // whitelist as authorization to activate. The advice view stays inactive.
   }
-  const requestId = randomUUID();
   const sanitized = sanitizeEmployeeAdviceClientInput(clientInput);
+  const requestId = sanitized.request.requestId ?? randomUUID();
   if (!sanitized.ok) {
     return buildEmployeeAdviceView({
       requestId,
@@ -469,8 +484,40 @@ export async function runEmployeeRuleAdaptationAdvice(
       modelCalled: false,
     });
   }
-  if (typeof host.facts.currentContextTokens !== "number") {
-    const message = "宿主缺少当前生效的 contextTokens 事实，无法给出完整建议。";
+  if (host.facts.targetAuthorization === "denied") {
+    const message =
+      host.facts.targetAuthorizationReason?.trim() ||
+      "拥有员工席位也不等于有权调整目标机器人的规则。";
+    return buildEmployeeAdviceView({
+      requestId,
+      outcomeCode: "insufficient_permission",
+      reasons: [{ code: "insufficient_permission", message }],
+      summary: message,
+      modelCalled: false,
+    });
+  }
+  if (host.facts.targetAuthorization !== "approved" || !approvedScopeId(host.facts)) {
+    const message = "服务端尚未核准目标，缺少目标访问权限证明，无法给出规则适配建议。";
+    return buildEmployeeAdviceView({
+      requestId,
+      outcomeCode: "needs_information",
+      reasons: [{ code: "needs_information", message }],
+      summary: message,
+      modelCalled: false,
+    });
+  }
+  if (!hasTrustedEffectiveValue(host.facts)) {
+    const message = "宿主缺少计入实际模型窗口的 currentEffectiveValue，不能把配置帽当作有效值。";
+    return buildEmployeeAdviceView({
+      requestId,
+      outcomeCode: "needs_information",
+      reasons: [{ code: "insufficient_sources", message }],
+      summary: message,
+      modelCalled: false,
+    });
+  }
+  if (!host.facts.compatibilityRecord || !host.facts.expectedPolicyState) {
+    const message = "宿主缺少已核准的兼容记录或策略状态，无法给出完整建议。";
     return buildEmployeeAdviceView({
       requestId,
       outcomeCode: "needs_information",
@@ -497,32 +544,32 @@ export async function runEmployeeRuleAdaptationAdvice(
       complete: host.model.complete,
     },
   };
+  const signal = bindShadowHostAbortSignal(host.signal, undefined);
+  if (signal?.aborted) {
+    return buildEmployeeAdviceView({
+      requestId,
+      outcomeCode: "cancelled",
+      reasons: [
+        {
+          code: "cancelled",
+          message: "建议请求已取消。已有聊天与原任务未改动。",
+        },
+      ],
+      modelCalled: false,
+    });
+  }
   const shadowRequest = buildTrustedEmployeeShadowRequest({
     requestId,
     request: sanitized.request,
     identity: host.identity,
     facts: host.facts,
-    signal: host.signal,
+    signal,
   });
-  const params = buildIsolatedAdviceInteractionParams({
-    requestId,
-    identity: host.identity,
-    request: sanitized.request,
-    provider: host.model.provider,
-    model: host.model.model,
-    config: host.config,
-    agentDir: host.agentDir,
-    isolatedSessionFile: host.isolatedSessionFile,
-    signal: host.signal,
-  });
+  const runShadow = host.runShadow ?? runOfficialShadowRuleAdaptation;
 
   try {
-    const wrapped = await host.interact(params, {
-      trigger: true,
-      request: shadowRequest,
-      binding,
-    });
-    return shadowToAdviceView(requestId, wrapped.shadow, true);
+    const shadow = await runShadow(shadowRequest, binding);
+    return shadowToAdviceView(requestId, shadow, true);
   } catch (error) {
     const detail = error instanceof Error ? error.message : "advice_request_failed";
     return buildEmployeeAdviceView({

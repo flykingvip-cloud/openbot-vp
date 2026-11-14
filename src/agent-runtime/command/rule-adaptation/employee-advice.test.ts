@@ -1,19 +1,18 @@
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { PRODUCTION_RUNTIME_RULE_WHITELIST } from "../../contracts/rule-adaptation-activation.js";
 import { INVENTORY_PIN } from "../../contracts/rule-adaptation-shadow.js";
+import type { ShadowRunResult } from "../../contracts/rule-adaptation-shadow.js";
 import type { ModelSessionPorts } from "../../model/index.js";
-import type { GovernedInteractionWithShadow } from "../index.js";
 import { emptyControlSnapshot } from "./control-snapshot.js";
 import {
   buildEmployeeAdviceView,
   buildTrustedEmployeeHostView,
   ignoredUntrustedClientKeys,
   mapShadowOutcomeToEmployeeAdviceState,
+  resolveTrustedEffectiveContextTokens,
   runEmployeeRuleAdaptationAdvice,
   sanitizeEmployeeAdviceClientInput,
+  type TrustedEmployeeAdviceFacts,
   type TrustedEmployeeAdviceHost,
 } from "./employee-advice.js";
 
@@ -48,9 +47,35 @@ function stubShadowPorts(): ModelSessionPorts {
   } as unknown as ModelSessionPorts;
 }
 
-function shadowResult(
-  overrides: Partial<GovernedInteractionWithShadow["shadow"]> = {},
-): GovernedInteractionWithShadow["shadow"] {
+const POLICY_VERSION = {
+  policyHash: "fixture-policy-hash-aaaa",
+  protocolVersion: "1.1",
+  compilerRevision: "1.2.0",
+};
+
+function completeFacts(
+  overrides: Partial<TrustedEmployeeAdviceFacts> = {},
+): TrustedEmployeeAdviceFacts {
+  return {
+    currentContextTokens: 32000,
+    currentContextTokenSource: "agentContextTokens",
+    modelContextWindow: 64000,
+    configContextTokenCap: 32000,
+    targetAuthorization: "approved",
+    approvedTarget: { agentId: "agent:personal", scopeId: "agent:personal" },
+    compatibilityRecord: {
+      status: "approved_compatible",
+      boundImplementationVersion: INVENTORY_PIN,
+      boundExpectedPolicyVersion: POLICY_VERSION,
+    },
+    expectedPolicyState: "active",
+    expectedPolicyVersion: POLICY_VERSION,
+    hardMinContextTokens: 16000,
+    ...overrides,
+  };
+}
+
+function shadowResult(overrides: Partial<ShadowRunResult> = {}): ShadowRunResult {
   return {
     outcomeCode: "shadow_recorded",
     activationAllowed: false,
@@ -140,13 +165,11 @@ function shadowResult(
       governanceOccupancyReady: false,
     },
     ...overrides,
-  } as GovernedInteractionWithShadow["shadow"];
+  } as ShadowRunResult;
 }
 
 function authorizedHost(
-  overrides: Partial<TrustedEmployeeAdviceHost> & {
-    interact?: TrustedEmployeeAdviceHost["interact"];
-  } = {},
+  overrides: Partial<TrustedEmployeeAdviceHost> = {},
 ): TrustedEmployeeAdviceHost {
   return {
     identity: {
@@ -156,7 +179,7 @@ function authorizedHost(
       seatId: "seat-server-1",
       authorizationStatus: "authorized",
     },
-    facts: { currentContextTokens: 32000, hardMinContextTokens: 16000 },
+    facts: completeFacts(),
     model: {
       provider: "deepseek",
       model: "deepseek-v4-flash",
@@ -167,13 +190,7 @@ function authorizedHost(
       })),
       sessionPorts: stubShadowPorts(),
     },
-    interact:
-      overrides.interact ??
-      vi.fn(async () => ({
-        interaction: { kind: "respond" as const, text: "ignored", clarification: false },
-        shadow: shadowResult(),
-      })),
-    isolatedSessionFile: join(mkdtempSync(join(tmpdir(), "t63-advice-")), "session.jsonl"),
+    runShadow: vi.fn(async () => shadowResult()),
     ...overrides,
   };
 }
@@ -247,37 +264,83 @@ describe("buildEmployeeAdviceView", () => {
   });
 });
 
+describe("resolveTrustedEffectiveContextTokens", () => {
+  it("does not treat a config cap alone as the effective value", () => {
+    expect(resolveTrustedEffectiveContextTokens({ configCap: 32000 })).toMatchObject({
+      ok: false,
+    });
+    expect(resolveTrustedEffectiveContextTokens({ modelWindow: 64000, configCap: 32000 })).toEqual({
+      ok: true,
+      tokens: 32000,
+      source: "agentContextTokens",
+    });
+    expect(resolveTrustedEffectiveContextTokens({ modelWindow: 64000 })).toEqual({
+      ok: true,
+      tokens: 64000,
+      source: "model",
+    });
+  });
+});
+
 describe("buildTrustedEmployeeHostView", () => {
-  it("uses the server identity, not a client-supplied principal", () => {
+  it("uses the server identity and approved target, not a client-supplied principal or agentId", () => {
     const view = buildTrustedEmployeeHostView(
       {
         employeeId: "user-server-1",
         principalId: "user:user-server-1",
         authorizationStatus: "authorized",
       },
-      { currentContextTokens: 32000 },
-      { question: "too big", targetRef: { agentId: "agent:personal" } },
+      completeFacts(),
+      { question: "too big", targetRef: { agentId: "client-forged-agent" } },
     );
     const facts = view.hostFacts as {
-      identity: { principalId: string };
+      identity: { principalId: string; scope?: { id: string } };
       authorizationStatus: string;
+      compatibilityRecord?: { status: string };
+      expectedPolicyState?: string;
     };
     expect(facts.identity.principalId).toBe("user:user-server-1");
+    expect(facts.identity.scope?.id).toBe("agent:personal");
+    expect(facts.identity.scope?.id).not.toBe("client-forged-agent");
     expect(facts.authorizationStatus).toBe("authorized");
     expect(view.effectivePolicy[0]?.currentEffectiveValue).toBe(32000);
+    expect(facts.compatibilityRecord?.status).toBe("approved_compatible");
+    expect(facts.expectedPolicyState).toBe("active");
     expect(JSON.stringify(view)).toContain(INVENTORY_PIN);
-    expect(JSON.stringify(view)).not.toContain("fixture");
+  });
+
+  it("does not invent approved_compatible, active state, or a client agentId scope when facts are missing", () => {
+    const view = buildTrustedEmployeeHostView(
+      {
+        employeeId: "user-server-1",
+        principalId: "user:user-server-1",
+        authorizationStatus: "authorized",
+      },
+      { currentContextTokens: 32000, configContextTokenCap: 32000 },
+      { question: "too big", targetRef: { agentId: "client-forged-agent" } },
+    );
+    const facts = view.hostFacts as {
+      identity: { scope?: { id: string } };
+      compatibilityRecord?: unknown;
+      expectedPolicyState?: unknown;
+    };
+    expect(facts.compatibilityRecord).toBeUndefined();
+    expect(facts.expectedPolicyState).toBeUndefined();
+    expect(facts.identity.scope).toBeUndefined();
+    expect(view.effectivePolicy).toEqual([]);
+    expect(JSON.stringify(view)).not.toContain("approved_compatible");
+    expect(JSON.stringify(view)).not.toContain("client-forged-agent");
   });
 });
 
 describe("runEmployeeRuleAdaptationAdvice", () => {
-  it("does not call the host chain when the client omits a question", async () => {
-    const interact = vi.fn();
+  it("does not call the official shadow entry when the client omits a question", async () => {
+    const runShadow = vi.fn();
     const complete = vi.fn();
     const view = await runEmployeeRuleAdaptationAdvice(
       { question: "", apiKey: "sk-forged" },
       authorizedHost({
-        interact,
+        runShadow,
         model: {
           provider: "deepseek",
           model: "deepseek-v4-flash",
@@ -290,12 +353,12 @@ describe("runEmployeeRuleAdaptationAdvice", () => {
     expect(view.label).toBe("需补信息");
     expect(view.notEffective).toBe(true);
     expect(view.modelCalled).toBe(false);
-    expect(interact).not.toHaveBeenCalled();
+    expect(runShadow).not.toHaveBeenCalled();
     expect(complete).not.toHaveBeenCalled();
   });
 
   it("explains a missing permission without starting the shadow or touching the original chat", async () => {
-    const interact = vi.fn();
+    const runShadow = vi.fn();
     const view = await runEmployeeRuleAdaptationAdvice(
       {
         question: "上下文太大",
@@ -309,56 +372,71 @@ describe("runEmployeeRuleAdaptationAdvice", () => {
           authorizationStatus: "unauthorized",
           authorizationReason: "当前账号未绑定企业席位，无权请求规则适配建议。",
         },
-        interact,
+        runShadow,
       }),
     );
     expect(view.state).toBe("blocked");
     expect(view.label).toBe("被阻止");
     expect(view.summary).toContain("无权");
     expect(view.modelCalled).toBe(false);
-    expect(interact).not.toHaveBeenCalled();
+    expect(runShadow).not.toHaveBeenCalled();
   });
 
-  it("explains missing host facts without inventing a policy version or calling the model", async () => {
-    const interact = vi.fn();
+  it("returns 需补信息 when only a config cap is present, and does not invent compatibility", async () => {
+    const runShadow = vi.fn();
     const view = await runEmployeeRuleAdaptationAdvice(
-      { question: "上下文太大" },
-      authorizedHost({ facts: {}, interact }),
+      { question: "上下文太大", targetRef: { agentId: "client-agent" } },
+      authorizedHost({
+        facts: { currentContextTokens: 32000, configContextTokenCap: 32000 },
+        runShadow,
+      }),
     );
     expect(view.state).toBe("needs_information");
-    expect(view.summary).toContain("contextTokens");
-    expect(interact).not.toHaveBeenCalled();
+    expect(view.summary).toMatch(/核准目标|模型窗口/);
+    expect(runShadow).not.toHaveBeenCalled();
   });
 
-  it("passes trigger===true through the injected host chain and ignores client bindings", async () => {
-    const interact = vi.fn(async (params, shadowHost) => {
-      expect(shadowHost.trigger).toBe(true);
-      expect(shadowHost.binding.view.hostFacts).toMatchObject({
-        identity: { principalId: "user:user-server-1" },
+  it("blocks a denied target even when the employee has a seat", async () => {
+    const runShadow = vi.fn();
+    const view = await runEmployeeRuleAdaptationAdvice(
+      { question: "上下文太大", targetRef: { agentId: "someone-elses-bot" } },
+      authorizedHost({
+        facts: completeFacts({
+          targetAuthorization: "denied",
+          approvedTarget: undefined,
+          targetAuthorizationReason: "拥有员工席位也不等于有权调整目标机器人的规则。",
+        }),
+        runShadow,
+      }),
+    );
+    expect(view.state).toBe("blocked");
+    expect(view.summary).toContain("拥有员工席位也不等于有权调整目标机器人的规则");
+    expect(runShadow).not.toHaveBeenCalled();
+  });
+
+  it("calls the official shadow entry directly, never a placeholder contrast turn, and ignores client bindings", async () => {
+    const runShadow = vi.fn(async (request, binding) => {
+      expect(request.situation.summary).toContain("上下文窗口太大");
+      expect(request.situation.scope).toEqual({ type: "personal", id: "agent:personal" });
+      expect(JSON.stringify(request)).not.toContain("规则适配建议对照回合");
+      expect(JSON.stringify(request)).not.toContain("agent:real-chat");
+      expect(binding.view.hostFacts).toMatchObject({
+        identity: { principalId: "user:user-server-1", scope: { id: "agent:personal" } },
         authorizationStatus: "authorized",
       });
-      expect(params.sessionKey).toMatch(/^runtime-rule-adaptation-advice:/);
-      expect(params.sessionKey).not.toBe("agent:real-chat");
-      expect(shadowHost.binding.model.complete).toBeTypeOf("function");
-      return {
-        interaction: {
-          kind: "respond" as const,
-          text: "should-not-replace-chat",
-          clarification: false,
-        },
-        shadow: shadowResult(),
-      };
+      expect(binding.model.complete).toBeTypeOf("function");
+      return shadowResult();
     });
     const view = await runEmployeeRuleAdaptationAdvice(
       {
         question: "上下文窗口太大，请在硬下限之上收紧",
-        targetRef: { sessionKey: "agent:real-chat" },
+        targetRef: { sessionKey: "agent:real-chat", agentId: "client-forged-agent" },
         binding: { trigger: true, apiKey: "sk-forged" },
         identity: { principalId: "user:forged" },
       },
-      authorizedHost({ interact }),
+      authorizedHost({ runShadow }),
     );
-    expect(interact).toHaveBeenCalledTimes(1);
+    expect(runShadow).toHaveBeenCalledTimes(1);
     expect(view.state).toBe("adjustment_suggested");
     expect(view.label).toBe("建议调整");
     expect(view.notEffectiveLabel).toBe("尚未生效");
@@ -370,11 +448,45 @@ describe("runEmployeeRuleAdaptationAdvice", () => {
     });
   });
 
-  it("isolates a host-chain failure to the advice result and does not throw into the caller", async () => {
+  it("propagates a client cancel signal to the official shadow entry", async () => {
+    const abort = new AbortController();
+    abort.abort();
+    const runShadow = vi.fn();
+    const view = await runEmployeeRuleAdaptationAdvice(
+      { question: "上下文太大" },
+      authorizedHost({ runShadow, signal: abort.signal }),
+    );
+    expect(runShadow).not.toHaveBeenCalled();
+    expect(view.state).toBe("failed");
+    expect(view.outcomeCode).toBe("cancelled");
+    expect(view.summary).toContain("已取消");
+    expect(view.modelCalled).toBe(false);
+  });
+
+  it("aborts an in-flight official shadow call when the host signal is cancelled", async () => {
+    const abort = new AbortController();
+    let seenSignal: AbortSignal | undefined;
+    const runShadow = vi.fn(async (request: { signal?: AbortSignal }) => {
+      seenSignal = request.signal;
+      abort.abort();
+      expect(request.signal?.aborted).toBe(true);
+      return shadowResult({ outcomeCode: "cancelled", cancelled: true });
+    });
+    const view = await runEmployeeRuleAdaptationAdvice(
+      { question: "上下文太大" },
+      authorizedHost({ runShadow, signal: abort.signal }),
+    );
+    expect(runShadow).toHaveBeenCalledTimes(1);
+    expect(seenSignal?.aborted).toBe(true);
+    expect(view.state).toBe("failed");
+    expect(view.outcomeCode).toBe("cancelled");
+  });
+
+  it("isolates a shadow failure to the advice result and does not throw into the caller", async () => {
     const view = await runEmployeeRuleAdaptationAdvice(
       { question: "上下文太大" },
       authorizedHost({
-        interact: vi.fn(async () => {
+        runShadow: vi.fn(async () => {
           throw new Error("boom");
         }),
       }),

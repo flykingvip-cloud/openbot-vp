@@ -1,14 +1,12 @@
 /**
  * Live employee-advice verification: official DeepSeek is resolved only by
- * the trusted host and is reached through replyTurnRuntime.interaction.
- * Test-only. Does not extend the official production runner, does not read
- * production machine config, and does not log credentials.
+ * the trusted host and is reached through the official shadow entry, without
+ * a placeholder contrast interaction. Test-only. Does not extend the official
+ * production runner, does not read production machine config, and does not
+ * log credentials.
  */
 import { createHash } from "node:crypto";
-import { mkdtempSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { resolveEmbeddedModelGovernance } from "../../../agents/embedded-model-governance.js";
@@ -16,15 +14,14 @@ import { makeZeroUsageSnapshot } from "../../../agents/usage.js";
 import { PRODUCTION_RUNTIME_RULE_WHITELIST } from "../../contracts/rule-adaptation-activation.js";
 import { INVENTORY_PIN } from "../../contracts/rule-adaptation-shadow.js";
 import type { ModelSessionPorts } from "../../model/index.js";
-import { replyTurnRuntime } from "../../wiring/reply-turn.js";
-import * as activate from "./activate.js";
-import { runEmployeeRuleAdaptationAdvice } from "./employee-advice.js";
 import {
   createOfficialDeepSeekShadowCompletion,
   resolveOfficialDeepSeekCredential,
-} from "./official-deepseek-complete.js";
+} from "../../model/rule-adaptation/index.js";
+import * as activate from "./activate.js";
+import { runEmployeeRuleAdaptationAdvice } from "./employee-advice.js";
 
-const EVIDENCE_DIR = "/workspace/t63-employee-advice-entry/logs";
+const EVIDENCE_DIR = "/workspace/t64-employee-advice-wiring-fix/logs";
 
 const calls = vi.hoisted(() => ({ complete: vi.fn() }));
 const candidateMocks = vi.hoisted(() => ({
@@ -165,10 +162,6 @@ liveIt(
     const activateSpy = vi.spyOn(activate, "activateApprovedRuntimeRuleProposal");
     const revokeSpy = vi.spyOn(activate, "revokeActivatedRuntimeRulePolicy");
     const rollbackSpy = vi.spyOn(activate, "rollbackActivatedRuntimeRulePolicy");
-    const isolatedSessionFile = join(
-      mkdtempSync(join(tmpdir(), "t63-employee-advice-live-")),
-      "session.jsonl",
-    );
     const advice = await runEmployeeRuleAdaptationAdvice(
       {
         question:
@@ -188,6 +181,24 @@ liveIt(
         },
         facts: {
           currentContextTokens: 32000,
+          currentContextTokenSource: "agentContextTokens",
+          modelContextWindow: 64000,
+          configContextTokenCap: 32000,
+          targetAuthorization: "approved",
+          approvedTarget: {
+            agentId: "agent:fixture-personal-1",
+            scopeId: "agent:fixture-personal-1",
+          },
+          compatibilityRecord: {
+            status: "approved_compatible",
+            boundImplementationVersion: INVENTORY_PIN,
+            boundExpectedPolicyVersion: {
+              policyHash: "fixture-policy-hash-aaaa",
+              protocolVersion: "1.1",
+              compilerRevision: "1.2.0",
+            },
+          },
+          expectedPolicyState: "active",
           hardMinContextTokens: 16000,
           expectedPolicyVersion: {
             policyHash: "fixture-policy-hash-aaaa",
@@ -219,8 +230,6 @@ liveIt(
           complete,
           sessionPorts: stubShadowPorts(),
         },
-        interact: (params, shadowHost) => replyTurnRuntime.interaction(params, shadowHost),
-        isolatedSessionFile,
       },
     );
 
@@ -236,7 +245,7 @@ liveIt(
       proposal: advice.proposal,
       modelCalled: advice.modelCalled,
       officialShadowCalls: complete.mock.calls.length,
-      originalCompleteCalls: calls.complete.mock.calls.length,
+      placeholderInteractionCalls: calls.complete.mock.calls.length,
       activationCalled: activateSpy.mock.calls.length,
       revokeCalled: revokeSpy.mock.calls.length,
       rollbackCalled: rollbackSpy.mock.calls.length,
@@ -254,6 +263,7 @@ liveIt(
     expect(advice.activationAllowed).toBe(false);
     expect(advice.notEffectiveLabel).toBe("尚未生效");
     expect(advice.modelCalled).toBe(true);
+    expect(calls.complete).not.toHaveBeenCalled();
     expect(advice.state).toBe("adjustment_suggested");
     expect(advice.label).toBe("建议调整");
     expect(advice.outcomeCode).toBe("shadow_recorded");

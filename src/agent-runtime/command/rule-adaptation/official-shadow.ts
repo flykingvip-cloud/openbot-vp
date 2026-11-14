@@ -42,6 +42,29 @@ export type OfficialShadowHostBinding = {
   candidateEntry?: ControlledCandidateEntry;
 };
 
+/**
+ * Bind the original request cancel with any caller-supplied shadow signal.
+ * Same combination semantics as the t53 host-chain abort binder.
+ */
+export function bindShadowHostAbortSignal(
+  origin?: AbortSignal,
+  request?: AbortSignal,
+): AbortSignal | undefined {
+  if (!origin) {
+    return request;
+  }
+  if (!request) {
+    return origin;
+  }
+  if (origin.aborted) {
+    return origin;
+  }
+  if (request.aborted) {
+    return request;
+  }
+  return AbortSignal.any([origin, request]);
+}
+
 export async function runOfficialShadowRuleAdaptation(
   request: ShadowRunRequest,
   binding: OfficialShadowHostBinding,
