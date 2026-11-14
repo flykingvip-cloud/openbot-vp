@@ -14560,6 +14560,28 @@ tasks:
             covering globs, session history, and CONFLICT records remain declared and are not
             shrunk. command/index.ts, interaction-turn.ts, and reply-turn.ts are not taken over.
             Official loom register was not run. No predecessor personal sign-off is claimed.
+        - at: 2026-11-14T06:25:00.000Z
+          kind: coordinated-surgical-extension
+          exclusive: false
+          officialLoomRegister: false
+          humanOwnerSignOff: not-claimed
+          authorizedBy: human-governor
+          paths:
+            - src/gateway/server-methods/runtime-rule-adaptation-advice-facts.ts
+            - src/gateway/server-methods/runtime-rule-adaptation-advice-facts.test.ts
+            - src/gateway/server-methods/runtime-rule-adaptation-advice.live.test.ts
+          currentOpenOwners:
+            - taskId: GWSV
+              owner: Gateway Supervisor And Protocol Extensions
+              state: active
+              coveringPatterns:
+                - src/gateway/server-methods/**
+          note: Limited landing registration only, not exclusive ownership. Owner t65u 2026-11-14
+            closed the employee-advice path landing authorization gap for the production fact
+            resolver and cancel-registry files. These exact files are not added to this task's
+            exclusive paths. Predecessor owners, covering globs, session history, and CONFLICT
+            records remain declared and are not shrunk. Official loom register was not run.
+            Registration does not replace authorization; this records the Owner instruction.
   - id: exec-chain-fidelity-ab-min
     owner: grok-dynamic-rules
     intent:
@@ -33737,4 +33759,25 @@ sharedPaths:
       owners, paths, session history, and covering globs (including GWSV src/gateway/server-methods/**
       and EUI ui/**) remain declared. exclusive:false; no exclusive takeover; official loom register
       was not run. Does not take over command/index.ts, interaction-turn.ts, or reply-turn.ts."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/runtime-rule-adaptation-advice-facts.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t65u 2026-11-14 closed the employee-advice path landing authorization gap.
+      Exact-file sharedPath only; predecessor owners, paths, session history, and covering globs
+      (including GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive
+      takeover; official loom register was not run. Registration does not replace authorization."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/runtime-rule-adaptation-advice-facts.test.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t65u 2026-11-14 closed the employee-advice path landing authorization gap.
+      Exact-file sharedPath only; predecessor owners, paths, session history, and covering globs
+      (including GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive
+      takeover; official loom register was not run. Registration does not replace authorization."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/runtime-rule-adaptation-advice.live.test.ts
+    landerTask: runtime-rule-adaptation
+    reason: "Owner t65u 2026-11-14 closed the employee-advice path landing authorization gap.
+      Exact-file sharedPath only; predecessor owners, paths, session history, and covering globs
+      (including GWSV src/gateway/server-methods/**) remain declared. exclusive:false; no exclusive
+      takeover; official loom register was not run. Registration does not replace authorization."
     reviewAfter: 2026-11-30
