@@ -14,7 +14,7 @@ import {
   createFixturePersonalContextCapPort,
   type ContextCapSelectionMode,
   type PersonalContextCapSelectionPort,
-} from "../../model/rule-adaptation/context-cap-selection.js";
+} from "../../model/rule-adaptation/index.js";
 import { readRuntimeRuleAdaptationBoard } from "../../state/mutations/runtime-rule-adaptation.js";
 import { readActivatedRuntimeRulePolicy, type ActivationHostDependencies } from "./activate.js";
 

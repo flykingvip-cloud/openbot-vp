@@ -15,7 +15,7 @@ import { describeUnknownError } from "../../../agents/pi-embedded-runner/utils.j
 import { normalizeUsage, type UsageLike } from "../../../agents/usage.js";
 import type { resolveContextEngine } from "../../../context-engine/index.js";
 import { inheritExecutionIdentityRunFields } from "../../../gateway/execution-identity-context.js";
-import { sameRunInheritedContextWindowTokens } from "../../model/rule-adaptation/context-cap-selection.js";
+import { sameRunInheritedContextWindowTokens } from "../../model/rule-adaptation/index.js";
 import { MAX_OVERFLOW_COMPACTION_ATTEMPTS } from "../../policy/index.js";
 import {
   buildErrorAgentMeta,

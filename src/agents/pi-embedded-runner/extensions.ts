@@ -1,6 +1,6 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import type { ExtensionFactory, SessionManager } from "@earendil-works/pi-coding-agent";
-import { inheritSelectedContextCap } from "../../agent-runtime/model/rule-adaptation/context-cap-selection.js";
+import { inheritSelectedContextCap } from "../../agent-runtime/model/rule-adaptation/index.js";
 import { resolveContextWindowInfo } from "../../agent-runtime/policy/index.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../defaults.js";

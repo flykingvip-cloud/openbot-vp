@@ -33,4 +33,9 @@ export {
   activationAccessScopeVerified,
   hashCanonicalJson,
   deepFreezeActivation,
+  activationReason,
+  resolveActivationWhitelist,
+  whitelistHit,
+  boardScopesEqual,
 } from "./activation-precheck.js";
+export { isSafeIntegerNumber } from "./inspect.js";
