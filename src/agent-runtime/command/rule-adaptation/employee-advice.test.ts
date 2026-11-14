@@ -482,6 +482,49 @@ describe("runEmployeeRuleAdaptationAdvice", () => {
     expect(view.outcomeCode).toBe("cancelled");
   });
 
+  it("returns an unbound rule explanation without inventing active state or claiming full validation", async () => {
+    const runShadow = vi.fn(async (_request, binding) => {
+      expect(binding.view.hostFacts.compatibilityRecord).toBeUndefined();
+      expect(binding.view.hostFacts.expectedPolicyState).toBeUndefined();
+      expect(JSON.stringify(binding.view)).not.toContain("approved_compatible");
+      expect(JSON.stringify(binding.view.hostFacts)).not.toContain('"active"');
+      return shadowResult({
+        outcomeCode: "insufficient_sources",
+        reasons: [
+          {
+            code: "missing_host_fact",
+            message: "Host expectedPolicyState is missing.",
+            path: "host.expectedPolicyState",
+          },
+        ],
+      });
+    });
+    const view = await runEmployeeRuleAdaptationAdvice(
+      { question: "上下文窗口太大，请在硬下限之上收紧" },
+      authorizedHost({
+        facts: completeFacts({
+          compatibilityRecord: undefined,
+          expectedPolicyState: undefined,
+          expectedPolicyVersion: undefined,
+        }),
+        runShadow,
+      }),
+    );
+    expect(runShadow).toHaveBeenCalledTimes(1);
+    expect(view.modelCalled).toBe(true);
+    expect(view.taskApplicability).toBe("unbound");
+    expect(view.proposalFullyValidated).toBe(false);
+    expect(view.state).toBe("adjustment_suggested");
+    expect(view.summary).toContain("不承诺任务适用性的规则解释");
+    expect(view.summary).toContain("尚未完整校验");
+    expect(view.activationAllowed).toBe(false);
+    expect(view.notEffective).toBe(true);
+    expect(view.proposal).toMatchObject({
+      kind: "policy_proposal",
+      items: [{ field: "agents.defaults.contextTokens", proposedValue: 24000 }],
+    });
+  });
+
   it("isolates a shadow failure to the advice result and does not throw into the caller", async () => {
     const view = await runEmployeeRuleAdaptationAdvice(
       { question: "上下文太大" },

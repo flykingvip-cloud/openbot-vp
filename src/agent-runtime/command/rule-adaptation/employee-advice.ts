@@ -19,15 +19,25 @@ import type {
   HostCompatibilityRecord,
   HostExpectedPolicyState,
 } from "../../contracts/rule-adaptation.js";
+import type { SessionTaskBoard } from "../../contracts/task.js";
 import { createAuthorizedModelSession, type ModelSessionPorts } from "../../model/index.js";
 import type { GovernedShadowModelPortDeps } from "../../model/rule-adaptation/index.js";
 import { validateRuntimeRuleProposal } from "../../policy/rule-adaptation/index.js";
+import { readRuntimeRuleAdaptationBoard } from "../../state/mutations/runtime-rule-adaptation.js";
 import { emptyControlSnapshot } from "./control-snapshot.js";
 import {
   bindShadowHostAbortSignal,
   runOfficialShadowRuleAdaptation,
   type OfficialShadowHostBinding,
 } from "./official-shadow.js";
+
+/**
+ * Official read-only access to the SessionTaskBoard used as the authoritative
+ * record for employee advice policy facts. Does not create a session or a task.
+ */
+export function readOfficialEmployeeAdviceTaskBoard(sessionFile: string): SessionTaskBoard {
+  return readRuntimeRuleAdaptationBoard(sessionFile);
+}
 
 export const EMPLOYEE_ADVICE_METHOD = "runtime-rule-adaptation.advice" as const;
 export const EMPLOYEE_ADVICE_CANCEL_METHOD = "runtime-rule-adaptation.advice.cancel" as const;
@@ -88,6 +98,16 @@ export type EmployeeAdviceView = {
   activationAllowed: false;
   requestId: string;
   modelCalled: boolean;
+  /**
+   * Set only for a consultation with no trusted task binding.
+   * The explanation does not promise that a proposal applies to a task.
+   */
+  taskApplicability?: "unbound";
+  /**
+   * False when P1 could not fully validate because task constraints or
+   * policy facts were missing. Never set true to paper over a gap.
+   */
+  proposalFullyValidated?: false;
 };
 
 export type TrustedEmployeeAdviceIdentity = {
@@ -275,8 +295,11 @@ export function buildEmployeeAdviceView(input: {
   proposal?: unknown;
   summary?: string;
   modelCalled?: boolean;
+  state?: EmployeeAdviceState;
+  taskApplicability?: "unbound";
+  proposalFullyValidated?: false;
 }): EmployeeAdviceView {
-  const state = mapShadowOutcomeToEmployeeAdviceState(input.outcomeCode);
+  const state = input.state ?? mapShadowOutcomeToEmployeeAdviceState(input.outcomeCode);
   const reasons = input.reasons ?? [];
   return {
     state,
@@ -290,7 +313,43 @@ export function buildEmployeeAdviceView(input: {
     activationAllowed: false,
     requestId: input.requestId,
     modelCalled: input.modelCalled === true,
+    ...(input.taskApplicability ? { taskApplicability: input.taskApplicability } : {}),
+    ...(input.proposalFullyValidated === false ? { proposalFullyValidated: false } : {}),
   };
+}
+
+const UNBOUND_CONSULTATION_MESSAGE =
+  "这是不承诺任务适用性的规则解释。因缺少任务绑定或完整策略事实，提案尚未完整校验。建议尚未生效。";
+
+function hasTrustedTaskPolicyFacts(facts: TrustedEmployeeAdviceFacts): boolean {
+  return Boolean(facts.compatibilityRecord && facts.expectedPolicyState);
+}
+
+function consultativeAdviceView(
+  requestId: string,
+  shadow: ShadowRunResult,
+  modelCalled: boolean,
+): EmployeeAdviceView {
+  const reasons: EmployeeAdviceReasonView[] = [
+    { code: "unbound_consultation", message: UNBOUND_CONSULTATION_MESSAGE },
+    ...shadow.reasons.map((reason) => ({
+      code: reason.code,
+      message: reason.message,
+      ...(reason.path ? { path: reason.path } : {}),
+    })),
+  ];
+  const hasProposal = shadow.proposal !== undefined;
+  return buildEmployeeAdviceView({
+    requestId,
+    outcomeCode: shadow.outcomeCode,
+    reasons,
+    ...(hasProposal ? { proposal: shadow.proposal } : {}),
+    summary: UNBOUND_CONSULTATION_MESSAGE,
+    modelCalled,
+    ...(hasProposal ? { state: "adjustment_suggested" } : {}),
+    taskApplicability: "unbound",
+    proposalFullyValidated: false,
+  });
 }
 
 export function resolveTrustedEffectiveContextTokens(input: {
@@ -516,16 +575,11 @@ export async function runEmployeeRuleAdaptationAdvice(
       modelCalled: false,
     });
   }
-  if (!host.facts.compatibilityRecord || !host.facts.expectedPolicyState) {
-    const message = "宿主缺少已核准的兼容记录或策略状态，无法给出完整建议。";
-    return buildEmployeeAdviceView({
-      requestId,
-      outcomeCode: "needs_information",
-      reasons: [{ code: "insufficient_sources", message }],
-      summary: message,
-      modelCalled: false,
-    });
-  }
+  // A consultation without a trusted task binding must not create a task or
+  // invent expectedPolicyState=active / approved_compatible just to pass P1.
+  // Those missing facts stay missing; the shadow still runs, and the result
+  // is marked as a rule explanation that does not claim full validation.
+  const consultative = !hasTrustedTaskPolicyFacts(host.facts);
 
   const view = buildTrustedEmployeeHostView(host.identity, host.facts, sanitized.request);
   const binding: OfficialShadowHostBinding = {
@@ -569,6 +623,9 @@ export async function runEmployeeRuleAdaptationAdvice(
 
   try {
     const shadow = await runShadow(shadowRequest, binding);
+    if (consultative) {
+      return consultativeAdviceView(requestId, shadow, true);
+    }
     return shadowToAdviceView(requestId, shadow, true);
   } catch (error) {
     const detail = error instanceof Error ? error.message : "advice_request_failed";
