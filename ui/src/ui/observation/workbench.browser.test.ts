@@ -29,8 +29,9 @@ describe("observation workbench interaction", () => {
       "openbot-observation-workbench",
     ) as OpenBotObservationWorkbench;
     await panel.updateComplete;
-    expect(panel.querySelector(".obs-reasons")?.textContent).toContain(
-      "还没有严格匹配当前会话的事件",
+    expect(panel.querySelector(".obs-reasons")).toBeNull();
+    expect(panel.querySelector(".obs-empty")?.textContent).toContain(
+      "没有严格匹配的事件时，不借用其他会话数据",
     );
     expect(panel.querySelectorAll('[role="tablist"][aria-label="观测视图"] button')).toHaveLength(
       3,
@@ -41,15 +42,26 @@ describe("observation workbench interaction", () => {
     expect(panel.querySelector(".obs-header p")).toBeNull();
     expect(panel.textContent).not.toContain("态势总览、运行分析与治理验证共用同一授权投影");
     expect(panel.textContent).not.toContain("任务质量进化中心");
-    expect(panel.querySelector('[aria-label="连接工作台筛选"]')?.textContent).toContain("连接工作台筛选");
+    expect(panel.querySelector('[aria-label="连接工作台筛选"]')).not.toBeNull();
+    expect(panel.querySelector(".obs-wb-filters__head")).toBeNull();
+    expect(panel.querySelector('[aria-label="连接工作台筛选"]')?.textContent).not.toContain(
+      "连接工作台筛选",
+    );
+    expect(panel.querySelector('[data-action="pause"]')?.textContent).toContain("暂停刷新");
+    expect(panel.textContent).not.toContain("当前企业 · 个人与共享终态分开");
+    expect(panel.textContent).not.toContain("当前连接观察片段");
     expect(panel.textContent).not.toContain("四个筛选项为独立维度");
     expect(panel.textContent).not.toContain("筛选上下文：");
     expect(panel.textContent).not.toContain("下方运行证据仍是当前连接窗口");
     expect(panel.querySelector('[aria-label="观测对象筛选"]')).not.toBeNull();
     expect(panel.querySelector('[aria-label="会话筛选"]')).not.toBeNull();
     expect(panel.querySelector('[aria-label="运行类型筛选"]')).not.toBeNull();
-    expect(panel.querySelector('[aria-label="需要关注的运行"]')?.textContent).toContain("需要关注的运行");
-    expect(panel.querySelector('[aria-label="观测闭环说明"]')?.textContent).toContain("观测闭环说明");
+    expect(panel.querySelector('[aria-label="需要关注的运行"]')?.textContent).toContain(
+      "需要关注的运行",
+    );
+    expect(panel.querySelector('[aria-label="观测闭环说明"]')?.textContent).toContain(
+      "观测闭环说明",
+    );
     expect([...panel.querySelectorAll(".obs-pulse-card")].map((card) => card.textContent)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("活跃运行"),
@@ -62,7 +74,11 @@ describe("observation workbench interaction", () => {
     );
     const issueBoard = panel.querySelector('[aria-label="需要关注的运行"]');
     const metrics = panel.querySelector(".obs-metrics-block");
-    expect(issueBoard && metrics && (issueBoard.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+    expect(
+      issueBoard &&
+        metrics &&
+        issueBoard.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
     selector.value = "sample";
     selector.dispatchEvent(new Event("change"));
@@ -202,9 +218,15 @@ describe("platform tenant compare filters", () => {
     expect(
       panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
     ).toBe("未知");
-    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).toContain("1 已授权");
-    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).toContain("1 尚未确认");
-    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).not.toMatch(/0 无授权/);
+    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).toContain(
+      "1 已授权",
+    );
+    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).toContain(
+      "1 尚未确认",
+    );
+    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).not.toMatch(
+      /0 无授权/,
+    );
     expect(panel.querySelector('[data-testid="obs-health-未映射事件"]')?.textContent).toContain(
       "不计入企业",
     );
@@ -214,15 +236,21 @@ describe("platform tenant compare filters", () => {
     expect(panel.querySelector(".obs-pulse-grid")).toBeNull();
     expect(panel.querySelector('[role="tablist"][aria-label="观测视图"]')).toBeNull();
     expect(
-      [...panel.querySelectorAll('[aria-label="平台观测视图"] button')].map((row) => row.textContent),
+      [...panel.querySelectorAll('[aria-label="平台观测视图"] button')].map(
+        (row) => row.textContent,
+      ),
     ).toEqual(["平台总览", "精确任务查询", "租户与授权", "覆盖与容量"]);
     expect(panel.querySelector(".obs-header h2")?.textContent ?? "").not.toContain("运行观测");
-    expect(panel.querySelector(".obs-header h2")?.textContent ?? "").not.toContain("实时运行与改善");
+    expect(panel.querySelector(".obs-header h2")?.textContent ?? "").not.toContain(
+      "实时运行与改善",
+    );
 
     expect(panel.querySelector('[data-testid="obs-tenant-compare"]')?.textContent).toContain(
       "租户隔离与授权",
     );
-    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("华东正式企业");
+    expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain(
+      "华东正式企业",
+    );
     expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("已授权");
     expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("未知");
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).toContain("尚未确认");
@@ -322,7 +350,9 @@ describe("platform tenant compare filters", () => {
     ) as OpenBotObservationWorkbench;
     await panel.updateComplete;
     expect(panel.querySelectorAll(".obs-sparkline")).toHaveLength(0);
-    expect(panel.querySelector(".obs-realtime-head")?.textContent).toContain("从本次连接开始");
+    expect(panel.querySelector('[data-action="pause"]')?.textContent).toContain("暂停刷新");
+    expect(panel.querySelector(".obs-realtime-head")).toBeNull();
+    expect(panel.textContent).not.toContain("从本次连接开始");
     for (const [seq, stream, phase] of [
       [1, "lifecycle", "start"],
       [2, "tool", "end"],
@@ -347,7 +377,7 @@ describe("platform tenant compare filters", () => {
     await new Promise((resolve) => setTimeout(resolve, 1050));
     await panel.updateComplete;
     expect(readRuntimeObservations(host, "agent:main").events.length).toBe(3);
-    expect(panel.querySelector(".obs-stream-foot")?.textContent).toContain("1 次数据变化");
+    expect(panel.querySelector(".obs-stream-foot")).toBeNull();
     expect(panel.querySelectorAll(".obs-run")).toHaveLength(1);
     panel.querySelector<HTMLButtonElement>('[data-action="pause"]')!.click();
     await panel.updateComplete;
@@ -415,8 +445,12 @@ describe("platform tenant compare filters", () => {
     select.value = "t1";
     select.dispatchEvent(new Event("change"));
     await panel.updateComplete;
-    expect(panel.querySelector('[data-testid="obs-health-关联覆盖率"]')?.textContent).toContain("未知");
-    expect(panel.querySelector('[data-testid="obs-health-心跳时效"]')?.textContent).toContain("未知");
+    expect(panel.querySelector('[data-testid="obs-health-关联覆盖率"]')?.textContent).toContain(
+      "未知",
+    );
+    expect(panel.querySelector('[data-testid="obs-health-心跳时效"]')?.textContent).toContain(
+      "未知",
+    );
     expect(panel.querySelector('[data-testid="obs-health-未映射事件"]')?.textContent).toContain(
       "所选企业暂无已映射运行事件",
     );
