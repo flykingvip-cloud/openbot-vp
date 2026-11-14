@@ -1353,41 +1353,6 @@ select {
   font-size: 12px;
   line-height: 1.55;
 }
-.obs-status-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 0 0 14px;
-  font-size: 12px;
-  color: var(--obs-muted);
-}
-.obs-status-line__left {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 0;
-  align-items: center;
-}
-.obs-status-line__left > span {
-  margin-right: 6px;
-}
-.obs-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #94a3b8;
-  margin-right: 6px;
-}
-.obs-status-dot.is-live {
-  background: #3f9d6a;
-}
-.obs-status-dot.is-paused {
-  background: #d97706;
-}
-.obs-status-dot.is-off {
-  background: #94a3b8;
-}
 .obs-list-scope-bar {
   display: flex;
   align-items: center;

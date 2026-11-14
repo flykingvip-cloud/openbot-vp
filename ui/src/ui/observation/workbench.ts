@@ -583,59 +583,6 @@ export class OpenBotObservationWorkbench extends LitElement {
       ${frozenNote ? html`<span class="obs-stream-foot">${frozenNote}</span>` : nothing}
     </div>`;
   }
-  private formatClock(at: number | null): string {
-    if (at == null) {
-      return "无";
-    }
-    return new Date(at).toLocaleTimeString("zh-CN", {
-      hour12: false,
-      timeZone: "Asia/Shanghai",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  }
-  private renderEnterpriseStatus(view: ObservationView, runs: readonly ObservationRun[]) {
-    const stream = this.streamFor(view);
-    const paused = this.paused;
-    const events = runs.reduce((sum, row) => sum + row.eventCount, 0);
-    const complete =
-      runs.length === 0
-        ? "当前筛选下无匹配事件"
-        : view.partial || runs.some((row) => row.reasons.length > 0)
-          ? "部分证据"
-          : "已观察";
-    const head = paused
-      ? "刷新已暂停"
-      : view.source === "sample"
-        ? "样例已启用"
-        : view.connected
-          ? "已连接"
-          : "未连接";
-    const origin = view.source === "sample" ? "交互验收样例" : "本次连接起";
-    const windowLabel =
-      stream.windowStartAt != null && stream.windowEndAt != null
-        ? `窗口 ${this.formatClock(stream.windowStartAt)}–${this.formatClock(stream.windowEndAt)} Asia/Shanghai`
-        : "窗口 无";
-    const pending = paused && this.pendingStreamUpdate ? "暂停刷新期间已收到后台更新" : null;
-    const liveClass = paused
-      ? "is-paused"
-      : view.connected || view.source === "sample"
-        ? "is-live"
-        : "is-off";
-    return html`<div class="obs-status-line" aria-label="连接状态" data-testid="obs-status-line">
-      <div class="obs-status-line__left">
-        <span class="obs-status-dot ${liveClass}" aria-hidden="true"></span>
-        <span>${head}</span>
-        <span>· ${origin}</span>
-        <span>· 最后事件 ${this.formatClock(view.receivedAt)}</span>
-        <span>· ${windowLabel}</span>
-        <span>· ${events} 条</span>
-        <span>· ${complete}</span>
-        ${pending ? html`<span>· ${pending}</span>` : nothing}
-      </div>
-    </div>`;
-  }
   private evidenceLayers(run: ObservationRun): readonly (readonly [string, string])[] {
     return [
       [
@@ -1719,7 +1666,6 @@ export class OpenBotObservationWorkbench extends LitElement {
       <div class="obs-header"><div><h2>智能诊断</h2></div></div>
       ${this.renderTabs()}
       ${this.renderFilters(view)}
-      ${this.renderEnterpriseStatus(view, runs)}
       ${notice ? html`<p class="obs-access-notice" data-testid="obs-access-notice">${notice}</p>` : nothing}
       ${this.surface === "overview" ? this.renderEnterpriseOverview(view, runs, selected) : this.surface === "analysis" ? this.renderAnalysis(view, listRuns, selected) : this.renderGovernance(view)}
       ${showDrawer && selected ? this.renderEvidence(selected) : nothing}

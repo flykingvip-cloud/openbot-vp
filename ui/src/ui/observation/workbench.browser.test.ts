@@ -925,14 +925,12 @@ describe("R5 enterprise IA alignment", () => {
     return { container, panel };
   }
 
-  it("keeps a compact status line and does not restore density-cut copy", async () => {
+  it("does not restore the filter status strip or other density-cut copy", async () => {
     const { container, panel } = await mountEnterprise();
-    const status = panel.querySelector('[data-testid="obs-status-line"]')?.textContent ?? "";
-    expect(status).toContain("已连接");
-    expect(status).toContain("本次连接起");
-    expect(status).toContain("0 条");
-    expect(status).toContain("当前筛选下无匹配事件");
-    expect(status).toContain("窗口 无");
+    expect(panel.querySelector('[data-testid="obs-status-line"]')).toBeNull();
+    expect(panel.textContent).not.toContain("本次连接起");
+    expect(panel.textContent).not.toContain("从本次连接开始");
+    expect(panel.textContent).not.toContain("已连接 ·");
     expect(panel.querySelector('[data-action="pause"]')?.textContent).toContain("暂停刷新");
     expect(panel.querySelector("select[aria-label=观测数据源]")).not.toBeNull();
     expect(panel.querySelector(".obs-wb-filters__head")).toBeNull();
