@@ -10,6 +10,11 @@
  */
 import { createHash } from "node:crypto";
 import type { Task } from "@openbot/collaboration-core";
+import {
+  classifyLaterBoundMessage,
+  shouldReuseCurrentGoalTask,
+  shouldStartNewFormalTask,
+} from "../../agent-runtime/policy/collaboration-current-goal-binding.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { isCollabTaskClaimContractEnabled } from "../collaboration-dispatch/claim-contract.js";
 import {
@@ -37,6 +42,7 @@ import {
   readDiscussToTaskMetaFromTags,
   stagesFromActivation,
 } from "./discuss-to-task-stages.js";
+import { readGroupOperatingState } from "./shared.js";
 import type { TeamResourceAuthOk } from "./team-resource-auth.js";
 import { resolveTeamDeliverableStores } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
@@ -74,6 +80,9 @@ export type ControlledDiscussToTaskInput = {
   goal?: string;
   acceptanceCriteria?: readonly string[];
   constraints?: readonly string[];
+  /** User-appointed project owner; persisted separately from the standing coordinator. */
+  appointedOwnerId?: string | null;
+  coordinatorBotId?: string | null;
   /** Suggestions only — never treated as actual claimants. */
   suggestedClaimantIds?: readonly string[];
   suggestedRole?: string;
@@ -363,12 +372,91 @@ export async function controlledDiscussToTask(
     });
   }
 
-  const taskId = mintDiscussToTaskId({
-    tenantId,
+  let boundCurrentTaskId: string | null = null;
+  let boundCurrentGoal: string | null = compact(input.goal) || null;
+  let laterBoundKind: ReturnType<typeof classifyLaterBoundMessage> | null = null;
+  const storeProbe = resolveTeamDeliverableStores({
+    auth: input.auth,
+    trusted: input.trusted,
     groupId,
-    sourceMessageId,
-    operationSlot,
+    cfg: input.cfg,
+    tenantId: input.auth?.tenantId ?? input.tenant?.tenantId ?? tenantId,
   });
+  if (storeProbe.ok) {
+    const operatingState = await readGroupOperatingState({
+      fileStore: storeProbe.fileStore,
+      groupId,
+    });
+    boundCurrentTaskId = compact(operatingState?.activeContext?.currentTaskId) || null;
+    boundCurrentGoal =
+      compact(operatingState?.activeContext?.currentMission) || boundCurrentGoal || null;
+    if (!boundCurrentTaskId) {
+      const tasks = await storeProbe.objectStorage
+        .listObjects<Task>(groupId, "task")
+        .catch(() => []);
+      const liveTasks = [...tasks]
+        .filter((task) =>
+          ["draft", "ready", "in_progress", "blocked", "review"].includes(task.status),
+        )
+        .toSorted((left, right) => (right.updatedAtMs ?? 0) - (left.updatedAtMs ?? 0));
+      boundCurrentTaskId = compact(liveTasks[0]?.taskId) || null;
+    }
+    if (boundCurrentTaskId) {
+      const live = await storeProbe.objectStorage
+        .readObject<Task>(groupId, "task", boundCurrentTaskId)
+        .catch(() => null);
+      boundCurrentGoal = compact(live?.title) || compact(live?.description) || boundCurrentGoal;
+    }
+    laterBoundKind = classifyLaterBoundMessage({
+      currentGoal: boundCurrentGoal,
+      currentTaskId: boundCurrentTaskId,
+      message,
+    });
+    if (laterBoundKind === "read_only_query") {
+      return finish({
+        classification: { kind: "discussion", reason: "ordinary_discussion" },
+        attempted: false,
+        taskId: boundCurrentTaskId,
+        activationKey: null,
+        activation: null,
+        stages: stagesFromActivation({
+          taskEnsured: Boolean(boundCurrentTaskId),
+          boardPublished: false,
+        }),
+        internalReason: "bound_read_only_query",
+      });
+    }
+    if (shouldReuseCurrentGoalTask(laterBoundKind) && boundCurrentTaskId) {
+      const reason =
+        laterBoundKind === "block_bound"
+          ? "bound_member_block_not_new_task"
+          : laterBoundKind === "revision_bound"
+            ? "bound_revision_not_new_task"
+            : "bound_clarification_not_new_task";
+      return finish({
+        classification,
+        attempted: false,
+        taskId: boundCurrentTaskId,
+        activationKey: null,
+        activation: null,
+        stages: stagesFromActivation({ taskEnsured: true, boardPublished: false }),
+        internalReason: reason,
+      });
+    }
+  }
+
+  const taskId =
+    laterBoundKind &&
+    shouldReuseCurrentGoalTask(laterBoundKind) &&
+    boundCurrentTaskId &&
+    !shouldStartNewFormalTask(laterBoundKind)
+      ? boundCurrentTaskId
+      : mintDiscussToTaskId({
+          tenantId,
+          groupId,
+          sourceMessageId,
+          operationSlot,
+        });
   const fp = contractFingerprint({
     title,
     goal,
@@ -499,6 +587,8 @@ export async function controlledDiscussToTask(
     title,
     message,
     actor,
+    appointedOwnerId: input.appointedOwnerId,
+    coordinatorBotId: input.coordinatorBotId,
     goal,
     acceptanceCriteria,
     constraints,

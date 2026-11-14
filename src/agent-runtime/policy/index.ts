@@ -205,6 +205,27 @@ export {
   classifyHandoffApplyAgainstLive,
   appendHandoffHistoryById,
 } from "./collaboration-handoff.js";
+export {
+  parseAppointedProjectOwner,
+  buildAuthoritativeResponsibility,
+  resolveOwnerAfterLaterMessage,
+  classifyLaterBoundMessage,
+  shouldReuseCurrentGoalTask,
+  shouldStartNewFormalTask,
+  projectCollaborationWorkBrief,
+  classifyMemberContribution,
+  evaluateFirstStageAcceptanceHold,
+} from "./collaboration-current-goal-binding.js";
+export type {
+  KnownBindingMember,
+  AppointedProjectOwner,
+  LaterBoundMessageKind,
+  MemberContributionKind,
+  MemberContributionSource,
+  MemberContributionDecision,
+  CollaborationWorkBriefInput,
+  FirstStageAcceptanceHold,
+} from "./collaboration-current-goal-binding.js";
 export type {
   HandoffResponsibilityRole,
   HandoffKindName,
