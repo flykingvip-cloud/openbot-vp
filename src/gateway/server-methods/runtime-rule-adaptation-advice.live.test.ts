@@ -14,7 +14,7 @@ import { resolveOfficialDeepSeekCredential } from "../../agent-runtime/model/rul
 import { handleRuntimeRuleAdaptationAdvice } from "./runtime-rule-adaptation-advice.ts";
 import type { GatewayRequestHandlerOptions } from "./types.ts";
 
-const EVIDENCE_DIR = "/workspace/t66-employee-advice-policy-facts/logs";
+const EVIDENCE_DIR = "/workspace/t67-advice-status-display-fix/logs";
 
 const seatedContext = {
   tenantId: "tenant-1",
@@ -134,6 +134,41 @@ liveIt(
     expect(advice.notEffectiveLabel).toBe("尚未生效");
     expect(advice.proposalFullyValidated).toBe(false);
     expect(advice.taskApplicability).toBe("unbound");
+    expect(advice.state).not.toBe("adjustment_suggested");
+    expect(advice.label).not.toBe("建议调整");
+    const rejectionReason = (advice.reasons ?? []).some((reason) =>
+      [
+        "structural_invalid_type",
+        "structural_forbidden_field",
+        "structural_unknown_field",
+        "structural_duplicate_field",
+        "unknown_rule_id",
+        "non_candidate_field",
+        "below_hard_min",
+        "above_hard_ceiling",
+        "above_current_effective",
+        "hard_boundary_conflict",
+        "hard_rule_conflict",
+        "fabricated_rule_id",
+        "unknown_parameter",
+        "protocol_failure",
+      ].includes(reason.code),
+    );
+    if (
+      rejectionReason ||
+      [
+        "protocol_failure",
+        "hard_rule_conflict",
+        "malicious_material_rejected",
+        "fabricated_rule_id",
+        "unknown_parameter",
+      ].includes(String(advice.outcomeCode ?? ""))
+    ) {
+      expect(["blocked", "failed"]).toContain(advice.state);
+    } else {
+      expect(advice.state).toBe("interpretation_pending");
+      expect(advice.label).toBe("规则解释／待核验");
+    }
     expect(PRODUCTION_RUNTIME_RULE_WHITELIST).toEqual([]);
     expect(evidence.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(advice.modelCalled).toBe(true);

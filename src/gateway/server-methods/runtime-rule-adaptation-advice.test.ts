@@ -775,7 +775,9 @@ describe("default handler with official board facts and HTTP boundary only", () 
     expect(advice.notEffective).toBe(true);
     expect(advice.proposalFullyValidated).toBe(false);
     expect(advice.taskApplicability).toBe("unbound");
-    expect(advice.state).toBe("adjustment_suggested");
+    expect(advice.state).toBe("interpretation_pending");
+    expect(advice.label).toBe("规则解释／待核验");
+    expect(advice.state).not.toBe("adjustment_suggested");
     expect(advice.summary).toContain("不承诺任务适用性的规则解释");
     expect(advice.summary).toContain("尚未完整校验");
     expect(JSON.stringify(advice)).not.toContain("approved_compatible");
@@ -809,9 +811,55 @@ describe("default handler with official board facts and HTTP boundary only", () 
     expect(advice.modelCalled).toBe(true);
     expect(advice.taskApplicability).toBe("unbound");
     expect(advice.proposalFullyValidated).toBe(false);
-    expect(advice.state).toBe("adjustment_suggested");
+    expect(advice.state).toBe("interpretation_pending");
+    expect(advice.label).toBe("规则解释／待核验");
+    expect(advice.state).not.toBe("adjustment_suggested");
     expect(advice.activationAllowed).toBe(false);
     expect(sessionFile && fs.existsSync(taskBoardPath(sessionFile))).toBe(false);
+  });
+
+  it("does not show 建议调整 when the official path returns a structurally illegal proposal without task facts", async () => {
+    const runShadow = vi.fn(
+      async () =>
+        ({
+          outcomeCode: "validator_blocked",
+          activationAllowed: false,
+          reasons: [
+            {
+              code: "structural_invalid_type",
+              message: "action is not a defined enum value.",
+              path: "proposal.items[0].action",
+            },
+          ],
+          proposal: {
+            kind: "policy_proposal",
+            items: [
+              { field: "agents.defaults.contextTokens", action: "tighten", proposedValue: 24000 },
+            ],
+          },
+        }) as never,
+    );
+    const advice = await handleRuntimeRuleAdaptationAdvice(
+      { question: "上下文窗口太大，请在硬下限之上收紧", targetRef: { agentId: "personal-bot" } },
+      client(),
+      {
+        loadConfig: () => configWithKnownAgent(),
+        resolveTrustedContext: async () => seatedContext,
+        resolveOfficialModel: () => official,
+        checkAgentAccess: viewOnlyAccess(),
+        runShadow,
+      },
+    );
+    expect(runShadow).toHaveBeenCalledTimes(1);
+    expect(advice.state).toBe("blocked");
+    expect(advice.label).toBe("被阻止");
+    expect(advice.state).not.toBe("adjustment_suggested");
+    expect(advice.label).not.toBe("建议调整");
+    expect(advice.outcomeCode).toBe("validator_blocked");
+    expect(advice.proposalFullyValidated).toBe(false);
+    expect(advice.taskApplicability).toBe("unbound");
+    expect(advice.activationAllowed).toBe(false);
+    expect(advice.modelCalled).toBe(true);
   });
 
   it("returns 需补信息 and does not call the model when required window facts are missing", async () => {

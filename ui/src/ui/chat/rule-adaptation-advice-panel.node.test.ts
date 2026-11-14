@@ -70,6 +70,7 @@ describe("rule-adaptation-advice-panel", () => {
       ["needs_information", "需补信息"],
       ["blocked", "被阻止"],
       ["adjustment_suggested", "建议调整"],
+      ["interpretation_pending", "规则解释／待核验"],
     ] as const;
     for (const [state, label] of cases) {
       const el = mount(

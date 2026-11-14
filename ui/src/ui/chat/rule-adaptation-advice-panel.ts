@@ -9,6 +9,7 @@ export type EmployeeAdviceState =
   | "needs_information"
   | "blocked"
   | "adjustment_suggested"
+  | "interpretation_pending"
   | "failed";
 
 export type EmployeeAdviceReasonView = {
@@ -50,6 +51,7 @@ const STATE_CLASS: Record<EmployeeAdviceState, string> = {
   needs_information: "is-needs-information",
   blocked: "is-blocked",
   adjustment_suggested: "is-adjustment",
+  interpretation_pending: "is-interpretation-pending",
   failed: "is-failed",
 };
 
