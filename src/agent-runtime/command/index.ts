@@ -49,15 +49,17 @@ export type {
 } from "./governed-interaction.js";
 export {
   EMPLOYEE_ADVICE_METHOD,
+  EMPLOYEE_ADVICE_CANCEL_METHOD,
   runEmployeeRuleAdaptationAdvice,
   sanitizeEmployeeAdviceClientInput,
   buildEmployeeAdviceView,
+  resolveTrustedEffectiveContextTokens,
 } from "./rule-adaptation/employee-advice.js";
 export type {
   EmployeeAdviceView,
   EmployeeAdviceClientFields,
   TrustedEmployeeAdviceHost,
-  IsolatedAdviceInteractionParams,
+  TrustedEmployeeAdviceFacts,
 } from "./rule-adaptation/employee-advice.js";
 export {
   createInteractionSourceBoundary,
