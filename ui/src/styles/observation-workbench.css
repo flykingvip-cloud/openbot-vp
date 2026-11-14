@@ -1282,35 +1282,14 @@ select {
   line-height: 1.55;
 }
 .obs-guide {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
   margin-top: 14px;
-  padding: 12px 14px;
   border: 1px solid var(--obs-line);
   border-radius: 12px;
   background: var(--obs-bg);
 }
 .obs-guide h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-.obs-guide ol {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 16px;
   margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.obs-guide li {
-  color: var(--obs-muted);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.obs-guide li strong {
-  color: inherit;
+  font-size: 14px;
 }
 .obs-metrics-block {
   margin: 16px 0 0;
@@ -1374,9 +1353,208 @@ select {
   font-size: 12px;
   line-height: 1.55;
 }
+.obs-status-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--obs-muted);
+}
+.obs-status-line__left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  align-items: center;
+}
+.obs-status-line__left > span {
+  margin-right: 6px;
+}
+.obs-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+  margin-right: 6px;
+}
+.obs-status-dot.is-live {
+  background: #3f9d6a;
+}
+.obs-status-dot.is-paused {
+  background: #d97706;
+}
+.obs-status-dot.is-off {
+  background: #94a3b8;
+}
+.obs-list-scope-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f6f3eb;
+  color: #5c5346;
+  font-size: 12px;
+}
+.obs-list-scope-bar p {
+  margin: 0;
+}
+.obs-issue-table .obs-run {
+  display: block;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  gap: 4px;
+}
+.obs-issue-table .obs-run code {
+  display: block;
+}
+.obs-issue-table tr.is-selected {
+  background: #f7f9fc;
+}
+.obs-issue-type {
+  white-space: nowrap;
+  font-weight: 600;
+}
+.obs-guide {
+  display: block;
+  padding: 0;
+}
+.obs-guide__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.obs-guide__toggle span {
+  color: var(--obs-muted);
+  font-size: 12px;
+}
+.obs-guide__body {
+  padding: 0 14px 14px;
+}
+.obs-guide ol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.obs-guide li {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f6f8fa;
+}
+.obs-guide li .n {
+  flex: none;
+  width: 18px;
+  color: var(--obs-muted);
+  font-size: 11px;
+}
+.obs-guide li strong,
+.obs-guide li small {
+  display: block;
+}
+.obs-guide li small {
+  margin-top: 2px;
+}
+.obs-md {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 12px;
+  min-height: 420px;
+}
+.obs-md-list,
+.obs-md-detail {
+  border: 1px solid var(--obs-line);
+  border-radius: 12px;
+  background: var(--obs-bg);
+  overflow: auto;
+}
+.obs-list-head {
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--obs-line);
+}
+.obs-list-head p,
+.obs-footnote {
+  margin: 4px 0 0;
+  color: var(--obs-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.obs-md-list .obs-run {
+  padding: 12px 14px;
+}
+.obs-md-list .obs-run.is-selected,
+.obs-run.is-selected {
+  background: #f7f9fc;
+}
+.obs-md-detail {
+  padding: 16px 18px 20px;
+}
+.obs-md-detail h3 {
+  margin: 8px 0 4px;
+  font-size: 16px;
+}
+.obs-md-detail h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.obs-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.obs-detail-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.obs-detail-card {
+  border: 1px solid var(--obs-line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fbfcfe;
+}
+.obs-gov {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 14px;
+  align-items: start;
+}
+.obs-gov-head h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.obs-gov-head p {
+  margin: 0 0 12px;
+  color: var(--obs-muted);
+  font-size: 12px;
+}
 @media (max-width: 1100px) {
-  .obs-metrics-compact {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .obs-metrics-compact,
+  .obs-md,
+  .obs-gov,
+  .obs-detail-split {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 760px) {

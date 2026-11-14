@@ -901,3 +901,86 @@ describe("R5 incremental wiring", () => {
     container.remove();
   });
 });
+
+describe("R5 enterprise IA alignment", () => {
+  async function mountEnterprise() {
+    const container = document.createElement("div");
+    document.body.append(container);
+    render(
+      renderObservationWorkbench({
+        role: "enterprise",
+        tenantId: "demo",
+        sessionKey: "agent:one:main",
+        connected: true,
+        authorized: true,
+        observationHost: {},
+      }),
+      container,
+    );
+    await customElements.whenDefined("openbot-observation-workbench");
+    const panel = container.querySelector(
+      "openbot-observation-workbench",
+    ) as OpenBotObservationWorkbench;
+    await panel.updateComplete;
+    return { container, panel };
+  }
+
+  it("keeps a compact status line and does not restore density-cut copy", async () => {
+    const { container, panel } = await mountEnterprise();
+    const status = panel.querySelector('[data-testid="obs-status-line"]')?.textContent ?? "";
+    expect(status).toContain("已连接");
+    expect(status).toContain("本次连接起");
+    expect(status).toContain("0 条");
+    expect(status).toContain("当前筛选下无匹配事件");
+    expect(status).toContain("窗口 无");
+    expect(panel.querySelector('[data-action="pause"]')?.textContent).toContain("暂停刷新");
+    expect(panel.querySelector("select[aria-label=观测数据源]")).not.toBeNull();
+    expect(panel.querySelector(".obs-wb-filters__head")).toBeNull();
+    expect(panel.querySelector('[aria-label="连接工作台筛选"]')?.textContent).not.toContain(
+      "连接工作台筛选",
+    );
+    expect(panel.textContent).not.toContain("当前企业 · 个人与共享终态分开");
+    expect(panel.textContent).not.toContain("当前连接观察片段");
+    expect(panel.textContent).not.toContain("等待第一次事件");
+    expect(panel.textContent).not.toContain("尚无真实事件");
+    expect(panel.querySelector('[aria-label="需要关注的运行"]')?.textContent).toContain("全部关注");
+    expect(panel.querySelector('[aria-label="需要关注的运行"]')?.textContent).toContain("规则发现");
+    expect(panel.querySelector('[aria-label="观测闭环说明"]')?.textContent).toContain("已观察");
+    expect(panel.querySelector('[aria-label="观测闭环说明"]')?.textContent).toContain(
+      "从一次运行的证据开始，而不是从一张报表结束",
+    );
+    container.remove();
+  });
+
+  it("shows analysis as a master-detail split and opens the drawer only from complete evidence", async () => {
+    const { container, panel } = await mountEnterprise();
+    const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
+    selector.value = "sample";
+    selector.dispatchEvent(new Event("change"));
+    await panel.updateComplete;
+    const issueTable = panel.querySelector(".obs-issue-table");
+    expect(issueTable?.textContent).toContain("主状态");
+    expect(issueTable?.textContent).toContain("影响");
+    const tabs = [
+      ...panel.querySelectorAll<HTMLButtonElement>(
+        '[role="tablist"][aria-label="观测视图"] button',
+      ),
+    ];
+    tabs[1].click();
+    await panel.updateComplete;
+    expect(panel.querySelector('[data-testid="obs-analysis-split"]')).not.toBeNull();
+    expect(panel.querySelector(".obs-list-head")?.textContent).toContain("运行列表");
+    expect(panel.querySelector(".obs-drawer")).toBeNull();
+    panel.querySelector<HTMLButtonElement>("[data-run-id=sample-partial]")!.click();
+    await panel.updateComplete;
+    expect(panel.querySelector(".obs-drawer")).toBeNull();
+    expect(panel.querySelector('[data-testid="obs-analysis-detail"]')?.textContent).toContain(
+      "完整运行证据",
+    );
+    panel.querySelector<HTMLButtonElement>('[data-testid="obs-open-evidence"]')!.click();
+    await panel.updateComplete;
+    expect(panel.querySelector(".obs-drawer")?.textContent).toContain("运行标识与状态");
+    expect(panel.querySelector(".obs-drawer")?.textContent).toContain("improvementEligible：false");
+    container.remove();
+  });
+});
