@@ -12,11 +12,15 @@ import { createHash } from "node:crypto";
 import type { Task } from "@openbot/collaboration-core";
 import {
   classifyLaterBoundMessage,
+  classifyLaterMessageSpeech,
+  resolveAuthoritativeGoalBinding,
   shouldReuseCurrentGoalTask,
   shouldStartNewFormalTask,
+  type LiveBindingTask,
 } from "../../agent-runtime/policy/collaboration-current-goal-binding.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { isCollabTaskClaimContractEnabled } from "../collaboration-dispatch/claim-contract.js";
+import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
 import {
   activateCollaborationTask,
   buildActivationKey,
@@ -334,7 +338,13 @@ export async function controlledDiscussToTask(
   const constraints = input.constraints ? [...input.constraints] : [];
   const suggestedClaimantIds = input.suggestedClaimantIds ? [...input.suggestedClaimantIds] : [];
 
-  if (acceptanceCriteria.length === 0) {
+  const earlyFollowupSpeech = classifyLaterMessageSpeech(message);
+  const earlyFollowupNeedsTarget =
+    earlyFollowupSpeech === "revision" ||
+    earlyFollowupSpeech === "clarification" ||
+    earlyFollowupSpeech === "block" ||
+    earlyFollowupSpeech === "read_only_query";
+  if (acceptanceCriteria.length === 0 && !earlyFollowupNeedsTarget) {
     return finish({
       classification: {
         kind: "needs_clarification",
@@ -382,30 +392,88 @@ export async function controlledDiscussToTask(
     cfg: input.cfg,
     tenantId: input.auth?.tenantId ?? input.tenant?.tenantId ?? tenantId,
   });
-  if (storeProbe.ok) {
-    const operatingState = await readGroupOperatingState({
-      fileStore: storeProbe.fileStore,
-      groupId,
+  if (!storeProbe.ok) {
+    return finish({
+      classification: {
+        kind: "needs_clarification",
+        reason: "missing_goal",
+        titleHint: compact(input.title) || message.slice(0, 80),
+        goalHint: compact(input.goal) || message.slice(0, 240),
+        missingFields: ["current_goal_binding"],
+      },
+      attempted: false,
+      taskId: null,
+      activationKey: null,
+      activation: null,
+      stages: stagesFromActivation({ taskEnsured: false, boardPublished: false }),
+      internalReason: "state_read_failed",
     });
-    boundCurrentTaskId = compact(operatingState?.activeContext?.currentTaskId) || null;
-    boundCurrentGoal =
-      compact(operatingState?.activeContext?.currentMission) || boundCurrentGoal || null;
-    if (!boundCurrentTaskId) {
-      const tasks = await storeProbe.objectStorage
-        .listObjects<Task>(groupId, "task")
-        .catch(() => []);
-      const liveTasks = [...tasks]
-        .filter((task) =>
-          ["draft", "ready", "in_progress", "blocked", "review"].includes(task.status),
-        )
-        .toSorted((left, right) => (right.updatedAtMs ?? 0) - (left.updatedAtMs ?? 0));
-      boundCurrentTaskId = compact(liveTasks[0]?.taskId) || null;
+  }
+  {
+    let listed: Task[] | null = null;
+    let operatingState: Awaited<ReturnType<typeof readGroupOperatingState>> | null = null;
+    try {
+      operatingState = await readGroupOperatingState({
+        fileStore: storeProbe.fileStore,
+        groupId,
+      });
+    } catch {
+      operatingState = null;
     }
-    if (boundCurrentTaskId) {
-      const live = await storeProbe.objectStorage
-        .readObject<Task>(groupId, "task", boundCurrentTaskId)
-        .catch(() => null);
-      boundCurrentGoal = compact(live?.title) || compact(live?.description) || boundCurrentGoal;
+    try {
+      listed = await storeProbe.objectStorage.listObjects<Task>(groupId, "task");
+    } catch {
+      listed = null;
+    }
+    const bindingTasks: LiveBindingTask[] | null =
+      listed == null
+        ? null
+        : listed.map((task) => ({
+            taskId: task.taskId,
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            goal: task.title,
+          }));
+    const resolved = resolveAuthoritativeGoalBinding({
+      message,
+      activeContext: operatingState?.activeContext
+        ? {
+            currentTaskId: operatingState.activeContext.currentTaskId,
+            currentMission: operatingState.activeContext.currentMission,
+          }
+        : null,
+      tasks: bindingTasks,
+      understandingGoal: compact(input.goal) || null,
+    });
+    const followupSpeech = classifyLaterMessageSpeech(message);
+    const followupNeedsTarget =
+      followupSpeech === "revision" ||
+      followupSpeech === "clarification" ||
+      followupSpeech === "block" ||
+      followupSpeech === "read_only_query";
+    if (resolved.kind === "clarify") {
+      if (resolved.reason === "state_read_failed" || followupNeedsTarget) {
+        return finish({
+          classification: {
+            kind: "needs_clarification",
+            reason: "missing_goal",
+            titleHint: compact(input.title) || message.slice(0, 80),
+            goalHint: compact(input.goal) || message.slice(0, 240),
+            missingFields: ["current_goal_binding"],
+          },
+          attempted: false,
+          taskId: null,
+          activationKey: null,
+          activation: null,
+          stages: stagesFromActivation({ taskEnsured: false, boardPublished: false }),
+          internalReason: resolved.reason,
+        });
+      }
+      // New formal work may still be minted when no unique current goal exists.
+    } else {
+      boundCurrentTaskId = resolved.taskId;
+      boundCurrentGoal = resolved.goal || boundCurrentGoal || null;
     }
     laterBoundKind = classifyLaterBoundMessage({
       currentGoal: boundCurrentGoal,
@@ -427,21 +495,73 @@ export async function controlledDiscussToTask(
       });
     }
     if (shouldReuseCurrentGoalTask(laterBoundKind) && boundCurrentTaskId) {
-      const reason =
+      const controlReason =
         laterBoundKind === "block_bound"
-          ? "bound_member_block_not_new_task"
+          ? "bound_member_block_applied"
           : laterBoundKind === "revision_bound"
-            ? "bound_revision_not_new_task"
-            : "bound_clarification_not_new_task";
-      return finish({
-        classification,
-        attempted: false,
-        taskId: boundCurrentTaskId,
-        activationKey: null,
-        activation: null,
-        stages: stagesFromActivation({ taskEnsured: true, boardPublished: false }),
-        internalReason: reason,
-      });
+            ? "bound_revision_applied"
+            : "bound_clarification_applied";
+      try {
+        const patched = await applyBusinessTaskPatchUnderControlLock({
+          groupId,
+          taskId: boundCurrentTaskId,
+          cfg: input.cfg,
+          groupRootDir: storeProbe.groupsRoot,
+          objectStorage: storeProbe.objectStorage,
+          buildPatch: (live) => {
+            const revisionLine = compact(message);
+            const description = compact(live.description);
+            const nextDescription =
+              revisionLine && !description.includes(revisionLine)
+                ? [description, `Bound revision: ${revisionLine}`].filter(Boolean).join("\n")
+                : live.description;
+            return {
+              description: nextDescription,
+              updatedBy: compact(input.actor) || live.updatedBy,
+              updatedAtMs: input.nowMs ?? Date.now(),
+              ...(laterBoundKind === "block_bound" && live.status !== "cancelled"
+                ? { status: "blocked" as const }
+                : {}),
+            };
+          },
+        });
+        return finish({
+          classification,
+          attempted: true,
+          taskId: patched.taskId || boundCurrentTaskId,
+          activationKey: null,
+          activation: {
+            status: "needs_confirm",
+            taskId: patched.taskId || boundCurrentTaskId,
+            activationKey: "",
+            reason: controlReason,
+            taskEnsured: true,
+            boardPublished: false,
+            dispatched: false,
+          },
+          stages: stagesFromActivation({ taskEnsured: true, boardPublished: false }),
+          internalReason: controlReason,
+        });
+      } catch (error) {
+        return finish({
+          classification: {
+            kind: "needs_clarification",
+            reason: "missing_goal",
+            titleHint: compact(input.title) || message.slice(0, 80),
+            goalHint: boundCurrentGoal || message.slice(0, 240),
+            missingFields: ["current_goal_binding"],
+          },
+          attempted: false,
+          taskId: boundCurrentTaskId,
+          activationKey: null,
+          activation: null,
+          stages: stagesFromActivation({ taskEnsured: true, boardPublished: false }),
+          internalReason:
+            error instanceof Error && error.message.includes("not found")
+              ? "state_read_failed"
+              : "state_read_failed",
+        });
+      }
     }
   }
 

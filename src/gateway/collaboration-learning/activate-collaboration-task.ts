@@ -11,8 +11,12 @@
 import { createHash } from "node:crypto";
 import type { Task } from "@openbot/collaboration-core";
 import {
+  authorizeAppointedProjectOwner,
+  bindingMembersFromRoster,
   buildAuthoritativeResponsibility,
+  legalOrganizerId,
   parseAppointedProjectOwner,
+  proposeAppointedProjectOwner,
   type KnownBindingMember,
 } from "../../agent-runtime/policy/collaboration-current-goal-binding.js";
 import type { TaskResponsibility } from "../../agent-runtime/policy/collaboration-policy-model.js";
@@ -435,8 +439,10 @@ async function mutateCollaborationTaskObject(params: {
       title: compact(params.title) || existing.title,
       status: nextStatus,
       tags,
-      ownerMemberId:
-        responsibility.owner === "group" ? existing.ownerMemberId : responsibility.owner,
+      ownerMemberId: (() => {
+        const organizer = legalOrganizerId(responsibility);
+        return organizer && organizer !== "group" ? organizer : existing.ownerMemberId;
+      })(),
       updatedBy: compact(params.actor) || existing.updatedBy,
       updatedAtMs: now,
       responsibility,
@@ -460,8 +466,10 @@ async function mutateCollaborationTaskObject(params: {
     groupId: params.groupId,
     title: compact(params.title) || params.taskId,
     status: params.readyRequested ? "ready" : "draft",
-    ownerMemberId:
-      responsibility.owner !== "group" ? responsibility.owner : compact(params.actor) || undefined,
+    ownerMemberId: (() => {
+      const organizer = legalOrganizerId(responsibility);
+      return organizer && organizer !== "group" ? organizer : compact(params.actor) || undefined;
+    })(),
     assignedMemberIds: compact(params.actor) ? [compact(params.actor)] : [],
     tags: mergeExtraTags(mergeActivationTag(undefined, params.activationKey), effectiveExtraTags),
     createdBy: compact(params.actor) || undefined,
@@ -714,39 +722,35 @@ export async function activateCollaborationTask(
   const teamStores = storesResolved.stores;
 
   const profile = await teamStores.groupStorage.readProfile(groupId).catch(() => null);
-  const roster = await teamStores.groupStorage.readMembers(groupId).catch(() => []);
-  const knownMembers =
-    params.knownMembers ??
-    (roster ?? [])
-      .map((member) => {
-        const id = compact(member.agentId) || compact(member.userId) || compact(member.memberId);
-        return {
-          id,
-          name: member.name ?? null,
-          aliases: [
-            compact(member.memberId),
-            compact(member.agentId),
-            compact(member.userId),
-          ].filter(Boolean),
-        };
-      })
-      .filter((member) => member.id);
+  let rosterReadFailed = false;
+  let roster: Awaited<ReturnType<typeof teamStores.groupStorage.readMembers>> = [];
+  try {
+    roster = await teamStores.groupStorage.readMembers(groupId);
+  } catch {
+    rosterReadFailed = true;
+    roster = [];
+  }
+  // Current authority is the server-side roster, not request-body knownMembers.
+  const knownMembers = rosterReadFailed ? [] : bindingMembersFromRoster(roster ?? []);
   const coordinatorBotId =
     compact(params.coordinatorBotId) || compact(profile?.coordinatorBotId) || null;
-  const appointedOwnerId =
-    parseAppointedProjectOwner({
-      message,
-      appointedOwnerId: params.appointedOwnerId,
-      knownMembers,
-    })?.ownerId ??
-    (compact(params.appointedOwnerId) || null);
+  const appointmentProposal = proposeAppointedProjectOwner({
+    message,
+    appointedOwnerId: params.appointedOwnerId,
+    knownMembers,
+  });
+  const appointedOwnerId = rosterReadFailed
+    ? null
+    : (authorizeAppointedProjectOwner({
+        proposal: appointmentProposal,
+        roster: { ok: true, members: knownMembers },
+      })?.ownerId ?? null);
   const bindingFields = {
     appointedOwnerId,
     coordinatorBotId,
     knownMembers,
     message,
   };
-
   const syncActivated = async (
     item: GroupBoardClaimItem,
     taskCreated: boolean,

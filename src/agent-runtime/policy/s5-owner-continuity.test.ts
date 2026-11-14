@@ -82,7 +82,61 @@ async function useS5Workspace() {
   const groupsRoot = path.join(root, "collaboration", "groups");
   const groupLocator = path.join(groupsRoot, "grp_s5");
   await fs.mkdir(groupLocator, { recursive: true });
-  return { root, cfg, trusted: { groupsRoot, groupLocator } };
+  const trusted = { groupsRoot, groupLocator };
+  const stores = createTrustedGroupStores(trusted);
+  const now = Date.now();
+  await stores.groupStorage.writeProfile({
+    groupId: "grp_s5",
+    groupCode: "grp_s5",
+    displayName: "s5",
+    ownerUserId: "human:owner",
+    coordinatorBotId: "bot-coord",
+    createdAtMs: now,
+    updatedAtMs: now,
+  });
+  await stores.groupStorage.writeMembers("grp_s5", [
+    {
+      memberId: "m-owner",
+      memberKind: "bot",
+      agentId: "bot-owner",
+      userId: "bot-owner",
+      name: "校园项目负责人",
+      governanceRole: "member",
+      status: "active",
+      updatedAtMs: now,
+    },
+    {
+      memberId: "m-coord",
+      memberKind: "bot",
+      agentId: "bot-coord",
+      userId: "bot-coord",
+      name: "群协调者",
+      governanceRole: "member",
+      status: "active",
+      updatedAtMs: now,
+    },
+    {
+      memberId: "m-a",
+      memberKind: "bot",
+      agentId: "bot-a",
+      userId: "bot-a",
+      name: "成员A",
+      governanceRole: "member",
+      status: "active",
+      updatedAtMs: now,
+    },
+    {
+      memberId: "m-b",
+      memberKind: "bot",
+      agentId: "bot-b",
+      userId: "bot-b",
+      name: "成员B",
+      governanceRole: "member",
+      status: "active",
+      updatedAtMs: now,
+    },
+  ]);
+  return { root, cfg, trusted, stores };
 }
 
 const MEMBERS = [
@@ -305,8 +359,8 @@ describe("S5 isolated campus-project path on existing ports", () => {
       trusted,
     });
     expect(later.taskId).toBe("TEAM-S5-CAMPUS-1");
-    expect(later.attempted).toBe(false);
-    expect(later.internalReason).toMatch(/bound_(clarification|revision)_not_new_task/);
+    expect(later.attempted).toBe(true);
+    expect(later.internalReason).toMatch(/bound_(clarification|revision)_applied/);
 
     const query = await controlledDiscussToTask({
       sourceMessageId: "s5-later-query",
@@ -332,6 +386,7 @@ describe("S5 isolated campus-project path on existing ports", () => {
     expect(afterLater?.ownerMemberId).toBe("bot-owner");
     expect(afterLater?.responsibility?.owner).toBe("bot-owner");
     expect(afterLater?.responsibility?.coordinator).toBe("bot-coord");
+    expect(afterLater?.description).toContain("把截止日期改到周五");
 
     const listed = await objectStore.listObjects<Task>("grp_s5", "task");
     expect(listed.map((item) => item.taskId)).toEqual(["TEAM-S5-CAMPUS-1"]);
