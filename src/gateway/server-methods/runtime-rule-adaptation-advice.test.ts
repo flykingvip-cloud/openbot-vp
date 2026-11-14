@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { INVENTORY_PIN } from "../../agent-runtime/contracts/rule-adaptation-shadow.js";
 import {
+  createEmployeeAdvicePolicyFactSource,
+  resolveEmployeeAdviceProductionFacts,
+} from "./runtime-rule-adaptation-advice-facts.ts";
+import {
   createEmployeeAdviceAbortRegistry,
   defaultResolveApprovedTarget,
   handleRuntimeRuleAdaptationAdvice,
@@ -49,6 +53,57 @@ function configWithModelWindow() {
   } as never;
 }
 
+function configWithKnownAgent(agentId = "personal-bot") {
+  return {
+    agents: {
+      defaults: { contextTokens: 32000 },
+      list: [{ id: agentId }],
+    },
+    models: {
+      providers: {
+        deepseek: {
+          models: [{ id: "deepseek-v4-flash", contextWindow: 64000 }],
+        },
+      },
+    },
+  } as never;
+}
+
+function viewOnlyAccess(agentId = "personal-bot") {
+  return async (input: { agentId: string }) => {
+    if (input.agentId !== agentId) {
+      return { ok: false as const, denied: true, reason: "目标访问被拒绝。" };
+    }
+    return {
+      ok: true as const,
+      agentId,
+      tenantId: "tenant-1",
+      userId: "employee-server",
+      activationAuthorized: false,
+    };
+  };
+}
+
+function readablePolicyFacts(agentId = "personal-bot") {
+  return createEmployeeAdvicePolicyFactSource([
+    {
+      tenantId: "tenant-1",
+      agentId,
+      facts: {
+        compatibilityRecord: {
+          status: "approved_compatible",
+          boundImplementationVersion: INVENTORY_PIN,
+          boundExpectedPolicyVersion: POLICY_VERSION,
+        },
+        expectedPolicyState: "active",
+        expectedPolicyVersion: POLICY_VERSION,
+        hardMinContextTokens: 16000,
+        activationAuthorized: false,
+      },
+    },
+  ]);
+}
+
 describe("handleRuntimeRuleAdaptationAdvice", () => {
   it("does not invent an effective value or approved target from a seat plus a config cap", async () => {
     const runShadow = vi.fn();
@@ -73,7 +128,7 @@ describe("handleRuntimeRuleAdaptationAdvice", () => {
     expect(advice.state).toBe("needs_information");
     expect(advice.modelCalled).toBe(false);
     expect(advice.notEffective).toBe(true);
-    expect(defaultResolveApprovedTarget().targetAuthorization).toBe("unknown");
+    expect((await defaultResolveApprovedTarget()).targetAuthorization).toBe("unknown");
   });
 
   it("calls the official shadow entry only after a server-approved target and a real effective value are present", async () => {
@@ -293,5 +348,264 @@ describe("handleRuntimeRuleAdaptationAdviceCancel", () => {
     expect(advice.state).toBe("failed");
     released?.(null as never);
     void pending;
+  });
+});
+
+describe("production fact resolver on the gateway handler", () => {
+  it("enters the official shadow entry when the production resolver reads view access and real policy facts", async () => {
+    const runShadow = vi.fn(async (request, binding) => {
+      expect(request.situation.scope).toEqual({ type: "personal", id: "personal-bot" });
+      expect(JSON.stringify(request)).not.toContain("client-agent");
+      expect(binding.view.hostFacts.compatibilityRecord).toEqual({
+        status: "approved_compatible",
+        boundImplementationVersion: INVENTORY_PIN,
+        boundExpectedPolicyVersion: POLICY_VERSION,
+      });
+      expect(binding.view.hostFacts.expectedPolicyState).toBe("active");
+      expect(binding.view.effectivePolicy[0]?.currentEffectiveValue).toBe(32000);
+      return {
+        outcomeCode: "shadow_recorded",
+        activationAllowed: false,
+        reasons: [],
+        proposal: { kind: "policy_proposal", items: [] },
+      } as never;
+    });
+
+    const advice = await handleRuntimeRuleAdaptationAdvice(
+      { question: "上下文窗口太大", targetRef: { sessionKey: "agent:personal-bot:chat" } },
+      client(),
+      {
+        loadConfig: () => configWithKnownAgent(),
+        resolveTrustedContext: async () => seatedContext,
+        resolveOfficialModel: () => official,
+        checkAgentAccess: viewOnlyAccess(),
+        policyFactSource: readablePolicyFacts(),
+        runShadow,
+      },
+    );
+
+    expect(runShadow).toHaveBeenCalledTimes(1);
+    expect(advice.state).toBe("adjustment_suggested");
+    expect(advice.activationAllowed).toBe(false);
+    expect(advice.notEffective).toBe(true);
+    expect(advice.modelCalled).toBe(true);
+  });
+
+  it("returns 需补信息 and does not call the model when the readable fact source has no record", async () => {
+    const runShadow = vi.fn();
+    const advice = await handleRuntimeRuleAdaptationAdvice(
+      { question: "上下文窗口太大", targetRef: { agentId: "personal-bot" } },
+      client(),
+      {
+        loadConfig: () => configWithKnownAgent(),
+        resolveTrustedContext: async () => seatedContext,
+        resolveOfficialModel: () => official,
+        checkAgentAccess: viewOnlyAccess(),
+        policyFactSource: createEmployeeAdvicePolicyFactSource([]),
+        runShadow,
+      },
+    );
+    expect(runShadow).not.toHaveBeenCalled();
+    expect(advice.state).toBe("needs_information");
+    expect(advice.modelCalled).toBe(false);
+    expect(JSON.stringify(advice)).not.toContain("approved_compatible");
+  });
+
+  it("blocks when the employee has no view access to the target", async () => {
+    const runShadow = vi.fn();
+    const advice = await handleRuntimeRuleAdaptationAdvice(
+      { question: "上下文太大", targetRef: { agentId: "personal-bot" } },
+      client(),
+      {
+        loadConfig: () => configWithKnownAgent(),
+        resolveTrustedContext: async () => seatedContext,
+        resolveOfficialModel: () => official,
+        checkAgentAccess: async () => ({
+          ok: false,
+          denied: true,
+          reason: "当前账号没有查看该目标并请求建议的权限。",
+        }),
+        policyFactSource: readablePolicyFacts(),
+        runShadow,
+      },
+    );
+    expect(runShadow).not.toHaveBeenCalled();
+    expect(advice.state).toBe("blocked");
+    expect(advice.summary).toContain("查看该目标并请求建议的权限");
+    expect(advice.modelCalled).toBe(false);
+  });
+
+  it("still requests advice when the employee can view the target but may not activate or modify rules", async () => {
+    const runShadow = vi.fn(
+      async () =>
+        ({
+          outcomeCode: "shadow_recorded",
+          activationAllowed: false,
+          reasons: [],
+          proposal: { kind: "policy_proposal", items: [] },
+        }) as never,
+    );
+    const advice = await handleRuntimeRuleAdaptationAdvice(
+      { question: "上下文窗口太大", targetRef: { agentId: "personal-bot" } },
+      client(),
+      {
+        loadConfig: () => configWithKnownAgent(),
+        resolveTrustedContext: async () => seatedContext,
+        resolveOfficialModel: () => official,
+        checkAgentAccess: viewOnlyAccess(),
+        policyFactSource: readablePolicyFacts(),
+        runShadow,
+      },
+    );
+    expect(runShadow).toHaveBeenCalledTimes(1);
+    expect(advice.state).toBe("adjustment_suggested");
+    expect(advice.activationAllowed).toBe(false);
+    expect(advice.notEffective).toBe(true);
+  });
+
+  it("does not invent approved_compatible or active; it copies only facts from the readable source", async () => {
+    const facts = await resolveEmployeeAdviceProductionFacts({
+      identity: {
+        employeeId: "employee-server",
+        principalId: "user:employee-server",
+        tenantId: "tenant-1",
+        seatId: "seat-1",
+        authorizationStatus: "authorized",
+      },
+      targetRef: { agentId: "personal-bot" },
+      config: configWithKnownAgent(),
+      officialModel: official,
+      checkAgentAccess: viewOnlyAccess(),
+      policyFactSource: createEmployeeAdvicePolicyFactSource([
+        {
+          tenantId: "tenant-1",
+          agentId: "personal-bot",
+          facts: {
+            compatibilityRecord: {
+              status: "unapproved",
+              boundImplementationVersion: INVENTORY_PIN,
+              boundExpectedPolicyVersion: POLICY_VERSION,
+            },
+            expectedPolicyState: "expired",
+            expectedPolicyVersion: POLICY_VERSION,
+          },
+        },
+      ]),
+    });
+    expect(facts.compatibilityRecord?.status).toBe("unapproved");
+    expect(facts.expectedPolicyState).toBe("expired");
+    expect(facts.currentContextTokens).toBe(32000);
+    expect(facts.modelContextWindow).toBe(64000);
+    expect(facts.targetAuthorization).toBe("approved");
+  });
+
+  it("resolves an approved target through the default production resolver when view access exists", async () => {
+    const resolved = await defaultResolveApprovedTarget({
+      identity: {
+        employeeId: "employee-server",
+        principalId: "user:employee-server",
+        tenantId: "tenant-1",
+        authorizationStatus: "authorized",
+      },
+      targetRef: { sessionKey: "agent:personal-bot:chat", agentId: "personal-bot" },
+      config: configWithKnownAgent(),
+      checkAgentAccess: viewOnlyAccess(),
+    });
+    expect(resolved.targetAuthorization).toBe("approved");
+    expect(resolved.approvedTarget).toEqual({
+      agentId: "personal-bot",
+      scopeId: "personal-bot",
+      sessionKey: "agent:personal-bot:chat",
+    });
+  });
+});
+
+describe("createEmployeeAdviceAbortRegistry", () => {
+  it("isolates keys by trusted tenant, employee, and requestId", () => {
+    const registry = createEmployeeAdviceAbortRegistry();
+    const first = new AbortController();
+    const second = new AbortController();
+    expect(
+      registry.register(
+        { tenantId: "tenant-a", employeeId: "employee-1", requestId: "req-1" },
+        first,
+      ),
+    ).toEqual({ accepted: true });
+    expect(
+      registry.register(
+        { tenantId: "tenant-b", employeeId: "employee-1", requestId: "req-1" },
+        second,
+      ),
+    ).toEqual({ accepted: true });
+    expect(
+      registry.cancel({ tenantId: "tenant-a", employeeId: "employee-1", requestId: "req-1" }),
+    ).toBe(true);
+    expect(first.signal.aborted).toBe(true);
+    expect(second.signal.aborted).toBe(false);
+  });
+
+  it("rejects a duplicate in-flight requestId without replacing the running controller", () => {
+    const registry = createEmployeeAdviceAbortRegistry();
+    const first = new AbortController();
+    const second = new AbortController();
+    const key = { tenantId: "tenant-1", employeeId: "employee-1", requestId: "req-1" };
+    expect(registry.register(key, first)).toEqual({ accepted: true });
+    expect(registry.register(key, second)).toEqual({
+      accepted: false,
+      reason: "duplicate_in_flight",
+    });
+    expect(first.signal.aborted).toBe(false);
+    expect(second.signal.aborted).toBe(false);
+    expect(registry.cancel(key)).toBe(true);
+    expect(first.signal.aborted).toBe(true);
+    expect(second.signal.aborted).toBe(false);
+  });
+
+  it("bounds unmatched early-cancel reservations by a cap and evicts the oldest", () => {
+    const registry = createEmployeeAdviceAbortRegistry({
+      now: () => 1_000,
+      reservedLimit: 2,
+      reservedTtlMs: 60_000,
+    });
+    expect(registry.cancel({ tenantId: "tenant-1", employeeId: "e", requestId: "r1" })).toBe(true);
+    expect(registry.cancel({ tenantId: "tenant-1", employeeId: "e", requestId: "r2" })).toBe(true);
+    expect(registry.cancel({ tenantId: "tenant-1", employeeId: "e", requestId: "r3" })).toBe(true);
+    const first = new AbortController();
+    const third = new AbortController();
+    expect(
+      registry.register({ tenantId: "tenant-1", employeeId: "e", requestId: "r1" }, first),
+    ).toEqual({ accepted: true });
+    expect(first.signal.aborted).toBe(false);
+    expect(
+      registry.register({ tenantId: "tenant-1", employeeId: "e", requestId: "r3" }, third),
+    ).toEqual({ accepted: true, alreadyCancelled: true });
+    expect(third.signal.aborted).toBe(true);
+  });
+
+  it("expires early-cancel reservations by TTL without a scheduler", () => {
+    let now = 1_000;
+    const registry = createEmployeeAdviceAbortRegistry({
+      now: () => now,
+      reservedLimit: 8,
+      reservedTtlMs: 100,
+    });
+    expect(registry.cancel({ tenantId: "tenant-1", employeeId: "e", requestId: "late" })).toBe(
+      true,
+    );
+    now = 1_250;
+    const controller = new AbortController();
+    expect(
+      registry.register({ tenantId: "tenant-1", employeeId: "e", requestId: "late" }, controller),
+    ).toEqual({ accepted: true });
+    expect(controller.signal.aborted).toBe(false);
+  });
+
+  it("refuses to register or cancel without a trusted tenant", () => {
+    const registry = createEmployeeAdviceAbortRegistry();
+    const controller = new AbortController();
+    expect(
+      registry.register({ tenantId: "  ", employeeId: "e", requestId: "r1" }, controller),
+    ).toEqual({ accepted: false, reason: "missing_identity" });
+    expect(registry.cancel({ tenantId: "", employeeId: "e", requestId: "r1" })).toBe(false);
   });
 });

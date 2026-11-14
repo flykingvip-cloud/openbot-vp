@@ -2,11 +2,9 @@ import {
   buildEmployeeAdviceView,
   EMPLOYEE_ADVICE_CANCEL_METHOD,
   EMPLOYEE_ADVICE_METHOD,
-  resolveTrustedEffectiveContextTokens,
   runEmployeeRuleAdaptationAdvice,
   sanitizeEmployeeAdviceClientInput,
   type EmployeeAdviceView,
-  type TrustedEmployeeAdviceFacts,
   type TrustedEmployeeAdviceHost,
 } from "../../agent-runtime/command/index.js";
 import type { ModelSessionPorts } from "../../agent-runtime/model/index.js";
@@ -28,13 +26,17 @@ import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-h
 import { loadConfig, type OpenBotConfig } from "../../config/config.js";
 import { resolveTrustedEnterpriseDataExecutionContext } from "../enterprise-data/enterprise-data-seat-context.js";
 import { respondUnavailable } from "./billing-helpers.js";
-import type { GatewayRequestHandlers } from "./types.js";
+import {
+  officialEmployeeAdviceAgentAccessCheck,
+  resolveEmployeeAdviceApprovedTarget,
+  resolveEmployeeAdviceProductionFacts,
+  type EmployeeAdviceAgentAccessCheck,
+  type EmployeeAdviceApprovedTarget,
+  type EmployeeAdvicePolicyFactSource,
+} from "./runtime-rule-adaptation-advice-facts.js";
+import type { GatewayClient, GatewayRequestHandlers } from "./types.js";
 
-export type EmployeeAdviceApprovedTarget = {
-  targetAuthorization: "approved" | "denied" | "unknown";
-  reason?: string;
-  approvedTarget?: TrustedEmployeeAdviceFacts["approvedTarget"];
-};
+export type { EmployeeAdviceApprovedTarget } from "./runtime-rule-adaptation-advice-facts.js";
 
 export type EmployeeAdviceHandlerDeps = {
   loadConfig?: () => OpenBotConfig;
@@ -44,7 +46,12 @@ export type EmployeeAdviceHandlerDeps = {
     identity: TrustedEmployeeAdviceHost["identity"];
     targetRef: { sessionKey?: string; agentId?: string };
     config: OpenBotConfig;
+    client?: GatewayClient | null;
+    checkAgentAccess?: EmployeeAdviceAgentAccessCheck;
   }) => Promise<EmployeeAdviceApprovedTarget> | EmployeeAdviceApprovedTarget;
+  resolveProductionFacts?: typeof resolveEmployeeAdviceProductionFacts;
+  policyFactSource?: EmployeeAdvicePolicyFactSource;
+  checkAgentAccess?: EmployeeAdviceAgentAccessCheck;
   runAdvice?: typeof runEmployeeRuleAdaptationAdvice;
   runShadow?: TrustedEmployeeAdviceHost["runShadow"];
   env?: NodeJS.ProcessEnv;
@@ -52,41 +59,122 @@ export type EmployeeAdviceHandlerDeps = {
   abortRegistry?: EmployeeAdviceAbortRegistry;
 };
 
-export type EmployeeAdviceAbortRegistry = {
-  register: (employeeId: string, requestId: string, controller: AbortController) => void;
-  cancel: (employeeId: string, requestId: string) => boolean;
-  release: (employeeId: string, requestId: string) => void;
+export type EmployeeAdviceAbortKey = {
+  tenantId: string;
+  employeeId: string;
+  requestId: string;
 };
 
-function adviceAbortKey(employeeId: string, requestId: string): string {
-  return `${employeeId}:${requestId}`;
+export type EmployeeAdviceAbortRegisterResult =
+  | { accepted: true; alreadyCancelled?: boolean }
+  | { accepted: false; reason: "duplicate_in_flight" | "missing_identity" };
+
+export type EmployeeAdviceAbortRegistry = {
+  register: (
+    key: EmployeeAdviceAbortKey,
+    controller: AbortController,
+  ) => EmployeeAdviceAbortRegisterResult;
+  cancel: (key: EmployeeAdviceAbortKey) => boolean;
+  release: (key: EmployeeAdviceAbortKey) => void;
+};
+
+/** Upper bound on unmatched early-cancel reservations. No scheduler is added. */
+export const EMPLOYEE_ADVICE_ABORT_RESERVED_LIMIT = 128;
+/** Reservations older than this are dropped on the next register/cancel/release. */
+export const EMPLOYEE_ADVICE_ABORT_RESERVED_TTL_MS = 60_000;
+
+export type EmployeeAdviceAbortRegistryOptions = {
+  now?: () => number;
+  reservedLimit?: number;
+  reservedTtlMs?: number;
+};
+
+const ABORT_KEY_UNIT = "\u001f";
+
+export function adviceAbortKey(key: EmployeeAdviceAbortKey): string | undefined {
+  const tenantId = key.tenantId.trim();
+  const employeeId = key.employeeId.trim();
+  const requestId = key.requestId.trim();
+  if (!tenantId || !employeeId || !requestId) {
+    return undefined;
+  }
+  return `${tenantId}${ABORT_KEY_UNIT}${employeeId}${ABORT_KEY_UNIT}${requestId}`;
 }
 
-export function createEmployeeAdviceAbortRegistry(): EmployeeAdviceAbortRegistry {
+export function createEmployeeAdviceAbortRegistry(
+  options: EmployeeAdviceAbortRegistryOptions = {},
+): EmployeeAdviceAbortRegistry {
   const controllers = new Map<string, AbortController>();
-  const reserved = new Set<string>();
-  return {
-    register(employeeId, requestId, controller) {
-      const key = adviceAbortKey(employeeId, requestId);
-      if (reserved.has(key)) {
-        controller.abort();
+  const reserved = new Map<string, number>();
+  const now = options.now ?? Date.now;
+  const reservedLimit = Math.max(1, options.reservedLimit ?? EMPLOYEE_ADVICE_ABORT_RESERVED_LIMIT);
+  const reservedTtlMs = Math.max(1, options.reservedTtlMs ?? EMPLOYEE_ADVICE_ABORT_RESERVED_TTL_MS);
+
+  function pruneReserved(at: number): void {
+    for (const [key, reservedAt] of reserved) {
+      if (at - reservedAt > reservedTtlMs) {
         reserved.delete(key);
       }
+    }
+    while (reserved.size > reservedLimit) {
+      const oldest = reserved.keys().next().value;
+      if (typeof oldest !== "string") {
+        break;
+      }
+      reserved.delete(oldest);
+    }
+  }
+
+  return {
+    register(parts, controller) {
+      const key = adviceAbortKey(parts);
+      if (!key) {
+        return { accepted: false, reason: "missing_identity" };
+      }
+      const at = now();
+      pruneReserved(at);
+      if (controllers.has(key)) {
+        // Do not silently replace an in-flight controller.
+        return { accepted: false, reason: "duplicate_in_flight" };
+      }
+      const reservedAt = reserved.get(key);
+      if (typeof reservedAt === "number") {
+        reserved.delete(key);
+        if (at - reservedAt <= reservedTtlMs) {
+          controller.abort();
+          controllers.set(key, controller);
+          return { accepted: true, alreadyCancelled: true };
+        }
+      }
       controllers.set(key, controller);
+      return { accepted: true };
     },
-    cancel(employeeId, requestId) {
-      const key = adviceAbortKey(employeeId, requestId);
+    cancel(parts) {
+      const key = adviceAbortKey(parts);
+      if (!key) {
+        return false;
+      }
+      const at = now();
+      pruneReserved(at);
       const controller = controllers.get(key);
       if (controller) {
         controller.abort();
         controllers.delete(key);
         return true;
       }
-      reserved.add(key);
+      if (!reserved.has(key)) {
+        reserved.set(key, at);
+        pruneReserved(at);
+      }
       return true;
     },
-    release(employeeId, requestId) {
-      controllers.delete(adviceAbortKey(employeeId, requestId));
+    release(parts) {
+      const key = adviceAbortKey(parts);
+      if (!key) {
+        return;
+      }
+      controllers.delete(key);
+      pruneReserved(now());
     },
   };
 }
@@ -110,40 +198,22 @@ function createEmployeeAdviceSessionPorts(): ModelSessionPorts {
   };
 }
 
-function readCatalogModelContextWindow(
-  cfg: OpenBotConfig,
-  provider: string,
-  modelId: string,
-): number | undefined {
-  const providers = cfg.models?.providers as
-    | Record<string, { models?: Array<{ id?: string; contextWindow?: number }> }>
-    | undefined;
-  const models = Array.isArray(providers?.[provider]?.models) ? providers[provider].models : [];
-  const match = models.find((entry) => entry?.id === modelId);
-  const value = match?.contextWindow;
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : undefined;
-}
-
-function readConfigContextTokenCap(cfg: OpenBotConfig): number | undefined {
-  const value = cfg.agents?.defaults?.contextTokens;
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? Math.floor(value)
-    : undefined;
-}
-
 /**
- * Seat membership is not target-rule authorization. Unless a caller injects a
- * real approval, the default resolver returns unknown so the use case can
- * ask for more information instead of inventing a scope from the client
- * agentId.
+ * Production default: resolve the target through the existing view-access
+ * check. Does not invent an approved scope from a seat or a client agentId.
+ * When called with no input, the result stays unknown because there is
+ * nothing to resolve.
  */
-export function defaultResolveApprovedTarget(): EmployeeAdviceApprovedTarget {
-  return {
-    targetAuthorization: "unknown",
-    reason: "服务端尚未核准目标，拥有员工席位也不等于有权调整目标机器人的规则。",
-  };
+export async function defaultResolveApprovedTarget(
+  input?: Parameters<typeof resolveEmployeeAdviceApprovedTarget>[0],
+): Promise<EmployeeAdviceApprovedTarget> {
+  if (!input) {
+    return {
+      targetAuthorization: "unknown",
+      reason: "服务端尚未核准目标，拥有员工席位也不等于有权查看目标并请求规则适配建议。",
+    };
+  }
+  return resolveEmployeeAdviceApprovedTarget(input);
 }
 
 function errorCode(error: unknown): string | undefined {
@@ -193,7 +263,7 @@ export async function handleRuntimeRuleAdaptationAdvice(
   const loadCfg = deps.loadConfig ?? loadConfig;
   const resolveCtx = deps.resolveTrustedContext ?? resolveTrustedEnterpriseDataExecutionContext;
   const resolveModel = deps.resolveOfficialModel ?? resolveOfficialDeepSeekCredential;
-  const resolveTarget = deps.resolveApprovedTarget ?? defaultResolveApprovedTarget;
+  const resolveFacts = deps.resolveProductionFacts ?? resolveEmployeeAdviceProductionFacts;
   const runAdvice = deps.runAdvice ?? runEmployeeRuleAdaptationAdvice;
   const env = deps.env ?? process.env;
   const abortRegistry = deps.abortRegistry ?? defaultAbortRegistry;
@@ -222,46 +292,65 @@ export async function handleRuntimeRuleAdaptationAdvice(
     };
   }
 
-  const facts: TrustedEmployeeAdviceFacts = {};
-  const cap = readConfigContextTokenCap(cfg);
-  if (typeof cap === "number") {
-    facts.configContextTokenCap = cap;
-  }
-  if (official) {
-    const modelWindow = readCatalogModelContextWindow(cfg, official.provider, official.model);
-    if (typeof modelWindow === "number") {
-      facts.modelContextWindow = modelWindow;
-      const effective = resolveTrustedEffectiveContextTokens({
-        modelWindow,
-        configCap: cap,
-      });
-      if (effective.ok) {
-        facts.currentContextTokens = effective.tokens;
-        facts.currentContextTokenSource = effective.source;
-      }
-    }
-  }
-  // Compatibility records and expected policy state are not invented here.
-  if (identity.authorizationStatus === "authorized") {
-    const sanitized = sanitizeEmployeeAdviceClientInput(params);
-    const target = await resolveTarget({
+  const sanitized = sanitizeEmployeeAdviceClientInput(params);
+  const facts =
+    identity.authorizationStatus === "authorized"
+      ? await resolveFacts({
+          identity,
+          targetRef: sanitized.request.targetRef,
+          config: cfg,
+          client,
+          officialModel: official,
+          policyFactSource: deps.policyFactSource,
+          checkAgentAccess: deps.checkAgentAccess ?? officialEmployeeAdviceAgentAccessCheck,
+        })
+      : {};
+  if (identity.authorizationStatus === "authorized" && deps.resolveApprovedTarget) {
+    const target = await deps.resolveApprovedTarget({
       identity,
       targetRef: sanitized.request.targetRef,
       config: cfg,
+      client,
+      checkAgentAccess: deps.checkAgentAccess,
     });
     facts.targetAuthorization = target.targetAuthorization;
     if (target.reason) {
       facts.targetAuthorizationReason = target.reason;
+    } else {
+      delete facts.targetAuthorizationReason;
     }
     if (target.approvedTarget) {
       facts.approvedTarget = target.approvedTarget;
+    } else {
+      delete facts.approvedTarget;
     }
   }
 
   const requestId = readClientRequestId(params);
   const abort = new AbortController();
-  if (requestId) {
-    abortRegistry.register(identity.employeeId, requestId, abort);
+  const abortKey =
+    requestId && identity.tenantId
+      ? {
+          tenantId: identity.tenantId,
+          employeeId: identity.employeeId,
+          requestId,
+        }
+      : undefined;
+  if (abortKey) {
+    const registered = abortRegistry.register(abortKey, abort);
+    if (!registered.accepted && registered.reason === "duplicate_in_flight") {
+      return buildEmployeeAdviceView({
+        requestId: abortKey.requestId,
+        outcomeCode: "soft_failure",
+        reasons: [
+          {
+            code: "duplicate_request",
+            message: "相同建议请求仍在处理中，未覆盖已有请求。已有聊天与原任务未改动。",
+          },
+        ],
+        modelCalled: false,
+      });
+    }
   }
 
   const host: TrustedEmployeeAdviceHost = {
@@ -293,8 +382,8 @@ export async function handleRuntimeRuleAdaptationAdvice(
   try {
     return await runAdvice(params, host);
   } finally {
-    if (requestId) {
-      abortRegistry.release(identity.employeeId, requestId);
+    if (abortKey) {
+      abortRegistry.release(abortKey);
     }
   }
 }
@@ -320,7 +409,14 @@ export async function handleRuntimeRuleAdaptationAdviceCancel(
   }
   try {
     const ctx = await resolveCtx(client);
-    const cancelled = abortRegistry.cancel(ctx.employeeId, requestId);
+    if (!ctx.tenantId || !ctx.employeeId) {
+      return { cancelled: false, requestId };
+    }
+    const cancelled = abortRegistry.cancel({
+      tenantId: ctx.tenantId,
+      employeeId: ctx.employeeId,
+      requestId,
+    });
     return { cancelled, requestId };
   } catch {
     return { cancelled: false, requestId };
