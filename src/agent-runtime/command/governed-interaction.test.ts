@@ -3,10 +3,7 @@ import { expect, it, vi } from "vitest";
 import { resolveEmbeddedModelGovernance } from "../../agents/embedded-model-governance.js";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
 import { PRODUCTION_RUNTIME_RULE_WHITELIST } from "../contracts/rule-adaptation-activation.js";
-import {
-  createAuthorizedModelSession,
-  type ModelSessionPorts,
-} from "../model/authorized-session.js";
+import { createAuthorizedModelSession, type ModelSessionPorts } from "../model/index.js";
 import { bindAdmittedTurnHost } from "../wiring/admitted-turn-host.js";
 import {
   governedShadowHostBoundary,
