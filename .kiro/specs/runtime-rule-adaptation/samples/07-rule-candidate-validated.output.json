@@ -1,0 +1,25 @@
+{
+  "resultKind": "candidate_validated",
+  "activationAllowed": false,
+  "authorizationAssessment": "assessment_unavailable",
+  "reasons": [
+    {
+      "code": "candidate_validated",
+      "message": "The rule_candidate payload is structurally valid under the candidate schema. This result means candidate_validated only: the P1 validator does not register, persist, or assign a storage id, and this object is not a registration receipt.",
+      "path": "proposal.candidate"
+    }
+  ],
+  "items": [
+    {
+      "proposedRuleId": "diag.paused_job.watch.candidate",
+      "resultKind": "candidate_validated",
+      "reasons": [
+        {
+          "code": "candidate_validated",
+          "message": "The rule_candidate payload is structurally valid under the candidate schema. This result means candidate_validated only: the P1 validator does not register, persist, or assign a storage id, and this object is not a registration receipt.",
+          "path": "proposal.candidate"
+        }
+      ]
+    }
+  ]
+}

@@ -48,10 +48,7 @@ export { renderIdentityBootstrapGuard } from "./sources/identity-bootstrap.js";
 export { omitTaskStatusSeparators, omitParkedPriorTurns } from "./sources/task-history.js";
 
 export { appendUntrustedContext } from "./untrusted.js";
-export {
-  projectInteractionHistory,
-  projectInteractionHistoryWithStatus,
-} from "./interaction-history.js";
+export { projectInteractionHistory } from "./interaction-history.js";
 export { renderConversationPeerContext } from "./sources/conversation-peers.js";
 export {
   ASIDE_NORMAL_REPLY_CONTEXT_MAX_CHARS,

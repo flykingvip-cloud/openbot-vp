@@ -392,8 +392,8 @@ function formatPreservedTurnsSection(messages: AgentMessage[]): string {
         return null;
       }
       const trimmed =
-        message.role === "toolResult" && rendered.length > MAX_RECENT_TURN_TEXT_CHARS
-          ? "[Tool result omitted for budget; consult original result before relying on it.]"
+        rendered.length > MAX_RECENT_TURN_TEXT_CHARS
+          ? `${rendered.slice(0, MAX_RECENT_TURN_TEXT_CHARS)}...`
           : rendered;
       return `- ${roleLabel}: ${trimmed}`;
     })
@@ -652,6 +652,7 @@ function auditSummaryQuality(params: {
  * Limited to 2000 chars to avoid bloating the summary.
  */
 async function readWorkspaceContextForSummary(): Promise<string> {
+  const MAX_SUMMARY_CONTEXT_CHARS = 2000;
   const workspaceDir = process.cwd();
   const agentsPath = path.join(workspaceDir, "AGENTS.md");
 
@@ -684,10 +685,10 @@ async function readWorkspaceContextForSummary(): Promise<string> {
     }
 
     const combined = sections.join("\n\n");
-    // Critical rules are not display previews: clipping the tail can remove
-    // a prohibition or exception. Let the existing compaction failure boundary
-    // retain history if the summarizer cannot accept the complete rules.
-    const safeContent = combined;
+    const safeContent =
+      combined.length > MAX_SUMMARY_CONTEXT_CHARS
+        ? combined.slice(0, MAX_SUMMARY_CONTEXT_CHARS) + "\n...[truncated]..."
+        : combined;
 
     return `\n\n<workspace-critical-rules>\n${safeContent}\n</workspace-critical-rules>`;
   } catch {
@@ -920,17 +921,17 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
                   attemptError instanceof Error ? attemptError.message : String(attemptError)
                 }`,
             );
-            return { cancel: true };
+            summary = lastSuccessfulSummary;
+            break;
           }
           throw attemptError;
         }
-        lastSuccessfulSummary = summaryWithPreservedTurns;
-
         const canRegenerate =
           messagesToSummarize.length > 0 ||
           (preparation.isSplitTurn && turnPrefixMessages.length > 0);
         if (!qualityGuardEnabled || !canRegenerate) {
           summary = summaryWithPreservedTurns;
+          lastSuccessfulSummary = summaryWithPreservedTurns;
           break;
         }
         const quality = auditSummaryQuality({
@@ -939,8 +940,9 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
           latestAsk: latestUserAsk,
           identifierPolicy,
         });
-        summary = summaryWithPreservedTurns;
         if (quality.ok) {
+          summary = summaryWithPreservedTurns;
+          lastSuccessfulSummary = summaryWithPreservedTurns;
           break;
         }
         if (attempt >= totalAttempts - 1) {
@@ -949,6 +951,7 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
           );
           return { cancel: true };
         }
+        summary = summaryWithPreservedTurns;
         const reasons = quality.reasons.join(", ");
         const qualityFeedbackInstruction =
           identifierPolicy === "strict"
@@ -963,19 +966,6 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
           : `${structuredInstructions}\n\n${qualityFeedbackInstruction}`;
       }
 
-      // Do not let a generated summary replace the user's actual conditions.
-      // Keep original user statements as historical data (not new instructions).
-      const originalUserStatements = [...preparation.messagesToSummarize, ...turnPrefixMessages]
-        .filter((message) => message.role === "user")
-        .map(extractMessageText)
-        .filter((text) => Boolean(text) && !summary.includes(text));
-      if (originalUserStatements.length > 0) {
-        summary = appendSummarySection(
-          summary,
-          "## Original user statements (historical data; preserve chronology and later revisions)\n" +
-            JSON.stringify(originalUserStatements),
-        );
-      }
       summary = appendSummarySection(summary, toolFailureSection);
       summary = appendSummarySection(summary, fileOpsSummary);
 
@@ -985,17 +975,6 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
         summary = appendSummarySection(summary, workspaceContext);
       }
 
-      if (
-        estimateMessagesTokens([{ role: "user", content: summary, timestamp: 0 }]) +
-          reserveTokens +
-          SUMMARIZATION_OVERHEAD_TOKENS >
-        contextWindowTokens
-      ) {
-        log.warn(
-          "Compaction safeguard: lossless user statements exceed budget; preserving original history.",
-        );
-        return { cancel: true };
-      }
       return {
         compaction: {
           summary,

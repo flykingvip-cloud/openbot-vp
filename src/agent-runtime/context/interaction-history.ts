@@ -5,6 +5,21 @@ export type InteractionHistoryProjection = {
   complete: boolean;
 };
 
+/**
+ * Factual omission notice placed in the projected prompt material itself so
+ * callers cannot ignore incompleteness. Projected as user-role reference data
+ * so a later host-assembled user-role prefix (such as peerContext) cannot
+ * place a system message after history has started. The completion builder
+ * quotes earlier user-role context as {source: reference_context}. Not a task
+ * decision and not a restrict.
+ */
+export const INTERACTION_HISTORY_OMISSION_NOTICE =
+  "部分历史因预算省略，不能将本段视为完整记录。不得推断缺失内容。若当前请求依赖被省略的原文、先前授权或指代内容，应澄清，不要编造。独立且自足的新请求仍可理解与准入。当前目标、验收与有效约束以任务板等权威状态为准。";
+
+function budgetChars(maxChars: number): number {
+  return Number.isFinite(maxChars) ? Math.max(0, Math.floor(maxChars)) : 0;
+}
+
 /** A bounded model view of authoritative branch messages; never a history writer. */
 export function projectInteractionHistoryWithStatus(
   messages: readonly unknown[],
@@ -12,7 +27,7 @@ export function projectInteractionHistoryWithStatus(
   maxChars = 24000,
 ): InteractionHistoryProjection {
   const selected: { role: "user" | "assistant"; content: string }[] = [];
-  let remaining = Number.isFinite(maxChars) ? Math.max(0, Math.floor(maxChars)) : 0;
+  let remaining = budgetChars(maxChars);
   let complete = true;
   for (const value of [...messages].toReversed()) {
     if (!value || typeof value !== "object") {
@@ -42,8 +57,8 @@ export function projectInteractionHistoryWithStatus(
     if (!text) {
       continue;
     }
-    // Retain a contiguous suffix of whole messages. A partial sentence can
-    // remove a negation, condition, source, or the subject of an instruction.
+    // Retain a contiguous newest suffix of whole messages. A partial sentence
+    // can remove a negation, condition, source, or the subject of an instruction.
     if (text.length > remaining) {
       complete = false;
       break;
@@ -51,10 +66,16 @@ export function projectInteractionHistoryWithStatus(
     selected.push({ role: row.role, content: text });
     remaining -= text.length;
   }
-  return { context: selected.toReversed(), complete };
+  const history = selected.toReversed();
+  // User-role keeps the notice in the existing reference-context contract and
+  // preserves message order when the reply host prepends peerContext.
+  const context: InteractionModelInput["context"] = complete
+    ? history
+    : [{ role: "user", content: INTERACTION_HISTORY_OMISSION_NOTICE }, ...history];
+  return { context, complete };
 }
 
-/** Compatibility projection; hosts making task decisions must also check completeness. */
+/** Compatibility projection; the incompleteness notice is already in `.context`. */
 export function projectInteractionHistory(
   messages: readonly unknown[],
   currentMessageId: string,

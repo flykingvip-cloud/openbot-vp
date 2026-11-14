@@ -1,0 +1,26 @@
+{
+  "resultKind": "blocked",
+  "activationAllowed": false,
+  "authorizationAssessment": "host_unauthorized",
+  "reasons": [
+    {
+      "code": "structural_forbidden_field",
+      "message": "authorizationStatus is forbidden on the model proposal. Its presence is a structural reject and must not override trusted host facts, even if the host is unauthorized or the numeric tighten would otherwise have been shadow-legal.",
+      "path": "proposal.authorizationStatus"
+    }
+  ],
+  "items": [
+    {
+      "ruleId": "model.context_window.guard",
+      "field": "agents.defaults.contextTokens",
+      "resultKind": "blocked",
+      "reasons": [
+        {
+          "code": "structural_forbidden_field",
+          "message": "authorizationStatus is forbidden on the model proposal. Its presence is a structural reject and must not override trusted host facts, even if the host is unauthorized or the numeric tighten would otherwise have been shadow-legal.",
+          "path": "proposal.authorizationStatus"
+        }
+      ]
+    }
+  ]
+}

@@ -202,10 +202,7 @@ function compactArgValue(value: unknown): string {
   if (typeof value !== "string") {
     return "";
   }
-  const compact = value.replace(/\s+/g, " ").trim();
-  return compact.length > MAX_ARG_VALUE_CHARS
-    ? "[argument omitted: exceeds digest budget; consult original tool call]"
-    : compact;
+  return value.replace(/\s+/g, " ").trim().slice(0, MAX_ARG_VALUE_CHARS);
 }
 
 function summarizeKeyArgs(args: unknown): string {
@@ -235,21 +232,15 @@ function summarizeKeyArgs(args: unknown): string {
 function resultPreview(message: AgentMessage): string {
   const text = getToolResultText(message);
   if (text) {
-    return text.length > TOOL_DIGEST_RESULT_CHARS
-      ? "[result omitted: exceeds digest budget; consult original tool result before relying on it]"
-      : text;
+    return text.slice(0, TOOL_DIGEST_RESULT_CHARS);
   }
   const content = (message as { content?: unknown }).content;
   if (typeof content === "string") {
-    return content.length > TOOL_DIGEST_RESULT_CHARS
-      ? "[result omitted: consult original tool result]"
-      : content;
+    return content.slice(0, TOOL_DIGEST_RESULT_CHARS);
   }
   try {
     const serialized = JSON.stringify(content ?? "");
-    return typeof serialized === "string" && serialized.length <= TOOL_DIGEST_RESULT_CHARS
-      ? serialized
-      : "[result omitted: consult original tool result]";
+    return typeof serialized === "string" ? serialized.slice(0, TOOL_DIGEST_RESULT_CHARS) : "";
   } catch {
     return "";
   }

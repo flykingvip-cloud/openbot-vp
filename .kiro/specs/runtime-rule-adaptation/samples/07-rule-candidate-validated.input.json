@@ -1,0 +1,26 @@
+{
+  "proposal": {
+    "kind": "rule_candidate",
+    "scope": {
+      "type": "personal",
+      "id": "agent:fixture-personal-1"
+    },
+    "implementationVersion": "9b65109f41dee30b892a6faff493e46e735cab8d",
+    "candidate": {
+      "proposedRuleId": "diag.paused_job.watch.candidate",
+      "summary": "Fixture candidate: propose declaring an isolated paused-job watch rule. Not a production rule and not in the catalog.",
+      "body": "Validate-only fixture body. The P1 validator must not persist or register this candidate."
+    }
+  },
+  "host": {
+    "fixture": true,
+    "identity": {
+      "principalType": "personal",
+      "principalId": "user:fixture-1",
+      "scope": {
+        "type": "personal",
+        "id": "agent:fixture-personal-1"
+      }
+    }
+  }
+}

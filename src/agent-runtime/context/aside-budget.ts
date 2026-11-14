@@ -16,7 +16,7 @@ export type AsideDialogueTurn = {
 
 /**
  * Newest-first selection that respects a character budget on `role: text` lines.
- * Only complete turns are retained; oversized newest turns are omitted, never rewritten.
+ * Always keeps at least the most recent turn (truncated if needed).
  */
 export function selectAsideTurnsWithinCharBudget(
   turns: readonly AsideDialogueTurn[],
@@ -32,6 +32,19 @@ export function selectAsideTurnsWithinCharBudget(
     const turn = turns[i];
     const line = `${turn.role}: ${turn.text}`;
     const cost = line.length + (selected.length > 0 ? 1 : 0);
+    if (selected.length === 0) {
+      if (line.length <= budget) {
+        selected.unshift(turn);
+        used = line.length;
+      } else {
+        selected.unshift({
+          ...turn,
+          text: `${turn.text.slice(0, Math.max(0, budget - `${turn.role}: `.length - 1))}…`,
+        });
+        used = budget;
+      }
+      continue;
+    }
     if (used + cost > budget) {
       break;
     }

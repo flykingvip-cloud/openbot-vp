@@ -108,4 +108,17 @@ export type SessionTaskBoard = {
   archived?: ArchivedTask[];
   /** Optional tenant+user+session scope (C1 / AC18). */
   scope?: TaskBoardScope;
+  /**
+   * Board-level runtime-rule-adaptation snapshots, keyed by taskId.
+   * Coordinated surgical field: must be preserved by official read/clone/write
+   * in the same lock as writeEpoch. Not hung on TrackedTask (CLOSE would drop
+   * a task-only snapshot; revoke/audit needs immutable history to remain).
+   * Value shape is owned by runtime-rule-adaptation.
+   */
+  runtimeRuleAdaptationByTaskId?: {
+    [taskId: string]: {
+      current?: unknown;
+      history: unknown[];
+    };
+  };
 };
