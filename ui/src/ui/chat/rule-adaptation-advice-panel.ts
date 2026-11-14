@@ -2,6 +2,7 @@ import { html, nothing } from "lit";
 import { t } from "../../i18n/index.ts";
 
 export const EMPLOYEE_ADVICE_METHOD = "runtime-rule-adaptation.advice" as const;
+export const EMPLOYEE_ADVICE_CANCEL_METHOD = "runtime-rule-adaptation.advice.cancel" as const;
 
 export type EmployeeAdviceState =
   | "no_change"

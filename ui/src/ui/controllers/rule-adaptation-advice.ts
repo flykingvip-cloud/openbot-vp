@@ -1,4 +1,5 @@
 import {
+  EMPLOYEE_ADVICE_CANCEL_METHOD,
   EMPLOYEE_ADVICE_METHOD,
   type EmployeeAdviceView,
   type RuleAdaptationAdvicePanelModel,
@@ -19,12 +20,16 @@ export type RuleAdaptationAdviceRequestInput = {
 const INITIAL: RuleAdaptationAdvicePanelModel & {
   generation: number;
   abort: AbortController | null;
+  requestId: string | null;
+  client: GatewayRequestClient | null;
 } = {
   status: "idle",
   result: null,
   error: null,
   generation: 0,
   abort: null,
+  requestId: null,
+  client: null,
 };
 
 let panel = { ...INITIAL };
@@ -66,9 +71,28 @@ export function isRuleAdaptationAdviceInFlight(): boolean {
   return panel.status === "loading";
 }
 
+function notifyServerCancel(client: GatewayRequestClient | null, requestId: string | null) {
+  if (!client || !requestId) {
+    return;
+  }
+  void client.request(EMPLOYEE_ADVICE_CANCEL_METHOD, { requestId }).catch(() => {
+    // Soft-failure: hiding the panel must not start a retry of the advice itself.
+  });
+}
+
 export function resetRuleAdaptationAdvicePanel() {
-  panel.abort?.abort();
-  panel = { ...INITIAL, generation: panel.generation + 1, abort: null };
+  const { abort, client, requestId } = panel;
+  abort?.abort();
+  if (panel.status === "loading") {
+    notifyServerCancel(client, requestId);
+  }
+  panel = {
+    ...INITIAL,
+    generation: panel.generation + 1,
+    abort: null,
+    requestId: null,
+    client: null,
+  };
   publish();
 }
 
@@ -76,13 +100,17 @@ export function cancelRuleAdaptationAdvice() {
   if (panel.status !== "loading") {
     return;
   }
-  panel.abort?.abort();
+  const { abort, client, requestId } = panel;
+  abort?.abort();
+  notifyServerCancel(client, requestId);
   panel = {
     status: "cancelled",
     result: null,
     error: null,
     generation: panel.generation + 1,
     abort: null,
+    requestId: null,
+    client: null,
   };
   publish();
 }
@@ -97,18 +125,27 @@ export async function requestRuleAdaptationAdvice(input: RuleAdaptationAdviceReq
       status: "failed",
       result: null,
       error: "未连接网关，无法请求规则适配建议。",
+      abort: null,
+      requestId: null,
+      client: null,
     };
     publish();
     return;
   }
   const generation = panel.generation + 1;
   const abort = new AbortController();
+  const requestId =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `advice-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   panel = {
     status: "loading",
     result: null,
     error: null,
     generation,
     abort,
+    requestId,
+    client: input.client,
   };
   publish();
 
@@ -117,6 +154,7 @@ export async function requestRuleAdaptationAdvice(input: RuleAdaptationAdviceReq
       EMPLOYEE_ADVICE_METHOD,
       {
         question: input.question,
+        requestId,
         targetRef: {
           ...(input.sessionKey ? { sessionKey: input.sessionKey } : {}),
           ...(input.agentId ? { agentId: input.agentId } : {}),
@@ -135,6 +173,8 @@ export async function requestRuleAdaptationAdvice(input: RuleAdaptationAdviceReq
         error: "本次建议请求失败，已有聊天与原任务未改动。",
         generation,
         abort: null,
+        requestId: null,
+        client: null,
       };
       publish();
       return;
@@ -145,6 +185,8 @@ export async function requestRuleAdaptationAdvice(input: RuleAdaptationAdviceReq
       error: null,
       generation,
       abort: null,
+      requestId: null,
+      client: null,
     };
     publish();
   } catch (error) {
@@ -159,6 +201,8 @@ export async function requestRuleAdaptationAdvice(input: RuleAdaptationAdviceReq
       error: message,
       generation,
       abort: null,
+      requestId: null,
+      client: null,
     };
     publish();
   }
@@ -166,5 +210,6 @@ export async function requestRuleAdaptationAdvice(input: RuleAdaptationAdviceReq
 
 export const ruleAdaptationAdviceClientContract = {
   method: EMPLOYEE_ADVICE_METHOD,
-  allowedKeys: ["question", "targetRef"] as const,
+  cancelMethod: EMPLOYEE_ADVICE_CANCEL_METHOD,
+  allowedKeys: ["question", "targetRef", "requestId"] as const,
 };

@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EMPLOYEE_ADVICE_METHOD } from "../chat/rule-adaptation-advice-panel.ts";
+import {
+  EMPLOYEE_ADVICE_CANCEL_METHOD,
+  EMPLOYEE_ADVICE_METHOD,
+} from "../chat/rule-adaptation-advice-panel.ts";
 import {
   cancelRuleAdaptationAdvice,
   getRuleAdaptationAdvicePanel,
@@ -18,14 +21,19 @@ describe("rule-adaptation-advice controller", () => {
     resetRuleAdaptationAdvicePanel();
   });
 
-  it("sends only question and targetRef to the gateway method", async () => {
+  it("sends only question, targetRef, and a correlation requestId to the gateway method", async () => {
     const request = vi.fn(async (method: string, params: unknown) => {
       expect(method).toBe(EMPLOYEE_ADVICE_METHOD);
-      expect(params).toEqual({
-        question: "上下文太大",
-        targetRef: { sessionKey: "agent:main", agentId: "bot" },
-      });
-      expect(Object.keys(params as object).toSorted()).toEqual(["question", "targetRef"]);
+      const record = params as { question?: unknown; targetRef?: unknown; requestId?: unknown };
+      expect(record.question).toBe("上下文太大");
+      expect(record.targetRef).toEqual({ sessionKey: "agent:main", agentId: "bot" });
+      expect(typeof record.requestId).toBe("string");
+      expect(String(record.requestId).length).toBeGreaterThan(0);
+      expect(Object.keys(params as object).toSorted()).toEqual([
+        "question",
+        "requestId",
+        "targetRef",
+      ]);
       return {
         advice: {
           state: "adjustment_suggested",
@@ -49,7 +57,12 @@ describe("rule-adaptation-advice controller", () => {
     expect(request).toHaveBeenCalledTimes(1);
     expect(getRuleAdaptationAdvicePanel().status).toBe("result");
     expect(getRuleAdaptationAdvicePanel().result?.label).toBe("建议调整");
-    expect(ruleAdaptationAdviceClientContract.allowedKeys).toEqual(["question", "targetRef"]);
+    expect(ruleAdaptationAdviceClientContract.allowedKeys).toEqual([
+      "question",
+      "targetRef",
+      "requestId",
+    ]);
+    expect(ruleAdaptationAdviceClientContract.cancelMethod).toBe(EMPLOYEE_ADVICE_CANCEL_METHOD);
   });
 
   it("does not start a second request while one is in flight", async () => {
@@ -80,15 +93,27 @@ describe("rule-adaptation-advice controller", () => {
     expect(getRuleAdaptationAdvicePanel().result?.state).toBe("no_change");
   });
 
-  it("drops a stale result after cancel or refresh", async () => {
+  it("sends cancel to the server and drops a stale result after cancel or refresh", async () => {
     let resolveRequest: (value: unknown) => void = () => undefined;
     const pending = new Promise((resolve) => {
       resolveRequest = resolve;
     });
-    const request = vi.fn(async () => pending);
+    const request = vi.fn(async (method: string, _params?: unknown) => {
+      if (method === EMPLOYEE_ADVICE_CANCEL_METHOD) {
+        return { cancelled: true };
+      }
+      return pending;
+    });
     const first = requestRuleAdaptationAdvice({ client: { request }, question: "one" });
+    const started = request.mock.calls.find((call) => call[0] === EMPLOYEE_ADVICE_METHOD) as
+      | [string, { requestId?: string }]
+      | undefined;
+    const requestId = started?.[1]?.requestId;
+    expect(typeof requestId).toBe("string");
     cancelRuleAdaptationAdvice();
+    await Promise.resolve();
     expect(getRuleAdaptationAdvicePanel().status).toBe("cancelled");
+    expect(request).toHaveBeenCalledWith(EMPLOYEE_ADVICE_CANCEL_METHOD, { requestId });
     resolveRequest({
       advice: {
         state: "adjustment_suggested",
