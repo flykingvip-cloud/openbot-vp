@@ -1,37 +1,97 @@
 import {
   buildEmployeeAdviceView,
-  createOfficialDeepSeekShadowCompletion,
+  EMPLOYEE_ADVICE_CANCEL_METHOD,
   EMPLOYEE_ADVICE_METHOD,
-  resolveOfficialDeepSeekCredential,
+  resolveTrustedEffectiveContextTokens,
   runEmployeeRuleAdaptationAdvice,
+  sanitizeEmployeeAdviceClientInput,
   type EmployeeAdviceView,
+  type TrustedEmployeeAdviceFacts,
   type TrustedEmployeeAdviceHost,
 } from "../../agent-runtime/command/index.js";
 import type { ModelSessionPorts } from "../../agent-runtime/model/index.js";
+import {
+  createOfficialDeepSeekShadowCompletion,
+  resolveOfficialDeepSeekCredential,
+} from "../../agent-runtime/model/rule-adaptation/index.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
-import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
 /**
  * Employee "规则适配建议" gateway method.
  *
- * The client may submit only a question and a target reference. Identity,
- * authorization, model credentials, and the official shadow binding are
- * resolved on the already-authenticated server host. The handler reuses the
- * #288 replyTurnRuntime.interaction passthrough with trigger===true and
- * returns suggestion-only results that are never marked effective.
+ * The client may submit only a question, a target reference, and a
+ * correlation requestId used to cancel. Identity, authorization, model
+ * credentials, approved target, real effective values, and the official
+ * shadow binding are resolved on the already-authenticated server host.
+ * The handler calls the official shadow entry directly; it does not
+ * construct a placeholder contrast chat turn.
  */
 import { loadConfig, type OpenBotConfig } from "../../config/config.js";
 import { resolveTrustedEnterpriseDataExecutionContext } from "../enterprise-data/enterprise-data-seat-context.js";
 import { respondUnavailable } from "./billing-helpers.js";
 import type { GatewayRequestHandlers } from "./types.js";
 
+export type EmployeeAdviceApprovedTarget = {
+  targetAuthorization: "approved" | "denied" | "unknown";
+  reason?: string;
+  approvedTarget?: TrustedEmployeeAdviceFacts["approvedTarget"];
+};
+
 export type EmployeeAdviceHandlerDeps = {
   loadConfig?: () => OpenBotConfig;
   resolveTrustedContext?: typeof resolveTrustedEnterpriseDataExecutionContext;
   resolveOfficialModel?: typeof resolveOfficialDeepSeekCredential;
+  resolveApprovedTarget?: (input: {
+    identity: TrustedEmployeeAdviceHost["identity"];
+    targetRef: { sessionKey?: string; agentId?: string };
+    config: OpenBotConfig;
+  }) => Promise<EmployeeAdviceApprovedTarget> | EmployeeAdviceApprovedTarget;
   runAdvice?: typeof runEmployeeRuleAdaptationAdvice;
-  interact?: TrustedEmployeeAdviceHost["interact"];
+  runShadow?: TrustedEmployeeAdviceHost["runShadow"];
   env?: NodeJS.ProcessEnv;
+  now?: () => number;
+  abortRegistry?: EmployeeAdviceAbortRegistry;
 };
+
+export type EmployeeAdviceAbortRegistry = {
+  register: (employeeId: string, requestId: string, controller: AbortController) => void;
+  cancel: (employeeId: string, requestId: string) => boolean;
+  release: (employeeId: string, requestId: string) => void;
+};
+
+function adviceAbortKey(employeeId: string, requestId: string): string {
+  return `${employeeId}:${requestId}`;
+}
+
+export function createEmployeeAdviceAbortRegistry(): EmployeeAdviceAbortRegistry {
+  const controllers = new Map<string, AbortController>();
+  const reserved = new Set<string>();
+  return {
+    register(employeeId, requestId, controller) {
+      const key = adviceAbortKey(employeeId, requestId);
+      if (reserved.has(key)) {
+        controller.abort();
+        reserved.delete(key);
+      }
+      controllers.set(key, controller);
+    },
+    cancel(employeeId, requestId) {
+      const key = adviceAbortKey(employeeId, requestId);
+      const controller = controllers.get(key);
+      if (controller) {
+        controller.abort();
+        controllers.delete(key);
+        return true;
+      }
+      reserved.add(key);
+      return true;
+    },
+    release(employeeId, requestId) {
+      controllers.delete(adviceAbortKey(employeeId, requestId));
+    },
+  };
+}
+
+const defaultAbortRegistry = createEmployeeAdviceAbortRegistry();
 
 function createEmployeeAdviceSessionPorts(): ModelSessionPorts {
   const admitted = bindAdmittedTurnHost();
@@ -50,9 +110,40 @@ function createEmployeeAdviceSessionPorts(): ModelSessionPorts {
   };
 }
 
-function readCurrentContextTokens(cfg: OpenBotConfig): number | undefined {
+function readCatalogModelContextWindow(
+  cfg: OpenBotConfig,
+  provider: string,
+  modelId: string,
+): number | undefined {
+  const providers = cfg.models?.providers as
+    | Record<string, { models?: Array<{ id?: string; contextWindow?: number }> }>
+    | undefined;
+  const models = Array.isArray(providers?.[provider]?.models) ? providers[provider].models : [];
+  const match = models.find((entry) => entry?.id === modelId);
+  const value = match?.contextWindow;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : undefined;
+}
+
+function readConfigContextTokenCap(cfg: OpenBotConfig): number | undefined {
   const value = cfg.agents?.defaults?.contextTokens;
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.floor(value)
+    : undefined;
+}
+
+/**
+ * Seat membership is not target-rule authorization. Unless a caller injects a
+ * real approval, the default resolver returns unknown so the use case can
+ * ask for more information instead of inventing a scope from the client
+ * agentId.
+ */
+export function defaultResolveApprovedTarget(): EmployeeAdviceApprovedTarget {
+  return {
+    targetAuthorization: "unknown",
+    reason: "服务端尚未核准目标，拥有员工席位也不等于有权调整目标机器人的规则。",
+  };
 }
 
 function errorCode(error: unknown): string | undefined {
@@ -89,6 +180,11 @@ function mapIdentityError(error: unknown): TrustedEmployeeAdviceHost["identity"]
   };
 }
 
+function readClientRequestId(params: unknown): string | undefined {
+  const sanitized = sanitizeEmployeeAdviceClientInput(params);
+  return sanitized.request.requestId;
+}
+
 export async function handleRuntimeRuleAdaptationAdvice(
   params: unknown,
   client: Parameters<GatewayRequestHandlers[string]>[0]["client"],
@@ -97,8 +193,10 @@ export async function handleRuntimeRuleAdaptationAdvice(
   const loadCfg = deps.loadConfig ?? loadConfig;
   const resolveCtx = deps.resolveTrustedContext ?? resolveTrustedEnterpriseDataExecutionContext;
   const resolveModel = deps.resolveOfficialModel ?? resolveOfficialDeepSeekCredential;
+  const resolveTarget = deps.resolveApprovedTarget ?? defaultResolveApprovedTarget;
   const runAdvice = deps.runAdvice ?? runEmployeeRuleAdaptationAdvice;
   const env = deps.env ?? process.env;
+  const abortRegistry = deps.abortRegistry ?? defaultAbortRegistry;
 
   let identity: TrustedEmployeeAdviceHost["identity"];
   try {
@@ -124,11 +222,51 @@ export async function handleRuntimeRuleAdaptationAdvice(
     };
   }
 
+  const facts: TrustedEmployeeAdviceFacts = {};
+  const cap = readConfigContextTokenCap(cfg);
+  if (typeof cap === "number") {
+    facts.configContextTokenCap = cap;
+  }
+  if (official) {
+    const modelWindow = readCatalogModelContextWindow(cfg, official.provider, official.model);
+    if (typeof modelWindow === "number") {
+      facts.modelContextWindow = modelWindow;
+      const effective = resolveTrustedEffectiveContextTokens({
+        modelWindow,
+        configCap: cap,
+      });
+      if (effective.ok) {
+        facts.currentContextTokens = effective.tokens;
+        facts.currentContextTokenSource = effective.source;
+      }
+    }
+  }
+  // Compatibility records and expected policy state are not invented here.
+  if (identity.authorizationStatus === "authorized") {
+    const sanitized = sanitizeEmployeeAdviceClientInput(params);
+    const target = await resolveTarget({
+      identity,
+      targetRef: sanitized.request.targetRef,
+      config: cfg,
+    });
+    facts.targetAuthorization = target.targetAuthorization;
+    if (target.reason) {
+      facts.targetAuthorizationReason = target.reason;
+    }
+    if (target.approvedTarget) {
+      facts.approvedTarget = target.approvedTarget;
+    }
+  }
+
+  const requestId = readClientRequestId(params);
+  const abort = new AbortController();
+  if (requestId) {
+    abortRegistry.register(identity.employeeId, requestId, abort);
+  }
+
   const host: TrustedEmployeeAdviceHost = {
     identity,
-    facts: {
-      currentContextTokens: readCurrentContextTokens(cfg),
-    },
+    facts,
     model: official
       ? {
           provider: official.provider,
@@ -146,13 +284,47 @@ export async function handleRuntimeRuleAdaptationAdvice(
           }),
           sessionPorts: createEmployeeAdviceSessionPorts(),
         },
-    interact:
-      deps.interact ??
-      ((interactParams, shadowHost) => replyTurnRuntime.interaction(interactParams, shadowHost)),
+    ...(deps.runShadow ? { runShadow: deps.runShadow } : {}),
     config: cfg,
+    signal: abort.signal,
+    now: deps.now,
   };
 
-  return runAdvice(params, host);
+  try {
+    return await runAdvice(params, host);
+  } finally {
+    if (requestId) {
+      abortRegistry.release(identity.employeeId, requestId);
+    }
+  }
+}
+
+export async function handleRuntimeRuleAdaptationAdviceCancel(
+  params: unknown,
+  client: Parameters<GatewayRequestHandlers[string]>[0]["client"],
+  deps: EmployeeAdviceHandlerDeps = {},
+): Promise<{ cancelled: boolean; requestId?: string }> {
+  const resolveCtx = deps.resolveTrustedContext ?? resolveTrustedEnterpriseDataExecutionContext;
+  const abortRegistry = deps.abortRegistry ?? defaultAbortRegistry;
+  const requestId =
+    readClientRequestId(params) ??
+    ((): string | undefined => {
+      if (typeof params === "object" && params !== null && "requestId" in params) {
+        const value = (params as { requestId?: unknown }).requestId;
+        return typeof value === "string" && value.trim() ? value.trim() : undefined;
+      }
+      return undefined;
+    })();
+  if (!requestId) {
+    return { cancelled: false };
+  }
+  try {
+    const ctx = await resolveCtx(client);
+    const cancelled = abortRegistry.cancel(ctx.employeeId, requestId);
+    return { cancelled, requestId };
+  } catch {
+    return { cancelled: false, requestId };
+  }
 }
 
 export const runtimeRuleAdaptationAdviceHandlers: GatewayRequestHandlers = {
@@ -177,6 +349,14 @@ export const runtimeRuleAdaptationAdviceHandlers: GatewayRequestHandlers = {
       } catch {
         respondUnavailable(respond, err);
       }
+    }
+  },
+  [EMPLOYEE_ADVICE_CANCEL_METHOD]: async ({ params, client, respond }) => {
+    try {
+      const result = await handleRuntimeRuleAdaptationAdviceCancel(params, client);
+      respond(true, result);
+    } catch (err) {
+      respondUnavailable(respond, err);
     }
   },
 };
