@@ -16,7 +16,7 @@ import type {
   ShadowDiagnosticSink,
   ShadowUsageAccountingStatus,
 } from "../../contracts/rule-adaptation-shadow.js";
-import { createAuthorizedModelSession, type ModelSessionPorts } from "../authorized-session.js";
+import { createAuthorizedModelSession, type ModelSessionPorts } from "../index.js";
 import { asModelUsage, zeroUsage } from "./budget.js";
 import {
   invokeLimitedCompletion,

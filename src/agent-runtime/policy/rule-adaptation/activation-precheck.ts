@@ -52,8 +52,7 @@ import {
   type RuntimeRuleAdaptationMissingFact,
   type TrustedHostFacts,
 } from "../../contracts/rule-adaptation.js";
-import { POLICY_COMPILER_REVISION } from "../collaboration-policy-identity.js";
-import { COLLABORATION_POLICY_PROTOCOL_VERSION } from "../collaboration-rules.js";
+import { COLLABORATION_POLICY_PROTOCOL_VERSION, POLICY_COMPILER_REVISION } from "../index.js";
 import { isKnownCatalogRuleId } from "./descriptors.js";
 import {
   collectForbiddenKeys,
