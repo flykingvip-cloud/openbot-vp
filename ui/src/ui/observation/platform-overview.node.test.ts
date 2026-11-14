@@ -6,6 +6,7 @@ import {
   formatGrantCensus,
   formatHeartbeat,
   formatLinkCoverage,
+  linkCoverageFraction,
   formatTenantCoverage,
   tenantGrantNote,
 } from "./platform-overview.ts";
@@ -42,6 +43,17 @@ describe("formatLinkCoverage", () => {
 
   it("formats a confirmed numerator and positive denominator", () => {
     expect(formatLinkCoverage({ fullyLinkedCount: 1, attemptedCount: 5 }).value).toBe("1/5 · 20%");
+  });
+});
+
+describe("linkCoverageFraction", () => {
+  it("is null when coverage is unknown and does not invent a zero ratio", () => {
+    expect(linkCoverageFraction(null)).toBeNull();
+    expect(linkCoverageFraction({ fullyLinkedCount: 0, attemptedCount: 0 })).toBeNull();
+  });
+
+  it("returns the confirmed linked ratio", () => {
+    expect(linkCoverageFraction({ fullyLinkedCount: 1, attemptedCount: 5 })).toBe(0.2);
   });
 });
 

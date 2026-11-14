@@ -1024,6 +1024,27 @@ select {
   color: var(--obs-muted);
   line-height: 1.6;
 }
+
+.obs-cap-item--chart .obs-coverage-chart {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.obs-coverage-meter {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+}
+.obs-coverage-meter__track {
+  stroke: var(--obs-line);
+}
+.obs-coverage-meter__fill {
+  stroke: #2563eb;
+  stroke-linecap: round;
+}
+.obs-coverage-meter.is-unknown .obs-coverage-meter__track {
+  stroke: #d6dbe3;
+}
 .obs-query-scope {
   margin: 0 0 10px;
 }

@@ -37,6 +37,25 @@ export type FormattedMetric = {
 
 const UNKNOWN_COVERAGE_DETAIL = "关联覆盖率，非业务成功率。分母未供给或为 0 时显示未知，不填 0%。";
 
+export function linkCoverageFraction(coverage: LinkCoverageInput | null | undefined): number | null {
+  const formatted = formatLinkCoverage(coverage);
+  if (formatted.value === "未知") {
+    return null;
+  }
+  const attempted = coverage?.attemptedCount;
+  const linked = coverage?.fullyLinkedCount;
+  if (
+    attempted == null ||
+    linked == null ||
+    !Number.isFinite(attempted) ||
+    !Number.isFinite(linked) ||
+    attempted <= 0
+  ) {
+    return null;
+  }
+  return Math.min(1, Math.max(0, linked / attempted));
+}
+
 export function formatLinkCoverage(coverage: LinkCoverageInput | null | undefined): FormattedMetric {
   const attempted = coverage?.attemptedCount;
   const linked = coverage?.fullyLinkedCount;

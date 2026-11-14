@@ -56,8 +56,10 @@ import {
   formatGrantCensus,
   formatHeartbeat,
   formatLinkCoverage,
+  linkCoverageFraction,
   formatTenantCoverage,
   tenantGrantNote,
+  type LinkCoverageInput,
 } from "./platform-overview.ts";
 import { observationSamples, SAMPLE_ENTERPRISE_DIRECTORY } from "./samples.ts";
 import {
@@ -1462,8 +1464,31 @@ export class OpenBotObservationWorkbench extends LitElement {
   private renderSourceSwitch(view: ObservationView) {
     return html`<div class="obs-source"><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select></div>`;
   }
+
+  private renderCoverageMeter(coverage: LinkCoverageInput | null | undefined) {
+    const formatted = formatLinkCoverage(coverage);
+    const fraction = linkCoverageFraction(coverage);
+    const radius = 28;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference * (1 - (fraction ?? 0));
+    const label = formatted.value === "未知" ? "关联覆盖率未知" : `关联覆盖率 ${formatted.value}`;
+    return html`<div class="obs-coverage-chart">
+      <svg class="obs-coverage-meter ${fraction == null ? "is-unknown" : ""}" viewBox="0 0 72 72" role="img" aria-label=${label}>
+        <circle class="obs-coverage-meter__track" cx="36" cy="36" r="28" fill="none" stroke-width="8"></circle>
+        ${
+          fraction == null
+            ? nothing
+            : html`<circle class="obs-coverage-meter__fill" cx="36" cy="36" r="28" fill="none" stroke-width="8" stroke-dasharray=${circumference} stroke-dashoffset=${offset} transform="rotate(-90 36 36)"></circle>`
+        }
+      </svg>
+      <div class="obs-cap-val">${formatted.value}</div>
+    </div>`;
+  }
+
   private renderPlatformHealth(view: ObservationView) {
-    const coverage = formatLinkCoverage(null);
+    // Coverage and heartbeat stay unknown until a confirmed numerator and
+    // positive denominator are supplied; do not invent first-screen ratios.
+    const coverageInput = null;
     const heartbeat = formatHeartbeat(null);
     const census = formatGrantCensus(
       censusTenantGrants(this.directoryEntries(view), this.tenantGrants),
@@ -1472,28 +1497,25 @@ export class OpenBotObservationWorkbench extends LitElement {
       this.role === "platform" && view.source === "live" && this.tenantFilter !== "all";
     const unmapped = {
       value: "不计入企业",
-      detail:
-        view.source === "live"
-          ? "execution_only 连接事件无租户映射"
-          : "样例运行按已授权租户投影，未映射事件不计入企业",
-      note: unmappedLive
-        ? "所选企业暂无已映射运行事件。execution_only 投影不含租户标签，不能把本机事件算到某个企业。"
-        : "不能把未映射事件分配给某个企业。",
+      detail: unmappedLive ? "当前企业暂无已映射运行" : "未映射事件不计入企业",
     };
     const cards = [
-      { title: "关联覆盖率", ...coverage },
       { title: "心跳时效", ...heartbeat },
       { title: "租户授权", ...census },
       { title: "未映射事件", ...unmapped },
     ];
     return html`<section class="obs-plat-card" data-testid="obs-platform-health" aria-label="平台健康与覆盖">
-      <div class="obs-plat-card__head"><div><h3>平台健康与覆盖</h3><p>覆盖率必须带分子分母；不足则为未知。</p></div></div>
-      <div class="obs-cap-grid">${cards.map(
+      <div class="obs-plat-card__head"><div><h3>平台健康与覆盖</h3></div></div>
+      <div class="obs-cap-grid">
+        <div class="obs-cap-item obs-cap-item--chart" data-testid="obs-health-关联覆盖率">
+          <h4>关联覆盖率</h4>
+          ${this.renderCoverageMeter(coverageInput)}
+        </div>
+        ${cards.map(
         (card) => html`<div class="obs-cap-item" data-testid=${`obs-health-${card.title}`}>
         <h4>${card.title}</h4>
         <div class="obs-cap-val">${card.value}</div>
-        <div class="obs-cap-den">${card.detail}</div>
-        <p class="obs-cap-note">${card.note}</p>
+        ${"detail" in card && card.detail ? html`<div class="obs-cap-den">${card.detail}</div>` : nothing}
       </div>`,
       )}</div>
     </section>`;
@@ -1502,15 +1524,9 @@ export class OpenBotObservationWorkbench extends LitElement {
     const directory = this.directoryEntries(view);
     const authorization = currentAuthorization(this.accessInput());
     const disabled = !authorization.ok;
-    const tenantLabel =
-      this.tenantFilter === "all"
-        ? view.source === "sample"
-          ? "全部企业（样例）"
-          : "全部企业"
-        : (directory.find((row) => row.tenantId === this.tenantFilter)?.label ?? this.tenantFilter);
     const result = this.queryResult;
     return html`<section class="obs-plat-card" data-testid="obs-precise-query" aria-label="精确任务查询">
-      <div class="obs-plat-card__head"><div><h3>精确任务查询</h3><p>必须输入精确的任务或运行标识，不借用近似结果。此区域独立，不随连接工作台筛选切换。</p></div></div>
+      <div class="obs-plat-card__head"><div><h3>精确任务查询</h3></div></div>
       <label class="field obs-query-scope"><span>租户筛选</span>
         <select aria-label="租户筛选" ?disabled=${this.isAuthorized() === false} @change=${(
           event: Event,
@@ -1526,7 +1542,6 @@ export class OpenBotObservationWorkbench extends LitElement {
           })}
         </select>
       </label>
-      <p class="obs-plat-footnote">只影响精确查询、当前租户投影和证据下钻，不改写平台身份域，也不与连接工作台筛选混用。当前租户投影：${tenantLabel}。</p>
       <form class="obs-query-box" @submit=${(event: Event) => {
         event.preventDefault();
         this.submitPreciseQuery(view);
@@ -1540,12 +1555,9 @@ export class OpenBotObservationWorkbench extends LitElement {
         </label>
         <button class="obs-query-submit" type="button" ?disabled=${disabled} @click=${() => this.submitPreciseQuery(view)}>精确查询</button>
       </form>
-      <p class="obs-plat-footnote">不支持模糊检索或“相似任务”借用。${disabled ? authorization.message : "只在当前租户筛选的已授权范围内按精确标识解析。"}</p>
       ${
         !result
-          ? html`
-              <p class="obs-plat-footnote" data-testid="obs-query-empty">尚未执行精确查询。</p>
-            `
+          ? nothing
           : result.status === "denied"
             ? html`<div class="obs-query-result" data-testid="obs-query-result"><strong>无授权</strong><p>${result.message}</p></div>`
             : result.status === "miss"
@@ -1575,13 +1587,13 @@ export class OpenBotObservationWorkbench extends LitElement {
     const isSample = view.source === "sample";
     if (!rows.length) {
       return html`<section class="obs-plat-card obs-tenant-compare" data-testid="obs-tenant-compare" aria-label="租户隔离与授权">
-        <div class="obs-plat-card__head"><div><h3>租户隔离与授权</h3><p>租户之间隔离；无授权租户不可查询。</p></div></div>
+        <div class="obs-plat-card__head"><div><h3>租户隔离与授权</h3></div></div>
         <div class="obs-empty obs-tenant-empty"><strong>${isSample ? "样例企业未启用" : "暂无企业目录摘要"}</strong><p>${isSample ? "切换到样例验收后应出现明确标注的样例企业。" : "近 7 天跨租户视图依赖目录摘要，不是事件回放。"}</p></div>
         <p class="obs-plat-footnote">${this.liveNote(view)}</p>
       </section>`;
     }
     return html`<section class="obs-plat-card obs-tenant-compare" data-testid="obs-tenant-compare" aria-label="租户隔离与授权">
-      <div class="obs-plat-card__head"><div><h3>租户隔离与授权</h3><p>租户之间隔离；无授权租户不可查询。</p></div></div>
+      <div class="obs-plat-card__head"><div><h3>租户隔离与授权</h3></div></div>
       <div class="obs-tenant-table-wrap">
         <table class="obs-tenant-table">
           <thead><tr><th>租户</th><th>授权</th><th>覆盖</th><th>说明</th></tr></thead>

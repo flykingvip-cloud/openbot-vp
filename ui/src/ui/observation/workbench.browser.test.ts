@@ -215,6 +215,24 @@ describe("platform tenant compare filters", () => {
     expect(
       panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-cap-val')?.textContent,
     ).toBe("未知");
+    expect(panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-coverage-meter')).not.toBeNull();
+    expect(panel.querySelector('[data-testid="obs-health-关联覆盖率"] .obs-coverage-meter__fill')).toBeNull();
+    expect(panel.querySelector('[data-testid="obs-platform-health"]')?.textContent).not.toContain(
+      "覆盖率必须带分子分母",
+    );
+    expect(panel.querySelector('[data-testid="obs-precise-query"]')?.textContent).not.toContain(
+      "必须输入精确的任务或运行标识",
+    );
+    expect(panel.querySelector('[data-testid="obs-precise-query"]')?.textContent).not.toContain(
+      "不支持模糊检索",
+    );
+    expect(panel.querySelector('[data-testid="obs-precise-query"]')?.textContent).not.toContain(
+      "尚未执行精确查询",
+    );
+    expect(panel.querySelector('[data-testid="obs-tenant-compare"]')?.textContent).not.toContain(
+      "租户之间隔离；无授权租户不可查询",
+    );
+    expect(panel.querySelector("select[aria-label=观测数据源]")).not.toBeNull();
     expect(
       panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
     ).toBe("未知");
@@ -452,7 +470,7 @@ describe("platform tenant compare filters", () => {
       "未知",
     );
     expect(panel.querySelector('[data-testid="obs-health-未映射事件"]')?.textContent).toContain(
-      "所选企业暂无已映射运行事件",
+      "当前企业暂无已映射运行",
     );
     expect(panel.querySelector(".obs-pulse-grid")).toBeNull();
     container.remove();
