@@ -236,6 +236,17 @@ describe("platform tenant compare filters", () => {
     expect(
       panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
     ).toBe("未知");
+    expect(panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-coverage-meter')).not.toBeNull();
+    expect(panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-coverage-meter__fill')).toBeNull();
+    expect(panel.querySelector('[data-testid="obs-platform-health"]')?.textContent).not.toContain(
+      "expectedSamples",
+    );
+    expect(panel.querySelector('[data-testid="obs-platform-health"]')?.textContent).not.toContain(
+      "observedSamples",
+    );
+    expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).not.toContain(
+      "目录分母",
+    );
     expect(panel.querySelector('[data-testid="obs-health-租户授权"]')?.textContent).toContain(
       "1 已授权",
     );
@@ -273,7 +284,7 @@ describe("platform tenant compare filters", () => {
     expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("未知");
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).toContain("尚未确认");
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).not.toContain("无授权");
-    expect(panel.querySelector("select[aria-label=观测数据源]")).not.toBeNull();
+    expect(panel.querySelector(".obs-plat-toolbar select[aria-label=观测数据源]")).not.toBeNull();
     expect(panel.querySelector(".obs-source")?.textContent).toContain("真实连接");
     expect(panel.querySelector(".obs-source")?.textContent).toContain("样例验收");
     expect(panel.querySelector(".obs-source")?.textContent).not.toContain("连接工作台数据源");
@@ -311,6 +322,9 @@ describe("platform tenant compare filters", () => {
     const values = [...capacity!.querySelectorAll(".obs-cap-val")].map((node) => node.textContent);
     expect(values).toEqual(["未知", "未知", "未知", "未知"]);
     expect(values.some((value) => value?.includes("0%"))).toBe(false);
+    expect(capacity?.textContent).not.toContain("expectedSamples");
+    expect(capacity?.textContent).not.toContain("capacity_does_not_establish_task_outcome");
+    expect(capacity?.querySelector(".obs-plat-card__head p")).toBeNull();
     panel.querySelector<HTMLButtonElement>('[data-platform-page="overview"]')!.click();
     await panel.updateComplete;
     expect(panel.querySelector('[data-testid="obs-platform-health"]')).not.toBeNull();

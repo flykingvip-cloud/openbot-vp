@@ -81,6 +81,25 @@ export function formatLinkCoverage(coverage: LinkCoverageInput | null | undefine
   };
 }
 
+export function heartbeatFraction(activity: HeartbeatInput | null | undefined): number | null {
+  const formatted = formatHeartbeat(activity);
+  if (formatted.value === "未知") {
+    return null;
+  }
+  const expected = activity?.expectedSamples;
+  const observed = activity?.observedSamples;
+  if (
+    expected == null ||
+    observed == null ||
+    !Number.isFinite(expected) ||
+    !Number.isFinite(observed) ||
+    expected <= 0
+  ) {
+    return null;
+  }
+  return Math.min(1, Math.max(0, observed / expected));
+}
+
 export function formatHeartbeat(activity: HeartbeatInput | null | undefined): FormattedMetric {
   const expected = activity?.expectedSamples;
   const observed = activity?.observedSamples;
@@ -94,15 +113,25 @@ export function formatHeartbeat(activity: HeartbeatInput | null | undefined): Fo
   ) {
     return {
       value: "未知",
-      detail: "expectedSamples 未知 / observedSamples 未知",
+      detail: "",
       note: "source_unavailable · 不等于窗口覆盖",
     };
   }
   return {
     value: `${observed}/${expected}`,
-    detail: `expectedSamples ${expected} / observedSamples ${observed}`,
+    detail: "",
     note: "心跳时效 · 不等于窗口覆盖",
   };
+}
+
+/** Show a secondary tenant id only when it adds information; hide numeric aliases such as 001. */
+export function visibleTenantCode(label: string, tenantId: string): string | null {
+  const name = label.trim() || tenantId.trim();
+  const id = tenantId.trim();
+  if (!id || id === name || /^\d+$/.test(id)) {
+    return null;
+  }
+  return id;
 }
 
 export function censusTenantGrants(

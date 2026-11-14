@@ -37,7 +37,6 @@ import {
   attentionCounts,
   classifyAttention,
   computeOverviewMetrics,
-  defaultCapacityCards,
   filterAttention,
   groupTargetsByAgent,
   type AttentionKind,
@@ -56,9 +55,12 @@ import {
   formatGrantCensus,
   formatHeartbeat,
   formatLinkCoverage,
+  heartbeatFraction,
   linkCoverageFraction,
   formatTenantCoverage,
   tenantGrantNote,
+  visibleTenantCode,
+  type HeartbeatInput,
   type LinkCoverageInput,
 } from "./platform-overview.ts";
 import { observationSamples, SAMPLE_ENTERPRISE_DIRECTORY } from "./samples.ts";
@@ -799,26 +801,32 @@ export class OpenBotObservationWorkbench extends LitElement {
       ["tenants", "租户与授权"],
       ["capacity", "覆盖与容量"],
     ] as const;
-    return html`<nav class="obs-plat-subnav" aria-label="平台观测视图">${items.map(
+    return html`<nav class="obs-plat-subnav" role="tablist" aria-label="平台观测视图">${items.map(
       ([id, label]) =>
-        html`<button type="button" class=${this.platformPage === id ? "is-active" : ""} aria-current=${this.platformPage === id ? "page" : nothing} data-platform-page=${id} @click=${() => {
+        html`<button type="button" role="tab" class=${this.platformPage === id ? "is-active" : ""} aria-selected=${this.platformPage === id} aria-current=${this.platformPage === id ? "page" : nothing} data-platform-page=${id} @click=${() => {
           this.platformPage = id;
         }}>${label}</button>`,
     )}</nav>`;
   }
   private renderPlatformCapacity() {
-    const cards = defaultCapacityCards();
+    const cards = [
+      { title: "采样覆盖", value: "未知", chart: true },
+      { title: "心跳时效", value: "未知", chart: true },
+      { title: "登记并发", value: "未知", chart: false },
+      { title: "额度", value: "未知", chart: false },
+    ];
     return html`<section class="obs-plat-card" data-testid="obs-platform-capacity" aria-label="覆盖与容量">
-      <div class="obs-plat-card__head"><div><h3>覆盖与容量</h3><p>采样覆盖、心跳时效、登记并发与额度只在确认分子且分母大于零时展示比值；否则为未知，不以零百分比占位，也不套用样例容量。</p></div></div>
+      <div class="obs-plat-card__head"><div><h3>覆盖与容量</h3></div></div>
       <div class="obs-cap-grid">${cards.map(
-        (card) => html`<div class="obs-cap" data-testid=${`obs-capacity-${card.title}`}>
-          <span>${card.title}</span>
-          <strong class="obs-cap-val">${card.value}</strong>
-          <small>${card.detail}</small>
-          <p class="obs-plat-footnote">${card.note} · ${card.reasons}</p>
+        (card) => html`<div class="obs-cap-item ${card.chart ? "obs-cap-item--chart" : ""}" data-testid=${`obs-capacity-${card.title}`}>
+          <h4>${card.title}</h4>
+          ${
+            card.chart
+              ? this.renderRatioMeter({ label: card.title, value: card.value, fraction: null })
+              : html`<div class="obs-cap-val">${card.value}</div>`
+          }
         </div>`,
       )}</div>
-      <p class="obs-plat-footnote">业务结果：unknown · capacity_does_not_establish_task_outcome。容量不代表业务结果。对照查询在「治理与验证」，且不随连接工作台筛选切换。</p>
     </section>`;
   }
   private renderTabs() {
@@ -1465,59 +1473,65 @@ export class OpenBotObservationWorkbench extends LitElement {
     return html`<div class="obs-source"><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select></div>`;
   }
 
-  private renderCoverageMeter(coverage: LinkCoverageInput | null | undefined) {
-    const formatted = formatLinkCoverage(coverage);
-    const fraction = linkCoverageFraction(coverage);
+  private renderRatioMeter(options: { label: string; value: string; fraction: number | null }) {
     const radius = 28;
     const circumference = 2 * Math.PI * radius;
-    const offset = circumference * (1 - (fraction ?? 0));
-    const label = formatted.value === "未知" ? "关联覆盖率未知" : `关联覆盖率 ${formatted.value}`;
+    const offset = circumference * (1 - (options.fraction ?? 0));
+    const label = options.fraction == null ? `${options.label}未知` : `${options.label} ${options.value}`;
     return html`<div class="obs-coverage-chart">
-      <svg class="obs-coverage-meter ${fraction == null ? "is-unknown" : ""}" viewBox="0 0 72 72" role="img" aria-label=${label}>
+      <svg class="obs-coverage-meter ${options.fraction == null ? "is-unknown" : ""}" viewBox="0 0 72 72" role="img" aria-label=${label}>
         <circle class="obs-coverage-meter__track" cx="36" cy="36" r="28" fill="none" stroke-width="8"></circle>
         ${
-          fraction == null
+          options.fraction == null
             ? nothing
             : html`<circle class="obs-coverage-meter__fill" cx="36" cy="36" r="28" fill="none" stroke-width="8" stroke-dasharray=${circumference} stroke-dashoffset=${offset} transform="rotate(-90 36 36)"></circle>`
         }
       </svg>
-      <div class="obs-cap-val">${formatted.value}</div>
+      <div class="obs-cap-val">${options.value}</div>
     </div>`;
   }
 
   private renderPlatformHealth(view: ObservationView) {
     // Coverage and heartbeat stay unknown until a confirmed numerator and
     // positive denominator are supplied; do not invent first-screen ratios.
-    const coverageInput = null;
-    const heartbeat = formatHeartbeat(null);
+    const coverageInput: LinkCoverageInput | null = null;
+    const heartbeatInput: HeartbeatInput | null = null;
+    const coverage = formatLinkCoverage(coverageInput);
+    const heartbeat = formatHeartbeat(heartbeatInput);
     const census = formatGrantCensus(
       censusTenantGrants(this.directoryEntries(view), this.tenantGrants),
     );
     const unmappedLive =
       this.role === "platform" && view.source === "live" && this.tenantFilter !== "all";
-    const unmapped = {
-      value: "不计入企业",
-      detail: unmappedLive ? "当前企业暂无已映射运行" : "未映射事件不计入企业",
-    };
-    const cards = [
-      { title: "心跳时效", ...heartbeat },
-      { title: "租户授权", ...census },
-      { title: "未映射事件", ...unmapped },
-    ];
     return html`<section class="obs-plat-card" data-testid="obs-platform-health" aria-label="平台健康与覆盖">
       <div class="obs-plat-card__head"><div><h3>平台健康与覆盖</h3></div></div>
       <div class="obs-cap-grid">
         <div class="obs-cap-item obs-cap-item--chart" data-testid="obs-health-关联覆盖率">
           <h4>关联覆盖率</h4>
-          ${this.renderCoverageMeter(coverageInput)}
+          ${this.renderRatioMeter({
+            label: "关联覆盖率",
+            value: coverage.value,
+            fraction: linkCoverageFraction(coverageInput),
+          })}
         </div>
-        ${cards.map(
-        (card) => html`<div class="obs-cap-item" data-testid=${`obs-health-${card.title}`}>
-        <h4>${card.title}</h4>
-        <div class="obs-cap-val">${card.value}</div>
-        ${"detail" in card && card.detail ? html`<div class="obs-cap-den">${card.detail}</div>` : nothing}
-      </div>`,
-      )}</div>
+        <div class="obs-cap-item obs-cap-item--chart" data-testid="obs-health-心跳时效">
+          <h4>心跳时效</h4>
+          ${this.renderRatioMeter({
+            label: "心跳时效",
+            value: heartbeat.value,
+            fraction: heartbeatFraction(heartbeatInput),
+          })}
+        </div>
+        <div class="obs-cap-item" data-testid="obs-health-租户授权">
+          <h4>租户授权</h4>
+          <div class="obs-cap-val">${census.value}</div>
+        </div>
+        <div class="obs-cap-item" data-testid="obs-health-未映射事件">
+          <h4>未映射事件</h4>
+          <div class="obs-cap-val">不计入企业</div>
+          ${unmappedLive ? html`<div class="obs-cap-den">当前企业暂无已映射运行</div>` : nothing}
+        </div>
+      </div>
     </section>`;
   }
   private renderPreciseQuery(view: ObservationView) {
@@ -1602,24 +1616,27 @@ export class OpenBotObservationWorkbench extends LitElement {
               const grant = this.entryGrant(entry);
               const grantLabel =
                 grant === "granted" ? "已授权" : grant === "none" ? "无授权" : "尚未确认";
+              const tenantCode = visibleTenantCode(entry.label, entry.tenantId);
+              const note = grant === "granted" ? "" : tenantGrantNote(grant, isSample);
               return html`<tr data-tenant-id=${entry.tenantId}>
-                <td>${entry.label}<code>${entry.tenantId}</code></td>
+                <td>${entry.label}${tenantCode ? html`<code>${tenantCode}</code>` : nothing}</td>
                 <td><span class="obs-grant-chip is-${grant}">${grantLabel}</span></td>
                 <td>${formatTenantCoverage(grant)}</td>
-                <td class="obs-plat-footnote">${tenantGrantNote(grant, isSample)}</td>
+                <td class="obs-plat-footnote">${note}</td>
               </tr>`;
             })}
           </tbody>
         </table>
       </div>
-      <p class="obs-plat-footnote">切换租户筛选不会改变平台身份域；未映射的连接事件仍不计入任何企业。${this.liveNote(view) ? ` ${this.liveNote(view)}` : ""}</p>
     </section>`;
   }
   private renderPlatformOverview(view: ObservationView, notice: string | null) {
     const page = this.platformPage;
     return html`
-      <div class="obs-plat-toolbar">${this.renderSourceSwitch(view)}</div>
-      ${this.renderPlatformSubnav()}
+      <div class="obs-plat-toolbar">
+        ${this.renderPlatformSubnav()}
+        ${this.renderSourceSwitch(view)}
+      </div>
       ${notice ? html`<p class="obs-access-notice" data-testid="obs-access-notice">${notice}</p>` : nothing}
       ${
         view.source === "sample"

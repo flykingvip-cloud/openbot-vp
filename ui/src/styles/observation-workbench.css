@@ -960,13 +960,17 @@ select {
  * scoped; does not restyle the rest of the platform shell. */
 .obs-plat-toolbar {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
   margin: 0 0 16px;
+  border-bottom: 1px solid var(--obs-line);
 }
 .obs-plat-toolbar .obs-source {
-  margin-left: auto;
+  margin: 0 0 8px auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 .obs-plat-grid {
   display: grid;
@@ -1328,8 +1332,7 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 18px;
-  border-bottom: 1px solid var(--obs-line);
-  margin: 0 0 16px;
+  margin: 0;
 }
 .obs-plat-subnav button {
   padding: 10px 0;

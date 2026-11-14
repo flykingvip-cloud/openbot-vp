@@ -5,6 +5,8 @@ import {
   exactRunMatches,
   formatGrantCensus,
   formatHeartbeat,
+  heartbeatFraction,
+  visibleTenantCode,
   formatLinkCoverage,
   linkCoverageFraction,
   formatTenantCoverage,
@@ -67,6 +69,28 @@ describe("formatHeartbeat", () => {
 
   it("formats a confirmed expected and observed count", () => {
     expect(formatHeartbeat({ expectedSamples: 4, observedSamples: 3 }).value).toBe("3/4");
+  });
+
+  it("does not expose raw field names in the formatted detail", () => {
+    expect(formatHeartbeat(null).detail).not.toContain("expectedSamples");
+    expect(formatHeartbeat({ expectedSamples: 4, observedSamples: 3 }).detail).not.toContain(
+      "observedSamples",
+    );
+  });
+});
+
+describe("heartbeatFraction", () => {
+  it("is null when heartbeat is unknown and returns the confirmed ratio", () => {
+    expect(heartbeatFraction(null)).toBeNull();
+    expect(heartbeatFraction({ expectedSamples: 4, observedSamples: 3 })).toBe(0.75);
+  });
+});
+
+describe("visibleTenantCode", () => {
+  it("hides numeric aliases and ids that already match the label", () => {
+    expect(visibleTenantCode("upbeyond", "001")).toBeNull();
+    expect(visibleTenantCode("001", "001")).toBeNull();
+    expect(visibleTenantCode("Aegis", "aegis-99491824")).toBe("aegis-99491824");
   });
 });
 
