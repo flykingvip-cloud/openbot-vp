@@ -185,11 +185,56 @@ export type SurfaceRequestHint = {
   referer?: string | null;
 };
 
+/** Page path for local cookie selection when the request URL is an API route. */
+export const OPENBOT_PAGE_PATH_HEADER = "x-openbot-page-path";
+
+function requestUrlParts(rawUrl: string | undefined): {
+  pathname: string | null;
+  pagePathQuery: string | null;
+} {
+  const raw = rawUrl?.trim();
+  if (!raw) {
+    return { pathname: null, pagePathQuery: null };
+  }
+  try {
+    const parsed = raw.includes("://") ? new URL(raw) : new URL(raw, "http://localhost");
+    return {
+      pathname: parsed.pathname || null,
+      pagePathQuery: parsed.searchParams.get("pagePath"),
+    };
+  } catch {
+    return { pathname: raw.startsWith("/") ? raw : null, pagePathQuery: null };
+  }
+}
+
+function firstSurfacePathOrFallback(candidates: Array<string | null | undefined>): string | null {
+  let fallback: string | null = null;
+  for (const candidate of candidates) {
+    const path = pathnameFrom(candidate);
+    if (!path) {
+      continue;
+    }
+    if (!fallback) {
+      fallback = path;
+    }
+    if (localPathSurface(path)) {
+      return path;
+    }
+  }
+  return fallback;
+}
+
 export function hintFromIncomingMessage(req: IncomingMessage): SurfaceRequestHint {
+  const urlParts = requestUrlParts(req.url);
   return {
     origin: headerValue(req.headers.origin),
     host: headerValue(req.headers.host),
     forwardedHost: headerValue(req.headers["x-forwarded-host"]),
+    pathname: firstSurfacePathOrFallback([
+      urlParts.pathname,
+      headerValue(req.headers[OPENBOT_PAGE_PATH_HEADER]),
+      urlParts.pagePathQuery,
+    ]),
     referer: headerValue(req.headers.referer),
   };
 }

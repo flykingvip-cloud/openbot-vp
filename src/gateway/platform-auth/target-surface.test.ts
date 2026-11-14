@@ -1,3 +1,4 @@
+import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vitest";
 import type { PlatformAuthStore } from "./store-types.js";
 import {
@@ -5,6 +6,7 @@ import {
   buildPasswordResetLink,
   employeePositionLoginBlock,
   evaluateEmployeePosition,
+  hintFromIncomingMessage,
   loginUrlForSurface,
   passwordResetReturn,
   resolveLoginTarget,
@@ -169,6 +171,67 @@ describe("request surface agreement", () => {
         "employee",
       ).ok,
     ).toBe(false);
+  });
+
+  it("reads an authoritative enterprise surface from the local document URL", () => {
+    const hint = hintFromIncomingMessage({
+      url: "/enterprise/001/overview",
+      headers: { host: "127.0.0.1:18789" },
+    } as IncomingMessage);
+    expect(hint.pathname).toBe("/enterprise/001/overview");
+    expect(resolveRequestSessionSurface(hint)).toEqual({
+      kind: "authoritative",
+      surface: "enterprise",
+    });
+  });
+
+  it("keeps a local /session API call with no page-path signal ambiguous", () => {
+    const hint = hintFromIncomingMessage({
+      url: "/__openbot/platform-auth/session",
+      headers: { host: "127.0.0.1:18789" },
+    } as IncomingMessage);
+    expect(resolveRequestSessionSurface(hint)).toEqual({
+      kind: "ambiguous",
+      localDefault: "employee",
+    });
+  });
+
+  it("treats a local /session call with x-openbot-page-path as enterprise", () => {
+    const hint = hintFromIncomingMessage({
+      url: "/__openbot/platform-auth/session",
+      headers: {
+        host: "127.0.0.1:18789",
+        "x-openbot-page-path": "/enterprise/001/overview",
+      },
+    } as IncomingMessage);
+    expect(hint.pathname).toBe("/enterprise/001/overview");
+    expect(resolveRequestSessionSurface(hint)).toEqual({
+      kind: "authoritative",
+      surface: "enterprise",
+    });
+  });
+
+  it("treats a local /session call with a pagePath query as enterprise", () => {
+    const hint = hintFromIncomingMessage({
+      url: "/__openbot/platform-auth/session?pagePath=%2Fenterprise%2F001%2Foverview",
+      headers: { host: "127.0.0.1:18789" },
+    } as IncomingMessage);
+    expect(hint.pathname).toBe("/enterprise/001/overview");
+    expect(resolveRequestSessionSurface(hint)).toEqual({
+      kind: "authoritative",
+      surface: "enterprise",
+    });
+  });
+
+  it("still treats biz.openbot.love as authoritative enterprise from the hostname", () => {
+    const hint = hintFromIncomingMessage({
+      url: "/__openbot/platform-auth/session",
+      headers: { host: "biz.openbot.love" },
+    } as IncomingMessage);
+    expect(resolveRequestSessionSurface(hint)).toEqual({
+      kind: "authoritative",
+      surface: "enterprise",
+    });
   });
 
   it.each([
@@ -370,6 +433,33 @@ describe("surface cookies do not clobber each other", () => {
       ],
     });
     expect(selected).toMatchObject({ id: "e" });
+  });
+
+  it("returns null for platform+enterprise cookies when the local path is absent", () => {
+    // Live local gap: two cookies and no page path must not guess the highest role.
+    const baseName = "openbot_platform_session";
+    const candidates = [
+      { cookieName: surfaceCookieName(baseName, "platform"), domain: "platform" as const, id: "p" },
+      {
+        cookieName: surfaceCookieName(baseName, "enterprise"),
+        domain: "enterprise" as const,
+        id: "b",
+      },
+    ];
+    expect(
+      selectSurfaceSessionCookie({
+        baseName,
+        resolution: { kind: "ambiguous", localDefault: "employee" },
+        candidates,
+      }),
+    ).toBeNull();
+    expect(
+      selectSurfaceSessionCookie({
+        baseName,
+        resolution: { kind: "authoritative", surface: "enterprise" },
+        candidates,
+      }),
+    ).toMatchObject({ id: "b" });
   });
 });
 

@@ -183,6 +183,24 @@ function buildPlatformAuthUrl(basePath: string, suffix: PlatformAuthRoute): stri
   return `${root}${suffix}`;
 }
 
+/** Current page path for local session-cookie selection on /session reads. */
+function currentPagePathForSessionRequest(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const pathname = window.location?.pathname;
+  return typeof pathname === "string" && pathname.trim() ? pathname : null;
+}
+
+function platformAuthSessionRequestHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const pagePath = currentPagePathForSessionRequest();
+  if (pagePath) {
+    headers["x-openbot-page-path"] = pagePath;
+  }
+  return headers;
+}
+
 function trimErrorMessage(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -302,9 +320,10 @@ async function assertPlatformSessionCookieLanded(host: PlatformAuthHost): Promis
   try {
     const response = await fetch(buildPlatformAuthUrl(host.basePath, "/session"), {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: platformAuthSessionRequestHeaders(),
       credentials: "same-origin",
       cache: "no-store",
+      referrerPolicy: "same-origin",
     });
     if (!response.ok) {
       return false;
