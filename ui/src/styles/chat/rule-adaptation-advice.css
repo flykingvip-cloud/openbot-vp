@@ -59,6 +59,10 @@
   border-color: #f08c00;
 }
 
+.rule-adaptation-advice.is-interpretation-pending {
+  border-color: #1971c2;
+}
+
 .chat-compose__advice-btn {
   white-space: nowrap;
 }
