@@ -272,7 +272,7 @@
       "src/agent-runtime/command/rule-adaptation/run.cases.test.ts",
       "src/agent-runtime/command/rule-adaptation/test-support.ts"
     ],
-    "description": "Production code consumes policy through the public index facade or a first-level policy/*/index.ts module barrel; numeric limits and decisions share one entry. Policy internals may cross-import; the rule-adaptation subtree is outside this rule's check scope. Listed policy sources/tests and the exact-path command test fixtures that must import policy test-support remain exempt."
+    "description": "Production code consumes policy through the public index facade or a first-level policy/*/index.ts module barrel; numeric limits and decisions share one entry. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed policy sources/tests and the exact-path command test fixtures that must import policy test-support remain exempt."
   },
   {
     "name": "runtime-context-reply-public-entry",
@@ -346,7 +346,7 @@
       "src/agent-runtime/model/xai-arguments-stream.ts",
       "src/executor-evidence/acceptance-fix-r8-cli.isolation.test.ts"
     ],
-    "description": "Production code consumes model infrastructure through the public model/index facade or a first-level model/*/index.ts module barrel. Model internals may cross-import; the rule-adaptation subtree is outside this rule's check scope. Listed model sources/tests and the R8 CLI isolation test (which must bind command-commercial-gate directly) are exempt."
+    "description": "Production code consumes model infrastructure through the public model/index facade or a first-level model/*/index.ts module barrel. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed model sources/tests and the R8 CLI isolation test (which must bind command-commercial-gate directly) are exempt."
   },
   {
     "name": "runtime-command-public-entry",
@@ -388,7 +388,7 @@
       "src/agent-runtime/model/rule-adaptation/occupancy.test.ts",
       "src/agent-runtime/policy/rule-adaptation/activation-precheck.test.ts"
     ],
-    "description": "Production code consumes command use-cases through the public command/index facade or a first-level command/*/index.ts module barrel. Command internals may cross-import; the rule-adaptation subtree is outside this rule's check scope. Listed command sources/tests and the exact-path test files that must bind official command test fixtures remain exempt. Existing auto-reply and gateway entry rules remain."
+    "description": "Production code consumes command use-cases through the public command/index facade or a first-level command/*/index.ts module barrel. Internal references are allowed only when both importer and target belong to the same rule-adaptation subtree; imports of other components' internals must use a public entry. Listed command sources/tests and the exact-path test files that must bind official command test fixtures remain exempt. Existing auto-reply and gateway entry rules remain."
   },
   {
     "name": "runtime-acceptance-no-platform-effects",
