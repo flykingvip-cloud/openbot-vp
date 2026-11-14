@@ -53,7 +53,10 @@ describe("S4 result persist → notify → delivery receipt", () => {
   beforeEach(() => {
     agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "s4-loop-"));
     storeRoot = path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME);
-    cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
+    cfg = {
+      agents: { list: [{ id: "bot", agentDir }] },
+      channels: { telegram: { enabled: true, defaultTo: "111" } },
+    } as unknown as OpenBotConfig;
     clearAwaitingDeliveriesForTests();
   });
 
@@ -523,6 +526,10 @@ describe("S4 result persist → notify → delivery receipt", () => {
     });
     queueProbe.queued.length = 0;
     // Production default send, transport cannot start with this nonexistent adapter.
+    cfg = {
+      agents: { list: [{ id: "bot", agentDir }] },
+      channels: { "review-no-adapter": { enabled: true, defaultTo: "test" } },
+    } as unknown as OpenBotConfig;
     await recoverTaskOutcomeConsumersAtGatewayBoot({ cfg, startRuntimeDrain: false });
     console.log(
       "UNASSOCIATED_QUEUE_REVIEW",

@@ -43,7 +43,10 @@ describe("S4 result persist → notify → delivery receipt", () => {
   beforeEach(() => {
     agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "s4-loop-"));
     storeRoot = path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME);
-    cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
+    cfg = {
+      agents: { list: [{ id: "bot", agentDir }] },
+      channels: { telegram: { enabled: true, defaultTo: "111" } },
+    } as unknown as OpenBotConfig;
     clearAwaitingDeliveriesForTests();
   });
 
@@ -503,6 +506,10 @@ describe("S4 result persist → notify → delivery receipt", () => {
       deliverableVersion: "v1",
     };
     seedBoundBoard(sessionFile, binding);
+    cfg = {
+      agents: { list: [{ id: "bot", agentDir }] },
+      channels: { telegram: { enabled: true, defaultTo: "test" } },
+    } as unknown as OpenBotConfig;
     let sends = 0,
       published = 0;
     await prepareVisibleDelivery({
@@ -553,6 +560,10 @@ describe("S4 result persist → notify → delivery receipt", () => {
   });
 
   it("independent review: a second recovery consumer cannot resend another consumer's in-flight row", async () => {
+    cfg = {
+      agents: { list: [{ id: "bot", agentDir }] },
+      channels: { telegram: { enabled: true, defaultTo: "test" } },
+    } as unknown as OpenBotConfig;
     for (const n of ["a", "b"]) {
       const runId = `review-race-${n}`,
         taskId = `review-race-out-${n}`;
