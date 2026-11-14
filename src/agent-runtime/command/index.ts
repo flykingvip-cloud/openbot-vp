@@ -48,6 +48,18 @@ export type {
   GovernedShadowHostInjection,
 } from "./governed-interaction.js";
 export {
+  EMPLOYEE_ADVICE_METHOD,
+  runEmployeeRuleAdaptationAdvice,
+  sanitizeEmployeeAdviceClientInput,
+  buildEmployeeAdviceView,
+} from "./rule-adaptation/employee-advice.js";
+export type {
+  EmployeeAdviceView,
+  EmployeeAdviceClientFields,
+  TrustedEmployeeAdviceHost,
+  IsolatedAdviceInteractionParams,
+} from "./rule-adaptation/employee-advice.js";
+export {
   createInteractionSourceBoundary,
   formatRestrictedInteractionNotice,
 } from "./interaction-sources.js";
@@ -71,3 +83,8 @@ export {
   type AdmittedTaskQueryContinuation,
 } from "./admitted-task-query-continuation.js";
 export { hostBoundTaskTarget } from "./host-task-target.js";
+export {
+  createOfficialDeepSeekShadowCompletion,
+  resolveOfficialDeepSeekCredential,
+} from "./rule-adaptation/official-deepseek-complete.js";
+export type { OfficialDeepSeekCredential } from "./rule-adaptation/official-deepseek-complete.js";
