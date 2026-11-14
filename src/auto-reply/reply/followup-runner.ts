@@ -766,6 +766,14 @@ export function createFollowupRunner(params: {
                     ? { threadId: queued.originatingThreadId }
                     : {}),
                 },
+                authorization: {
+                  ...(queued.run.sessionKey ? { sessionKey: queued.run.sessionKey } : {}),
+                  ...(queued.originatingAccountId
+                    ? { accountId: queued.originatingAccountId }
+                    : {}),
+                  channel: queued.originatingChannel,
+                  to: queued.originatingTo,
+                },
               }
             : {}),
           publishPending: (identity) => {

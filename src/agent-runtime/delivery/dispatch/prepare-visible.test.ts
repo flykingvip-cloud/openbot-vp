@@ -1,13 +1,15 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { prepareVisibleDelivery } from "./prepare-visible.js";
 const mocks = vi.hoisted(() => ({
-  register: vi.fn(),
+  register: vi.fn(async (reg: unknown) => ({ ok: true, registration: reg })),
   persistIntent: vi.fn(),
+  release: vi.fn(async () => {}),
   root: vi.fn(() => "/tmp/agent-a"),
 }));
 vi.mock("../../../task-outcome/pending-delivery.js", () => ({
-  registerAwaitingDelivery: mocks.register,
+  handoffAwaitingDelivery: mocks.register,
   persistAwaitingDeliveryIntent: mocks.persistIntent,
+  releaseLiveProducerPreparation: mocks.release,
 }));
 const contract = {
   id: "code-v1",

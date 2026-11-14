@@ -4,8 +4,10 @@ import {
   type ResolvedTurnTaskContract,
 } from "../../../task-outcome/chat-entry.js";
 import {
+  handoffAwaitingDelivery,
   persistAwaitingDeliveryIntent,
-  registerAwaitingDelivery,
+  releaseLiveProducerPreparation,
+  type PendingVisibleAuthorizationLocator,
   type PendingVisiblePayload,
   type PendingVisibleTarget,
 } from "../../../task-outcome/pending-delivery.js";
@@ -37,6 +39,8 @@ export async function prepareVisibleDelivery(params: {
   payloads?: readonly PendingVisiblePayload[];
   /** Trusted delivery target for the original payloads. */
   target?: PendingVisibleTarget;
+  /** Locator for a current-authorization recheck on recovery. Not a grant. */
+  authorization?: PendingVisibleAuthorizationLocator;
 }): Promise<"passed" | "failed" | "pending" | "not_required"> {
   const deliveryId = `delivery:${params.runId}:visible`;
   const gates = resolveChatTurnCloseGates({
@@ -79,34 +83,46 @@ export async function prepareVisibleDelivery(params: {
       : undefined;
   // Persist identity, binding, payload and target before commit. This intent is
   // not a confirmable registration and does not imply the result is committed
-  // or delivered. Official register + publish still wait for a successful commit.
-  if (identity && persistRoot) {
-    persistAwaitingDeliveryIntent({
+  // or delivered. Official handoff + publish still wait for a successful commit.
+  let handedOff = false;
+  try {
+    if (identity && persistRoot) {
+      persistAwaitingDeliveryIntent({
+        ...identity,
+        persistRoot,
+        ...(checkedTask ? { checkedTask } : {}),
+        ...(params.payloads ? { payloads: [...params.payloads] } : {}),
+        ...(params.target ? { target: params.target } : {}),
+        ...(params.authorization ? { authorization: params.authorization } : {}),
+        sendDisposition: "not_attempted",
+      });
+    }
+    await params.commitOutcome(true, {
+      acceptance: gates.acceptance,
+      delivery: gates.delivery,
+      deliveryId: gates.deliveryId,
+      ...(checked ? { acceptanceEvidence: matches ? checked.evidence : [] } : {}),
+    });
+    if (!identity || !persistRoot) {
+      return gates.acceptance.status;
+    }
+    const handed = await handoffAwaitingDelivery({
       ...identity,
       persistRoot,
       ...(checkedTask ? { checkedTask } : {}),
       ...(params.payloads ? { payloads: [...params.payloads] } : {}),
       ...(params.target ? { target: params.target } : {}),
-      sendDisposition: "not_attempted",
+      ...(params.authorization ? { authorization: params.authorization } : {}),
+      sendDisposition: "handed_off",
     });
-  }
-  await params.commitOutcome(true, {
-    acceptance: gates.acceptance,
-    delivery: gates.delivery,
-    deliveryId: gates.deliveryId,
-    ...(checked ? { acceptanceEvidence: matches ? checked.evidence : [] } : {}),
-  });
-  if (!identity || !persistRoot) {
+    if (handed.ok) {
+      handedOff = true;
+      params.publishPending(identity);
+    }
     return gates.acceptance.status;
+  } finally {
+    if (identity && persistRoot && !handedOff) {
+      await releaseLiveProducerPreparation({ persistRoot, runId: identity.runId });
+    }
   }
-  registerAwaitingDelivery({
-    ...identity,
-    persistRoot,
-    ...(checkedTask ? { checkedTask } : {}),
-    ...(params.payloads ? { payloads: [...params.payloads] } : {}),
-    ...(params.target ? { target: params.target } : {}),
-    sendDisposition: "handed_off",
-  });
-  params.publishPending(identity);
-  return gates.acceptance.status;
 }

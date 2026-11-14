@@ -834,6 +834,26 @@ export async function runReplyAgent(params: {
                 channel: replyToChannel,
                 to: visibleTargetTo,
                 ...(sessionCtx.AccountId ? { accountId: sessionCtx.AccountId } : {}),
+                ...(sessionCtx.MessageThreadId !== undefined && sessionCtx.MessageThreadId !== null
+                  ? { threadId: sessionCtx.MessageThreadId }
+                  : {}),
+                ...((sessionCtx.MessageSidFull ?? sessionCtx.MessageSid)
+                  ? { replyToId: String(sessionCtx.MessageSidFull ?? sessionCtx.MessageSid) }
+                  : {}),
+              },
+              authorization: {
+                ...(sessionCtx.GatewayClientPlatformUserId?.trim()
+                  ? { subjectRef: sessionCtx.GatewayClientPlatformUserId.trim() }
+                  : sessionCtx.GatewayClientUser?.trim()
+                    ? { subjectRef: String(sessionCtx.GatewayClientUser).trim() }
+                    : {}),
+                ...(sessionKey ? { sessionKey } : {}),
+                ...(sessionCtx.GatewayClientSessionEnterpriseId?.trim()
+                  ? { tenantId: sessionCtx.GatewayClientSessionEnterpriseId.trim() }
+                  : {}),
+                ...(sessionCtx.AccountId ? { accountId: sessionCtx.AccountId } : {}),
+                channel: replyToChannel,
+                to: visibleTargetTo,
               },
             }
           : {}),

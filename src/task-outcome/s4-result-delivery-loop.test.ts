@@ -335,6 +335,14 @@ describe("S4 result persist → notify → delivery receipt", () => {
       },
       payloads: params.payloads,
       target: params.target,
+      authorization: {
+        subjectRef: "u",
+        sessionKey: "agent:bot:main",
+        tenantId: "personal:s4",
+        channel: params.target.channel,
+        to: params.target.to,
+        ...(params.target.accountId ? { accountId: params.target.accountId } : {}),
+      },
       commitOutcome: async (
         _success: boolean,
         opts: { acceptance?: unknown; delivery?: unknown; deliveryId?: string },

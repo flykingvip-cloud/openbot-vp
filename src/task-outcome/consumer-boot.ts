@@ -15,18 +15,20 @@ import {
 import type { OutboundChannel } from "../infra/outbound/targets.js";
 import { confirmedDeliveryMessageIds } from "../shared/delivery-receipt.js";
 import {
+  claimAwaitingDeliverySend,
   clearPendingDeliveryIntent,
+  hasLiveProducerPreparation,
   hydrateAwaitingDeliveriesFromDisk,
   listDurableAwaitingDeliveries,
   listPendingDeliveryIntents,
   listStaleAwaitingDeliveries,
-  markAwaitingDeliverySendDisposition,
   peekAwaitingDelivery,
   registerAwaitingDelivery,
   type AwaitingDeliveryRegistration,
   type PendingVisiblePayload,
   type PendingVisibleTarget,
 } from "./pending-delivery.js";
+import { recheckCurrentOutboundAuthorization } from "./recheck-outbound-authorization.js";
 import { drainPendingGrowthEvolution, TASK_OUTCOME_STORE_DIRNAME } from "./runtime-from-runner.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 
@@ -125,6 +127,10 @@ export function promotePendingDeliveryIntents(params: {
   let n = 0;
   for (const intent of listPendingDeliveryIntents(persistRoot)) {
     try {
+      if (hasLiveProducerPreparation(persistRoot, intent.runId)) {
+        // Live producer has not handed off; do not take over from the intent alone.
+        continue;
+      }
       if (
         peekAwaitingDelivery({
           runId: intent.runId,
@@ -155,6 +161,11 @@ export function promotePendingDeliveryIntents(params: {
         ...(intent.checkedTask ? { checkedTask: intent.checkedTask } : {}),
         ...(intent.payloads ? { payloads: intent.payloads } : {}),
         ...(intent.target ? { target: intent.target } : {}),
+        ...(intent.authorization ? { authorization: intent.authorization } : {}),
+        ...(intent.claimGeneration !== undefined
+          ? { claimGeneration: intent.claimGeneration }
+          : {}),
+        ...(intent.claimHolder !== undefined ? { claimHolder: intent.claimHolder } : {}),
         sendDisposition: intent.sendDisposition ?? "not_attempted",
       });
       n += 1;
@@ -185,6 +196,9 @@ async function defaultSendPendingVisible(input: RecoveredVisibleSendInput): Prom
           constraints: input.checkedTask.binding.constraints ?? [],
         }
       : undefined,
+    // Recovered visible send already has the pending-delivery receipt / unknown fence.
+    // Do not enqueue an unassociated ordinary retry queue that could bypass it.
+    skipQueue: true,
   });
 }
 
@@ -228,6 +242,7 @@ export async function deliverRecoveredAwaitingSends(params: {
   const store = new DurableTaskOutcomeStore(persistRoot);
   const send = params.sendPendingVisible ?? defaultSendPendingVisible;
   for (const pending of listDurableAwaitingDeliveries(persistRoot)) {
+    let claimedIdentity: { runId: string; deliveryId: string; taskId: string } | undefined;
     try {
       if (pending.sendDisposition !== "not_attempted") {
         continue;
@@ -259,26 +274,48 @@ export async function deliverRecoveredAwaitingSends(params: {
         out.blocked += 1;
         continue;
       }
-      // Persist unknown before the channel call so a crash mid-send is not resent.
-      markAwaitingDeliverySendDisposition(
-        {
-          runId: pending.runId,
-          deliveryId: pending.deliveryId,
-          taskId: pending.taskId,
-          persistRoot,
-        },
-        "unknown",
-      );
-      const receipts = await send({
+      const authorization = recheckCurrentOutboundAuthorization({
         cfg: params.cfg,
-        agentId: params.agentId,
+        pending,
+      });
+      if (!authorization.allow) {
+        out.blocked += 1;
+        continue;
+      }
+      // Reread and claim under the durable entry lock. The explicit claim
+      // result, not a list snapshot or writing unknown alone, grants send rights.
+      const claimed = await claimAwaitingDeliverySend({
         runId: pending.runId,
         deliveryId: pending.deliveryId,
         taskId: pending.taskId,
         persistRoot,
-        payloads: pending.payloads,
-        target: pending.target,
-        ...(pending.checkedTask ? { checkedTask: pending.checkedTask } : {}),
+      });
+      if (!claimed.ok) {
+        if (claimed.reason === "already_claimed" || claimed.reason === "live_producer") {
+          continue;
+        }
+        out.blocked += 1;
+        continue;
+      }
+      claimedIdentity = {
+        runId: claimed.registration.runId,
+        deliveryId: claimed.registration.deliveryId,
+        taskId: claimed.registration.taskId,
+      };
+      const receipts = await send({
+        cfg: params.cfg,
+        agentId: params.agentId,
+        runId: claimed.registration.runId,
+        deliveryId: claimed.registration.deliveryId,
+        taskId: claimed.registration.taskId,
+        persistRoot,
+        payloads: claimed.registration.payloads ?? pending.payloads,
+        target: claimed.registration.target ?? pending.target,
+        ...(claimed.registration.checkedTask
+          ? { checkedTask: claimed.registration.checkedTask }
+          : pending.checkedTask
+            ? { checkedTask: pending.checkedTask }
+            : {}),
       });
       const ids = confirmedDeliveryMessageIds(receipts);
       if (ids) {
@@ -309,6 +346,23 @@ export async function deliverRecoveredAwaitingSends(params: {
         out.unknown += 1;
       }
     } catch {
+      if (claimedIdentity) {
+        try {
+          await confirmPendingTurnDeliveryWithPorts(
+            {
+              cfg: params.cfg,
+              runId: claimedIdentity.runId,
+              deliveryId: claimedIdentity.deliveryId,
+              taskId: claimedIdentity.taskId,
+              sessionKey: `agent:${params.agentId}:main`,
+              status: "delivery_unknown",
+            },
+            confirmPorts(persistRoot),
+          );
+        } catch {
+          // Disposition is already unknown; keep the recoverable identity.
+        }
+      }
       out.unknown += 1;
     }
   }
