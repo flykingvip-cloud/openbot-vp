@@ -26,6 +26,7 @@ import {
   collaborationDispatchIdsMatch,
   ensureRegisteredMemberMainSession,
 } from "../collaboration-learning/member-dispatch-readiness.js";
+import { shouldSuppressWakeForFirstStageHold } from "../collaboration-learning/s5-collaboration-consumers.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -538,6 +539,19 @@ export async function consumeWakeForRoundDispatch(
           dispatched: false,
           gate: emptyGate(),
           reason: "task_stopped",
+          wakeEvent: undefined,
+          roundId: undefined,
+          dispatcherPresent: false,
+          opKey,
+          reused: false,
+        };
+      }
+      if (current && shouldSuppressWakeForFirstStageHold(current.tags)) {
+        return {
+          outcome: "recorded",
+          dispatched: false,
+          gate: emptyGate(),
+          reason: "waiting_acceptance",
           wakeEvent: undefined,
           roundId: undefined,
           dispatcherPresent: false,

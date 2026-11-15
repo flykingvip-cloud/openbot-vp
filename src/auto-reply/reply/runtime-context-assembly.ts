@@ -7,6 +7,7 @@ export {
   isCollaborationGroupRuntimeSession,
   resolveCollaborationGroupIdForRun,
 } from "../../agent-runtime/command/index.js";
+import type { Task } from "@openbot/collaboration-core";
 import {
   assembleCollaborationMember,
   renderCollaborationMission,
@@ -18,6 +19,7 @@ import {
   buildOperatingPhaseSystemPrompt,
   loadGroupCharterForRuntime,
 } from "../../gateway/collaboration-learning/group-charter.js";
+import { projectBoundTaskWorkBrief } from "../../gateway/collaboration-learning/s5-collaboration-consumers.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -181,7 +183,22 @@ export async function assembleCollaborationRuntimeContextParts(
   ]);
 
   const groupCharterPrompt = buildGroupCharterSystemPrompt(groupCharter);
-  const operatingPhasePrompt = buildOperatingPhaseSystemPrompt(operatingState);
+  let workBrief: string | undefined;
+  const boundTaskId = operatingState?.activeContext?.currentTaskId?.trim();
+  if (groupId && boundTaskId) {
+    try {
+      const task = await createWorkspaceCollaborationStores(
+        params.cfg,
+      ).objectStorage.readObject<Task>(groupId, "task", boundTaskId);
+      workBrief = projectBoundTaskWorkBrief(task);
+    } catch {
+      workBrief = undefined;
+    }
+  }
+  const operatingPhasePrompt =
+    [buildOperatingPhaseSystemPrompt(operatingState), workBrief]
+      .filter((part): part is string => Boolean(part?.trim()))
+      .join("\n\n") || undefined;
 
   const groupChatContext = buildGroupChatContext({
     sessionCtx: params.sessionCtx,

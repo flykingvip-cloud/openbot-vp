@@ -7,13 +7,17 @@
  * assist extraction later.
  */
 
-export type DiscussToTaskMissingField = "goal" | "deliverables_or_acceptance" | "delegation_focus";
+export type DiscussToTaskMissingField =
+  | "goal"
+  | "deliverables_or_acceptance"
+  | "delegation_focus"
+  | "current_goal_binding";
 
 export type DiscussToTaskClassification =
   | { kind: "discussion"; reason: "ordinary_discussion" }
   | {
       kind: "needs_clarification";
-      reason: "ambiguous_delegation" | "missing_acceptance" | "multi_goal_unclear";
+      reason: "ambiguous_delegation" | "missing_acceptance" | "multi_goal_unclear" | "missing_goal";
       titleHint?: string;
       goalHint?: string;
       deliverables?: string[];
@@ -250,6 +254,7 @@ export function formatDiscussToTaskClarificationMessage(
     goal: "目标",
     deliverables_or_acceptance: "交付物或验收条件",
     delegation_focus: "单一委托目标",
+    current_goal_binding: "当前目标绑定",
   };
   const missing = (classification.missingFields ?? []).map((field) => labels[field]);
 

@@ -812,6 +812,10 @@ export async function runReplyAgent(params: {
       return completeDelivery({ kind: "language_filtered", didUseTools });
     }
 
+    const visibleTargetTo = resolveOriginMessageTo({
+      originatingTo: sessionCtx.OriginatingTo,
+      to: sessionCtx.To,
+    });
     const acceptanceStatus = await replyTurnRuntime.delivery.prepareVisibleDelivery(
       followupRun.run.config,
       {
@@ -823,6 +827,36 @@ export async function runReplyAgent(params: {
         sessionKey,
         contract: resolveTurnContractFromRun(),
         commitOutcome: commitGrowthOutcome,
+        payloads: languageGuardedReplyPayloads,
+        ...(replyToChannel && visibleTargetTo
+          ? {
+              target: {
+                channel: replyToChannel,
+                to: visibleTargetTo,
+                ...(sessionCtx.AccountId ? { accountId: sessionCtx.AccountId } : {}),
+                ...(sessionCtx.MessageThreadId !== undefined && sessionCtx.MessageThreadId !== null
+                  ? { threadId: sessionCtx.MessageThreadId }
+                  : {}),
+                ...((sessionCtx.MessageSidFull ?? sessionCtx.MessageSid)
+                  ? { replyToId: String(sessionCtx.MessageSidFull ?? sessionCtx.MessageSid) }
+                  : {}),
+              },
+              authorization: {
+                ...(sessionCtx.GatewayClientPlatformUserId?.trim()
+                  ? { subjectRef: sessionCtx.GatewayClientPlatformUserId.trim() }
+                  : sessionCtx.GatewayClientUser?.trim()
+                    ? { subjectRef: String(sessionCtx.GatewayClientUser).trim() }
+                    : {}),
+                ...(sessionKey ? { sessionKey } : {}),
+                ...(sessionCtx.GatewayClientSessionEnterpriseId?.trim()
+                  ? { tenantId: sessionCtx.GatewayClientSessionEnterpriseId.trim() }
+                  : {}),
+                ...(sessionCtx.AccountId ? { accountId: sessionCtx.AccountId } : {}),
+                channel: replyToChannel,
+                to: visibleTargetTo,
+              },
+            }
+          : {}),
         publishPending: (identity) => {
           if (opts?.pendingTurnDeliveryRef) {
             opts.pendingTurnDeliveryRef.current = identity;

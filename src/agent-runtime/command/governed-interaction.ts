@@ -2,6 +2,7 @@ import type { OpenBotConfig } from "../../config/config.js";
 import type { InteractionModelInput } from "../contracts/interaction.js";
 import {
   createAuthorizedModelSession,
+  createInteractionResourceBudget,
   type ModelSessionPorts,
   type InteractionPreparationPorts,
 } from "../model/index.js";
@@ -68,9 +69,17 @@ function bindGovernedUnderstanding(
   ports: GovernedUnderstandingPorts,
 ) {
   const session = createAuthorizedModelSession(`${params.runId}:interaction`, ports.modelSession);
+  const resourceBudget = createInteractionResourceBudget({ overrideMs: params.timeoutMs });
+  const deadlineSignal = AbortSignal.timeout(resourceBudget.budgetMs);
+  const input = {
+    ...params.input,
+    abortSignal: params.input.abortSignal
+      ? AbortSignal.any([params.input.abortSignal, deadlineSignal])
+      : deadlineSignal,
+  };
   return {
     prepared: {
-      input: params.input,
+      input,
       config: params.config,
       provider: params.provider,
       model: params.model,
@@ -78,6 +87,7 @@ function bindGovernedUnderstanding(
       agentDir: params.agentDir,
       creditUserId: params.identity.gatewayClientPlatformUserId ?? undefined,
       timeoutMs: params.timeoutMs,
+      resourceBudget,
       maxTokens: 2048,
       fallbacksOverride: ports.resolveFallbacks({
         cfg: params.config,
@@ -89,6 +99,7 @@ function bindGovernedUnderstanding(
       session,
       authorization: {
         agentId: params.agentId,
+        queueMaxWaitMs: resourceBudget.remainingQueueWaitMs(),
         ...(params.identity.executionIdentity?.collaborationGroupId
           ? { groupId: params.identity.executionIdentity.collaborationGroupId }
           : {}),

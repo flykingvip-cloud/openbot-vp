@@ -10,6 +10,16 @@
  */
 import { createHash } from "node:crypto";
 import type { Task } from "@openbot/collaboration-core";
+import {
+  authorizeAppointedProjectOwner,
+  bindingMembersFromRoster,
+  buildAuthoritativeResponsibility,
+  legalOrganizerId,
+  parseAppointedProjectOwner,
+  proposeAppointedProjectOwner,
+  type KnownBindingMember,
+} from "../../agent-runtime/policy/collaboration-current-goal-binding.js";
+import type { TaskResponsibility } from "../../agent-runtime/policy/collaboration-policy-model.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import type { GroupBoardClaimItem } from "../collaboration-dispatch/claim-contract.js";
@@ -63,6 +73,11 @@ export type ActivateCollaborationTaskInput = {
   title: string;
   message: string;
   actor: string;
+  /** User-appointed project owner; recorded separately from the standing group coordinator. */
+  appointedOwnerId?: string | null;
+  /** Standing group coordinator bot id; never used as a fallback project owner. */
+  coordinatorBotId?: string | null;
+  knownMembers?: readonly KnownBindingMember[] | null;
   goal?: string;
   acceptanceCriteria?: readonly string[];
   constraints?: readonly string[];
@@ -342,6 +357,10 @@ async function mutateCollaborationTaskObject(params: {
   cfg: OpenBotConfig;
   nowMs?: number;
   stores: TrustedGroupStores;
+  appointedOwnerId?: string | null;
+  coordinatorBotId?: string | null;
+  knownMembers?: readonly KnownBindingMember[] | null;
+  message?: string | null;
 }): Promise<EnsureTaskResult> {
   const now = params.nowMs ?? Date.now();
   const stores = params.stores;
@@ -400,30 +419,65 @@ async function mutateCollaborationTaskObject(params: {
       mergeActivationTag(existing.tags, params.activationKey),
       effectiveExtraTags,
     );
+    const existingResponsibility = (existing as Task & { responsibility?: TaskResponsibility })
+      .responsibility;
+    const appointment = parseAppointedProjectOwner({
+      message: params.message,
+      appointedOwnerId: params.appointedOwnerId,
+      knownMembers: params.knownMembers,
+    });
+    const responsibility = buildAuthoritativeResponsibility({
+      appointedOwnerId: appointment?.ownerId,
+      standingCoordinatorBotId: params.coordinatorBotId,
+      createdBy: compact(params.actor),
+      existingOwnerMemberId: existing.ownerMemberId,
+      existingResponsibility,
+      assignedMemberIds: existing.assignedMemberIds,
+    });
     const touched: Task = {
       ...existing,
       title: compact(params.title) || existing.title,
       status: nextStatus,
       tags,
+      ownerMemberId: (() => {
+        const organizer = legalOrganizerId(responsibility);
+        return organizer && organizer !== "group" ? organizer : existing.ownerMemberId;
+      })(),
       updatedBy: compact(params.actor) || existing.updatedBy,
       updatedAtMs: now,
-    };
+      responsibility,
+    } as Task;
     await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, touched);
     return { ok: true, task: touched, created: false };
   }
+  const appointment = parseAppointedProjectOwner({
+    message: params.message,
+    appointedOwnerId: params.appointedOwnerId,
+    knownMembers: params.knownMembers,
+  });
+  const responsibility = buildAuthoritativeResponsibility({
+    appointedOwnerId: appointment?.ownerId,
+    standingCoordinatorBotId: params.coordinatorBotId,
+    createdBy: compact(params.actor),
+    assignedMemberIds: compact(params.actor) ? [compact(params.actor)] : [],
+  });
   const created: Task = {
     taskId: params.taskId,
     groupId: params.groupId,
     title: compact(params.title) || params.taskId,
     status: params.readyRequested ? "ready" : "draft",
-    ownerMemberId: compact(params.actor) || undefined,
+    ownerMemberId: (() => {
+      const organizer = legalOrganizerId(responsibility);
+      return organizer && organizer !== "group" ? organizer : compact(params.actor) || undefined;
+    })(),
     assignedMemberIds: compact(params.actor) ? [compact(params.actor)] : [],
     tags: mergeExtraTags(mergeActivationTag(undefined, params.activationKey), effectiveExtraTags),
     createdBy: compact(params.actor) || undefined,
     updatedBy: compact(params.actor) || undefined,
     createdAtMs: now,
     updatedAtMs: now,
-  };
+    responsibility,
+  } as Task;
   await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, created);
   return { ok: true, task: created, created: true };
 }
@@ -442,6 +496,10 @@ async function ensureCollaborationTaskObject(params: {
   stores: TrustedGroupStores;
   /** When true, caller already holds withTaskControlLock. */
   alreadyLocked?: boolean;
+  appointedOwnerId?: string | null;
+  coordinatorBotId?: string | null;
+  knownMembers?: readonly KnownBindingMember[] | null;
+  message?: string | null;
 }): Promise<EnsureTaskResult> {
   const cfg = params.cfg ?? loadConfig();
   const run = () =>
@@ -456,6 +514,10 @@ async function ensureCollaborationTaskObject(params: {
       cfg,
       nowMs: params.nowMs,
       stores: params.stores,
+      appointedOwnerId: params.appointedOwnerId,
+      coordinatorBotId: params.coordinatorBotId,
+      knownMembers: params.knownMembers,
+      message: params.message,
     });
   try {
     if (params.alreadyLocked) {
@@ -659,6 +721,36 @@ export async function activateCollaborationTask(
   }
   const teamStores = storesResolved.stores;
 
+  const profile = await teamStores.groupStorage.readProfile(groupId).catch(() => null);
+  let rosterReadFailed = false;
+  let roster: Awaited<ReturnType<typeof teamStores.groupStorage.readMembers>> = [];
+  try {
+    roster = await teamStores.groupStorage.readMembers(groupId);
+  } catch {
+    rosterReadFailed = true;
+    roster = [];
+  }
+  // Current authority is the server-side roster, not request-body knownMembers.
+  const knownMembers = rosterReadFailed ? [] : bindingMembersFromRoster(roster ?? []);
+  const coordinatorBotId =
+    compact(params.coordinatorBotId) || compact(profile?.coordinatorBotId) || null;
+  const appointmentProposal = proposeAppointedProjectOwner({
+    message,
+    appointedOwnerId: params.appointedOwnerId,
+    knownMembers,
+  });
+  const appointedOwnerId = rosterReadFailed
+    ? null
+    : (authorizeAppointedProjectOwner({
+        proposal: appointmentProposal,
+        roster: { ok: true, members: knownMembers },
+      })?.ownerId ?? null);
+  const bindingFields = {
+    appointedOwnerId,
+    coordinatorBotId,
+    knownMembers,
+    message,
+  };
   const syncActivated = async (
     item: GroupBoardClaimItem,
     taskCreated: boolean,
@@ -869,6 +961,7 @@ ${message}`
       cfg,
       stores: teamStores,
       nowMs: params.nowMs,
+      ...bindingFields,
     });
     if (!ensured.ok) {
       return {
@@ -987,6 +1080,7 @@ ${message}`
           stores: teamStores,
           nowMs: params.nowMs,
           alreadyLocked: true,
+          ...bindingFields,
         });
         if (!ensured.ok) {
           return {
@@ -1062,6 +1156,7 @@ ${message}`
           stores: teamStores,
           nowMs: params.nowMs,
           alreadyLocked: true,
+          ...bindingFields,
         });
         if (!promoted.ok) {
           return {

@@ -49,6 +49,8 @@ export async function tryAcquireEnterpriseAgentRun(input: {
   /** Collaboration group id. Omit channel/session keys that are not mesh groups. */
   groupId?: string;
   modelGateInput?: EmployeeModelGateInput;
+  /** Interaction-only wait bound; execution callers omit this and keep the default. */
+  queueMaxWaitMs?: number;
 }): Promise<AcquireAgentRunResult> {
   const auth = await authorizeCommercialRun({
     runId: input.runId,
@@ -58,6 +60,7 @@ export async function tryAcquireEnterpriseAgentRun(input: {
     action: "agent_run",
     ...(input.groupId ? { groupId: input.groupId } : {}),
     ...(input.modelGateInput ? { modelGateInput: input.modelGateInput } : {}),
+    ...(input.queueMaxWaitMs !== undefined ? { queueMaxWaitMs: input.queueMaxWaitMs } : {}),
   });
 
   if (auth.skipped) {
