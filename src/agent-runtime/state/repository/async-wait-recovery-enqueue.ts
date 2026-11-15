@@ -234,6 +234,9 @@ export function createAsyncWaitRecoveryContinueEnqueue(
         timeoutMs: 120_000,
         blockReplyBreak: "message_end",
         ...(binding ? { taskCompletionBinding: binding } : {}),
+        ...(params.intent.recovery?.boundWorkspace
+          ? { executionWorkspaceBinding: params.intent.recovery.boundWorkspace }
+          : {}),
       },
     };
     const enqueued = enqueueFollowupRun(

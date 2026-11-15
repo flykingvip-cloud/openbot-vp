@@ -1970,6 +1970,15 @@ export async function runPreparedReply(
         ? { privateRunBag: sessionCtx.CollaborationPrivateRunBag }
         : {}),
       workspaceDir: runWorkspaceDir,
+      ...(boundRunWorkspace
+        ? {
+            executionWorkspaceBinding: {
+              resourceId: boundRunWorkspace.resourceId,
+              bindingId: boundRunWorkspace.bindingId,
+              contentVersion: boundRunWorkspace.contentVersion,
+            },
+          }
+        : {}),
       config: cfg,
       skillsSnapshot,
       provider,

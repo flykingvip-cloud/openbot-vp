@@ -14583,6 +14583,10 @@ tasks:
       - src/commands/agent-item7-s03.test.ts
       - src/auto-reply/reply/followup-runner.canonical-binding.test.ts
       - src/gateway/server-methods/steward-workspace-file.managed.test.ts
+      - src/auto-reply/reply/queue/types.ts
+      - src/agent-runtime/state/repository/async-wait-job-store.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-turn.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
       - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
     state: active
     sessions:
@@ -14614,6 +14618,10 @@ landingStreams:
       - src/commands/agent-item7-s03.test.ts
       - src/auto-reply/reply/followup-runner.canonical-binding.test.ts
       - src/gateway/server-methods/steward-workspace-file.managed.test.ts
+      - src/auto-reply/reply/queue/types.ts
+      - src/agent-runtime/state/repository/async-wait-job-store.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-turn.ts
+      - src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
       - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
     canLandWith: []
     metadata:
@@ -29846,6 +29854,22 @@ sharedPaths:
   - glob: src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
     landerTask: canonical-execution-workspace-20261114
     reason: New regression tests for the canonical execution-workspace contract on this baseline.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/queue/types.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Followup binding identity snapshot and delivery-only revalidation for the canonical workspace contract.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/state/repository/async-wait-job-store.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Followup binding identity snapshot and delivery-only revalidation for the canonical workspace contract.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/state/repository/async-wait-recovery-turn.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Followup binding identity snapshot and delivery-only revalidation for the canonical workspace contract.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Followup binding identity snapshot and delivery-only revalidation for the canonical workspace contract.
     reviewAfter: 2026-11-30
   - glob: src/exec-protocol/**
     landerTask: exec-protocol-v1-min-loop

@@ -127,6 +127,7 @@ async function resolveGroupAccessContext(params: {
   respond: GatewayRequestHandlerOptions["respond"];
   groupId: string;
   userId: string;
+  operation: WorkspaceResolveOperation;
 }): Promise<
   | {
       ok: true;
@@ -173,7 +174,7 @@ async function resolveGroupAccessContext(params: {
       client: params.client,
       agentId: "",
       groupId: params.groupId,
-      operation: "read",
+      operation: params.operation === "write" ? "write" : "read",
     });
     locator =
       bound?.rootPath ??
@@ -235,6 +236,7 @@ async function handleGroupFileOpen(params: {
     respond: params.respond,
     groupId,
     userId: context.userId,
+    operation: params.operation,
   });
   if (!access.ok) {
     return;
@@ -418,6 +420,7 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       respond,
       groupId,
       userId: context.userId,
+      operation: "write",
     });
     if (!access.ok) {
       return;
@@ -492,6 +495,7 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       respond,
       groupId,
       userId: context.userId,
+      operation: "write",
     });
     if (!access.ok) {
       return;
@@ -608,6 +612,7 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       respond,
       groupId,
       userId: context.userId,
+      operation: "list",
     });
     if (!access.ok) {
       return;
@@ -673,6 +678,7 @@ export const groupWorkspaceFileHandlers: GatewayRequestHandlers = {
       respond,
       groupId,
       userId: context.userId,
+      operation: "read",
     });
     if (!access.ok) {
       return;

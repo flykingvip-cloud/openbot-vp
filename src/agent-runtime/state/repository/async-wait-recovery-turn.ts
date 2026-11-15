@@ -85,6 +85,12 @@ export function bindAsyncWaitRecoveryTurn(input: {
   payloads?: readonly AsyncWaitBoundPayload[];
   /** Holder pid for prepare/cross-process liveness; defaults to process.pid on turn_bound. */
   holderPid?: number;
+  /** Original canonical workspace identity for delivery-only revalidation. */
+  boundWorkspace?: {
+    resourceId: string;
+    bindingId: string;
+    contentVersion: string;
+  };
 }): BindAsyncWaitRecoveryTurnResult {
   const tid = input.taskId.trim();
   const runId = input.runId.trim();
@@ -195,6 +201,11 @@ export function bindAsyncWaitRecoveryTurn(input: {
             }
           : {}),
         ...(holderPid !== undefined ? { holderPid } : { holderPid: undefined }),
+        ...(input.boundWorkspace
+          ? { boundWorkspace: input.boundWorkspace }
+          : current.recovery.boundWorkspace
+            ? { boundWorkspace: current.recovery.boundWorkspace }
+            : {}),
         lastAttemptAtMs: Date.now(),
       },
     };

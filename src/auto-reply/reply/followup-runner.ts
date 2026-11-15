@@ -82,6 +82,29 @@ import { isRoutableChannel, routeReply } from "./route-reply.js";
 import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
+const WORKSPACE_BINDING_CHANGED =
+  "workspace_binding_changed: queued workspace requires revalidation";
+
+function assertQueuedExecutionWorkspaceBinding(
+  queued: FollowupRun,
+  boundWorkspace: Awaited<ReturnType<typeof resolveExecutionWorkspace>>,
+): void {
+  if (!boundWorkspace) {
+    return;
+  }
+  const saved = queued.run.executionWorkspaceBinding;
+  const pathChanged = path.resolve(queued.run.workspaceDir) !== boundWorkspace.rootPath;
+  const identityChanged =
+    !saved ||
+    saved.bindingId !== boundWorkspace.bindingId ||
+    saved.resourceId !== boundWorkspace.resourceId ||
+    saved.contentVersion !== boundWorkspace.contentVersion;
+  if (pathChanged || identityChanged) {
+    // Same directory with a new bindingId or contentVersion is still a switch.
+    throw new Error(WORKSPACE_BINDING_CHANGED);
+  }
+}
+
 export function createFollowupRunner(params: {
   opts?: GetReplyOptions;
   typing: TypingController;
@@ -161,18 +184,69 @@ export function createFollowupRunner(params: {
   };
 
   return async (queued: FollowupRun) => {
-    const boundWorkspace = await resolveExecutionWorkspace({
-      cfg: queued.run.config,
-      agentId: queued.run.agentId,
-      client: queued.run.executionIdentity
-        ? toRestrictedGatewayClient(queued.run.executionIdentity)
-        : buildKnowledgeReplyGatewayClient(queued.run),
-      groupId: queued.run.executionIdentity?.collaborationGroupId,
-      operation: "write",
-    });
-    if (boundWorkspace && path.resolve(queued.run.workspaceDir) !== boundWorkspace.rootPath) {
-      // A queued continuation cannot silently move its files to a new binding.
-      throw new Error("workspace_binding_changed: queued workspace requires revalidation");
+    const confirmDeliveryOnlyFailure = async (error: string) => {
+      const lookupRunId =
+        queued.asyncWaitRecoveryBind?.boundRunId?.trim() ||
+        queued.run.taskCompletionBinding?.executionAttempt?.trim() ||
+        "";
+      const pending = lookupRunId
+        ? peekAwaitingDelivery({
+            runId: lookupRunId,
+            ...(queued.asyncWaitRecoveryBind?.boundDeliveryId
+              ? { deliveryId: queued.asyncWaitRecoveryBind.boundDeliveryId }
+              : {}),
+          })
+        : undefined;
+      const deliveryRunId = pending?.runId || lookupRunId;
+      const deliveryId =
+        queued.asyncWaitRecoveryBind?.boundDeliveryId?.trim() ||
+        pending?.deliveryId ||
+        (deliveryRunId ? `delivery:${deliveryRunId}:visible` : "");
+      const taskId = pending?.taskId;
+      if (!deliveryRunId && !deliveryId) {
+        return;
+      }
+      await confirmPendingTurnDelivery({
+        cfg: queued.run.config,
+        ...(deliveryRunId ? { runId: deliveryRunId } : {}),
+        ...(deliveryId ? { deliveryId } : {}),
+        ...(taskId ? { taskId } : {}),
+        sessionKey: queued.run.sessionKey ?? sessionKey,
+        status: "failed",
+        error,
+      });
+    };
+
+    // Delivery-only retries resend original payloads and do not mutate the workspace,
+    // so they revalidate with read permission. A read_only binding must not block resend.
+    try {
+      const boundWorkspace = await resolveExecutionWorkspace({
+        cfg: queued.run.config,
+        agentId: queued.run.agentId,
+        client: queued.run.executionIdentity
+          ? toRestrictedGatewayClient(queued.run.executionIdentity)
+          : buildKnowledgeReplyGatewayClient(queued.run),
+        groupId: queued.run.executionIdentity?.collaborationGroupId,
+        operation: queued.asyncWaitDeliveryOnly ? "read" : "write",
+      });
+      assertQueuedExecutionWorkspaceBinding(queued, boundWorkspace);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (queued.asyncWaitDeliveryOnly) {
+        logVerbose(`async-wait delivery-only workspace revalidation failed: ${message}`);
+        try {
+          await confirmDeliveryOnlyFailure(message);
+        } catch (confirmErr) {
+          logVerbose(`async-wait delivery-only failure confirm failed: ${String(confirmErr)}`);
+        } finally {
+          typing.markRunComplete();
+          typing.markDispatchIdle();
+        }
+        // Do not throw: drain can shift the item. A throw would reschedule
+        // the same retry, including against a new binding at the same path.
+        return;
+      }
+      throw err;
     }
     // Agent run correlation id (may differ across retries of the same queue item).
     const runId = crypto.randomUUID();
@@ -814,6 +888,9 @@ export function createFollowupRunner(params: {
                   queued.run.taskCompletionBinding.deliverableVersion ?? identity.runId,
                 // Persist original visible payloads for delivery-only retry.
                 payloads: finalPayloads,
+                ...(queued.run.executionWorkspaceBinding
+                  ? { boundWorkspace: queued.run.executionWorkspaceBinding }
+                  : {}),
               });
               if (!bound.accepted) {
                 logVerbose(
