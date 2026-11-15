@@ -7,7 +7,7 @@ import { completeReplyDelivery } from "./complete-reply.js";
 function fixture() {
   return {
     runId: "run-a",
-    language: "en" as const,
+    language: "en" as "en" | "zh",
     readContract: vi.fn(() => ({
       id: "code-v1",
       version: "1",
@@ -243,4 +243,70 @@ describe("terminal reply delivery", () => {
       expect(ports.finalize).toHaveBeenCalledOnce();
     },
   );
+});
+
+const PENDING_NOTICE = "成果已生成，任务仍待验收，尚未确认全部要求已满足。";
+it("shows pending acceptance for a host-bound task without rerunning work or changing outcome", () => {
+  const ports = fixture();
+  ports.language = "zh";
+  const artifact = { text: "报告已生成", mediaUrl: "report.md" };
+  const result = completeReplyDelivery(
+    { kind: "visible", payloads: [artifact], acceptanceStatus: "pending", taskBound: true },
+    ports,
+  );
+  expect(result).toEqual({ ...artifact, text: `报告已生成\n\n${PENDING_NOTICE}` });
+  expect(artifact.text).toBe("报告已生成");
+  expect(ports.commitOutcome).not.toHaveBeenCalled();
+  expect(ports.considerContinuation).not.toHaveBeenCalled();
+});
+it.each(["passed", "not_required"] as const)(
+  "does not add pending notice to bound %s work",
+  (acceptanceStatus) => {
+    const ports = fixture();
+    expect(
+      completeReplyDelivery(
+        { kind: "visible", payloads: [{ text: "result" }], acceptanceStatus, taskBound: true },
+        ports,
+      ),
+    ).toEqual({ text: "result" });
+  },
+);
+it("leaves an unbound current-turn reply unchanged even if acceptance is pending", () => {
+  const ports = fixture();
+  expect(
+    completeReplyDelivery(
+      { kind: "visible", payloads: [{ text: "hello" }], acceptanceStatus: "pending" },
+      ports,
+    ),
+  ).toEqual({ text: "hello" });
+});
+it("keeps media-only pending task output and discloses the wait in one text receipt", () => {
+  const ports = fixture();
+  ports.language = "zh";
+  expect(
+    completeReplyDelivery(
+      {
+        kind: "visible",
+        payloads: [{ mediaUrl: "report.pdf" }],
+        acceptanceStatus: "pending",
+        taskBound: true,
+      },
+      ports,
+    ),
+  ).toEqual([{ mediaUrl: "report.pdf" }, { text: PENDING_NOTICE }]);
+});
+it("preserves the user's English reply language for pending task acceptance", () => {
+  const ports = fixture();
+  const result = completeReplyDelivery(
+    {
+      kind: "visible",
+      payloads: [{ text: "Report ready" }],
+      acceptanceStatus: "pending",
+      taskBound: true,
+    },
+    ports,
+  );
+  expect(result).toEqual({
+    text: "Report ready\n\nThe result is ready, but task acceptance is still pending; not all requirements have been verified.",
+  });
 });
