@@ -1823,3 +1823,27 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     });
   }, 30_000);
 });
+
+it("live seam: observation timestamp changes during understanding do not revoke an unchanged work proposal", async () => {
+  const fixture = await isolateTrustedGroupGateway();
+  completeMock.mockImplementation(async (...args: unknown[]) => {
+    const live = liveMessageFromCompleteArgs(args);
+    const osPath = path.join(fixture.groupDir, "operating-state.json");
+    const state = JSON.parse(fs.readFileSync(osPath, "utf8"));
+    fs.writeFileSync(osPath, JSON.stringify({ ...state, updatedAtMs: state.updatedAtMs + 100 }));
+    return {
+      role: "assistant",
+      content: [{ type: "text", text: JSON.stringify(decisionForLiveMessage(live)) }],
+      usage: makeZeroUsageSnapshot(),
+      stopReason: "stop",
+    };
+  });
+  const dispatchSpy = vi.spyOn(dispatchModule, "dispatchInboundMessage");
+  const context = createChatContext();
+  const runId = `run-observation-${path.basename(fixture.root)}`;
+  const sent = await sendGroupChat({ fixture, context, runId, message: WORK_MESSAGE });
+  await vi.waitFor(() => expect(findTerminal(context, runId)).toBeTruthy(), { timeout: 15000 });
+  await sent.pending;
+  expect(payloadText(findTerminal(context, runId))).not.toContain("当前群状态已更新");
+  expect(dispatchSpy).toHaveBeenCalled();
+});
