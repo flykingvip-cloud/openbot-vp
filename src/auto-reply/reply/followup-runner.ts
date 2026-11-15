@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import path from "node:path";
 import { deliverQueuedReply } from "../../agent-runtime/delivery/index.js";
 import {
   assertControlledExecutionStages,
@@ -19,7 +18,9 @@ import {
   persistRunSessionUsage,
 } from "../../agent-runtime/state/index.js";
 import {
-  recordBlockedFollowupDelivery,
+  findBlockedFollowupDelivery,
+  planFollowupRecoveryRetry,
+  recordFollowupWorkspaceDecision,
   resolveBlockedFollowupDeliveryPersistRoot,
 } from "../../agent-runtime/state/repository/blocked-followup-delivery.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
@@ -70,6 +71,14 @@ import type { OriginatingChannelType } from "../templating.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
 import { buildCommercialRunCreditUsageInput } from "./agent-run-credit-usage.js";
 import {
+  classifyFollowupWorkspaceChange,
+  loadFollowupRevalidationEvidence,
+  resolveWorkspaceRealpath,
+  type FollowupWorkspaceClassification,
+  type FollowupWorkspaceCurrentEvidence,
+  type FollowupWorkspaceSnapshot,
+} from "./followup-workspace-change.js";
+import {
   resolveOriginAccountId,
   resolveOriginMessageProvider,
   resolveOriginMessageTo,
@@ -86,26 +95,90 @@ import { isRoutableChannel, routeReply } from "./route-reply.js";
 import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
-const WORKSPACE_BINDING_CHANGED =
-  "workspace_binding_changed: queued workspace requires revalidation";
+function snapshotFromQueued(queued: FollowupRun): FollowupWorkspaceSnapshot {
+  return {
+    ...queued.run.executionWorkspaceBinding,
+    workspaceDir: queued.run.workspaceDir,
+  };
+}
 
-function assertQueuedExecutionWorkspaceBinding(
+function currentEvidenceFromBinding(
+  boundWorkspace: NonNullable<Awaited<ReturnType<typeof resolveExecutionWorkspace>>>,
+  operationAllowed: boolean,
+): FollowupWorkspaceCurrentEvidence {
+  return {
+    resourceId: boundWorkspace.resourceId,
+    bindingId: boundWorkspace.bindingId,
+    contentVersion: boundWorkspace.contentVersion,
+    rootPath: boundWorkspace.rootPath,
+    realpath: resolveWorkspaceRealpath(boundWorkspace.rootPath) || boundWorkspace.rootPath,
+    tenantId: boundWorkspace.tenantId,
+    owner: boundWorkspace.owner,
+    lifecycleState: boundWorkspace.lifecycleState,
+    bindingState: boundWorkspace.bindingState,
+    operationAllowed,
+  };
+}
+
+function applyWorkspaceContinuation(
   queued: FollowupRun,
-  boundWorkspace: Awaited<ReturnType<typeof resolveExecutionWorkspace>>,
+  boundWorkspace: NonNullable<Awaited<ReturnType<typeof resolveExecutionWorkspace>>>,
+  classification: FollowupWorkspaceClassification,
 ): void {
-  if (!boundWorkspace) {
-    return;
+  if (classification.pathNormalization || classification.migration) {
+    queued.run.workspaceDir = boundWorkspace.rootPath;
   }
-  const saved = queued.run.executionWorkspaceBinding;
-  const pathChanged = path.resolve(queued.run.workspaceDir) !== boundWorkspace.rootPath;
-  const identityChanged =
-    !saved ||
-    saved.bindingId !== boundWorkspace.bindingId ||
-    saved.resourceId !== boundWorkspace.resourceId ||
-    saved.contentVersion !== boundWorkspace.contentVersion;
-  if (pathChanged || identityChanged) {
-    // Same directory with a new bindingId or contentVersion is still a switch.
-    throw new Error(WORKSPACE_BINDING_CHANGED);
+  queued.run.executionWorkspaceBinding = {
+    resourceId: boundWorkspace.resourceId,
+    bindingId: boundWorkspace.bindingId,
+    contentVersion: boundWorkspace.contentVersion,
+    ...(boundWorkspace.tenantId ? { tenantId: boundWorkspace.tenantId } : {}),
+    ...(boundWorkspace.owner ? { owner: boundWorkspace.owner } : {}),
+    ...(boundWorkspace.lifecycleState ? { lifecycleState: boundWorkspace.lifecycleState } : {}),
+    ...(boundWorkspace.bindingState ? { bindingState: boundWorkspace.bindingState } : {}),
+  };
+}
+
+async function persistWorkspaceDecision(params: {
+  queued: FollowupRun;
+  sessionKey?: string;
+  classification: FollowupWorkspaceClassification;
+  error?: string;
+  reasonOverride?: string;
+  statusOverride?: "recoverable_wait" | "reauthorization_required" | "denied" | "continued";
+  pendingDestination?: FollowupWorkspaceClassification["destination"];
+  runId?: string;
+  deliveryId?: string;
+  taskId?: string;
+  id?: string;
+  retryCount?: number;
+  retryCap?: number;
+}): Promise<boolean> {
+  try {
+    await recordFollowupWorkspaceDecision({
+      persistRoot: resolveBlockedFollowupDeliveryPersistRoot(params.queued.run.sessionFile),
+      id: params.id,
+      classification: params.classification,
+      error: params.error ?? params.classification.reason,
+      reasonOverride: params.reasonOverride,
+      statusOverride: params.statusOverride,
+      pendingDestination: params.pendingDestination,
+      retryCount: params.retryCount,
+      retryCap: params.retryCap,
+      sessionKey: params.queued.run.sessionKey ?? params.sessionKey,
+      sessionFile: params.queued.run.sessionFile,
+      ...(params.queued.asyncWaitRecoveryBind?.jobId
+        ? { jobId: params.queued.asyncWaitRecoveryBind.jobId }
+        : {}),
+      ...(params.runId ? { runId: params.runId } : {}),
+      ...(params.deliveryId ? { deliveryId: params.deliveryId } : {}),
+      ...(params.taskId ? { taskId: params.taskId } : {}),
+      workspaceBinding: snapshotFromQueued(params.queued),
+    });
+    return true;
+  } catch (recordErr) {
+    logVerbose(`followup workspace decision record failed: ${String(recordErr)}`);
+    return false;
   }
 }
 
@@ -188,102 +261,229 @@ export function createFollowupRunner(params: {
   };
 
   return async (queued: FollowupRun) => {
-    const confirmDeliveryOnlyFailure = async (error: string): Promise<boolean> => {
-      const lookupRunId =
-        queued.asyncWaitRecoveryBind?.boundRunId?.trim() ||
-        queued.run.taskCompletionBinding?.executionAttempt?.trim() ||
-        "";
-      const pending = lookupRunId
-        ? peekAwaitingDelivery({
-            runId: lookupRunId,
-            ...(queued.asyncWaitRecoveryBind?.boundDeliveryId
-              ? { deliveryId: queued.asyncWaitRecoveryBind.boundDeliveryId }
-              : {}),
-          })
-        : undefined;
-      const deliveryRunId = pending?.runId || lookupRunId;
-      const deliveryId =
-        queued.asyncWaitRecoveryBind?.boundDeliveryId?.trim() ||
-        pending?.deliveryId ||
-        (deliveryRunId ? `delivery:${deliveryRunId}:visible` : "");
-      const taskId = pending?.taskId;
-      const hasIdentity = Boolean(deliveryRunId || deliveryId);
-      if (hasIdentity) {
-        try {
-          await confirmPendingTurnDelivery({
-            cfg: queued.run.config,
-            ...(deliveryRunId ? { runId: deliveryRunId } : {}),
-            ...(deliveryId ? { deliveryId } : {}),
-            ...(taskId ? { taskId } : {}),
-            sessionKey: queued.run.sessionKey ?? sessionKey,
-            status: "failed",
-            error,
-          });
-          return true;
-        } catch (confirmErr) {
-          logVerbose(`async-wait delivery-only failure confirm failed: ${String(confirmErr)}`);
-        }
-      }
-      try {
-        await recordBlockedFollowupDelivery({
-          persistRoot: resolveBlockedFollowupDeliveryPersistRoot(queued.run.sessionFile),
-          reason: hasIdentity ? "failure_receipt_write_failed" : "missing_delivery_identity",
-          error,
-          sessionKey: queued.run.sessionKey ?? sessionKey,
-          sessionFile: queued.run.sessionFile,
-          ...(queued.asyncWaitRecoveryBind?.jobId
-            ? { jobId: queued.asyncWaitRecoveryBind.jobId }
-            : {}),
-          ...(deliveryRunId ? { runId: deliveryRunId } : {}),
-          ...(deliveryId ? { deliveryId } : {}),
-          ...(taskId ? { taskId } : {}),
-          workspaceBinding: {
-            ...queued.run.executionWorkspaceBinding,
-            workspaceDir: queued.run.workspaceDir,
-          },
-        });
-        return true;
-      } catch (recordErr) {
-        logVerbose(`async-wait delivery-only blocked record failed: ${String(recordErr)}`);
-        return false;
-      }
-    };
-
     // Delivery-only retries resend original payloads and do not mutate the workspace,
     // so they revalidate with read permission. A read_only binding must not block resend.
+    const requiredOperation = queued.asyncWaitDeliveryOnly ? "read" : "write";
+    let boundWorkspace: Awaited<ReturnType<typeof resolveExecutionWorkspace>> = null;
+    let resolveError: string | undefined;
     try {
-      const boundWorkspace = await resolveExecutionWorkspace({
+      boundWorkspace = await resolveExecutionWorkspace({
         cfg: queued.run.config,
         agentId: queued.run.agentId,
         client: queued.run.executionIdentity
           ? toRestrictedGatewayClient(queued.run.executionIdentity)
           : buildKnowledgeReplyGatewayClient(queued.run),
         groupId: queued.run.executionIdentity?.collaborationGroupId,
-        operation: queued.asyncWaitDeliveryOnly ? "read" : "write",
+        operation: requiredOperation,
       });
-      assertQueuedExecutionWorkspaceBinding(queued, boundWorkspace);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (queued.asyncWaitDeliveryOnly) {
-        logVerbose(`async-wait delivery-only workspace revalidation failed: ${message}`);
-        let recorded = false;
+      resolveError = err instanceof Error ? err.message : String(err);
+    }
+
+    const lookupRunIdForDecision =
+      queued.asyncWaitRecoveryBind?.boundRunId?.trim() ||
+      queued.run.taskCompletionBinding?.executionAttempt?.trim() ||
+      "";
+    const pendingForDecision = lookupRunIdForDecision
+      ? peekAwaitingDelivery({
+          runId: lookupRunIdForDecision,
+          ...(queued.asyncWaitRecoveryBind?.boundDeliveryId
+            ? { deliveryId: queued.asyncWaitRecoveryBind.boundDeliveryId }
+            : {}),
+        })
+      : undefined;
+    const decisionRunId = pendingForDecision?.runId || lookupRunIdForDecision;
+    const decisionDeliveryId =
+      queued.asyncWaitRecoveryBind?.boundDeliveryId?.trim() ||
+      pendingForDecision?.deliveryId ||
+      (decisionRunId ? `delivery:${decisionRunId}:visible` : "");
+    const decisionTaskId = pendingForDecision?.taskId;
+    const hasDeliveryIdentity = Boolean(decisionRunId || decisionDeliveryId);
+    let existingRecovery = undefined as ReturnType<typeof findBlockedFollowupDelivery> | undefined;
+    if (queued.run.sessionFile) {
+      try {
+        existingRecovery = findBlockedFollowupDelivery(
+          resolveBlockedFollowupDeliveryPersistRoot(queued.run.sessionFile),
+          {
+            ...(queued.asyncWaitRecoveryBind?.jobId
+              ? { jobId: queued.asyncWaitRecoveryBind.jobId }
+              : {}),
+            ...(decisionRunId ? { runId: decisionRunId } : {}),
+            ...(decisionDeliveryId ? { deliveryId: decisionDeliveryId } : {}),
+          },
+        );
+      } catch {
+        existingRecovery = undefined;
+      }
+    }
+
+    const settleNonContinue = async (
+      classification: FollowupWorkspaceClassification,
+    ): Promise<void> => {
+      const existing = existingRecovery;
+      const retryCount =
+        classification.destination === "recoverable_wait" && existing?.status === "recoverable_wait"
+          ? (existing.retryCount ?? 0) + 1
+          : (existing?.retryCount ?? 0);
+      const persistDecision = async (opts?: {
+        reasonOverride?: string;
+        statusOverride?: "recoverable_wait" | "reauthorization_required" | "denied" | "continued";
+        pendingDestination?: FollowupWorkspaceClassification["destination"];
+        error?: string;
+      }): Promise<boolean> =>
+        persistWorkspaceDecision({
+          queued,
+          sessionKey,
+          classification,
+          runId: decisionRunId,
+          deliveryId: decisionDeliveryId,
+          taskId: decisionTaskId,
+          id: existing?.id,
+          retryCount,
+          retryCap: existing?.retryCap,
+          ...opts,
+        });
+
+      let recorded = false;
+      if (classification.destination === "denied" && hasDeliveryIdentity) {
         try {
-          recorded = await confirmDeliveryOnlyFailure(message);
+          await confirmPendingTurnDelivery({
+            cfg: queued.run.config,
+            ...(decisionRunId ? { runId: decisionRunId } : {}),
+            ...(decisionDeliveryId ? { deliveryId: decisionDeliveryId } : {}),
+            ...(decisionTaskId ? { taskId: decisionTaskId } : {}),
+            sessionKey: queued.run.sessionKey ?? sessionKey,
+            status: "failed",
+            error: classification.reason,
+          });
+          recorded = await persistDecision({
+            statusOverride: "denied",
+          });
         } catch (confirmErr) {
           logVerbose(`async-wait delivery-only failure confirm failed: ${String(confirmErr)}`);
-        } finally {
-          typing.markRunComplete();
-          typing.markDispatchIdle();
+          recorded = await persistDecision({
+            reasonOverride: "failure_receipt_write_failed",
+            statusOverride: "recoverable_wait",
+            pendingDestination: "denied",
+            error: classification.reason,
+          });
         }
-        // Drop the queue item only after a failed receipt or durable blocked
-        // record is saved. Never send against a new binding. If even the
-        // durable fallback cannot be saved, rethrow so drain keeps the item.
-        if (!recorded) {
-          throw err;
+      } else if (classification.destination === "denied" && !hasDeliveryIdentity) {
+        recorded = await persistDecision({
+          reasonOverride: "missing_delivery_identity",
+          statusOverride: "recoverable_wait",
+          pendingDestination: "denied",
+          error: classification.reason,
+        });
+      } else {
+        recorded = await persistDecision();
+      }
+
+      if (queued.asyncWaitDeliveryOnly) {
+        typing.markRunComplete();
+        typing.markDispatchIdle();
+      }
+      // Drop the queue item only after the destination is durably recorded.
+      // Never send against a new unverified binding. If even the durable
+      // state cannot be saved, rethrow so drain keeps the item for a later
+      // bounded persist retry.
+      if (!recorded) {
+        throw new Error(classification.reason);
+      }
+    };
+
+    if (boundWorkspace) {
+      const evidence = await loadFollowupRevalidationEvidence({
+        resourceId: queued.run.executionWorkspaceBinding?.resourceId || boundWorkspace.resourceId,
+        sessionFile: queued.run.sessionFile,
+        saved: snapshotFromQueued(queued),
+        current: currentEvidenceFromBinding(boundWorkspace, true),
+      });
+      const classification = classifyFollowupWorkspaceChange({
+        saved: snapshotFromQueued(queued),
+        current: currentEvidenceFromBinding(boundWorkspace, true),
+        savedRealpath: resolveWorkspaceRealpath(queued.run.workspaceDir),
+        requiredOperation,
+        verifiedMigration: evidence.verifiedMigration,
+        savedCatalogLifecycle: evidence.savedCatalogLifecycle,
+        savedCatalogOwner: evidence.savedCatalogOwner,
+        savedCatalogTenantId: evidence.savedCatalogTenantId,
+        trustedTenantId: boundWorkspace.tenantId,
+      });
+
+      // Prior authorization or denial records must not auto-continue.
+      if (
+        existingRecovery &&
+        (existingRecovery.status === "reauthorization_required" ||
+          existingRecovery.status === "denied")
+      ) {
+        const plan = planFollowupRecoveryRetry(existingRecovery);
+        if (plan.action === "await_reauthorization" || plan.action === "closed") {
+          await settleNonContinue({
+            ...classification,
+            destination:
+              existingRecovery.status === "denied" ? "denied" : "reauthorization_required",
+            reason: existingRecovery.reason,
+            code: existingRecovery.status === "denied" ? "denied" : "reauthorization_required",
+            askUser: existingRecovery.status === "reauthorization_required",
+            askUserDetail: existingRecovery.reauthorization?.detail,
+            reauthorization: existingRecovery.reauthorization,
+          });
+          return;
         }
+      }
+
+      if (classification.destination === "continue") {
+        if (
+          classification.code !== "unchanged" ||
+          classification.contentVersionChange ||
+          classification.pathNormalization ||
+          classification.migration
+        ) {
+          const continued = await persistWorkspaceDecision({
+            queued,
+            sessionKey,
+            classification,
+            runId: decisionRunId,
+            deliveryId: decisionDeliveryId,
+            taskId: decisionTaskId,
+            id: existingRecovery?.id,
+          });
+          if (!continued && classification.code !== "unchanged") {
+            // Version or migration should be recorded; retry persist later.
+            if (queued.asyncWaitDeliveryOnly) {
+              typing.markRunComplete();
+              typing.markDispatchIdle();
+            }
+            throw new Error(classification.reason);
+          }
+        }
+        applyWorkspaceContinuation(queued, boundWorkspace, classification);
+      } else {
+        await settleNonContinue(classification);
         return;
       }
-      throw err;
+    } else if (resolveError) {
+      const evidence = await loadFollowupRevalidationEvidence({
+        resourceId: queued.run.executionWorkspaceBinding?.resourceId,
+        sessionFile: queued.run.sessionFile,
+        saved: snapshotFromQueued(queued),
+      });
+      const classification = classifyFollowupWorkspaceChange({
+        saved: snapshotFromQueued(queued),
+        current: null,
+        resolveError,
+        requiredOperation,
+        verifiedMigration: evidence.verifiedMigration,
+        savedCatalogLifecycle: evidence.savedCatalogLifecycle,
+        savedCatalogOwner: evidence.savedCatalogOwner,
+        savedCatalogTenantId: evidence.savedCatalogTenantId,
+      });
+      if (classification.destination === "continue") {
+        throw new Error(resolveError);
+      }
+      await settleNonContinue(classification);
+      return;
     }
     // Agent run correlation id (may differ across retries of the same queue item).
     const runId = crypto.randomUUID();

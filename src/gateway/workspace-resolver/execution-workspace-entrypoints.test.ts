@@ -28,7 +28,7 @@ const entrypoints = [
   {
     name: "Followup queued runner",
     file: "src/auto-reply/reply/followup-runner.ts",
-    rootAssign: "workspace_binding_changed",
+    rootAssign: "boundWorkspace.rootPath",
   },
 ] as const;
 

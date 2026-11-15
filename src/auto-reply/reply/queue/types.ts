@@ -128,6 +128,14 @@ export type FollowupRun = {
       resourceId: string;
       bindingId: string;
       contentVersion: string;
+      tenantId?: string;
+      owner?:
+        | { kind: "user"; userId: string }
+        | { kind: "position"; seatId: string }
+        | { kind: "group"; groupId: string }
+        | { kind: "system"; systemId: string };
+      lifecycleState?: string;
+      bindingState?: string;
     };
     config: OpenBotConfig;
     skillsSnapshot?: SkillSnapshot;

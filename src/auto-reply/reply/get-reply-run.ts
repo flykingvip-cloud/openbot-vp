@@ -1976,6 +1976,14 @@ export async function runPreparedReply(
               resourceId: boundRunWorkspace.resourceId,
               bindingId: boundRunWorkspace.bindingId,
               contentVersion: boundRunWorkspace.contentVersion,
+              ...(boundRunWorkspace.tenantId ? { tenantId: boundRunWorkspace.tenantId } : {}),
+              ...(boundRunWorkspace.owner ? { owner: boundRunWorkspace.owner } : {}),
+              ...(boundRunWorkspace.lifecycleState
+                ? { lifecycleState: boundRunWorkspace.lifecycleState }
+                : {}),
+              ...(boundRunWorkspace.bindingState
+                ? { bindingState: boundRunWorkspace.bindingState }
+                : {}),
             },
           }
         : {}),

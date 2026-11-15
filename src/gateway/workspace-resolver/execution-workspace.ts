@@ -12,11 +12,21 @@ import { resolveSecurityProfile } from "../security-profile.js";
 import type { GatewayClient } from "../server-methods/types.js";
 import { isFilesystemWorkspaceLocator } from "./write-roots.js";
 
+export type ExecutionWorkspaceOwner =
+  | { kind: "user"; userId: string }
+  | { kind: "position"; seatId: string }
+  | { kind: "group"; groupId: string }
+  | { kind: "system"; systemId: string };
+
 export type ExecutionWorkspaceBinding = {
   resourceId: string;
   bindingId: string;
   contentVersion: string;
   rootPath: string;
+  tenantId?: string;
+  owner?: ExecutionWorkspaceOwner;
+  lifecycleState?: string;
+  bindingState?: "active" | "read_only" | "retired";
 };
 
 /** Identity must already be authenticated/admitted by the entry point.
@@ -129,6 +139,10 @@ export function selectExecutionWorkspace(params: {
     bindingId: binding.bindingId,
     contentVersion: binding.contentVersion,
     rootPath: real,
+    tenantId: record.envelope.tenantId ?? params.tenantId,
+    owner: record.envelope.owner,
+    lifecycleState: record.envelope.lifecycleState,
+    bindingState: binding.state,
   };
 }
 

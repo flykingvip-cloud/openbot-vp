@@ -14588,6 +14588,8 @@ tasks:
       - src/agent-runtime/state/repository/async-wait-recovery-turn.ts
       - src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
       - src/agent-runtime/state/repository/blocked-followup-delivery.ts
+      - src/auto-reply/reply/followup-workspace-change.ts
+      - src/auto-reply/reply/followup-workspace-change.test.ts
       - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
     state: active
     sessions:
@@ -14624,6 +14626,8 @@ landingStreams:
       - src/agent-runtime/state/repository/async-wait-recovery-turn.ts
       - src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
       - src/agent-runtime/state/repository/blocked-followup-delivery.ts
+      - src/auto-reply/reply/followup-workspace-change.ts
+      - src/auto-reply/reply/followup-workspace-change.test.ts
       - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
     canLandWith: []
     metadata:
@@ -29876,6 +29880,14 @@ sharedPaths:
   - glob: src/agent-runtime/state/repository/blocked-followup-delivery.ts
     landerTask: canonical-execution-workspace-20261114
     reason: Durable blocked followup delivery record when a failure receipt cannot be saved.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/followup-workspace-change.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Followup workspace change classification and recoverable continuation for the canonical workspace contract.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/followup-workspace-change.test.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Decision-table tests for followup workspace change classification and recoverable continuation.
     reviewAfter: 2026-11-30
   - glob: src/exec-protocol/**
     landerTask: exec-protocol-v1-min-loop

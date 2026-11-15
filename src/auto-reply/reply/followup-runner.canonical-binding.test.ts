@@ -5,8 +5,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   findBlockedFollowupDelivery,
   listBlockedFollowupDeliveries,
+  listRecoverableFollowupDeliveries,
+  planFollowupRecoveryRetry,
 } from "../../agent-runtime/state/repository/blocked-followup-delivery.js";
 import { drainNextQueueItem } from "../../utils/queue-helpers.js";
+import type { VerifiedMigrationReceiptEvidence } from "./followup-workspace-change.js";
 import type { FollowupRun } from "./queue.js";
 import { createMockTypingController } from "./test-helpers.js";
 
@@ -14,6 +17,8 @@ const resolveExecutionWorkspace = vi.fn();
 const confirmPendingTurnDelivery = vi.fn();
 const peekAwaitingDelivery = vi.fn();
 const deliverQueuedReply = vi.fn();
+const loadFollowupRevalidationEvidence = vi.fn();
+const runQueuedCandidate = vi.fn();
 
 vi.mock("../../gateway/workspace-resolver/execution-workspace.js", () => ({
   resolveExecutionWorkspace: (...args: unknown[]) => resolveExecutionWorkspace(...args),
@@ -35,20 +40,43 @@ vi.mock("../../agent-runtime/delivery/index.js", async (importOriginal) => {
   };
 });
 
+vi.mock("../../agent-runtime/execution/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../agent-runtime/execution/index.js")>();
+  return {
+    ...actual,
+    runQueuedCandidate: (...args: unknown[]) => runQueuedCandidate(...args),
+  };
+});
+
+vi.mock("./followup-workspace-change.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./followup-workspace-change.js")>();
+  return {
+    ...actual,
+    loadFollowupRevalidationEvidence: (...args: unknown[]) =>
+      loadFollowupRevalidationEvidence(...args),
+  };
+});
+
 const { createFollowupRunner } = await import("./followup-runner.js");
 
-const ROOT = path.resolve("/tmp/canonical-followup-root");
+const ROOT_ALIAS = path.resolve("/tmp/canonical-followup-root");
+fs.mkdirSync(ROOT_ALIAS, { recursive: true });
+const ROOT = fs.realpathSync(ROOT_ALIAS);
 const BINDING = {
   resourceId: "ws:tenant:seat:seat:asset:asset",
   bindingId: "binding",
   contentVersion: "2",
   rootPath: ROOT,
+  tenantId: "tenant",
+  owner: { kind: "position" as const, seatId: "seat" },
+  lifecycleState: "active",
+  bindingState: "active" as const,
 };
 
 const tempRoots: string[] = [];
 
 function makeSessionFile(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "t169-blocked-followup-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "t170-followup-"));
   tempRoots.push(root);
   return path.join(root, "session.jsonl");
 }
@@ -74,7 +102,7 @@ function queuedRun(
       agentId: "robot",
       messageProvider: "whatsapp",
       agentAccountId: "primary",
-      sessionFile: "/tmp/session.jsonl",
+      sessionFile: makeSessionFile(),
       workspaceDir,
       config: {},
       skillsSnapshot: {},
@@ -119,6 +147,10 @@ function queuedBinding() {
     resourceId: BINDING.resourceId,
     bindingId: BINDING.bindingId,
     contentVersion: BINDING.contentVersion,
+    tenantId: BINDING.tenantId,
+    owner: BINDING.owner,
+    lifecycleState: BINDING.lifecycleState,
+    bindingState: BINDING.bindingState,
   };
 }
 
@@ -144,7 +176,7 @@ function deliveryOnlyQueued(
   });
 }
 
-function mockSamePathBindingChange() {
+function mockUnverifiedBindingChange() {
   resolveExecutionWorkspace.mockResolvedValue({
     ...BINDING,
     bindingId: "binding-rotated",
@@ -168,54 +200,98 @@ function readBlockedRecordsFromDisk(persistRoot: string) {
 }
 
 beforeEach(() => {
+  fs.mkdirSync(ROOT_ALIAS, { recursive: true });
   resolveExecutionWorkspace.mockReset();
   confirmPendingTurnDelivery.mockReset();
   confirmPendingTurnDelivery.mockResolvedValue(undefined);
   peekAwaitingDelivery.mockReset();
   deliverQueuedReply.mockReset();
   deliverQueuedReply.mockResolvedValue("delivered");
+  loadFollowupRevalidationEvidence.mockReset();
+  loadFollowupRevalidationEvidence.mockResolvedValue({});
+  runQueuedCandidate.mockReset();
 });
 
-it("blocks a followup when the queued workspace no longer matches the canonical binding", async () => {
+it("puts a path change without a migration receipt into recoverable wait and does not run the followup", async () => {
   resolveExecutionWorkspace.mockResolvedValue(BINDING);
+  const sessionFile = makeSessionFile();
   const { runner } = createRunner();
-  await expect(runner(queuedRun("/tmp/old-queued-workspace"))).rejects.toThrow(
-    /workspace_binding_changed/,
-  );
-  expect(resolveExecutionWorkspace).toHaveBeenCalled();
-});
-
-it("blocks when the path is unchanged but bindingId or contentVersion changed", async () => {
-  resolveExecutionWorkspace.mockResolvedValue({
-    ...BINDING,
-    bindingId: "binding-rotated",
-    contentVersion: "9",
+  const queued = queuedRun("/tmp/old-queued-workspace", {
+    run: { sessionFile, executionWorkspaceBinding: queuedBinding() },
   });
-  const { runner } = createRunner();
-  const queued = queuedRun(ROOT, {
-    run: {
-      executionWorkspaceBinding: queuedBinding(),
-    },
-  });
-  await expect(runner(queued)).rejects.toThrow(/workspace_binding_changed/);
+  const items = [queued];
+  await expect(drainNextQueueItem(items, runner)).resolves.toBe(true);
+  expect(items).toHaveLength(0);
+  expect(runQueuedCandidate).not.toHaveBeenCalled();
   expect(deliverQueuedReply).not.toHaveBeenCalled();
+  const found = findBlockedFollowupDelivery(path.dirname(sessionFile), { sessionKey: "main" });
+  expect(found).toMatchObject({
+    status: "recoverable_wait",
+    destination: "recoverable_wait",
+  });
+  expect(found?.missingItems?.length).toBeGreaterThan(0);
 });
 
-it("blocks when the path is unchanged but only contentVersion changed", async () => {
+it("does not continue or send when the path is unchanged but bindingId changed without a verified migration receipt", async () => {
+  mockUnverifiedBindingChange();
+  peekAwaitingDelivery.mockReturnValue({
+    runId: "run-1",
+    deliveryId: "delivery:run-1:visible",
+    taskId: "task-1",
+  });
+  const sessionFile = makeSessionFile();
+  const { runner } = createRunner();
+  const items = [deliveryOnlyQueued(sessionFile)];
+  await expect(drainNextQueueItem(items, runner)).resolves.toBe(true);
+  expect(items).toHaveLength(0);
+  expect(deliverQueuedReply).not.toHaveBeenCalled();
+  expect(runQueuedCandidate).not.toHaveBeenCalled();
+  expect(confirmPendingTurnDelivery).not.toHaveBeenCalled();
+  const found = findBlockedFollowupDelivery(path.dirname(sessionFile), {
+    runId: "run-1",
+    jobId: "job-1",
+  });
+  expect(found).toMatchObject({
+    status: "recoverable_wait",
+    destination: "recoverable_wait",
+    reason: expect.stringMatching(/unverified_binding_change/),
+  });
+  expect(found?.missingItems).toEqual(expect.arrayContaining(["verified_migration_receipt"]));
+});
+
+it("continues a safe-equivalent contentVersion change, records old and new versions, and resends only original payloads", async () => {
   resolveExecutionWorkspace.mockResolvedValue({
     ...BINDING,
     contentVersion: "3",
   });
+  peekAwaitingDelivery.mockReturnValue({
+    runId: "run-1",
+    deliveryId: "delivery:run-1:visible",
+    taskId: "task-1",
+  });
+  const sessionFile = makeSessionFile();
+  const persistRoot = path.dirname(sessionFile);
   const { runner } = createRunner();
-  await expect(
-    runner(
-      queuedRun(ROOT, {
-        run: {
-          executionWorkspaceBinding: queuedBinding(),
-        },
-      }),
-    ),
-  ).rejects.toThrow(/workspace_binding_changed/);
+  const items = [deliveryOnlyQueued(sessionFile)];
+  await expect(drainNextQueueItem(items, runner)).resolves.toBe(true);
+  expect(items).toHaveLength(0);
+  expect(deliverQueuedReply).toHaveBeenCalledTimes(1);
+  const delivered = deliverQueuedReply.mock.calls[0]?.[0] as { payloads: Array<{ text?: string }> };
+  expect(delivered.payloads).toEqual([{ text: "original visible reply" }]);
+  expect(runQueuedCandidate).not.toHaveBeenCalled();
+  expect(confirmPendingTurnDelivery).toHaveBeenCalledWith(
+    expect.objectContaining({
+      runId: "run-1",
+      deliveryId: "delivery:run-1:visible",
+      status: "delivered",
+    }),
+  );
+  const found = findBlockedFollowupDelivery(persistRoot, { runId: "run-1", jobId: "job-1" });
+  expect(found).toMatchObject({
+    status: "continued",
+    destination: "continue",
+    contentVersionChange: { from: "2", to: "3" },
+  });
 });
 
 it("delivery-only revalidates with read permission and still delivers on a read_only workspace", async () => {
@@ -223,7 +299,7 @@ it("delivery-only revalidates with read permission and still delivers on a read_
     if (params.operation === "write") {
       throw new Error("workspace_binding_required:binding_read_only");
     }
-    return BINDING;
+    return { ...BINDING, bindingState: "read_only", lifecycleState: "read_only" };
   });
   peekAwaitingDelivery.mockReturnValue({
     runId: "run-1",
@@ -231,24 +307,13 @@ it("delivery-only revalidates with read permission and still delivers on a read_
     taskId: "task-1",
   });
   const { runner, typing } = createRunner();
-  const queued = queuedRun(ROOT, {
-    asyncWaitDeliveryOnly: true,
-    asyncWaitDeliveryPayloads: [{ text: "original visible reply" }],
-    asyncWaitRecoveryBind: {
-      jobId: "job-1",
-      claimToken: "token-1",
-      boundRunId: "run-1",
-      boundDeliveryId: "delivery:run-1:visible",
-    },
-    run: {
-      executionWorkspaceBinding: queuedBinding(),
-    },
-  });
+  const queued = deliveryOnlyQueued(makeSessionFile());
   await expect(runner(queued)).resolves.toBeUndefined();
   expect(resolveExecutionWorkspace).toHaveBeenCalledWith(
     expect.objectContaining({ operation: "read" }),
   );
   expect(deliverQueuedReply).toHaveBeenCalledTimes(1);
+  expect(runQueuedCandidate).not.toHaveBeenCalled();
   expect(confirmPendingTurnDelivery).toHaveBeenCalledWith(
     expect.objectContaining({
       runId: "run-1",
@@ -260,53 +325,15 @@ it("delivery-only revalidates with read permission and still delivers on a read_
   expect(typing.markDispatchIdle).toHaveBeenCalled();
 });
 
-it("delivery-only records a failed receipt and lets drain drop the item when identity changes at the same path", async () => {
-  mockSamePathBindingChange();
-  peekAwaitingDelivery.mockReturnValue({
-    runId: "run-1",
-    deliveryId: "delivery:run-1:visible",
-    taskId: "task-1",
-  });
-  const { runner, typing } = createRunner();
-  const queued = queuedRun(ROOT, {
-    asyncWaitDeliveryOnly: true,
-    asyncWaitDeliveryPayloads: [{ text: "original visible reply" }],
-    asyncWaitRecoveryBind: {
-      jobId: "job-1",
-      claimToken: "token-1",
-      boundRunId: "run-1",
-      boundDeliveryId: "delivery:run-1:visible",
-    },
-    run: {
-      executionWorkspaceBinding: queuedBinding(),
-    },
-  });
-  const items = [queued];
-  await expect(drainNextQueueItem(items, runner)).resolves.toBe(true);
-  expect(items).toHaveLength(0);
-  expect(deliverQueuedReply).not.toHaveBeenCalled();
-  expect(confirmPendingTurnDelivery).toHaveBeenCalledTimes(1);
-  expect(confirmPendingTurnDelivery).toHaveBeenCalledWith(
-    expect.objectContaining({
-      runId: "run-1",
-      deliveryId: "delivery:run-1:visible",
-      taskId: "task-1",
-      status: "failed",
-      error: expect.stringMatching(/workspace_binding_changed/),
-    }),
-  );
-  expect(typing.markRunComplete).toHaveBeenCalled();
-  expect(typing.markDispatchIdle).toHaveBeenCalled();
-});
-
-it("delivery-only does not demand write permission when recording a workspace failure", async () => {
+it("delivery-only does not demand write permission when an unverified binding change is recorded", async () => {
   resolveExecutionWorkspace.mockImplementation(async (params: { operation: "read" | "write" }) => {
     if (params.operation === "write") {
       throw new Error("workspace_binding_required:binding_read_only");
     }
     return {
       ...BINDING,
-      contentVersion: "changed",
+      bindingId: "binding-rotated",
+      bindingState: "read_only",
     };
   });
   peekAwaitingDelivery.mockReturnValue({
@@ -314,35 +341,96 @@ it("delivery-only does not demand write permission when recording a workspace fa
     deliveryId: "delivery:run-1:visible",
     taskId: "task-1",
   });
+  const sessionFile = makeSessionFile();
   const { runner } = createRunner();
-  const queued = queuedRun(ROOT, {
-    asyncWaitDeliveryOnly: true,
-    asyncWaitDeliveryPayloads: [{ text: "original visible reply" }],
-    asyncWaitRecoveryBind: {
-      jobId: "job-1",
-      claimToken: "token-1",
-      boundRunId: "run-1",
-      boundDeliveryId: "delivery:run-1:visible",
-    },
-    run: {
-      executionWorkspaceBinding: queuedBinding(),
-    },
-  });
-  await expect(runner(queued)).resolves.toBeUndefined();
+  const items = [deliveryOnlyQueued(sessionFile)];
+  await expect(drainNextQueueItem(items, runner)).resolves.toBe(true);
   expect(resolveExecutionWorkspace).toHaveBeenCalledWith(
     expect.objectContaining({ operation: "read" }),
   );
+  expect(resolveExecutionWorkspace).not.toHaveBeenCalledWith(
+    expect.objectContaining({ operation: "write" }),
+  );
   expect(deliverQueuedReply).not.toHaveBeenCalled();
+  expect(confirmPendingTurnDelivery).not.toHaveBeenCalled();
+  expect(findBlockedFollowupDelivery(path.dirname(sessionFile), { runId: "run-1" })).toMatchObject({
+    status: "recoverable_wait",
+  });
+});
+
+it("continues an authorized migration when a complete verify receipt is present, without resending to an unverified binding", async () => {
+  const migrated = {
+    ...BINDING,
+    bindingId: "binding-migrated",
+    rootPath: ROOT,
+    contentVersion: "4",
+  };
+  resolveExecutionWorkspace.mockResolvedValue(migrated);
+  const verifiedMigration: VerifiedMigrationReceiptEvidence = {
+    receiptId: "receipt-1",
+    resourceId: BINDING.resourceId,
+    tenantId: "tenant",
+    passed: true,
+    fromBindingId: "binding",
+    toBindingId: "binding-migrated",
+    artifactIdentityVerified: true,
+    integrityVerified: true,
+  };
+  loadFollowupRevalidationEvidence.mockResolvedValue({ verifiedMigration });
+  peekAwaitingDelivery.mockReturnValue({
+    runId: "run-1",
+    deliveryId: "delivery:run-1:visible",
+    taskId: "task-1",
+  });
+  const sessionFile = makeSessionFile();
+  const { runner } = createRunner();
+  const items = [deliveryOnlyQueued(sessionFile)];
+  await expect(drainNextQueueItem(items, runner)).resolves.toBe(true);
+  expect(deliverQueuedReply).toHaveBeenCalledTimes(1);
+  expect(runQueuedCandidate).not.toHaveBeenCalled();
+  expect(findBlockedFollowupDelivery(path.dirname(sessionFile), { runId: "run-1" })).toMatchObject({
+    status: "continued",
+    destination: "continue",
+  });
+});
+
+it("denies a cross-tenant current workspace, records the denial, and does not send", async () => {
+  resolveExecutionWorkspace.mockResolvedValue({
+    ...BINDING,
+    resourceId: "ws:other-tenant:seat:seat:asset:asset",
+    tenantId: "other-tenant",
+  });
+  peekAwaitingDelivery.mockReturnValue({
+    runId: "run-1",
+    deliveryId: "delivery:run-1:visible",
+    taskId: "task-1",
+  });
+  const sessionFile = makeSessionFile();
+  const { runner } = createRunner();
+  const items = [deliveryOnlyQueued(sessionFile)];
+  await expect(drainNextQueueItem(items, runner)).resolves.toBe(true);
+  expect(items).toHaveLength(0);
+  expect(deliverQueuedReply).not.toHaveBeenCalled();
+  expect(runQueuedCandidate).not.toHaveBeenCalled();
   expect(confirmPendingTurnDelivery).toHaveBeenCalledWith(
     expect.objectContaining({
       status: "failed",
-      error: expect.stringMatching(/workspace_binding_changed/),
+      error: expect.stringMatching(/cross_tenant/),
     }),
   );
+  expect(findBlockedFollowupDelivery(path.dirname(sessionFile), { runId: "run-1" })).toMatchObject({
+    status: "denied",
+    destination: "denied",
+    reason: expect.stringMatching(/cross_tenant/),
+  });
 });
 
-it("keeps a durable blocked record when the failure receipt write throws, and does not send", async () => {
-  mockSamePathBindingChange();
+it("keeps a recoverable durable record when the failure receipt write throws, and does not send", async () => {
+  resolveExecutionWorkspace.mockResolvedValue({
+    ...BINDING,
+    resourceId: "ws:other-tenant:seat:seat:asset:asset",
+    tenantId: "other-tenant",
+  });
   peekAwaitingDelivery.mockReturnValue({
     runId: "run-1",
     deliveryId: "delivery:run-1:visible",
@@ -363,14 +451,16 @@ it("keeps a durable blocked record when the failure receipt write throws, and do
   });
   expect(found).toMatchObject({
     kind: "blocked_followup_delivery",
-    status: "blocked_manual",
+    status: "recoverable_wait",
+    destination: "recoverable_wait",
+    pendingDestination: "denied",
     reason: "failure_receipt_write_failed",
     runId: "run-1",
     deliveryId: "delivery:run-1:visible",
     taskId: "task-1",
     jobId: "job-1",
     sessionKey: "main",
-    error: expect.stringMatching(/workspace_binding_changed/),
+    error: expect.stringMatching(/cross_tenant/),
     workspaceBinding: expect.objectContaining({
       resourceId: BINDING.resourceId,
       bindingId: BINDING.bindingId,
@@ -378,12 +468,13 @@ it("keeps a durable blocked record when the failure receipt write throws, and do
       workspaceDir: ROOT,
     }),
   });
+  expect(planFollowupRecoveryRetry(found!)).toMatchObject({ action: "revalidate" });
   expect(typing.markRunComplete).toHaveBeenCalled();
   expect(typing.markDispatchIdle).toHaveBeenCalled();
 });
 
-it("records a durable blocked delivery when runId and deliveryId are missing, and does not send", async () => {
-  mockSamePathBindingChange();
+it("records a recoverable delivery when runId and deliveryId are missing, and does not send", async () => {
+  mockUnverifiedBindingChange();
   peekAwaitingDelivery.mockReturnValue(undefined);
   const sessionFile = makeSessionFile();
   const persistRoot = path.dirname(sessionFile);
@@ -405,17 +496,22 @@ it("records a durable blocked delivery when runId and deliveryId are missing, an
   const found = findBlockedFollowupDelivery(persistRoot, { sessionKey: "main" });
   expect(found).toMatchObject({
     kind: "blocked_followup_delivery",
-    status: "blocked_manual",
-    reason: "missing_delivery_identity",
+    status: "recoverable_wait",
+    destination: "recoverable_wait",
+    reason: expect.stringMatching(/unverified_binding_change/),
     sessionKey: "main",
-    error: expect.stringMatching(/workspace_binding_changed/),
   });
   expect(found?.runId).toBeUndefined();
   expect(found?.deliveryId).toBeUndefined();
+  expect(planFollowupRecoveryRetry(found!)).toMatchObject({ action: "revalidate" });
 });
 
-it("can still find a blocked delivery from disk after a simulated process restart", async () => {
-  mockSamePathBindingChange();
+it("can still find a recoverable delivery from disk after a simulated process restart", async () => {
+  resolveExecutionWorkspace.mockResolvedValue({
+    ...BINDING,
+    resourceId: "ws:other-tenant:seat:seat:asset:asset",
+    tenantId: "other-tenant",
+  });
   peekAwaitingDelivery.mockReturnValue({
     runId: "run-1",
     deliveryId: "delivery:run-1:visible",
@@ -434,38 +530,43 @@ it("can still find a blocked delivery from disk after a simulated process restar
   expect(rawDiskRows).toHaveLength(1);
   expect(rawDiskRows[0]).toMatchObject({
     kind: "blocked_followup_delivery",
-    status: "blocked_manual",
+    status: "recoverable_wait",
     reason: "failure_receipt_write_failed",
+    pendingDestination: "denied",
     runId: "run-1",
     deliveryId: "delivery:run-1:visible",
     jobId: "job-1",
   });
 
-  // Re-open the store from the same persist root with no in-memory cache.
   const reopened = listBlockedFollowupDeliveries(persistRoot);
   expect(reopened).toHaveLength(1);
   expect(findBlockedFollowupDelivery(persistRoot, { runId: "run-1", jobId: "job-1" })).toEqual(
     reopened[0],
   );
   expect(reopened[0]?.id).toBe(rawDiskRows[0]?.id);
+  expect(listRecoverableFollowupDeliveries(persistRoot)).toHaveLength(1);
 });
 
-it("retains the queue item when even the durable blocked record cannot be saved, and does not send", async () => {
-  mockSamePathBindingChange();
+it("retains the queue item when even the durable recoverable record cannot be saved, and does not send", async () => {
+  resolveExecutionWorkspace.mockResolvedValue({
+    ...BINDING,
+    resourceId: "ws:other-tenant:seat:seat:asset:asset",
+    tenantId: "other-tenant",
+  });
   peekAwaitingDelivery.mockReturnValue({
     runId: "run-1",
     deliveryId: "delivery:run-1:visible",
     taskId: "task-1",
   });
   confirmPendingTurnDelivery.mockRejectedValue(new Error("receipt write failed"));
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "t169-blocked-followup-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "t170-followup-"));
   tempRoots.push(root);
   const notADir = path.join(root, "not-a-dir");
   fs.writeFileSync(notADir, "not a directory");
   const sessionFile = path.join(notADir, "session.jsonl");
   const { runner } = createRunner();
   const items = [deliveryOnlyQueued(sessionFile)];
-  await expect(drainNextQueueItem(items, runner)).rejects.toThrow(/workspace_binding_changed/);
+  await expect(drainNextQueueItem(items, runner)).rejects.toThrow(/cross_tenant/);
   expect(items).toHaveLength(1);
   expect(deliverQueuedReply).not.toHaveBeenCalled();
   expect(listBlockedFollowupDeliveries(path.dirname(sessionFile))).toHaveLength(0);
