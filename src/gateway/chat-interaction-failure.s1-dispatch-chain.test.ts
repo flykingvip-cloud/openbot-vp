@@ -36,7 +36,8 @@ import type { OpenBotConfig } from "../config/types.js";
 import { resolveConfigDir } from "../utils.js";
 import { readChatTurnTerminal, resolveChatTurnTerminalDir } from "./chat-interaction-failure.js";
 import { resolvePlatformAuthConfig } from "./platform-auth/config.js";
-import { saveStore, type PlatformAuthStore } from "./platform-auth/store.js";
+import type { PlatformAuthStore } from "./platform-auth/store-types.js";
+import { saveStore } from "./platform-auth/store.js";
 
 const completeMock = vi.hoisted(() => vi.fn());
 
@@ -90,16 +91,18 @@ function createChatContext() {
   };
 }
 
-function payloadText(
-  payload: { errorMessage?: string; message?: { content?: Array<{ text?: string }> } } | undefined,
-): string {
-  if (!payload) {
+function payloadText(payload: unknown): string {
+  if (!payload || typeof payload !== "object") {
     return "";
   }
-  if (typeof payload.errorMessage === "string" && payload.errorMessage.trim()) {
-    return payload.errorMessage;
+  const row = payload as {
+    errorMessage?: unknown;
+    message?: { content?: Array<{ text?: string }> };
+  };
+  if (typeof row.errorMessage === "string" && row.errorMessage.trim()) {
+    return row.errorMessage;
   }
-  return payload.message?.content?.[0]?.text ?? "";
+  return row.message?.content?.[0]?.text ?? "";
 }
 
 async function isolateTrustedGateway() {
@@ -140,7 +143,7 @@ async function isolateTrustedGateway() {
       defaults: { model: { primary: "testdemo/s1a-test" } },
       list: [{ id: "main", model: { primary: "testdemo/s1a-test" } }],
     },
-  } as OpenBotConfig;
+  } as unknown as OpenBotConfig;
   fs.writeFileSync(configPath, `${JSON.stringify(cfg, null, 2)}\n`);
   setRuntimeConfigSnapshot(cfg);
   clearConfigCache();

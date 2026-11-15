@@ -19,6 +19,7 @@ import { CURRENT_SESSION_VERSION } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeZeroUsageSnapshot } from "../agents/usage.js";
 import * as dispatchModule from "../auto-reply/dispatch.js";
+import type { DispatchInboundResult } from "../auto-reply/dispatch.js";
 import {
   clearConfigCache,
   clearRuntimeConfigSnapshot,
@@ -31,7 +32,8 @@ import * as interAgentBus from "../organization/inter-agent-bus.js";
 import * as mentionDelivery from "../organization/mention-delivery.js";
 import * as mentionStateTracker from "../organization/mention-state-tracker.js";
 import { resolvePlatformAuthConfig } from "./platform-auth/config.js";
-import { saveStore, type PlatformAuthStore } from "./platform-auth/store.js";
+import type { PlatformAuthStore } from "./platform-auth/store-types.js";
+import { saveStore } from "./platform-auth/store.js";
 
 const completeMock = vi.hoisted(() => vi.fn());
 
@@ -90,16 +92,22 @@ function createChatContext() {
   };
 }
 
-function payloadText(
-  payload: { errorMessage?: string; message?: { content?: Array<{ text?: string }> } } | undefined,
-): string {
-  if (!payload) {
+function payloadText(payload: unknown): string {
+  if (!payload || typeof payload !== "object") {
     return "";
   }
-  if (typeof payload.errorMessage === "string" && payload.errorMessage.trim()) {
-    return payload.errorMessage;
+  const row = payload as {
+    errorMessage?: unknown;
+    message?: { content?: Array<{ text?: string }> };
+  };
+  if (typeof row.errorMessage === "string" && row.errorMessage.trim()) {
+    return row.errorMessage;
   }
-  return payload.message?.content?.[0]?.text ?? "";
+  return row.message?.content?.[0]?.text ?? "";
+}
+
+function asDispatchResult(value: unknown): DispatchInboundResult {
+  return value as DispatchInboundResult;
 }
 
 function liveMessageFromCompleteArgs(args: unknown[]): string {
@@ -292,7 +300,7 @@ async function isolateTrustedGroupGateway(options?: { tinyHistoryBudget?: boolea
         { id: "bot-coord", model: { primary: "testdemo/s1b-test" } },
       ],
     },
-  } as OpenBotConfig;
+  } as unknown as OpenBotConfig;
   fs.writeFileSync(configPath, `${JSON.stringify(cfg, null, 2)}\n`);
   setRuntimeConfigSnapshot(cfg);
   clearConfigCache();
@@ -613,20 +621,22 @@ async function sendGroupChat(params: {
 }) {
   const respond = vi.fn();
   const started = Date.now();
-  const pending = chatHandlers["chat.send"]({
-    params: {
-      sessionKey: params.fixture.sessionKey,
-      message: params.message,
-      idempotencyKey: params.runId,
-      timeoutMs: 15_000,
-      ...(params.mentions ? { mentions: params.mentions } : {}),
-    },
-    respond: respond as never,
-    context: params.context as never,
-    req: {} as never,
-    client: params.fixture.client as never,
-    isWebchatConnect: () => false,
-  });
+  const pending = Promise.resolve(
+    chatHandlers["chat.send"]({
+      params: {
+        sessionKey: params.fixture.sessionKey,
+        message: params.message,
+        idempotencyKey: params.runId,
+        timeoutMs: 15_000,
+        ...(params.mentions ? { mentions: params.mentions } : {}),
+      },
+      respond: respond as never,
+      context: params.context as never,
+      req: {} as never,
+      client: params.fixture.client as never,
+      isWebchatConnect: () => false,
+    }),
+  );
   return { respond, pending, started };
 }
 
@@ -825,22 +835,24 @@ async function sendPrivateChat(params: {
   sessionKey?: string;
 }) {
   const respond = vi.fn();
-  const pending = chatHandlers["chat.send"]({
-    params: {
-      sessionKey: params.sessionKey ?? "agent:main:main",
-      message: params.message,
-      idempotencyKey: params.runId,
-      timeoutMs: 15_000,
-      ...(params.mentions ? { mentions: params.mentions } : {}),
-    },
-    respond: respond as never,
-    context: params.context as never,
-    req: {} as never,
-    // Null client keeps the authorized-peer / global session key from being
-    // remapped onto the employee steward mention router.
-    client: null as never,
-    isWebchatConnect: () => false,
-  });
+  const pending = Promise.resolve(
+    chatHandlers["chat.send"]({
+      params: {
+        sessionKey: params.sessionKey ?? "agent:main:main",
+        message: params.message,
+        idempotencyKey: params.runId,
+        timeoutMs: 15_000,
+        ...(params.mentions ? { mentions: params.mentions } : {}),
+      },
+      respond: respond as never,
+      context: params.context as never,
+      req: {} as never,
+      // Null client keeps the authorized-peer / global session key from being
+      // remapped onto the employee steward mention router.
+      client: null as never,
+      isWebchatConnect: () => false,
+    }),
+  );
   return { respond, pending };
 }
 
@@ -848,10 +860,10 @@ async function settleReleasedWorkTurn(params: {
   context: ReturnType<typeof createChatContext>;
   runId: string;
   pending: Promise<unknown>;
-  release?: ((value: unknown) => void) | undefined;
+  release?: ((value: DispatchInboundResult) => void) | undefined;
   result?: unknown;
 }) {
-  params.release?.(params.result ?? { ok: true });
+  params.release?.(asDispatchResult(params.result ?? { ok: true }));
   await Promise.all([
     params.pending.catch(() => undefined),
     vi.waitFor(
@@ -871,10 +883,10 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
   it("1: B greeting is understood and visible while A's hanging work turn stays unfinished", async () => {
     const fixture = await isolateTrustedGroupGateway();
     installUnderstandingComplete();
-    let releaseA: ((value: unknown) => void) | undefined;
+    let releaseA: ((value: DispatchInboundResult) => void) | undefined;
     const dispatchHang = vi.spyOn(dispatchModule, "dispatchInboundMessage").mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise<DispatchInboundResult>((resolve) => {
           releaseA = resolve;
         }),
     );
@@ -936,10 +948,10 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
   it("2: B readonly progress query does not write the board, claim, dispatch members, or resume A", async () => {
     const fixture = await isolateTrustedGroupGateway();
     installUnderstandingComplete();
-    let releaseA: ((value: unknown) => void) | undefined;
+    let releaseA: ((value: DispatchInboundResult) => void) | undefined;
     const dispatchHang = vi.spyOn(dispatchModule, "dispatchInboundMessage").mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise<DispatchInboundResult>((resolve) => {
           releaseA = resolve;
         }),
     );
@@ -989,10 +1001,10 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
   it("3: B clarify/deny-admission performs zero business actions, tasks, or mention dispatch", async () => {
     const fixture = await isolateTrustedGroupGateway();
     installUnderstandingComplete();
-    let releaseA: ((value: unknown) => void) | undefined;
+    let releaseA: ((value: DispatchInboundResult) => void) | undefined;
     const dispatchHang = vi.spyOn(dispatchModule, "dispatchInboundMessage").mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise<DispatchInboundResult>((resolve) => {
           releaseA = resolve;
         }),
     );
@@ -1035,10 +1047,10 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
   it("4+5: B's visible receipt does not clear A's occupancy; late A final does not overwrite B or resurrect occupancy", async () => {
     const fixture = await isolateTrustedGroupGateway();
     installUnderstandingComplete();
-    let releaseA: ((value: unknown) => void) | undefined;
+    let releaseA: ((value: DispatchInboundResult) => void) | undefined;
     vi.spyOn(dispatchModule, "dispatchInboundMessage").mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise<DispatchInboundResult>((resolve) => {
           releaseA = resolve;
         }),
     );
@@ -1072,7 +1084,7 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
 
     const bTextAfterB = collectTranscriptText(fixture.root);
     expect(bTextAfterB).toContain(GREETING_REPLY);
-    releaseA?.({ ok: true, text: "A业务结果" });
+    releaseA?.(asDispatchResult({ ok: true, text: "A业务结果" }));
     await vi.waitFor(
       () => {
         expect(findTerminal(context, runA), "A should emit a terminal after release").toBeTruthy();
@@ -1101,11 +1113,11 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
 
   it("6: a late B execution proposal is version/CAS rejected after A-era state revision", async () => {
     const fixture = await isolateTrustedGroupGateway();
-    let releaseA: ((value: unknown) => void) | undefined;
+    let releaseA: ((value: DispatchInboundResult) => void) | undefined;
     let releaseBUnderstand: ((value: unknown) => void) | undefined;
     const dispatchHang = vi.spyOn(dispatchModule, "dispatchInboundMessage").mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise<DispatchInboundResult>((resolve) => {
           releaseA = resolve;
         }),
     );
@@ -1285,7 +1297,9 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     installUnderstandingComplete();
     const dispatchSpy = vi
       .spyOn(dispatchModule, "dispatchInboundMessage")
-      .mockImplementation(async () => ({ ok: true, text: "should-not-dispatch-restricted" }));
+      .mockImplementation(async () =>
+        asDispatchResult({ ok: true, text: "should-not-dispatch-restricted" }),
+      );
     const osPath = path.join(fixture.groupDir, "operating-state.json");
     const osBefore = fs.readFileSync(osPath, "utf8");
     const context = createChatContext();
@@ -1350,7 +1364,9 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     let releaseBUnderstand: ((value: unknown) => void) | undefined;
     const dispatchSpy = vi
       .spyOn(dispatchModule, "dispatchInboundMessage")
-      .mockImplementation(async () => ({ ok: true, text: "should-not-dispatch-unreadable" }));
+      .mockImplementation(async () =>
+        asDispatchResult({ ok: true, text: "should-not-dispatch-unreadable" }),
+      );
     completeMock.mockImplementation(async (...args: unknown[]) => {
       const live = liveMessageFromCompleteArgs(args);
       if (live.includes(WORK_MESSAGE)) {
@@ -1403,14 +1419,16 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
       }
       return await originalRead(params);
     });
-    let releaseA: ((value: unknown) => void) | undefined;
+    let releaseA: ((value: DispatchInboundResult) => void) | undefined;
     const dispatchHang = vi
       .spyOn(dispatchModule, "dispatchInboundMessage")
       .mockImplementation(() => {
         if (releaseA) {
-          return Promise.resolve({ ok: true, text: "should-not-dispatch-queued-B" });
+          return Promise.resolve(
+            asDispatchResult({ ok: true, text: "should-not-dispatch-queued-B" }),
+          );
         }
-        return new Promise((resolve) => {
+        return new Promise<DispatchInboundResult>((resolve) => {
           releaseA = resolve;
         });
       });
@@ -1505,10 +1523,12 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     const spies = installMentionConsumerSpies();
     const dispatchSpy = vi
       .spyOn(dispatchModule, "dispatchInboundMessage")
-      .mockImplementation(async () => ({
-        ok: true,
-        text: "should-not-dispatch-restricted-mention",
-      }));
+      .mockImplementation(async () =>
+        asDispatchResult({
+          ok: true,
+          text: "should-not-dispatch-restricted-mention",
+        }),
+      );
     const osPath = path.join(fixture.groupDir, "operating-state.json");
     const osBefore = fs.readFileSync(osPath, "utf8");
     const context = createChatContext();
@@ -1542,10 +1562,12 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     const spies = installMentionConsumerSpies();
     const dispatchSpy = vi
       .spyOn(dispatchModule, "dispatchInboundMessage")
-      .mockImplementation(async () => ({
-        ok: true,
-        text: "should-not-dispatch-unreadable-mention",
-      }));
+      .mockImplementation(async () =>
+        asDispatchResult({
+          ok: true,
+          text: "should-not-dispatch-unreadable-mention",
+        }),
+      );
     completeMock.mockImplementation(async (...args: unknown[]) => {
       const live = liveMessageFromCompleteArgs(args);
       if (live.includes(WORK_MESSAGE)) {
@@ -1590,10 +1612,10 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
       .spyOn(dispatchModule, "dispatchInboundMessage")
       .mockImplementation(async (params) => {
         const ctx = (params as { ctx?: { SessionKey?: string; AgentId?: string } }).ctx;
-        return {
+        return asDispatchResult({
           ok: true,
           text: `official-once:${String(ctx?.AgentId ?? ctx?.SessionKey ?? "member")}`,
-        };
+        });
       });
     const context = createChatContext();
     const runId = `run-s2-once-${path.basename(fixture.root)}`;
@@ -1626,7 +1648,7 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
       .mockImplementation(async (params) => {
         const bag = JSON.stringify(params ?? {});
         expect(bag).not.toMatch(/formal_execution|executionDeliverableBinding/);
-        return { ok: true, text: "discussion-or-blocked-not-formal-bypass" };
+        return asDispatchResult({ ok: true, text: "discussion-or-blocked-not-formal-bypass" });
       });
     const osPath = path.join(fixture.groupDir, "operating-state.json");
     const osBefore = fs.readFileSync(osPath, "utf8");
@@ -1654,7 +1676,9 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     const spies = installMentionConsumerSpies();
     const dispatchSpy = vi
       .spyOn(dispatchModule, "dispatchInboundMessage")
-      .mockImplementation(async () => ({ ok: true, text: "official-idempotent-once" }));
+      .mockImplementation(async () =>
+        asDispatchResult({ ok: true, text: "official-idempotent-once" }),
+      );
     const context = createChatContext();
     const runId = `run-s2-idem-${path.basename(fixture.root)}`;
     const first = await sendGroupChat({
@@ -1708,7 +1732,9 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     const spies = installMentionConsumerSpies();
     const hostDispatch = vi
       .spyOn(dispatchModule, "dispatchInboundMessage")
-      .mockImplementation(async () => ({ ok: true, text: "private-host-stub-not-a-real-send" }));
+      .mockImplementation(async () =>
+        asDispatchResult({ ok: true, text: "private-host-stub-not-a-real-send" }),
+      );
     const context = createChatContext();
     const runId = `run-s2-private-${path.basename(fixture.root)}`;
     const message = "@bot-coord 私信问好";
@@ -1756,10 +1782,10 @@ describe("checkpoint B isolated Gateway group interaction isolation", () => {
     const fixture = await isolateTrustedGroupGateway();
     installUnderstandingComplete();
     const spies = installMentionConsumerSpies();
-    let releaseA: ((value: unknown) => void) | undefined;
+    let releaseA: ((value: DispatchInboundResult) => void) | undefined;
     const dispatchHang = vi.spyOn(dispatchModule, "dispatchInboundMessage").mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise<DispatchInboundResult>((resolve) => {
           releaseA = resolve;
         }),
     );

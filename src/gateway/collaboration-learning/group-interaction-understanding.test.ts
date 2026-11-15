@@ -82,7 +82,17 @@ it("marks incomplete budgeted history as restricted and still answers an ordinar
       history,
     }),
   ).toBe(result);
-  const request = calls.understand.mock.calls.at(-1)[0];
+  const understandCall = calls.understand.mock.calls.at(-1);
+  if (!understandCall) {
+    throw new Error("expected runGatewayUnderstanding to be called");
+  }
+  const request = understandCall[0] as {
+    input: {
+      availability?: unknown;
+      context: Array<{ role: string; content: string }>;
+      message: string;
+    };
+  };
   expect(request.input.availability).toEqual({
     mode: "restricted",
     reasons: ["context_source_unavailable"],
