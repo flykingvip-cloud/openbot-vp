@@ -2,7 +2,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it } from "vitest";
-import { M3_VERIFY_RECEIPT_KIND } from "../../gateway/data-governance/migration-verify.js";
+import { createFileDataGovernanceCatalogStore } from "../../gateway/data-governance/catalog-store.js";
+import { MIGRATION_RECEIPT_KIND } from "../../gateway/data-governance/migration-apply.js";
+import {
+  M3_VERIFY_RECEIPT_KIND,
+  verifyMigrationBatch,
+} from "../../gateway/data-governance/migration-verify.js";
+import { GOVERNANCE_ENVELOPE_SCHEMA_VERSION } from "../../gateway/data-governance/types.js";
 import {
   classifyFollowupWorkspaceChange,
   findVerifiedWorkspaceMigrationReceipt,
@@ -586,4 +592,140 @@ it("parses retained from/to binding fields and the checksummed artifact set from
       verifiedMigration: found,
     }).destination,
   ).toBe("continue");
+});
+
+it("treats an official M3 writer receipt as complete for this change and not for a later migration", async () => {
+  const fromDir = makeDir("t172-official-m3-from-");
+  const toDir = makeDir("t172-official-m3-to-");
+  const root = makeDir("t172-official-m3-root-");
+  const receiptDir = path.join(root, "m3-receipts");
+  const store = createFileDataGovernanceCatalogStore({
+    storePath: path.join(root, "catalog.json"),
+  });
+  const toChecksum = "sha256:abcd1234abcd1234abcd1234abcd1234";
+  await store.put({
+    envelope: {
+      resourceId: RESOURCE,
+      resourceType: "workspace",
+      schemaVersion: GOVERNANCE_ENVELOPE_SCHEMA_VERSION,
+      tenantId: "tenant",
+      owner: { kind: "position", seatId: "seat" },
+      scope: { kind: "tenant", tenantId: "tenant" },
+      lifecycleState: "active",
+      classification: "internal",
+      governanceVersion: 1,
+      canonicalBindingId: "binding-migrated",
+      createdAt: "2026-11-15T00:00:00Z",
+      updatedAt: "2026-11-15T00:00:00Z",
+    },
+    bindings: [
+      {
+        bindingId: "binding-migrated",
+        resourceId: RESOURCE,
+        role: "canonical",
+        storageKind: "filesystem",
+        locator: toDir,
+        state: "active",
+        contentVersion: "4",
+      },
+      {
+        bindingId: "binding",
+        resourceId: RESOURCE,
+        role: "replica",
+        storageKind: "filesystem",
+        locator: fromDir,
+        state: "read_only",
+        contentVersion: "2",
+      },
+    ],
+  });
+  const verified = await verifyMigrationBatch({
+    callerTenantId: "tenant",
+    authorizedTenantId: "tenant",
+    batchId: "batch-t172",
+    store,
+    items: [
+      {
+        candidateId: "candidate-c1",
+        status: "migrated",
+        resourceId: RESOURCE,
+        receipt: {
+          kind: MIGRATION_RECEIPT_KIND,
+          receiptId: "m2r-t172",
+          operationId: "tenant:tenant:operator:candidate-c1",
+          batchId: "batch-t172",
+          tenantId: "tenant",
+          candidateId: "candidate-c1",
+          resourceId: RESOURCE,
+          resourceType: "workspace",
+          status: "migrated",
+          inventoryChecksum: "sha256:inv",
+          planChecksum: "sha256:plan",
+          contentChecksum: toChecksum,
+          previousLocator: fromDir,
+          canonicalBindingId: "binding-migrated",
+          observationLocator: fromDir,
+        },
+      },
+    ],
+    proofs: {
+      "candidate-c1": {
+        owner: { kind: "position", seatId: "seat" },
+        scope: { kind: "tenant", tenantId: "tenant" },
+      },
+    },
+    physical: {
+      async read() {
+        return { checksum: "4" };
+      },
+    },
+    receiptDir,
+    changes: {
+      [RESOURCE]: {
+        fromBindingId: "binding",
+        toBindingId: "binding-migrated",
+        fromContentVersion: "2",
+        toContentVersion: "4",
+        fromDirectory: fromDir,
+        toDirectory: toDir,
+        authorizationIdentity: "tenant:tenant:grant:migration-batch-b1",
+        operationIdentity: "tenant:tenant:operator:candidate-c1",
+        artifactSet: [{ artifactId: RESOURCE, checksum: toChecksum }],
+      },
+    },
+  });
+  expect(verified.ok).toBe(true);
+  if (!verified.ok) {
+    return;
+  }
+  expect(verified.receipts[0]?.passed).toBe(true);
+  const writtenNames = fs.readdirSync(receiptDir).filter((name) => name.endsWith(".json"));
+  expect(writtenNames).toHaveLength(1);
+  const written = JSON.parse(fs.readFileSync(path.join(receiptDir, writtenNames[0]), "utf8")) as {
+    kind: string;
+  };
+  expect(written.kind).toBe(M3_VERIFY_RECEIPT_KIND);
+  const parsed = migrationReceiptToEvidence(written);
+  expect(parsed?.catalogBindingVerified).toBe(true);
+  expect(parsed?.ownershipTenantVerified).toBe(true);
+  const thisChange = isCompleteVerifiedMigration(
+    parsed,
+    saved(fromDir),
+    current(toDir, { bindingId: "binding-migrated", contentVersion: "4" }),
+    fromDir,
+  );
+  expect(thisChange).toEqual({ ok: true });
+  const laterChange = isCompleteVerifiedMigration(
+    parsed,
+    saved(fromDir),
+    current(toDir, { bindingId: "binding-later", contentVersion: "9" }),
+    fromDir,
+  );
+  expect(laterChange.ok).toBe(false);
+  expect(laterChange).toMatchObject({
+    missing: expect.arrayContaining([
+      "migration_receipt_target_binding",
+      "migration_receipt_target_version",
+    ]),
+  });
 });

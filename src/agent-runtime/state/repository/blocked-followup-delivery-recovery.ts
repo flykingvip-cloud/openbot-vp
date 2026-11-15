@@ -20,6 +20,7 @@ import {
   kickFollowupDrainIfIdle,
 } from "../../../auto-reply/reply/queue.js";
 import type { FollowupRun } from "../../../auto-reply/reply/queue.js";
+import { getExistingFollowupQueue } from "../../../auto-reply/reply/queue/state.js";
 import type { OriginatingChannelType } from "../../../auto-reply/templating.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { resolveSessionTranscriptsDirForAgent } from "../../../config/sessions/paths.js";
@@ -29,11 +30,16 @@ import { getAsyncWaitRecoveryFollowupConsumerEnsure } from "./async-wait-recover
 import {
   BLOCKED_FOLLOWUP_DELIVERY_DIRNAME,
   canAutoRevalidateFollowupRecovery,
+  claimFollowupRecoveryForResume,
   findBlockedFollowupDelivery,
+  followupDeliveryIdempotencyKey,
+  followupRecoveryClaimBlocksEnqueue,
   incrementFollowupRecoveryRetry,
   listRecoverableFollowupDeliveries,
+  markFollowupRecoveryClaimEnqueued,
   planFollowupRecoveryRetry,
   recordFollowupWorkspaceDecision,
+  releaseFollowupRecoveryClaim,
   type BlockedFollowupDeliveryRecord,
 } from "./blocked-followup-delivery.js";
 
@@ -206,7 +212,7 @@ function followupRunFromRecord(params: {
   const binding = record.workspaceBinding;
   return {
     prompt: record.resume?.prompt || "followup_workspace_wait_recovery",
-    messageId: `followup-wait-recovery:${record.id}:r${record.retryCount ?? 0}`,
+    messageId: followupDeliveryIdempotencyKey(record),
     summaryLine: "followup_workspace_wait_recovery",
     enqueuedAt: Date.now(),
     asyncWaitDeliveryOnly: true,
@@ -266,26 +272,45 @@ function ensureFollowupConsumer(params: { cfg?: OpenBotConfig; sessionKey: strin
   });
 }
 
+function isIdempotentDeliveryQueued(sessionKey: string, messageId: string): boolean {
+  const queued = getExistingFollowupQueue(sessionKey);
+  return Boolean(queued?.items.some((item) => item.messageId?.trim() === messageId));
+}
+
 function enqueueOriginalDelivery(params: {
   record: BlockedFollowupDeliveryRecord;
   cfg?: OpenBotConfig;
-}): boolean {
+}): "enqueued" | "duplicate" | "failed" {
   const run = followupRunFromRecord(params);
   const sessionKey = run?.run.sessionKey;
-  if (!run || !sessionKey) {
-    return false;
+  const messageId = run?.messageId?.trim();
+  if (!run || !sessionKey || !messageId) {
+    return "failed";
+  }
+  if (isIdempotentDeliveryQueued(sessionKey, messageId)) {
+    return "duplicate";
   }
   ensureFollowupConsumer({ cfg: params.cfg, sessionKey });
+  // Durable claim and the live queue already prevent a second delivery.
+  // Do not use the recent message-id cache as the only/primary dedupe: it
+  // embeds no send-success proof and would block a bounded retry of the
+  // same idempotency identity after a failed enqueue or send.
   const enqueued = enqueueFollowupRun(
     sessionKey,
     run,
     { mode: "followup", debounceMs: 0, cap: 20 },
-    "message-id",
+    "none",
   );
-  if (enqueued && hasFollowupDrainCallback(sessionKey)) {
-    kickFollowupDrainIfIdle(sessionKey);
+  if (enqueued) {
+    if (hasFollowupDrainCallback(sessionKey)) {
+      kickFollowupDrainIfIdle(sessionKey);
+    }
+    return "enqueued";
   }
-  return enqueued;
+  if (isIdempotentDeliveryQueued(sessionKey, messageId)) {
+    return "duplicate";
+  }
+  return "failed";
 }
 
 async function revalidateAndMaybeEnqueue(params: {
@@ -307,6 +332,15 @@ async function revalidateAndMaybeEnqueue(params: {
   }
   if (!params.allowReauthorizationResume && !canAutoRevalidateFollowupRecovery(params.record)) {
     return "exhausted";
+  }
+
+  // If a prior scan already claimed or enqueued this delivery, do not increment
+  // retry or enqueue again. A released or stale claim falls through and retries
+  // with the same idempotency identity.
+  if (!params.allowReauthorizationResume && followupRecoveryClaimBlocksEnqueue(params.record)) {
+    return params.record.status === "continued" || params.record.claim?.deliverySentAtMs
+      ? "closed"
+      : "enqueued";
   }
 
   const retried = params.allowReauthorizationResume
@@ -338,11 +372,26 @@ async function revalidateAndMaybeEnqueue(params: {
   });
 
   if (classification.destination === "continue") {
-    const enqueued = enqueueOriginalDelivery({ record: retried, cfg: params.cfg });
-    if (!enqueued) {
+    const claimed = await claimFollowupRecoveryForResume({
+      persistRoot: params.persistRoot,
+      record: retried,
+    });
+    if (!claimed.ok) {
+      if (claimed.reason === "already_claimed" || claimed.reason === "already_sent") {
+        return claimed.reason === "already_sent" ? "closed" : "enqueued";
+      }
+      return "skipped";
+    }
+    const enqueued = enqueueOriginalDelivery({ record: claimed.record, cfg: params.cfg });
+    if (enqueued === "failed") {
+      const released = await releaseFollowupRecoveryClaim({
+        persistRoot: params.persistRoot,
+        record: claimed.record,
+        claimToken: claimed.claimToken,
+      });
       await recordFollowupWorkspaceDecision({
         persistRoot: params.persistRoot,
-        id: retried.id,
+        id: released.id,
         classification: {
           ...classification,
           destination: "recoverable_wait",
@@ -351,28 +400,37 @@ async function revalidateAndMaybeEnqueue(params: {
           missingItems: [
             ...(classification.missingItems ?? []),
             "resume_enqueue",
-            ...(visiblePayloads(retried).length === 0 ? ["original_payloads"] : []),
+            ...(visiblePayloads(released).length === 0 ? ["original_payloads"] : []),
           ],
           askUser: false,
         },
         statusOverride: "recoverable_wait",
-        retryCount: retried.retryCount,
-        retryCap: retried.retryCap,
-        sessionKey: retried.sessionKey,
-        sessionFile: retried.sessionFile,
-        jobId: retried.jobId,
-        runId: retried.runId,
-        deliveryId: retried.deliveryId,
-        taskId: retried.taskId,
-        workspaceBinding: retried.workspaceBinding,
-        resume: retried.resume,
-        reauthorizationGrant: params.grant ?? retried.reauthorizationGrant,
+        retryCount: released.retryCount,
+        retryCap: released.retryCap,
+        sessionKey: released.sessionKey,
+        sessionFile: released.sessionFile,
+        jobId: released.jobId,
+        runId: released.runId,
+        deliveryId: released.deliveryId,
+        taskId: released.taskId,
+        workspaceBinding: released.workspaceBinding,
+        resume: released.resume,
+        reauthorizationGrant: params.grant ?? released.reauthorizationGrant,
+        claim: released.claim,
+        deliveryIdempotencyKey: followupDeliveryIdempotencyKey(released),
       });
-      return retried.retryExhausted ? "exhausted" : "waiting";
+      return released.retryExhausted ? "exhausted" : "waiting";
     }
+    await markFollowupRecoveryClaimEnqueued({
+      persistRoot: params.persistRoot,
+      record: claimed.record,
+      claimToken: claimed.claimToken,
+    });
     // The followup runner records `continued` after it revalidates and before
     // (or as) it resends the original payloads. Leave the wait record in place
-    // until that happens so a failed enqueue/send cannot look resolved.
+    // until that happens so a failed enqueue/send cannot look resolved. The
+    // durable claim plus stable idempotency key prevent a second scan from
+    // sending again in this window.
     return "enqueued";
   }
 
@@ -474,6 +532,12 @@ export async function recoverFollowupWorkspaceWaitsAtGatewayBoot(params: {
  * User/auth-flow entry after a tenant, ownership, or permission change has
  * been reauthorized. Runs the same revalidation and delivery-only enqueue
  * path used on gateway-boot recovery. Does not continue without a grant.
+ */
+/**
+ * Lower-level resume used by the access-control plane entry
+ * `confirmAccessReauthorization`. Production grant / permission-confirmation
+ * paths should call that control-plane hook rather than this function
+ * directly. Gateway boot must not use this without a grant.
  */
 export async function resumeFollowupDeliveryAfterReauthorization(params: {
   persistRoot: string;

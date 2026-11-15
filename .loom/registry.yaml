@@ -14594,6 +14594,8 @@ tasks:
       - src/agent-runtime/state/repository/blocked-followup-delivery-recovery.ts
       - src/agent-runtime/state/repository/blocked-followup-delivery-recovery.test.ts
       - src/agent-runtime/state/repository/async-wait-job-recovery.ts
+      - src/gateway/data-governance/migration-verify.ts
+      - src/gateway/access-control/followup-workspace-reauthorization.ts
     state: active
     sessions:
       - id: codex-canonical-20261114
@@ -14635,6 +14637,8 @@ landingStreams:
       - src/agent-runtime/state/repository/blocked-followup-delivery-recovery.ts
       - src/agent-runtime/state/repository/blocked-followup-delivery-recovery.test.ts
       - src/agent-runtime/state/repository/async-wait-job-recovery.ts
+      - src/gateway/data-governance/migration-verify.ts
+      - src/gateway/access-control/followup-workspace-reauthorization.ts
     canLandWith: []
     metadata:
       owner: codex-observation
@@ -29906,6 +29910,14 @@ sharedPaths:
   - glob: src/agent-runtime/state/repository/async-wait-job-recovery.ts
     landerTask: canonical-execution-workspace-20261114
     reason: Existing gateway-boot recoverer now scans and resumes durable followup workspace waits.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/data-governance/migration-verify.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Official M3 verify writer now emits complete from/to migration evidence for followup continuation.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/access-control/followup-workspace-reauthorization.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Existing access-control plane hook for followup workspace reauthorization resume.
     reviewAfter: 2026-11-30
   - glob: src/exec-protocol/**
     landerTask: exec-protocol-v1-min-loop

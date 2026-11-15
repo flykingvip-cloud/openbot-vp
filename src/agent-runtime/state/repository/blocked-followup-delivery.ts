@@ -8,7 +8,7 @@ import type {
   FollowupWorkspaceSnapshot,
 } from "../../../auto-reply/reply/followup-workspace-change.js";
 import { FOLLOWUP_WORKSPACE_RETRY_CAP } from "../../../auto-reply/reply/followup-workspace-change.js";
-import { writeJsonDurable } from "./durable-json.js";
+import { withDirectoryLock, writeJsonDurable } from "./durable-json.js";
 
 export const BLOCKED_FOLLOWUP_DELIVERY_DIRNAME = "blocked-followup-deliveries";
 export const DEFAULT_FOLLOWUP_RECOVERY_RETRY_CAP = FOLLOWUP_WORKSPACE_RETRY_CAP;
@@ -75,6 +75,18 @@ export type FollowupDeliveryResumeSnapshot = {
   };
 };
 
+export type FollowupRecoveryClaimStage = "claimed" | "enqueued" | "released";
+
+export type FollowupRecoveryClaim = {
+  token: string;
+  stage: FollowupRecoveryClaimStage;
+  claimedAtMs: number;
+  holderPid?: number;
+  /** Stable across retries and restarts; never includes retryCount. */
+  deliveryIdempotencyKey: string;
+  deliverySentAtMs?: number;
+};
+
 /**
  * Durable recoverable / denied / continuation record for a followup workspace
  * decision. This store is disk-only: a later process finds records by
@@ -106,6 +118,8 @@ export type BlockedFollowupDeliveryRecord = {
   deliveryId?: string;
   taskId?: string;
   workspaceBinding?: BlockedFollowupWorkspaceSnapshot;
+  claim?: FollowupRecoveryClaim;
+  deliveryIdempotencyKey?: string;
 };
 
 const STATUSES = new Set<FollowupRecoveryStatus>([
@@ -172,6 +186,12 @@ function normalizeRecord(row: BlockedFollowupDeliveryRecord): BlockedFollowupDel
     retryCap,
     updatedAtMs: row.updatedAtMs ?? row.recordedAtMs,
     retryExhausted: row.retryExhausted ?? retryCount >= retryCap,
+    ...(row.claim ? { claim: row.claim } : {}),
+    ...(row.deliveryIdempotencyKey
+      ? { deliveryIdempotencyKey: row.deliveryIdempotencyKey }
+      : row.claim?.deliveryIdempotencyKey
+        ? { deliveryIdempotencyKey: row.claim.deliveryIdempotencyKey }
+        : {}),
   };
 }
 
@@ -229,84 +249,110 @@ export async function recordBlockedFollowupDelivery(input: {
   deliveryId?: string;
   taskId?: string;
   workspaceBinding?: BlockedFollowupWorkspaceSnapshot;
+  claim?: FollowupRecoveryClaim;
+  deliveryIdempotencyKey?: string;
 }): Promise<BlockedFollowupDeliveryRecord> {
-  const now = Date.now();
-  const status = input.status ?? "recoverable_wait";
+  const requestedStatus = input.status ?? "recoverable_wait";
   const retryCap = input.retryCap ?? DEFAULT_FOLLOWUP_RECOVERY_RETRY_CAP;
   const retryCount = input.retryCount ?? 0;
-  const existing = input.id
-    ? listBlockedFollowupDeliveries(input.persistRoot).find((row) => row.id === input.id)
-    : undefined;
-  const record: BlockedFollowupDeliveryRecord = {
-    kind: "blocked_followup_delivery",
-    id: existing?.id ?? input.id ?? randomUUID(),
-    recordedAtMs: existing?.recordedAtMs ?? now,
-    updatedAtMs: now,
-    status,
-    destination:
-      input.destination ??
-      (status === "continued"
-        ? "continue"
-        : status === "denied"
-          ? "denied"
-          : status === "reauthorization_required"
-            ? "reauthorization_required"
-            : "recoverable_wait"),
-    reason: input.reason,
-    error: input.error,
-    retryCount,
-    retryCap,
-    retryExhausted: retryCount >= retryCap,
-    ...(input.missingItems && input.missingItems.length > 0
-      ? { missingItems: input.missingItems }
-      : {}),
-    ...(input.pendingDestination ? { pendingDestination: input.pendingDestination } : {}),
-    ...(input.contentVersionChange ? { contentVersionChange: input.contentVersionChange } : {}),
-    ...(input.pathNormalization ? { pathNormalization: input.pathNormalization } : {}),
-    ...(input.reauthorization
-      ? { reauthorization: input.reauthorization }
-      : existing?.reauthorization
-        ? { reauthorization: existing.reauthorization }
+  const recordId = input.id?.trim() || randomUUID();
+  // Persist under the same directory lock as claim/enqueue/sent mutations so a
+  // concurrent mark-enqueued cannot overwrite a just-written `continued` row.
+  const assembled = await mutateFollowupRecordUnderLock(input.persistRoot, recordId, (existing) => {
+    if (
+      existing &&
+      (existing.status === "continued" || Boolean(existing.claim?.deliverySentAtMs)) &&
+      requestedStatus !== "continued"
+    ) {
+      return existing;
+    }
+    const now = Date.now();
+    const status = requestedStatus;
+    const record: BlockedFollowupDeliveryRecord = {
+      kind: "blocked_followup_delivery",
+      id: existing?.id ?? recordId,
+      recordedAtMs: existing?.recordedAtMs ?? now,
+      updatedAtMs: now,
+      status,
+      destination:
+        input.destination ??
+        (status === "continued"
+          ? "continue"
+          : status === "denied"
+            ? "denied"
+            : status === "reauthorization_required"
+              ? "reauthorization_required"
+              : "recoverable_wait"),
+      reason: input.reason,
+      error: input.error,
+      retryCount,
+      retryCap,
+      retryExhausted: retryCount >= retryCap,
+      ...(input.missingItems && input.missingItems.length > 0
+        ? { missingItems: input.missingItems }
         : {}),
-    ...(input.reauthorizationGrant
-      ? { reauthorizationGrant: input.reauthorizationGrant }
-      : existing?.reauthorizationGrant
-        ? { reauthorizationGrant: existing.reauthorizationGrant }
-        : {}),
-    ...(input.resume
-      ? { resume: input.resume }
-      : existing?.resume
-        ? { resume: existing.resume }
-        : {}),
-    ...(input.sessionKey
-      ? { sessionKey: input.sessionKey }
-      : existing?.sessionKey
-        ? { sessionKey: existing.sessionKey }
-        : {}),
-    ...(input.sessionFile
-      ? { sessionFile: input.sessionFile }
-      : existing?.sessionFile
-        ? { sessionFile: existing.sessionFile }
-        : {}),
-    ...(input.jobId ? { jobId: input.jobId } : existing?.jobId ? { jobId: existing.jobId } : {}),
-    ...(input.runId ? { runId: input.runId } : existing?.runId ? { runId: existing.runId } : {}),
-    ...(input.deliveryId
-      ? { deliveryId: input.deliveryId }
-      : existing?.deliveryId
-        ? { deliveryId: existing.deliveryId }
-        : {}),
-    ...(input.taskId
-      ? { taskId: input.taskId }
-      : existing?.taskId
-        ? { taskId: existing.taskId }
-        : {}),
-    ...(input.workspaceBinding
-      ? { workspaceBinding: input.workspaceBinding }
-      : existing?.workspaceBinding
-        ? { workspaceBinding: existing.workspaceBinding }
-        : {}),
-  };
-  return writeRecord(input.persistRoot, record);
+      ...(input.pendingDestination ? { pendingDestination: input.pendingDestination } : {}),
+      ...(input.contentVersionChange ? { contentVersionChange: input.contentVersionChange } : {}),
+      ...(input.pathNormalization ? { pathNormalization: input.pathNormalization } : {}),
+      ...(input.reauthorization
+        ? { reauthorization: input.reauthorization }
+        : existing?.reauthorization
+          ? { reauthorization: existing.reauthorization }
+          : {}),
+      ...(input.reauthorizationGrant
+        ? { reauthorizationGrant: input.reauthorizationGrant }
+        : existing?.reauthorizationGrant
+          ? { reauthorizationGrant: existing.reauthorizationGrant }
+          : {}),
+      ...(input.resume
+        ? { resume: input.resume }
+        : existing?.resume
+          ? { resume: existing.resume }
+          : {}),
+      ...(input.sessionKey
+        ? { sessionKey: input.sessionKey }
+        : existing?.sessionKey
+          ? { sessionKey: existing.sessionKey }
+          : {}),
+      ...(input.sessionFile
+        ? { sessionFile: input.sessionFile }
+        : existing?.sessionFile
+          ? { sessionFile: existing.sessionFile }
+          : {}),
+      ...(input.jobId ? { jobId: input.jobId } : existing?.jobId ? { jobId: existing.jobId } : {}),
+      ...(input.runId ? { runId: input.runId } : existing?.runId ? { runId: existing.runId } : {}),
+      ...(input.deliveryId
+        ? { deliveryId: input.deliveryId }
+        : existing?.deliveryId
+          ? { deliveryId: existing.deliveryId }
+          : {}),
+      ...(input.taskId
+        ? { taskId: input.taskId }
+        : existing?.taskId
+          ? { taskId: existing.taskId }
+          : {}),
+      ...(input.workspaceBinding
+        ? { workspaceBinding: input.workspaceBinding }
+        : existing?.workspaceBinding
+          ? { workspaceBinding: existing.workspaceBinding }
+          : {}),
+      ...(input.claim ? { claim: input.claim } : existing?.claim ? { claim: existing.claim } : {}),
+      ...(input.deliveryIdempotencyKey
+        ? { deliveryIdempotencyKey: input.deliveryIdempotencyKey }
+        : input.claim?.deliveryIdempotencyKey
+          ? { deliveryIdempotencyKey: input.claim.deliveryIdempotencyKey }
+          : existing?.deliveryIdempotencyKey
+            ? { deliveryIdempotencyKey: existing.deliveryIdempotencyKey }
+            : existing?.claim?.deliveryIdempotencyKey
+              ? { deliveryIdempotencyKey: existing.claim.deliveryIdempotencyKey }
+              : {}),
+    };
+    return record;
+  });
+  if (!assembled) {
+    throw new Error("blocked_followup_delivery: record write failed");
+  }
+  return assembled;
 }
 
 export async function recordFollowupWorkspaceDecision(input: {
@@ -328,6 +374,8 @@ export async function recordFollowupWorkspaceDecision(input: {
   statusOverride?: FollowupRecoveryStatus;
   retryCount?: number;
   retryCap?: number;
+  claim?: FollowupRecoveryClaim;
+  deliveryIdempotencyKey?: string;
 }): Promise<BlockedFollowupDeliveryRecord> {
   const classification = input.classification;
   return recordBlockedFollowupDelivery({
@@ -362,6 +410,8 @@ export async function recordFollowupWorkspaceDecision(input: {
     deliveryId: input.deliveryId,
     taskId: input.taskId,
     workspaceBinding: input.workspaceBinding,
+    claim: input.claim,
+    deliveryIdempotencyKey: input.deliveryIdempotencyKey,
   });
 }
 
@@ -452,14 +502,28 @@ export async function incrementFollowupRecoveryRetry(input: {
 }): Promise<BlockedFollowupDeliveryRecord> {
   const retryCap = input.record.retryCap ?? DEFAULT_FOLLOWUP_RECOVERY_RETRY_CAP;
   const retryCount = (input.record.retryCount ?? 0) + 1;
-  const updated: BlockedFollowupDeliveryRecord = {
-    ...input.record,
-    retryCount,
-    retryCap,
-    retryExhausted: retryCount >= retryCap,
-    updatedAtMs: Date.now(),
-  };
-  return writeRecord(input.persistRoot, updated);
+  const updated = await mutateFollowupRecordUnderLock(
+    input.persistRoot,
+    input.record.id,
+    (current) => {
+      if (
+        !current ||
+        current.status === "continued" ||
+        current.status === "denied" ||
+        current.claim?.deliverySentAtMs
+      ) {
+        return undefined;
+      }
+      return {
+        ...current,
+        retryCount,
+        retryCap,
+        retryExhausted: retryCount >= retryCap,
+        updatedAtMs: Date.now(),
+      };
+    },
+  );
+  return updated ?? input.record;
 }
 
 export type FollowupRecoveryRetryPlan =
@@ -481,4 +545,266 @@ export function planFollowupRecoveryRetry(
     return { action: "hold", record, reason: "retry_exhausted" };
   }
   return { action: "revalidate", record };
+}
+
+export function followupDeliveryIdempotencyKey(record: BlockedFollowupDeliveryRecord): string {
+  if (record.deliveryIdempotencyKey?.trim()) {
+    return record.deliveryIdempotencyKey.trim();
+  }
+  if (record.claim?.deliveryIdempotencyKey?.trim()) {
+    return record.claim.deliveryIdempotencyKey.trim();
+  }
+  const original =
+    record.deliveryId?.trim() || record.jobId?.trim() || record.taskId?.trim() || "original";
+  return `followup-delivery:${record.id}:${original}`;
+}
+
+const CLAIM_HOLDER_STALE_MS = 30_000;
+
+function isClaimHolderAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function followupRecoveryClaimBlocksEnqueue(
+  record: BlockedFollowupDeliveryRecord,
+  nowMs = Date.now(),
+): boolean {
+  if (record.status === "continued" || record.claim?.deliverySentAtMs) {
+    return true;
+  }
+  const claim = record.claim;
+  if (!claim || (claim.stage !== "claimed" && claim.stage !== "enqueued")) {
+    return false;
+  }
+  return claimIsHeld(claim, nowMs);
+}
+
+function claimIsHeld(claim: FollowupRecoveryClaim, nowMs: number): boolean {
+  if (claim.deliverySentAtMs) {
+    return true;
+  }
+  if (claim.stage !== "claimed" && claim.stage !== "enqueued") {
+    return false;
+  }
+  if (typeof claim.holderPid === "number" && isClaimHolderAlive(claim.holderPid)) {
+    return true;
+  }
+  // An enqueued claim without a live holder stays held briefly so a second
+  // scan in the same window cannot enqueue again. After the stale window, a
+  // dead holder with no send marker may retry the same idempotency key.
+  return nowMs - claim.claimedAtMs < CLAIM_HOLDER_STALE_MS;
+}
+
+export type FollowupRecoveryClaimResult =
+  | {
+      ok: true;
+      record: BlockedFollowupDeliveryRecord;
+      claimToken: string;
+      freshClaim: boolean;
+    }
+  | {
+      ok: false;
+      reason: "already_claimed" | "already_sent" | "not_claimable" | "missing";
+      record?: BlockedFollowupDeliveryRecord;
+    };
+
+async function mutateFollowupRecordUnderLock(
+  persistRoot: string,
+  recordId: string,
+  mutate: (
+    current: BlockedFollowupDeliveryRecord | undefined,
+  ) => BlockedFollowupDeliveryRecord | undefined,
+): Promise<BlockedFollowupDeliveryRecord | undefined> {
+  const dir = blockedFollowupDeliveryDir(persistRoot);
+  return withDirectoryLock(dir, encodeURIComponent(recordId), async () => {
+    const current = findBlockedFollowupDelivery(persistRoot, { id: recordId });
+    const next = mutate(current);
+    if (!next) {
+      return current;
+    }
+    return writeRecord(persistRoot, next);
+  });
+}
+
+/**
+ * Durably claim a recoverable wait before enqueue. Failed or already-held
+ * claims must not enqueue again. A released or stale claim may be retried
+ * with the same delivery idempotency identity.
+ */
+export async function claimFollowupRecoveryForResume(input: {
+  persistRoot: string;
+  record: BlockedFollowupDeliveryRecord;
+  nowMs?: number;
+}): Promise<FollowupRecoveryClaimResult> {
+  const nowMs = input.nowMs ?? Date.now();
+  let result: FollowupRecoveryClaimResult = { ok: false, reason: "missing" };
+  const updated = await mutateFollowupRecordUnderLock(
+    input.persistRoot,
+    input.record.id,
+    (current) => {
+      if (!current) {
+        result = { ok: false, reason: "missing" };
+        return undefined;
+      }
+      if (current.status === "continued" || current.claim?.deliverySentAtMs) {
+        result = { ok: false, reason: "already_sent", record: current };
+        return undefined;
+      }
+      if (current.status === "denied") {
+        result = { ok: false, reason: "not_claimable", record: current };
+        return undefined;
+      }
+      const key = followupDeliveryIdempotencyKey(current);
+      const existing = current.claim;
+      if (
+        existing &&
+        (existing.stage === "claimed" || existing.stage === "enqueued") &&
+        claimIsHeld(existing, nowMs)
+      ) {
+        result = { ok: false, reason: "already_claimed", record: current };
+        return undefined;
+      }
+      const token = existing?.token?.trim() || randomUUID();
+      const claimed: BlockedFollowupDeliveryRecord = {
+        ...current,
+        updatedAtMs: nowMs,
+        deliveryIdempotencyKey: key,
+        claim: {
+          token,
+          stage: "claimed",
+          claimedAtMs: existing && existing.stage !== "released" ? existing.claimedAtMs : nowMs,
+          holderPid: process.pid,
+          deliveryIdempotencyKey: key,
+          ...(existing?.deliverySentAtMs ? { deliverySentAtMs: existing.deliverySentAtMs } : {}),
+        },
+      };
+      result = {
+        ok: true,
+        record: claimed,
+        claimToken: token,
+        freshClaim: !existing || existing.stage === "released",
+      };
+      return claimed;
+    },
+  );
+  if (result.ok) {
+    return { ...result, record: updated ?? result.record };
+  }
+  return result.record || !updated ? result : { ...result, record: updated };
+}
+
+export async function markFollowupRecoveryClaimEnqueued(input: {
+  persistRoot: string;
+  record: BlockedFollowupDeliveryRecord;
+  claimToken: string;
+}): Promise<BlockedFollowupDeliveryRecord> {
+  const nowMs = Date.now();
+  const updated = await mutateFollowupRecordUnderLock(
+    input.persistRoot,
+    input.record.id,
+    (current) => {
+      if (!current || current.claim?.token !== input.claimToken) {
+        return undefined;
+      }
+      const key = followupDeliveryIdempotencyKey(current);
+      return {
+        ...current,
+        updatedAtMs: nowMs,
+        // Never regress a completed delivery if the runner already persisted
+        // `continued` or a send marker while this claim was being marked enqueued.
+        status:
+          current.status === "continued" || current.claim.deliverySentAtMs
+            ? "continued"
+            : current.status,
+        destination:
+          current.status === "continued" || current.claim.deliverySentAtMs
+            ? "continue"
+            : current.destination,
+        deliveryIdempotencyKey: key,
+        claim: {
+          ...current.claim,
+          stage: "enqueued",
+          holderPid: process.pid,
+          deliveryIdempotencyKey: key,
+        },
+      };
+    },
+  );
+  return updated ?? input.record;
+}
+
+export async function releaseFollowupRecoveryClaim(input: {
+  persistRoot: string;
+  record: BlockedFollowupDeliveryRecord;
+  claimToken?: string;
+}): Promise<BlockedFollowupDeliveryRecord> {
+  const nowMs = Date.now();
+  const updated = await mutateFollowupRecordUnderLock(
+    input.persistRoot,
+    input.record.id,
+    (current) => {
+      if (!current?.claim) {
+        return undefined;
+      }
+      if (input.claimToken && current.claim.token !== input.claimToken) {
+        return undefined;
+      }
+      if (current.claim.deliverySentAtMs || current.status === "continued") {
+        return undefined;
+      }
+      return {
+        ...current,
+        updatedAtMs: nowMs,
+        status: current.status === "continued" ? current.status : "recoverable_wait",
+        destination: current.status === "continued" ? current.destination : "recoverable_wait",
+        deliveryIdempotencyKey: followupDeliveryIdempotencyKey(current),
+        claim: {
+          ...current.claim,
+          stage: "released",
+          holderPid: undefined,
+          deliveryIdempotencyKey: followupDeliveryIdempotencyKey(current),
+        },
+      };
+    },
+  );
+  return updated ?? input.record;
+}
+
+export async function markFollowupRecoveryDeliverySent(input: {
+  persistRoot: string;
+  record: BlockedFollowupDeliveryRecord;
+}): Promise<BlockedFollowupDeliveryRecord> {
+  const nowMs = Date.now();
+  const key = followupDeliveryIdempotencyKey(input.record);
+  const updated = await mutateFollowupRecordUnderLock(
+    input.persistRoot,
+    input.record.id,
+    (current) => {
+      if (!current) {
+        return undefined;
+      }
+      return {
+        ...current,
+        updatedAtMs: nowMs,
+        status: "continued",
+        destination: "continue",
+        deliveryIdempotencyKey: key,
+        claim: {
+          token: current.claim?.token || randomUUID(),
+          stage:
+            current.claim?.stage === "released" ? "enqueued" : (current.claim?.stage ?? "enqueued"),
+          claimedAtMs: current.claim?.claimedAtMs ?? nowMs,
+          holderPid: current.claim?.holderPid,
+          deliveryIdempotencyKey: key,
+          deliverySentAtMs: current.claim?.deliverySentAtMs ?? nowMs,
+        },
+      };
+    },
+  );
+  return updated ?? input.record;
 }
