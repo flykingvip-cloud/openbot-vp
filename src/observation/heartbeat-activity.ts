@@ -8,17 +8,21 @@ export const HEARTBEAT_ACTIVITY_FLAG = "OPENBOT_HEARTBEAT_ACTIVITY_OBSERVATION";
 
 export function resolveConfiguredHeartbeatPeriodMs(cfg: OpenBotConfig): number | null {
   const entries = listAgentEntries(cfg);
-  const intervals = new Set<number>();
+  const positive = new Set<number>();
   if (entries.length === 0) {
     const ms = resolveHeartbeatIntervalMs(cfg);
     return ms && ms > 0 ? ms : null;
   }
   for (const entry of entries) {
     const ms = resolveHeartbeatIntervalMs(cfg, undefined, entry.heartbeat);
-    intervals.add(ms && ms > 0 ? ms : 0);
+    if (ms && ms > 0) {
+      // Event-only / 0m neighbors must not zero out a scheduled cohort.
+      positive.add(ms);
+    }
   }
-  const unique = [...intervals];
-  return unique.length === 1 && unique[0] > 0 ? unique[0] : null;
+  const unique = [...positive];
+  // A ratio needs one shared positive interval; mixed positive periods stay unknown.
+  return unique.length === 1 ? unique[0] : null;
 }
 
 export function deriveHeartbeatSamples(input: {

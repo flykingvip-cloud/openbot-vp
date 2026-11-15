@@ -15,9 +15,17 @@ export type LinkCoverageInput = {
   link?: number | null;
 };
 
+export type HeartbeatActivityMark = {
+  ts: number;
+  status?: string;
+};
+
 export type HeartbeatInput = {
   expectedSamples?: number | null;
   observedSamples?: number | null;
+  observedEventCount?: number | null;
+  lastEventAt?: number | null;
+  events?: readonly HeartbeatActivityMark[] | null;
 };
 
 export type ConcurrencyInput = {
@@ -30,9 +38,31 @@ export type QuotaInput = {
   allowance?: number | null;
 };
 
+export type UnmappedEventsInput = {
+  count?: number | null;
+};
+
+export type PlatformTaskIndexItem = {
+  taskId: string;
+  outcomeVersion: number;
+  agentId: string;
+  decidedAt: string;
+  tenantId?: string | null;
+  coverage?: LinkCoverageInput | null;
+};
+
+export type PlatformTaskIndexSnapshot = {
+  authorization: "granted" | "unknown";
+  window: { from: number; to: number };
+  tasks: readonly PlatformTaskIndexItem[];
+  agents?: readonly { id: string }[];
+  truncated?: boolean;
+};
+
 export type PlatformFirstScreenSnapshot = {
   coverage?: LinkCoverageInput | null;
   heartbeat?: HeartbeatInput | null;
+  unmappedEvents?: UnmappedEventsInput | null;
   capacity?: {
     concurrency?: ConcurrencyInput | null;
     quota?: QuotaInput | null;
@@ -171,14 +201,24 @@ export function formatQuota(quota: QuotaInput | null | undefined): FormattedMetr
   return ratioOrUnknown(quota?.remaining, quota?.allowance, "额度 · 无分母时未知");
 }
 
-/** Show a secondary tenant id only when it adds information; hide numeric aliases such as 001. */
+/**
+ * Secondary tenant id for display. When a distinct human label exists, hide the
+ * technical id. Show the id only when it is the only label (empty display name).
+ */
 export function visibleTenantCode(label: string, tenantId: string): string | null {
-  const name = label.trim() || tenantId.trim();
+  const name = label.trim();
   const id = tenantId.trim();
-  if (!id || id === name || /^\d+$/.test(id)) {
+  if (!id) {
+    return null;
+  }
+  if (name) {
     return null;
   }
   return id;
+}
+
+export function tenantDisplayName(label: string, tenantId: string): string {
+  return label.trim() || tenantId.trim();
 }
 
 export function censusTenantGrants(
@@ -207,25 +247,28 @@ export function censusTenantGrants(
   };
 }
 
+export function grantFraction(census: GrantCensus): number | null {
+  if (!Number.isFinite(census.total) || census.total <= 0) {
+    return null;
+  }
+  const granted = Number.isFinite(census.granted) ? Math.max(0, census.granted) : 0;
+  return Math.min(1, Math.max(0, granted / census.total));
+}
+
 export function formatGrantCensus(census: GrantCensus): FormattedMetric {
-  if (!census.hasConfirmed) {
+  if (!Number.isFinite(census.total) || census.total <= 0) {
     return {
-      value: "尚未确认",
-      detail: census.total > 0 ? `目录 ${census.total} · 授权尚未确认` : "授权结果尚未确认",
-      note: "不把未确认计为无授权",
+      value: "未知",
+      detail: "",
+      note: "无目录分母时未知",
     };
   }
-  const parts = [`${census.granted} 已授权`];
-  if (census.none > 0) {
-    parts.push(`${census.none} 无授权`);
-  }
-  if (census.unconfirmed > 0) {
-    parts.push(`${census.unconfirmed} 尚未确认`);
-  }
+  const granted = Number.isFinite(census.granted) ? Math.max(0, census.granted) : 0;
+  const percent = Math.round((granted / census.total) * 1000) / 10;
   return {
-    value: parts.join(" / "),
-    detail: `目录分母 ${census.total}（仅已确认授权计数）`,
-    note: "仅已授权租户可被精确查询；未确认不记为无授权",
+    value: `${granted}/${census.total} · ${percent}%`,
+    detail: "",
+    note: "仅已授权计入分子；未确认不记为无授权",
   };
 }
 
@@ -278,4 +321,52 @@ export function exactRunMatches(
     return [];
   }
   return runs.filter((run) => runExactIdentifiers(run).includes(needle));
+}
+
+export function formatUnmappedEvents(input: UnmappedEventsInput | null | undefined): FormattedMetric {
+  const count = input?.count;
+  if (count == null || !Number.isFinite(count) || count < 0) {
+    return { value: "未知", detail: "", note: "未映射事件计数未供给" };
+  }
+  if (count === 0) {
+    return { value: "0", detail: "当前窗口没有未映射事件", note: "" };
+  }
+  return { value: String(count), detail: "", note: "" };
+}
+
+export function heartbeatActivityMarks(
+  activity: HeartbeatInput | null | undefined,
+): HeartbeatActivityMark[] {
+  const events = activity?.events;
+  if (!events) {
+    return [];
+  }
+  return events.filter((event) => Number.isFinite(event.ts)).toSorted((left, right) => left.ts - right.ts);
+}
+
+export function formatHeartbeatFreshness(
+  activity: HeartbeatInput | null | undefined,
+  now = Date.now(),
+): string {
+  const last = activity?.lastEventAt;
+  const count =
+    activity?.observedEventCount ??
+    (Array.isArray(activity?.events) ? activity.events.length : null);
+  if (last == null || !Number.isFinite(last)) {
+    if (count === 0) {
+      return "暂无心跳记录";
+    }
+    return count != null && Number.isFinite(count) ? `已观察 ${count}` : "";
+  }
+  const delta = now - last;
+  if (!Number.isFinite(delta) || delta < 0) {
+    return count != null && Number.isFinite(count) ? `已观察 ${count}` : "";
+  }
+  const minutes = Math.floor(delta / 60_000);
+  const freshness =
+    minutes < 1 ? "刚刚" : minutes < 60 ? `${minutes} 分钟前` : `${Math.floor(minutes / 60)} 小时前`;
+  if (count != null && Number.isFinite(count)) {
+    return `${freshness} · ${count} 次`;
+  }
+  return freshness;
 }

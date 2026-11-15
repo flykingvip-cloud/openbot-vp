@@ -219,11 +219,27 @@ describe("deriveHeartbeatSamples", () => {
 });
 
 describe("resolveConfiguredHeartbeatPeriodMs", () => {
-  it("returns a period only when every configured agent shares one positive interval", () => {
+  it("returns a shared positive interval for the scheduled cohort and ignores event-only neighbors", () => {
     expect(resolveConfiguredHeartbeatPeriodMs({})).toBeNull();
     expect(
       resolveConfiguredHeartbeatPeriodMs({
+        agents: { defaults: { heartbeat: { every: "0m" } }, list: [{ id: "a" }, { id: "b" }] },
+      }),
+    ).toBeNull();
+    expect(
+      resolveConfiguredHeartbeatPeriodMs({
         agents: { defaults: { heartbeat: { every: "2m" } }, list: [{ id: "a" }, { id: "b" }] },
+      }),
+    ).toBe(120000);
+    expect(
+      resolveConfiguredHeartbeatPeriodMs({
+        agents: {
+          defaults: { heartbeat: { every: "0m" } },
+          list: [
+            { id: "scheduled", heartbeat: { every: "2m" } },
+            { id: "event-only", heartbeat: { every: "0m" } },
+          ],
+        },
       }),
     ).toBe(120000);
     expect(

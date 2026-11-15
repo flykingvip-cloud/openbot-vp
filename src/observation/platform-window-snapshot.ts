@@ -1,7 +1,7 @@
 /** Read-only first-screen snapshot. Aggregates a window cohort, never a single task. */
 import fs from "node:fs";
 import path from "node:path";
-import { listAgentEntries, resolveDefaultAgentId } from "../agents/agent-scope.js";
+import { listAgentIds } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { readExecutorEvidence } from "../executor-evidence/read-port.js";
 import { resolveConfiguredTaskOutcomeRoot } from "../task-outcome/reject-result.js";
@@ -24,7 +24,7 @@ import {
   type OutcomeEvidence,
 } from "./sample-assembler.js";
 
-function scopeKey(scope: TrustedScope): string {
+export function scopeKey(scope: TrustedScope): string {
   return JSON.stringify(
     scope.kind === "enterprise"
       ? [scope.kind, scope.subjectRef, scope.authzScopeRef, scope.tenantId, scope.enterpriseDomainId]
@@ -32,65 +32,120 @@ function scopeKey(scope: TrustedScope): string {
   );
 }
 
-function configuredAgentIds(cfg: OpenBotConfig): string[] {
-  const ids = listAgentEntries(cfg)
-    .map((entry) => (typeof entry.id === "string" ? entry.id.trim() : ""))
-    .filter(Boolean);
-  if (ids.length) {
-    return [...new Set(ids)];
-  }
-  const fallback = resolveDefaultAgentId(cfg);
-  return fallback ? [fallback] : [];
+export function configuredAgentIds(cfg: OpenBotConfig): string[] {
+  return [...new Set(listAgentIds(cfg).map((id) => id.trim()).filter(Boolean))];
 }
 
-function readCurrentOutcomes(cfg: OpenBotConfig, agentId: string): OutcomeMetadata[] {
-  const located = resolveConfiguredTaskOutcomeRoot(cfg, agentId);
-  if (!located.ok) {
-    return [];
-  }
-  const tipsDir = path.join(located.root, "tips");
-  let names: string[] = [];
-  try {
-    if (!fs.existsSync(tipsDir)) {
-      return [];
+export function scopeTenantId(scope: TrustedScope): string | null {
+  return scope.kind === "enterprise" && scope.tenantId.trim() ? scope.tenantId.trim() : null;
+}
+
+export type ScannedOutcomeTip = {
+  agentId: string;
+  record: OutcomeMetadata;
+};
+
+export type OutcomeScanStats = {
+  configuredAgents: number;
+  resolvedRoots: number;
+  missingRoots: number;
+  tipFiles: number;
+  acceptedTips: number;
+  inWindow: number;
+  outsideWindow: number;
+};
+
+export function scanConfiguredOutcomeTips(input: {
+  cfg: OpenBotConfig;
+  from: number;
+  to: number;
+}): { tips: ScannedOutcomeTip[]; stats: OutcomeScanStats } {
+  const agentIds = configuredAgentIds(input.cfg);
+  const stats: OutcomeScanStats = {
+    configuredAgents: agentIds.length,
+    resolvedRoots: 0,
+    missingRoots: 0,
+    tipFiles: 0,
+    acceptedTips: 0,
+    inWindow: 0,
+    outsideWindow: 0,
+  };
+  const tips: ScannedOutcomeTip[] = [];
+  for (const agentId of agentIds) {
+    const located = resolveConfiguredTaskOutcomeRoot(input.cfg, agentId);
+    if (!located.ok) {
+      stats.missingRoots += 1;
+      continue;
     }
-    names = fs.readdirSync(tipsDir).filter((name) => name.endsWith(".json"));
-  } catch {
-    return [];
-  }
-  const rows: OutcomeMetadata[] = [];
-  for (const name of names) {
+    stats.resolvedRoots += 1;
+    const tipsDir = path.join(located.root, "tips");
+    let names: string[] = [];
     try {
-      const tipRaw: unknown = JSON.parse(fs.readFileSync(path.join(tipsDir, name), "utf8"));
-      const tip = projectOutcomeRecordMetadata(tipRaw, { isCurrentTip: true });
-      if (!tip) {
+      if (!fs.existsSync(tipsDir)) {
         continue;
       }
-      const versionPath = path.join(
-        located.root,
-        "versions",
-        `${boundedOutcomePathSegment(tip.taskId)}__v${tip.outcomeVersion}.json`,
-      );
-      if (!fs.existsSync(versionPath)) {
-        continue;
-      }
-      const snap = projectOutcomeRecordMetadata(JSON.parse(fs.readFileSync(versionPath, "utf8")), {
-        isCurrentTip: true,
-      });
-      if (
-        !snap ||
-        snap.taskId !== tip.taskId ||
-        snap.outcomeVersion !== tip.outcomeVersion ||
-        scopeKey(snap.scope) !== scopeKey(tip.scope)
-      ) {
-        continue;
-      }
-      rows.push(snap);
+      names = fs.readdirSync(tipsDir).filter((name) => name.endsWith(".json"));
     } catch {
-      /* skip unreadable tips; never invent records */
+      continue;
+    }
+    stats.tipFiles += names.length;
+    for (const name of names) {
+      try {
+        const tipRaw: unknown = JSON.parse(fs.readFileSync(path.join(tipsDir, name), "utf8"));
+        const tip = projectOutcomeRecordMetadata(tipRaw, { isCurrentTip: true });
+        if (!tip) {
+          continue;
+        }
+        const versionPath = path.join(
+          located.root,
+          "versions",
+          `${boundedOutcomePathSegment(tip.taskId)}__v${tip.outcomeVersion}.json`,
+        );
+        if (!fs.existsSync(versionPath)) {
+          continue;
+        }
+        const snap = projectOutcomeRecordMetadata(JSON.parse(fs.readFileSync(versionPath, "utf8")), {
+          isCurrentTip: true,
+        });
+        if (
+          !snap ||
+          snap.taskId !== tip.taskId ||
+          snap.outcomeVersion !== tip.outcomeVersion ||
+          scopeKey(snap.scope) !== scopeKey(tip.scope)
+        ) {
+          continue;
+        }
+        stats.acceptedTips += 1;
+        const decided = Date.parse(snap.decidedAt);
+        if (!Number.isFinite(decided) || decided < input.from || decided >= input.to) {
+          stats.outsideWindow += 1;
+          continue;
+        }
+        stats.inWindow += 1;
+        tips.push({ agentId, record: snap });
+      } catch {
+        /* skip unreadable tips; never invent records */
+      }
     }
   }
-  return rows;
+  return { tips, stats };
+}
+
+export function coverageReasonsFromScan(stats: OutcomeScanStats, attemptedCount: number): string[] {
+  if (attemptedCount > 0) {
+    return [];
+  }
+  const reasons = ["no_candidates"];
+  if (stats.configuredAgents > 0 && stats.resolvedRoots === 0) {
+    reasons.push("configured_outcome_store_not_found");
+  }
+  if (stats.acceptedTips > 0 && stats.inWindow === 0) {
+    reasons.push("tips_outside_window");
+  }
+  if (stats.tipFiles > 0 && stats.acceptedTips === 0) {
+    reasons.push("tips_unreadable");
+  }
+  return reasons;
 }
 
 function durableExecutions(input: {
@@ -125,6 +180,21 @@ function durableExecutions(input: {
   }
 }
 
+export type HeartbeatActivityMark = {
+  ts: number;
+  status: string;
+};
+
+export type PlatformHeartbeatSnapshot = {
+  expectedPeriodMs: number | null;
+  expectedSamples: number | null;
+  observedSamples: number | null;
+  observedEventCount: number;
+  lastEventAt: number | null;
+  events: HeartbeatActivityMark[];
+  reasons: string[];
+};
+
 export type PlatformWindowSnapshot = {
   ok: true;
   readOnly: true;
@@ -137,11 +207,9 @@ export type PlatformWindowSnapshot = {
     link: number | null;
     reasons: string[];
   };
-  heartbeat: {
-    expectedPeriodMs: number | null;
-    expectedSamples: number | null;
-    observedSamples: number | null;
-    reasons: string[];
+  heartbeat: PlatformHeartbeatSnapshot;
+  unmappedEvents: {
+    count: number;
   };
   capacity: {
     concurrency: {
@@ -158,6 +226,56 @@ export type PlatformWindowSnapshot = {
   };
 };
 
+export type HeartbeatActivityInput = {
+  expectedPeriodMs?: number | null;
+  expectedSamples?: number | null;
+  observedSamples?: number | null;
+  events?: readonly { ts: number; status?: string }[];
+  reasons: readonly string[];
+} | null;
+
+export function projectHeartbeatSnapshot(
+  activity: HeartbeatActivityInput,
+  window: { from: number; to: number },
+): PlatformHeartbeatSnapshot {
+  const marks = (activity?.events ?? [])
+    .filter(
+      (event) =>
+        Number.isFinite(event.ts) && event.ts >= window.from && event.ts < window.to,
+    )
+    .map((event) => ({
+      ts: event.ts,
+      status: typeof event.status === "string" && event.status.trim() ? event.status : "unknown",
+    }))
+    .toSorted((left, right) => left.ts - right.ts);
+  const lastEventAt = marks.length ? marks[marks.length - 1].ts : null;
+  if (!activity) {
+    return {
+      expectedPeriodMs: null,
+      expectedSamples: null,
+      observedSamples: null,
+      observedEventCount: marks.length,
+      lastEventAt,
+      events: marks,
+      reasons: [
+        "heartbeat_activity_not_liveness",
+        "tenant_attribution_unavailable",
+        "expected_period_unknown",
+        "platform_activity_unavailable",
+      ],
+    };
+  }
+  return {
+    expectedPeriodMs: activity.expectedPeriodMs ?? null,
+    expectedSamples: activity.expectedSamples ?? null,
+    observedSamples: activity.observedSamples ?? null,
+    observedEventCount: marks.length,
+    lastEventAt,
+    events: marks,
+    reasons: [...activity.reasons],
+  };
+}
+
 export function queryPlatformObservationSnapshot(input: {
   cfg: OpenBotConfig;
   from: number;
@@ -166,12 +284,7 @@ export function queryPlatformObservationSnapshot(input: {
   evidenceLookupWindow?: { from: number; to: number };
   executionStore?: Pick<ReturnType<typeof createExecutionEvidenceStore>, "query" | "queryAll">;
   outcomeSourceStore?: Pick<ReturnType<typeof createOutcomeSourceStore>, "query">;
-  activity?: {
-    expectedPeriodMs?: number | null;
-    expectedSamples?: number | null;
-    observedSamples?: number | null;
-    reasons: readonly string[];
-  } | null;
+  activity?: HeartbeatActivityInput;
   readExecutorEvidence?: typeof readExecutorEvidence;
 }): { ok: false; code: "invalid_window" | "invalid_evidence_lookup_window" } | PlatformWindowSnapshot {
   if (
@@ -198,10 +311,6 @@ export function queryPlatformObservationSnapshot(input: {
   const outcomesByScope = new Map<string, { scope: TrustedScope; outcomes: OutcomeEvidence[] }>();
   const executionsByScope = new Map<string, ExecutionEvidence[]>();
   const addOutcome = (agentId: string, record: OutcomeMetadata) => {
-    const decided = Date.parse(record.decidedAt);
-    if (!Number.isFinite(decided) || decided < input.from || decided >= input.to) {
-      return;
-    }
     const key = scopeKey(record.scope);
     const bucket = outcomesByScope.get(key) ?? { scope: record.scope, outcomes: [] };
     const source = outcomeSources.query(agentId, record);
@@ -220,37 +329,43 @@ export function queryPlatformObservationSnapshot(input: {
     const key = scopeKey(scope);
     executionsByScope.set(key, [...(executionsByScope.get(key) ?? []), ...rows]);
   };
-  for (const agentId of configuredAgentIds(input.cfg)) {
-    const records = readCurrentOutcomes(input.cfg, agentId);
-    for (const record of records) {
-      addOutcome(agentId, record);
-      const memory = projectExecutionEvidence({
-        snapshot: executionStore.query(record.scope),
-        scope: record.scope,
-        taskId: record.taskId,
-        outcomeVersion: record.outcomeVersion,
-      });
-      addExecutions(memory.executions[0]?.scope ?? record.scope, memory.executions);
-      addExecutions(
-        record.scope,
-        durableExecutions({
-          cfg: input.cfg,
-          agentId,
-          record,
-          from: lookup.from,
-          to: lookup.to,
-          read: input.readExecutorEvidence,
-        }),
-      );
-    }
+  const scanned = scanConfiguredOutcomeTips({
+    cfg: input.cfg,
+    from: input.from,
+    to: input.to,
+  });
+  for (const tip of scanned.tips) {
+    addOutcome(tip.agentId, tip.record);
+    const memory = projectExecutionEvidence({
+      snapshot: executionStore.query(tip.record.scope),
+      scope: tip.record.scope,
+      taskId: tip.record.taskId,
+      outcomeVersion: tip.record.outcomeVersion,
+    });
+    addExecutions(memory.executions[0]?.scope ?? tip.record.scope, memory.executions);
+    addExecutions(
+      tip.record.scope,
+      durableExecutions({
+        cfg: input.cfg,
+        agentId: tip.agentId,
+        record: tip.record,
+        from: lookup.from,
+        to: lookup.to,
+        read: input.readExecutorEvidence,
+      }),
+    );
   }
   const linkedIds = new Set(
     [...executionsByScope.values()].flatMap((rows) => rows.map((row) => row.eventId)),
   );
   const live = executionStore.queryAll();
+  let unmappedEventCount = 0;
   for (const fact of live.facts) {
     if (fact.occurredAt < lookup.from || fact.occurredAt >= lookup.to) {
       continue;
+    }
+    if (!scopeTenantId(fact.scope)) {
+      unmappedEventCount += 1;
     }
     const receipt = live.links.find((link) => link.eventIds.includes(fact.eventId));
     const eventId = receipt ? fact.eventId : fact.eventId;
@@ -309,25 +424,6 @@ export function queryPlatformObservationSnapshot(input: {
   const fullyLinkedCount = samples.filter((sample) => sample.qualification === "fully_linked").length;
   const invalidCount = samples.filter((sample) => sample.qualification === "invalid").length;
   const attemptedCount = samples.length;
-  const activity = input.activity;
-  const heartbeat = activity
-    ? {
-        expectedPeriodMs: activity.expectedPeriodMs ?? null,
-        expectedSamples: activity.expectedSamples ?? null,
-        observedSamples: activity.observedSamples ?? null,
-        reasons: [...activity.reasons],
-      }
-    : {
-        expectedPeriodMs: null,
-        expectedSamples: null,
-        observedSamples: null,
-        reasons: [
-          "heartbeat_activity_not_liveness",
-          "tenant_attribution_unavailable",
-          "expected_period_unknown",
-          "platform_activity_unavailable",
-        ],
-      };
   return {
     ok: true,
     readOnly: true,
@@ -338,9 +434,10 @@ export function queryPlatformObservationSnapshot(input: {
       fullyLinkedCount,
       invalidCount,
       link: attemptedCount ? fullyLinkedCount / attemptedCount : null,
-      reasons: attemptedCount ? [] : ["no_candidates"],
+      reasons: coverageReasonsFromScan(scanned.stats, attemptedCount),
     },
-    heartbeat,
+    heartbeat: projectHeartbeatSnapshot(input.activity ?? null, { from: input.from, to: input.to }),
+    unmappedEvents: { count: unmappedEventCount },
     capacity: {
       concurrency: {
         activeRuns: null,

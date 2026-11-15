@@ -55,16 +55,23 @@ import {
   formatConcurrency,
   formatGrantCensus,
   formatHeartbeat,
+  formatHeartbeatFreshness,
   formatLinkCoverage,
   formatQuota,
+  formatUnmappedEvents,
+  grantFraction,
+  heartbeatActivityMarks,
   heartbeatFraction,
   linkCoverageFraction,
   formatTenantCoverage,
+  tenantDisplayName,
   tenantGrantNote,
   visibleTenantCode,
   type HeartbeatInput,
   type LinkCoverageInput,
   type PlatformFirstScreenSnapshot,
+  type PlatformTaskIndexItem,
+  type PlatformTaskIndexSnapshot,
 } from "./platform-overview.ts";
 import { observationSamples, SAMPLE_ENTERPRISE_DIRECTORY } from "./samples.ts";
 import {
@@ -183,7 +190,13 @@ export class OpenBotObservationWorkbench extends LitElement {
   private frozenStream: ObservationStreamView | null = null;
   private frozenSnapshot: PlatformFirstScreenSnapshot | null = null;
   @state() private windowSnapshot: PlatformFirstScreenSnapshot | null = null;
+  @state() private taskIndex: PlatformTaskIndexSnapshot | null = null;
+  @state() private taskFrom: number | null = null;
+  @state() private taskTo: number | null = null;
+  @state() private taskAgentFilter = "all";
+  private frozenTaskIndex: PlatformTaskIndexSnapshot | null = null;
   private snapshotGeneration = 0;
+  private taskIndexGeneration = 0;
   private lastFingerprint = "";
   private pendingStreamUpdate = false;
   private requestedRunId: string | null = null;
@@ -199,11 +212,20 @@ export class OpenBotObservationWorkbench extends LitElement {
     this.captureDrawerRequest();
     this.poll = window.setInterval(() => {
       this.tick++;
-      if (this.tick % 10 === 0 && !this.paused) {
+      if (this.paused) {
+        return;
+      }
+      if (this.tick % 10 === 0 || (this.tick % 2 === 0 && this.windowSnapshot === null)) {
         void this.pullPlatformSnapshot();
       }
+      if (this.tick % 10 === 0 || (this.tick % 2 === 0 && this.taskIndex === null)) {
+        void this.pullTaskIndex();
+      }
     }, 1000);
-    queueMicrotask(() => void this.pullPlatformSnapshot());
+    queueMicrotask(() => {
+      void this.pullPlatformSnapshot();
+      void this.pullTaskIndex();
+    });
   }
   willUpdate(changed: Map<string | number | symbol, unknown>) {
     // Skip the first update: every property is "changed" on connect, including
@@ -268,7 +290,14 @@ export class OpenBotObservationWorkbench extends LitElement {
     }
     const row = value as {
       coverage?: { fullyLinkedCount?: unknown; attemptedCount?: unknown; link?: unknown };
-      heartbeat?: { expectedSamples?: unknown; observedSamples?: unknown };
+      heartbeat?: {
+        expectedSamples?: unknown;
+        observedSamples?: unknown;
+        observedEventCount?: unknown;
+        lastEventAt?: unknown;
+        events?: unknown;
+      };
+      unmappedEvents?: { count?: unknown };
       capacity?: {
         concurrency?: { activeRuns?: unknown; limit?: unknown };
         quota?: { remaining?: unknown; allowance?: unknown };
@@ -276,6 +305,18 @@ export class OpenBotObservationWorkbench extends LitElement {
     };
     const count = (input: unknown): number | null =>
       typeof input === "number" && Number.isFinite(input) ? input : null;
+    const events = Array.isArray(row.heartbeat?.events)
+      ? row.heartbeat.events.flatMap((event) => {
+          if (!event || typeof event !== "object") {
+            return [];
+          }
+          const ts = (event as { ts?: unknown }).ts;
+          const status = (event as { status?: unknown }).status;
+          return typeof ts === "number" && Number.isFinite(ts)
+            ? [{ ts, status: typeof status === "string" ? status : undefined }]
+            : [];
+        })
+      : [];
     return {
       coverage: row.coverage
         ? {
@@ -288,8 +329,12 @@ export class OpenBotObservationWorkbench extends LitElement {
         ? {
             expectedSamples: count(row.heartbeat.expectedSamples),
             observedSamples: count(row.heartbeat.observedSamples),
+            observedEventCount: count(row.heartbeat.observedEventCount) ?? (events.length ? events.length : null),
+            lastEventAt: count(row.heartbeat.lastEventAt),
+            events,
           }
         : null,
+      unmappedEvents: row.unmappedEvents ? { count: count(row.unmappedEvents.count) } : null,
       capacity: {
         concurrency: row.capacity?.concurrency
           ? {
@@ -342,6 +387,164 @@ export class OpenBotObservationWorkbench extends LitElement {
       this.windowSnapshot = null;
     }
   }
+  private currentTaskWindow(now = Date.now()): { from: number; to: number } {
+    const to = this.taskTo != null && Number.isFinite(this.taskTo) ? this.taskTo : now;
+    const from =
+      this.taskFrom != null && Number.isFinite(this.taskFrom) ? this.taskFrom : to - 7 * 86_400_000;
+    return { from, to };
+  }
+  private firstScreenTaskIndex(): PlatformTaskIndexSnapshot | null {
+    if (this.paused && this.frozenTaskIndex) {
+      return this.frozenTaskIndex;
+    }
+    return this.taskIndex;
+  }
+  private parseTaskIndex(value: unknown): PlatformTaskIndexSnapshot | null {
+    if (!value || typeof value !== "object" || (value as { ok?: unknown }).ok !== true) {
+      return null;
+    }
+    const row = value as {
+      authorization?: unknown;
+      window?: { from?: unknown; to?: unknown };
+      tasks?: unknown;
+      agents?: unknown;
+      truncated?: unknown;
+    };
+    const authorization = row.authorization === "unknown" ? "unknown" : row.authorization === "granted" ? "granted" : null;
+    if (!authorization || !row.window || typeof row.window.from !== "number" || typeof row.window.to !== "number") {
+      return null;
+    }
+    const tasks = Array.isArray(row.tasks)
+      ? row.tasks.flatMap((item) => {
+          if (!item || typeof item !== "object") {
+            return [];
+          }
+          const task = item as {
+            taskId?: unknown;
+            outcomeVersion?: unknown;
+            agentId?: unknown;
+            decidedAt?: unknown;
+            tenantId?: unknown;
+            coverage?: { fullyLinkedCount?: unknown; attemptedCount?: unknown; link?: unknown };
+          };
+          if (
+            typeof task.taskId !== "string" ||
+            !task.taskId.trim() ||
+            typeof task.agentId !== "string" ||
+            !task.agentId.trim() ||
+            typeof task.outcomeVersion !== "number" ||
+            !Number.isSafeInteger(task.outcomeVersion) ||
+            typeof task.decidedAt !== "string"
+          ) {
+            return [];
+          }
+          const count = (input: unknown): number | null =>
+            typeof input === "number" && Number.isFinite(input) ? input : null;
+          return [
+            {
+              taskId: task.taskId,
+              outcomeVersion: task.outcomeVersion,
+              agentId: task.agentId,
+              decidedAt: task.decidedAt,
+              tenantId: typeof task.tenantId === "string" && task.tenantId.trim() ? task.tenantId : null,
+              coverage: task.coverage
+                ? {
+                    fullyLinkedCount: count(task.coverage.fullyLinkedCount),
+                    attemptedCount: count(task.coverage.attemptedCount),
+                    link: count(task.coverage.link),
+                  }
+                : null,
+            },
+          ];
+        })
+      : [];
+    const agents = Array.isArray(row.agents)
+      ? row.agents.flatMap((entry) => {
+          const id = entry && typeof entry === "object" ? (entry as { id?: unknown }).id : undefined;
+          return typeof id === "string" && id.trim() ? [{ id }] : [];
+        })
+      : [];
+    return {
+      authorization,
+      window: { from: row.window.from, to: row.window.to },
+      tasks,
+      agents,
+      truncated: row.truncated === true,
+    };
+  }
+  private sampleTaskIndex(view: ObservationView): PlatformTaskIndexSnapshot {
+    const { from, to } = this.currentTaskWindow();
+    const tenant = this.tenantFilter !== "all" ? this.tenantFilter : "";
+    const agent = this.taskAgentFilter !== "all" ? this.taskAgentFilter : "";
+    const tasks: PlatformTaskIndexItem[] = view.runs.flatMap((run) => {
+      if (tenant && run.tenantId !== tenant) {
+        return [];
+      }
+      const agentId = "sample";
+      if (agent && agentId !== agent) {
+        return [];
+      }
+      return [
+        {
+          taskId: run.scenarioTaskRef ?? run.id,
+          outcomeVersion: Number(run.outcomeRevision) || 1,
+          agentId,
+          decidedAt: "2026-11-01T08:00:00.000Z",
+          tenantId: run.tenantId,
+          coverage: null,
+        },
+      ];
+    });
+    return {
+      authorization: "granted",
+      window: { from, to },
+      tasks,
+      agents: [{ id: "sample" }],
+      truncated: false,
+    };
+  }
+  private async pullTaskIndex() {
+    if (this.paused) {
+      return;
+    }
+    if (this.source === "sample") {
+      this.taskIndex = this.sampleTaskIndex(this.view());
+      return;
+    }
+    if (!this.canReadPlatformSnapshot() || !this.client) {
+      if (this.taskIndex !== null) {
+        this.taskIndex = null;
+      }
+      return;
+    }
+    const client = this.client;
+    const generation = ++this.taskIndexGeneration;
+    const { from, to } = this.currentTaskWindow();
+    const params: Record<string, unknown> = { taskIndex: true, from, to };
+    if (this.tenantFilter !== "all") {
+      params.tenantId = this.tenantFilter;
+    }
+    if (this.taskAgentFilter !== "all") {
+      params.agentId = this.taskAgentFilter;
+    }
+    try {
+      const result = await client.request("diagnosis.observation.query", params);
+      if (
+        generation !== this.taskIndexGeneration ||
+        this.paused ||
+        client !== this.client ||
+        !this.canReadPlatformSnapshot()
+      ) {
+        return;
+      }
+      this.taskIndex = this.parseTaskIndex(result);
+    } catch {
+      if (generation !== this.taskIndexGeneration || this.paused) {
+        return;
+      }
+      this.taskIndex = null;
+    }
+  }
   private currentTenantGrant(): TenantGrant {
     if (this.role !== "platform" || this.tenantFilter === "all") {
       return "granted";
@@ -377,7 +580,10 @@ export class OpenBotObservationWorkbench extends LitElement {
     this.queryResult = null;
     this.windowSnapshot = null;
     this.frozenSnapshot = null;
+    this.taskIndex = null;
+    this.frozenTaskIndex = null;
     this.snapshotGeneration += 1;
+    this.taskIndexGeneration += 1;
     const authorized = this.isAuthorized();
     this.accessNotice =
       authorized === true ? null : authorized === false ? AUTH_INVALID_COPY : AUTH_UNCONFIRMED_COPY;
@@ -541,12 +747,17 @@ export class OpenBotObservationWorkbench extends LitElement {
       this.queryResult = null;
       this.windowSnapshot = null;
       this.frozenSnapshot = null;
+      this.taskIndex = null;
+      this.frozenTaskIndex = null;
+      this.taskAgentFilter = "all";
       this.snapshotGeneration += 1;
+      this.taskIndexGeneration += 1;
       this.issueFilter = "all";
       this.sessionFilter = "current";
       this.agentFilter = "all";
       this.syncDrawerUrl({ runId: null, drawer: false });
       void this.pullPlatformSnapshot();
+      void this.pullTaskIndex();
     }
   }
   private directoryEntries(view: ObservationView): readonly ObservationEnterpriseEntry[] {
@@ -604,6 +815,12 @@ export class OpenBotObservationWorkbench extends LitElement {
     this.frozenStream = null;
     this.paused = false;
     this.queryResult = null;
+    this.frozenTaskIndex = null;
+    if (this.source !== "sample") {
+      this.taskIndex = null;
+    }
+    this.taskIndexGeneration += 1;
+    void this.pullTaskIndex();
   }
   private submitPreciseQuery(view: ObservationView) {
     const identifier = this.queryInput.trim();
@@ -621,7 +838,10 @@ export class OpenBotObservationWorkbench extends LitElement {
       this.queryResult = null;
       return;
     }
-    const matches = exactRunMatches(this.filteredRuns(view), identifier);
+    const matches = exactRunMatches(
+      [...this.filteredRuns(view), ...this.indexRunsForDrawer()],
+      identifier,
+    );
     if (matches.length !== 1) {
       this.queryResult = { status: "miss", message: PRECISE_QUERY_MISS_COPY };
       this.selected = null;
@@ -689,17 +909,22 @@ export class OpenBotObservationWorkbench extends LitElement {
       this.frozenView = view;
       this.frozenStream = this.buildLiveStream(view);
       this.frozenSnapshot = this.windowSnapshot;
+      this.frozenTaskIndex = this.taskIndex;
       this.paused = true;
       this.pendingStreamUpdate = false;
       this.snapshotGeneration += 1;
+      this.taskIndexGeneration += 1;
     } else {
       this.paused = false;
       this.frozenView = null;
       this.frozenStream = null;
       this.frozenSnapshot = null;
+      this.frozenTaskIndex = null;
       this.pendingStreamUpdate = false;
       this.snapshotGeneration += 1;
+      this.taskIndexGeneration += 1;
       void this.pullPlatformSnapshot();
+      void this.pullTaskIndex();
     }
   }
   private openRun(row: ObservationRun, drawer: boolean) {
@@ -970,9 +1195,11 @@ export class OpenBotObservationWorkbench extends LitElement {
         (card) => html`<div class="obs-cap-item ${card.chart ? "obs-cap-item--chart" : ""}" data-testid=${`obs-capacity-${card.title}`}>
           <h4>${card.title}</h4>
           ${
-            card.chart
-              ? this.renderRatioMeter({ label: card.title, value: card.value, fraction: card.fraction })
-              : html`<div class="obs-cap-val">${card.value}</div>`
+            card.title === "心跳时效" && card.fraction == null
+              ? this.renderHeartbeatActivity(heartbeatInput)
+              : card.chart
+                ? this.renderRatioMeter({ label: card.title, value: card.value, fraction: card.fraction })
+                : html`<div class="obs-cap-val">${card.value}</div>`
           }
         </div>`,
       )}</div>
@@ -1586,14 +1813,28 @@ export class OpenBotObservationWorkbench extends LitElement {
         changed.has(key),
       )
     ) {
-      queueMicrotask(() => void this.pullPlatformSnapshot());
+      queueMicrotask(() => {
+        void this.pullPlatformSnapshot();
+        void this.pullTaskIndex();
+      });
     }
     const view = this.updateStream(this.view());
     const runs = this.filteredRuns(view);
+    const indexRuns = this.role === "platform" ? this.indexRunsForDrawer() : [];
+    const drawerRuns = [...runs];
+    const drawerAll = [...view.runs];
+    for (const run of indexRuns) {
+      if (!drawerRuns.some((row) => row.id === run.id)) {
+        drawerRuns.push(run);
+      }
+      if (!drawerAll.some((row) => row.id === run.id)) {
+        drawerAll.push(run);
+      }
+    }
     const resolved = resolveDrawerSelection({
       access: this.accessInput(),
-      runs,
-      allRuns: view.runs,
+      runs: drawerRuns,
+      allRuns: drawerAll,
       selectedId: this.selected?.id ?? null,
       requestedRunId: this.requestedRunId,
       expanded: this.expanded,
@@ -1630,6 +1871,111 @@ export class OpenBotObservationWorkbench extends LitElement {
     return html`<div class="obs-source"><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select></div>`;
   }
 
+  private dateInputValue(ms: number): string {
+    const date = new Date(ms);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  private setTaskDateRange(fromValue: string, toValue: string) {
+    const fromParts = fromValue.split("-").map(Number);
+    const toParts = toValue.split("-").map(Number);
+    if (fromParts.length !== 3 || toParts.length !== 3 || fromParts.some((n) => !Number.isFinite(n)) || toParts.some((n) => !Number.isFinite(n))) {
+      return;
+    }
+    const from = new Date(fromParts[0], fromParts[1] - 1, fromParts[2]).getTime();
+    const to = new Date(toParts[0], toParts[1] - 1, toParts[2] + 1).getTime();
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to || to - from > 30 * 86_400_000) {
+      return;
+    }
+    this.taskFrom = from;
+    this.taskTo = to;
+    this.frozenTaskIndex = null;
+    this.paused = false;
+    this.taskIndexGeneration += 1;
+    void this.pullTaskIndex();
+  }
+  private setTaskAgentFilter(agentId: string) {
+    this.taskAgentFilter = agentId || "all";
+    this.frozenTaskIndex = null;
+    this.paused = false;
+    this.taskIndexGeneration += 1;
+    void this.pullTaskIndex();
+  }
+  private indexItemId(item: PlatformTaskIndexItem): string {
+    return `${item.agentId}:${item.taskId}@${item.outcomeVersion}`;
+  }
+  private indexItemToRun(item: PlatformTaskIndexItem, view: ObservationView): ObservationRun {
+    const directory = this.directoryEntries(view);
+    const entry = item.tenantId ? directory.find((row) => row.tenantId === item.tenantId) : undefined;
+    return {
+      id: this.indexItemId(item),
+      label: item.taskId,
+      scope: "unknown",
+      tenantId: item.tenantId ?? null,
+      tenantLabel: entry ? tenantDisplayName(entry.label, entry.tenantId) : null,
+      clientRunId: item.taskId,
+      sourceRunId: null,
+      admittedWorkId: null,
+      scenarioTaskRef: item.taskId,
+      outcomeRevision: String(item.outcomeVersion),
+      toolState: "unknown",
+      outcomeState: "unavailable",
+      latencyMs: null,
+      attributedCost: null,
+      stages: [],
+      reasons: [],
+      eventCount: 0,
+      sample: view.source === "sample",
+    };
+  }
+  private indexRunsForDrawer(): ObservationRun[] {
+    const index = this.firstScreenTaskIndex();
+    if (!index || index.authorization !== "granted") {
+      return [];
+    }
+    const view = this.view();
+    return accessibleRuns(
+      index.tasks.map((item) => this.indexItemToRun(item, view)),
+      this.accessInput(),
+    );
+  }
+  private openIndexedTask(item: PlatformTaskIndexItem, view: ObservationView) {
+    const run = this.indexItemToRun(item, view);
+    const access = canAccessRun({ ...this.accessInput(), run });
+    if (!access.ok) {
+      return;
+    }
+    this.selected = run;
+    this.expanded = true;
+    this.requestedRunId = run.id;
+    this.requestedDrawer = true;
+  }
+  private renderHeartbeatActivity(activity: HeartbeatInput | null) {
+    const marks = heartbeatActivityMarks(activity);
+    const first = marks[0]?.ts;
+    const last = marks[marks.length - 1]?.ts;
+    const start = first != null && last != null && last > first ? first : (last != null ? last - 1 : 0);
+    const end = last != null && last > start ? last : start + 1;
+    const span = Math.max(1, end - start);
+    const value = formatHeartbeatFreshness(activity);
+    return html`<div class="obs-heartbeat-activity" data-testid="obs-heartbeat-activity">
+      <svg class="obs-heartbeat-spark" viewBox="0 0 120 36" role="img" aria-label=${value || "心跳活动"}>
+        <line class="obs-heartbeat-spark__axis" x1="4" y1="18" x2="116" y2="18"></line>
+        ${
+          marks.length
+            ? marks.map((mark) => {
+                const x = 4 + (112 * (mark.ts - start)) / span;
+                return html`<circle class="obs-heartbeat-spark__mark" cx=${x} cy="18" r="3"></circle>`;
+              })
+            : nothing
+        }
+      </svg>
+      <div class="obs-cap-val">${value || "暂无心跳记录"}</div>
+    </div>`;
+  }
+
   private renderRatioMeter(options: { label: string; value: string; fraction: number | null }) {
     const radius = 28;
     const circumference = 2 * Math.PI * radius;
@@ -1655,11 +2001,10 @@ export class OpenBotObservationWorkbench extends LitElement {
     const heartbeatInput: HeartbeatInput | null = snapshot?.heartbeat ?? null;
     const coverage = formatLinkCoverage(coverageInput);
     const heartbeat = formatHeartbeat(heartbeatInput);
-    const census = formatGrantCensus(
-      censusTenantGrants(this.directoryEntries(view), this.tenantGrants),
-    );
-    const unmappedLive =
-      this.role === "platform" && view.source === "live" && this.tenantFilter !== "all";
+    const heartbeatRatio = heartbeatFraction(heartbeatInput);
+    const grantCensus = censusTenantGrants(this.directoryEntries(view), this.tenantGrants);
+    const census = formatGrantCensus(grantCensus);
+    const unmapped = formatUnmappedEvents(snapshot?.unmappedEvents ?? null);
     return html`<section class="obs-plat-card" data-testid="obs-platform-health" aria-label="平台健康与覆盖">
       <div class="obs-plat-card__head"><div><h3>平台健康与覆盖</h3></div></div>
       <div class="obs-cap-grid">
@@ -1673,20 +2018,28 @@ export class OpenBotObservationWorkbench extends LitElement {
         </div>
         <div class="obs-cap-item obs-cap-item--chart" data-testid="obs-health-心跳时效">
           <h4>心跳时效</h4>
-          ${this.renderRatioMeter({
-            label: "心跳时效",
-            value: heartbeat.value,
-            fraction: heartbeatFraction(heartbeatInput),
-          })}
+          ${
+            heartbeatRatio == null
+              ? this.renderHeartbeatActivity(heartbeatInput)
+              : this.renderRatioMeter({
+                  label: "心跳时效",
+                  value: heartbeat.value,
+                  fraction: heartbeatRatio,
+                })
+          }
         </div>
-        <div class="obs-cap-item" data-testid="obs-health-租户授权">
+        <div class="obs-cap-item obs-cap-item--chart" data-testid="obs-health-租户授权">
           <h4>租户授权</h4>
-          <div class="obs-cap-val">${census.value}</div>
+          ${this.renderRatioMeter({
+            label: "租户授权",
+            value: census.value,
+            fraction: grantFraction(grantCensus),
+          })}
         </div>
         <div class="obs-cap-item" data-testid="obs-health-未映射事件">
           <h4>未映射事件</h4>
-          <div class="obs-cap-val">不计入企业</div>
-          ${unmappedLive ? html`<div class="obs-cap-den">当前企业暂无已映射运行</div>` : nothing}
+          <div class="obs-cap-val">${unmapped.value}</div>
+          ${unmapped.detail ? html`<div class="obs-cap-den">${unmapped.detail}</div>` : nothing}
         </div>
       </div>
     </section>`;
@@ -1696,8 +2049,18 @@ export class OpenBotObservationWorkbench extends LitElement {
     const authorization = currentAuthorization(this.accessInput());
     const disabled = !authorization.ok;
     const result = this.queryResult;
+    const index = this.firstScreenTaskIndex();
+    const window = index?.window ?? this.currentTaskWindow();
+    const agents = [
+      ...new Map(
+        [...(index?.agents ?? []), ...this.targets.map((target) => ({ id: target.agentId }))]
+          .filter((row) => row.id)
+          .map((row) => [row.id, row]),
+      ).values(),
+    ];
     return html`<section class="obs-plat-card" data-testid="obs-precise-query" aria-label="精确任务查询">
       <div class="obs-plat-card__head"><div><h3>精确任务查询</h3></div></div>
+      <div class="obs-query-filters">
       <label class="field obs-query-scope"><span>租户筛选</span>
         <select aria-label="租户筛选" ?disabled=${this.isAuthorized() === false} @change=${(
           event: Event,
@@ -1709,10 +2072,32 @@ export class OpenBotObservationWorkbench extends LitElement {
             const grant = this.entryGrant(row);
             const suffix =
               grant === "none" ? " · 无授权" : grant === "unknown" ? " · 尚未确认" : "";
-            return html`<option value=${row.tenantId} ?selected=${this.tenantFilter === row.tenantId}>${row.label}（${row.tenantId}）${suffix}</option>`;
+            const code = visibleTenantCode(row.label, row.tenantId);
+            return html`<option value=${row.tenantId} ?selected=${this.tenantFilter === row.tenantId}>${tenantDisplayName(row.label, row.tenantId)}${code ? `（${code}）` : ""}${suffix}</option>`;
           })}
         </select>
       </label>
+      <label class="field obs-query-scope"><span>日期</span>
+        <div class="obs-query-dates">
+          <input type="date" aria-label="起始日期" ?disabled=${disabled} .value=${this.dateInputValue(window.from)} @change=${(event: Event) => {
+            const fromValue = (event.target as HTMLInputElement).value;
+            this.setTaskDateRange(fromValue, this.dateInputValue(window.to - 1));
+          }} />
+          <input type="date" aria-label="结束日期" ?disabled=${disabled} .value=${this.dateInputValue(window.to - 1)} @change=${(event: Event) => {
+            const toValue = (event.target as HTMLInputElement).value;
+            this.setTaskDateRange(this.dateInputValue(window.from), toValue);
+          }} />
+        </div>
+      </label>
+      <label class="field obs-query-scope"><span>机器人</span>
+        <select aria-label="机器人筛选" ?disabled=${disabled} @change=${(event: Event) => {
+          this.setTaskAgentFilter((event.target as HTMLSelectElement).value || "all");
+        }}>
+          <option value="all" ?selected=${this.taskAgentFilter === "all"}>全部机器人</option>
+          ${agents.map((row) => html`<option value=${row.id} ?selected=${this.taskAgentFilter === row.id}>${row.id}</option>`)}
+        </select>
+      </label>
+      </div>
       <form class="obs-query-box" @submit=${(event: Event) => {
         event.preventDefault();
         this.submitPreciseQuery(view);
@@ -1751,7 +2136,44 @@ export class OpenBotObservationWorkbench extends LitElement {
                   </div>`
                 : nothing
       }
+      ${this.renderTaskIndexList(view, index, disabled)}
     </section>`;
+  }
+  private renderTaskIndexList(
+    view: ObservationView,
+    index: PlatformTaskIndexSnapshot | null,
+    disabled: boolean,
+  ) {
+    if (disabled) {
+      return nothing;
+    }
+    if (!index) {
+      return html`<div class="obs-task-index" data-testid="obs-task-index"><p class="obs-plat-footnote">任务列表将按企业、日期和机器人自动出现。</p></div>`;
+    }
+    if (index.authorization === "unknown") {
+      return html`<div class="obs-task-index" data-testid="obs-task-index"><p class="obs-plat-footnote">授权尚未确认，不返回该租户任务。</p></div>`;
+    }
+    if (!index.tasks.length) {
+      return html`<div class="obs-task-index" data-testid="obs-task-index"><p class="obs-plat-footnote">当前筛选下没有可列出的任务。</p></div>`;
+    }
+    return html`<div class="obs-task-index" data-testid="obs-task-index">
+      <ul class="obs-task-index__list">
+        ${index.tasks.map((item) => {
+          const run = this.indexItemToRun(item, view);
+          const coverage = item.coverage ? formatLinkCoverage(item.coverage).value : "";
+          const decided = Number.isFinite(Date.parse(item.decidedAt))
+            ? new Date(item.decidedAt).toLocaleString("zh-CN", { hour12: false })
+            : "";
+          return html`<li>
+            <button type="button" class="obs-task-index__item" data-task-id=${item.taskId} @click=${() => this.openIndexedTask(item, view)}>
+              <strong>${item.taskId}</strong>
+              <span>${item.agentId}${run.tenantLabel ? ` · ${run.tenantLabel}` : ""}${decided ? ` · ${decided}` : ""}${coverage && coverage !== "未知" ? ` · ${coverage}` : ""}</span>
+            </button>
+          </li>`;
+        })}
+      </ul>
+      ${index.truncated ? html`<p class="obs-plat-footnote">仅显示最近一部分匹配任务。</p>` : nothing}
+    </div>`;
   }
   private renderTenantGrantTable(view: ObservationView) {
     const rows = this.directoryEntries(view);
@@ -1776,7 +2198,7 @@ export class OpenBotObservationWorkbench extends LitElement {
               const tenantCode = visibleTenantCode(entry.label, entry.tenantId);
               const note = grant === "granted" ? "" : tenantGrantNote(grant, isSample);
               return html`<tr data-tenant-id=${entry.tenantId}>
-                <td>${entry.label}${tenantCode ? html`<code>${tenantCode}</code>` : nothing}</td>
+                <td>${tenantDisplayName(entry.label, entry.tenantId)}${tenantCode ? html`<code>${tenantCode}</code>` : nothing}</td>
                 <td><span class="obs-grant-chip is-${grant}">${grantLabel}</span></td>
                 <td>${formatTenantCoverage(grant)}</td>
                 <td class="obs-plat-footnote">${note}</td>
@@ -1826,11 +2248,24 @@ export class OpenBotObservationWorkbench extends LitElement {
     const view = this.updateStream(this.view());
     const runs = this.filteredRuns(view);
     const listRuns = this.applyMetricFilter(runs);
+    const indexRuns = this.role === "platform" ? this.indexRunsForDrawer() : [];
+    const drawerRuns = [...runs];
+    for (const run of indexRuns) {
+      if (!drawerRuns.some((row) => row.id === run.id)) {
+        drawerRuns.push(run);
+      }
+    }
+    const drawerAll = [...view.runs];
+    for (const run of indexRuns) {
+      if (!drawerAll.some((row) => row.id === run.id)) {
+        drawerAll.push(run);
+      }
+    }
     // Re-resolve from the current authorized projection, never a stale drawer snapshot.
     const resolved = resolveDrawerSelection({
       access: this.accessInput(),
-      runs,
-      allRuns: view.runs,
+      runs: drawerRuns,
+      allRuns: drawerAll,
       selectedId: this.selected?.id ?? null,
       requestedRunId: this.requestedRunId,
       expanded: this.expanded,

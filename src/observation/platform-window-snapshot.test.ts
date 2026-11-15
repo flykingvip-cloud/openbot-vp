@@ -145,4 +145,78 @@ describe("platform window snapshot", () => {
     expect(snapshot.heartbeat.expectedSamples).toBe(4);
     expect(snapshot.heartbeat.observedSamples).toBe(3);
   });
+
+  it("marks coverage unknown with tips_outside_window when durable tips exist outside the window", () => {
+    const record = row("task-old");
+    fs.writeFileSync(path.join(dir, "task-outcomes/tips", "task-old.json"), JSON.stringify(record));
+    fs.writeFileSync(
+      path.join(dir, "task-outcomes/versions", "task-old__v1.json"),
+      JSON.stringify(record),
+    );
+    const snapshot = queryPlatformObservationSnapshot({
+      cfg,
+      from: time + 60_000,
+      to: time + 120_000,
+      projectedAt: time + 120_000,
+      executionStore: createExecutionEvidenceStore({ enabled: () => false, now: () => time + 61_000 }),
+      activity: null,
+    });
+    expect(snapshot.ok).toBe(true);
+    if (!snapshot.ok) {
+      throw new Error("snapshot_failed");
+    }
+    expect(snapshot.coverage.attemptedCount).toBe(0);
+    expect(snapshot.coverage.link).toBeNull();
+    expect(snapshot.coverage.reasons).toContain("no_candidates");
+    expect(snapshot.coverage.reasons).toContain("tips_outside_window");
+    expect(snapshot.unmappedEvents.count).toBe(0);
+  });
+
+  it("counts unmapped execution events and forwards heartbeat activity marks", () => {
+    const executionStore = createExecutionEvidenceStore({
+      enabled: () => true,
+      now: () => time + 1,
+    });
+    executionStore.recordFact({
+      eventId: "u1",
+      stage: "started",
+      occurredAt: time,
+      scope: {
+        kind: "personal",
+        personalDomainId: "personal",
+        subjectRef: "subject:alice",
+        authzScopeRef: "auth",
+      },
+      taskId: "task-u",
+      runId: "run-u",
+    });
+    const snapshot = queryPlatformObservationSnapshot({
+      cfg,
+      from: time,
+      to: time + 1000,
+      projectedAt: time + 1000,
+      executionStore,
+      activity: {
+        expectedPeriodMs: null,
+        expectedSamples: null,
+        observedSamples: null,
+        events: [
+          { ts: time, status: "sent" },
+          { ts: time + 400, status: "ok-empty" },
+          { ts: time - 1, status: "skipped" },
+        ],
+        reasons: ["expected_period_unknown"],
+      },
+    });
+    expect(snapshot.ok).toBe(true);
+    if (!snapshot.ok) {
+      throw new Error("snapshot_failed");
+    }
+    expect(snapshot.unmappedEvents.count).toBe(1);
+    expect(snapshot.heartbeat.expectedSamples).toBeNull();
+    expect(snapshot.heartbeat.observedEventCount).toBe(2);
+    expect(snapshot.heartbeat.lastEventAt).toBe(time + 400);
+    expect(snapshot.heartbeat.events.map((row) => row.status)).toEqual(["sent", "ok-empty"]);
+    expect(JSON.stringify(snapshot)).not.toContain("subject:alice");
+  });
 });

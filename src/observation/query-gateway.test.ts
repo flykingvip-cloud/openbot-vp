@@ -491,3 +491,47 @@ describe("platform window snapshot gateway", () => {
     expect(query).not.toHaveBeenCalled();
   });
 });
+
+
+describe("platform task index gateway", () => {
+  const platformClient = (): GatewayClient =>
+    ({
+      platformUserId: "platform-user",
+      sessionDomain: "platform",
+      sessionKind: "platform-admin",
+      connect: { scopes: ["operator.read", "operator.platform"] },
+    }) as GatewayClient;
+  const handler = () =>
+    createObservationQueryHandlers({
+      authDeps: { resolveMembership: async () => ({ tenantId: null, userId: "platform-user" }) },
+      loadConfig: () => ({}),
+      now: () => 7 * 86_400_000,
+      listGrantedTenantIds: async () => ["tenant-a"],
+    })[OBSERVATION_QUERY_METHOD];
+
+  it("rejects mixed task index requests and non-platform sessions", async () => {
+    expect(
+      (await invoke(handler(), platformClient(), { taskIndex: true, platformWindow: true } as never))
+        .mock.calls[0][0],
+    ).toBe(false);
+    expect(
+      (await invoke(handler(), platformClient(), { taskIndex: true, taskId: "task" } as never)).mock
+        .calls[0][0],
+    ).toBe(false);
+    const enterprise = client(["operator.read", "operator.platform"]);
+    expect((await invoke(handler(), enterprise, { taskIndex: true } as never)).mock.calls[0][0]).toBe(
+      false,
+    );
+  });
+
+  it("returns a compact index rather than a precise-task observation", async () => {
+    query.mockClear();
+    const respond = await invoke(handler(), platformClient(), { taskIndex: true } as never);
+    expect(respond.mock.calls[0][0]).toBe(true);
+    expect(respond.mock.calls[0][1].ok).toBe(true);
+    expect(respond.mock.calls[0][1].readOnly).toBe(true);
+    expect(respond.mock.calls[0][1].tasks).toEqual([]);
+    expect(respond.mock.calls[0][1].window).toEqual({ from: 0, to: 7 * 86_400_000 });
+    expect(query).not.toHaveBeenCalled();
+  });
+});

@@ -17,10 +17,29 @@ import { createPlatformHeartbeatActivityQuery } from "./heartbeat-activity-query
 import type { startHeartbeatActivity } from "./heartbeat-activity.js";
 import { createMetricCompareGatewayHelper } from "./metric-compare-gateway.js";
 import { queryObservationWithJournal } from "./query.js";
+import { resolvePlatformAuthConfig } from "../gateway/platform-auth/config.js";
+import { loadStore } from "../gateway/platform-auth/store.js";
+import { queryPlatformTaskIndex } from "./platform-task-index.js";
 import { queryPlatformObservationSnapshot } from "./platform-window-snapshot.js";
 import { createReasoningGatewayAdapter } from "./reasoning-gateway.js";
 import type { ReasoningInput, ReasoningModelPort } from "./reasoning-pass.js";
 export const OBSERVATION_QUERY_METHOD = "diagnosis.observation.query";
+
+async function defaultListGrantedTenantIds(loadCfg: () => OpenBotConfig): Promise<string[]> {
+  try {
+    const config = resolvePlatformAuthConfig(loadCfg().gateway?.auth?.trustedProxy);
+    if (!config) {
+      return [];
+    }
+    const store = await loadStore(config);
+    return Object.values(store.enterprises)
+      .map((row) => (typeof row.id === "string" ? row.id.trim() : ""))
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 export function createObservationQueryHandlers(
   options: {
     authDeps?: DiagnosisGatewayAuthDeps;
@@ -36,6 +55,7 @@ export function createObservationQueryHandlers(
     };
     capacityReader?: ReturnType<typeof createCapacityReader>;
     actionIntentStore?: Pick<ReturnType<typeof createActionIntentStore>, "list" | "detail">;
+    listGrantedTenantIds?: () => Promise<readonly string[]>;
   } = {},
 ): GatewayRequestHandlers {
   return {
@@ -151,6 +171,84 @@ export function createObservationQueryHandlers(
           return;
         }
         respond(true, snapshot, undefined);
+        return;
+      }
+      if (params.taskIndex !== undefined) {
+        if (params.taskIndex !== true) {
+          deny("invalid_task_index_request");
+          return;
+        }
+        const allowedIndex = new Set(["taskIndex", "from", "to", "tenantId", "agentId"]);
+        if (Object.keys(params).some((key) => !allowedIndex.has(key))) {
+          deny("invalid_task_index_request");
+          return;
+        }
+        const indexScopes = client.connect.scopes ?? [];
+        const indexIdentityOk =
+          client.sessionDomain === "platform" &&
+          auth.trusted.tenantId === null &&
+          indexScopes.includes("operator.platform");
+        if (!indexIdentityOk) {
+          deny("unauthorized");
+          return;
+        }
+        const projectedAt = (options.now ?? Date.now)();
+        let from = params.from;
+        let to = params.to;
+        if (from === undefined && to === undefined) {
+          to = projectedAt;
+          from = to - 7 * 86_400_000;
+        }
+        if (
+          typeof from !== "number" ||
+          typeof to !== "number" ||
+          !Number.isFinite(from) ||
+          !Number.isFinite(to)
+        ) {
+          deny("invalid_task_index_request");
+          return;
+        }
+        if (params.tenantId !== undefined && typeof params.tenantId !== "string") {
+          deny("invalid_task_index_request");
+          return;
+        }
+        if (params.agentId !== undefined && typeof params.agentId !== "string") {
+          deny("invalid_task_index_request");
+          return;
+        }
+        const loadCfg = options.loadConfig ?? loadConfig;
+        const grantedTenantIds = options.listGrantedTenantIds
+          ? [...(await options.listGrantedTenantIds())]
+          : await defaultListGrantedTenantIds(loadCfg);
+        const index = queryPlatformTaskIndex({
+          cfg: loadCfg(),
+          from,
+          to,
+          projectedAt,
+          tenantId: params.tenantId,
+          agentId: params.agentId,
+          grantedTenantIds,
+        });
+        const fresh = await resolveDiagnosisProductionAuth(
+          client as unknown as DiagnosisGatewayAuthClient,
+          options.authDeps,
+        );
+        if (
+          !fresh ||
+          fresh.trusted.tenantId !== auth.trusted.tenantId ||
+          fresh.principal.principalId !== auth.principal.principalId ||
+          client.sessionDomain !== "platform" ||
+          fresh.trusted.tenantId !== null ||
+          !(client.connect.scopes ?? []).includes("operator.platform")
+        ) {
+          deny("unauthorized");
+          return;
+        }
+        if (!index.ok) {
+          deny(index.code);
+          return;
+        }
+        respond(true, index, undefined);
         return;
       }
       const allowed = new Set([

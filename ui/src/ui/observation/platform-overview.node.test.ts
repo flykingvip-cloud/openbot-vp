@@ -5,8 +5,13 @@ import {
   exactRunMatches,
   formatGrantCensus,
   formatHeartbeat,
+  formatHeartbeatFreshness,
+  formatUnmappedEvents,
+  grantFraction,
+  heartbeatActivityMarks,
   heartbeatFraction,
   visibleTenantCode,
+  tenantDisplayName,
   formatLinkCoverage,
   formatQuota,
   formatConcurrency,
@@ -89,10 +94,14 @@ describe("heartbeatFraction", () => {
 });
 
 describe("visibleTenantCode", () => {
-  it("hides numeric aliases and ids that already match the label", () => {
+  it("hides technical ids when a distinct human label exists, including numeric aliases", () => {
     expect(visibleTenantCode("upbeyond", "001")).toBeNull();
     expect(visibleTenantCode("001", "001")).toBeNull();
-    expect(visibleTenantCode("Aegis", "aegis-99491824")).toBe("aegis-99491824");
+    expect(visibleTenantCode("Aegis", "aegis-99491824")).toBeNull();
+    expect(visibleTenantCode("小飞鱼", "workspace-97096055")).toBeNull();
+    expect(visibleTenantCode("", "aegis-99491824")).toBe("aegis-99491824");
+    expect(tenantDisplayName("Aegis", "aegis-99491824")).toBe("Aegis");
+    expect(tenantDisplayName("", "workspace-97096055")).toBe("workspace-97096055");
   });
 });
 
@@ -114,16 +123,26 @@ describe("censusTenantGrants", () => {
       total: 4,
       hasConfirmed: true,
     });
-    expect(formatGrantCensus(census).value).toBe("1 已授权 / 1 无授权 / 2 尚未确认");
+    expect(formatGrantCensus(census).value).toBe("1/4 · 25%");
+    expect(grantFraction(census)).toBe(0.25);
   });
 
-  it("renders 尚未确认 when no grant has been confirmed", () => {
+  it("stays unknown without a directory denominator and never paints 0% for an empty directory", () => {
+    const empty = censusTenantGrants([], null);
+    expect(empty.total).toBe(0);
+    expect(formatGrantCensus(empty).value).toBe("未知");
+    expect(formatGrantCensus(empty).value).not.toContain("0%");
+    expect(grantFraction(empty)).toBeNull();
+  });
+
+  it("renders a granted ratio when the directory has a positive denominator", () => {
     const census = censusTenantGrants(
       [{ tenantId: "a" }, { tenantId: "b", tenantGrant: "unknown" }],
       null,
     );
     expect(census.hasConfirmed).toBe(false);
-    expect(formatGrantCensus(census).value).toBe("尚未确认");
+    expect(formatGrantCensus(census).value).toBe("0/2 · 0%");
+    expect(grantFraction(census)).toBe(0);
     expect(formatGrantCensus(census).value).not.toContain("无授权");
   });
 });
@@ -178,5 +197,34 @@ describe("formatConcurrency and formatQuota", () => {
     expect(formatQuota({ remaining: 2, allowance: 10 }).value).toBe("2/10");
     expect(formatConcurrency({ activeRuns: 1, limit: 4 }).detail).not.toContain("activeRuns");
     expect(formatQuota({ remaining: 2, allowance: 10 }).detail).not.toContain("allowance");
+  });
+});
+
+describe("formatUnmappedEvents", () => {
+  it("shows a real count and uses a short empty state only at zero", () => {
+    expect(formatUnmappedEvents(null).value).toBe("未知");
+    expect(formatUnmappedEvents({ count: 0 }).value).toBe("0");
+    expect(formatUnmappedEvents({ count: 0 }).detail).toContain("没有未映射事件");
+    expect(formatUnmappedEvents({ count: 3 }).value).toBe("3");
+    expect(formatUnmappedEvents({ count: 3 }).value).not.toContain("不计入企业");
+  });
+});
+
+describe("heartbeat activity presentation", () => {
+  it("keeps the ratio unknown without a period and describes an activity series instead", () => {
+    const activity = {
+      expectedSamples: null,
+      observedSamples: null,
+      observedEventCount: 2,
+      lastEventAt: 1_000,
+      events: [{ ts: 500, status: "sent" }, { ts: 1_000, status: "ok-empty" }],
+    };
+    expect(formatHeartbeat(activity).value).toBe("未知");
+    expect(heartbeatFraction(activity)).toBeNull();
+    expect(heartbeatActivityMarks(activity)).toHaveLength(2);
+    expect(formatHeartbeatFreshness(activity, 1_000)).toContain("刚刚");
+    expect(formatHeartbeatFreshness({ observedEventCount: 0, events: [] })).toBe("暂无心跳记录");
+    expect(formatHeartbeatFreshness(activity, 1_000)).not.toContain("expectedSamples");
+    expect(formatHeartbeatFreshness(activity, 1_000)).not.toContain("observedSamples");
   });
 });
