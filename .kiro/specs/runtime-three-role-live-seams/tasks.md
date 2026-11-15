@@ -28,3 +28,28 @@
 - 长任务TaskOutcome为awaiting_acceptance，delivery=delivered，看板unfinished=true；原验收仅支持明确checks，本次五条自然语言条件未提供可自动验收checks，未伪造通过。不能称任务闭环完成，需后续梳理验收和用户可见状态。— codex-runtime-manager
 - 协作正式任务被write_acl拒绝；CLI token客户端只有设备身份，无authenticatedSessionSubjects服务端成员主体，设备ID夹具不能代替服务端认证用户。成员已能讨论，不代表有建任务权限，下一轮需真实登录测试主体，不允许靠connect.user伪造授权。— codex-runtime-manager
 - 尚未修复/未宣称：组终稿、停止级联、无归属远端取消、真实PPT/外发。仍需在有合法主体的隔离环境完成场景。— codex-runtime-manager
+
+## 2026-11-16 pending acceptance follow-up
+
+- [x] 统一交付出口仅为host-bound + acceptance=pending任务追加待验收提示，不改状态、不触发重复业务；ordinary turn、passed/not_required保持原文，media-only保留附件。— codex-runtime-manager
+- 原代码新用例3FAIL/26PASS；修复后交付3文件46PASS；宿主/认证/旧回执4文件98PASS；3文件type-aware lint为0错误。命令使用vitest configLoader runner避免共享依赖缓存写入。— codex-runtime-manager
+- 用户已于本轮明确授权complete-reply及测试/agent-runner三个文件限定落地；保留所有其他路径及历史。— codex-runtime-manager
+- 基线来自用户终端fetch：HEAD=d23d7bc27，origin/main=8aa10c0c，BASELINE_PASS；当前agent自动审批服务403余额不足，后续需要提权动作不得绕过。— codex-runtime-manager
+- 协作认证：无validated session只返回空identity为原保护规则，本轮已复跑现有认证用例；尚未在合法登录主体下完成真实协作启动，不能称已修复或实测通过。未构建/启动Gateway真实复测本次待验收提示。— codex-runtime-manager
+
+## 2026-11-16 WebSocket acceptance receipt
+
+- 真实复测发现仅格式化返回payload不会更新已流式输出的WS终局，未将该失败记为完成。用户随后授权server-chat及回归限定落地。— codex-runtime-manager
+- 原统一交付出口先通过SessionManager持久化宿主待验收回执，再发原agent事件通道delivery事实；server-chat同一可见出口发布稳定消息身份，不覆盖原成果、不清其他任务。隐藏及取消回归通过。— codex-runtime-manager
+- 最终定向5文件82PASS；已跑宿主/认证4文件98PASS。构建曾因新增logVerbose漏导入失败，补齐后重建通过；本机完整tsgo恢复到既有117项，变更文件0项，不称全仓绿。— codex-runtime-manager
+- 用户选择隔离测试账号，已走原bootstrap+密码+TOTP注册/登录，真实cookie+设备签名连接；密码/会话/恢复码仅0600隔离存储，未输出或入仓。— codex-runtime-manager
+- 真实WS与history都出现1条宿主待验收回执，原任务仍unfinished且acceptance=pending，没有假结算；原文件原有artifact保留。认证主体平台账号无tenant/seat时成果正式根仍未解析，继续开放，不拓宽旧fallback。— codex-runtime-manager
+- 新组首次请求自举实际改purpose，门禁正确拒绝非时间戳的真实变化；不将它当作旧快照误判回归。等待最新状态确认复测记录，不冒称协作终局通过。— codex-runtime-manager
+
+## 2026-11-16 final checkpoint
+
+- 交付提示提交a7df67ff2、宿主接线e14661759；实际WS出口补修4d2ef7f41，原流式出口遗漏的失败日志保留。最后82PASS、先前98PASS、构建通过；未将本机117项继承类型错误当绿。— codex-runtime-manager
+- 新专用账号通过原本地bootstrap、密码和TOTP登录，未关闭MFA；真实cookie+设备签名WS中，run=uat-auth-1794784413253出现稳定后续回执run:acceptance，history中宿主提示数=1，未覆盖原成果。— codex-runtime-manager
+- 该合法平台主体仍无enterprise/seat绑定，正式成果根no_writable_root再次出现；这是与匿名local已修分支不同的已登录作用域接缝，继续核准，不放宽owner/tenant根保护。— codex-runtime-manager
+- 合法成员新组首次自举改变purpose，拒绝旧提案正确；确认后正式入口提示当前目标绑定不可核准，未发布/认领/执行。服务端登录身份已补齐，不能再简单归因于设备无主体；正式目标绑定/状态读取仍开放。— codex-runtime-manager
+- 本轮不推送、不合并、不部署；临时账号密码、MFA、cookie不入仓/证据包。原18789未重启。— codex-runtime-manager
