@@ -4,7 +4,11 @@ import {
   suppressResolvedConflictEdges,
   type DocumentGovernanceOverlay,
 } from "./governance/runtime/object-writeback.js";
-import { buildRelationshipGraphCached } from "./runtime/relationship-runtime-cache.js";
+import type { EventLoopYielder } from "./event-loop-yield.js";
+import {
+  buildRelationshipGraphCached,
+  buildRelationshipGraphCachedAsync,
+} from "./runtime/relationship-runtime-cache.js";
 import { buildPersonalSourceSummary } from "./sources/personal-source.js";
 import type { KnowledgeSourceBundle } from "./sources/types.js";
 import type {
@@ -86,6 +90,41 @@ export function buildKnowledgeSourceBundle(params: {
   /** Chunk citation totals keyed by knowledge-object id (feeds node.governance.usageCount). */
   usageCountByObjectId?: Record<string, number>;
 }): KnowledgeSourceBundle {
+  const assembled = assembleKnowledgeSourceBundleInputs(params);
+  const runtime = buildRelationshipGraphCached(assembled.runtimeInput);
+  return finishKnowledgeSourceBundle(assembled, runtime);
+}
+
+export async function buildKnowledgeSourceBundleAsync(
+  params: Parameters<typeof buildKnowledgeSourceBundle>[0] & {
+    yieldFn?: EventLoopYielder;
+    yieldEvery?: number;
+  },
+): Promise<KnowledgeSourceBundle> {
+  const assembled = assembleKnowledgeSourceBundleInputs(params);
+  const runtime = await buildRelationshipGraphCachedAsync(assembled.runtimeInput, {
+    yieldFn: params.yieldFn,
+    yieldEvery: params.yieldEvery,
+  });
+  return finishKnowledgeSourceBundle(assembled, runtime);
+}
+
+function assembleKnowledgeSourceBundleInputs(
+  params: Parameters<typeof buildKnowledgeSourceBundle>[0],
+): {
+  dataCapabilities: DataCapabilityDescriptor[];
+  sourceSummary: KnowledgeSourceSummary;
+  enterpriseRestricted: KnowledgeObject[];
+  externalDataSources: ExternalDataSourceSummary[];
+  feedItems: KnowledgeFeedItem[];
+  graph: RelationshipGraph | undefined;
+  extraEdges: RelationshipEdge[] | undefined;
+  runtimeInput: {
+    objects: KnowledgeObject[];
+    dataCapabilities: DataCapabilityDescriptor[];
+    usageCountByObjectId: Record<string, number> | undefined;
+  };
+} {
   const objects = params.objects;
   const dataCapabilities = params.dataCapabilities ?? [];
   const sourceSummary = params.sourceSummary ?? {
@@ -96,31 +135,46 @@ export function buildKnowledgeSourceBundle(params: {
   const overlayObjects = params.documentGovernanceOverlay
     ? applyDocumentGovernanceOverlay(objects, params.documentGovernanceOverlay)
     : objects;
-  const runtime = buildRelationshipGraphCached({
-    objects: overlayObjects,
+  return {
     dataCapabilities,
-    usageCountByObjectId: params.usageCountByObjectId,
-  });
-  const baseGraph = params.graph ?? {
+    sourceSummary,
+    enterpriseRestricted: params.enterpriseRestricted ?? [],
+    externalDataSources: params.externalDataSources ?? [],
+    feedItems: params.feedItems ?? [],
+    graph: params.graph,
+    extraEdges: params.extraEdges,
+    runtimeInput: {
+      objects: overlayObjects,
+      dataCapabilities,
+      usageCountByObjectId: params.usageCountByObjectId,
+    },
+  };
+}
+
+function finishKnowledgeSourceBundle(
+  assembled: ReturnType<typeof assembleKnowledgeSourceBundleInputs>,
+  runtime: ReturnType<typeof buildRelationshipGraphCached>,
+): KnowledgeSourceBundle {
+  const baseGraph = assembled.graph ?? {
     nodes: runtime.graph.nodes,
     edges: suppressResolvedConflictEdges(runtime.graph.edges, runtime.objects),
   };
-  const graph: RelationshipGraph = params.extraEdges?.length
+  const graph: RelationshipGraph = assembled.extraEdges?.length
     ? {
         nodes: baseGraph.nodes,
-        edges: mergeRelationshipEdges(baseGraph.nodes, baseGraph.edges, params.extraEdges),
+        edges: mergeRelationshipEdges(baseGraph.nodes, baseGraph.edges, assembled.extraEdges),
       }
     : baseGraph;
   return {
     objects: runtime.objects,
-    dataCapabilities,
-    sourceSummary,
+    dataCapabilities: assembled.dataCapabilities,
+    sourceSummary: assembled.sourceSummary,
     sourceBrowse: buildSourceBrowse({
       objects: runtime.objects,
-      enterpriseRestricted: params.enterpriseRestricted ?? [],
+      enterpriseRestricted: assembled.enterpriseRestricted,
     }),
-    externalDataSources: params.externalDataSources ?? [],
-    feedItems: params.feedItems ?? [],
+    externalDataSources: assembled.externalDataSources,
+    feedItems: assembled.feedItems,
     graph,
   };
 }

@@ -230,6 +230,9 @@ export function ensureKnowledgeGovernanceSchema(db: DatabaseSync): void {
   db.exec(
     `CREATE INDEX IF NOT EXISTS idx_chunk_gov_semhash ON chunk_governance(kb_id, semantic_hash);`,
   );
+  db.exec(
+    `CREATE INDEX IF NOT EXISTS idx_chunk_gov_semhash_value ON chunk_governance(semantic_hash, kb_id);`,
+  );
   db.exec(`
     CREATE TABLE IF NOT EXISTS chunk_relations (
       id TEXT PRIMARY KEY,

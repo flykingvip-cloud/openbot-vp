@@ -4,7 +4,11 @@ import {
 } from "../document-obsidian-extract.js";
 import type { ExplicitDocumentMetadataRecord } from "../explicit-metadata-store.js";
 import type { DataCapabilityDescriptor, KnowledgeObject, RelationshipEdgeType } from "../types.js";
+import type { EventLoopYielder } from "../event-loop-yield.js";
 import type { CandidateRelationship } from "./types.js";
+
+/** Pair iterations between yield checks during a cache-miss graph build. */
+export const RELATIONSHIP_CANDIDATE_YIELD_EVERY = 256;
 
 function normalizeTag(value: string): string {
   return value.trim().toLowerCase();
@@ -111,6 +115,28 @@ export function buildCandidateRelationships(params: {
     }
   }
 
+  addNonPairwiseCandidateRelationships({
+    objects: params.objects,
+    dataCapabilities: params.dataCapabilities,
+    explicitMetadata: params.explicitMetadata,
+    candidates,
+    seen,
+    byId,
+  });
+
+  return candidates;
+}
+
+
+function addNonPairwiseCandidateRelationships(params: {
+  objects: KnowledgeObject[];
+  dataCapabilities?: DataCapabilityDescriptor[];
+  explicitMetadata?: ExplicitDocumentMetadataRecord[];
+  candidates: CandidateRelationship[];
+  seen: Set<string>;
+  byId: Map<string, KnowledgeObject>;
+}): void {
+  const { candidates, seen, byId } = params;
   for (const object of params.objects) {
     for (const relatedId of object.relatedObjectIds ?? []) {
       if (!byId.has(relatedId)) {
@@ -259,5 +285,72 @@ export function buildCandidateRelationships(params: {
     }
   }
 
+}
+
+export async function buildCandidateRelationshipsAsync(
+  params: {
+    objects: KnowledgeObject[];
+    dataCapabilities?: DataCapabilityDescriptor[];
+    explicitMetadata?: ExplicitDocumentMetadataRecord[];
+  },
+  options?: { yieldFn?: EventLoopYielder; yieldEvery?: number },
+): Promise<CandidateRelationship[]> {
+  const yieldEvery = Math.max(1, options?.yieldEvery ?? RELATIONSHIP_CANDIDATE_YIELD_EVERY);
+  const yieldFn = options?.yieldFn;
+  const candidates: CandidateRelationship[] = [];
+  const seen = new Set<string>();
+  const byId = new Map(params.objects.map((item) => [item.id, item]));
+  let steps = 0;
+
+  for (let index = 0; index < params.objects.length; index += 1) {
+    for (let inner = index + 1; inner < params.objects.length; inner += 1) {
+      const left = params.objects[index];
+      const right = params.objects[inner];
+      const overlap = sharedTags(left, right);
+      if (overlap.length) {
+        pushCandidate(candidates, seen, {
+          sourceObjectId: left.id,
+          targetObjectId: right.id,
+          relationType: "related",
+          reasons: [`shared-tags:${overlap.join(",")}`],
+          baseScore: 58 + Math.min(overlap.length * 8, 24),
+        });
+      }
+      if (isProjectObject(left) && isProjectObject(right)) {
+        pushCandidate(candidates, seen, {
+          sourceObjectId: left.id,
+          targetObjectId: right.id,
+          relationType: "supports",
+          reasons: ["shared-project-context"],
+          baseScore: 64,
+        });
+      }
+      if (left.scopeLabel && left.scopeLabel === right.scopeLabel) {
+        pushCandidate(candidates, seen, {
+          sourceObjectId: left.id,
+          targetObjectId: right.id,
+          relationType: "owned-by",
+          reasons: [`shared-scope:${left.scopeLabel}`],
+          baseScore: 62,
+        });
+      }
+      steps += 1;
+      if (yieldFn && steps % yieldEvery === 0) {
+        await yieldFn();
+      }
+    }
+  }
+
+  addNonPairwiseCandidateRelationships({
+    objects: params.objects,
+    dataCapabilities: params.dataCapabilities,
+    explicitMetadata: params.explicitMetadata,
+    candidates,
+    seen,
+    byId,
+  });
+  if (yieldFn) {
+    await yieldFn();
+  }
   return candidates;
 }

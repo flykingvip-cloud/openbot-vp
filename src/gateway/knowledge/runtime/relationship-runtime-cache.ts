@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
-import { buildIntelligentRelationshipGraph } from "./relationship-runtime.js";
+import type { EventLoopYielder } from "../event-loop-yield.js";
+import {
+  buildIntelligentRelationshipGraph,
+  buildIntelligentRelationshipGraphAsync,
+} from "./relationship-runtime.js";
 import type { RelationshipRuntimeInput, RelationshipRuntimeResult } from "./types.js";
 
 /**
@@ -27,6 +31,10 @@ export type RelationshipGraphCacheStats = {
 
 export type RelationshipGraphCache = {
   build(input: RelationshipRuntimeInput): RelationshipRuntimeResult;
+  buildAsync(
+    input: RelationshipRuntimeInput,
+    options?: { yieldFn?: EventLoopYielder; yieldEvery?: number },
+  ): Promise<RelationshipRuntimeResult>;
   invalidate(): void;
   readonly stats: RelationshipGraphCacheStats;
   readonly size: number;
@@ -80,27 +88,53 @@ export function createRelationshipGraphCache(options?: {
   const entries = new Map<string, RelationshipRuntimeResult>();
   const stats: RelationshipGraphCacheStats = { hits: 0, misses: 0 };
 
+  function remember(key: string, result: RelationshipRuntimeResult): RelationshipRuntimeResult {
+    entries.set(key, result);
+    if (entries.size > limit) {
+      const oldest = entries.keys().next().value;
+      if (oldest !== undefined) {
+        entries.delete(oldest);
+      }
+    }
+    return result;
+  }
+
+  function takeCached(key: string): RelationshipRuntimeResult | null {
+    const cached = entries.get(key);
+    if (!cached) {
+      return null;
+    }
+    stats.hits += 1;
+    entries.delete(key);
+    entries.set(key, cached);
+    return cached;
+  }
+
   return {
     build(input: RelationshipRuntimeInput): RelationshipRuntimeResult {
       const key = fingerprintInput(input);
-      const cached = entries.get(key);
+      const cached = takeCached(key);
       if (cached) {
-        stats.hits += 1;
-        // Refresh LRU recency.
-        entries.delete(key);
-        entries.set(key, cached);
         return cached;
       }
       stats.misses += 1;
-      const result = builder(input);
-      entries.set(key, result);
-      if (entries.size > limit) {
-        const oldest = entries.keys().next().value;
-        if (oldest !== undefined) {
-          entries.delete(oldest);
-        }
+      return remember(key, builder(input));
+    },
+    async buildAsync(
+      input: RelationshipRuntimeInput,
+      options?: { yieldFn?: EventLoopYielder; yieldEvery?: number },
+    ): Promise<RelationshipRuntimeResult> {
+      const key = fingerprintInput(input);
+      const cached = takeCached(key);
+      if (cached) {
+        return cached;
       }
-      return result;
+      stats.misses += 1;
+      const result =
+        builder === buildIntelligentRelationshipGraph
+          ? await buildIntelligentRelationshipGraphAsync(input, options)
+          : builder(input);
+      return remember(key, result);
     },
     invalidate() {
       entries.clear();
@@ -125,6 +159,13 @@ export function buildRelationshipGraphCached(
   input: RelationshipRuntimeInput,
 ): RelationshipRuntimeResult {
   return defaultCache.build(input);
+}
+
+export function buildRelationshipGraphCachedAsync(
+  input: RelationshipRuntimeInput,
+  options?: { yieldFn?: EventLoopYielder; yieldEvery?: number },
+): Promise<RelationshipRuntimeResult> {
+  return defaultCache.buildAsync(input, options);
 }
 
 export function invalidateRelationshipGraphCache(): void {
