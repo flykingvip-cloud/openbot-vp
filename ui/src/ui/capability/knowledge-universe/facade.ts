@@ -1,6 +1,8 @@
-import type { GatewayBrowserClient } from "../../gateway.ts";
 import type { KnowledgeUniverseHomeSnapshot } from "./endpoints.ts";
-import { createKnowledgeUniverseGateway } from "./gateway-client.ts";
+import {
+  createKnowledgeUniverseGateway,
+  type KnowledgeUniverseRpcClient,
+} from "./gateway-client.ts";
 import { buildHomeGraphViewModel } from "./graph-layout.ts";
 import type {
   KnowledgeActionSuggestion,
@@ -36,7 +38,7 @@ export type KnowledgeUniverseHomePartialSnapshot = Partial<KnowledgeUniverseHome
  * method is missing.
  */
 export async function loadKnowledgeUniverseHomeSnapshot(params: {
-  client: GatewayBrowserClient | null | undefined;
+  client: KnowledgeUniverseRpcClient | null | undefined;
   query?: string;
   selectedNodeId?: string | null;
   selectedKnowledgeBaseId?: string | null;

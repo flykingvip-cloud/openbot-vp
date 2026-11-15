@@ -186,9 +186,28 @@ export function createKnowledgeSourceBundleCache(options?: {
     stats.misses += 1;
     stats.loads += 1;
     const loadGeneration = generation;
-    const promise = (async () => {
-      try {
-        const bundle = await loader();
+    // Register a holder before the loader runs so a synchronous throw cannot
+    // observe `promise` in the TDZ, and so `finally` always finds the current
+    // generation's holder (an older completion must not delete a newer one).
+    let settle!: (result: Promise<KnowledgeSourceBundle>) => void;
+    const promise = new Promise<KnowledgeSourceBundle>((resolve, reject) => {
+      settle = (result) => {
+        result.then(resolve, reject);
+      };
+    });
+    const holder: InFlightEntry = { promise, generation: loadGeneration };
+    inFlight.set(key, holder);
+    // Invoke the loader in this turn so callers (and tests) can attach
+    // release hooks immediately, while still converting a synchronous throw
+    // into a rejection after the holder is registered.
+    let started: Promise<KnowledgeSourceBundle>;
+    try {
+      started = Promise.resolve(loader());
+    } catch (error) {
+      started = Promise.reject(error);
+    }
+    const result = started
+      .then((bundle) => {
         if (loadGeneration === generation) {
           entries.set(key, {
             bundle,
@@ -197,14 +216,13 @@ export function createKnowledgeSourceBundleCache(options?: {
           });
         }
         return bundle;
-      } finally {
-        const current = inFlight.get(key);
-        if (current?.promise === promise) {
+      })
+      .finally(() => {
+        if (inFlight.get(key) === holder) {
           inFlight.delete(key);
         }
-      }
-    })();
-    inFlight.set(key, { promise, generation: loadGeneration });
+      });
+    settle(result);
     return promise;
   }
 

@@ -1178,8 +1178,12 @@ export function createMockKnowledgeUniverseGateway(): KnowledgeUniverseGateway {
   };
 }
 
+export type KnowledgeUniverseRpcClient = {
+  request: GatewayBrowserClient["request"];
+};
+
 export function createKnowledgeUniverseGateway(
-  client: GatewayBrowserClient | null | undefined,
+  client: KnowledgeUniverseRpcClient | null | undefined,
 ): KnowledgeUniverseGateway {
   if (!client) {
     return createMockKnowledgeUniverseGateway();
