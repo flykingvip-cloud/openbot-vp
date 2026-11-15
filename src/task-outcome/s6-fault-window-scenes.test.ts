@@ -2,9 +2,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { confirmPendingTurnDeliveryWithPorts } from "../agent-runtime/delivery/dispatch/confirm-pending.js";
-import { prepareVisibleDelivery } from "../agent-runtime/delivery/dispatch/prepare-visible.js";
-import { INTERACTION_MODEL_FAILURE_TEXT } from "../agent-runtime/model/interaction-resource-wait.js";
+import {
+  confirmPendingTurnDeliveryWithPorts,
+  prepareVisibleDelivery,
+} from "../agent-runtime/delivery/index.js";
+import { INTERACTION_MODEL_FAILURE_TEXT } from "../agent-runtime/model/index.js";
 import { markAsyncWaitRecoveryDelivered } from "../agent-runtime/state/index.js";
 import type { OpenBotConfig } from "../config/config.js";
 import {

@@ -18,14 +18,12 @@ import {
   readChatTurnTerminal,
   reconcileChatTurnTerminal,
 } from "../gateway/chat-interaction-failure.js";
-import { admittedTaskQueryContinuation } from "./command/admitted-task-query-continuation.js";
-import { interactionAdmissionFact, routeInteraction } from "./command/route-interaction.js";
-import { formatTaskProposalReply } from "./command/task-proposal-reply.js";
+import { formatTaskProposalReply, routeInteraction } from "./command/index.js";
 import {
   previewArtifactFromNamedFileReceipt,
   registerNamedFileReceipt,
 } from "./delivery/named-file-receipt.js";
-import { INTERACTION_MODEL_FAILURE_TEXT } from "./model/interaction-resource-wait.js";
+import { INTERACTION_MODEL_FAILURE_TEXT } from "./model/index.js";
 import { admitSessionExecution } from "./wiring/execution-admission.js";
 
 const dirs: string[] = [];
@@ -69,7 +67,8 @@ describe("S6 personal production-consumer scenes", () => {
       expect(qa.text).toBe("今天天气不错。");
       expect(qa.clarification).toBe(false);
     }
-    expect(interactionAdmissionFact(qa)).toEqual({ admitted: false });
+    // Public RoutedInteraction kind is the admission fact here: respond is not admitted.
+    expect(qa.kind).not.toBe("execution_admission");
     expect(inferQa).toHaveBeenCalledOnce();
     expect(authorize).not.toHaveBeenCalled();
     expect(commit).not.toHaveBeenCalled();
@@ -88,6 +87,9 @@ describe("S6 personal production-consumer scenes", () => {
     const admittedTurn = await admitSessionExecution(sessionFile, turnRequest, async () => true);
     expect(admittedTurn.kind).toBe("accepted_turn");
     expect(fs.existsSync(sessionTaskBoardPath(sessionFile))).toBe(false);
+    // Artifact-interface evidence only: the test writes the file, then checks the
+    // receipt/preview checksum contract. This is not proof that a model or tool
+    // created and delivered the artifact through controlled execution.
     const notePath = path.join(dir, "note.txt");
     fs.writeFileSync(notePath, "当日备忘：已完成小任务。\n");
     const receipt = registerNamedFileReceipt({ workspaceDir: dir, relativePath: "note.txt" });
@@ -131,6 +133,16 @@ describe("S6 personal production-consumer scenes", () => {
     expect(beforeQuery.current?.unfinished).toBe(true);
     expect(beforeQuery.current?.executionAttempt).toBe("run-long-a");
 
+    // hangingA is a local unsettled Promise. It is not connected to the
+    // executor, host queue, or model port. This block proves routeInteraction
+    // can return a non-admitted reply and that board bytes stay unchanged. It
+    // does not by itself prove interaction remains available while execution
+    // is occupied. Same-SHA host occupancy evidence is in
+    // chat-group-interaction-isolation.s1b.test.ts cases
+    // "1: B greeting is understood and visible while A's hanging work turn stays unfinished"
+    // and "S2-6: B @mention greeting still answers while A's occupancy remains and mention bypass stays closed".
+    // The continue_admitted helper stays in its same-component test
+    // command/admitted-task-query-continuation.test.ts (official matrix).
     let resolveHang: (() => void) | undefined;
     const hangingA = new Promise<void>((resolve) => {
       resolveHang = resolve;
@@ -156,17 +168,14 @@ describe("S6 personal production-consumer scenes", () => {
     expect(Date.now() - queryStarted).toBeLessThan(2000);
     expect(hangingA).toBeInstanceOf(Promise);
     expect(mid.kind).toBe("respond");
-    expect(interactionAdmissionFact(mid)).toEqual({ admitted: false });
+    expect(mid.kind).not.toBe("execution_admission");
     expect(inferQuery).toHaveBeenCalledOnce();
     expect(fs.readFileSync(sessionTaskBoardPath(sessionFile), "utf8")).toBe(beforeBytes);
-    const continuation = admittedTaskQueryContinuation({
-      board: readSessionTaskBoard(sessionFile),
-    });
-    expect(continuation).toMatchObject({
-      shouldContinue: true,
-      taskId: admittedLong.binding.taskId,
-      reason: "continue_admitted",
-    });
+    const afterQuery = readSessionTaskBoard(sessionFile);
+    expect(afterQuery.current?.taskId).toBe(admittedLong.binding.taskId);
+    expect(afterQuery.current?.unfinished).toBe(true);
+    expect(afterQuery.current?.wakeSuppress).not.toBe(true);
+    expect(afterQuery.current?.executionAttempt).toBe("run-long-a");
     resolveHang?.();
     await hangingA;
     expect(readSessionTaskBoard(sessionFile).current?.executionAttempt).toBe("run-long-a");
@@ -293,7 +302,7 @@ describe("S6 personal production-consumer scenes", () => {
     if (later.kind === "respond") {
       expect(later.text).toBe("在，可以继续。");
     }
-    expect(interactionAdmissionFact(later)).toEqual({ admitted: false });
+    expect(later.kind).not.toBe("execution_admission");
     const stillFailed = readChatTurnTerminal("fail-model", storeDir, "agent:bot:main");
     expect(stillFailed?.text).toBe(INTERACTION_MODEL_FAILURE_TEXT);
     expect(stillFailed?.businessExecution).toBe("none");

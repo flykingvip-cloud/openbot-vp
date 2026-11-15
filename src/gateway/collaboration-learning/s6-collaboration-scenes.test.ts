@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
 import { afterEach, describe, expect, it } from "vitest";
-import type { TaskResponsibility as Responsibility } from "../../agent-runtime/policy/collaboration-policy-model.js";
+import type { TaskResponsibility as Responsibility } from "../../agent-runtime/policy/index.js";
 import {
   clearConfigCache,
   clearRuntimeConfigSnapshot,
@@ -203,6 +203,11 @@ describe("S6 collaboration production-consumer scenes", () => {
       expect(confirmed.dispatched).toBe(false);
     }
 
+    // Persistence-rule evidence only: the test supplies runId/artifactId/
+    // runOwnerId/memberStatus. It does not start these members, receive
+    // runner completion events, or read artifacts submitted by an execution.
+    // This proves contribution persistence and ghost rejection, not
+    // independent member execution.
     const memberA = await recordAuthoritativeMemberContribution({
       groupId: "grp_s6",
       taskId: "TEAM-S6-CAMPUS-1",
@@ -269,6 +274,10 @@ describe("S6 collaboration production-consumer scenes", () => {
     expect(restriction.taskId).toBe("TEAM-S6-CAMPUS-1");
     expect(restriction.internalReason).toBe("bound_revision_applied");
 
+    // recordPeerReview non-author identity and localization are a real local
+    // rule. Passing an item and recording revise does not prove the author
+    // revised and resubmitted, that review was accepted, or that a group-final
+    // was delivered. The group-final authoritative chain remains GAP.
     const item = {
       taskId: "TEAM-S6-CAMPUS-1",
       itemId: "item-background",
@@ -333,6 +342,14 @@ describe("S6 collaboration production-consumer scenes", () => {
     expect(query.classification).toBe("discussion");
     expect(query.taskId).toBe("TEAM-S6-CAMPUS-1");
 
+    // The test writes ownerIntegrated=true itself, then consumeWakeForRoundDispatch
+    // proves that mark blocks dispatch. This is a read/write/consume boundary,
+    // not proof that a real integration or stage-delivery completion event
+    // writes the mark. Excluding tests, organizerFromTask,
+    // recordAuthoritativeMemberContribution, and persistFirstStageAcceptanceHold
+    // currently have definitions only, with no host callers.
+    // projectBoundTaskWorkBrief already has a context-assembly consumer in
+    // auto-reply/reply/runtime-context-assembly.ts.
     const hold = await persistFirstStageAcceptanceHold({
       groupId: "grp_s6",
       taskId: "TEAM-S6-CAMPUS-1",
