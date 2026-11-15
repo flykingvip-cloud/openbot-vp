@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { invalidateKnowledgeSourceBundleCache } from "../source-bundle-cache.js";
 import type {
   ChunkGovernanceFactors,
   GovernanceJobPayload,
@@ -11,6 +12,10 @@ import type {
   GovernanceTaskType,
 } from "./types.js";
 import { getGovernanceLlmUsageStats } from "./usage/governance-llm-usage-store.js";
+
+function noteGovernanceWrite(): void {
+  invalidateKnowledgeSourceBundleCache();
+}
 
 export function ensureChunkGovernanceRows(params: {
   db: DatabaseSync;
@@ -28,6 +33,7 @@ export function ensureChunkGovernanceRows(params: {
   for (const chunkId of params.chunkIds) {
     insert.run(chunkId, params.kbId);
   }
+  noteGovernanceWrite();
 }
 
 export function upsertChunkSemanticHash(params: {
@@ -47,6 +53,7 @@ export function upsertChunkSemanticHash(params: {
          last_analyzed_at = excluded.last_analyzed_at`,
     )
     .run(params.chunkId, params.kbId, params.semanticHash, now);
+  noteGovernanceWrite();
 }
 
 export function findChunkIdsBySemanticHash(params: {
@@ -78,6 +85,7 @@ export function assignDuplicateGroup(params: {
   for (const chunkId of params.chunkIds) {
     stmt.run(params.duplicateGroupId, params.kbId, chunkId);
   }
+  noteGovernanceWrite();
 }
 
 export function assignConflictGroup(params: {
@@ -92,6 +100,7 @@ export function assignConflictGroup(params: {
   for (const chunkId of params.chunkIds) {
     stmt.run(params.conflictGroupId, params.kbId, chunkId);
   }
+  noteGovernanceWrite();
 }
 
 export function readExistingConflictGroupId(
@@ -146,6 +155,7 @@ export function insertChunkRelation(params: {
       params.weight ?? 1,
       now,
     );
+  noteGovernanceWrite();
 }
 
 export function recordChunkRetrievalHits(params: {
@@ -228,6 +238,7 @@ export function createGovernanceTask(params: {
       now,
       now,
     );
+  noteGovernanceWrite();
   return id;
 }
 
@@ -334,6 +345,7 @@ export function updateGovernanceTaskStatus(params: {
   const result = params.db
     .prepare(`UPDATE governance_tasks SET status = ?, updated_at = ? WHERE id = ?`)
     .run(params.status, now, params.taskId);
+  noteGovernanceWrite();
   return result.changes > 0;
 }
 

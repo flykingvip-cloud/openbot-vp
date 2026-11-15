@@ -13,6 +13,11 @@ import {
   KB_FTS_TABLE,
   KB_VECTOR_TABLE,
 } from "./kb-index-schema.js";
+import { invalidateKnowledgeSourceBundleCache } from "./source-bundle-cache.js";
+
+function noteKnowledgeIndexMutation(): void {
+  invalidateKnowledgeSourceBundleCache();
+}
 
 export type KnowledgeDocumentRecord = {
   docId: string;
@@ -291,6 +296,7 @@ export function upsertKnowledgeDocument(params: {
       existing?.createdAt ?? now,
       now,
     );
+  noteKnowledgeIndexMutation();
   return getKnowledgeDocument(params.db, params.docId)!;
 }
 
@@ -321,6 +327,7 @@ export function insertKnowledgeDocumentVersion(params: {
       publishedAt,
       now,
     );
+  noteKnowledgeIndexMutation();
   return getKnowledgeDocumentVersion(params.db, params.versionId)!;
 }
 
@@ -334,6 +341,7 @@ export function updateKnowledgeDocumentCurrentVersion(params: {
   params.db
     .prepare(`UPDATE documents SET current_version_id = ?, updated_at = ? WHERE doc_id = ?`)
     .run(params.versionId, now, params.docId);
+  noteKnowledgeIndexMutation();
 }
 
 export function updateKnowledgeDocumentVersionRawHash(params: {
@@ -344,6 +352,7 @@ export function updateKnowledgeDocumentVersionRawHash(params: {
   params.db
     .prepare(`UPDATE document_versions SET raw_hash = ? WHERE version_id = ?`)
     .run(params.rawHash, params.versionId);
+  noteKnowledgeIndexMutation();
 }
 
 export function buildKnowledgeChunkId(params: {
@@ -444,6 +453,7 @@ export function insertKnowledgeChunks(params: {
     }
     throw err;
   }
+  noteKnowledgeIndexMutation();
 }
 
 export function listKnowledgeChunkMetaForVersion(params: {
@@ -567,6 +577,7 @@ export function deleteKnowledgeChunksByIds(params: {
     }
     throw error;
   }
+  noteKnowledgeIndexMutation();
 }
 
 /**
@@ -659,6 +670,7 @@ export function upsertKnowledgeChunks(params: {
     }
     throw error;
   }
+  noteKnowledgeIndexMutation();
 }
 
 export function deleteKnowledgeDocumentFromIndex(params: {
@@ -708,6 +720,7 @@ export function deleteKnowledgeDocumentFromIndex(params: {
     params.db.prepare(`DELETE FROM web_source_refresh WHERE doc_id = ?`).run(params.docId);
 
     params.db.exec("COMMIT");
+    noteKnowledgeIndexMutation();
     return { ok: true, removedChunkIds };
   } catch (error) {
     try {

@@ -23,6 +23,7 @@ import {
 } from "./knowledge-retrieval-runtime.js";
 import { explainKnowledgeLineage } from "./lineage/lineage-explain.js";
 import { listKnowledgeRecentVisits, recordKnowledgeRecentVisit } from "./recent-visits.js";
+import { capRelationshipGraph } from "./relationship-graph-limits.js";
 import { classifyKnowledgeIntent } from "./resolve/intent-classifier.js";
 import {
   buildKnowledgeAgentProfile,
@@ -109,6 +110,8 @@ export async function knowledgeSearch(
   params: { query?: string; limit?: number },
 ) {
   const query = normalizeQuery(params.query);
+  // Shared principal-scoped bundle (in-flight merge + short TTL). Results are
+  // already truncated to `limit` (1–50, default 20).
   const bundle = await loadKnowledgeBundle(client);
   if (!query) {
     return knowledgeSearchFromBundle(bundle, params);
@@ -178,16 +181,20 @@ export async function knowledgeRelationships(
       knowledgeBaseId,
     });
     if (library) {
-      return filterRelationshipGraph({
-        graph: library,
-        query: params.query,
-        focusNodeId: null,
-      });
+      return capRelationshipGraph(
+        filterRelationshipGraph({
+          graph: library,
+          query: params.query,
+          focusNodeId: null,
+        }),
+        "library",
+      );
     }
-    return kbGraph;
+    return capRelationshipGraph(kbGraph, "summary");
   }
   if (!focusDocumentId) {
-    return kbGraph;
+    // Unfocused home: return a capped hub/space summary, not the full index panorama.
+    return capRelationshipGraph(kbGraph, "summary");
   }
   if (!knowledgeBaseId) {
     const { listKnowledgeBases } = await import("./knowledge-base-store.js");
@@ -202,7 +209,7 @@ export async function knowledgeRelationships(
     }
   }
   if (!knowledgeBaseId) {
-    return kbGraph;
+    return capRelationshipGraph(kbGraph, "summary");
   }
   const { buildDocumentEgoGraphForKnowledgeBase } = await import("./document-ego-graph-runtime.js");
   const ego = await buildDocumentEgoGraphForKnowledgeBase({
@@ -210,16 +217,20 @@ export async function knowledgeRelationships(
     docId: focusDocumentId,
   });
   if (!ego) {
-    return kbGraph;
+    // Still do not invent a library panorama under a requested document focus.
+    return capRelationshipGraph(kbGraph, "summary");
   }
   // Document focus must switch the cockpit to document↔document topology.
   // Do not keep the KB-folder panorama under the ego overlay — that hides the
   // document layer the user selected (see home relations "库级全景" regression).
-  return filterRelationshipGraph({
-    graph: ego,
-    query: params.query,
-    focusNodeId: null,
-  });
+  return capRelationshipGraph(
+    filterRelationshipGraph({
+      graph: ego,
+      query: params.query,
+      focusNodeId: null,
+    }),
+    "document-ego",
+  );
 }
 
 export function knowledgeObjectFromBundle(
@@ -305,6 +316,7 @@ export async function knowledgeRecommendations(
     taskContext?: KnowledgeTaskContext | null;
   },
 ): Promise<KnowledgeRecommendation[]> {
+  // Compute from the shared bundle rather than materializing a second graph.
   const bundle = await loadKnowledgeBundle(client);
   return knowledgeRecommendationsFromBundle(bundle, params);
 }
