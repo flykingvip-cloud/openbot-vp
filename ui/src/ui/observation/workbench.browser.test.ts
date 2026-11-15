@@ -7,6 +7,18 @@ import {
 } from "../runtime-observation.ts";
 import { renderObservationWorkbench, type OpenBotObservationWorkbench } from "./workbench.ts";
 
+function rectsOverlap(left: Element | null, right: Element | null): boolean {
+  if (!(left instanceof HTMLElement) || !(right instanceof HTMLElement)) {
+    return true;
+  }
+  const a = left.getBoundingClientRect();
+  const b = right.getBoundingClientRect();
+  if (a.width === 0 || a.height === 0 || b.width === 0 || b.height === 0) {
+    return true;
+  }
+  return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+}
+
 describe("observation workbench interaction", () => {
   it("starts from the original host projection, then explicitly enters samples and evidence", async () => {
     const host = {};
@@ -207,6 +219,9 @@ describe("platform tenant compare filters", () => {
     const panel = container.querySelector(
       "openbot-observation-workbench",
     ) as OpenBotObservationWorkbench;
+    container.style.width = "1100px";
+    panel.style.display = "block";
+    panel.style.width = "100%";
     await panel.updateComplete;
 
     expect(panel.querySelector('[data-testid="obs-platform-health"]')?.textContent).toContain(
@@ -232,7 +247,10 @@ describe("platform tenant compare filters", () => {
     expect(panel.querySelector('[data-testid="obs-tenant-compare"]')?.textContent).not.toContain(
       "租户之间隔离；无授权租户不可查询",
     );
-    expect(panel.querySelector("select[aria-label=观测数据源]")).not.toBeNull();
+    expect(panel.querySelector(".obs-plat-toolbar select[aria-label=观测数据源]")).toBeNull();
+    expect(panel.querySelector('[data-testid="obs-precise-query"]')?.textContent).not.toContain(
+      "任务列表将按企业、日期和机器人自动出现。",
+    );
     expect(
       panel.querySelector('[data-testid="obs-health-心跳时效"] .obs-cap-val')?.textContent,
     ).toBe("暂无心跳记录");
@@ -285,20 +303,24 @@ describe("platform tenant compare filters", () => {
     expect(panel.querySelector('[data-tenant-id="tenant-a"]')?.textContent).toContain("未知");
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).toContain("尚未确认");
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).not.toContain("无授权");
-    expect(panel.querySelector(".obs-plat-toolbar select[aria-label=观测数据源]")).not.toBeNull();
-    expect(panel.querySelector(".obs-source")?.textContent).toContain("真实连接");
-    expect(panel.querySelector(".obs-source")?.textContent).toContain("样例验收");
-    expect(panel.querySelector(".obs-source")?.textContent).not.toContain("连接工作台数据源");
-    expect(panel.querySelector(".obs-source")?.textContent).not.toContain("不影响独立精确任务查询");
+    expect(panel.querySelector(".obs-plat-toolbar select[aria-label=观测数据源]")).toBeNull();
+    expect(panel.querySelector(".obs-plat-toolbar")?.textContent).not.toContain("真实连接");
+    expect(panel.querySelector(".obs-plat-toolbar")?.textContent).not.toContain("样例验收");
     expect(panel.querySelector(".obs-source-label")).toBeNull();
     expect(panel.querySelector(".obs-source small")).toBeNull();
+    expect(rectsOverlap(
+      panel.querySelector('[aria-label="起始日期"]'),
+      panel.querySelector('[aria-label="机器人筛选"]'),
+    )).toBe(false);
+    expect(rectsOverlap(
+      panel.querySelector('[aria-label="结束日期"]'),
+      panel.querySelector('[aria-label="机器人筛选"]'),
+    )).toBe(false);
     expect(panel.querySelector('[data-tenant-id="tenant-b"]')?.textContent).not.toMatch(
       /近 7 天调用[\s\S]*\b0\b/,
     );
 
-    const sample = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
-    sample.value = "sample";
-    sample.dispatchEvent(new Event("change"));
+    panel.setSource("sample");
     await panel.updateComplete;
     expect(panel.textContent).toContain("物业示例（样例）");
     expect(panel.textContent).toContain("华北示例（样例）");
@@ -848,9 +870,7 @@ describe("R5 incremental wiring", () => {
         "sample-tenant-north": "none",
       },
     });
-    const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
-    selector.value = "sample";
-    selector.dispatchEvent(new Event("change"));
+    panel.setSource("sample");
     await panel.updateComplete;
 
     const tenant = panel.querySelector<HTMLSelectElement>("select[aria-label=租户筛选]")!;
@@ -915,9 +935,7 @@ describe("R5 incremental wiring", () => {
         "sample-tenant-north": "granted",
       },
     });
-    const selector = panel.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
-    selector.value = "sample";
-    selector.dispatchEvent(new Event("change"));
+    panel.setSource("sample");
     await panel.updateComplete;
     const tenant = panel.querySelector<HTMLSelectElement>("select[aria-label=租户筛选]")!;
     tenant.value = "sample-tenant-property";

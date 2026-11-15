@@ -767,7 +767,7 @@ export class OpenBotObservationWorkbench extends LitElement {
     return this.paused && this.frozenView ? this.frozenView : view;
   }
 
-  private setSource(value: string) {
+  setSource(value: string) {
     if (value === "sample" || value === "live") {
       this.source = value;
       this.selected = null;
@@ -1904,10 +1904,6 @@ export class OpenBotObservationWorkbench extends LitElement {
     this.syncDrawerUrl(resolved.url);
   }
 
-  private renderSourceSwitch(view: ObservationView) {
-    return html`<div class="obs-source"><select aria-label="观测数据源" @change=${(event: Event) => this.setSource((event.target as HTMLSelectElement).value)}><option value="live" ?selected=${view.source === "live"}>真实连接</option><option value="sample" ?selected=${view.source === "sample"}>样例验收</option></select></div>`;
-  }
-
   private dateInputValue(ms: number): string {
     const date = new Date(ms);
     const year = date.getFullYear();
@@ -2114,7 +2110,7 @@ export class OpenBotObservationWorkbench extends LitElement {
           })}
         </select>
       </label>
-      <label class="field obs-query-scope"><span>日期</span>
+      <label class="field obs-query-scope obs-query-dates-field"><span>日期</span>
         <div class="obs-query-dates">
           <input type="date" aria-label="起始日期" ?disabled=${disabled} .value=${this.dateInputValue(window.from)} @change=${(event: Event) => {
             const fromValue = (event.target as HTMLInputElement).value;
@@ -2185,7 +2181,7 @@ export class OpenBotObservationWorkbench extends LitElement {
       return nothing;
     }
     if (!index) {
-      return html`<div class="obs-task-index" data-testid="obs-task-index"><p class="obs-plat-footnote">任务列表将按企业、日期和机器人自动出现。</p></div>`;
+      return nothing;
     }
     if (index.authorization === "unknown") {
       return html`<div class="obs-task-index" data-testid="obs-task-index"><p class="obs-plat-footnote">授权尚未确认，不返回该租户任务。</p></div>`;
@@ -2255,7 +2251,6 @@ export class OpenBotObservationWorkbench extends LitElement {
     return html`
       <div class="obs-plat-toolbar">
         ${this.renderPlatformSubnav()}
-        ${this.renderSourceSwitch(view)}
       </div>
       ${notice ? html`<p class="obs-access-notice" data-testid="obs-access-notice">${notice}</p>` : nothing}
       ${

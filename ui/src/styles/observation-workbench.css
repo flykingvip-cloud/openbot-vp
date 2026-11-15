@@ -966,12 +966,6 @@ select {
   margin: 0 0 16px;
   border-bottom: 1px solid var(--obs-line);
 }
-.obs-plat-toolbar .obs-source {
-  margin: 0 0 8px auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
 .obs-plat-grid {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
@@ -1067,14 +1061,27 @@ select {
   fill: #2563eb;
 }
 .obs-query-filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
   margin: 0 0 10px;
+}
+.obs-query-filters > .obs-query-scope {
+  flex: 1 1 160px;
+  min-width: 160px;
+  max-width: 100%;
+  margin: 0;
+}
+.obs-query-filters > .obs-query-dates-field {
+  flex: 2 1 284px;
+  min-width: min(100%, 284px);
 }
 .obs-query-dates {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 .obs-query-dates input {
   font: inherit;
@@ -1084,7 +1091,17 @@ select {
   border-radius: 5px;
   padding: 7px 9px;
   min-height: 34px;
+  flex: 1 1 136px;
+  min-width: 136px;
+  width: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.obs-query-scope select {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .obs-task-index {
   margin-top: 12px;
@@ -1226,9 +1243,6 @@ select {
   }
   .obs-plat-toolbar {
     flex-direction: column;
-  }
-  .obs-plat-toolbar .obs-source {
-    margin-left: 0;
   }
 }
 

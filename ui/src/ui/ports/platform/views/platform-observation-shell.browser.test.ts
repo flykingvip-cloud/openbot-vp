@@ -116,9 +116,7 @@ describe("platform observation shell", () => {
     expect(container.textContent).toContain("精确任务查询");
     expect(container.textContent).toContain("租户隔离与授权");
     expect(container.querySelector(".obs-pulse-grid")).toBeNull();
-    const selector = workbench.querySelector<HTMLSelectElement>("select[aria-label=观测数据源]")!;
-    selector.value = "sample";
-    selector.dispatchEvent(new Event("change"));
+    workbench.setSource("sample");
     await workbench.updateComplete;
     expect(container.textContent).toContain("交互验收样例");
     expect(container.textContent).toContain("平台观测");
