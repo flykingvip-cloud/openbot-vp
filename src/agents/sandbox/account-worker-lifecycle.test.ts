@@ -1,3 +1,7 @@
+import { vi } from "vitest";
+vi.mock("../../gateway/workspace-resolver/execution-workspace.js", () => ({
+  resolveExecutionWorkspace: vi.fn(async () => null),
+}));
 /**
  * Account Computer v4.1 §10–§11 P3 lifecycle.
  *

@@ -1,3 +1,7 @@
+import { vi } from "vitest";
+vi.mock("../../gateway/workspace-resolver/execution-workspace.js", () => ({
+  resolveExecutionWorkspace: vi.fn(async () => null),
+}));
 /**
  * One Account Computer browser per user.
  * Exec containers stay per agent and attach to that shared browser.
