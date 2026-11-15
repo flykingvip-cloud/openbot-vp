@@ -186,7 +186,12 @@ describe("knowledge source bundle cache", () => {
         }),
     );
     const pending = cache.getOrLoad(key, firstLoader);
-    cache.invalidate({ userId: "user-a" });
+    cache.invalidate({
+      userId: "user-a",
+      tenantId: "tenant-a",
+      seatId: "seat-a",
+      agentType: "employee-agent",
+    });
     release(emptyBundleFixture("stale"));
     const stale = await pending;
     const freshLoader = vi.fn(async () => emptyBundleFixture("fresh"));
@@ -194,6 +199,91 @@ describe("knowledge source bundle cache", () => {
     expect(fresh).not.toBe(stale);
     expect(fresh.graph.nodes[0]?.id).toBe("fresh");
     expect(freshLoader).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries after a synchronous loader throw and does not leave in-flight state", async () => {
+    const cache = createKnowledgeSourceBundleCache();
+    const key = formatKnowledgeSourceBundleCacheKey({
+      userId: "user-a",
+      tenantId: "tenant-a",
+      seatId: "seat-a",
+      agentType: "employee-agent",
+    });
+    const boom = vi.fn(() => {
+      throw new Error("sync-boom");
+    });
+    await expect(cache.getOrLoad(key, boom)).rejects.toThrow("sync-boom");
+    expect(cache.inFlightSize).toBe(0);
+    expect(cache.get(key)).toBeNull();
+    const ok = vi.fn(async () => emptyBundleFixture("after-sync"));
+    const recovered = await cache.getOrLoad(key, ok);
+    expect(recovered.graph.nodes[0]?.id).toBe("after-sync");
+    expect(ok).toHaveBeenCalledTimes(1);
+    expect(cache.stats.loads).toBe(2);
+  });
+
+  it("retries after an asynchronous loader rejection", async () => {
+    const cache = createKnowledgeSourceBundleCache();
+    const key = formatKnowledgeSourceBundleCacheKey({
+      userId: "user-a",
+      tenantId: "tenant-a",
+      seatId: "seat-a",
+      agentType: "employee-agent",
+    });
+    const boom = vi.fn(async () => {
+      throw new Error("async-boom");
+    });
+    await expect(cache.getOrLoad(key, boom)).rejects.toThrow("async-boom");
+    expect(cache.inFlightSize).toBe(0);
+    const ok = vi.fn(async () => emptyBundleFixture("after-async"));
+    const recovered = await cache.getOrLoad(key, ok);
+    expect(recovered.graph.nodes[0]?.id).toBe("after-async");
+    expect(ok).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let a stale in-flight finally drop a newer holder or refill the cache", async () => {
+    const cache = createKnowledgeSourceBundleCache();
+    const key = formatKnowledgeSourceBundleCacheKey({
+      userId: "user-a",
+      tenantId: "tenant-a",
+      seatId: "seat-a",
+      agentType: "employee-agent",
+    });
+    let releaseStale!: (bundle: KnowledgeSourceBundle) => void;
+    let releaseFresh!: (bundle: KnowledgeSourceBundle) => void;
+    const staleLoader = vi.fn(
+      () =>
+        new Promise<KnowledgeSourceBundle>((resolve) => {
+          releaseStale = resolve;
+        }),
+    );
+    const freshLoader = vi.fn(
+      () =>
+        new Promise<KnowledgeSourceBundle>((resolve) => {
+          releaseFresh = resolve;
+        }),
+    );
+    const stalePending = cache.getOrLoad(key, staleLoader);
+    cache.invalidate({
+      userId: "user-a",
+      tenantId: "tenant-a",
+      seatId: "seat-a",
+      agentType: "employee-agent",
+    });
+    const freshPending = cache.getOrLoad(key, freshLoader);
+    expect(staleLoader).toHaveBeenCalledTimes(1);
+    expect(freshLoader).toHaveBeenCalledTimes(1);
+    expect(cache.inFlightSize).toBe(1);
+    releaseStale(emptyBundleFixture("stale"));
+    const stale = await stalePending;
+    expect(stale.graph.nodes[0]?.id).toBe("stale");
+    expect(cache.get(key)).toBeNull();
+    expect(cache.inFlightSize).toBe(1);
+    releaseFresh(emptyBundleFixture("fresh"));
+    const fresh = await freshPending;
+    expect(fresh.graph.nodes[0]?.id).toBe("fresh");
+    expect(cache.get(key)).toBe(fresh);
+    expect(cache.inFlightSize).toBe(0);
   });
 });
 

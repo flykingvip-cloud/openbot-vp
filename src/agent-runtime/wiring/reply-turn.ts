@@ -21,7 +21,7 @@ import {
 import { resolveExecutionQueueAction } from "../policy/index.js";
 import { sessionTaskState, prepareReplacementSessionEntry } from "../state/index.js";
 import {
-  persistInteractionMessage,
+  persistInteractionMessage as writeInteractionTranscriptMessage,
   persistRunSessionUsage,
   incrementRunCompactionCount,
 } from "../state/index.js";
@@ -35,7 +35,11 @@ import { evaluateBoundTaskAcceptance } from "./task-acceptance.js";
 export const replyTurnRuntime = {
   isHumanInteractionIngress,
   prepareReplacementSessionEntry,
-  persistInteractionMessage,
+  persistInteractionMessage(
+    input: Parameters<typeof writeInteractionTranscriptMessage>[0],
+  ): ReturnType<typeof writeInteractionTranscriptMessage> {
+    return writeInteractionTranscriptMessage(input);
+  },
   interaction: (async (
     params: GatewayInteractionParams,
     shadowHost?: GovernedShadowHostInjection,

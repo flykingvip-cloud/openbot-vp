@@ -172,6 +172,7 @@ import {
   listChatTurnTerminals,
   persistRejectedInteractionTurn,
   reconcileChatTurnTerminal,
+  shortChatRunId,
   writeChatTurnTerminal,
   readChatTurnTerminal,
 } from "../chat-interaction-failure.js";
@@ -465,8 +466,11 @@ import {
 } from "./chat-resume-parked-recheck.js";
 import {
   assistantTextForAbortPartial,
+  buildWebchatInteractionIngress,
   EMPTY_FINAL_ASSISTANT_TEXT,
+  planDirectChatFallbackPersist,
   transcriptHasVisibleAssistantAfterUser,
+  visibleAssistantTextAfterUser,
 } from "./chat-terminal-transcript.js";
 import {
   appendInjectedAssistantMessageToTranscript,
@@ -7147,9 +7151,11 @@ export const chatHandlers: GatewayRequestHandlers = {
               });
             }
           },
-          ...(!systemInputProvenance && !p.growthBirthTurn
-            ? { interactionIngress: { userMessageId: clientRunId } }
-            : {}),
+          ...buildWebchatInteractionIngress({
+            clientRunId,
+            systemInputProvenance,
+            growthBirthTurn: p.growthBirthTurn,
+          }),
           ...(taskTracking.action === "resume"
             ? { resumedTaskBinding: sessionTaskState.captureBinding(entry?.sessionFile) }
             : {}),
@@ -7188,20 +7194,83 @@ export const chatHandlers: GatewayRequestHandlers = {
               .trim();
             let message: Record<string, unknown> | undefined;
             let prepared: PreparedChatDeliverable | null = null;
-            if (combinedReply) {
-              const { storePath: latestStorePath, entry: latestEntry } =
-                await loadSessionEntryForClient(sessionKey, client);
-              const sessionId = latestEntry?.sessionId ?? entry?.sessionId ?? clientRunId;
-              const replyGovernance = await resolveChatTranscriptGovernance({ client, cfg });
+            const { storePath: latestStorePath, entry: latestEntry } =
+              await loadSessionEntryForClient(sessionKey, client);
+            const sessionId = latestEntry?.sessionId ?? entry?.sessionId ?? clientRunId;
+            const priorMessages =
+              sessionId && latestStorePath
+                ? readSessionMessages(sessionId, latestStorePath, latestEntry?.sessionFile)
+                : [];
+            const existingAssistantText = visibleAssistantTextAfterUser(priorMessages, clientRunId);
+            const plan = planDirectChatFallbackPersist({
+              combinedReply,
+              transcriptHasVisibleAssistant: Boolean(existingAssistantText),
+              existingAssistantText,
+            });
+            const replyGovernance = await resolveChatTranscriptGovernance({ client, cfg });
+            const buildFallbackBroadcastMessage = (
+              text: string,
+              extras?: {
+                deliverablePublish?: Record<string, unknown>;
+                artifact?: Record<string, unknown>;
+                artifacts?: Record<string, unknown>[];
+              },
+            ): Record<string, unknown> => {
+              const now = Date.now();
+              return {
+                role: "assistant",
+                content: [{ type: "text", text }],
+                timestamp: now,
+                ...(extras?.deliverablePublish
+                  ? { deliverablePublish: extras.deliverablePublish }
+                  : {}),
+                ...(extras?.artifact ? { artifact: extras.artifact } : {}),
+                ...(extras?.artifacts ? { artifacts: extras.artifacts } : {}),
+                stopReason: "stop",
+                usage: { input: 0, output: 0, totalTokens: 0 },
+              };
+            };
+            if (plan.kind === "append-empty-final") {
+              context.logGateway.warn(
+                `webchat empty interaction final: run=${shortChatRunId(clientRunId)} agentRunStarted=false`,
+              );
+              const appended = await appendAssistantTranscriptMessage({
+                message: plan.text,
+                sessionId,
+                storePath: latestStorePath,
+                sessionFile: latestEntry?.sessionFile,
+                agentId,
+                createIfMissing: true,
+                idempotencyKey: `${clientRunId}:assistant`,
+                tenantId: replyGovernance.tenantId,
+                ownerUserId: replyGovernance.ownerUserId,
+                groupId: replyGovernance.groupId,
+                failClosed: replyGovernance.failClosed,
+                abortMeta: {
+                  aborted: true as const,
+                  origin: "rpc" as const,
+                  runId: clientRunId,
+                },
+              });
+              if (appended.ok && appended.message) {
+                message = appended.message;
+              } else if (!appended.ok) {
+                context.logGateway.warn(
+                  `webchat empty-final transcript append failed: ${appended.error ?? "unknown error"}`,
+                );
+                message = buildFallbackBroadcastMessage(plan.text);
+              }
+            } else if (plan.kind === "reuse" || plan.kind === "append-reply") {
+              const sourceText = plan.text ?? combinedReply;
               const turnSettled = settleTurnCompletion({
                 userText: transcriptMessage,
-                assistantText: combinedReply,
+                assistantText: sourceText,
                 nowMs: Date.now(),
                 sessionKey: resolvedSessionKey,
               });
               const settledReply = turnSettled.visibleText.trim()
                 ? turnSettled.visibleText
-                : combinedReply;
+                : sourceText;
               prepared = prepareChatDeliverablePublish({
                 text: settledReply,
                 publishIntent: "direct-fallback-final",
@@ -7218,120 +7287,108 @@ export const chatHandlers: GatewayRequestHandlers = {
               });
               const replyText = projectAssistantReplyForDisplay(prepared.text);
               const fallbackPublish = prepared.structured ? prepared.view : undefined;
-              const appended = await appendAssistantTranscriptMessage({
-                message: replyText,
-                sessionId,
-                storePath: latestStorePath,
-                sessionFile: latestEntry?.sessionFile,
-                agentId,
-                createIfMissing: true,
-                tenantId: replyGovernance.tenantId,
-                ownerUserId: replyGovernance.ownerUserId,
-                groupId: replyGovernance.groupId,
-                failClosed: replyGovernance.failClosed,
+              const fallbackExtras = {
                 ...(fallbackPublish ? { deliverablePublish: fallbackPublish } : {}),
                 ...(fallbackArtifacts.artifact ? { artifact: fallbackArtifacts.artifact } : {}),
                 ...(fallbackArtifacts.artifacts ? { artifacts: fallbackArtifacts.artifacts } : {}),
-              });
-              if (appended.ok) {
-                message = appended.message
-                  ? {
-                      ...appended.message,
-                      ...(fallbackPublish ? { deliverablePublish: fallbackPublish } : {}),
-                      ...(fallbackArtifacts.artifact
-                        ? { artifact: fallbackArtifacts.artifact }
-                        : {}),
-                      ...(fallbackArtifacts.artifacts
-                        ? { artifacts: fallbackArtifacts.artifacts }
-                        : {}),
-                    }
-                  : undefined;
-                emitChatInboundStage({
-                  runId: clientRunId,
-                  stage: "assistant_persisted",
-                  sessionKey: resolvedSessionKey,
-                  extra: { source: "chat_send_fallback" },
-                });
-                const { resolveContinuityWorkspaceDirForTurn } =
-                  await import("./chat-continuity-workspace.js");
-                const turnWorkspaceDir = await resolveContinuityWorkspaceDirForTurn({
-                  cfg,
-                  sessionKey,
+              };
+              if (plan.kind === "reuse") {
+                message = buildFallbackBroadcastMessage(replyText, fallbackExtras);
+              } else {
+                const appended = await appendAssistantTranscriptMessage({
+                  message: replyText,
+                  sessionId,
+                  storePath: latestStorePath,
+                  sessionFile: latestEntry?.sessionFile,
                   agentId,
-                  client,
-                  resolvePrimaryWorkspaceDir: resolveCallerWorkspaceCwd,
+                  createIfMissing: true,
+                  idempotencyKey: `${clientRunId}:assistant`,
+                  tenantId: replyGovernance.tenantId,
+                  ownerUserId: replyGovernance.ownerUserId,
+                  groupId: replyGovernance.groupId,
+                  failClosed: replyGovernance.failClosed,
+                  ...fallbackExtras,
                 });
-                const continuityTenantId =
-                  client?.sessionEnterpriseId?.trim() ||
-                  chatCheckpointStore.readTrustedTenantIdFromGatewayClient(client) ||
-                  null;
-                const spaceGroupId = extractGroupIdFromChatSessionKey(sessionKey);
-                if (turnWorkspaceDir || spaceGroupId) {
-                  const continuityWorkspaceDir =
-                    turnWorkspaceDir ??
-                    resolveSessionContinuityWorkspaceDir({
+                if (appended.ok) {
+                  message = appended.message
+                    ? { ...appended.message, ...fallbackExtras }
+                    : buildFallbackBroadcastMessage(replyText, fallbackExtras);
+                  emitChatInboundStage({
+                    runId: clientRunId,
+                    stage: "assistant_persisted",
+                    sessionKey: resolvedSessionKey,
+                    extra: { source: "chat_send_fallback" },
+                  });
+                  const { resolveContinuityWorkspaceDirForTurn } =
+                    await import("./chat-continuity-workspace.js");
+                  const turnWorkspaceDir = await resolveContinuityWorkspaceDirForTurn({
+                    cfg,
+                    sessionKey,
+                    agentId,
+                    client,
+                    resolvePrimaryWorkspaceDir: resolveCallerWorkspaceCwd,
+                  });
+                  const continuityTenantId =
+                    client?.sessionEnterpriseId?.trim() ||
+                    chatCheckpointStore.readTrustedTenantIdFromGatewayClient(client) ||
+                    null;
+                  const spaceGroupId = extractGroupIdFromChatSessionKey(sessionKey);
+                  if (turnWorkspaceDir || spaceGroupId) {
+                    const continuityWorkspaceDir =
+                      turnWorkspaceDir ??
+                      resolveSessionContinuityWorkspaceDir({
+                        cfg,
+                        sessionKey,
+                        sessionEntry: latestEntry,
+                        agentId,
+                        agentWorkspaceDir: process.cwd(),
+                        tenantId: continuityTenantId,
+                      });
+                    void commitSessionContinuityForCurrentSession({
                       cfg,
+                      workspaceDir: continuityWorkspaceDir,
+                      agentId,
                       sessionKey,
                       sessionEntry: latestEntry,
-                      agentId,
-                      agentWorkspaceDir: process.cwd(),
+                      reason: "turn_completed",
                       tenantId: continuityTenantId,
-                    });
-                  void commitSessionContinuityForCurrentSession({
-                    cfg,
-                    workspaceDir: continuityWorkspaceDir,
-                    agentId,
-                    sessionKey,
-                    sessionEntry: latestEntry,
-                    reason: "turn_completed",
-                    tenantId: continuityTenantId,
-                  }).catch(() => undefined);
+                    }).catch(() => undefined);
+                  }
+                } else {
+                  context.logGateway.warn(
+                    `webchat transcript append failed: ${appended.error ?? "unknown error"}`,
+                  );
+                  const terminal = await persistRejectedInteractionTurn({
+                    error: Object.assign(
+                      new Error(appended.error ?? "transcript append failed"),
+                      replyText.includes("本轮交互在时限内没有得到有效输出")
+                        ? { interactionPhase: "interpretation" as const, reason: "timeout" }
+                        : replyText.includes("本轮交互未能完成")
+                          ? { interactionPhase: "interpretation" as const, reason: "model" }
+                          : {},
+                    ),
+                    runId: clientRunId,
+                    sessionKey: resolvedSessionKey,
+                    append: async (messageText, idempotencyKey) =>
+                      appendAssistantTranscriptMessage({
+                        message: messageText,
+                        idempotencyKey,
+                        sessionId,
+                        storePath: latestStorePath,
+                        sessionFile: latestEntry?.sessionFile,
+                        agentId,
+                        createIfMissing: false,
+                        tenantId: replyGovernance.tenantId,
+                        ownerUserId: replyGovernance.ownerUserId,
+                        groupId: replyGovernance.groupId,
+                        failClosed: replyGovernance.failClosed,
+                      }),
+                  });
+                  message = buildFallbackBroadcastMessage(
+                    terminal.text ?? replyText,
+                    fallbackExtras,
+                  );
                 }
-              } else {
-                context.logGateway.warn(
-                  `webchat transcript append failed: ${appended.error ?? "unknown error"}`,
-                );
-                const terminal = await persistRejectedInteractionTurn({
-                  error: Object.assign(
-                    new Error(appended.error ?? "transcript append failed"),
-                    replyText.includes("本轮交互在时限内没有得到有效输出")
-                      ? { interactionPhase: "interpretation" as const, reason: "timeout" }
-                      : replyText.includes("本轮交互未能完成")
-                        ? { interactionPhase: "interpretation" as const, reason: "model" }
-                        : {},
-                  ),
-                  runId: clientRunId,
-                  sessionKey: resolvedSessionKey,
-                  append: async (messageText, idempotencyKey) =>
-                    appendAssistantTranscriptMessage({
-                      message: messageText,
-                      idempotencyKey,
-                      sessionId,
-                      storePath: latestStorePath,
-                      sessionFile: latestEntry?.sessionFile,
-                      agentId,
-                      createIfMissing: false,
-                      tenantId: replyGovernance.tenantId,
-                      ownerUserId: replyGovernance.ownerUserId,
-                      groupId: replyGovernance.groupId,
-                      failClosed: replyGovernance.failClosed,
-                    }),
-                });
-                const now = Date.now();
-                message = {
-                  role: "assistant",
-                  content: [{ type: "text", text: terminal.text ?? replyText }],
-                  timestamp: now,
-                  ...(prepared.structured ? { deliverablePublish: prepared.view } : {}),
-                  ...(fallbackArtifacts.artifact ? { artifact: fallbackArtifacts.artifact } : {}),
-                  ...(fallbackArtifacts.artifacts
-                    ? { artifacts: fallbackArtifacts.artifacts }
-                    : {}),
-                  // Keep this compatible with Pi stopReason enums even though this message isn't
-                  // persisted to the transcript due to the append failure.
-                  stopReason: "stop",
-                  usage: { input: 0, output: 0, totalTokens: 0 },
-                };
               }
             }
             const taskUpdate =
@@ -7489,11 +7546,23 @@ export const chatHandlers: GatewayRequestHandlers = {
               });
             },
           });
+          const errorClass = err instanceof Error ? err.name : typeof err;
+          const phase =
+            err && typeof err === "object" && "interactionPhase" in err
+              ? String((err as { interactionPhase?: unknown }).interactionPhase)
+              : "unknown";
+          const usageRecorded =
+            err &&
+            typeof err === "object" &&
+            (err as { usageRecorded?: unknown }).usageRecorded === true;
+          context.logGateway.warn(
+            `webchat interaction dispatch failed: class=${errorClass} run=${shortChatRunId(clientRunId)} persisted=${terminal.persisted} phase=${phase} usageRecorded=${usageRecorded}`,
+          );
           broadcastChatError({
             context,
             runId: clientRunId,
             sessionKey: resolvedSessionKey,
-            errorMessage: terminal.text ?? String(err),
+            errorMessage: terminal.text ?? CHAT_TURN_ERROR_UNCONFIRMED_TEXT,
             persistedToTranscript: terminal.persisted,
             businessExecution: terminal.persisted || terminal.text ? undefined : "unknown",
           });

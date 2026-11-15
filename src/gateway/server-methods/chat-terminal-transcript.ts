@@ -5,6 +5,56 @@ export const BLANK_ABORT_ASSISTANT_TEXT = "这一轮已中止，没有生成可�
 export const EMPTY_FINAL_ASSISTANT_TEXT =
   "这一轮没有完成回复（助手在给出结果前结束或返回了空内容）。请再试一次。";
 
+/** Default assistant bubble when interaction ends with no collected reply and no executor run. */
+export type DirectChatFallbackPersistPlan =
+  | { kind: "reuse"; text?: string }
+  | { kind: "append-reply"; text: string }
+  | { kind: "append-empty-final"; text: string };
+
+/**
+ * Ordinary webchat `chat.send` ingress: persist the interaction's own assistant
+ * reply (or rejection notice) onto the session transcript. Growth/cron paths
+ * omit this so they keep the bare executor runId.
+ */
+export function buildWebchatInteractionIngress(params: {
+  clientRunId: string;
+  systemInputProvenance?: unknown;
+  growthBirthTurn?: boolean;
+}):
+  | { interactionIngress: { userMessageId: string; persistOwnTranscript: true } }
+  | Record<string, never> {
+  if (params.systemInputProvenance || params.growthBirthTurn) {
+    return {};
+  }
+  return {
+    interactionIngress: {
+      userMessageId: params.clientRunId,
+      persistOwnTranscript: true,
+    },
+  };
+}
+
+/**
+ * Decide how the `!agentRunStarted` webchat fallback should persist.
+ * If the interaction path already wrote a visible assistant bubble, reuse it
+ * so `persistOwnTranscript` and `chat_send_fallback` cannot double-write.
+ */
+export function planDirectChatFallbackPersist(params: {
+  combinedReply: string;
+  transcriptHasVisibleAssistant: boolean;
+  existingAssistantText?: string;
+}): DirectChatFallbackPersistPlan {
+  if (params.transcriptHasVisibleAssistant) {
+    const text = params.combinedReply.trim() || params.existingAssistantText?.trim() || undefined;
+    return text ? { kind: "reuse", text } : { kind: "reuse" };
+  }
+  const reply = params.combinedReply.trim();
+  if (reply) {
+    return { kind: "append-reply", text: reply };
+  }
+  return { kind: "append-empty-final", text: EMPTY_FINAL_ASSISTANT_TEXT };
+}
+
 /** Abort persistence must keep a visible bubble when the partial buffer is blank. */
 export function assistantTextForAbortPartial(partial: string | null | undefined): string {
   const trimmed = partial?.trim() ?? "";
@@ -51,13 +101,13 @@ function assistantText(message: Record<string, unknown>): string {
  * True when this user turn already has a non-empty assistant bubble after it.
  * Reconnect then has something to paint; an empty final must not add a second one.
  */
-export function transcriptHasVisibleAssistantAfterUser(
+export function visibleAssistantTextAfterUser(
   messages: readonly unknown[],
   userIdempotencyKey: string,
-): boolean {
+): string {
   const userKey = userIdempotencyKey.trim();
   if (!userKey) {
-    return false;
+    return "";
   }
   let seenUser = false;
   for (const entry of messages) {
@@ -70,9 +120,19 @@ export function transcriptHasVisibleAssistantAfterUser(
       seenUser = true;
       continue;
     }
-    if (seenUser && assistantText(message)) {
-      return true;
+    if (seenUser) {
+      const text = assistantText(message);
+      if (text) {
+        return text;
+      }
     }
   }
-  return false;
+  return "";
+}
+
+export function transcriptHasVisibleAssistantAfterUser(
+  messages: readonly unknown[],
+  userIdempotencyKey: string,
+): boolean {
+  return Boolean(visibleAssistantTextAfterUser(messages, userIdempotencyKey));
 }

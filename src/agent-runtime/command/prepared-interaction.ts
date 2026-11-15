@@ -81,7 +81,34 @@ export function createPreparedInteractionInference(
       if (resourceBudget.isExhausted()) {
         throw interactionTimeoutError();
       }
-      return result.result.readDecision();
+      try {
+        return result.result.readDecision();
+      } catch (error) {
+        const errorClass = error instanceof Error ? error.name : typeof error;
+        const phase =
+          error && typeof error === "object" && "interactionPhase" in error
+            ? String((error as { interactionPhase?: unknown }).interactionPhase)
+            : undefined;
+        const reason =
+          error && typeof error === "object" && "reason" in error
+            ? String((error as { reason?: unknown }).reason)
+            : undefined;
+        if (error && typeof error === "object") {
+          Object.assign(error, { usageRecorded: true });
+        }
+        console.warn(
+          "[interaction-decision-failed]",
+          JSON.stringify({
+            errorClass,
+            ...(phase ? { phase } : {}),
+            ...(reason && reason.length < 40 && !reason.includes("{") ? { reason } : {}),
+            usageRecorded: true,
+            provider: result.provider,
+            model: result.model,
+          }),
+        );
+        throw error;
+      }
     },
   };
 }

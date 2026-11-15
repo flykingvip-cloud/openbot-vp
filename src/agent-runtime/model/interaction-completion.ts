@@ -306,7 +306,25 @@ export async function invokeInteractionCompletion(params: {
           reason: "empty",
         });
       }
-      return readInteractionDecisionText(text);
+      try {
+        return readInteractionDecisionText(text);
+      } catch (error) {
+        const errorClass = error instanceof Error ? error.name : typeof error;
+        console.warn("[interaction-decision-parse-failed]", {
+          provider: params.model.provider,
+          model: params.model.id,
+          api: params.model.api,
+          errorClass,
+          contentTypes: completed.content.map((part) => part.type),
+          textCharacters: text.length,
+          outputTokens: completed.usage.output,
+        });
+        // Never surface SyntaxError, stacks, or raw model fragments to the chat UI.
+        throw Object.assign(new Error("本轮未取得有效的交互决定，没有启动或修改任务。"), {
+          interactionPhase: "interpretation" as const,
+          reason: "empty",
+        });
+      }
     },
   };
 }

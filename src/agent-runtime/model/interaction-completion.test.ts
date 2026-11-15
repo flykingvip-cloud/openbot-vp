@@ -251,7 +251,35 @@ it("still rejects a broken JSON decision instead of showing it as a reply", asyn
     usage: makeZeroUsageSnapshot(),
   });
   const result = await invokeInteractionCompletion(request);
-  expect(() => result.readDecision()).toThrow(SyntaxError);
+  try {
+    result.readDecision();
+    throw new Error("expected readDecision to throw");
+  } catch (error) {
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(SyntaxError);
+    const message = error instanceof Error ? error.message : String(error);
+    expect(message).toBe("本轮未取得有效的交互决定，没有启动或修改任务。");
+    expect(message).not.toMatch(/SyntaxError|stack|kind":"reply/);
+    expect((error as { interactionPhase?: string }).interactionPhase).toBe("interpretation");
+  }
+});
+
+it("rejects a completion with no text parts as an invalid decision", async () => {
+  mocks.complete.mockResolvedValue({
+    content: [{ type: "reasoning", text: "internal" }],
+    stopReason: "stop",
+    usage: { ...makeZeroUsageSnapshot(), output: 12 },
+  });
+  const result = await invokeInteractionCompletion(request);
+  try {
+    result.readDecision();
+    throw new Error("expected readDecision to throw");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    expect(message).toBe("本轮未取得有效的交互决定，没有启动或修改任务。");
+    expect(message).not.toContain("internal");
+    expect((error as { interactionPhase?: string }).interactionPhase).toBe("interpretation");
+  }
 });
 
 it("rejects a tool call even if the provider labels it finished", async () => {
@@ -346,7 +374,14 @@ it("rejects a blank final completion rather than producing an empty reply", asyn
     usage: makeZeroUsageSnapshot(),
   });
   const result = await invokeInteractionCompletion(request);
-  expect(() => result.readDecision()).toThrow();
+  try {
+    result.readDecision();
+    throw new Error("expected readDecision to throw");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    expect(message).toBe("本轮未取得有效的交互决定，没有启动或修改任务。");
+    expect((error as { interactionPhase?: string }).interactionPhase).toBe("interpretation");
+  }
 });
 
 it("disables thinking only for the known DeepSeek machine-protocol adapter", async () => {
