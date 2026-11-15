@@ -29,6 +29,8 @@ describe("mid-task-dialogue helpers", () => {
     const text = formatTaskBoardProgressReply(board);
     expect(text).toContain("手机调研");
     expect(text).toContain("任务板最近记录");
+    expect(text).toContain("来源：任务板");
+    expect(text).toContain("时点：");
     expect(text).toContain("未完成");
     expect(text).toContain("主人已暂停自动续跑");
     expect(text).toContain("正在收集评测");

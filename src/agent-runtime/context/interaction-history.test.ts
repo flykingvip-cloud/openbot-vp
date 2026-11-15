@@ -244,3 +244,34 @@ it("does not invent an omission notice when complete history has no peerContext"
   expect(referenceContents(built.messages)).toEqual(["previous"]);
   expect(built.messages.at(-1)?.content).toBe("current");
 });
+
+it("reports complete when every authorized message fits, and incomplete when the budget drops history", () => {
+  const messages = [
+    { role: "user", content: "older-goal" },
+    { role: "assistant", content: "older-answer" },
+    { role: "user", content: "recent" },
+  ];
+  expect(projectInteractionHistoryWithStatus(messages, "current")).toMatchObject({
+    complete: true,
+    context: [
+      { role: "user", content: "older-goal" },
+      { role: "assistant", content: "older-answer" },
+      { role: "user", content: "recent" },
+    ],
+  });
+  expect(projectInteractionHistoryWithStatus(messages, "current", 6)).toEqual({
+    complete: false,
+    context: [
+      { role: "user", content: INTERACTION_HISTORY_OMISSION_NOTICE },
+      { role: "user", content: "recent" },
+    ],
+  });
+  expect(projectInteractionHistoryWithStatus(messages, "current", 4)).toEqual({
+    complete: false,
+    context: [{ role: "user", content: INTERACTION_HISTORY_OMISSION_NOTICE }],
+  });
+  expect(projectInteractionHistoryWithStatus([], "current", 0)).toEqual({
+    complete: true,
+    context: [],
+  });
+});

@@ -49,3 +49,66 @@ it("assembles group identity, bootstrap, skills and quoted history for one gover
   expect(request).not.toHaveProperty("sessionFile");
   expect(request).not.toHaveProperty("captured");
 });
+
+it("marks incomplete budgeted history as restricted and still answers an ordinary question", async () => {
+  calls.bootstrap.mockResolvedValue({ contextFiles: [] });
+  const result = { kind: "understood", decision: { kind: "reply", text: "4" } };
+  calls.understand.mockResolvedValue(result);
+  const history = [
+    {
+      role: "user",
+      content: `${"prior-authorization-record-".repeat(40)}must-not-be-a-complete-view`,
+    },
+    { role: "assistant", content: "previous official conclusion" },
+  ];
+  expect(
+    await understandGroupInteraction({
+      config: {
+        agents: {
+          defaults: { contextBudget: { enabled: true, maxTokens: 1 } },
+        },
+      },
+      runId: "request-budget",
+      groupId: "g",
+      agentId: "bot",
+      sessionKey: "s",
+      workspaceDir: "/tmp/authorized-group",
+      provider: "p",
+      model: "m",
+      timeoutMs: 1000,
+      identity: { gatewayClientPlatformUserId: "owner" },
+      message: "2加2等于几",
+      groupContext: { title: "Group" },
+      history,
+    }),
+  ).toBe(result);
+  const understandCall = calls.understand.mock.calls.at(-1);
+  if (!understandCall) {
+    throw new Error("expected runGatewayUnderstanding to be called");
+  }
+  const request = understandCall[0] as {
+    input: {
+      availability?: unknown;
+      context: Array<{ role: string; content: string }>;
+      message: string;
+    };
+  };
+  expect(request.input.availability).toEqual({
+    mode: "restricted",
+    reasons: ["context_source_unavailable"],
+  });
+  expect(
+    request.input.context.some(
+      (part) =>
+        part.role === "system" &&
+        String(part.content).includes("not a complete authorization record"),
+    ),
+  ).toBe(true);
+  const historyChars = request.input.context
+    .filter((part) => part.role !== "system" && !String(part.content).includes('"groupId"'))
+    .reduce((sum, part) => sum + part.content.length, 0);
+  const sourceChars = history.reduce((sum, part) => sum + part.content.length, 0);
+  expect(historyChars).toBeLessThanOrEqual(512);
+  expect(historyChars).toBeLessThan(sourceChars);
+  expect(request.input.message).toBe("2加2等于几");
+});

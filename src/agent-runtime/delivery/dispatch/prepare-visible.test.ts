@@ -1,8 +1,15 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { prepareVisibleDelivery } from "./prepare-visible.js";
-const mocks = vi.hoisted(() => ({ register: vi.fn(), root: vi.fn(() => "/tmp/agent-a") }));
+const mocks = vi.hoisted(() => ({
+  register: vi.fn(async (reg: unknown) => ({ ok: true, registration: reg })),
+  persistIntent: vi.fn(),
+  release: vi.fn(async () => {}),
+  root: vi.fn(() => "/tmp/agent-a"),
+}));
 vi.mock("../../../task-outcome/pending-delivery.js", () => ({
-  registerAwaitingDelivery: mocks.register,
+  handoffAwaitingDelivery: mocks.register,
+  persistAwaitingDeliveryIntent: mocks.persistIntent,
+  releaseLiveProducerPreparation: mocks.release,
 }));
 const contract = {
   id: "code-v1",
@@ -37,6 +44,7 @@ it("awaits preparation before registration and publishes the same stable receipt
       deliveryId: "delivery:run-a:visible",
     }),
   );
+  expect(mocks.persistIntent).toHaveBeenCalledOnce();
   expect(mocks.register).not.toHaveBeenCalled();
   expect(publish).not.toHaveBeenCalled();
   release();
@@ -121,7 +129,7 @@ it.each([true, false])(
       commitOutcome: vi.fn(),
       publishPending: vi.fn(),
     });
-    const registration = mocks.register.mock.calls[0][0];
+    const registration = mocks.register.mock.calls[0][0] as { checkedTask?: unknown };
     expect(registration.checkedTask).toEqual({ sessionFile: "/tmp/test-session.jsonl", binding });
   },
 );
@@ -140,7 +148,9 @@ it("does not register an identity from another execution run", async () => {
     commitOutcome: vi.fn(),
     publishPending: vi.fn(),
   });
-  expect(mocks.register.mock.calls[0][0].checkedTask).toBeUndefined();
+  expect(
+    (mocks.register.mock.calls[0][0] as { checkedTask?: unknown }).checkedTask,
+  ).toBeUndefined();
 });
 
 it("never waives acceptance for a bound execution through a legacy chat classification", async () => {

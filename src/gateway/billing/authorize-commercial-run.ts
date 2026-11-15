@@ -90,6 +90,8 @@ export type AuthorizeCommercialRunInput = {
    * Channel session keys are not collaboration ids and must not be passed here.
    */
   groupId?: string;
+  /** Optional bound for queue-mode slot wait. Does not add concurrency or skip the gate. */
+  queueMaxWaitMs?: number;
   storePaths?: {
     subscriptions?: string;
     runtimeSnapshots?: string;
@@ -568,6 +570,7 @@ export async function authorizeCommercialRun(
       {
         registryStorePath: input.storePaths?.agentRunRegistry,
         queueStorePath: input.storePaths?.agentRunQueue,
+        ...(input.queueMaxWaitMs !== undefined ? { maxWaitMs: input.queueMaxWaitMs } : {}),
       },
     );
     if (!slot.ok) {

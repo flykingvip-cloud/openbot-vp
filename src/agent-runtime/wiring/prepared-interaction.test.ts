@@ -1,7 +1,9 @@
 import type { Api, Model } from "@earendil-works/pi-ai/compat";
 import { expect, it, vi } from "vitest";
+import type { FallbackAttempt } from "../../agents/model-fallback.types.js";
 import { makeZeroUsageSnapshot } from "../../agents/usage.js";
 import { runGovernedInteraction, runGovernedUnderstanding } from "../command/index.js";
+import { INTERACTION_TIMEOUT_TEXT } from "../model/interaction-resource-wait.js";
 import { bindAdmittedTurnHost } from "./admitted-turn-host.js";
 const calls = vi.hoisted(() => ({ complete: vi.fn() }));
 vi.mock("@earendil-works/pi-ai/compat", async (original) => ({
@@ -221,3 +223,144 @@ it.each([
     expect(host.model.forgetRunModelSet).toHaveBeenCalledOnce();
   },
 );
+
+it("checkpoint A: fallbacks share one deadline and do not start once the budget is exhausted", async () => {
+  // Timing method: real short timeout (150ms) on the production remaining-budget
+  // path used by the default 15s interaction deadline. Fake timers are not used
+  // because they can deadlock queue I/O; this is equivalent for the budget math.
+  const host = bindAdmittedTurnHost();
+  const completeStarted: number[] = [];
+  host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
+    acquired: true as const,
+    skipped: false as const,
+    enterpriseId: "tenant",
+  }));
+  host.model.runWithModelFallback = vi.fn(async (p) => {
+    try {
+      return {
+        result: await p.run("test", "first"),
+        provider: "test",
+        model: "first",
+        attempts: [] as FallbackAttempt[],
+      };
+    } catch (error) {
+      return {
+        result: await p.run("test", "second"),
+        provider: "test",
+        model: "second",
+        attempts: [
+          {
+            provider: "test",
+            model: "first",
+            error: error instanceof Error ? error.message : String(error),
+          },
+        ],
+      };
+    }
+  });
+  host.admission.releaseEnterpriseAgentRun = vi.fn(async () => {});
+  host.model.forgetRunModelSet = vi.fn();
+  host.task.ensureChatTurnTaskOutcome = vi.fn();
+  calls.complete.mockClear();
+  calls.complete.mockImplementation(async () => {
+    completeStarted.push(Date.now());
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    return {
+      role: "assistant",
+      content: [{ type: "text", text: JSON.stringify({ kind: "reply", text: "迟到" }) }],
+      usage: makeZeroUsageSnapshot(),
+      stopReason: "stop",
+    };
+  });
+  const started = Date.now();
+  const result = await runGovernedInteraction(
+    {
+      input: { message: "你好", context: [] },
+      runId: "deadline-fallback",
+      agentId: "bot",
+      agentDir: "/tmp/agent",
+      sessionFile: "/tmp/session.jsonl",
+      requestId: "deadline-fallback",
+      captured: { expectedFocusRevision: 0, expectedWriteEpoch: 0 },
+      identity: {},
+      authorized: true,
+      config: {},
+      provider: "test",
+      model: "test",
+      timeoutMs: 150,
+    },
+    {
+      modelSession: host,
+      model: host.model,
+      resolveFallbacks: () => ["test/second"],
+      candidate: async () => ({ model }),
+      commit: vi.fn(() => {
+        throw new Error("late proposal must not commit");
+      }),
+    },
+  );
+  const elapsed = Date.now() - started;
+  expect(result).toEqual({
+    kind: "respond",
+    text: INTERACTION_TIMEOUT_TEXT,
+    clarification: false,
+  });
+  expect(elapsed).toBeLessThan(150 + 400);
+  expect(completeStarted.length).toBe(1);
+  expect(host.admission.tryAcquireEnterpriseAgentRun).toHaveBeenCalledOnce();
+  expect(host.admission.releaseEnterpriseAgentRun).toHaveBeenCalledOnce();
+  expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
+});
+
+it("checkpoint A: an ordinary model reply still returns within the total deadline", async () => {
+  const host = bindAdmittedTurnHost();
+  host.admission.tryAcquireEnterpriseAgentRun = vi.fn(async () => ({
+    acquired: true as const,
+    skipped: false as const,
+    enterpriseId: "tenant",
+  }));
+  host.model.runWithModelFallback = vi.fn(async (p) => ({
+    result: await p.run("test", "test"),
+    provider: "test",
+    model: "test",
+    attempts: [],
+  }));
+  host.admission.releaseEnterpriseAgentRun = vi.fn(async () => {});
+  host.model.forgetRunModelSet = vi.fn();
+  host.task.ensureChatTurnTaskOutcome = vi.fn();
+  calls.complete.mockClear();
+  calls.complete.mockResolvedValue({
+    role: "assistant",
+    content: [{ type: "text", text: JSON.stringify({ kind: "reply", text: "你好，我在。" }) }],
+    usage: makeZeroUsageSnapshot(),
+    stopReason: "stop",
+  });
+  const started = Date.now();
+  const result = await runGovernedInteraction(
+    {
+      input: { message: "你好", context: [] },
+      runId: "deadline-reply",
+      agentId: "bot",
+      agentDir: "/tmp/agent",
+      sessionFile: "/tmp/session.jsonl",
+      requestId: "deadline-reply",
+      captured: { expectedFocusRevision: 0, expectedWriteEpoch: 0 },
+      identity: {},
+      authorized: true,
+      config: {},
+      provider: "test",
+      model: "test",
+      timeoutMs: 15_000,
+    },
+    {
+      modelSession: host,
+      model: host.model,
+      resolveFallbacks: () => undefined,
+      candidate: async () => ({ model }),
+      commit: vi.fn(),
+    },
+  );
+  expect(Date.now() - started).toBeLessThan(2_000);
+  expect(result).toEqual({ kind: "respond", text: "你好，我在。", clarification: false });
+  expect(host.task.ensureChatTurnTaskOutcome).not.toHaveBeenCalled();
+});

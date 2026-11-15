@@ -19,3 +19,13 @@ it("does not present a stale model answer as current after CAS rejection", () =>
   expect(reply).toContain("本次未修改");
   expect(reply).not.toContain(decision.answer);
 });
+
+it("does not treat an unconfirmed drain as an already-effective revision", () => {
+  const reply = formatTaskProposalReply(decision, {
+    kind: "unconfirmed",
+    text: "要求已写入原任务板，但未能确认旧执行已停止，本次未启动新执行。",
+  });
+  expect(reply).toContain("未能确认旧执行已停止");
+  expect(reply).not.toContain(decision.answer);
+  expect(reply).not.toContain("已生效");
+});
