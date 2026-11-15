@@ -1182,8 +1182,6 @@ export class OpenBotDiagnosisPanel extends LitElement {
     const model = this.model ?? diagnosisViewModelFromQuery(this.audience(), null, null);
     if (this.role === "enterprise") {
       return html`
-        ${this.renderHandlingCard()}
-        ${this.renderResolutionActions(model)}
         ${renderObservationWorkbench({
           role: "enterprise",
           tenantId: this.tenantId,
@@ -1222,12 +1220,11 @@ export class OpenBotDiagnosisPanel extends LitElement {
             this.selectedIntent = { intentId, revision };
           },
         })}
+        <section id="original-diagnosis" data-testid="original-diagnosis">
+        ${this.renderHandlingCard()}
+        ${this.renderResolutionActions(model)}
         <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
         <p data-testid="observation-query-scope">精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。</p>${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
-        <section class="enterprise-diagnosis__panel">
-          <h2>原诊断工作区</h2>
-          <p class="enterprise-diagnosis__sub">下面的数据来自真实诊断接口，不受上方样例模式影响。</p>
-        </section>
         ${this.renderEvolutionProjection()}
         ${renderEnterpriseDiagnosisSurface(model, {
           embedded: true,
@@ -1301,6 +1298,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
               }
             : {}),
         })}
+        </section>
       `;
     }
     return html`

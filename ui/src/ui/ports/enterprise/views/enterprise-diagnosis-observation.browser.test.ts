@@ -84,4 +84,28 @@ describe("enterprise diagnosis observation host wiring", () => {
       false,
     );
   });
+
+  it("keeps the workbench as the first screen and anchors the downstream diagnosis surface", async () => {
+    const { panel } = await mount({
+      connected: true,
+      scopes: ["operator.read"],
+      sessionKind: "enterprise-admin",
+    });
+    await customElements.whenDefined("openbot-observation-workbench");
+    const workbench = panel.querySelector("openbot-observation-workbench");
+    expect(workbench).not.toBeNull();
+    expect(panel.firstElementChild).toBe(workbench);
+    expect(
+      [...panel.querySelectorAll("h1, h2, h3")].map((node) => node.textContent?.trim()),
+    ).not.toContain("原诊断工作区");
+    expect(panel.textContent).not.toContain(
+      "下面的数据来自真实诊断接口，不受上方样例模式影响。",
+    );
+    const original = panel.querySelector("#original-diagnosis");
+    expect(original).not.toBeNull();
+    expect(original?.querySelector('[data-testid="enterprise-diagnosis"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="diagnosis-run-now"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="observation-query-scope"]')).not.toBeNull();
+    expect(workbench?.querySelector('[aria-label="观测数据源"]')).not.toBeNull();
+  });
 });

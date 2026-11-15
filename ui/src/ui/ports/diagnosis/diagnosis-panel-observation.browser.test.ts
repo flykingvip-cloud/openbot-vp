@@ -1070,6 +1070,11 @@ it("shows the paused-job handling preview in admin language and never offers 立
   expect(container.textContent).not.toContain("立即修复");
   expect(container.querySelector("[data-testid=diagnosis-resolution-actions]")).not.toBeNull();
   expect(container.textContent).toContain("交给所选数字人处理");
+  const original = panel.querySelector("#original-diagnosis");
+  expect(original).not.toBeNull();
+  expect(original?.querySelector("[data-testid=diagnosis-handling-card]")).not.toBeNull();
+  expect(original?.querySelector("[data-testid=diagnosis-resolution-actions]")).not.toBeNull();
+  expect(panel.firstElementChild?.tagName.toLowerCase()).toBe("openbot-observation-workbench");
   container.remove();
 });
 
@@ -1122,5 +1127,86 @@ describe("diagnosis panel tenant grant host wiring", () => {
     await omittedWorkbench.updateComplete;
     expect(omittedWorkbench.tenantGrants).toBeNull();
     omitted.remove();
+  });
+});
+
+describe("enterprise diagnosis first-screen close", () => {
+  it("keeps the workbench as the only first screen and puts diagnose modules behind #original-diagnosis", async () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    render(
+      html`<openbot-diagnosis-panel
+        role="enterprise"
+        tenant-id="t1"
+        .scopes=${["operator.read"]}
+        connected
+      ></openbot-diagnosis-panel>`,
+      container,
+    );
+    await customElements.whenDefined("openbot-diagnosis-panel");
+    const panel = container.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
+    await panel.updateComplete;
+    await waitFor(() =>
+      expect(panel.querySelector("openbot-observation-workbench")).not.toBeNull(),
+    );
+    const workbench = panel.querySelector(
+      "openbot-observation-workbench",
+    ) as OpenBotObservationWorkbench;
+    await workbench.updateComplete;
+
+    expect(panel.firstElementChild).toBe(workbench);
+    expect(panel.querySelector("h2")?.textContent).not.toBe("原诊断工作区");
+    expect(
+      [...panel.querySelectorAll("h1, h2, h3")].map((node) => node.textContent?.trim()),
+    ).not.toContain("原诊断工作区");
+    expect(panel.textContent).not.toContain(
+      "下面的数据来自真实诊断接口，不受上方样例模式影响。",
+    );
+
+    const original = panel.querySelector("#original-diagnosis");
+    expect(original).not.toBeNull();
+    expect(original?.getAttribute("data-testid")).toBe("original-diagnosis");
+    expect(
+      workbench.compareDocumentPosition(original!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(workbench.contains(original)).toBe(false);
+
+    expect(original?.querySelector('[data-testid="observation-evidence-status"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="observation-query-scope"]')?.textContent).toContain(
+      "精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。",
+    );
+    expect(original?.querySelector('[data-testid="enterprise-diagnosis"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="diagnosis-target-picker"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="diagnosis-run-now"]')).not.toBeNull();
+    expect(workbench.querySelector('[data-testid="enterprise-diagnosis"]')).toBeNull();
+    expect(workbench.querySelector('[data-testid="diagnosis-run-now"]')).toBeNull();
+    expect(workbench.querySelector('[data-testid="observation-query-scope"]')).toBeNull();
+
+    const filters = workbench.querySelector('[aria-label="连接工作台筛选"]');
+    expect(filters?.querySelector('[aria-label="观测数据源"]')).not.toBeNull();
+    expect(filters?.querySelector('[data-action="pause"]')?.textContent).toContain("暂停刷新");
+    expect(panel.querySelector(".obs-plat-toolbar")).toBeNull();
+
+    const source = workbench.querySelector<HTMLSelectElement>('[aria-label="观测数据源"]')!;
+    source.value = "sample";
+    source.dispatchEvent(new Event("change"));
+    await workbench.updateComplete;
+    await waitFor(() => expect(workbench.querySelectorAll(".obs-run").length).toBeGreaterThan(0));
+    workbench.querySelector<HTMLButtonElement>(".obs-run")!.click();
+    await workbench.updateComplete;
+    const links = [
+      ...workbench.querySelectorAll<HTMLAnchorElement>('a[href="#original-diagnosis"]'),
+    ];
+    expect(links.length).toBeGreaterThan(0);
+    expect(
+      links.some(
+        (link) =>
+          link.textContent?.includes("进入原诊断并选择目标") ||
+          link.textContent?.includes("进入针对性诊断"),
+      ),
+    ).toBe(true);
+    expect(links[0].getAttribute("href")).toBe("#original-diagnosis");
+    expect(panel.querySelector("#original-diagnosis")).toBe(original);
+    container.remove();
   });
 });
