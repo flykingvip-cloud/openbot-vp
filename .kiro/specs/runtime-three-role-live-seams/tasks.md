@@ -53,3 +53,10 @@
 - 该合法平台主体仍无enterprise/seat绑定，正式成果根no_writable_root再次出现；这是与匿名local已修分支不同的已登录作用域接缝，继续核准，不放宽owner/tenant根保护。— codex-runtime-manager
 - 合法成员新组首次自举改变purpose，拒绝旧提案正确；确认后正式入口提示当前目标绑定不可核准，未发布/认领/执行。服务端登录身份已补齐，不能再简单归因于设备无主体；正式目标绑定/状态读取仍开放。— codex-runtime-manager
 - 本轮不推送、不合并、不部署；临时账号密码、MFA、cookie不入仓/证据包。原18789未重启。— codex-runtime-manager
+
+## 2026-11-16 authenticated new-work recheck
+
+- 在b2449e57b源码与先前隔离构建上，沿同一原登录cookie/设备签名重新提交完整独立新建请求，run=uat-auth-1794785058320；正式入口生成d2t-097c48fa9574c73015738db5，tasks.json中status=draft，原可见回执为“已整理任务草案，尚未开始执行”。因此不能把上一轮“继续”找不到目标的现象泛化为合法主体无法建项。— codex-runtime-manager
+- 当前尚未发布/认领/确认计划/执行/验收。草案责任记录为发起账号而非请求指定的uat-lead；成员回复称发布遇到activationKey不一致，该说法尚未用工具回执独立核准，不能直接作为已证根因。继续核准任命提案与首次持久契约的衔接，不改确认模式或绕过身份门禁。— codex-runtime-manager
+- personal_local专用平台账号不等于已配置企业/席位主体，已登录成果根定位缺口继续开放；不为测试伪造tenant或放宽匿名工作区fallback。新增测试日志在/tmp/runtime-auth-group-new-task-result.log。— codex-runtime-manager
+- 本次重启仅隔离19101；初次沙箱绑定和Bun WS握手失败均为测试环境失败，后续原Node/tsx客户端成功，不当作业务回归。凭证仍为0600且不纳入证据。— codex-runtime-manager
