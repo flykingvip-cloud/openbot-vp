@@ -122,6 +122,52 @@ describe("agent event handler", () => {
     return harness;
   }
 
+  it("publishes a late persisted host acceptance receipt without replacing artifacts or clearing another run", () => {
+    const h = createHarness({ resolveSessionKeyForRun: () => "session-1" });
+    h.chatRunState.buffers.set("other-run", "Still running");
+    const data = { phase: "acceptance_pending", text: "成果已生成，任务仍待验收" };
+    h.handler({
+      runId: "run-1",
+      seq: 10,
+      ts: 100,
+      sessionKey: "session-1",
+      stream: "delivery",
+      data,
+    });
+    expect(h.broadcastChat).toHaveBeenCalledWith(
+      "session-1",
+      expect.objectContaining({
+        runId: "run-1:acceptance",
+        state: "final",
+        message: expect.objectContaining({
+          id: "run-1:acceptance:assistant",
+          content: [{ type: "text", text: data.text }],
+        }),
+      }),
+    );
+    expect(h.chatRunState.buffers.get("other-run")).toBe("Still running");
+  });
+  it("does not expose hidden or aborted host acceptance receipts", () => {
+    const h = createHarness({ resolveSessionKeyForRun: () => "session-1" });
+    registerAgentRunContext("hidden", { isControlUiVisible: false });
+    h.handler({
+      runId: "hidden",
+      seq: 1,
+      ts: 1,
+      stream: "delivery",
+      data: { phase: "acceptance_pending", text: "private" },
+    });
+    h.chatRunState.abortedRuns.set("aborted", Date.now());
+    h.handler({
+      runId: "aborted",
+      seq: 1,
+      ts: 1,
+      stream: "delivery",
+      data: { phase: "acceptance_pending", text: "private" },
+    });
+    expect(h.broadcastChat).not.toHaveBeenCalled();
+  });
+
   it("retains original engine identity when publishing a client-mapped lifecycle event", () => {
     const harness = createHarness();
     harness.chatRunState.registry.add("engine", { sessionKey: "own", clientRunId: "client" });

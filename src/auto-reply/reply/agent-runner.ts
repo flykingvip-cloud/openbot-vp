@@ -21,6 +21,7 @@ import {
 import type { TypingMode } from "../../config/types.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 import { tryResolveCapabilityGapsFromUsage } from "../../gateway/evolution-control/capability-gap-ingest.js";
+import { logVerbose } from "../../globals.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
 import { emitDiagnosticEvent, isDiagnosticsEnabled } from "../../infra/diagnostic-events.js";
 import { generateSecureUuid } from "../../infra/secure-random.js";
@@ -650,6 +651,33 @@ export async function runReplyAgent(params: {
                 : "私聊静默/空回复；缺可执行技能/工具或可感知输入",
           }),
         considerContinuation: maybeScheduleTaskBoardContinue,
+        onPendingAcceptance: (text) => {
+          if (replyToChannel !== "webchat" || !sessionKey) {
+            return;
+          }
+          // Model lifecycle end can precede host verification. Persist the
+          // host receipt through SessionManager before notifying the same WS
+          // egress; never let model prose create an acceptance fact.
+          try {
+            const messageId = `${outcomeRunId}:acceptance`;
+            replyTurnRuntime.persistInteractionMessage({
+              sessionFile: followupRun.run.sessionFile,
+              sessionId: followupRun.run.sessionId,
+              cwd: followupRun.run.workspaceDir,
+              messageId,
+              role: "assistant",
+              text,
+            });
+            emitAgentEvent({
+              runId: outcomeRunId,
+              sessionKey,
+              stream: "delivery",
+              data: { phase: "acceptance_pending", text },
+            });
+          } catch (error) {
+            logVerbose(`pending acceptance feedback could not be persisted: ${String(error)}`);
+          }
+        },
         finalize: (payload) => finalizeWithFollowup(payload, queueKey, runFollowupTurn),
       });
 

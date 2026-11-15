@@ -36,6 +36,7 @@ type ReplyDeliveryPorts<T> = {
   commitOutcome: (success: boolean, opts: GrowthOutcomeCommitOpts) => unknown;
   recordEmptyGap: (reason: "direct_chat_silent_or_empty_reply") => void;
   considerContinuation: (payloads: ReplyPayload[]) => void;
+  onPendingAcceptance?: (notice: string) => void;
   finalize: (payload: ReplyPayload | ReplyPayload[] | undefined) => T;
 };
 
@@ -57,6 +58,7 @@ export function completeReplyDelivery<T>(
         ports.language === "en"
           ? "The result is ready, but task acceptance is still pending; not all requirements have been verified."
           : "成果已生成，任务仍待验收，尚未确认全部要求已满足。";
+      ports.onPendingAcceptance?.(notice);
       const lastText = payloads.findLastIndex((payload) => Boolean(payload.text?.trim()));
       payloads =
         lastText >= 0

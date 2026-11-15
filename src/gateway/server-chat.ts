@@ -1006,6 +1006,31 @@ export function createAgentEventHandler({
       chatRunState.abortedRuns.has(clientRunId) || chatRunState.abortedRuns.has(evt.runId);
     // Include sessionKey so Control UI can filter tool streams per session.
     const agentPayload = sessionKey ? { ...eventForClients, sessionKey } : eventForClients;
+    // This is a persisted host verification receipt, not another model end
+    // or a task transition. Keep its own stable message identity so late
+    // acceptance does not erase the already-visible artifact response.
+    if (evt.stream === "delivery" && evt.data.phase === "acceptance_pending") {
+      if (!isControlUiVisible || !sessionKey || isAborted || typeof evt.data.text !== "string") {
+        return;
+      }
+      const receiptRunId = `${clientRunId}:acceptance`;
+      const payload = {
+        runId: receiptRunId,
+        sessionKey,
+        seq: evt.seq,
+        state: "final" as const,
+        message: {
+          id: `${evt.runId}:acceptance:assistant`,
+          idempotencyKey: `${evt.runId}:acceptance:assistant`,
+          role: "assistant",
+          content: [{ type: "text", text: evt.data.text }],
+          timestamp: evt.ts,
+        },
+      };
+      broadcastChat(sessionKey, payload);
+      nodeSendToSession(sessionKey, "chat", payload);
+      return;
+    }
     const last = agentRunSeq.get(evt.runId) ?? 0;
     const isToolEvent = evt.stream === "tool";
     const toolVerbose = isToolEvent ? resolveToolVerboseLevel(evt.runId, sessionKey) : "off";
