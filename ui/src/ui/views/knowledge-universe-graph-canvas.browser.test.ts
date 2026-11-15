@@ -372,3 +372,82 @@ describe("knowledge universe graph canvas — direction arrows", () => {
     }
   });
 });
+
+// t326: node names are not painted permanently. A name appears only while the pointer hovers that
+// node, then retracts. Selection / the detail panel stay a separate click interaction.
+describe("knowledge universe graph canvas — hover-only node labels", () => {
+  function nodeLabel(root: ParentNode, nodeId: string) {
+    return root.querySelector(`[data-node-id="${nodeId}"] .knowledge-universe__graph-node-label`);
+  }
+
+  it("does not render standing node names by default", () => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    renderCanvas(host);
+
+    const canvas = host.querySelector(".knowledge-universe__graph-canvas");
+    expect(canvas).toBeTruthy();
+    expect(canvas!.querySelectorAll(".knowledge-universe__graph-node-label")).toHaveLength(0);
+    expect(canvas!.querySelectorAll("[data-node-id]")).toHaveLength(GRAPH.nodes.length);
+  });
+
+  it("shows only the hovered node name and leaves other nodes unlabeled", () => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    renderCanvasWith(host, { hoveredNodeId: "node:a" });
+
+    const canvas = host.querySelector(".knowledge-universe__graph-canvas");
+    const labels = canvas!.querySelectorAll(".knowledge-universe__graph-node-label");
+    expect(labels).toHaveLength(1);
+    expect(nodeLabel(canvas!, "node:a")).toBeTruthy();
+    expect(nodeLabel(canvas!, "node:b")).toBeNull();
+    expect(nodeLabel(canvas!, "node:c")).toBeNull();
+    expect(nodeLabel(canvas!, "node:me")).toBeNull();
+  });
+
+  it("removes the name after hover leaves", () => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    renderCanvasWith(host, { hoveredNodeId: "node:a" });
+    expect(nodeLabel(host, "node:a")).toBeTruthy();
+
+    renderCanvasWith(host, { hoveredNodeId: null });
+    expect(host.querySelectorAll(".knowledge-universe__graph-node-label")).toHaveLength(0);
+  });
+
+  it("does not treat click-selection as a standing name", () => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    renderCanvasWith(host, { selectedNodeId: "node:a", hoveredNodeId: null });
+
+    expect(host.querySelectorAll(".knowledge-universe__graph-node-label")).toHaveLength(0);
+    expect(host.querySelector('[data-node-id="node:a"]')).toBeTruthy();
+  });
+
+  it("reports hover enter/leave without changing selection", () => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    const onHoverNode = vi.fn();
+    const onSelectNode = vi.fn();
+    renderCanvasWith(host, { onHoverNode, onSelectNode });
+
+    const nodeA = host.querySelector('[data-node-id="node:a"]');
+    expect(nodeA).toBeTruthy();
+    nodeA!.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    expect(onHoverNode).toHaveBeenCalledWith("node:a");
+    nodeA!.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+    expect(onHoverNode).toHaveBeenCalledWith(null);
+    expect(onSelectNode).not.toHaveBeenCalled();
+  });
+
+  it("still selects a node on click", () => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    const onSelectNode = vi.fn();
+    renderCanvasWith(host, { onSelectNode, hoveredNodeId: "node:a" });
+
+    const node = host.querySelector('[data-node-id="node:a"]');
+    node!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onSelectNode).toHaveBeenCalledWith("node:a");
+  });
+});
