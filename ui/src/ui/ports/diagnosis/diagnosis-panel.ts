@@ -230,6 +230,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
   @state() private diagnosing = false;
   @state() private lastDiagnose: DiagnosisRunNote | null = null;
   @state() private focusedRunId: string | null = null;
+  @state() private hashOriginalDiagnosis = false;
+  @state() private diagnoseReveal = false;
+  private originalDiagnosisEntered = false;
   @state() private evolutionProjections: DiagnosisEvolutionProjection[] = [];
   @state() private selectedTargetId: string | null = null;
   @state() private observationSessionKey: string | null = null;
@@ -260,6 +263,8 @@ export class OpenBotDiagnosisPanel extends LitElement {
     super.connectedCallback();
     void this.reload();
     this.requestUpdate("connected", !this.connected);
+    this.syncHashOriginalDiagnosis({ scroll: this.hashTargetsOriginalDiagnosis() });
+    window.addEventListener("hashchange", this.onHashChange);
   }
 
   updated(changed: Map<string | number | symbol, unknown>) {
@@ -272,6 +277,50 @@ export class OpenBotDiagnosisPanel extends LitElement {
     ) {
       void this.reload();
     }
+    if (this.hashOriginalDiagnosis || this.diagnoseReveal || this.hasNamedQuery()) {
+      this.originalDiagnosisEntered = true;
+    }
+    if (this.pendingOriginalDiagnosisScroll && this.shouldShowOriginalDiagnosis()) {
+      this.pendingOriginalDiagnosisScroll = false;
+      this.querySelector("#original-diagnosis")?.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  private pendingOriginalDiagnosisScroll = false;
+  private hashTargetsOriginalDiagnosis() {
+    return typeof window !== "undefined" && window.location.hash === "#original-diagnosis";
+  }
+  private onHashChange = () => {
+    this.syncHashOriginalDiagnosis({ scroll: this.hashTargetsOriginalDiagnosis() });
+  };
+  private syncHashOriginalDiagnosis(options?: { scroll?: boolean }) {
+    const next = this.hashTargetsOriginalDiagnosis();
+    if (options?.scroll && next) {
+      this.pendingOriginalDiagnosisScroll = true;
+    }
+    this.hashOriginalDiagnosis = next;
+  }
+  private hideOriginalDiagnosisFromWorkbench() {
+    this.diagnoseReveal = false;
+    this.originalDiagnosisEntered = false;
+    if (this.hashTargetsOriginalDiagnosis()) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    }
+    this.hashOriginalDiagnosis = false;
+  }
+  private hasNamedQuery() {
+    return Boolean(this.resolveReasoningRef());
+  }
+  private shouldShowOriginalDiagnosis() {
+    return (
+      this.hashOriginalDiagnosis ||
+      this.diagnoseReveal ||
+      this.hasNamedQuery() ||
+      this.originalDiagnosisEntered
+    );
+  }
+  private shouldPaintEvidence() {
+    return this.hasNamedQuery() || this.observationEvidence != null;
   }
 
   @state() private observationEvidence: EvidenceProjection | null = null;
@@ -517,6 +566,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
     }
   }
   disconnectedCallback() {
+    window.removeEventListener("hashchange", this.onHashChange);
     this.clearReasoning();
     ++this.evidenceGeneration;
     this.capacity = null;
@@ -1196,6 +1246,7 @@ export class OpenBotDiagnosisPanel extends LitElement {
             this.focusedRunId = null;
           },
           onDiagnoseRun: ({ runId, sessionKey }) => {
+            this.diagnoseReveal = true;
             this.focusedRunId = runId;
             this.observationSessionKey = sessionKey;
             this.selectedTargetId =
@@ -1205,6 +1256,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
                 block: "nearest",
               });
             });
+          },
+          onSurfaceChange: () => {
+            this.hideOriginalDiagnosisFromWorkbench();
           },
           connected: this.connected,
           scopes: this.scopes,
@@ -1220,11 +1274,17 @@ export class OpenBotDiagnosisPanel extends LitElement {
             this.selectedIntent = { intentId, revision };
           },
         })}
-        <section id="original-diagnosis" data-testid="original-diagnosis">
+        ${
+          this.shouldShowOriginalDiagnosis()
+            ? html`<section id="original-diagnosis" data-testid="original-diagnosis">
         ${this.renderHandlingCard()}
         ${this.renderResolutionActions(model)}
-        <p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
-        <p data-testid="observation-query-scope">精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。</p>${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}
+        ${
+          this.shouldPaintEvidence()
+            ? html`<p data-testid="observation-evidence-status">${this.observationEvidenceNote}</p>
+        <p data-testid="observation-query-scope">精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。</p>${renderObservationEvidence(this.observationEvidence)}${this.renderReasoning()}`
+            : nothing
+        }
         ${this.renderEvolutionProjection()}
         ${renderEnterpriseDiagnosisSurface(model, {
           embedded: true,
@@ -1298,7 +1358,9 @@ export class OpenBotDiagnosisPanel extends LitElement {
               }
             : {}),
         })}
-        </section>
+        </section>`
+            : nothing
+        }
       `;
     }
     return html`

@@ -97,6 +97,7 @@ export type ObservationProps = {
   gatewayMethods?: readonly string[] | null;
   targets?: readonly DiagnosisTargetOption[];
   onDiagnoseRun?: (input: { runId: string; sessionKey: string; agentId: string }) => void;
+  onSurfaceChange?: (surface: "overview" | "analysis" | "governance") => void;
   onSessionKey?: (sessionKey: string) => void;
   enterpriseDirectory?: readonly ObservationEnterpriseEntry[];
   actionIntents?: ObservationActionIntents | null;
@@ -123,6 +124,7 @@ export function renderObservationWorkbench(props: ObservationProps) {
     .capacity=${props.capacity ?? null} .comparison=${props.comparison ?? null}
     .actionIntents=${props.actionIntents ?? null} .onSelectActionIntent=${props.onSelectActionIntent ?? null}
     .onDiagnoseRun=${props.onDiagnoseRun ?? null}
+    .onSurfaceChange=${props.onSurfaceChange ?? null}
     .scopes=${props.scopes ?? null} .authorized=${props.authorized ?? null}
     .tenantGrants=${props.tenantGrants ?? null}
     .initialRunId=${props.initialRunId ?? null} .initialDrawer=${props.initialDrawer ?? false}
@@ -140,6 +142,9 @@ export class OpenBotObservationWorkbench extends LitElement {
   @property({ attribute: false }) targets: readonly DiagnosisTargetOption[] = [];
   @property({ attribute: false }) onDiagnoseRun:
     | ((input: { runId: string; sessionKey: string; agentId: string }) => void)
+    | null = null;
+  @property({ attribute: false }) onSurfaceChange:
+    | ((surface: "overview" | "analysis" | "governance") => void)
     | null = null;
   @property({ attribute: false }) enterpriseDirectory: readonly ObservationEnterpriseEntry[] = [];
   @property({ attribute: false }) actionIntents: ObservationActionIntents | null = null;
@@ -1130,8 +1135,8 @@ export class OpenBotObservationWorkbench extends LitElement {
       )}</div>
     </section>`;
   }
-  private renderLoopGuide(isEmpty: boolean) {
-    const open = this.guideUserOpen ?? isEmpty;
+  private renderLoopGuide() {
+    const open = this.guideUserOpen === true;
     return html`
       <section class="obs-guide" aria-label="观测闭环说明">
         <button type="button" class="obs-guide__toggle" aria-expanded=${open} data-action="toggle-guide" @click=${() => {
@@ -1185,7 +1190,7 @@ export class OpenBotObservationWorkbench extends LitElement {
       ${this.renderAttentionBoard(runs, selected)}
       ${selected ? this.renderImprovement(view, selected) : nothing}
       ${this.renderOverviewMetrics(runs)}
-      ${this.renderLoopGuide(runs.length === 0)}
+      ${this.renderLoopGuide()}
     `;
   }
   private renderPlatformSubnav() {
@@ -1254,6 +1259,7 @@ export class OpenBotObservationWorkbench extends LitElement {
         ([id, label]) =>
           html`<button type="button" role="tab" aria-selected=${this.surface === id} class=${this.surface === id ? "is-active" : ""} @click=${() => {
             this.surface = id;
+            this.onSurfaceChange?.(id);
           }}>${label}</button>`,
       )}
     </nav>`;

@@ -71,9 +71,13 @@ describe("observation workbench interaction", () => {
     expect(panel.querySelector('[aria-label="需要关注的运行"]')?.textContent).toContain(
       "需要关注的运行",
     );
-    expect(panel.querySelector('[aria-label="观测闭环说明"]')?.textContent).toContain(
-      "观测闭环说明",
+    const guide = panel.querySelector('[aria-label="观测闭环说明"]');
+    expect(guide?.textContent).toContain("观测闭环说明");
+    expect(guide?.querySelector("[data-action=toggle-guide]")?.getAttribute("aria-expanded")).toBe(
+      "false",
     );
+    expect(guide?.querySelector(".obs-guide__body")).toBeNull();
+    expect(guide?.textContent).not.toContain("已观察");
     expect([...panel.querySelectorAll(".obs-pulse-card")].map((card) => card.textContent)).toEqual(
       expect.arrayContaining([
         expect.stringContaining("活跃运行"),
@@ -1000,10 +1004,21 @@ describe("R5 enterprise IA alignment", () => {
     expect(panel.textContent).not.toContain("尚无真实事件");
     expect(panel.querySelector('[aria-label="需要关注的运行"]')?.textContent).toContain("全部关注");
     expect(panel.querySelector('[aria-label="需要关注的运行"]')?.textContent).toContain("规则发现");
-    expect(panel.querySelector('[aria-label="观测闭环说明"]')?.textContent).toContain("已观察");
-    expect(panel.querySelector('[aria-label="观测闭环说明"]')?.textContent).toContain(
-      "从一次运行的证据开始，而不是从一张报表结束",
+    const guide = panel.querySelector('[aria-label="观测闭环说明"]');
+    expect(guide?.querySelector("[data-action=toggle-guide]")?.getAttribute("aria-expanded")).toBe(
+      "false",
     );
+    expect(guide?.querySelector(".obs-guide__body")).toBeNull();
+    expect(guide?.textContent).not.toContain("已观察");
+    expect(guide?.textContent).toContain("从一次运行的证据开始，而不是从一张报表结束");
+    guide?.querySelector<HTMLButtonElement>("[data-action=toggle-guide]")?.click();
+    await panel.updateComplete;
+    expect(guide?.querySelector("[data-action=toggle-guide]")?.getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    expect(guide?.textContent).toContain("已观察");
+    expect(guide?.textContent).toContain("改善实验");
+    expect(guide?.textContent).toContain("业务回验");
     container.remove();
   });
 

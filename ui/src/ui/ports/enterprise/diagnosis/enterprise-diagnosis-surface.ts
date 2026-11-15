@@ -468,19 +468,19 @@ function targetPicker(handlers: EnterpriseDiagnosisHandlers): TemplateResult | t
           handlers.onSelectTarget?.(value);
         }}
       >
-        <option value="">选择数字人或协作小组</option>
-        <option value=${ALL_DIAGNOSIS_TARGET_ID}>全部数字人与协作小组</option>
+        <option value="" ?selected=${!selectedId}>选择数字人或协作小组</option>
+        <option value=${ALL_DIAGNOSIS_TARGET_ID} ?selected=${selectedId === ALL_DIAGNOSIS_TARGET_ID}>全部数字人与协作小组</option>
         ${
           agents.length > 0
             ? html`<optgroup label="数字人">
-                ${agents.map((row) => html`<option value=${row.id}>${row.label}</option>`)}
+                ${agents.map((row) => html`<option value=${row.id} ?selected=${row.id === selectedId}>${row.label}</option>`)}
               </optgroup>`
             : nothing
         }
         ${
           groups.length > 0
             ? html`<optgroup label="协作小组">
-                ${groups.map((row) => html`<option value=${row.id}>${row.label}</option>`)}
+                ${groups.map((row) => html`<option value=${row.id} ?selected=${row.id === selectedId}>${row.label}</option>`)}
               </optgroup>`
             : nothing
         }

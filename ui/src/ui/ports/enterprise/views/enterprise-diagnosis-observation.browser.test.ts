@@ -4,6 +4,19 @@ import type { GatewayBrowserClient } from "../../../gateway.ts";
 import type { OpenBotDiagnosisPanel } from "../../diagnosis/diagnosis-panel.ts";
 import type { EnterpriseSurfaceProps } from "./enterprise-surface-types.ts";
 import { renderEnterpriseSurface } from "./enterprise-surfaces-core.ts";
+function waitFor(assertion: () => void, at = performance.now()): Promise<void> {
+  try {
+    assertion();
+    return Promise.resolve();
+  } catch (error) {
+    if (performance.now() - at > 3000) {
+      return Promise.reject(error);
+    }
+    return new Promise<void>((resolve) => setTimeout(resolve, 20)).then(() =>
+      waitFor(assertion, at),
+    );
+  }
+}
 const hosts: HTMLElement[] = [];
 afterEach(() => {
   for (const host of hosts) {
@@ -11,6 +24,7 @@ afterEach(() => {
     host.remove();
   }
   hosts.length = 0;
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
 });
 async function mount(extra: Partial<EnterpriseSurfaceProps> = {}) {
   const request = vi.fn(async (_method: string) => ({
@@ -85,7 +99,7 @@ describe("enterprise diagnosis observation host wiring", () => {
     );
   });
 
-  it("keeps the workbench as the first screen and anchors the downstream diagnosis surface", async () => {
+  it("keeps the workbench as the first screen and reveals the downstream surface from #original-diagnosis", async () => {
     const { panel } = await mount({
       connected: true,
       scopes: ["operator.read"],
@@ -101,11 +115,22 @@ describe("enterprise diagnosis observation host wiring", () => {
     expect(panel.textContent).not.toContain(
       "下面的数据来自真实诊断接口，不受上方样例模式影响。",
     );
+    expect(panel.querySelector("#original-diagnosis")).toBeNull();
+    expect(panel.querySelector('[data-testid="observation-query-scope"]')).toBeNull();
+    expect(panel.textContent).not.toContain("执行器技术调用");
+    expect(panel.textContent).not.toContain("推理假设 · 只读旁路");
+    expect(workbench?.querySelector('[aria-label="观测数据源"]')).not.toBeNull();
+    expect(workbench?.querySelector('[data-action="pause"]')?.textContent).toContain("暂停刷新");
+
+    window.location.hash = "#original-diagnosis";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    await panel.updateComplete;
+    await waitFor(() => expect(panel.querySelector("#original-diagnosis")).not.toBeNull());
     const original = panel.querySelector("#original-diagnosis");
     expect(original).not.toBeNull();
     expect(original?.querySelector('[data-testid="enterprise-diagnosis"]')).not.toBeNull();
     expect(original?.querySelector('[data-testid="diagnosis-run-now"]')).not.toBeNull();
-    expect(original?.querySelector('[data-testid="observation-query-scope"]')).not.toBeNull();
-    expect(workbench?.querySelector('[aria-label="观测数据源"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="diagnosis-target-picker"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="observation-query-scope"]')).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { html, render } from "lit";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildCapacitySnapshot } from "../../../../../src/observation/capacity-snapshot.js";
 import type { GatewayBrowserClient } from "../../gateway.ts";
 import type { OpenBotObservationWorkbench } from "../../observation/workbench.ts";
@@ -20,6 +20,21 @@ function waitFor(assertion: () => void, at = performance.now()): Promise<void> {
     );
   }
 }
+
+function clearDiagnosisHash() {
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+}
+
+async function revealOriginalDiagnosis(panel: OpenBotDiagnosisPanel) {
+  window.location.hash = "#original-diagnosis";
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  await panel.updateComplete;
+  await waitFor(() => expect(panel.querySelector("#original-diagnosis")).not.toBeNull());
+}
+
+afterEach(() => {
+  clearDiagnosisHash();
+});
 
 describe("diagnosis panel observation origin", () => {
   it("keeps the selected session and sends its real runId, then renders returned experiment state", async () => {
@@ -84,12 +99,6 @@ describe("diagnosis panel observation origin", () => {
     select.value = "agent:main:main";
     select.dispatchEvent(new Event("change"));
     await component.updateComplete;
-    await waitFor(() =>
-      expect(
-        component.querySelector<HTMLSelectElement>('[data-testid="diagnosis-target-select"]')
-          ?.value,
-      ).toBe("agent:main"),
-    );
     recordRuntimeObservation(
       host,
       "agent:main:main",
@@ -132,6 +141,11 @@ describe("diagnosis panel observation origin", () => {
         component.querySelector('[data-testid="diagnosis-evolution-projection"]')?.textContent,
       ).toContain("preview only · 未提交"),
     );
+    expect(component.querySelector("#original-diagnosis")).not.toBeNull();
+    expect(
+      component.querySelector<HTMLSelectElement>('[data-testid="diagnosis-target-select"]')
+        ?.value,
+    ).toBe("agent:main");
     expect(component.textContent).toContain("申请开实验");
     expect(
       request.mock.calls.filter(([name]) =>
@@ -1061,6 +1075,11 @@ it("shows the paused-job handling preview in admin language and never offers 立
   const panel = container.querySelector("openbot-diagnosis-panel") as OpenBotDiagnosisPanel;
   await panel.updateComplete;
   await waitFor(() =>
+    expect(panel.querySelector("openbot-observation-workbench")).not.toBeNull(),
+  );
+  expect(panel.querySelector("#original-diagnosis")).toBeNull();
+  await revealOriginalDiagnosis(panel);
+  await waitFor(() =>
     expect(container.querySelector("[data-testid=diagnosis-handling-card]")).not.toBeNull(),
   );
   expect(container.textContent).toContain("该租户的诊断定时任务已暂停");
@@ -1131,7 +1150,11 @@ describe("diagnosis panel tenant grant host wiring", () => {
 });
 
 describe("enterprise diagnosis first-screen close", () => {
-  it("keeps the workbench as the only first screen and puts diagnose modules behind #original-diagnosis", async () => {
+  async function mountEnterprisePanel(taskOutcomeRef?: {
+    taskId: string;
+    agentId: string;
+    outcomeVersion: number;
+  }) {
     const container = document.createElement("div");
     document.body.append(container);
     render(
@@ -1139,6 +1162,7 @@ describe("enterprise diagnosis first-screen close", () => {
         role="enterprise"
         tenant-id="t1"
         .scopes=${["operator.read"]}
+        .taskOutcomeRef=${taskOutcomeRef ?? null}
         connected
       ></openbot-diagnosis-panel>`,
       container,
@@ -1153,6 +1177,24 @@ describe("enterprise diagnosis first-screen close", () => {
       "openbot-observation-workbench",
     ) as OpenBotObservationWorkbench;
     await workbench.updateComplete;
+    return { container, panel, workbench };
+  }
+
+  function expectNoEvidenceDump(root: ParentNode) {
+    expect(root.querySelector('[data-testid="observation-query-scope"]')).toBeNull();
+    expect(root.querySelector('[data-testid="observation-evidence-status"]')).toBeNull();
+    expect(root.querySelector('[aria-label="运行证据投影"]')).toBeNull();
+    expect(root.querySelector('[aria-label="推理假设旁路"]')).toBeNull();
+    expect(root.textContent).not.toContain("精确任务真实查询，不受连接工作台样例选择影响");
+    expect(root.textContent).not.toContain("execution_only");
+    expect(root.textContent).not.toContain("executor_source_unavailable");
+    expect(root.textContent).not.toContain("执行器技术调用");
+    expect(root.textContent).not.toContain("推理假设 · 只读旁路");
+    expect(root.textContent).not.toContain("业务结果未知 · 无可用授权证据");
+  }
+
+  it("keeps the workbench as the only first screen and hides diagnose modules until original diagnosis or a named query", async () => {
+    const { container, panel, workbench } = await mountEnterprisePanel();
 
     expect(panel.firstElementChild).toBe(workbench);
     expect(panel.querySelector("h2")?.textContent).not.toBe("原诊断工作区");
@@ -1162,30 +1204,40 @@ describe("enterprise diagnosis first-screen close", () => {
     expect(panel.textContent).not.toContain(
       "下面的数据来自真实诊断接口，不受上方样例模式影响。",
     );
+    expect(panel.querySelector("#original-diagnosis")).toBeNull();
+    expectNoEvidenceDump(panel);
 
-    const original = panel.querySelector("#original-diagnosis");
-    expect(original).not.toBeNull();
-    expect(original?.getAttribute("data-testid")).toBe("original-diagnosis");
-    expect(
-      workbench.compareDocumentPosition(original!) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(workbench.contains(original)).toBe(false);
-
-    expect(original?.querySelector('[data-testid="observation-evidence-status"]')).not.toBeNull();
-    expect(original?.querySelector('[data-testid="observation-query-scope"]')?.textContent).toContain(
-      "精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。",
+    const guide = workbench.querySelector('[aria-label="观测闭环说明"]');
+    expect(guide).not.toBeNull();
+    expect(guide?.querySelector("[data-action=toggle-guide]")?.getAttribute("aria-expanded")).toBe(
+      "false",
     );
-    expect(original?.querySelector('[data-testid="enterprise-diagnosis"]')).not.toBeNull();
-    expect(original?.querySelector('[data-testid="diagnosis-target-picker"]')).not.toBeNull();
-    expect(original?.querySelector('[data-testid="diagnosis-run-now"]')).not.toBeNull();
-    expect(workbench.querySelector('[data-testid="enterprise-diagnosis"]')).toBeNull();
-    expect(workbench.querySelector('[data-testid="diagnosis-run-now"]')).toBeNull();
-    expect(workbench.querySelector('[data-testid="observation-query-scope"]')).toBeNull();
+    expect(guide?.querySelector(".obs-guide__body")).toBeNull();
 
     const filters = workbench.querySelector('[aria-label="连接工作台筛选"]');
     expect(filters?.querySelector('[aria-label="观测数据源"]')).not.toBeNull();
     expect(filters?.querySelector('[data-action="pause"]')?.textContent).toContain("暂停刷新");
     expect(panel.querySelector(".obs-plat-toolbar")).toBeNull();
+
+    const tabs = [
+      ...workbench.querySelectorAll<HTMLButtonElement>(
+        '[role="tablist"][aria-label="观测视图"] button',
+      ),
+    ];
+    expect(tabs.map((tab) => tab.textContent?.trim())).toEqual([
+      "态势总览",
+      "运行分析",
+      "治理与验证",
+    ]);
+    for (const tab of tabs) {
+      tab.click();
+      await workbench.updateComplete;
+      await panel.updateComplete;
+      expect(panel.querySelector("#original-diagnosis")).toBeNull();
+      expectNoEvidenceDump(panel);
+    }
+    tabs[0].click();
+    await workbench.updateComplete;
 
     const source = workbench.querySelector<HTMLSelectElement>('[aria-label="观测数据源"]')!;
     source.value = "sample";
@@ -1206,7 +1258,53 @@ describe("enterprise diagnosis first-screen close", () => {
       ),
     ).toBe(true);
     expect(links[0].getAttribute("href")).toBe("#original-diagnosis");
-    expect(panel.querySelector("#original-diagnosis")).toBe(original);
+    expect(panel.querySelector("#original-diagnosis")).toBeNull();
+
+    links[0].click();
+    await panel.updateComplete;
+    await waitFor(() => expect(panel.querySelector("#original-diagnosis")).not.toBeNull());
+    const original = panel.querySelector("#original-diagnosis");
+    expect(original?.getAttribute("data-testid")).toBe("original-diagnosis");
+    expect(
+      workbench.compareDocumentPosition(original!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(workbench.contains(original)).toBe(false);
+    expect(original?.querySelector('[data-testid="enterprise-diagnosis"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="diagnosis-target-picker"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="diagnosis-run-now"]')).not.toBeNull();
+    expect(workbench.querySelector('[data-testid="enterprise-diagnosis"]')).toBeNull();
+    expect(workbench.querySelector('[data-testid="diagnosis-run-now"]')).toBeNull();
+    expect(workbench.querySelector('[data-testid="observation-query-scope"]')).toBeNull();
+    expectNoEvidenceDump(original!);
+
+    tabs[1].click();
+    await workbench.updateComplete;
+    await panel.updateComplete;
+    expect(panel.querySelector("#original-diagnosis")).toBeNull();
+    expect(window.location.hash).not.toBe("#original-diagnosis");
+    expectNoEvidenceDump(panel);
+    container.remove();
+  });
+
+  it("shows evidence and reasoning modules when a named query is in effect", async () => {
+    const { container, panel, workbench } = await mountEnterprisePanel({
+      taskId: "task1",
+      agentId: "main",
+      outcomeVersion: 3,
+    });
+    const original = panel.querySelector("#original-diagnosis");
+    expect(original).not.toBeNull();
+    expect(
+      workbench.compareDocumentPosition(original!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(original?.querySelector('[data-testid="enterprise-diagnosis"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="diagnosis-target-picker"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="observation-evidence-status"]')).not.toBeNull();
+    expect(original?.querySelector('[data-testid="observation-query-scope"]')?.textContent).toContain(
+      "精确任务真实查询，不受连接工作台样例选择影响；仍按当前身份授权读取。",
+    );
+    expect(original?.querySelector('[aria-label="运行证据投影"]')).not.toBeNull();
+    expect(original?.querySelector('[aria-label="推理假设旁路"]')).not.toBeNull();
     container.remove();
   });
 });
