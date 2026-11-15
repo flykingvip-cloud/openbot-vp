@@ -44,6 +44,22 @@ type InFlightEntry = {
   generation: number;
 };
 
+const invalidationHooks: Array<() => void> = [];
+
+/**
+ * Side-effect hook for invalidation (e.g. close pooled read connections).
+ * Hooks must be cheap and must not re-enter the cache.
+ */
+export function registerKnowledgeSourceBundleCacheInvalidationHook(hook: () => void): void {
+  invalidationHooks.push(hook);
+}
+
+function runInvalidationHooks(): void {
+  for (const hook of invalidationHooks) {
+    hook();
+  }
+}
+
 function normalizeKeyPart(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
@@ -127,6 +143,7 @@ export function createKnowledgeSourceBundleCache(options?: {
     if (!scope) {
       entries.clear();
       inFlight.clear();
+      runInvalidationHooks();
       return;
     }
     const hasConstraint =
@@ -149,6 +166,7 @@ export function createKnowledgeSourceBundleCache(options?: {
         inFlight.delete(key);
       }
     }
+    runInvalidationHooks();
   }
 
   async function getOrLoad(

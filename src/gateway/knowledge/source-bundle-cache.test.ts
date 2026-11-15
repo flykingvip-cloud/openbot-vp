@@ -206,7 +206,7 @@ describe("loadKnowledgeSourceBundle principal cache", () => {
       agentType: "employee-agent",
       hasEnterpriseScope: false,
     });
-    const spy = vi.spyOn(emptyBundle, "buildKnowledgeSourceBundle");
+    const spy = vi.spyOn(emptyBundle, "buildKnowledgeSourceBundleAsync");
     const started = Date.now();
     const bundles = await Promise.all([
       loadKnowledgeSourceBundle(null),
@@ -260,7 +260,7 @@ describe("loadKnowledgeSourceBundle principal cache", () => {
       agentType: "employee-agent",
       hasEnterpriseScope: false,
     });
-    const spy = vi.spyOn(emptyBundle, "buildKnowledgeSourceBundle");
+    const spy = vi.spyOn(emptyBundle, "buildKnowledgeSourceBundleAsync");
     const storePath = `/tmp/openbot-t317-kb-store-${Date.now()}.json`;
     const first = await loadKnowledgeSourceBundle(null);
     expect(spy).toHaveBeenCalledTimes(1);

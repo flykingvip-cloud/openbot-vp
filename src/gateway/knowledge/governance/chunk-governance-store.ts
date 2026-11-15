@@ -449,6 +449,110 @@ export function sumChunkReferenceCounts(db: DatabaseSync, kbId: string): number 
   return row.total ?? 0;
 }
 
+/** SQLite variable cap is typically 999; stay well below it for batched IN lists. */
+const KNOWLEDGE_BASE_IN_BATCH = 400;
+
+function batchedKnowledgeBaseIds(kbIds: string[]): string[][] {
+  const unique = [...new Set(kbIds.map((id) => id.trim()).filter(Boolean))];
+  const batches: string[][] = [];
+  for (let index = 0; index < unique.length; index += KNOWLEDGE_BASE_IN_BATCH) {
+    batches.push(unique.slice(index, index + KNOWLEDGE_BASE_IN_BATCH));
+  }
+  return batches;
+}
+
+/**
+ * One grouped scan for many knowledge bases, equivalent to calling
+ * {@link getChunkRelationBreakdown} per id. Used by the home projection so a
+ * 50-space library does not issue 50 separate scans.
+ */
+export function getChunkRelationBreakdownByKnowledgeBase(
+  db: DatabaseSync,
+  kbIds: string[],
+): Map<string, ChunkRelationBreakdown> {
+  const map = new Map<string, ChunkRelationBreakdown>();
+  for (const id of kbIds) {
+    if (id.trim()) {
+      map.set(id, { reference: 0, duplicate: 0, conflict: 0 });
+    }
+  }
+  for (const batch of batchedKnowledgeBaseIds(kbIds)) {
+    const placeholders = batch.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `SELECT kb_id, relation_type, COUNT(*) AS count
+           FROM chunk_relations
+          WHERE kb_id IN (${placeholders})
+          GROUP BY kb_id, relation_type`,
+      )
+      .all(...batch) as Array<{ kb_id: string; relation_type: string; count: number }>;
+    for (const row of rows) {
+      const breakdown = map.get(row.kb_id) ?? { reference: 0, duplicate: 0, conflict: 0 };
+      if (row.relation_type === "reference") {
+        breakdown.reference = row.count;
+      } else if (row.relation_type === "duplicate") {
+        breakdown.duplicate = row.count;
+      } else if (row.relation_type === "conflict") {
+        breakdown.conflict = row.count;
+      }
+      map.set(row.kb_id, breakdown);
+    }
+  }
+  return map;
+}
+
+/**
+ * One grouped scan for many knowledge bases, equivalent to calling
+ * {@link sumChunkReferenceCounts} per id.
+ */
+export function sumChunkReferenceCountsByKnowledgeBase(
+  db: DatabaseSync,
+  kbIds: string[],
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const id of kbIds) {
+    if (id.trim()) {
+      map.set(id, 0);
+    }
+  }
+  for (const batch of batchedKnowledgeBaseIds(kbIds)) {
+    const placeholders = batch.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `SELECT kb_id, COALESCE(SUM(reference_count), 0) AS total
+           FROM chunk_governance
+          WHERE kb_id IN (${placeholders})
+          GROUP BY kb_id`,
+      )
+      .all(...batch) as Array<{ kb_id: string; total: number }>;
+    for (const row of rows) {
+      map.set(row.kb_id, row.total ?? 0);
+    }
+  }
+  return map;
+}
+
+export function listChunkKnowledgeBaseIds(
+  db: DatabaseSync,
+  chunkIds: string[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  const unique = [...new Set(chunkIds.map((id) => id.trim()).filter(Boolean))];
+  for (let index = 0; index < unique.length; index += KNOWLEDGE_BASE_IN_BATCH) {
+    const batch = unique.slice(index, index + KNOWLEDGE_BASE_IN_BATCH);
+    const placeholders = batch.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `SELECT chunk_id, kb_id FROM chunk_meta WHERE chunk_id IN (${placeholders})`,
+      )
+      .all(...batch) as Array<{ chunk_id: string; kb_id: string }>;
+    for (const row of rows) {
+      map.set(row.chunk_id, row.kb_id);
+    }
+  }
+  return map;
+}
+
 /** Sum `reference_count` for a bounded set of chunk ids (governance action evidence). */
 export function sumReferenceCountsForChunks(db: DatabaseSync, chunkIds: string[]): number {
   const ids = [...new Set(chunkIds.map((id) => id.trim()).filter(Boolean))].slice(0, 50);

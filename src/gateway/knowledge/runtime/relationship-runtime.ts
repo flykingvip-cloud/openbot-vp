@@ -8,8 +8,15 @@ import type {
   RelationshipNodeGovernanceStatus,
 } from "../types.js";
 import { enrichKnowledgeObjectsWithExplicitMetadata } from "./explicit-graph-enrichment.js";
-import { buildCandidateRelationships } from "./relationship-builder.js";
-import { detectRelationshipConflicts } from "./relationship-conflict-detector.js";
+import {
+  buildCandidateRelationships,
+  buildCandidateRelationshipsAsync,
+} from "./relationship-builder.js";
+import {
+  detectRelationshipConflicts,
+  detectRelationshipConflictsAsync,
+} from "./relationship-conflict-detector.js";
+import type { EventLoopYielder } from "../event-loop-yield.js";
 import { scoreRelationshipCandidates } from "./relationship-score-engine.js";
 import type { RelationshipRuntimeInput, RelationshipRuntimeResult } from "./types.js";
 
@@ -194,18 +201,10 @@ export function clearRelationshipRuntimeCache(): void {
  * the underlying knowledge set actually changes; repeated loads of an unchanged
  * set reuse the previously computed graph (LRU-bounded), avoiding a full rebuild.
  */
-export function buildIntelligentRelationshipGraph(
-  input: RelationshipRuntimeInput,
+function rememberRelationshipRuntimeResult(
+  signature: string,
+  result: RelationshipRuntimeResult,
 ): RelationshipRuntimeResult {
-  const signature = relationshipRuntimeSignature(input);
-  const cached = relationshipRuntimeCache.get(signature);
-  if (cached) {
-    // Refresh LRU recency.
-    relationshipRuntimeCache.delete(signature);
-    relationshipRuntimeCache.set(signature, cached);
-    return cached;
-  }
-  const result = computeIntelligentRelationshipGraph(input);
   relationshipRuntimeCache.set(signature, result);
   if (relationshipRuntimeCache.size > RELATIONSHIP_RUNTIME_CACHE_MAX) {
     const oldest = relationshipRuntimeCache.keys().next().value;
@@ -216,9 +215,49 @@ export function buildIntelligentRelationshipGraph(
   return result;
 }
 
-function computeIntelligentRelationshipGraph(
+function takeCachedRelationshipRuntimeResult(
+  signature: string,
+): RelationshipRuntimeResult | null {
+  const cached = relationshipRuntimeCache.get(signature);
+  if (!cached) {
+    return null;
+  }
+  relationshipRuntimeCache.delete(signature);
+  relationshipRuntimeCache.set(signature, cached);
+  return cached;
+}
+
+export function buildIntelligentRelationshipGraph(
   input: RelationshipRuntimeInput,
 ): RelationshipRuntimeResult {
+  const signature = relationshipRuntimeSignature(input);
+  const cached = takeCachedRelationshipRuntimeResult(signature);
+  if (cached) {
+    return cached;
+  }
+  return rememberRelationshipRuntimeResult(signature, computeIntelligentRelationshipGraph(input));
+}
+
+export async function buildIntelligentRelationshipGraphAsync(
+  input: RelationshipRuntimeInput,
+  options?: { yieldFn?: EventLoopYielder; yieldEvery?: number },
+): Promise<RelationshipRuntimeResult> {
+  const signature = relationshipRuntimeSignature(input);
+  const cached = takeCachedRelationshipRuntimeResult(signature);
+  if (cached) {
+    return cached;
+  }
+  const result = await computeIntelligentRelationshipGraphAsync(input, options);
+  return rememberRelationshipRuntimeResult(signature, result);
+}
+
+function prepareIntelligentRelationshipGraph(input: RelationshipRuntimeInput): {
+  objects: KnowledgeObject[];
+  nodes: RelationshipNode[];
+  edges: RelationshipEdge[];
+  dataCapabilities: DataCapabilityDescriptor[];
+  explicitMetadata: ReturnType<typeof listExplicitDocumentMetadata>;
+} {
   const nodes: RelationshipNode[] = [HUB_NODES.me];
   const edges: RelationshipEdge[] = [];
   const dataCapabilities = input.dataCapabilities ?? [];
@@ -327,6 +366,14 @@ function computeIntelligentRelationshipGraph(
     }
   }
 
+  return { objects, nodes, edges, dataCapabilities, explicitMetadata };
+}
+
+function computeIntelligentRelationshipGraph(
+  input: RelationshipRuntimeInput,
+): RelationshipRuntimeResult {
+  const { objects, nodes, edges, dataCapabilities, explicitMetadata } =
+    prepareIntelligentRelationshipGraph(input);
   const scoredCandidates = scoreRelationshipCandidates({
     candidates: buildCandidateRelationships({
       objects,
@@ -335,6 +382,59 @@ function computeIntelligentRelationshipGraph(
     }),
     objects,
   });
+  const conflicts = detectRelationshipConflicts(objects);
+  return finalizeIntelligentRelationshipGraph({
+    input,
+    objects,
+    nodes,
+    edges,
+    scoredCandidates,
+    conflicts,
+  });
+}
+
+async function computeIntelligentRelationshipGraphAsync(
+  input: RelationshipRuntimeInput,
+  options?: { yieldFn?: EventLoopYielder; yieldEvery?: number },
+): Promise<RelationshipRuntimeResult> {
+  const prepared = prepareIntelligentRelationshipGraph(input);
+  if (options?.yieldFn) {
+    await options.yieldFn();
+  }
+  const scoredCandidates = scoreRelationshipCandidates({
+    candidates: await buildCandidateRelationshipsAsync(
+      {
+        objects: prepared.objects,
+        dataCapabilities: prepared.dataCapabilities,
+        explicitMetadata: prepared.explicitMetadata,
+      },
+      options,
+    ),
+    objects: prepared.objects,
+  });
+  const conflicts = await detectRelationshipConflictsAsync(prepared.objects, options);
+  if (options?.yieldFn) {
+    await options.yieldFn();
+  }
+  return finalizeIntelligentRelationshipGraph({
+    input,
+    objects: prepared.objects,
+    nodes: prepared.nodes,
+    edges: prepared.edges,
+    scoredCandidates,
+    conflicts,
+  });
+}
+
+function finalizeIntelligentRelationshipGraph(params: {
+  input: RelationshipRuntimeInput;
+  objects: KnowledgeObject[];
+  nodes: RelationshipNode[];
+  edges: RelationshipEdge[];
+  scoredCandidates: ReturnType<typeof scoreRelationshipCandidates>;
+  conflicts: ReturnType<typeof detectRelationshipConflicts>;
+}): RelationshipRuntimeResult {
+  const { input, objects, nodes, edges, scoredCandidates, conflicts } = params;
   for (const candidate of scoredCandidates) {
     pushEdge(edges, {
       sourceId: nodeIdForObject(candidate.sourceObjectId),
@@ -346,7 +446,6 @@ function computeIntelligentRelationshipGraph(
     });
   }
 
-  const conflicts = detectRelationshipConflicts(objects);
   for (const conflict of conflicts) {
     pushEdge(edges, {
       sourceId: nodeIdForObject(conflict.leftId),

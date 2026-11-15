@@ -9,15 +9,17 @@ import { resolveControlPlaneStorePathForClient } from "../tenant-context.js";
 import { TENANT_ENTERPRISE_DATA_FILE } from "../tenant-store-paths.js";
 import { resolveKnowledgeSourceContext } from "./context.js";
 import { listDeliverableArchiveKnowledgeBaseIds } from "./deliverables/archive-store.js";
-import { buildKnowledgeSourceBundle } from "./empty-bundle.js";
+import { buildKnowledgeSourceBundleAsync } from "./empty-bundle.js";
+import { createBudgetedEventLoopYielder } from "./event-loop-yield.js";
 import { buildKnowledgeIndexCapabilityDescriptor } from "./feed/data-capability-feed-adapter.js";
 import { loadKnowledgeFeedBundle } from "./feed/knowledge-feed-adapter.js";
 import {
   countIndexedChunks,
-  sumChunkReferenceCounts,
+  sumChunkReferenceCountsByKnowledgeBase,
 } from "./governance/chunk-governance-store.js";
-import { loadDocumentGovernanceOverlay } from "./governance/runtime/object-writeback.js";
-import { openKnowledgeIndex, resolveKnowledgeIndexDbPath } from "./kb-index.js";
+import { loadDocumentGovernanceOverlayAsync } from "./governance/runtime/object-writeback.js";
+import { resolveKnowledgeIndexDbPath } from "./kb-index.js";
+import { acquireKnowledgeIndexRead } from "./kb-index-read-pool.js";
 import { listKnowledgeBases } from "./knowledge-base-store.js";
 import { buildDefaultKnowledgeObjects, buildDefaultKnowledgeSourceSummary } from "./mock-graph.js";
 import { buildIntelligentRelationshipGraph } from "./runtime/relationship-runtime.js";
@@ -30,9 +32,9 @@ import { buildConfiguredChannelCapabilityDescriptors } from "./sources/channel-c
 import { buildEnterpriseSourceSummary } from "./sources/enterprise-source.js";
 import { loadExternalDataSourceSummaries } from "./sources/external-data-sources.js";
 import {
-  buildCrossKnowledgeBaseEdges,
+  buildCrossKnowledgeBaseEdgesAsync,
   loadArchivedDeliverableObjects,
-  loadKnowledgeBaseSpaceObjects,
+  loadKnowledgeBaseSpaceObjectsAsync,
   knowledgeBaseNodeObjectId,
 } from "./sources/knowledge-index-source.js";
 import {
@@ -69,6 +71,7 @@ async function loadEnterpriseStoreBundle(
     context?: import("./sources/types.js").KnowledgeSourceContext;
   },
 ): Promise<KnowledgeSourceBundle> {
+  const yieldFn = createBudgetedEventLoopYielder();
   const context =
     options?.context ??
     (await resolveKnowledgeSourceContext(client, {
@@ -118,14 +121,15 @@ async function loadEnterpriseStoreBundle(
       tenantId: context.tenantId,
     });
     if (fs.existsSync(dbPath)) {
-      const index = await openKnowledgeIndex({ dbPath, vectorEnabled: false });
+      const index = await acquireKnowledgeIndexRead({ dbPath, vectorEnabled: false });
       try {
-        documentGovernanceOverlay = loadDocumentGovernanceOverlay(index.db);
+        documentGovernanceOverlay = await loadDocumentGovernanceOverlayAsync(index.db, yieldFn);
         // Real, non-demo data source: surface the employee's own knowledge index
         // as a granted capability when it actually holds indexed chunks.
         knowledgeIndexCapability = buildKnowledgeIndexCapabilityDescriptor({
           indexedChunkCount: countIndexedChunks(index.db),
         });
+        await yieldFn();
         const knowledgeBases = listKnowledgeBases({
           ownerId: context.userId,
           ...(context.tenantId ? { tenantId: context.tenantId } : {}),
@@ -133,7 +137,11 @@ async function loadEnterpriseStoreBundle(
         ownedKnowledgeBaseCount = knowledgeBases.length;
         if (knowledgeBases.length > 0) {
           knowledgeIndexObjects.push(
-            ...loadKnowledgeBaseSpaceObjects({ db: index.db, knowledgeBases }),
+            ...(await loadKnowledgeBaseSpaceObjectsAsync({
+              db: index.db,
+              knowledgeBases,
+              yieldFn,
+            })),
             ...loadArchivedDeliverableObjects({
               db: index.db,
               knowledgeBases,
@@ -141,24 +149,27 @@ async function loadEnterpriseStoreBundle(
             }),
           );
           knowledgeIndexEdges.push(
-            ...buildCrossKnowledgeBaseEdges({ db: index.db, knowledgeBases }),
+            ...(await buildCrossKnowledgeBaseEdgesAsync({
+              db: index.db,
+              knowledgeBases,
+              yieldFn,
+            })),
           );
           usageCountByObjectId = {};
-          for (const base of knowledgeBases) {
-            const citationTotal = sumChunkReferenceCounts(index.db, base.id);
+          const citationTotals = sumChunkReferenceCountsByKnowledgeBase(
+            index.db,
+            knowledgeBases.map((base) => base.id),
+          );
+          for (const [baseId, citationTotal] of citationTotals.entries()) {
             if (citationTotal > 0) {
-              usageCountByObjectId[knowledgeBaseNodeObjectId(base.id)] = citationTotal;
+              usageCountByObjectId[knowledgeBaseNodeObjectId(baseId)] = citationTotal;
             }
           }
+          await yieldFn();
         }
       } finally {
         index.close();
       }
-      // Yield after the (potentially large) index read so healthz is not stuck
-      // behind a fully synchronous sqlite + graph turn. The O(n²) graph build
-      // itself remains synchronous; connection reuse / incremental projection
-      // is a follow-up (t317 P2).
-      await new Promise<void>((resolve) => setImmediate(resolve));
     }
   }
   objects.push(...knowledgeIndexObjects);
@@ -190,9 +201,10 @@ async function loadEnterpriseStoreBundle(
           grantedCount: dataCatalog.summary.grantedCount + realCapabilities.length,
         }
       : dataCatalog.summary;
-  return buildKnowledgeSourceBundle({
+  return buildKnowledgeSourceBundleAsync({
     objects,
     dataCapabilities,
+    yieldFn,
     sourceSummary: {
       personal: buildPersonalSourceSummary(personalObjects),
       enterprise: buildEnterpriseSourceSummary({
@@ -216,19 +228,13 @@ async function loadEnterpriseStoreBundle(
   });
 }
 
-export async function loadKnowledgeSourceBundle(
-  client: GatewayClient | null,
+export async function loadKnowledgeSourceBundleFromContext(
+  context: import("./sources/types.js").KnowledgeSourceContext,
+  client: GatewayClient | null = null,
   options?: {
-    preferMock?: boolean;
     agentType?: import("../enterprise-data/types.js").KnowledgeAgentType | null;
   },
 ): Promise<KnowledgeSourceBundle> {
-  if (options?.preferMock) {
-    return loadMockBundle();
-  }
-  const context = await resolveKnowledgeSourceContext(client, {
-    agentType: options?.agentType ?? undefined,
-  });
   const cacheKey = formatKnowledgeSourceBundleCacheKey({
     userId: context.userId,
     tenantId: context.tenantId,
@@ -247,8 +253,9 @@ export async function loadKnowledgeSourceBundle(
         userId: context.userId,
         personalObjectCount: personal.length,
       });
-      return buildKnowledgeSourceBundle({
+      return buildKnowledgeSourceBundleAsync({
         objects: personal,
+        yieldFn: createBudgetedEventLoopYielder(),
         sourceSummary: {
           personal: buildPersonalSourceSummary(personal),
           enterprise: { libraryCount: 0, accessibleCount: 0 },
@@ -257,4 +264,20 @@ export async function loadKnowledgeSourceBundle(
       });
     }
   });
+}
+
+export async function loadKnowledgeSourceBundle(
+  client: GatewayClient | null,
+  options?: {
+    preferMock?: boolean;
+    agentType?: import("../enterprise-data/types.js").KnowledgeAgentType | null;
+  },
+): Promise<KnowledgeSourceBundle> {
+  if (options?.preferMock) {
+    return loadMockBundle();
+  }
+  const context = await resolveKnowledgeSourceContext(client, {
+    agentType: options?.agentType ?? undefined,
+  });
+  return loadKnowledgeSourceBundleFromContext(context, client, options);
 }
