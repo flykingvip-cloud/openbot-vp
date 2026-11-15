@@ -1044,7 +1044,12 @@ export async function runReplyAgent(params: {
       finalPayloads = appendUsageLine(finalPayloads, responseUsageLine);
     }
 
-    return completeDelivery({ kind: "visible", payloads: finalPayloads, acceptanceStatus });
+    return completeDelivery({
+      kind: "visible",
+      payloads: finalPayloads,
+      acceptanceStatus,
+      taskBound: Boolean(completionBinding?.taskId),
+    });
   } catch (error) {
     // Keep the followup queue moving even when an unexpected exception escapes
     // the run path; the caller still receives the original error.
