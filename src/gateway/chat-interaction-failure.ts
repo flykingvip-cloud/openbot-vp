@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -29,6 +30,39 @@ export type ChatTurnTerminalReceipt = {
 
 const INTERACTION_DECISION_PATTERN =
   /^(?:Invalid interaction (?:decision|reply|answer|target|task decision|acceptance checks)|Interaction target is not bound to this request|Interaction did not return a final decision|本轮未取得有效的交互决定，没有启动或修改任务。)$/;
+
+/** Short, non-reversible run identifier for gateway warn lines. */
+export function shortChatRunId(runId: string): string {
+  return createHash("sha256").update(runId).digest("hex").slice(0, 12);
+}
+
+function describeInteractionFailureForLog(
+  error: unknown,
+  runId?: string,
+): Record<string, unknown> {
+  const errorClass = error instanceof Error ? error.name : typeof error;
+  const phase =
+    error && typeof error === "object" && "interactionPhase" in error
+      ? String((error as { interactionPhase?: unknown }).interactionPhase)
+      : undefined;
+  const reason =
+    error && typeof error === "object" && "reason" in error
+      ? String((error as { reason?: unknown }).reason)
+      : undefined;
+  const usageRecorded =
+    error && typeof error === "object" && (error as { usageRecorded?: unknown }).usageRecorded === true;
+  const shape =
+    error && typeof error === "object" ? (error as { shape?: unknown }).shape : undefined;
+  return {
+    errorClass,
+    ...(runId ? { run: shortChatRunId(runId) } : {}),
+    ...(phase ? { phase } : {}),
+    ...(reason && reason.length < 40 && !reason.includes("{") ? { reason } : {}),
+    kind: classifyInteractionFailure(error),
+    ...(usageRecorded ? { usageRecorded: true } : {}),
+    ...(shape && typeof shape === "object" && shape ? { shape } : {}),
+  };
+}
 
 export function resolveChatTurnTerminalDir(storeDir?: string): string {
   return storeDir?.trim() || path.join(resolveConfigDir(), "openbot-chat-turn-terminals");
@@ -245,6 +279,10 @@ function isInterpretationFailure(error: unknown): boolean {
   if (INTERACTION_DECISION_PATTERN.test(message)) {
     return true;
   }
+  // Broken protocol JSON must not be inferred as an execution-phase error.
+  if (error instanceof SyntaxError) {
+    return true;
+  }
   const kind = classifyInteractionFailure(error);
   return kind === "queue_timeout";
 }
@@ -266,6 +304,9 @@ export function formatChatTurnTerminalText(error: unknown): {
     return { text: BILLING_BLOCKED_INTERACTION_TEXT, businessExecution: "none" };
   }
   if (isInterpretationFailure(error)) {
+    if (error instanceof SyntaxError) {
+      return { text: REJECTED_INTERACTION_TURN_TEXT, businessExecution: "none" };
+    }
     const kind = classifyInteractionFailure(error);
     if (kind === "timeout" || kind === "empty") {
       return { text: INTERACTION_TIMEOUT_TEXT, businessExecution: "none" };
@@ -299,12 +340,8 @@ export async function persistRejectedInteractionTurn(params: {
     JSON.stringify({
       validation: isGovernedBillingInterpretation(params.error)
         ? "interaction_provider_billing"
-        : params.error instanceof Error
-          ? params.error.message
-          : "interaction_failure",
-      shape: (params.error as Error & { shape?: unknown }).shape,
-      stack:
-        params.error instanceof Error ? params.error.stack?.split("\n").slice(1, 7) : undefined,
+        : "interaction_failure",
+      ...describeInteractionFailureForLog(params.error, params.runId),
     }),
   );
   return writeTerminalWithTranscript({
