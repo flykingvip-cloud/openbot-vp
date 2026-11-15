@@ -162,6 +162,10 @@ export function requireSelectedKnowledgeBaseId(state: AppPortState): string | nu
 
 export type KnowledgeUniverseControllerState = {
   loading: boolean;
+  /** True while the relation graph request for the current home load is in flight. */
+  graphLoading: boolean;
+  /** True while recommendations / actions / discovery for the current home load are in flight. */
+  insightsLoading: boolean;
   error: string | null;
   query: string;
   homeFocus: KnowledgeHomeFocus | null;
@@ -580,6 +584,8 @@ function syncToAppState(state: AppPortState, runtime: KnowledgeUniverseControlle
 function createInitialRuntime(): KnowledgeUniverseControllerState {
   return {
     loading: false,
+    graphLoading: false,
+    insightsLoading: false,
     error: null,
     query: "",
     homeFocus: null,
@@ -783,99 +789,190 @@ export function getKnowledgeUniverseRuntime(state: AppPortState): KnowledgeUnive
   return runtime;
 }
 
-export async function loadKnowledgeUniverseHome(
+type KnowledgeUniverseHomeLoadRequest = { mode: "load" | "refresh"; force?: boolean };
+
+const homeLoadCoalescers = new WeakMap<
+  AppPortState,
+  { inFlight: Promise<void> | null; queued: KnowledgeUniverseHomeLoadRequest | null }
+>();
+
+function getHomeLoadCoalescer(state: AppPortState) {
+  let entry = homeLoadCoalescers.get(state);
+  if (!entry) {
+    entry = { inFlight: null, queued: null };
+    homeLoadCoalescers.set(state, entry);
+  }
+  return entry;
+}
+
+function applyKnowledgeUniverseHomeSnapshot(
+  runtime: KnowledgeUniverseControllerState,
+  snapshot:
+    | import("../capability/knowledge-universe/facade.ts").KnowledgeUniverseHomePartialSnapshot
+    | import("../capability/knowledge-universe/endpoints.ts").KnowledgeUniverseHomeSnapshot,
+) {
+  if ("sourceSummary" in snapshot && snapshot.sourceSummary !== undefined) {
+    runtime.sourceSummary = snapshot.sourceSummary;
+  }
+  if ("graph" in snapshot && snapshot.graph !== undefined) {
+    runtime.graph = snapshot.graph;
+    if ("graphViewModel" in snapshot && snapshot.graphViewModel !== undefined) {
+      runtime.graphViewModel = snapshot.graphViewModel;
+    }
+    runtime.graphLoading = false;
+  }
+  if ("searchResults" in snapshot && snapshot.searchResults !== undefined) {
+    runtime.searchResults = snapshot.searchResults;
+  }
+  if ("dataCapabilities" in snapshot && snapshot.dataCapabilities !== undefined) {
+    runtime.dataCapabilities = snapshot.dataCapabilities;
+  }
+  if ("sourceBrowse" in snapshot && snapshot.sourceBrowse !== undefined) {
+    runtime.sourceBrowse = snapshot.sourceBrowse;
+  }
+  if ("externalDataSources" in snapshot && snapshot.externalDataSources !== undefined) {
+    runtime.externalDataSources = snapshot.externalDataSources;
+  }
+  if ("recommendations" in snapshot && snapshot.recommendations !== undefined) {
+    runtime.recommendations = snapshot.recommendations;
+  }
+  if ("discoveryEvents" in snapshot && snapshot.discoveryEvents !== undefined) {
+    runtime.discoveryEvents = snapshot.discoveryEvents;
+  }
+  if ("actionSuggestions" in snapshot && snapshot.actionSuggestions !== undefined) {
+    runtime.actionSuggestions = snapshot.actionSuggestions;
+  }
+  if ("homeInsightsDegraded" in snapshot && snapshot.homeInsightsDegraded !== undefined) {
+    runtime.homeInsightsDegraded = snapshot.homeInsightsDegraded;
+  }
+  if ("recentVisits" in snapshot && snapshot.recentVisits !== undefined) {
+    runtime.recentVisits = snapshot.recentVisits;
+  }
+  if ("relatedGroups" in snapshot && snapshot.relatedGroups !== undefined) {
+    runtime.relatedGroups = snapshot.relatedGroups;
+  }
+  if ("selectedObject" in snapshot && snapshot.selectedObject !== undefined) {
+    runtime.selectedObject = snapshot.selectedObject;
+  }
+  const settled = "settled" in snapshot ? snapshot.settled : undefined;
+  if (
+    !settled ||
+    (settled.includes("recommendations") &&
+      settled.includes("actions") &&
+      settled.includes("discovery"))
+  ) {
+    runtime.insightsLoading = false;
+  }
+}
+
+async function runKnowledgeUniverseHomeLoad(
   state: AppPortState,
-  options?: { force?: boolean },
+  request: KnowledgeUniverseHomeLoadRequest,
 ) {
   const runtime = getKnowledgeUniverseRuntime(state);
-  if (runtime.loading) {
-    return;
-  }
-  if (runtime.hasLoaded && !options?.force) {
+  if (request.mode === "load" && runtime.hasLoaded && !request.force) {
     return;
   }
   if (!runtime.hasLoaded) {
     applyKnowledgeUniverseUiPrefs(state);
   }
   runtime.loading = true;
+  runtime.graphLoading = true;
+  runtime.insightsLoading = true;
   runtime.error = null;
   syncToAppState(state, runtime);
   requestUpdate(state);
+  // Start the space list immediately so it can render before the graph settles.
+  const workspacePromise = loadKnowledgeUniverseWorkspace(state);
   try {
     const snapshot = await loadKnowledgeUniverseHomeSnapshot({
       client: state.client,
       query: runtime.query,
       selectedNodeId: runtime.selectedNodeId,
       selectedKnowledgeBaseId: runtime.selectedKnowledgeBaseId,
+      onPartial: (partial) => {
+        applyKnowledgeUniverseHomeSnapshot(runtime, partial);
+        syncToAppState(state, runtime);
+        requestUpdate(state);
+      },
     });
-    runtime.sourceSummary = snapshot.sourceSummary;
-    runtime.graph = snapshot.graph;
-    runtime.graphViewModel = snapshot.graphViewModel;
-    runtime.searchResults = snapshot.searchResults;
-    runtime.dataCapabilities = snapshot.dataCapabilities;
-    runtime.sourceBrowse = snapshot.sourceBrowse;
-    runtime.externalDataSources = snapshot.externalDataSources;
-    runtime.recommendations = snapshot.recommendations;
-    runtime.discoveryEvents = snapshot.discoveryEvents;
-    runtime.actionSuggestions = snapshot.actionSuggestions;
-    runtime.homeInsightsDegraded = snapshot.homeInsightsDegraded ?? false;
-    runtime.recentVisits = snapshot.recentVisits;
-    runtime.relatedGroups = snapshot.relatedGroups;
-    runtime.selectedObject = snapshot.selectedObject;
+    applyKnowledgeUniverseHomeSnapshot(runtime, snapshot);
     runtime.hasLoaded = true;
     runtime.error = null;
-    await loadKnowledgeUniverseWorkspace(state);
+    await workspacePromise;
     void loadKnowledgeUniverseGovernance(state);
-    void import("./knowledge-universe-connector-bind.ts").then((module) => {
-      module.maybeResumeKnowledgeUniverseConnectorOAuthFromUrl(state);
-    });
+    if (request.mode === "load") {
+      void import("./knowledge-universe-connector-bind.ts").then((module) => {
+        module.maybeResumeKnowledgeUniverseConnectorOAuthFromUrl(state);
+      });
+    }
   } catch (error) {
-    runtime.error = runtimeMessageFromError(error, runtimeMessageLoadWorkbenchFailed);
+    runtime.error = runtimeMessageFromError(
+      error,
+      request.mode === "refresh"
+        ? runtimeMessageRefreshWorkbenchFailed
+        : runtimeMessageLoadWorkbenchFailed,
+    );
+    await workspacePromise.catch(() => undefined);
   } finally {
     runtime.loading = false;
+    runtime.graphLoading = false;
+    runtime.insightsLoading = false;
     syncToAppState(state, runtime);
     requestUpdate(state);
   }
 }
 
-export async function refreshKnowledgeUniverseHome(state: AppPortState) {
-  const runtime = getKnowledgeUniverseRuntime(state);
-  runtime.loading = true;
-  runtime.error = null;
-  syncToAppState(state, runtime);
-  requestUpdate(state);
-  try {
-    const snapshot = await loadKnowledgeUniverseHomeSnapshot({
-      client: state.client,
-      query: runtime.query,
-      selectedNodeId: runtime.selectedNodeId,
-      selectedKnowledgeBaseId: runtime.selectedKnowledgeBaseId,
-    });
-    runtime.sourceSummary = snapshot.sourceSummary;
-    runtime.graph = snapshot.graph;
-    runtime.graphViewModel = snapshot.graphViewModel;
-    runtime.searchResults = snapshot.searchResults;
-    runtime.dataCapabilities = snapshot.dataCapabilities;
-    runtime.sourceBrowse = snapshot.sourceBrowse;
-    runtime.externalDataSources = snapshot.externalDataSources;
-    runtime.recommendations = snapshot.recommendations;
-    runtime.discoveryEvents = snapshot.discoveryEvents;
-    runtime.actionSuggestions = snapshot.actionSuggestions;
-    runtime.homeInsightsDegraded = snapshot.homeInsightsDegraded ?? false;
-    runtime.recentVisits = snapshot.recentVisits;
-    runtime.relatedGroups = snapshot.relatedGroups;
-    runtime.selectedObject = snapshot.selectedObject;
-    runtime.hasLoaded = true;
-    runtime.error = null;
-    await loadKnowledgeUniverseWorkspace(state);
-    void loadKnowledgeUniverseGovernance(state);
-  } catch (error) {
-    runtime.error = runtimeMessageFromError(error, runtimeMessageRefreshWorkbenchFailed);
-  } finally {
-    runtime.loading = false;
-    syncToAppState(state, runtime);
-    requestUpdate(state);
+async function enqueueKnowledgeUniverseHomeLoad(
+  state: AppPortState,
+  request: KnowledgeUniverseHomeLoadRequest,
+) {
+  const coalescer = getHomeLoadCoalescer(state);
+  if (coalescer.inFlight) {
+    // Merge or queue behind the in-flight load instead of starting a second
+    // overlapping home snapshot (t316 stacked three home loads to 60s+).
+    const current = coalescer.queued;
+    coalescer.queued = {
+      mode: request.mode === "refresh" || current?.mode === "refresh" ? "refresh" : "load",
+      force:
+        Boolean(request.force || current?.force) ||
+        request.mode === "refresh" ||
+        current?.mode === "refresh",
+    };
+    await coalescer.inFlight;
+    if (coalescer.queued && !coalescer.inFlight) {
+      const leftover = coalescer.queued;
+      coalescer.queued = null;
+      await enqueueKnowledgeUniverseHomeLoad(state, leftover);
+    }
+    return;
   }
+  const run = (async () => {
+    try {
+      do {
+        const next = coalescer.queued ?? request;
+        coalescer.queued = null;
+        await runKnowledgeUniverseHomeLoad(state, next);
+      } while (coalescer.queued);
+    } finally {
+      if (coalescer.inFlight === run) {
+        coalescer.inFlight = null;
+      }
+    }
+  })();
+  coalescer.inFlight = run;
+  await run;
+}
+
+export async function loadKnowledgeUniverseHome(
+  state: AppPortState,
+  options?: { force?: boolean },
+) {
+  await enqueueKnowledgeUniverseHomeLoad(state, { mode: "load", force: options?.force });
+}
+
+export async function refreshKnowledgeUniverseHome(state: AppPortState) {
+  await enqueueKnowledgeUniverseHomeLoad(state, { mode: "refresh", force: true });
 }
 
 export function setKnowledgeUniverseSearchPanelOpen(state: AppPortState, open: boolean) {

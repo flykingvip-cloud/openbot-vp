@@ -1,4 +1,7 @@
+import type { EventLoopYielder } from "../event-loop-yield.js";
 import type { KnowledgeObject } from "../types.js";
+
+export const RELATIONSHIP_CONFLICT_YIELD_EVERY = 256;
 
 const CONFLICT_MARKERS = [
   ["增长", "下降"],
@@ -73,6 +76,31 @@ export function detectRelationshipConflicts(objects: KnowledgeObject[]): Array<{
         continue;
       }
       conflicts.push({ leftId: left.id, rightId: right.id, reason });
+    }
+  }
+  return conflicts;
+}
+
+export async function detectRelationshipConflictsAsync(
+  objects: KnowledgeObject[],
+  options?: { yieldFn?: EventLoopYielder; yieldEvery?: number },
+): Promise<Array<{ leftId: string; rightId: string; reason: string }>> {
+  const yieldEvery = Math.max(1, options?.yieldEvery ?? RELATIONSHIP_CONFLICT_YIELD_EVERY);
+  const yieldFn = options?.yieldFn;
+  const conflicts: Array<{ leftId: string; rightId: string; reason: string }> = [];
+  let steps = 0;
+  for (let index = 0; index < objects.length; index += 1) {
+    for (let inner = index + 1; inner < objects.length; inner += 1) {
+      const left = objects[index];
+      const right = objects[inner];
+      const reason = hasConflictSignal(left, right);
+      if (reason) {
+        conflicts.push({ leftId: left.id, rightId: right.id, reason });
+      }
+      steps += 1;
+      if (yieldFn && steps % yieldEvery === 0) {
+        await yieldFn();
+      }
     }
   }
   return conflicts;

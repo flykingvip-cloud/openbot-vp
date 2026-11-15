@@ -145,12 +145,15 @@ export function renderKnowledgeUniverseHomeRelationsCockpit(
   const focusLabel = resolveHomeFocusLabel(surface);
   const cockpitInsights = buildHomeCockpitInsights(surface);
   const activeTab = surface.homeCockpitTab === "document" ? "document" : "relations";
+  const showGraphLoading = activeTab === "relations" && Boolean(surface.graphLoading);
   const showNoCrossDocHint =
     activeTab === "relations" &&
+    !showGraphLoading &&
     surface.homeFocus?.kind === "document" &&
     !documentHasCrossDocEdges(surface, surface.homeFocus.id);
   const showEmptyLibraryHint =
     activeTab === "relations" &&
+    !showGraphLoading &&
     surface.homeFocus?.kind === "knowledge-base" &&
     (surface.graph?.nodes.length ?? 0) === 0;
 
@@ -210,19 +213,23 @@ export function renderKnowledgeUniverseHomeRelationsCockpit(
             }
           </div>
           ${
-            showNoCrossDocHint
-              ? html`<p class="ku-home-cockpit__hint" data-testid="ku-home-cockpit-no-cross-doc">
+            showGraphLoading
+              ? html`<p class="ku-home-cockpit__hint" data-testid="ku-home-cockpit-graph-loading">
+                  ${t("frontstage.workbench.knowledgeUniverse.home.relationsCockpit.loadingGraph")}
+                </p>`
+              : showNoCrossDocHint
+                ? html`<p class="ku-home-cockpit__hint" data-testid="ku-home-cockpit-no-cross-doc">
                   ${t(
                     "frontstage.workbench.knowledgeUniverse.home.relationsCockpit.noCrossDocRelations",
                   )}
                 </p>`
-              : showEmptyLibraryHint
-                ? html`<p class="ku-home-cockpit__hint" data-testid="ku-home-cockpit-empty-library">
+                : showEmptyLibraryHint
+                  ? html`<p class="ku-home-cockpit__hint" data-testid="ku-home-cockpit-empty-library">
                     ${t(
                       "frontstage.workbench.knowledgeUniverse.home.relationsCockpit.emptyLibraryPanorama",
                     )}
                   </p>`
-                : nothing
+                  : nothing
           }
         </div>
         <div class="ku-home-cockpit__head-actions">

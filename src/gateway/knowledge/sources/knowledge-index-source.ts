@@ -18,7 +18,11 @@
  *    成果 → 知识库 sedimentation is visible in the network.
  */
 import type { DatabaseSync } from "node:sqlite";
-import { getChunkRelationBreakdown } from "../governance/chunk-governance-store.js";
+import type { EventLoopYielder } from "../event-loop-yield.js";
+import {
+  getChunkRelationBreakdown,
+  getChunkRelationBreakdownByKnowledgeBase,
+} from "../governance/chunk-governance-store.js";
 import type { KnowledgeBase } from "../knowledge-base-store.js";
 import { nodeIdForObject } from "../runtime/relationship-runtime.js";
 import type { KnowledgeObject, KnowledgeSource, RelationshipEdge } from "../types.js";
@@ -54,29 +58,59 @@ function scopeLabelForVisibility(visibility: KnowledgeBase["visibility"]): strin
  * 引用/重复/冲突 counts are embedded in the summary so the detail panel shows a
  * base's internal relation density even though intra-KB edges stay collapsed.
  */
+function spaceObjectForBase(
+  base: KnowledgeBase,
+  breakdown: { reference: number; duplicate: number; conflict: number },
+): KnowledgeObject {
+  const scopeLabel = scopeLabelForVisibility(base.visibility);
+  const description = base.description?.trim();
+  const summary =
+    description ||
+    `${base.documentCount} 篇文档 · 引用 ${breakdown.reference} / 重复 ${breakdown.duplicate} / 冲突 ${breakdown.conflict}`;
+  return {
+    id: knowledgeBaseNodeObjectId(base.id),
+    title: base.title,
+    source: sourceForVisibility(base.visibility),
+    kind: "document",
+    summary,
+    tags: [...new Set(["知识库", scopeLabel, ...base.tags])].slice(0, 8),
+    updatedAt: base.updatedAtMs,
+    sourceSystem: "知识库",
+    scopeLabel,
+  } satisfies KnowledgeObject;
+}
+
 export function loadKnowledgeBaseSpaceObjects(params: {
   db: DatabaseSync;
   knowledgeBases: KnowledgeBase[];
 }): KnowledgeObject[] {
-  return params.knowledgeBases.map((base) => {
-    const breakdown = getChunkRelationBreakdown(params.db, base.id);
-    const scopeLabel = scopeLabelForVisibility(base.visibility);
-    const description = base.description?.trim();
-    const summary =
-      description ||
-      `${base.documentCount} 篇文档 · 引用 ${breakdown.reference} / 重复 ${breakdown.duplicate} / 冲突 ${breakdown.conflict}`;
-    return {
-      id: knowledgeBaseNodeObjectId(base.id),
-      title: base.title,
-      source: sourceForVisibility(base.visibility),
-      kind: "document",
-      summary,
-      tags: [...new Set(["知识库", scopeLabel, ...base.tags])].slice(0, 8),
-      updatedAt: base.updatedAtMs,
-      sourceSystem: "知识库",
-      scopeLabel,
-    } satisfies KnowledgeObject;
-  });
+  if (params.knowledgeBases.length <= 1) {
+    return params.knowledgeBases.map((base) =>
+      spaceObjectForBase(base, getChunkRelationBreakdown(params.db, base.id)),
+    );
+  }
+  const breakdowns = getChunkRelationBreakdownByKnowledgeBase(
+    params.db,
+    params.knowledgeBases.map((base) => base.id),
+  );
+  return params.knowledgeBases.map((base) =>
+    spaceObjectForBase(
+      base,
+      breakdowns.get(base.id) ?? { reference: 0, duplicate: 0, conflict: 0 },
+    ),
+  );
+}
+
+export async function loadKnowledgeBaseSpaceObjectsAsync(params: {
+  db: DatabaseSync;
+  knowledgeBases: KnowledgeBase[];
+  yieldFn?: EventLoopYielder;
+}): Promise<KnowledgeObject[]> {
+  const objects = loadKnowledgeBaseSpaceObjects(params);
+  if (params.yieldFn) {
+    await params.yieldFn();
+  }
+  return objects;
 }
 
 type SemanticHashRow = { hash: string | null; kb_id: string };
@@ -97,17 +131,55 @@ export function buildCrossKnowledgeBaseEdges(params: {
   if (kbIds.size < 2) {
     return [];
   }
+  return collectCrossKnowledgeBaseEdges({
+    db: params.db,
+    kbIds,
+    afterHash: "",
+    limit: 0,
+  }).edges;
+}
+
+const CROSS_KB_HASH_PAGE = 100;
+
+function collectCrossKnowledgeBaseEdges(params: {
+  db: DatabaseSync;
+  kbIds: Set<string>;
+  afterHash: string;
+  /** 0 means no hash-page cap (single shot). */
+  limit: number;
+}): { edges: RelationshipEdge[]; lastHash: string; done: boolean } {
+  const hashClause = params.afterHash ? "AND semantic_hash > ?" : "";
+  const limitClause = params.limit > 0 ? "LIMIT ?" : "";
+  const hashRows = params.db
+    .prepare(
+      `SELECT semantic_hash AS hash
+         FROM chunk_governance
+        WHERE semantic_hash IS NOT NULL AND semantic_hash <> ''
+          ${hashClause}
+        GROUP BY semantic_hash
+       HAVING COUNT(DISTINCT kb_id) >= 2
+        ORDER BY semantic_hash
+        ${limitClause}`,
+    )
+    .all(...(params.afterHash ? [params.afterHash] : []), ...(params.limit > 0 ? [params.limit] : [])) as Array<{
+    hash: string | null;
+  }>;
+  const hashes = hashRows.map((row) => row.hash).filter((hash): hash is string => Boolean(hash));
+  if (hashes.length === 0) {
+    return { edges: [], lastHash: params.afterHash, done: true };
+  }
+  const placeholders = hashes.map(() => "?").join(", ");
   const rows = params.db
     .prepare(
       `SELECT semantic_hash AS hash, kb_id
          FROM chunk_governance
-        WHERE semantic_hash IS NOT NULL AND semantic_hash <> ''
+        WHERE semantic_hash IN (${placeholders})
         GROUP BY semantic_hash, kb_id`,
     )
-    .all() as SemanticHashRow[];
+    .all(...hashes) as SemanticHashRow[];
   const kbsByHash = new Map<string, string[]>();
   for (const row of rows) {
-    if (!row.hash || !kbIds.has(row.kb_id)) {
+    if (!row.hash || !params.kbIds.has(row.kb_id)) {
       continue;
     }
     const list = kbsByHash.get(row.hash) ?? [];
@@ -116,7 +188,6 @@ export function buildCrossKnowledgeBaseEdges(params: {
       kbsByHash.set(row.hash, list);
     }
   }
-
   const edges: RelationshipEdge[] = [];
   const seen = new Set<string>();
   for (const list of kbsByHash.values()) {
@@ -126,7 +197,11 @@ export function buildCrossKnowledgeBaseEdges(params: {
     for (let i = 0; i < list.length; i += 1) {
       for (let j = i + 1; j < list.length; j += 1) {
         if (edges.length >= MAX_CROSS_KB_EDGES) {
-          return edges;
+          return {
+            edges,
+            lastHash: hashes[hashes.length - 1] ?? params.afterHash,
+            done: true,
+          };
         }
         const [a, b] = [list[i], list[j]].toSorted();
         const key = `${a}::${b}`;
@@ -141,6 +216,50 @@ export function buildCrossKnowledgeBaseEdges(params: {
           score: 70,
         });
       }
+    }
+  }
+  return {
+    edges,
+    lastHash: hashes[hashes.length - 1] ?? params.afterHash,
+    done: params.limit <= 0 || hashes.length < params.limit,
+  };
+}
+
+export async function buildCrossKnowledgeBaseEdgesAsync(params: {
+  db: DatabaseSync;
+  knowledgeBases: KnowledgeBase[];
+  yieldFn?: EventLoopYielder;
+}): Promise<RelationshipEdge[]> {
+  const kbIds = new Set(params.knowledgeBases.map((base) => base.id));
+  if (kbIds.size < 2) {
+    return [];
+  }
+  const edges: RelationshipEdge[] = [];
+  const seen = new Set<string>();
+  let afterHash = "";
+  let done = false;
+  while (!done && edges.length < MAX_CROSS_KB_EDGES) {
+    const page = collectCrossKnowledgeBaseEdges({
+      db: params.db,
+      kbIds,
+      afterHash,
+      limit: CROSS_KB_HASH_PAGE,
+    });
+    for (const edge of page.edges) {
+      const key = `${[edge.sourceId, edge.targetId].toSorted().join("::")}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      edges.push(edge);
+      if (edges.length >= MAX_CROSS_KB_EDGES) {
+        return edges;
+      }
+    }
+    afterHash = page.lastHash;
+    done = page.done;
+    if (params.yieldFn) {
+      await params.yieldFn();
     }
   }
   return edges;

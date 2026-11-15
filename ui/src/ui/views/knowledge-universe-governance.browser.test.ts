@@ -547,9 +547,15 @@ describe("knowledge universe governance browser", () => {
       container,
     );
 
-    expect(container.querySelector('[data-testid="ku-governance-task-graph"]')).not.toBeNull();
+    const taskGraph = container.querySelector('[data-testid="ku-governance-task-graph"]');
+    expect(taskGraph).not.toBeNull();
     expect(container.textContent).toContain("问题子图");
-    expect(container.textContent).toContain("片段 A");
+    const canvas = taskGraph!.querySelector(".knowledge-universe__graph-canvas");
+    expect(canvas).not.toBeNull();
+    expect(canvas!.querySelector('[data-node-id="chunk:a"]')).not.toBeNull();
+    expect(canvas!.querySelector('[data-node-id="chunk:b"]')).not.toBeNull();
+    // Node names stay hidden until hover; the subgraph still paints the issue nodes.
+    expect(canvas!.querySelectorAll(".knowledge-universe__graph-node-label")).toHaveLength(0);
   });
 
   it("renders health tiles and LLM empty state when summary is null", () => {

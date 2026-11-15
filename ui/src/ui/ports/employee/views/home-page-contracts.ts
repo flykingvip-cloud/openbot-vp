@@ -144,6 +144,10 @@ export type KnowledgeHomeFocus = {
 
 export type WorkbenchKnowledgeSurface = {
   loading: boolean;
+  /** Relation graph request still in flight. Optional so older fixtures stay valid. */
+  graphLoading?: boolean;
+  /** Recommendations / actions / discovery still in flight. Optional so older fixtures stay valid. */
+  insightsLoading?: boolean;
   error: string | null;
   query: string;
   searchScope: KnowledgeUniverseSearchScope;
