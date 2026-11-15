@@ -1641,36 +1641,41 @@ export class OpenBotObservationWorkbench extends LitElement {
       </div>
     </article>`;
   }
+  private renderComparisonField(
+    side: "baseline" | "candidate",
+    sideLabel: "基准" | "候选",
+    key: "agentId" | "taskId" | "version" | "from" | "to",
+    label: string,
+  ) {
+    return html`<label class=${key === "from" || key === "to" ? "obs-compare-date" : "obs-compare-id"}>${label}<input aria-label=${sideLabel + " " + label} .value=${this.comparisonDraft[side][key]} placeholder=${key === "from" || key === "to" ? "2026-11-01T00:00:00Z" : ""} @input=${(
+      event: Event,
+    ) => {
+      this.comparisonDraft = {
+        ...this.comparisonDraft,
+        [side]: {
+          ...this.comparisonDraft[side],
+          [key]: (event.target as HTMLInputElement).value,
+        },
+      };
+      this.comparisonInputNote = "输入已变更，需重新读取";
+      this.onComparisonRefs?.(null);
+    }}></label>`;
+  }
   private renderComparisonInput() {
-    return html`<section aria-label="显式对照查询"><p>只读查询：请显式填写两个任务版本和 UTC 窗口，不自动选择任务。</p>
-    ${(["baseline", "candidate"] as const).map(
-      (side) =>
-        html`<fieldset><legend>${side}</legend>${(
-          [
-            ["agentId", "数字人"],
-            ["taskId", "任务"],
-            ["version", "结果版本"],
-            ["from", "开始UTC"],
-            ["to", "结束UTC"],
-          ] as const
-        ).map(
-          ([key, label]) =>
-            html`<label>${label}<input aria-label=${side + " " + label} .value=${this.comparisonDraft[side][key]} placeholder=${key === "from" || key === "to" ? "2026-11-01T00:00:00Z" : ""} @input=${(
-              event: Event,
-            ) => {
-              this.comparisonDraft = {
-                ...this.comparisonDraft,
-                [side]: {
-                  ...this.comparisonDraft[side],
-                  [key]: (event.target as HTMLInputElement).value,
-                },
-              };
-              this.comparisonInputNote = "输入已变更，需重新读取";
-              this.onComparisonRefs?.(null);
-            }}></label>`,
-        )}</fieldset>`,
+    return html`<section class="obs-compare" aria-label="显式对照查询">${(
+      [
+        ["baseline", "基准"],
+        ["candidate", "候选"],
+      ] as const
+    ).map(
+      ([side, sideLabel]) =>
+        html`<fieldset class="obs-compare-card">
+          <legend>${sideLabel}</legend>
+          <div class="obs-compare-row obs-compare-row--identity">${this.renderComparisonField(side, sideLabel, "agentId", "数字人")}${this.renderComparisonField(side, sideLabel, "taskId", "任务")}${this.renderComparisonField(side, sideLabel, "version", "结果版本")}</div>
+          <div class="obs-compare-row obs-compare-row--window">${this.renderComparisonField(side, sideLabel, "from", "开始时间")}${this.renderComparisonField(side, sideLabel, "to", "结束时间")}</div>
+        </fieldset>`,
     )}
-    <button type="button" @click=${() => {
+    <div class="obs-compare-submit"><button type="button" @click=${() => {
       const parse = (side: "baseline" | "candidate") => {
         const d = this.comparisonDraft[side];
         const version = Number(d.version);
@@ -1705,7 +1710,7 @@ export class OpenBotObservationWorkbench extends LitElement {
       }
       this.comparisonInputNote = "已提交只读对照查询";
       this.onComparisonRefs?.({ baseline, candidate });
-    }}>读取对照</button><p>${this.comparisonInputNote}</p></section>`;
+    }}>读取对照</button></div>${this.comparisonInputNote ? html`<p class="obs-compare-note">${this.comparisonInputNote}</p>` : nothing}</section>`;
   }
   private renderUnavailableAnalysis() {
     const labels = {
@@ -1749,12 +1754,11 @@ export class OpenBotObservationWorkbench extends LitElement {
                 `
           }${this.actionIntents?.reasons.join(", ")}${this.actionIntents?.mode === "detail" ? renderActionIntent(this.actionIntents.detail, Date.now()) : nothing}</section>`;
     return html`<section class="obs-panel obs-process">
-      <p class="obs-gov-banner">改善记录与显式任务版本对照独立于连接工作台筛选，不随观测对象、会话、运行类型或数据源切换。improvementEligible 保持为 false；不合格回执不会投影为已验证。</p>
       <div class="obs-gov">
         <div class="obs-gov-col">
-          <div class="obs-gov-head"><h3>改善记录（ActionIntent）</h3><p>每条记录分开呈现受理、执行、生效与验证；不用 executed 替代执行中或已生效。</p></div>
+          <div class="obs-gov-head"><h3>改善记录</h3></div>
           ${intents}
-          <h3>从发现到验证，每一步都有回执</h3><p>这里是建议，不是已执行或已生效的配置。</p>
+          <h3>从发现到验证，每一步都有回执</h3>
           <ol>${[
             "任务证据",
             "诊断发现",
@@ -1763,20 +1767,12 @@ export class OpenBotObservationWorkbench extends LitElement {
             "同口径验证",
             "晋升 / 回滚",
           ].map(
-            (row, index) =>
-              html`<li><span>${index + 1}</span><strong>${row}</strong>${
-                index === 0
-                  ? html`<small>${view.source === "sample" ? "样例证据" : "仅元数据"}</small>`
-                  : html`
-                      <small>原控制面</small>
-                    `
-              }</li>`,
+            (row, index) => html`<li><span>${index + 1}</span><strong>${row}</strong></li>`,
           )}</ol>
           <div class="obs-actions"><a href=${pathForTab(this.role === "platform" ? "platformModels" : "enterpriseCapabilityCenter", this.basePath, { tenantId: this.tenantId })}>${this.role === "platform" ? "配置模型" : "进入能力中心"} →</a><a href=${pathForTab(this.role === "platform" ? "platformAdvanced" : "enterpriseMesh", this.basePath, { tenantId: this.tenantId })}>进入治理控制面 →</a></div>
-          <p class="obs-note">观测不会创建建议、授权请求或新任务；accepted、executed、effective、verified 不混称。</p>
         </div>
         <div class="obs-gov-col">
-          <div class="obs-gov-head"><h3>显式任务版本对照（独立查询）</h3><p>只读查询，不随连接工作台筛选切换。请显式填写两个任务版本和时间窗口。</p></div>
+          <div class="obs-gov-head"><h3>显式任务版本对照</h3></div>
           ${
             view.source === "sample"
               ? html`

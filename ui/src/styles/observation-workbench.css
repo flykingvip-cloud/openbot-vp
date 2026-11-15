@@ -1449,15 +1449,6 @@ select {
   margin-top: 4px;
   font-size: 13px;
 }
-.obs-gov-banner {
-  margin: 0 0 14px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #f6f7f9;
-  color: #334155;
-  font-size: 12px;
-  line-height: 1.55;
-}
 .obs-list-scope-bar {
   display: flex;
   align-items: center;
@@ -1606,18 +1597,82 @@ select {
 }
 .obs-gov {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 1fr);
+  gap: 16px;
   align-items: start;
 }
+.obs-gov-col {
+  min-width: 0;
+}
 .obs-gov-head h3 {
-  margin: 0 0 4px;
+  margin: 0 0 12px;
   font-size: 15px;
 }
-.obs-gov-head p {
-  margin: 0 0 12px;
+.obs-compare {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.obs-compare-card {
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--obs-line);
+  border-radius: 8px;
+  background: #fbfcfe;
+  min-width: 0;
+}
+.obs-compare-card legend {
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #172033);
+}
+.obs-compare-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 10px;
+  min-width: 0;
+}
+.obs-compare-row + .obs-compare-row {
+  margin-top: 8px;
+}
+.obs-compare-row--identity > label {
+  flex: 1 1 96px;
+  min-width: 0;
+}
+.obs-compare-row--window > label {
+  flex: 1 1 284px;
+  min-width: min(100%, 284px);
+}
+.obs-compare label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--obs-muted);
+  min-width: 0;
+}
+.obs-compare input {
+  font: inherit;
+  color: inherit;
+  background: var(--obs-bg);
+  border: 1px solid var(--obs-line);
+  border-radius: 5px;
+  padding: 7px 9px;
+  min-height: 34px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.obs-compare-submit {
+  display: flex;
+}
+.obs-compare-note {
+  margin: 0;
   color: var(--obs-muted);
   font-size: 12px;
+  line-height: 1.55;
 }
 @media (max-width: 1100px) {
   .obs-metrics-compact,

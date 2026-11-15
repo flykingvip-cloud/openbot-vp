@@ -600,7 +600,7 @@ describe("explicit comparison user entry host", () => {
     await waitFor(() => expect(workbench.querySelector('[aria-label="分析维度"]')).not.toBeNull());
     workbench.querySelectorAll<HTMLButtonElement>('[aria-label="分析维度"] button')[3].click();
     await waitFor(() =>
-      expect(workbench.querySelector('[aria-label="baseline 数字人"]')).not.toBeNull(),
+      expect(workbench.querySelector('[aria-label="基准 数字人"]')).not.toBeNull(),
     );
     const set = async (label: string, value: string) => {
       const input = workbench.querySelector<HTMLInputElement>('[aria-label="' + label + '"]')!;
@@ -608,16 +608,19 @@ describe("explicit comparison user entry host", () => {
       input.dispatchEvent(new Event("input"));
       await new Promise((resolve) => setTimeout(resolve, 0));
     };
-    for (const side of ["baseline", "candidate"]) {
-      await set(side + " 数字人", "explicit-agent");
-      await set(side + " 任务", side + "-task");
-      await set(side + " 结果版本", "1");
+    for (const [side, sideLabel] of [
+      ["baseline", "基准"],
+      ["candidate", "候选"],
+    ] as const) {
+      await set(sideLabel + " 数字人", "explicit-agent");
+      await set(sideLabel + " 任务", side + "-task");
+      await set(sideLabel + " 结果版本", "1");
       await set(
-        side + " 开始UTC",
+        sideLabel + " 开始时间",
         side === "baseline" ? "2026-11-01T00:00:00Z" : "2026-11-02T00:00:00Z",
       );
       await set(
-        side + " 结束UTC",
+        sideLabel + " 结束时间",
         side === "baseline" ? "2026-11-02T00:00:00Z" : "2026-11-03T00:00:00Z",
       );
     }
@@ -648,7 +651,7 @@ describe("explicit comparison user entry host", () => {
         },
       },
     });
-    await set("baseline 任务", "");
+    await set("基准 任务", "");
     expect(panel.comparisonRefs).toBeNull();
     panel.remove();
   });

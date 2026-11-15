@@ -576,15 +576,44 @@ describe("governance readonly intent integration", () => {
     tabs[2].click();
     await panel.updateComplete;
     expect(panel.textContent).toContain("记录状态：effective");
-    expect(panel.textContent).toContain("改善记录与显式任务版本对照独立于连接工作台筛选");
-    expect(panel.textContent).toContain("improvementEligible 保持为 false");
-    expect(panel.querySelector('[aria-label="显式对照查询"]')).not.toBeNull();
+    expect(panel.querySelector(".obs-gov-banner")).toBeNull();
+    expect(
+      [...panel.querySelectorAll("h3")].map((node) => node.textContent?.trim()),
+    ).toEqual(expect.arrayContaining(["改善记录", "从发现到验证，每一步都有回执", "显式任务版本对照"]));
+    expect(panel.textContent).not.toContain("ActionIntent");
+    expect(panel.textContent).not.toContain("改善记录与显式任务版本对照独立于连接工作台筛选");
+    expect(panel.textContent).not.toContain("improvementEligible 保持为 false");
+    expect(panel.textContent).not.toContain("每条记录分开呈现受理、执行、生效与验证");
+    expect(panel.textContent).not.toContain("这里是建议，不是已执行或已生效的配置");
+    expect(panel.textContent).not.toContain("观测不会创建建议、授权请求或新任务");
+    expect(panel.textContent).not.toContain("只读查询，不随连接工作台筛选切换");
+    expect(panel.textContent).not.toContain("只读查询：请显式填写两个任务版本和 UTC 窗口");
+    expect(panel.textContent).not.toContain("原控制面");
+    expect(panel.textContent).not.toContain("仅元数据");
+    expect(panel.textContent).not.toContain("样例证据");
+    expect(panel.textContent).toContain("进入能力中心");
+    expect(panel.textContent).toContain("进入治理控制面");
+    const compare = panel.querySelector('[aria-label="显式对照查询"]')!;
+    expect(compare).not.toBeNull();
+    expect([...compare.querySelectorAll("legend")].map((node) => node.textContent?.trim())).toEqual([
+      "基准",
+      "候选",
+    ]);
+    expect(compare.querySelector('[aria-label="基准 开始时间"]')).not.toBeNull();
+    expect(compare.querySelector('[aria-label="候选 结束时间"]')).not.toBeNull();
+    expect(compare.textContent).not.toContain("开始UTC");
+    expect(compare.textContent).not.toContain("结束UTC");
     panel.querySelector<HTMLButtonElement>('[data-intent-id="intent-test"]')!.click();
     expect(selected).toEqual(["intent-test"]);
     panel.source = "sample";
     await panel.updateComplete;
     expect(panel.querySelector('[data-intent-id="intent-test"]')).toBeNull();
     expect(panel.textContent).toContain("样例模式不展示真实改善记录");
+    expect(panel.textContent).toContain("样例模式不读取真实对照");
+    expect(panel.querySelector('[aria-label="显式对照查询"]')).toBeNull();
+    expect(panel.textContent).not.toContain("原控制面");
+    expect(panel.textContent).not.toContain("仅元数据");
+    expect(panel.textContent).not.toContain("样例证据");
     panel.source = "live";
     panel.actionIntents = null;
     await panel.updateComplete;
@@ -631,25 +660,29 @@ describe("explicit comparison input", () => {
       input.dispatchEvent(new Event("input"));
       await panel.updateComplete;
     };
-    for (const side of ["baseline", "candidate"]) {
-      await set(side + " 数字人", "main");
-      await set(side + " 任务", side + "-task");
-      await set(side + " 结果版本", "1");
+    for (const [side, sideLabel] of [
+      ["baseline", "基准"],
+      ["candidate", "候选"],
+    ] as const) {
+      await set(sideLabel + " 数字人", "main");
+      await set(sideLabel + " 任务", side + "-task");
+      await set(sideLabel + " 结果版本", "1");
       await set(
-        side + " 开始UTC",
+        sideLabel + " 开始时间",
         side === "baseline" ? "2026-11-01T00:00:00Z" : "2026-11-02T00:00:00Z",
       );
       await set(
-        side + " 结束UTC",
+        sideLabel + " 结束时间",
         side === "baseline" ? "2026-11-02T00:00:00Z" : "2026-11-03T00:00:00Z",
       );
     }
     expect(selections.filter(Boolean)).toHaveLength(0);
-    await set("candidate 结果版本", "9007199254740993");
+    await set("候选 结果版本", "9007199254740993");
     submit();
     await panel.updateComplete;
     expect(selections.filter(Boolean)).toHaveLength(0);
-    await set("candidate 结果版本", "2");
+    expect(panel.textContent).toContain("需要完整合法的同一数字人任务版本与UTC窗口");
+    await set("候选 结果版本", "2");
     submit();
     await panel.updateComplete;
     expect(selections.filter(Boolean)).toHaveLength(1);
@@ -657,7 +690,8 @@ describe("explicit comparison input", () => {
       baseline: { refs: [{ taskId: "baseline-task", agentId: "main", outcomeVersion: 1 }] },
       candidate: { refs: [{ taskId: "candidate-task", agentId: "main", outcomeVersion: 2 }] },
     });
-    await set("baseline 任务", "");
+    expect(panel.textContent).toContain("已提交只读对照查询");
+    await set("基准 任务", "");
     expect(selections.at(-1)).toBeNull();
     container.remove();
   });
