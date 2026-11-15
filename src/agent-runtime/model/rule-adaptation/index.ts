@@ -41,3 +41,13 @@ export {
   type PersonalContextCapSelectionPort,
   type PersonalContextCapFixtureResolvePort,
 } from "./context-cap-selection.js";
+export {
+  createLegacyContextWindowDecisionProvider,
+  consumeContextWindowDecision,
+  type ContextWindowDecisionSwitch,
+  type ConfirmedContextWindowDecision,
+  selectComplexRuleProvider,
+  type ComplexRuleDecision,
+  type ComplexRuleDecisionMode,
+  type ComplexRuleDecisionProvider,
+} from "./complex-rule-decision.js";

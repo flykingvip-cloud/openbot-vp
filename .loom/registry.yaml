@@ -14533,6 +14533,12 @@ tasks:
         No merge or deploy until authorized. Does not include A/B fidelity files
         or #281 content."
     paths:
+      - src/agent-runtime/command/rule-adaptation/index.ts
+      - src/agent-runtime/model/prepare-embedded-model.ts
+      - src/agent-runtime/command/rule-adaptation/context-window-decision.test.ts
+      - src/agent-runtime/command/rule-adaptation/context-window-decision.ts
+      - src/agent-runtime/model/rule-adaptation/complex-rule-decision.test.ts
+      - src/agent-runtime/model/rule-adaptation/complex-rule-decision.ts
       - src/agent-runtime/command/governed-interaction.ts
       - src/agent-runtime/command/governed-interaction.test.ts
       - src/agent-runtime/wiring/reply-turn.ts
@@ -14579,6 +14585,12 @@ landingStreams:
   - id: rule-adaptation-shadow-host-min
     landingPolicy: serial
     paths:
+      - src/agent-runtime/command/rule-adaptation/index.ts
+      - src/agent-runtime/model/prepare-embedded-model.ts
+      - src/agent-runtime/command/rule-adaptation/context-window-decision.test.ts
+      - src/agent-runtime/command/rule-adaptation/context-window-decision.ts
+      - src/agent-runtime/model/rule-adaptation/complex-rule-decision.test.ts
+      - src/agent-runtime/model/rule-adaptation/complex-rule-decision.ts
       - .loom/registry.yaml
       - src/agent-runtime/command/index.ts
       - src/agent-runtime/wiring/reply-turn.ts
