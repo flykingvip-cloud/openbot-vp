@@ -18,6 +18,10 @@ import {
   incrementRunCompactionCount,
   persistRunSessionUsage,
 } from "../../agent-runtime/state/index.js";
+import {
+  recordBlockedFollowupDelivery,
+  resolveBlockedFollowupDeliveryPersistRoot,
+} from "../../agent-runtime/state/repository/blocked-followup-delivery.js";
 import { bindAdmittedTurnHost } from "../../agent-runtime/wiring/admitted-turn-host.js";
 import { confirmPendingTurnDelivery } from "../../agent-runtime/wiring/delivery-confirm.js";
 import { replyTurnRuntime } from "../../agent-runtime/wiring/reply-turn.js";
@@ -184,7 +188,7 @@ export function createFollowupRunner(params: {
   };
 
   return async (queued: FollowupRun) => {
-    const confirmDeliveryOnlyFailure = async (error: string) => {
+    const confirmDeliveryOnlyFailure = async (error: string): Promise<boolean> => {
       const lookupRunId =
         queued.asyncWaitRecoveryBind?.boundRunId?.trim() ||
         queued.run.taskCompletionBinding?.executionAttempt?.trim() ||
@@ -203,18 +207,46 @@ export function createFollowupRunner(params: {
         pending?.deliveryId ||
         (deliveryRunId ? `delivery:${deliveryRunId}:visible` : "");
       const taskId = pending?.taskId;
-      if (!deliveryRunId && !deliveryId) {
-        return;
+      const hasIdentity = Boolean(deliveryRunId || deliveryId);
+      if (hasIdentity) {
+        try {
+          await confirmPendingTurnDelivery({
+            cfg: queued.run.config,
+            ...(deliveryRunId ? { runId: deliveryRunId } : {}),
+            ...(deliveryId ? { deliveryId } : {}),
+            ...(taskId ? { taskId } : {}),
+            sessionKey: queued.run.sessionKey ?? sessionKey,
+            status: "failed",
+            error,
+          });
+          return true;
+        } catch (confirmErr) {
+          logVerbose(`async-wait delivery-only failure confirm failed: ${String(confirmErr)}`);
+        }
       }
-      await confirmPendingTurnDelivery({
-        cfg: queued.run.config,
-        ...(deliveryRunId ? { runId: deliveryRunId } : {}),
-        ...(deliveryId ? { deliveryId } : {}),
-        ...(taskId ? { taskId } : {}),
-        sessionKey: queued.run.sessionKey ?? sessionKey,
-        status: "failed",
-        error,
-      });
+      try {
+        await recordBlockedFollowupDelivery({
+          persistRoot: resolveBlockedFollowupDeliveryPersistRoot(queued.run.sessionFile),
+          reason: hasIdentity ? "failure_receipt_write_failed" : "missing_delivery_identity",
+          error,
+          sessionKey: queued.run.sessionKey ?? sessionKey,
+          sessionFile: queued.run.sessionFile,
+          ...(queued.asyncWaitRecoveryBind?.jobId
+            ? { jobId: queued.asyncWaitRecoveryBind.jobId }
+            : {}),
+          ...(deliveryRunId ? { runId: deliveryRunId } : {}),
+          ...(deliveryId ? { deliveryId } : {}),
+          ...(taskId ? { taskId } : {}),
+          workspaceBinding: {
+            ...queued.run.executionWorkspaceBinding,
+            workspaceDir: queued.run.workspaceDir,
+          },
+        });
+        return true;
+      } catch (recordErr) {
+        logVerbose(`async-wait delivery-only blocked record failed: ${String(recordErr)}`);
+        return false;
+      }
     };
 
     // Delivery-only retries resend original payloads and do not mutate the workspace,
@@ -234,16 +266,21 @@ export function createFollowupRunner(params: {
       const message = err instanceof Error ? err.message : String(err);
       if (queued.asyncWaitDeliveryOnly) {
         logVerbose(`async-wait delivery-only workspace revalidation failed: ${message}`);
+        let recorded = false;
         try {
-          await confirmDeliveryOnlyFailure(message);
+          recorded = await confirmDeliveryOnlyFailure(message);
         } catch (confirmErr) {
           logVerbose(`async-wait delivery-only failure confirm failed: ${String(confirmErr)}`);
         } finally {
           typing.markRunComplete();
           typing.markDispatchIdle();
         }
-        // Do not throw: drain can shift the item. A throw would reschedule
-        // the same retry, including against a new binding at the same path.
+        // Drop the queue item only after a failed receipt or durable blocked
+        // record is saved. Never send against a new binding. If even the
+        // durable fallback cannot be saved, rethrow so drain keeps the item.
+        if (!recorded) {
+          throw err;
+        }
         return;
       }
       throw err;

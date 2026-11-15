@@ -14587,6 +14587,7 @@ tasks:
       - src/agent-runtime/state/repository/async-wait-job-store.ts
       - src/agent-runtime/state/repository/async-wait-recovery-turn.ts
       - src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
+      - src/agent-runtime/state/repository/blocked-followup-delivery.ts
       - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
     state: active
     sessions:
@@ -14622,6 +14623,7 @@ landingStreams:
       - src/agent-runtime/state/repository/async-wait-job-store.ts
       - src/agent-runtime/state/repository/async-wait-recovery-turn.ts
       - src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
+      - src/agent-runtime/state/repository/blocked-followup-delivery.ts
       - src/gateway/workspace-resolver/execution-workspace-entrypoints.test.ts
     canLandWith: []
     metadata:
@@ -29870,6 +29872,10 @@ sharedPaths:
   - glob: src/agent-runtime/state/repository/async-wait-recovery-enqueue.ts
     landerTask: canonical-execution-workspace-20261114
     reason: Followup binding identity snapshot and delivery-only revalidation for the canonical workspace contract.
+    reviewAfter: 2026-11-30
+  - glob: src/agent-runtime/state/repository/blocked-followup-delivery.ts
+    landerTask: canonical-execution-workspace-20261114
+    reason: Durable blocked followup delivery record when a failure receipt cannot be saved.
     reviewAfter: 2026-11-30
   - glob: src/exec-protocol/**
     landerTask: exec-protocol-v1-min-loop
