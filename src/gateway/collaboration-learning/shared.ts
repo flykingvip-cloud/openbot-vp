@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import type {
   BotParticipationProfile,
   CapsuleConfidentialityScope,
@@ -1029,6 +1030,21 @@ export function resolveGroupOperatingStateAuthLockDir(params: {
   });
 }
 
+/** Persisted JSON facts; observation timestamps do not create revisions. */
+function sameOperatingFacts(
+  left: GatewayCollaborationGroupOperatingState,
+  right: GatewayCollaborationGroupOperatingState,
+): boolean {
+  const facts = (state: GatewayCollaborationGroupOperatingState) => ({
+    ...state,
+    updatedAtMs: undefined,
+  });
+  return isDeepStrictEqual(
+    JSON.parse(JSON.stringify(facts(left))),
+    JSON.parse(JSON.stringify(facts(right))),
+  );
+}
+
 /**
  * T52/T53: all OS writers converge here. Under group auth lock: re-read live, apply
  * auth merge policy, then persist. Auth-intent writers pass writeKind:"auth".
@@ -1065,6 +1081,9 @@ export async function writeGroupOperatingState(params: {
       incoming: params.state as GatewayCollaborationGroupOperatingState & { authEpoch?: number },
       writeKind,
     });
+    if (live && sameOperatingFacts(live, merged)) {
+      return live as GatewayCollaborationGroupOperatingState & { authEpoch: number };
+    }
     await persistGroupOperatingStateUnlocked({
       fileStore: params.fileStore,
       groupId: params.groupId,
@@ -1205,6 +1224,13 @@ export async function commitSyncedGroupOperatingState(params: {
               projected.governance.finalDecisionPolicy,
           },
         };
+      }
+      // Observing/reprojecting the same facts is not a business revision.
+      // Keep the existing version so an in-flight interpretation is not made
+      // stale by its own snapshot refresh. Real auth/policy/task changes below
+      // still persist under the same lock and advance the observable version.
+      if (live && sameOperatingFacts(live, desired)) {
+        return live as GatewayCollaborationGroupOperatingState & { authEpoch: number };
       }
       const desiredSurface = readOperatingStateAuthSurface(desired);
       const liveSurface = readOperatingStateAuthSurface(live);
@@ -1363,7 +1389,9 @@ export async function syncGroupOperatingState(params: {
       expectedOutputs: ["task", "review", "decision", "deliverable", "capsule"],
       // New-group seed prefers task_driven; existing profiles keep their mode.
       collaborationMode:
-        normalizeValue(profile?.collaborationMode) ?? (existingState ? null : "task_driven"),
+        normalizeValue(profile?.collaborationMode) ??
+        existingState?.groupProfile.collaborationMode ??
+        (existingState ? null : "task_driven"),
       successCriteria: normalizeStringList(profile?.successCriteria),
     },
     governance: {
@@ -1404,7 +1432,7 @@ export async function syncGroupOperatingState(params: {
         deliverableId: deliverableBinding.currentDeliverableId,
         noFormalDeliverableForCurrentTask: deliverableBinding.noFormalDeliverable,
       }),
-      updatedAtMs: activeContextUpdatedAt || Date.now(),
+      updatedAtMs: activeContextUpdatedAt || existingState?.activeContext.updatedAtMs || Date.now(),
     },
     onboardingStatus: {
       initialized: Boolean(bootstrapMemory || charterCapsule),
