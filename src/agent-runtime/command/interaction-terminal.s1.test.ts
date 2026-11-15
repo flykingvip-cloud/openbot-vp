@@ -442,7 +442,17 @@ it("S1-A / checkpoint A: B's visible receipt is observed through the persist con
 
 it("checkpoint A: a late model proposal after timeout is not admitted and does not start business", async () => {
   const admissionAuthorize = vi.fn(async () => true);
-  const admissionCommit = vi.fn(() => ({ kind: "accepted_turn" as const }));
+  const admissionCommit = vi.fn(() => ({
+    kind: "accepted_turn" as const,
+    admission: {
+      requestId: "message",
+      sessionFile: "session",
+      goal: "开始任务",
+      acceptance: [],
+      focusRevision: 0,
+      writeEpoch: 0,
+    },
+  }));
   const controller = new AbortController();
   let releaseModel!: (decision: {
     kind: "execution_request";
